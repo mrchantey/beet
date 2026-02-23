@@ -4,6 +4,7 @@
 #![feature(associated_type_defaults, closure_track_caller)]
 #![doc = include_str!("../README.md")]
 mod document;
+mod input;
 mod integrations;
 pub mod nodes;
 mod parsers;
@@ -15,6 +16,7 @@ mod utils;
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
 	pub use crate::document::*;
+	pub use crate::input::*;
 	pub use crate::integrations::*;
 	pub use crate::nodes;
 	pub use crate::nodes::*;

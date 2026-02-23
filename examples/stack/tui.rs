@@ -35,9 +35,5 @@ fn main() -> AppExit {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((tui_server(), petes_beets::stack()));
 		})
-		.add_observer(on_click)
 		.run()
-}
-fn on_click(ev: On<TuiMouseDown>) {
-	println!("Clicked on entity: {:?}", ev.target);
 }

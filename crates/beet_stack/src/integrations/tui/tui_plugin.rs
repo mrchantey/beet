@@ -6,6 +6,7 @@ use beet_core::prelude::*;
 use bevy_ratatui::RatatuiPlugins;
 
 
+
 /// Top level Bevy plugin that sets up [`bevy_ratatui`], inserts TUI resources,
 /// and registers the input/draw systems.
 ///
@@ -30,7 +31,7 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<StackPlugin>()
-		.init_resource::<TuiHoverState>()
+		.init_resource::<HoverState>()
 		.add_systems(PreUpdate, mouse_input_system)
 		.add_systems(
 			PostUpdate,

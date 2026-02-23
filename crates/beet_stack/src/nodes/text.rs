@@ -56,6 +56,7 @@
 //! node type, including inline nodes, and handles structural
 //! boundaries automatically.
 use super::node::Node;
+use crate::input::MouseUp;
 use crate::nodes::DisplayBlock;
 use crate::nodes::DisplayInline;
 use beet_core::prelude::*;
@@ -379,6 +380,7 @@ pub struct Quote;
 /// The link text can be either a [`TextNode`] on the same entity or
 /// in child entities (the container pattern used by the markdown parser).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[component(on_add = on_add_link)]
 #[reflect(Component)]
 #[require(Node = Node::Link, DisplayInline)]
 pub struct Link {
@@ -402,4 +404,12 @@ impl Link {
 		self.title = Some(title.into());
 		self
 	}
+}
+
+fn on_add_link(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).observe(on_click_link);
+}
+
+fn on_click_link(_ev: On<MouseUp>) {
+	cross_log!("do something cool here");
 }

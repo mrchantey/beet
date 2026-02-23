@@ -164,9 +164,9 @@ impl<'buf> TuiRenderer<'buf> {
 	/// ensure orphaned text nodes (those not wrapped in a block-level
 	/// element like [`Paragraph`]) are rendered. Without this call,
 	/// bare [`TextNode`] content silently produces blank output.
-	pub fn finish(&mut self) -> TuiSpanMap {
+	pub fn finish(mut self) -> TuiSpanMap {
 		self.flush_spans();
-		std::mem::take(&mut self.span_map)
+		self.span_map
 	}
 
 	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
@@ -1051,7 +1051,7 @@ mod test {
 		let (_buf, span_map) = render_with_span_map(&mut world, entity, 40, 10);
 		span_map.is_empty().xpect_false();
 		// Row 0 should map to the text node entity
-		span_map.get(0, 0).xpect_some();
+		span_map.get(TuiPos::new(0, 0)).xpect_some();
 	}
 
 	#[test]
@@ -1066,7 +1066,7 @@ mod test {
 		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
 		// Per-span mapping: cells map to the text node, not the paragraph
-		span_map.get(0, 0).xpect_eq(Some(text_entity));
+		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(text_entity));
 	}
 
 	#[test]
@@ -1087,7 +1087,7 @@ mod test {
 		let mut heading_row = None;
 		let mut para_row = None;
 		for row in 0..10 {
-			match span_map.get(0, row) {
+			match span_map.get(TuiPos::new(row, 0)) {
 				Some(entity) if entity == heading_text => {
 					if heading_row.is_none() {
 						heading_row = Some(row);
@@ -1122,9 +1122,9 @@ mod test {
 		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
 		// "[" maps to the button entity
-		span_map.get(0, 0).xpect_eq(Some(button));
+		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(button));
 		// "C" of "Click me" maps to the text node entity
-		span_map.get(1, 0).xpect_eq(Some(btn_text));
+		span_map.get(TuiPos::new(0, 1)).xpect_eq(Some(btn_text));
 	}
 
 	#[test]
@@ -1144,13 +1144,13 @@ mod test {
 		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
 		// "this is some " is 13 chars (cols 0..12)
-		span_map.get(0, 0).xpect_eq(Some(plain_text));
-		span_map.get(12, 0).xpect_eq(Some(plain_text));
+		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(plain_text));
+		span_map.get(TuiPos::new(0, 12)).xpect_eq(Some(plain_text));
 		// "Bold Text" starts at col 13
-		span_map.get(13, 0).xpect_eq(Some(bold_text));
-		span_map.get(21, 0).xpect_eq(Some(bold_text));
+		span_map.get(TuiPos::new(0, 13)).xpect_eq(Some(bold_text));
+		span_map.get(TuiPos::new(0, 21)).xpect_eq(Some(bold_text));
 		// Col 22 is past all content, should be None
-		span_map.get(22, 0).xpect_eq(None);
+		span_map.get(TuiPos::new(0, 22)).xpect_eq(None);
 	}
 
 	#[test]

@@ -20,7 +20,7 @@ impl TuiPos {
 ///
 /// Cleared and rebuilt each frame by the draw system. The input
 /// system reads it to resolve mouse positions into entity targets
-/// for [`TuiMouseDown`](super::TuiMouseDown) and related events.
+/// for [`MouseDown`](crate::input::MouseDown) and related events.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct TuiSpanMap {
 	entries: HashMap<TuiPos, Entity>,
@@ -40,8 +40,8 @@ impl TuiSpanMap {
 	}
 
 	/// Look up the entity that owns the cell at the given position.
-	pub fn get(&self, col: u16, row: u16) -> Option<Entity> {
-		self.entries.get(&TuiPos::new(row, col)).copied()
+	pub fn get(&self, pos: TuiPos) -> Option<Entity> {
+		self.entries.get(&pos).copied()
 	}
 
 	/// The number of mapped cells, useful for testing.
@@ -69,12 +69,12 @@ mod test {
 		map.len().xpect_eq(8);
 		for row in 3..5 {
 			for col in 2..6 {
-				map.get(col, row).xpect_eq(Some(entity));
+				map.get(TuiPos::new(row, col)).xpect_eq(Some(entity));
 			}
 		}
 		// Outside the area should return None
-		map.get(0, 0).xpect_eq(None);
-		map.get(6, 3).xpect_eq(None);
+		map.get(TuiPos::new(0, 0)).xpect_eq(None);
+		map.get(TuiPos::new(3, 6)).xpect_eq(None);
 	}
 
 	#[test]
@@ -100,9 +100,9 @@ mod test {
 		// Overlapping area with a different entity
 		map.set_area(Rect::new(3, 0, 4, 1), second);
 
-		map.get(2, 0).xpect_eq(Some(first));
-		map.get(3, 0).xpect_eq(Some(second));
-		map.get(6, 0).xpect_eq(Some(second));
-		map.get(7, 0).xpect_eq(Some(first));
+		map.get(TuiPos::new(0, 2)).xpect_eq(Some(first));
+		map.get(TuiPos::new(0, 3)).xpect_eq(Some(second));
+		map.get(TuiPos::new(0, 6)).xpect_eq(Some(second));
+		map.get(TuiPos::new(0, 7)).xpect_eq(Some(first));
 	}
 }

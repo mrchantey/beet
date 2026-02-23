@@ -13,11 +13,23 @@ lets keep iterating on our beet_stack tui renderer
 - also create leave_entity and leave_unknown_entity
 ```
 
-I think you got a bit confused here, we're calling `visit/leave_unknown_entity` for known entities! this is only for the ones we dont know the type of. we call `visit/leave_entity` on **every** entity
-
-## tui_renderer.rs
-
-- `renderer.finish()` should take self, not &mut self.
+I think you got a bit confused here, we should call `visit/leave_entity` on **every** entity, and `visit/leave_unknown_entity` only for the ones we dont know the type of. we're currently calling visit/leave_unknown for known entities!
 
 
-## tui_span_map.rs
+## Input system
+
+Once thats done lets keep iterating on the generic input system. `tui_mouse_events` has been implemented incorrectly, this is supposed to be renderer agnostic, migrate these to `src/input/mouse_events.rs`.
+
+Then add an observer to the `text.rs::Link`, so when it receives a mouseup will log: 'do something cool here', ill implement that later.
+
+
+```
+#[component(on_add=on_add)]
+struct Link
+
+fn on_add(mut world,cx){
+	world.commands().entity(cx.entity).add_observer(on_click_link);
+}
+fn on_click_link(ev:On<MouseUp>)..
+
+```

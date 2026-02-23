@@ -139,9 +139,8 @@ impl CardWalker<'_, '_> {
 		root: Entity,
 	) {
 		let Ok(node) = self.nodes.get(entity) else {
-			// Entity has no Node component — call visit_entity,
-			// visit_unknown_entity, recurse, leave_unknown_entity,
-			// leave_entity.
+			// Entity has no Node component — call visit_unknown_entity,
+			// recurse, leave_unknown_entity.
 			cx.set_entity(entity);
 			visitor.visit_entity(cx);
 			let flow = visitor.visit_unknown_entity(cx);
@@ -183,12 +182,7 @@ impl CardWalker<'_, '_> {
 					visitor.leave_heading(cx, heading);
 					cx.clear_heading_level();
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -221,12 +215,7 @@ impl CardWalker<'_, '_> {
 					visitor.leave_code_block(cx, code_block);
 					cx.in_code_block = false;
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -244,12 +233,7 @@ impl CardWalker<'_, '_> {
 					visitor.leave_list(cx, list_marker);
 					cx.pop_list();
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -274,12 +258,7 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_table(cx, table);
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -324,12 +303,7 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_image(cx, image);
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -341,12 +315,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -366,26 +335,18 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_html_block(cx, html_block);
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
-			// Block-level nodes without dedicated visitor callbacks
+			// Block-level nodes without dedicated visitor callbacks.
+			// These have a known Node variant but no typed visitor,
+			// so just recurse children.
 			Node::DefinitionList
 			| Node::DefinitionTitle
 			| Node::DefinitionDetails
 			| Node::MetadataBlock => {
-				let flow = visitor.visit_unknown_entity(cx);
-				if flow.is_continue() {
-					self.recurse_children(visitor, cx, entity, root);
-				}
-				cx.set_entity(entity);
-				visitor.leave_unknown_entity(cx);
+				self.recurse_children(visitor, cx, entity, root);
 			}
 
 			// ---- Form ----
@@ -398,12 +359,7 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_button(cx, button);
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -414,12 +370,7 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
+					self.recurse_children(visitor, cx, entity, root);
 				}
 			}
 
@@ -427,14 +378,8 @@ impl CardWalker<'_, '_> {
 			Node::TextNode => {
 				if let Ok(text) = self.text_nodes.get(entity) {
 					let _flow = visitor.visit_text(cx, text);
-				} else {
-					let flow = visitor.visit_unknown_entity(cx);
-					if flow.is_continue() {
-						self.recurse_children(visitor, cx, entity, root);
-					}
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
 				}
+				// TextNode with missing data is a leaf, nothing to recurse
 			}
 
 			// ---- Inline containers ----
@@ -476,20 +421,14 @@ impl CardWalker<'_, '_> {
 			Node::FootnoteRef => {
 				if let Ok(footnote_ref) = self.footnote_refs.get(entity) {
 					let _flow = visitor.visit_footnote_ref(cx, footnote_ref);
-				} else {
-					let _flow = visitor.visit_unknown_entity(cx);
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
 				}
+				// FootnoteRef with missing data is a leaf
 			}
 			Node::HtmlInline => {
 				if let Ok(html_inline) = self.html_inlines.get(entity) {
 					let _flow = visitor.visit_html_inline(cx, html_inline);
-				} else {
-					let _flow = visitor.visit_unknown_entity(cx);
-					cx.set_entity(entity);
-					visitor.leave_unknown_entity(cx);
 				}
+				// HtmlInline with missing data is a leaf
 			}
 		}
 
