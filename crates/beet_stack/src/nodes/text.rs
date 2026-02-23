@@ -431,7 +431,7 @@ fn on_click_link(
 	ancestors: Query<&ChildOf>,
 	mut commands: Commands,
 ) {
-	let Ok(link) = links.get(ev.target()) else {
+	let Ok(link) = links.get(ev.event().target) else {
 		return;
 	};
 	let href = &link.href;

@@ -1,13 +1,13 @@
 //! Renderer-agnostic pointer event types for entity interaction.
 //!
-//! These [`EntityTargetEvent`] types are triggered by renderer-specific
+//! These [`EntityEvent`] types are triggered by renderer-specific
 //! input systems when a pointer interacts with entities. A pointer is a
 //! general interaction device: in XR it could be a hit test or finger
 //! collision, in a TUI it could be a mouse cursor or keyboard-driven
 //! cursor.
 //!
 //! The renderer resolves screen positions to entities and fires these
-//! generic events via [`trigger_target`](beet_core::prelude::EntityWorldMutActionEventExt::trigger_target),
+//! generic events via [`trigger`](bevy::ecs::world::EntityWorldMut::trigger),
 //! each carrying the [`Entity`] of the pointer that triggered the
 //! interaction.
 use beet_core::prelude::*;
@@ -39,41 +39,78 @@ pub struct PrimaryPointer;
 ///
 /// In a TUI this corresponds to a mouse button press; in XR it
 /// could be a close-pinch gesture.
-#[derive(Debug, EntityTargetEvent)]
-#[event(auto_propagate)]
+#[derive(Debug, EntityEvent)]
+// #[event(propagate, auto_propagate)]
 pub struct PointerDown {
+	/// The entity this event is targeting.
+	#[event_target]
+	pub target: Entity,
 	/// The pointer that triggered this event.
 	pub pointer: Entity,
+}
+
+impl PointerDown {
+	/// Constructs the event for the given `pointer`, deferring the target.
+	pub fn new(pointer: Entity) -> impl FnOnce(Entity) -> Self {
+		move |target| Self { target, pointer }
+	}
 }
 
 /// Triggered when a pointer button is released over an entity.
 ///
 /// In a TUI this corresponds to a mouse button release; in XR it
 /// could be an open-pinch gesture.
-#[derive(Debug, EntityTargetEvent)]
-#[event(auto_propagate)]
+#[derive(Debug, EntityEvent)]
 pub struct PointerUp {
+	/// The entity this event is targeting.
+	#[event_target]
+	pub target: Entity,
 	/// The pointer that triggered this event.
 	pub pointer: Entity,
+}
+
+impl PointerUp {
+	/// Constructs the event for the given `pointer`, deferring the target.
+	pub fn new(pointer: Entity) -> impl FnOnce(Entity) -> Self {
+		move |target| Self { target, pointer }
+	}
 }
 
 /// Triggered when a pointer enters an entity's region.
 ///
 /// Only fires once per hover, not every frame.
-#[derive(Debug, EntityTargetEvent)]
-#[event(auto_propagate)]
+#[derive(Debug, EntityEvent)]
 pub struct PointerOver {
+	/// The entity this event is targeting.
+	#[event_target]
+	pub target: Entity,
 	/// The pointer that triggered this event.
 	pub pointer: Entity,
+}
+
+impl PointerOver {
+	/// Constructs the event for the given `pointer`, deferring the target.
+	pub fn new(pointer: Entity) -> impl FnOnce(Entity) -> Self {
+		move |target| Self { target, pointer }
+	}
 }
 
 /// Triggered when a pointer leaves an entity's region.
 ///
 /// Fires on the entity that was previously hovered when the pointer
 /// moves to a different entity or to empty space.
-#[derive(Debug, EntityTargetEvent)]
-#[event(auto_propagate)]
+#[derive(Debug, EntityEvent)]
 pub struct PointerOut {
+	/// The entity this event is targeting.
+	#[event_target]
+	pub target: Entity,
 	/// The pointer that triggered this event.
 	pub pointer: Entity,
+}
+
+impl PointerOut {
+	/// Constructs the event for the given `pointer`, deferring the target.
+	pub fn new(pointer: Entity) -> impl FnOnce(Entity) -> Self {
+		move |target| Self { target, pointer }
+	}
 }

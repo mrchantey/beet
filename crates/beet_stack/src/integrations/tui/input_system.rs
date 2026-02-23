@@ -37,16 +37,16 @@ pub fn pointer_input_system(
 		match message.0.kind {
 			MouseEventKind::Down(_) => {
 				if let Some(entity) = target {
-					commands.entity(entity).trigger_target(PointerDown {
-						pointer: pointer_entity,
-					});
+					commands
+						.entity(entity)
+						.trigger(PointerDown::new(pointer_entity));
 				}
 			}
 			MouseEventKind::Up(_) => {
 				if let Some(entity) = target {
-					commands.entity(entity).trigger_target(PointerUp {
-						pointer: pointer_entity,
-					});
+					commands
+						.entity(entity)
+						.trigger(PointerUp::new(pointer_entity));
 				}
 			}
 			MouseEventKind::Moved | MouseEventKind::Drag(_) => {
@@ -54,26 +54,26 @@ pub fn pointer_input_system(
 				match (prev, target) {
 					// Pointer moved from one entity to a different one
 					(Some(old), Some(new)) if old != new => {
-						commands.entity(old).trigger_target(PointerOut {
-							pointer: pointer_entity,
-						});
-						commands.entity(new).trigger_target(PointerOver {
-							pointer: pointer_entity,
-						});
+						commands
+							.entity(old)
+							.trigger(PointerOut::new(pointer_entity));
+						commands
+							.entity(new)
+							.trigger(PointerOver::new(pointer_entity));
 						pointer.hover = Some(new);
 					}
 					// Pointer entered an entity from empty space
 					(None, Some(new)) => {
-						commands.entity(new).trigger_target(PointerOver {
-							pointer: pointer_entity,
-						});
+						commands
+							.entity(new)
+							.trigger(PointerOver::new(pointer_entity));
 						pointer.hover = Some(new);
 					}
 					// Pointer left an entity into empty space
 					(Some(old), None) => {
-						commands.entity(old).trigger_target(PointerOut {
-							pointer: pointer_entity,
-						});
+						commands
+							.entity(old)
+							.trigger(PointerOut::new(pointer_entity));
 						pointer.hover = None;
 					}
 					// Same entity or still empty, nothing to do
