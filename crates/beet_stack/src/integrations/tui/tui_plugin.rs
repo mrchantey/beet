@@ -30,6 +30,7 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<StackPlugin>()
+		.init_resource::<TuiHoverState>()
 		.add_systems(PreUpdate, mouse_input_system)
 		.add_systems(
 			PostUpdate,

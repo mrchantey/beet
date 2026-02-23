@@ -11,3 +11,7 @@ mod tui_server;
 pub use tui_server::*;
 mod draw_system;
 pub(self) use draw_system::*;
+mod tui_span_map;
+pub use tui_span_map::*;
+mod tui_mouse_events;
+pub use tui_mouse_events::*;

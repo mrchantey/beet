@@ -41,7 +41,7 @@ pub(super) fn draw_system(world: &mut World) -> Result {
 						tui_render_system,
 						(card_entity, area),
 					)
-					.map(|inner_buf| {
+					.map(|(inner_buf, span_map)| {
 						// Merge the inner buffer into the frame buffer
 						let area = inner_buf.area;
 						for row in area.y..area.y + area.height {
@@ -50,6 +50,8 @@ pub(super) fn draw_system(world: &mut World) -> Result {
 									inner_buf[(col, row)].clone();
 							}
 						}
+						// Store the span map for input hit-testing
+						world.insert_resource(span_map);
 					})
 					.map_err(|err| bevyhow!("{err}"))
 			})
@@ -88,7 +90,7 @@ mod test {
 			.unwrap();
 
 		let area = Rect::new(0, 0, width, height);
-		let buf = world
+		let (buf, _span_map) = world
 			.run_system_once_with(tui_render_system, (card_entity, area))
 			.unwrap();
 
@@ -105,7 +107,7 @@ mod test {
 			.id();
 
 		let area = Rect::new(0, 0, 80, 24);
-		let buf = world
+		let (buf, _span_map) = world
 			.run_system_once_with(tui_render_system, (entity, area))
 			.unwrap();
 
@@ -124,7 +126,7 @@ mod test {
 			.id();
 
 		let area = Rect::new(0, 0, 80, 24);
-		let buf = world
+		let (buf, _span_map) = world
 			.run_system_once_with(tui_render_system, (entity, area))
 			.unwrap();
 
@@ -146,7 +148,7 @@ mod test {
 			.id();
 
 		let area = Rect::new(0, 0, 80, 24);
-		let buf = world
+		let (buf, _span_map) = world
 			.run_system_once_with(tui_render_system, (entity, area))
 			.unwrap();
 

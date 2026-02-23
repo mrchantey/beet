@@ -1,42 +1,80 @@
+//! TUI input handling: keyboard shortcuts and mouse-to-entity routing.
+//!
+//! The [`mouse_input_system`] reads crossterm mouse messages, resolves
+//! the terminal cell position to an entity via [`TuiSpanMap`], and
+//! triggers [`TuiMouseDown`], [`TuiMouseUp`], [`TuiMouseOver`], and
+//! [`TuiMouseOut`] entity events as appropriate.
 use beet_core::prelude::*;
 use bevy::input::keyboard::KeyboardInput;
-use bevy_ratatui::RatatuiContext;
 use bevy_ratatui::event::MouseMessage;
-use ratatui::crossterm::event::MouseEvent;
 use ratatui::crossterm::event::MouseEventKind;
+
+use super::TuiHoverState;
+use super::TuiMouseDown;
+use super::TuiMouseOut;
+use super::TuiMouseOver;
+use super::TuiMouseUp;
+use super::TuiSpanMap;
 
 
 
 pub fn mouse_input_system(
 	mut messages: MessageReader<MouseMessage>,
-	mut _commands: Commands,
-	context: Res<RatatuiContext>,
+	mut commands: Commands,
+	span_map: Option<Res<TuiSpanMap>>,
+	mut hover_state: ResMut<TuiHoverState>,
 ) -> Result {
+	let Some(span_map) = span_map else {
+		// No span map yet (nothing rendered), drain messages
+		for _message in messages.read() {}
+		return Ok(());
+	};
+
 	for message in messages.read() {
-		// println!("Mouse event: {:?}", message.0);
-		// message.
-		// let MouseEvent {
-		// 	kind, column, row, ..
-		// } = message.0;
-		// let size = context.size()?;
-		// let _column = column as f32 / size.width as f32;
-		// let _row = row as f32 / size.height as f32;
-		// match kind {
-		// 	MouseEventKind::Down(_mouse_button) => {
-		// 		todo!()
-		// 	}
-		// 	MouseEventKind::Up(_mouse_button) => {
-		// 		todo!()
-		// 	}
-		// 	MouseEventKind::Drag(_mouse_button) => {
-		// 		todo!()
-		// 	}
-		// 	MouseEventKind::Moved => todo!(),
-		// 	MouseEventKind::ScrollDown => todo!(),
-		// 	MouseEventKind::ScrollUp => todo!(),
-		// 	MouseEventKind::ScrollLeft => todo!(),
-		// 	MouseEventKind::ScrollRight => todo!(),
-		// }
+		let col = message.0.column;
+		let row = message.0.row;
+		let target = span_map.get(col, row);
+
+		match message.0.kind {
+			MouseEventKind::Down(_) => {
+				if let Some(entity) = target {
+					commands.trigger(TuiMouseDown(entity));
+				}
+			}
+			MouseEventKind::Up(_) => {
+				if let Some(entity) = target {
+					commands.trigger(TuiMouseUp(entity));
+				}
+			}
+			MouseEventKind::Moved | MouseEventKind::Drag(_) => {
+				let prev = hover_state.hovered;
+				match (prev, target) {
+					// Cursor moved from one entity to a different one
+					(Some(old), Some(new)) if old != new => {
+						commands.trigger(TuiMouseOut(old));
+						commands.trigger(TuiMouseOver(new));
+						hover_state.hovered = Some(new);
+					}
+					// Cursor entered an entity from empty space
+					(None, Some(new)) => {
+						commands.trigger(TuiMouseOver(new));
+						hover_state.hovered = Some(new);
+					}
+					// Cursor left an entity into empty space
+					(Some(old), None) => {
+						commands.trigger(TuiMouseOut(old));
+						hover_state.hovered = None;
+					}
+					// Same entity or still empty, nothing to do
+					_ => {}
+				}
+			}
+			// Scroll events are handled by the scrollbar widget
+			MouseEventKind::ScrollDown
+			| MouseEventKind::ScrollUp
+			| MouseEventKind::ScrollLeft
+			| MouseEventKind::ScrollRight => {}
+		}
 	}
 	Ok(())
 }

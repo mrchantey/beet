@@ -23,7 +23,7 @@ fn counter() -> impl Bundle {
 		mdx!(
 			r#"
 # Stock Counter
-Records in stock: { field_ref.clone().as_text() }
+**Records** in stock: { field_ref.clone().as_text() }
 
 ## Tools
 { increment(field_ref) }

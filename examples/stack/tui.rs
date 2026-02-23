@@ -35,19 +35,9 @@ fn main() -> AppExit {
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((tui_server(), petes_beets::stack()));
 		})
-		.add_systems(Update, mouse_click_system)
+		.add_observer(on_click)
 		.run()
 }
-fn mouse_click_system(mouse_button_input: Res<ButtonInput<MouseButton>>) {
-	if mouse_button_input.pressed(MouseButton::Left) {
-		info!("left mouse currently pressed");
-	}
-
-	if mouse_button_input.just_pressed(MouseButton::Left) {
-		info!("left mouse just pressed");
-	}
-
-	if mouse_button_input.just_released(MouseButton::Left) {
-		info!("left mouse just released");
-	}
+fn on_click(ev: On<TuiMouseDown>) {
+	println!("Clicked on entity: {:?}", ev.0);
 }
