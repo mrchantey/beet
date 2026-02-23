@@ -56,7 +56,7 @@ pub fn pointer_input_system(
 					(Some(old), Some(new)) if old != new => {
 						commands
 							.entity(old)
-							.trigger(PointerOut::new(pointer_entity));
+							.try_trigger(PointerOut::new(pointer_entity));
 						commands
 							.entity(new)
 							.trigger(PointerOver::new(pointer_entity));

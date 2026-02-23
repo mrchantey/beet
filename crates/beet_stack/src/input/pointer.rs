@@ -40,7 +40,7 @@ pub struct PrimaryPointer;
 /// In a TUI this corresponds to a mouse button press; in XR it
 /// could be a close-pinch gesture.
 #[derive(Debug, EntityEvent)]
-// #[event(propagate, auto_propagate)]
+#[entity_event(propagate, auto_propagate)]
 pub struct PointerDown {
 	/// The entity this event is targeting.
 	#[event_target]
@@ -61,6 +61,7 @@ impl PointerDown {
 /// In a TUI this corresponds to a mouse button release; in XR it
 /// could be an open-pinch gesture.
 #[derive(Debug, EntityEvent)]
+#[entity_event(propagate, auto_propagate)]
 pub struct PointerUp {
 	/// The entity this event is targeting.
 	#[event_target]
@@ -80,6 +81,7 @@ impl PointerUp {
 ///
 /// Only fires once per hover, not every frame.
 #[derive(Debug, EntityEvent)]
+#[entity_event(propagate, auto_propagate)]
 pub struct PointerOver {
 	/// The entity this event is targeting.
 	#[event_target]
@@ -100,6 +102,7 @@ impl PointerOver {
 /// Fires on the entity that was previously hovered when the pointer
 /// moves to a different entity or to empty space.
 #[derive(Debug, EntityEvent)]
+#[entity_event(propagate, auto_propagate)]
 pub struct PointerOut {
 	/// The entity this event is targeting.
 	#[event_target]

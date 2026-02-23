@@ -1,5 +1,7 @@
 //! Extension methods for Bevy's [`Commands`].
 
+use bevy::ecs::system::command;
+
 use crate::prelude::*;
 
 /// Extension trait adding utility methods to [`Commands`].
@@ -46,5 +48,21 @@ pub impl Commands<'_, '_> {
 		self.queue(move |world: &mut World| {
 			world.run_system_once_with(system, input).ok();
 		});
+	}
+}
+
+
+/// Extension trait adding utility methods to [`EntityCommands`].
+#[extend::ext(name=EntityCommandsExt)]
+pub impl EntityCommands<'_> {
+	/// Triggers an entity event on this entity,
+	/// discarding the error if any.
+	fn try_trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		&mut self,
+		event_fn: impl FnOnce(Entity) -> E,
+	) -> &mut Self {
+		let event = (event_fn)(self.id());
+		self.commands_mut().queue_silenced(command::trigger(event));
+		self
 	}
 }
