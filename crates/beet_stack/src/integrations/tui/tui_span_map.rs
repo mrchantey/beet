@@ -5,14 +5,25 @@
 //! mouse is interacting with.
 use beet_core::prelude::*;
 
-/// Maps terminal `(col, row)` positions to the entity that rendered content there.
+/// A terminal cell position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TuiPos {
+	pub row: u16,
+	pub col: u16,
+}
+
+impl TuiPos {
+	pub fn new(row: u16, col: u16) -> Self { Self { row, col } }
+}
+
+/// Maps terminal cell positions to the entity that rendered content there.
 ///
 /// Cleared and rebuilt each frame by the draw system. The input
 /// system reads it to resolve mouse positions into entity targets
 /// for [`TuiMouseDown`](super::TuiMouseDown) and related events.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct TuiSpanMap {
-	entries: HashMap<(u16, u16), Entity>,
+	entries: HashMap<TuiPos, Entity>,
 }
 
 impl TuiSpanMap {
@@ -23,14 +34,14 @@ impl TuiSpanMap {
 	pub fn set_area(&mut self, area: ratatui::prelude::Rect, entity: Entity) {
 		for row in area.y..area.y.saturating_add(area.height) {
 			for col in area.x..area.x.saturating_add(area.width) {
-				self.entries.insert((col, row), entity);
+				self.entries.insert(TuiPos::new(row, col), entity);
 			}
 		}
 	}
 
-	/// Look up the entity that owns the cell at `(col, row)`.
+	/// Look up the entity that owns the cell at the given position.
 	pub fn get(&self, col: u16, row: u16) -> Option<Entity> {
-		self.entries.get(&(col, row)).copied()
+		self.entries.get(&TuiPos::new(row, col)).copied()
 	}
 
 	/// The number of mapped cells, useful for testing.

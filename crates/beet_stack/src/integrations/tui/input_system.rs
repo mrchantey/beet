@@ -38,12 +38,12 @@ pub fn mouse_input_system(
 		match message.0.kind {
 			MouseEventKind::Down(_) => {
 				if let Some(entity) = target {
-					commands.trigger(TuiMouseDown(entity));
+					commands.trigger(TuiMouseDown { target: entity });
 				}
 			}
 			MouseEventKind::Up(_) => {
 				if let Some(entity) = target {
-					commands.trigger(TuiMouseUp(entity));
+					commands.trigger(TuiMouseUp { target: entity });
 				}
 			}
 			MouseEventKind::Moved | MouseEventKind::Drag(_) => {
@@ -51,18 +51,18 @@ pub fn mouse_input_system(
 				match (prev, target) {
 					// Cursor moved from one entity to a different one
 					(Some(old), Some(new)) if old != new => {
-						commands.trigger(TuiMouseOut(old));
-						commands.trigger(TuiMouseOver(new));
+						commands.trigger(TuiMouseOut { target: old });
+						commands.trigger(TuiMouseOver { target: new });
 						hover_state.hovered = Some(new);
 					}
 					// Cursor entered an entity from empty space
 					(None, Some(new)) => {
-						commands.trigger(TuiMouseOver(new));
+						commands.trigger(TuiMouseOver { target: new });
 						hover_state.hovered = Some(new);
 					}
 					// Cursor left an entity into empty space
 					(Some(old), None) => {
-						commands.trigger(TuiMouseOut(old));
+						commands.trigger(TuiMouseOut { target: old });
 						hover_state.hovered = None;
 					}
 					// Same entity or still empty, nothing to do

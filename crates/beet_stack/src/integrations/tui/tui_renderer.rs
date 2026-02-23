@@ -19,7 +19,7 @@
 //!     let mut buf = Buffer::empty(area);
 //!     let mut renderer = TuiRenderer::new(area, &mut buf);
 //!     walker.walk_card(&mut renderer, entity);
-//!     renderer.finish();
+//!     let span_map = renderer.finish();
 //! }
 //! ```
 //!
@@ -113,16 +113,15 @@ pub struct TuiRenderer<'buf> {
 	buf: &'buf mut Buffer,
 	/// Style stack pushed by block-level elements like headings.
 	style_stack: Vec<Style>,
-	/// Current accumulated spans for the active line/block.
-	spans: Vec<Span<'static>>,
+	/// Current accumulated spans with their owning entity for
+	/// per-span hit-testing.
+	spans: Vec<(Span<'static>, Option<Entity>)>,
 	/// Whether we are inside a list item collecting text.
 	in_list_item: bool,
 	/// Rendering configuration.
 	config: TuiConfig,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
-	/// The entity currently being rendered, updated by visitor methods.
-	current_entity: Entity,
 }
 
 impl<'buf> TuiRenderer<'buf> {
@@ -136,7 +135,6 @@ impl<'buf> TuiRenderer<'buf> {
 			in_list_item: false,
 			config: TuiConfig::default(),
 			span_map: TuiSpanMap::default(),
-			current_entity: Entity::PLACEHOLDER,
 		}
 	}
 
@@ -154,23 +152,20 @@ impl<'buf> TuiRenderer<'buf> {
 			in_list_item: false,
 			config,
 			span_map: TuiSpanMap::default(),
-			current_entity: Entity::PLACEHOLDER,
 		}
 	}
 
 	/// Returns the remaining drawable area after rendering.
 	pub fn remaining_area(&self) -> Rect { self.area }
 
-	/// Flush any remaining spans accumulated during the walk.
+	/// Flush remaining spans and return the populated [`TuiSpanMap`].
 	///
 	/// Must be called after [`CardWalker::walk_card`] returns to
 	/// ensure orphaned text nodes (those not wrapped in a block-level
 	/// element like [`Paragraph`]) are rendered. Without this call,
 	/// bare [`TextNode`] content silently produces blank output.
-	pub fn finish(&mut self) { self.flush_spans(); }
-
-	/// Consume the renderer and return the populated [`TuiSpanMap`].
-	pub fn take_span_map(&mut self) -> TuiSpanMap {
+	pub fn finish(&mut self) -> TuiSpanMap {
+		self.flush_spans();
 		std::mem::take(&mut self.span_map)
 	}
 
@@ -200,37 +195,86 @@ impl<'buf> TuiRenderer<'buf> {
 		self.style_stack.last().copied().unwrap_or_default()
 	}
 
+	/// Push a span associated with the given entity for hit-testing.
+	fn push_span(&mut self, span: Span<'static>, entity: Entity) {
+		self.spans.push((span, Some(entity)));
+	}
+
 	/// Flush accumulated spans as a wrapped paragraph, consuming
-	/// vertical space from `self.area`.
+	/// vertical space from `self.area`. Each span is mapped to its
+	/// owning entity in the span map at character granularity.
 	fn flush_spans(&mut self) {
 		if self.spans.is_empty() {
 			return;
 		}
 
-		let spans = std::mem::take(&mut self.spans);
-		let line = Line::from(spans);
-		let text = Text::from(line);
-		self.render_text(text);
-	}
+		let span_entries = std::mem::take(&mut self.spans);
+		let (raw_spans, entities): (Vec<Span<'static>>, Vec<Option<Entity>>) =
+			span_entries.into_iter().unzip();
 
-	/// Render a [`Text`] block into the buffer, consuming vertical
-	/// space. Also records the rendered area in the span map.
-	fn render_text(&mut self, text: Text<'_>) {
-		if text.lines.is_empty() {
-			return;
-		}
+		let line = Line::from(raw_spans.clone());
+		let text = Text::from(line);
+
 		let before_y = self.area.y;
 		let paragraph =
 			widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
 		let line_count = paragraph.line_count(self.area.width) as u16;
 		paragraph.render(self.area, self.buf);
 
-		// Record the rendered area in the span map
-		if self.current_entity != Entity::PLACEHOLDER {
-			let rendered =
-				Rect::new(self.area.x, before_y, self.area.width, line_count);
-			self.span_map.set_area(rendered, self.current_entity);
+		// Map each span's cells to its entity at character granularity.
+		let mut col = self.area.x;
+		let mut row = before_y;
+		let area_right = self.area.x.saturating_add(self.area.width);
+		for (span, entity) in raw_spans.iter().zip(entities.iter()) {
+			let span_width = span.width() as u16;
+			if let Some(entity) = entity {
+				let mut remaining = span_width;
+				let mut cur_col = col;
+				let mut cur_row = row;
+				while remaining > 0 {
+					let space = area_right.saturating_sub(cur_col);
+					let chars_this_line = remaining.min(space);
+					if chars_this_line > 0 {
+						let span_area =
+							Rect::new(cur_col, cur_row, chars_this_line, 1);
+						self.span_map.set_area(span_area, *entity);
+					}
+					remaining = remaining.saturating_sub(chars_this_line);
+					if remaining > 0 {
+						cur_row += 1;
+						cur_col = self.area.x;
+					} else {
+						cur_col += chars_this_line;
+					}
+				}
+				col = cur_col;
+				row = cur_row;
+			} else {
+				col += span_width;
+				while col >= area_right && area_right > self.area.x {
+					col = self.area.x + (col - area_right);
+					row += 1;
+				}
+			}
 		}
+
+		self.area.y = self.area.y.saturating_add(line_count);
+		self.area.height = self.area.height.saturating_sub(line_count);
+	}
+
+	/// Render a [`Text`] block into the buffer, consuming vertical space.
+	///
+	/// This is a low-level helper that does **not** update the span
+	/// map. Callers that need hit-testing should use [`Self::flush_spans`]
+	/// or map areas manually.
+	fn render_text(&mut self, text: Text<'_>) {
+		if text.lines.is_empty() {
+			return;
+		}
+		let paragraph =
+			widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
+		let line_count = paragraph.line_count(self.area.width) as u16;
+		paragraph.render(self.area, self.buf);
 
 		self.area.y = self.area.y.saturating_add(line_count);
 		self.area.height = self.area.height.saturating_sub(line_count);
@@ -260,10 +304,9 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_heading(
 		&mut self,
-		cx: &VisitContext,
+		_cx: &VisitContext,
 		heading: &Heading,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		let style = match heading.level() {
 			1 => {
 				self.advance_lines(self.config.h1_gap_before);
@@ -276,14 +319,12 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_paragraph(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_paragraph(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_block_quote(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_block_quote(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.advance_lines(self.config.block_quote_gap);
 		let indent = self.config.block_quote_indent;
 		if self.area.width > indent {
@@ -303,26 +344,23 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn visit_code_block(
 		&mut self,
-		cx: &VisitContext,
+		_cx: &VisitContext,
 		_code_block: &CodeBlock,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		self.style_stack.push(Style::new().bg(Color::DarkGray));
 		ControlFlow::Continue(())
 	}
 
 	fn visit_list(
 		&mut self,
-		cx: &VisitContext,
+		_cx: &VisitContext,
 		_list_marker: &ListMarker,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		// List stack is managed by VisitContext
 		ControlFlow::Continue(())
 	}
 
 	fn visit_list_item(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		self.in_list_item = true;
 
 		// Emit the bullet/number prefix from the context's list stack
@@ -337,43 +375,42 @@ impl CardVisitor for TuiRenderer<'_> {
 			self.config.bullet.clone()
 		};
 
-		self.spans
-			.push(Span::styled(bullet, Style::new().fg(self.config.bullet_fg)));
+		self.push_span(
+			Span::styled(bullet, Style::new().fg(self.config.bullet_fg)),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
 	fn visit_table(
 		&mut self,
-		cx: &VisitContext,
+		_cx: &VisitContext,
 		_table: &Table,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_head(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_table_head(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().bold());
 		ControlFlow::Continue(())
 	}
 
-	fn visit_table_row(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_table_row(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
 
 	fn visit_table_cell(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		// Add a separator between cells
 		if !self.spans.is_empty() {
-			self.spans
-				.push(Span::styled(" │ ", Style::new().fg(Color::DarkGray)));
+			self.push_span(
+				Span::styled(" │ ", Style::new().fg(Color::DarkGray)),
+				cx.entity(),
+			);
 		}
 		ControlFlow::Continue(())
 	}
 
-	fn visit_thematic_break(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_thematic_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.flush_spans();
 		self.render_hr();
 		ControlFlow::Continue(())
@@ -384,11 +421,10 @@ impl CardVisitor for TuiRenderer<'_> {
 		cx: &VisitContext,
 		_image: &Image,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
-		self.spans.push(Span::styled(
-			"[image: ",
-			Style::new().fg(Color::DarkGray).italic(),
-		));
+		self.push_span(
+			Span::styled("[image: ", Style::new().fg(Color::DarkGray).italic()),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
@@ -397,16 +433,17 @@ impl CardVisitor for TuiRenderer<'_> {
 		cx: &VisitContext,
 		footnote_def: &FootnoteDefinition,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
-		self.spans.push(Span::styled(
-			format!("[^{}]: ", footnote_def.label),
-			Style::new().fg(Color::DarkGray),
-		));
+		self.push_span(
+			Span::styled(
+				format!("[^{}]: ", footnote_def.label),
+				Style::new().fg(Color::DarkGray),
+			),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
-	fn visit_math_display(&mut self, cx: &VisitContext) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
+	fn visit_math_display(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
 		self.style_stack.push(Style::new().fg(Color::Magenta));
 		ControlFlow::Continue(())
 	}
@@ -416,12 +453,14 @@ impl CardVisitor for TuiRenderer<'_> {
 		cx: &VisitContext,
 		html_block: &HtmlBlock,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		if !html_block.0.is_empty() {
-			self.spans.push(Span::styled(
-				html_block.0.clone(),
-				Style::new().fg(Color::DarkGray),
-			));
+			self.push_span(
+				Span::styled(
+					html_block.0.clone(),
+					Style::new().fg(Color::DarkGray),
+				),
+				cx.entity(),
+			);
 		}
 		ControlFlow::Continue(())
 	}
@@ -431,10 +470,11 @@ impl CardVisitor for TuiRenderer<'_> {
 		cx: &VisitContext,
 		_button: &Button,
 	) -> ControlFlow<()> {
-		self.current_entity = cx.entity();
 		// Render buttons as link-style inline text
-		self.spans
-			.push(Span::styled("[", Style::new().fg(self.config.link_fg)));
+		self.push_span(
+			Span::styled("[", Style::new().fg(self.config.link_fg)),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
@@ -449,15 +489,18 @@ impl CardVisitor for TuiRenderer<'_> {
 		let inline_style = self.style_from_inline(&style);
 		let base = self.current_style().patch(inline_style);
 
+		let entity = cx.entity();
 		if cx.in_code_block {
 			// In code blocks, render line by line
 			for line in text.as_str().lines() {
-				self.spans.push(Span::styled(line.to_string(), base));
+				self.push_span(Span::styled(line.to_string(), base), entity);
 				self.flush_spans();
 			}
 		} else {
-			self.spans
-				.push(Span::styled(text.as_str().to_string(), base));
+			self.push_span(
+				Span::styled(text.as_str().to_string(), base),
+				entity,
+			);
 		}
 		ControlFlow::Continue(())
 	}
@@ -475,50 +518,59 @@ impl CardVisitor for TuiRenderer<'_> {
 		ControlFlow::Continue(())
 	}
 
-	fn visit_soft_break(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
+	fn visit_soft_break(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		// Soft breaks are rendered as spaces in TUI
-		self.spans.push(Span::raw(" "));
+		self.push_span(Span::raw(" "), cx.entity());
 		ControlFlow::Continue(())
 	}
 
 	fn visit_footnote_ref(
 		&mut self,
-		_cx: &VisitContext,
+		cx: &VisitContext,
 		footnote_ref: &FootnoteRef,
 	) -> ControlFlow<()> {
-		self.spans.push(Span::styled(
-			format!("[^{}]", footnote_ref.label),
-			Style::new().fg(Color::Cyan),
-		));
+		self.push_span(
+			Span::styled(
+				format!("[^{}]", footnote_ref.label),
+				Style::new().fg(Color::Cyan),
+			),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
 	fn visit_html_inline(
 		&mut self,
-		_cx: &VisitContext,
+		cx: &VisitContext,
 		html_inline: &HtmlInline,
 	) -> ControlFlow<()> {
-		self.spans.push(Span::styled(
-			html_inline.0.clone(),
-			Style::new().fg(Color::DarkGray),
-		));
+		self.push_span(
+			Span::styled(
+				html_inline.0.clone(),
+				Style::new().fg(Color::DarkGray),
+			),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
 	fn visit_task_list_check(
 		&mut self,
-		_cx: &VisitContext,
+		cx: &VisitContext,
 		task_check: &TaskListCheck,
 	) -> ControlFlow<()> {
 		let symbol = if task_check.checked { "☑ " } else { "☐ " };
-		self.spans.push(Span::styled(
-			symbol,
-			Style::new().fg(if task_check.checked {
-				Color::Green
-			} else {
-				Color::DarkGray
-			}),
-		));
+		self.push_span(
+			Span::styled(
+				symbol,
+				Style::new().fg(if task_check.checked {
+					Color::Green
+				} else {
+					Color::DarkGray
+				}),
+			),
+			cx.entity(),
+		);
 		ControlFlow::Continue(())
 	}
 
@@ -528,17 +580,40 @@ impl CardVisitor for TuiRenderer<'_> {
 		// Flush heading spans with the heading style applied to the
 		// entire line, then center h1.
 		let heading_level = cx.heading_level();
-		let spans = std::mem::take(&mut self.spans);
-		if !spans.is_empty() {
-			let line = Line::from(spans);
-			let mut text = Text::from(line);
-			if let Some(style) = self.style_stack.last() {
-				text = text.style(*style);
-			}
-			if heading_level == 1 && self.config.h1_centered {
+		if heading_level == 1 && self.config.h1_centered {
+			// Centered headings: render via render_text and map the
+			// whole area to the heading entity since centering shifts
+			// column offsets unpredictably.
+			let span_entries = std::mem::take(&mut self.spans);
+			if !span_entries.is_empty() {
+				let (raw_spans, entities): (Vec<_>, Vec<_>) =
+					span_entries.into_iter().unzip();
+				let line = Line::from(raw_spans);
+				let mut text = Text::from(line);
+				if let Some(style) = self.style_stack.last() {
+					text = text.style(*style);
+				}
 				text = text.centered();
+				let before_y = self.area.y;
+				let paragraph = widgets::Paragraph::new(text)
+					.wrap(widgets::Wrap { trim: false });
+				let line_count = paragraph.line_count(self.area.width) as u16;
+				paragraph.render(self.area, self.buf);
+				// Map whole area; pick the first entity with a value
+				if let Some(entity) = entities.iter().flatten().next() {
+					let rendered = Rect::new(
+						self.area.x,
+						before_y,
+						self.area.width,
+						line_count,
+					);
+					self.span_map.set_area(rendered, *entity);
+				}
+				self.area.y = self.area.y.saturating_add(line_count);
+				self.area.height = self.area.height.saturating_sub(line_count);
 			}
-			self.render_text(text);
+		} else {
+			self.flush_spans();
 		}
 		self.style_stack.pop();
 		self.advance_lines(self.config.heading_gap_after);
@@ -595,11 +670,14 @@ impl CardVisitor for TuiRenderer<'_> {
 
 	fn leave_link(&mut self, _cx: &VisitContext, _link: &Link) {}
 
-	fn leave_image(&mut self, _cx: &VisitContext, image: &Image) {
-		self.spans.push(Span::styled(
-			format!(": {}]", image.src),
-			Style::new().fg(Color::DarkGray).italic(),
-		));
+	fn leave_image(&mut self, cx: &VisitContext, image: &Image) {
+		self.push_span(
+			Span::styled(
+				format!(": {}]", image.src),
+				Style::new().fg(Color::DarkGray).italic(),
+			),
+			cx.entity(),
+		);
 		self.flush_spans();
 	}
 
@@ -611,9 +689,11 @@ impl CardVisitor for TuiRenderer<'_> {
 		self.flush_spans();
 	}
 
-	fn leave_button(&mut self, _cx: &VisitContext, _button: &Button) {
-		self.spans
-			.push(Span::styled("]", Style::new().fg(self.config.link_fg)));
+	fn leave_button(&mut self, cx: &VisitContext, _button: &Button) {
+		self.push_span(
+			Span::styled("]", Style::new().fg(self.config.link_fg)),
+			cx.entity(),
+		);
 	}
 }
 
@@ -625,8 +705,7 @@ pub fn tui_render_system(
 	let mut buf = Buffer::empty(area);
 	let mut renderer = TuiRenderer::new(area, &mut buf);
 	walker.walk_card(&mut renderer, entity);
-	renderer.finish();
-	let span_map = renderer.take_span_map();
+	let span_map = renderer.finish();
 	(buf, span_map)
 }
 
@@ -971,51 +1050,50 @@ mod test {
 
 		let (_buf, span_map) = render_with_span_map(&mut world, entity, 40, 10);
 		span_map.is_empty().xpect_false();
-		// Row 0 should map to the paragraph entity (child of root)
+		// Row 0 should map to the text node entity
 		span_map.get(0, 0).xpect_some();
 	}
 
 	#[test]
-	fn span_map_maps_to_correct_entity() {
+	fn span_map_maps_to_text_entity() {
 		let mut world = World::new();
-		let para_entity = world
-			.spawn((Paragraph, children![TextNode::new("body")]))
-			.id();
-		let _root = world.spawn((CardTool, children![])).id();
-		// Build the tree manually so we know the paragraph entity
-		world.entity_mut(_root).add_children(&[para_entity]);
+		let text_entity = world.spawn(TextNode::new("body")).id();
+		let para_entity = world.spawn((Paragraph, children![])).id();
+		world.entity_mut(para_entity).add_children(&[text_entity]);
+		let root = world.spawn((CardTool, children![])).id();
+		world.entity_mut(root).add_children(&[para_entity]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, _root, 40, 10);
+		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
-		// The rendered cells should map back to the paragraph entity
-		span_map.get(0, 0).xpect_eq(Some(para_entity));
+		// Per-span mapping: cells map to the text node, not the paragraph
+		span_map.get(0, 0).xpect_eq(Some(text_entity));
 	}
 
 	#[test]
 	fn span_map_separates_heading_and_paragraph() {
 		let mut world = World::new();
-		let heading = world
-			.spawn((Heading1, children![TextNode::new("Title")]))
-			.id();
-		let paragraph = world
-			.spawn((Paragraph, children![TextNode::new("Body")]))
-			.id();
+		let heading_text = world.spawn(TextNode::new("Title")).id();
+		let heading = world.spawn((Heading1, children![])).id();
+		world.entity_mut(heading).add_children(&[heading_text]);
+		let para_text = world.spawn(TextNode::new("Body")).id();
+		let paragraph = world.spawn((Paragraph, children![])).id();
+		world.entity_mut(paragraph).add_children(&[para_text]);
 		let root = world.spawn(CardTool).id();
 		world.entity_mut(root).add_children(&[heading, paragraph]);
 
 		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
-		// h1_gap_before defaults to 1, so the heading renders at row 1
+		// Per-span mapping: cells map to text node entities
 		let mut heading_row = None;
 		let mut para_row = None;
 		for row in 0..10 {
 			match span_map.get(0, row) {
-				Some(entity) if entity == heading => {
+				Some(entity) if entity == heading_text => {
 					if heading_row.is_none() {
 						heading_row = Some(row);
 					}
 				}
-				Some(entity) if entity == paragraph => {
+				Some(entity) if entity == para_text => {
 					if para_row.is_none() {
 						para_row = Some(row);
 					}
@@ -1031,11 +1109,11 @@ mod test {
 	}
 
 	#[test]
-	fn span_map_button_overwrites_paragraph() {
+	fn span_map_button_maps_bracket_and_text() {
 		let mut world = World::new();
-		let button = world
-			.spawn((Button, children![TextNode::new("Click me")]))
-			.id();
+		let btn_text = world.spawn(TextNode::new("Click me")).id();
+		let button = world.spawn((Button, children![])).id();
+		world.entity_mut(button).add_children(&[btn_text]);
 		let paragraph = world.spawn((Paragraph, children![])).id();
 		world.entity_mut(paragraph).add_children(&[button]);
 		let root = world.spawn(CardTool).id();
@@ -1043,9 +1121,36 @@ mod test {
 
 		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
 
-		// The button visit happens after the paragraph visit so it
-		// overwrites the paragraph mapping for its rendered cells.
+		// "[" maps to the button entity
 		span_map.get(0, 0).xpect_eq(Some(button));
+		// "C" of "Click me" maps to the text node entity
+		span_map.get(1, 0).xpect_eq(Some(btn_text));
+	}
+
+	#[test]
+	fn span_map_resolves_inline_spans() {
+		let mut world = World::new();
+		let plain_text = world.spawn(TextNode::new("this is some ")).id();
+		let bold_text = world.spawn(TextNode::new("Bold Text")).id();
+		let bold = world.spawn((Important, children![])).id();
+		world.entity_mut(bold).add_children(&[bold_text]);
+		let paragraph = world.spawn((Paragraph, children![])).id();
+		world
+			.entity_mut(paragraph)
+			.add_children(&[plain_text, bold]);
+		let root = world.spawn(CardTool).id();
+		world.entity_mut(root).add_children(&[paragraph]);
+
+		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+
+		// "this is some " is 13 chars (cols 0..12)
+		span_map.get(0, 0).xpect_eq(Some(plain_text));
+		span_map.get(12, 0).xpect_eq(Some(plain_text));
+		// "Bold Text" starts at col 13
+		span_map.get(13, 0).xpect_eq(Some(bold_text));
+		span_map.get(21, 0).xpect_eq(Some(bold_text));
+		// Col 22 is past all content, should be None
+		span_map.get(22, 0).xpect_eq(None);
 	}
 
 	#[test]

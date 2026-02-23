@@ -7,24 +7,36 @@ use beet_core::prelude::*;
 
 /// Triggered when a mouse button is pressed over an entity.
 #[derive(Debug, EntityEvent)]
-pub struct TuiMouseDown(pub Entity);
+pub struct TuiMouseDown {
+	#[event_target]
+	pub target: Entity,
+}
 
 /// Triggered when a mouse button is released over an entity.
 #[derive(Debug, EntityEvent)]
-pub struct TuiMouseUp(pub Entity);
+pub struct TuiMouseUp {
+	#[event_target]
+	pub target: Entity,
+}
 
 /// Triggered when the mouse cursor enters an entity's region.
 ///
 /// Only fires once per hover, not every frame.
 #[derive(Debug, EntityEvent)]
-pub struct TuiMouseOver(pub Entity);
+pub struct TuiMouseOver {
+	#[event_target]
+	pub target: Entity,
+}
 
 /// Triggered when the mouse cursor leaves an entity's region.
 ///
 /// Fires on the entity that was previously hovered when the cursor
 /// moves to a different entity or to empty space.
 #[derive(Debug, EntityEvent)]
-pub struct TuiMouseOut(pub Entity);
+pub struct TuiMouseOut {
+	#[event_target]
+	pub target: Entity,
+}
 
 /// Tracks which entity the mouse is currently hovering over.
 ///

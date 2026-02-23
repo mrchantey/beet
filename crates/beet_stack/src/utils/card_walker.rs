@@ -139,14 +139,18 @@ impl CardWalker<'_, '_> {
 		root: Entity,
 	) {
 		let Ok(node) = self.nodes.get(entity) else {
-			// Entity has no Node component — call visit_entity and
-			// recurse into children (supports non-node structural
-			// entities like the card root).
+			// Entity has no Node component — call visit_entity,
+			// visit_unknown_entity, recurse, leave_unknown_entity,
+			// leave_entity.
 			cx.set_entity(entity);
-			let flow = visitor.visit_entity(cx);
+			visitor.visit_entity(cx);
+			let flow = visitor.visit_unknown_entity(cx);
 			if flow.is_continue() {
 				self.recurse_children(visitor, cx, entity, root);
 			}
+			cx.set_entity(entity);
+			visitor.leave_unknown_entity(cx);
+			visitor.leave_entity(cx);
 			return;
 		};
 
@@ -162,6 +166,7 @@ impl CardWalker<'_, '_> {
 		}
 
 		cx.set_entity(entity);
+		visitor.visit_entity(cx);
 
 		// Dispatch visit, recurse children, then leave — all within
 		// a single match so visit/leave correspondence is explicit.
@@ -178,10 +183,12 @@ impl CardWalker<'_, '_> {
 					visitor.leave_heading(cx, heading);
 					cx.clear_heading_level();
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -214,10 +221,12 @@ impl CardWalker<'_, '_> {
 					visitor.leave_code_block(cx, code_block);
 					cx.in_code_block = false;
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -235,10 +244,12 @@ impl CardWalker<'_, '_> {
 					visitor.leave_list(cx, list_marker);
 					cx.pop_list();
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -263,10 +274,12 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_table(cx, table);
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -311,10 +324,12 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_image(cx, image);
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -326,10 +341,12 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -349,10 +366,12 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_html_block(cx, html_block);
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -361,10 +380,12 @@ impl CardWalker<'_, '_> {
 			| Node::DefinitionTitle
 			| Node::DefinitionDetails
 			| Node::MetadataBlock => {
-				let flow = visitor.visit_entity(cx);
+				let flow = visitor.visit_unknown_entity(cx);
 				if flow.is_continue() {
 					self.recurse_children(visitor, cx, entity, root);
 				}
+				cx.set_entity(entity);
+				visitor.leave_unknown_entity(cx);
 			}
 
 			// ---- Form ----
@@ -377,10 +398,12 @@ impl CardWalker<'_, '_> {
 					cx.set_entity(entity);
 					visitor.leave_button(cx, button);
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -391,10 +414,12 @@ impl CardWalker<'_, '_> {
 						self.recurse_children(visitor, cx, entity, root);
 					}
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -403,10 +428,12 @@ impl CardWalker<'_, '_> {
 				if let Ok(text) = self.text_nodes.get(entity) {
 					let _flow = visitor.visit_text(cx, text);
 				} else {
-					let flow = visitor.visit_entity(cx);
+					let flow = visitor.visit_unknown_entity(cx);
 					if flow.is_continue() {
 						self.recurse_children(visitor, cx, entity, root);
 					}
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 
@@ -450,17 +477,25 @@ impl CardWalker<'_, '_> {
 				if let Ok(footnote_ref) = self.footnote_refs.get(entity) {
 					let _flow = visitor.visit_footnote_ref(cx, footnote_ref);
 				} else {
-					let _flow = visitor.visit_entity(cx);
+					let _flow = visitor.visit_unknown_entity(cx);
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 			Node::HtmlInline => {
 				if let Ok(html_inline) = self.html_inlines.get(entity) {
 					let _flow = visitor.visit_html_inline(cx, html_inline);
 				} else {
-					let _flow = visitor.visit_entity(cx);
+					let _flow = visitor.visit_unknown_entity(cx);
+					cx.set_entity(entity);
+					visitor.leave_unknown_entity(cx);
 				}
 			}
 		}
+
+		// Restore entity and call leave_entity after typed leave
+		cx.set_entity(entity);
+		visitor.leave_entity(cx);
 
 		// Pop style after leave so leave methods still see the style
 		if is_inline_container {
@@ -491,10 +526,20 @@ impl CardWalker<'_, '_> {
 /// rather than tracking duplicate state.
 #[allow(unused_variables)]
 pub trait CardVisitor {
+	/// Called for every entity before any typed `visit_*` method.
+	fn visit_entity(&mut self, cx: &VisitContext) {}
+
+	/// Called after every entity's typed `leave_*` method (or after
+	/// `leave_unknown_entity` for untyped entities).
+	fn leave_entity(&mut self, cx: &VisitContext) {}
+
 	/// Called for entities that don't match any specific node type.
-	fn visit_entity(&mut self, cx: &VisitContext) -> ControlFlow<()> {
+	fn visit_unknown_entity(&mut self, cx: &VisitContext) -> ControlFlow<()> {
 		ControlFlow::Continue(())
 	}
+
+	/// Called after `visit_unknown_entity` and its children.
+	fn leave_unknown_entity(&mut self, cx: &VisitContext) {}
 
 	// -- Block-level visit --
 
@@ -727,7 +772,10 @@ mod test {
 	struct EntityCounter(usize);
 
 	impl CardVisitor for EntityCounter {
-		fn visit_entity(&mut self, _cx: &VisitContext) -> ControlFlow<()> {
+		fn visit_unknown_entity(
+			&mut self,
+			_cx: &VisitContext,
+		) -> ControlFlow<()> {
 			self.0 += 1;
 			ControlFlow::Continue(())
 		}
@@ -1293,9 +1341,9 @@ mod test {
 	fn context_entity_tracks_current() {
 		let mut world = World::new();
 		let card = world
-			.spawn((CardTool, children![(Paragraph, children![TextNode::new(
-				"hello"
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				TextNode::new("hello")
+			])]))
 			.id();
 
 		struct EntityTracker(Vec<Entity>);

@@ -39,5 +39,5 @@ fn main() -> AppExit {
 		.run()
 }
 fn on_click(ev: On<TuiMouseDown>) {
-	println!("Clicked on entity: {:?}", ev.0);
+	println!("Clicked on entity: {:?}", ev.target);
 }
