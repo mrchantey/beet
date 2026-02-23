@@ -20,7 +20,7 @@ impl TuiPos {
 ///
 /// Cleared and rebuilt each frame by the draw system. The input
 /// system reads it to resolve mouse positions into entity targets
-/// for [`MouseDown`](crate::input::MouseDown) and related events.
+/// for [`PointerDown`](crate::input::PointerDown) and related events.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct TuiSpanMap {
 	entries: HashMap<TuiPos, Entity>,

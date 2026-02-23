@@ -56,10 +56,11 @@
 //! node type, including inline nodes, and handles structural
 //! boundaries automatically.
 use super::node::Node;
-use crate::input::MouseUp;
+use crate::input::PointerUp;
 use crate::nodes::DisplayBlock;
 use crate::nodes::DisplayInline;
 use beet_core::prelude::*;
+use beet_tool::prelude::*;
 
 
 /// A string of text, always used as a direct child of a structural
@@ -407,9 +408,47 @@ impl Link {
 }
 
 fn on_add_link(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe(on_click_link);
+	world
+		.commands()
+		.entity(cx.entity)
+		.observe_any(on_click_link);
 }
 
-fn on_click_link(_ev: On<MouseUp>) {
-	cross_log!("do something cool here");
+/// Returns `true` if the href is an external URL that should be
+/// opened by the OS rather than navigated to as a local path.
+fn is_external_url(href: &str) -> bool {
+	href.contains("://")
+		|| href.starts_with("mailto:")
+		|| href.starts_with("tel:")
+		|| href.starts_with("sms:")
+		|| href.starts_with("javascript:")
+		|| href.starts_with("data:")
+}
+
+fn on_click_link(
+	ev: On<PointerUp>,
+	links: Query<&Link>,
+	ancestors: Query<&ChildOf>,
+	mut commands: Commands,
+) {
+	let Ok(link) = links.get(ev.target()) else {
+		return;
+	};
+	let href = &link.href;
+
+	if is_external_url(href) {
+		if let Err(err) = webbrowser::open(href) {
+			cross_log!("failed to open URL: {err}");
+		}
+	} else {
+		// Navigate by dispatching a request on the root ancestor
+		// of the pointer that triggered the event.
+		let mut root = ev.event().pointer;
+		while let Ok(child_of) = ancestors.get(root) {
+			root = child_of.parent();
+		}
+		commands
+			.entity(root)
+			.call(Request::get(href), OutHandler::new(|_, _: Response| Ok(())));
+	}
 }

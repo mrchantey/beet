@@ -31,8 +31,9 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<StackPlugin>()
-		.init_resource::<HoverState>()
-		.add_systems(PreUpdate, mouse_input_system)
+		.register_type::<Pointer>()
+		.register_type::<PrimaryPointer>()
+		.add_systems(PreUpdate, pointer_input_system)
 		.add_systems(
 			PostUpdate,
 			(handle_scroll_input, super::draw_system)
@@ -42,3 +43,4 @@ impl Plugin for TuiPlugin {
 		.add_systems(PostUpdate, exit_system);
 	}
 }
+

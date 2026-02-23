@@ -1,9 +1,9 @@
-//! TUI input handling: keyboard shortcuts and mouse-to-entity routing.
+//! TUI input handling: keyboard shortcuts and pointer-to-entity routing.
 //!
-//! The [`mouse_input_system`] reads crossterm mouse messages, resolves
+//! The [`pointer_input_system`] reads crossterm mouse messages, resolves
 //! the terminal cell position to an entity via [`TuiSpanMap`], and
-//! triggers [`MouseDown`], [`MouseUp`], [`MouseOver`], and
-//! [`MouseOut`] entity events as appropriate.
+//! triggers [`PointerDown`], [`PointerUp`], [`PointerOver`], and
+//! [`PointerOut`] entity events as appropriate.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::input::keyboard::KeyboardInput;
@@ -12,15 +12,21 @@ use ratatui::crossterm::event::MouseEventKind;
 
 
 
-pub fn mouse_input_system(
+pub fn pointer_input_system(
 	mut messages: MessageReader<MouseMessage>,
 	mut commands: Commands,
 	span_map: Option<Res<TuiSpanMap>>,
-	mut hover_state: ResMut<HoverState>,
+	mut pointers: Query<(Entity, &mut Pointer), With<PrimaryPointer>>,
 ) -> Result {
 	let Some(span_map) = span_map else {
 		// No span map yet (nothing rendered), drain messages
-		for _message in messages.read() {}
+		messages.clear();
+		return Ok(());
+	};
+
+	let Ok((pointer_entity, mut pointer)) = pointers.single_mut() else {
+		// No primary pointer spawned yet, drain messages
+		messages.clear();
 		return Ok(());
 	};
 
@@ -31,32 +37,44 @@ pub fn mouse_input_system(
 		match message.0.kind {
 			MouseEventKind::Down(_) => {
 				if let Some(entity) = target {
-					commands.trigger(MouseDown { target: entity });
+					commands.entity(entity).trigger_target(PointerDown {
+						pointer: pointer_entity,
+					});
 				}
 			}
 			MouseEventKind::Up(_) => {
 				if let Some(entity) = target {
-					commands.trigger(MouseUp { target: entity });
+					commands.entity(entity).trigger_target(PointerUp {
+						pointer: pointer_entity,
+					});
 				}
 			}
 			MouseEventKind::Moved | MouseEventKind::Drag(_) => {
-				let prev = hover_state.hovered;
+				let prev = pointer.hover;
 				match (prev, target) {
-					// Cursor moved from one entity to a different one
+					// Pointer moved from one entity to a different one
 					(Some(old), Some(new)) if old != new => {
-						commands.trigger(MouseOut { target: old });
-						commands.trigger(MouseOver { target: new });
-						hover_state.hovered = Some(new);
+						commands.entity(old).trigger_target(PointerOut {
+							pointer: pointer_entity,
+						});
+						commands.entity(new).trigger_target(PointerOver {
+							pointer: pointer_entity,
+						});
+						pointer.hover = Some(new);
 					}
-					// Cursor entered an entity from empty space
+					// Pointer entered an entity from empty space
 					(None, Some(new)) => {
-						commands.trigger(MouseOver { target: new });
-						hover_state.hovered = Some(new);
+						commands.entity(new).trigger_target(PointerOver {
+							pointer: pointer_entity,
+						});
+						pointer.hover = Some(new);
 					}
-					// Cursor left an entity into empty space
+					// Pointer left an entity into empty space
 					(Some(old), None) => {
-						commands.trigger(MouseOut { target: old });
-						hover_state.hovered = None;
+						commands.entity(old).trigger_target(PointerOut {
+							pointer: pointer_entity,
+						});
+						pointer.hover = None;
 					}
 					// Same entity or still empty, nothing to do
 					_ => {}

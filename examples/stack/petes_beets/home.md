@@ -13,3 +13,6 @@ We carry *vinyl*, *cassette*, and *CD* across every genre from jazz to jungle.
 > "If it grooves, we got it." — Pete
 
 For more info check out our [github page](https://github.com/mrchantey/beet)
+
+
+- [About Us](/about)

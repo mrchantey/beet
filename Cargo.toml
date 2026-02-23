@@ -136,6 +136,7 @@ rand_chacha = "0.9"
 # wasm_js ignored in native
 getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
+webbrowser = "1"
 
 #💡 logging
 log = "0.4"

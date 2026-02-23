@@ -12,8 +12,8 @@ use beet_core::prelude::*;
 /// dispatches it through the owning entity's tool pipeline.
 ///
 /// Includes a [`tui_render_tool`] child entity for stateful card
-/// rendering. Typically combined with a [`default_router`] and
-/// child cards/tools:
+/// rendering and a [`PrimaryPointer`] child entity for input routing.
+/// Typically combined with a [`default_router`] and child cards/tools:
 ///
 /// ```no_run
 /// # use beet_core::prelude::*;
@@ -35,6 +35,7 @@ use beet_core::prelude::*;
 pub fn tui_server() -> impl Bundle {
 	(
 		OnSpawn::insert_child(tui_render_tool()),
+		OnSpawn::insert_child(PrimaryPointer),
 		OnSpawn::new_async(async |entity| -> Result {
 			// Dispatch CLI args as the initial request, rendering the
 			// root content when no args are provided.
