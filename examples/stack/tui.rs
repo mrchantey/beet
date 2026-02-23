@@ -31,12 +31,23 @@ mod petes_beets;
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((
-			// LogPlugin::default(),
-			TuiPlugin,
-		))
+		.add_plugins((LogPlugin::default(), TuiPlugin))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((tui_server(), petes_beets::stack()));
 		})
+		.add_systems(Update, mouse_click_system)
 		.run()
+}
+fn mouse_click_system(mouse_button_input: Res<ButtonInput<MouseButton>>) {
+	if mouse_button_input.pressed(MouseButton::Left) {
+		info!("left mouse currently pressed");
+	}
+
+	if mouse_button_input.just_pressed(MouseButton::Left) {
+		info!("left mouse just pressed");
+	}
+
+	if mouse_button_input.just_released(MouseButton::Left) {
+		info!("left mouse just released");
+	}
 }

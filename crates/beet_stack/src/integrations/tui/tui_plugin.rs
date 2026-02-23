@@ -1,8 +1,8 @@
 use crate::prelude::widgets::handle_scroll_input;
+use crate::prelude::*;
 use crate::stack::PropagateChanges;
 use crate::stack::StackPlugin;
 use beet_core::prelude::*;
-use bevy::input::keyboard::KeyboardInput;
 use bevy_ratatui::RatatuiPlugins;
 
 
@@ -29,35 +29,14 @@ impl Plugin for TuiPlugin {
 				enable_input_forwarding: true,
 			},
 		))
-		.init_plugin::<StackPlugin>();
-
-		// Systems: handle input and draw, all after PropagateChanges
-		app.add_systems(
+		.init_plugin::<StackPlugin>()
+		.add_systems(PreUpdate, mouse_input_system)
+		.add_systems(
 			PostUpdate,
 			(handle_scroll_input, super::draw_system)
 				.chain()
 				.after(PropagateChanges),
 		)
 		.add_systems(PostUpdate, exit_system);
-	}
-}
-
-
-
-fn exit_system(
-	mut messages: MessageReader<KeyboardInput>,
-	mut commands: Commands,
-) {
-	use bevy::input::keyboard::Key;
-	for message in messages.read() {
-		match &message.logical_key {
-			Key::Character(val) if val == "q" => {
-				commands.write_message(AppExit::Success);
-			}
-			Key::Escape => {
-				commands.write_message(AppExit::Success);
-			}
-			_ => {}
-		}
 	}
 }
