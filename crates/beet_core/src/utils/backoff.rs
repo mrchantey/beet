@@ -3,10 +3,10 @@
 // MIT/APACHE
 // - added stream
 //
+#[allow(unused_imports)]
 use crate::prelude::*;
 
-use std::pin::Pin;
-use std::time::Duration;
+use core::time::Duration;
 
 impl Default for Backoff {
 	fn default() -> Self {
@@ -291,6 +291,7 @@ impl Backoff {
 	/// }
 	/// # }
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn stream(&self) -> BackoffStream { BackoffStream::new(self.clone()) }
 	/// Retry a synchronous operation using this backoff.
 	///
@@ -314,7 +315,7 @@ impl Backoff {
 	/// })?;
 	/// # Ok(()) }
 	/// ```
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	pub fn retry<T, E, F>(&self, mut op: F) -> Result<T, E>
 	where
 		F: FnMut(BackoffFrame) -> Result<T, E>,
@@ -351,6 +352,7 @@ impl Backoff {
 	/// # Ok(())
 	/// # }
 	/// ```
+	#[cfg(feature = "std")]
 	pub async fn retry_async<T, E, Fut, F>(&self, mut op: F) -> Result<T, E>
 	where
 		F: FnMut(BackoffFrame) -> Fut,
@@ -421,7 +423,7 @@ impl IntoIterator for Backoff {
 	fn into_iter(self) -> Self::IntoIter { Self::IntoIter::new(self) }
 }
 
-use std::iter;
+use core::iter;
 /// An exponential backoff iterator.
 #[derive(Debug, Clone)]
 pub struct BackoffIter {
@@ -517,8 +519,8 @@ pub struct BackoffFrame {
 	pub next_attempt: Option<Duration>,
 }
 
-impl std::fmt::Display for BackoffFrame {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for BackoffFrame {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self.next_attempt {
 			Some(d) => write!(
 				f,
@@ -540,16 +542,19 @@ impl BackoffFrame {
 /// Behavior:
 /// - First attempt is yielded immediately (no pre-sleep).
 /// - Between subsequent attempts the stream sleeps using `time_ext::sleep(duration).await`.
+#[cfg(feature = "std")]
 pub struct BackoffStream {
 	iter: BackoffIter,
 	// Frame for the attempt to be yielded next (as produced by BackoffIter).
 	current: Option<BackoffFrame>,
 	#[cfg(target_arch = "wasm32")]
-	sleeper: Option<Pin<Box<dyn Future<Output = ()> + 'static>>>,
+	sleeper: Option<core::pin::Pin<Box<dyn Future<Output = ()> + 'static>>>,
 	#[cfg(not(target_arch = "wasm32"))]
-	sleeper: Option<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
+	sleeper:
+		Option<core::pin::Pin<Box<dyn Future<Output = ()> + Send + 'static>>>,
 }
 
+#[cfg(feature = "std")]
 impl BackoffStream {
 	fn new(inner: Backoff) -> Self {
 		let mut iter = BackoffIter::new(inner);
@@ -562,18 +567,19 @@ impl BackoffStream {
 	}
 }
 
+#[cfg(feature = "std")]
 impl futures::Stream for BackoffStream {
 	type Item = BackoffFrame;
 
 	fn poll_next(
-		mut self: std::pin::Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Option<Self::Item>> {
+		mut self: core::pin::Pin<&mut Self>,
+		cx: &mut core::task::Context<'_>,
+	) -> core::task::Poll<Option<Self::Item>> {
 		// If a sleep is in-flight, drive it to completion first.
 		if let Some(fut) = self.sleeper.as_mut() {
 			match fut.as_mut().poll(cx) {
-				std::task::Poll::Pending => return std::task::Poll::Pending,
-				std::task::Poll::Ready(()) => {
+				core::task::Poll::Pending => return core::task::Poll::Pending,
+				core::task::Poll::Ready(()) => {
 					// Completed the scheduled sleep. Prepare next attempt's current.
 					self.sleeper = None;
 					self.current = self.iter.next();
@@ -583,13 +589,13 @@ impl futures::Stream for BackoffStream {
 
 		// Yield the next attempt if we have one.
 		match self.current.take() {
-			None => std::task::Poll::Ready(None),
+			None => core::task::Poll::Ready(None),
 			Some(frame) => {
 				if let Some(d) = frame.next_attempt {
 					// Schedule sleep before the next attempt is yielded.
 					self.sleeper = Some(Box::pin(crate::time_ext::sleep(d)));
 				}
-				std::task::Poll::Ready(Some(frame))
+				core::task::Poll::Ready(Some(frame))
 			}
 		}
 	}
@@ -658,6 +664,7 @@ mod tests {
 
 	#[test]
 	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(feature = "std")]
 	fn retry_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -684,6 +691,7 @@ mod tests {
 	}
 
 	#[crate::test]
+	#[cfg(feature = "std")]
 	async fn retry_async_succeeds_after_failures() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;
@@ -751,6 +759,7 @@ mod tests {
 	}
 
 	#[crate::test]
+	#[cfg(feature = "std")]
 	async fn stream_sleeps_and_yields_attempts() {
 		#[allow(unused_mut)]
 		let mut backoff = Backoff::new(

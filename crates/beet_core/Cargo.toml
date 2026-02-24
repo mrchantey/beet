@@ -22,7 +22,17 @@ required-features = ["tokens"]
 
 
 [features]
-# default = ["json"]
+default = ["std"]
+std = [
+	"dep:path-clean",
+	"dep:pathdiff",
+	"dep:glob",
+	"dep:futures",
+	"dep:async-channel",
+	"dep:async-executor",
+	"dep:async-io",
+	"dep:async-task",
+]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["exchange", "ansi_paint"]
@@ -80,8 +90,8 @@ serde_urlencoded = { version = "0.7", optional = true }
 
 
 #💡 path
-path-clean = "1"
-pathdiff = "0.2"
+path-clean = { version = "1", optional = true }
+pathdiff = { version = "0.2", optional = true }
 either = "1"
 
 #💡 serde
@@ -95,7 +105,7 @@ heck.workspace = true
 
 #💡 async
 futures-lite = { workspace = true, features = ["race"] }
-async-channel.workspace = true
+async-channel = { workspace = true, optional = true }
 
 # tokens dependencies
 syn = { workspace = true, optional = true }
@@ -114,14 +124,14 @@ uuid = { workspace = true, optional = true, features = ["v4"] }
 ## utils
 thiserror.workspace = true
 extend.workspace = true
-glob.workspace = true
-futures.workspace = true
+glob = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ## async
-async-executor.workspace = true
-async-io.workspace = true
-async-task.workspace = true
+async-executor = { workspace = true, optional = true }
+async-io = { workspace = true, optional = true }
+async-task = { workspace = true, optional = true }
 
 ## fs
 async-fs = { workspace = true, optional = true }

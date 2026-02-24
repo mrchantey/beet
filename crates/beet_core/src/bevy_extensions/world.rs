@@ -10,8 +10,8 @@ use bevy::ecs::query::QueryFilter;
 use bevy::ecs::schedule::ExecutorKind;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
+use core::marker::PhantomData;
 use extend::ext;
-use std::marker::PhantomData;
 
 /// System that logs component names for an entity.
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
@@ -121,13 +121,15 @@ pub struct QueryOnce<D: QueryData, F: QueryFilter = ()> {
 	_phantom: PhantomData<F>,
 }
 
-impl<D: QueryData, F: QueryFilter> std::ops::Deref for QueryOnce<D, F> {
+impl<D: QueryData, F: QueryFilter> core::ops::Deref for QueryOnce<D, F> {
 	type Target = Vec<D::Item<'static, 'static>>;
-	fn deref(&self) -> &Self::Target { &self.items }
+	fn deref(&self) -> &<Self as core::ops::Deref>::Target { &self.items }
 }
 
-impl<D: QueryData, F: QueryFilter> std::ops::DerefMut for QueryOnce<D, F> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.items }
+impl<D: QueryData, F: QueryFilter> core::ops::DerefMut for QueryOnce<D, F> {
+	fn deref_mut(&mut self) -> &mut <Self as core::ops::Deref>::Target {
+		&mut self.items
+	}
 }
 
 impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
@@ -138,7 +140,7 @@ impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
 		let items = query.iter_mut(world).collect::<Vec<_>>();
 		// SAFETY: We're extending the lifetime to 'static because we own the data
 		// The query items are collected into owned data structures
-		let items = unsafe { std::mem::transmute(items) };
+		let items = unsafe { core::mem::transmute(items) };
 		Self {
 			items,
 			_phantom: PhantomData,
@@ -148,14 +150,14 @@ impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
 
 impl<D: QueryData, F: QueryFilter> IntoIterator for QueryOnce<D, F> {
 	type Item = D::Item<'static, 'static>;
-	type IntoIter = std::vec::IntoIter<Self::Item>;
+	type IntoIter = alloc::vec::IntoIter<Self::Item>;
 
 	fn into_iter(self) -> Self::IntoIter { self.items.into_iter() }
 }
 
 impl<'a, D: QueryData, F: QueryFilter> IntoIterator for &'a QueryOnce<D, F> {
 	type Item = &'a D::Item<'static, 'static>;
-	type IntoIter = std::slice::Iter<'a, D::Item<'static, 'static>>;
+	type IntoIter = core::slice::Iter<'a, D::Item<'static, 'static>>;
 
 	fn into_iter(self) -> Self::IntoIter { self.items.iter() }
 }
@@ -164,7 +166,7 @@ impl<'a, D: QueryData, F: QueryFilter> IntoIterator
 	for &'a mut QueryOnce<D, F>
 {
 	type Item = &'a mut D::Item<'static, 'static>;
-	type IntoIter = std::slice::IterMut<'a, D::Item<'static, 'static>>;
+	type IntoIter = core::slice::IterMut<'a, D::Item<'static, 'static>>;
 
 	fn into_iter(self) -> Self::IntoIter { self.items.iter_mut() }
 }
@@ -226,8 +228,7 @@ pub impl<W: IntoWorld> W {
 	fn log_component_names(&self, entity: Entity) {
 		let names = self.component_names_related::<Children>(entity);
 		let str = names.iter_to_string_indented();
-		println!("Component names for {entity}: \n{str}");
-		// bevy::log::info!("Component names for {entity}: \n{str}");
+		crate::cross_log!("Component names for {entity}: \n{str}");
 	}
 
 	/// Returns the component names for an entity and all its descendants as a tree.
@@ -238,7 +239,7 @@ pub impl<W: IntoWorld> W {
 		fn recurse<'a, R: RelationshipTarget>(
 			world: &'a World,
 			entity: Entity,
-			visited: &mut std::collections::HashSet<Entity>,
+			visited: &mut HashSet<Entity>,
 		) -> Tree<Vec<String>> {
 			if !visited.insert(entity) {
 				return Tree::default(); // Prevent cycles

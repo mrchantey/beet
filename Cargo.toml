@@ -21,7 +21,7 @@ readme = "README.md"
 homepage = "https://beetstack.dev"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["folk-technology", "web", "behavior", "game-ai", "robotics"]
+keywords = ["malleable-software", "local-first", "cross-platform", "framework", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",

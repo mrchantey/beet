@@ -24,6 +24,7 @@ pub impl Commands<'_, '_> {
 	}
 
 	/// Queues an asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,

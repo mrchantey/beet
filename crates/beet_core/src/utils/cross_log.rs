@@ -4,12 +4,19 @@
 macro_rules! cross_log_noline {
     ($($t:tt)*) => ({
       #[cfg(target_arch = "wasm32")]
-      	$crate::exports::web_sys::console::log_1(&(format!($($t)*).into()));
+      	$crate::exports::web_sys::console::log_1(&($crate::_alloc::format!($($t)*).into()));
       #[cfg(not(target_arch = "wasm32"))]
         {
-					print!($($t)*);
-					use std::io::Write;
-					std::io::stdout().flush().unwrap();
+					#[cfg(feature = "std")]
+					{
+						print!($($t)*);
+						use std::io::Write;
+						std::io::stdout().flush().unwrap();
+					}
+					#[cfg(not(feature = "std"))]
+					{
+						tracing::info!($($t)*);
+					}
 				}
     })
 }
@@ -19,9 +26,14 @@ macro_rules! cross_log_noline {
 macro_rules! cross_log {
     ($($t:tt)*) => ({
       #[cfg(target_arch = "wasm32")]
-      	$crate::exports::web_sys::console::log_1(&(format!($($t)*).into()));
+      	$crate::exports::web_sys::console::log_1(&($crate::_alloc::format!($($t)*).into()));
       #[cfg(not(target_arch = "wasm32"))]
-      	println!($($t)*);
+      {
+				#[cfg(feature = "std")]
+				println!($($t)*);
+				#[cfg(not(feature = "std"))]
+				tracing::info!($($t)*);
+			}
     })
 }
 /// cross-platform way of error logging a formatted value
@@ -29,9 +41,14 @@ macro_rules! cross_log {
 macro_rules! cross_log_error {
     ($($t:tt)*) => ({
       #[cfg(target_arch = "wasm32")]
-        $crate::exports::web_sys::console::error_1(&(format!($($t)*).into()));
+        $crate::exports::web_sys::console::error_1(&($crate::_alloc::format!($($t)*).into()));
       #[cfg(not(target_arch = "wasm32"))]
-        eprintln!($($t)*);
+      {
+				#[cfg(feature = "std")]
+				eprintln!($($t)*);
+				#[cfg(not(feature = "std"))]
+				tracing::error!($($t)*);
+			}
     })
 }
 

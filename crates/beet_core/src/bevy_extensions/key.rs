@@ -1,3 +1,4 @@
+use alloc::string::ToString;
 use bevy::input::keyboard::Key;
 /// Extension trait for [`Key`] to add convenient constructors.
 #[extend::ext(name=KeyExt)]
