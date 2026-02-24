@@ -287,9 +287,11 @@ mod test {
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((CardTool, Document::new(val!({ "flag": true })), children![
-			(TextNode::default(), FieldRef::new("flag"))
-		]));
+		world.spawn((
+			CardTool,
+			Document::new(val!({ "flag": true })),
+			children![(TextNode::default(), FieldRef::new("flag"))],
+		));
 
 		world.update_local();
 

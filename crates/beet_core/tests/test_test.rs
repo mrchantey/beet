@@ -1,7 +1,6 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::prelude::*;
-use beet_core::testing;
 
 #[test]
 fn returns_ok() -> Result<(), String> { Ok(()) }

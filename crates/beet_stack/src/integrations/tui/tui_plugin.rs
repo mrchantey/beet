@@ -43,4 +43,3 @@ impl Plugin for TuiPlugin {
 		.add_systems(PostUpdate, exit_system);
 	}
 }
-

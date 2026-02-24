@@ -1,3 +1,7 @@
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -493,6 +497,8 @@ fn extract_result_inner(ty: &Type) -> Option<&Type> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use alloc::string::String;
+	use alloc::string::ToString;
 	use quote::quote;
 
 	fn parse_str(attr: TokenStream, item: syn::ItemFn) -> String {

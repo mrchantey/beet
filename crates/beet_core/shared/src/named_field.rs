@@ -1,4 +1,7 @@
+extern crate alloc;
+
 use crate::prelude::*;
+use alloc::vec::Vec;
 use syn::Attribute;
 use syn::Data;
 use syn::DeriveInput;

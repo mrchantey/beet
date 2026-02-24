@@ -1,12 +1,15 @@
+#![no_std]
+extern crate alloc;
+
 mod action;
 mod as_any;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
-mod tool;
 mod mdx;
 mod sendit;
 mod to_tokens;
+mod tool;
 mod utils;
 use macros::*;
 

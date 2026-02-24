@@ -17,6 +17,7 @@
 //! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 //! - [`cross_log!`](crate::cross_log) - Cross-platform logging (works in wasm)
 
+mod as_any;
 /// Async utilities and future helpers.
 pub mod async_ext;
 mod backoff;
@@ -46,7 +47,6 @@ pub mod type_info_to_json_schema;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 mod xtend;
-mod as_any;
 pub use as_any::*;
 
 pub use async_ext::LifetimeSendBoxedFuture;

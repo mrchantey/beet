@@ -96,10 +96,11 @@ mod test {
 
 		// Create card with document and text child
 		let card = world
-			.spawn((CardTool, Document::new(val!({ "count": 0i64 })), children![(
-				TextNode::default(),
-				FieldRef::new("count")
-			)]))
+			.spawn((
+				CardTool,
+				Document::new(val!({ "count": 0i64 })),
+				children![(TextNode::default(), FieldRef::new("count"))],
+			))
 			.id();
 
 		world.update_local();

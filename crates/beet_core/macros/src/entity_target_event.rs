@@ -49,6 +49,7 @@ fn parse_entity_target_event(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use alloc::string::ToString;
 
 	#[test]
 	fn works() {

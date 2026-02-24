@@ -13,6 +13,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
+hashbrown = "0.15"
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true

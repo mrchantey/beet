@@ -819,7 +819,6 @@ impl AsyncEntity {
 /// Extension trait adding async command methods to [`World`].
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
-
 	/// Spawns an async task.
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where

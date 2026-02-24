@@ -1,3 +1,7 @@
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::ToString;
 use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -82,6 +86,7 @@ struct MyAction;
 #[cfg(test)]
 mod test {
 	use super::parse;
+	use alloc::string::ToString;
 	use quote::quote;
 	use syn::DeriveInput;
 

@@ -1,8 +1,10 @@
-//! Shared utilities for `beet_core` and `beet_core_macros`.
-//!
-//! This crate contains token utilities that need to be compiled for both
-//! the main `beet_core` crate and the `beet_core_macros` proc-macro crate.
+#![no_std]
+extern crate alloc;
 
+/// Shared utilities for `beet_core` and `beet_core_macros`.
+///
+/// This crate contains token utilities that need to be compiled for both
+/// the main `beet_core` crate and the `beet_core_macros` proc-macro crate.
 mod attribute_group;
 mod attribute_map;
 mod named_field;

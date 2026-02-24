@@ -322,7 +322,9 @@ mod test {
 			.spawn((render_markdown(), CardTool, children![
 				Paragraph::with_text("Inside card"),
 				// Nested card should not be rendered
-				(CardTool, children![Paragraph::with_text("Inside nested card")])
+				(CardTool, children![Paragraph::with_text(
+					"Inside nested card"
+				)])
 			]))
 			.call_blocking::<(), String>(())
 			.unwrap()

@@ -48,9 +48,7 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		func_tool(self)
-	}
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { func_tool(self) }
 }
 
 pub struct TypedFuncToolMarker;
@@ -182,9 +180,7 @@ mod test {
 	#[test]
 	fn tool_macro_func_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
-		let entity = world
-			.spawn(func_passthrough_entity.into_tool())
-			.id();
+		let entity = world.spawn(func_passthrough_entity.into_tool()).id();
 		world
 			.entity_mut(entity)
 			.call_blocking::<(), Entity>(())

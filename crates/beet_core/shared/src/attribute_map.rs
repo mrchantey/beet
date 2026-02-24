@@ -1,6 +1,8 @@
 use crate::*;
+use alloc::string::String;
+use alloc::string::ToString;
+use hashbrown::HashMap;
 use proc_macro2::TokenStream;
-use std::collections::HashMap;
 use syn::Expr;
 use syn::ExprAssign;
 use syn::Result;
@@ -10,7 +12,7 @@ use syn::punctuated::Punctuated;
 
 pub struct AttributeMap(pub HashMap<String, Option<Expr>>);
 
-impl std::ops::Deref for AttributeMap {
+impl core::ops::Deref for AttributeMap {
 	type Target = HashMap<String, Option<Expr>>;
 	fn deref(&self) -> &Self::Target { &self.0 }
 }

@@ -347,7 +347,9 @@ mod test {
 	fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn((CardTool, set_field_typed::<String>(field))).id();
+		let entity = world
+			.spawn((CardTool, set_field_typed::<String>(field)))
+			.id();
 
 		world
 			.entity_mut(entity)

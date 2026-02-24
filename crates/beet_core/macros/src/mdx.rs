@@ -17,7 +17,13 @@
 //! mdx!("string with {interpolation}")
 //! mdx!(r#"raw string with {interpolation}"#)
 //! ```
+extern crate alloc;
+
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use beet_core_shared::pkg_ext;
+use core::mem;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
@@ -109,8 +115,7 @@ fn parse_string_content(
 				// Valid expression — flush accumulated text first,
 				// then add the bundle segment
 				if !text_buf.is_empty() {
-					segments
-						.push(Segment::Markdown(std::mem::take(&mut text_buf)));
+					segments.push(Segment::Markdown(mem::take(&mut text_buf)));
 				}
 				segments.push(Segment::Bundle(ts));
 			} else {
@@ -180,8 +185,7 @@ fn parse_raw_tokens(tokens: Vec<TokenTree>) -> Vec<Segment> {
 
 				// Unescaped {expr} → flush text and add bundle
 				if !text_buf.is_empty() {
-					segments
-						.push(Segment::Markdown(std::mem::take(&mut text_buf)));
+					segments.push(Segment::Markdown(mem::take(&mut text_buf)));
 				}
 				segments.push(Segment::Bundle(group.stream()));
 				last_was_punct = false;

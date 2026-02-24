@@ -1,16 +1,12 @@
 # beet_transport
 
-How exciting! we are at the beginning of a no-std general purpose transport crate. http, websockets, gopher, smoke signals? all just 
+How exciting! we are at the beginning of a no-std general purpose transport crate. http, stdio, websockets, gopher, smoke signals? all just ways of moving bytes around.
 
+## The need
 
-## The need for another transport crate
+We're building a bevy metaframework. Bevy already has opinions about async runtimes, state management etc, and crates like `hyper` introduce non-trivial dependencies like `tokio` which are platform dependent and cut against the grain of a pure ecs application.
 
-We're building a bevy metaframework. Bevy already has mechanisms for async runtimes, for 
-
-
-
-
-We are creating a new crate: `beet_transport`
+Bevy is cross-platform, it is no-std and happily runs on tiny devices like the esp32. Likewise the general abstraction of beet_transport should be agnostic to the target, including very constrained environments like microcontrollers and wasm.
 
 We are building a non-tokio dependent bevy-first http server. I've included the now unmaintained `tiny-http` in `./agent/reference/tiny-http` for your reference.
 

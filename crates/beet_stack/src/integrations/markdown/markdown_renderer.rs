@@ -656,8 +656,9 @@ mod test {
 	#[test]
 	fn heading_renders() {
 		let mut world = World::new();
-		let entity =
-			world.spawn((CardTool, Heading1::with_text("Hello World"))).id();
+		let entity = world
+			.spawn((CardTool, Heading1::with_text("Hello World")))
+			.id();
 		render_card(&mut world, entity).xpect_eq("# Hello World\n\n");
 	}
 
@@ -703,7 +704,9 @@ mod test {
 		let entity = world
 			.spawn((CardTool, children![
 				Paragraph::with_text("Inside card"),
-				(CardTool, children![Paragraph::with_text("Inside nested card")]),
+				(CardTool, children![Paragraph::with_text(
+					"Inside nested card"
+				)]),
 			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq("Inside card\n\n");
