@@ -1346,7 +1346,6 @@ dependencies = [
 name = "beet_core_shared"
 version = "0.0.9-dev.3"
 dependencies = [
- "hashbrown 0.15.5",
  "proc-macro2",
  "quote",
  "syn 2.0.114",

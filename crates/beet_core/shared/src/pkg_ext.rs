@@ -17,12 +17,16 @@
 pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
 	if !is_internal() {
 		syn::parse_str("beet").unwrap()
-	} else if pkg_name == env!("CARGO_PKG_NAME") {
+	} else if pkg_name == crate_name() {
 		syn::parse_str("crate").unwrap()
 	} else {
 		syn::parse_str(pkg_name).unwrap()
 	}
 }
+fn crate_name() -> alloc::string::String {
+	std::env::var("CARGO_PKG_NAME").unwrap()
+}
+
 
 /// checks the CARGO_PKG_NAME against a list of internal packages
 pub fn is_internal() -> bool {
@@ -47,5 +51,5 @@ pub fn is_internal() -> bool {
 		"beet_stack",
 		"beet_tool",
 	];
-	INTERNAL_PKGS.contains(&env!("CARGO_PKG_NAME"))
+	INTERNAL_PKGS.contains(&crate_name().as_str())
 }

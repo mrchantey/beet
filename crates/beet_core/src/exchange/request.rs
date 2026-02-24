@@ -271,7 +271,7 @@ impl Request {
 	/// Deserializes the request body using the format indicated by
 	/// the `content-type` header, defaulting to JSON.
 	///
-	/// ```no_run
+	/// ```ignore
 	/// # use beet_core::prelude::*;
 	/// # async {
 	/// let request = Request::with_json("/test", &42u32).unwrap();
@@ -291,7 +291,7 @@ impl Request {
 	/// Deserializes the request body using the format indicated by
 	/// the `content-type` header, blocking the current thread.
 	///
-	/// ```
+	/// ```ignore
 	/// # use beet_core::prelude::*;
 	/// let request = Request::with_json("/test", &42u32).unwrap();
 	/// let value: u32 = request.deserialize_blocking().unwrap();

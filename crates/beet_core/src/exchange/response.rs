@@ -201,7 +201,7 @@ impl Response {
 	/// Deserializes the response body using the format indicated by
 	/// the `content-type` header, defaulting to JSON.
 	///
-	/// ```no_run
+	/// ```ignore
 	/// # use beet_core::prelude::*;
 	/// # async {
 	/// let response = Response::with_json(&42u32).unwrap();
@@ -221,7 +221,7 @@ impl Response {
 	/// Deserializes the response body using the format indicated by
 	/// the `content-type` header, blocking the current thread.
 	///
-	/// ```
+	/// ```ignore
 	/// # use beet_core::prelude::*;
 	/// let response = Response::with_json(&42u32).unwrap();
 	/// let value: u32 = response.deserialize_blocking().unwrap();

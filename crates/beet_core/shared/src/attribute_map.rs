@@ -1,7 +1,7 @@
 use crate::*;
 use alloc::string::String;
 use alloc::string::ToString;
-use hashbrown::HashMap;
+use alloc::vec::Vec;
 use proc_macro2::TokenStream;
 use syn::Expr;
 use syn::ExprAssign;
@@ -10,19 +10,14 @@ use syn::Token;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 
-pub struct AttributeMap(pub HashMap<String, Option<Expr>>);
-
-impl core::ops::Deref for AttributeMap {
-	type Target = HashMap<String, Option<Expr>>;
-	fn deref(&self) -> &Self::Target { &self.0 }
-}
+pub struct AttributeMap(Vec<(String, Option<Expr>)>);
 
 impl AttributeMap {
 	pub fn parse(tokens: TokenStream) -> Result<Self> {
 		let args =
 			Punctuated::<Expr, Token![,]>::parse_terminated.parse2(tokens)?;
 
-		let mut map = HashMap::new();
+		let mut map = Vec::new();
 
 		fn path_segment(path: syn::ExprPath) -> Result<String> {
 			if path.path.segments.len() != 1 {
@@ -44,11 +39,11 @@ impl AttributeMap {
 						);
 					};
 					let left = path_segment(expr_path)?;
-					map.insert(left, Some(*right));
+					map.push((left, Some(*right)));
 				}
 				Expr::Path(expr_path) => {
 					let left = path_segment(expr_path)?;
-					map.insert(left, None);
+					map.push((left, None));
 				}
 				other => synbail!(
 					other,
@@ -60,20 +55,34 @@ impl AttributeMap {
 		Ok(Self(map))
 	}
 
+	pub fn get(&self, key: &str) -> Option<&Option<Expr>> {
+		self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+	}
+
+	pub fn contains_key(&self, key: &str) -> bool {
+		self.0.iter().any(|(k, _)| k == key)
+	}
+
+	pub fn keys(&self) -> impl Iterator<Item = &str> {
+		self.0.iter().map(|(k, _)| k.as_str())
+	}
+
+	pub fn insert(&mut self, key: String, value: Option<Expr>) {
+		self.0.push((key, value));
+	}
+
 	pub fn assert_types(
 		&self,
 		required: &[&str],
 		optional: &[&str],
 	) -> Result<&Self> {
 		for key in required {
-			if !self.0.contains_key(*key) {
+			if !self.contains_key(key) {
 				synbail!(key, "Missing required attribute `{}`", key);
 			}
 		}
-		for key in self.0.keys() {
-			if !optional.contains(&key.as_str())
-				&& !required.contains(&key.as_str())
-			{
+		for key in self.keys() {
+			if !optional.contains(&key) && !required.contains(&key) {
 				synbail!(
 					key,
 					"Invalid attribute key `{}`. Allowed keys are: {}",

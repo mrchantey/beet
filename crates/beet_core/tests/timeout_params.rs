@@ -4,7 +4,7 @@
 //!
 //! This demonstrates the `timeout_ms` parameter on `#[beet_core::test]` which allows
 //! per-test timeout configuration, overriding the suite-level timeout.
-
+use beet_core::testing;
 
 
 /// Test with custom timeout - async function
