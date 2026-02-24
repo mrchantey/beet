@@ -30,7 +30,7 @@ bitflags = "2"
 
 serde = {workspace = true, optional=true}
 bevy_ratatui = {workspace = true, optional=true}
-ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-widget-ref","unstable-rendered-line-info"]}
+ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 pulldown-cmark = { version = "0.13", optional = true }
 webbrowser.workspace = true

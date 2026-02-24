@@ -85,7 +85,7 @@ pub(super) fn unlink_field_from_document(
 	ev: On<Remove, FieldRef>,
 	mut commands: Commands,
 ) -> Result {
-	commands.entity(ev.entity).remove::<FieldOf>();
+	commands.entity(ev.entity).try_remove::<FieldOf>();
 	Ok(())
 }
 
