@@ -1,6 +1,5 @@
 assets
-agent/ratatui
-agent/tui_server
+agent/reference
 
 !examples/assets
 Cargo.toml.full
