@@ -113,7 +113,8 @@ async fn response_to_hyper(
 
 	// Convert our ResponseParts to http::response::Parts
 	let http_parts: http::response::Parts =
-		parts.try_into().unwrap_or_else(|_| {
+		parts.try_into().unwrap_or_else(|err| {
+			error!("Failed to convert response parts: {}", err);
 			http::Response::builder()
 				.status(http::StatusCode::INTERNAL_SERVER_ERROR)
 				.body(())
