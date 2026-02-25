@@ -19,26 +19,37 @@ pub impl EntityWorldMut<'_> {
 	/// If the tool call fails, logs the error and returns
 	/// [`Response::internal_error`].
 	fn exchange(
-		self,
+		mut self,
 		request: impl Into<Request>,
 	) -> impl Future<Output = Response> {
 		let start_time = Instant::now();
-		let entity = self.id();
-		let fut = self.call::<Request, Response>(request.into());
+		let request = request.into();
 		async move {
-			let response = match fut.await {
-				Ok(res) => res,
-				Err(err) => {
-					error!("Exchange failed on entity {:?}: {}", entity, err);
+			self.run_async_then(async move |entity| {
+				let res = entity.call(request).await.unwrap_or_else(|err| {
+					error!(
+						"Exchange failed on entity {:?}: {}",
+						entity.id(),
+						err
+					);
 					Response::internal_error()
-				}
-			};
-			trace!(
-				"Exchange on {:?} completed in {:?}",
-				entity,
-				start_time.elapsed()
-			);
-			response
+				});
+				trace!(
+					"Exchange on {:?} completed in {:?}",
+					entity.id(),
+					start_time.elapsed()
+				);
+				let status = res.status();
+				entity
+					.trigger_then(move |entity| ExchangeEnd {
+						entity,
+						start_time,
+						status,
+					})
+					.await;
+				res
+			})
+			.await
 		}
 	}
 
@@ -103,7 +114,6 @@ pub struct ExchangeEnd {
 	/// The HTTP status code of the response.
 	pub status: StatusCode,
 }
-
 
 #[cfg(test)]
 mod test {

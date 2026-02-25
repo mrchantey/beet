@@ -97,15 +97,6 @@ mod test {
 			.await
 			.xpect_ok();
 
-		// Manually trigger ExchangeEnd since tool-based exchanges
-		// do not automatically trigger it
-		world.trigger(ExchangeEnd {
-			entity,
-			start_time: Instant::now(),
-			status: StatusCode::Ok,
-		});
-		world.flush();
-
 		world
 			.query_once::<&ExchangeStats>()
 			.iter()
