@@ -1,8 +1,7 @@
 //! # Basic Server
 //!
 //! This example demonstrates creating a basic server in Beet
-//! using the [`handler_exchange`], which is the least opinionated exchange pattern
-//! and can only process a single request at a time.
+//! using [`func_tool`], the simplest synchronous exchange pattern.
 //! For concurrent request handling see [`spawn_exchange`].
 //!
 //!

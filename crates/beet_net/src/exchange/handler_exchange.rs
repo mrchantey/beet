@@ -59,7 +59,6 @@ pub fn mirror_exchange() -> Tool<Request, Response> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use beet_tool::prelude::*;
 
 	#[beet_core::test]
 	async fn handler_sync_works() {

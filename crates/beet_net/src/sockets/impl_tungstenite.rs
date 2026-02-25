@@ -266,39 +266,50 @@ impl SocketWriter for TungWriter {
 		let sink = self.sink.clone();
 		async move {
 			let mut guard = sink.lock().await;
-			guard
-				.send(tmsg)
-				.await
-				.map_err(|e| bevyhow!("WebSocket send failed: {}", e))?;
-			Ok(())
+			match guard.send(tmsg).await {
+				Ok(_) => Ok(()),
+				Err(TungError::ConnectionClosed | TungError::AlreadyClosed) => {
+					// Expected during close handshake: peer already closed the connection
+					debug!("WebSocket send skipped: connection already closed");
+					Ok(())
+				}
+				Err(err) => Err(bevyhow!("WebSocket send failed: {}", err)),
+			}
 		}
 		.boxed()
 	}
 	fn close_boxed(
 		&mut self,
 		close: Option<CloseFrame>,
-	) -> BoxFuture<'static, Result<()>> {
+	) -> BoxFuture<'static, Result> {
 		let sink = self.sink.clone();
 		async move {
 			let mut guard = sink.lock().await;
-			match close {
-				Some(cf) => {
-					let frame = TungCloseFrame {
-						code: close_code_from_u16(cf.code),
-						reason: cf.reason.into(),
-					};
-					guard.send(TungMessage::Close(Some(frame))).await.map_err(
-						|e| bevyhow!("WebSocket close send failed: {}", e),
-					)?;
-					// ensure the sink closes gracefully after sending close
-					guard.close().await.map_err(|e| {
-						bevyhow!("WebSocket close failed: {}", e)
-					})?;
+
+			if let Some(cf) = close {
+				let frame = TungCloseFrame {
+					code: close_code_from_u16(cf.code),
+					reason: cf.reason.into(),
+				};
+				match guard.send(TungMessage::Close(Some(frame))).await {
+					Ok(_) => {}
+					Err(
+						TungError::ConnectionClosed | TungError::AlreadyClosed,
+					) => {
+						// do not even log a failed close message due to already closed
+					}
+					Err(e) => {
+						bevybail!("WebSocket close send failed: {}", e);
+					}
 				}
-				None => {
-					guard.close().await.map_err(|e| {
-						bevyhow!("WebSocket close failed: {}", e)
-					})?;
+			}
+			match guard.close().await {
+				Ok(_) => {}
+				Err(TungError::ConnectionClosed | TungError::AlreadyClosed) => {
+					// do not even log a failed close message due to already closed
+				}
+				Err(e) => {
+					bevybail!("WebSocket close failed: {}", e);
 				}
 			}
 			Ok(())
