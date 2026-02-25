@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.spawn((
 ///     HttpServer::default(),
-///     HandlerExchange::new(|req| req.mirror()),
+///     handler_exchange(|req| req.mirror()),
 /// ));
 /// ```
 #[derive(Clone, Component)]

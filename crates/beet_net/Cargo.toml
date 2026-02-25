@@ -8,7 +8,7 @@ readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["router", "request", "buckets", "key-value-store"]
+keywords = ["router", "request", "buckets", "key-value-store", "tool"]
 categories.workspace = true
 publish = true
 
@@ -27,7 +27,6 @@ server = [
 lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
-flow = ["dep:beet_flow"]
 aws = [
 	"serde",
 	"dep:crc-fast",
@@ -70,7 +69,7 @@ rustls-tls = [
 
 [dependencies]
 beet_core = {workspace = true,features=["exchange","http","json"]}
-beet_flow = { workspace = true, optional = true }
+beet_tool = {workspace = true,features=["exchange"]}
 
 bevy.workspace = true
 

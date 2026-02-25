@@ -1,35 +1,25 @@
-//! Generalized request/response exchange patterns for Bevy entities.
+//! Request/response exchange patterns built on the tool system.
 //!
-//! This module provides infrastructure for handling transport agnostic request/response
-//! exchanges within the Bevy ECS. It enables entities to act as "servers" that
-//! receive requests and produce responses through the observer pattern.
+//! This module provides infrastructure for handling request/response
+//! exchanges within the Bevy ECS using [`Tool<Request, Response>`]
+//! components from `beet_tool`.
 //!
 //! ## Core Concepts
 //!
-//! - [`ExchangeStart`]: Event triggered when a request arrives at an entity
-//! - [`ExchangeContext`]: Contains the response sender and timing information
+//! - [`ExchangeExt`] / [`AsyncExchangeExt`]: Convenience traits for calling
+//!   `Tool<Request, Response>` on entities
 //! - [`ExchangeEnd`]: Event triggered when an exchange completes
 //!
 //! ## Exchange Patterns
 //!
-//! - [`SpawnExchange`]: Spawns a child entity for each exchange
-//! - [`HandlerExchange`]: Routes requests to handler functions
-//! - [`FlowExchange`]: Integrates with beet_flow for behavior tree responses
+//! - [`handler_exchange`]: Creates a sync `Tool<Request, Response>` from a closure
+//! - [`handler_exchange_async`]: Creates an async `Tool<Request, Response>` from a closure
+//! - [`mirror_exchange`]: Echoes requests back as responses
 mod exchange;
 mod exchange_stats;
 mod extractors;
-#[cfg(feature = "flow")]
-mod flow_exchange;
-#[cfg(feature = "flow")]
-mod flow_exchange_stream;
 mod handler_exchange;
-mod spawn_exchange;
 pub use exchange::*;
 pub use exchange_stats::*;
 pub use extractors::*;
-#[cfg(feature = "flow")]
-pub use flow_exchange::*;
-#[cfg(feature = "flow")]
-pub use flow_exchange_stream::*;
 pub use handler_exchange::*;
-pub use spawn_exchange::*;

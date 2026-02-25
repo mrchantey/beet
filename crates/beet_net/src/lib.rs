@@ -2,7 +2,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(feature = "aws", feature(if_let_guard))]
-#![feature(fn_traits, unboxed_closures)]
 #![deny(missing_docs)]
 
 mod client;

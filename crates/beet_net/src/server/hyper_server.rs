@@ -275,12 +275,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					handler_exchange(move |mut entity, req| {
-						let count = entity.world_scope(|world: &mut World| {
-							world.query_once::<&ExchangeStats>()[0]
-								.request_count()
-						});
-						assert!(count < 99999);
+					handler_exchange(move |req| {
 						Response::ok().with_body(req.body)
 					}),
 				))
@@ -335,7 +330,7 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
-					handler_exchange(move |_, req| {
+					handler_exchange(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
 							req.body,

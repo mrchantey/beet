@@ -19,10 +19,8 @@ native-tls = ["beet_net/native-tls"]
 fs = ["beet_core/fs"]
 
 [dependencies]
-beet_net = { workspace = true, features = ["ureq","flow"] }
+beet_net = { workspace = true, features = ["ureq"] }
 beet_core = { workspace = true, features = ["serde","exchange"] }
-beet_flow.workspace = true
-beet_router.workspace = true
 
 futures.workspace = true
 strum.workspace = true

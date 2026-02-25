@@ -1,16 +1,12 @@
-//! Direct handler exchange patterns for simple request/response handling.
+//! Exchange handlers that produce [`Tool<Request, Response>`] components.
 //!
-//! This module provides [`handler_exchange`] and [`handler_exchange_async`],
-//! which create exchange handlers that directly process requests without
-//! the overhead of component insertion/removal.
+//! These convenience functions create tools for common request/response
+//! patterns, wrapping the `beet_tool` primitives with HTTP-friendly APIs.
 
-use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::Arc;
+use beet_tool::prelude::*;
 
-/// Creates an exchange handler that processes requests directly with a synchronous function.
-/// This is the least opinionated exchange pattern but can only process a single request
-/// at a time. For concurrent request handling see [`spawn_exchange`].
+/// Creates a synchronous [`Tool<Request, Response>`] from a closure.
 ///
 /// ## Example
 ///
@@ -18,54 +14,18 @@ use std::sync::Arc;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let mut entity = world.spawn(handler_exchange(|_entity, request| {
-///     // Echo the request path back as a response
+/// let mut entity = world.spawn(handler_exchange(|request| {
 ///     request.mirror()
 /// }));
 /// ```
-///
-///
-/// ## Execution Flow
-///
-/// 1. [`ExchangeStart`] is triggered on the spawner entity
-/// 2. The handler function is called with [`EntityWorldMut`] and [`Request`]
-/// 3. The returned [`Response`] is sent via the exchange channel
-
-pub fn handler_exchange<F>(func: F) -> impl Bundle
+pub fn handler_exchange<F>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Clone + Fn(EntityWorldMut, Request) -> Response,
+	F: 'static + Send + Sync + Fn(Request) -> Response,
 {
-	OnSpawn::observe(
-		move |ev: On<ExchangeStart>, mut commands: Commands| -> Result {
-			let func = func.clone();
-			let server_entity = ev.event_target();
-			let (req, cx) = ev.take()?;
-
-			commands.queue(move |world: &mut World| -> Result {
-				let res = func(world.entity_mut(server_entity), req);
-				cx.end_no_entity(res)
-			});
-
-			Ok(())
-		},
-	)
+	func_tool(move |input: FuncToolIn<Request>| Ok(func(input.input)))
 }
 
-/// Creates an exchange handler that processes requests with an async function.
-///
-/// Unlike [`spawn_exchange`], this pattern does not insert/remove [`Request`] and [`Response`]
-/// components. Instead, the handler function receives the request directly and returns
-/// a future that resolves to a response, which is sent via the exchange channel.
-///
-/// The async task is spawned directly on the executor, so this works without
-/// needing to update the world. The handler receives the spawner [`Entity`] and [`Request`].
-///
-/// ## Execution Flow
-///
-/// 1. [`ExchangeStart`] is triggered on the spawner entity
-/// 2. An async task is spawned directly on the executor
-/// 3. The handler receives the spawner [`Entity`] and [`Request`]
-/// 4. When the future resolves, the [`Response`] is sent via the exchange channel
+/// Creates an async [`Tool<Request, Response>`] from a closure.
 ///
 /// ## Example
 ///
@@ -73,38 +33,26 @@ where
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let mut entity = world.spawn(handler_exchange_async(|_entity, request| async move {
-///     // Async operations can be performed here
+/// let mut entity = world.spawn(handler_exchange_async(|request| async move {
 ///     request.mirror()
 /// }));
 /// ```
-pub fn handler_exchange_async<F, Fut>(func: F) -> impl Bundle
+pub fn handler_exchange_async<F, Fut>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Fn(Entity, Request) -> Fut,
+	F: 'static + Send + Sync + Clone + Fn(Request) -> Fut,
 	Fut: 'static + Send + Future<Output = Response>,
 {
-	let func = Arc::new(func);
-	OnSpawn::observe(
-		move |ev: On<ExchangeStart>, mut commands: AsyncCommands| -> Result {
-			let func = func.clone();
-			let server_entity = ev.event_target();
-			let (req, cx) = ev.take()?;
-
-			commands.run(async move |_| {
-				let response = func(server_entity, req).await;
-				cx.end_no_entity(response)
-			});
-
-			Ok(())
-		},
-	)
+	async_tool(move |input: AsyncToolIn<Request>| {
+		let fut = func(input.input);
+		async move { Ok(fut.await) }
+	})
 }
 
-/// Creates a simple mirror exchange handler that echoes requests back as responses.
+/// Creates a mirror exchange tool that echoes requests back as responses.
 ///
 /// Useful for testing and debugging exchange infrastructure.
-pub fn mirror_exchange() -> impl Bundle {
-	handler_exchange(|_, req| req.mirror())
+pub fn mirror_exchange() -> Tool<Request, Response> {
+	handler_exchange(|req| req.mirror())
 }
 
 #[cfg(test)]
@@ -114,8 +62,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn handler_sync_works() {
-		World::new()
-			.spawn(handler_exchange(|_, req| req.mirror_parts()))
+		AsyncPlugin::world()
+			.spawn(handler_exchange(|req| req.mirror_parts()))
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
@@ -124,8 +72,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn handler_sync_custom_response() {
-		World::new()
-			.spawn(handler_exchange(|_, _| {
+		AsyncPlugin::world()
+			.spawn(handler_exchange(|_| {
 				Response::from_status(StatusCode::ImATeapot)
 			}))
 			.exchange(Request::get("/foo"))
@@ -137,9 +85,9 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_works() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange_async(|_, req| async move {
-				req.mirror_parts()
-			}))
+			.spawn(handler_exchange_async(
+				|req| async move { req.mirror_parts() },
+			))
 			.exchange(Request::get("/bar"))
 			.await
 			.status()
@@ -149,7 +97,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange_async(|_, _| async move {
+			.spawn(handler_exchange_async(|_| async move {
 				Response::from_status(StatusCode::ImATeapot)
 			}))
 			.exchange(Request::get("/bar"))
@@ -160,7 +108,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn mirror_works() {
-		World::new()
+		AsyncPlugin::world()
 			.spawn(mirror_exchange())
 			.exchange(Request::get("/mirror"))
 			.await
