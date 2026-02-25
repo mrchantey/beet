@@ -26,7 +26,7 @@ mod bevyhow;
 #[cfg(feature = "std")]
 mod cli_args;
 mod clone_func;
-mod cross_log;
+pub mod cross_log;
 /// Display formatting utilities.
 pub mod display_ext;
 #[cfg(feature = "std")]

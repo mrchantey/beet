@@ -67,6 +67,16 @@ pub use utils::async_ext;
 #[cfg(feature = "std")]
 pub use utils::time_ext;
 
+// Re-export cross_log helpers at crate root so `$crate::` in macros resolves them.
+// The std feature check lives inside these functions (in beet_core where std is a
+// declared feature), avoiding unexpected_cfgs warnings in downstream crates.
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_error_native;
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_native;
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_native_noline;
+
 #[cfg(feature = "std")]
 pub mod arena;
 mod bevy_extensions;

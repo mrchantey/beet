@@ -85,7 +85,7 @@ mod test_request {
 	// TODO spin up our own server for tests
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
-	// #[ignore = "flaky example.com"]
+	#[ignore = "requires external network and system CA certs"]
 	async fn works() {
 		Request::get("https://example.com")
 			.send()
@@ -199,6 +199,7 @@ mod test_request {
 
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	#[ignore = "requires external network and system CA certs"]
 	async fn concurrent_requests_complete_independently() {
 		// This test verifies that multiple requests can run concurrently
 		// without blocking each other. Make 3 concurrent requests - if they're
