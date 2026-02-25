@@ -20,9 +20,9 @@ use beet_tool::prelude::*;
 /// ```
 pub fn handler_exchange<F>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Fn(Request) -> Response,
+	F: 'static + Send + Sync + Fn(FuncToolIn<Request>) -> Response,
 {
-	func_tool(move |input: FuncToolIn<Request>| Ok(func(input.input)))
+	func_tool(move |input: FuncToolIn<Request>| Ok(func(input)))
 }
 
 /// Creates an async [`Tool<Request, Response>`] from a closure.
@@ -52,13 +52,14 @@ where
 ///
 /// Useful for testing and debugging exchange infrastructure.
 pub fn mirror_exchange() -> Tool<Request, Response> {
-	handler_exchange(|req| req.mirror())
+	handler_exchange(|req| req.take().mirror())
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_tool::prelude::*;
 
 	#[beet_core::test]
 	async fn handler_sync_works() {

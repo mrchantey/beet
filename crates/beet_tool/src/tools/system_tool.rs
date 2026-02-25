@@ -52,12 +52,7 @@ pub fn system_tool<Func, Input, Out, FnMarker>(func: Func) -> Tool<Input, Out>
 where
 	Func: 'static + Send + Sync + Clone,
 	FnMarker: 'static,
-	Func: SystemParamFunction<FnMarker, Out = Result<Out>>,
-	Func: IntoSystem<
-			In<SystemToolIn<Input>>,
-			Result<Out>,
-			(IsFunctionSystem, FnMarker),
-		>,
+	Func: IntoSystem<In<SystemToolIn<Input>>, Result<Out>, FnMarker>,
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {

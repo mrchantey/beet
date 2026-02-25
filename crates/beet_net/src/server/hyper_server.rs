@@ -276,7 +276,7 @@ mod test {
 				.spawn_then((
 					server,
 					handler_exchange(move |req| {
-						Response::ok().with_body(req.body)
+						Response::ok().with_body(req.take().body)
 					}),
 				))
 				.run();

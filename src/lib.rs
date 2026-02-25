@@ -37,6 +37,8 @@ pub use beet_rsx as rsx;
 pub use beet_spatial as spatial;
 #[cfg(feature = "stack")]
 pub use beet_stack as stack;
+#[cfg(feature = "tool")]
+pub use beet_tool as tool;
 pub mod prelude {
 	pub use crate::beet_plugins::*;
 	#[cfg(feature = "build")]
@@ -65,6 +67,8 @@ pub mod prelude {
 	pub use crate::rsx::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
+	#[cfg(feature = "tool")]
+	pub use crate::tool::prelude::*;
 	// TODO deprecate the original versions of these
 	#[cfg(feature = "stack")]
 	pub use crate::stack::prelude::CardTool;

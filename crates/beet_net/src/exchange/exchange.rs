@@ -133,7 +133,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange(|req| req.mirror()))
+			.spawn(handler_exchange(|req| req.take().mirror()))
 			.exchange(Request::get("foo"))
 			.await
 			.status()

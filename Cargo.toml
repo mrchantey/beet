@@ -235,7 +235,7 @@ client = [
 	"beet_dom/client",
 	"beet_design/client",
 ]
-http_server = ["net", "beet_net/server"]
+http_server = ["net", "tool", "beet_net/server"]
 
 #💡 fine-grained
 native-tls = [
@@ -252,6 +252,7 @@ rand = ["beet_core/rand"]
 clanker = ["dep:beet_clanker","net","router"]
 testing = ["beet_core/testing"]
 dom = ["css", "dep:beet_dom"]
+tool = ["dep:beet_tool"]
 router = ["dep:beet_router"]
 examples = ["bevy_default", "spatial", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
@@ -317,6 +318,7 @@ beet_ml = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
 beet_examples = { workspace = true, optional = true }
+beet_tool = { workspace = true, optional = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -1191,6 +1191,7 @@ dependencies = [
  "beet_rsx",
  "beet_spatial",
  "beet_stack",
+ "beet_tool",
  "bevy",
  "console_error_panic_hook",
  "futures",

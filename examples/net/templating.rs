@@ -31,7 +31,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				Count::default(),
-				handler_exchange(router),
+				system_tool(router),
 			));
 		})
 		.run();
@@ -41,7 +41,12 @@ fn main() {
 struct Count(u32);
 
 /// A simple router implementation that matches the request path
-fn router(entity: EntityWorldMut, request: Request) -> Response {
+fn router(
+	In(input): In<SystemToolIn<Request>>,
+	world: &mut World,
+) -> Result<Response> {
+	let entity = world.entity_mut(input.tool);
+	let request = input.take();
 	println!("{}: {}", request.method(), request.path_string());
 
 	let route = match request.path_string().as_str() {
@@ -49,7 +54,7 @@ fn router(entity: EntityWorldMut, request: Request) -> Response {
 		"/planting-trees" => planting_trees,
 		_ => not_found,
 	};
-	route(entity, request)
+	route(entity, request).xok()
 }
 
 

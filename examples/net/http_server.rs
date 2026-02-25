@@ -36,7 +36,7 @@ fn main() {
 				// CliServer::default(),
 				HttpServer::default(),
 				Count::default(),
-				handler_exchange(handler),
+				system_tool(handler),
 			));
 		})
 		.run();
@@ -46,7 +46,12 @@ fn main() {
 struct Count(u32);
 
 /// Handler function that processes all incoming requests.
-fn handler(mut server: EntityWorldMut, request: Request) -> Response {
+fn handler(
+	input: In<SystemToolIn<Request>>,
+	mut query: Query<&mut Count>,
+) -> Result<Response> {
+	let tool = input.0.tool;
+	let request = input.0.input;
 	// only accept `/` routes
 	if !request.path().is_empty() {
 		let message = format!("Not Found: {}", request.path_string());
@@ -59,14 +64,15 @@ fn handler(mut server: EntityWorldMut, request: Request) -> Response {
 			StatusCode::NotFound,
 			message,
 			"text/plain",
-		);
+		)
+		.xok();
 	}
 
 	// increment visitor count
 	let name = request.get_param("name").unwrap_or("world");
 
 	// increment visitor count
-	let mut count = server.get_mut::<Count>().unwrap();
+	let mut count = query.get_mut(tool)?;
 	count.0 += 1;
 
 	let message = format!(
@@ -80,5 +86,5 @@ pass the 'name' parameter to receive a warm personal greeting.
 	);
 
 	println!("{}: {}", request.method(), request.path_string());
-	Response::ok_body(message, "text/plain")
+	Response::ok_body(message, "text/plain").xok()
 }

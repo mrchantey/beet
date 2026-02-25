@@ -39,6 +39,10 @@ impl<In> std::ops::DerefMut for FuncToolIn<In> {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
 }
 
+impl<In> FuncToolIn<In> {
+	pub fn take(self) -> In { self.input }
+}
+
 pub struct FuncToolMarker;
 
 impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
