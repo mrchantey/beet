@@ -333,7 +333,7 @@ mod test {
 					handler_exchange(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
-							req.body,
+							req.take().body,
 							|mut body| async move {
 								match body.next().await {
 									Ok(Some(chunk)) => {

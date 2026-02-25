@@ -1,0 +1,2 @@
+- beet_net the InMemoryProvider should use a static LazyLock instead of storing data on the struct, ie two buckets with the same name should point to the same in-memory bucket, despite being created independently. This replicates the behavior of cloud or filesystem buckets
+-

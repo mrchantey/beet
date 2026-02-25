@@ -2,12 +2,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// HTTP server that listens for incoming requests and routes them to handlers.
+/// HTTP server that listens for incoming requests, triggering a [`Tool::<Request,Response>`] call.
 ///
 /// When spawned, this component automatically starts a server on the specified port.
 /// The underlying implementation depends on compile-time feature flags:
-/// - `lambda`: Uses AWS Lambda runtime
 /// - Default: Uses Hyper HTTP server
+/// - `lambda`: Uses AWS Lambda runtime
 ///
 /// # Example
 ///

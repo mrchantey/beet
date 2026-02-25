@@ -141,7 +141,6 @@ where
 								move |world: &mut World| -> Result {
 									let entity = world
 										.spawn((
-											CardTool,
 											CardOf::new(card_tool),
 											func(),
 										))
@@ -161,7 +160,7 @@ where
 						.await?;
 
 					// Delegate to the render tool with spawn capability
-					let response: Response = world
+					let response = world
 						.entity(render_tool)
 						.call::<RenderRequest, Response>(RenderRequest {
 							card_tool,
@@ -238,7 +237,7 @@ pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 					})
 					.await?;
 
-				let response: Response = world
+				let response = world
 					.entity(render_tool)
 					.call::<RenderRequest, Response>(RenderRequest {
 						card_tool,
