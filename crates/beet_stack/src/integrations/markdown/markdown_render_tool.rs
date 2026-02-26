@@ -89,7 +89,7 @@ pub fn render_markdown() -> impl Bundle {
 /// so it can be called from any context with `&mut World`.
 pub fn render_markdown_for(entity: Entity, world: &mut World) -> String {
 	world
-		.run_system_cached_with(render_markdown_for_entity, entity)
+		.run_system_cached_with(render_markdown_for_system, entity)
 		.unwrap_or_default()
 }
 
@@ -106,7 +106,7 @@ fn render_markdown_system(
 
 /// System that renders a specific entity to markdown, starting from
 /// that entity directly rather than resolving the card root first.
-fn render_markdown_for_entity(
+fn render_markdown_for_system(
 	In(entity): In<Entity>,
 	walker: CardWalker,
 ) -> String {

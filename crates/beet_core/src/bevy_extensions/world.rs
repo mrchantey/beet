@@ -388,6 +388,7 @@ pub impl<W: IntoWorld> W {
 
 
 	/// Triggers an event with a reference, using the given caller location.
+	// a public version of bevy's inbuilt one
 	#[track_caller]
 	fn trigger_ref_with_caller_pub<'a, E: Event>(
 		&mut self,

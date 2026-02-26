@@ -122,6 +122,10 @@ const DEFAULT_CLI_VERSION: &str = "0.1.0";
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestParts {
+	/// The HTTP method (GET, POST, etc.),
+	///
+	/// Note: body constraints may be enforced at the protocol level but they
+	/// are not at the framework level, ie a GET request may have a body.
 	method: HttpMethod,
 	/// The scheme of the request (http, https, cli, etc.)
 	scheme: Scheme,
