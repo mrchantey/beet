@@ -1,7 +1,6 @@
 //! Extension methods for Bevy's [`World`].
 
-#[cfg(feature = "bevy_scene")]
-use crate::bevy_utils::scene_serde::*;
+
 use crate::prelude::*;
 use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
@@ -349,21 +348,5 @@ pub impl<'w> EntityWorldMut<'w> {
 			world.flush();
 		}
 		self
-	}
-}
-
-
-#[cfg(test)]
-#[cfg(feature = "bevy_scene")]
-mod test {
-	use crate::prelude::*;
-
-	#[test]
-	fn serializes() {
-		let mut app = App::new();
-		app.add_plugins(MinimalPlugins);
-		app.init();
-		app.update();
-		app.world_mut().build_scene().xpect_contains("Time");
 	}
 }

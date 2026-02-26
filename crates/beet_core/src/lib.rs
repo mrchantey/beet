@@ -80,7 +80,7 @@ pub use utils::cross_log::_cross_log_native_noline;
 #[cfg(feature = "std")]
 pub mod arena;
 mod bevy_extensions;
-mod bevy_utils;
+pub mod bevy_utils;
 #[cfg(feature = "exchange")]
 mod exchange;
 pub mod extensions;

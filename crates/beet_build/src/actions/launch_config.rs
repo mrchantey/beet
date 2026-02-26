@@ -109,7 +109,7 @@ fn insert_launch_hash(
 }
 
 fn export_launch_scene(world: &mut World) -> Result {
-	let scene = world.build_scene();
+	let scene = SceneSaver::new_default(world).save_ron()?;
 	let launch_file =
 		world.resource::<WorkspaceConfig>().launch_file.into_abs();
 	fs_ext::write(&launch_file, scene)?;
@@ -143,7 +143,7 @@ fn load_launch_scene(
 ) -> Result {
 	// missing scene is an error at this stage
 	let scene = fs_ext::read_to_string(&config.launch_file.into_abs())?;
-	commands.load_scene(scene);
+	commands.load_scene_ron(scene);
 
 	commands.entity(ev.target()).trigger_target(Outcome::Pass);
 	Ok(())
@@ -178,7 +178,7 @@ fn launch_step_predicate() -> impl Bundle {
 				// create a temp world to extract resources from the launch scene
 				let mut temp_world = World::new();
 				temp_world.insert_resource(type_registry.clone());
-				temp_world.load_scene(scene)?;
+				SceneLoader::new(&mut temp_world).load_ron(scene)?;
 				let launch_hash = temp_world.get_resource::<LaunchHash>().ok_or_else(||{
 					bevyhow!(
 						"LaunchHash is missing from launch scene, this can happen if it was not generated with the LaunchConfig::runner"

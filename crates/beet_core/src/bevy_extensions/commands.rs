@@ -1,8 +1,7 @@
 //! Extension methods for Bevy's [`Commands`].
 
-use bevy::ecs::system::command;
-
 use crate::prelude::*;
+use bevy::ecs::system::command;
 
 /// Extension trait adding utility methods to [`Commands`].
 #[extend::ext(name=CommandsExt)]
@@ -16,10 +15,10 @@ pub impl Commands<'_, '_> {
 
 	/// Loads a scene from a serialized string.
 	#[cfg(feature = "bevy_scene")]
-	fn load_scene(&mut self, scene: impl Into<String>) {
+	fn load_scene_ron(&mut self, scene: impl Into<String>) {
 		let scene = scene.into();
 		self.queue(move |world: &mut World| -> Result {
-			world.load_scene(&scene)
+			SceneLoader::new(world).load_ron(&scene)
 		});
 	}
 
