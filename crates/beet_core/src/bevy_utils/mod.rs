@@ -25,6 +25,11 @@
 //!
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
 //! - [`IdCounter`] - Unique ID generation
+//!
+//! # Scene Utilities
+//!
+//! - [`SceneSaver`] - Serialize world or entity subtrees to RON, JSON, or postcard
+//! - [`SceneLoader`] - Deserialize scenes back into a world
 
 mod ancestor_query;
 #[cfg(feature = "std")]
@@ -43,6 +48,8 @@ pub mod observer_ext;
 mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
+#[cfg(feature = "bevy_scene")]
+pub mod scene_serde;
 mod when;
 
 pub use ancestor_query::*;
@@ -60,4 +67,6 @@ pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
+#[cfg(feature = "bevy_scene")]
+pub use scene_serde::*;
 pub use when::*;

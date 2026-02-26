@@ -47,7 +47,8 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	for file in files {
 		let file = fs_ext::read_to_string(file)?;
 		{
-			world.load_scene_with(file, &mut snippet_entity_map)?;
+			SceneLoader::new(self)
+				.load_ron_with(file, snippet_entity_ma)?;
 		}
 	}
 	debug!(

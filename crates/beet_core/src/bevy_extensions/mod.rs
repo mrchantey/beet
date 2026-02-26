@@ -9,8 +9,8 @@
 //!
 //! # World Extensions
 //!
-//! - [`WorldExt`] - Local execution, serialization, entity inspection
-//! - [`IntoWorldMutExt`] - Query utilities, component inspection, scene building
+//! - [`WorldExt`] - Local execution, entity inspection
+//! - [`WorldMutExt`] - Query utilities, component inspection, scene building
 //! - [`CoreWorldExt`] - Observer helpers
 //!
 //! # Entity Extensions
