@@ -1,5 +1,7 @@
 mod body;
 pub mod header;
+/// Alias for [`header`] — use `exchange::headers` for ergonomic typed header access.
+pub use header as headers;
 mod header_map;
 #[cfg(feature = "serde")]
 pub mod mime_serde;

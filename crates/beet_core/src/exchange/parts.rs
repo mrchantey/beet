@@ -16,7 +16,7 @@
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
 //! assert_eq!(request.get_param("limit"), Some("10"));
-//! assert_eq!(request.headers.first_raw("content-type"), None);
+//! assert_eq!(request.headers.get::<header::ContentType>(), None);
 //!
 //! // From CLI: `myapp users list --limit 10`
 //! let cli = CliArgs::parse("users list --limit 10");
@@ -325,14 +325,20 @@ impl RequestParts {
 	/// Check if this request indicates a body is present based on headers.
 	pub fn has_body(&self) -> bool {
 		self.headers
-			.first_raw("content-length")
-			.and_then(|val| val.parse::<usize>().ok())
+			.get::<header::ContentLength>()
+			.and_then(|res| res.ok())
 			.map(|len| len > 0)
 			.unwrap_or(false)
 			|| self
 				.headers
-				.first_raw("transfer-encoding")
-				.map(|val| val.contains("chunked"))
+				.get::<header::TransferEncoding>()
+				.and_then(|res| res.ok())
+				.map(|enc| {
+					matches!(
+						enc,
+						header::TransferEncodingValue::Chunked
+					)
+				})
 				.unwrap_or(false)
 	}
 
@@ -775,7 +781,7 @@ mod test {
 			HttpMethod::Get,
 			"http://example.com/api/users/123?limit=10",
 		);
-		parts.headers.set_raw("content-type", "application/json");
+		parts.headers.set_content_type(&MimeType::Json);
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -787,9 +793,10 @@ mod test {
 		parts.get_param("limit").unwrap().xpect_eq("10");
 		parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 	}
 
 	#[test]
@@ -807,14 +814,15 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::Ok);
-		parts.headers.set_raw("content-type", "text/html");
+		parts.headers.set_content_type(&MimeType::Html);
 
 		parts.status().xpect_eq(StatusCode::Ok);
 		parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("text/html");
+			.unwrap()
+			.xpect_eq(MimeType::Html);
 	}
 
 	#[test]
@@ -868,9 +876,10 @@ mod test {
 		parts.get_param("offset").unwrap().xpect_eq("20");
 		parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 	}
 
 	#[test]
@@ -889,9 +898,10 @@ mod test {
 		parts.status().xpect_eq(StatusCode::Created);
 		parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 	}
 
 	#[test]
@@ -977,7 +987,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let mut parts = RequestParts::post("/api/users?limit=10");
-		parts.headers.set_raw("content-type", "application/json");
+		parts.headers.set_content_type(&MimeType::Json);
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
@@ -990,7 +1000,7 @@ mod test {
 	fn response_parts_to_http() {
 		let mut parts =
 			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
-		parts.headers.set_raw("content-type", "application/json");
+		parts.headers.set_content_type(&MimeType::Json);
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -1021,11 +1031,17 @@ mod test {
 		let mut parts = RequestParts::default();
 		parts.has_body().xpect_false();
 
-		parts.headers.set_raw("content-length", "5");
+		parts
+			.headers
+			.set::<header::ContentLength>(&5u64);
 		parts.has_body().xpect_true();
 
 		let mut parts2 = RequestParts::default();
-		parts2.headers.set_raw("transfer-encoding", "chunked");
+		parts2
+			.headers
+			.set::<header::TransferEncoding>(
+				&header::TransferEncodingValue::Chunked,
+			);
 		parts2.has_body().xpect_true();
 	}
 }

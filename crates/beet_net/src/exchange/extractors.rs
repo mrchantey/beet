@@ -297,16 +297,19 @@ mod test {
 	#[test]
 	fn request_response_cycle() {
 		let mut app = App::new();
-		let req = Request::post("/test")
-			.with_header("content-length", "5")
-			.with_body(b"hello");
+		let mut req = Request::post("/test").with_body(b"hello");
+		req.headers.set::<header::ContentLength>(&5u64);
+		let req = req;
 
 		let entity = app.world_mut().spawn(req).id();
 		app.add_systems(
 			Update,
 			move |mut commands: Commands, query: Query<&Request>| {
 				let _req = query.single().unwrap();
-				let res = Response::ok().with_header("content-length", "5");
+				let mut res = Response::ok();
+				res.parts
+					.headers
+					.set::<header::ContentLength>(&5u64);
 				commands.entity(entity).insert(res);
 			},
 		);
@@ -318,15 +321,16 @@ mod test {
 			.unwrap()
 			.parts
 			.headers
-			.first_raw("content-length")
+			.get::<header::ContentLength>()
 			.unwrap()
-			.xpect_eq("5");
+			.unwrap()
+			.xpect_eq(5u64);
 	}
 
 	#[test]
 	fn parts_has_body() {
 		let mut parts = RequestParts::post("/test");
-		parts.headers.set_raw("content-length", "5");
+		parts.headers.set::<header::ContentLength>(&5u64);
 
 		parts.has_body().xpect_true();
 

@@ -112,15 +112,13 @@ pub fn no_cache_headers() -> impl Bundle {
 					};
 
 					let parts = response.response_parts_mut();
-					parts.headers.set::<beet_core::header::CacheControl>(
+					parts.headers.set::<header::CacheControl>(
 						&"no-cache, no-store, must-revalidate".to_string(),
-					);
-					parts.headers.set::<beet_core::header::Pragma>(
-						&"no-cache".to_string(),
 					);
 					parts
 						.headers
-						.set::<beet_core::header::Expires>(&"0".to_string());
+						.set::<header::Pragma>(&"no-cache".to_string());
+					parts.headers.set::<header::Expires>(&"0".to_string());
 					Ok(())
 				});
 
@@ -217,7 +215,7 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 						})?
 						.parts
 						.headers
-						.get::<beet_core::header::Origin>()
+						.get::<header::Origin>()
 						.and_then(|r| r.ok());
 
 					let origin = match (config.allow_any_origin, origin_header)
@@ -320,9 +318,7 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 					response
 						.response_parts_mut()
 						.headers
-						.set::<beet_core::header::AccessControlAllowOrigin>(
-						&origin,
-					);
+						.set::<header::AccessControlAllowOrigin>(&origin);
 
 					Ok(())
 				});
@@ -394,7 +390,7 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 					let origin_header = request
 						.parts
 						.headers
-						.get::<beet_core::header::Origin>()
+						.get::<header::Origin>()
 						.and_then(|r| r.ok());
 
 					let origin = match (config.allow_any_origin, origin_header)
@@ -436,19 +432,13 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 
 					let mut response = Response::ok();
 					let parts = response.response_parts_mut();
+					parts.headers.set::<header::AccessControlMaxAge>(&60u32);
+					parts.headers.set::<header::AccessControlAllowHeaders>(
+						&"content-type".to_string(),
+					);
 					parts
 						.headers
-						.set::<beet_core::header::AccessControlMaxAge>(&60u32);
-					parts
-						.headers
-						.set::<beet_core::header::AccessControlAllowHeaders>(
-							&"content-type".to_string(),
-						);
-					parts
-						.headers
-						.set::<beet_core::header::AccessControlAllowOrigin>(
-							&origin,
-						);
+						.set::<header::AccessControlAllowOrigin>(&origin);
 
 					world.entity_mut(agent).insert(response);
 					world.entity_mut(action).trigger_target(Outcome::Pass);
@@ -479,19 +469,19 @@ mod test {
 			.xtap(|response| {
 				response
 					.headers
-					.get::<beet_core::header::CacheControl>()
+					.get::<header::CacheControl>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");
 				response
 					.headers
-					.get::<beet_core::header::Pragma>()
+					.get::<header::Pragma>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache");
 				response
 					.headers
-					.get::<beet_core::header::Expires>()
+					.get::<header::Expires>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("0");
@@ -517,7 +507,7 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.get::<beet_core::header::AccessControlAllowOrigin>()
+					.get::<header::AccessControlAllowOrigin>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("https://allowed.com");
@@ -562,7 +552,7 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.get::<beet_core::header::AccessControlAllowOrigin>()
+					.get::<header::AccessControlAllowOrigin>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("https://anything.com");
@@ -588,13 +578,13 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.get::<beet_core::header::AccessControlAllowOrigin>()
+					.get::<header::AccessControlAllowOrigin>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("https://allowed.com");
 				response
 					.headers
-					.get::<beet_core::header::AccessControlMaxAge>()
+					.get::<header::AccessControlMaxAge>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq(60);
@@ -621,7 +611,7 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.get::<beet_core::header::AccessControlAllowOrigin>()
+					.get::<header::AccessControlAllowOrigin>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("https://example.com");
@@ -648,13 +638,13 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.get::<beet_core::header::AccessControlAllowOrigin>()
+					.get::<header::AccessControlAllowOrigin>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("https://example.com");
 				response
 					.headers
-					.get::<beet_core::header::CacheControl>()
+					.get::<header::CacheControl>()
 					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");

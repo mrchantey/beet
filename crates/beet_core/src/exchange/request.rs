@@ -282,8 +282,8 @@ impl Request {
 	) -> Result<T> {
 		let mime = self
 			.headers
-			.first_raw("content-type")
-			.map(MimeType::from_content_type)
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok())
 			.unwrap_or(MimeType::Json);
 		self.body.into_mime(mime).await
 	}
@@ -312,6 +312,7 @@ impl Request {
 		value: &str,
 	) -> Self {
 		let key_str = header_name_to_string(key);
+		// NOTE: `with_header` accepts arbitrary key/value strings — raw is correct here.
 		self.headers.set_raw(key_str, value);
 		self
 	}
@@ -319,16 +320,20 @@ impl Request {
 	/// Shorthand for an `Authorization: Bearer <token>` header
 	#[cfg(feature = "http")]
 	pub fn with_auth_bearer(self, token: &str) -> Self {
-		self.with_header(
-			http::header::AUTHORIZATION,
-			&format!("Bearer {}", token),
-		)
+		let mut this = self;
+		this.headers.set::<header::Authorization>(
+			&header::Authorization::bearer(token),
+		);
+		this
 	}
 
 	/// Sets the content type header
 	#[cfg(feature = "http")]
 	pub fn with_content_type(self, content_type: &str) -> Self {
-		self.with_header(http::header::CONTENT_TYPE, content_type)
+		let mut this = self;
+		this.headers
+			.set_content_type(&MimeType::from_content_type(content_type));
+		this
 	}
 
 	/// Parse both the key and value as valid URL query parameters
@@ -656,9 +661,10 @@ mod test {
 		request.path_string().xpect_eq("/api/users");
 		request
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
@@ -672,9 +678,10 @@ mod test {
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		String::from_utf8(body_bytes.to_vec())
@@ -699,9 +706,10 @@ mod test {
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/x-postcard");
+			.unwrap()
+			.xpect_eq(MimeType::Postcard);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
@@ -715,9 +723,10 @@ mod test {
 		let request = Request::with_postcard_bytes("/api/data", &raw);
 		request
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/x-postcard");
+			.unwrap()
+			.xpect_eq(MimeType::Postcard);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		body_bytes.to_vec().xpect_eq(raw);

@@ -129,14 +129,17 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 	// Check if this is an SSE response which must always be streamed
 	let is_event_stream = parts
 		.headers
-		.first_raw("content-type")
-		.map_or(false, |ct| ct.contains("text/event-stream"));
+		.get::<header::ContentType>()
+		.and_then(|res| res.ok())
+		.map_or(false, |mime| {
+			mime == beet_core::prelude::MimeType::EventStream
+		});
 
 	let is_bytes = !is_event_stream
 		&& parts
 			.headers
-			.first_raw("content-length")
-			.and_then(|val| val.parse::<u64>().ok())
+			.get::<header::ContentLength>()
+			.and_then(|res| res.ok())
 			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 
 	let body: Body = if is_bytes {

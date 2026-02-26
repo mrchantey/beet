@@ -166,6 +166,15 @@ impl Header for Location {
 // ============================================================================
 
 /// Typed `Authorization` header value.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_core::exchange::headers;
+/// let mut map = HeaderMap::new();
+/// map.set::<headers::Authorization>(&headers::Authorization::bearer("abc123"));
+/// let auth = map.get::<headers::Authorization>().unwrap().unwrap();
+/// assert_eq!(auth, headers::Authorization::Bearer("abc123".to_string()));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Authorization {
 	/// `Bearer <token>`
@@ -193,19 +202,7 @@ impl core::fmt::Display for Authorization {
 	}
 }
 
-/// Typed `Authorization` header.
-///
-/// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
-/// let mut map = HeaderMap::new();
-/// map.set::<headers::AuthorizationHeader>(&headers::Authorization::bearer("abc123"));
-/// let auth = map.get::<headers::AuthorizationHeader>().unwrap().unwrap();
-/// assert_eq!(auth, headers::Authorization::Bearer("abc123".to_string()));
-/// ```
-pub struct AuthorizationHeader;
-
-impl Header for AuthorizationHeader {
+impl Header for Authorization {
 	type Value = Authorization;
 	const KEY: &'static str = "authorization";
 
@@ -399,29 +396,80 @@ impl Header for AccessControlMaxAge {
 // TransferEncoding
 // ============================================================================
 
-/// Typed `Transfer-Encoding` header.
+/// Value for the `Transfer-Encoding` header.
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::TransferEncoding>(&"chunked".to_string());
-/// assert_eq!(map.get::<headers::TransferEncoding>().unwrap().unwrap(), "chunked");
+/// map.set::<headers::TransferEncoding>(&headers::TransferEncodingValue::Chunked);
+/// assert_eq!(
+///     map.get::<headers::TransferEncoding>().unwrap().unwrap(),
+///     headers::TransferEncodingValue::Chunked,
+/// );
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransferEncodingValue {
+	/// `chunked` — body is sent in a series of chunks.
+	Chunked,
+	/// `compress` — LZW compression.
+	Compress,
+	/// `deflate` — zlib deflate compression.
+	Deflate,
+	/// `gzip` — GNU zip compression.
+	Gzip,
+	/// Any other transfer-encoding value.
+	Other(String),
+}
+
+impl TransferEncodingValue {
+	/// Returns the canonical string representation.
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::Chunked => "chunked",
+			Self::Compress => "compress",
+			Self::Deflate => "deflate",
+			Self::Gzip => "gzip",
+			Self::Other(val) => val.as_str(),
+		}
+	}
+}
+
+impl core::fmt::Display for TransferEncodingValue {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{}", self.as_str())
+	}
+}
+
+impl From<&str> for TransferEncodingValue {
+	fn from(val: &str) -> Self {
+		match val {
+			"chunked" => Self::Chunked,
+			"compress" => Self::Compress,
+			"deflate" => Self::Deflate,
+			"gzip" => Self::Gzip,
+			other => Self::Other(other.to_string()),
+		}
+	}
+}
+
+/// Typed `Transfer-Encoding` header.
 pub struct TransferEncoding;
 
 impl Header for TransferEncoding {
-	type Value = String;
+	type Value = TransferEncodingValue;
 	const KEY: &'static str = "transfer-encoding";
 
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
 		values
 			.first()
-			.cloned()
+			.map(|val| TransferEncodingValue::from(val.as_str()))
 			.ok_or_else(|| bevyhow!("transfer-encoding header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: &TransferEncodingValue) -> Vec<String> {
+		vec![value.as_str().to_string()]
+	}
 }
 
 // ============================================================================
@@ -555,8 +603,8 @@ mod test {
 	#[test]
 	fn authorization_bearer() {
 		let mut map = HeaderMap::new();
-		map.set::<AuthorizationHeader>(&Authorization::bearer("tok123"));
-		let auth = map.get::<AuthorizationHeader>().unwrap().unwrap();
+		map.set::<Authorization>(&Authorization::bearer("tok123"));
+		let auth = map.get::<Authorization>().unwrap().unwrap();
 		auth.xpect_eq(Authorization::Bearer("tok123".to_string()));
 	}
 
@@ -564,7 +612,7 @@ mod test {
 	fn authorization_basic() {
 		let mut map = HeaderMap::new();
 		map.set_raw("authorization", "Basic dXNlcjpwYXNz");
-		let auth = map.get::<AuthorizationHeader>().unwrap().unwrap();
+		let auth = map.get::<Authorization>().unwrap().unwrap();
 		auth.xpect_eq(Authorization::Basic("dXNlcjpwYXNz".to_string()));
 	}
 
@@ -572,7 +620,7 @@ mod test {
 	fn authorization_other() {
 		let mut map = HeaderMap::new();
 		map.set_raw("authorization", "Digest realm=\"test\"");
-		let auth = map.get::<AuthorizationHeader>().unwrap().unwrap();
+		let auth = map.get::<Authorization>().unwrap().unwrap();
 		auth.xpect_eq(Authorization::Other(
 			"Digest realm=\"test\"".to_string(),
 		));
@@ -651,10 +699,28 @@ mod test {
 	#[test]
 	fn transfer_encoding_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<TransferEncoding>(&"chunked".to_string());
+		map.set::<TransferEncoding>(&TransferEncodingValue::Chunked);
 		map.get::<TransferEncoding>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq("chunked");
+			.xpect_eq(TransferEncodingValue::Chunked);
+	}
+
+	#[test]
+	fn transfer_encoding_variants() {
+		for (raw, expected) in [
+			("chunked", TransferEncodingValue::Chunked),
+			("compress", TransferEncodingValue::Compress),
+			("deflate", TransferEncodingValue::Deflate),
+			("gzip", TransferEncodingValue::Gzip),
+			("br", TransferEncodingValue::Other("br".to_string())),
+		] {
+			let mut map = HeaderMap::new();
+			map.set_raw("transfer-encoding", raw);
+			map.get::<TransferEncoding>()
+				.unwrap()
+				.unwrap()
+				.xpect_eq(expected);
+		}
 	}
 }

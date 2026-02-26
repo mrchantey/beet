@@ -110,7 +110,9 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.headers.set_raw("location", location.into());
+		parts
+			.headers
+			.set::<header::Location>(&location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -125,7 +127,9 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.headers.set_raw("location", location.into());
+		parts
+			.headers
+			.set::<header::Location>(&location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -220,8 +224,8 @@ impl Response {
 		let mime = self
 			.parts
 			.headers
-			.first_raw("content-type")
-			.map(MimeType::from_content_type)
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok())
 			.unwrap_or(MimeType::Json);
 		self.body.into_mime(mime).await
 	}
@@ -249,7 +253,9 @@ impl Response {
 		content_type: &str,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
-		parts.headers.set_raw("content-type", content_type);
+		parts
+			.headers
+			.set_content_type(&MimeType::from_content_type(content_type));
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
@@ -263,6 +269,8 @@ impl Response {
 		header: http::header::HeaderName,
 	) -> Result<Option<&str>> {
 		Ok(self.parts.headers.first_raw(header.as_str()))
+		// NOTE: `first_raw` is intentional here — callers supply an arbitrary
+		// `http::HeaderName` which may not have a typed `Header` impl.
 	}
 
 	/// Check whether a header exactly matches the given value.
@@ -315,7 +323,9 @@ impl Response {
 	/// Create a response with the given body and content type
 	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
 		let mut parts = ResponseParts::ok();
-		parts.headers.set_raw("content-type", content_type);
+		parts
+			.headers
+			.set_content_type(&MimeType::from_content_type(content_type));
 		Self {
 			parts,
 			body: body.into(),
@@ -398,6 +408,7 @@ impl Response {
 	/// Adds a header to the response
 	pub fn with_header(mut self, key: &str, value: &str) -> Self {
 		self.parts.headers.set_raw(key, value);
+		// NOTE: `with_header` accepts arbitrary key/value strings — raw is correct here.
 		self
 	}
 
@@ -604,7 +615,8 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("location")
+			.get::<header::Location>()
+			.unwrap()
 			.unwrap()
 			.xpect_eq("/new-location");
 	}
@@ -619,7 +631,8 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("location")
+			.get::<header::Location>()
+			.unwrap()
 			.unwrap()
 			.xpect_eq("/new-location");
 	}
@@ -633,6 +646,7 @@ mod test {
 			.first_raw("x-custom")
 			.unwrap()
 			.xpect_eq("value");
+		// NOTE: x-custom has no typed header — raw access is correct here.
 	}
 
 	#[cfg(feature = "json")]
@@ -652,9 +666,10 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
@@ -669,9 +684,10 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		String::from_utf8(body_bytes.to_vec())
@@ -696,9 +712,10 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/x-postcard");
+			.unwrap()
+			.xpect_eq(MimeType::Postcard);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
@@ -713,9 +730,10 @@ mod test {
 		response
 			.parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/x-postcard");
+			.unwrap()
+			.xpect_eq(MimeType::Postcard);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		body_bytes.to_vec().xpect_eq(raw);

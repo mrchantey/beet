@@ -93,7 +93,7 @@ impl HeaderMap {
 
 	/// Set the `Content-Type` header from a [`MimeType`].
 	pub fn set_content_type(&mut self, mime: &MimeType) {
-		self.set_raw(crate::exchange::header::ContentType::KEY, mime.as_str());
+		self.set::<header::ContentType>(mime);
 	}
 
 	/// Check if a header key exists.
@@ -273,6 +273,7 @@ impl core::fmt::Display for MimeType {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::exchange::headers;
 
 	#[test]
 	fn to_kebab_case_lowercase() {
@@ -303,17 +304,24 @@ mod test {
 	#[test]
 	fn insert_and_get_str() {
 		let mut headers = HeaderMap::new();
-		headers.set_raw("Content-Type", "application/json");
+		headers.set::<headers::ContentType>(&MimeType::Json);
 		headers
-			.first_raw("content-type")
+			.get::<headers::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 	}
 
 	#[test]
 	fn case_insensitive_lookup() {
 		let mut headers = HeaderMap::new();
-		headers.set_raw("content-type", "text/html");
+		headers.set::<headers::ContentType>(&MimeType::Html);
+		// All casings resolve to the same normalized key
+		headers
+			.get::<headers::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MimeType::Html);
 		headers
 			.first_raw("Content-Type")
 			.unwrap()
@@ -333,16 +341,16 @@ mod test {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("set-cookie", "a=1");
 		headers.set_raw("set-cookie", "b=2");
-		let values = headers.get_raw("set-cookie").unwrap();
-		values.len().xpect_eq(2);
-		values[0].as_str().xpect_eq("a=1");
-		values[1].as_str().xpect_eq("b=2");
+		let cookies = headers.get::<headers::SetCookie>().unwrap().unwrap();
+		cookies.len().xpect_eq(2);
+		cookies[0].as_str().xpect_eq("a=1");
+		cookies[1].as_str().xpect_eq("b=2");
 	}
 
 	#[test]
 	fn contains_key_normalized() {
 		let mut headers = HeaderMap::new();
-		headers.set_raw("X-Custom", "value");
+		headers.set_raw("x-custom", "value");
 		headers.contains_key("x-custom").xpect_true();
 		headers.contains_key("X_Custom").xpect_true();
 		headers.contains_key("x-missing").xpect_false();
@@ -352,7 +360,7 @@ mod test {
 	fn remove_header() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
-		headers.remove("X_Custom").unwrap().len().xpect_eq(1);
+		headers.remove("x-custom").unwrap().len().xpect_eq(1);
 		headers.contains_key("x-custom").xpect_false();
 	}
 
@@ -361,9 +369,10 @@ mod test {
 		let mut headers = HeaderMap::new();
 		headers.set_content_type(&MimeType::Json);
 		headers
-			.first_raw("content-type")
+			.get::<headers::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 	}
 
 	#[test]
@@ -372,9 +381,10 @@ mod test {
 		raw.insert("Content_Type".to_string(), "text/html".to_string());
 		let headers = HeaderMap::from(raw);
 		headers
-			.first_raw("content-type")
+			.get::<headers::ContentType>()
 			.unwrap()
-			.xpect_eq("text/html");
+			.unwrap()
+			.xpect_eq(MimeType::Html);
 	}
 
 	// MimeType tests

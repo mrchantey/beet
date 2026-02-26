@@ -92,16 +92,14 @@ where
 {
 	let mime = request
 		.headers
-		.first_raw("content-type")
-		.map(MimeType::from_content_type)
+		.get::<header::ContentType>()
+		.and_then(|res| res.ok())
 		.unwrap_or(MimeType::Json);
 	let body_bytes = request.body.into_bytes().await?;
-	let input: Input =
-		beet_core::prelude::mime_serde::deserialize(mime.clone(), &body_bytes)?;
+	let input: Input = mime_serde::deserialize(mime.clone(), &body_bytes)?;
 	let output: Output = next.call(input).await?;
 	// Use the same format as the request payload
-	let body_bytes =
-		beet_core::prelude::mime_serde::serialize(mime.clone(), &output)?;
+	let body_bytes = mime_serde::serialize(mime.clone(), &output)?;
 	Response::ok()
 		.with_content_type(mime.as_str())
 		.with_body(body_bytes)
@@ -143,12 +141,11 @@ mod test {
 
 		response.status().xpect_eq(StatusCode::Ok);
 		response
-			.parts
 			.headers
-			.first_raw("content-type")
-			// Response.parts is pub, so this is fine
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/json");
+			.unwrap()
+			.xpect_eq(MimeType::Json);
 		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(30);
 	}
@@ -181,11 +178,11 @@ mod test {
 			.unwrap();
 
 		response
-			.parts
 			.headers
-			.first_raw("content-type")
+			.get::<header::ContentType>()
 			.unwrap()
-			.xpect_eq("application/x-postcard");
+			.unwrap()
+			.xpect_eq(MimeType::Postcard);
 
 		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(12);
@@ -220,7 +217,6 @@ mod test {
 
 	#[test]
 	fn mime_serde_roundtrip_json() {
-		use beet_core::prelude::mime_serde;
 		let input = AddInput { a: 1, b: 2 };
 		let bytes = mime_serde::serialize(MimeType::Json, &input).unwrap();
 		let output: AddInput =
@@ -230,7 +226,6 @@ mod test {
 
 	#[test]
 	fn mime_serde_roundtrip_postcard() {
-		use beet_core::prelude::mime_serde;
 		let input = AddInput { a: 3, b: 4 };
 		let bytes = mime_serde::serialize(MimeType::Postcard, &input).unwrap();
 		let output: AddInput =
