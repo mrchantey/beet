@@ -425,8 +425,9 @@ impl Request {
 		res_parts.headers = self.parts.headers().clone();
 		Response::new(res_parts, self.body)
 	}
+
 	/// Creates a response that mirrors this request's headers,
-	/// with an empty body
+	/// with an empty body.
 	pub fn mirror_parts(&self) -> Response {
 		let mut res_parts = ResponseParts::ok();
 		res_parts.headers = self.parts.headers().clone();

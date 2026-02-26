@@ -1,0 +1,665 @@
+//! Typed header map for HTTP-style headers.
+//!
+//! [`HeaderMap`] wraps a [`MultiMap`] with kebab-case key normalization,
+//! and provides typed access via the [`Header`] trait.
+//!
+//! # Example
+//!
+//! ```
+//! # use beet_core::prelude::*;
+//! let mut headers = HeaderMap::new();
+//! headers.insert("Content-Type", "application/json");
+//! assert_eq!(headers.get_str("content-type"), Some("application/json"));
+//! ```
+
+use crate::prelude::*;
+use alloc::borrow::Cow;
+
+/// A multimap of HTTP-style headers with kebab-case key normalization.
+///
+/// All keys are normalized to lowercase with underscores replaced by hyphens
+/// on insertion and lookup, ensuring case-insensitive, canonical access.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HeaderMap(MultiMap<String, String>);
+
+/// Normalize a header key to lowercase kebab-case.
+///
+/// Converts uppercase to lowercase and replaces `_` with `-`.
+/// Returns [`Cow::Borrowed`] if no transformation is needed.
+pub fn to_kebab_case(val: &str) -> Cow<'_, str> {
+	let needs_transform = val
+		.bytes()
+		.any(|byte| byte.is_ascii_uppercase() || byte == b'_');
+	if needs_transform {
+		let transformed: String = val
+			.bytes()
+			.map(|byte| {
+				if byte == b'_' {
+					b'-'
+				} else {
+					byte.to_ascii_lowercase()
+				}
+			})
+			.map(|byte| byte as char)
+			.collect();
+		Cow::Owned(transformed)
+	} else {
+		Cow::Borrowed(val)
+	}
+}
+
+impl HeaderMap {
+	/// Create a new empty header map.
+	pub fn new() -> Self { Self(MultiMap::new()) }
+
+	/// Insert a header value. The key is normalized to kebab-case.
+	pub fn set_raw(&mut self, key: impl AsRef<str>, value: impl Into<String>) {
+		let key = to_kebab_case(key.as_ref()).into_owned();
+		self.0.insert(key, value.into());
+	}
+
+	/// Get the first raw string value for a header key.
+	pub fn first_raw(&self, key: &str) -> Option<&str> {
+		let key = to_kebab_case(key);
+		self.0
+			.get_vec(key.as_ref())
+			.and_then(|vals| vals.first().map(|val| val.as_str()))
+	}
+
+	/// Get all raw string values for a header key.
+	pub fn get_raw(&self, key: &str) -> Option<&Vec<String>> {
+		let key = to_kebab_case(key);
+		self.0.get_vec(key.as_ref())
+	}
+
+	/// Get a typed header value. Returns `None` if the header is absent,
+	/// or `Some(Err(..))` if parsing fails.
+	pub fn get<H: Header>(&self) -> Option<Result<H::Value>> {
+		self.get_raw(H::KEY).map(|vals| H::parse(vals))
+	}
+
+	/// Set a typed header, replacing any existing values for that key.
+	pub fn set<H: Header>(&mut self, value: &H::Value) {
+		let key = to_kebab_case(H::KEY).into_owned();
+		self.0.remove(&key);
+		for val in H::serialize(value) {
+			self.0.insert(key.clone(), val);
+		}
+	}
+
+	/// Check if a header key exists.
+	pub fn contains_key(&self, key: &str) -> bool {
+		let key = to_kebab_case(key);
+		self.0.contains_key(key.as_ref())
+	}
+
+	/// Returns true if the map contains no headers.
+	pub fn is_empty(&self) -> bool { self.0.is_empty() }
+
+	/// Returns the number of distinct header keys.
+	pub fn len(&self) -> usize { self.0.len() }
+
+	/// Iterate over all key-value pairs.
+	pub fn iter_all(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+		self.0.iter_all()
+	}
+
+	/// Iterate over all keys.
+	pub fn keys(&self) -> impl Iterator<Item = &String> { self.0.keys() }
+
+	/// Remove a header key and all its values.
+	pub fn remove(&mut self, key: &str) -> Option<Vec<String>> {
+		let key = to_kebab_case(key);
+		self.0.remove(key.as_ref())
+	}
+
+	/// Clear all headers.
+	pub fn clear(&mut self) { self.0.clear(); }
+
+	/// Returns a reference to the inner multimap.
+	pub fn inner(&self) -> &MultiMap<String, String> { &self.0 }
+
+	/// Returns a mutable reference to the inner multimap.
+	///
+	/// Use with caution — keys inserted directly will not be normalized.
+	pub fn inner_mut(&mut self) -> &mut MultiMap<String, String> { &mut self.0 }
+}
+
+/// Convert a raw [`MultiMap`] into a [`HeaderMap`], normalizing all keys.
+impl From<MultiMap<String, String>> for HeaderMap {
+	fn from(raw: MultiMap<String, String>) -> Self {
+		let mut map = HeaderMap::new();
+		for (key, values) in raw.iter_all() {
+			let normalized = to_kebab_case(key).into_owned();
+			for value in values {
+				map.0.insert(normalized.clone(), value.clone());
+			}
+		}
+		map
+	}
+}
+
+// ============================================================================
+// Header trait
+// ============================================================================
+
+/// A typed header that can be parsed from raw string values.
+///
+/// Implement this trait for zero-sized marker types to provide typed access
+/// to specific headers via [`HeaderMap::get`].
+pub trait Header {
+	/// The parsed value type for this header.
+	type Value;
+	/// The canonical lowercase kebab-case key, ie `"content-type"`.
+	const KEY: &'static str;
+	/// Parse the header from its raw string values.
+	fn parse(values: &Vec<String>) -> Result<Self::Value>;
+	/// Serialize the typed value into raw header strings.
+	fn serialize(value: &Self::Value) -> Vec<String>;
+}
+
+// ============================================================================
+// MimeType
+// ============================================================================
+
+/// Common MIME types used in exchange serialization.
+///
+/// Extends the previous `ExchangeFormat` with broader coverage.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MimeType {
+	/// `application/octet-stream` — raw bytes, the default.
+	Bytes,
+	/// `text/plain`
+	Text,
+	/// `text/html`
+	Html,
+	/// `application/xml` or `text/xml`
+	Xml,
+	/// `application/json`
+	Json,
+	/// `application/x-postcard`
+	Postcard,
+	/// `text/markdown`
+	Markdown,
+	/// An unrecognized MIME type.
+	Other(String),
+}
+
+impl Default for MimeType {
+	fn default() -> Self { MimeType::Bytes }
+}
+
+impl MimeType {
+	/// The MIME string for `application/json`.
+	pub const JSON: &'static str = "application/json";
+	/// The MIME string for `application/x-postcard`.
+	pub const POSTCARD: &'static str = "application/x-postcard";
+	/// The MIME string for `text/plain`.
+	pub const TEXT: &'static str = "text/plain";
+	/// The MIME string for `text/html`.
+	pub const HTML: &'static str = "text/html";
+	/// The MIME string for `application/xml`.
+	pub const XML: &'static str = "application/xml";
+	/// The MIME string for `text/markdown`.
+	pub const MARKDOWN: &'static str = "text/markdown";
+	/// The MIME string for `application/octet-stream`.
+	pub const BYTES: &'static str = "application/octet-stream";
+
+	/// Parse a MIME type from a content-type string.
+	///
+	/// Strips parameters like `; charset=utf-8` before matching.
+	pub fn from_content_type(content_type: &str) -> Self {
+		let mime = content_type
+			.split(';')
+			.next()
+			.unwrap_or(content_type)
+			.trim();
+		match mime {
+			val if val.contains(Self::JSON) => MimeType::Json,
+			val if val.contains(Self::POSTCARD) => MimeType::Postcard,
+			val if val.contains(Self::HTML) => MimeType::Html,
+			val if val.contains(Self::MARKDOWN) => MimeType::Markdown,
+			val if val.contains("text/xml") || val.contains(Self::XML) => {
+				MimeType::Xml
+			}
+			val if val.contains(Self::TEXT) => MimeType::Text,
+			val if val.contains(Self::BYTES) => MimeType::Bytes,
+			other => MimeType::Other(other.to_string()),
+		}
+	}
+
+	/// The canonical MIME string for this type.
+	pub fn as_str(&self) -> &str {
+		match self {
+			MimeType::Bytes => Self::BYTES,
+			MimeType::Text => Self::TEXT,
+			MimeType::Html => Self::HTML,
+			MimeType::Xml => Self::XML,
+			MimeType::Json => Self::JSON,
+			MimeType::Postcard => Self::POSTCARD,
+			MimeType::Markdown => Self::MARKDOWN,
+			MimeType::Other(val) => val.as_str(),
+		}
+	}
+
+	/// Whether this is a serializable format (JSON or Postcard).
+	pub fn is_serializable(&self) -> bool {
+		matches!(self, MimeType::Json | MimeType::Postcard)
+	}
+}
+
+impl core::fmt::Display for MimeType {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
+		write!(formatter, "{}", self.as_str())
+	}
+}
+
+// ============================================================================
+// Concrete header types
+// ============================================================================
+
+/// Typed `Content-Type` header, parsed as a [`MimeType`].
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let mut headers = HeaderMap::new();
+/// headers.insert("content-type", "application/json");
+/// let mime: MimeType = headers.get::<ContentType>().unwrap().unwrap();
+/// assert_eq!(mime, MimeType::Json);
+/// ```
+pub struct ContentType;
+
+impl Header for ContentType {
+	type Value = MimeType;
+	const KEY: &'static str = "content-type";
+	fn parse(values: &Vec<String>) -> Result<Self::Value> {
+		values
+			.first()
+			.map(|val| MimeType::from_content_type(val))
+			.ok_or_else(|| bevyhow!("content-type header has no value"))
+	}
+	fn serialize(value: &MimeType) -> Vec<String> {
+		vec![value.as_str().to_string()]
+	}
+}
+
+/// Typed `Accept` header, parsed as a list of [`MimeType`] ordered by quality.
+///
+/// Quality scores (eg `text/html;q=0.9`) are used for ordering but stripped
+/// from the resulting values. Higher quality types come first.
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let mut headers = HeaderMap::new();
+/// headers.insert("accept", "text/html;q=0.9, application/json");
+/// let types: Vec<MimeType> = headers.get::<Accept>().unwrap().unwrap();
+/// assert_eq!(types, vec![MimeType::Json, MimeType::Html]);
+/// ```
+pub struct Accept;
+
+/// A MIME type with its quality score for sorting.
+struct QualityMime {
+	mime: MimeType,
+	quality: f32,
+}
+
+impl Header for Accept {
+	type Value = Vec<MimeType>;
+	const KEY: &'static str = "accept";
+	fn parse(values: &Vec<String>) -> Result<Self::Value> {
+		let mut entries: Vec<QualityMime> = Vec::new();
+		for value in values {
+			for part in value.split(',') {
+				let part = part.trim();
+				if part.is_empty() {
+					continue;
+				}
+				let (mime_str, quality) = parse_quality(part);
+				entries.push(QualityMime {
+					mime: MimeType::from_content_type(mime_str),
+					quality,
+				});
+			}
+		}
+		// Sort by quality descending (stable sort preserves insertion order
+		// for equal quality)
+		entries.sort_by(|left, right| {
+			right
+				.quality
+				.partial_cmp(&left.quality)
+				.unwrap_or(core::cmp::Ordering::Equal)
+		});
+		entries
+			.into_iter()
+			.map(|entry| entry.mime)
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	fn serialize(value: &Vec<MimeType>) -> Vec<String> {
+		vec![
+			value
+				.iter()
+				.map(|mime| mime.as_str().to_string())
+				.collect::<Vec<_>>()
+				.join(", "),
+		]
+	}
+}
+
+/// Parse a quality parameter from a MIME type string.
+/// Returns `(mime_str, quality)` where quality defaults to `1.0`.
+fn parse_quality(part: &str) -> (&str, f32) {
+	// Split on `;` and look for `q=` parameter
+	let mut segments = part.splitn(2, ';');
+	let mime_str = segments.next().unwrap_or(part).trim();
+	let quality = segments
+		.next()
+		.and_then(|params| {
+			params.split(';').find_map(|param| {
+				let param = param.trim();
+				param
+					.strip_prefix("q=")
+					.and_then(|val| val.trim().parse::<f32>().ok())
+			})
+		})
+		.unwrap_or(1.0);
+	(mime_str, quality)
+}
+
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn to_kebab_case_lowercase() {
+		to_kebab_case("content-type").xpect_eq("content-type");
+	}
+
+	#[test]
+	fn to_kebab_case_uppercase() {
+		to_kebab_case("Content-Type").xpect_eq("content-type");
+	}
+
+	#[test]
+	fn to_kebab_case_underscores() {
+		to_kebab_case("content_type").xpect_eq("content-type");
+	}
+
+	#[test]
+	fn to_kebab_case_mixed() {
+		to_kebab_case("X_Custom_Header").xpect_eq("x-custom-header");
+	}
+
+	#[test]
+	fn to_kebab_case_borrows_when_already_normalized() {
+		let result = to_kebab_case("content-type");
+		matches!(result, Cow::Borrowed(_)).xpect_true();
+	}
+
+	#[test]
+	fn insert_and_get_str() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("Content-Type", "application/json");
+		headers
+			.first_raw("content-type")
+			.unwrap()
+			.xpect_eq("application/json");
+	}
+
+	#[test]
+	fn case_insensitive_lookup() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("content-type", "text/html");
+		headers
+			.first_raw("Content-Type")
+			.unwrap()
+			.xpect_eq("text/html");
+		headers
+			.first_raw("CONTENT-TYPE")
+			.unwrap()
+			.xpect_eq("text/html");
+		headers
+			.first_raw("content_type")
+			.unwrap()
+			.xpect_eq("text/html");
+	}
+
+	#[test]
+	fn multiple_values() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("set-cookie", "a=1");
+		headers.set_raw("set-cookie", "b=2");
+		let values = headers.get_raw("set-cookie").unwrap();
+		values.len().xpect_eq(2);
+		values[0].as_str().xpect_eq("a=1");
+		values[1].as_str().xpect_eq("b=2");
+	}
+
+	#[test]
+	fn contains_key_normalized() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("X-Custom", "value");
+		headers.contains_key("x-custom").xpect_true();
+		headers.contains_key("X_Custom").xpect_true();
+		headers.contains_key("x-missing").xpect_false();
+	}
+
+	#[test]
+	fn remove_header() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("x-custom", "value");
+		headers.remove("X_Custom").unwrap().len().xpect_eq(1);
+		headers.contains_key("x-custom").xpect_false();
+	}
+
+	#[test]
+	fn typed_content_type() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("content-type", "application/json");
+		let mime: MimeType = headers.get::<ContentType>().unwrap().unwrap();
+		mime.xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn typed_content_type_with_charset() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("content-type", "application/json; charset=utf-8");
+		let mime: MimeType = headers.get::<ContentType>().unwrap().unwrap();
+		mime.xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn typed_content_type_absent() {
+		let headers = HeaderMap::new();
+		let result = headers.get::<ContentType>();
+		result.is_none().xpect_true();
+	}
+
+	#[test]
+	fn typed_accept_single() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("accept", "application/json");
+		let types: Vec<MimeType> = headers.get::<Accept>().unwrap().unwrap();
+		types.len().xpect_eq(1);
+		types[0].clone().xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn typed_accept_multiple_with_quality() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("accept", "text/html;q=0.9, application/json");
+		let types: Vec<MimeType> = headers.get::<Accept>().unwrap().unwrap();
+		types.len().xpect_eq(2);
+		// JSON should be first (quality 1.0 > 0.9)
+		types[0].clone().xpect_eq(MimeType::Json);
+		types[1].clone().xpect_eq(MimeType::Html);
+	}
+
+	#[test]
+	fn typed_accept_equal_quality_preserves_order() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("accept", "text/html, application/json");
+		let types: Vec<MimeType> = headers.get::<Accept>().unwrap().unwrap();
+		types.len().xpect_eq(2);
+		// Both quality 1.0, insertion order preserved
+		types[0].clone().xpect_eq(MimeType::Html);
+		types[1].clone().xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn set_typed_content_type() {
+		let mut headers = HeaderMap::new();
+		headers.set::<ContentType>(&MimeType::Postcard);
+		headers
+			.first_raw("content-type")
+			.unwrap()
+			.xpect_eq("application/x-postcard");
+	}
+
+	#[test]
+	fn set_typed_accept() {
+		let mut headers = HeaderMap::new();
+		headers.set::<Accept>(&vec![MimeType::Json, MimeType::Html]);
+		headers
+			.first_raw("accept")
+			.unwrap()
+			.xpect_eq("application/json, text/html");
+	}
+
+	#[test]
+	fn from_multimap() {
+		let mut raw = MultiMap::new();
+		raw.insert("Content_Type".to_string(), "text/html".to_string());
+		let headers = HeaderMap::from(raw);
+		headers
+			.first_raw("content-type")
+			.unwrap()
+			.xpect_eq("text/html");
+	}
+
+	// MimeType tests
+
+	#[test]
+	fn mime_type_from_content_type_json() {
+		MimeType::from_content_type("application/json")
+			.xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_json_with_charset() {
+		MimeType::from_content_type("application/json; charset=utf-8")
+			.xpect_eq(MimeType::Json);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_postcard() {
+		MimeType::from_content_type("application/x-postcard")
+			.xpect_eq(MimeType::Postcard);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_html() {
+		MimeType::from_content_type("text/html").xpect_eq(MimeType::Html);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_text() {
+		MimeType::from_content_type("text/plain").xpect_eq(MimeType::Text);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_xml() {
+		MimeType::from_content_type("application/xml").xpect_eq(MimeType::Xml);
+		MimeType::from_content_type("text/xml").xpect_eq(MimeType::Xml);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_markdown() {
+		MimeType::from_content_type("text/markdown")
+			.xpect_eq(MimeType::Markdown);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_bytes() {
+		MimeType::from_content_type("application/octet-stream")
+			.xpect_eq(MimeType::Bytes);
+	}
+
+	#[test]
+	fn mime_type_from_content_type_unknown() {
+		MimeType::from_content_type("application/x-custom")
+			.xpect_eq(MimeType::Other("application/x-custom".to_string()));
+	}
+
+	#[test]
+	fn mime_type_as_str_roundtrip() {
+		let types = vec![
+			MimeType::Bytes,
+			MimeType::Text,
+			MimeType::Html,
+			MimeType::Xml,
+			MimeType::Json,
+			MimeType::Postcard,
+			MimeType::Markdown,
+		];
+		for mime in types {
+			MimeType::from_content_type(mime.as_str()).xpect_eq(mime);
+		}
+	}
+
+	#[test]
+	fn mime_type_default_is_bytes() {
+		MimeType::default().xpect_eq(MimeType::Bytes);
+	}
+
+	#[test]
+	fn mime_type_display() {
+		format!("{}", MimeType::Json).xpect_eq("application/json");
+	}
+
+	#[test]
+	fn mime_type_is_serializable() {
+		MimeType::Json.is_serializable().xpect_true();
+		MimeType::Postcard.is_serializable().xpect_true();
+		MimeType::Html.is_serializable().xpect_false();
+		MimeType::Text.is_serializable().xpect_false();
+	}
+
+	#[test]
+	fn header_map_empty() {
+		let headers = HeaderMap::new();
+		headers.is_empty().xpect_true();
+		headers.len().xpect_eq(0);
+	}
+
+	#[test]
+	fn header_map_len() {
+		let mut headers = HeaderMap::new();
+		headers.set_raw("a", "1");
+		headers.set_raw("b", "2");
+		headers.len().xpect_eq(2);
+		// Same key, different values — still one key
+		headers.set_raw("a", "3");
+		headers.len().xpect_eq(2);
+	}
+
+	#[test]
+	fn quality_parsing() {
+		let (mime, quality) = parse_quality("text/html;q=0.5");
+		mime.xpect_eq("text/html");
+		quality.xpect_close(0.5);
+
+		let (mime, quality) = parse_quality("application/json");
+		mime.xpect_eq("application/json");
+		quality.xpect_close(1.0);
+	}
+}

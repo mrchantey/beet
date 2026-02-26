@@ -18,9 +18,9 @@ pub enum ExchangeFormat {
 
 impl ExchangeFormat {
 	/// The MIME content-type for JSON.
-	pub const JSON_CONTENT_TYPE: &str = "application/json";
+	pub const JSON_CONTENT_TYPE: &str = MimeType::JSON;
 	/// The MIME content-type for postcard.
-	pub const POSTCARD_CONTENT_TYPE: &str = "application/x-postcard";
+	pub const POSTCARD_CONTENT_TYPE: &str = MimeType::POSTCARD;
 
 	/// Determine the format from a `content-type` header value,
 	/// defaulting to JSON if absent.
@@ -30,17 +30,26 @@ impl ExchangeFormat {
 	/// Returns an error if the content-type is present but unrecognized.
 	pub fn from_content_type(content_type: Option<&str>) -> Result<Self> {
 		match content_type {
-			Some(ct) if ct.contains(Self::POSTCARD_CONTENT_TYPE) => {
-				Self::Postcard
-			}
-			Some(ct) if ct.contains(Self::JSON_CONTENT_TYPE) => Self::Json,
-			Some(other) => bevybail!(
+			Some(ct) => Self::from_mime_type(&MimeType::from_content_type(ct)),
+			None => Self::Json.xok(),
+		}
+	}
+
+	/// Convert a [`MimeType`] to an [`ExchangeFormat`].
+	///
+	/// ## Errors
+	///
+	/// Returns an error if the mime type is not a serializable format.
+	pub fn from_mime_type(mime: &MimeType) -> Result<Self> {
+		match mime {
+			MimeType::Json => Self::Json,
+			MimeType::Postcard => Self::Postcard,
+			other => bevybail!(
 				"Unrecognized content-type for exchange: {other}. \
 				 Supported: {}, {}.",
 				Self::JSON_CONTENT_TYPE,
 				Self::POSTCARD_CONTENT_TYPE
 			),
-			None => Self::Json,
 		}
 		.xok()
 	}
@@ -48,8 +57,16 @@ impl ExchangeFormat {
 	/// The MIME content-type string for this format.
 	pub fn content_type_str(&self) -> &'static str {
 		match self {
-			Self::Json => Self::JSON_CONTENT_TYPE,
-			Self::Postcard => Self::POSTCARD_CONTENT_TYPE,
+			Self::Json => MimeType::JSON,
+			Self::Postcard => MimeType::POSTCARD,
+		}
+	}
+
+	/// Convert to a [`MimeType`].
+	pub fn mime_type(&self) -> MimeType {
+		match self {
+			Self::Json => MimeType::Json,
+			Self::Postcard => MimeType::Postcard,
 		}
 	}
 
@@ -190,6 +207,22 @@ mod test {
 		ExchangeFormat::Postcard
 			.content_type_str()
 			.xpect_eq("application/x-postcard");
+	}
+
+	#[test]
+	fn mime_type_roundtrip() {
+		ExchangeFormat::Json.mime_type().xpect_eq(MimeType::Json);
+		ExchangeFormat::Postcard
+			.mime_type()
+			.xpect_eq(MimeType::Postcard);
+
+		ExchangeFormat::from_mime_type(&MimeType::Json)
+			.unwrap()
+			.xpect_eq(ExchangeFormat::Json);
+		ExchangeFormat::from_mime_type(&MimeType::Postcard)
+			.unwrap()
+			.xpect_eq(ExchangeFormat::Postcard);
+		ExchangeFormat::from_mime_type(&MimeType::Html).xpect_err();
 	}
 
 	#[cfg(feature = "json")]

@@ -145,7 +145,7 @@ pub struct RequestParts {
 	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
 	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
-	headers: MultiMap<String, String>,
+	headers: HeaderMap,
 	/// The HTTP version or CLI command version
 	version: String,
 }
@@ -194,7 +194,7 @@ impl RequestParts {
 					authority,
 					path: path_segments,
 					params,
-					headers: MultiMap::<String, String>::default(),
+					headers: HeaderMap::default(),
 					version: DEFAULT_HTTP_VERSION.to_string(),
 				};
 			}
@@ -211,7 +211,7 @@ impl RequestParts {
 			authority: String::new(),
 			path: path_segments,
 			params,
-			headers: MultiMap::<String, String>::default(),
+			headers: HeaderMap::default(),
 			version: DEFAULT_HTTP_VERSION.to_string(),
 		}
 	}
@@ -271,9 +271,7 @@ impl RequestParts {
 	}
 
 	/// Returns a mutable reference to the headers
-	pub fn headers_mut(&mut self) -> &mut MultiMap<String, String> {
-		&mut self.headers
-	}
+	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
 
 	/// Adds a parameter and returns self for chaining
 	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
@@ -305,17 +303,17 @@ impl RequestParts {
 		self.params.insert(key.into(), value.into());
 	}
 
-	/// Adds a header
+	/// Adds a header. The key is normalized to kebab-case.
 	pub fn insert_header(
 		&mut self,
-		key: impl Into<String>,
+		key: impl AsRef<str>,
 		value: impl Into<String>,
 	) {
-		self.headers.insert(key.into(), value.into());
+		self.headers.set_raw(key, value);
 	}
 
 	/// Returns all headers
-	pub fn headers(&self) -> &MultiMap<String, String> { &self.headers }
+	pub fn headers(&self) -> &HeaderMap { &self.headers }
 
 	/// Gets the first value for a parameter
 	pub fn get_param(&self, key: &str) -> Option<&str> {
@@ -331,14 +329,12 @@ impl RequestParts {
 
 	/// Gets the first value for a header
 	pub fn get_header(&self, key: &str) -> Option<&str> {
-		self.headers
-			.get_vec(key)
-			.and_then(|vals| vals.first().map(|s| s.as_str()))
+		self.headers.first_raw(key)
 	}
 
 	/// Gets all values for a header
 	pub fn get_headers(&self, key: &str) -> Option<&Vec<String>> {
-		self.headers.get_vec(key)
+		self.headers.get_raw(key)
 	}
 
 	/// Checks if a parameter exists (useful for CLI flags)
@@ -351,12 +347,14 @@ impl RequestParts {
 
 	/// Check if this request indicates a body is present based on headers.
 	pub fn has_body(&self) -> bool {
-		self.get_header("content-length")
+		self.headers
+			.first_raw("content-length")
 			.and_then(|val| val.parse::<usize>().ok())
 			.map(|len| len > 0)
 			.unwrap_or(false)
 			|| self
-				.get_header("transfer-encoding")
+				.headers
+				.first_raw("transfer-encoding")
 				.map(|val| val.contains("chunked"))
 				.unwrap_or(false)
 	}
@@ -421,7 +419,7 @@ pub struct ResponseParts {
 	/// The HTTP status code of the response.
 	pub status: StatusCode,
 	/// HTTP headers
-	pub headers: MultiMap<String, String>,
+	pub headers: HeaderMap,
 	/// The HTTP version
 	pub version: String,
 }
@@ -470,32 +468,28 @@ impl ResponseParts {
 	pub fn version(&self) -> &str { &self.version }
 
 	/// Returns all headers
-	pub fn headers(&self) -> &MultiMap<String, String> { &self.headers }
+	pub fn headers(&self) -> &HeaderMap { &self.headers }
 
 	/// Returns a mutable reference to the headers
-	pub fn headers_mut(&mut self) -> &mut MultiMap<String, String> {
-		&mut self.headers
-	}
+	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
 
-	/// Adds a header
+	/// Adds a header. The key is normalized to kebab-case.
 	pub fn insert_header(
 		&mut self,
-		key: impl Into<String>,
+		key: impl AsRef<str>,
 		value: impl Into<String>,
 	) {
-		self.headers.insert(key.into(), value.into());
+		self.headers.set_raw(key, value);
 	}
 
 	/// Gets the first value for a header
 	pub fn get_header(&self, key: &str) -> Option<&str> {
-		self.headers
-			.get_vec(key)
-			.and_then(|vals| vals.first().map(|s| s.as_str()))
+		self.headers.first_raw(key)
 	}
 
 	/// Gets all values for a header
 	pub fn get_headers(&self, key: &str) -> Option<&Vec<String>> {
-		self.headers.get_vec(key)
+		self.headers.get_raw(key)
 	}
 
 	/// Checks if a header exists
@@ -521,20 +515,18 @@ fn split_path_and_query(uri: &str) -> (&str, Option<&str>) {
 		.unwrap_or((uri, None))
 }
 
-/// Convert an [`http::HeaderMap`] to a [`MultiMap<String, String>`],
-/// with all keys converted to lower kebab-case
+/// Convert an [`http::HeaderMap`] to a [`HeaderMap`],
+/// with all keys normalized to kebab-case.
 #[cfg(feature = "http")]
-fn header_map_to_multimap(map: &http::HeaderMap) -> MultiMap<String, String> {
-	use heck::ToKebabCase;
-	let mut multi_map = MultiMap::default();
+fn http_header_map_to_header_map(map: &http::HeaderMap) -> HeaderMap {
+	let mut header_map = HeaderMap::new();
 	for (key, value) in map.iter() {
-		let key = key.to_string().to_kebab_case();
 		// Header values can technically contain opaque bytes
 		// but this is considered bad practice; we use a placeholder
 		let value = value.to_str().unwrap_or("<opaque-bytes>").to_string();
-		multi_map.insert(key, value);
+		header_map.set_raw(key.as_str(), value);
 	}
-	multi_map
+	header_map
 }
 
 /// Parse query string into a MultiMap
@@ -561,26 +553,26 @@ fn split_path(path: &str) -> Vec<String> {
 		.collect()
 }
 
-/// Convert a MultiMap back to http::HeaderMap
+/// Convert a [`HeaderMap`] back to [`http::HeaderMap`].
 #[cfg(feature = "http")]
-fn multimap_to_header_map(
-	multimap: &MultiMap<String, String>,
+fn header_map_to_http(
+	headers: &HeaderMap,
 ) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {
 	use std::str::FromStr;
-	let mut headers = http::HeaderMap::new();
-	for (key, values) in multimap.iter_all() {
+	let mut http_headers = http::HeaderMap::new();
+	for (key, values) in headers.iter_all() {
 		let header_name = http::header::HeaderName::from_str(key)
 			.unwrap_or_else(|_| {
 				http::header::HeaderName::from_static("x-invalid")
 			});
 		for value in values {
-			headers.append(
+			http_headers.append(
 				header_name.clone(),
 				http::header::HeaderValue::from_str(value)?,
 			);
 		}
 	}
-	Ok(headers)
+	Ok(http_headers)
 }
 
 /// Build query string from MultiMap
@@ -614,7 +606,7 @@ impl From<http::request::Parts> for RequestParts {
 			.unwrap_or_default();
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
-		let headers = header_map_to_multimap(&http_parts.headers);
+		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(http_parts.method);
 
@@ -642,7 +634,7 @@ impl From<&http::request::Parts> for RequestParts {
 			.unwrap_or_default();
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
-		let headers = header_map_to_multimap(&http_parts.headers);
+		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(&http_parts.method);
 
@@ -665,7 +657,7 @@ impl From<&http::request::Parts> for RequestParts {
 #[cfg(feature = "http")]
 impl From<http::response::Parts> for ResponseParts {
 	fn from(http_parts: http::response::Parts) -> Self {
-		let headers = header_map_to_multimap(&http_parts.headers);
+		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 
 		ResponseParts {
@@ -680,7 +672,7 @@ impl From<http::response::Parts> for ResponseParts {
 #[cfg(feature = "http")]
 impl From<&http::response::Parts> for ResponseParts {
 	fn from(http_parts: &http::response::Parts) -> Self {
-		let headers = header_map_to_multimap(&http_parts.headers);
+		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 
 		ResponseParts {
@@ -720,7 +712,7 @@ impl From<CliArgs> for RequestParts {
 			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
 			path,
 			params,
-			headers: MultiMap::default(),
+			headers: HeaderMap::default(),
 			version: env_ext::var("CARGO_PKG_VERSION")
 				.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
 		}
@@ -748,7 +740,7 @@ impl From<&CliArgs> for RequestParts {
 			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
 			path,
 			params,
-			headers: MultiMap::default(),
+			headers: HeaderMap::default(),
 			version: DEFAULT_CLI_VERSION.to_string(),
 		}
 	}
@@ -774,7 +766,7 @@ impl TryFrom<RequestParts> for http::request::Parts {
 			.version(http_ext::parse_version(&parts.version));
 
 		// Add headers
-		if let Ok(header_map) = multimap_to_header_map(&parts.headers) {
+		if let Ok(header_map) = header_map_to_http(&parts.headers) {
 			for (key, value) in header_map.iter() {
 				builder = builder.header(key, value);
 			}
@@ -795,7 +787,7 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 			.version(http_ext::parse_version(&parts.version));
 
 		// Add headers
-		if let Ok(header_map) = multimap_to_header_map(&parts.headers) {
+		if let Ok(header_map) = header_map_to_http(&parts.headers) {
 			for (key, value) in header_map.iter() {
 				builder = builder.header(key, value);
 			}
