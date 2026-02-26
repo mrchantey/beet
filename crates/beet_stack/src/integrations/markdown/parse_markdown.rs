@@ -32,7 +32,6 @@
 //! - Mismatched kinds cause the old subtree to be despawned and a new
 //!   one spawned.
 //! - Extra old children are despawned; extra new nodes are spawned.
-use super::Parser as ParserTrait;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;
@@ -254,7 +253,7 @@ impl<'a> MarkdownDiffer<'a> {
 	}
 }
 
-impl ParserTrait for MarkdownDiffer<'_> {
+impl Parser for MarkdownDiffer<'_> {
 	fn diff(&mut self, entity: EntityWorldMut) -> Result {
 		let nodes = self.parse();
 		let entity_id = entity.id();

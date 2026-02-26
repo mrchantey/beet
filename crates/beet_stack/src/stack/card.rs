@@ -1,6 +1,12 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+pub trait Template {
+	fn apply(entity: &mut EntityWorldMut);
+}
+
+
+
 /// An entity spawned by a [`card`] tool call.
 ///
 /// Points back to the card tool entity that produced it, establishing
@@ -140,10 +146,7 @@ where
 							commands.commands.queue(
 								move |world: &mut World| -> Result {
 									let entity = world
-										.spawn((
-											CardOf::new(card_tool),
-											func(),
-										))
+										.spawn((CardOf::new(card_tool), func()))
 										.id();
 									out_handler.call_world(world, entity)
 								},

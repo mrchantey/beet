@@ -1,6 +1,4 @@
 use crate::nodes::node::mark_node_changed;
-#[cfg(feature = "markdown")]
-use crate::parsers::load_file_content;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
