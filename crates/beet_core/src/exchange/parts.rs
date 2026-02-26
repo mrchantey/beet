@@ -16,6 +16,7 @@
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
 //! assert_eq!(request.get_param("limit"), Some("10"));
+//! assert_eq!(request.headers.first_raw("content-type"), None);
 //!
 //! // From CLI: `myapp users list --limit 10`
 //! let cli = CliArgs::parse("users list --limit 10");
@@ -145,7 +146,7 @@ pub struct RequestParts {
 	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
 	params: MultiMap<String, String>,
 	/// HTTP headers or CLI environment variables
-	headers: HeaderMap,
+	pub headers: HeaderMap,
 	/// The HTTP version or CLI command version
 	version: String,
 }
@@ -303,15 +304,6 @@ impl RequestParts {
 		self.params.insert(key.into(), value.into());
 	}
 
-	/// Adds a header. The key is normalized to kebab-case.
-	pub fn insert_header(
-		&mut self,
-		key: impl AsRef<str>,
-		value: impl Into<String>,
-	) {
-		self.headers.set_raw(key, value);
-	}
-
 	/// Returns all headers
 	pub fn headers(&self) -> &HeaderMap { &self.headers }
 
@@ -327,23 +319,8 @@ impl RequestParts {
 		self.params.get_vec(key)
 	}
 
-	/// Gets the first value for a header
-	pub fn get_header(&self, key: &str) -> Option<&str> {
-		self.headers.first_raw(key)
-	}
-
-	/// Gets all values for a header
-	pub fn get_headers(&self, key: &str) -> Option<&Vec<String>> {
-		self.headers.get_raw(key)
-	}
-
 	/// Checks if a parameter exists (useful for CLI flags)
 	pub fn has_param(&self, key: &str) -> bool { self.params.contains_key(key) }
-
-	/// Checks if a header exists
-	pub fn has_header(&self, key: &str) -> bool {
-		self.headers.contains_key(key)
-	}
 
 	/// Check if this request indicates a body is present based on headers.
 	pub fn has_body(&self) -> bool {
@@ -472,30 +449,6 @@ impl ResponseParts {
 
 	/// Returns a mutable reference to the headers
 	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
-
-	/// Adds a header. The key is normalized to kebab-case.
-	pub fn insert_header(
-		&mut self,
-		key: impl AsRef<str>,
-		value: impl Into<String>,
-	) {
-		self.headers.set_raw(key, value);
-	}
-
-	/// Gets the first value for a header
-	pub fn get_header(&self, key: &str) -> Option<&str> {
-		self.headers.first_raw(key)
-	}
-
-	/// Gets all values for a header
-	pub fn get_headers(&self, key: &str) -> Option<&Vec<String>> {
-		self.headers.get_raw(key)
-	}
-
-	/// Checks if a header exists
-	pub fn has_header(&self, key: &str) -> bool {
-		self.headers.contains_key(key)
-	}
 
 	/// Sets the status code
 	pub fn with_status(mut self, status: StatusCode) -> Self {
@@ -822,7 +775,7 @@ mod test {
 			HttpMethod::Get,
 			"http://example.com/api/users/123?limit=10",
 		);
-		parts.insert_header("content-type", "application/json");
+		parts.headers.set_raw("content-type", "application/json");
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -833,7 +786,8 @@ mod test {
 		]);
 		parts.get_param("limit").unwrap().xpect_eq("10");
 		parts
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 	}
@@ -853,11 +807,12 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::Ok);
-		parts.insert_header("content-type", "text/html");
+		parts.headers.set_raw("content-type", "text/html");
 
 		parts.status().xpect_eq(StatusCode::Ok);
 		parts
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("text/html");
 	}
@@ -912,7 +867,8 @@ mod test {
 		parts.get_param("limit").unwrap().xpect_eq("10");
 		parts.get_param("offset").unwrap().xpect_eq("20");
 		parts
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 	}
@@ -932,7 +888,8 @@ mod test {
 
 		parts.status().xpect_eq(StatusCode::Created);
 		parts
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 	}
@@ -1020,7 +977,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let mut parts = RequestParts::post("/api/users?limit=10");
-		parts.insert_header("content-type", "application/json");
+		parts.headers.set_raw("content-type", "application/json");
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
@@ -1033,7 +990,7 @@ mod test {
 	fn response_parts_to_http() {
 		let mut parts =
 			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
-		parts.insert_header("content-type", "application/json");
+		parts.headers.set_raw("content-type", "application/json");
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -1051,8 +1008,12 @@ mod test {
 	#[test]
 	fn response_parts_headers() {
 		let mut parts = ResponseParts::ok();
-		parts.insert_header("x-custom", "value");
-		parts.get_header("x-custom").unwrap().xpect_eq("value");
+		parts.headers.set_raw("x-custom", "value");
+		parts
+			.headers
+			.first_raw("x-custom")
+			.unwrap()
+			.xpect_eq("value");
 	}
 
 	#[test]
@@ -1060,11 +1021,11 @@ mod test {
 		let mut parts = RequestParts::default();
 		parts.has_body().xpect_false();
 
-		parts.insert_header("content-length", "5");
+		parts.headers.set_raw("content-length", "5");
 		parts.has_body().xpect_true();
 
 		let mut parts2 = RequestParts::default();
-		parts2.insert_header("transfer-encoding", "chunked");
+		parts2.headers.set_raw("transfer-encoding", "chunked");
 		parts2.has_body().xpect_true();
 	}
 }

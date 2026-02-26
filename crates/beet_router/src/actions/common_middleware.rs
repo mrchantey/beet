@@ -112,12 +112,12 @@ pub fn no_cache_headers() -> impl Bundle {
 					};
 
 					let parts = response.response_parts_mut();
-					parts.insert_header(
+					parts.headers.set_raw(
 						"cache-control",
 						"no-cache, no-store, must-revalidate",
 					);
-					parts.insert_header("pragma", "no-cache");
-					parts.insert_header("expires", "0");
+					parts.headers.set_raw("pragma", "no-cache");
+					parts.headers.set_raw("expires", "0");
 					Ok(())
 				});
 
@@ -212,7 +212,9 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 						.ok_or_else(|| {
 							bevyhow!("No Request found for CORS middleware")
 						})?
-						.get_header("origin")
+						.parts
+						.headers
+						.first_raw("origin")
 						.map(|s| s.to_string());
 
 					let origin = match (config.allow_any_origin, origin_header)
@@ -314,7 +316,8 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 
 					response
 						.response_parts_mut()
-						.insert_header("access-control-allow-origin", &origin);
+						.headers
+						.set_raw("access-control-allow-origin", &origin);
 
 					Ok(())
 				});
@@ -383,8 +386,11 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 						return Ok(());
 					}
 
-					let origin_header =
-						request.get_header("origin").map(|s| s.to_string());
+					let origin_header = request
+						.parts
+						.headers
+						.first_raw("origin")
+						.map(|s| s.to_string());
 
 					let origin = match (config.allow_any_origin, origin_header)
 					{
@@ -425,12 +431,14 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 
 					let mut response = Response::ok();
 					let parts = response.response_parts_mut();
-					parts.insert_header("access-control-max-age", "60");
-					parts.insert_header(
+					parts.headers.set_raw("access-control-max-age", "60");
+					parts.headers.set_raw(
 						"access-control-allow-headers",
 						"content-type",
 					);
-					parts.insert_header("access-control-allow-origin", &origin);
+					parts
+						.headers
+						.set_raw("access-control-allow-origin", &origin);
 
 					world.entity_mut(agent).insert(response);
 					world.entity_mut(action).trigger_target(Outcome::Pass);
@@ -460,11 +468,16 @@ mod test {
 			.await
 			.xtap(|response| {
 				response
-					.get_header("cache-control")
+					.headers
+					.first_raw("cache-control")
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");
-				response.get_header("pragma").unwrap().xpect_eq("no-cache");
-				response.get_header("expires").unwrap().xpect_eq("0");
+				response
+					.headers
+					.first_raw("pragma")
+					.unwrap()
+					.xpect_eq("no-cache");
+				response.headers.first_raw("expires").unwrap().xpect_eq("0");
 			});
 	}
 
@@ -486,7 +499,8 @@ mod test {
 			.xtap(|response| {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
-					.get_header("access-control-allow-origin")
+					.headers
+					.first_raw("access-control-allow-origin")
 					.unwrap()
 					.xpect_eq("https://allowed.com");
 			});
@@ -529,7 +543,8 @@ mod test {
 			.xtap(|response| {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
-					.get_header("access-control-allow-origin")
+					.headers
+					.first_raw("access-control-allow-origin")
 					.unwrap()
 					.xpect_eq("https://anything.com");
 			});
@@ -553,11 +568,13 @@ mod test {
 			.xtap(|response| {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
-					.get_header("access-control-allow-origin")
+					.headers
+					.first_raw("access-control-allow-origin")
 					.unwrap()
 					.xpect_eq("https://allowed.com");
 				response
-					.get_header("access-control-max-age")
+					.headers
+					.first_raw("access-control-max-age")
 					.unwrap()
 					.xpect_eq("60");
 			});
@@ -582,7 +599,8 @@ mod test {
 			.xtap(|response| {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
-					.get_header("access-control-allow-origin")
+					.headers
+					.first_raw("access-control-allow-origin")
 					.unwrap()
 					.xpect_eq("https://example.com");
 			});
@@ -607,11 +625,13 @@ mod test {
 			.xtap(|response| {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
-					.get_header("access-control-allow-origin")
+					.headers
+					.first_raw("access-control-allow-origin")
 					.unwrap()
 					.xpect_eq("https://example.com");
 				response
-					.get_header("cache-control")
+					.headers
+					.first_raw("cache-control")
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");
 			});

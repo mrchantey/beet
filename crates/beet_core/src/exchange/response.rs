@@ -110,7 +110,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.insert_header("location", location.into());
+		parts.headers.set_raw("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -125,7 +125,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts.insert_header("location", location.into());
+		parts.headers.set_raw("location", location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -155,7 +155,7 @@ impl Response {
 	/// # use beet_core::prelude::*;
 	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
 	/// assert_eq!(response.status(), StatusCode::Ok);
-	/// assert_eq!(response.get_header("content-type"), Some("application/json"));
+	/// assert_eq!(response.parts.headers.first_raw("content-type"), Some("application/json"));
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(value: &T) -> Result<Self> {
@@ -181,7 +181,7 @@ impl Response {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// let response = Response::with_json_str(r#"{"foo": 42}"#);
-	/// assert_eq!(response.get_header("content-type"), Some("application/json"));
+	/// assert_eq!(response.parts.headers.first_raw("content-type"), Some("application/json"));
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(json: impl AsRef<str>) -> Self {
@@ -213,8 +213,9 @@ impl Response {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let format =
-			ExchangeFormat::from_content_type(self.get_header("content-type"))?;
+		let format = ExchangeFormat::from_content_type(
+			self.parts.headers.first_raw("content-type"),
+		)?;
 		self.body.into_format(format).await
 	}
 
@@ -241,23 +242,20 @@ impl Response {
 		content_type: &str,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
-		parts.insert_header("content-type", content_type);
+		parts.headers.set_raw("content-type", content_type);
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
 		}
 	}
 
-	/// Gets a header value by name
+	/// Gets a header value by name.
 	#[cfg(feature = "http")]
 	pub fn header(
 		&self,
 		header: http::header::HeaderName,
 	) -> Result<Option<&str>> {
-		match self.parts.get_header(header.as_str()) {
-			Some(value) => Ok(Some(value)),
-			None => Ok(None),
-		}
+		Ok(self.parts.headers.first_raw(header.as_str()))
 	}
 
 	/// Check whether a header exactly matches the given value.
@@ -270,7 +268,8 @@ impl Response {
 		value: &str,
 	) -> bool {
 		self.parts
-			.get_header(header.as_str())
+			.headers
+			.first_raw(header.as_str())
 			.map_or(false, |val| val == value)
 	}
 
@@ -284,7 +283,8 @@ impl Response {
 		value: &str,
 	) -> bool {
 		self.parts
-			.get_header(header.as_str())
+			.headers
+			.first_raw(header.as_str())
 			.map_or(false, |val| val.contains(value))
 	}
 
@@ -308,7 +308,7 @@ impl Response {
 	/// Create a response with the given body and content type
 	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
 		let mut parts = ResponseParts::ok();
-		parts.insert_header("content-type", content_type);
+		parts.headers.set_raw("content-type", content_type);
 		Self {
 			parts,
 			body: body.into(),
@@ -390,7 +390,7 @@ impl Response {
 
 	/// Adds a header to the response
 	pub fn with_header(mut self, key: &str, value: &str) -> Self {
-		self.parts.insert_header(key, value);
+		self.parts.headers.set_raw(key, value);
 		self
 	}
 
@@ -525,7 +525,9 @@ impl From<String> for Response {
 
 #[cfg(test)]
 mod test {
+	#[allow(unused_imports)]
 	use super::*;
+
 
 	#[test]
 	fn response_ok() {
@@ -593,7 +595,9 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::Http(http::StatusCode::TEMPORARY_REDIRECT));
 		response
-			.get_header("location")
+			.parts
+			.headers
+			.first_raw("location")
 			.unwrap()
 			.xpect_eq("/new-location");
 	}
@@ -606,7 +610,9 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::Http(http::StatusCode::MOVED_PERMANENTLY));
 		response
-			.get_header("location")
+			.parts
+			.headers
+			.first_raw("location")
 			.unwrap()
 			.xpect_eq("/new-location");
 	}
@@ -614,7 +620,12 @@ mod test {
 	#[test]
 	fn response_with_header() {
 		let response = Response::ok().with_header("x-custom", "value");
-		response.get_header("x-custom").unwrap().xpect_eq("value");
+		response
+			.parts
+			.headers
+			.first_raw("x-custom")
+			.unwrap()
+			.xpect_eq("value");
 	}
 
 	#[cfg(feature = "json")]
@@ -632,7 +643,9 @@ mod test {
 		let response = Response::with_json(&payload).unwrap();
 		response.status().xpect_eq(StatusCode::Ok);
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 
@@ -647,7 +660,9 @@ mod test {
 		let response = Response::with_json_str(r#"{"foo":42}"#);
 		response.status().xpect_eq(StatusCode::Ok);
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 
@@ -672,7 +687,9 @@ mod test {
 		let response = Response::with_postcard(&payload).unwrap();
 		response.status().xpect_eq(StatusCode::Ok);
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 
@@ -687,7 +704,9 @@ mod test {
 		let raw = vec![0x01, 0x02, 0x03];
 		let response = Response::with_postcard_bytes(&raw);
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 

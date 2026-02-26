@@ -80,7 +80,7 @@ async fn into_response(res: reqwest::Response) -> Result<Response> {
 	let mut parts = ResponseParts::new(status.into());
 	for (key, value) in res.headers().iter() {
 		if let Ok(value_str) = value.to_str() {
-			parts.insert_header(key.to_string(), value_str);
+			parts.headers.set_raw(key.to_string(), value_str);
 		}
 	}
 

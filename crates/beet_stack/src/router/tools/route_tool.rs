@@ -90,8 +90,9 @@ where
 	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
 	Output: 'static + Send + Sync + serde::Serialize,
 {
-	let format =
-		ExchangeFormat::from_content_type(request.get_header("content-type"))?;
+	let format = ExchangeFormat::from_content_type(
+		request.headers.first_raw("content-type"),
+	)?;
 	let body_bytes = request.body.into_bytes().await?;
 	let input: Input = format.deserialize(&body_bytes)?;
 	let output: Output = next.call(input).await?;
@@ -138,7 +139,10 @@ mod test {
 
 		response.status().xpect_eq(StatusCode::Ok);
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
+			// Response.parts is pub, so this is fine
 			.unwrap()
 			.xpect_eq("application/json");
 		let result: i32 = response.deserialize_blocking().unwrap();
@@ -173,7 +177,9 @@ mod test {
 			.unwrap();
 
 		response
-			.get_header("content-type")
+			.parts
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 

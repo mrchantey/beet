@@ -190,7 +190,7 @@ impl Request {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
-	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// assert_eq!(request.headers.first_raw("content-type"), Some("application/json"));
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(
@@ -201,11 +201,13 @@ impl Request {
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
 		request
-			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+			.headers
+			.set_raw("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
 		request.xok()
 	}
 
 	/// Creates a POST request with a postcard-serialized body and `content-type` header.
+	/// Sets the `content-type` header to `application/x-postcard`.
 	#[cfg(feature = "postcard")]
 	pub fn with_postcard<T: serde::Serialize>(
 		path: impl AsRef<str>,
@@ -214,10 +216,9 @@ impl Request {
 		let body = Body::from_postcard(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request.insert_header(
-			"content-type",
-			ExchangeFormat::POSTCARD_CONTENT_TYPE,
-		);
+		request
+			.headers
+			.set_raw("content-type", ExchangeFormat::POSTCARD_CONTENT_TYPE);
 		request.xok()
 	}
 
@@ -226,13 +227,14 @@ impl Request {
 	/// ```
 	/// # use beet_core::prelude::*;
 	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
-	/// assert_eq!(request.get_header("content-type"), Some("application/json"));
+	/// assert_eq!(request.headers.first_raw("content-type"), Some("application/json"));
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
 		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
 		request
-			.insert_header("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+			.headers
+			.set_raw("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
 		request
 	}
 
@@ -243,10 +245,9 @@ impl Request {
 		bytes: impl AsRef<[u8]>,
 	) -> Self {
 		let mut request = Self::post(path).with_body(bytes);
-		request.insert_header(
-			"content-type",
-			ExchangeFormat::POSTCARD_CONTENT_TYPE,
-		);
+		request
+			.headers
+			.set_raw("content-type", ExchangeFormat::POSTCARD_CONTENT_TYPE);
 		request
 	}
 
@@ -283,8 +284,9 @@ impl Request {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let format =
-			ExchangeFormat::from_content_type(self.get_header("content-type"))?;
+		let format = ExchangeFormat::from_content_type(
+			self.headers.first_raw("content-type"),
+		)?;
 		self.body.into_format(format).await
 	}
 
@@ -312,7 +314,7 @@ impl Request {
 		value: &str,
 	) -> Self {
 		let key_str = header_name_to_string(key);
-		self.parts.insert_header(key_str, value);
+		self.headers.set_raw(key_str, value);
 		self
 	}
 
@@ -533,6 +535,7 @@ mod test {
 
 	#[test]
 	fn request_get() {
+		// basic smoke-test; header access goes through parts.headers
 		let request = Request::get("/api/users");
 		(*request.method()).xpect_eq(HttpMethod::Get);
 		request
@@ -639,6 +642,7 @@ mod test {
 	#[cfg(feature = "json")]
 	#[test]
 	fn request_with_json() {
+		// headers accessed directly on parts.headers
 		use serde::Deserialize;
 		use serde::Serialize;
 
@@ -653,7 +657,8 @@ mod test {
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request.path_string().xpect_eq("/api/users");
 		request
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 
@@ -668,7 +673,8 @@ mod test {
 		let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/json");
 
@@ -694,7 +700,8 @@ mod test {
 
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 
@@ -709,7 +716,8 @@ mod test {
 		let raw = vec![0x01, 0x02, 0x03];
 		let request = Request::with_postcard_bytes("/api/data", &raw);
 		request
-			.get_header("content-type")
+			.headers
+			.first_raw("content-type")
 			.unwrap()
 			.xpect_eq("application/x-postcard");
 

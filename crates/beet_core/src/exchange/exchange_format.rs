@@ -1,8 +1,9 @@
 //! Content-type based serialization format negotiation.
 //!
-//! [`ExchangeFormat`] determines the serialization format for
-//! request/response bodies based on the `content-type` header.
+//! [`ExchangeFormat`] maps a `content-type` header to a [`MimeType`] and
+//! delegates serialization to [`mime_serde`].
 
+use crate::exchange::mime_serde;
 use crate::prelude::*;
 
 /// The serialization format used for exchange request/response bodies.
@@ -72,83 +73,21 @@ impl ExchangeFormat {
 
 	/// Deserialize bytes into `T` using this format.
 	///
-	/// Empty bytes are treated as JSON `null` for the JSON format,
-	/// enabling unit-type inputs on requests with no body.
+	/// Delegates to [`mime_serde::deserialize`].
 	#[cfg(feature = "serde")]
 	pub fn deserialize<T: serde::de::DeserializeOwned>(
 		&self,
 		bytes: &[u8],
 	) -> Result<T> {
-		match self {
-			Self::Json => {
-				#[cfg(feature = "json")]
-				{
-					let slice = if bytes.is_empty() { b"null" } else { bytes };
-					serde_json::from_slice(slice).map_err(|err| {
-						bevyhow!("Failed to deserialize JSON body: {err}")
-					})
-				}
-				#[cfg(not(feature = "json"))]
-				{
-					let _ = bytes;
-					bevybail!(
-						"The `json` feature is required for JSON deserialization"
-					)
-				}
-			}
-			Self::Postcard => {
-				#[cfg(feature = "postcard")]
-				{
-					postcard::from_bytes(bytes).map_err(|err| {
-						bevyhow!("Failed to deserialize postcard body: {err}")
-					})
-				}
-				#[cfg(not(feature = "postcard"))]
-				{
-					let _ = bytes;
-					bevybail!(
-						"The `postcard` feature is required for postcard deserialization"
-					)
-				}
-			}
-		}
+		mime_serde::deserialize(self.mime_type(), bytes)
 	}
 
 	/// Serialize `T` into bytes using this format.
+	///
+	/// Delegates to [`mime_serde::serialize`].
 	#[cfg(feature = "serde")]
 	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
-		match self {
-			Self::Json => {
-				#[cfg(feature = "json")]
-				{
-					serde_json::to_vec(value).map_err(|err| {
-						bevyhow!("Failed to serialize JSON: {err}")
-					})
-				}
-				#[cfg(not(feature = "json"))]
-				{
-					let _ = value;
-					bevybail!(
-						"The `json` feature is required for JSON serialization"
-					)
-				}
-			}
-			Self::Postcard => {
-				#[cfg(feature = "postcard")]
-				{
-					postcard::to_allocvec(value).map_err(|err| {
-						bevyhow!("Failed to serialize postcard: {err}")
-					})
-				}
-				#[cfg(not(feature = "postcard"))]
-				{
-					let _ = value;
-					bevybail!(
-						"The `postcard` feature is required for postcard serialization"
-					)
-				}
-			}
-		}
+		mime_serde::serialize(self.mime_type(), value)
 	}
 }
 

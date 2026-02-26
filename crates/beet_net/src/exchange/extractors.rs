@@ -316,7 +316,9 @@ mod test {
 			.entity_mut(entity)
 			.take::<Response>()
 			.unwrap()
-			.get_header("content-length")
+			.parts
+			.headers
+			.first_raw("content-length")
 			.unwrap()
 			.xpect_eq("5");
 	}
@@ -324,7 +326,7 @@ mod test {
 	#[test]
 	fn parts_has_body() {
 		let mut parts = RequestParts::post("/test");
-		parts.insert_header("content-length", "5");
+		parts.headers.set_raw("content-length", "5");
 
 		parts.has_body().xpect_true();
 

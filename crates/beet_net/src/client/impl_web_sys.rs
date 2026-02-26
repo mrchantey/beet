@@ -122,18 +122,20 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		if arr.length() == 2 {
 			let key = arr.get(0).as_string().unwrap_or_default();
 			let value = arr.get(1).as_string().unwrap_or_default();
-			parts.insert_header(key.to_lowercase(), value);
+			parts.headers.set_raw(key.to_lowercase(), value);
 		}
 	}
 
 	// Check if this is an SSE response which must always be streamed
 	let is_event_stream = parts
-		.get_header("content-type")
+		.headers
+		.first_raw("content-type")
 		.map_or(false, |ct| ct.contains("text/event-stream"));
 
 	let is_bytes = !is_event_stream
 		&& parts
-			.get_header("content-length")
+			.headers
+			.first_raw("content-length")
 			.and_then(|val| val.parse::<u64>().ok())
 			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 

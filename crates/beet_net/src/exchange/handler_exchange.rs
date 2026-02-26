@@ -15,7 +15,7 @@ use beet_tool::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
 /// let mut entity = world.spawn(handler_exchange(|request| {
-///     request.mirror()
+///     request.take().mirror()
 /// }));
 /// ```
 pub fn handler_exchange<F>(func: F) -> Tool<Request, Response>
@@ -34,7 +34,7 @@ where
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
 /// let mut entity = world.spawn(handler_exchange_async(|request| async move {
-///     request.mirror()
+///     request.mirror_parts()
 /// }));
 /// ```
 pub fn handler_exchange_async<F, Fut>(func: F) -> Tool<Request, Response>

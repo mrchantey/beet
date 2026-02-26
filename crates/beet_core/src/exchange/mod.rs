@@ -1,6 +1,7 @@
 mod body;
 mod exchange_format;
 mod header_map;
+pub mod mime_serde;
 mod parts;
 mod request;
 mod response;
