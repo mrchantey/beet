@@ -110,9 +110,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts
-			.headers
-			.set::<header::Location>(&location.into());
+		parts.headers.set::<header::Location>(location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -127,9 +125,7 @@ impl Response {
 		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
 
 		let mut parts = ResponseParts::new(status);
-		parts
-			.headers
-			.set::<header::Location>(&location.into());
+		parts.headers.set::<header::Location>(location.into());
 		Self {
 			parts,
 			body: Default::default(),
@@ -255,7 +251,7 @@ impl Response {
 		let mut parts = ResponseParts::new(status);
 		parts
 			.headers
-			.set_content_type(&MimeType::from_content_type(content_type));
+			.set_content_type(MimeType::from_content_type(content_type));
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
@@ -325,7 +321,7 @@ impl Response {
 		let mut parts = ResponseParts::ok();
 		parts
 			.headers
-			.set_content_type(&MimeType::from_content_type(content_type));
+			.set_content_type(MimeType::from_content_type(content_type));
 		Self {
 			parts,
 			body: body.into(),

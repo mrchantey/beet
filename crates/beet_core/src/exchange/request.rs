@@ -202,7 +202,7 @@ impl Request {
 		let body = Body::from_json(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request.headers.set_content_type(&MimeType::Json);
+		request.headers.set_content_type(MimeType::Json);
 		request.xok()
 	}
 
@@ -216,7 +216,7 @@ impl Request {
 		let body = Body::from_postcard(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request.headers.set_content_type(&MimeType::Postcard);
+		request.headers.set_content_type(MimeType::Postcard);
 		request.xok()
 	}
 
@@ -232,7 +232,7 @@ impl Request {
 	#[cfg(feature = "json")]
 	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
 		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
-		request.headers.set_content_type(&MimeType::Json);
+		request.headers.set_content_type(MimeType::Json);
 		request
 	}
 
@@ -243,7 +243,7 @@ impl Request {
 		bytes: impl AsRef<[u8]>,
 	) -> Self {
 		let mut request = Self::post(path).with_body(bytes);
-		request.headers.set_content_type(&MimeType::Postcard);
+		request.headers.set_content_type(MimeType::Postcard);
 		request
 	}
 
@@ -321,9 +321,8 @@ impl Request {
 	#[cfg(feature = "http")]
 	pub fn with_auth_bearer(self, token: &str) -> Self {
 		let mut this = self;
-		this.headers.set::<header::Authorization>(
-			&header::Authorization::bearer(token),
-		);
+		this.headers
+			.set::<header::Authorization>(header::Authorization::bearer(token));
 		this
 	}
 
@@ -332,7 +331,7 @@ impl Request {
 	pub fn with_content_type(self, content_type: &str) -> Self {
 		let mut this = self;
 		this.headers
-			.set_content_type(&MimeType::from_content_type(content_type));
+			.set_content_type(MimeType::from_content_type(content_type));
 		this
 	}
 

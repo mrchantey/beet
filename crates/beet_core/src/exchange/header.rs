@@ -6,7 +6,7 @@
 //! # use beet_core::prelude::*;
 //! # use beet_core::exchange::headers;
 //! let mut map = HeaderMap::new();
-//! map.set::<headers::ContentType>(&MimeType::Json);
+//! map.set::<headers::ContentType>(MimeType::Json);
 //! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
 //! assert_eq!(mime, MimeType::Json);
 //! ```
@@ -40,7 +40,7 @@ impl Header for ContentType {
 			.ok_or_else(|| bevyhow!("content-type header has no value"))
 	}
 
-	fn serialize(value: &MimeType) -> Vec<String> {
+	fn serialize(value: MimeType) -> Vec<String> {
 		vec![value.as_str().to_string()]
 	}
 }
@@ -102,7 +102,7 @@ impl Header for Accept {
 			.xok()
 	}
 
-	fn serialize(value: &Vec<MimeType>) -> Vec<String> {
+	fn serialize(value: Vec<MimeType>) -> Vec<String> {
 		vec![
 			value
 				.iter()
@@ -142,7 +142,7 @@ fn parse_quality(part: &str) -> (&str, f32) {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::Location>(&"/new/path".to_string());
+/// map.set::<headers::Location>("/new/path".to_string());
 /// assert_eq!(map.get::<headers::Location>().unwrap().unwrap(), "/new/path");
 /// ```
 pub struct Location;
@@ -158,7 +158,7 @@ impl Header for Location {
 			.ok_or_else(|| bevyhow!("location header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 // ============================================================================
@@ -171,7 +171,7 @@ impl Header for Location {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::Authorization>(&headers::Authorization::bearer("abc123"));
+/// map.set::<headers::Authorization>(headers::Authorization::bearer("abc123"));
 /// let auth = map.get::<headers::Authorization>().unwrap().unwrap();
 /// assert_eq!(auth, headers::Authorization::Bearer("abc123".to_string()));
 /// ```
@@ -219,7 +219,7 @@ impl Header for Authorization {
 		}
 	}
 
-	fn serialize(value: &Authorization) -> Vec<String> {
+	fn serialize(value: Authorization) -> Vec<String> {
 		vec![value.to_string()]
 	}
 }
@@ -234,7 +234,7 @@ impl Header for Authorization {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::CacheControl>(&"no-cache, no-store".to_string());
+/// map.set::<headers::CacheControl>("no-cache, no-store".to_string());
 /// assert_eq!(map.get::<headers::CacheControl>().unwrap().unwrap(), "no-cache, no-store");
 /// ```
 pub struct CacheControl;
@@ -250,7 +250,7 @@ impl Header for CacheControl {
 			.ok_or_else(|| bevyhow!("cache-control header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 // ============================================================================
@@ -263,7 +263,7 @@ impl Header for CacheControl {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::ContentLength>(&42u64);
+/// map.set::<headers::ContentLength>(42u64);
 /// assert_eq!(map.get::<headers::ContentLength>().unwrap().unwrap(), 42u64);
 /// ```
 pub struct ContentLength;
@@ -280,7 +280,7 @@ impl Header for ContentLength {
 			.map_err(|err| bevyhow!("invalid content-length: {err}"))
 	}
 
-	fn serialize(value: &u64) -> Vec<String> { vec![value.to_string()] }
+	fn serialize(value: u64) -> Vec<String> { vec![value.to_string()] }
 }
 
 // ============================================================================
@@ -293,7 +293,7 @@ impl Header for ContentLength {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::Origin>(&"https://example.com".to_string());
+/// map.set::<headers::Origin>("https://example.com".to_string());
 /// assert_eq!(map.get::<headers::Origin>().unwrap().unwrap(), "https://example.com");
 /// ```
 pub struct Origin;
@@ -309,7 +309,7 @@ impl Header for Origin {
 			.ok_or_else(|| bevyhow!("origin header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 // ============================================================================
@@ -322,7 +322,7 @@ impl Header for Origin {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::AccessControlAllowOrigin>(&"*".to_string());
+/// map.set::<headers::AccessControlAllowOrigin>("*".to_string());
 /// assert_eq!(map.get::<headers::AccessControlAllowOrigin>().unwrap().unwrap(), "*");
 /// ```
 pub struct AccessControlAllowOrigin;
@@ -337,7 +337,7 @@ impl Header for AccessControlAllowOrigin {
 		})
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 // ============================================================================
@@ -357,7 +357,7 @@ impl Header for AccessControlAllowHeaders {
 		})
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 // ============================================================================
@@ -370,7 +370,7 @@ impl Header for AccessControlAllowHeaders {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::AccessControlMaxAge>(&3600u32);
+/// map.set::<headers::AccessControlMaxAge>(3600u32);
 /// assert_eq!(map.get::<headers::AccessControlMaxAge>().unwrap().unwrap(), 3600u32);
 /// ```
 pub struct AccessControlMaxAge;
@@ -389,7 +389,7 @@ impl Header for AccessControlMaxAge {
 			.map_err(|err| bevyhow!("invalid access-control-max-age: {err}"))
 	}
 
-	fn serialize(value: &u32) -> Vec<String> { vec![value.to_string()] }
+	fn serialize(value: u32) -> Vec<String> { vec![value.to_string()] }
 }
 
 // ============================================================================
@@ -402,7 +402,7 @@ impl Header for AccessControlMaxAge {
 /// # use beet_core::prelude::*;
 /// # use beet_core::exchange::headers;
 /// let mut map = HeaderMap::new();
-/// map.set::<headers::TransferEncoding>(&headers::TransferEncodingValue::Chunked);
+/// map.set::<headers::TransferEncoding>(headers::TransferEncodingValue::Chunked);
 /// assert_eq!(
 ///     map.get::<headers::TransferEncoding>().unwrap().unwrap(),
 ///     headers::TransferEncodingValue::Chunked,
@@ -467,7 +467,7 @@ impl Header for TransferEncoding {
 			.ok_or_else(|| bevyhow!("transfer-encoding header has no value"))
 	}
 
-	fn serialize(value: &TransferEncodingValue) -> Vec<String> {
+	fn serialize(value: TransferEncodingValue) -> Vec<String> {
 		vec![value.as_str().to_string()]
 	}
 }
@@ -500,7 +500,7 @@ impl Header for SetCookie {
 		values.clone().xok()
 	}
 
-	fn serialize(value: &Vec<String>) -> Vec<String> { value.clone() }
+	fn serialize(value: Vec<String>) -> Vec<String> { value }
 }
 
 /// Typed `Cookie` request header — returns all values.
@@ -517,7 +517,7 @@ impl Header for Cookie {
 		values.clone().xok()
 	}
 
-	fn serialize(value: &Vec<String>) -> Vec<String> { value.clone() }
+	fn serialize(value: Vec<String>) -> Vec<String> { value }
 }
 
 // ============================================================================
@@ -538,7 +538,7 @@ impl Header for Pragma {
 			.ok_or_else(|| bevyhow!("pragma header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 /// Typed `Expires` header.
@@ -555,7 +555,7 @@ impl Header for Expires {
 			.ok_or_else(|| bevyhow!("expires header has no value"))
 	}
 
-	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
+	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
 #[cfg(test)]
@@ -565,7 +565,7 @@ mod test {
 	#[test]
 	fn content_type_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<ContentType>(&MimeType::Json);
+		map.set::<ContentType>(MimeType::Json);
 		map.get::<ContentType>()
 			.unwrap()
 			.unwrap()
@@ -593,7 +593,7 @@ mod test {
 	#[test]
 	fn location_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<Location>(&"/redirect".to_string());
+		map.set::<Location>("/redirect".to_string());
 		map.get::<Location>()
 			.unwrap()
 			.unwrap()
@@ -603,7 +603,7 @@ mod test {
 	#[test]
 	fn authorization_bearer() {
 		let mut map = HeaderMap::new();
-		map.set::<Authorization>(&Authorization::bearer("tok123"));
+		map.set::<Authorization>(Authorization::bearer("tok123"));
 		let auth = map.get::<Authorization>().unwrap().unwrap();
 		auth.xpect_eq(Authorization::Bearer("tok123".to_string()));
 	}
@@ -629,7 +629,7 @@ mod test {
 	#[test]
 	fn content_length_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<ContentLength>(&1024u64);
+		map.set::<ContentLength>(1024u64);
 		map.get::<ContentLength>()
 			.unwrap()
 			.unwrap()
@@ -646,7 +646,7 @@ mod test {
 	#[test]
 	fn origin_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<Origin>(&"https://example.com".to_string());
+		map.set::<Origin>("https://example.com".to_string());
 		map.get::<Origin>()
 			.unwrap()
 			.unwrap()
@@ -656,7 +656,7 @@ mod test {
 	#[test]
 	fn access_control_allow_origin_wildcard() {
 		let mut map = HeaderMap::new();
-		map.set::<AccessControlAllowOrigin>(&"*".to_string());
+		map.set::<AccessControlAllowOrigin>("*".to_string());
 		map.get::<AccessControlAllowOrigin>()
 			.unwrap()
 			.unwrap()
@@ -666,7 +666,7 @@ mod test {
 	#[test]
 	fn access_control_max_age_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<AccessControlMaxAge>(&60u32);
+		map.set::<AccessControlMaxAge>(60u32);
 		map.get::<AccessControlMaxAge>()
 			.unwrap()
 			.unwrap()
@@ -688,7 +688,7 @@ mod test {
 	fn cache_control_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<CacheControl>(
-			&"no-cache, no-store, must-revalidate".to_string(),
+			"no-cache, no-store, must-revalidate".to_string(),
 		);
 		map.get::<CacheControl>()
 			.unwrap()
@@ -699,7 +699,7 @@ mod test {
 	#[test]
 	fn transfer_encoding_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<TransferEncoding>(&TransferEncodingValue::Chunked);
+		map.set::<TransferEncoding>(TransferEncodingValue::Chunked);
 		map.get::<TransferEncoding>()
 			.unwrap()
 			.unwrap()

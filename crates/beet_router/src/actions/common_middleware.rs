@@ -113,12 +113,10 @@ pub fn no_cache_headers() -> impl Bundle {
 
 					let parts = response.response_parts_mut();
 					parts.headers.set::<header::CacheControl>(
-						&"no-cache, no-store, must-revalidate".to_string(),
+						"no-cache, no-store, must-revalidate".to_string(),
 					);
-					parts
-						.headers
-						.set::<header::Pragma>(&"no-cache".to_string());
-					parts.headers.set::<header::Expires>(&"0".to_string());
+					parts.headers.set::<header::Pragma>("no-cache".to_string());
+					parts.headers.set::<header::Expires>("0".to_string());
 					Ok(())
 				});
 
@@ -318,7 +316,7 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 					response
 						.response_parts_mut()
 						.headers
-						.set::<header::AccessControlAllowOrigin>(&origin);
+						.set::<header::AccessControlAllowOrigin>(origin);
 
 					Ok(())
 				});
@@ -432,13 +430,13 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 
 					let mut response = Response::ok();
 					let parts = response.response_parts_mut();
-					parts.headers.set::<header::AccessControlMaxAge>(&60u32);
+					parts.headers.set::<header::AccessControlMaxAge>(60u32);
 					parts.headers.set::<header::AccessControlAllowHeaders>(
-						&"content-type".to_string(),
+						"content-type".to_string(),
 					);
 					parts
 						.headers
-						.set::<header::AccessControlAllowOrigin>(&origin);
+						.set::<header::AccessControlAllowOrigin>(origin);
 
 					world.entity_mut(agent).insert(response);
 					world.entity_mut(action).trigger_target(Outcome::Pass);

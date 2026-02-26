@@ -334,10 +334,7 @@ impl RequestParts {
 				.get::<header::TransferEncoding>()
 				.and_then(|res| res.ok())
 				.map(|enc| {
-					matches!(
-						enc,
-						header::TransferEncodingValue::Chunked
-					)
+					matches!(enc, header::TransferEncodingValue::Chunked)
 				})
 				.unwrap_or(false)
 	}
@@ -781,7 +778,7 @@ mod test {
 			HttpMethod::Get,
 			"http://example.com/api/users/123?limit=10",
 		);
-		parts.headers.set_content_type(&MimeType::Json);
+		parts.headers.set_content_type(MimeType::Json);
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -814,7 +811,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::Ok);
-		parts.headers.set_content_type(&MimeType::Html);
+		parts.headers.set_content_type(MimeType::Html);
 
 		parts.status().xpect_eq(StatusCode::Ok);
 		parts
@@ -987,7 +984,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let mut parts = RequestParts::post("/api/users?limit=10");
-		parts.headers.set_content_type(&MimeType::Json);
+		parts.headers.set_content_type(MimeType::Json);
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
@@ -1000,7 +997,7 @@ mod test {
 	fn response_parts_to_http() {
 		let mut parts =
 			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
-		parts.headers.set_content_type(&MimeType::Json);
+		parts.headers.set_content_type(MimeType::Json);
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -1031,17 +1028,13 @@ mod test {
 		let mut parts = RequestParts::default();
 		parts.has_body().xpect_false();
 
-		parts
-			.headers
-			.set::<header::ContentLength>(&5u64);
+		parts.headers.set::<header::ContentLength>(5u64);
 		parts.has_body().xpect_true();
 
 		let mut parts2 = RequestParts::default();
-		parts2
-			.headers
-			.set::<header::TransferEncoding>(
-				&header::TransferEncodingValue::Chunked,
-			);
+		parts2.headers.set::<header::TransferEncoding>(
+			header::TransferEncodingValue::Chunked,
+		);
 		parts2.has_body().xpect_true();
 	}
 }

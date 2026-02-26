@@ -11,7 +11,7 @@
 //! # use beet_core::prelude::*;
 //! # use beet_core::exchange::headers;
 //! let mut map = HeaderMap::new();
-//! map.set::<headers::ContentType>(&MimeType::Json);
+//! map.set::<headers::ContentType>(MimeType::Json);
 //! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
 //! assert_eq!(mime, MimeType::Json);
 //! ```
@@ -83,7 +83,7 @@ impl HeaderMap {
 	}
 
 	/// Set a typed header, replacing any existing values for that key.
-	pub fn set<H: Header>(&mut self, value: &H::Value) {
+	pub fn set<H: Header>(&mut self, value: H::Value) {
 		let key = to_kebab_case(H::KEY).into_owned();
 		self.0.remove(&key);
 		for val in H::serialize(value) {
@@ -92,7 +92,7 @@ impl HeaderMap {
 	}
 
 	/// Set the `Content-Type` header from a [`MimeType`].
-	pub fn set_content_type(&mut self, mime: &MimeType) {
+	pub fn set_content_type(&mut self, mime: MimeType) {
 		self.set::<header::ContentType>(mime);
 	}
 
@@ -164,7 +164,7 @@ pub trait Header {
 	/// Parse the header from its raw string values.
 	fn parse(values: &Vec<String>) -> Result<Self::Value>;
 	/// Serialize the typed value into raw header strings.
-	fn serialize(value: &Self::Value) -> Vec<String>;
+	fn serialize(value: Self::Value) -> Vec<String>;
 }
 
 // ============================================================================
@@ -304,7 +304,7 @@ mod test {
 	#[test]
 	fn insert_and_get_str() {
 		let mut headers = HeaderMap::new();
-		headers.set::<headers::ContentType>(&MimeType::Json);
+		headers.set::<headers::ContentType>(MimeType::Json);
 		headers
 			.get::<headers::ContentType>()
 			.unwrap()
@@ -315,7 +315,7 @@ mod test {
 	#[test]
 	fn case_insensitive_lookup() {
 		let mut headers = HeaderMap::new();
-		headers.set::<headers::ContentType>(&MimeType::Html);
+		headers.set::<headers::ContentType>(MimeType::Html);
 		// All casings resolve to the same normalized key
 		headers
 			.get::<headers::ContentType>()
@@ -367,7 +367,7 @@ mod test {
 	#[test]
 	fn set_content_type_helper() {
 		let mut headers = HeaderMap::new();
-		headers.set_content_type(&MimeType::Json);
+		headers.set_content_type(MimeType::Json);
 		headers
 			.get::<headers::ContentType>()
 			.unwrap()
