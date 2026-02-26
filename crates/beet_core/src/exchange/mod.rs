@@ -1,10 +1,6 @@
 mod body;
+pub mod header;
 mod header_map;
-/// Typed header marker structs for use with [`HeaderMap::get`] and [`HeaderMap::set`].
-mod header_types;
-pub mod headers {
-	pub use super::header_types::*;
-}
 #[cfg(feature = "serde")]
 pub mod mime_serde;
 mod parts;

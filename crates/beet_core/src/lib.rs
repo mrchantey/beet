@@ -84,7 +84,7 @@ pub mod bevy_utils;
 #[cfg(feature = "exchange")]
 mod exchange;
 #[cfg(feature = "exchange")]
-pub use exchange::headers;
+pub use exchange::header;
 #[cfg(all(feature = "exchange", feature = "serde"))]
 pub use exchange::mime_serde;
 pub mod extensions;

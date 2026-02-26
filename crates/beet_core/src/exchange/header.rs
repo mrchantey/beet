@@ -335,10 +335,9 @@ impl Header for AccessControlAllowOrigin {
 	const KEY: &'static str = "access-control-allow-origin";
 
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
-		values
-			.first()
-			.cloned()
-			.ok_or_else(|| bevyhow!("access-control-allow-origin header has no value"))
+		values.first().cloned().ok_or_else(|| {
+			bevyhow!("access-control-allow-origin header has no value")
+		})
 	}
 
 	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
@@ -356,10 +355,9 @@ impl Header for AccessControlAllowHeaders {
 	const KEY: &'static str = "access-control-allow-headers";
 
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
-		values
-			.first()
-			.cloned()
-			.ok_or_else(|| bevyhow!("access-control-allow-headers header has no value"))
+		values.first().cloned().ok_or_else(|| {
+			bevyhow!("access-control-allow-headers header has no value")
+		})
 	}
 
 	fn serialize(value: &String) -> Vec<String> { vec![value.clone()] }
@@ -387,7 +385,9 @@ impl Header for AccessControlMaxAge {
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
 		values
 			.first()
-			.ok_or_else(|| bevyhow!("access-control-max-age header has no value"))?
+			.ok_or_else(|| {
+				bevyhow!("access-control-max-age header has no value")
+			})?
 			.parse::<u32>()
 			.map_err(|err| bevyhow!("invalid access-control-max-age: {err}"))
 	}
@@ -546,7 +546,10 @@ mod test {
 	fn location_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<Location>(&"/redirect".to_string());
-		map.get::<Location>().unwrap().unwrap().xpect_eq("/redirect");
+		map.get::<Location>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("/redirect");
 	}
 
 	#[test]
@@ -570,14 +573,19 @@ mod test {
 		let mut map = HeaderMap::new();
 		map.set_raw("authorization", "Digest realm=\"test\"");
 		let auth = map.get::<AuthorizationHeader>().unwrap().unwrap();
-		auth.xpect_eq(Authorization::Other("Digest realm=\"test\"".to_string()));
+		auth.xpect_eq(Authorization::Other(
+			"Digest realm=\"test\"".to_string(),
+		));
 	}
 
 	#[test]
 	fn content_length_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<ContentLength>(&1024u64);
-		map.get::<ContentLength>().unwrap().unwrap().xpect_eq(1024u64);
+		map.get::<ContentLength>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(1024u64);
 	}
 
 	#[test]
@@ -631,7 +639,9 @@ mod test {
 	#[test]
 	fn cache_control_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<CacheControl>(&"no-cache, no-store, must-revalidate".to_string());
+		map.set::<CacheControl>(
+			&"no-cache, no-store, must-revalidate".to_string(),
+		);
 		map.get::<CacheControl>()
 			.unwrap()
 			.unwrap()

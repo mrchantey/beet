@@ -57,13 +57,6 @@ impl HeaderMap {
 	pub fn new() -> Self { Self(MultiMap::new()) }
 
 	/// Insert a raw header value. The key is normalized to kebab-case.
-	///
-	/// Alias for [`set_raw`](Self::set_raw) for ergonomic use in tests and builders.
-	pub fn insert(&mut self, key: impl AsRef<str>, value: impl Into<String>) {
-		self.set_raw(key, value);
-	}
-
-	/// Insert a raw header value. The key is normalized to kebab-case.
 	pub fn set_raw(&mut self, key: impl AsRef<str>, value: impl Into<String>) {
 		let key = to_kebab_case(key.as_ref()).into_owned();
 		self.0.insert(key, value.into());
@@ -100,7 +93,7 @@ impl HeaderMap {
 
 	/// Set the `Content-Type` header from a [`MimeType`].
 	pub fn set_content_type(&mut self, mime: &MimeType) {
-		self.set_raw(crate::exchange::headers::ContentType::KEY, mime.as_str());
+		self.set_raw(crate::exchange::header::ContentType::KEY, mime.as_str());
 	}
 
 	/// Check if a header key exists.
@@ -310,7 +303,7 @@ mod test {
 	#[test]
 	fn insert_and_get_str() {
 		let mut headers = HeaderMap::new();
-		headers.insert("Content-Type", "application/json");
+		headers.set_raw("Content-Type", "application/json");
 		headers
 			.first_raw("content-type")
 			.unwrap()
