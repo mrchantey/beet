@@ -400,6 +400,11 @@ impl Link {
 			title: None,
 		}
 	}
+
+	pub fn with_text(self, text: impl Into<String>) -> impl Bundle {
+		(self, children![TextNode::new(text)])
+	}
+
 	/// Set the title for this link.
 	pub fn with_title(mut self, title: impl Into<String>) -> Self {
 		self.title = Some(title.into());

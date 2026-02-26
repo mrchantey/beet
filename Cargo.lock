@@ -1603,12 +1603,14 @@ dependencies = [
 name = "beet_stack"
 version = "0.0.9-dev.3"
 dependencies = [
+ "async-io",
  "beet_core",
  "beet_tool",
  "bevy",
  "bevy_ratatui",
  "bitflags 2.10.0",
  "extend",
+ "futures-lite",
  "pulldown-cmark",
  "ratatui",
  "serde",

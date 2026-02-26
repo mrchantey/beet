@@ -18,6 +18,7 @@ interface = ["serde"]
 serde = ["dep:serde","beet_core/json","beet_core/postcard"]
 tui = ["interface", "dep:bevy_ratatui", "dep:ratatui"]
 markdown = ["dep:pulldown-cmark"]
+http = ["dep:async-io", "dep:futures-lite"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
@@ -34,6 +35,8 @@ bevy_ratatui = {workspace = true, optional=true}
 ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 pulldown-cmark = { version = "0.13", optional = true }
+async-io = { workspace = true, optional = true }
+futures-lite = { workspace = true, optional = true }
 webbrowser.workspace = true
 
 [dev-dependencies]
