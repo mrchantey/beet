@@ -137,7 +137,7 @@ impl Body {
 	#[cfg(feature = "json")]
 	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		ExchangeFormat::Json.deserialize(&bytes)
+		mime_serde::deserialize(MimeType::Json, &bytes)
 	}
 
 	/// Consumes the body and deserializes the content as postcard.
@@ -146,33 +146,31 @@ impl Body {
 		self,
 	) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		ExchangeFormat::Postcard.deserialize(&bytes)
+		mime_serde::deserialize(MimeType::Postcard, &bytes)
 	}
 
 	/// Creates a body by serializing `value` as JSON.
 	#[cfg(feature = "json")]
 	pub fn from_json<T: serde::Serialize>(value: &T) -> Result<Self> {
-		ExchangeFormat::Json
-			.serialize(value)
+		mime_serde::serialize(MimeType::Json, value)
 			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
 	}
 
 	/// Creates a body by serializing `value` as postcard.
 	#[cfg(feature = "postcard")]
 	pub fn from_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
-		ExchangeFormat::Postcard
-			.serialize(value)
+		mime_serde::serialize(MimeType::Postcard, value)
 			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
 	}
 
-	/// Consumes the body and deserializes using the given [`ExchangeFormat`].
+	/// Consumes the body and deserializes using the given [`MimeType`].
 	#[cfg(feature = "serde")]
-	pub async fn into_format<T: serde::de::DeserializeOwned>(
+	pub async fn into_mime<T: serde::de::DeserializeOwned>(
 		self,
-		format: ExchangeFormat,
+		mime: MimeType,
 	) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		format.deserialize(&bytes)
+		mime_serde::deserialize(mime, &bytes)
 	}
 
 	/// Attempts to extract bytes without consuming a stream.

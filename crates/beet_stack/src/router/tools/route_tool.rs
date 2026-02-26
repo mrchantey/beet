@@ -90,16 +90,20 @@ where
 	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
 	Output: 'static + Send + Sync + serde::Serialize,
 {
-	let format = ExchangeFormat::from_content_type(
-		request.headers.first_raw("content-type"),
-	)?;
+	let mime = request
+		.headers
+		.first_raw("content-type")
+		.map(MimeType::from_content_type)
+		.unwrap_or(MimeType::Json);
 	let body_bytes = request.body.into_bytes().await?;
-	let input: Input = format.deserialize(&body_bytes)?;
+	let input: Input =
+		beet_core::prelude::mime_serde::deserialize(mime.clone(), &body_bytes)?;
 	let output: Output = next.call(input).await?;
 	// Use the same format as the request payload
-	let body_bytes = format.serialize(&output)?;
+	let body_bytes =
+		beet_core::prelude::mime_serde::serialize(mime.clone(), &output)?;
 	Response::ok()
-		.with_content_type(format.content_type_str())
+		.with_content_type(mime.as_str())
 		.with_body(body_bytes)
 		.xok()
 }
@@ -200,44 +204,37 @@ mod test {
 		result.xpect_eq(42);
 	}
 
-	// -- ExchangeFormat unit tests --
+	// -- mime_serde unit tests --
 
 	#[test]
-	fn format_from_content_type() {
-		ExchangeFormat::from_content_type(None)
-			.unwrap()
-			.xpect_eq(ExchangeFormat::Json);
-		ExchangeFormat::from_content_type(Some("application/json"))
-			.unwrap()
-			.xpect_eq(ExchangeFormat::Json);
-		ExchangeFormat::from_content_type(Some(
-			"application/json; charset=utf-8",
-		))
-		.unwrap()
-		.xpect_eq(ExchangeFormat::Json);
-		ExchangeFormat::from_content_type(Some("application/x-postcard"))
-			.unwrap()
-			.xpect_eq(ExchangeFormat::Postcard);
-
-		// unrecognized content-type should error
-		ExchangeFormat::from_content_type(Some("text/plain")).xpect_err();
+	fn mime_type_from_content_type() {
+		MimeType::from_content_type("application/json")
+			.xpect_eq(MimeType::Json);
+		MimeType::from_content_type("application/json; charset=utf-8")
+			.xpect_eq(MimeType::Json);
+		MimeType::from_content_type("application/x-postcard")
+			.xpect_eq(MimeType::Postcard);
+		// absent content-type defaults to Json in serde_exchange
+		MimeType::from_content_type("text/plain").xpect_eq(MimeType::Text);
 	}
 
 	#[test]
-	fn format_roundtrip_json() {
+	fn mime_serde_roundtrip_json() {
+		use beet_core::prelude::mime_serde;
 		let input = AddInput { a: 1, b: 2 };
-		let bytes = ExchangeFormat::Json.serialize(&input).unwrap();
+		let bytes = mime_serde::serialize(MimeType::Json, &input).unwrap();
 		let output: AddInput =
-			ExchangeFormat::Json.deserialize(&bytes).unwrap();
+			mime_serde::deserialize(MimeType::Json, &bytes).unwrap();
 		output.xpect_eq(input);
 	}
 
 	#[test]
-	fn format_roundtrip_postcard() {
+	fn mime_serde_roundtrip_postcard() {
+		use beet_core::prelude::mime_serde;
 		let input = AddInput { a: 3, b: 4 };
-		let bytes = ExchangeFormat::Postcard.serialize(&input).unwrap();
+		let bytes = mime_serde::serialize(MimeType::Postcard, &input).unwrap();
 		let output: AddInput =
-			ExchangeFormat::Postcard.deserialize(&bytes).unwrap();
+			mime_serde::deserialize(MimeType::Postcard, &bytes).unwrap();
 		output.xpect_eq(input);
 	}
 

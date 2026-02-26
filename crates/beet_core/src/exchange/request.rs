@@ -189,8 +189,10 @@ impl Request {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
+	/// # use beet_core::exchange::headers;
 	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
-	/// assert_eq!(request.headers.first_raw("content-type"), Some("application/json"));
+	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(mime, MimeType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(
@@ -200,9 +202,7 @@ impl Request {
 		let body = Body::from_json(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request
-			.headers
-			.set_raw("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request.headers.set_content_type(&MimeType::Json);
 		request.xok()
 	}
 
@@ -216,9 +216,7 @@ impl Request {
 		let body = Body::from_postcard(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request
-			.headers
-			.set_raw("content-type", ExchangeFormat::POSTCARD_CONTENT_TYPE);
+		request.headers.set_content_type(&MimeType::Postcard);
 		request.xok()
 	}
 
@@ -226,15 +224,15 @@ impl Request {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
+	/// # use beet_core::exchange::headers;
 	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
-	/// assert_eq!(request.headers.first_raw("content-type"), Some("application/json"));
+	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(mime, MimeType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
 		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
-		request
-			.headers
-			.set_raw("content-type", ExchangeFormat::JSON_CONTENT_TYPE);
+		request.headers.set_content_type(&MimeType::Json);
 		request
 	}
 
@@ -245,9 +243,7 @@ impl Request {
 		bytes: impl AsRef<[u8]>,
 	) -> Self {
 		let mut request = Self::post(path).with_body(bytes);
-		request
-			.headers
-			.set_raw("content-type", ExchangeFormat::POSTCARD_CONTENT_TYPE);
+		request.headers.set_content_type(&MimeType::Postcard);
 		request
 	}
 
@@ -284,10 +280,12 @@ impl Request {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let format = ExchangeFormat::from_content_type(
-			self.headers.first_raw("content-type"),
-		)?;
-		self.body.into_format(format).await
+		let mime = self
+			.headers
+			.first_raw("content-type")
+			.map(MimeType::from_content_type)
+			.unwrap_or(MimeType::Json);
+		self.body.into_mime(mime).await
 	}
 
 	/// Deserializes the request body using the format indicated by

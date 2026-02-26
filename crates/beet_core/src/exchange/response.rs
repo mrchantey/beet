@@ -153,16 +153,18 @@ impl Response {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
+	/// # use beet_core::exchange::headers;
 	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
 	/// assert_eq!(response.status(), StatusCode::Ok);
-	/// assert_eq!(response.parts.headers.first_raw("content-type"), Some("application/json"));
+	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(mime, MimeType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(value: &T) -> Result<Self> {
 		let body = Body::from_json(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(ExchangeFormat::JSON_CONTENT_TYPE)
+			.with_content_type(MimeType::JSON)
 			.xok()
 	}
 
@@ -172,7 +174,7 @@ impl Response {
 		let body = Body::from_postcard(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(ExchangeFormat::POSTCARD_CONTENT_TYPE)
+			.with_content_type(MimeType::POSTCARD)
 			.xok()
 	}
 
@@ -180,14 +182,16 @@ impl Response {
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
+	/// # use beet_core::exchange::headers;
 	/// let response = Response::with_json_str(r#"{"foo": 42}"#);
-	/// assert_eq!(response.parts.headers.first_raw("content-type"), Some("application/json"));
+	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(mime, MimeType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(json: impl AsRef<str>) -> Self {
 		Self::ok()
 			.with_body(json.as_ref())
-			.with_content_type(ExchangeFormat::JSON_CONTENT_TYPE)
+			.with_content_type(MimeType::JSON)
 	}
 
 	/// Creates an OK response with raw postcard bytes and `content-type` header.
@@ -195,7 +199,7 @@ impl Response {
 	pub fn with_postcard_bytes(bytes: impl AsRef<[u8]>) -> Self {
 		Self::ok()
 			.with_body(Bytes::copy_from_slice(bytes.as_ref()))
-			.with_content_type(ExchangeFormat::POSTCARD_CONTENT_TYPE)
+			.with_content_type(MimeType::POSTCARD)
 	}
 
 	/// Deserializes the response body using the format indicated by
@@ -213,10 +217,13 @@ impl Response {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let format = ExchangeFormat::from_content_type(
-			self.parts.headers.first_raw("content-type"),
-		)?;
-		self.body.into_format(format).await
+		let mime = self
+			.parts
+			.headers
+			.first_raw("content-type")
+			.map(MimeType::from_content_type)
+			.unwrap_or(MimeType::Json);
+		self.body.into_mime(mime).await
 	}
 
 	/// Deserializes the response body using the format indicated by

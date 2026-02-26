@@ -83,6 +83,10 @@ mod bevy_extensions;
 pub mod bevy_utils;
 #[cfg(feature = "exchange")]
 mod exchange;
+#[cfg(feature = "exchange")]
+pub use exchange::headers;
+#[cfg(all(feature = "exchange", feature = "serde"))]
+pub use exchange::mime_serde;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;

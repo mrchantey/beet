@@ -112,12 +112,15 @@ pub fn no_cache_headers() -> impl Bundle {
 					};
 
 					let parts = response.response_parts_mut();
-					parts.headers.set_raw(
-						"cache-control",
-						"no-cache, no-store, must-revalidate",
+					parts.headers.set::<beet_core::headers::CacheControl>(
+						&"no-cache, no-store, must-revalidate".to_string(),
 					);
-					parts.headers.set_raw("pragma", "no-cache");
-					parts.headers.set_raw("expires", "0");
+					parts.headers.set::<beet_core::headers::Pragma>(
+						&"no-cache".to_string(),
+					);
+					parts
+						.headers
+						.set::<beet_core::headers::Expires>(&"0".to_string());
 					Ok(())
 				});
 
@@ -214,8 +217,8 @@ pub fn cors_request(config: CorsConfig) -> impl Bundle {
 						})?
 						.parts
 						.headers
-						.first_raw("origin")
-						.map(|s| s.to_string());
+						.get::<beet_core::headers::Origin>()
+						.and_then(|r| r.ok());
 
 					let origin = match (config.allow_any_origin, origin_header)
 					{
@@ -317,7 +320,9 @@ pub fn cors_response(_config: CorsConfig) -> impl Bundle {
 					response
 						.response_parts_mut()
 						.headers
-						.set_raw("access-control-allow-origin", &origin);
+						.set::<beet_core::headers::AccessControlAllowOrigin>(
+						&origin,
+					);
 
 					Ok(())
 				});
@@ -389,8 +394,8 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 					let origin_header = request
 						.parts
 						.headers
-						.first_raw("origin")
-						.map(|s| s.to_string());
+						.get::<beet_core::headers::Origin>()
+						.and_then(|r| r.ok());
 
 					let origin = match (config.allow_any_origin, origin_header)
 					{
@@ -431,14 +436,19 @@ pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
 
 					let mut response = Response::ok();
 					let parts = response.response_parts_mut();
-					parts.headers.set_raw("access-control-max-age", "60");
-					parts.headers.set_raw(
-						"access-control-allow-headers",
-						"content-type",
-					);
 					parts
 						.headers
-						.set_raw("access-control-allow-origin", &origin);
+						.set::<beet_core::headers::AccessControlMaxAge>(&60u32);
+					parts
+						.headers
+						.set::<beet_core::headers::AccessControlAllowHeaders>(
+							&"content-type".to_string(),
+						);
+					parts
+						.headers
+						.set::<beet_core::headers::AccessControlAllowOrigin>(
+							&origin,
+						);
 
 					world.entity_mut(agent).insert(response);
 					world.entity_mut(action).trigger_target(Outcome::Pass);
@@ -469,15 +479,22 @@ mod test {
 			.xtap(|response| {
 				response
 					.headers
-					.first_raw("cache-control")
+					.get::<beet_core::headers::CacheControl>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");
 				response
 					.headers
-					.first_raw("pragma")
+					.get::<beet_core::headers::Pragma>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache");
-				response.headers.first_raw("expires").unwrap().xpect_eq("0");
+				response
+					.headers
+					.get::<beet_core::headers::Expires>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("0");
 			});
 	}
 
@@ -500,7 +517,8 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.first_raw("access-control-allow-origin")
+					.get::<beet_core::headers::AccessControlAllowOrigin>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("https://allowed.com");
 			});
@@ -544,7 +562,8 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.first_raw("access-control-allow-origin")
+					.get::<beet_core::headers::AccessControlAllowOrigin>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("https://anything.com");
 			});
@@ -569,14 +588,16 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.first_raw("access-control-allow-origin")
+					.get::<beet_core::headers::AccessControlAllowOrigin>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("https://allowed.com");
 				response
 					.headers
-					.first_raw("access-control-max-age")
+					.get::<beet_core::headers::AccessControlMaxAge>()
 					.unwrap()
-					.xpect_eq("60");
+					.unwrap()
+					.xpect_eq(60);
 			});
 	}
 
@@ -600,7 +621,8 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.first_raw("access-control-allow-origin")
+					.get::<beet_core::headers::AccessControlAllowOrigin>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("https://example.com");
 			});
@@ -626,12 +648,14 @@ mod test {
 				response.status().xpect_eq(StatusCode::Ok);
 				response
 					.headers
-					.first_raw("access-control-allow-origin")
+					.get::<beet_core::headers::AccessControlAllowOrigin>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("https://example.com");
 				response
 					.headers
-					.first_raw("cache-control")
+					.get::<beet_core::headers::CacheControl>()
+					.unwrap()
 					.unwrap()
 					.xpect_eq("no-cache, no-store, must-revalidate");
 			});

@@ -1,12 +1,16 @@
 mod body;
-mod exchange_format;
 mod header_map;
+/// Typed header marker structs for use with [`HeaderMap::get`] and [`HeaderMap::set`].
+mod header_types;
+pub mod headers {
+	pub use super::header_types::*;
+}
+#[cfg(feature = "serde")]
 pub mod mime_serde;
 mod parts;
 mod request;
 mod response;
 pub use body::*;
-pub use exchange_format::*;
 pub use header_map::*;
 pub use response::*;
 mod param_pattern;

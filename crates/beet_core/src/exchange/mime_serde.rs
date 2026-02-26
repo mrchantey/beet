@@ -9,7 +9,6 @@
 //!
 //! ```
 //! # use beet_core::prelude::*;
-//! # use beet_core::exchange::mime_serde;
 //! # #[cfg(feature = "json")] {
 //! let bytes = mime_serde::serialize(MimeType::Json, &42u32).unwrap();
 //! let value: u32 = mime_serde::deserialize(MimeType::Json, &bytes).unwrap();
@@ -34,7 +33,6 @@ use crate::prelude::*;
 /// | `Json`               | JSON     | `json`          |
 /// | `Postcard` / `Bytes` | postcard | `postcard`      |
 /// | `Text`               | UTF-8    | —               |
-#[cfg(feature = "serde")]
 pub fn serialize<T: serde::Serialize>(
 	mime_type: MimeType,
 	value: &T,
@@ -90,7 +88,6 @@ pub fn serialize<T: serde::Serialize>(
 /// |----------------------|----------|-----------------|
 /// | `Json`               | JSON     | `json`          |
 /// | `Postcard` / `Bytes` | postcard | `postcard`      |
-#[cfg(feature = "serde")]
 pub fn deserialize<T: serde::de::DeserializeOwned>(
 	mime_type: MimeType,
 	bytes: &[u8],
@@ -132,7 +129,6 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(
 }
 
 #[cfg(test)]
-#[cfg(feature = "serde")]
 mod test {
 	use super::*;
 
