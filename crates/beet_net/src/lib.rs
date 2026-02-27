@@ -37,10 +37,7 @@ pub mod prelude {
 	pub use crate::sockets;
 
 	// Re-export common types from dependencies
-	#[cfg(feature = "http")]
-	pub use http::header;
 	pub use uuid::Uuid;
-
 	pub use bevy::tasks::futures_lite::StreamExt;
 }
 

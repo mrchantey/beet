@@ -29,7 +29,7 @@ impl FsBucketProvider {
 	}
 }
 
-impl<T: TableRow> TableProvider<T> for FsBucketProvider {
+impl<T: TableStoreRow> TableProvider<T> for FsBucketProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

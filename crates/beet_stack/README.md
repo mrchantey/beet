@@ -1,6 +1,72 @@
 # Beet Stack
 
-An opinionated, interface-agnostic application framework inspired by the HyperCard stack/card metaphor.
+An interface-agnostic application framework inspired by the HyperCard stack/card paradigm.
+
+```rust
+fn warm_greeting() -> impl Bundle {
+	card("/warm-greeting", move || {
+		mdx!("hello **world**")
+	})
+}
+```
+
+Beet is an extension of the bevy engine.
+
+```rust
+App::new()
+	.add_plugins((MinimalPlugins, StackPlugin))
+	.add_systems(Startup, |mut commands: Commands| {
+		commands.spawn((http_server(5000), warm_greeting()));
+	})
+	.run()
+```
+
+### Is it a web framework?
+
+Beet is centered around the Bevy ECS model, supporting many domains including the web:
+
+**Servers**
+- `http`
+- `discord`
+- `cli`
+- `repl`
+
+**Parsers & Renderers**
+- `html`: Static Site Generation 
+- `dom`: Single Page Applications 
+- `ratatui`: Terminal UI
+- `bevy_ui`: Native and spatial applications
+
+These can be combined to create frameworks for applications across domains like web, games, robotics.
+
+> Got an integration? create a PR adding your crate to the list!
+
+**Endpoints** 
+
+Endpoints accept and return arbitary payloads.
+
+```rust
+#[tool]
+fn add(a:i32, b:ie3) -> i32 {
+	a + b
+}
+```
+**Cards**
+
+A card provides a created or cached entity to the server for rendering, according to the request `Accept` header.
+
+This provides extensibility, for example our tui client asks for the `application/beet-tui` mimetype, instructing the server to just update the tui.
+
+
+### Everything is a tool
+
+Both endpoints and cards are defined as tools, an **entities as functions** pattern used throughout beet.
+
+Tools may be one of three types:
+- Pure Functions: great for middleware and error handling
+- Bevy Systems: useful when world access is required
+- Async Systems: great for IO tasks or calling other tools
+
 
 ### Cards
 
@@ -42,13 +108,13 @@ assert_eq!(output, 3);
 
 ### RouteTree
 
-The `RouteTree` collects all tools in an entity hierarchy into a validated routing tree. It is automatically inserted on the root ancestor whenever routes are registered. Cards register as tools with `is_card: true` on the `ToolNode`.
+The `RouteTree` collects all tools in an entity hierarchy into a validated routing tree. It is automatically inserted and updated on the root ancestor whenever a tool or card is added.
 
 ```text
 RouteTree
-  /about [card]         <- card tool
-  /settings [card]      <- card tool
-  /increment            <- tool
+  /about [card]
+  /settings [card]
+  /increment
     input:  ()
     output: i64
 ```

@@ -25,7 +25,7 @@ pub mod prelude {
 	pub use crate::stack::*;
 	pub use crate::utils::*;
 	pub use crate::val;
-	pub use beet_tool::prelude::*;
+	pub(crate) use beet_tool::prelude::*;
 }
 /// A module for re-exporting items from other crates.
 pub mod exports {
