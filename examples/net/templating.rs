@@ -74,7 +74,7 @@ fn home(mut entity: EntityWorldMut, _: Request) -> Response {
 "#,
 			count.0
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
@@ -87,7 +87,7 @@ fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
 <p>Do it, just do it. Dont ask questions. Go and buy a native tree and plant it somewhere.</p>
 "#,
 		),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
@@ -102,7 +102,7 @@ fn not_found(_: EntityWorldMut, request: Request) -> Response {
 <p>The path at <a href="{path}">{path}</a> could not be found.</p>
 "#,
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 

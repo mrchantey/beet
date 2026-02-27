@@ -2,6 +2,15 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
+
+pub fn fallback<Input, Output>() -> impl Bundle
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	async_tool(fallback_tool::<Input, Output>)
+}
+
 /// ## Errors
 ///
 /// Errors if the entity has no children.
@@ -10,7 +19,7 @@ use beet_core::prelude::*;
 /// `Input`/`Outcome<Output, Input>` are silently skipped, preventing
 /// unrelated tools (like render tools) from being called with the
 /// wrong types.
-pub async fn fallback<Input, Output>(
+pub async fn fallback_tool<Input, Output>(
 	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
@@ -73,7 +82,7 @@ mod tests {
 	#[test]
 	fn no_children() {
 		AsyncPlugin::world()
-			.spawn(async_tool(fallback::<(), ()>))
+			.spawn(fallback::<(), ()>())
 			.call_blocking::<(), Outcome>(())
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
@@ -81,7 +90,7 @@ mod tests {
 	#[test]
 	fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((async_tool(fallback::<(), ()>), children![(
+			.spawn((fallback::<(), ()>(), children![(
 				PathPartial::new("foo"),
 				outcome_fail(),
 			)]))
@@ -92,7 +101,7 @@ mod tests {
 	#[test]
 	fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((async_tool(fallback::<(), ()>), children![(
+			.spawn((fallback::<(), ()>(), children![(
 				PathPartial::new("foo"),
 				outcome_pass(),
 			)]))
@@ -103,7 +112,7 @@ mod tests {
 	#[test]
 	fn passing_nth_child() {
 		AsyncPlugin::world()
-			.spawn((async_tool(fallback::<(), ()>), children![
+			.spawn((fallback::<(), ()>(), children![
 				(PathPartial::new("foo"), outcome_fail()),
 				(PathPartial::new("bar"), outcome_fail()),
 				(PathPartial::new("bazz"), outcome_pass()),

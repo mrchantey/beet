@@ -35,7 +35,7 @@ pub fn exchange_fallback() -> impl Bundle {
 	(
 		// Name::new("Exchange Fallback"),
 		async_tool(async |request: AsyncToolIn<Request>| -> Result<Response> {
-			match fallback::<Request, Response>(request).await? {
+			match fallback_tool::<Request, Response>(request).await? {
 				// a response matched, which may be an opinionated not found response
 				Pass(res) => Ok(res),
 				// usually an interface should render an opinionated not found response
