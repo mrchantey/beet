@@ -6,8 +6,9 @@ use beet_core::prelude::*;
 ///
 /// When spawned, this component automatically starts a server on the specified port.
 /// The underlying implementation depends on compile-time feature flags:
-/// - Default: Uses Hyper HTTP server
-/// - `lambda`: Uses AWS Lambda runtime
+/// - Default: Lightweight mini HTTP server using `async-io` TCP
+/// - `hyper`: Full-featured Hyper HTTP server
+/// - `lambda`: AWS Lambda runtime
 ///
 /// # Example
 ///
@@ -75,10 +76,15 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.commands()
 		.run_system_cached_with(super::start_lambda_server, cx.entity);
 
-	#[cfg(not(feature = "lambda"))]
+	#[cfg(all(feature = "hyper", not(feature = "lambda")))]
 	world
 		.commands()
 		.run_system_cached_with(super::start_hyper_server, cx.entity);
+
+	#[cfg(all(not(feature = "hyper"), not(feature = "lambda")))]
+	world
+		.commands()
+		.run_system_cached_with(super::start_mini_http_server, cx.entity);
 }
 
 

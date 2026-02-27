@@ -255,7 +255,7 @@ impl Request {
 	) -> Result<Self, serde_json::Error> {
 		let body = serde_json::to_string(body)?;
 		self.with_body(Bytes::from(body))
-			.with_content_type("application/json")
+			.with_content_type(MimeType::Json)
 			.xok()
 	}
 
@@ -318,7 +318,6 @@ impl Request {
 	}
 
 	/// Shorthand for an `Authorization: Bearer <token>` header
-	#[cfg(feature = "http")]
 	pub fn with_auth_bearer(self, token: &str) -> Self {
 		let mut this = self;
 		this.headers
@@ -326,12 +325,10 @@ impl Request {
 		this
 	}
 
-	/// Sets the content type header
-	#[cfg(feature = "http")]
-	pub fn with_content_type(self, content_type: &str) -> Self {
+	/// Sets the content type header.
+	pub fn with_content_type(self, content_type: MimeType) -> Self {
 		let mut this = self;
-		this.headers
-			.set_content_type(MimeType::from_content_type(content_type));
+		this.headers.set_content_type(content_type);
 		this
 	}
 

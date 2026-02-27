@@ -1027,10 +1027,9 @@ mod test {
 	fn link_inline_style() {
 		let mut world = World::new();
 		let card = world
-			.spawn((CardTool, children![(Paragraph, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click")],
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				Link::new("https://example.com").with_text("click"),
+			])]))
 			.id();
 
 		struct LinkChecker(Vec<InlineStyle>);
@@ -1322,10 +1321,9 @@ mod test {
 	fn leave_link_called() {
 		let mut world = World::new();
 		let card = world
-			.spawn((CardTool, children![(Paragraph, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click")],
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				Link::new("https://example.com").with_text("click"),
+			])]))
 			.id();
 
 		struct LinkTracker(Vec<String>);

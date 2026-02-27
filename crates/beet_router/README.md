@@ -31,10 +31,10 @@ fn main() {
 				flow_exchange(|| {
 					(InfallibleSequence, children![
 						EndpointBuilder::get()
-							.with_action(|| { Response::ok_body("hello world", "text/plain")}),
+							.with_action(|| { Response::ok_body("hello world", MimeType::Text)}),
 						EndpointBuilder::get()
 							.with_path("foo")
-							.with_action(|| { Response::ok_body("hello foo", "text/plain")}),
+							.with_action(|| { Response::ok_body("hello foo", MimeType::Text)}),
 						),
 					])
 				}),

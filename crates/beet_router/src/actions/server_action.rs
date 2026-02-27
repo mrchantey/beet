@@ -45,12 +45,12 @@ where
 	fn into_action_response(self) -> Response {
 		self.map(|val| {
 			serde_json::to_string(&val)
-				.map(|val| Response::ok_body(val, "application/json"))
+				.map(|val| Response::ok_body(val, MimeType::Json))
 				.unwrap_or_else(|_| {
 					Response::from_status_body(
 						StatusCode::INTERNAL_SERVER_ERROR,
 						"Failed to serialize response body",
-						"text/plain",
+						MimeType::Text,
 					)
 				})
 				.into_response()

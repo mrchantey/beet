@@ -49,7 +49,7 @@ pub fn html_render_tool() -> impl Bundle {
 					})
 					.await;
 
-				Response::ok_body(html, "text/html").xok()
+				Response::ok_body(html, MimeType::Html).xok()
 			},
 		),
 	)
@@ -217,10 +217,9 @@ mod test {
 	#[test]
 	fn link_without_title() {
 		AsyncPlugin::world()
-			.spawn((render_html(), children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click here")],
-			)]))
+			.spawn((render_html(), children![
+				Link::new("https://example.com").with_text("click here"),
+			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("<a href=\"https://example.com\">click here</a>");

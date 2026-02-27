@@ -983,9 +983,7 @@ mod test {
 		let entity = world
 			.spawn((CardTool, children![(Paragraph, children![
 				TextNode::new("visit "),
-				(Link::new("https://example.com"), children![TextNode::new(
-					"example"
-				)],),
+				Link::new("https://example.com").with_text("example"),
 				TextNode::new(" site"),
 			])]))
 			.id();
@@ -1002,10 +1000,9 @@ mod test {
 	fn link_text_is_underlined() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(Paragraph, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click")],
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				Link::new("https://example.com").with_text("click"),
+			])]))
 			.id();
 
 		let buf = render_to_buffer(&mut world, entity, 40, 10);

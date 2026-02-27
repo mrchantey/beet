@@ -18,9 +18,13 @@ nightly = []
 # for conditional compilation in hooks
 client = []
 server = [
+"dep:async-io",
+"dep:futures-lite",
+]
+hyper = [
+"server",
 "dep:hyper",
 "dep:http-body-util",
-"dep:async-io",
 "dep:async-executor",
 "dep:pin-project"
 ]
@@ -115,9 +119,11 @@ futures-rustls = { version = "0.26", optional = true, default-features = false, 
 webpki-roots = { version = "1", optional = true }
 
 #💡 server
+async-io = { workspace = true, optional = true }
+futures-lite = { workspace = true, optional = true }
+#💡 hyper server
 hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }
-async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 pin-project = { workspace = true, optional = true }
 

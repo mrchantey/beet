@@ -68,7 +68,7 @@ async fn bucket_to_response(
 		bucket
 			.get(&path.join("index.html"))
 			.await
-			.map(|bytes| Response::ok_body(bytes, "text/html"))?
+			.map(|bytes| Response::ok_body(bytes, MimeType::Html))?
 			.xok()
 		// .map_err(|_| HttpError::not_found().into())
 	}

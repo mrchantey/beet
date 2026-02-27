@@ -29,7 +29,7 @@ pub(crate) async fn help_handler(
 			})
 			.await?;
 
-		Outcome::Pass(Response::ok_body(help_text, "text/plain")).xok()
+		Outcome::Pass(Response::ok_body(help_text, MimeType::Text)).xok()
 	} else {
 		Fail(cx.input).xok()
 	}
@@ -54,7 +54,7 @@ pub(crate) async fn contextual_not_found_handler(
 	Outcome::Pass(Response::from_status_body(
 		StatusCode::NOT_FOUND,
 		help_text,
-		"text/plain",
+		MimeType::Text,
 	))
 	.xok()
 }

@@ -101,7 +101,7 @@ where
 	// Use the same format as the request payload
 	let body_bytes = mime_serde::serialize(mime.clone(), &output)?;
 	Response::ok()
-		.with_content_type(mime.as_str())
+		.with_content_type(mime)
 		.with_body(body_bytes)
 		.xok()
 }

@@ -84,5 +84,5 @@ pass the 'name' parameter to receive a warm personal greeting.
 	);
 
 	println!("{}: {}", request.method(), request.path_string());
-	Response::ok_body(message, "text/plain").xok()
+	Response::ok_body(message, MimeType::Text).xok()
 }

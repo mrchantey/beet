@@ -174,7 +174,7 @@ pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
 				let agent = route_query.agents.entity(action);
 				commands.entity(agent).insert(
 					Response::new(default(), help_text.into())
-						.with_content_type("text/plain"),
+						.with_content_type(MimeType::Text),
 				);
 
 				// pass to exit fallback early

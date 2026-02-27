@@ -7,6 +7,8 @@
 //! 1. `text/html` → [`HtmlRenderer`]
 //! 2. `text/markdown` → [`MarkdownRenderer`]
 //! 3. `text/plain` → [`MarkdownRenderer`] (readable fallback)
+//! 4. `application/json` → markdown serialized as JSON via [`mime_serde`]
+//! 5. `application/x-postcard` → markdown serialized as postcard via [`mime_serde`]
 //!
 //! If no `Accept` header is present, or none of the requested types
 //! are supported, it falls back to HTML.
@@ -27,8 +29,8 @@ use beet_core::prelude::*;
 /// Creates a render tool that negotiates content type via the
 /// `Accept` header.
 ///
-/// Prefers HTML, then markdown, then falls back to HTML when the
-/// client doesn't specify a preference.
+/// Prefers HTML, then markdown, then JSON, then postcard, falling
+/// back to HTML when the client doesn't specify a preference.
 ///
 /// On each request it:
 /// 1. Reads the `Accept` header from the original request
@@ -52,28 +54,41 @@ pub fn mime_render_tool() -> impl Bundle {
 				let card_entity = cx.tool.call_tool(spawn_tool, ()).await?;
 
 				// Render in the negotiated format, then despawn
-				let (body, content_type) = world
-					.with_then(
-						move |world: &mut World| -> (String, &'static str) {
-							let result = match accept {
-								NegotiatedFormat::Html => {
-									let html =
-										render_html_for(card_entity, world);
-									(html, "text/html")
-								}
-								NegotiatedFormat::Markdown => {
-									let md =
-										render_markdown_for(card_entity, world);
-									(md, "text/markdown")
-								}
-							};
-							world.entity_mut(card_entity).despawn();
-							result
-						},
-					)
-					.await;
+				let response = world
+					.with_then(move |world: &mut World| -> Result<Response> {
+						let response = match accept {
+							NegotiatedFormat::Html => {
+								let html = render_html_for(card_entity, world);
+								Response::ok_body(html, MimeType::Html)
+							}
+							NegotiatedFormat::Markdown => {
+								let md =
+									render_markdown_for(card_entity, world);
+								Response::ok_body(md, MimeType::Markdown)
+							}
+							NegotiatedFormat::Json => {
+								let md =
+									render_markdown_for(card_entity, world);
+								let bytes =
+									mime_serde::serialize(MimeType::Json, &md)?;
+								Response::ok_body(bytes, MimeType::Json)
+							}
+							NegotiatedFormat::Postcard => {
+								let md =
+									render_markdown_for(card_entity, world);
+								let bytes = mime_serde::serialize(
+									MimeType::Postcard,
+									&md,
+								)?;
+								Response::ok_body(bytes, MimeType::Postcard)
+							}
+						};
+						world.entity_mut(card_entity).despawn();
+						response.xok()
+					})
+					.await?;
 
-				Response::ok_body(body, content_type).xok()
+				response.xok()
 			},
 		),
 	)
@@ -85,6 +100,8 @@ pub fn mime_render_tool() -> impl Bundle {
 enum NegotiatedFormat {
 	Html,
 	Markdown,
+	Json,
+	Postcard,
 }
 
 /// Inspect the request's `Accept` header and pick the best supported
@@ -107,6 +124,10 @@ fn negotiate_format(request: &Request) -> NegotiatedFormat {
 			MimeType::Html => return NegotiatedFormat::Html,
 			MimeType::Markdown => return NegotiatedFormat::Markdown,
 			MimeType::Text => return NegotiatedFormat::Markdown,
+			MimeType::Json => return NegotiatedFormat::Json,
+			MimeType::Postcard | MimeType::Bytes => {
+				return NegotiatedFormat::Postcard;
+			}
 			_ => continue,
 		}
 	}
@@ -159,6 +180,24 @@ mod test {
 		let request =
 			request_with_accept("text/html;q=0.5, text/markdown;q=0.9");
 		negotiate_format(&request).xpect_eq(NegotiatedFormat::Markdown);
+	}
+
+	#[test]
+	fn selects_json() {
+		let request = request_with_accept("application/json");
+		negotiate_format(&request).xpect_eq(NegotiatedFormat::Json);
+	}
+
+	#[test]
+	fn selects_postcard() {
+		let request = request_with_accept("application/x-postcard");
+		negotiate_format(&request).xpect_eq(NegotiatedFormat::Postcard);
+	}
+
+	#[test]
+	fn bytes_selects_postcard() {
+		let request = request_with_accept("application/octet-stream");
+		negotiate_format(&request).xpect_eq(NegotiatedFormat::Postcard);
 	}
 
 	#[test]

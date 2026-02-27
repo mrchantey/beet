@@ -49,7 +49,7 @@ pub fn markdown_render_tool() -> impl Bundle {
 					})
 					.await;
 
-				Response::ok_body(markdown, "text/plain").xok()
+				Response::ok_body(markdown, MimeType::Text).xok()
 			},
 		),
 	)
@@ -196,10 +196,9 @@ mod test {
 	#[test]
 	fn link_without_title() {
 		AsyncPlugin::world()
-			.spawn((render_markdown(), children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click here")],
-			)]))
+			.spawn((render_markdown(), children![
+				Link::new("https://example.com").with_text("click here"),
+			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[click here](https://example.com)");
@@ -208,10 +207,11 @@ mod test {
 	#[test]
 	fn link_with_title() {
 		AsyncPlugin::world()
-			.spawn((render_markdown(), children![(
-				Link::new("https://example.com").with_title("Example Site"),
-				children![TextNode::new("example")],
-			)]))
+			.spawn((render_markdown(), children![
+				Link::new("https://example.com")
+					.with_title("Example Site")
+					.with_text("example"),
+			]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[example](https://example.com \"Example Site\")");
@@ -247,10 +247,9 @@ mod test {
 	#[test]
 	fn important_link() {
 		AsyncPlugin::world()
-			.spawn((render_markdown(), children![(Important, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("important link")],
-			)],)]))
+			.spawn((render_markdown(), children![(Important, children![
+				Link::new("https://example.com").with_text("important link"),
+			])]))
 			.call_blocking::<(), String>(())
 			.unwrap()
 			.xpect_eq("[**important link**](https://example.com)");
@@ -261,10 +260,9 @@ mod test {
 		AsyncPlugin::world()
 			.spawn((render_markdown(), children![(Quote, children![(
 				Important,
-				children![(Emphasize, children![(Code, children![(
-					Link::new("https://example.com"),
-					children![TextNode::new("text")],
-				)],)],)],
+				children![(Emphasize, children![(Code, children![
+					Link::new("https://example.com").with_text("text"),
+				])],)],
 			)],)]))
 			.call_blocking::<(), String>(())
 			.unwrap()

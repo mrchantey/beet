@@ -652,10 +652,9 @@ mod test {
 	fn link_without_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click here")],
-			)]))
+			.spawn((CardTool, children![
+				Link::new("https://example.com").with_text("click here"),
+			]))
 			.id();
 		render_card(&mut world, entity)
 			.xpect_eq("<a href=\"https://example.com\">click here</a>");
@@ -665,10 +664,11 @@ mod test {
 	fn link_with_title() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(
-				Link::new("https://example.com").with_title("Example Site"),
-				children![TextNode::new("example")],
-			)]))
+			.spawn((CardTool, children![
+				Link::new("https://example.com")
+					.with_title("Example Site")
+					.with_text("example"),
+			]))
 			.id();
 		render_card(&mut world, entity).xpect_eq(
 			"<a href=\"https://example.com\" title=\"Example Site\">example</a>",
@@ -679,10 +679,9 @@ mod test {
 	fn important_link() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(Important, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("important link")],
-			)],)]))
+			.spawn((CardTool, children![(Important, children![
+				Link::new("https://example.com").with_text("important link"),
+			])]))
 			.id();
 		render_card(&mut world, entity).xpect_eq(
 			"<a href=\"https://example.com\"><strong>important link</strong></a>",
@@ -905,10 +904,9 @@ mod test {
 	fn link_container() {
 		let mut world = World::new();
 		let entity = world
-			.spawn((CardTool, children![(Paragraph, children![(
-				Link::new("https://example.com"),
-				children![TextNode::new("click here")],
-			)])]))
+			.spawn((CardTool, children![(Paragraph, children![
+				Link::new("https://example.com").with_text("click here"),
+			])]))
 			.id();
 		render_card(&mut world, entity)
 			.xpect_eq("<p><a href=\"https://example.com\">click here</a></p>");
@@ -920,9 +918,10 @@ mod test {
 		let entity = world
 			.spawn((CardTool, children![(Paragraph, children![(
 				Important,
-				children![(Link::new("https://example.com"), children![
-					TextNode::new("important link")
-				],)],
+				children![
+					Link::new("https://example.com")
+						.with_text("important link"),
+				],
 			)])]))
 			.id();
 		render_card(&mut world, entity).xpect_eq(

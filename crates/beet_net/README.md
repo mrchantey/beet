@@ -27,7 +27,7 @@ App::new()
       CliServer::default(),
       // HttpServer::default(),
       handler_exchange(|_| {
-        Response::ok_body("hello world", "text/plain")
+        Response::ok_body("hello world", MimeType::Text)
       }),
     ));
   })
@@ -38,7 +38,8 @@ App::new()
 
 | Feature | Description |
 |---------|-------------|
-| `server` | HTTP server functionality |
+| `server` | Lightweight mini HTTP server using `async-io` TCP |
+| `hyper` | Full-featured Hyper HTTP server (implies `server`) |
 | `lambda` | AWS Lambda server support |
 | `aws` | AWS S3 and DynamoDB providers |
 | `reqwest` | Use reqwest as the HTTP client backend |

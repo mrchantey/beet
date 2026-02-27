@@ -154,7 +154,7 @@ impl Response {
 		let body = Body::from_json(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(MimeType::JSON)
+			.with_content_type(MimeType::Json)
 			.xok()
 	}
 
@@ -164,7 +164,7 @@ impl Response {
 		let body = Body::from_postcard(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(MimeType::POSTCARD)
+			.with_content_type(MimeType::Postcard)
 			.xok()
 	}
 
@@ -181,7 +181,7 @@ impl Response {
 	pub fn with_json_str(json: impl AsRef<str>) -> Self {
 		Self::ok()
 			.with_body(json.as_ref())
-			.with_content_type(MimeType::JSON)
+			.with_content_type(MimeType::Json)
 	}
 
 	/// Creates an OK response with raw postcard bytes and `content-type` header.
@@ -189,7 +189,7 @@ impl Response {
 	pub fn with_postcard_bytes(bytes: impl AsRef<[u8]>) -> Self {
 		Self::ok()
 			.with_body(Bytes::copy_from_slice(bytes.as_ref()))
-			.with_content_type(MimeType::POSTCARD)
+			.with_content_type(MimeType::Postcard)
 	}
 
 	/// Deserializes the response body using the format indicated by
@@ -236,12 +236,10 @@ impl Response {
 	pub fn from_status_body(
 		status: StatusCode,
 		body: impl AsRef<[u8]>,
-		content_type: &str,
+		content_type: MimeType,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
-		parts
-			.headers
-			.set_content_type(MimeType::from_content_type(content_type));
+		parts.headers.set_content_type(content_type);
 		Self {
 			parts,
 			body: Bytes::copy_from_slice(body.as_ref()).into(),
@@ -307,11 +305,9 @@ impl Response {
 	}
 
 	/// Create a response with the given body and content type
-	pub fn ok_body(body: impl Into<Body>, content_type: &str) -> Self {
+	pub fn ok_body(body: impl Into<Body>, content_type: MimeType) -> Self {
 		let mut parts = ResponseParts::ok();
-		parts
-			.headers
-			.set_content_type(MimeType::from_content_type(content_type));
+		parts.headers.set_content_type(content_type);
 		Self {
 			parts,
 			body: body.into(),
@@ -327,7 +323,8 @@ impl Response {
 		path: impl AsRef<std::path::Path>,
 	) -> Self {
 		let mime_type = mime_guess::from_path(path).first_or_octet_stream();
-		Self::ok_body(body, mime_type.as_ref())
+		let mime = MimeType::from_content_type(mime_type.as_ref());
+		Self::ok_body(body, mime)
 	}
 
 	/// Returns a reference to the response parts
@@ -398,9 +395,10 @@ impl Response {
 		self
 	}
 
-	/// Sets the content type header
-	pub fn with_content_type(self, content_type: &str) -> Self {
-		self.with_header("content-type", content_type)
+	/// Sets the content type header.
+	pub fn with_content_type(mut self, content_type: MimeType) -> Self {
+		self.parts.headers.set_content_type(content_type);
+		self
 	}
 	/// Unwrap the ok status code and get the body as text
 	pub async fn unwrap_str(self) -> String {
@@ -470,16 +468,13 @@ impl From<BevyError> for Response {
 
 impl IntoResponse<Self> for Bytes {
 	fn into_response(self) -> Response {
-		Response::ok_body(self, "application/octet-stream")
+		Response::ok_body(self, MimeType::Bytes)
 	}
 }
 
 impl IntoResponse<Self> for &[u8] {
 	fn into_response(self) -> Response {
-		Response::ok_body(
-			Bytes::copy_from_slice(self),
-			"application/octet-stream",
-		)
+		Response::ok_body(Bytes::copy_from_slice(self), MimeType::Bytes)
 	}
 }
 
@@ -517,13 +512,13 @@ impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
 
 impl<'a> From<&'a str> for Response {
 	fn from(value: &'a str) -> Response {
-		Response::ok_body(value, "text/plain; charset=utf-8")
+		Response::ok_body(value, MimeType::Text)
 	}
 }
 
 impl From<String> for Response {
 	fn from(value: String) -> Response {
-		Response::ok_body(value, "text/plain; charset=utf-8")
+		Response::ok_body(value, MimeType::Text)
 	}
 }
 
@@ -534,10 +529,7 @@ mod test {
 
 
 	#[test]
-	fn response_ok() {
-		let response = Response::ok();
-		response.status().xpect_eq(StatusCode::OK);
-	}
+	fn response_ok() { Response::ok().status().xpect_eq(StatusCode::OK); }
 
 	#[test]
 	fn response_not_found() {
@@ -564,7 +556,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_from_status_body() {
 		let response =
-			Response::from_status_body(StatusCode::OK, b"data", "text/plain");
+			Response::from_status_body(StatusCode::OK, b"data", MimeType::Text);
 		response.status().xpect_eq(StatusCode::OK);
 		response
 			.header_contains(http::header::CONTENT_TYPE, "text/plain")

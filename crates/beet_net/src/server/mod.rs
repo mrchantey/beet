@@ -5,21 +5,30 @@
 //!
 //! ## Implementations
 //!
-//! - **Hyper**: Default async HTTP server (requires `server` feature)
+//! - **Mini HTTP**: Lightweight async-io TCP server (default for `server` feature)
+//! - **Hyper**: Full-featured HTTP server (requires `hyper` feature)
 //! - **Lambda**: AWS Lambda runtime adapter (requires `lambda` feature)
 //!
 //! The server backend is selected at compile time based on feature flags.
-//! Both implementations route requests through the tool-based exchange
-//! pattern, allowing the same handler code to work in both environments.
+//! All implementations route requests through the tool-based exchange
+//! pattern, allowing the same handler code to work in every environment.
 mod cli_server;
 #[cfg(all(
 	feature = "server",
+	feature = "hyper",
 	not(feature = "lambda"),
 	not(target_arch = "wasm32")
 ))]
 mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
+#[cfg(all(
+	feature = "server",
+	not(feature = "hyper"),
+	not(feature = "lambda"),
+	not(target_arch = "wasm32")
+))]
+mod mini_http_server;
 
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod http_server;
@@ -29,10 +38,18 @@ pub use cli_server::*;
 pub use http_server::*;
 #[cfg(all(
 	feature = "server",
+	feature = "hyper",
 	not(feature = "lambda"),
 	not(target_arch = "wasm32")
 ))]
 use hyper_server::*;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 use lambda_server::*;
+#[cfg(all(
+	feature = "server",
+	not(feature = "hyper"),
+	not(feature = "lambda"),
+	not(target_arch = "wasm32")
+))]
+use mini_http_server::*;
 pub use server_plugin::*;

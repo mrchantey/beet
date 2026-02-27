@@ -51,6 +51,6 @@ pub mod exports {
 	pub use eventsource_stream;
 	#[cfg(feature = "http")]
 	pub use http;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "hyper", not(target_arch = "wasm32")))]
 	pub use http_body_util;
 }

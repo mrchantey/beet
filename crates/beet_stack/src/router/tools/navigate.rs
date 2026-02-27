@@ -83,7 +83,7 @@ pub(crate) async fn navigate_handler(
 	let Some(node) = resolved else {
 		return Pass(Response::ok_body(
 			"Navigation target not found",
-			"text/plain",
+			MimeType::Text,
 		))
 		.xok();
 	};

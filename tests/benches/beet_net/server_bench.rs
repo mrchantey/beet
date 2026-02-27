@@ -17,7 +17,7 @@ async fn main_async() {
 			.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {
 				commands
 					.entity(ev.event_target())
-					.insert(Response::ok_body("hello world", "text/plain"));
+					.insert(Response::ok_body("hello world", MimeType::Text));
 			})
 			.run();
 	});

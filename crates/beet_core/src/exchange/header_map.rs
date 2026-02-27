@@ -190,6 +190,12 @@ pub enum MimeType {
 	Markdown,
 	/// `text/event-stream` — Server-Sent Events.
 	EventStream,
+	/// `text/css`
+	Css,
+	/// `application/javascript`
+	Javascript,
+	/// `image/png`
+	Png,
 	/// An unrecognized MIME type.
 	Other(String),
 }
@@ -215,6 +221,12 @@ impl MimeType {
 	pub const BYTES: &'static str = "application/octet-stream";
 	/// The MIME string for `text/event-stream`.
 	pub const EVENT_STREAM: &'static str = "text/event-stream";
+	/// The MIME string for `text/css`.
+	pub const CSS: &'static str = "text/css";
+	/// The MIME string for `application/javascript`.
+	pub const JAVASCRIPT: &'static str = "application/javascript";
+	/// The MIME string for `image/png`.
+	pub const PNG: &'static str = "image/png";
 
 	/// Parse a MIME type from a content-type string.
 	///
@@ -236,6 +248,9 @@ impl MimeType {
 			}
 			val if val.contains(Self::TEXT) => MimeType::Text,
 			val if val.contains(Self::BYTES) => MimeType::Bytes,
+			val if val.contains(Self::CSS) => MimeType::Css,
+			val if val.contains(Self::JAVASCRIPT) => MimeType::Javascript,
+			val if val.contains(Self::PNG) => MimeType::Png,
 			other => MimeType::Other(other.to_string()),
 		}
 	}
@@ -251,6 +266,9 @@ impl MimeType {
 			MimeType::Postcard => Self::POSTCARD,
 			MimeType::Markdown => Self::MARKDOWN,
 			MimeType::EventStream => Self::EVENT_STREAM,
+			MimeType::Css => Self::CSS,
+			MimeType::Javascript => Self::JAVASCRIPT,
+			MimeType::Png => Self::PNG,
 			MimeType::Other(val) => val.as_str(),
 		}
 	}
@@ -259,6 +277,14 @@ impl MimeType {
 	pub fn is_serializable(&self) -> bool {
 		matches!(self, MimeType::Json | MimeType::Postcard)
 	}
+}
+
+impl From<&str> for MimeType {
+	fn from(value: &str) -> Self { MimeType::from_content_type(value) }
+}
+
+impl From<String> for MimeType {
+	fn from(value: String) -> Self { MimeType::from_content_type(&value) }
 }
 
 impl core::fmt::Display for MimeType {
