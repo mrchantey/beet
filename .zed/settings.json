@@ -16,7 +16,7 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
-						"http_server",
+						// "http_server",
 						// "stack",
 						// "server"
 						// "client",

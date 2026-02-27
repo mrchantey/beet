@@ -46,17 +46,15 @@ These can be combined to create frameworks for applications across domains like 
 Endpoints accept and return arbitary payloads.
 
 ```rust
+
 #[tool]
-fn add(a:i32, b:ie3) -> i32 {
+fn add(a:i32, b:i32) -> i32 {
 	a + b
 }
 ```
 **Cards**
 
-A card provides a created or cached entity to the server for rendering, according to the request `Accept` header.
-
-This provides extensibility, for example our tui client asks for the `application/beet-tui` mimetype, instructing the server to just update the tui.
-
+Cards perform some operation on an entity, for example populating it with text content, then provide it to the server for rendering, usually according to the request `Accept` header.
 
 ### Everything is a tool
 

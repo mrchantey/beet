@@ -1,5 +1,5 @@
 assets
-agent/reference
+agent/reference*
 
 !examples/assets
 Cargo.toml.full

@@ -7,11 +7,11 @@ mod document;
 mod input;
 mod integrations;
 pub mod nodes;
-mod parsers;
+mod parser;
 mod router;
 mod stack;
 
-mod utils;
+mod renderer;
 
 /// A prelude for beet_stack, re-exporting the most commonly used items.
 pub mod prelude {
@@ -20,10 +20,10 @@ pub mod prelude {
 	pub use crate::integrations::*;
 	pub use crate::nodes;
 	pub use crate::nodes::*;
-	pub use crate::parsers::*;
+	pub use crate::parser::*;
 	pub use crate::router::*;
 	pub use crate::stack::*;
-	pub use crate::utils::*;
+	pub use crate::renderer::*;
 	pub use crate::val;
 	pub(crate) use beet_tool::prelude::*;
 }
