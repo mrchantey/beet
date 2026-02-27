@@ -407,7 +407,7 @@ pub struct ResponseParts {
 impl Default for ResponseParts {
 	fn default() -> Self {
 		Self {
-			status: StatusCode::Ok,
+			status: StatusCode::OK,
 			headers: default(),
 			version: DEFAULT_HTTP_VERSION.to_string(),
 		}
@@ -425,16 +425,18 @@ impl ResponseParts {
 	}
 
 	/// Creates an OK (200) response
-	pub fn ok() -> Self { Self::new(StatusCode::Ok) }
+	pub fn ok() -> Self { Self::new(StatusCode::OK) }
 
 	/// Creates a Not Found (404) response
-	pub fn not_found() -> Self { Self::new(StatusCode::NotFound) }
+	pub fn not_found() -> Self { Self::new(StatusCode::NOT_FOUND) }
 
 	/// Creates an Internal Server Error (500) response
-	pub fn internal_error() -> Self { Self::new(StatusCode::InternalError) }
+	pub fn internal_error() -> Self {
+		Self::new(StatusCode::INTERNAL_SERVER_ERROR)
+	}
 
 	/// Creates a Bad Request (400) response
-	pub fn bad_request() -> Self { Self::new(StatusCode::MalformedRequest) }
+	pub fn bad_request() -> Self { Self::new(StatusCode::BAD_REQUEST) }
 
 	/// Returns the status code
 	pub fn status(&self) -> StatusCode { self.status }
@@ -810,10 +812,10 @@ mod test {
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
-		let mut parts = ResponseParts::new(StatusCode::Ok);
+		let mut parts = ResponseParts::new(StatusCode::OK);
 		parts.headers.set_content_type(MimeType::Html);
 
-		parts.status().xpect_eq(StatusCode::Ok);
+		parts.status().xpect_eq(StatusCode::OK);
 		parts
 			.headers
 			.get::<header::ContentType>()
@@ -840,13 +842,13 @@ mod test {
 	#[test]
 	fn response_parts_default() {
 		let parts = ResponseParts::default();
-		parts.status().xpect_eq(StatusCode::Ok);
+		parts.status().xpect_eq(StatusCode::OK);
 	}
 
 	#[test]
 	fn response_parts_not_found() {
 		let parts = ResponseParts::not_found();
-		parts.status().xpect_eq(StatusCode::NotFound);
+		parts.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 
 	#[test]
@@ -892,7 +894,7 @@ mod test {
 
 		let parts = ResponseParts::from(http_parts);
 
-		parts.status().xpect_eq(StatusCode::Created);
+		parts.status().xpect_eq(StatusCode::CREATED);
 		parts
 			.headers
 			.get::<header::ContentType>()
@@ -995,8 +997,7 @@ mod test {
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
-		let mut parts =
-			ResponseParts::new(StatusCode::Http(http::StatusCode::CREATED));
+		let mut parts = ResponseParts::new(StatusCode::CREATED);
 		parts.headers.set_content_type(MimeType::Json);
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();

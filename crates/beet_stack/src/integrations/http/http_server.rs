@@ -262,7 +262,7 @@ async fn serialize_http_response(response: Response) -> Result<Vec<u8>> {
 		body_bytes.extend_from_slice(&chunk);
 	}
 
-	let status_code = parts.status().into_http();
+	let status_code = parts.status().as_u16();
 	let status_text = status_phrase(status_code);
 
 	let mut output = Vec::new();

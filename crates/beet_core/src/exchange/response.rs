@@ -13,7 +13,7 @@
 //!
 //! // Create error responses
 //! let not_found = Response::not_found();
-//! let error = Response::from_status(StatusCode::InternalError);
+//! let error = Response::from_status(StatusCode::INTERNAL_SERVER_ERROR);
 //! ```
 
 use crate::prelude::*;
@@ -34,7 +34,7 @@ use std::convert::Infallible;
 /// ```
 /// # use beet_core::prelude::*;
 /// let response = Response::ok();
-/// assert_eq!(response.status(), StatusCode::Ok);  // From ResponseParts
+/// assert_eq!(response.status(), StatusCode::OK);  // From ResponseParts
 /// ```
 #[derive(Debug, Component)]
 #[require(ResponseMarker = ResponseMarker{_sealed:()})]
@@ -93,23 +93,18 @@ impl Response {
 	}
 
 	/// Creates an OK (200) response
-	pub fn ok() -> Self { Self::from_status(StatusCode::Ok) }
+	pub fn ok() -> Self { Self::from_status(StatusCode::OK) }
 
 	/// Creates a Not Found (404) response
-	pub fn not_found() -> Self { Self::from_status(StatusCode::NotFound) }
+	pub fn not_found() -> Self { Self::from_status(StatusCode::NOT_FOUND) }
 	/// Creates an Internal Server Error (500) response
 	pub fn internal_error() -> Self {
-		Self::from_status(StatusCode::InternalError)
+		Self::from_status(StatusCode::INTERNAL_SERVER_ERROR)
 	}
 
 	/// Creates a Temporary Redirect (307) response with the given location
 	pub fn temporary_redirect(location: impl Into<String>) -> Self {
-		#[cfg(feature = "http")]
-		let status = StatusCode::Http(http::StatusCode::TEMPORARY_REDIRECT);
-		#[cfg(not(feature = "http"))]
-		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
-
-		let mut parts = ResponseParts::new(status);
+		let mut parts = ResponseParts::new(StatusCode::TEMPORARY_REDIRECT);
 		parts.headers.set::<header::Location>(location.into());
 		Self {
 			parts,
@@ -119,12 +114,7 @@ impl Response {
 
 	/// Creates a Permanent Redirect (301) response with the given location
 	pub fn permanent_redirect(location: impl Into<String>) -> Self {
-		#[cfg(feature = "http")]
-		let status = StatusCode::Http(http::StatusCode::MOVED_PERMANENTLY);
-		#[cfg(not(feature = "http"))]
-		let status = StatusCode::Ok; // Redirects are success in non-HTTP contexts
-
-		let mut parts = ResponseParts::new(status);
+		let mut parts = ResponseParts::new(StatusCode::MOVED_PERMANENTLY);
 		parts.headers.set::<header::Location>(location.into());
 		Self {
 			parts,
@@ -155,7 +145,7 @@ impl Response {
 	/// # use beet_core::prelude::*;
 	/// # use beet_core::exchange::headers;
 	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
-	/// assert_eq!(response.status(), StatusCode::Ok);
+	/// assert_eq!(response.status(), StatusCode::OK);
 	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(mime, MimeType::Json);
 	/// ```
@@ -546,23 +536,19 @@ mod test {
 	#[test]
 	fn response_ok() {
 		let response = Response::ok();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 	}
 
 	#[test]
 	fn response_not_found() {
 		let response = Response::not_found();
-		response.status().xpect_eq(StatusCode::NotFound);
+		response.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_from_status() {
-		let response =
-			Response::from_status(StatusCode::Http(http::StatusCode::CREATED));
-		response
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
+		let response = Response::from_status(StatusCode::CREATED);
+		response.status().xpect_eq(StatusCode::CREATED);
 	}
 
 	#[test]
@@ -578,8 +564,8 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_from_status_body() {
 		let response =
-			Response::from_status_body(StatusCode::Ok, b"data", "text/plain");
-		response.status().xpect_eq(StatusCode::Ok);
+			Response::from_status_body(StatusCode::OK, b"data", "text/plain");
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.header_contains(http::header::CONTENT_TYPE, "text/plain")
 			.xpect_true();
@@ -588,14 +574,14 @@ mod test {
 	#[test]
 	fn response_deref_to_parts() {
 		let response = Response::ok();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 	}
 
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_from_str() {
 		let response: Response = "hello".into();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.header_contains(http::header::CONTENT_TYPE, "text/plain")
 			.xpect_true();
@@ -605,9 +591,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_temporary_redirect() {
 		let response = Response::temporary_redirect("/new-location");
-		response
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::TEMPORARY_REDIRECT));
+		response.status().xpect_eq(StatusCode::TEMPORARY_REDIRECT);
 		response
 			.parts
 			.headers
@@ -621,9 +605,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_permanent_redirect() {
 		let response = Response::permanent_redirect("/new-location");
-		response
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::MOVED_PERMANENTLY));
+		response.status().xpect_eq(StatusCode::MOVED_PERMANENTLY);
 		response
 			.parts
 			.headers
@@ -658,7 +640,7 @@ mod test {
 
 		let payload = Payload { foo: 42 };
 		let response = Response::with_json(&payload).unwrap();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.parts
 			.headers
@@ -676,7 +658,7 @@ mod test {
 	#[test]
 	fn response_with_json_str() {
 		let response = Response::with_json_str(r#"{"foo":42}"#);
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.parts
 			.headers
@@ -704,7 +686,7 @@ mod test {
 
 		let payload = Payload { val: 99 };
 		let response = Response::with_postcard(&payload).unwrap();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.parts
 			.headers
@@ -774,7 +756,7 @@ mod test {
 		let response = Response::ok().with_body("data");
 		let (parts, body) = response.into_parts();
 
-		parts.status().xpect_eq(StatusCode::Ok);
+		parts.status().xpect_eq(StatusCode::OK);
 		body.bytes_eq(&Body::Bytes(Bytes::from("data")))
 			.xpect_true();
 	}
@@ -800,32 +782,24 @@ mod test {
 	#[test]
 	fn into_response_unit() {
 		let response = ().into_response();
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn into_response_status_code() {
-		let response =
-			StatusCode::Http(http::StatusCode::CREATED).into_response();
-		response
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
+		let response = StatusCode::CREATED.into_response();
+		response.status().xpect_eq(StatusCode::CREATED);
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn into_response_option_some() {
-		let response =
-			Some(StatusCode::Http(http::StatusCode::CREATED)).into_response();
-		response
-			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::CREATED));
+		let response = Some(StatusCode::CREATED).into_response();
+		response.status().xpect_eq(StatusCode::CREATED);
 	}
 
 	#[test]
 	fn into_response_option_none() {
 		let response: Response = None::<StatusCode>.into_response();
-		response.status().xpect_eq(StatusCode::NotFound);
+		response.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 }

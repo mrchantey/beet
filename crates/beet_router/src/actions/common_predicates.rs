@@ -102,7 +102,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_flow::prelude::*;
-	use beet_net::exports::http;
 	use beet_net::prelude::*;
 
 	#[beet_core::test]
@@ -118,7 +117,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -127,9 +126,7 @@ mod test {
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| {
 				(Sequence, children![
-					EndpointBuilder::get().with_action(StatusCode::Http(
-						http::StatusCode::IM_A_TEAPOT
-					)),
+					EndpointBuilder::get().with_action(StatusCode::IM_A_TEAPOT),
 					common_predicates::fallback(),
 					EndpointBuilder::get().with_action(|| -> () {
 						unreachable!();
@@ -139,7 +136,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Http(http::StatusCode::IM_A_TEAPOT));
+			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
 	#[beet_core::test]
@@ -155,7 +152,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -171,7 +168,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	#[beet_core::test]
@@ -203,7 +200,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -219,6 +216,6 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 }

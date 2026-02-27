@@ -92,7 +92,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -103,7 +103,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -116,7 +116,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -128,7 +128,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -140,7 +140,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 
 		Request::get(format!("{HTTPBIN}/delete"))
 			.with_method(HttpMethod::Delete)
@@ -148,7 +148,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -213,9 +213,9 @@ mod test_request {
 
 		let (res1, res2, res3) = futures::join!(req1, req2, req3);
 
-		res1.unwrap().status().xpect_eq(StatusCode::Ok);
-		res2.unwrap().status().xpect_eq(StatusCode::Ok);
-		res3.unwrap().status().xpect_eq(StatusCode::Ok);
+		res1.unwrap().status().xpect_eq(StatusCode::OK);
+		res2.unwrap().status().xpect_eq(StatusCode::OK);
+		res3.unwrap().status().xpect_eq(StatusCode::OK);
 
 		// Should complete concurrently in < 3 seconds, not sequentially
 		start.elapsed().as_secs().xpect_less_than(3);

@@ -162,7 +162,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]

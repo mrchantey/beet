@@ -50,13 +50,13 @@ mod test {
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 		RouterPlugin::world()
 			.spawn(flow_exchange(|| EndWith(Outcome::Fail)))
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	#[beet_core::test]
@@ -115,6 +115,6 @@ mod test {
 			.await
 			.unwrap()
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 }

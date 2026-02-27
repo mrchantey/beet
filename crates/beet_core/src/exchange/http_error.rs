@@ -26,7 +26,6 @@ pub type HttpResult<T> = std::result::Result<T, HttpError>;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HttpError {
 	/// The HTTP status code.
-	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub status_code: StatusCode,
 	/// The error message.
 	pub message: String,
@@ -51,11 +50,11 @@ impl HttpError {
 	}
 
 	/// Creates a 404 Not Found error.
-	pub fn not_found() -> Self { Self::from_status(StatusCode::NotFound) }
+	pub fn not_found() -> Self { Self::from_status(StatusCode::NOT_FOUND) }
 
 	/// Creates a 400 Bad Request error with the given message.
 	pub fn bad_request(message: impl Into<String>) -> Self {
-		Self::new(StatusCode::MalformedRequest, message)
+		Self::new(StatusCode::BAD_REQUEST, message)
 	}
 
 	/// Creates a 500 Internal Server Error.
@@ -70,7 +69,7 @@ impl HttpError {
 		#[cfg(debug_assertions)]
 		{
 			Self::new(
-				StatusCode::InternalError,
+				StatusCode::INTERNAL_SERVER_ERROR,
 				format!(
 					"Internal Error: {}\n\nThis error will *not* be returned to the client in release builds.",
 					message
@@ -79,7 +78,10 @@ impl HttpError {
 		}
 		#[cfg(not(debug_assertions))]
 		{
-			Self::new(StatusCode::InternalError, format!("Internal Error"))
+			Self::new(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				StatusCode::INTERNAL_SERVER_ERROR.message(),
+			)
 		}
 	}
 
@@ -150,52 +152,6 @@ impl From<HttpError> for Response {
 				error.message.as_bytes(),
 				"text/plain; charset=utf-8",
 			)
-		}
-	}
-}
-
-
-/// Serde support for [`StatusCode`].
-#[cfg(feature = "serde")]
-pub mod status_code_serde {
-	use super::*;
-	use serde::Deserialize;
-
-	/// Serializes a [`StatusCode`] to a numeric value.
-	pub fn serialize<S>(
-		status: &StatusCode,
-		serializer: S,
-	) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		#[cfg(feature = "http")]
-		{
-			let http_status: http::StatusCode = (*status).into();
-			serializer.serialize_u16(http_status.as_u16())
-		}
-		#[cfg(not(feature = "http"))]
-		{
-			let exit_code: u8 = (*status).into();
-			serializer.serialize_u8(exit_code)
-		}
-	}
-
-	/// Deserializes a [`StatusCode`] from a numeric value.
-	#[cfg(feature = "serde")]
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		#[cfg(feature = "http")]
-		{
-			let code = u16::deserialize(deserializer)?;
-			Ok(StatusCode::from_http_raw(code))
-		}
-		#[cfg(not(feature = "http"))]
-		{
-			let code = u8::deserialize(deserializer)?;
-			Ok(StatusCode::from(code))
 		}
 	}
 }

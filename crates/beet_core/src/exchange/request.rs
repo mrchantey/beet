@@ -423,7 +423,7 @@ impl Request {
 	}
 
 	/// Creates a response that mirrors this request's headers and body,
-	/// with a [`StatusCode::Ok`]
+	/// with a [`StatusCode::OK`]
 	pub fn mirror(self) -> Response {
 		let mut res_parts = ResponseParts::ok();
 		res_parts.headers = self.parts.headers().clone();

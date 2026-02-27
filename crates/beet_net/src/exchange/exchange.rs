@@ -127,7 +127,7 @@ mod test {
 			.exchange(Request::get("foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	#[beet_core::test]

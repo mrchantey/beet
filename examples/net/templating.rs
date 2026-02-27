@@ -95,7 +95,7 @@ fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
 fn not_found(_: EntityWorldMut, request: Request) -> Response {
 	let path = request.path_string();
 	Response::from_status_body(
-		StatusCode::NotFound,
+		StatusCode::NOT_FOUND,
 		render(&format!(
 			r#"
 <h1>Not Found</h1>

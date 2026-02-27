@@ -107,7 +107,7 @@ fn create_readable_stream_from_body(
 
 
 async fn into_response(res: web_sys::Response) -> Result<Response> {
-	let status = StatusCode::from_http_raw(res.status() as u16);
+	let status = StatusCode::new(res.status() as u16);
 
 	// Build ResponseParts with headers
 	let mut parts = ResponseParts::new(status);

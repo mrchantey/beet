@@ -48,18 +48,13 @@ pub struct JsonResult<T, E> {
 	pub result: Result<T, E>,
 	/// The status code to return in case of an error.
 	/// Defaults to 418 (I'm a teapot).
-	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub err_status: StatusCode,
 }
 
 
 impl JsonResult<(), ()> {
-	/// Default error status code when the `http` feature is enabled.
-	#[cfg(feature = "http")]
-	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::ImATeapot;
-	/// Default error status code when the `http` feature is disabled.
-	#[cfg(not(feature = "http"))]
-	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::InternalError;
+	/// Default error status code for failed server action responses.
+	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::IM_A_TEAPOT;
 }
 
 impl<T, E> From<Result<T, E>> for JsonResult<T, E> {

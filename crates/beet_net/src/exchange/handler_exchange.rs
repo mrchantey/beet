@@ -67,19 +67,19 @@ mod test {
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
 	async fn handler_sync_custom_response() {
 		AsyncPlugin::world()
 			.spawn(handler_exchange(|_| {
-				Response::from_status(StatusCode::ImATeapot)
+				Response::from_status(StatusCode::IM_A_TEAPOT)
 			}))
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::ImATeapot);
+			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
 	#[beet_core::test]
@@ -91,19 +91,19 @@ mod test {
 			.exchange(Request::get("/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
 		AsyncPlugin::world()
 			.spawn(handler_exchange_async(|_| async move {
-				Response::from_status(StatusCode::ImATeapot)
+				Response::from_status(StatusCode::IM_A_TEAPOT)
 			}))
 			.exchange(Request::get("/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::ImATeapot);
+			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
 	#[beet_core::test]
@@ -113,6 +113,6 @@ mod test {
 			.exchange(Request::get("/mirror"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 }

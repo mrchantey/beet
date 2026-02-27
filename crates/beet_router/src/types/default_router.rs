@@ -277,12 +277,12 @@ mod test {
 			.await
 			.unwrap();
 		let mut stat = async |val: &str| entity.exchange(val).await.status();
-		stat("/bingbong").await.xpect_eq(StatusCode::NotFound);
-		stat("/assets/bing").await.xpect_eq(StatusCode::NotFound);
+		stat("/bingbong").await.xpect_eq(StatusCode::NOT_FOUND);
+		stat("/assets/bing").await.xpect_eq(StatusCode::NOT_FOUND);
 		stat("/assets/branding/logo.png")
 			.await
-			.xpect_eq(StatusCode::Ok);
-		stat("/foobar").await.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
+		stat("/foobar").await.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test(timeout_ms = 5000)]

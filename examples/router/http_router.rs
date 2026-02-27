@@ -123,7 +123,7 @@ fn not_found() -> impl Bundle {
 			.with_action(|req: In<Request>| {
 				let path = req.path_string();
 				Response::from_status_body(
-					StatusCode::NotFound,
+					StatusCode::NOT_FOUND,
 					render(&format!(
 						r#"
 <h1>Not Found</h1>

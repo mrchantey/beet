@@ -54,7 +54,7 @@ impl Default for EndpointBuilder {
 	fn default() -> Self {
 		Self {
 			insert: Box::new(|entity| {
-				entity.insert(endpoint_action(StatusCode::Ok));
+				entity.insert(endpoint_action(StatusCode::OK));
 			}),
 			path: None,
 			params: None,
@@ -78,7 +78,7 @@ impl EndpointBuilder {
 	/// ```ignore
 	/// EndpointBuilder::new()
 	///     .with_path("/foo")
-	///     .with_action(|| StatusCode::Ok)
+	///     .with_action(|| StatusCode::OK)
 	/// ```
 	pub fn new() -> Self { Self::default() }
 
@@ -383,7 +383,7 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -436,26 +436,26 @@ mod test {
 			.exchange(Request::post("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 		// method does not match - returns 500 because single endpoint failure
 		// (404 requires a router with fallback structure)
 		entity
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		// path does not match
 		entity
 			.exchange(Request::get("/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 		// path has extra parts
 		entity
 			.exchange(Request::get("/foo/bar"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::InternalError);
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 	#[beet_core::test]
 	async fn middleware_allows_trailing() {
@@ -486,7 +486,7 @@ mod test {
 			.exchange(Request::get("/api/users"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 
@@ -525,7 +525,7 @@ mod test {
 			.spawn(flow_exchange(|| {
 				(InfallibleSequence, children![
 					EndpointBuilder::get()
-						.with_action(|| StatusCode::Ok.into_response()),
+						.with_action(|| StatusCode::OK.into_response()),
 					OnSpawn::observe(
 						|ev: On<GetOutcome>,
 						 agents: AgentQuery,
@@ -546,6 +546,6 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 }

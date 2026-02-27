@@ -42,7 +42,7 @@ pub fn exchange_fallback() -> impl Bundle {
 				// as the final fallback, in this case they didnt so we'll return
 				// a simple plaintext one.
 				Fail(req) => Ok(Response::from_status_body(
-					StatusCode::NotFound,
+					StatusCode::NOT_FOUND,
 					format!("Resource not found: {}", req.path_string()),
 					"text/plain",
 				)),
@@ -181,7 +181,7 @@ mod test {
 			.await
 			.unwrap()
 			.status()
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -197,7 +197,7 @@ mod test {
 			.await
 			.unwrap()
 			.status()
-			.xpect_eq(StatusCode::NotFound);
+			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
 	#[beet_core::test]

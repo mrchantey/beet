@@ -60,7 +60,7 @@ fn handler(
 			request.path_string()
 		);
 		return Response::from_status_body(
-			StatusCode::NotFound,
+			StatusCode::NOT_FOUND,
 			message,
 			"text/plain",
 		)

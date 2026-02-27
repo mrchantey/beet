@@ -52,7 +52,7 @@ pub(crate) async fn contextual_not_found_handler(
 		.await?;
 
 	Outcome::Pass(Response::from_status_body(
-		StatusCode::NotFound,
+		StatusCode::NOT_FOUND,
 		help_text,
 		"text/plain",
 	))

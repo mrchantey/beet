@@ -48,7 +48,7 @@ where
 				.map(|val| Response::ok_body(val, "application/json"))
 				.unwrap_or_else(|_| {
 					Response::from_status_body(
-						StatusCode::InternalError,
+						StatusCode::INTERNAL_SERVER_ERROR,
 						"Failed to serialize response body",
 						"text/plain",
 					)
@@ -191,7 +191,7 @@ mod test {
 			.exchange(Request::post("/foo"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::MalformedRequest);
+			.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 	#[beet_core::test]
 	async fn get_sync() {
@@ -219,6 +219,6 @@ mod test {
 			.exchange(Request::get("/"))
 			.await
 			.status()
-			.xpect_eq(StatusCode::MalformedRequest);
+			.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 }

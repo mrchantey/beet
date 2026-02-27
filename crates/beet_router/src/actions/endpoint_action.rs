@@ -309,35 +309,35 @@ mod test {
 
 	#[beet_core::test]
 	async fn response() {
-		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
+		assert(|| StatusCode::OK).await.xpect_eq(StatusCode::OK);
 	}
 
 
 	#[beet_core::test]
 	async fn system() {
-		fn my_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::Ok }
-		assert(|| my_system).await.xpect_eq(StatusCode::Ok);
-		assert(|| |_: In<Json<Foo>>| StatusCode::Ok)
+		fn my_system(_: In<Json<Foo>>) -> StatusCode { StatusCode::OK }
+		assert(|| my_system).await.xpect_eq(StatusCode::OK);
+		assert(|| |_: In<Json<Foo>>| StatusCode::OK)
 			.await
-			.xpect_eq(StatusCode::Ok);
-		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
+		assert(|| StatusCode::OK).await.xpect_eq(StatusCode::OK);
 	}
 	#[beet_core::test]
 	async fn cx_system() {
-		assert(|| |_: Json<Foo>, _: AsyncEntity| StatusCode::Ok)
+		assert(|| |_: Json<Foo>, _: AsyncEntity| StatusCode::OK)
 			.await
-			.xpect_eq(StatusCode::Ok);
-		assert(|| StatusCode::Ok).await.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
+		assert(|| StatusCode::OK).await.xpect_eq(StatusCode::OK);
 	}
 	#[beet_core::test]
 	async fn async_system() {
 		async fn my_async_system(_: Json<Foo>, _: AsyncEntity) -> StatusCode {
-			StatusCode::Ok
+			StatusCode::OK
 		}
-		assert(|| my_async_system).await.xpect_eq(StatusCode::Ok);
-		assert(|| async |_: Json<Foo>, _: AsyncEntity| StatusCode::Ok)
+		assert(|| my_async_system).await.xpect_eq(StatusCode::OK);
+		assert(|| async |_: Json<Foo>, _: AsyncEntity| StatusCode::OK)
 			.await
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]

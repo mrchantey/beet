@@ -139,7 +139,7 @@ mod test {
 			.call_blocking::<Request, Response>(request)
 			.unwrap();
 
-		response.status().xpect_eq(StatusCode::Ok);
+		response.status().xpect_eq(StatusCode::OK);
 		response
 			.headers
 			.get::<header::ContentType>()
