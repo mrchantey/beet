@@ -235,7 +235,7 @@ client = [
 	"beet_dom/client",
 	"beet_design/client",
 ]
-http_server = ["net", "tool", "beet_net/server"]
+http_server = ["net", "tool", "beet_net/server","beet_stack?/http"]
 
 #💡 fine-grained
 native-tls = [
@@ -364,6 +364,11 @@ required-features = ["stack"]
 name = "repl"
 path = "examples/stack/repl.rs"
 required-features = ["stack"]
+
+[[example]]
+name = "http"
+path = "examples/stack/http.rs"
+required-features = ["http_server"]
 
 # 💡 Examples - agent
 

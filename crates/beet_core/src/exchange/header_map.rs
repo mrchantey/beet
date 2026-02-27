@@ -206,27 +206,27 @@ impl Default for MimeType {
 
 impl MimeType {
 	/// The MIME string for `application/json`.
-	pub const JSON: &'static str = "application/json";
+	const JSON: &'static str = "application/json";
 	/// The MIME string for `application/x-postcard`.
-	pub const POSTCARD: &'static str = "application/x-postcard";
+	const POSTCARD: &'static str = "application/x-postcard";
 	/// The MIME string for `text/plain`.
-	pub const TEXT: &'static str = "text/plain";
+	const TEXT: &'static str = "text/plain";
 	/// The MIME string for `text/html`.
-	pub const HTML: &'static str = "text/html";
+	const HTML: &'static str = "text/html";
 	/// The MIME string for `application/xml`.
-	pub const XML: &'static str = "application/xml";
+	const XML: &'static str = "application/xml";
 	/// The MIME string for `text/markdown`.
-	pub const MARKDOWN: &'static str = "text/markdown";
+	const MARKDOWN: &'static str = "text/markdown";
 	/// The MIME string for `application/octet-stream`.
-	pub const BYTES: &'static str = "application/octet-stream";
+	const BYTES: &'static str = "application/octet-stream";
 	/// The MIME string for `text/event-stream`.
-	pub const EVENT_STREAM: &'static str = "text/event-stream";
+	const EVENT_STREAM: &'static str = "text/event-stream";
 	/// The MIME string for `text/css`.
-	pub const CSS: &'static str = "text/css";
+	const CSS: &'static str = "text/css";
 	/// The MIME string for `application/javascript`.
-	pub const JAVASCRIPT: &'static str = "application/javascript";
+	const JAVASCRIPT: &'static str = "application/javascript";
 	/// The MIME string for `image/png`.
-	pub const PNG: &'static str = "image/png";
+	const PNG: &'static str = "image/png";
 
 	/// Parse a MIME type from a content-type string.
 	///

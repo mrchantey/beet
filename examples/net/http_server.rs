@@ -62,7 +62,7 @@ fn handler(
 		return Response::from_status_body(
 			StatusCode::NOT_FOUND,
 			message,
-			"text/plain",
+			MimeType::Text,
 		)
 		.xok();
 	}
