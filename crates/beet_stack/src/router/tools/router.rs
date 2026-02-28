@@ -63,7 +63,7 @@ mod test {
 	async fn route_renders_card() {
 		StackPlugin::world()
 			.spawn((router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("about", || Paragraph::with_text("About page")),
 			]))
 			.call::<Request, Response>(Request::get("about"))
@@ -79,7 +79,7 @@ mod test {
 	async fn route_renders_root_card_on_empty_path() {
 		StackPlugin::world()
 			.spawn((router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("", || Paragraph::with_text("Root content")),
 			]))
 			.call::<Request, Response>(Request::get(""))
@@ -94,7 +94,7 @@ mod test {
 	async fn route_renders_root_card_child() {
 		let body = StackPlugin::world()
 			.spawn((router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("", || {
 					children![
 						Heading1::with_text("My Server"),
@@ -113,6 +113,7 @@ mod test {
 	}
 
 	#[beet_core::test]
+	#[cfg(feature = "json")]
 	async fn route_calls_route_tool() {
 		StackPlugin::world()
 			.spawn((router(), children![route_tool(

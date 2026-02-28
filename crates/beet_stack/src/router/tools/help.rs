@@ -328,7 +328,7 @@ mod test {
 
 		let root = world
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -350,7 +350,7 @@ mod test {
 	async fn help_scoped_to_prefix() {
 		let body = StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],
@@ -374,7 +374,7 @@ mod test {
 	async fn not_found_shows_ancestor_help() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				increment(FieldRef::new("count")),
 			]))
 			.call::<Request, Response>(
@@ -393,7 +393,7 @@ mod test {
 	async fn not_found_shows_scoped_ancestor_help() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],

@@ -4,13 +4,13 @@
 //! a format-detecting variant that picks a parser based on the file
 //! extension:
 //!
-//! - `.md` / `.markdown` → [`MarkdownDiffer`]
+//! - `.md` / `.markdown` → [`MarkdownDiffer`] (requires `markdown` feature)
 //! - `.html` / `.htm` → [`HtmlDiffer`]
-//! - `.json` → deserialized via [`mime_serde`] (JSON)
-//! - `.postcard` → deserialized via [`mime_serde`] (postcard binary)
+//! - `.json` → deserialized via [`SceneLoader`] (requires `bevy_scene` + `json`)
+//! - `.postcard` → deserialized via [`SceneLoader`] (requires `bevy_scene` + `postcard`)
 //!
 //! Unknown extensions are treated as plain text wrapped in a
-//! [`Paragraph`].
+//! [`TextNode`].
 //!
 //! # Usage
 //!
@@ -75,38 +75,69 @@ fn detect_format(path: &WsPathBuf) -> FileFormat {
 /// For text-based formats (markdown, HTML, plain text), parses the
 /// content and diffs the resulting tree into the entity's children.
 ///
-/// For serialized formats (JSON, postcard), deserializes the content
-/// as a markdown string via [`mime_serde`], then diffs as markdown.
+/// For serialized formats (JSON, postcard), deserializes the scene
+/// via [`SceneLoader`] and reparents all spawned roots under the entity.
 fn diff_by_format(
 	format: FileFormat,
 	bytes: &[u8],
 	entity: EntityWorldMut,
 ) -> Result {
 	match format {
+		FileFormat::PlainText => diff_plaintext(bytes, entity),
 		FileFormat::Markdown => {
-			let text = std::str::from_utf8(bytes)?;
-			MarkdownDiffer::new(text).diff(entity)
+			#[cfg(feature = "markdown")]
+			{
+				let text = std::str::from_utf8(bytes)?;
+				MarkdownDiffer::new(text).diff(entity)
+			}
+			#[cfg(not(feature = "markdown"))]
+			{
+				let _ = (bytes, entity);
+				bevybail!(
+					"Markdown format detected but the `markdown` feature is not enabled"
+				);
+			}
 		}
 		FileFormat::Html => {
 			let text = std::str::from_utf8(bytes)?;
 			HtmlDiffer::new(text).diff(entity)
 		}
+		#[cfg(all(feature = "bevy_scene", feature = "json"))]
 		FileFormat::Json => {
-			let text: String = mime_serde::deserialize(MimeType::Json, bytes)?;
-			MarkdownDiffer::new(&text).diff(entity)
+			let target = entity.id();
+			let world = entity.into_world_mut();
+			SceneLoader::new(world).with_entity(target).load_json(bytes)
 		}
+		#[cfg(not(all(feature = "bevy_scene", feature = "json")))]
+		FileFormat::Json => {
+			let _ = (bytes, entity);
+			bevybail!(
+				"JSON scene format requires the `bevy_scene` and `json` features"
+			);
+		}
+		#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
 		FileFormat::Postcard => {
-			let text: String =
-				mime_serde::deserialize(MimeType::Postcard, bytes)?;
-			MarkdownDiffer::new(&text).diff(entity)
+			let target = entity.id();
+			let world = entity.into_world_mut();
+			SceneLoader::new(world)
+				.with_entity(target)
+				.load_postcard(bytes)
 		}
-		FileFormat::PlainText => {
-			let text = std::str::from_utf8(bytes)?;
-			// Wrap plain text in a paragraph
-			let wrapped = format!("<p>{}</p>", text);
-			HtmlDiffer::new(&wrapped).diff(entity)
+		#[cfg(not(all(feature = "bevy_scene", feature = "postcard")))]
+		FileFormat::Postcard => {
+			let _ = (bytes, entity);
+			bevybail!(
+				"Postcard scene format requires the `bevy_scene` and `postcard` features"
+			);
 		}
 	}
+}
+
+
+fn diff_plaintext(bytes: &[u8], mut entity: EntityWorldMut) -> Result {
+	entity.insert(TextNode::new(std::str::from_utf8(bytes)?));
+	// TODO proper plaintext diff
+	Ok(())
 }
 
 /// System that loads and parses files for entities with a new or
@@ -192,6 +223,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "markdown")]
 	fn diff_markdown_format() {
 		let mut world = World::new();
 		let root = world.spawn_empty().id();
@@ -258,74 +290,96 @@ mod test {
 		)
 		.unwrap();
 
-		let children: Vec<Entity> = world
+		world
+			.entity(root)
+			.get::<TextNode>()
+			.unwrap()
+			.0
+			.as_str()
+			.xpect_eq("just some text");
+	}
+
+	/// Helper to create a world with the minimum plugins for scene
+	/// serialization round-trips.
+	#[cfg(feature = "bevy_scene")]
+	fn scene_world() -> App {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins);
+		app.register_type::<Name>();
+		app.init();
+		app.update();
+		app
+	}
+
+	#[test]
+	#[cfg(all(feature = "bevy_scene", feature = "json"))]
+	fn diff_json_format() {
+		let mut app = scene_world();
+		// Build a scene containing a named entity
+		let child = app.world_mut().spawn(Name::new("JsonChild")).id();
+		let scene_bytes = SceneSaver::new(app.world_mut())
+			.with_entities([child])
+			.save_json()
+			.unwrap();
+
+		// Load into a fresh world with a target entity
+		let mut app2 = scene_world();
+		let root = app2.world_mut().spawn_empty().id();
+		diff_by_format(
+			FileFormat::Json,
+			&scene_bytes,
+			app2.world_mut().entity_mut(root),
+		)
+		.unwrap();
+
+		let children: Vec<Entity> = app2
+			.world()
 			.entity(root)
 			.get::<Children>()
 			.unwrap()
 			.iter()
 			.collect();
 		children.len().xpect_eq(1);
-		world
+		app2.world()
 			.entity(children[0])
-			.contains::<Paragraph>()
-			.xpect_true();
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("JsonChild");
 	}
 
 	#[test]
-	fn diff_json_format() {
-		let markdown = "# Hello\n\nworld";
-		let json_bytes =
-			mime_serde::serialize(MimeType::Json, &markdown).unwrap();
-		let mut world = World::new();
-		let root = world.spawn_empty().id();
-		diff_by_format(FileFormat::Json, &json_bytes, world.entity_mut(root))
+	#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+	fn diff_postcard_format() {
+		let mut app = scene_world();
+		let child = app.world_mut().spawn(Name::new("PostcardChild")).id();
+		let scene_bytes = SceneSaver::new(app.world_mut())
+			.with_entities([child])
+			.save_postcard()
 			.unwrap();
 
-		let children: Vec<Entity> = world
-			.entity(root)
-			.get::<Children>()
-			.unwrap()
-			.iter()
-			.collect();
-		children.len().xpect_eq(2);
-		world
-			.entity(children[0])
-			.contains::<Heading1>()
-			.xpect_true();
-		world
-			.entity(children[1])
-			.contains::<Paragraph>()
-			.xpect_true();
-	}
-
-	#[test]
-	fn diff_postcard_format() {
-		let markdown = "# Hello\n\nworld";
-		let postcard_bytes =
-			mime_serde::serialize(MimeType::Postcard, &markdown).unwrap();
-		let mut world = World::new();
-		let root = world.spawn_empty().id();
+		let mut app2 = scene_world();
+		let root = app2.world_mut().spawn_empty().id();
 		diff_by_format(
 			FileFormat::Postcard,
-			&postcard_bytes,
-			world.entity_mut(root),
+			&scene_bytes,
+			app2.world_mut().entity_mut(root),
 		)
 		.unwrap();
 
-		let children: Vec<Entity> = world
+		let children: Vec<Entity> = app2
+			.world()
 			.entity(root)
 			.get::<Children>()
 			.unwrap()
 			.iter()
 			.collect();
-		children.len().xpect_eq(2);
-		world
+		children.len().xpect_eq(1);
+		app2.world()
 			.entity(children[0])
-			.contains::<Heading1>()
-			.xpect_true();
-		world
-			.entity(children[1])
-			.contains::<Paragraph>()
-			.xpect_true();
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("PostcardChild");
 	}
 }

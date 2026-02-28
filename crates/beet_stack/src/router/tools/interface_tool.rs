@@ -132,10 +132,11 @@ mod test {
 	}
 
 	#[beet_core::test]
+	#[cfg(feature = "json")]
 	async fn dispatches_tool_request() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				route_tool(
 					"add",
 					func_tool(|input: FuncToolIn<(i32, i32)>| Ok(
@@ -158,7 +159,7 @@ mod test {
 	async fn help_flag_returns_route_list() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -174,7 +175,7 @@ mod test {
 	async fn dispatches_help_request() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				increment(FieldRef::new("count")),
 				card("about", || Paragraph::with_text("about")),
 			]))
@@ -189,7 +190,7 @@ mod test {
 	async fn not_found() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				increment(FieldRef::new("count")),
 			]))
 			.call::<Request, Response>(
@@ -205,7 +206,7 @@ mod test {
 	async fn renders_root_card_on_empty_args() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("", || {
 					children![
 						Heading1::with_text("My Server"),
@@ -229,7 +230,7 @@ mod test {
 
 		let root = world
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				(
 					card("counter", || Paragraph::with_text("counter")),
 					children![increment(FieldRef::new("count")),],

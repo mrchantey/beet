@@ -16,6 +16,8 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
+						"bevy_scene",
+						"json",
 						// "http_server",
 						// "stack",
 						// "server"

@@ -94,11 +94,20 @@ impl<'a> SceneSaver<'a> {
 
 	/// Serializes to a JSON string.
 	#[cfg(feature = "json")]
-	pub fn save_json(self) -> Result<String> {
+	pub fn save_json_string_pretty(self) -> Result<String> {
 		let registry = self.registry.read();
 		let dyn_scene = self.builder.build();
 		let serializer = SceneSerializer::new(&dyn_scene, &registry);
 		serde_json::to_string_pretty(&serializer)?.xok()
+	}
+
+	/// Serializes to JSON bytes.
+	#[cfg(feature = "json")]
+	pub fn save_json(self) -> Result<Vec<u8>> {
+		let registry = self.registry.read();
+		let dyn_scene = self.builder.build();
+		let serializer = SceneSerializer::new(&dyn_scene, &registry);
+		serde_json::to_vec(&serializer)?.xok()
 	}
 
 	/// Serializes to postcard bytes.
@@ -125,9 +134,15 @@ impl<'a> SceneSaver<'a> {
 ///
 /// An optional [`EntityHashMap`] can be provided via [`SceneLoader::with_entity_map`]
 /// to remap entity identifiers on load. If none is provided, a default map is used.
+///
+/// If an entity is provided via [`SceneLoader::with_entity`], all spawned root
+/// entities (those without a [`ChildOf`] relationship) will be reparented as
+/// children of that entity.
 pub struct SceneLoader<'a> {
 	world: &'a mut World,
 	entity_map: Option<&'a mut EntityHashMap<Entity>>,
+	/// If set, all spawned root entities are reparented as children of this entity.
+	entity: Option<Entity>,
 }
 
 impl<'a> SceneLoader<'a> {
@@ -136,6 +151,7 @@ impl<'a> SceneLoader<'a> {
 		Self {
 			world,
 			entity_map: None,
+			entity: None,
 		}
 	}
 
@@ -145,6 +161,15 @@ impl<'a> SceneLoader<'a> {
 		entity_map: &'a mut EntityHashMap<Entity>,
 	) -> Self {
 		self.entity_map = Some(entity_map);
+		self
+	}
+
+	/// Reparents all spawned root entities as children of the given entity.
+	///
+	/// Any existing children of the entity are removed before the scene
+	/// roots are attached.
+	pub fn with_entity(mut self, entity: Entity) -> Self {
+		self.entity = Some(entity);
 		self
 	}
 
@@ -164,9 +189,9 @@ impl<'a> SceneLoader<'a> {
 
 	/// Deserializes a JSON scene string into the world.
 	#[cfg(feature = "json")]
-	pub fn load_json(self, scene: impl AsRef<str>) -> Result {
+	pub fn load_json(self, bytes: &[u8]) -> Result {
 		use serde::de::DeserializeSeed;
-		let mut de = serde_json::Deserializer::from_str(scene.as_ref());
+		let mut de = serde_json::Deserializer::from_slice(bytes);
 		let dynamic_scene = {
 			let type_registry = self.world.resource::<AppTypeRegistry>();
 			let scene_de = bevy::scene::serde::SceneDeserializer {
@@ -194,9 +219,35 @@ impl<'a> SceneLoader<'a> {
 	}
 
 	fn write(self, dynamic_scene: bevy::scene::DynamicScene) -> Result {
+		let entity = self.entity;
 		let mut default_map = EntityHashMap::default();
 		let entity_map = self.entity_map.unwrap_or(&mut default_map);
 		dynamic_scene.write_to_world(self.world, entity_map)?;
+
+		// after writing, handle entity spawn situation
+		// this will likely need a rewrite after new scene system (bevy 0.19)
+		if let Some(parent) = entity {
+			// Remove existing children from the target entity
+			if let Some(children) = self.world.entity(parent).get::<Children>()
+			{
+				let to_despawn: Vec<Entity> = children.iter().collect();
+				for child in to_despawn {
+					self.world.entity_mut(child).despawn();
+				}
+			}
+			// Reparent all spawned root entities (those without ChildOf)
+			let spawned_roots: Vec<Entity> = entity_map
+				.values()
+				.copied()
+				.filter(|spawned| {
+					!self.world.entity(*spawned).contains::<ChildOf>()
+				})
+				.collect();
+			for root in spawned_roots {
+				self.world.entity_mut(root).insert(ChildOf(parent));
+			}
+		}
+
 		Ok(())
 	}
 }
@@ -248,5 +299,82 @@ mod test {
 			.with_entity_map(&mut entity_map)
 			.load_ron(&scene)
 			.unwrap();
+	}
+
+	#[test]
+	fn loads_into_entity() {
+		let mut app = scene_world();
+		// Spawn a named entity with a child to form a scene
+		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entities([child])
+			.save_ron()
+			.unwrap();
+
+		// Load the scene into a target entity
+		let target = app.world_mut().spawn(Name::new("Target")).id();
+		SceneLoader::new(app.world_mut())
+			.with_entity(target)
+			.load_ron(&scene)
+			.unwrap();
+
+		// The target should now have children
+		let children: Vec<Entity> = app
+			.world()
+			.entity(target)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.collect();
+		children.len().xpect_eq(1);
+		app.world()
+			.entity(children[0])
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("SceneChild");
+	}
+
+	#[test]
+	fn loads_into_entity_replaces_existing_children() {
+		let mut app = scene_world();
+		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entities([child])
+			.save_ron()
+			.unwrap();
+
+		// Spawn a target with an existing child
+		let target = app
+			.world_mut()
+			.spawn((Name::new("Target"), children![Name::new("OldChild")]))
+			.id();
+		app.world()
+			.entity(target)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+
+		SceneLoader::new(app.world_mut())
+			.with_entity(target)
+			.load_ron(&scene)
+			.unwrap();
+
+		// Old child should be replaced
+		let children: Vec<Entity> = app
+			.world()
+			.entity(target)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.collect();
+		children.len().xpect_eq(1);
+		app.world()
+			.entity(children[0])
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("SceneChild");
 	}
 }

@@ -956,6 +956,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "markdown")]
 	fn kitchen_sink_snapshot() {
 		let mut world = World::new();
 		let entity = world

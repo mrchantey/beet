@@ -334,6 +334,12 @@ impl Request {
 		this
 	}
 
+	/// Sets the `Accept` header to the given MIME type.
+	pub fn with_accept(mut self, mime: MimeType) -> Self {
+		self.headers.set::<header::Accept>(vec![mime]);
+		self
+	}
+
 	/// Parse both the key and value as valid URL query parameters
 	#[cfg(feature = "serde")]
 	pub fn parse_query_param<

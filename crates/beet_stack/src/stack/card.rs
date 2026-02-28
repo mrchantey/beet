@@ -325,7 +325,7 @@ fn file_card_parse_content(
 ///
 /// Returns an error if no render tool is found in the hierarchy.
 /// Ensure a render tool is added to the server, ie
-/// [`markdown_render_tool`] for CLI/REPL or [`tui_render_tool`]
+/// [`mime_render_tool`] for CLI/REPL or [`tui_render_tool`]
 /// for TUI.
 fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 	world
@@ -346,7 +346,7 @@ fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 		.ok_or_else(|| {
 			bevyhow!(
 				"No render tool found. Add a render tool like \
-				 `markdown_render_tool()` to the server's entity tree."
+				 `mime_render_tool()` to the server's entity tree."
 			)
 		})
 }
@@ -359,7 +359,7 @@ mod test {
 	async fn card_renders_via_render_tool() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("about", || Paragraph::with_text("About page")),
 			]))
 			.call::<Request, Response>(Request::get("about"))
@@ -374,7 +374,7 @@ mod test {
 	async fn card_with_children() {
 		StackPlugin::world()
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("home", || {
 					children![
 						Heading1::with_text("Welcome"),
@@ -396,7 +396,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("about", || Paragraph::with_text("About page")),
 			]))
 			.flush();
@@ -409,7 +409,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("test", || Paragraph::with_text("test")),
 			]))
 			.flush();
@@ -430,7 +430,7 @@ mod test {
 	fn insert_child_alone() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn(OnSpawn::insert_child(markdown_render_tool()))
+			.spawn(OnSpawn::insert_child(mime_render_tool()))
 			.flush();
 		find_render_tool(&mut world, root).xpect_ok();
 	}
@@ -440,7 +440,7 @@ mod test {
 	fn insert_child_with_children_macro() {
 		let mut world = StackPlugin::world();
 		let root = world
-			.spawn((OnSpawn::insert_child(markdown_render_tool()), children![
+			.spawn((OnSpawn::insert_child(mime_render_tool()), children![
 				card("test", || Paragraph::with_text("test")),
 			]))
 			.flush();
@@ -455,7 +455,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((
-				OnSpawn::insert_child(markdown_render_tool()),
+				OnSpawn::insert_child(mime_render_tool()),
 				OnSpawn::insert(children![(Name::new("Other Child"),)]),
 			))
 			.flush();
@@ -469,7 +469,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((
-				OnSpawn::insert_child(markdown_render_tool()),
+				OnSpawn::insert_child(mime_render_tool()),
 				default_router(),
 				children![card("test", || Paragraph::with_text("test")),],
 			))
@@ -483,7 +483,7 @@ mod test {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
-				markdown_render_tool(),
+				mime_render_tool(),
 				card("about", || Paragraph::with_text("About page")),
 			]))
 			.flush();

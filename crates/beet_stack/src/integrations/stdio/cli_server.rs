@@ -41,7 +41,7 @@ use beet_core::prelude::*;
 /// ```
 pub fn cli_server() -> impl Bundle {
 	(
-		OnSpawn::insert_child(markdown_render_tool()),
+		OnSpawn::insert_child(mime_render_tool()),
 		OnSpawn::new(|entity| {
 			entity.run_async(async |entity| -> Result {
 				let req = Request::from_cli_args(CliArgs::parse_env())?;

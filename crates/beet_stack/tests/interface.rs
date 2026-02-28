@@ -41,7 +41,7 @@ fn test_interface() -> (World, Entity) {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
-			markdown_render_tool(),
+			mime_render_tool(),
 			counter(),
 			calculator(),
 			card("about", || (Paragraph::with_text("About page"),)),
@@ -135,7 +135,7 @@ async fn navigate_parent_from_card() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
-			markdown_render_tool(),
+			mime_render_tool(),
 			card("", || (Heading1::with_text("Root"),)),
 			card("child", || (Paragraph::with_text("Child page"),)),
 		]))
@@ -150,7 +150,7 @@ async fn navigate_next_sibling() {
 	let mut world = StackPlugin::world();
 	let root = world
 		.spawn((default_router(), children![
-			markdown_render_tool(),
+			mime_render_tool(),
 			card("alpha", || (Paragraph::with_text("Alpha"),)),
 			card("beta", || (Paragraph::with_text("Beta"),)),
 		]))

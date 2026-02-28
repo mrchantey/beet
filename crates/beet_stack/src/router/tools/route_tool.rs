@@ -171,6 +171,7 @@ mod test {
 	// -- postcard binary round-trip --
 
 	#[beet_core::test]
+	#[cfg(feature = "postcard")]
 	async fn postcard_request_response() {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 5, b: 7 }).unwrap();
@@ -221,6 +222,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "json")]
 	fn mime_serde_roundtrip_json() {
 		let input = AddInput { a: 1, b: 2 };
 		let bytes = mime_serde::serialize(MimeType::Json, &input).unwrap();
@@ -230,6 +232,7 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "postcard")]
 	fn mime_serde_roundtrip_postcard() {
 		let input = AddInput { a: 3, b: 4 };
 		let bytes = mime_serde::serialize(MimeType::Postcard, &input).unwrap();
@@ -241,6 +244,7 @@ mod test {
 	// -- Response::deserialize round-trip --
 
 	#[beet_core::test]
+	#[cfg(feature = "json")]
 	async fn response_deserialize_json_roundtrip() {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 5 }).unwrap();
@@ -256,6 +260,7 @@ mod test {
 	}
 
 	#[beet_core::test]
+	#[cfg(feature = "postcard")]
 	async fn response_deserialize_postcard_roundtrip() {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 3, b: 9 }).unwrap();
@@ -273,6 +278,7 @@ mod test {
 	// -- with_json_str convenience --
 
 	#[beet_core::test]
+	#[cfg(feature = "json")]
 	async fn json_str_request() {
 		let request = Request::with_json_str("/add", r#"{"a":100,"b":200}"#);
 

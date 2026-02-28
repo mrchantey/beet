@@ -51,7 +51,7 @@ use beet_core::prelude::*;
 /// ```
 pub fn repl_server() -> impl Bundle {
 	(
-		OnSpawn::insert_child(markdown_render_tool()),
+		OnSpawn::insert_child(mime_render_tool()),
 		OnSpawn::new_async(async |entity| -> Result {
 			// Dispatch CLI args as the initial request, rendering the
 			// root content when no args are provided.

@@ -2,7 +2,9 @@
 mod stdio;
 #[cfg(not(target_arch = "wasm32"))]
 pub use stdio::*;
+#[cfg(feature = "markdown")]
 mod markdown;
+#[cfg(feature = "markdown")]
 pub use markdown::*;
 mod html;
 pub use html::*;

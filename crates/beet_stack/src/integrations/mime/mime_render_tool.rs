@@ -5,10 +5,10 @@
 //! original request and dispatches to the best available renderer:
 //!
 //! 1. `text/html` → [`HtmlRenderer`]
-//! 2. `text/markdown` → [`MarkdownRenderer`]
-//! 3. `text/plain` → [`MarkdownRenderer`] (readable fallback)
-//! 4. `application/json` → markdown serialized as JSON via [`mime_serde`]
-//! 5. `application/x-postcard` → markdown serialized as postcard via [`mime_serde`]
+//! 2. `text/markdown` → [`MarkdownRenderer`] (requires `markdown` feature)
+//! 3. `text/plain` → [`HtmlRenderer`] (readable fallback)
+//! 4. `application/json` → scene serialized as JSON via [`SceneSaver`]
+//! 5. `application/x-postcard` → scene serialized as postcard via [`SceneSaver`]
 //!
 //! If no `Accept` header is present, or none of the requested types
 //! are supported, it falls back to HTML.
@@ -61,26 +61,33 @@ pub fn mime_render_tool() -> impl Bundle {
 								let html = render_html_for(card_entity, world);
 								Response::ok_body(html, MimeType::Html)
 							}
+							#[cfg(feature = "markdown")]
 							NegotiatedFormat::Markdown => {
 								let md =
 									render_markdown_for(card_entity, world);
 								Response::ok_body(md, MimeType::Markdown)
 							}
-							NegotiatedFormat::Json => {
-								let md =
-									render_markdown_for(card_entity, world);
-								let bytes =
-									mime_serde::serialize(MimeType::Json, &md)?;
-								Response::ok_body(bytes, MimeType::Json)
+							#[cfg(not(feature = "markdown"))]
+							NegotiatedFormat::Markdown => {
+								// Fall back to HTML when markdown is unavailable
+								let html = render_html_for(card_entity, world);
+								Response::ok_body(html, MimeType::Html)
 							}
+							#[cfg(all(feature = "bevy_scene", feature = "json"))]
+							NegotiatedFormat::Json => render_scene_json(card_entity, world)?,
+							#[cfg(not(all(feature = "bevy_scene", feature = "json")))]
+							NegotiatedFormat::Json => {
+								bevybail!(
+									"JSON scene format requires the `bevy_scene` and `json` features"
+								);
+							}
+							#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+							NegotiatedFormat::Postcard => render_scene_postcard(card_entity, world)?,
+							#[cfg(not(all(feature = "bevy_scene", feature = "postcard")))]
 							NegotiatedFormat::Postcard => {
-								let md =
-									render_markdown_for(card_entity, world);
-								let bytes = mime_serde::serialize(
-									MimeType::Postcard,
-									&md,
-								)?;
-								Response::ok_body(bytes, MimeType::Postcard)
+								bevybail!(
+									"Postcard scene format requires the `bevy_scene` and `postcard` features"
+								);
 							}
 						};
 						world.entity_mut(card_entity).despawn();
@@ -94,6 +101,26 @@ pub fn mime_render_tool() -> impl Bundle {
 	)
 }
 
+/// Serialize an entity tree to a JSON scene [`Response`].
+#[cfg(all(feature = "bevy_scene", feature = "json"))]
+fn render_scene_json(entity: Entity, world: &mut World) -> Result<Response> {
+	let bytes = SceneSaver::new(world)
+		.with_entity_tree(entity)
+		.save_json()?;
+	Response::ok_body(bytes, MimeType::Json).xok()
+}
+
+/// Serialize an entity tree to a postcard scene [`Response`].
+#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+fn render_scene_postcard(
+	entity: Entity,
+	world: &mut World,
+) -> Result<Response> {
+	let bytes = SceneSaver::new(world)
+		.with_entity_tree(entity)
+		.save_postcard()?;
+	Response::ok_body(bytes, MimeType::Postcard).xok()
+}
 
 /// The format chosen by content negotiation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
