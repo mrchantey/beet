@@ -224,7 +224,7 @@ default = ["stack"]
 # 💡 Top Level
 
 http_server = ["net", "tool","stack", "beet_net/server"]
-
+tui_server = ["tui", "markdown"]
 # 💡 Core
 
 serde = ["beet_core/serde", "beet_net?/serde"]
@@ -263,6 +263,7 @@ hyper = ["net", "beet_net?/hyper"]
 tool = ["dep:beet_tool"]
 stack = ["tool", "dep:beet_stack"]
 tui = ["stack", "beet_stack/tui"]
+markdown = ["beet_stack?/markdown"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]
@@ -378,7 +379,7 @@ required-features = ["http_server"]
 [[example]]
 name = "tui"
 path = "examples/stack/tui.rs"
-required-features = ["tui"]
+required-features = ["tui_server"]
 
 [[example]]
 name = "cli"
