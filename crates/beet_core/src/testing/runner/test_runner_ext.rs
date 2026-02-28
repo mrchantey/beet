@@ -12,7 +12,7 @@ pub async fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
 		"--quiet".into()
 	};
 	app.world_mut().spawn((
-		TestRunnerArgs::from_cli_str(&args),
+		TestRunnerConfig::from_cli_str(&args),
 		tests_bundle(vec![test]),
 	));
 	let store = Store::new(None);

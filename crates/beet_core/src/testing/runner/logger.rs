@@ -4,45 +4,23 @@ use crate::testing::utils::*;
 
 
 
-#[derive(Clone, Reflect, Component, Default)]
-#[reflect(Default)]
-pub struct RunnerParams {
-	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode
-	pub watch: bool,
-	/// Do not log test outcomes as they complete
-	pub no_incremental: bool,
-	/// Log each test name before running it
-	pub log_runs: bool,
-	/// Log each skipped test
-	pub log_skipped: bool,
-	/// Disable ANSII colored output
-	pub no_color: bool,
-	/// Suppress all logger output
-	pub quiet: bool,
-}
-
 #[allow(unused)]
 pub(super) fn log_suite_running(
-	requests: Populated<(Entity, &TestRunnerArgs), Added<TestRunnerArgs>>,
-	mut logger_params: TestParamQuery<RunnerParams>,
+	requests: Populated<(Entity, &TestRunnerConfig), Added<TestRunnerConfig>>,
 ) -> Result {
-	for (entity, _req) in requests {
-		let logger_params = logger_params.get(entity)?;
-		if logger_params.watch {
+	for (_entity, config) in requests {
+		if config.watch {
 			terminal_ext::clear().ok();
 		}
 
-		if logger_params.quiet {
+		if config.quiet {
 			continue;
 		}
-		let _guard =
-			paint_ext::SetPaintEnabledTemp::new(!logger_params.no_color);
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
 		let mut out = Vec::new();
 
 		out.push("🌱 beet test 🌱".to_string());
-		// out.push(format!("Request: {:#?}", req));
-		// out.push(format!("Test filter: {:#?}", filter_params));
 
 
 		crate::cross_log!("\n{}\n", out.join("\n"));
@@ -52,16 +30,14 @@ pub(super) fn log_suite_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_running(
-	requests: Populated<(Entity, &Children), With<TestRunnerArgs>>,
+	requests: Populated<(&TestRunnerConfig, &Children), With<TestRunnerConfig>>,
 	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-	mut params: TestParamQuery<RunnerParams>,
 ) -> Result {
-	for (entity, children) in requests {
-		let params = params.get(entity)?;
-		if !params.log_runs {
+	for (config, children) in requests {
+		if !config.log_runs {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
 
 		for test in children
@@ -76,16 +52,17 @@ pub(super) fn log_case_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_outcomes(
-	requests: Populated<(Entity, &Children), With<TestRunnerArgs>>,
+	requests: Populated<
+		(Entity, &TestRunnerConfig, &Children),
+		With<TestRunnerConfig>,
+	>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
-	mut params: TestParamQuery<RunnerParams>,
 ) -> Result {
-	for (entity, children) in requests {
-		let params = params.get(entity)?;
-		if params.quiet || params.no_incremental {
+	for (_entity, config, children) in requests {
+		if config.quiet || config.no_incremental {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
 		let just_finished = children
 			.iter()
@@ -93,7 +70,7 @@ pub(super) fn log_case_outcomes(
 			.collect::<Vec<_>>();
 
 		for (test, outcome) in &just_finished {
-			if outcome.is_skip() && !params.log_skipped {
+			if outcome.is_skip() && !config.log_skipped {
 				continue;
 			}
 			log_case_output(&test, outcome).xprint_display();
@@ -130,18 +107,16 @@ fn test_heading_log(prefix: &str, test: &Test) -> String {
 
 pub(super) fn log_suite_outcome(
 	requests: Populated<
-		(Entity, &TestRunnerArgs, &SuiteOutcome, &Children),
+		(&TestRunnerConfig, &SuiteOutcome, &Children),
 		Added<SuiteOutcome>,
 	>,
-	mut params: TestParamQuery<RunnerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
 ) -> Result {
-	for (entity, args, outcome, children) in requests {
-		let params = params.get(entity)?;
-		if params.quiet {
+	for (config, outcome, children) in requests {
+		if config.quiet {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
 		let mut out = Vec::new();
 		if outcome.num_fail() != 0 {
@@ -159,7 +134,7 @@ pub(super) fn log_suite_outcome(
 				}
 			}
 		}
-		out.push(run_stats(outcome, args));
+		out.push(run_stats(outcome, config));
 		crate::cross_log!("\n{}\n", out.join("\n"));
 	}
 
@@ -193,8 +168,8 @@ fn test_stats(outcome: &SuiteOutcome) -> String {
 	stats.join(", ")
 }
 
-fn run_stats(outcome: &SuiteOutcome, args: &TestRunnerArgs) -> String {
-	let duration = args.started().elapsed();
+fn run_stats(outcome: &SuiteOutcome, config: &TestRunnerConfig) -> String {
+	let duration = config.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
 	let time = paint_ext::blue_bold(time);
 	let test_stats = test_stats(outcome);
@@ -316,7 +291,7 @@ mod tests {
 			TestPlugin,
 		));
 		app.world_mut().spawn((
-			TestRunnerArgs::from_cli_str("--quiet"),
+			TestRunnerConfig::from_cli_str("--quiet"),
 			tests_bundle(tests),
 		));
 		app.run();

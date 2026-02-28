@@ -29,6 +29,7 @@ impl FsBucketProvider {
 	}
 }
 
+#[cfg(feature = "json")]
 impl<T: TableStoreRow> TableProvider<T> for FsBucketProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())

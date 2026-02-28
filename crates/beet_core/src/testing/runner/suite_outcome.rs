@@ -1,24 +1,8 @@
 use crate::prelude::*;
 use crate::testing::runner::*;
 
-/// Configuration parameters for a test suite.
-#[derive(Debug, Clone, Reflect, Component)]
-#[reflect(Default)]
-pub struct SuiteParams {
-	/// Timeout per test in the suite
-	timeout_ms: u64,
-}
 
-impl Default for SuiteParams {
-	fn default() -> Self { Self { timeout_ms: 5_000 } }
-}
-impl SuiteParams {
-	/// Timeout per test in the suite
-	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
-}
-
-
-/// Added to the [`TestRunnerArgs`] entity once all tests have completed
+/// Added to the [`TestRunnerConfig`] entity once all tests have completed
 #[derive(Component)]
 pub struct SuiteOutcome {
 	num_pass: usize,
@@ -63,19 +47,19 @@ impl SuiteOutcome {
 /// Insert final when no tests to run
 pub fn insert_suite_outcome(
 	mut commands: Commands,
-	requests: Populated<
-		(Entity, &TestRunnerArgs, Option<&Children>),
-		Without<SuiteOutcome>,
+	runners: Populated<
+		(Entity, Option<&Children>),
+		(With<TestRunnerConfig>, Without<SuiteOutcome>),
 	>,
 	// listener query, running this system on
 	// either
-	// - added args (in case none to run)
+	// - added config (in case none to run)
 	// - added outcome (in case all done)
-	_listener: Populated<(), Or<(Added<TestRunnerArgs>, Added<TestOutcome>)>>,
+	_listener: Populated<(), Or<(Added<TestRunnerConfig>, Added<TestOutcome>)>>,
 	all_finished: Query<(&Test, &TestOutcome)>,
 	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
 ) {
-	for (entity, _args, children) in requests {
+	for (entity, children) in runners {
 		let Some(children) = children else {
 			commands.entity(entity).insert(SuiteOutcome::new(&[]));
 			continue;
@@ -101,22 +85,23 @@ pub fn insert_suite_outcome(
 pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
-	mut params: TestParamQuery<SuiteParams>,
+	configs: Query<&TestRunnerConfig>,
 	mut query: Populated<
 		(Entity, &mut Test, &ChildOf, Option<&TestCaseParams>),
 		Without<TestOutcome>,
 	>,
 ) -> Result {
 	for (entity, mut test, parent, test_params) in query.iter_mut() {
+		let config = configs.get(parent.0)?;
 		// Check per-test timeout first, then fall back to suite timeout
 		let timeout = if let Some(test_params) = test_params {
 			if let Some(timeout) = test_params.timeout {
 				timeout
 			} else {
-				params.get(parent.0)?.timeout()
+				config.timeout()
 			}
 		} else {
-			params.get(parent.0)?.timeout()
+			config.timeout()
 		};
 
 		test.tick(time.delta());

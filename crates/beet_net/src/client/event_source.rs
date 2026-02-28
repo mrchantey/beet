@@ -154,7 +154,7 @@ pub impl Response {
 	///     println!("{}: {}", sse.data.user, sse.data.text);
 	/// }
 	/// ```
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	#[allow(async_fn_in_trait)]
 	async fn event_source_typed<T>(
 		self,

@@ -85,7 +85,7 @@ impl<T, E> JsonResult<T, E> {
 		}
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 	for JsonResult<T, E>
 {
@@ -126,7 +126,7 @@ impl<T> Json<T> {
 }
 
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 	fn from_request(
 		req: Request,
@@ -143,7 +143,7 @@ impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 		})
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	type Error = HttpError;
 
@@ -162,13 +162,13 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 pub struct JsonQueryParams<T>(pub T);
 
 /// Internal representation for JSON query params.
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct JsonQueryParamsInner {
 	data: String,
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize> JsonQueryParams<T> {
 	/// Serializes a value to a URL-encoded query string.
 	pub fn to_query_string(value: &T) -> Result<String> {
@@ -177,7 +177,7 @@ impl<T: serde::Serialize> JsonQueryParams<T> {
 	}
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	/// Deserializes a value from a URL-encoded query string.
 	pub fn from_query_string(query: &str) -> Result<T> {
@@ -185,7 +185,7 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 		serde_json::from_str::<T>(&inner.data)?.xok()
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
@@ -327,7 +327,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	fn json_query_params() {
 		#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
 		struct Foo(u32, String);

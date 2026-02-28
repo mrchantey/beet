@@ -15,6 +15,7 @@ use bytes::Bytes;
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
 
+#[cfg(feature = "json")]
 impl<T: TableStoreRow> TableProvider<T> for S3Provider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
