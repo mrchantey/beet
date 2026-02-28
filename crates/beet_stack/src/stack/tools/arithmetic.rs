@@ -449,18 +449,16 @@ mod test {
 	async fn get_field_typed_retrieves_value() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
-		let entity = world
+		world
 			.spawn((
 				CardTool,
 				Document::new(val!({ "data": 42i64 })),
 				get_field_typed::<i64>(field),
 			))
-			.id();
-
-		let result =
-			world.entity_mut(entity).call::<(), i64>(()).await.unwrap();
-
-		result.xpect_eq(42);
+			.call::<(), i64>(())
+			.await
+			.unwrap()
+			.xpect_eq(42);
 	}
 
 	#[beet_core::test]
