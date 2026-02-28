@@ -16,7 +16,6 @@
 //! - `std` - Standard library support (enabled by default)
 //! - `serde` - Serialization support
 //! - `testing` - Test runner and matcher utilities
-//! - `exchange` - HTTP request/response types
 //! - `fs` - File system watching and utilities (native only)
 //! - `tokens` - Proc-macro token utilities
 //! - `rand` - Random number generation
@@ -81,12 +80,6 @@ pub use utils::cross_log::_cross_log_native_noline;
 pub mod arena;
 mod bevy_extensions;
 pub mod bevy_utils;
-#[cfg(feature = "exchange")]
-mod exchange;
-#[cfg(feature = "exchange")]
-pub use exchange::header;
-#[cfg(all(feature = "exchange", feature = "serde"))]
-pub use exchange::mime_serde;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
@@ -137,8 +130,6 @@ pub mod prelude {
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
-	#[cfg(feature = "exchange")]
-	pub use crate::exchange::*;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;

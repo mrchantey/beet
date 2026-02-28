@@ -8,7 +8,8 @@
 //! In release builds, internal error details are logged but an opaque error
 //! is returned to clients to prevent information leakage.
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use tracing::error;

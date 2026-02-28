@@ -1,8 +1,7 @@
-use std::time::SystemTime;
-
 use super::Message;
 use super::*;
 use beet_core::prelude::*;
+use std::time::SystemTime;
 
 /// Log the received socket message to info output
 pub fn log_recv(ev: On<MessageRecv>) {

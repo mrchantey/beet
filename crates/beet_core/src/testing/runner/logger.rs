@@ -23,8 +23,8 @@ pub struct RunnerParams {
 
 #[allow(unused)]
 pub(super) fn log_suite_running(
-	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
-	mut logger_params: ParamQuery<RunnerParams>,
+	requests: Populated<(Entity, &TestRunnerArgs), Added<TestRunnerArgs>>,
+	mut logger_params: TestParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, _req) in requests {
 		let logger_params = logger_params.get(entity)?;
@@ -52,9 +52,9 @@ pub(super) fn log_suite_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_running(
-	requests: Populated<(Entity, &Children), With<RequestMeta>>,
+	requests: Populated<(Entity, &Children), With<TestRunnerArgs>>,
 	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-	mut params: ParamQuery<RunnerParams>,
+	mut params: TestParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -76,9 +76,9 @@ pub(super) fn log_case_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_outcomes(
-	requests: Populated<(Entity, &Children), With<RequestMeta>>,
+	requests: Populated<(Entity, &Children), With<TestRunnerArgs>>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
-	mut params: ParamQuery<RunnerParams>,
+	mut params: TestParamQuery<RunnerParams>,
 ) -> Result {
 	for (entity, children) in requests {
 		let params = params.get(entity)?;
@@ -130,13 +130,13 @@ fn test_heading_log(prefix: &str, test: &Test) -> String {
 
 pub(super) fn log_suite_outcome(
 	requests: Populated<
-		(Entity, &RequestMeta, &SuiteOutcome, &Children),
+		(Entity, &TestRunnerArgs, &SuiteOutcome, &Children),
 		Added<SuiteOutcome>,
 	>,
-	mut params: ParamQuery<RunnerParams>,
+	mut params: TestParamQuery<RunnerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
 ) -> Result {
-	for (entity, req, outcome, children) in requests {
+	for (entity, args, outcome, children) in requests {
 		let params = params.get(entity)?;
 		if params.quiet {
 			continue;
@@ -159,7 +159,7 @@ pub(super) fn log_suite_outcome(
 				}
 			}
 		}
-		out.push(run_stats(outcome, req));
+		out.push(run_stats(outcome, args));
 		crate::cross_log!("\n{}\n", out.join("\n"));
 	}
 
@@ -193,8 +193,8 @@ fn test_stats(outcome: &SuiteOutcome) -> String {
 	stats.join(", ")
 }
 
-fn run_stats(outcome: &SuiteOutcome, req: &RequestMeta) -> String {
-	let duration = req.started().elapsed();
+fn run_stats(outcome: &SuiteOutcome, args: &TestRunnerArgs) -> String {
+	let duration = args.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
 	let time = paint_ext::blue_bold(time);
 	let test_stats = test_stats(outcome);
@@ -316,7 +316,7 @@ mod tests {
 			TestPlugin,
 		));
 		app.world_mut().spawn((
-			Request::from_cli_str("--quiet").unwrap(),
+			TestRunnerArgs::from_cli_str("--quiet"),
 			tests_bundle(tests),
 		));
 		app.run();

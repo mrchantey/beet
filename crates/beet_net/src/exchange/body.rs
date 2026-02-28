@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! // Create from bytes
 //! let body: Body = "Hello, world!".into();
 //!
@@ -16,7 +16,8 @@
 //! let body = Body::stream(stream);
 //! ```
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
 use futures::Stream;

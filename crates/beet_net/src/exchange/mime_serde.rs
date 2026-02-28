@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```
-//! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! # #[cfg(feature = "json")] {
 //! let bytes = mime_serde::serialize(MimeType::Json, &42u32).unwrap();
 //! let value: u32 = mime_serde::deserialize(MimeType::Json, &bytes).unwrap();
@@ -16,7 +16,8 @@
 //! # }
 //! ```
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 
 /// Serialize `value` into bytes using the given MIME type's format.
 ///
@@ -130,6 +131,7 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(
 
 #[cfg(test)]
 mod test {
+	#[allow(unused_imports)]
 	use super::*;
 
 	#[cfg(any(feature = "json", feature = "postcard"))]

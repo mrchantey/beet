@@ -18,7 +18,7 @@ impl SuiteParams {
 }
 
 
-/// Added to the [`Request`] entity once all tests have completed
+/// Added to the [`TestRunnerArgs`] entity once all tests have completed
 #[derive(Component)]
 pub struct SuiteOutcome {
 	num_pass: usize,
@@ -64,18 +64,18 @@ impl SuiteOutcome {
 pub fn insert_suite_outcome(
 	mut commands: Commands,
 	requests: Populated<
-		(Entity, &RequestMeta, Option<&Children>),
+		(Entity, &TestRunnerArgs, Option<&Children>),
 		Without<SuiteOutcome>,
 	>,
 	// listener query, running this system on
 	// either
-	// - added request (in case none to run)
+	// - added args (in case none to run)
 	// - added outcome (in case all done)
-	_listener: Populated<(), Or<(Added<RequestMeta>, Added<TestOutcome>)>>,
+	_listener: Populated<(), Or<(Added<TestRunnerArgs>, Added<TestOutcome>)>>,
 	all_finished: Query<(&Test, &TestOutcome)>,
 	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
 ) {
-	for (entity, _req, children) in requests {
+	for (entity, _args, children) in requests {
 		let Some(children) = children else {
 			commands.entity(entity).insert(SuiteOutcome::new(&[]));
 			continue;
@@ -101,7 +101,7 @@ pub fn insert_suite_outcome(
 pub(crate) fn trigger_timeouts(
 	mut commands: Commands,
 	time: Res<Time>,
-	mut params: ParamQuery<SuiteParams>,
+	mut params: TestParamQuery<SuiteParams>,
 	mut query: Populated<
 		(Entity, &mut Test, &ChildOf, Option<&TestCaseParams>),
 		Without<TestOutcome>,

@@ -2,7 +2,7 @@
 //!
 //! The [`StatusCode`] struct wraps a `u16` HTTP status code, providing
 //! named constants and classification methods.
-use crate::prelude::*;
+use beet_core::prelude::*;
 
 /// An HTTP status code for request/response exchanges.
 ///
@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// # Examples
 ///
 /// ```rust
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// let ok = StatusCode::OK;
 /// assert!(ok.is_ok());
 ///

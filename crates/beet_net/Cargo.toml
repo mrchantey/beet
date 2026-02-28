@@ -15,6 +15,8 @@ publish = true
 [features]
 default = ["serde", "fs", "http", "nightly"]
 nightly = []
+json = ["serde",	"dep:serde_json", "beet_core/json"]
+postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # for conditional compilation in hooks
 client = []
 server = [
@@ -41,7 +43,6 @@ aws = [
 ]
 serde = [
 	"dep:serde",
-	"dep:serde_json",
 	"dep:base64",
 	"dep:serde_urlencoded",
 	"uuid/serde",
@@ -49,6 +50,7 @@ serde = [
 ]
 http = [
 	"dep:http",
+	"dep:mime_guess",
 	"dep:eventsource-stream",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
@@ -69,17 +71,18 @@ rustls-tls = [
 	"dep:futures-rustls",
 	"dep:webpki-roots",
 ]
-
+bevy_reflect_documentation = ["bevy/reflect_documentation"]
 
 [dependencies]
-beet_core = {workspace = true,features=["exchange","http","json"]}
-beet_tool = {workspace = true,features=["exchange"]}
+beet_core = {workspace = true,features=["http"]}
+beet_tool = {workspace = true}
 
 bevy.workspace = true
 
 # utils
 async-channel.workspace = true
 extend.workspace = true
+heck.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 send_wrapper.workspace = true
@@ -94,10 +97,12 @@ base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
+postcard = { workspace = true, optional = true }
 
 
 # http
 http = { workspace = true, optional = true }
+mime_guess = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
 url = { workspace = true, optional = true }
 

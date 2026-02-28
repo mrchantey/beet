@@ -3,7 +3,8 @@
 //! This module provides [`ParamQuery`], a system parameter that extracts and
 //! caches typed values from request parameters.
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 

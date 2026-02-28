@@ -35,9 +35,8 @@ std = [
 ]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
-testing = ["exchange", "ansi_paint"]
-exchange = ["dep:bytes"]
-http = ["dep:http","dep:mime_guess"]
+testing = ["ansi_paint"]
+http = ["dep:http"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
 bevy_default = ["bevy_scene", "multi_threaded"]
@@ -82,10 +81,8 @@ send_wrapper.workspace = true
 web-time.workspace = true
 nu-ansi-term = { workspace = true, optional = true }
 
-#💡 exchange
-bytes = {workspace = true,optional = true}
+#💡 http
 http = {workspace = true,optional=true}
-mime_guess = {workspace = true,optional=true}
 serde_urlencoded = { version = "0.7", optional = true }
 
 

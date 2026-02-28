@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -182,7 +183,7 @@ impl RoutePath {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use super::*;
 
 	#[test]
 	fn route_path() {

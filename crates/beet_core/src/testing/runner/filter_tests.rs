@@ -20,10 +20,10 @@ pub struct FilterParams {
 
 
 impl FilterParams {
-	fn new(req: &RequestMeta) -> Result<Self> {
-		let mut this = req.params().parse_reflect::<FilterParams>()?;
+	fn new(args: &TestRunnerArgs) -> Result<Self> {
+		let mut this = args.params().parse_reflect::<FilterParams>()?;
 		// extend include by positional args
-		this.filter = this.filter.extend_include(req.path());
+		this.filter = this.filter.extend_include(args.path());
 		// check for 'exact' specification
 		if !this.exact {
 			this.filter.wrap_all_with_wildcard();
@@ -40,12 +40,12 @@ impl FilterParams {
 /// Filters tests based on request parameters, marking non-matching tests as skipped.
 pub fn filter_tests(
 	mut commands: Commands,
-	requests: Populated<(&RequestMeta, &Children), Added<RequestMeta>>,
+	requests: Populated<(&TestRunnerArgs, &Children), Added<TestRunnerArgs>>,
 	tests: Populated<(Entity, &Test), Added<Test>>,
 ) -> Result {
-	for (request, children) in requests {
+	for (args, children) in requests {
 		// we dont use Extractor because this has extra extractor steps
-		let filter = FilterParams::new(request)?;
+		let filter = FilterParams::new(args)?;
 
 		for (entity, _test) in children
 			.iter()
@@ -69,7 +69,7 @@ mod tests {
 	fn passes_filter(args: &str) -> bool {
 		let mut world = TestPlugin::world();
 		world.spawn((
-			Request::from_cli_str(args).unwrap(),
+			TestRunnerArgs::from_cli_str(args),
 			tests_bundle(vec![test_ext::new_auto(|| Ok(()))]),
 		));
 		world.update_local();

@@ -2,7 +2,7 @@
 //!
 //! This module provides [`ExchangeStats`] for tracking request counts
 //! and the [`exchange_stats`] observer for logging exchange completion.
-use crate::prelude::*;
+use super::*;
 use beet_core::prelude::*;
 
 

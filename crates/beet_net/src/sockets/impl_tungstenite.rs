@@ -143,6 +143,7 @@ pub async fn connect_tungstenite(url: impl AsRef<str>) -> Result<Socket> {
 /// occurs when multiple providers (eg `ring` + `aws-lc-rs`) are enabled as
 /// cargo features on `rustls`.
 #[cfg(feature = "rustls-tls")]
+#[allow(unused)]
 pub(crate) fn default_rustls_client_config() -> Result<rustls::ClientConfig> {
 	let provider = rustls::crypto::ring::default_provider();
 	let mut root_store = rustls::RootCertStore::empty();
@@ -159,6 +160,7 @@ pub(crate) fn default_rustls_client_config() -> Result<rustls::ClientConfig> {
 ///
 /// Returns the boxed sink and stream halves ready for [`Socket`] construction.
 #[cfg(feature = "rustls-tls")]
+#[allow(unused)]
 pub(crate) async fn rustls_connect(
 	url: &str,
 	stream: Async<TcpStream>,

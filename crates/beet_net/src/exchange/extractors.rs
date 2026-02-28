@@ -10,6 +10,8 @@
 //! - [`Json`]: Parse JSON request body
 //! - [`Html`], [`Css`], [`Javascript`], [`Png`]: Response type wrappers
 #[allow(unused)]
+use super::*;
+#[allow(unused)]
 use beet_core::prelude::*;
 
 /// Wrapper for HTML content responses.
@@ -270,17 +272,12 @@ impl Into<Response> for Css {
 
 impl Into<Response> for Javascript {
 	fn into(self) -> Response {
-		Response::ok_body(
-			self.0,
-			MimeType::Javascript,
-		)
+		Response::ok_body(self.0, MimeType::Javascript)
 	}
 }
 
 impl Into<Response> for Png {
-	fn into(self) -> Response {
-		Response::ok_body(self.0, MimeType::Png)
-	}
+	fn into(self) -> Response { Response::ok_body(self.0, MimeType::Png) }
 }
 
 #[cfg(test)]

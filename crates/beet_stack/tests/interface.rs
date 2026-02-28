@@ -9,7 +9,6 @@
 
 use beet_core::prelude::*;
 use beet_stack::prelude::*;
-use beet_tool::prelude::*;
 
 
 fn counter() -> impl Bundle {

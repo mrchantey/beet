@@ -12,11 +12,12 @@
 //!
 //! ```
 //! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! // From HTTP
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
 //! assert_eq!(request.get_param("limit"), Some("10"));
-//! assert_eq!(request.headers.get::<header::ContentType>(), None);
+//! assert!(request.headers.get::<header::ContentType>().is_none());
 //!
 //! // From CLI: `myapp users list --limit 10`
 //! let cli = CliArgs::parse("users list --limit 10");
@@ -25,7 +26,8 @@
 //! assert_eq!(parts.get_param("limit"), Some("10"));
 //! ```
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 
 
 /// The transport scheme used for a request or response.
@@ -116,7 +118,7 @@ const DEFAULT_CLI_VERSION: &str = "0.1.0";
 /// # Example
 ///
 /// ```
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// let parts = RequestParts::get("/api/users");
 /// assert_eq!(parts.path(), &["api", "users"]);
 /// assert_eq!(parts.method(), &HttpMethod::Get);

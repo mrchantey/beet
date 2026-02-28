@@ -12,7 +12,6 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-exchange = ["beet_core/exchange"]
 serde = ["dep:serde"]
 
 [dependencies]
@@ -22,3 +21,4 @@ extend.workspace = true
 serde = { workspace = true, optional = true }
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+beet_net.workspace = true

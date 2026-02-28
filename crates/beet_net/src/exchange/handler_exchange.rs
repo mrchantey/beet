@@ -3,7 +3,7 @@
 //! These convenience functions create tools for common request/response
 //! patterns, wrapping the `beet_tool` primitives with HTTP-friendly APIs.
 
-use beet_core::prelude::*;
+use super::*;
 use beet_tool::prelude::*;
 
 /// Creates a synchronous [`Tool<Request, Response>`] from a closure.

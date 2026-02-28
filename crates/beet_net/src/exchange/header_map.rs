@@ -3,21 +3,22 @@
 //! [`HeaderMap`] wraps a [`MultiMap`] with kebab-case key normalization,
 //! and provides typed access via the [`Header`] trait.
 //!
-//! For concrete header types see [`crate::exchange::headers`].
+//! For concrete header types see [`super::header`].
 //!
 //! # Example
 //!
 //! ```
-//! # use beet_core::prelude::*;
-//! # use beet_core::exchange::headers;
+//! # use beet_net::prelude::*;
+//! # use beet_net::headers;
 //! let mut map = HeaderMap::new();
 //! map.set::<headers::ContentType>(MimeType::Json);
 //! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
 //! assert_eq!(mime, MimeType::Json);
 //! ```
 
-use crate::prelude::*;
-use alloc::borrow::Cow;
+use super::*;
+use beet_core::prelude::*;
+use std::borrow::Cow;
 
 /// A multimap of HTTP-style headers with kebab-case key normalization.
 ///
@@ -298,8 +299,8 @@ impl core::fmt::Display for MimeType {
 
 #[cfg(test)]
 mod test {
+	use super::header as headers;
 	use super::*;
-	use crate::exchange::headers;
 
 	#[test]
 	fn to_kebab_case_lowercase() {

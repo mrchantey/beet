@@ -71,6 +71,7 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use beet_net::prelude::*;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
 		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())

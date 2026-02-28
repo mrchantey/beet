@@ -2,6 +2,7 @@
 //!
 //! This module provides the [`RequestClientExt`] extension trait that adds
 //! a `send()` method to [`Request`] for executing HTTP requests.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Validates that appropriate TLS features are enabled for HTTPS requests.

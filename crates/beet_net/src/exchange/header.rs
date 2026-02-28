@@ -3,15 +3,16 @@
 //! Import this module as `headers` for ergonomic typed access:
 //!
 //! ```
-//! # use beet_core::prelude::*;
-//! # use beet_core::exchange::headers;
+//! # use beet_net::prelude::*;
+//! # use beet_net::headers;
 //! let mut map = HeaderMap::new();
 //! map.set::<headers::ContentType>(MimeType::Json);
 //! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
 //! assert_eq!(mime, MimeType::Json);
 //! ```
+use super::*;
+use beet_core::prelude::*;
 
-use crate::prelude::*;
 
 // ============================================================================
 // ContentType
@@ -20,8 +21,8 @@ use crate::prelude::*;
 /// Typed `Content-Type` header, parsed as a [`MimeType`].
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut headers = HeaderMap::new();
 /// headers.set_raw("content-type", "application/json");
 /// let mime: MimeType = headers.get::<headers::ContentType>().unwrap().unwrap();
@@ -55,8 +56,8 @@ impl Header for ContentType {
 /// from the resulting values. Higher quality types come first.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set_raw("accept", "text/html;q=0.9, application/json");
 /// let types: Vec<MimeType> = map.get::<headers::Accept>().unwrap().unwrap();
@@ -139,8 +140,8 @@ fn parse_quality(part: &str) -> (&str, f32) {
 /// Typed `Location` header, used for redirects.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::Location>("/new/path".to_string());
 /// assert_eq!(map.get::<headers::Location>().unwrap().unwrap(), "/new/path");
@@ -168,8 +169,8 @@ impl Header for Location {
 /// Typed `Authorization` header value.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::Authorization>(headers::Authorization::bearer("abc123"));
 /// let auth = map.get::<headers::Authorization>().unwrap().unwrap();
@@ -231,8 +232,8 @@ impl Header for Authorization {
 /// Typed `Cache-Control` header.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::CacheControl>("no-cache, no-store".to_string());
 /// assert_eq!(map.get::<headers::CacheControl>().unwrap().unwrap(), "no-cache, no-store");
@@ -260,8 +261,8 @@ impl Header for CacheControl {
 /// Typed `Content-Length` header.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::ContentLength>(42u64);
 /// assert_eq!(map.get::<headers::ContentLength>().unwrap().unwrap(), 42u64);
@@ -290,8 +291,8 @@ impl Header for ContentLength {
 /// Typed `Origin` header.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::Origin>("https://example.com".to_string());
 /// assert_eq!(map.get::<headers::Origin>().unwrap().unwrap(), "https://example.com");
@@ -319,8 +320,8 @@ impl Header for Origin {
 /// Typed `Access-Control-Allow-Origin` header.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::AccessControlAllowOrigin>("*".to_string());
 /// assert_eq!(map.get::<headers::AccessControlAllowOrigin>().unwrap().unwrap(), "*");
@@ -367,8 +368,8 @@ impl Header for AccessControlAllowHeaders {
 /// Typed `Access-Control-Max-Age` header, value in seconds.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::AccessControlMaxAge>(3600u32);
 /// assert_eq!(map.get::<headers::AccessControlMaxAge>().unwrap().unwrap(), 3600u32);
@@ -399,8 +400,8 @@ impl Header for AccessControlMaxAge {
 /// Value for the `Transfer-Encoding` header.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set::<headers::TransferEncoding>(headers::TransferEncodingValue::Chunked);
 /// assert_eq!(
@@ -479,8 +480,8 @@ impl Header for TransferEncoding {
 /// Typed `Set-Cookie` header — returns all values since there may be multiple.
 ///
 /// ```
-/// # use beet_core::prelude::*;
-/// # use beet_core::exchange::headers;
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set_raw("set-cookie", "a=1");
 /// map.set_raw("set-cookie", "b=2");

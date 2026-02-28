@@ -8,6 +8,7 @@
 //!
 //! ```
 //! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! // Create an HTTP-style request
 //! let request = Request::get("/api/users?limit=10");
 //! assert_eq!(request.path(), &["api", "users"]);
@@ -21,7 +22,8 @@
 
 #[cfg(feature = "http")]
 use super::http_ext;
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use bytes::Bytes;
 #[cfg(feature = "http")]
 use http::header::IntoHeaderName;
@@ -38,7 +40,7 @@ use http::header::IntoHeaderName;
 /// [`RequestParts`] are available directly:
 ///
 /// ```
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// let request = Request::get("/api/users?limit=10");
 /// assert_eq!(request.method(), &HttpMethod::Get);
 /// assert_eq!(request.path(), &["api", "users"]);
@@ -188,8 +190,8 @@ impl Request {
 	/// Creates a POST request with a JSON-serialized body and `content-type` header.
 	///
 	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_core::exchange::headers;
+	/// # use beet_net::prelude::*;
+	/// # use beet_net::headers;
 	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
 	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(mime, MimeType::Json);
@@ -223,8 +225,8 @@ impl Request {
 	/// Creates a POST request with a raw JSON string body and `content-type` header.
 	///
 	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_core::exchange::headers;
+	/// # use beet_net::prelude::*;
+	/// # use beet_net::headers;
 	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
 	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(mime, MimeType::Json);
@@ -269,7 +271,7 @@ impl Request {
 	/// the `content-type` header, defaulting to JSON.
 	///
 	/// ```ignore
-	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async {
 	/// let request = Request::with_json("/test", &42u32).unwrap();
 	/// let value: u32 = request.deserialize().await.unwrap();
@@ -292,7 +294,7 @@ impl Request {
 	/// the `content-type` header, blocking the current thread.
 	///
 	/// ```ignore
-	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// let request = Request::with_json("/test", &42u32).unwrap();
 	/// let value: u32 = request.deserialize_blocking().unwrap();
 	/// assert_eq!(value, 42);

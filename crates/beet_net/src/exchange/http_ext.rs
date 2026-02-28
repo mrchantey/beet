@@ -3,6 +3,8 @@
 //! This module provides utility functions for parsing and working with
 //! the `http` crate types. All intense parsing of HTTP types should occur here.
 
+
+
 #[cfg(feature = "http")]
 /// Check if HTTP request parts indicate a body is present based on headers.
 pub fn has_body(parts: &http::request::Parts) -> bool {
@@ -60,7 +62,7 @@ pub fn parse_version(version: &str) -> http::Version {
 #[cfg(all(test, feature = "http"))]
 mod test {
 	use super::*;
-	use crate::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn has_body_with_content_length() {

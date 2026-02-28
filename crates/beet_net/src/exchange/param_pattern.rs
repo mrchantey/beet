@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use heck::ToKebabCase;

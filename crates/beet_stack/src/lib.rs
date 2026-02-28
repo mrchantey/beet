@@ -21,11 +21,12 @@ pub mod prelude {
 	pub use crate::nodes;
 	pub use crate::nodes::*;
 	pub use crate::parser::*;
+	pub use crate::renderer::*;
 	pub use crate::router::*;
 	pub use crate::stack::*;
-	pub use crate::renderer::*;
 	pub use crate::val;
-	pub(crate) use beet_tool::prelude::*;
+	pub use beet_net::prelude::*;
+	pub use beet_tool::prelude::*;
 }
 /// A module for re-exporting items from other crates.
 pub mod exports {

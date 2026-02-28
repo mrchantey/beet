@@ -2,7 +2,7 @@
 
 An interface-agnostic application framework inspired by the HyperCard stack/card paradigm.
 
-```rust
+```rust,ignore
 fn warm_greeting() -> impl Bundle {
 	card("/warm-greeting", move || {
 		mdx!("hello **world**")
@@ -12,7 +12,7 @@ fn warm_greeting() -> impl Bundle {
 
 Beet is an extension of the bevy engine.
 
-```rust
+```rust,ignore
 App::new()
 	.add_plugins((MinimalPlugins, StackPlugin))
 	.add_systems(Startup, |mut commands: Commands| {
@@ -45,7 +45,7 @@ These can be combined to create frameworks for applications across domains like 
 
 Endpoints accept and return arbitary payloads.
 
-```rust
+```rust,ignore
 
 #[tool]
 fn add(a:i32, b:i32) -> i32 {

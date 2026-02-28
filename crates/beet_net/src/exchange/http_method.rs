@@ -9,7 +9,7 @@
 //! case-sensitive and doesn't implement useful traits like `Copy` or `serde`.
 //! This module provides a safer, more ergonomic alternative.
 
-use crate::prelude::*;
+use beet_core::prelude::*;
 use std::fmt;
 
 /// Caching strategy for route responses.
@@ -39,7 +39,7 @@ pub enum CacheStrategy {
 /// # Example
 ///
 /// ```
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// let method: HttpMethod = "POST".parse().unwrap();
 /// assert_eq!(method, HttpMethod::Post);
 /// assert!(method.has_body());
@@ -202,7 +202,7 @@ impl std::str::FromStr for HttpMethod {
 /// # Example
 ///
 /// ```
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// // Single method
 /// let filter: MethodFilter = HttpMethod::Get.into();
 ///

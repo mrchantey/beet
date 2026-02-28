@@ -15,7 +15,7 @@ use bytes::Bytes;
 #[derive(Clone, Deref, DerefMut, Resource)]
 pub struct S3Provider(pub Client);
 
-impl<T: TableRow> TableProvider<T> for S3Provider {
+impl<T: TableStoreRow> TableProvider<T> for S3Provider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
@@ -300,7 +300,6 @@ impl BucketProvider for S3Provider {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]

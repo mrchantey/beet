@@ -296,7 +296,7 @@ impl BucketProvider for DynamoDbProvider {
 }
 
 
-impl<T: TableRow> TableProvider<T> for DynamoDbProvider {
+impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

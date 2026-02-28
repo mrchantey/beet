@@ -6,7 +6,7 @@ use crate::testing::runner::*;
 pub fn exit_on_suite_outcome(
 	mut commands: Commands,
 	finished: Populated<(Entity, &SuiteOutcome), Added<SuiteOutcome>>,
-	mut exit_params: ParamQuery<RunnerParams>,
+	mut exit_params: TestParamQuery<RunnerParams>,
 ) -> Result {
 	if let Some((entity, outcome)) = finished.iter().next() {
 		let params = exit_params.get(entity)?;

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use eventsource_stream::Event;
@@ -188,7 +189,6 @@ pub impl Response {
 ))]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	#[derive(serde::Deserialize, Debug)]
 	struct TestEvent {

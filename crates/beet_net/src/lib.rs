@@ -6,6 +6,13 @@
 
 mod client;
 mod exchange;
+/// Re-export the typed header module at crate level.
+pub use exchange::header;
+/// Alias for [`header`] for ergonomic typed header access.
+pub use exchange::headers;
+/// Re-export mime serialization at crate level.
+#[cfg(feature = "serde")]
+pub use exchange::mime_serde;
 mod object_storage;
 mod server;
 /// WebSocket client and server implementations.
@@ -37,8 +44,8 @@ pub mod prelude {
 	pub use crate::sockets;
 
 	// Re-export common types from dependencies
-	pub use uuid::Uuid;
 	pub use bevy::tasks::futures_lite::StreamExt;
+	pub use uuid::Uuid;
 }
 
 /// Re-exports of dependency crates for downstream use.

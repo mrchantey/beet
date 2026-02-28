@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! // Create an HTTP-style response
 //! let response = Response::ok().with_body("Hello, world!");
 //!
@@ -16,7 +16,8 @@
 //! let error = Response::from_status(StatusCode::INTERNAL_SERVER_ERROR);
 //! ```
 
-use crate::prelude::*;
+use super::*;
+use beet_core::prelude::*;
 use bytes::Bytes;
 use std::convert::Infallible;
 
@@ -32,7 +33,7 @@ use std::convert::Infallible;
 /// [`ResponseParts`] are available directly:
 ///
 /// ```
-/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
 /// let response = Response::ok();
 /// assert_eq!(response.status(), StatusCode::OK);  // From ResponseParts
 /// ```
@@ -142,8 +143,8 @@ impl Response {
 	/// Creates an OK response with a JSON-serialized body and `content-type` header.
 	///
 	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_core::exchange::headers;
+	/// # use beet_net::prelude::*;
+	/// # use beet_net::headers;
 	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
 	/// assert_eq!(response.status(), StatusCode::OK);
 	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
@@ -171,8 +172,8 @@ impl Response {
 	/// Creates an OK response with a raw JSON string body and `content-type` header.
 	///
 	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_core::exchange::headers;
+	/// # use beet_net::prelude::*;
+	/// # use beet_net::headers;
 	/// let response = Response::with_json_str(r#"{"foo": 42}"#);
 	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
 	/// assert_eq!(mime, MimeType::Json);
@@ -196,7 +197,7 @@ impl Response {
 	/// the `content-type` header, defaulting to JSON.
 	///
 	/// ```ignore
-	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// # async {
 	/// let response = Response::with_json(&42u32).unwrap();
 	/// let value: u32 = response.deserialize().await.unwrap();
@@ -220,7 +221,7 @@ impl Response {
 	/// the `content-type` header, blocking the current thread.
 	///
 	/// ```ignore
-	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
 	/// let response = Response::with_json(&42u32).unwrap();
 	/// let value: u32 = response.deserialize_blocking().unwrap();
 	/// assert_eq!(value, 42);
@@ -710,7 +711,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[crate::test]
+	#[beet_core::test]
 	async fn response_deserialize_json() {
 		use serde::Deserialize;
 		use serde::Serialize;
@@ -727,7 +728,7 @@ mod test {
 	}
 
 	#[cfg(feature = "postcard")]
-	#[crate::test]
+	#[beet_core::test]
 	async fn response_deserialize_postcard() {
 		use serde::Deserialize;
 		use serde::Serialize;

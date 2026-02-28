@@ -3,6 +3,7 @@
 //! This module provides [`ExchangeExt`] for ergonomic request/response
 //! exchanges on entities that have a [`Tool<Request, Response>`] component,
 //! and [`ExchangeEnd`] for observability.
+use super::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
 

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use send_wrapper::SendWrapper;
@@ -131,9 +132,7 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		.headers
 		.get::<header::ContentType>()
 		.and_then(|res| res.ok())
-		.map_or(false, |mime| {
-			mime == beet_core::prelude::MimeType::EventStream
-		});
+		.map_or(false, |mime| mime == MimeType::EventStream);
 
 	let is_bytes = !is_event_stream
 		&& parts
