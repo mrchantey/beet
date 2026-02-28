@@ -47,15 +47,21 @@ impl SuiteOutcome {
 /// Insert final when no tests to run
 pub fn insert_suite_outcome(
 	mut commands: Commands,
+	// matches runners even if the config was not just added
 	runners: Populated<
 		(Entity, Option<&Children>),
 		(With<TestRunnerConfig>, Without<SuiteOutcome>),
 	>,
-	// listener query, running this system on
-	// either
-	// - added config (in case none to run)
-	// - added outcome (in case all done)
-	_listener: Populated<(), Or<(Added<TestRunnerConfig>, Added<TestOutcome>)>>,
+	// listener query, running this system on a match
+	_listener: Populated<
+		(),
+		Or<(
+			// config added, but may not have children if no tests to run
+			Added<TestRunnerConfig>,
+			// individual test finished
+			Added<TestOutcome>,
+		)>,
+	>,
 	all_finished: Query<(&Test, &TestOutcome)>,
 	still_running: Query<(), (With<Test>, Without<TestOutcome>)>,
 ) {
@@ -123,8 +129,9 @@ mod tests {
 
 	use super::*;
 
+	
 	async fn did_timeout(test: TestDescAndFn) -> bool {
-		test_runner_ext::run(Some("--timeout_ms=10"), test)
+		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await
 			.as_fail()
 			.unwrap()
@@ -181,7 +188,7 @@ mod tests {
 			Ok(())
 		});
 
-		test_runner_ext::run(Some("--timeout_ms=10"), test)
+		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await
 			.xpect_eq(TestOutcome::Pass);
 	}
@@ -197,7 +204,7 @@ mod tests {
 			Ok(())
 		});
 
-		test_runner_ext::run(Some("--timeout_ms=5000"), test)
+		test_runner_ext::run(Some("--timeout-ms=5000"), test)
 			.await
 			.as_fail()
 			.unwrap()
@@ -216,7 +223,7 @@ mod tests {
 			Ok(())
 		});
 
-		test_runner_ext::run(Some("--timeout_ms=5000"), test)
+		test_runner_ext::run(Some("--timeout-ms=5000"), test)
 			.await
 			.as_fail()
 			.unwrap()
@@ -235,7 +242,7 @@ mod tests {
 			Ok(())
 		});
 
-		test_runner_ext::run(Some("--timeout_ms=10"), test)
+		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await
 			.xpect_eq(TestOutcome::Pass);
 	}
@@ -251,7 +258,7 @@ mod tests {
 			Ok(())
 		});
 
-		test_runner_ext::run(Some("--timeout_ms=10"), test)
+		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await
 			.xpect_eq(TestOutcome::Pass);
 	}

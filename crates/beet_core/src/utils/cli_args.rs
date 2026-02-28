@@ -7,8 +7,8 @@ use crate::prelude::*;
 pub struct CliArgs {
 	/// Positional arguments forming the path.
 	pub path: Vec<String>,
-	/// Named arguments as key-value pairs.
-	pub params: HashMap<String, Vec<String>>,
+	/// Named arguments as key-value pairs, supporting multiple values per key.
+	pub params: StringMultiMap,
 }
 
 
@@ -22,7 +22,7 @@ impl CliArgs {
 	pub fn parse(args: &str) -> Self {
 		let args = Self::group_quotations(args);
 		let mut path = Vec::new();
-		let mut query = HashMap::<String, Vec<String>>::new();
+		let mut params = StringMultiMap::new();
 		let mut collecting_nested = false;
 		let mut pending_key: Option<String> = None;
 
@@ -30,32 +30,26 @@ impl CliArgs {
 		while let Some(arg) = args_iter.next() {
 			if collecting_nested {
 				// After seeing `--`, everything goes into 'nested-args'
-				query
-					.entry("nested-args".to_string())
-					.or_default()
-					.push(arg);
+				params.insert("nested-args".to_string(), arg);
 			} else if arg == "--" {
-				// Start collecting nested args
-				// If there's a pending key, it's a flag
+				// Start collecting nested args.
+				// If there's a pending key, it's a flag.
 				if let Some(key) = pending_key.take() {
-					query.entry(key).or_default();
+					params.insert_key(key);
 				}
 				collecting_nested = true;
 			} else if let Some(stripped) =
 				arg.strip_prefix("--").or_else(|| arg.strip_prefix("-"))
 			{
-				// Query param with -- or - prefix
-				// If there's a pending key, it's a flag
+				// Query param with -- or - prefix.
+				// If there's a pending key, it's a flag.
 				if let Some(key) = pending_key.take() {
-					query.entry(key).or_default();
+					params.insert_key(key);
 				}
 
 				if let Some((key, value)) = stripped.split_once('=') {
 					// Key=value format
-					query
-						.entry(key.to_string())
-						.or_default()
-						.push(value.to_string());
+					params.insert(key.to_string(), value.to_string());
 				} else {
 					// No equals sign - might be followed by a value
 					pending_key = Some(stripped.to_string());
@@ -64,7 +58,7 @@ impl CliArgs {
 				// Non-dash argument
 				if let Some(key) = pending_key.take() {
 					// This is the value for the pending key
-					query.entry(key).or_default().push(arg);
+					params.insert(key, arg);
 				} else {
 					// Path param
 					path.push(arg);
@@ -74,13 +68,10 @@ impl CliArgs {
 
 		// Handle any remaining pending key as a flag
 		if let Some(key) = pending_key {
-			query.entry(key).or_default();
+			params.insert_key(key);
 		}
 
-		Self {
-			path,
-			params: query,
-		}
+		Self { path, params }
 	}
 
 	/// Groups arguments respecting quotations (single and double quotes).
@@ -88,66 +79,59 @@ impl CliArgs {
 	/// - Single quotes preserve everything literally (no escape sequences)
 	/// - Double quotes allow backslash escaping (\", \\, etc.)
 	/// - Outside quotes, backslash escapes the next character
-	/// - Unmatched quotes continue to end of input
-	fn group_quotations(input: &str) -> Vec<String> {
+	fn group_quotations(args: &str) -> Vec<String> {
 		let mut result = Vec::new();
 		let mut current = String::new();
+		let mut chars = args.chars().peekable();
 		let mut in_single_quote = false;
 		let mut in_double_quote = false;
-		let mut escape_next = false;
 
-		let combined = input;
-		let chars: Vec<char> = combined.chars().collect();
-		let mut i = 0;
-
-		while i < chars.len() {
-			let ch = chars[i];
-
-			if escape_next {
-				// Add the escaped character literally
-				current.push(ch);
-				escape_next = false;
-				i += 1;
-				continue;
-			}
-
+		while let Some(ch) = chars.next() {
 			match ch {
-				'\\' if in_double_quote
-					|| (!in_single_quote && !in_double_quote) =>
-				{
-					// Backslash escapes next character in double quotes or outside quotes
-					escape_next = true;
-					i += 1;
-				}
 				'\'' if !in_double_quote => {
-					// Toggle single quote mode (unless we're in double quotes)
 					in_single_quote = !in_single_quote;
-					i += 1;
 				}
 				'"' if !in_single_quote => {
-					// Toggle double quote mode (unless we're in single quotes)
 					in_double_quote = !in_double_quote;
-					i += 1;
 				}
-				' ' | '\t' | '\n' | '\r'
-					if !in_single_quote && !in_double_quote =>
+				'\\' if in_double_quote => {
+					// In double quotes, backslash escapes next char
+					if let Some(next) = chars.next() {
+						match next {
+							'"' => current.push('"'),
+							'\\' => current.push('\\'),
+							'n' => current.push('\n'),
+							't' => current.push('\t'),
+							_ => {
+								current.push('\\');
+								current.push(next);
+							}
+						}
+					}
+				}
+				'\\' if !in_single_quote && !in_double_quote => {
+					// Outside quotes, backslash escapes the next character
+					if let Some(next) = chars.next() {
+						current.push(next);
+					}
+				}
+				c if (c == ' ' || c == '\t' || c == '\n')
+					&& !in_single_quote
+					&& !in_double_quote =>
 				{
-					// Whitespace outside quotes separates arguments
+					// Whitespace outside quotes is a separator
 					if !current.is_empty() {
 						result.push(current.clone());
 						current.clear();
 					}
-					i += 1;
 				}
-				_ => {
-					// Regular character, add to current argument
-					current.push(ch);
-					i += 1;
+				c => {
+					current.push(c);
 				}
 			}
 		}
 
-		// Push any remaining content
+		// Push the final token if any
 		if !current.is_empty() {
 			result.push(current);
 		}
@@ -161,7 +145,7 @@ impl CliArgs {
 
 		if !self.params.is_empty() {
 			let mut first = true;
-			for (key, values) in &self.params {
+			for (key, values) in self.params.iter_all() {
 				for value in values {
 					if first {
 						path_str.push('?');
@@ -217,10 +201,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
 	#[test]
@@ -229,7 +210,8 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params.get("verbose").unwrap().xpect_empty();
+		cli.params.contains_key("verbose").xpect_true();
+		cli.params.get("verbose").xpect_none();
 	}
 
 	#[test]
@@ -238,9 +220,9 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(3);
-		cli.params.get("a").unwrap().xpect_eq(vec!["1".to_string()]);
-		cli.params.get("b").unwrap().xpect_eq(vec!["2".to_string()]);
-		cli.params.get("c").unwrap().xpect_eq(vec!["3".to_string()]);
+		cli.params.get("a").unwrap().xpect_eq("1");
+		cli.params.get("b").unwrap().xpect_eq("2");
+		cli.params.get("c").unwrap().xpect_eq("3");
 	}
 
 	#[test]
@@ -249,7 +231,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params.get("key").unwrap().xpect_eq(vec![
+		cli.params.get_vec("key").unwrap().xpect_eq(vec![
 			"val1".to_string(),
 			"val2".to_string(),
 			"val3".to_string(),
@@ -263,10 +245,7 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
 	#[test]
@@ -278,15 +257,12 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path2".to_string()]);
 		cli.params.len().xpect_eq(2);
-		cli.params.get("key").unwrap().xpect_eq(vec![
+		cli.params.get_vec("key").unwrap().xpect_eq(vec![
 			"val1".to_string(),
 			"val2".to_string(),
 			"val3".to_string(),
 		]);
-		cli.params
-			.get("other")
-			.unwrap()
-			.xpect_eq(vec!["one".to_string()]);
+		cli.params.get("other").unwrap().xpect_eq("one");
 	}
 
 	#[test]
@@ -295,10 +271,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("");
 	}
 
 	#[test]
@@ -307,10 +280,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["val=ue".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("val=ue");
 	}
 
 	#[test]
@@ -319,10 +289,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar".to_string()]);
+		cli.params.get("foo").unwrap().xpect_eq("bar");
 	}
 
 	#[test]
@@ -331,10 +298,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("f")
-			.unwrap()
-			.xpect_eq(vec!["bar".to_string()]);
+		cli.params.get("f").unwrap().xpect_eq("bar");
 	}
 
 	#[test]
@@ -343,10 +307,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("f")
-			.unwrap()
-			.xpect_eq(vec!["bar".to_string()]);
+		cli.params.get("f").unwrap().xpect_eq("bar");
 	}
 
 	#[test]
@@ -355,14 +316,8 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(2);
-		cli.params
-			.get("foo")
-			.unwrap()
-			.xpect_eq(vec!["bar".to_string()]);
-		cli.params
-			.get("baz")
-			.unwrap()
-			.xpect_eq(vec!["qux".to_string()]);
+		cli.params.get("foo").unwrap().xpect_eq("bar");
+		cli.params.get("baz").unwrap().xpect_eq("qux");
 	}
 
 	#[test]
@@ -372,10 +327,7 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path2".to_string()]);
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
 	#[test]
@@ -384,11 +336,8 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(2);
-		cli.params.get("verbose").unwrap().xpect_empty();
-		cli.params
-			.get("nested-args")
-			.unwrap()
-			.xpect_eq(vec!["nested".to_string()]);
+		cli.params.get("verbose").xpect_none();
+		cli.params.get("nested-args").unwrap().xpect_eq("nested");
 	}
 
 	#[test]
@@ -397,9 +346,9 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(3);
-		cli.params.get("verbose").unwrap().xpect_empty();
-		cli.params.get("debug").unwrap().xpect_empty();
-		cli.params.get("trace").unwrap().xpect_empty();
+		cli.params.get("verbose").xpect_none();
+		cli.params.get("debug").xpect_none();
+		cli.params.get("trace").xpect_none();
 	}
 
 	#[test]
@@ -408,11 +357,8 @@ mod tests {
 
 		cli.path.xpect_eq(vec!["path1".to_string()]);
 		cli.params.len().xpect_eq(2);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value".to_string()]);
-		cli.params.get("flag").unwrap().xpect_empty();
+		cli.params.get("key").unwrap().xpect_eq("value");
+		cli.params.get_vec("flag").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -421,7 +367,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params.get("v").unwrap().xpect_empty();
+		cli.params.get_vec("v").unwrap().xpect_empty();
 	}
 
 	#[test]
@@ -430,16 +376,10 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(4);
-		cli.params.get("v").unwrap().xpect_empty();
-		cli.params.get("verbose").unwrap().xpect_empty();
-		cli.params
-			.get("f")
-			.unwrap()
-			.xpect_eq(vec!["bar".to_string()]);
-		cli.params
-			.get("foo")
-			.unwrap()
-			.xpect_eq(vec!["baz".to_string()]);
+		cli.params.get_vec("v").unwrap().xpect_empty();
+		cli.params.get_vec("verbose").unwrap().xpect_empty();
+		cli.params.get("f").unwrap().xpect_eq("bar");
+		cli.params.get("foo").unwrap().xpect_eq("baz");
 	}
 
 	#[test]
@@ -449,10 +389,7 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["path1".to_string(), "path3".to_string()]);
 		cli.params.len().xpect_eq(1);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["path2".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("path2");
 	}
 
 	#[test]
@@ -462,7 +399,7 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
 		cli.params.len().xpect_eq(1);
-		cli.params.get("nested-args").unwrap().xpect_eq(vec![
+		cli.params.get_vec("nested-args").unwrap().xpect_eq(vec![
 			"nested1".to_string(),
 			"nested2".to_string(),
 			"--flag".to_string(),
@@ -475,12 +412,9 @@ mod tests {
 
 		cli.path.xpect_eq(vec!["foo".to_string()]);
 		cli.params.len().xpect_eq(2);
+		cli.params.get("name").unwrap().xpect_eq("bob");
 		cli.params
-			.get("name")
-			.unwrap()
-			.xpect_eq(vec!["bob".to_string()]);
-		cli.params
-			.get("nested-args")
+			.get_vec("nested-args")
 			.unwrap()
 			.xpect_eq(vec!["arg1".to_string(), "arg2".to_string()]);
 	}
@@ -491,7 +425,7 @@ mod tests {
 
 		cli.path.xpect_empty();
 		cli.params.len().xpect_eq(1);
-		cli.params.get("nested-args").unwrap().xpect_eq(vec![
+		cli.params.get_vec("nested-args").unwrap().xpect_eq(vec![
 			"foo".to_string(),
 			"bar".to_string(),
 			"baz".to_string(),
@@ -564,10 +498,7 @@ mod tests {
 
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
 	#[test]
@@ -714,27 +645,27 @@ mod tests {
 	fn parse_with_quoted_query_value() {
 		let cli = CliArgs::parse("--message='hello world'");
 		cli.params
-			.get("message")
+			.get_vec("message")
 			.unwrap()
 			.xpect_eq(vec!["hello world".to_string()]);
 	}
 
 	#[test]
 	fn parse_with_quoted_equals_value() {
-		let cli = CliArgs::parse("--text=\"foo bar\"");
-		cli.params
+		CliArgs::parse("--text=\"foo bar\"")
+			.params
 			.get("text")
 			.unwrap()
-			.xpect_eq(vec!["foo bar".to_string()]);
+			.xpect_eq("foo bar");
 	}
 
 	#[test]
 	fn parse_with_quoted_whitespace_value() {
-		let cli = CliArgs::parse("--name 'Jane Doe'");
-		cli.params
+		CliArgs::parse("--name 'Jane Doe'")
+			.params
 			.get("name")
 			.unwrap()
-			.xpect_eq(vec!["Jane Doe".to_string()]);
+			.xpect_eq("Jane Doe");
 	}
 
 	#[test]
@@ -790,10 +721,7 @@ mod tests {
 		let cli = CliArgs::parse("foo 'bar baz' --key='value with spaces'");
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar baz".to_string()]);
-		cli.params
-			.get("key")
-			.unwrap()
-			.xpect_eq(vec!["value with spaces".to_string()]);
+		cli.params.get("key").unwrap().xpect_eq("value with spaces");
 	}
 
 	#[test]
@@ -804,13 +732,7 @@ mod tests {
 		cli.path
 			.xpect_eq(vec!["build".to_string(), "src/main.rs".to_string()]);
 		cli.params.len().xpect_eq(2);
-		cli.params
-			.get("msg")
-			.unwrap()
-			.xpect_eq(vec!["Initial commit".to_string()]);
-		cli.params
-			.get("author")
-			.unwrap()
-			.xpect_eq(vec!["John Doe".to_string()]);
+		cli.params.get("msg").unwrap().xpect_eq("Initial commit");
+		cli.params.get("author").unwrap().xpect_eq("John Doe");
 	}
 }

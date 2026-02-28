@@ -6,7 +6,9 @@ mod navigate;
 pub use navigate::*;
 mod interface_tool;
 pub use interface_tool::*;
+#[cfg(feature = "serde")]
 mod route_tool;
+#[cfg(feature = "serde")]
 pub use route_tool::*;
 
 use crate::prelude::*;

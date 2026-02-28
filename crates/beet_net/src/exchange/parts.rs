@@ -649,59 +649,15 @@ impl From<&http::response::Parts> for ResponseParts {
 
 impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
-		// For CLI, path segments are the positional arguments verbatim
-		let path = cli.path.clone();
-
-		// Convert query HashMap to MultiMap before consuming cli
-		// We need to capture flags (keys with empty value vectors) as well
-		let mut params = MultiMap::default();
-		for (key, values) in &cli.params {
-			if values.is_empty() {
-				// Flag without value - insert with empty string to mark presence
-				params.insert(key.clone(), String::new());
-			} else {
-				for value in values {
-					params.insert(key.clone(), value.clone());
-				}
-			}
-		}
-
-		RequestParts {
-			method: HttpMethod::Get, // CLI defaults to GET-like semantics
-			scheme: Scheme::Cli,
-			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
-			path,
-			params,
-			headers: HeaderMap::default(),
-			version: env_ext::var("CARGO_PKG_VERSION")
-				.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
-		}
-	}
-}
-
-impl From<&CliArgs> for RequestParts {
-	fn from(cli: &CliArgs) -> Self {
-		let path = cli.path.clone();
-
-		let mut params = MultiMap::default();
-		for (key, values) in &cli.params {
-			if values.is_empty() {
-				params.insert(key.clone(), String::new());
-			} else {
-				for value in values {
-					params.insert(key.clone(), value.clone());
-				}
-			}
-		}
-
 		RequestParts {
 			method: HttpMethod::Get,
 			scheme: Scheme::Cli,
 			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
-			path,
-			params,
+			path: cli.path,
+			params: cli.params,
 			headers: HeaderMap::default(),
-			version: DEFAULT_CLI_VERSION.to_string(),
+			version: env_ext::var("CARGO_PKG_VERSION")
+				.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
 		}
 	}
 }

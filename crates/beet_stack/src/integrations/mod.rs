@@ -1,4 +1,6 @@
+#[cfg(not(target_arch = "wasm32"))]
 mod stdio;
+#[cfg(not(target_arch = "wasm32"))]
 pub use stdio::*;
 mod markdown;
 pub use markdown::*;
@@ -10,7 +12,7 @@ pub use mime::*;
 mod http;
 #[cfg(feature = "http")]
 pub use http::*;
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 mod tui;
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 pub use tui::*;

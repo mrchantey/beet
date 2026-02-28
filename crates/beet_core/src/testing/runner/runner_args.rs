@@ -40,34 +40,23 @@ impl TestRunnerConfig {
 
 	/// Creates a config from a [`CliArgs`] instance.
 	pub fn from_cli_args(args: CliArgs) -> Self {
-		let mut params: StringMultiMap = MultiMap::new();
-		for (key, values) in args.params {
-			if values.is_empty() {
-				params.insert_key(key);
-			} else {
-				for value in values {
-					params.insert(key.clone(), value);
-				}
-			}
-		}
+		let params = args.params;
+
+		// while Multimap does have deserialization capabilities through bevy reflect,
+		// our merging of positional args to include filters requires a custom impl
 
 		// Parse boolean flags
 		let watch = params.contains_key("watch");
-		let no_incremental = params.contains_key("no_incremental")
-			|| params.contains_key("no-incremental");
-		let log_runs =
-			params.contains_key("log_runs") || params.contains_key("log-runs");
-		let log_skipped = params.contains_key("log_skipped")
-			|| params.contains_key("log-skipped");
-		let no_color =
-			params.contains_key("no_color") || params.contains_key("no-color");
+		let no_incremental = params.contains_key("no-incremental");
+		let log_runs = params.contains_key("log-runs");
+		let log_skipped = params.contains_key("log-skipped");
+		let no_color = params.contains_key("no-color");
 		let quiet = params.contains_key("quiet");
 		let exact = params.contains_key("exact");
 
 		// Parse timeout
 		let timeout_ms = params
-			.get("timeout_ms")
-			.or_else(|| params.get("timeout-ms"))
+			.get("timeout-ms")
 			.and_then(|val| val.parse::<u64>().ok())
 			.unwrap_or(Self::DEFAULT_TIMEOUT_MS);
 
