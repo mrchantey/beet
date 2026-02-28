@@ -74,62 +74,69 @@ mod test {
 	#[tool]
 	fn to_string(val: i32) -> String { val.to_string() }
 
-	#[test]
-	fn two() {
+	#[beet_core::test]
+	async fn two() {
 		AsyncPlugin::world()
 			.spawn(add.chain(negate))
-			.call_blocking::<(i32, i32), i32>((5, 2))
+			.call::<(i32, i32), i32>((5, 2))
+			.await
 			.unwrap()
 			.xpect_eq(-7);
 	}
-	#[test]
-	fn three() {
+	#[beet_core::test]
+	async fn three() {
 		AsyncPlugin::world()
 			.spawn(add.chain(multiply).chain(negate))
-			.call_blocking::<(i32, i32), i32>((5, 3))
+			.call::<(i32, i32), i32>((5, 3))
+			.await
 			.unwrap()
 			.xpect_eq(-64);
 	}
 
-	#[test]
-	fn type_conversion() {
+	#[beet_core::test]
+	async fn type_conversion() {
 		AsyncPlugin::world()
 			.spawn(add.chain(to_string))
-			.call_blocking::<(i32, i32), String>((3, 4))
+			.call::<(i32, i32), String>((3, 4))
+			.await
 			.unwrap()
 			.xpect_eq("7".to_string());
 	}
 
-	#[test]
-	fn with_closure() {
+	#[beet_core::test]
+	async fn with_closure() {
 		AsyncPlugin::world()
 			.spawn(add.chain(|val: i32| val * 2))
-			.call_blocking::<(i32, i32), i32>((3, 4))
+			.call::<(i32, i32), i32>((3, 4))
+			.await
 			.unwrap()
 			.xpect_eq(14);
 	}
 
-	#[test]
-	fn called_multiple_times() {
+	#[beet_core::test]
+	async fn called_multiple_times() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn(add.chain(negate)).id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<(i32, i32), i32>((1, 2))
+			.call::<(i32, i32), i32>((1, 2))
+			.await
 			.unwrap()
 			.xpect_eq(-3);
 		world
 			.entity_mut(entity)
-			.call_blocking::<(i32, i32), i32>((10, 20))
+			.call::<(i32, i32), i32>((10, 20))
+			.await
 			.unwrap()
 			.xpect_eq(-30);
 	}
 
-	#[test]
-	fn identity() {
+	#[beet_core::test]
+	async fn identity() {
 		AsyncPlugin::world()
 			.spawn(add.chain(|val: i32| val))
-			.call_blocking::<(i32, i32), i32>((5, 5))
+			.call::<(i32, i32), i32>((5, 5))
+			.await
 			.unwrap()
 			.xpect_eq(10);
 	}

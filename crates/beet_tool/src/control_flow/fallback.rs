@@ -80,38 +80,41 @@ mod tests {
 		func_tool(|_: FuncToolIn<()>| Outcome::PASS.xok())
 	}
 
-	#[test]
-	fn no_children() {
+	#[beet_core::test]
+	async fn no_children() {
 		AsyncPlugin::world()
 			.spawn(fallback::<(), ()>())
-			.call_blocking::<(), Outcome>(())
+			.call::<(), Outcome>(())
+			.await
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
 	}
-	#[test]
-	fn failing_child() {
+	#[beet_core::test]
+	async fn failing_child() {
 		AsyncPlugin::world()
 			.spawn((fallback::<(), ()>(), children![(
 				PathPartial::new("foo"),
 				outcome_fail(),
 			)]))
-			.call_blocking::<(), Outcome>(())
+			.call::<(), Outcome>(())
+			.await
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
 	}
-	#[test]
-	fn passing_child() {
+	#[beet_core::test]
+	async fn passing_child() {
 		AsyncPlugin::world()
 			.spawn((fallback::<(), ()>(), children![(
 				PathPartial::new("foo"),
 				outcome_pass(),
 			)]))
-			.call_blocking::<(), Outcome>(())
+			.call::<(), Outcome>(())
+			.await
 			.unwrap()
 			.xpect_eq(Outcome::PASS);
 	}
-	#[test]
-	fn passing_nth_child() {
+	#[beet_core::test]
+	async fn passing_nth_child() {
 		AsyncPlugin::world()
 			.spawn((fallback::<(), ()>(), children![
 				(PathPartial::new("foo"), outcome_fail()),
@@ -119,7 +122,8 @@ mod tests {
 				(PathPartial::new("bazz"), outcome_pass()),
 				(PathPartial::new("boo"), outcome_fail()),
 			]))
-			.call_blocking::<(), Outcome>(())
+			.call::<(), Outcome>(())
+			.await
 			.unwrap()
 			.xpect_eq(Outcome::PASS);
 	}

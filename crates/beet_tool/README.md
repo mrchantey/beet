@@ -10,17 +10,8 @@ fn add(a:i32, b:i32) -> i32 {
 	a + b
 }
 
-#[allow(non_snake_case)]
-#[derive(BundleEffect)]
-struct add;
-
-impl add{	
-	fn effect(entity: &mut EntityWorldMut){
-		entity.insert(Tool::new(..))
-	}
-}
-
 world.spawn(add)
-	.call_blocking::<(i32, i32), i32>((5, 5))
+	.call::<(i32, i32), i32>((5, 5))
+	.await
 ;
 ```

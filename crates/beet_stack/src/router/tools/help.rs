@@ -181,8 +181,8 @@ mod test {
 		format_route_help(tree).xok()
 	}
 
-	#[test]
-	fn help_lists_tools() {
+	#[beet_core::test]
+	async fn help_lists_tools() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn(children![
@@ -202,7 +202,8 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		output.contains("Available routes").xpect_true();
@@ -212,8 +213,8 @@ mod test {
 		output.contains("help").xpect_false();
 	}
 
-	#[test]
-	fn help_shows_nested_tools() {
+	#[beet_core::test]
+	async fn help_shows_nested_tools() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn(children![
@@ -234,14 +235,15 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		output.contains("counter/increment").xpect_true();
 	}
 
-	#[test]
-	fn help_shows_input_output_types() {
+	#[beet_core::test]
+	async fn help_shows_input_output_types() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn(children![help(), add(FieldRef::new("value")),])
@@ -257,15 +259,16 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		// add takes i64 input and returns i64
 		output.contains("i64").xpect_true();
 	}
 
-	#[test]
-	fn help_with_no_other_tools() {
+	#[beet_core::test]
+	async fn help_with_no_other_tools() {
 		let mut world = StackPlugin::world();
 		let root = world.spawn(children![help()]).flush();
 
@@ -279,15 +282,16 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		output.contains("(none)").xpect_true();
 		output.contains("Available routes").xpect_true();
 	}
 
-	#[test]
-	fn help_includes_cards() {
+	#[beet_core::test]
+	async fn help_includes_cards() {
 		let mut world = StackPlugin::world();
 		let root = world
 			.spawn((default_router(), children![
@@ -307,7 +311,8 @@ mod test {
 
 		let output = world
 			.entity_mut(help_entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		// cards should appear with a [card] marker

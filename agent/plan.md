@@ -1,2 +1,0 @@
-- CliArgs::params must be a MultiMap, TestRunnerConfig shouldnt need to walk the map
-- insert_suite_outcome remove _listener

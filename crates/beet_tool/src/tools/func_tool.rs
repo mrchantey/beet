@@ -76,13 +76,14 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
-	fn works() {
+	#[beet_core::test]
+	async fn works() {
 		AsyncPlugin::world()
 			.spawn(func_tool(|input: FuncToolIn<(i32, i32)>| {
 				Ok(input.0 + input.1)
 			}))
-			.call_blocking::<(i32, i32), i32>((5, 3))
+			.call::<(i32, i32), i32>((5, 3))
+			.await
 			.unwrap()
 			.xpect_eq(8);
 	}
@@ -90,22 +91,24 @@ mod test {
 	#[tool]
 	fn no_args_tool() {}
 
-	#[test]
-	fn tool_macro_no_args() {
+	#[beet_core::test]
+	async fn tool_macro_no_args() {
 		AsyncPlugin::world()
 			.spawn(no_args_tool.into_tool())
-			.call_blocking::<(), ()>(())
+			.call::<(), ()>(())
+			.await
 			.unwrap();
 	}
 
 	#[tool]
 	fn add_tool(a: i32, b: i32) -> i32 { a + b }
 
-	#[test]
-	fn tool_macro_with_args() {
+	#[beet_core::test]
+	async fn tool_macro_with_args() {
 		AsyncPlugin::world()
 			.spawn(add_tool.into_tool())
-			.call_blocking::<(i32, i32), i32>((5, 3))
+			.call::<(i32, i32), i32>((5, 3))
+			.await
 			.unwrap()
 			.xpect_eq(8);
 	}
@@ -113,11 +116,12 @@ mod test {
 	#[tool]
 	fn single_arg_tool(val: i32) -> i32 { val * 3 }
 
-	#[test]
-	fn tool_macro_single_arg() {
+	#[beet_core::test]
+	async fn tool_macro_single_arg() {
 		AsyncPlugin::world()
 			.spawn(single_arg_tool.into_tool())
-			.call_blocking::<i32, i32>(7)
+			.call::<i32, i32>(7)
+			.await
 			.unwrap()
 			.xpect_eq(21);
 	}
@@ -130,20 +134,22 @@ mod test {
 		Ok(a + b)
 	}
 
-	#[test]
-	fn tool_macro_result_ok() {
+	#[beet_core::test]
+	async fn tool_macro_result_ok() {
 		AsyncPlugin::world()
 			.spawn(fallible_tool.into_tool())
-			.call_blocking::<(i32, i32), i32>((5, 3))
+			.call::<(i32, i32), i32>((5, 3))
+			.await
 			.unwrap()
 			.xpect_eq(8);
 	}
 
-	#[test]
-	fn tool_macro_result_err() {
+	#[beet_core::test]
+	async fn tool_macro_result_err() {
 		AsyncPlugin::world()
 			.spawn(fallible_tool.into_tool())
-			.call_blocking::<(i32, i32), i32>((5, 0))
+			.call::<(i32, i32), i32>((5, 0))
+			.await
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot be zero");
@@ -152,11 +158,12 @@ mod test {
 	#[tool(result_out)]
 	fn result_out_tool(val: i32) -> Result<i32> { Ok(val * 2) }
 
-	#[test]
-	fn tool_macro_result_out() {
+	#[beet_core::test]
+	async fn tool_macro_result_out() {
 		AsyncPlugin::world()
 			.spawn(result_out_tool.into_tool())
-			.call_blocking::<i32, Result<i32>>(4)
+			.call::<i32, Result<i32>>(4)
+			.await
 			.unwrap()
 			.unwrap()
 			.xpect_eq(8);
@@ -169,11 +176,12 @@ mod test {
 	#[tool]
 	fn func_passthrough_tool(cx: FuncToolIn<i32>) -> i32 { *cx * 3 }
 
-	#[test]
-	fn tool_macro_func_passthrough() {
+	#[beet_core::test]
+	async fn tool_macro_func_passthrough() {
 		AsyncPlugin::world()
 			.spawn(func_passthrough_tool.into_tool())
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(15);
 	}
@@ -181,13 +189,14 @@ mod test {
 	#[tool]
 	fn func_passthrough_entity(cx: FuncToolIn<()>) -> Entity { cx.tool }
 
-	#[test]
-	fn tool_macro_func_passthrough_entity() {
+	#[beet_core::test]
+	async fn tool_macro_func_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn(func_passthrough_entity.into_tool()).id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), Entity>(())
+			.call::<(), Entity>(())
+			.await
 			.unwrap()
 			.xpect_eq(entity);
 	}

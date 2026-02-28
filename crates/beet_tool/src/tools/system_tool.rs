@@ -106,8 +106,8 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
-	fn with_resource() {
+	#[beet_core::test]
+	async fn with_resource() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world
@@ -122,13 +122,14 @@ mod test {
 			.id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), f32>(())
+			.call::<(), f32>(())
+			.await
 			.unwrap()
 			.xpect_eq(0.0);
 	}
 
-	#[test]
-	fn with_input() {
+	#[beet_core::test]
+	async fn with_input() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world
@@ -140,25 +141,23 @@ mod test {
 			.id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, i32>(21)
+			.call::<i32, i32>(21)
+			.await
 			.unwrap()
 			.xpect_eq(42);
 	}
 
-	#[test]
-	fn unit_in_unit_out() {
+	#[beet_core::test]
+	async fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn(system_tool(|_: In<SystemToolIn<()>>| -> Result { Ok(()) }))
 			.id();
-		world
-			.entity_mut(entity)
-			.call_blocking::<(), ()>(())
-			.unwrap();
+		world.entity_mut(entity).call::<(), ()>(()).await.unwrap();
 	}
 
-	#[test]
-	fn access_tool_entity() {
+	#[beet_core::test]
+	async fn access_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn(system_tool(
@@ -169,13 +168,14 @@ mod test {
 			.id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), Entity>(())
+			.call::<(), Entity>(())
+			.await
 			.unwrap()
 			.xpect_eq(entity);
 	}
 
-	#[test]
-	fn pipe_with_system() {
+	#[beet_core::test]
+	async fn pipe_with_system() {
 		#[tool]
 		fn negate(val: i32) -> i32 { -val }
 
@@ -193,7 +193,8 @@ mod test {
 			.id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(-10);
 	}
@@ -205,11 +206,12 @@ mod test {
 	#[tool]
 	fn sys_double(val: In<i32>) -> i32 { val.0 * 2 }
 
-	#[test]
-	fn tool_macro_system_basic() {
+	#[beet_core::test]
+	async fn tool_macro_system_basic() {
 		AsyncPlugin::world()
 			.spawn(sys_double.into_tool())
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(10);
 	}
@@ -219,14 +221,15 @@ mod test {
 		val.0 as f32 + time.elapsed_secs()
 	}
 
-	#[test]
-	fn tool_macro_system_with_resource() {
+	#[beet_core::test]
+	async fn tool_macro_system_with_resource() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world.spawn(sys_with_resource.into_tool()).id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, f32>(10)
+			.call::<i32, f32>(10)
+			.await
 			.unwrap()
 			.xpect_eq(10.0);
 	}
@@ -234,11 +237,12 @@ mod test {
 	#[tool]
 	fn sys_unit(_val: In<()>) {}
 
-	#[test]
-	fn tool_macro_system_unit() {
+	#[beet_core::test]
+	async fn tool_macro_system_unit() {
 		AsyncPlugin::world()
 			.spawn(sys_unit.into_tool())
-			.call_blocking::<(), ()>(())
+			.call::<(), ()>(())
+			.await
 			.unwrap();
 	}
 
@@ -250,11 +254,12 @@ mod test {
 		val.0 * 2
 	}
 
-	#[test]
-	fn tool_macro_system_in_rewrap() {
+	#[beet_core::test]
+	async fn tool_macro_system_in_rewrap() {
 		AsyncPlugin::world()
 			.spawn(sys_in_rewrap.into_tool())
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(10);
 	}
@@ -267,11 +272,12 @@ mod test {
 		Ok(val.0 * 3)
 	}
 
-	#[test]
-	fn tool_macro_system_result_ok() {
+	#[beet_core::test]
+	async fn tool_macro_system_result_ok() {
 		AsyncPlugin::world()
 			.spawn(sys_fallible.into_tool())
-			.call_blocking::<i32, i32>(4)
+			.call::<i32, i32>(4)
+			.await
 			.unwrap()
 			.xpect_eq(12);
 	}
@@ -283,13 +289,14 @@ mod test {
 	#[tool]
 	fn sys_passthrough(cx: In<SystemToolIn<()>>) -> Entity { cx.tool }
 
-	#[test]
-	fn tool_macro_system_passthrough_entity() {
+	#[beet_core::test]
+	async fn tool_macro_system_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn(sys_passthrough.into_tool()).id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), Entity>(())
+			.call::<(), Entity>(())
+			.await
 			.unwrap()
 			.xpect_eq(entity);
 	}
@@ -302,14 +309,15 @@ mod test {
 		cx.take() as f32 + time.elapsed_secs()
 	}
 
-	#[test]
-	fn tool_macro_system_passthrough_with_resource() {
+	#[beet_core::test]
+	async fn tool_macro_system_passthrough_with_resource() {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world.spawn(sys_passthrough_with_res.into_tool()).id();
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, f32>(7)
+			.call::<i32, f32>(7)
+			.await
 			.unwrap()
 			.xpect_eq(7.0);
 	}

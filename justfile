@@ -188,9 +188,9 @@ test-core *args:
 	cargo test -p beet_net	 --all-features																					{{ args }} -- {{ test-threads }}
 	cargo test -p beet_net 	 --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
 	cargo test -p beet_tool	 --all-features																					{{ args }} -- {{ test-threads }}
+	cargo test -p beet_tool  --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
 	cargo test -p beet_stack --all-features																					{{ args }} -- {{ test-threads }}
-# cargo test -p beet_tool  --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
-# cargo test -p beet_stack --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
+	cargo test -p beet_stack --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
 
 test-flow *args:
 	cargo test -p beet_flow 		--all-features 																						{{ args }} -- {{ test-threads }}

@@ -207,56 +207,61 @@ mod test {
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
 
-	#[test]
-	fn increment_initializes_to_one() {
+	#[beet_core::test]
+	async fn increment_initializes_to_one() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((CardTool, increment(count_field()))).id();
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(1);
 	}
 
-	#[test]
-	fn increment_works_multiple_times() {
+	#[beet_core::test]
+	async fn increment_works_multiple_times() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((CardTool, increment(count_field()))).id();
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(1);
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(2);
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(3);
 	}
 
-	#[test]
-	fn decrement_initializes_to_negative_one() {
+	#[beet_core::test]
+	async fn decrement_initializes_to_negative_one() {
 		let mut world = AsyncPlugin::world();
 		let entity = world.spawn((CardTool, decrement(count_field()))).id();
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(-1);
 	}
 
-	#[test]
-	fn decrement_works() {
+	#[beet_core::test]
+	async fn decrement_works() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
@@ -268,13 +273,14 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
+			.call::<(), i64>(())
+			.await
 			.unwrap()
 			.xpect_eq(4);
 	}
 
-	#[test]
-	fn add_works() {
+	#[beet_core::test]
+	async fn add_works() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
@@ -286,26 +292,29 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i64, i64>(5)
+			.call::<i64, i64>(5)
+			.await
 			.unwrap()
 			.xpect_eq(15);
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i64, i64>(3)
+			.call::<i64, i64>(3)
+			.await
 			.unwrap()
 			.xpect_eq(18);
 	}
 
-	#[test]
-	fn set_field_creates_new_field() {
+	#[beet_core::test]
+	async fn set_field_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
 		let entity = world.spawn((CardTool, set_field(field))).id();
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<Value, ()>(val!("Hello"))
+			.call::<Value, ()>(val!("Hello"))
+			.await
 			.unwrap();
 
 		world
@@ -317,8 +326,8 @@ mod test {
 			.xpect_eq("Hello");
 	}
 
-	#[test]
-	fn set_field_updates_existing() {
+	#[beet_core::test]
+	async fn set_field_updates_existing() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("status");
 		let entity = world
@@ -331,7 +340,8 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<Value, ()>(val!("complete"))
+			.call::<Value, ()>(val!("complete"))
+			.await
 			.unwrap();
 
 		world
@@ -343,8 +353,8 @@ mod test {
 			.xpect_eq("complete");
 	}
 
-	#[test]
-	fn set_field_typed_creates_new_field() {
+	#[beet_core::test]
+	async fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
 		let entity = world
@@ -353,7 +363,8 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<String, ()>("Hello".to_string())
+			.call::<String, ()>("Hello".to_string())
+			.await
 			.unwrap();
 
 		world
@@ -365,8 +376,8 @@ mod test {
 			.xpect_eq("Hello");
 	}
 
-	#[test]
-	fn set_field_typed_updates_existing() {
+	#[beet_core::test]
+	async fn set_field_typed_updates_existing() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("status");
 		let entity = world
@@ -379,7 +390,8 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<String, ()>("complete".to_string())
+			.call::<String, ()>("complete".to_string())
+			.await
 			.unwrap();
 
 		world
@@ -391,8 +403,8 @@ mod test {
 			.xpect_eq("complete");
 	}
 
-	#[test]
-	fn get_field_retrieves_value() {
+	#[beet_core::test]
+	async fn get_field_retrieves_value() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
@@ -405,14 +417,15 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.call_blocking::<(), Value>(())
+			.call::<(), Value>(())
+			.await
 			.unwrap();
 
 		result.xpect_eq(val!(42i64));
 	}
 
-	#[test]
-	fn get_field_nested() {
+	#[beet_core::test]
+	async fn get_field_nested() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
@@ -425,14 +438,15 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.call_blocking::<(), Value>(())
+			.call::<(), Value>(())
+			.await
 			.unwrap();
 
 		result.xpect_eq(val!("Alice"));
 	}
 
-	#[test]
-	fn get_field_typed_retrieves_value() {
+	#[beet_core::test]
+	async fn get_field_typed_retrieves_value() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
@@ -443,16 +457,14 @@ mod test {
 			))
 			.id();
 
-		let result = world
-			.entity_mut(entity)
-			.call_blocking::<(), i64>(())
-			.unwrap();
+		let result =
+			world.entity_mut(entity).call::<(), i64>(()).await.unwrap();
 
 		result.xpect_eq(42);
 	}
 
-	#[test]
-	fn get_field_typed_nested() {
+	#[beet_core::test]
+	async fn get_field_typed_nested() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
@@ -465,7 +477,8 @@ mod test {
 
 		let result = world
 			.entity_mut(entity)
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap();
 
 		result.xpect_eq("Alice");

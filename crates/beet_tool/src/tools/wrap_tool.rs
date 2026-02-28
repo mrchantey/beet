@@ -46,7 +46,7 @@ where
 		+ Sync
 		+ Clone
 		+ Fn(WrapIn, Next<InnerIn, InnerOut>) -> Fut,
-	Fut: 'static + Send + Future<Output = Result<WrapOut>>,
+	Fut: 'static + Future<Output = Result<WrapOut>>,
 	WrapIn: 'static + Send + Sync,
 	WrapOut: 'static + Send + Sync,
 	InnerIn: 'static + Send + Sync,
@@ -65,7 +65,7 @@ where
 			          out_handler,
 			      }| {
 				let func = self.clone();
-				commands.run(async move |world: AsyncWorld| -> Result {
+				commands.run_local(async move |world: AsyncWorld| -> Result {
 					let output = func(wrap_in, next).await?;
 					out_handler.call_async(world, output).await
 				});
@@ -91,7 +91,7 @@ where
 		+ Sync
 		+ Clone
 		+ Fn(WrapIn, Next<InnerIn, InnerOut>) -> Fut,
-	Fut: 'static + Send + Future<Output = WrapOut>,
+	Fut: 'static + Future<Output = WrapOut>,
 	WrapIn: 'static + Send + Sync,
 	WrapOut: 'static + Send + Sync + bevy::reflect::Typed,
 	InnerIn: 'static + Send + Sync,
@@ -110,7 +110,7 @@ where
 			          out_handler,
 			      }| {
 				let func = self.clone();
-				commands.run(async move |world: AsyncWorld| -> Result {
+				commands.run_local(async move |world: AsyncWorld| -> Result {
 					let output = func(wrap_in, next).await;
 					out_handler.call_async(world, output).await
 				});
@@ -214,17 +214,18 @@ mod test {
 		Ok(format!("output: {}", output.to_string()))
 	}
 
-	#[test]
-	fn transforms_input_and_output() {
+	#[beet_core::test]
+	async fn transforms_input_and_output() {
 		AsyncPlugin::world()
 			.spawn(serde.wrap(double))
-			.call_blocking::<String, String>("21".into())
+			.call::<String, String>("21".into())
+			.await
 			.unwrap()
 			.xpect_eq("output: 42".to_string());
 	}
 
-	#[test]
-	fn passthrough() {
+	#[beet_core::test]
+	async fn passthrough() {
 		AsyncPlugin::world()
 			.spawn(
 				(async |input: i32, next: Next<i32, i32>| -> Result<i32> {
@@ -232,13 +233,14 @@ mod test {
 				})
 				.wrap(negate),
 			)
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(-5);
 	}
 
-	#[test]
-	fn short_circuit() {
+	#[beet_core::test]
+	async fn short_circuit() {
 		AsyncPlugin::world()
 			.spawn(
 				(async |input: i32, _next: Next<i32, i32>| -> i32 {
@@ -247,13 +249,14 @@ mod test {
 				})
 				.wrap(negate),
 			)
-			.call_blocking::<i32, i32>(3)
+			.call::<i32, i32>(3)
+			.await
 			.unwrap()
 			.xpect_eq(300);
 	}
 
-	#[test]
-	fn with_tuple_inner() {
+	#[beet_core::test]
+	async fn with_tuple_inner() {
 		AsyncPlugin::world()
 			.spawn(
 				(async |input: (i32, i32),
@@ -264,13 +267,14 @@ mod test {
 				})
 				.wrap(add),
 			)
-			.call_blocking::<(i32, i32), i32>((3, 4))
+			.call::<(i32, i32), i32>((3, 4))
+			.await
 			.unwrap()
 			.xpect_eq(8);
 	}
 
-	#[test]
-	fn called_multiple_times() {
+	#[beet_core::test]
+	async fn called_multiple_times() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn(
@@ -283,19 +287,21 @@ mod test {
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, i32>(5)
+			.call::<i32, i32>(5)
+			.await
 			.unwrap()
 			.xpect_eq(10);
 
 		world
 			.entity_mut(entity)
-			.call_blocking::<i32, i32>(7)
+			.call::<i32, i32>(7)
+			.await
 			.unwrap()
 			.xpect_eq(14);
 	}
 
-	#[test]
-	fn modifies_inner_input_and_output() {
+	#[beet_core::test]
+	async fn modifies_inner_input_and_output() {
 		AsyncPlugin::world()
 			.spawn(
 				(async |input: i32, next: Next<i32, i32>| -> Result<i32> {
@@ -304,7 +310,8 @@ mod test {
 				})
 				.wrap(negate),
 			)
-			.call_blocking::<i32, i32>(3)
+			.call::<i32, i32>(3)
+			.await
 			.unwrap()
 			.xpect_eq(-29);
 	}

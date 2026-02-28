@@ -319,12 +319,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	#[should_panic = "No Tool"]
-	fn missing_tool_component() {
+	async fn missing_tool_component() {
 		AsyncPlugin::world()
 			.spawn_empty()
-			.call_blocking::<(), ()>(())
+			.call::<(), ()>(())
+			.await
 			.unwrap();
 	}
 }

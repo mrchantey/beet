@@ -8,9 +8,9 @@ mod html;
 pub use html::*;
 mod mime;
 pub use mime::*;
-#[cfg(feature = "http")]
+#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
 mod http;
-#[cfg(feature = "http")]
+#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
 pub use http::*;
 #[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 mod tui;

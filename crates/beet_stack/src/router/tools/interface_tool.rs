@@ -115,11 +115,12 @@ mod test {
 	}
 
 
-	#[test]
-	fn works() {
+	#[beet_core::test]
+	async fn works() {
 		let tree = StackPlugin::world()
 			.spawn(my_interface())
-			.call_blocking::<_, RouteTree>(Request::get("foo"))
+			.call::<_, RouteTree>(Request::get("foo"))
+			.await
 			.unwrap();
 		tree.find(&["add"]).xpect_some();
 		tree.find(&["add"])

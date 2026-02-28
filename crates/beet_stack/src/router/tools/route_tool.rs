@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_tool::prelude::IntoWrapTool;
 
 /// Create a routable tool that can be called with [`Request`]/[`Response`]
 /// pairs. The request body is deserialized to `In` and the `Out` is
@@ -129,14 +130,15 @@ mod test {
 
 	// -- Request/Response JSON round-trip --
 
-	#[test]
-	fn json_request_response() {
+	#[beet_core::test]
+	async fn json_request_response() {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 20 }).unwrap();
 
 		let response = AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap();
 
 		response.status().xpect_eq(StatusCode::OK);
@@ -152,13 +154,14 @@ mod test {
 
 	// -- JSON is the default when no content-type is specified --
 
-	#[test]
-	fn json_default_content_type() {
+	#[beet_core::test]
+	async fn json_default_content_type() {
 		let request = Request::post("/add").with_body(r#"{"a":1,"b":2}"#);
 
 		AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap()
 			.deserialize_blocking::<u32>()
 			.unwrap()
@@ -167,14 +170,15 @@ mod test {
 
 	// -- postcard binary round-trip --
 
-	#[test]
-	fn postcard_request_response() {
+	#[beet_core::test]
+	async fn postcard_request_response() {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 5, b: 7 }).unwrap();
 
 		let response = AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap();
 
 		response
@@ -190,11 +194,12 @@ mod test {
 
 	// -- unit input with empty body --
 
-	#[test]
-	fn unit_input_empty_body() {
+	#[beet_core::test]
+	async fn unit_input_empty_body() {
 		let response = AsyncPlugin::world()
 			.spawn(route_tool("unit", func_tool(|_: FuncToolIn<()>| Ok(42i32))))
-			.call_blocking::<Request, Response>(Request::get("/"))
+			.call::<Request, Response>(Request::get("/"))
+			.await
 			.unwrap();
 
 		let result: i32 = response.deserialize_blocking().unwrap();
@@ -235,28 +240,30 @@ mod test {
 
 	// -- Response::deserialize round-trip --
 
-	#[test]
-	fn response_deserialize_json_roundtrip() {
+	#[beet_core::test]
+	async fn response_deserialize_json_roundtrip() {
 		let request =
 			Request::with_json("/add", &AddInput { a: 10, b: 5 }).unwrap();
 
 		AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap()
 			.deserialize_blocking::<i32>()
 			.unwrap()
 			.xpect_eq(15);
 	}
 
-	#[test]
-	fn response_deserialize_postcard_roundtrip() {
+	#[beet_core::test]
+	async fn response_deserialize_postcard_roundtrip() {
 		let request =
 			Request::with_postcard("/add", &AddInput { a: 3, b: 9 }).unwrap();
 
 		AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap()
 			.deserialize_blocking::<i32>()
 			.unwrap()
@@ -265,13 +272,14 @@ mod test {
 
 	// -- with_json_str convenience --
 
-	#[test]
-	fn json_str_request() {
+	#[beet_core::test]
+	async fn json_str_request() {
 		let request = Request::with_json_str("/add", r#"{"a":100,"b":200}"#);
 
 		AsyncPlugin::world()
 			.spawn(add_route_tool())
-			.call_blocking::<Request, Response>(request)
+			.call::<Request, Response>(request)
+			.await
 			.unwrap()
 			.deserialize_blocking::<i32>()
 			.unwrap()

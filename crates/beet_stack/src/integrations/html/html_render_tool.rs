@@ -119,89 +119,96 @@ fn render_html_for_system(
 mod test {
 	use super::*;
 
-	#[test]
-	fn plain_text() {
+	#[beet_core::test]
+	async fn plain_text() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![TextNode::new("hello world")]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("hello world");
 	}
 
-	#[test]
-	fn multiple_segments() {
+	#[beet_core::test]
+	async fn multiple_segments() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![
 				TextNode::new("hello"),
 				TextNode::new(" "),
 				TextNode::new("world"),
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("hello world");
 	}
 
-	#[test]
-	fn important_text() {
+	#[beet_core::test]
+	async fn important_text() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![
 				TextNode::new("hello "),
 				(Important, children![TextNode::new("bold")]),
 				TextNode::new(" text"),
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("hello <strong>bold</strong> text");
 	}
 
-	#[test]
-	fn emphasized_text() {
+	#[beet_core::test]
+	async fn emphasized_text() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![
 				TextNode::new("hello "),
 				(Emphasize, children![TextNode::new("italic")]),
 				TextNode::new(" text"),
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("hello <em>italic</em> text");
 	}
 
-	#[test]
-	fn heading_renders() {
+	#[beet_core::test]
+	async fn heading_renders() {
 		AsyncPlugin::world()
 			.spawn((render_html(), Heading1::with_text("Hello World")))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("<h1>Hello World</h1>");
 	}
 
-	#[test]
-	fn paragraph_renders() {
+	#[beet_core::test]
+	async fn paragraph_renders() {
 		AsyncPlugin::world()
 			.spawn((
 				render_html(),
 				Paragraph::with_text("A paragraph of text."),
 			))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("<p>A paragraph of text.</p>");
 	}
 
-	#[test]
-	fn mixed_structure() {
+	#[beet_core::test]
+	async fn mixed_structure() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![
 				Heading1::with_text("Welcome"),
 				Paragraph::with_text("This is the intro.")
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("<h1>Welcome</h1><p>This is the intro.</p>");
 	}
 
-	#[test]
-	fn respects_card_boundary() {
+	#[beet_core::test]
+	async fn respects_card_boundary() {
 		AsyncPlugin::world()
 			.spawn((render_html(), CardTool, children![
 				Paragraph::with_text("Inside card"),
@@ -209,18 +216,20 @@ mod test {
 					"Inside nested card"
 				)])
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("<p>Inside card</p>");
 	}
 
-	#[test]
-	fn link_without_title() {
+	#[beet_core::test]
+	async fn link_without_title() {
 		AsyncPlugin::world()
 			.spawn((render_html(), children![
 				Link::new("https://example.com").with_text("click here"),
 			]))
-			.call_blocking::<(), String>(())
+			.call::<(), String>(())
+			.await
 			.unwrap()
 			.xpect_eq("<a href=\"https://example.com\">click here</a>");
 	}
