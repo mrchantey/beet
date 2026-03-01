@@ -49,7 +49,9 @@ members = [
 	"crates/beet_core/shared",
 	"crates/beet_net",
 	"crates/beet_tool",
+	"crates/beet_tool2",
 	"crates/beet_stack",
+	"crates/beet_stack2",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -81,7 +83,9 @@ beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.3" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.3" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.3" }
 beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.3" }
+beet_tool2 = { path = "crates/beet_tool2", version = "0.0.9-dev.3" }
 beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.3" }
+beet_stack2 = { path = "crates/beet_stack2", version = "0.0.9-dev.3" }
 beet = { path = "", version = "0.0.9-dev.3" }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.3" }
@@ -225,6 +229,8 @@ default = ["stack"]
 
 http_server = ["net", "tool","stack", "beet_net/server"]
 tui_server = ["tui", "markdown"]
+stdio_server = ["stack", "markdown"]
+
 # 💡 Core
 
 serde = ["beet_core/serde", "beet_net?/serde"]
@@ -384,12 +390,12 @@ required-features = ["tui_server"]
 [[example]]
 name = "cli"
 path = "examples/stack/cli.rs"
-required-features = ["stack"]
+required-features = ["stdio_server"]
 
 [[example]]
 name = "repl"
 path = "examples/stack/repl.rs"
-required-features = ["stack"]
+required-features = ["stdio_server"]
 
 [[example]]
 name = "http"

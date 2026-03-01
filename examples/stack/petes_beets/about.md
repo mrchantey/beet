@@ -14,5 +14,5 @@ We're open seven days a week in the heart of downtown. Drop in, flip through the
 
 ---
 
-[Browse the catalog](catalog)
 - [Go home man!](/)
+- [Browse the catalog](catalog)

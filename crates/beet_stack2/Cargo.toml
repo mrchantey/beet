@@ -1,5 +1,5 @@
 [package]
-name = "beet_stack"
+name = "beet_stack2"
 version.workspace = true
 edition.workspace = true
 description = "An opinionated semantic layer between applications and interfaces"
@@ -26,7 +26,7 @@ bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 [dependencies]
 beet_core = { workspace = true }
 beet_net.workspace = true
-beet_tool.workspace = true
+beet_tool2.workspace = true
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true
@@ -52,7 +52,7 @@ beet_core = { workspace = true, features = ["testing"] }
 
 
 
-[[test]]
-name = "interface"
-path = "tests/interface.rs"
-required-features = ["interface"]
+# [[test]]
+# name = "interface"
+# path = "tests/interface.rs"
+# required-features = ["interface"]

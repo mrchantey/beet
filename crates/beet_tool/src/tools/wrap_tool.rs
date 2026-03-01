@@ -200,7 +200,8 @@ mod test {
 	#[tool]
 	fn negate(val: i32) -> i32 { -val }
 
-	async fn serde<In, Out>(
+	/// Example middleware accepting and returning an opaque type
+	async fn my_middleware<In, Out>(
 		input: String,
 		next: Next<In, Out>,
 	) -> Result<String>
@@ -217,7 +218,7 @@ mod test {
 	#[beet_core::test]
 	async fn transforms_input_and_output() {
 		AsyncPlugin::world()
-			.spawn(serde.wrap(double))
+			.spawn(my_middleware.wrap(double))
 			.call::<String, String>("21".into())
 			.await
 			.unwrap()

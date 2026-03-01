@@ -19,9 +19,7 @@ pub(crate) async fn help_handler(
 			.with_then(move |world: &mut World| -> Result<String> {
 				let tree = root_route_tree(world, tool_entity)?;
 				// Scope help to the requested path prefix
-				if path.is_empty() {
-					format_route_help(tree).xok()
-				} else if let Some(subtree) = tree.find_subtree(&path) {
+				if let Some(subtree) = tree.find_subtree(&path) {
 					format_route_help(subtree).xok()
 				} else {
 					nearest_ancestor_help(tree, &path).xok()
@@ -29,10 +27,11 @@ pub(crate) async fn help_handler(
 			})
 			.await?;
 
-		Outcome::Pass(Response::ok_body(help_text, MimeType::Text)).xok()
+		Pass(Response::ok_body(help_text, MimeType::Text))
 	} else {
-		Fail(cx.input).xok()
+		Fail(cx.input)
 	}
+	.xok()
 }
 
 /// Fallback handler that shows help scoped to the nearest ancestor card
@@ -51,7 +50,7 @@ pub(crate) async fn contextual_not_found_handler(
 		})
 		.await?;
 
-	Outcome::Pass(Response::from_status_body(
+	Pass(Response::from_status_body(
 		StatusCode::NOT_FOUND,
 		help_text,
 		MimeType::Text,
