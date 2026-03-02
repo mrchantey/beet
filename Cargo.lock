@@ -1194,6 +1194,7 @@ dependencies = [
  "beet_core",
  "beet_net",
  "bevy",
+ "bytes",
  "extend",
  "serde",
 ]

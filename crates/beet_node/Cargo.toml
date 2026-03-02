@@ -21,6 +21,7 @@ serde = ["dep:serde"]
 beet_core = { workspace = true }
 bevy.workspace = true
 extend.workspace = true
+bytes.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -173,9 +173,10 @@ pub trait Header {
 // ============================================================================
 
 /// Common MIME types used in HTTP exchange.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub enum MimeType {
 	/// `application/octet-stream` — raw bytes, the default.
+	#[default]
 	Bytes,
 	/// `text/plain`
 	Text,
@@ -199,10 +200,6 @@ pub enum MimeType {
 	Png,
 	/// An unrecognized MIME type.
 	Other(String),
-}
-
-impl Default for MimeType {
-	fn default() -> Self { MimeType::Bytes }
 }
 
 impl MimeType {

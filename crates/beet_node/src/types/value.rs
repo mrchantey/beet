@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use beet_core::prelude::*;
 
 
@@ -148,6 +150,9 @@ impl From<&str> for Value {
 	fn from(value: &str) -> Self { Value::Str(value.to_string()) }
 }
 
+impl<'a> From<Cow<'a, str>> for Value {
+	fn from(value: Cow<'a, str>) -> Self { Value::Str(value.into_owned()) }
+}
 
 impl From<Vec<u8>> for Value {
 	fn from(value: Vec<u8>) -> Self { Value::Bytes(value) }

@@ -16,7 +16,7 @@ impl Element {
 }
 
 
-/// Marker type Denoting that this node and its children should be rendered inside of comment notation,
+/// Marker type Denoting that this node and all descendents should be rendered inside of comment notation,
 /// and excluded from user-facing interfaces.
 #[derive(
 	Debug,
