@@ -1188,6 +1188,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_node"
+version = "0.0.9-dev.3"
+dependencies = [
+ "beet_core",
+ "beet_net",
+ "bevy",
+ "extend",
+ "serde",
+]
+
+[[package]]
 name = "beet_stack"
 version = "0.0.9-dev.3"
 dependencies = [

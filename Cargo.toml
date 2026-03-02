@@ -50,6 +50,7 @@ members = [
 	"crates/beet_net",
 	"crates/beet_tool",
 	"crates/beet_tool2",
+	"crates/beet_node",
 	"crates/beet_stack",
 	"crates/beet_stack2",
 
@@ -84,6 +85,7 @@ beet_core = { path = "crates/beet_core", version = "0.0.9-dev.3" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.3" }
 beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.3" }
 beet_tool2 = { path = "crates/beet_tool2", version = "0.0.9-dev.3" }
+beet_node = { path = "crates/beet_node", version = "0.0.9-dev.3" }
 beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.3" }
 beet_stack2 = { path = "crates/beet_stack2", version = "0.0.9-dev.3" }
 beet = { path = "", version = "0.0.9-dev.3" }
