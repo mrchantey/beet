@@ -13,12 +13,15 @@ pub trait NodeDiffer {
 }
 
 
-pub struct TextParser {}
+pub struct PlainTextParser {}
 
-impl TextParser {
+impl PlainTextParser {
 	pub fn new() -> Self { Self {} }
 }
-impl NodeDiffer for TextParser {
+
+
+
+impl NodeDiffer for PlainTextParser {
 	fn diff(
 		&mut self,
 		entity: AsyncEntity,
