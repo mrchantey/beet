@@ -29,6 +29,24 @@ pub enum Value {
 	Str(String),
 }
 
+impl Value {
+	pub fn new(value: impl Into<Self>) -> Self { value.into() }
+}
+
+impl std::fmt::Display for Value {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Value::Null => write!(f, "null"),
+			Value::Bool(b) => write!(f, "{}", b),
+			Value::Int(i) => write!(f, "{}", i),
+			Value::Uint(u) => write!(f, "{}", u),
+			Value::Float(fl) => write!(f, "{}", fl.0),
+			Value::Bytes(bytes) => write!(f, "{:?}", bytes),
+			Value::Str(s) => write!(f, "{}", s),
+		}
+	}
+}
+
 // a wrapper around f64 that implements Eq and Hash by comparing the bit representation of the float.
 #[derive(
 	Debug,

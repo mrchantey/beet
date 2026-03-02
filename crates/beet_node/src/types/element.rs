@@ -57,7 +57,7 @@ pub struct Comment;
 pub struct Attribute(String);
 
 impl Attribute {
-	pub fn new(key: String) -> Self { Self(key.into()) }
+	pub fn new(key: impl Into<String>) -> Self { Self(key.into()) }
 	pub fn is_event(&self) -> bool { self.0.starts_with("on") }
 }
 
