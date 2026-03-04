@@ -42,6 +42,7 @@ pub fn is_internal() -> bool {
 		"beet_flow_macros",
 		"beet_ml",
 		"beet_net",
+		"beet_node",
 		"beet_parse",
 		"beet_rsx",
 		"beet_rsx_macros",
