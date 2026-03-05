@@ -4,9 +4,11 @@
 //! - outputs the file path on fs error
 //! - creates missing directories when writing files
 use crate::prelude::*;
+use futures_lite::Stream;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::process::ExitStatus;
 
 /// The workspace relative directory for this file,
@@ -207,7 +209,78 @@ pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 	}
 }
 
+/// Stream a file as byte chunks.
+///
+/// On native with the `fs` feature, reads asynchronously in 64 KiB
+/// chunks via [`async_fs::File`]. Otherwise falls back to reading the
+/// entire file synchronously and yielding a single chunk.
+pub fn read_stream(
+	path: impl AsRef<Path>,
+) -> FsResult<Pin<Box<dyn Stream<Item = Result<Vec<u8>, BevyError>>>>> {
+	let path = path.as_ref().to_path_buf();
 
+	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+	{
+		let bytes = fs_ext::read(&path)?;
+		Ok(Box::pin(futures_lite::stream::once(Ok(bytes))))
+	}
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	{
+		use futures_lite::io::AsyncReadExt;
+		// 64 KiB — matches the Linux kernel's default pipe/socket buffer size, ensuring a full
+		// buffer drain in a single syscall. Also a round multiple of the 4 KiB page size (16 pages),
+		// and comfortably fits in L2 cache. A reliable general-purpose default for async I/O.
+		const CHUNK_SIZE: usize = 64 * 1024;
+		// Validate path exists synchronously to return an early error.
+		if !std::fs::exists(&path).unwrap_or(false) {
+			return Err(FsError::file_not_found(&path));
+		}
+		let stream =
+			futures_lite::stream::unfold(None::<async_fs::File>, move |file| {
+				let path = path.clone();
+				async move {
+					let mut file = match file {
+						Some(file) => file,
+						None => match async_fs::File::open(&path).await {
+							Ok(file) => file,
+							Err(err) => {
+								return Some((
+									Err(BevyError::from(FsError::io(
+										&path, err,
+									))),
+									None,
+								));
+							}
+						},
+					};
+					let mut buf = vec![0u8; CHUNK_SIZE];
+					match file.read(&mut buf).await {
+						Ok(0) => None,
+						Ok(num) => {
+							buf.truncate(num);
+							Some((Ok(buf), Some(file)))
+						}
+						Err(err) => Some((
+							Err(BevyError::from(FsError::io(&path, err))),
+							None,
+						)),
+					}
+				}
+			});
+		Ok(Box::pin(stream))
+	}
+}
+
+/// Stream a file as UTF-8 string chunks via [`TextStream`].
+///
+/// Internally calls [`read_stream`] and pipes bytes through
+/// [`stream_ext::bytes_to_text`] for cross-boundary UTF-8 decoding.
+pub fn read_stream_string(
+	path: impl AsRef<Path>,
+) -> FsResult<crate::utils::TextStream> {
+	let byte_stream = fs_ext::read_stream(path)?;
+	crate::utils::stream_ext::bytes_to_text(byte_stream).xok()
+}
 
 
 /// Computes a hash of a file's contents.
@@ -365,5 +438,48 @@ mod test {
 			fs_ext::read_to_string(fs_ext::test_dir().join("mod.rs")).unwrap();
 		let hash3 = fs_ext::hash_string(&str);
 		hash3.xpect_eq(hash1);
+	}
+
+	#[crate::test]
+	async fn read_stream_matches_read() {
+		let path = fs_ext::test_dir().join("mod.rs");
+		let expected = fs_ext::read(&path).unwrap();
+
+		let stream = fs_ext::read_stream(&path).unwrap();
+		futures_lite::pin!(stream);
+
+		let mut collected = Vec::new();
+		while let Some(chunk) = stream.next().await {
+			collected.extend_from_slice(&chunk.unwrap());
+		}
+		collected.xpect_eq(expected);
+	}
+
+	#[crate::test]
+	async fn read_stream_string_matches_read_to_string() {
+		let path = fs_ext::test_dir().join("mod.rs");
+		let expected = fs_ext::read_to_string(&path).unwrap();
+
+		let mut stream = fs_ext::read_stream_string(&path).unwrap();
+
+		let mut collected = String::new();
+		while let Some(chunk) = stream.next().await {
+			collected.push_str(&chunk.unwrap());
+		}
+		collected.xpect_eq(expected);
+	}
+
+	#[crate::test]
+	async fn read_stream_missing_file() {
+		fs_ext::read_stream("nonexistent_file.txt")
+			.is_err()
+			.xpect_true();
+	}
+
+	#[crate::test]
+	async fn read_stream_string_missing_file() {
+		fs_ext::read_stream_string("nonexistent_file.txt")
+			.is_err()
+			.xpect_true();
 	}
 }

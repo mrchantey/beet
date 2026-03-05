@@ -43,6 +43,11 @@ mod panic_context;
 pub mod process_ext;
 #[cfg(feature = "rand")]
 mod random_source;
+/// Stream conversion utilities for byte-to-text streaming.
+#[cfg(feature = "std")]
+pub mod stream_ext;
+#[cfg(feature = "std")]
+pub use stream_ext::TextStream;
 #[cfg(feature = "std")]
 pub mod terminal_ext;
 /// Time and duration utilities.

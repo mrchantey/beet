@@ -51,6 +51,11 @@ impl Body {
 	) -> Self {
 		Body::Stream(SendWrapper::new(Box::pin(stream)))
 	}
+
+	/// Converts this body into a [`TextStream`] of UTF-8 string chunks.
+	pub fn into_text_stream(self) -> TextStream {
+		stream_ext::bytes_to_text(self)
+	}
 }
 
 impl Default for Body {
@@ -211,5 +216,60 @@ impl Body {
 			(Body::Bytes(a), Body::Bytes(b)) => a == b,
 			_ => false,
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[beet_core::test]
+	async fn into_text_stream_from_bytes() {
+		let body: Body = "hello world".into();
+		let mut stream = body.into_text_stream();
+
+		stream
+			.next()
+			.await
+			.unwrap()
+			.unwrap()
+			.xpect_eq("hello world");
+		stream.next().await.xpect_none();
+	}
+
+	#[beet_core::test]
+	async fn into_text_stream_from_stream() {
+		let byte_stream = futures::stream::iter(vec![
+			Ok(Bytes::from("hello ")),
+			Ok(Bytes::from("world")),
+		]);
+		let body = Body::stream(byte_stream);
+		let mut stream = body.into_text_stream();
+
+		stream.next().await.unwrap().unwrap().xpect_eq("hello ");
+		stream.next().await.unwrap().unwrap().xpect_eq("world");
+		stream.next().await.xpect_none();
+	}
+
+	#[beet_core::test]
+	async fn into_text_stream_multibyte_split() {
+		// '€' = [0xE2, 0x82, 0xAC], split across two chunks
+		let byte_stream = futures::stream::iter(vec![
+			Ok(Bytes::from_static(&[b'a', 0xE2])),
+			Ok(Bytes::from_static(&[0x82, 0xAC, b'b'])),
+		]);
+		let body = Body::stream(byte_stream);
+		let mut stream = body.into_text_stream();
+
+		stream.next().await.unwrap().unwrap().xpect_eq("a");
+		stream.next().await.unwrap().unwrap().xpect_eq("€b");
+		stream.next().await.xpect_none();
+	}
+
+	#[beet_core::test]
+	async fn into_text_stream_empty_body() {
+		let body = Body::default();
+		let mut stream = body.into_text_stream();
+		stream.next().await.xpect_none();
 	}
 }

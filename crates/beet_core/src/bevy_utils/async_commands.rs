@@ -382,9 +382,12 @@ impl AsyncWorld {
 		let sender = senders.get(&self.world_id).expect(
 			"AsyncWorld sender not found for world, please add the AsyncPlugin",
 		);
-		if let Err(err) = sender.try_send(queue) {
-			warn!("Failed to send command queue: {}", err);
-		}
+		sender.try_send(queue).expect(
+			"Failed to send command queue, the world may have been dropped during teardown",
+		);
+		// if let Err(err) = sender.try_send(queue) {
+		// 	warn!("Failed to send command queue: {}", err);
+		// }
 	}
 
 	/// Queues a command to be executed on the world.
