@@ -47,6 +47,7 @@ where
 	fn into_bundle(self) -> impl Bundle { OnSpawn::observe(self) }
 }
 
+// Option
 impl<T, M> IntoBundle<(Self, M)> for Option<T>
 where
 	T: IntoBundle<M>,
@@ -59,6 +60,7 @@ where
 	}
 }
 
+/// Vec
 impl<T, M> IntoBundle<(Self, M)> for Vec<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,
@@ -86,9 +88,9 @@ impl IntoBundle<Self> for Entity {
 	}
 }
 
-pub struct ValueMarker;
+pub struct IntoValueMarker;
 
-impl<T: Into<Value>> IntoBundle<ValueMarker> for T {
+impl<T: Into<Value>> IntoBundle<IntoValueMarker> for T {
 	fn into_bundle(self) -> impl Bundle { self.into() }
 }
 

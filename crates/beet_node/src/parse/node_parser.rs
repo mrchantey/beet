@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite;
 use bevy::tasks::futures_lite::Stream;
@@ -22,56 +21,6 @@ pub trait NodeParser {
 		stream: impl 'static + Unpin + Stream<Item = Result<impl AsRef<[u8]>>>,
 	) -> impl Future<Output = Result>;
 }
-
-
-#[derive(Debug, Default, Clone)]
-pub struct PlainTextParser;
-
-impl PlainTextParser {
-	pub fn new() -> Self { Self::default() }
-}
-
-impl NodeParser for PlainTextParser {
-	fn parse(
-		&mut self,
-		entity: AsyncEntity,
-		bytes: impl AsRef<[u8]>,
-	) -> impl Future<Output = Result> {
-		async move {
-			let text = std::str::from_utf8(bytes.as_ref())?;
-			entity.insert_then(Value::new(text.to_string())).await;
-			Ok(())
-		}
-	}
-
-	fn parse_stream(
-		&mut self,
-		entity: AsyncEntity,
-		stream: impl 'static + Unpin + Stream<Item = Result<impl AsRef<[u8]>>>,
-	) -> impl Future<Output = Result> {
-		let mut stream = stream_ext::bytes_to_text(stream);
-		async move {
-			entity.insert_then(Value::new(String::new())).await;
-			while let Some(result) = stream.next().await {
-				let text = result?;
-				entity
-					.get_mut::<Value, _>(move |mut value| {
-						match value.as_mut() {
-							Value::Str(existing) => {
-								existing.push_str(&text);
-								Ok(())
-							}
-							_ => bevybail!("Expected a String Value"),
-						}
-					})
-					.await??;
-			}
-
-			Ok(())
-		}
-	}
-}
-
 
 
 #[cfg(test)]
