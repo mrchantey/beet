@@ -19,14 +19,11 @@
 //! let request = Request::from(cli);
 //! assert_eq!(request.path(), &["users", "list"]);
 //! ```
-
 #[cfg(feature = "http")]
 use super::http_ext;
 use super::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-#[cfg(feature = "http")]
-use http::header::IntoHeaderName;
 
 /// A generalized request type that can represent HTTP requests, CLI commands,
 /// or other request-response patterns.
@@ -170,6 +167,17 @@ impl Request {
 		self.parts = self.parts.with_method(method);
 		self
 	}
+	/// Adds a header
+	pub fn with_header<H: Header>(mut self, value: H::Value) -> Self {
+		self.headers.set::<H>(value);
+		self
+	}
+
+	/// Adds a header
+	pub fn with_header_raw(mut self, key: &str, value: &str) -> Self {
+		self.headers.set_raw(key, value);
+		self
+	}
 
 	/// Sets the request body from bytes
 	pub fn with_body(mut self, body: impl AsRef<[u8]>) -> Self {
@@ -306,19 +314,6 @@ impl Request {
 		async_ext::block_on(self.deserialize())
 	}
 
-	/// Adds a header using http header types
-	#[cfg(feature = "http")]
-	pub fn with_header<K: IntoHeaderName>(
-		mut self,
-		key: K,
-		value: &str,
-	) -> Self {
-		let key_str = header_name_to_string(key);
-		// NOTE: `with_header` accepts arbitrary key/value strings — raw is correct here.
-		self.headers.set_raw(key_str, value);
-		self
-	}
-
 	/// Shorthand for an `Authorization: Bearer <token>` header
 	pub fn with_auth_bearer(self, token: &str) -> Self {
 		let mut this = self;
@@ -442,19 +437,6 @@ impl Request {
 		res_parts.headers = self.parts.headers().clone();
 		Response::new(res_parts, default())
 	}
-}
-
-/// Helper to convert http header name to string
-#[cfg(feature = "http")]
-fn header_name_to_string<K: IntoHeaderName>(key: K) -> String {
-	// This is a bit of a hack - we create a temporary request to extract the header name
-	let mut headers = http::HeaderMap::new();
-	headers.insert(key, http::HeaderValue::from_static(""));
-	headers
-		.keys()
-		.next()
-		.map(|name| name.to_string())
-		.unwrap_or_default()
 }
 
 impl From<&str> for Request {

@@ -124,7 +124,7 @@ mod test_request {
 	#[ignore = "flaky httpbin"]
 	async fn custom_header_works() {
 		Request::get(format!("{HTTPBIN}/headers"))
-			.with_header("X-Foo", "Bar")
+			.with_header_raw("X-Foo", "Bar")
 			.send()
 			.await
 			.unwrap()
@@ -245,12 +245,6 @@ mod test_request {
 			.await
 			.unwrap()
 			.xpect_contains("baz");
-	}
-
-	#[test]
-	#[should_panic]
-	fn invalid_header_fails() {
-		Request::get("http://localhost").with_header("bad\nheader", "val");
 	}
 }
 
