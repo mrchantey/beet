@@ -9,10 +9,12 @@ pub struct NodeWalker<'w, 's> {
 		'w,
 		's,
 		(
+			Option<&'static Doctype>,
 			Option<&'static Comment>,
 			Option<&'static Element>,
 			Option<&'static Children>,
 			Option<&'static Value>,
+			Option<&'static Expression>,
 		),
 	>,
 	attributes: AttributeQuery<'w, 's>,
@@ -21,12 +23,11 @@ pub struct NodeWalker<'w, 's> {
 
 pub struct VisitContext {
 	/// The entity from which the walker began
-	start: Entity,
+	pub start: Entity,
 	/// The element/value node currently being visited
-	entity: Entity,
-	/// Whether this entity or an ancestor was
-	/// marked as a comment
-	comment: bool,
+	pub entity: Entity,
+	/// Current depth in the tree, starting at 0 for the root
+	pub depth: usize,
 }
 
 impl NodeWalker<'_, '_> {
@@ -34,49 +35,52 @@ impl NodeWalker<'_, '_> {
 		let cx = VisitContext {
 			start: entity,
 			entity,
-			// this may be updated by walk_entity
-			comment: false,
+			depth: 0,
 		};
 		self.walk_entity(visitor, cx);
 	}
 
-	fn walk_entity(
-		&self,
-		visitor: &mut impl NodeVisitor,
-		mut cx: VisitContext,
-	) {
-		let Ok((comment, element, children, value)) = self.nodes.get(cx.entity)
+	fn walk_entity(&self, visitor: &mut impl NodeVisitor, cx: VisitContext) {
+		let Ok((doctype, comment, element, children, value, expression)) =
+			self.nodes.get(cx.entity)
 		else {
 			return;
 		};
-		// 1. Comment check
-		if comment.is_some() {
-			// may already be true
-			cx.comment = true;
-		}
 
-		// 2. Walk Element
+		// 1. Doctype
+		if let Some(doctype) = doctype {
+			visitor.visit_doctype(&cx, doctype);
+		}
+		// 2. Comment
+		if let Some(comment) = comment {
+			visitor.visit_comment(&cx, comment);
+		}
+		// 3. Element
 		if let Some(element) = element {
 			let attrs = self.attributes.all(cx.entity);
 			visitor.visit_element(&cx, element, attrs);
 		}
-		// 4. Walk Value
+		// 4. Value
 		if let Some(value) = value {
 			visitor.visit_value(&cx, value);
 		}
-		// 5. Walk Children
+		// 5. Expression
+		if let Some(expression) = expression {
+			visitor.visit_expression(&cx, expression);
+		}
+		// 6. Children
 		if let Some(children) = children {
 			for child in children {
 				let child_cx = VisitContext {
 					start: cx.start,
 					entity: *child,
-					comment: cx.comment,
+					depth: cx.depth + 1,
 				};
 				self.walk_entity(visitor, child_cx);
 			}
 		}
 
-		// 6. Leave Element
+		// 7. Leave Element
 		if let Some(element) = element {
 			visitor.leave_element(&cx, element);
 		}
@@ -85,20 +89,45 @@ impl NodeWalker<'_, '_> {
 
 
 pub trait NodeVisitor {
+	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
+	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}
 	fn visit_element(
 		&mut self,
 		_cx: &VisitContext,
 		_element: &Element,
 		_attrs: Vec<(Entity, &Attribute, &Value)>,
-	);
-	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element);
-	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value);
+	) {
+	}
+	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {}
+	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value) {}
+	fn visit_expression(
+		&mut self,
+		_cx: &VisitContext,
+		_expression: &Expression,
+	) {
+	}
 }
 
 
 pub struct PlainTextRenderer {
 	did_newline: bool,
 	buffer: String,
+}
+
+impl PlainTextRenderer {
+	pub fn new() -> Self {
+		Self {
+			did_newline: true,
+			buffer: String::new(),
+		}
+	}
+
+	/// Consume the renderer and return the accumulated text.
+	pub fn into_string(self) -> String { self.buffer }
+}
+
+impl Default for PlainTextRenderer {
+	fn default() -> Self { Self::new() }
 }
 
 impl NodeVisitor for PlainTextRenderer {
@@ -114,7 +143,7 @@ impl NodeVisitor for PlainTextRenderer {
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {
 		// add a newline after every element, except if we just added one
 		if !self.did_newline {
-			self.buffer.push_str("\n");
+			self.buffer.push('\n');
 			self.did_newline = true;
 		}
 	}

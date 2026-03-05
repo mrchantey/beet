@@ -8,7 +8,8 @@
 //! - Element entities: span of the opening tag (`<tag ...>`)
 //! - Attribute entities: span of the `key="value"` or `{expr}` text
 //! - Text nodes: span of the text content
-//! - Comment / doctype nodes: span of the comment / doctype text
+//! - Comment nodes: span of the comment text
+//! - Doctype nodes: span of the doctype text
 //! - Expression nodes: span of the `{expr}` text
 
 use super::combinators::ParseConfig;
@@ -16,7 +17,6 @@ use super::tokens::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
-use std::pin::Pin;
 
 /// Controls how children of void elements are handled.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -263,8 +263,9 @@ fn build_tree_children<'a>(
 }
 
 /// Collect the entity ids of the direct children of `entity`.
-fn collect_children(entity: &EntityWorldMut) -> Vec<Entity> {
-	entity
+fn collect_children(world: &World, entity: Entity) -> Vec<Entity> {
+	world
+		.entity(entity)
 		.get::<Children>()
 		.map(|children| {
 			let mut result = Vec::new();
@@ -278,46 +279,33 @@ fn collect_children(entity: &EntityWorldMut) -> Vec<Entity> {
 
 /// Apply a list of [`TreeNode`] as children of the given entity,
 /// diffing against existing children to minimize ECS mutations.
-pub(super) async fn diff_children(
-	entity: &AsyncEntity,
+pub(super) fn diff_children(
+	world: &mut World,
+	entity: Entity,
 	tree_nodes: &[TreeNode<'_>],
 	config: &DiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
-	let existing_children: Vec<Entity> =
-		entity.with_then(|entity| collect_children(&entity)).await;
-
+	let existing_children = collect_children(world, entity);
 	let existing_count = existing_children.len();
 	let new_count = tree_nodes.len();
 
-	// process each tree node against existing children
+	// diff each tree node against existing children
 	for (idx, tree_node) in tree_nodes.iter().enumerate() {
 		if idx < existing_count {
-			// diff against existing child
 			let child_entity = existing_children[idx];
-			let child = entity.world().entity(child_entity);
-			diff_node(&child, tree_node, config, span_lookup).await?;
+			diff_node(world, child_entity, tree_node, config, span_lookup)?;
 		} else {
-			// spawn new child
-			spawn_node(entity, tree_node, config, span_lookup).await?;
+			spawn_node(world, entity, tree_node, config, span_lookup)?;
 		}
 	}
 
 	// despawn excess children
 	if existing_count > new_count {
-		let world = entity.world().clone();
 		let excess: Vec<Entity> = existing_children[new_count..].to_vec();
-		world
-			.with_then(move |world: &mut World| {
-				for child in excess {
-					if world.get_entity(child).is_ok() {
-						let entity_mut: EntityWorldMut =
-							world.entity_mut(child);
-						entity_mut.despawn();
-					}
-				}
-			})
-			.await;
+		for child in excess {
+			world.entity_mut(child).despawn();
+		}
 	}
 
 	Ok(())
@@ -327,146 +315,123 @@ pub(super) async fn diff_children(
 /// if the type matches, or replacing it if the type differs.
 ///
 /// When `span_lookup` is provided, a [`FileSpan`] is inserted on the entity.
-fn diff_node<'a, 'b>(
-	entity: &'a AsyncEntity,
-	tree_node: &'b TreeNode<'_>,
-	config: &'a DiffConfig,
-	span_lookup: Option<&'a SpanLookup>,
-) -> Pin<Box<dyn Future<Output = Result> + 'a>>
-where
-	'b: 'a,
-{
-	Box::pin(async move {
-		match tree_node {
-			TreeNode::Element {
-				name,
-				attributes,
-				children,
-				source,
-			} => {
-				let el_name = name.to_string();
-				let span = span_lookup.map(|lookup| lookup.span_of(source));
-				let attrs_owned: Vec<HtmlAttribute> = attributes
-					.iter()
-					.map(|attr| HtmlAttribute {
-						key: attr.key,
-						value: attr.value,
-						expression: attr.expression,
-					})
-					.collect();
-				let has_matching_element = entity
-					.with_then(move |entity| entity.get::<Element>().is_some())
-					.await;
+fn diff_node(
+	world: &mut World,
+	entity: Entity,
+	tree_node: &TreeNode<'_>,
+	config: &DiffConfig,
+	span_lookup: Option<&SpanLookup>,
+) -> Result {
+	match tree_node {
+		TreeNode::Element {
+			name,
+			attributes,
+			children,
+			source,
+		} => {
+			let span = span_lookup.map(|lookup| lookup.span_of(source));
+			let has_matching_element =
+				world.entity(entity).get::<Element>().is_some();
 
-				if has_matching_element {
-					// update element name and span in place
-					let el_name_clone = el_name.clone();
-					entity
-						.with_then(move |mut entity| {
-							// Element is immutable, remove and re-insert
-							entity.remove::<Element>();
-							entity.insert(Element::new(el_name_clone));
-							if let Some(span) = span {
-								entity.set_if_ne_or_insert(span);
-							}
-						})
-						.await;
-
-					// diff attributes
-					diff_attributes(entity, &attrs_owned, config, span_lookup)
-						.await?;
-
-					// diff children recursively
-					diff_children(entity, children, config, span_lookup)
-						.await?;
-				} else {
-					// type mismatch: replace entity contents
-					replace_with_element(
-						entity,
-						&el_name,
-						&attrs_owned,
-						children,
-						config,
-						span_lookup,
-						span,
-					)
-					.await?;
+			if has_matching_element {
+				// update element name and span in place
+				let mut entity_mut = world.entity_mut(entity);
+				entity_mut.remove::<Element>();
+				entity_mut.insert(Element::new(*name));
+				if let Some(span) = span {
+					entity_mut.insert(span);
 				}
-			}
-			TreeNode::Text(text) => {
-				let value = config.text_value(text);
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				entity
-					.with_then(move |mut entity| {
-						// remove element-related components if present
-						entity.remove::<Element>();
-						entity.remove::<Comment>();
-						entity.remove::<Expression>();
-						entity.set_if_ne_or_insert(value);
-						if let Some(span) = span {
-							entity.set_if_ne_or_insert(span);
-						}
-					})
-					.await;
-			}
-			TreeNode::Comment(text) => {
-				let value = Value::Str(text.to_string());
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				entity
-					.with_then(move |mut entity| {
-						entity.remove::<Element>();
-						entity.remove::<Expression>();
-						// Comment is immutable, remove and re-insert
-						entity.remove::<Comment>();
-						entity.insert(Comment);
-						entity.set_if_ne_or_insert(value);
-						if let Some(span) = span {
-							entity.set_if_ne_or_insert(span);
-						}
-					})
-					.await;
-			}
-			TreeNode::Doctype(text) => {
-				// doctypes are stored as comments with a special value
-				let value = Value::Str(text.to_string());
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				entity
-					.with_then(move |mut entity| {
-						entity.remove::<Element>();
-						entity.remove::<Expression>();
-						entity.remove::<Comment>();
-						entity.insert(Comment);
-						entity.set_if_ne_or_insert(value);
-						if let Some(span) = span {
-							entity.set_if_ne_or_insert(span);
-						}
-					})
-					.await;
-			}
-			TreeNode::Expression(expr) => {
-				let expression = Expression(expr.to_string());
-				let span = span_lookup.map(|lookup| lookup.span_of(expr));
-				entity
-					.with_then(move |mut entity| {
-						entity.remove::<Element>();
-						entity.remove::<Comment>();
-						// Expression is immutable, remove and re-insert
-						entity.remove::<Expression>();
-						entity.insert(expression);
-						if let Some(span) = span {
-							entity.set_if_ne_or_insert(span);
-						}
-					})
-					.await;
+				drop(entity_mut);
+
+				// diff attributes
+				diff_attributes(
+					world,
+					entity,
+					attributes,
+					config,
+					span_lookup,
+				)?;
+
+				// diff children recursively
+				diff_children(world, entity, children, config, span_lookup)?;
+			} else {
+				// type mismatch: replace entity contents
+				replace_with_element(
+					world,
+					entity,
+					name,
+					attributes,
+					children,
+					config,
+					span_lookup,
+					span,
+				)?;
 			}
 		}
-		Ok(())
-	})
+		TreeNode::Text(text) => {
+			let value = config.text_value(text);
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let mut entity_mut = world.entity_mut(entity);
+			// remove element-related components if present
+			entity_mut.remove::<Element>();
+			entity_mut.remove::<Comment>();
+			entity_mut.remove::<Doctype>();
+			entity_mut.remove::<Expression>();
+			entity_mut.set_if_ne_or_insert(value);
+			if let Some(span) = span {
+				entity_mut.set_if_ne_or_insert(span);
+			}
+		}
+		TreeNode::Comment(text) => {
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let mut entity_mut = world.entity_mut(entity);
+			entity_mut.remove::<Element>();
+			entity_mut.remove::<Doctype>();
+			entity_mut.remove::<Expression>();
+			entity_mut.remove::<Value>();
+			// Comment is immutable, remove and re-insert
+			entity_mut.remove::<Comment>();
+			entity_mut.insert(Comment::new(*text));
+			if let Some(span) = span {
+				entity_mut.set_if_ne_or_insert(span);
+			}
+		}
+		TreeNode::Doctype(text) => {
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let mut entity_mut = world.entity_mut(entity);
+			entity_mut.remove::<Element>();
+			entity_mut.remove::<Comment>();
+			entity_mut.remove::<Expression>();
+			entity_mut.remove::<Value>();
+			// Doctype is immutable, remove and re-insert
+			entity_mut.remove::<Doctype>();
+			entity_mut.insert(Doctype::new(*text));
+			if let Some(span) = span {
+				entity_mut.set_if_ne_or_insert(span);
+			}
+		}
+		TreeNode::Expression(expr) => {
+			let expression = Expression(expr.to_string());
+			let span = span_lookup.map(|lookup| lookup.span_of(expr));
+			let mut entity_mut = world.entity_mut(entity);
+			entity_mut.remove::<Element>();
+			entity_mut.remove::<Comment>();
+			entity_mut.remove::<Doctype>();
+			// Expression is immutable, remove and re-insert
+			entity_mut.remove::<Expression>();
+			entity_mut.insert(expression);
+			if let Some(span) = span {
+				entity_mut.set_if_ne_or_insert(span);
+			}
+		}
+	}
+	Ok(())
 }
 
 /// Replace an entity's contents with a new element, clearing old components.
-async fn replace_with_element(
-	entity: &AsyncEntity,
+fn replace_with_element(
+	world: &mut World,
+	entity: Entity,
 	name: &str,
 	attributes: &[HtmlAttribute<'_>],
 	children: &[TreeNode<'_>],
@@ -474,54 +439,33 @@ async fn replace_with_element(
 	span_lookup: Option<&SpanLookup>,
 	span: Option<FileSpan>,
 ) -> Result {
-	let el_name = name.to_string();
 	// clear and set element
-	entity
-		.with_then(move |mut entity| {
-			entity.remove::<Comment>();
-			entity.remove::<Expression>();
-			entity.remove::<Value>();
-			// Element is immutable, remove before inserting
-			entity.remove::<Element>();
-			entity.insert(Element::new(el_name));
-			if let Some(span) = span {
-				entity.set_if_ne_or_insert(span);
-			}
-		})
-		.await;
+	let mut entity_mut = world.entity_mut(entity);
+	entity_mut.remove::<Comment>();
+	entity_mut.remove::<Doctype>();
+	entity_mut.remove::<Expression>();
+	entity_mut.remove::<Value>();
+	entity_mut.remove::<Element>();
+	entity_mut.insert(Element::new(name));
+	if let Some(span) = span {
+		entity_mut.set_if_ne_or_insert(span);
+	}
+	drop(entity_mut);
 
-	// set attributes
-	diff_attributes(entity, attributes, config, span_lookup).await?;
+	// diff attributes
+	diff_attributes(world, entity, attributes, config, span_lookup)?;
 
-	// despawn all existing children and spawn new ones
-	let world = entity.world().clone();
-	let parent_id = entity.id();
-
-	world
-		.with_then(move |world: &mut World| {
-			let child_ids: Vec<Entity> = {
-				let entity_ref = world.entity(parent_id);
-				entity_ref
-					.get::<Children>()
-					.map(|children| {
-						let mut ids = Vec::new();
-						for &child in children {
-							ids.push(child);
-						}
-						ids
-					})
-					.unwrap_or_default()
-			};
-			for child in child_ids {
-				let entity_mut: EntityWorldMut = world.entity_mut(child);
-				entity_mut.despawn();
-			}
-		})
-		.await;
+	// despawn all existing children
+	let child_ids = collect_children(world, entity);
+	for child in child_ids {
+		if world.get_entity(child).is_ok() {
+			world.entity_mut(child).despawn();
+		}
+	}
 
 	// spawn new children
 	for child_node in children {
-		spawn_node(entity, child_node, config, span_lookup).await?;
+		spawn_node(world, entity, child_node, config, span_lookup)?;
 	}
 
 	Ok(())
@@ -529,27 +473,22 @@ async fn replace_with_element(
 
 /// Diff attributes on an entity against a list of parsed attributes.
 ///
-/// This batches all attribute work into a single `with_then` call
-/// to minimize world locking overhead.
-///
 /// When `span_lookup` is provided, each attribute entity receives a
 /// [`FileSpan`] covering its source text (key, `=`, and value).
-async fn diff_attributes(
-	entity: &AsyncEntity,
+fn diff_attributes(
+	world: &mut World,
+	entity: Entity,
 	attributes: &[HtmlAttribute<'_>],
 	config: &DiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
-	// pre-convert to owned data for the closure, including optional spans
+	// pre-convert to owned data including optional spans
 	let attrs_owned: Vec<(String, Option<String>, bool, Option<FileSpan>)> =
 		attributes
 			.iter()
 			.map(|attr| {
-				// compute span from the key slice if available and non-empty
 				let span = span_lookup.and_then(|lookup| {
 					if !attr.key.is_empty() {
-						// for keyed attributes, span covers from key start
-						// through value end (if present)
 						if let Some(val) = attr.value {
 							// span from key to end of value
 							let key_offset = lookup.slice_offset(attr.key);
@@ -578,150 +517,125 @@ async fn diff_attributes(
 				)
 			})
 			.collect();
+
 	let parse_values = config.parse_attribute_values;
 
-	entity
-		.with_then(move |mut entity| {
-			// collect existing attribute entities
-			let existing_attr_entities: Vec<Entity> = entity
-				.get::<Attributes>()
-				.map(|attrs| {
-					let mut ids = Vec::new();
-					for attr_entity in attrs.iter() {
-						ids.push(attr_entity);
-					}
-					ids
-				})
-				.unwrap_or_default();
-
-			let entity_id = entity.id();
-
-			entity.world_scope(move |world: &mut World| {
-				// build a list of existing attributes: (entity, key, value)
-				let existing: Vec<(Entity, String, Value)> =
-					existing_attr_entities
-						.iter()
-						.filter_map(|&attr_entity| {
-							let entity_ref: EntityRef =
-								world.get_entity(attr_entity).ok()?;
-							let key: String =
-								entity_ref.get::<Attribute>()?.to_string();
-							let value: Value = entity_ref
-								.get::<Value>()
-								.cloned()
-								.unwrap_or_default();
-							Some((attr_entity, key, value))
-						})
-						.collect();
-
-				// process new attributes
-				let mut matched = vec![false; existing.len()];
-
-				for (key, value, is_expression, span) in &attrs_owned {
-					if *is_expression {
-						// expression attributes
-						let expr_value: Value = value
-							.as_ref()
-							.map(|val| Value::Str(val.clone()))
-							.unwrap_or(Value::Null);
-
-						// try to find matching existing attribute
-						let found =
-							existing.iter().position(|(_, existing_key, _)| {
-								existing_key == key
-							});
-
-						if let Some(idx) = found {
-							matched[idx] = true;
-							let (attr_entity, _, ref existing_val) =
-								existing[idx];
-							if *existing_val != expr_value {
-								let mut attr_mut: EntityWorldMut =
-									world.entity_mut(attr_entity);
-								attr_mut.insert(expr_value);
-							}
-							// also ensure it has the Expression component
-							// Expression is immutable, remove then insert
-							let mut attr_mut: EntityWorldMut =
-								world.entity_mut(attr_entity);
-							attr_mut.remove::<Expression>();
-							attr_mut.insert(Expression(
-								value.clone().unwrap_or_default(),
-							));
-							if let Some(span) = span {
-								attr_mut.insert(span.clone());
-							}
-						} else {
-							// spawn new attribute entity
-							let bundle = (
-								Attribute::new(key),
-								expr_value,
-								Expression(value.clone().unwrap_or_default()),
-								AttributeOf::new(entity_id),
-							);
-							let attr_id = world.spawn(bundle).id();
-							if let Some(span) = span {
-								world.entity_mut(attr_id).insert(span.clone());
-							}
-						}
-					} else {
-						let new_value: Value = value
-							.as_ref()
-							.map(|val| {
-								if parse_values {
-									Value::parse_string(val)
-								} else {
-									Value::Str(val.clone())
-								}
-							})
-							.unwrap_or(Value::Null);
-
-						// find matching existing attribute
-						let found =
-							existing.iter().position(|(_, existing_key, _)| {
-								*existing_key == *key
-							});
-
-						if let Some(idx) = found {
-							matched[idx] = true;
-							let (attr_entity, _, ref existing_val) =
-								existing[idx];
-							if *existing_val != new_value {
-								let mut attr_mut: EntityWorldMut =
-									world.entity_mut(attr_entity);
-								attr_mut.insert(new_value);
-							}
-							if let Some(span) = span {
-								let mut attr_mut: EntityWorldMut =
-									world.entity_mut(attr_entity);
-								attr_mut.insert(span.clone());
-							}
-						} else {
-							// spawn new attribute entity
-							let attr_id = world
-								.spawn((
-									Attribute::new(key),
-									new_value,
-									AttributeOf::new(entity_id),
-								))
-								.id();
-							if let Some(span) = span {
-								world.entity_mut(attr_id).insert(span.clone());
-							}
-						}
-					}
-				}
-
-				// despawn unmatched existing attributes
-				for (idx, was_matched) in matched.iter().enumerate() {
-					if !was_matched {
-						let (attr_entity, _, _) = &existing[idx];
-						world.entity_mut(*attr_entity).despawn();
-					}
-				}
-			});
+	// collect existing attribute entities
+	let existing_attr_entities: Vec<Entity> = world
+		.entity(entity)
+		.get::<Attributes>()
+		.map(|attrs| {
+			let mut ids = Vec::new();
+			for attr_entity in attrs.iter() {
+				ids.push(attr_entity);
+			}
+			ids
 		})
-		.await;
+		.unwrap_or_default();
+
+	// build a list of existing attributes: (entity, key, value)
+	let existing: Vec<(Entity, String, Value)> = existing_attr_entities
+		.iter()
+		.filter_map(|&attr_entity| {
+			let entity_ref = world.get_entity(attr_entity).ok()?;
+			let key = entity_ref.get::<Attribute>()?.to_string();
+			let value = entity_ref.get::<Value>().cloned().unwrap_or_default();
+			Some((attr_entity, key, value))
+		})
+		.collect();
+
+	// process new attributes
+	let mut matched = vec![false; existing.len()];
+
+	for (key, value, is_expression, span) in &attrs_owned {
+		if *is_expression {
+			// expression attributes
+			let expr_value: Value = value
+				.as_ref()
+				.map(|val| Value::Str(val.clone()))
+				.unwrap_or(Value::Null);
+
+			// try to find matching existing attribute
+			let found = existing
+				.iter()
+				.position(|(_, existing_key, _)| existing_key == key);
+
+			if let Some(idx) = found {
+				matched[idx] = true;
+				let (attr_entity, _, ref existing_val) = existing[idx];
+				if *existing_val != expr_value {
+					world.entity_mut(attr_entity).insert(expr_value);
+				}
+				// ensure it has the Expression component
+				// Expression is immutable, remove then insert
+				let mut attr_mut = world.entity_mut(attr_entity);
+				attr_mut.remove::<Expression>();
+				attr_mut.insert(Expression(value.clone().unwrap_or_default()));
+				if let Some(span) = span {
+					attr_mut.insert(span.clone());
+				}
+			} else {
+				// spawn new attribute entity
+				let bundle = (
+					Attribute::new(key),
+					expr_value,
+					Expression(value.clone().unwrap_or_default()),
+					AttributeOf::new(entity),
+				);
+				let attr_id = world.spawn(bundle).id();
+				if let Some(span) = span {
+					world.entity_mut(attr_id).insert(span.clone());
+				}
+			}
+		} else {
+			let new_value: Value = value
+				.as_ref()
+				.map(|val| {
+					if parse_values {
+						Value::parse_string(val)
+					} else {
+						Value::Str(val.clone())
+					}
+				})
+				.unwrap_or(Value::Null);
+
+			// find matching existing attribute
+			let found = existing
+				.iter()
+				.position(|(_, existing_key, _)| *existing_key == *key);
+
+			if let Some(idx) = found {
+				matched[idx] = true;
+				let (attr_entity, _, ref existing_val) = existing[idx];
+				if *existing_val != new_value {
+					world.entity_mut(attr_entity).insert(new_value);
+				}
+				if let Some(span) = span {
+					world.entity_mut(attr_entity).insert(span.clone());
+				}
+			} else {
+				// spawn new attribute entity
+				let attr_id = world
+					.spawn((
+						Attribute::new(key),
+						new_value,
+						AttributeOf::new(entity),
+					))
+					.id();
+				if let Some(span) = span {
+					world.entity_mut(attr_id).insert(span.clone());
+				}
+			}
+		}
+	}
+
+	// despawn unmatched existing attributes
+	for (idx, was_matched) in matched.iter().enumerate() {
+		if !was_matched {
+			let (attr_entity, _, _) = &existing[idx];
+			world.entity_mut(*attr_entity).despawn();
+		}
+	}
 
 	Ok(())
 }
@@ -729,92 +643,66 @@ async fn diff_attributes(
 /// Spawn a new child entity from a tree node.
 ///
 /// When `span_lookup` is provided, the new entity receives a [`FileSpan`].
-fn spawn_node<'a>(
-	parent: &'a AsyncEntity,
-	tree_node: &'a TreeNode<'_>,
-	config: &'a DiffConfig,
-	span_lookup: Option<&'a SpanLookup>,
-) -> Pin<Box<dyn Future<Output = Result> + 'a>> {
-	Box::pin(async move {
-		match tree_node {
-			TreeNode::Element {
-				name,
-				attributes,
-				children,
-				source,
-			} => {
-				let span = span_lookup.map(|lookup| lookup.span_of(source));
-				let child_entity =
-					parent.spawn_child(Element::new(*name)).await;
-				let child = parent.world().entity(child_entity);
-				if let Some(span) = span {
-					child
-						.with_then(move |mut entity| {
-							entity.insert(span);
-						})
-						.await;
-				}
-				diff_attributes(&child, attributes, config, span_lookup)
-					.await?;
-				for child_node in children {
-					spawn_node(&child, child_node, config, span_lookup).await?;
-				}
+fn spawn_node(
+	world: &mut World,
+	parent: Entity,
+	tree_node: &TreeNode<'_>,
+	config: &DiffConfig,
+	span_lookup: Option<&SpanLookup>,
+) -> Result {
+	match tree_node {
+		TreeNode::Element {
+			name,
+			attributes,
+			children,
+			source,
+		} => {
+			let span = span_lookup.map(|lookup| lookup.span_of(source));
+			let child_id =
+				world.spawn((Element::new(*name), ChildOf(parent))).id();
+			if let Some(span) = span {
+				world.entity_mut(child_id).insert(span);
 			}
-			TreeNode::Text(text) => {
-				let value = config.text_value(text);
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				let child_entity = parent.spawn_child(value).await;
-				if let Some(span) = span {
-					let child = parent.world().entity(child_entity);
-					child
-						.with_then(move |mut entity| {
-							entity.insert(span);
-						})
-						.await;
-				}
-			}
-			TreeNode::Comment(text) => {
-				let value = Value::Str(text.to_string());
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				let child_entity = parent.spawn_child((Comment, value)).await;
-				if let Some(span) = span {
-					let child = parent.world().entity(child_entity);
-					child
-						.with_then(move |mut entity| {
-							entity.insert(span);
-						})
-						.await;
-				}
-			}
-			TreeNode::Doctype(text) => {
-				let value = Value::Str(text.to_string());
-				let span = span_lookup.map(|lookup| lookup.span_of(text));
-				let child_entity = parent.spawn_child((Comment, value)).await;
-				if let Some(span) = span {
-					let child = parent.world().entity(child_entity);
-					child
-						.with_then(move |mut entity| {
-							entity.insert(span);
-						})
-						.await;
-				}
-			}
-			TreeNode::Expression(expr) => {
-				let span = span_lookup.map(|lookup| lookup.span_of(expr));
-				let child_entity =
-					parent.spawn_child(Expression(expr.to_string())).await;
-				if let Some(span) = span {
-					let child = parent.world().entity(child_entity);
-					child
-						.with_then(move |mut entity| {
-							entity.insert(span);
-						})
-						.await;
-				}
+			diff_attributes(world, child_id, attributes, config, span_lookup)?;
+			for child_node in children {
+				spawn_node(world, child_id, child_node, config, span_lookup)?;
 			}
 		}
-		Ok(())
-	})
+		TreeNode::Text(text) => {
+			let value = config.text_value(text);
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let child_id = world.spawn((value, ChildOf(parent))).id();
+			if let Some(span) = span {
+				world.entity_mut(child_id).insert(span);
+			}
+		}
+		TreeNode::Comment(text) => {
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let child_id =
+				world.spawn((Comment::new(*text), ChildOf(parent))).id();
+			if let Some(span) = span {
+				world.entity_mut(child_id).insert(span);
+			}
+		}
+		TreeNode::Doctype(text) => {
+			let span = span_lookup.map(|lookup| lookup.span_of(text));
+			let child_id =
+				world.spawn((Doctype::new(*text), ChildOf(parent))).id();
+			if let Some(span) = span {
+				world.entity_mut(child_id).insert(span);
+			}
+		}
+		TreeNode::Expression(expr) => {
+			let span = span_lookup.map(|lookup| lookup.span_of(expr));
+			let child_id = world
+				.spawn((Expression(expr.to_string()), ChildOf(parent)))
+				.id();
+			if let Some(span) = span {
+				world.entity_mut(child_id).insert(span);
+			}
+		}
+	}
+	Ok(())
 }
 
 

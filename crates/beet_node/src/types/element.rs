@@ -13,20 +13,22 @@ pub struct Element(String);
 
 impl Element {
 	pub fn new(name: impl Into<String>) -> Self { Self(name.into()) }
+	/// The tag name of this element, ie `div`, `span`, `p`.
+	pub fn name(&self) -> &str { &self.0 }
 }
 
 
-/// Marker type Denoting that this node and all descendents should be rendered inside of comment notation,
-/// and excluded from user-facing interfaces.
+/// An HTML comment node. The inner string is the comment content
+/// excluding the `<!--` and `-->` delimiters.
 #[derive(
 	Debug,
-	Default,
 	Clone,
 	PartialEq,
 	Eq,
 	PartialOrd,
 	Ord,
 	Hash,
+	Deref,
 	Reflect,
 	Component,
 )]
@@ -34,7 +36,35 @@ impl Element {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[component(immutable)]
-pub struct Comment;
+pub struct Comment(pub String);
+
+impl Comment {
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+}
+
+/// An HTML doctype declaration. The inner string is the doctype value,
+/// usually `"html"` for `<!DOCTYPE html>`.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[component(immutable)]
+pub struct Doctype(pub String);
+
+impl Doctype {
+	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
+}
 
 #[derive(
 	Debug,

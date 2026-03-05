@@ -1,24 +1,18 @@
-# beet_node
+## crates/beet_node/src/parse/html
 
-Time to implement our markdown and html parsers.
+Great second pass! lets keep iterating
 
-- Refactor TextReader to have a 
+## Types
 
-```rust
-pub struct TextReader{
-	entity_stack: Vec<Entity>,
-}
+Our comment and doctype types are not set up correctly throughout the beet_node crate. lets change Comment to hold a String, and also add a Doctype(String) (usually "html") as well. 
+This means updating `node_walker.rs`, adding visit_comment and visit_doctype methods. note that components are not mutually exclusive, its possible for a single entity to have a Doctype, element, comment and value. thats fine, just visit them in that order.
 
-impl TextReader {
-	pub fn new(entity: AsyncEntity){
-		let root = entity.id();
-		Self {
-			entity_stack: vec![root],
-			
-		}
-	}
-}
-```
+## html/diff.rs
 
+- diff should be synchronous, ive updated `html/mod.rs` and the signature for diff_children, deliberately breaking the current impl. complete the refactor to use the world directly and make it all synchronous.
 
-These should both implement `TextParser`, ie 
+## Renderer
+
+Lets also implement `crates/beet_node/src/render/html.rs`. diff.rs should provide an indication of what types are to be expected in the tree. Expression values should be rendered as strings verbatim
+
+Add more options as required to the HtmlRenderer type.

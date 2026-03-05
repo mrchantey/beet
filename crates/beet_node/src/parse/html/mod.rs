@@ -63,38 +63,53 @@ impl HtmlParser {
 	/// Shared parsing logic: tokenize, build tree, diff against entity.
 	///
 	/// This is the core implementation used by both [`NodeParser::parse`]
-	/// and the streaming path. It operates synchronously on a complete
-	/// text buffer with full world access via `AsyncEntity`.
+	/// and the streaming path. All work happens synchronously inside a
+	/// single world access.
 	async fn parse_text(
 		&self,
 		entity: &AsyncEntity,
 		text: &str,
 		path: Option<&WsPathBuf>,
 	) -> Result {
-		let parse_config = &self.parse_config;
-		let diff_config = &self.diff_config;
+		let parse_config = self.parse_config.clone();
+		let diff_config = self.diff_config.clone();
+		let id = entity.id();
+		let text_owned = text.to_string();
+		let path_owned = path.cloned();
 
-		// tokenize
-		let tokens = combinators::parse_document(text, parse_config)?;
+		entity
+			.world()
+			.with_then(move |world| -> Result {
+				// tokenize
+				let tokens =
+					combinators::parse_document(&text_owned, &parse_config)?;
 
-		// build tree from flat tokens
-		let tree = build_tree(&tokens, diff_config, parse_config)?;
+				// build tree from flat tokens
+				let tree = build_tree(&tokens, &diff_config, &parse_config)?;
 
-		// build span lookup if path was provided, enabling per-entity FileSpan
-		let span_lookup = path.map(|path| SpanLookup::new(text, path.clone()));
+				// build span lookup if path was provided
+				let span_lookup = path_owned
+					.as_ref()
+					.map(|path| SpanLookup::new(&text_owned, path.clone()));
 
-		// diff tree against entity, note the root is not a node so is not diffed
-		diff_children(entity, &tree, diff_config, span_lookup.as_ref()).await?;
+				// diff tree against entity, note the root is not a node so is not diffed
+				diff_children(
+					world,
+					id,
+					&tree,
+					&diff_config,
+					span_lookup.as_ref(),
+				)?;
 
-		// insert file span on the root entity if path provided
-		if let Some(ref lookup) = span_lookup {
-			let span = lookup.full_span();
-			entity
-				.with_then(move |mut entity| {
-					entity.set_if_ne_or_insert(span);
-				})
-				.await;
-		}
+				// insert file span on the root entity if path provided
+				if let Some(ref lookup) = span_lookup {
+					let span = lookup.full_span();
+					world.entity_mut(id).set_if_ne_or_insert(span);
+				}
+
+				Ok(())
+			})
+			.await?;
 
 		Ok(())
 	}
@@ -277,14 +292,16 @@ mod test {
 				let children = get_children(&entity).await;
 
 				let child = world.entity(children[0]);
-				let has_comment: bool = child
-					.with_then(|entity| entity.get::<Comment>().is_some())
+				let comment: Comment = child
+					.with_then(|entity| {
+						entity.get::<Comment>().cloned().unwrap()
+					})
 					.await;
 
-				has_comment
+				comment
 			})
 			.await
-			.xpect_true();
+			.xpect_eq(Comment::new(" hello "));
 	}
 
 	#[beet_core::test]
