@@ -1,3 +1,7 @@
+#[cfg(feature = "html_parser")]
+mod html;
+#[cfg(feature = "html_parser")]
+pub use html::*;
 mod node_parser;
 mod plaintext;
 mod span_tracker;

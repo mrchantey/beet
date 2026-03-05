@@ -1197,6 +1197,7 @@ dependencies = [
  "bytes",
  "extend",
  "serde",
+ "winnow",
 ]
 
 [[package]]

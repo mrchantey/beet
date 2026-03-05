@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use beet_core::prelude::*;
+use std::borrow::Cow;
 
 
 /// used either as an element node, aka an xml text node, or as an attribute value.
@@ -32,6 +32,31 @@ pub enum Value {
 
 impl Value {
 	pub fn new(value: impl Into<Self>) -> Self { value.into() }
+
+	/// Optimistically parse a string into the most specific [`Value`] variant.
+	///
+	/// Attempts trimmed conversions in order:
+	/// - bool
+	/// - uint
+	/// - int
+	/// - float (<18 characters)
+	/// - string fallback (untrimmed)
+	pub fn parse_string(input: &str) -> Self {
+		let trimmed = input.trim();
+		if let Ok(val) = trimmed.parse::<bool>() {
+			Value::new(val)
+		} else if let Ok(val) = trimmed.parse::<u64>() {
+			Value::new(val)
+		} else if let Ok(val) = trimmed.parse::<i64>() {
+			Value::new(val)
+		} else if trimmed.len() < 18
+			&& let Ok(val) = trimmed.parse::<f64>()
+		{
+			Value::new(val)
+		} else {
+			Value::new(input)
+		}
+	}
 }
 
 impl std::fmt::Display for Value {
@@ -159,4 +184,52 @@ impl From<Vec<u8>> for Value {
 
 impl From<&[u8]> for Value {
 	fn from(value: &[u8]) -> Self { Value::Bytes(value.to_vec()) }
+}
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn parse_string_bool() {
+		Value::parse_string("true").xpect_eq(Value::Bool(true));
+		Value::parse_string("false").xpect_eq(Value::Bool(false));
+	}
+
+	#[test]
+	fn parse_string_uint() {
+		Value::parse_string("42").xpect_eq(Value::Uint(42));
+		Value::parse_string("0").xpect_eq(Value::Uint(0));
+		Value::parse_string("007").xpect_eq(Value::Uint(7));
+	}
+
+	#[test]
+	fn parse_string_int() {
+		Value::parse_string("-7").xpect_eq(Value::Int(-7));
+		Value::parse_string("-383").xpect_eq(Value::Int(-383));
+	}
+
+	#[test]
+	fn parse_string_float() {
+		Value::parse_string("3.14").xpect_eq(Value::Float(Float(3.14)));
+		Value::parse_string("-383.484").xpect_eq(Value::Float(Float(-383.484)));
+		Value::parse_string("0.0").xpect_eq(Value::Float(Float(0.0)));
+	}
+
+	#[test]
+	fn parse_string_fallback() {
+		for test_case in [
+			"",
+			"hello",
+			"True",
+			"-",
+			".",
+			"12abc",
+			// too long number
+			"2938297884738974328908",
+		] {
+			Value::parse_string(test_case).xpect_eq(Value::new(test_case));
+		}
+	}
 }

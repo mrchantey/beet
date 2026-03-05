@@ -12,10 +12,11 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std"]
+default = ["std","html_parser"]
 std = []
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]
+html_parser = ["dep:winnow"]
 
 [dependencies]
 beet_core = { workspace = true }
@@ -23,6 +24,7 @@ bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
 serde = { workspace = true, optional = true }
+winnow = { version = "0.7", optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
