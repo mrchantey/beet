@@ -88,9 +88,7 @@ struct DecodeState<S> {
 /// # }
 /// ```
 pub fn bytes_to_text(
-	stream: impl 'static
-	+ Stream<Item = Result<impl AsRef<[u8]>, BevyError>>
-	+ Unpin,
+	stream: impl 'static + Unpin + Stream<Item = Result<impl AsRef<[u8]>>>,
 ) -> TextStream {
 	let state = DecodeState {
 		stream,
@@ -134,13 +132,13 @@ pub fn bytes_to_text(
 					)) {
 						Ok(text) if text.is_empty() => None,
 						Ok(text) => Some((Ok(text), state)),
-						Err(err) => Some((
-							Err(bevyhow!(
+						Err(err) => {
+							warn!(
 								"Incomplete UTF-8 sequence at end of stream: {}",
 								err
-							)),
-							state,
-						)),
+							);
+							None
+						}
 					};
 				}
 			}
