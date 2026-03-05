@@ -1,7 +1,13 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::tasks::futures_lite::Stream;
 
+/// Parses raw bytes as UTF-8 text and stores the result as a [`Value::Str`] component.
+///
+/// On repeated calls the value is only updated when the content has changed,
+/// avoiding unnecessary change-detection triggers.
+///
+/// If a `path` is provided a [`FileSpan`] covering the entire text is inserted
+/// alongside the value.
 #[derive(Debug, Default, Clone)]
 pub struct PlainTextParser;
 
@@ -13,51 +19,29 @@ impl NodeParser for PlainTextParser {
 	fn parse(
 		&mut self,
 		entity: AsyncEntity,
-		bytes: impl AsRef<[u8]>,
+		bytes: Vec<u8>,
+		path: Option<WsPathBuf>,
 	) -> impl Future<Output = Result> {
-		let bytes = bytes.as_ref().to_vec();
 		async move {
-			let text = std::str::from_utf8(&bytes)?.to_string();
+			let text = std::str::from_utf8(&bytes)
+				.map_err(|e| bevyhow!("invalid utf-8: {e}"))?
+				.to_string();
+
+			let span = path.map(|p| {
+				let mut tracker = SpanTracker::new(p);
+				tracker.extend(&text);
+				tracker.into_full_span()
+			});
+
 			entity
 				.with_then(move |mut entity| {
-					match entity.get_mut::<Value>() {
-						Some(mut value) => {
-							value.set_if_neq(Value::new(text));
-						}
-						None => {
-							entity.insert(Value::new(text));
-						}
+					entity.set_if_ne_or_insert(Value::new(text));
+					if let Some(span) = span {
+						entity.set_if_ne_or_insert(span);
 					}
 					Ok(())
 				})
 				.await
-		}
-	}
-
-	fn parse_stream(
-		&mut self,
-		entity: AsyncEntity,
-		stream: impl 'static + Unpin + Stream<Item = Result<impl AsRef<[u8]>>>,
-	) -> impl Future<Output = Result> {
-		let mut stream = stream_ext::bytes_to_text(stream);
-		async move {
-			entity.insert_then(Value::new(String::new())).await;
-			while let Some(result) = stream.next().await {
-				let text = result?;
-				entity
-					.get_mut::<Value, _>(move |mut value| {
-						match value.as_mut() {
-							Value::Str(existing) => {
-								existing.push_str(&text);
-								Ok(())
-							}
-							_ => bevybail!("Expected a String Value"),
-						}
-					})
-					.await??;
-			}
-
-			Ok(())
 		}
 	}
 }

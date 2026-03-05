@@ -1,5 +1,7 @@
 //! Extension methods for Bevy's [`EntityWorldMut`].
 
+use bevy::ecs::component::Mutable;
+
 use crate::prelude::*;
 
 /// Extension trait adding utility methods to [`EntityWorldMut`].
@@ -12,5 +14,19 @@ pub impl EntityWorldMut<'_> {
 			world.log_component_names(id);
 		});
 		self
+	}
+	/// Sets the value of a component if it is different from the existing value, or inserts it if not present.
+	fn set_if_ne_or_insert<T: Component<Mutability = Mutable> + PartialEq>(
+		&mut self,
+		value: T,
+	) {
+		match self.get_mut::<T>() {
+			Some(mut existing) => {
+				existing.set_if_neq(value);
+			}
+			None => {
+				self.insert(value);
+			}
+		}
 	}
 }
