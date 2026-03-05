@@ -51,7 +51,7 @@ impl NodeParser for PlainTextParser {
 	) -> impl Future<Output = Result> {
 		let mut stream = stream_ext::bytes_to_text(stream);
 		async move {
-			entity.insert_then(Value:: new(String::new())).await;
+			entity.insert_then(Value::new(String::new())).await;
 			while let Some(result) = stream.next().await {
 				let text = result?;
 				entity
@@ -164,8 +164,6 @@ mod test {
 			.xpect_eq(Value::Str("hié!".into()));
 	}
 
-	/// An entirely incomplete UTF-8 sequence at the end of the stream is
-	/// silently dropped (no panic or error).
 	#[beet_core::test]
 	async fn read_stream_truncated_utf8_at_eof() {
 		AsyncPlugin::world()
@@ -177,12 +175,11 @@ mod test {
 				PlainTextParser::default()
 					.parse_stream(entity, stream::iter(chunks))
 					.await
-					.unwrap();
-				entity.get_cloned::<Value>().await.unwrap()
 			})
 			.await
-			// The valid "ok" prefix must be present; the dangling byte is discarded
-			.xpect_eq(Value::Str("ok".into()));
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Incomplete UTF-8 sequence at end of stream:");
 	}
 
 	/// An empty stream results in an empty string value being initialised.

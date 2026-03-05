@@ -132,13 +132,13 @@ pub fn bytes_to_text(
 					)) {
 						Ok(text) if text.is_empty() => None,
 						Ok(text) => Some((Ok(text), state)),
-						Err(err) => {
-							warn!(
+						Err(err) => Some((
+							Err(bevyhow!(
 								"Incomplete UTF-8 sequence at end of stream: {}",
 								err
-							);
-							None
-						}
+							)),
+							state,
+						)),
 					};
 				}
 			}
