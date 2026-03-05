@@ -3,6 +3,9 @@
 //! All combinators operate on `&str` input and produce [`HtmlToken`] or
 //! sub-components thereof. The parsers are designed to be composed by
 //! the top-level [`parse_document`] entry point.
+//!
+//! All returned string data borrows directly from the input for zero-copy
+//! parsing. Owned strings are only created when building ECS components.
 
 use super::tokens::*;
 use winnow::ModalResult;
@@ -53,17 +56,58 @@ impl ParseConfig {
 	}
 }
 
-/// Parse a complete HTML document into a sequence of tokens.
-pub fn parse_document(
-	input: &str,
+/// Parse a complete HTML document into a sequence of borrowed tokens.
+///
+/// When an opening tag for a raw text element (ie `<script>`, `<style>`) is
+/// encountered, the parser switches to raw text mode until the matching
+/// close tag, correctly handling `<` characters and optional `{{expr}}`
+/// expressions inside the raw content.
+pub fn parse_document<'a>(
+	input: &'a str,
 	config: &ParseConfig,
-) -> Result<Vec<HtmlToken>, String> {
+) -> Result<Vec<HtmlToken<'a>>, String> {
 	let mut remaining = input;
 	let mut tokens = Vec::new();
 
 	while !remaining.is_empty() {
 		match parse_node(config).parse_next(&mut remaining) {
-			Ok(token) => tokens.push(token),
+			Ok(token) => {
+				// after an open tag for a raw text element, switch to raw
+				// text mode for its content
+				let raw_tag_name = if let HtmlToken::OpenTag {
+					name,
+					self_closing: false,
+					..
+				} = &token
+				{
+					if config.is_raw_text_element(name) {
+						Some(*name)
+					} else {
+						None
+					}
+				} else {
+					None
+				};
+
+				tokens.push(token);
+
+				if let Some(tag_name) = raw_tag_name {
+					// parse raw text content until the matching close tag
+					match parse_raw_text_content(
+						tag_name,
+						config.parse_raw_text_expressions,
+					)(&mut remaining)
+					{
+						Ok(raw_tokens) => tokens.extend(raw_tokens),
+						Err(err) => {
+							return Err(format!(
+								"parse error in raw text element <{tag_name}> at byte {}: {err}",
+								input.len() - remaining.len()
+							));
+						}
+					}
+				}
+			}
 			Err(err) => {
 				return Err(format!(
 					"parse error at byte {}: {err}",
@@ -77,9 +121,12 @@ pub fn parse_document(
 }
 
 /// Parse a single HTML node, dispatching to the appropriate sub-parser.
-fn parse_node<'input>(
-	config: &ParseConfig,
-) -> impl Parser<&'input str, HtmlToken, ErrMode<ContextError>> + '_ {
+fn parse_node<'input, 'config>(
+	config: &'config ParseConfig,
+) -> impl Parser<&'input str, HtmlToken<'input>, ErrMode<ContextError>> + 'config
+where
+	'input: 'config,
+{
 	move |input: &mut &'input str| {
 		if input.starts_with("<!--") {
 			return parse_comment.parse_next(input);
@@ -101,23 +148,29 @@ fn parse_node<'input>(
 }
 
 /// Parse an HTML comment: `<!-- content -->`.
-fn parse_comment(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
+fn parse_comment<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlToken<'a>, ContextError> {
 	let _ = "<!--".parse_next(input)?;
 	let content = take_until(0.., "-->").parse_next(input)?;
 	let _ = "-->".parse_next(input)?;
-	Ok(HtmlToken::Comment(content.to_string()))
+	Ok(HtmlToken::Comment(content))
 }
 
 /// Parse a doctype declaration: `<!DOCTYPE ...>`.
-fn parse_doctype(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
+fn parse_doctype<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlToken<'a>, ContextError> {
 	let _ = "<!".parse_next(input)?;
 	let content = take_till(1.., '>').parse_next(input)?;
 	let _ = '>'.parse_next(input)?;
-	Ok(HtmlToken::Doctype(content.to_string()))
+	Ok(HtmlToken::Doctype(content))
 }
 
 /// Parse a closing tag: `</name>`.
-fn parse_close_tag(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
+fn parse_close_tag<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlToken<'a>, ContextError> {
 	let _ = "</".parse_next(input)?;
 	let _ = take_while(0.., |ch: char| ch.is_ascii_whitespace())
 		.parse_next(input)?;
@@ -129,7 +182,14 @@ fn parse_close_tag(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
 }
 
 /// Parse an opening tag: `<name attr="val" ...>` or self-closing `<name />`.
-fn parse_open_tag(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
+///
+/// Captures the full source text from `<` to `>` (inclusive) in the
+/// `source` field for [`FileSpan`] tracking.
+fn parse_open_tag<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlToken<'a>, ContextError> {
+	// capture start of input before consuming `<`
+	let before = *input;
 	let _ = '<'.parse_next(input)?;
 	let name = parse_tag_name(input)?;
 
@@ -143,18 +203,22 @@ fn parse_open_tag(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
 		// check for end of tag
 		if input.starts_with("/>") {
 			let _ = "/>".parse_next(input)?;
+			let source_len = before.len() - input.len();
 			return Ok(HtmlToken::OpenTag {
 				name,
 				attributes,
 				self_closing: true,
+				source: &before[..source_len],
 			});
 		}
 		if input.starts_with('>') {
 			let _ = '>'.parse_next(input)?;
+			let source_len = before.len() - input.len();
 			return Ok(HtmlToken::OpenTag {
 				name,
 				attributes,
 				self_closing: false,
+				source: &before[..source_len],
 			});
 		}
 
@@ -169,15 +233,24 @@ fn parse_open_tag(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
 }
 
 /// Parse a valid HTML tag name: starts with ascii alpha, followed by
-/// alphanumeric or hyphens (for custom elements).
-fn parse_tag_name(input: &mut &str) -> ModalResult<String, ContextError> {
-	let first = winnow::token::one_of(|ch: char| ch.is_ascii_alphabetic())
+/// alphanumeric, hyphens, underscores, dots, or colons (for SVG/XML namespaces).
+fn parse_tag_name<'a>(
+	input: &mut &'a str,
+) -> ModalResult<&'a str, ContextError> {
+	// capture the start of the remaining input
+	let before = *input;
+	let _first = winnow::token::one_of(|ch: char| ch.is_ascii_alphabetic())
 		.parse_next(input)?;
-	let rest = take_while(0.., |ch: char| {
-		ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.'
-	})
-	.parse_next(input)?;
-	Ok(format!("{first}{rest}"))
+	let _rest =
+		take_while(0.., |ch: char| {
+			ch.is_ascii_alphanumeric()
+				|| ch == '-' || ch == '_'
+				|| ch == '.' || ch == ':'
+		})
+		.parse_next(input)?;
+	// the consumed portion is the slice from before up to current position
+	let consumed_len = before.len() - input.len();
+	Ok(&before[..consumed_len])
 }
 
 /// Parse a single attribute from inside an opening tag.
@@ -188,9 +261,9 @@ fn parse_tag_name(input: &mut &str) -> ModalResult<String, ContextError> {
 /// - `key` (boolean, no value)
 /// - `{expr}` (keyless expression)
 /// - `key={expr}` (keyed expression)
-fn parse_attribute(
-	input: &mut &str,
-) -> ModalResult<HtmlAttribute, ContextError> {
+fn parse_attribute<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlAttribute<'a>, ContextError> {
 	// keyless expression attribute: {expr}
 	if input.starts_with('{') {
 		let expr = parse_brace_content(input)?;
@@ -225,8 +298,10 @@ fn parse_attribute(
 	Ok(HtmlAttribute::new(key, value))
 }
 
-/// Parse an attribute name: alphanumeric, hyphens, underscores, colons, periods.
-fn parse_attribute_name(input: &mut &str) -> ModalResult<String, ContextError> {
+/// Parse an attribute name: alphanumeric, hyphens, underscores, colons, periods, `@`.
+fn parse_attribute_name<'a>(
+	input: &mut &'a str,
+) -> ModalResult<&'a str, ContextError> {
 	let name =
 		take_while(1.., |ch: char| {
 			ch.is_ascii_alphanumeric()
@@ -235,25 +310,25 @@ fn parse_attribute_name(input: &mut &str) -> ModalResult<String, ContextError> {
 				|| ch == '@'
 		})
 		.parse_next(input)?;
-	Ok(name.to_string())
+	Ok(name)
 }
 
 /// Parse an attribute value: double-quoted, single-quoted, or unquoted.
-fn parse_attribute_value(
-	input: &mut &str,
-) -> ModalResult<String, ContextError> {
+fn parse_attribute_value<'a>(
+	input: &mut &'a str,
+) -> ModalResult<&'a str, ContextError> {
 	if input.starts_with('"') {
 		// double-quoted
 		let _ = '"'.parse_next(input)?;
 		let val = take_till(0.., '"').parse_next(input)?;
 		let _ = '"'.parse_next(input)?;
-		Ok(val.to_string())
+		Ok(val)
 	} else if input.starts_with('\'') {
 		// single-quoted
 		let _ = '\''.parse_next(input)?;
 		let val = take_till(0.., '\'').parse_next(input)?;
 		let _ = '\''.parse_next(input)?;
-		Ok(val.to_string())
+		Ok(val)
 	} else {
 		// unquoted: terminated by whitespace, >, or /
 		let val = take_while(1.., |ch: char| {
@@ -263,36 +338,42 @@ fn parse_attribute_value(
 				&& ch != '"'
 		})
 		.parse_next(input)?;
-		Ok(val.to_string())
+		Ok(val)
 	}
 }
 
 /// Parse text content between tags. Terminates at `<` or `{` (when expressions enabled).
-fn parse_text(
+fn parse_text<'a>(
 	expressions_enabled: bool,
-) -> impl FnMut(&mut &str) -> ModalResult<HtmlToken, ContextError> {
-	move |input: &mut &str| {
+) -> impl FnMut(&mut &'a str) -> ModalResult<HtmlToken<'a>, ContextError> {
+	move |input: &mut &'a str| {
 		let text = if expressions_enabled {
 			take_while(1.., |ch: char| ch != '<' && ch != '{')
 				.parse_next(input)?
 		} else {
 			take_while(1.., |ch: char| ch != '<').parse_next(input)?
 		};
-		Ok(HtmlToken::Text(text.to_string()))
+		Ok(HtmlToken::Text(text))
 	}
 }
 
-/// Parse a `{expression}` with nested brace tracking.
-fn parse_expression(input: &mut &str) -> ModalResult<HtmlToken, ContextError> {
+/// Parse a `{expression}` with nested brace tracking, returning a borrowed slice.
+fn parse_expression<'a>(
+	input: &mut &'a str,
+) -> ModalResult<HtmlToken<'a>, ContextError> {
 	let content = parse_brace_content(input)?;
 	Ok(HtmlToken::Expression(content))
 }
 
 /// Parse the content between `{` and `}`, handling nested braces.
-fn parse_brace_content(input: &mut &str) -> ModalResult<String, ContextError> {
+/// Returns a borrowed slice of the content (excluding the outer braces).
+fn parse_brace_content<'a>(
+	input: &mut &'a str,
+) -> ModalResult<&'a str, ContextError> {
 	let _ = '{'.parse_next(input)?;
+	// after consuming `{`, the remaining input starts at the content
+	let content_start = *input;
 	let mut depth: u32 = 1;
-	let mut content = String::new();
 
 	while depth > 0 {
 		if input.is_empty() {
@@ -302,18 +383,17 @@ fn parse_brace_content(input: &mut &str) -> ModalResult<String, ContextError> {
 		match ch {
 			'{' => {
 				depth += 1;
-				content.push(ch);
 			}
 			'}' => {
 				depth -= 1;
-				if depth > 0 {
-					content.push(ch);
-				}
 			}
-			_ => content.push(ch),
+			_ => {}
 		}
 	}
-	Ok(content)
+	// the content is everything from content_start up to (but not including)
+	// the final `}` which was just consumed
+	let content_len = content_start.len() - input.len() - 1; // -1 for closing `}`
+	Ok(&content_start[..content_len])
 }
 
 /// Parse raw text content inside elements like `<script>` or `<style>`.
@@ -321,49 +401,63 @@ fn parse_brace_content(input: &mut &str) -> ModalResult<String, ContextError> {
 ///
 /// When `parse_raw_text_expressions` is enabled, `{{expr}}` sequences
 /// are extracted as separate expression tokens.
-#[allow(dead_code)]
-pub fn parse_raw_text_content(
-	tag_name: &str,
+pub fn parse_raw_text_content<'a, 'tag>(
+	tag_name: &'tag str,
 	parse_expressions: bool,
-) -> impl FnMut(&mut &str) -> ModalResult<Vec<HtmlToken>, ContextError> + '_ {
-	move |input: &mut &str| {
+) -> impl FnMut(&mut &'a str) -> ModalResult<Vec<HtmlToken<'a>>, ContextError> + 'tag
+where
+	'a: 'tag,
+{
+	move |input: &mut &'a str| {
 		let mut tokens = Vec::new();
-		let mut text_buf = String::new();
+		// track start of current text run
+		let mut text_start = *input;
 
 		while !input.is_empty() {
 			// check for closing tag (case-insensitive)
 			if starts_with_close_tag(input, tag_name) {
+				// flush text buffer
+				let text_len = text_start.len() - input.len();
+				if text_len > 0 {
+					tokens.push(HtmlToken::Text(&text_start[..text_len]));
+				}
 				break;
 			}
 
 			// check for double-brace expression
 			if parse_expressions && input.starts_with("{{") {
-				// flush text buffer
-				if !text_buf.is_empty() {
-					tokens
-						.push(HtmlToken::Text(core::mem::take(&mut text_buf)));
+				// flush text buffer up to this point
+				let text_len = text_start.len() - input.len();
+				if text_len > 0 {
+					tokens.push(HtmlToken::Text(&text_start[..text_len]));
 				}
 				let _ = "{{".parse_next(input)?;
-				let mut expr = String::new();
-				// track double-braces: we need to find matching `}}`
+				// capture expression start
+				let expr_start = *input;
 				while !input.is_empty() {
 					if input.starts_with("}}") {
+						let expr_len = expr_start.len() - input.len();
+						let expr = &expr_start[..expr_len];
 						let _ = "}}".parse_next(input)?;
+						tokens.push(HtmlToken::Expression(expr));
 						break;
 					}
-					let ch = any.parse_next(input)?;
-					expr.push(ch);
+					let _ = any.parse_next(input)?;
 				}
-				tokens.push(HtmlToken::Expression(expr));
+				// reset text start after expression
+				text_start = *input;
 				continue;
 			}
 
-			let ch = any.parse_next(input)?;
-			text_buf.push(ch);
+			let _ = any.parse_next(input)?;
 		}
 
-		if !text_buf.is_empty() {
-			tokens.push(HtmlToken::Text(text_buf));
+		// flush remaining text if we hit EOF without close tag
+		if !starts_with_close_tag_or_empty(input, tag_name) {
+			let text_len = text_start.len() - input.len();
+			if text_len > 0 {
+				tokens.push(HtmlToken::Text(&text_start[..text_len]));
+			}
 		}
 
 		Ok(tokens)
@@ -372,7 +466,6 @@ pub fn parse_raw_text_content(
 
 /// Check if input starts with a close tag for the given element name
 /// (case-insensitive comparison).
-#[allow(dead_code)]
 fn starts_with_close_tag(input: &str, tag_name: &str) -> bool {
 	if !input.starts_with("</") {
 		return false;
@@ -397,6 +490,11 @@ fn starts_with_close_tag(input: &str, tag_name: &str) -> bool {
 		|| after.is_empty()
 }
 
+/// Returns true if input is empty or starts with the given close tag.
+fn starts_with_close_tag_or_empty(input: &str, tag_name: &str) -> bool {
+	input.is_empty() || starts_with_close_tag(input, tag_name)
+}
+
 
 #[cfg(test)]
 mod test {
@@ -408,17 +506,19 @@ mod test {
 	#[test]
 	fn tag_name_simple() {
 		let mut input = "div ";
-		parse_tag_name(&mut input)
-			.unwrap()
-			.xpect_eq("div".to_string());
+		parse_tag_name(&mut input).unwrap().xpect_eq("div");
 	}
 
 	#[test]
 	fn tag_name_custom_element() {
 		let mut input = "my-component>";
-		parse_tag_name(&mut input)
-			.unwrap()
-			.xpect_eq("my-component".to_string());
+		parse_tag_name(&mut input).unwrap().xpect_eq("my-component");
+	}
+
+	#[test]
+	fn tag_name_svg_namespace() {
+		let mut input = "svg:circle>";
+		parse_tag_name(&mut input).unwrap().xpect_eq("svg:circle");
 	}
 
 	// -- attribute value --
@@ -428,23 +528,19 @@ mod test {
 		let mut input = "\"hello world\"";
 		parse_attribute_value(&mut input)
 			.unwrap()
-			.xpect_eq("hello world".to_string());
+			.xpect_eq("hello world");
 	}
 
 	#[test]
 	fn attr_value_single_quoted() {
 		let mut input = "'hello'";
-		parse_attribute_value(&mut input)
-			.unwrap()
-			.xpect_eq("hello".to_string());
+		parse_attribute_value(&mut input).unwrap().xpect_eq("hello");
 	}
 
 	#[test]
 	fn attr_value_unquoted() {
 		let mut input = "hello>";
-		parse_attribute_value(&mut input)
-			.unwrap()
-			.xpect_eq("hello".to_string());
+		parse_attribute_value(&mut input).unwrap().xpect_eq("hello");
 	}
 
 	// -- attributes --
@@ -488,7 +584,7 @@ mod test {
 		let mut input = "<!-- hello -->";
 		parse_comment(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Comment(" hello ".to_string()));
+			.xpect_eq(HtmlToken::Comment(" hello "));
 	}
 
 	// -- doctype --
@@ -498,7 +594,7 @@ mod test {
 		let mut input = "<!DOCTYPE html>";
 		parse_doctype(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Doctype("DOCTYPE html".to_string()));
+			.xpect_eq(HtmlToken::Doctype("DOCTYPE html"));
 	}
 
 	// -- close tag --
@@ -508,7 +604,7 @@ mod test {
 		let mut input = "</div>";
 		parse_close_tag(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::CloseTag("div".to_string()));
+			.xpect_eq(HtmlToken::CloseTag("div"));
 	}
 
 	#[test]
@@ -516,7 +612,7 @@ mod test {
 		let mut input = "</ div >";
 		parse_close_tag(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::CloseTag("div".to_string()));
+			.xpect_eq(HtmlToken::CloseTag("div"));
 	}
 
 	// -- open tag --
@@ -527,9 +623,10 @@ mod test {
 		parse_open_tag(&mut input)
 			.unwrap()
 			.xpect_eq(HtmlToken::OpenTag {
-				name: "div".to_string(),
+				name: "div",
 				attributes: vec![],
 				self_closing: false,
+				source: "<div>",
 			});
 	}
 
@@ -539,9 +636,10 @@ mod test {
 		parse_open_tag(&mut input)
 			.unwrap()
 			.xpect_eq(HtmlToken::OpenTag {
-				name: "br".to_string(),
+				name: "br",
 				attributes: vec![],
 				self_closing: true,
+				source: "<br />",
 			});
 	}
 
@@ -551,12 +649,13 @@ mod test {
 		parse_open_tag(&mut input)
 			.unwrap()
 			.xpect_eq(HtmlToken::OpenTag {
-				name: "input".to_string(),
+				name: "input",
 				attributes: vec![
 					HtmlAttribute::new("type", "text"),
 					HtmlAttribute::boolean("disabled"),
 				],
 				self_closing: true,
+				source: "<input type=\"text\" disabled />",
 			});
 	}
 
@@ -567,7 +666,7 @@ mod test {
 		let mut input = "hello world<";
 		parse_text(false)(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Text("hello world".to_string()));
+			.xpect_eq(HtmlToken::Text("hello world"));
 	}
 
 	#[test]
@@ -575,7 +674,7 @@ mod test {
 		let mut input = "hello {world}";
 		parse_text(true)(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Text("hello ".to_string()));
+			.xpect_eq(HtmlToken::Text("hello "));
 	}
 
 	// -- expression --
@@ -585,7 +684,7 @@ mod test {
 		let mut input = "{foo}";
 		parse_expression(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Expression("foo".to_string()));
+			.xpect_eq(HtmlToken::Expression("foo"));
 	}
 
 	#[test]
@@ -593,7 +692,7 @@ mod test {
 		let mut input = "{a {b} c}";
 		parse_expression(&mut input)
 			.unwrap()
-			.xpect_eq(HtmlToken::Expression("a {b} c".to_string()));
+			.xpect_eq(HtmlToken::Expression("a {b} c"));
 	}
 
 	// -- brace content --
@@ -603,7 +702,7 @@ mod test {
 		let mut input = "{a {b {c}} d}rest";
 		parse_brace_content(&mut input)
 			.unwrap()
-			.xpect_eq("a {b {c}} d".to_string());
+			.xpect_eq("a {b {c}} d");
 		input.xpect_eq("rest");
 	}
 
@@ -614,7 +713,7 @@ mod test {
 		let mut input = "let x = 1 < 2;</script>";
 		let tokens =
 			parse_raw_text_content("script", false)(&mut input).unwrap();
-		tokens.xpect_eq(vec![HtmlToken::Text("let x = 1 < 2;".to_string())]);
+		tokens.xpect_eq(vec![HtmlToken::Text("let x = 1 < 2;")]);
 		input.xpect_eq("</script>");
 	}
 
@@ -623,10 +722,79 @@ mod test {
 		let mut input = "prefix {{expr}} suffix</style>";
 		let tokens = parse_raw_text_content("style", true)(&mut input).unwrap();
 		tokens.xpect_eq(vec![
-			HtmlToken::Text("prefix ".to_string()),
-			HtmlToken::Expression("expr".to_string()),
-			HtmlToken::Text(" suffix".to_string()),
+			HtmlToken::Text("prefix "),
+			HtmlToken::Expression("expr"),
+			HtmlToken::Text(" suffix"),
 		]);
+	}
+
+	// -- raw text in document --
+
+	#[test]
+	fn document_script_raw_text() {
+		let config = ParseConfig::default();
+		let tokens =
+			parse_document("<script>let x = 1 < 2;</script>", &config).unwrap();
+		tokens.xpect_eq(vec![
+			HtmlToken::OpenTag {
+				name: "script",
+				attributes: vec![],
+				self_closing: false,
+				source: "<script>",
+			},
+			HtmlToken::Text("let x = 1 < 2;"),
+			HtmlToken::CloseTag("script"),
+		]);
+	}
+
+	#[test]
+	fn document_style_raw_text() {
+		let config = ParseConfig::default();
+		let tokens =
+			parse_document("<style>body { color: red; }</style>", &config)
+				.unwrap();
+		tokens.xpect_eq(vec![
+			HtmlToken::OpenTag {
+				name: "style",
+				attributes: vec![],
+				self_closing: false,
+				source: "<style>",
+			},
+			HtmlToken::Text("body { color: red; }"),
+			HtmlToken::CloseTag("style"),
+		]);
+	}
+
+	#[test]
+	fn document_script_with_expressions() {
+		let config = ParseConfig {
+			parse_raw_text_expressions: true,
+			..Default::default()
+		};
+		let tokens =
+			parse_document("<script>prefix {{name}} suffix</script>", &config)
+				.unwrap();
+		tokens.xpect_eq(vec![
+			HtmlToken::OpenTag {
+				name: "script",
+				attributes: vec![],
+				self_closing: false,
+				source: "<script>",
+			},
+			HtmlToken::Text("prefix "),
+			HtmlToken::Expression("name"),
+			HtmlToken::Text(" suffix"),
+			HtmlToken::CloseTag("script"),
+		]);
+	}
+
+	#[test]
+	fn document_self_closing_script_no_raw() {
+		// self-closing script should NOT trigger raw text mode
+		let config = ParseConfig::default();
+		let tokens =
+			parse_document("<script /><div>hello</div>", &config).unwrap();
+		tokens.len().xpect_eq(4); // script(self-closing), open-div, text, close-div
 	}
 
 	// -- document --
@@ -637,12 +805,13 @@ mod test {
 		let tokens = parse_document("<div>hello</div>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
-				name: "div".to_string(),
+				name: "div",
 				attributes: vec![],
 				self_closing: false,
+				source: "<div>",
 			},
-			HtmlToken::Text("hello".to_string()),
-			HtmlToken::CloseTag("div".to_string()),
+			HtmlToken::Text("hello"),
+			HtmlToken::CloseTag("div"),
 		]);
 	}
 
@@ -653,18 +822,20 @@ mod test {
 			parse_document("<div><span>hi</span></div>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
-				name: "div".to_string(),
+				name: "div",
 				attributes: vec![],
 				self_closing: false,
+				source: "<div>",
 			},
 			HtmlToken::OpenTag {
-				name: "span".to_string(),
+				name: "span",
 				attributes: vec![],
 				self_closing: false,
+				source: "<span>",
 			},
-			HtmlToken::Text("hi".to_string()),
-			HtmlToken::CloseTag("span".to_string()),
-			HtmlToken::CloseTag("div".to_string()),
+			HtmlToken::Text("hi"),
+			HtmlToken::CloseTag("span"),
+			HtmlToken::CloseTag("div"),
 		]);
 	}
 
@@ -677,13 +848,14 @@ mod test {
 		let tokens = parse_document("<p>hello {name}</p>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
-				name: "p".to_string(),
+				name: "p",
 				attributes: vec![],
 				self_closing: false,
+				source: "<p>",
 			},
-			HtmlToken::Text("hello ".to_string()),
-			HtmlToken::Expression("name".to_string()),
-			HtmlToken::CloseTag("p".to_string()),
+			HtmlToken::Text("hello "),
+			HtmlToken::Expression("name"),
+			HtmlToken::CloseTag("p"),
 		]);
 	}
 
@@ -694,12 +866,13 @@ mod test {
 			parse_document("<!DOCTYPE html><!-- hi --><br />", &config)
 				.unwrap();
 		tokens.xpect_eq(vec![
-			HtmlToken::Doctype("DOCTYPE html".to_string()),
-			HtmlToken::Comment(" hi ".to_string()),
+			HtmlToken::Doctype("DOCTYPE html"),
+			HtmlToken::Comment(" hi "),
 			HtmlToken::OpenTag {
-				name: "br".to_string(),
+				name: "br",
 				attributes: vec![],
 				self_closing: true,
+				source: "<br />",
 			},
 		]);
 	}
@@ -711,19 +884,21 @@ mod test {
 			parse_document("<p>hello <em>world</em></p>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
-				name: "p".to_string(),
+				name: "p",
 				attributes: vec![],
 				self_closing: false,
+				source: "<p>",
 			},
-			HtmlToken::Text("hello ".to_string()),
+			HtmlToken::Text("hello "),
 			HtmlToken::OpenTag {
-				name: "em".to_string(),
+				name: "em",
 				attributes: vec![],
 				self_closing: false,
+				source: "<em>",
 			},
-			HtmlToken::Text("world".to_string()),
-			HtmlToken::CloseTag("em".to_string()),
-			HtmlToken::CloseTag("p".to_string()),
+			HtmlToken::Text("world"),
+			HtmlToken::CloseTag("em"),
+			HtmlToken::CloseTag("p"),
 		]);
 	}
 
@@ -733,12 +908,13 @@ mod test {
 		let tokens = parse_document("<div>  hello  </div>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
-				name: "div".to_string(),
+				name: "div",
 				attributes: vec![],
 				self_closing: false,
+				source: "<div>",
 			},
-			HtmlToken::Text("  hello  ".to_string()),
-			HtmlToken::CloseTag("div".to_string()),
+			HtmlToken::Text("  hello  "),
+			HtmlToken::CloseTag("div"),
 		]);
 	}
 
@@ -749,13 +925,14 @@ mod test {
 			parse_document("<div class=\"foo\" id='bar' data-x=baz>", &config)
 				.unwrap();
 		tokens.xpect_eq(vec![HtmlToken::OpenTag {
-			name: "div".to_string(),
+			name: "div",
 			attributes: vec![
 				HtmlAttribute::new("class", "foo"),
 				HtmlAttribute::new("id", "bar"),
 				HtmlAttribute::new("data-x", "baz"),
 			],
 			self_closing: false,
+			source: "<div class=\"foo\" id='bar' data-x=baz>",
 		}]);
 	}
 
@@ -766,5 +943,79 @@ mod test {
 		starts_with_close_tag("</ script>", "script").xpect_true();
 		starts_with_close_tag("</div>", "script").xpect_false();
 		starts_with_close_tag("not a tag", "script").xpect_false();
+	}
+
+	// -- SVG --
+
+	#[test]
+	fn svg_basic_elements() {
+		let config = ParseConfig::default();
+		let input = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" /></svg>";
+		let tokens = parse_document(input, &config).unwrap();
+		tokens.len().xpect_eq(3);
+		match &tokens[0] {
+			HtmlToken::OpenTag {
+				name, attributes, ..
+			} => {
+				name.xpect_eq("svg");
+				attributes.len().xpect_eq(2);
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+		match &tokens[1] {
+			HtmlToken::OpenTag {
+				name,
+				self_closing,
+				attributes,
+				..
+			} => {
+				name.xpect_eq("circle");
+				self_closing.xpect_true();
+				attributes.len().xpect_eq(3);
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn svg_path_data() {
+		let config = ParseConfig::default();
+		let tokens = parse_document(
+			"<path d=\"M10 10 H 90 V 90 H 10 Z\" fill=\"none\" stroke=\"black\" />",
+			&config,
+		)
+		.unwrap();
+		tokens.len().xpect_eq(1);
+		match &tokens[0] {
+			HtmlToken::OpenTag {
+				name,
+				attributes,
+				self_closing,
+				..
+			} => {
+				name.xpect_eq("path");
+				self_closing.xpect_true();
+				attributes.len().xpect_eq(3);
+				attributes[0]
+					.value
+					.unwrap()
+					.xpect_eq("M10 10 H 90 V 90 H 10 Z");
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn svg_namespace_attribute() {
+		let config = ParseConfig::default();
+		let tokens =
+			parse_document("<use xlink:href=\"#icon\" />", &config).unwrap();
+		match &tokens[0] {
+			HtmlToken::OpenTag { attributes, .. } => {
+				attributes[0].key.xpect_eq("xlink:href");
+				attributes[0].value.unwrap().xpect_eq("#icon");
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
 	}
 }
