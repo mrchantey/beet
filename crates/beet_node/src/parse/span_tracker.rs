@@ -104,8 +104,8 @@ mod test {
 		let start = tracker.pos(); // 1:0
 		tracker.extend("hi\nthere");
 		let span = tracker.span_from(start);
-		span.start.xpect_eq(LineCol::new(1, 0));
-		span.end.xpect_eq(LineCol::new(2, 5));
+		span.start().xpect_eq(LineCol::new(1, 0));
+		span.end().xpect_eq(LineCol::new(2, 5));
 	}
 
 	#[test]
@@ -124,7 +124,7 @@ mod test {
 			t
 		};
 		let span = tracker.into_full_span();
-		span.start.xpect_eq(LineCol::default());
-		span.end.xpect_eq(LineCol::new(3, 0));
+		span.start().xpect_eq(LineCol::default());
+		span.end().xpect_eq(LineCol::new(3, 0));
 	}
 }

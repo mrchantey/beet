@@ -87,7 +87,7 @@ impl DiffConfig {
 		if self.parse_attribute_values {
 			Value::parse_string(raw)
 		} else {
-			Value::Str(raw.to_string())
+			Value::new(raw)
 		}
 	}
 
@@ -96,7 +96,7 @@ impl DiffConfig {
 		if self.parse_text_nodes {
 			Value::parse_string(raw)
 		} else {
-			Value::Str(raw.to_string())
+			Value::new(raw)
 		}
 	}
 }

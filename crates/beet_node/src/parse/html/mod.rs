@@ -130,15 +130,13 @@ impl NodeParser for HtmlParser {
 		path: Option<WsPathBuf>,
 	) -> impl Future<Output = Result> {
 		async move {
-			let text = std::str::from_utf8(&bytes)
-				.map_err(|err| bevyhow!("invalid utf-8: {err}"))?;
+			let text = std::str::from_utf8(&bytes)?;
 
 			let parse_config = self.parse_config();
 			let diff_config = self.diff_config();
 
 			// tokenize
-			let tokens = combinators::parse_document(text, &parse_config)
-				.map_err(|err| bevyhow!("{err}"))?;
+			let tokens = combinators::parse_document(text, &parse_config)?;
 
 			// build tree from flat tokens
 			let tree = build_tree(&tokens, &diff_config, &parse_config)?;
@@ -150,7 +148,7 @@ impl NodeParser for HtmlParser {
 				tracker
 			});
 
-			// diff tree against entity
+			// diff tree against entity, note the root is not a node so is not diffed
 			diff_children(&entity, &tree, &diff_config, span_tracker.as_ref())
 				.await?;
 
@@ -164,6 +162,25 @@ impl NodeParser for HtmlParser {
 					.await;
 			}
 
+			Ok(())
+		}
+	}
+
+	fn parse_stream(
+		&mut self,
+		_entity: AsyncEntity,
+		stream: impl 'static
+		+ Unpin
+		+ bevy::tasks::futures_lite::Stream<
+			Item = Result<impl AsRef<[u8]>>,
+		>,
+		_path: Option<WsPathBuf>,
+	) -> impl Future<Output = Result> {
+		async move {
+			let mut stream = stream_ext::bytes_to_text(stream);
+			while let Some(_result) = stream.next().await {
+				todo!("parse chunk, shared impl with parse()");
+			}
 			Ok(())
 		}
 	}

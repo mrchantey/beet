@@ -92,7 +92,7 @@ pathdiff = { version = "0.2", optional = true }
 either = "1"
 
 #💡 serde
-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features=["rc"] }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
