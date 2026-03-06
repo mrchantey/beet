@@ -13,3 +13,4 @@ title = "The Full Moon Harvest"
 - [#6 - Folk Technology](/blog/post-6)
 - [#7 - Malleable Application Framework](/blog/post-7)
 - [#8 - It's all been done before](/blog/post-8)
+- [#9 - Multi-Interface Applications](/blog/post-9)
