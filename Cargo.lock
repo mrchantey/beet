@@ -1196,6 +1196,7 @@ dependencies = [
  "bevy",
  "bytes",
  "extend",
+ "pulldown-cmark",
  "serde",
  "winnow",
 ]

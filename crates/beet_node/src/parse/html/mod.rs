@@ -6,9 +6,9 @@
 //!
 //! Enable with the `html_parser` feature flag.
 
-mod combinators;
-mod diff;
-mod tokens;
+pub(crate) mod combinators;
+pub(crate) mod diff;
+pub(crate) mod tokens;
 
 pub use combinators::ParseConfig;
 pub use diff::*;
@@ -33,6 +33,10 @@ pub struct HtmlParser {
 	pub parse_config: ParseConfig,
 	/// Entity diffing configuration.
 	pub diff_config: DiffConfig,
+	/// When enabled, text nodes are re-parsed as markdown after the
+	/// HTML tree is built. Requires the `markdown_parser` feature.
+	#[cfg(feature = "markdown_parser")]
+	pub parse_markdown: bool,
 }
 
 impl Default for HtmlParser {
@@ -40,6 +44,8 @@ impl Default for HtmlParser {
 		Self {
 			parse_config: ParseConfig::default(),
 			diff_config: DiffConfig::default(),
+			#[cfg(feature = "markdown_parser")]
+			parse_markdown: false,
 		}
 	}
 }
@@ -57,7 +63,21 @@ impl HtmlParser {
 				..Default::default()
 			},
 			diff_config: DiffConfig::default(),
+			#[cfg(feature = "markdown_parser")]
+			parse_markdown: false,
 		}
+	}
+
+	/// Enable parsing text nodes as markdown.
+	///
+	/// When enabled, after building the HTML entity tree, each text
+	/// node's content is re-parsed as markdown and the resulting
+	/// subtree replaces the original text node. Requires the
+	/// `markdown_parser` feature.
+	#[cfg(feature = "markdown_parser")]
+	pub fn with_markdown(mut self) -> Self {
+		self.parse_markdown = true;
+		self
 	}
 
 	/// Shared parsing logic: tokenize, build tree, diff against entity.
@@ -73,6 +93,8 @@ impl HtmlParser {
 	) -> Result {
 		let parse_config = self.parse_config.clone();
 		let diff_config = self.diff_config.clone();
+		#[cfg(feature = "markdown_parser")]
+		let parse_markdown = self.parse_markdown;
 		let id = entity.id();
 		let text_owned = text.to_string();
 		let path_owned = path.cloned();
@@ -101,6 +123,18 @@ impl HtmlParser {
 					span_lookup.as_ref(),
 				)?;
 
+				// if markdown parsing is enabled, re-parse text node
+				// children as markdown subtrees
+				#[cfg(feature = "markdown_parser")]
+				if parse_markdown {
+					reparse_text_nodes_as_markdown(
+						world,
+						id,
+						&diff_config,
+						span_lookup.as_ref(),
+					)?;
+				}
+
 				// insert file span on the root entity if path provided
 				if let Some(ref lookup) = span_lookup {
 					let span = lookup.full_span();
@@ -127,6 +161,74 @@ impl NodeParser for HtmlParser {
 			self.parse_text(&entity, text, path.as_ref()).await
 		}
 	}
+}
+
+/// Recursively walk the entity tree rooted at `parent`, find text-only
+/// child entities (those with [`Value`] but no [`Element`]), re-parse
+/// their content as markdown, and replace them with the resulting subtree.
+#[cfg(feature = "markdown_parser")]
+fn reparse_text_nodes_as_markdown(
+	world: &mut World,
+	parent: Entity,
+	diff_config: &DiffConfig,
+	span_lookup: Option<&SpanLookup>,
+) -> Result {
+	use crate::parse::html::diff::TreeNode;
+	use crate::parse::html::diff::spawn_node;
+	use crate::parse::markdown::tree_builder;
+
+	let children: Vec<Entity> = world
+		.entity(parent)
+		.get::<Children>()
+		.map(|children| children.iter().collect())
+		.unwrap_or_default();
+
+	for child in children {
+		let entity_ref = world.entity(child);
+		let has_element = entity_ref.get::<Element>().is_some();
+		let text_value = entity_ref.get::<Value>().cloned();
+
+		if has_element {
+			// recurse into element children
+			reparse_text_nodes_as_markdown(
+				world,
+				child,
+				diff_config,
+				span_lookup,
+			)?;
+		}
+		if let Some(Value::Str(ref text)) = text_value {
+			if text.trim().is_empty() {
+				continue;
+			}
+			// try to parse as markdown
+			let parse_config =
+				crate::parse::html::combinators::ParseConfig::default();
+			let md_result = tree_builder::build_markdown_tree(
+				text,
+				crate::prelude::MarkdownParser::default_options(),
+				&parse_config,
+				diff_config,
+				None,
+			)?;
+
+			// only replace if markdown produced structure beyond a
+			// single text node (ie actual markdown formatting)
+			let dominated_by_single_text = md_result.nodes.len() == 1
+				&& matches!(md_result.nodes[0], TreeNode::Text(_));
+
+			if !dominated_by_single_text && !md_result.nodes.is_empty() {
+				// replace the text entity with the markdown subtree
+				// remove the Value component and insert children
+				world.entity_mut(child).remove::<Value>();
+
+				for node in &md_result.nodes {
+					spawn_node(world, child, node, diff_config, span_lookup)?;
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 
@@ -611,5 +713,59 @@ mod test {
 				LineCol::new(1, 4),
 				LineCol::new(1, 8),
 			));
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn parse_markdown_text_nodes() {
+		AsyncPlugin::world()
+			.run_async_local_then(|world| async move {
+				let entity = world.spawn_then(()).await;
+				// The div contains markdown text "**bold**" which should
+				// be re-parsed into <p><strong>bold</strong></p>
+				HtmlParser::new()
+					.with_markdown()
+					.parse(entity, b"<div>**bold**</div>".to_vec(), None)
+					.await
+					.unwrap();
+
+				let root_children = get_children(&entity).await;
+				let div = world.entity(root_children[0]);
+				let div_children = get_children(&div).await;
+				// the text node should now be replaced with a subtree
+				// containing a <p> with <strong>
+				let first_child = world.entity(div_children[0]);
+				let has_children: bool = first_child
+					.with_then(|entity| entity.get::<Children>().is_some())
+					.await;
+				has_children
+			})
+			.await
+			.xpect_true();
+	}
+
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn parse_markdown_preserves_plain_text() {
+		AsyncPlugin::world()
+			.run_async_local_then(|world| async move {
+				let entity = world.spawn_then(()).await;
+				// Plain text without markdown formatting should still
+				// get wrapped in a <p> element by the markdown parser
+				HtmlParser::new()
+					.with_markdown()
+					.parse(entity, b"<div>hello world</div>".to_vec(), None)
+					.await
+					.unwrap();
+
+				let root_children = get_children(&entity).await;
+				let div = world.entity(root_children[0]);
+				let div_children = get_children(&div).await;
+				// "hello world" parsed as markdown becomes <p>hello world</p>
+				// so the original text node is replaced with structure
+				div_children.len()
+			})
+			.await
+			.xpect_eq(1);
 	}
 }

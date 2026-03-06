@@ -12,11 +12,12 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","html_parser"]
+default = ["std","html_parser","markdown_parser"]
 std = []
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]
 html_parser = ["dep:winnow"]
+markdown_parser = ["html_parser", "dep:pulldown-cmark"]
 
 [dependencies]
 beet_core = { workspace = true }
@@ -25,6 +26,7 @@ extend.workspace = true
 bytes.workspace = true
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
+pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

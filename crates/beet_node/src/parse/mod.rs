@@ -2,6 +2,10 @@
 mod html;
 #[cfg(feature = "html_parser")]
 pub use html::*;
+#[cfg(feature = "markdown_parser")]
+mod markdown;
+#[cfg(feature = "markdown_parser")]
+pub use markdown::*;
 mod node_parser;
 mod plaintext;
 mod span_tracker;

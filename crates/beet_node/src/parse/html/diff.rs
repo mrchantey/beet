@@ -115,7 +115,7 @@ impl DiffConfig {
 /// Each variant carries enough source information for [`SpanLookup`]
 /// to produce a [`FileSpan`].
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum TreeNode<'a> {
+pub(crate) enum TreeNode<'a> {
 	/// An element with name, attributes, and children.
 	Element {
 		name: &'a str,
@@ -138,7 +138,7 @@ pub(super) enum TreeNode<'a> {
 ///
 /// This handles nesting by tracking open/close tags, void elements,
 /// and self-closing tags. Malformed HTML is handled per the config.
-pub(super) fn build_tree<'a>(
+pub(crate) fn build_tree<'a>(
 	tokens: &[HtmlToken<'a>],
 	diff_config: &DiffConfig,
 	parse_config: &ParseConfig,
@@ -279,7 +279,7 @@ fn collect_children(world: &World, entity: Entity) -> Vec<Entity> {
 
 /// Apply a list of [`TreeNode`] as children of the given entity,
 /// diffing against existing children to minimize ECS mutations.
-pub(super) fn diff_children(
+pub(crate) fn diff_children(
 	world: &mut World,
 	entity: Entity,
 	tree_nodes: &[TreeNode<'_>],
@@ -643,7 +643,7 @@ fn diff_attributes(
 /// Spawn a new child entity from a tree node.
 ///
 /// When `span_lookup` is provided, the new entity receives a [`FileSpan`].
-fn spawn_node(
+pub(crate) fn spawn_node(
 	world: &mut World,
 	parent: Entity,
 	tree_node: &TreeNode<'_>,
