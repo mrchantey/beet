@@ -84,10 +84,10 @@ impl HeaderMap {
 	}
 
 	/// Set a typed header, replacing any existing values for that key.
-	pub fn set<H: Header>(&mut self, value: H::Value) {
+	pub fn set<H: Header>(&mut self, value: impl Into<H::Value>) {
 		let key = to_kebab_case(H::KEY).into_owned();
 		self.0.remove(&key);
-		for val in H::serialize(value) {
+		for val in H::serialize(value.into()) {
 			self.0.insert(key.clone(), val);
 		}
 	}
@@ -283,6 +283,10 @@ impl From<&str> for MimeType {
 
 impl From<String> for MimeType {
 	fn from(value: String) -> Self { MimeType::from_content_type(&value) }
+}
+
+impl Into<Vec<MimeType>> for MimeType {
+	fn into(self) -> Vec<MimeType> { vec![self] }
 }
 
 impl core::fmt::Display for MimeType {

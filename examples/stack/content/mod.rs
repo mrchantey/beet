@@ -8,10 +8,10 @@ pub fn stack() -> impl Bundle {
 	(default_router(), children![root(), about(), counter()])
 }
 
-fn root() -> impl Bundle { file_card("", "examples/stack/petes_beets/home.md") }
+fn root() -> impl Bundle { file_card("", "examples/stack/content/home.md") }
 
 fn about() -> impl Bundle {
-	file_card("about", "examples/stack/petes_beets/about.md")
+	file_card("about", "examples/stack/content/about.md")
 }
 
 /// Stock counter page using MDX-style markdown interpolation for

@@ -1,18 +1,20 @@
-## crates/beet_node/src/parse/html
+# beet_node -> Markdown
 
-Great second pass! lets keep iterating
+Our html integration is shaping up `crates/beet_node/src/parse/html`, `crates/beet_node/src/render/html`.
 
-## Types
+Time to implement the markdown parser! Pay attention, these two parsers are linked and we'll need careful planning to ensure the implementation is beautiful and not full of duplicated code and types.
 
-Our comment and doctype types are not set up correctly throughout the beet_node crate. lets change Comment to hold a String, and also add a Doctype(String) (usually "html") as well. 
-This means updating `node_walker.rs`, adding visit_comment and visit_doctype methods. note that components are not mutually exclusive, its possible for a single entity to have a Doctype, element, comment and value. thats fine, just visit them in that order.
+- `pulldown-cmark` emits opaque HtmlBlock events, which we will need to parse with our html parser.
+- just like html, tracking the spans is very important. we may need to adjust the Node
+- the `MarkdownParser` will need a {html: HtmlParser} type to allow for options.
+- the `markdown_parser` feature must pull in the `html_parser` feature
+- We should also add a flag to the html parser: `markdown`, which will parse html text nodes as markdown.
+- we should maximally enable pulldown-cmark features like GFM etc
+- we'll need to also parse frontmatter, both toml and yaml flavors, lets write our own parsers for this, and parse into bevy_reflect DynamicStruct. the Frontmatter type should be added to the root when present
 
-## html/diff.rs
-
-- diff should be synchronous, ive updated `html/mod.rs` and the signature for diff_children, deliberately breaking the current impl. complete the refactor to use the world directly and make it all synchronous.
-
-## Renderer
-
-Lets also implement `crates/beet_node/src/render/html.rs`. diff.rs should provide an indication of what types are to be expected in the tree. Expression values should be rendered as strings verbatim
-
-Add more options as required to the HtmlRenderer type.
+```rust
+#[derive(Component)]
+pub struct Frontmatter{
+	value: DynamicStruct
+}
+```

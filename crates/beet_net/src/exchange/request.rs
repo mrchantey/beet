@@ -168,7 +168,10 @@ impl Request {
 		self
 	}
 	/// Adds a header
-	pub fn with_header<H: Header>(mut self, value: H::Value) -> Self {
+	pub fn with_header<H: Header>(
+		mut self,
+		value: impl Into<H::Value>,
+	) -> Self {
 		self.headers.set::<H>(value);
 		self
 	}

@@ -50,13 +50,18 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn repl_server() -> impl Bundle {
+	let accept = MimeType::Markdown;
 	(
 		OnSpawn::insert_child(mime_render_tool()),
-		OnSpawn::new_async(async |entity| -> Result {
+		OnSpawn::new_async(async move |entity| -> Result {
 			// Dispatch CLI args as the initial request, rendering the
 			// root content when no args are provided.
-			call(&entity, Request::from_cli_args(CliArgs::parse_env())?)
-				.await?;
+			call(
+				&entity,
+				Request::from_cli_args(CliArgs::parse_env())?
+					.with_header::<header::Accept>(accept.clone()),
+			)
+			.await?;
 
 			cross_log_noline!("> ");
 			let stdin = stdin_lines();
@@ -67,7 +72,12 @@ pub fn repl_server() -> impl Bundle {
 					break;
 				}
 
-				call(&entity, Request::from_cli_str(trimmed)?).await?;
+				call(
+					&entity,
+					Request::from_cli_str(trimmed)?
+						.with_header::<header::Accept>(accept.clone()),
+				)
+				.await?;
 
 				cross_log_noline!("> ");
 			}
