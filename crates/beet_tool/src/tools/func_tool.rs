@@ -11,21 +11,21 @@ where
 		TypeMeta::of::<F>(),
 		move |ToolCall {
 		          commands,
-		          tool,
+		          caller,
 		          input,
 		          out_handler,
 		      }| {
-			let cx = FuncToolIn { tool, input };
+			let cx = FuncToolIn { caller, input };
 			let out = func(cx)?;
 			out_handler.call(commands, out)
 		},
 	)
 }
 
-/// Context passed to tool handlers containing the tool entity and input payload.
+/// Context passed to tool handlers containing the caller entity and input payload.
 pub struct FuncToolIn<In = ()> {
-	/// The async tool entity being called.
-	pub tool: Entity,
+	/// The entity that initiated this tool call.
+	pub caller: Entity,
 	/// The input payload for this tool call.
 	pub input: In,
 }
@@ -187,7 +187,7 @@ mod test {
 	}
 
 	#[tool]
-	fn func_passthrough_entity(cx: FuncToolIn<()>) -> Entity { cx.tool }
+	fn func_passthrough_entity(cx: FuncToolIn<()>) -> Entity { cx.caller }
 
 	#[beet_core::test]
 	async fn tool_macro_func_passthrough_entity() {

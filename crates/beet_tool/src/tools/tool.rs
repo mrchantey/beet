@@ -85,7 +85,7 @@ where
 	) -> Result {
 		let call = ToolCall {
 			commands,
-			tool: entity,
+			caller: entity,
 			input,
 			out_handler,
 		};
@@ -225,14 +225,14 @@ impl PartialEq for TypeMeta {
 	fn eq(&self, other: &Self) -> bool { self.type_id == other.type_id }
 }
 
-/// Payload for a single tool invocation, containing the tool entity,
+/// Payload for a single tool invocation, containing the caller entity,
 /// input value, [`AsyncCommands`] for queuing work, and a callback
 /// for delivering the output.
 pub struct ToolCall<'w, 's, In, Out> {
 	/// Commands for queuing ECS work or spawning async tasks.
 	pub commands: AsyncCommands<'w, 's>,
-	/// The entity that owns the [`Tool`] component being called.
-	pub tool: Entity,
+	/// The entity that initiated or owns this tool call.
+	pub caller: Entity,
 	/// The input payload for this invocation.
 	pub input: In,
 	/// Callback invoked with the output when the tool completes.

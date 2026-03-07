@@ -72,13 +72,13 @@ where
 }
 
 fn call_tool_system<Input, Out>(
-	In((tool, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
+	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
 	tools: Query<&Tool<Input, Out>>,
 ) -> Result {
-	tools.get(tool)?.call(ToolCall {
+	tools.get(caller)?.call(ToolCall {
 		commands,
-		tool,
+		caller,
 		input,
 		out_handler,
 	})?;
@@ -169,7 +169,7 @@ pub impl AsyncEntity {
 	///
 	/// # Errors
 	/// Errors if the tool handler fails or the response channel closes.
-	fn call_tool<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
+	fn call_detached<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&self,
 		tool: Tool<Input, Out>,
 		input: Input,

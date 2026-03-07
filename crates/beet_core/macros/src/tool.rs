@@ -720,7 +720,7 @@ mod test {
 	#[test]
 	fn system_passthrough() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			fn my_tool(cx: In<SystemToolIn<i32>>) -> Entity { cx.tool }
+			fn my_tool(cx: In<SystemToolIn<i32>>) -> Entity { cx.caller }
 		});
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("system_tool"));

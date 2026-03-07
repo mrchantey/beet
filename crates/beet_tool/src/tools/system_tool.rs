@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
 
-/// Context passed to system tool handlers containing the tool entity
+/// Context passed to system tool handlers containing the caller entity
 /// and input payload.
 ///
 /// This mirrors [`FuncToolIn`] and [`AsyncToolIn`], giving
@@ -11,7 +11,7 @@ use bevy::ecs::system::SystemParamFunction;
 /// [`Tool`] component.
 pub struct SystemToolIn<In = ()> {
 	/// The entity that owns the [`Tool`] being called.
-	pub tool: Entity,
+	pub caller: Entity,
 	/// The input payload for this tool call.
 	pub input: In,
 }
@@ -60,12 +60,12 @@ where
 		TypeMeta::of::<Func>(),
 		move |ToolCall {
 		          mut commands,
-		          tool,
+		          caller,
 		          input,
 		          out_handler,
 		      }| {
 			let func = func.clone();
-			let sys_input = SystemToolIn { tool, input };
+			let sys_input = SystemToolIn { caller, input };
 			commands.commands.queue(move |world: &mut World| -> Result {
 				let output: Result<Out> =
 					world.run_system_cached_with(func, sys_input)?;
@@ -115,7 +115,7 @@ mod test {
 				|In(input): In<SystemToolIn<()>>,
 				 time: Res<Time>|
 				 -> Result<f32> {
-					let _ = input.tool;
+					let _ = input.caller;
 					Ok(time.elapsed_secs())
 				},
 			))
@@ -162,7 +162,7 @@ mod test {
 		let entity = world
 			.spawn(system_tool(
 				|In(input): In<SystemToolIn<()>>| -> Result<Entity> {
-					Ok(input.tool)
+					Ok(input.caller)
 				},
 			))
 			.id();
@@ -287,7 +287,7 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[tool]
-	fn sys_passthrough(cx: In<SystemToolIn<()>>) -> Entity { cx.tool }
+	fn sys_passthrough(cx: In<SystemToolIn<()>>) -> Entity { cx.caller }
 
 	#[beet_core::test]
 	async fn tool_macro_system_passthrough_entity() {
@@ -306,7 +306,7 @@ mod test {
 		cx: In<SystemToolIn<i32>>,
 		time: Res<Time>,
 	) -> f32 {
-		cx.take() as f32 + time.elapsed_secs()
+		*cx as f32 + time.elapsed_secs()
 	}
 
 	#[beet_core::test]

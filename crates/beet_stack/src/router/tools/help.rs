@@ -12,9 +12,9 @@ pub(crate) async fn help_handler(
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
 		let path = cx.input.path().clone();
-		let tool_entity = cx.tool.id();
+		let tool_entity = cx.caller.id();
 		let help_text = cx
-			.tool
+			.caller
 			.world()
 			.with_then(move |world: &mut World| -> Result<String> {
 				let tree = root_route_tree(world, tool_entity)?;
@@ -40,9 +40,9 @@ pub(crate) async fn contextual_not_found_handler(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
-	let tool_entity = cx.tool.id();
+	let tool_entity = cx.caller.id();
 	let help_text = cx
-		.tool
+		.caller
 		.world()
 		.with_then(move |world: &mut World| -> Result<String> {
 			let tree = root_route_tree(world, tool_entity)?;
@@ -173,7 +173,7 @@ mod test {
 		ancestors: Query<&ChildOf>,
 		trees: Query<&RouteTree>,
 	) -> Result<String> {
-		let root = ancestors.root_ancestor(cx.tool);
+		let root = ancestors.root_ancestor(cx.caller);
 		let tree = trees.get(root).map_err(|_| {
 			bevyhow!("No RouteTree found on root ancestor, cannot render help")
 		})?;

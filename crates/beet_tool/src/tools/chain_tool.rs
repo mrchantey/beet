@@ -24,20 +24,20 @@ where
 			TypeMeta::of::<(Self, T2)>(),
 			move |ToolCall {
 			          commands,
-			          tool,
+			          caller,
 			          input: in_a,
 			          out_handler,
 			      }: ToolCall<In, T2::Out>| {
 				let handler2 = handler2.clone();
 				handler1.call(ToolCall {
 					commands,
-					tool,
+					caller,
 					input: in_a,
 					out_handler: OutHandler::new(
 						move |commands, out_a: Out| {
 							handler2.call(ToolCall::<T2::In, T2::Out> {
 								commands,
-								tool,
+								caller,
 								input: out_a.into(),
 								out_handler,
 							})

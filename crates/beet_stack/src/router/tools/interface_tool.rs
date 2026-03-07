@@ -101,7 +101,7 @@ mod test {
 				|In(req): In<SystemToolIn<Request>>,
 				 trees: Query<&RouteTree>|
 				 -> Result<RouteTree> {
-					let tree = trees.get(req.tool)?;
+					let tree = trees.get(req.caller)?;
 					Ok(tree.clone())
 				},
 			),

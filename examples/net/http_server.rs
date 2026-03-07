@@ -49,7 +49,7 @@ fn handler(
 	input: In<SystemToolIn<Request>>,
 	mut query: Query<&mut Count>,
 ) -> Result<Response> {
-	let tool = input.0.tool;
+	let caller = input.0.caller;
 	let request = input.0.input;
 	// only accept `/` routes
 	if !request.path().is_empty() {
@@ -70,7 +70,7 @@ fn handler(
 	let name = request.get_param("name").unwrap_or("world");
 
 	// increment visitor count
-	let mut count = query.get_mut(tool)?;
+	let mut count = query.get_mut(caller)?;
 	count.0 += 1;
 
 	let message = format!(

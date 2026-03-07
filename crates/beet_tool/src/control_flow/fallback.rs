@@ -27,7 +27,7 @@ where
 	Output: 'static + Send + Sync,
 {
 	let children =
-		match cx.tool.get(|children: &Children| children.to_vec()).await {
+		match cx.caller.get(|children: &Children| children.to_vec()).await {
 			Ok(children) => children,
 			Err(_) => {
 				// entity has no children, fail returning the input
@@ -37,7 +37,7 @@ where
 
 	// try each child in order, returning the first pass or the last fail
 	let mut input = cx.input;
-	let world = cx.tool.world();
+	let world = cx.caller.world();
 	for child in children {
 		// skip children whose ToolMeta doesn't match our types
 		let is_compatible = world

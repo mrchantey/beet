@@ -126,7 +126,7 @@ where
 			TypeMeta::of::<F>(),
 			move |ToolCall {
 			          mut commands,
-			          tool: card_tool,
+			          caller: card_tool,
 			          input: request,
 			          out_handler,
 			      }| {
@@ -138,7 +138,7 @@ where
 						let func = func.clone();
 						move |ToolCall {
 						          mut commands,
-						          tool: _,
+						          caller: _,
 						          input: (),
 						          out_handler,
 						      }| {
@@ -204,7 +204,7 @@ pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 		TypeMeta::of::<FileCardMarker>(),
 		move |ToolCall {
 		          mut commands,
-		          tool: card_tool,
+		          caller: card_tool,
 		          input: request,
 		          out_handler,
 		      }| {
@@ -214,7 +214,7 @@ pub fn file_card(path: &str, file_path: impl Into<WsPathBuf>) -> impl Bundle {
 					let ws_path = ws_path.clone();
 					move |ToolCall {
 					          mut commands,
-					          tool: _,
+					          caller: _,
 					          input: (),
 					          out_handler,
 					      }| {

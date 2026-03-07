@@ -35,10 +35,10 @@ pub fn markdown_render_tool() -> impl Bundle {
 		async_tool(
 			async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
 				let spawn_tool = cx.input.spawn_tool.clone();
-				let world = cx.tool.world();
+				let world = cx.caller.world();
 
 				// Spawn the card content on demand
-				let card_entity = cx.tool.call_tool(spawn_tool, ()).await?;
+				let card_entity = cx.caller.call_detached(spawn_tool, ()).await?;
 
 				// Render to markdown, then despawn
 				let markdown = world
@@ -100,7 +100,7 @@ fn render_markdown_system(
 	walker: CardWalker,
 ) -> Result<String> {
 	let mut renderer = MarkdownRenderer::new();
-	walker.walk_card(&mut renderer, cx.tool);
+	walker.walk_card(&mut renderer, cx.caller);
 	renderer.finish().xok()
 }
 

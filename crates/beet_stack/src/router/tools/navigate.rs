@@ -68,8 +68,8 @@ pub(crate) async fn navigate_handler(
 
 	let direction = NavigateTo::from_str_param(value)?;
 	let current_path = cx.input.path().clone();
-	let tool_entity = cx.tool.id();
-	let world = cx.tool.world();
+	let tool_entity = cx.caller.id();
+	let world = cx.caller.world();
 
 	let resolved = world
 		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {

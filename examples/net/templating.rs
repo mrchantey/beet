@@ -45,7 +45,7 @@ fn router(
 	In(input): In<SystemToolIn<Request>>,
 	world: &mut World,
 ) -> Result<Response> {
-	let entity = world.entity_mut(input.tool);
+	let entity = world.entity_mut(input.caller);
 	let request = input.take();
 	println!("{}: {}", request.method(), request.path_string());
 

@@ -30,8 +30,8 @@ async fn router_tool(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
-	let tool_entity = cx.tool.id();
-	let world = cx.tool.world();
+	let tool_entity = cx.caller.id();
+	let world = cx.caller.world();
 
 	let node = world
 		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {

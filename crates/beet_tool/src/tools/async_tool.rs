@@ -4,8 +4,8 @@ use beet_core::prelude::*;
 /// Context passed to async tool handlers containing an [`AsyncEntity`]
 /// handle and the input payload.
 pub struct AsyncToolIn<In = ()> {
-	/// The async entity handle for non-blocking ECS access.
-	pub tool: AsyncEntity,
+	/// The entity that initiated this tool call.
+	pub caller: AsyncEntity,
 	/// The input payload for this tool call.
 	pub input: In,
 }
@@ -46,13 +46,13 @@ where
 		TypeMeta::of::<Func>(),
 		move |ToolCall {
 		          mut commands,
-		          tool,
+		          caller,
 		          input,
 		          out_handler,
 		      }| {
-			let async_entity = commands.world().entity(tool);
+			let async_entity = commands.world().entity(caller);
 			let arg = AsyncToolIn {
-				tool: async_entity,
+				caller: async_entity,
 				input,
 			};
 			let func = func.clone();
@@ -137,7 +137,7 @@ mod test {
 	async fn returns_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(async_tool(async |cx: AsyncToolIn<()>| Ok(cx.tool.id())))
+			.spawn(async_tool(async |cx: AsyncToolIn<()>| Ok(cx.caller.id())))
 			.id();
 		world
 			.entity_mut(entity)
@@ -259,7 +259,7 @@ mod test {
 
 	#[tool]
 	async fn async_passthrough_entity(cx: AsyncToolIn<()>) -> Entity {
-		cx.tool.id()
+		cx.caller.id()
 	}
 
 	#[beet_core::test]

@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 /// or short-circuiting.
 pub struct Next<In: 'static, Out: 'static> {
 	handler: Tool<In, Out>,
-	tool: Entity,
+	caller: Entity,
 	world: AsyncWorld,
 }
 
@@ -23,10 +23,10 @@ where
 	/// Schedules the inner handler via [`AsyncWorld`] and awaits
 	/// the result through a channel.
 	pub async fn call(&self, input: In) -> Result<Out> {
-		let tool = self.tool;
+		let caller = self.caller;
 		self.world
-			.entity(tool)
-			.call_tool(self.handler.clone(), input)
+			.entity(caller)
+			.call_detached(self.handler.clone(), input)
 			.await
 	}
 }
@@ -60,7 +60,7 @@ where
 			TypeMeta::of::<WrapFn>(),
 			move |ToolCall {
 			          mut commands,
-			          tool: _,
+			          caller: _,
 			          input: (wrap_in, next),
 			          out_handler,
 			      }| {
@@ -105,7 +105,7 @@ where
 			TypeMeta::of::<WrapFn>(),
 			move |ToolCall {
 			          mut commands,
-			          tool: _,
+			          caller: _,
 			          input: (wrap_in, next),
 			          out_handler,
 			      }| {
@@ -165,19 +165,19 @@ where
 			TypeMeta::of::<(T, Inner)>(),
 			move |ToolCall {
 			          commands,
-			          tool,
+			          caller,
 			          input,
 			          out_handler,
 			      }| {
 				let next = Next {
 					handler: inner_handler.clone(),
-					tool,
+					caller,
 					world: commands.world(),
 				};
 
 				outer_handler.call(ToolCall {
 					commands,
-					tool,
+					caller,
 					input: (input, next),
 					out_handler,
 				})

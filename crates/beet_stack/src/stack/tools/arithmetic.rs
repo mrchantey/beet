@@ -41,8 +41,8 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
-				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
+				let field = fields.get(cx.caller)?;
+				query.with_field(cx.caller, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current + 1;
 					*value = Value::I64(new_value);
@@ -71,8 +71,8 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
-				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
+				let field = fields.get(cx.caller)?;
+				query.with_field(cx.caller, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current - 1;
 					*value = Value::I64(new_value);
@@ -96,8 +96,8 @@ pub fn add(field: FieldRef) -> impl Bundle {
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<i64> {
-				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, |value| {
+				let field = fields.get(cx.caller)?;
+				query.with_field(cx.caller, field, |value| {
 					let current = value.as_i64().unwrap_or(0);
 					let new_value = current + cx.input;
 					*value = Value::I64(new_value);
@@ -120,8 +120,8 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<()> {
-				let field = fields.get(cx.tool)?;
-				query.with_field(cx.tool, field, move |value| {
+				let field = fields.get(cx.caller)?;
+				query.with_field(cx.caller, field, move |value| {
 					*value = cx.input;
 				})
 			},
@@ -144,9 +144,9 @@ where
 			      mut query: DocumentQuery,
 			      fields: Query<&FieldRef>|
 			      -> Result<()> {
-				let field = fields.get(cx.tool)?;
+				let field = fields.get(cx.caller)?;
 				let new_value = Value::from_reflect(&cx.input)?;
-				query.with_field(cx.tool, field, move |value| {
+				query.with_field(cx.caller, field, move |value| {
 					*value = new_value;
 				})
 			},
@@ -166,8 +166,8 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<Value> {
-				let field = fields.get(cx.tool)?;
-				let doc = query.get(cx.tool, &field.document)?;
+				let field = fields.get(cx.caller)?;
+				let doc = query.get(cx.caller, &field.document)?;
 				doc.get_field_ref(&field.field_path)
 					.map(|v| v.clone())?
 					.xok()
@@ -191,8 +191,8 @@ where
 			 mut query: DocumentQuery,
 			 fields: Query<&FieldRef>|
 			 -> Result<T> {
-				let field = fields.get(cx.tool)?;
-				let doc = query.get(cx.tool, &field.document)?;
+				let field = fields.get(cx.caller)?;
+				let doc = query.get(cx.caller, &field.document)?;
 				doc.get_field::<T>(&field.field_path)?.xok()
 			},
 		),
