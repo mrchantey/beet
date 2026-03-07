@@ -12,7 +12,7 @@
 //! - Doctype nodes: span of the doctype text
 //! - Expression nodes: span of the `{expr}` text
 
-use super::combinators::ParseConfig;
+use super::combinators::HtmlParseConfig;
 use super::tokens::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -42,7 +42,7 @@ pub enum MalformedElementsOpts {
 
 /// Configuration for the HTML differ, controlling how tokens are applied to entities.
 #[derive(Debug, Clone)]
-pub struct DiffConfig {
+pub struct HtmlDiffConfig {
 	/// Use [`Value::parse_string`] for text node content instead of [`Value::Str`].
 	pub parse_text_nodes: bool,
 	/// Use [`Value::parse_string`] for attribute values instead of [`Value::Str`].
@@ -55,7 +55,7 @@ pub struct DiffConfig {
 	pub malformed_elements: MalformedElementsOpts,
 }
 
-impl Default for DiffConfig {
+impl Default for HtmlDiffConfig {
 	fn default() -> Self {
 		Self {
 			parse_text_nodes: false,
@@ -82,7 +82,7 @@ impl Default for DiffConfig {
 	}
 }
 
-impl DiffConfig {
+impl HtmlDiffConfig {
 	/// Returns whether the given element name is a void element.
 	pub fn is_void_element(&self, name: &str) -> bool {
 		let lower = name.to_ascii_lowercase();
@@ -115,12 +115,12 @@ impl DiffConfig {
 /// Each variant carries enough source information for [`SpanLookup`]
 /// to produce a [`FileSpan`].
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum TreeNode<'a> {
+pub(crate) enum HtmlNode<'a> {
 	/// An element with name, attributes, and children.
 	Element {
 		name: &'a str,
 		attributes: Vec<HtmlAttribute<'a>>,
-		children: Vec<TreeNode<'a>>,
+		children: Vec<HtmlNode<'a>>,
 		/// The full opening tag source text, ie `<div class="foo">`.
 		source: &'a str,
 	},
@@ -138,11 +138,11 @@ pub(crate) enum TreeNode<'a> {
 ///
 /// This handles nesting by tracking open/close tags, void elements,
 /// and self-closing tags. Malformed HTML is handled per the config.
-pub(crate) fn build_tree<'a>(
+pub(crate) fn build_html_tree<'a>(
 	tokens: &[HtmlToken<'a>],
-	diff_config: &DiffConfig,
-	parse_config: &ParseConfig,
-) -> Result<Vec<TreeNode<'a>>> {
+	diff_config: &HtmlDiffConfig,
+	parse_config: &HtmlParseConfig,
+) -> Result<Vec<HtmlNode<'a>>> {
 	let mut cursor = 0;
 	build_tree_children(tokens, &mut cursor, None, diff_config, parse_config)
 }
@@ -151,9 +151,9 @@ fn build_tree_children<'a>(
 	tokens: &[HtmlToken<'a>],
 	cursor: &mut usize,
 	parent_tag: Option<&str>,
-	diff_config: &DiffConfig,
-	parse_config: &ParseConfig,
-) -> Result<Vec<TreeNode<'a>>> {
+	diff_config: &HtmlDiffConfig,
+	parse_config: &HtmlParseConfig,
+) -> Result<Vec<HtmlNode<'a>>> {
 	let mut children = Vec::new();
 
 	while *cursor < tokens.len() {
@@ -207,7 +207,7 @@ fn build_tree_children<'a>(
 				let _is_raw = parse_config.is_raw_text_element(name);
 
 				if *self_closing || is_void {
-					children.push(TreeNode::Element {
+					children.push(HtmlNode::Element {
 						name,
 						attributes: attributes.clone(),
 						children: vec![],
@@ -222,7 +222,7 @@ fn build_tree_children<'a>(
 						diff_config,
 						parse_config,
 					)?;
-					children.push(TreeNode::Element {
+					children.push(HtmlNode::Element {
 						name,
 						attributes: attributes.clone(),
 						children: element_children,
@@ -232,16 +232,16 @@ fn build_tree_children<'a>(
 				continue;
 			}
 			HtmlToken::Text(text) => {
-				children.push(TreeNode::Text(text));
+				children.push(HtmlNode::Text(text));
 			}
 			HtmlToken::Comment(text) => {
-				children.push(TreeNode::Comment(text));
+				children.push(HtmlNode::Comment(text));
 			}
 			HtmlToken::Doctype(text) => {
-				children.push(TreeNode::Doctype(text));
+				children.push(HtmlNode::Doctype(text));
 			}
 			HtmlToken::Expression(expr) => {
-				children.push(TreeNode::Expression(expr));
+				children.push(HtmlNode::Expression(expr));
 			}
 		}
 		*cursor += 1;
@@ -282,8 +282,8 @@ fn collect_children(world: &World, entity: Entity) -> Vec<Entity> {
 pub(crate) fn diff_children(
 	world: &mut World,
 	entity: Entity,
-	tree_nodes: &[TreeNode<'_>],
-	config: &DiffConfig,
+	tree_nodes: &[HtmlNode<'_>],
+	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
 	let existing_children = collect_children(world, entity);
@@ -318,12 +318,12 @@ pub(crate) fn diff_children(
 fn diff_node(
 	world: &mut World,
 	entity: Entity,
-	tree_node: &TreeNode<'_>,
-	config: &DiffConfig,
+	tree_node: &HtmlNode<'_>,
+	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
 	match tree_node {
-		TreeNode::Element {
+		HtmlNode::Element {
 			name,
 			attributes,
 			children,
@@ -368,7 +368,7 @@ fn diff_node(
 				)?;
 			}
 		}
-		TreeNode::Text(text) => {
+		HtmlNode::Text(text) => {
 			let value = config.text_value(text);
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let mut entity_mut = world.entity_mut(entity);
@@ -382,7 +382,7 @@ fn diff_node(
 				entity_mut.set_if_ne_or_insert(span);
 			}
 		}
-		TreeNode::Comment(text) => {
+		HtmlNode::Comment(text) => {
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let mut entity_mut = world.entity_mut(entity);
 			entity_mut.remove::<Element>();
@@ -396,7 +396,7 @@ fn diff_node(
 				entity_mut.set_if_ne_or_insert(span);
 			}
 		}
-		TreeNode::Doctype(text) => {
+		HtmlNode::Doctype(text) => {
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let mut entity_mut = world.entity_mut(entity);
 			entity_mut.remove::<Element>();
@@ -410,7 +410,7 @@ fn diff_node(
 				entity_mut.set_if_ne_or_insert(span);
 			}
 		}
-		TreeNode::Expression(expr) => {
+		HtmlNode::Expression(expr) => {
 			let expression = Expression(expr.to_string());
 			let span = span_lookup.map(|lookup| lookup.span_of(expr));
 			let mut entity_mut = world.entity_mut(entity);
@@ -434,8 +434,8 @@ fn replace_with_element(
 	entity: Entity,
 	name: &str,
 	attributes: &[HtmlAttribute<'_>],
-	children: &[TreeNode<'_>],
-	config: &DiffConfig,
+	children: &[HtmlNode<'_>],
+	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
 	span: Option<FileSpan>,
 ) -> Result {
@@ -479,7 +479,7 @@ fn diff_attributes(
 	world: &mut World,
 	entity: Entity,
 	attributes: &[HtmlAttribute<'_>],
-	config: &DiffConfig,
+	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
 	// pre-convert to owned data including optional spans
@@ -646,12 +646,12 @@ fn diff_attributes(
 pub(crate) fn spawn_node(
 	world: &mut World,
 	parent: Entity,
-	tree_node: &TreeNode<'_>,
-	config: &DiffConfig,
+	tree_node: &HtmlNode<'_>,
+	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
 	match tree_node {
-		TreeNode::Element {
+		HtmlNode::Element {
 			name,
 			attributes,
 			children,
@@ -668,7 +668,7 @@ pub(crate) fn spawn_node(
 				spawn_node(world, child_id, child_node, config, span_lookup)?;
 			}
 		}
-		TreeNode::Text(text) => {
+		HtmlNode::Text(text) => {
 			let value = config.text_value(text);
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let child_id = world.spawn((value, ChildOf(parent))).id();
@@ -676,7 +676,7 @@ pub(crate) fn spawn_node(
 				world.entity_mut(child_id).insert(span);
 			}
 		}
-		TreeNode::Comment(text) => {
+		HtmlNode::Comment(text) => {
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let child_id =
 				world.spawn((Comment::new(*text), ChildOf(parent))).id();
@@ -684,7 +684,7 @@ pub(crate) fn spawn_node(
 				world.entity_mut(child_id).insert(span);
 			}
 		}
-		TreeNode::Doctype(text) => {
+		HtmlNode::Doctype(text) => {
 			let span = span_lookup.map(|lookup| lookup.span_of(text));
 			let child_id =
 				world.spawn((Doctype::new(*text), ChildOf(parent))).id();
@@ -692,7 +692,7 @@ pub(crate) fn spawn_node(
 				world.entity_mut(child_id).insert(span);
 			}
 		}
-		TreeNode::Expression(expr) => {
+		HtmlNode::Expression(expr) => {
 			let span = span_lookup.map(|lookup| lookup.span_of(expr));
 			let child_id = world
 				.spawn((Expression(expr.to_string()), ChildOf(parent)))
@@ -722,16 +722,16 @@ mod test {
 			HtmlToken::Text("hello"),
 			HtmlToken::CloseTag("div"),
 		];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		tree.len().xpect_eq(1);
 		match &tree[0] {
-			TreeNode::Element { name, children, .. } => {
+			HtmlNode::Element { name, children, .. } => {
 				name.xpect_eq("div");
 				children.len().xpect_eq(1);
 				match &children[0] {
-					TreeNode::Text(text) => {
+					HtmlNode::Text(text) => {
 						text.xpect_eq("hello");
 					}
 					other => panic!("expected Text, got {other:?}"),
@@ -760,15 +760,15 @@ mod test {
 			HtmlToken::CloseTag("span"),
 			HtmlToken::CloseTag("div"),
 		];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		tree.len().xpect_eq(1);
 		match &tree[0] {
-			TreeNode::Element { children, .. } => {
+			HtmlNode::Element { children, .. } => {
 				children.len().xpect_eq(1);
 				match &children[0] {
-					TreeNode::Element { name, children, .. } => {
+					HtmlNode::Element { name, children, .. } => {
 						name.xpect_eq("span");
 						children.len().xpect_eq(1);
 					}
@@ -797,15 +797,15 @@ mod test {
 			HtmlToken::Text("after"),
 			HtmlToken::CloseTag("div"),
 		];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		// div should have two children: br (void, no children) and "after" text
 		match &tree[0] {
-			TreeNode::Element { children, .. } => {
+			HtmlNode::Element { children, .. } => {
 				children.len().xpect_eq(2);
 				match &children[0] {
-					TreeNode::Element {
+					HtmlNode::Element {
 						name,
 						children: br_children,
 						..
@@ -828,12 +828,12 @@ mod test {
 			self_closing: true,
 			source: "<img src=\"foo.png\" />",
 		}];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		tree.len().xpect_eq(1);
 		match &tree[0] {
-			TreeNode::Element {
+			HtmlNode::Element {
 				name,
 				attributes,
 				children,
@@ -866,12 +866,12 @@ mod test {
 			HtmlToken::Text("hello"),
 			HtmlToken::CloseTag("div"),
 		];
-		let config = DiffConfig {
+		let config = HtmlDiffConfig {
 			malformed_elements: MalformedElementsOpts::Fix,
 			..Default::default()
 		};
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		tree.len().xpect_eq(1);
 	}
 
@@ -887,12 +887,12 @@ mod test {
 			HtmlToken::Text("hello"),
 			// missing close tag for div
 		];
-		let config = DiffConfig {
+		let config = HtmlDiffConfig {
 			malformed_elements: MalformedElementsOpts::Error,
 			..Default::default()
 		};
-		let parse_config = ParseConfig::default();
-		build_tree(&tokens, &config, &parse_config)
+		let parse_config = HtmlParseConfig::default();
+		build_html_tree(&tokens, &config, &parse_config)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unclosed");
@@ -918,20 +918,20 @@ mod test {
 			HtmlToken::CloseTag("em"),
 			HtmlToken::CloseTag("p"),
 		];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		match &tree[0] {
-			TreeNode::Element { children, .. } => {
+			HtmlNode::Element { children, .. } => {
 				children.len().xpect_eq(2);
 				match &children[0] {
-					TreeNode::Text(text) => {
+					HtmlNode::Text(text) => {
 						text.xpect_eq("hello ");
 					}
 					other => panic!("expected Text, got {other:?}"),
 				}
 				match &children[1] {
-					TreeNode::Element { name, .. } => {
+					HtmlNode::Element { name, .. } => {
 						name.xpect_eq("em");
 					}
 					other => panic!("expected Element, got {other:?}"),
@@ -953,14 +953,14 @@ mod test {
 			HtmlToken::Expression("foo"),
 			HtmlToken::CloseTag("div"),
 		];
-		let config = DiffConfig::default();
-		let parse_config = ParseConfig::default();
-		let tree = build_tree(&tokens, &config, &parse_config).unwrap();
+		let config = HtmlDiffConfig::default();
+		let parse_config = HtmlParseConfig::default();
+		let tree = build_html_tree(&tokens, &config, &parse_config).unwrap();
 		match &tree[0] {
-			TreeNode::Element { children, .. } => {
+			HtmlNode::Element { children, .. } => {
 				children.len().xpect_eq(1);
 				match &children[0] {
-					TreeNode::Expression(expr) => {
+					HtmlNode::Expression(expr) => {
 						expr.xpect_eq("foo");
 					}
 					other => panic!("expected Expression, got {other:?}"),
@@ -972,7 +972,7 @@ mod test {
 
 	#[test]
 	fn diff_config_is_void() {
-		let config = DiffConfig::default();
+		let config = HtmlDiffConfig::default();
 		config.is_void_element("br").xpect_true();
 		config.is_void_element("BR").xpect_true();
 		config.is_void_element("div").xpect_false();
@@ -981,7 +981,7 @@ mod test {
 
 	#[test]
 	fn diff_config_text_value_parsing() {
-		let config = DiffConfig {
+		let config = HtmlDiffConfig {
 			parse_text_nodes: true,
 			..Default::default()
 		};
@@ -990,7 +990,7 @@ mod test {
 			.text_value("hello")
 			.xpect_eq(Value::Str("hello".into()));
 
-		let config_no_parse = DiffConfig::default();
+		let config_no_parse = HtmlDiffConfig::default();
 		config_no_parse
 			.text_value("42")
 			.xpect_eq(Value::Str("42".into()));
@@ -998,7 +998,7 @@ mod test {
 
 	#[test]
 	fn diff_config_attribute_value_parsing() {
-		let config = DiffConfig {
+		let config = HtmlDiffConfig {
 			parse_attribute_values: true,
 			..Default::default()
 		};
@@ -1007,7 +1007,7 @@ mod test {
 			.attribute_value("hello")
 			.xpect_eq(Value::Str("hello".into()));
 
-		let config_no_parse = DiffConfig::default();
+		let config_no_parse = HtmlDiffConfig::default();
 		config_no_parse
 			.attribute_value("true")
 			.xpect_eq(Value::Str("true".into()));

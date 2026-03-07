@@ -6,10 +6,10 @@
 
 use super::frontmatter::Frontmatter;
 use super::frontmatter::FrontmatterKind;
-use crate::parse::html::combinators::ParseConfig;
-use crate::parse::html::diff::DiffConfig;
-use crate::parse::html::diff::TreeNode;
-use crate::parse::html::diff::build_tree;
+use crate::parse::html::combinators::HtmlParseConfig;
+use crate::parse::html::diff::HtmlDiffConfig;
+use crate::parse::html::diff::HtmlNode;
+use crate::parse::html::diff::build_html_tree;
 use crate::parse::html::tokens::HtmlAttribute;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -21,7 +21,7 @@ use pulldown_cmark::Tag;
 /// optional parsed frontmatter.
 pub(crate) struct MarkdownTree<'a> {
 	/// The top-level tree nodes ready for diffing.
-	pub nodes: Vec<TreeNode<'a>>,
+	pub nodes: Vec<HtmlNode<'a>>,
 	/// Parsed frontmatter if a metadata block was present.
 	pub frontmatter: Option<Frontmatter>,
 }
@@ -34,8 +34,8 @@ pub(crate) struct MarkdownTree<'a> {
 pub(crate) fn build_markdown_tree<'a>(
 	text: &'a str,
 	options: Options,
-	html_parse_config: &ParseConfig,
-	html_diff_config: &DiffConfig,
+	html_parse_config: &HtmlParseConfig,
+	html_diff_config: &HtmlDiffConfig,
 	_span_lookup: Option<&SpanLookup>,
 ) -> Result<MarkdownTree<'a>> {
 	let parser = pulldown_cmark::Parser::new_ext(text, options);
@@ -68,9 +68,9 @@ struct MdTreeBuilder<'a> {
 	/// Whether we're inside a metadata block.
 	in_metadata: bool,
 	/// Owned HTML parse config for embedded HTML.
-	html_parse_config: ParseConfig,
+	html_parse_config: HtmlParseConfig,
 	/// Owned HTML diff config for embedded HTML.
-	html_diff_config: DiffConfig,
+	html_diff_config: HtmlDiffConfig,
 }
 
 struct StackFrame<'a> {
@@ -81,7 +81,7 @@ struct StackFrame<'a> {
 	/// Source text slice for span tracking.
 	source: &'a str,
 	/// Accumulated child nodes.
-	children: Vec<TreeNode<'a>>,
+	children: Vec<HtmlNode<'a>>,
 }
 
 impl<'a> StackFrame<'a> {
@@ -111,8 +111,8 @@ impl<'a> StackFrame<'a> {
 impl<'a> MdTreeBuilder<'a> {
 	fn new(
 		text: &'a str,
-		html_parse_config: ParseConfig,
-		html_diff_config: DiffConfig,
+		html_parse_config: HtmlParseConfig,
+		html_diff_config: HtmlDiffConfig,
 	) -> Self {
 		Self {
 			text,
@@ -140,7 +140,7 @@ impl<'a> MdTreeBuilder<'a> {
 			return;
 		}
 		if let Some(frame) = self.stack.pop() {
-			let node = TreeNode::Element {
+			let node = HtmlNode::Element {
 				name: frame.name,
 				attributes: frame.attributes,
 				children: frame.children,
@@ -153,7 +153,7 @@ impl<'a> MdTreeBuilder<'a> {
 	}
 
 	/// Append a leaf node to the current frame.
-	fn push_leaf(&mut self, node: TreeNode<'a>) {
+	fn push_leaf(&mut self, node: HtmlNode<'a>) {
 		if let Some(parent) = self.stack.last_mut() {
 			parent.children.push(node);
 		}
@@ -166,7 +166,7 @@ impl<'a> MdTreeBuilder<'a> {
 		source: &'a str,
 		attributes: Vec<HtmlAttribute<'a>>,
 	) {
-		self.push_leaf(TreeNode::Element {
+		self.push_leaf(HtmlNode::Element {
 			name,
 			attributes,
 			children: vec![],
@@ -192,7 +192,7 @@ impl<'a> MdTreeBuilder<'a> {
 						content.push_str(&text);
 					}
 				} else {
-					self.push_leaf(TreeNode::Text(self.slice(&range)));
+					self.push_leaf(HtmlNode::Text(self.slice(&range)));
 				}
 			}
 			Event::Code(text) => {
@@ -201,17 +201,17 @@ impl<'a> MdTreeBuilder<'a> {
 				// We need a borrowed slice for the text content.
 				// The source range includes backticks, the inner text is
 				// what pulldown gives us. We use the full source for span.
-				self.push_leaf(TreeNode::Element {
+				self.push_leaf(HtmlNode::Element {
 					name: "code",
 					attributes: vec![],
-					children: vec![TreeNode::Text(
+					children: vec![HtmlNode::Text(
 						self.find_inner_text(text_slice, &text),
 					)],
 					source: text_slice,
 				});
 			}
 			Event::SoftBreak => {
-				self.push_leaf(TreeNode::Text(self.slice(&range)));
+				self.push_leaf(HtmlNode::Text(self.slice(&range)));
 			}
 			Event::HardBreak => {
 				self.push_void("br", source, vec![]);
@@ -230,13 +230,13 @@ impl<'a> MdTreeBuilder<'a> {
 				// <sup><a href="#fn-{label}">[{label}]</a></sup>
 				let href_text =
 					self.find_substring(source, label_str).unwrap_or(source);
-				self.push_leaf(TreeNode::Element {
+				self.push_leaf(HtmlNode::Element {
 					name: "sup",
 					attributes: vec![],
-					children: vec![TreeNode::Element {
+					children: vec![HtmlNode::Element {
 						name: "a",
 						attributes: vec![HtmlAttribute::new("href", href_text)],
-						children: vec![TreeNode::Text(href_text)],
+						children: vec![HtmlNode::Text(href_text)],
 						source,
 					}],
 					source,
@@ -254,25 +254,25 @@ impl<'a> MdTreeBuilder<'a> {
 			}
 			Event::InlineMath(_text) => {
 				let text_slice = self.slice(&range);
-				self.push_leaf(TreeNode::Element {
+				self.push_leaf(HtmlNode::Element {
 					name: "span",
 					attributes: vec![HtmlAttribute::new(
 						"class",
 						"math-inline",
 					)],
-					children: vec![TreeNode::Text(text_slice)],
+					children: vec![HtmlNode::Text(text_slice)],
 					source: text_slice,
 				});
 			}
 			Event::DisplayMath(_text) => {
 				let text_slice = self.slice(&range);
-				self.push_leaf(TreeNode::Element {
+				self.push_leaf(HtmlNode::Element {
 					name: "div",
 					attributes: vec![HtmlAttribute::new(
 						"class",
 						"math-display",
 					)],
-					children: vec![TreeNode::Text(text_slice)],
+					children: vec![HtmlNode::Text(text_slice)],
 					source: text_slice,
 				});
 			}
@@ -458,7 +458,7 @@ impl<'a> MdTreeBuilder<'a> {
 					.children
 					.iter()
 					.filter_map(|node| match node {
-						TreeNode::Text(text) => Some(*text),
+						HtmlNode::Text(text) => Some(*text),
 						_ => None,
 					})
 					.collect();
@@ -482,7 +482,7 @@ impl<'a> MdTreeBuilder<'a> {
 			&self.html_parse_config,
 		) {
 			Ok(tokens) => {
-				match build_tree(
+				match build_html_tree(
 					&tokens,
 					&self.html_diff_config,
 					&self.html_parse_config,
@@ -492,17 +492,17 @@ impl<'a> MdTreeBuilder<'a> {
 						// Since the HTML tokens borrow from `html` (a
 						// temporary), we can't directly use them. Instead,
 						// insert as a raw text node.
-						self.push_leaf(TreeNode::Text(source));
+						self.push_leaf(HtmlNode::Text(source));
 					}
 					Err(_) => {
 						// Fallback: treat as raw text
-						self.push_leaf(TreeNode::Text(source));
+						self.push_leaf(HtmlNode::Text(source));
 					}
 				}
 			}
 			Err(_) => {
 				// Fallback: treat as raw text
-				self.push_leaf(TreeNode::Text(source));
+				self.push_leaf(HtmlNode::Text(source));
 			}
 		}
 	}
@@ -512,7 +512,7 @@ impl<'a> MdTreeBuilder<'a> {
 		// Inline HTML is tricky because it may be a partial tag
 		// (opening tag in one event, closing in another).
 		// For now, insert as raw text; the HTML renderer will pass it through.
-		self.push_leaf(TreeNode::Text(source));
+		self.push_leaf(HtmlNode::Text(source));
 	}
 
 	/// Try to find a substring within the source slice, returning a
@@ -573,31 +573,31 @@ impl<'a> MdTreeBuilder<'a> {
 mod test {
 	use super::*;
 
-	fn build(text: &str) -> Vec<TreeNode<'_>> {
+	fn build(text: &str) -> Vec<HtmlNode<'_>> {
 		build_markdown_tree(
 			text,
-			crate::prelude::MarkdownParser::default_options(),
-			&ParseConfig::default(),
-			&DiffConfig::default(),
+			MarkdownParseConfig::default_cmark_options(),
+			&HtmlParseConfig::default(),
+			&HtmlDiffConfig::default(),
 			None,
 		)
 		.unwrap()
 		.nodes
 	}
 
-	fn node_name<'a>(node: &TreeNode<'a>) -> &'a str {
+	fn node_name<'a>(node: &HtmlNode<'a>) -> &'a str {
 		match node {
-			TreeNode::Element { name, .. } => name,
-			TreeNode::Text(text) => text,
-			TreeNode::Comment(text) => text,
-			TreeNode::Doctype(text) => text,
-			TreeNode::Expression(text) => text,
+			HtmlNode::Element { name, .. } => name,
+			HtmlNode::Text(text) => text,
+			HtmlNode::Comment(text) => text,
+			HtmlNode::Doctype(text) => text,
+			HtmlNode::Expression(text) => text,
 		}
 	}
 
-	fn node_children<'a>(node: &'a TreeNode<'a>) -> &'a [TreeNode<'a>] {
+	fn node_children<'a>(node: &'a HtmlNode<'a>) -> &'a [HtmlNode<'a>] {
 		match node {
-			TreeNode::Element { children, .. } => children,
+			HtmlNode::Element { children, .. } => children,
 			_ => &[],
 		}
 	}
@@ -609,7 +609,7 @@ mod test {
 		node_name(&nodes[0]).xpect_eq("p");
 		let children = node_children(&nodes[0]);
 		children.len().xpect_eq(1);
-		matches!(&children[0], TreeNode::Text(_)).xpect_true();
+		matches!(&children[0], HtmlNode::Text(_)).xpect_true();
 	}
 
 	#[test]
@@ -753,9 +753,9 @@ mod test {
 	fn frontmatter_parsed() {
 		let result = build_markdown_tree(
 			"---\ntitle: Hello\n---\n\n# Title",
-			crate::prelude::MarkdownParser::default_options(),
-			&ParseConfig::default(),
-			&DiffConfig::default(),
+			MarkdownParseConfig::default_cmark_options(),
+			&HtmlParseConfig::default(),
+			&HtmlDiffConfig::default(),
 			None,
 		)
 		.unwrap();
@@ -772,9 +772,9 @@ mod test {
 	fn no_frontmatter() {
 		let result = build_markdown_tree(
 			"# Just a heading",
-			crate::prelude::MarkdownParser::default_options(),
-			&ParseConfig::default(),
-			&DiffConfig::default(),
+			MarkdownParseConfig::default_cmark_options(),
+			&HtmlParseConfig::default(),
+			&HtmlDiffConfig::default(),
 			None,
 		)
 		.unwrap();

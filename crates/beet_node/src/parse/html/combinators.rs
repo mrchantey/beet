@@ -19,7 +19,7 @@ use winnow::token::take_while;
 
 /// Parser configuration passed through combinators to control behavior.
 #[derive(Debug, Clone)]
-pub struct ParseConfig {
+pub struct HtmlParseConfig {
 	/// Enable `{expr}` expression parsing in content and attributes.
 	pub parse_expressions: bool,
 	/// Enable `{{expr}}` double-escaped expressions in raw text elements.
@@ -30,7 +30,7 @@ pub struct ParseConfig {
 	pub raw_character_data_elements: Vec<String>,
 }
 
-impl Default for ParseConfig {
+impl Default for HtmlParseConfig {
 	fn default() -> Self {
 		Self {
 			parse_expressions: false,
@@ -44,7 +44,16 @@ impl Default for ParseConfig {
 	}
 }
 
-impl ParseConfig {
+impl HtmlParseConfig {
+	pub fn with_expressions() -> Self {
+		Self {
+			parse_expressions: true,
+			parse_raw_text_expressions: true,
+			..Default::default()
+		}
+	}
+
+
 	/// Returns whether the given element name is a raw text or raw character data element.
 	pub fn is_raw_text_element(&self, name: &str) -> bool {
 		let lower = name.to_ascii_lowercase();
@@ -64,7 +73,7 @@ impl ParseConfig {
 /// expressions inside the raw content.
 pub fn parse_document<'a>(
 	input: &'a str,
-	config: &ParseConfig,
+	config: &HtmlParseConfig,
 ) -> Result<Vec<HtmlToken<'a>>, String> {
 	let mut remaining = input;
 	let mut tokens = Vec::new();
@@ -122,7 +131,7 @@ pub fn parse_document<'a>(
 
 /// Parse a single HTML node, dispatching to the appropriate sub-parser.
 fn parse_node<'input, 'config>(
-	config: &'config ParseConfig,
+	config: &'config HtmlParseConfig,
 ) -> impl Parser<&'input str, HtmlToken<'input>, ErrMode<ContextError>> + 'config
 where
 	'input: 'config,
@@ -732,7 +741,7 @@ mod test {
 
 	#[test]
 	fn document_script_raw_text() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<script>let x = 1 < 2;</script>", &config).unwrap();
 		tokens.xpect_eq(vec![
@@ -749,7 +758,7 @@ mod test {
 
 	#[test]
 	fn document_style_raw_text() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<style>body { color: red; }</style>", &config)
 				.unwrap();
@@ -767,7 +776,7 @@ mod test {
 
 	#[test]
 	fn document_script_with_expressions() {
-		let config = ParseConfig {
+		let config = HtmlParseConfig {
 			parse_raw_text_expressions: true,
 			..Default::default()
 		};
@@ -791,7 +800,7 @@ mod test {
 	#[test]
 	fn document_self_closing_script_no_raw() {
 		// self-closing script should NOT trigger raw text mode
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<script /><div>hello</div>", &config).unwrap();
 		tokens.len().xpect_eq(4); // script(self-closing), open-div, text, close-div
@@ -801,7 +810,7 @@ mod test {
 
 	#[test]
 	fn document_simple() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens = parse_document("<div>hello</div>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
@@ -817,7 +826,7 @@ mod test {
 
 	#[test]
 	fn document_nested() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<div><span>hi</span></div>", &config).unwrap();
 		tokens.xpect_eq(vec![
@@ -841,7 +850,7 @@ mod test {
 
 	#[test]
 	fn document_with_expressions() {
-		let config = ParseConfig {
+		let config = HtmlParseConfig {
 			parse_expressions: true,
 			..Default::default()
 		};
@@ -861,7 +870,7 @@ mod test {
 
 	#[test]
 	fn document_comment_and_doctype() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<!DOCTYPE html><!-- hi --><br />", &config)
 				.unwrap();
@@ -879,7 +888,7 @@ mod test {
 
 	#[test]
 	fn document_mixed_content() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<p>hello <em>world</em></p>", &config).unwrap();
 		tokens.xpect_eq(vec![
@@ -904,7 +913,7 @@ mod test {
 
 	#[test]
 	fn document_whitespace_preserved() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens = parse_document("<div>  hello  </div>", &config).unwrap();
 		tokens.xpect_eq(vec![
 			HtmlToken::OpenTag {
@@ -920,7 +929,7 @@ mod test {
 
 	#[test]
 	fn document_multiple_attributes() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<div class=\"foo\" id='bar' data-x=baz>", &config)
 				.unwrap();
@@ -949,7 +958,7 @@ mod test {
 
 	#[test]
 	fn svg_basic_elements() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let input = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" /></svg>";
 		let tokens = parse_document(input, &config).unwrap();
 		tokens.len().xpect_eq(3);
@@ -979,7 +988,7 @@ mod test {
 
 	#[test]
 	fn svg_path_data() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens = parse_document(
 			"<path d=\"M10 10 H 90 V 90 H 10 Z\" fill=\"none\" stroke=\"black\" />",
 			&config,
@@ -1007,7 +1016,7 @@ mod test {
 
 	#[test]
 	fn svg_namespace_attribute() {
-		let config = ParseConfig::default();
+		let config = HtmlParseConfig::default();
 		let tokens =
 			parse_document("<use xlink:href=\"#icon\" />", &config).unwrap();
 		match &tokens[0] {

@@ -106,7 +106,6 @@ impl Attribute {
 	Component,
 )]
 #[reflect(Component)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[relationship(relationship_target = Attributes)]
 pub struct AttributeOf(Entity);

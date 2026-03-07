@@ -10,7 +10,7 @@ pub(crate) mod combinators;
 pub(crate) mod diff;
 pub(crate) mod tokens;
 
-pub use combinators::ParseConfig;
+pub use combinators::HtmlParseConfig;
 pub use diff::*;
 pub use tokens::*;
 
@@ -30,22 +30,22 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone)]
 pub struct HtmlParser {
 	/// Tokenization configuration.
-	pub parse_config: ParseConfig,
+	pub parse_config: HtmlParseConfig,
 	/// Entity diffing configuration.
-	pub diff_config: DiffConfig,
+	pub diff_config: HtmlDiffConfig,
 	/// When enabled, text nodes are re-parsed as markdown after the
 	/// HTML tree is built. Requires the `markdown_parser` feature.
 	#[cfg(feature = "markdown_parser")]
-	pub parse_markdown: bool,
+	pub parse_markdown: Option<MarkdownParseConfig>,
 }
 
 impl Default for HtmlParser {
 	fn default() -> Self {
 		Self {
-			parse_config: ParseConfig::default(),
-			diff_config: DiffConfig::default(),
+			parse_config: HtmlParseConfig::default(),
+			diff_config: HtmlDiffConfig::default(),
 			#[cfg(feature = "markdown_parser")]
-			parse_markdown: false,
+			parse_markdown: None,
 		}
 	}
 }
@@ -57,14 +57,14 @@ impl HtmlParser {
 	/// Create a parser with expression support enabled.
 	pub fn with_expressions() -> Self {
 		Self {
-			parse_config: ParseConfig {
+			parse_config: HtmlParseConfig {
 				parse_expressions: true,
 				parse_raw_text_expressions: true,
-				..Default::default()
+				..default()
 			},
-			diff_config: DiffConfig::default(),
+			diff_config: default(),
 			#[cfg(feature = "markdown_parser")]
-			parse_markdown: false,
+			parse_markdown: None,
 		}
 	}
 
@@ -76,7 +76,7 @@ impl HtmlParser {
 	/// `markdown_parser` feature.
 	#[cfg(feature = "markdown_parser")]
 	pub fn with_markdown(mut self) -> Self {
-		self.parse_markdown = true;
+		self.parse_markdown = Some(default());
 		self
 	}
 
@@ -94,7 +94,7 @@ impl HtmlParser {
 		let parse_config = self.parse_config.clone();
 		let diff_config = self.diff_config.clone();
 		#[cfg(feature = "markdown_parser")]
-		let parse_markdown = self.parse_markdown;
+		let parse_markdown = self.parse_markdown.clone();
 		let id = entity.id();
 		let text_owned = text.to_string();
 		let path_owned = path.cloned();
@@ -107,7 +107,7 @@ impl HtmlParser {
 					combinators::parse_document(&text_owned, &parse_config)?;
 
 				// build tree from flat tokens
-				let tree = build_tree(&tokens, &diff_config, &parse_config)?;
+				let tree = build_html_tree(&tokens, &diff_config, &parse_config)?;
 
 				// build span lookup if path was provided
 				let span_lookup = path_owned
@@ -126,11 +126,12 @@ impl HtmlParser {
 				// if markdown parsing is enabled, re-parse text node
 				// children as markdown subtrees
 				#[cfg(feature = "markdown_parser")]
-				if parse_markdown {
+				if let Some(md_config) = parse_markdown {
 					reparse_text_nodes_as_markdown(
 						world,
 						id,
 						&diff_config,
+						&md_config,
 						span_lookup.as_ref(),
 					)?;
 				}
@@ -170,12 +171,12 @@ impl NodeParser for HtmlParser {
 fn reparse_text_nodes_as_markdown(
 	world: &mut World,
 	parent: Entity,
-	diff_config: &DiffConfig,
+	diff_config: &HtmlDiffConfig,
+	md_config: &MarkdownParseConfig,
 	span_lookup: Option<&SpanLookup>,
 ) -> Result {
-	use crate::parse::html::diff::TreeNode;
+	use crate::parse::html::diff::HtmlNode;
 	use crate::parse::html::diff::spawn_node;
-	use crate::parse::markdown::tree_builder;
 
 	let children: Vec<Entity> = world
 		.entity(parent)
@@ -194,6 +195,7 @@ fn reparse_text_nodes_as_markdown(
 				world,
 				child,
 				diff_config,
+				md_config,
 				span_lookup,
 			)?;
 		}
@@ -203,10 +205,10 @@ fn reparse_text_nodes_as_markdown(
 			}
 			// try to parse as markdown
 			let parse_config =
-				crate::parse::html::combinators::ParseConfig::default();
-			let md_result = tree_builder::build_markdown_tree(
+				crate::parse::html::combinators::HtmlParseConfig::default();
+			let md_result = build_markdown_tree(
 				text,
-				crate::prelude::MarkdownParser::default_options(),
+				md_config.options,
 				&parse_config,
 				diff_config,
 				None,
@@ -215,7 +217,7 @@ fn reparse_text_nodes_as_markdown(
 			// only replace if markdown produced structure beyond a
 			// single text node (ie actual markdown formatting)
 			let dominated_by_single_text = md_result.nodes.len() == 1
-				&& matches!(md_result.nodes[0], TreeNode::Text(_));
+				&& matches!(md_result.nodes[0], HtmlNode::Text(_));
 
 			if !dominated_by_single_text && !md_result.nodes.is_empty() {
 				// replace the text entity with the markdown subtree
@@ -412,7 +414,7 @@ mod test {
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
 				let mut parser = HtmlParser {
-					diff_config: DiffConfig {
+					diff_config: HtmlDiffConfig {
 						parse_text_nodes: true,
 						..Default::default()
 					},

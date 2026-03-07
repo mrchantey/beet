@@ -9,7 +9,8 @@
 //! Enable with the `markdown_parser` feature flag.
 
 mod frontmatter;
-pub(crate) mod tree_builder;
+mod tree_builder;
+pub(crate) use tree_builder::*;
 
 pub use frontmatter::*;
 
@@ -28,40 +29,33 @@ use pulldown_cmark::Options;
 /// # use beet_node::prelude::*;
 /// let parser = MarkdownParser::new();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct MarkdownParser {
-	/// HTML parser config used for embedded HTML blocks and inline HTML.
-	pub html: HtmlParser,
+	pub html_parse_config: HtmlParseConfig,
+	pub html_diff_config: HtmlDiffConfig,
+	pub config: MarkdownParseConfig,
+}
+
+#[derive(Debug, Clone)]
+pub struct MarkdownParseConfig {
 	/// pulldown-cmark options controlling which extensions are enabled.
 	pub options: Options,
 	/// Whether to parse frontmatter metadata blocks.
 	pub parse_frontmatter: bool,
 }
 
-impl Default for MarkdownParser {
+impl Default for MarkdownParseConfig {
 	fn default() -> Self {
 		Self {
-			html: HtmlParser::default(),
-			options: Self::default_options(),
+			options: Self::default_cmark_options(),
 			parse_frontmatter: true,
 		}
 	}
 }
 
-impl MarkdownParser {
-	/// Create a new parser with default settings and maximal extensions.
-	pub fn new() -> Self { Self::default() }
-
-	/// Create a parser with expression support enabled in embedded HTML.
-	pub fn with_expressions() -> Self {
-		Self {
-			html: HtmlParser::with_expressions(),
-			..Default::default()
-		}
-	}
-
+impl MarkdownParseConfig {
 	/// Returns the default pulldown-cmark options with maximal extensions.
-	pub fn default_options() -> Options {
+	pub fn default_cmark_options() -> Options {
 		Options::ENABLE_TABLES
 			| Options::ENABLE_FOOTNOTES
 			| Options::ENABLE_STRIKETHROUGH
@@ -75,6 +69,21 @@ impl MarkdownParser {
 			| Options::ENABLE_SUPERSCRIPT
 			| Options::ENABLE_SUBSCRIPT
 	}
+}
+
+
+impl MarkdownParser {
+	/// Create a new parser with default settings and maximal extensions.
+	pub fn new() -> Self { Self::default() }
+
+	/// Create a parser with expression support enabled in embedded HTML.
+	pub fn with_expressions() -> Self {
+		Self {
+			html_parse_config: HtmlParseConfig::with_expressions(),
+			..Default::default()
+		}
+	}
+
 
 	/// Shared parsing logic: tokenize markdown, build tree, diff against entity.
 	async fn parse_text(
@@ -83,10 +92,10 @@ impl MarkdownParser {
 		text: &str,
 		path: Option<&WsPathBuf>,
 	) -> Result {
-		let options = self.options;
-		let html_parse_config = self.html.parse_config.clone();
-		let html_diff_config = self.html.diff_config.clone();
-		let parse_frontmatter = self.parse_frontmatter;
+		let options = self.config.options;
+		let html_parse_config = self.html_parse_config.clone();
+		let html_diff_config = self.html_diff_config.clone();
+		let parse_frontmatter = self.config.parse_frontmatter;
 		let entity_id = entity.id();
 		let text_owned = text.to_string();
 		let path_owned = path.cloned();
