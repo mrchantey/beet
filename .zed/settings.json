@@ -53,7 +53,7 @@
 		// "crates/beet_net",
 		// "crates/beet_stack",
 		// "crates/beet_parse",
-		"crates/beet_router",
+		"crates/beet_router_old",
 		"crates/beet_rsx",
 		"crates/beet_rsx_combinator",
 		"crates/beet_site",

@@ -1227,7 +1227,6 @@ version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
- "beet_tool2",
  "bevy",
  "bevy_ratatui",
  "bitflags 2.10.0",
@@ -1242,17 +1241,6 @@ dependencies = [
 
 [[package]]
 name = "beet_tool"
-version = "0.0.9-dev.4"
-dependencies = [
- "beet_core",
- "beet_net",
- "bevy",
- "extend",
- "serde",
-]
-
-[[package]]
-name = "beet_tool2"
 version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
