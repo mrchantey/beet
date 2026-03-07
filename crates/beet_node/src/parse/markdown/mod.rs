@@ -86,63 +86,47 @@ impl MarkdownParser {
 
 
 	/// Shared parsing logic: tokenize markdown, build tree, diff against entity.
-	async fn parse_text(
+	fn parse_text(
 		&self,
-		entity: &AsyncEntity,
+		world: &mut World,
+		entity: Entity,
 		text: &str,
 		path: Option<&WsPathBuf>,
 	) -> Result {
-		let options = self.config.options;
-		let html_parse_config = self.html_parse_config.clone();
-		let html_diff_config = self.html_diff_config.clone();
-		let parse_frontmatter = self.config.parse_frontmatter;
-		let entity_id = entity.id();
-		let text_owned = text.to_string();
-		let path_owned = path.cloned();
+		let span_lookup = path.map(|path| SpanLookup::new(text, path.clone()));
 
-		entity
-			.world()
-			.with_then(move |world| -> Result {
-				let span_lookup = path_owned
-					.as_ref()
-					.map(|path| SpanLookup::new(&text_owned, path.clone()));
+		let tree_result = tree_builder::build_markdown_tree(
+			text,
+			self.config.options,
+			&self.html_parse_config,
+			&self.html_diff_config,
+			span_lookup.as_ref(),
+		)?;
 
-				let tree_result = tree_builder::build_markdown_tree(
-					&text_owned,
-					options,
-					&html_parse_config,
-					&html_diff_config,
-					span_lookup.as_ref(),
-				)?;
+		// diff tree against entity
+		diff_children(
+			world,
+			entity,
+			&tree_result.nodes,
+			&self.html_diff_config,
+			span_lookup.as_ref(),
+		)?;
 
-				// diff tree against entity
-				diff_children(
-					world,
-					entity_id,
-					&tree_result.nodes,
-					&html_diff_config,
-					span_lookup.as_ref(),
-				)?;
+		// insert frontmatter on root if present
+		if self.config.parse_frontmatter {
+			if let Some(fm) = tree_result.frontmatter {
+				world.entity_mut(entity).insert(fm);
+			} else {
+				// remove stale frontmatter if content no longer has it
+				world.entity_mut(entity).remove::<Frontmatter>();
+			}
+		}
 
-				// insert frontmatter on root if present
-				if parse_frontmatter {
-					if let Some(fm) = tree_result.frontmatter {
-						world.entity_mut(entity_id).insert(fm);
-					} else {
-						// remove stale frontmatter if content no longer has it
-						world.entity_mut(entity_id).remove::<Frontmatter>();
-					}
-				}
-
-				// insert file span on the root entity if path provided
-				if let Some(ref lookup) = span_lookup {
-					let span = lookup.full_span();
-					world.entity_mut(entity_id).set_if_ne_or_insert(span);
-				}
-
-				Ok(())
-			})
-			.await?;
+		// insert file span on the root entity if path provided
+		if let Some(ref lookup) = span_lookup {
+			let span = lookup.full_span();
+			world.entity_mut(entity).set_if_ne_or_insert(span);
+		}
 
 		Ok(())
 	}
@@ -151,14 +135,13 @@ impl MarkdownParser {
 impl NodeParser for MarkdownParser {
 	fn parse(
 		&mut self,
-		entity: AsyncEntity,
+		world: &mut World,
+		entity: Entity,
 		bytes: Vec<u8>,
 		path: Option<WsPathBuf>,
-	) -> impl Future<Output = Result> {
-		async move {
-			let text = std::str::from_utf8(&bytes)?;
-			self.parse_text(&entity, text, path.as_ref()).await
-		}
+	) -> Result {
+		let text = std::str::from_utf8(&bytes)?;
+		self.parse_text(world, entity, text, path.as_ref())
 	}
 }
 
@@ -171,22 +154,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Collect the entity ids of the direct children via [`AsyncEntity`].
-	async fn get_children(entity: &AsyncEntity) -> Vec<Entity> {
-		entity
-			.with_then(|entity| {
-				entity
-					.get::<Children>()
-					.map(|children| {
-						let mut ids = Vec::new();
-						for &child in children {
-							ids.push(child);
-						}
-						ids
-					})
-					.unwrap_or_default()
-			})
-			.await
+	/// Collect the entity ids of the direct children.
+	fn get_children(world: &World, entity: Entity) -> Vec<Entity> {
+		world
+			.entity(entity)
+			.get::<Children>()
+			.map(|children| children.iter().collect())
+			.unwrap_or_default()
 	}
 
 	#[beet_core::test]
@@ -194,13 +168,16 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"Hello world".to_vec(), None)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, b"Hello world".to_vec(), None)
+							.unwrap();
+						get_children(world, id).len()
+					})
 					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				// should have one child: the <p> element
-				children.len()
 			})
 			.await
 			.xpect_eq(1);
@@ -211,19 +188,22 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"Hello world".to_vec(), None)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let p_entity = world.entity(children[0]);
-				// verify it's a <p> element
-				let element: Element = p_entity
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, b"Hello world".to_vec(), None)
+							.unwrap();
+						let children = get_children(world, id);
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("p".to_string());
@@ -234,18 +214,22 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"# Title".to_vec(), None)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let h1 = world.entity(children[0]);
-				let element: Element = h1
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, b"# Title".to_vec(), None)
+							.unwrap();
+						let children = get_children(world, id);
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("h1".to_string());
@@ -256,12 +240,21 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"# Title\n\nParagraph text".to_vec(), None)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Title\n\nParagraph text".to_vec(),
+								None,
+							)
+							.unwrap();
+						get_children(world, id).len()
+					})
 					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				children.len()
 			})
 			.await
 			.xpect_eq(2);
@@ -272,21 +265,24 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"*hello*".to_vec(), None)
-					.await
-					.unwrap();
-				// root -> p -> em -> "hello"
-				let children = get_children(&entity).await;
-				let p_entity = world.entity(children[0]);
-				let p_children = get_children(&p_entity).await;
-				let em = world.entity(p_children[0]);
-				let element: Element = em
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, b"*hello*".to_vec(), None)
+							.unwrap();
+						// root -> p -> em -> "hello"
+						let children = get_children(world, id);
+						let p_children = get_children(world, children[0]);
+						world
+							.entity(p_children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("em".to_string());
@@ -297,25 +293,29 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"[click](https://example.com)".to_vec(),
-						None,
-					)
-					.await
-					.unwrap();
-				// root -> p -> a
-				let children = get_children(&entity).await;
-				let p_entity = world.entity(children[0]);
-				let p_children = get_children(&p_entity).await;
-				let link = world.entity(p_children[0]);
-				let element: Element = link
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"[click](https://example.com)".to_vec(),
+								None,
+							)
+							.unwrap();
+						// root -> p -> a
+						let children = get_children(world, id);
+						let p_children = get_children(world, children[0]);
+						world
+							.entity(p_children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("a".to_string());
@@ -326,18 +326,27 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"```rust\nfn main() {}\n```".to_vec(), None)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let pre = world.entity(children[0]);
-				let element: Element = pre
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"```rust\nfn main() {}\n```".to_vec(),
+								None,
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("pre".to_string());
@@ -348,19 +357,30 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"- item 1\n- item 2".to_vec(), None)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let ul = world.entity(children[0]);
-				let element: Element = ul
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"- item 1\n- item 2".to_vec(),
+								None,
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						let ul = children[0];
+						let name = world
+							.entity(ul)
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string();
+						let ul_children = get_children(world, ul);
+						(name, ul_children.len())
 					})
-					.await;
-				let ul_children = get_children(&ul).await;
-				(element.name().to_string(), ul_children.len())
+					.await
 			})
 			.await
 			.xpect_eq(("ul".to_string(), 2));
@@ -371,15 +391,21 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Hello".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Hello".to_vec(),
+								Some(WsPathBuf::new("test.md")),
+							)
+							.unwrap();
+						world.entity(id).get::<FileSpan>().cloned().unwrap()
+					})
 					.await
-					.unwrap();
-				entity.get_cloned::<FileSpan>().await.unwrap()
 			})
 			.await
 			.path()
@@ -391,19 +417,22 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello"
-							.to_vec(),
-						None,
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello"
+									.to_vec(),
+								None,
+							)
+							.unwrap();
+						world.entity(id).get::<Frontmatter>().is_some()
+					})
 					.await
-					.unwrap();
-				let has_frontmatter: bool = entity
-					.with_then(|entity| entity.get::<Frontmatter>().is_some())
-					.await;
-				has_frontmatter
 			})
 			.await
 			.xpect_true();
@@ -414,18 +443,22 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"---".to_vec(), None)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let hr = world.entity(children[0]);
-				let element: Element = hr
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, b"---".to_vec(), None)
+							.unwrap();
+						let children = get_children(world, id);
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("hr".to_string());
@@ -436,21 +469,29 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, b"![alt text](image.png)".to_vec(), None)
-					.await
-					.unwrap();
-				// root -> p -> img
-				let children = get_children(&entity).await;
-				let p_entity = world.entity(children[0]);
-				let p_children = get_children(&p_entity).await;
-				let img = world.entity(p_children[0]);
-				let element: Element = img
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"![alt text](image.png)".to_vec(),
+								None,
+							)
+							.unwrap();
+						// root -> p -> img
+						let children = get_children(world, id);
+						let p_children = get_children(world, children[0]);
+						world
+							.entity(p_children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("img".to_string());
@@ -461,12 +502,17 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				let mut parser = MarkdownParser::new();
-				let md = b"# Title\n\nParagraph".to_vec();
-				parser.parse(entity, md.clone(), None).await.unwrap();
-				parser.parse(entity, md, None).await.unwrap();
-				let children = get_children(&entity).await;
-				children.len()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						let mut parser = MarkdownParser::new();
+						let md = b"# Title\n\nParagraph".to_vec();
+						parser.parse(world, id, md.clone(), None).unwrap();
+						parser.parse(world, id, md, None).unwrap();
+						get_children(world, id).len()
+					})
+					.await
 			})
 			.await
 			.xpect_eq(2);
@@ -477,22 +523,27 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"| A | B |\n|---|---|\n| 1 | 2 |".to_vec(),
-						None,
-					)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let table = world.entity(children[0]);
-				let element: Element = table
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"| A | B |\n|---|---|\n| 1 | 2 |".to_vec(),
+								None,
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("table".to_string());
@@ -505,14 +556,13 @@ mod test {
 		world_handle
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(entity, md_owned, None)
-					.await
-					.unwrap();
-
 				let id = entity.id();
-				world
+				entity
+					.world()
 					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(world, id, md_owned, None)
+							.unwrap();
 						let mut renderer = Some(HtmlRenderer::new());
 						world
 							.run_system_once(move |walker: NodeWalker| {
@@ -614,22 +664,27 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				// Markdown with an embedded HTML block
-				let md =
-					b"# Title\n\n<div class=\"custom\">inner</div>\n\nAfter"
-						.to_vec();
-				MarkdownParser::new().parse(entity, md, None).await.unwrap();
-				let children = get_children(&entity).await;
-				// Should have: h1, raw html text, paragraph
-				(children.len() >= 2).xpect_true();
-				// First child is the heading
-				let h1 = world.entity(children[0]);
-				let element: Element = h1
-					.with_then(|entity| {
-						entity.get::<Element>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						let md =
+							b"# Title\n\n<div class=\"custom\">inner</div>\n\nAfter"
+								.to_vec();
+						MarkdownParser::new()
+							.parse(world, id, md, None)
+							.unwrap();
+						let children = get_children(world, id);
+						// Should have: h1, raw html text, paragraph
+						(children.len() >= 2).xpect_true();
+						world
+							.entity(children[0])
+							.get::<Element>()
+							.unwrap()
+							.name()
+							.to_string()
 					})
-					.await;
-				element.name().to_string()
+					.await
 			})
 			.await
 			.xpect_eq("h1".to_string());
@@ -640,23 +695,27 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				// Inline HTML mixed with markdown
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"Hello <strong>world</strong> end".to_vec(),
-						None,
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"Hello <strong>world</strong> end".to_vec(),
+								None,
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						// Should produce a paragraph with mixed children
+						children.len().xpect_eq(1);
+						let p_children = get_children(world, children[0]);
+						// Multiple inline children
+						(p_children.len() >= 3).xpect_true();
+						true
+					})
 					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				// Should produce a paragraph with mixed children
-				children.len().xpect_eq(1);
-				let p_entity = world.entity(children[0]);
-				let p_children = get_children(&p_entity).await;
-				// Multiple inline children: text, raw html, text, raw html, text
-				(p_children.len() >= 3).xpect_true();
-				true
 			})
 			.await
 			.xpect_true();
@@ -667,20 +726,22 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Title".to_vec(),
+								Some(WsPathBuf::new("test.md")),
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						world.entity(children[0]).get::<FileSpan>().is_some()
+					})
 					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let h1 = world.entity(children[0]);
-				let span: Option<FileSpan> = h1
-					.with_then(|entity| entity.get::<FileSpan>().cloned())
-					.await;
-				span.is_some()
 			})
 			.await
 			.xpect_true();
@@ -691,22 +752,23 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Title".to_vec(),
+								Some(WsPathBuf::new("test.md")),
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						let h1_children = get_children(world, children[0]);
+						world.entity(h1_children[0]).get::<FileSpan>().is_some()
+					})
 					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				let h1 = world.entity(children[0]);
-				let h1_children = get_children(&h1).await;
-				let text = world.entity(h1_children[0]);
-				let span: Option<FileSpan> = text
-					.with_then(|entity| entity.get::<FileSpan>().cloned())
-					.await;
-				span.is_some()
 			})
 			.await
 			.xpect_true();
@@ -717,29 +779,34 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				// line 1: # Title\n
-				// line 2: \n
-				// line 3: Paragraph
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title\n\nParagraph".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
-					.await
-					.unwrap();
-				let children = get_children(&entity).await;
-				// Check that the paragraph element has a span
-				// starting after the heading
-				let para = world.entity(children[1]);
-				let span: FileSpan = para
-					.with_then(|entity| {
-						entity.get::<FileSpan>().cloned().unwrap()
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						// line 1: # Title\n
+						// line 2: \n
+						// line 3: Paragraph
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Title\n\nParagraph".to_vec(),
+								Some(WsPathBuf::new("test.md")),
+							)
+							.unwrap();
+						let children = get_children(world, id);
+						// Check that the paragraph element has a span
+						// starting after the heading
+						let span = world
+							.entity(children[1])
+							.get::<FileSpan>()
+							.cloned()
+							.unwrap();
+						// paragraph starts on line 3
+						(span.start().line >= 3).xpect_true();
+						true
 					})
-					.await;
-				// paragraph starts on line 3
-				(span.start().line >= 3).xpect_true();
-				true
+					.await
 			})
 			.await
 			.xpect_true();
@@ -750,18 +817,28 @@ mod test {
 		AsyncPlugin::world()
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title\n\nParagraph".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+				let id = entity.id();
+				entity
+					.world()
+					.with_then(move |world| {
+						MarkdownParser::new()
+							.parse(
+								world,
+								id,
+								b"# Title\n\nParagraph".to_vec(),
+								Some(WsPathBuf::new("test.md")),
+							)
+							.unwrap();
+						let span = world
+							.entity(id)
+							.get::<FileSpan>()
+							.cloned()
+							.unwrap();
+						// root span should cover entire input
+						span.start().xpect_eq(LineCol::new(1, 0));
+						span.path().clone()
+					})
 					.await
-					.unwrap();
-				let span = entity.get_cloned::<FileSpan>().await.unwrap();
-				// root span should cover entire input
-				span.start().xpect_eq(LineCol::new(1, 0));
-				span.path().clone()
 			})
 			.await
 			.xpect_eq(WsPathBuf::new("test.md"));

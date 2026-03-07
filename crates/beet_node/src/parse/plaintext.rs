@@ -18,30 +18,28 @@ impl PlainTextParser {
 impl NodeParser for PlainTextParser {
 	fn parse(
 		&mut self,
-		entity: AsyncEntity,
+		world: &mut World,
+		entity: Entity,
 		bytes: Vec<u8>,
 		path: Option<WsPathBuf>,
-	) -> impl Future<Output = Result> {
-		async move {
-			let text = std::str::from_utf8(&bytes)
-				.map_err(|e| bevyhow!("invalid utf-8: {e}"))?
-				.to_string();
+	) -> Result {
+		let text = std::str::from_utf8(&bytes)
+			.map_err(|err| bevyhow!("invalid utf-8: {err}"))?
+			.to_string();
 
-			let span = path.map(|p| {
-				let mut tracker = SpanTracker::new(p);
-				tracker.extend(&text);
-				tracker.into_full_span()
-			});
+		let span = path.map(|path| {
+			let mut tracker = SpanTracker::new(path);
+			tracker.extend(&text);
+			tracker.into_full_span()
+		});
 
-			entity
-				.with_then(move |mut entity| {
-					entity.set_if_ne_or_insert(Value::new(text));
-					if let Some(span) = span {
-						entity.set_if_ne_or_insert(span);
-					}
-					Ok(())
-				})
-				.await
+		world
+			.entity_mut(entity)
+			.set_if_ne_or_insert(Value::new(text));
+		if let Some(span) = span {
+			world.entity_mut(entity).set_if_ne_or_insert(span);
 		}
+
+		Ok(())
 	}
 }

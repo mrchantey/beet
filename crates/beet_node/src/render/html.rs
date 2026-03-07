@@ -249,14 +249,13 @@ mod test {
 		world_handle
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				HtmlParser::new()
-					.parse(entity, html_owned, None)
-					.await
-					.unwrap();
-
 				let id = entity.id();
-				world
+				entity
+					.world()
 					.with_then(move |world| {
+						HtmlParser::new()
+							.parse(world, id, html_owned, None)
+							.unwrap();
 						let mut renderer = Some(HtmlRenderer::new());
 						world
 							.run_system_once(move |walker: NodeWalker| {
@@ -278,14 +277,13 @@ mod test {
 		world_handle
 			.run_async_local_then(|world| async move {
 				let entity = world.spawn_then(()).await;
-				HtmlParser::with_expressions()
-					.parse(entity, html_owned, None)
-					.await
-					.unwrap();
-
 				let id = entity.id();
-				world
+				entity
+					.world()
 					.with_then(move |world| {
+						HtmlParser::with_expressions()
+							.parse(world, id, html_owned, None)
+							.unwrap();
 						let mut renderer =
 							Some(HtmlRenderer::new().with_expressions());
 						world
