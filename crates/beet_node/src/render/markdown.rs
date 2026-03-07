@@ -502,14 +502,13 @@ mod test {
 	/// Parse markdown then render it back via [`MarkdownRenderer`].
 	fn roundtrip(md: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world, entity, md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(MarkdownRenderer::new());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut render = MarkdownRenderer::new();
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})
@@ -520,14 +519,13 @@ mod test {
 	#[allow(dead_code)]
 	fn roundtrip_expressions(md: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::with_expressions()
-			.parse(&mut world, entity, md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(MarkdownRenderer::new().with_expressions());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut render = MarkdownRenderer::new().with_expressions();
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})
@@ -563,30 +561,28 @@ mod test {
 
 	#[test]
 	fn render_link() {
-		let result = trim(roundtrip(b"[click](https://example.com)"));
-		result
+		trim(roundtrip(b"[click](https://example.com)"))
 			.xpect_contains("[click]")
 			.xpect_contains("(https://example.com)");
 	}
 
 	#[test]
 	fn render_image() {
-		let result = trim(roundtrip(b"![alt](image.png)"));
-		result
+		trim(roundtrip(b"![alt](image.png)"))
 			.xpect_contains("![alt]")
 			.xpect_contains("(image.png)");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		let result = trim(roundtrip(b"- a\n- b"));
-		result.xpect_contains("- a").xpect_contains("- b");
+		trim(roundtrip(b"- a\n- b"))
+			.xpect_contains("- a")
+			.xpect_contains("- b");
 	}
 
 	#[test]
 	fn render_code_block() {
-		let result = trim(roundtrip(b"```rust\nfn main() {}\n```"));
-		result
+		trim(roundtrip(b"```rust\nfn main() {}\n```"))
 			.xpect_contains("```rust")
 			.xpect_contains("fn main() {}")
 			.xpect_contains("```");
@@ -607,13 +603,13 @@ mod test {
 
 	#[test]
 	fn render_multiple_blocks() {
-		let result = trim(roundtrip(b"# Title\n\nParagraph"));
-		result.xpect_contains("# Title").xpect_contains("Paragraph");
+		trim(roundtrip(b"# Title\n\nParagraph"))
+			.xpect_contains("# Title")
+			.xpect_contains("Paragraph");
 	}
 
 	#[test]
 	fn render_comment() {
-		let result = trim(roundtrip(b"<!-- hello -->"));
-		result.xpect_contains("<!-- hello -->");
+		trim(roundtrip(b"<!-- hello -->")).xpect_contains("<!-- hello -->");
 	}
 }

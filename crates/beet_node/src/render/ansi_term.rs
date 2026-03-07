@@ -507,14 +507,13 @@ mod test {
 	/// Parse markdown then render via [`AnsiTermRenderer`].
 	fn render(md: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world, entity, md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(AnsiTermRenderer::new());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut render = AnsiTermRenderer::new();
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})
@@ -576,28 +575,30 @@ mod test {
 
 	#[test]
 	fn render_paragraph() {
-		let result = strip_ansi(&render(b"Hello world"));
-		trim(result).xpect_eq("Hello world".to_string());
+		strip_ansi(&render(b"Hello world"))
+			.xmap(trim)
+			.xpect_eq("Hello world".to_string());
 	}
 
 	#[test]
 	fn render_heading_h1() {
-		let result = strip_ansi(&render(b"# Title"));
-		trim(result).xpect_contains("# Title");
+		strip_ansi(&render(b"# Title"))
+			.xmap(trim)
+			.xpect_contains("# Title");
 	}
 
 	#[test]
 	fn render_heading_styled() {
-		let result = render(b"# Title");
-		// should contain ANSI escape codes for bold green
-		result.xpect_contains("\x1b[").xpect_contains("Title");
+		render(b"# Title")
+			// should contain ANSI escape codes for bold green
+			.xpect_contains("\x1b[")
+			.xpect_contains("Title");
 	}
 
 	#[test]
 	fn render_link_has_osc8() {
-		let result = render(b"[click](https://example.com)");
-		// should contain OSC-8 opening and closing sequences
-		result
+		render(b"[click](https://example.com)")
+			// should contain OSC-8 opening and closing sequences
 			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
 			.xpect_contains("click")
 			.xpect_contains("\x1b]8;;\x1b\\");
@@ -605,14 +606,15 @@ mod test {
 
 	#[test]
 	fn render_link_text_stripped() {
-		let result = strip_ansi(&render(b"[click](https://example.com)"));
-		trim(result).xpect_contains("click");
+		strip_ansi(&render(b"[click](https://example.com)"))
+			.xmap(trim)
+			.xpect_contains("click");
 	}
 
 	#[test]
 	fn render_code_block() {
-		let result = strip_ansi(&render(b"```rust\nfn main() {}\n```"));
-		result.xpect_contains("fn main() {}");
+		strip_ansi(&render(b"```rust\nfn main() {}\n```"))
+			.xpect_contains("fn main() {}");
 	}
 
 	#[test]
@@ -625,27 +627,26 @@ mod test {
 
 	#[test]
 	fn render_image() {
-		let result = strip_ansi(&render(b"![alt text](image.png)"));
-		result.xpect_contains("[alt text]");
+		strip_ansi(&render(b"![alt text](image.png)"))
+			.xpect_contains("[alt text]");
 	}
 
 	#[test]
 	fn render_image_has_osc8() {
-		let result = render(b"![alt](image.png)");
-		result.xpect_contains("\x1b]8;;image.png\x1b\\");
+		render(b"![alt](image.png)").xpect_contains("\x1b]8;;image.png\x1b\\");
 	}
 
 	#[test]
 	fn render_blockquote() {
-		let result = strip_ansi(&render(b"> quoted text"));
-		// uses the vertical bar prefix
-		result.xpect_contains("▌").xpect_contains("quoted text");
+		strip_ansi(&render(b"> quoted text"))
+			// uses the vertical bar prefix
+			.xpect_contains("▌")
+			.xpect_contains("quoted text");
 	}
 
 	#[test]
 	fn render_thematic_break() {
-		let result = strip_ansi(&render(b"---"));
-		result.xpect_contains("────");
+		strip_ansi(&render(b"---")).xpect_contains("────");
 	}
 
 	#[test]
@@ -660,18 +661,17 @@ mod test {
 	#[test]
 	fn custom_style_map() {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world, entity, b"# Hello".to_vec(), None)
+			.parse(&mut world.entity_mut(entity), b"# Hello".to_vec(), None)
 			.unwrap();
-		let mut custom_map: HashMap<Cow<'static, str>, Style> =
-			HashMap::default();
-		custom_map.insert("h1".into(), Style::new().fg(Color::Red));
-		let mut renderer =
-			Some(AnsiTermRenderer::new().with_style_map(custom_map));
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut custom_map: HashMap<Cow<'static, str>, Style> =
+					HashMap::default();
+				custom_map.insert("h1".into(), Style::new().fg(Color::Red));
+				let mut render =
+					AnsiTermRenderer::new().with_style_map(custom_map);
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})

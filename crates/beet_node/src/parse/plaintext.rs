@@ -18,8 +18,7 @@ impl PlainTextParser {
 impl NodeParser for PlainTextParser {
 	fn parse(
 		&mut self,
-		world: &mut World,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 		bytes: Vec<u8>,
 		path: Option<WsPathBuf>,
 	) -> Result {
@@ -33,11 +32,9 @@ impl NodeParser for PlainTextParser {
 			tracker.into_full_span()
 		});
 
-		world
-			.entity_mut(entity)
-			.set_if_ne_or_insert(Value::new(text));
+		entity.set_if_ne_or_insert(Value::new(text));
 		if let Some(span) = span {
-			world.entity_mut(entity).set_if_ne_or_insert(span);
+			entity.set_if_ne_or_insert(span);
 		}
 
 		Ok(())

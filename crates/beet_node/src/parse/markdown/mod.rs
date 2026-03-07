@@ -136,13 +136,15 @@ impl MarkdownParser {
 impl NodeParser for MarkdownParser {
 	fn parse(
 		&mut self,
-		world: &mut World,
-		entity: Entity,
+		entity: &mut EntityWorldMut,
 		bytes: Vec<u8>,
 		path: Option<WsPathBuf>,
 	) -> Result {
 		let text = std::str::from_utf8(&bytes)?;
-		self.parse_text(world, entity, text, path.as_ref())
+		let id = entity.id();
+		entity.world_scope(|world| {
+			self.parse_text(world, id, text, path.as_ref())
+		})
 	}
 }
 
@@ -156,35 +158,31 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Collect the entity ids of the direct children.
-	fn get_children(world: &World, entity: Entity) -> Vec<Entity> {
-		world
-			.entity(entity)
-			.get::<Children>()
-			.map(|children| children.iter().collect())
-			.unwrap_or_default()
-	}
-
 	#[test]
 	fn parse_simple_paragraph() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"Hello world".to_vec(), None)
-			.unwrap();
-		get_children(&world, entity).len().xpect_eq(1);
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"Hello world".to_vec(), None)
+					.unwrap();
+			})
+			.children()
+			.len()
+			.xpect_eq(1);
 	}
 
 	#[test]
 	fn parse_paragraph_contains_text() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"Hello world".to_vec(), None)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"Hello world".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -194,14 +192,15 @@ mod test {
 
 	#[test]
 	fn parse_heading() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"# Title".to_vec(), None)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"# Title".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -211,31 +210,32 @@ mod test {
 
 	#[test]
 	fn parse_multiple_blocks() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Title\n\nParagraph text".to_vec(),
-				None,
-			)
-			.unwrap();
-		get_children(&world, entity).len().xpect_eq(2);
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"# Title\n\nParagraph text".to_vec(), None)
+					.unwrap();
+			})
+			.children()
+			.len()
+			.xpect_eq(2);
 	}
 
 	#[test]
 	fn parse_emphasis() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"*hello*".to_vec(), None)
-			.unwrap();
-		// root -> p -> em -> "hello"
-		let children = get_children(&world, entity);
-		let p_children = get_children(&world, children[0]);
-		world
-			.entity(p_children[0])
+		// root -> p -> em
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"*hello*".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -245,21 +245,22 @@ mod test {
 
 	#[test]
 	fn parse_link() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"[click](https://example.com)".to_vec(),
-				None,
-			)
-			.unwrap();
 		// root -> p -> a
-		let children = get_children(&world, entity);
-		let p_children = get_children(&world, children[0]);
-		world
-			.entity(p_children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"[click](https://example.com)".to_vec(),
+						None,
+					)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -269,19 +270,15 @@ mod test {
 
 	#[test]
 	fn parse_code_block() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"```rust\nfn main() {}\n```".to_vec(),
-				None,
-			)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"```rust\nfn main() {}\n```".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -292,36 +289,37 @@ mod test {
 	#[test]
 	fn parse_unordered_list() {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world, entity, b"- item 1\n- item 2".to_vec(), None)
+			.parse(
+				&mut world.entity_mut(entity),
+				b"- item 1\n- item 2".to_vec(),
+				None,
+			)
 			.unwrap();
-		let children = get_children(&world, entity);
-		let ul = children[0];
-		let name = world
+		let ul = world.entity_mut(entity).child(0).unwrap().id();
+		world
 			.entity(ul)
 			.get::<Element>()
 			.unwrap()
 			.name()
-			.to_string();
-		let ul_children = get_children(&world, ul);
-		(name, ul_children.len()).xpect_eq(("ul".to_string(), 2));
+			.xpect_eq("ul");
+		world.entity_mut(ul).children().len().xpect_eq(2);
 	}
 
 	#[test]
 	fn parse_with_path_inserts_file_span() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Hello".to_vec(),
-				Some(WsPathBuf::new("test.md")),
-			)
-			.unwrap();
-		world
-			.entity(entity)
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"# Hello".to_vec(),
+						Some(WsPathBuf::new("test.md")),
+					)
+					.unwrap();
+			})
 			.get::<FileSpan>()
 			.cloned()
 			.unwrap()
@@ -331,18 +329,18 @@ mod test {
 
 	#[test]
 	fn parse_yaml_frontmatter() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello".to_vec(),
-				None,
-			)
-			.unwrap();
-		world
-			.entity(entity)
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello"
+							.to_vec(),
+						None,
+					)
+					.unwrap();
+			})
 			.get::<Frontmatter>()
 			.is_some()
 			.xpect_true();
@@ -350,14 +348,15 @@ mod test {
 
 	#[test]
 	fn parse_thematic_break() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"---".to_vec(), None)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"---".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -367,16 +366,18 @@ mod test {
 
 	#[test]
 	fn parse_image() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(&mut world, entity, b"![alt text](image.png)".to_vec(), None)
-			.unwrap();
 		// root -> p -> img
-		let children = get_children(&world, entity);
-		let p_children = get_children(&world, children[0]);
-		world
-			.entity(p_children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(entity, b"![alt text](image.png)".to_vec(), None)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -386,30 +387,34 @@ mod test {
 
 	#[test]
 	fn reparse_unchanged_no_change() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		let mut parser = MarkdownParser::new();
-		let md = b"# Title\n\nParagraph".to_vec();
-		parser.parse(&mut world, entity, md.clone(), None).unwrap();
-		parser.parse(&mut world, entity, md, None).unwrap();
-		get_children(&world, entity).len().xpect_eq(2);
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				let mut parser = MarkdownParser::new();
+				let md = b"# Title\n\nParagraph".to_vec();
+				parser.parse(entity, md.clone(), None).unwrap();
+				parser.parse(entity, md, None).unwrap();
+			})
+			.children()
+			.len()
+			.xpect_eq(2);
 	}
 
 	#[test]
 	fn parse_table() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"| A | B |\n|---|---|\n| 1 | 2 |".to_vec(),
-				None,
-			)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"| A | B |\n|---|---|\n| 1 | 2 |".to_vec(),
+						None,
+					)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -420,16 +425,15 @@ mod test {
 	/// Parse markdown then render it back via [`HtmlRenderer`].
 	fn roundtrip(md: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world, entity, md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(HtmlRenderer::new());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				let mut renderer = HtmlRenderer::new();
+				walker.walk(&mut renderer, entity);
+				renderer.into_string()
 			})
 			.unwrap()
 	}
@@ -510,17 +514,18 @@ mod test {
 	#[test]
 	fn parse_embedded_html_block() {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		let md =
 			b"# Title\n\n<div class=\"custom\">inner</div>\n\nAfter".to_vec();
 		MarkdownParser::new()
-			.parse(&mut world, entity, md, None)
+			.parse(&mut world.entity_mut(entity), md, None)
 			.unwrap();
-		let children = get_children(&world, entity);
 		// Should have: h1, raw html text, paragraph
-		(children.len() >= 2).xpect_true();
+		(world.entity_mut(entity).children().len() >= 2).xpect_true();
 		world
-			.entity(children[0])
+			.entity_mut(entity)
+			.child(0)
+			.unwrap()
 			.get::<Element>()
 			.unwrap()
 			.name()
@@ -531,38 +536,36 @@ mod test {
 	#[test]
 	fn parse_inline_html_in_markdown() {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
 			.parse(
-				&mut world,
-				entity,
+				&mut world.entity_mut(entity),
 				b"Hello <strong>world</strong> end".to_vec(),
 				None,
 			)
 			.unwrap();
-		let children = get_children(&world, entity);
 		// Should produce a paragraph with mixed children
-		children.len().xpect_eq(1);
-		let p_children = get_children(&world, children[0]);
+		world.entity_mut(entity).children().len().xpect_eq(1);
 		// Multiple inline children
-		(p_children.len() >= 3).xpect_true();
+		(world.entity_mut(entity).child(0).unwrap().children().len() >= 3)
+			.xpect_true();
 	}
 
 	#[test]
 	fn span_tracking_heading() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Title".to_vec(),
-				Some(WsPathBuf::new("test.md")),
-			)
-			.unwrap();
-		let children = get_children(&world, entity);
-		world
-			.entity(children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"# Title".to_vec(),
+						Some(WsPathBuf::new("test.md")),
+					)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
 			.get::<FileSpan>()
 			.is_some()
 			.xpect_true();
@@ -570,20 +573,21 @@ mod test {
 
 	#[test]
 	fn span_tracking_text_node() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Title".to_vec(),
-				Some(WsPathBuf::new("test.md")),
-			)
-			.unwrap();
-		let children = get_children(&world, entity);
-		let h1_children = get_children(&world, children[0]);
-		world
-			.entity(h1_children[0])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"# Title".to_vec(),
+						Some(WsPathBuf::new("test.md")),
+					)
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
+			.child(0)
+			.unwrap()
 			.get::<FileSpan>()
 			.is_some()
 			.xpect_true();
@@ -591,43 +595,46 @@ mod test {
 
 	#[test]
 	fn span_tracking_multiline() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		// line 1: # Title\n
-		// line 2: \n
-		// line 3: Paragraph
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Title\n\nParagraph".to_vec(),
-				Some(WsPathBuf::new("test.md")),
-			)
-			.unwrap();
-		let children = get_children(&world, entity);
-		// Check that the paragraph element has a span starting after the heading
-		let span = world
-			.entity(children[1])
+		World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				// line 1: # Title\n
+				// line 2: \n
+				// line 3: Paragraph
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"# Title\n\nParagraph".to_vec(),
+						Some(WsPathBuf::new("test.md")),
+					)
+					.unwrap();
+			})
+			.child(1)
+			.unwrap()
 			.get::<FileSpan>()
 			.cloned()
-			.unwrap();
-		// paragraph starts on line 3
-		(span.start().line >= 3).xpect_true();
+			.unwrap()
+			.start()
+			.line
+			.xpect_eq(3);
 	}
 
 	#[test]
 	fn span_tracking_root_full_span() {
-		let mut world = World::new();
-		let entity = world.spawn(()).id();
-		MarkdownParser::new()
-			.parse(
-				&mut world,
-				entity,
-				b"# Title\n\nParagraph".to_vec(),
-				Some(WsPathBuf::new("test.md")),
-			)
+		let span = World::new()
+			.spawn_empty()
+			.xtap(|entity| {
+				MarkdownParser::new()
+					.parse(
+						entity,
+						b"# Title\n\nParagraph".to_vec(),
+						Some(WsPathBuf::new("test.md")),
+					)
+					.unwrap();
+			})
+			.get::<FileSpan>()
+			.cloned()
 			.unwrap();
-		let span = world.entity(entity).get::<FileSpan>().cloned().unwrap();
 		// root span should cover entire input
 		span.start().xpect_eq(LineCol::new(1, 0));
 		span.path().xpect_eq(WsPathBuf::new("test.md"));

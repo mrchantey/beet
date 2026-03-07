@@ -245,14 +245,13 @@ mod test {
 	/// Parse HTML then render it back via [`HtmlRenderer`].
 	fn roundtrip(html: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		HtmlParser::new()
-			.parse(&mut world, entity, html.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), html.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(HtmlRenderer::new());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut render = HtmlRenderer::new();
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})
@@ -262,14 +261,13 @@ mod test {
 	/// Parse then render with expression support.
 	fn roundtrip_expressions(html: &[u8]) -> String {
 		let mut world = World::new();
-		let entity = world.spawn(()).id();
+		let entity = world.spawn_empty().id();
 		HtmlParser::with_expressions()
-			.parse(&mut world, entity, html.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), html.to_vec(), None)
 			.unwrap();
-		let mut renderer = Some(HtmlRenderer::new().with_expressions());
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = renderer.take().unwrap();
+				let mut render = HtmlRenderer::new().with_expressions();
 				walker.walk(&mut render, entity);
 				render.into_string()
 			})

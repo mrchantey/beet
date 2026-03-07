@@ -1042,7 +1042,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "beet"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-executor",
  "beet",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1115,7 +1115,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core_shared",
  "proc-macro2",
@@ -1126,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_shared"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1135,7 +1135,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1189,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "beet_node"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
@@ -1204,7 +1204,7 @@ dependencies = [
 
 [[package]]
 name = "beet_stack"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
@@ -1223,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "beet_stack2"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
@@ -1242,7 +1242,7 @@ dependencies = [
 
 [[package]]
 name = "beet_tool"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
@@ -1253,7 +1253,7 @@ dependencies = [
 
 [[package]]
 name = "beet_tool2"
-version = "0.0.9-dev.3"
+version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
