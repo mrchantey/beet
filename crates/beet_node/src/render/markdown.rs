@@ -493,191 +493,127 @@ impl NodeVisitor for MarkdownRenderer {
 }
 
 
-fn default_block_elements() -> Vec<Cow<'static, str>> {
-	vec![
-		"address".into(),
-		"article".into(),
-		"aside".into(),
-		"blockquote".into(),
-		"details".into(),
-		"dialog".into(),
-		"dd".into(),
-		"div".into(),
-		"dl".into(),
-		"dt".into(),
-		"fieldset".into(),
-		"figcaption".into(),
-		"figure".into(),
-		"footer".into(),
-		"form".into(),
-		"h1".into(),
-		"h2".into(),
-		"h3".into(),
-		"h4".into(),
-		"h5".into(),
-		"h6".into(),
-		"header".into(),
-		"hgroup".into(),
-		"hr".into(),
-		"li".into(),
-		"main".into(),
-		"nav".into(),
-		"ol".into(),
-		"p".into(),
-		"pre".into(),
-		"search".into(),
-		"section".into(),
-		"table".into(),
-		"ul".into(),
-	]
-}
+
 
 #[cfg(test)]
 mod test {
 	use super::*;
 
 	/// Parse markdown then render it back via [`MarkdownRenderer`].
-	async fn roundtrip(md: &[u8]) -> String {
-		let mut world_handle = AsyncPlugin::world();
-		let md_owned = md.to_vec();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						MarkdownParser::new()
-							.parse(world, id, md_owned, None)
-							.unwrap();
-						let mut renderer = Some(MarkdownRenderer::new());
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut render = renderer.take().unwrap();
-								walker.walk(&mut render, id);
-								render.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	fn roundtrip(md: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		MarkdownParser::new()
+			.parse(&mut world, entity, md.to_vec(), None)
+			.unwrap();
+		let mut renderer = Some(MarkdownRenderer::new());
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 	}
 
 	/// Parse markdown then render with expression support.
 	#[allow(dead_code)]
-	async fn roundtrip_expressions(md: &[u8]) -> String {
-		let mut world_handle = AsyncPlugin::world();
-		let md_owned = md.to_vec();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						MarkdownParser::with_expressions()
-							.parse(world, id, md_owned, None)
-							.unwrap();
-						let mut renderer =
-							Some(MarkdownRenderer::new().with_expressions());
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut render = renderer.take().unwrap();
-								walker.walk(&mut render, id);
-								render.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	fn roundtrip_expressions(md: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		MarkdownParser::with_expressions()
+			.parse(&mut world, entity, md.to_vec(), None)
+			.unwrap();
+		let mut renderer = Some(MarkdownRenderer::new().with_expressions());
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 	}
 
 	fn trim(input: String) -> String { input.trim().to_string() }
 
-	#[beet_core::test]
-	async fn render_paragraph() {
-		trim(roundtrip(b"Hello world").await)
-			.xpect_eq("Hello world".to_string());
+	#[test]
+	fn render_paragraph() {
+		trim(roundtrip(b"Hello world")).xpect_eq("Hello world".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_heading_h1() {
-		trim(roundtrip(b"# Title").await).xpect_eq("# Title".to_string());
+	#[test]
+	fn render_heading_h1() {
+		trim(roundtrip(b"# Title")).xpect_eq("# Title".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_heading_h2() {
-		trim(roundtrip(b"## Subtitle").await)
-			.xpect_eq("## Subtitle".to_string());
+	#[test]
+	fn render_heading_h2() {
+		trim(roundtrip(b"## Subtitle")).xpect_eq("## Subtitle".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_emphasis() {
-		trim(roundtrip(b"*hello*").await).xpect_contains("*hello*");
+	#[test]
+	fn render_emphasis() {
+		trim(roundtrip(b"*hello*")).xpect_contains("*hello*");
 	}
 
-	#[beet_core::test]
-	async fn render_strong() {
-		trim(roundtrip(b"**hello**").await).xpect_contains("**hello**");
+	#[test]
+	fn render_strong() {
+		trim(roundtrip(b"**hello**")).xpect_contains("**hello**");
 	}
 
-	#[beet_core::test]
-	async fn render_link() {
-		let result = trim(roundtrip(b"[click](https://example.com)").await);
+	#[test]
+	fn render_link() {
+		let result = trim(roundtrip(b"[click](https://example.com)"));
 		result
 			.xpect_contains("[click]")
 			.xpect_contains("(https://example.com)");
 	}
 
-	#[beet_core::test]
-	async fn render_image() {
-		let result = trim(roundtrip(b"![alt](image.png)").await);
+	#[test]
+	fn render_image() {
+		let result = trim(roundtrip(b"![alt](image.png)"));
 		result
 			.xpect_contains("![alt]")
 			.xpect_contains("(image.png)");
 	}
 
-	#[beet_core::test]
-	async fn render_unordered_list() {
-		let result = trim(roundtrip(b"- a\n- b").await);
+	#[test]
+	fn render_unordered_list() {
+		let result = trim(roundtrip(b"- a\n- b"));
 		result.xpect_contains("- a").xpect_contains("- b");
 	}
 
-	#[beet_core::test]
-	async fn render_code_block() {
-		let result = trim(roundtrip(b"```rust\nfn main() {}\n```").await);
+	#[test]
+	fn render_code_block() {
+		let result = trim(roundtrip(b"```rust\nfn main() {}\n```"));
 		result
 			.xpect_contains("```rust")
 			.xpect_contains("fn main() {}")
 			.xpect_contains("```");
 	}
 
-	#[beet_core::test]
-	async fn render_inline_code() {
-		trim(roundtrip(b"use `foo()` here").await).xpect_contains("`foo()`");
+	#[test]
+	fn render_inline_code() {
+		trim(roundtrip(b"use `foo()` here")).xpect_contains("`foo()`");
 	}
 
-	#[beet_core::test]
-	async fn render_blockquote() {
-		trim(roundtrip(b"> quoted text").await).xpect_contains("> quoted text");
+	#[test]
+	fn render_blockquote() {
+		trim(roundtrip(b"> quoted text")).xpect_contains("> quoted text");
 	}
 
-	#[beet_core::test]
-	async fn render_thematic_break() {
-		roundtrip(b"---").await.xpect_contains("---");
-	}
+	#[test]
+	fn render_thematic_break() { roundtrip(b"---").xpect_contains("---"); }
 
-	#[beet_core::test]
-	async fn render_multiple_blocks() {
-		let result = trim(roundtrip(b"# Title\n\nParagraph").await);
+	#[test]
+	fn render_multiple_blocks() {
+		let result = trim(roundtrip(b"# Title\n\nParagraph"));
 		result.xpect_contains("# Title").xpect_contains("Paragraph");
 	}
 
-	#[beet_core::test]
-	async fn render_comment() {
-		let result = trim(roundtrip(b"<!-- hello -->").await);
+	#[test]
+	fn render_comment() {
+		let result = trim(roundtrip(b"<!-- hello -->"));
 		result.xpect_contains("<!-- hello -->");
 	}
 }

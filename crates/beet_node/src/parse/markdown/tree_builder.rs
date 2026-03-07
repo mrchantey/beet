@@ -191,6 +191,8 @@ impl<'a> MdTreeBuilder<'a> {
 					{
 						content.push_str(&text);
 					}
+				} else if self.html_parse_config.parse_expressions {
+					self.push_text_with_expressions(self.slice(&range));
 				} else {
 					self.push_leaf(HtmlNode::Text(self.slice(&range)));
 				}
@@ -546,6 +548,51 @@ impl<'a> MdTreeBuilder<'a> {
 		self.find_substring(source, content).unwrap_or(source)
 	}
 
+	/// Split a text slice on `{expr}` boundaries, pushing interleaved
+	/// [`HtmlNode::Text`] and [`HtmlNode::Expression`] leaves.
+	///
+	/// Supports nested braces, ie `{a {b} c}` is a single expression.
+	fn push_text_with_expressions(&mut self, source: &'a str) {
+		let mut remaining = source;
+		while !remaining.is_empty() {
+			if let Some(brace_pos) = remaining.find('{') {
+				// push any text before the brace
+				if brace_pos > 0 {
+					self.push_leaf(HtmlNode::Text(&remaining[..brace_pos]));
+				}
+				// parse the expression with nested brace tracking
+				let after_brace = &remaining[brace_pos + 1..];
+				let mut depth: usize = 1;
+				let mut end = None;
+				for (idx, ch) in after_brace.char_indices() {
+					match ch {
+						'{' => depth += 1,
+						'}' => {
+							depth -= 1;
+							if depth == 0 {
+								end = Some(idx);
+								break;
+							}
+						}
+						_ => {}
+					}
+				}
+				if let Some(end_idx) = end {
+					let expr = &after_brace[..end_idx];
+					self.push_leaf(HtmlNode::Expression(expr));
+					remaining = &after_brace[end_idx + 1..];
+				} else {
+					// unmatched brace, treat the rest as text
+					self.push_leaf(HtmlNode::Text(remaining));
+					break;
+				}
+			} else {
+				self.push_leaf(HtmlNode::Text(remaining));
+				break;
+			}
+		}
+	}
+
 	/// Consume the builder and produce the final result.
 	fn finish(mut self) -> Result<MarkdownTree<'a>> {
 		// Drain any unclosed elements
@@ -779,5 +826,74 @@ mod test {
 		)
 		.unwrap();
 		result.frontmatter.is_none().xpect_true();
+	}
+
+	fn build_with_expressions(text: &str) -> Vec<HtmlNode<'_>> {
+		build_markdown_tree(
+			text,
+			MarkdownParseConfig::default_cmark_options(),
+			&HtmlParseConfig::with_expressions(),
+			&HtmlDiffConfig::default(),
+			None,
+		)
+		.unwrap()
+		.nodes
+	}
+
+	#[test]
+	fn expression_in_paragraph() {
+		let nodes = build_with_expressions("hello {name} world");
+		nodes.len().xpect_eq(1);
+		let children = node_children(&nodes[0]);
+		children.len().xpect_eq(3);
+		matches!(&children[0], HtmlNode::Text(text) if *text == "hello ")
+			.xpect_true();
+		matches!(&children[1], HtmlNode::Expression(expr) if *expr == "name")
+			.xpect_true();
+		matches!(&children[2], HtmlNode::Text(text) if *text == " world")
+			.xpect_true();
+	}
+
+	#[test]
+	fn expression_only() {
+		let nodes = build_with_expressions("{greeting}");
+		let children = node_children(&nodes[0]);
+		children.len().xpect_eq(1);
+		matches!(&children[0], HtmlNode::Expression(expr) if *expr == "greeting")
+			.xpect_true();
+	}
+
+	#[test]
+	fn expression_nested_braces() {
+		let nodes = build_with_expressions("{a {b} c}");
+		let children = node_children(&nodes[0]);
+		children
+			.iter()
+			.any(
+				|child| matches!(child, HtmlNode::Expression(expr) if *expr == "a {b} c"),
+			)
+			.xpect_true();
+	}
+
+	#[test]
+	fn no_expressions_without_flag() {
+		// Without expression parsing, braces are plain text
+		let nodes = build("hello {name} world");
+		let children = node_children(&nodes[0]);
+		children.len().xpect_eq(1);
+		matches!(&children[0], HtmlNode::Text(_)).xpect_true();
+	}
+
+	#[test]
+	fn multiple_expressions() {
+		let nodes = build_with_expressions("{a} and {b}");
+		let children = node_children(&nodes[0]);
+		children.len().xpect_eq(3);
+		matches!(&children[0], HtmlNode::Expression(expr) if *expr == "a")
+			.xpect_true();
+		matches!(&children[1], HtmlNode::Text(text) if *text == " and ")
+			.xpect_true();
+		matches!(&children[2], HtmlNode::Expression(expr) if *expr == "b")
+			.xpect_true();
 	}
 }

@@ -242,117 +242,83 @@ fn default_void_elements() -> Vec<Cow<'static, str>> {
 mod test {
 	use super::*;
 
-	/// Helper to parse HTML then render it back via [`HtmlRenderer`].
-	async fn roundtrip(html: &[u8]) -> String {
-		let mut world_handle = AsyncPlugin::world();
-		let html_owned = html.to_vec();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(world, id, html_owned, None)
-							.unwrap();
-						let mut renderer = Some(HtmlRenderer::new());
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut r = renderer.take().unwrap();
-								walker.walk(&mut r, id);
-								r.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	/// Parse HTML then render it back via [`HtmlRenderer`].
+	fn roundtrip(html: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, html.to_vec(), None)
+			.unwrap();
+		let mut renderer = Some(HtmlRenderer::new());
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 	}
 
-	/// Helper to parse then render with expression support.
-	async fn roundtrip_expressions(html: &[u8]) -> String {
-		let mut world_handle = AsyncPlugin::world();
-		let html_owned = html.to_vec();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::with_expressions()
-							.parse(world, id, html_owned, None)
-							.unwrap();
-						let mut renderer =
-							Some(HtmlRenderer::new().with_expressions());
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut r = renderer.take().unwrap();
-								walker.walk(&mut r, id);
-								r.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	/// Parse then render with expression support.
+	fn roundtrip_expressions(html: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::with_expressions()
+			.parse(&mut world, entity, html.to_vec(), None)
+			.unwrap();
+		let mut renderer = Some(HtmlRenderer::new().with_expressions());
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 	}
 
-	#[beet_core::test]
-	async fn render_simple_element() {
-		roundtrip(b"<div>hello</div>")
-			.await
-			.xpect_eq("<div>hello</div>".to_string());
+	#[test]
+	fn render_simple_element() {
+		roundtrip(b"<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_nested_elements() {
+	#[test]
+	fn render_nested_elements() {
 		roundtrip(b"<div><span>inner</span></div>")
-			.await
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_void_element() {
+	#[test]
+	fn render_void_element() {
 		roundtrip(b"<div><br>text</div>")
-			.await
 			.xpect_eq("<div><br />text</div>".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_comment() {
-		roundtrip(b"<!-- hello -->")
-			.await
-			.xpect_eq("<!-- hello -->".to_string());
+	#[test]
+	fn render_comment() {
+		roundtrip(b"<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_text_only() {
-		roundtrip(b"hello world")
-			.await
-			.xpect_eq("hello world".to_string());
+	#[test]
+	fn render_text_only() {
+		roundtrip(b"hello world").xpect_eq("hello world".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_expression() {
+	#[test]
+	fn render_expression() {
 		roundtrip_expressions(b"<p>{name}</p>")
-			.await
 			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_attributes() {
+	#[test]
+	fn render_attributes() {
 		roundtrip(b"<div class=\"foo\" id=\"bar\"></div>")
-			.await
 			.xpect_contains("class=\"foo\"")
 			.xpect_contains("id=\"bar\"");
 	}
 
-	#[beet_core::test]
-	async fn render_self_closing() {
+	#[test]
+	fn render_self_closing() {
 		roundtrip(b"<img src=\"foo.png\" />")
-			.await
 			.xpect_contains("<img")
 			.xpect_contains("/>");
 	}

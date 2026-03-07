@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::borrow::Cow;
 
 
 #[derive(
@@ -166,4 +167,48 @@ impl AttributeQuery<'_, '_> {
 			.filter(|(_, key, _)| key.is_event())
 			.collect()
 	}
+}
+
+
+/// The default set of HTML block-level element names.
+///
+/// Shared by renderers that need to distinguish block vs inline elements
+/// for whitespace and layout decisions.
+pub fn default_block_elements() -> Vec<Cow<'static, str>> {
+	vec![
+		"address".into(),
+		"article".into(),
+		"aside".into(),
+		"blockquote".into(),
+		"details".into(),
+		"dialog".into(),
+		"dd".into(),
+		"div".into(),
+		"dl".into(),
+		"dt".into(),
+		"fieldset".into(),
+		"figcaption".into(),
+		"figure".into(),
+		"footer".into(),
+		"form".into(),
+		"h1".into(),
+		"h2".into(),
+		"h3".into(),
+		"h4".into(),
+		"h5".into(),
+		"h6".into(),
+		"header".into(),
+		"hgroup".into(),
+		"hr".into(),
+		"li".into(),
+		"main".into(),
+		"nav".into(),
+		"ol".into(),
+		"p".into(),
+		"pre".into(),
+		"search".into(),
+		"section".into(),
+		"table".into(),
+		"ul".into(),
+	]
 }

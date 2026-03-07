@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use nu_ansi_term::Color;
 use nu_ansi_term::Style;
 use std::borrow::Cow;
-use std::collections::HashSet;
 
 /// Renders an entity tree to styled ANSI terminal output via [`NodeVisitor`].
 ///
@@ -24,7 +23,7 @@ pub struct AnsiTermRenderer {
 	/// Style used when no mapping or association is found.
 	default_style: Style,
 	/// Elements that produce block-level output with trailing newlines.
-	block_tags: HashSet<Cow<'static, str>>,
+	block_tags: Vec<Cow<'static, str>>,
 	/// Render [`Expression`] values verbatim as `{expr}`.
 	render_expressions: bool,
 
@@ -69,7 +68,7 @@ impl AnsiTermRenderer {
 			style_map: default_style_map(),
 			default_associations: default_associations(),
 			default_style: Style::default(),
-			block_tags: default_block_tags(),
+			block_tags: default_block_elements(),
 			render_expressions: false,
 			buffer: String::new(),
 			style_stack: Vec::new(),
@@ -110,7 +109,7 @@ impl AnsiTermRenderer {
 	}
 
 	/// Override the set of block-level tags.
-	pub fn with_block_tags(mut self, tags: HashSet<Cow<'static, str>>) -> Self {
+	pub fn with_block_tags(mut self, tags: Vec<Cow<'static, str>>) -> Self {
 		self.block_tags = tags;
 		self
 	}
@@ -155,7 +154,8 @@ impl AnsiTermRenderer {
 	}
 
 	fn is_block_tag(&self, name: &str) -> bool {
-		self.block_tags.contains(name)
+		let lower = name.to_ascii_lowercase();
+		self.block_tags.iter().any(|el| el.as_ref() == lower)
 	}
 
 	fn ensure_newline(&mut self) {
@@ -497,47 +497,7 @@ fn default_associations() -> HashMap<Cow<'static, str>, Cow<'static, str>> {
 	map
 }
 
-fn default_block_tags() -> HashSet<Cow<'static, str>> {
-	[
-		"address",
-		"article",
-		"aside",
-		"blockquote",
-		"details",
-		"dialog",
-		"dd",
-		"div",
-		"dl",
-		"dt",
-		"fieldset",
-		"figcaption",
-		"figure",
-		"footer",
-		"form",
-		"h1",
-		"h2",
-		"h3",
-		"h4",
-		"h5",
-		"h6",
-		"header",
-		"hgroup",
-		"hr",
-		"li",
-		"main",
-		"nav",
-		"ol",
-		"p",
-		"pre",
-		"search",
-		"section",
-		"table",
-		"ul",
-	]
-	.into_iter()
-	.map(Cow::Borrowed)
-	.collect()
-}
+
 
 
 #[cfg(test)]
@@ -545,31 +505,20 @@ mod test {
 	use super::*;
 
 	/// Parse markdown then render via [`AnsiTermRenderer`].
-	async fn render(md: &[u8]) -> String {
-		let mut world_handle = AsyncPlugin::world();
-		let md_owned = md.to_vec();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						MarkdownParser::new()
-							.parse(world, id, md_owned, None)
-							.unwrap();
-						let mut renderer = Some(AnsiTermRenderer::new());
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut render = renderer.take().unwrap();
-								walker.walk(&mut render, id);
-								render.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	fn render(md: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		MarkdownParser::new()
+			.parse(&mut world, entity, md.to_vec(), None)
+			.unwrap();
+		let mut renderer = Some(AnsiTermRenderer::new());
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 	}
 
 	fn strip_ansi(input: &str) -> String {
@@ -625,28 +574,28 @@ mod test {
 
 	fn trim(input: String) -> String { input.trim().to_string() }
 
-	#[beet_core::test]
-	async fn render_paragraph() {
-		let result = strip_ansi(&render(b"Hello world").await);
+	#[test]
+	fn render_paragraph() {
+		let result = strip_ansi(&render(b"Hello world"));
 		trim(result).xpect_eq("Hello world".to_string());
 	}
 
-	#[beet_core::test]
-	async fn render_heading_h1() {
-		let result = strip_ansi(&render(b"# Title").await);
+	#[test]
+	fn render_heading_h1() {
+		let result = strip_ansi(&render(b"# Title"));
 		trim(result).xpect_contains("# Title");
 	}
 
-	#[beet_core::test]
-	async fn render_heading_styled() {
-		let result = render(b"# Title").await;
+	#[test]
+	fn render_heading_styled() {
+		let result = render(b"# Title");
 		// should contain ANSI escape codes for bold green
 		result.xpect_contains("\x1b[").xpect_contains("Title");
 	}
 
-	#[beet_core::test]
-	async fn render_link_has_osc8() {
-		let result = render(b"[click](https://example.com)").await;
+	#[test]
+	fn render_link_has_osc8() {
+		let result = render(b"[click](https://example.com)");
 		// should contain OSC-8 opening and closing sequences
 		result
 			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
@@ -654,91 +603,79 @@ mod test {
 			.xpect_contains("\x1b]8;;\x1b\\");
 	}
 
-	#[beet_core::test]
-	async fn render_link_text_stripped() {
-		let result = strip_ansi(&render(b"[click](https://example.com)").await);
+	#[test]
+	fn render_link_text_stripped() {
+		let result = strip_ansi(&render(b"[click](https://example.com)"));
 		trim(result).xpect_contains("click");
 	}
 
-	#[beet_core::test]
-	async fn render_code_block() {
-		let result = strip_ansi(&render(b"```rust\nfn main() {}\n```").await);
+	#[test]
+	fn render_code_block() {
+		let result = strip_ansi(&render(b"```rust\nfn main() {}\n```"));
 		result.xpect_contains("fn main() {}");
 	}
 
-	#[beet_core::test]
-	async fn render_unordered_list() {
-		strip_ansi(&render(b"- alpha\n- beta").await)
+	#[test]
+	fn render_unordered_list() {
+		strip_ansi(&render(b"- alpha\n- beta"))
 			.xpect_contains("alpha")
 			.xpect_contains("beta")
 			.xpect_contains("•");
 	}
 
-	#[beet_core::test]
-	async fn render_image() {
-		let result = strip_ansi(&render(b"![alt text](image.png)").await);
+	#[test]
+	fn render_image() {
+		let result = strip_ansi(&render(b"![alt text](image.png)"));
 		result.xpect_contains("[alt text]");
 	}
 
-	#[beet_core::test]
-	async fn render_image_has_osc8() {
-		let result = render(b"![alt](image.png)").await;
+	#[test]
+	fn render_image_has_osc8() {
+		let result = render(b"![alt](image.png)");
 		result.xpect_contains("\x1b]8;;image.png\x1b\\");
 	}
 
-	#[beet_core::test]
-	async fn render_blockquote() {
-		let result = strip_ansi(&render(b"> quoted text").await);
+	#[test]
+	fn render_blockquote() {
+		let result = strip_ansi(&render(b"> quoted text"));
 		// uses the vertical bar prefix
 		result.xpect_contains("▌").xpect_contains("quoted text");
 	}
 
-	#[beet_core::test]
-	async fn render_thematic_break() {
-		let result = strip_ansi(&render(b"---").await);
+	#[test]
+	fn render_thematic_break() {
+		let result = strip_ansi(&render(b"---"));
 		result.xpect_contains("────");
 	}
 
-	#[beet_core::test]
-	async fn render_multiple_blocks_separated() {
-		strip_ansi(&render(b"# Title\n\nParagraph").await)
+	#[test]
+	fn render_multiple_blocks_separated() {
+		strip_ansi(&render(b"# Title\n\nParagraph"))
 			.xpect_contains("Title")
 			.xpect_contains("Paragraph")
 			// should have a blank line between blocks
 			.xpect_contains("\n\n");
 	}
 
-	#[beet_core::test]
-	async fn custom_style_map() {
-		let mut world_handle = AsyncPlugin::world();
-		world_handle
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						MarkdownParser::new()
-							.parse(world, id, b"# Hello".to_vec(), None)
-							.unwrap();
-						let mut custom_map: HashMap<Cow<'static, str>, Style> =
-							HashMap::default();
-						custom_map
-							.insert("h1".into(), Style::new().fg(Color::Red));
-						let mut renderer = Some(
-							AnsiTermRenderer::new().with_style_map(custom_map),
-						);
-						world
-							.run_system_once(move |walker: NodeWalker| {
-								let mut render = renderer.take().unwrap();
-								walker.walk(&mut render, id);
-								render.into_string()
-							})
-							.unwrap()
-					})
-					.await
+	#[test]
+	fn custom_style_map() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		MarkdownParser::new()
+			.parse(&mut world, entity, b"# Hello".to_vec(), None)
+			.unwrap();
+		let mut custom_map: HashMap<Cow<'static, str>, Style> =
+			HashMap::default();
+		custom_map.insert("h1".into(), Style::new().fg(Color::Red));
+		let mut renderer =
+			Some(AnsiTermRenderer::new().with_style_map(custom_map));
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = renderer.take().unwrap();
+				walker.walk(&mut render, entity);
+				render.into_string()
 			})
-			.await
+			.unwrap()
 			// red foreground escape code
 			.xpect_contains("\x1b[")
 			.xpect_contains("Hello");

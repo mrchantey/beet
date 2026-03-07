@@ -228,397 +228,248 @@ mod test {
 			.unwrap_or_default()
 	}
 
-	#[beet_core::test]
-	async fn parse_simple_element() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div>hello</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						get_children(world, id).len()
-					})
-					.await
-			})
-			.await
-			.xpect_eq(1);
+	#[test]
+	fn parse_simple_element() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, b"<div>hello</div>".to_vec(), None)
+			.unwrap();
+		get_children(&world, entity).len().xpect_eq(1);
 	}
 
-	#[beet_core::test]
-	async fn parse_text_node() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(world, id, b"hello world".to_vec(), None)
-							.unwrap();
-						let children = get_children(world, id);
-						world
-							.entity(children[0])
-							.get::<Value>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_text_node() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, b"hello world".to_vec(), None)
+			.unwrap();
+		let children = get_children(&world, entity);
+		world
+			.entity(children[0])
+			.get::<Value>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(Value::Str("hello world".into()));
 	}
 
-	#[beet_core::test]
-	async fn parse_nested_elements() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div><span>inner</span></div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div = root_children[0];
-						let div_children = get_children(world, div);
-						let span = div_children[0];
-						world
-							.entity(span)
-							.get::<Element>()
-							.unwrap()
-							.name()
-							.to_string()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_nested_elements() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div><span>inner</span></div>".to_vec(),
+				None,
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div = root_children[0];
+		let div_children = get_children(&world, div);
+		let span = div_children[0];
+		world
+			.entity(span)
+			.get::<Element>()
+			.unwrap()
+			.name()
+			.to_string()
 			.xpect_eq("span".to_string());
 	}
 
-	#[beet_core::test]
-	async fn parse_with_expressions() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::with_expressions()
-							.parse(
-								world,
-								id,
-								b"<p>hello {name}</p>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let p_children = get_children(world, root_children[0]);
-						world
-							.entity(p_children[1])
-							.get::<Expression>()
-							.unwrap()
-							.0
-							.clone()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_with_expressions() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::with_expressions()
+			.parse(&mut world, entity, b"<p>hello {name}</p>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let p_children = get_children(&world, root_children[0]);
+		world
+			.entity(p_children[1])
+			.get::<Expression>()
+			.unwrap()
+			.0
+			.clone()
 			.xpect_eq("name".to_string());
 	}
 
-	#[beet_core::test]
-	async fn parse_void_element() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div><br>text</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						world
-							.entity(div_children[0])
-							.get::<Element>()
-							.unwrap()
-							.name()
-							.to_string()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_void_element() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, b"<div><br>text</div>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		world
+			.entity(div_children[0])
+			.get::<Element>()
+			.unwrap()
+			.name()
+			.to_string()
 			.xpect_eq("br".to_string());
 	}
 
-	#[beet_core::test]
-	async fn parse_with_path_inserts_file_span() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div>hello</div>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						world.entity(id).get::<FileSpan>().cloned().unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_with_path_inserts_file_span() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div>hello</div>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		world
+			.entity(entity)
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.path()
 			.xpect_eq(WsPathBuf::new("test.html"));
 	}
 
-	#[beet_core::test]
-	async fn parse_comment() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(world, id, b"<!-- hello -->".to_vec(), None)
-							.unwrap();
-						let root_children = get_children(world, id);
-						world
-							.entity(root_children[0])
-							.get::<Comment>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_comment() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, b"<!-- hello -->".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		world
+			.entity(root_children[0])
+			.get::<Comment>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(Comment::new(" hello "));
 	}
 
-	#[beet_core::test]
-	async fn parse_value_parsing_enabled() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						let mut parser = HtmlParser {
-							diff_config: HtmlDiffConfig {
-								parse_text_nodes: true,
-								..Default::default()
-							},
-							..Default::default()
-						};
-						parser
-							.parse(world, id, b"<div>42</div>".to_vec(), None)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						world
-							.entity(div_children[0])
-							.get::<Value>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_value_parsing_enabled() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		let mut parser = HtmlParser {
+			diff_config: HtmlDiffConfig {
+				parse_text_nodes: true,
+				..default()
+			},
+			..default()
+		};
+		parser
+			.parse(&mut world, entity, b"<div>42</div>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		world
+			.entity(div_children[0])
+			.get::<Value>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(Value::Uint(42));
 	}
 
-	#[beet_core::test]
-	async fn parse_attributes() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div class=\"foo\" id=\"bar\"></div>"
-									.to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div = root_children[0];
-						let attrs = world
-							.entity(div)
-							.get::<Attributes>()
-							.map(|attrs| {
-								let mut result = Vec::new();
-								for attr_entity in attrs.iter() {
-									let attr_ref = world.entity(attr_entity);
-									let key = attr_ref
-										.get::<Attribute>()
-										.unwrap()
-										.to_string();
-									let val = attr_ref
-										.get::<Value>()
-										.cloned()
-										.unwrap_or_default();
-									result.push((key, val));
-								}
-								result
-							})
-							.unwrap_or_default();
-						attrs.len()
-					})
-					.await
+	#[test]
+	fn parse_attributes() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div class=\"foo\" id=\"bar\"></div>".to_vec(),
+				None,
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div = root_children[0];
+		let attrs = world
+			.entity(div)
+			.get::<Attributes>()
+			.map(|attrs| {
+				let mut result = Vec::new();
+				for attr_entity in attrs.iter() {
+					let attr_ref = world.entity(attr_entity);
+					let key = attr_ref.get::<Attribute>().unwrap().to_string();
+					let val =
+						attr_ref.get::<Value>().cloned().unwrap_or_default();
+					result.push((key, val));
+				}
+				result
 			})
-			.await
-			.xpect_eq(2);
+			.unwrap_or_default();
+		attrs.len().xpect_eq(2);
 	}
 
-	#[beet_core::test]
-	async fn parse_self_closing() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(world, id, b"<img />".to_vec(), None)
-							.unwrap();
-						get_children(world, id).len()
-					})
-					.await
-			})
-			.await
-			.xpect_eq(1);
+	#[test]
+	fn parse_self_closing() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(&mut world, entity, b"<img />".to_vec(), None)
+			.unwrap();
+		get_children(&world, entity).len().xpect_eq(1);
 	}
 
-	#[beet_core::test]
-	async fn reparse_unchanged_no_change() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						let mut parser = HtmlParser::new();
-						let html = b"<div>hello</div>".to_vec();
-						parser.parse(world, id, html.clone(), None).unwrap();
-						parser.parse(world, id, html, None).unwrap();
-						get_children(world, id).len()
-					})
-					.await
-			})
-			.await
-			.xpect_eq(1);
+	#[test]
+	fn reparse_unchanged_no_change() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		let mut parser = HtmlParser::new();
+		let html = b"<div>hello</div>".to_vec();
+		parser
+			.parse(&mut world, entity, html.clone(), None)
+			.unwrap();
+		parser.parse(&mut world, entity, html, None).unwrap();
+		get_children(&world, entity).len().xpect_eq(1);
 	}
 
-	#[beet_core::test]
-	async fn reparse_changed_content() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						let mut parser = HtmlParser::new();
-						parser
-							.parse(
-								world,
-								id,
-								b"<div>hello</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						parser
-							.parse(
-								world,
-								id,
-								b"<div>world</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						world
-							.entity(div_children[0])
-							.get::<Value>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn reparse_changed_content() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		let mut parser = HtmlParser::new();
+		parser
+			.parse(&mut world, entity, b"<div>hello</div>".to_vec(), None)
+			.unwrap();
+		parser
+			.parse(&mut world, entity, b"<div>world</div>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		world
+			.entity(div_children[0])
+			.get::<Value>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(Value::Str("world".into()));
 	}
 
-	#[beet_core::test]
-	async fn element_span_covers_opening_tag() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div>hello</div>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						world
-							.entity(root_children[0])
-							.get::<FileSpan>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn element_span_covers_opening_tag() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div>hello</div>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		world
+			.entity(root_children[0])
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(FileSpan::new(
 				"test.html",
 				LineCol::new(1, 0),
@@ -626,35 +477,25 @@ mod test {
 			));
 	}
 
-	#[beet_core::test]
-	async fn text_node_span() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div>hello</div>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						world
-							.entity(div_children[0])
-							.get::<FileSpan>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn text_node_span() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div>hello</div>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		world
+			.entity(div_children[0])
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(FileSpan::new(
 				"test.html",
 				LineCol::new(1, 5),
@@ -662,38 +503,28 @@ mod test {
 			));
 	}
 
-	#[beet_core::test]
-	async fn multiline_spans() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						// line 1: <div>\n
-						// line 2: hello\n
-						// line 3: </div>
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div>\nhello\n</div>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						world
-							.entity(div_children[0])
-							.get::<FileSpan>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn multiline_spans() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		// line 1: <div>\n
+		// line 2: hello\n
+		// line 3: </div>
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div>\nhello\n</div>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		world
+			.entity(div_children[0])
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(FileSpan::new(
 				"test.html",
 				LineCol::new(1, 5), // after `<div>`
@@ -701,37 +532,27 @@ mod test {
 			));
 	}
 
-	#[beet_core::test]
-	async fn attribute_entity_has_span() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::new()
-							.parse(
-								world,
-								id,
-								b"<div class=\"foo\"></div>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div = root_children[0];
-						let attrs =
-							world.entity(div).get::<Attributes>().unwrap();
-						let attr_entity = attrs.iter().next().unwrap();
-						world
-							.entity(attr_entity)
-							.get::<FileSpan>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn attribute_entity_has_span() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::new()
+			.parse(
+				&mut world,
+				entity,
+				b"<div class=\"foo\"></div>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div = root_children[0];
+		let attrs = world.entity(div).get::<Attributes>().unwrap();
+		let attr_entity = attrs.iter().next().unwrap();
+		world
+			.entity(attr_entity)
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(FileSpan::new(
 				"test.html",
 				// span covers `class` through `foo` (key offset to value end)
@@ -740,34 +561,25 @@ mod test {
 			));
 	}
 
-	#[beet_core::test]
-	async fn expression_node_span() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						HtmlParser::with_expressions()
-							.parse(
-								world,
-								id,
-								b"<p>{name}</p>".to_vec(),
-								Some(WsPathBuf::new("test.html")),
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let p_children = get_children(world, root_children[0]);
-						world
-							.entity(p_children[0])
-							.get::<FileSpan>()
-							.cloned()
-							.unwrap()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn expression_node_span() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		HtmlParser::with_expressions()
+			.parse(
+				&mut world,
+				entity,
+				b"<p>{name}</p>".to_vec(),
+				Some(WsPathBuf::new("test.html")),
+			)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let p_children = get_children(&world, root_children[0]);
+		world
+			.entity(p_children[0])
+			.get::<FileSpan>()
+			.cloned()
+			.unwrap()
 			.xpect_eq(FileSpan::new(
 				"test.html",
 				// span covers `name` (the expression content inside braces)
@@ -777,73 +589,42 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[beet_core::test]
-	async fn parse_markdown_text_nodes() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						// The div contains markdown text "**bold**" which should
-						// be re-parsed into <p><strong>bold</strong></p>
-						HtmlParser::new()
-							.with_markdown()
-							.parse(
-								world,
-								id,
-								b"<div>**bold**</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						// the text node should now be replaced with a subtree
-						// containing a <p> with <strong>
-						world
-							.entity(div_children[0])
-							.get::<Children>()
-							.is_some()
-					})
-					.await
-			})
-			.await
+	#[test]
+	fn parse_markdown_text_nodes() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		// The div contains markdown text "**bold**" which should
+		// be re-parsed into <p><strong>bold</strong></p>
+		HtmlParser::new()
+			.with_markdown()
+			.parse(&mut world, entity, b"<div>**bold**</div>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		// the text node should now be replaced with a subtree
+		// containing a <p> with <strong>
+		world
+			.entity(div_children[0])
+			.get::<Children>()
+			.is_some()
 			.xpect_true();
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[beet_core::test]
-	async fn parse_markdown_preserves_plain_text() {
-		AsyncPlugin::world()
-			.run_async_local_then(|world| async move {
-				let entity = world.spawn_then(()).await;
-				let id = entity.id();
-				entity
-					.world()
-					.with_then(move |world| {
-						// Plain text without markdown formatting should still
-						// get wrapped in a <p> element by the markdown parser
-						HtmlParser::new()
-							.with_markdown()
-							.parse(
-								world,
-								id,
-								b"<div>hello world</div>".to_vec(),
-								None,
-							)
-							.unwrap();
-						let root_children = get_children(world, id);
-						let div_children =
-							get_children(world, root_children[0]);
-						// "hello world" parsed as markdown becomes <p>hello world</p>
-						// so the original text node is replaced with structure
-						div_children.len()
-					})
-					.await
-			})
-			.await
-			.xpect_eq(1);
+	#[test]
+	fn parse_markdown_preserves_plain_text() {
+		let mut world = World::new();
+		let entity = world.spawn(()).id();
+		// Plain text without markdown formatting should still
+		// get wrapped in a <p> element by the markdown parser
+		HtmlParser::new()
+			.with_markdown()
+			.parse(&mut world, entity, b"<div>hello world</div>".to_vec(), None)
+			.unwrap();
+		let root_children = get_children(&world, entity);
+		let div_children = get_children(&world, root_children[0]);
+		// "hello world" parsed as markdown becomes <p>hello world</p>
+		// so the original text node is replaced with structure
+		div_children.len().xpect_eq(1);
 	}
 }
