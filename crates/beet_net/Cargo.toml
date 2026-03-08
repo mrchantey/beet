@@ -31,7 +31,7 @@ hyper = [
 "dep:pin-project"
 ]
 lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
-fs = ["beet_core/fs","dep:async-process","dep:path-clean"]
+fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
 aws = [
 	"serde",
@@ -100,7 +100,7 @@ postcard = { workspace = true, optional = true }
 
 
 # fs
-path-clean = { version = "1", optional = true }
+path-clean = { version = "1" }
 
 # http
 http = { workspace = true, optional = true }

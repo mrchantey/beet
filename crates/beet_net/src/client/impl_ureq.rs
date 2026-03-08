@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use send_wrapper::SendWrapper;
 use std::io::Read;
 
 pub(super) async fn send_ureq(req: Request) -> Result<Response> {
@@ -142,5 +141,5 @@ fn create_streaming_body(ureq_body: ureq::Body) -> Body {
 		}
 	});
 
-	Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
+	Body::stream(byte_stream)
 }

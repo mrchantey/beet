@@ -223,6 +223,7 @@ mod test {
 		}
 	}
 
+	#[cfg(feature = "json")]
 	#[cfg_attr(
 		feature = "reqwest",
 		beet_core::test(tokio, timeout_ms = 30_000)
@@ -251,6 +252,7 @@ mod test {
 		}
 	}
 
+	#[cfg(feature = "json")]
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
 	async fn mapped_works() {

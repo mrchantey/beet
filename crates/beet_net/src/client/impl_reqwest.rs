@@ -96,11 +96,7 @@ async fn into_response(res: reqwest::Response) -> Result<Response> {
 		Body::Bytes(res.bytes().await?.into())
 	} else {
 		use futures::TryStreamExt;
-		use send_wrapper::SendWrapper;
-
-		Body::Stream(SendWrapper::new(Box::pin(
-			res.bytes_stream().map_err(BevyError::from),
-		)))
+		Body::stream(res.bytes_stream().map_err(BevyError::from))
 	};
 
 	Ok(Response::from_parts(parts, bytes::Bytes::new()).with_body(body))

@@ -91,16 +91,16 @@ async fn hyper_to_request(
 
 	// Convert hyper body into a stream
 	let stream = http_body_util::BodyStream::new(body);
-	let stream = Box::pin(stream.map(|result| match result {
+	let stream = stream.map(|result| match result {
 		Ok(frame) => match frame.into_data() {
 			Ok(data) => Ok(data),
 			Err(_) => Err(bevyhow!("Failed to convert frame to data")),
 		},
 		Err(err) => Err(bevyhow!("Body stream error: {:?}", err)),
-	}));
+	});
 
 	// Create body based on size
-	let body = Body::Stream(SendWrapper::new(stream));
+	let body = Body::stream(stream);
 
 	Request::from_parts(RequestParts::from(parts), body)
 }

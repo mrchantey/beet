@@ -216,7 +216,9 @@ pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 /// entire file synchronously and yielding a single chunk.
 pub fn read_stream(
 	path: impl AsRef<Path>,
-) -> FsResult<Pin<Box<dyn Stream<Item = Result<Vec<u8>, BevyError>>>>> {
+) -> FsResult<
+	Pin<Box<dyn Stream<Item = Result<Vec<u8>, BevyError>> + Send + Sync>>,
+> {
 	let path = path.as_ref().to_path_buf();
 
 	#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]

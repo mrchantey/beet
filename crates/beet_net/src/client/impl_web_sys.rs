@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 
@@ -181,7 +180,7 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 			Some((Ok(Bytes::from(bytes)), reader))
 		});
 
-		Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
+		Body::stream(byte_stream)
 	};
 
 	Ok(Response::from_parts(parts, Bytes::new()).with_body(body))

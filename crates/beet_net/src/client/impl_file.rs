@@ -9,6 +9,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
+use futures::TryStreamExt;
 use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
@@ -82,16 +83,16 @@ impl FileClient {
 
 		let media_type = MediaType::from_path(&file_path);
 
-		let bytes = fs_ext::read_async(&file_path)
-			.await
-			.map_err(|err| bevyhow!("Failed to read file {raw}: {err}"))?;
-
 		if self.streaming {
-			let chunk = Bytes::from(bytes);
-			let stream = futures::stream::once(async move { Ok(chunk) });
-			let body = Body::stream(stream);
+			let byte_stream = fs_ext::read_stream(&file_path)
+				.map_err(|err| bevyhow!("Failed to stream file {raw}: {err}"))?
+				.map_ok(Bytes::from);
+			let body = Body::stream(byte_stream);
 			Response::ok_body(body, media_type).xok()
 		} else {
+			let bytes = fs_ext::read_async(&file_path)
+				.await
+				.map_err(|err| bevyhow!("Failed to read file {raw}: {err}"))?;
 			Response::ok_body(bytes, media_type).xok()
 		}
 	}

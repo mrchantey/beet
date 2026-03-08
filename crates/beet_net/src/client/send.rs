@@ -60,7 +60,7 @@ async fn send_http(request: Request) -> Result<Response> {
 }
 
 /// Send a request via the local filesystem [`FileClient`].
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(feature = "fs")]
 async fn send_file(request: Request) -> Result<Response> {
 	let url = request.url();
 	let path = match url.scheme() {
@@ -98,14 +98,14 @@ impl Request {
 		match self.scheme() {
 			Scheme::Http | Scheme::Https => send_http(self).await,
 			Scheme::File => {
-				#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+				#[cfg(feature = "fs")]
 				{
 					send_file(self).await
 				}
-				#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+				#[cfg(not(feature = "fs"))]
 				{
 					bevybail!(
-						"The 'fs' feature is required for file:// requests on this platform"
+						"The 'fs' feature is required for file:// requests"
 					);
 				}
 			}
@@ -115,17 +115,14 @@ impl Request {
 					send_http(self).await
 				} else {
 					// No authority — treat as a local file path
-					#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+					#[cfg(feature = "fs")]
 					{
 						send_file(self).await
 					}
-					#[cfg(not(all(
-						feature = "fs",
-						not(target_arch = "wasm32")
-					)))]
+					#[cfg(not(feature = "fs"))]
 					{
 						bevybail!(
-							"The 'fs' feature is required for local file requests on this platform"
+							"The 'fs' feature is required for local file requests"
 						);
 					}
 				}
@@ -150,6 +147,7 @@ impl Request {
 	target_arch = "wasm32"
 ))]
 #[cfg(test)]
+#[cfg(feature = "json")]
 mod test_request {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -324,6 +322,7 @@ mod test_request {
 
 #[cfg(test)]
 #[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
+#[cfg(feature = "json")]
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -365,7 +364,7 @@ mod test_response {
 }
 
 
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(feature = "fs")]
 #[cfg(test)]
 mod test_file_scheme {
 	use crate::prelude::*;

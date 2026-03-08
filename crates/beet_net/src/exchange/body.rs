@@ -24,14 +24,23 @@ use futures::Stream;
 use send_wrapper::SendWrapper;
 use std::pin::Pin;
 
-
 #[cfg(target_arch = "wasm32")]
-type DynBytesStream = dyn Stream<Item = Result<Bytes>>;
-/// Crates like Axum require Stream to be Send.
-// TODO we dont use axum anymore, can we make stream non-send?
-#[cfg(not(target_arch = "wasm32"))]
-type DynBytesStream = dyn Stream<Item = Result<Bytes>> + Send + Sync;
+/// Trait for streams implementing Send on non-wasm platforms
+pub trait MaybeSendStream: Stream<Item = Result<Bytes>> + 'static {}
+#[cfg(target_arch = "wasm32")]
+impl<T> MaybeSendStream for T where T: Stream<Item = Result<Bytes>> + 'static {}
 
+#[cfg(not(target_arch = "wasm32"))]
+/// Trait for streams implementing Send on non-wasm platforms
+pub trait MaybeSendStream:
+	Stream<Item = Result<Bytes>> + Send + Sync + 'static
+{
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl<T> MaybeSendStream for T where
+	T: Stream<Item = Result<Bytes>> + Send + Sync + 'static
+{
+}
 
 /// The body of an HTTP request or response.
 ///
@@ -41,14 +50,12 @@ pub enum Body {
 	/// In-memory bytes content.
 	Bytes(Bytes),
 	/// A streaming body wrapped in [`SendWrapper`] for use in Bevy components.
-	Stream(SendWrapper<Pin<Box<DynBytesStream>>>),
+	Stream(SendWrapper<Pin<Box<dyn MaybeSendStream>>>),
 }
 
 impl Body {
 	/// Creates a streaming body from the given stream.
-	pub fn stream(
-		stream: impl 'static + Stream<Item = Result<Bytes>> + Send + Sync,
-	) -> Self {
+	pub fn stream(stream: impl 'static + MaybeSendStream) -> Self {
 		Body::Stream(SendWrapper::new(Box::pin(stream)))
 	}
 

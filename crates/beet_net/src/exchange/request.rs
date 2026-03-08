@@ -193,8 +193,7 @@ impl Request {
 	where
 		S: 'static + Send + Sync + futures::Stream<Item = Result<Bytes>>,
 	{
-		use send_wrapper::SendWrapper;
-		self.body = Body::Stream(SendWrapper::new(Box::pin(stream)));
+		self.body = Body::stream(stream);
 		self
 	}
 
