@@ -3,8 +3,9 @@
 //! [`MediaType`] represents common IANA media types used in HTTP
 //! `Content-Type` and `Accept` headers. The term "media type" is the
 //! current IANA standard, replacing the older "MIME type" terminology.
+//! [MDN - Media Types](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
 
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// Common media types used in HTTP exchange.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -255,7 +256,7 @@ impl MediaType {
 	/// not `".html"`. Returns [`MediaType::Bytes`] for unrecognized extensions.
 	///
 	/// ```
-	/// # use beet_net::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// assert_eq!(MediaType::from_extension("html"), MediaType::Html);
 	/// assert_eq!(MediaType::from_extension("json"), MediaType::Json);
 	/// assert_eq!(MediaType::from_extension("wasm"), MediaType::Wasm);
@@ -332,7 +333,7 @@ impl MediaType {
 	/// the extension is unrecognized.
 	///
 	/// ```
-	/// # use beet_net::prelude::*;
+	/// # use beet_core::prelude::*;
 	/// assert_eq!(MediaType::from_path("index.html"), MediaType::Html);
 	/// assert_eq!(MediaType::from_path("/assets/style.css"), MediaType::Css);
 	/// assert_eq!(MediaType::from_path("no_extension"), MediaType::Bytes);

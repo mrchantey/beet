@@ -1210,6 +1210,7 @@ version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
+ "beet_node",
  "beet_tool",
  "bevy",
  "bevy_ratatui",

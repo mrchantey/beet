@@ -11,8 +11,6 @@ pub use exchange::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use exchange::headers;
 /// Re-export media-type-driven serialization at crate level.
-#[cfg(feature = "serde")]
-pub use exchange::mime_serde;
 mod object_storage;
 mod server;
 /// WebSocket client and server implementations.
@@ -43,6 +41,7 @@ pub mod prelude {
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
+	pub use beet_core::prelude::*;
 
 	// Re-export common types from dependencies
 	pub use bevy::tasks::futures_lite::StreamExt;

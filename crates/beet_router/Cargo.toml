@@ -25,6 +25,7 @@ bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
 beet_core.workspace = true
+beet_node.workspace = true
 beet_tool.workspace = true
 beet_net.workspace = true
 bevy.workspace = true

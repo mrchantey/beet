@@ -3,21 +3,19 @@
 //! Provides free [`serialize`] and [`deserialize`] functions that dispatch
 //! based on a [`MediaType`] value. Use these instead of reaching for
 //! `serde_json` or `postcard` directly when the format is determined at
-//! runtime from a `content-type` header.
+//! runtime ie from a `content-type` header.
 //!
 //! # Example
 //!
 //! ```
-//! # use beet_net::prelude::*;
+//! # use beet_core::prelude::*;
 //! # #[cfg(feature = "json")] {
-//! let bytes = mime_serde::serialize(MediaType::Json, &42u32).unwrap();
-//! let value: u32 = mime_serde::deserialize(MediaType::Json, &bytes).unwrap();
+//! let bytes = media_serde::serialize(MediaType::Json, &42u32).unwrap();
+//! let value: u32 = media_serde::deserialize(MediaType::Json, &bytes).unwrap();
 //! assert_eq!(value, 42);
 //! # }
 //! ```
-
-use super::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// Serialize `value` into bytes using the given MIME type's format.
 ///

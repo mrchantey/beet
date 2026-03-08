@@ -16,7 +16,6 @@
 //! let body = Body::stream(stream);
 //! ```
 
-use super::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
@@ -150,7 +149,7 @@ impl Body {
 	#[cfg(feature = "json")]
 	pub async fn into_json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		mime_serde::deserialize(MediaType::Json, &bytes)
+		media_serde::deserialize(MediaType::Json, &bytes)
 	}
 
 	/// Consumes the body and deserializes the content as postcard.
@@ -159,20 +158,20 @@ impl Body {
 		self,
 	) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		mime_serde::deserialize(MediaType::Postcard, &bytes)
+		media_serde::deserialize(MediaType::Postcard, &bytes)
 	}
 
 	/// Creates a body by serializing `value` as JSON.
 	#[cfg(feature = "json")]
 	pub fn from_json<T: serde::Serialize>(value: &T) -> Result<Self> {
-		mime_serde::serialize(MediaType::Json, value)
+		media_serde::serialize(MediaType::Json, value)
 			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
 	}
 
 	/// Creates a body by serializing `value` as postcard.
 	#[cfg(feature = "postcard")]
 	pub fn from_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
-		mime_serde::serialize(MediaType::Postcard, value)
+		media_serde::serialize(MediaType::Postcard, value)
 			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
 	}
 
@@ -183,7 +182,7 @@ impl Body {
 		media_type: MediaType,
 	) -> Result<T> {
 		let bytes = self.into_bytes().await?;
-		mime_serde::deserialize(media_type, &bytes)
+		media_serde::deserialize(media_type, &bytes)
 	}
 
 	/// Attempts to extract bytes without consuming a stream.

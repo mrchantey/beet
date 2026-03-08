@@ -20,7 +20,6 @@ pub trait NodeParser {
 	) -> Result;
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -29,16 +29,12 @@ pub mod header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use header as headers;
 mod header_map;
-mod media_type;
-#[cfg(feature = "serde")]
-pub mod mime_serde;
 mod parts;
 mod request;
 mod response;
 mod url;
 pub use body::*;
 pub use header_map::*;
-pub use media_type::*;
 pub use response::*;
 pub use url::*;
 mod param_pattern;

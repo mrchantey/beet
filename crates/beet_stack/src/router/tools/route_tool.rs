@@ -98,10 +98,10 @@ where
 		.unwrap_or(MediaType::Json);
 	let body_bytes = request.body.into_bytes().await?;
 	let input: Input =
-		mime_serde::deserialize(media_type.clone(), &body_bytes)?;
+		media_serde::deserialize(media_type.clone(), &body_bytes)?;
 	let output: Output = next.call(input).await?;
 	// Use the same format as the request payload
-	let body_bytes = mime_serde::serialize(media_type.clone(), &output)?;
+	let body_bytes = media_serde::serialize(media_type.clone(), &output)?;
 	Response::ok()
 		.with_content_type(media_type)
 		.with_body(body_bytes)
@@ -206,40 +206,6 @@ mod test {
 
 		let result: i32 = response.deserialize_blocking().unwrap();
 		result.xpect_eq(42);
-	}
-
-	// -- mime_serde unit tests --
-
-	#[test]
-	fn media_type_from_content_type() {
-		MediaType::from_content_type("application/json")
-			.xpect_eq(MediaType::Json);
-		MediaType::from_content_type("application/json; charset=utf-8")
-			.xpect_eq(MediaType::Json);
-		MediaType::from_content_type("application/x-postcard")
-			.xpect_eq(MediaType::Postcard);
-		// absent content-type defaults to Json in serde_exchange
-		MediaType::from_content_type("text/plain").xpect_eq(MediaType::Text);
-	}
-
-	#[test]
-	#[cfg(feature = "json")]
-	fn mime_serde_roundtrip_json() {
-		let input = AddInput { a: 1, b: 2 };
-		let bytes = mime_serde::serialize(MediaType::Json, &input).unwrap();
-		let output: AddInput =
-			mime_serde::deserialize(MediaType::Json, &bytes).unwrap();
-		output.xpect_eq(input);
-	}
-
-	#[test]
-	#[cfg(feature = "postcard")]
-	fn mime_serde_roundtrip_postcard() {
-		let input = AddInput { a: 3, b: 4 };
-		let bytes = mime_serde::serialize(MediaType::Postcard, &input).unwrap();
-		let output: AddInput =
-			mime_serde::deserialize(MediaType::Postcard, &bytes).unwrap();
-		output.xpect_eq(input);
 	}
 
 	// -- Response::deserialize round-trip --

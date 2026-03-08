@@ -89,6 +89,7 @@ mod path_utils;
 pub mod testing;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
+pub mod types;
 pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
@@ -139,6 +140,7 @@ pub mod prelude {
 	pub use crate::testing::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	pub use crate::types::*;
 	pub use crate::utils::*;
 	pub use either::Either;
 	// as a metaframework we're a superset of bevy,

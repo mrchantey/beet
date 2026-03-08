@@ -118,6 +118,19 @@ pub trait Xtend: Sized {
 	/// ```
 	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
 
+	/// Wraps `self` in [`Err`].
+	///
+	/// # Examples
+	///
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// fn foo() -> Result<u32, &'static str> {
+	///     "error".xerr()
+	/// }
+	/// ```
+	fn xerr<T>(self) -> Result<T, Self> { Err(self) }
+
 	/// Wraps `self` in [`Some`].
 	///
 	/// # Examples

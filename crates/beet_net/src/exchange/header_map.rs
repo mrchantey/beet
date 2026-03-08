@@ -118,7 +118,10 @@ impl HeaderMap {
 	pub fn keys(&self) -> impl Iterator<Item = &String> { self.0.keys() }
 
 	/// Remove a header key and all its values.
-	pub fn remove(&mut self, key: &str) -> Option<Vec<String>> {
+	pub fn remove<H: Header>(&mut self) { self.remove_raw(H::KEY); }
+
+	/// Remove a header key and all its values.
+	pub fn remove_raw(&mut self, key: &str) -> Option<Vec<String>> {
 		let key = to_kebab_case(key);
 		self.0.remove(key.as_ref())
 	}
@@ -258,7 +261,7 @@ mod test {
 	fn remove_header() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
-		headers.remove("x-custom").unwrap().len().xpect_eq(1);
+		headers.remove_raw("x-custom").unwrap().len().xpect_eq(1);
 		headers.contains_key("x-custom").xpect_false();
 	}
 
