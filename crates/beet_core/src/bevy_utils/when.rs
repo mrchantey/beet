@@ -33,13 +33,15 @@ impl<T> When<T> {
 	pub fn into_inner(self) -> T { self.0 }
 }
 
-impl<T> std::ops::Deref for When<T> {
+impl<T> core::ops::Deref for When<T> {
 	type Target = T;
-	fn deref(&self) -> &Self::Target { &self.0 }
+	fn deref(&self) -> &<Self as core::ops::Deref>::Target { &self.0 }
 }
 
-impl<T> std::ops::DerefMut for When<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+impl<T> core::ops::DerefMut for When<T> {
+	fn deref_mut(&mut self) -> &mut <Self as core::ops::Deref>::Target {
+		&mut self.0
+	}
 }
 
 // SAFETY: Delegates to `T`, which ensures the safety requirements are met

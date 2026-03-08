@@ -1,8 +1,8 @@
 //! Exchange statistics tracking and logging.
 //!
-//! This module provides [`ExchangeStats`] for tracking request counts and
-//! the [`exchange_stats`] observer for logging exchange completion.
-use crate::prelude::*;
+//! This module provides [`ExchangeStats`] for tracking request counts
+//! and the [`exchange_stats`] observer for logging exchange completion.
+use super::*;
 use beet_core::prelude::*;
 
 
@@ -53,7 +53,8 @@ pub fn exchange_stats(
 /// Component for tracking exchange statistics on a server entity.
 ///
 /// Add this to server entities to track the number of requests processed.
-/// The [`exchange_stats`] observer will automatically update these stats.
+/// The [`exchange_stats`] observer will automatically update these stats
+/// when [`ExchangeEnd`] events are triggered.
 #[derive(Default, Component)]
 pub struct ExchangeStats {
 	request_count: u128,
@@ -80,24 +81,16 @@ mod test {
 	async fn works() {
 		let mut world = AsyncPlugin::world();
 		world.add_observer(exchange_stats);
-		world
+
+		let entity = world
 			.spawn((
 				ExchangeStats::default(),
-				spawn_exchange(|| {
-					OnSpawn::observe(
-						|ev: On<Insert, Request>,
-						 mut commands: Commands,
-						 requests: Query<&Request>| {
-							commands.entity(ev.event_target()).insert(
-								requests
-									.get(ev.event_target())
-									.unwrap()
-									.mirror_parts(),
-							);
-						},
-					)
-				}),
+				handler_exchange(|req| req.mirror_parts()),
 			))
+			.id();
+
+		world
+			.entity_mut(entity)
 			.exchange(Request::get("/mirror"))
 			.await
 			.into_result()

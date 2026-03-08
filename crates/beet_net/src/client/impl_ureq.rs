@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use send_wrapper::SendWrapper;
@@ -79,15 +80,12 @@ fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {
 	let should_stream = is_event_stream || is_chunked;
 
 	// Build ResponseParts with headers
-	let parts = {
-		let mut builder = PartsBuilder::new();
-		for (key, value) in res.headers().iter() {
-			if let Ok(value_str) = value.to_str() {
-				builder = builder.header(key.to_string(), value_str);
-			}
+	let mut parts = ResponseParts::new(res.status().into());
+	for (key, value) in res.headers().iter() {
+		if let Ok(value_str) = value.to_str() {
+			parts.headers.set_raw(key.to_string(), value_str);
 		}
-		builder.build_response_parts(res.status().into())
-	};
+	}
 
 	let body = if should_stream {
 		// Create a streaming body for SSE/chunked responses

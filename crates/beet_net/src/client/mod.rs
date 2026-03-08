@@ -21,6 +21,7 @@
 //!     response.text().await
 //! }
 //! ```
+#[cfg(feature = "http")]
 mod event_source;
 #[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
 mod impl_reqwest;
@@ -28,7 +29,7 @@ mod impl_reqwest;
 mod impl_ureq;
 #[cfg(target_arch = "wasm32")]
 mod impl_web_sys;
-// pub use event_source::*;
 mod send;
+#[cfg(feature = "http")]
 pub use event_source::*;
 pub use send::*;

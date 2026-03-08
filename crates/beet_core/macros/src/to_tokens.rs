@@ -1,3 +1,7 @@
+extern crate alloc;
+
+use alloc::format;
+use alloc::vec::Vec;
 use beet_core_shared::pkg_ext;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -229,6 +233,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::parse;
+	use alloc::string::ToString;
 	use syn::DeriveInput;
 
 	#[test]

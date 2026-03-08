@@ -1,4 +1,6 @@
+#[cfg(feature = "std")]
 use crate::arena::Getter;
+use alloc::boxed::Box;
 
 /// A utility struct containing a `'static + Send + Clone + FnOnce()`
 pub struct CloneFunc<In, Out>(pub Box<dyn CloneFuncTrait<In, Out>>);
@@ -42,6 +44,7 @@ where
 	fn call_func(&self, input: In) -> Out { (self.clone())(input) }
 }
 
+#[cfg(feature = "std")]
 impl<Out> CloneFuncTrait<(), Out> for Getter<Out>
 where
 	Out: 'static + Send + Clone,
@@ -55,7 +58,7 @@ where
 
 
 #[cfg(feature = "nightly")]
-impl<In, Out> std::ops::FnOnce<(In,)> for CloneFunc<In, Out>
+impl<In, Out> core::ops::FnOnce<(In,)> for CloneFunc<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -67,7 +70,7 @@ where
 }
 
 #[cfg(feature = "nightly")]
-impl<In, Out> std::ops::FnMut<(In,)> for CloneFunc<In, Out>
+impl<In, Out> core::ops::FnMut<(In,)> for CloneFunc<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -78,7 +81,7 @@ where
 }
 
 #[cfg(feature = "nightly")]
-impl<In, Out> std::ops::Fn<(In,)> for CloneFunc<In, Out>
+impl<In, Out> core::ops::Fn<(In,)> for CloneFunc<In, Out>
 where
 	In: 'static,
 	Out: 'static,

@@ -31,7 +31,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				Count::default(),
-				handler_exchange(router),
+				system_tool(router),
 			));
 		})
 		.run();
@@ -41,7 +41,12 @@ fn main() {
 struct Count(u32);
 
 /// A simple router implementation that matches the request path
-fn router(entity: EntityWorldMut, request: Request) -> Response {
+fn router(
+	In(input): In<SystemToolIn<Request>>,
+	world: &mut World,
+) -> Result<Response> {
+	let entity = world.entity_mut(input.caller);
+	let request = input.take();
 	println!("{}: {}", request.method(), request.path_string());
 
 	let route = match request.path_string().as_str() {
@@ -49,7 +54,7 @@ fn router(entity: EntityWorldMut, request: Request) -> Response {
 		"/planting-trees" => planting_trees,
 		_ => not_found,
 	};
-	route(entity, request)
+	route(entity, request).xok()
 }
 
 
@@ -69,7 +74,7 @@ fn home(mut entity: EntityWorldMut, _: Request) -> Response {
 "#,
 			count.0
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
@@ -82,7 +87,7 @@ fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
 <p>Do it, just do it. Dont ask questions. Go and buy a native tree and plant it somewhere.</p>
 "#,
 		),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
@@ -90,14 +95,14 @@ fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
 fn not_found(_: EntityWorldMut, request: Request) -> Response {
 	let path = request.path_string();
 	Response::from_status_body(
-		StatusCode::NotFound,
+		StatusCode::NOT_FOUND,
 		render(&format!(
 			r#"
 <h1>Not Found</h1>
 <p>The path at <a href="{path}">{path}</a> could not be found.</p>
 "#,
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 

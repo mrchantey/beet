@@ -83,12 +83,12 @@ use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use core::any::TypeId;
+use core::borrow::Borrow;
+use core::hash::BuildHasher;
+use core::hash::Hash;
+use core::str::FromStr;
 use heck::ToSnakeCase;
-use std::any::TypeId;
-use std::borrow::Borrow;
-use std::hash::BuildHasher;
-use std::hash::Hash;
-use std::str::FromStr;
 
 /// Marker attribute indicating a field is required during MultiMap parsing.
 ///
@@ -601,7 +601,7 @@ fn parse_number_field<T: FromStr + PartialReflect>(
 	field_name: &str,
 ) -> Result<Option<Box<dyn PartialReflect>>>
 where
-	T::Err: std::fmt::Display,
+	T::Err: core::fmt::Display,
 {
 	let value_str = values.first();
 

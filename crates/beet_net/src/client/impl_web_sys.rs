@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use send_wrapper::SendWrapper;
@@ -107,7 +108,7 @@ fn create_readable_stream_from_body(
 
 
 async fn into_response(res: web_sys::Response) -> Result<Response> {
-	let status = StatusCode::from_http_raw(res.status() as u16);
+	let status = StatusCode::new(res.status() as u16);
 
 	// Build ResponseParts with headers
 	let mut parts = ResponseParts::new(status);
@@ -122,19 +123,22 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		if arr.length() == 2 {
 			let key = arr.get(0).as_string().unwrap_or_default();
 			let value = arr.get(1).as_string().unwrap_or_default();
-			parts.parts_mut().insert_header(key.to_lowercase(), value);
+			parts.headers.set_raw(key.to_lowercase(), value);
 		}
 	}
 
 	// Check if this is an SSE response which must always be streamed
 	let is_event_stream = parts
-		.get_header("content-type")
-		.map_or(false, |ct| ct.contains("text/event-stream"));
+		.headers
+		.get::<header::ContentType>()
+		.and_then(|res| res.ok())
+		.map_or(false, |mime| mime == MimeType::EventStream);
 
 	let is_bytes = !is_event_stream
 		&& parts
-			.get_header("content-length")
-			.and_then(|val| val.parse::<u64>().ok())
+			.headers
+			.get::<header::ContentLength>()
+			.and_then(|res| res.ok())
 			.map_or(false, |val| val <= Body::MAX_BUFFER_SIZE as u64);
 
 	let body: Body = if is_bytes {

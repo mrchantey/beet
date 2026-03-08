@@ -296,7 +296,8 @@ impl BucketProvider for DynamoDbProvider {
 }
 
 
-impl<T: TableRow> TableProvider<T> for DynamoDbProvider {
+#[cfg(feature = "json")]
+impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
@@ -349,6 +350,7 @@ mod test {
 		let provider = DynamoDbProvider::create().await;
 		bucket_test::run(provider).await;
 	}
+	#[cfg(feature = "json")]
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {

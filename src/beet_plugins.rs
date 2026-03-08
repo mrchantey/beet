@@ -16,10 +16,10 @@ impl Plugin for BeetPlugins {
 		// do we do console error panic hook here?
 		// console_error_panic_hook::set_once();
 
-		#[cfg(feature = "rsx")]
-		app.init_plugin::<ApplyDirectivesPlugin>();
-		#[cfg(feature = "build")]
-		app.init_plugin::<BuildPlugin>();
+		// #[cfg(feature = "rsx")]
+		// app.init_plugin::<ApplyDirectivesPlugin>();
+		// #[cfg(feature = "build")]
+		// app.init_plugin::<BuildPlugin>();
 
 		// it causin too many problems
 		// #[cfg(feature = "server_app")]
@@ -39,27 +39,27 @@ impl Plugin for BeetRunner {
 		// order matters, last flag wins
 		// client runner should be set first so server can override it
 		// (server needs special shutdown handling to avoid TLS panics)
-		#[cfg(feature = "client")]
-		app.init_plugin::<TaskPoolPlugin>();
+		// #[cfg(feature = "client")]
+		// app.init_plugin::<TaskPoolPlugin>();
 
-		#[cfg(feature = "client")]
-		app.set_runner(ReactiveApp::runner);
+		// #[cfg(feature = "client")]
+		// app.set_runner(ReactiveApp::runner);
 
-		#[cfg(feature = "launch")]
-		app.set_runner(LaunchConfig::runner);
+		// #[cfg(feature = "launch")]
+		// app.set_runner(LaunchConfig::runner);
 
-		#[cfg(feature = "server_app")]
-		app.set_runner(ServerPlugin::maybe_tokio_runner);
+		// #[cfg(feature = "server_app")]
+		// app.set_runner(ServerPlugin::maybe_tokio_runner);
 
-		app.add_systems(Startup, print_config);
-		#[cfg(not(any(
-			feature = "launch",
-			feature = "server_app",
-			feature = "client"
-		)))]
-		panic!(
-			"No runner feature enabled. Please enable one of: launch, server_app, client."
-		);
+		// app.add_systems(Startup, print_config);
+		// #[cfg(not(any(
+		// 	feature = "launch",
+		// 	feature = "server_app",
+		// 	feature = "client"
+		// )))]
+		// panic!(
+		// 	"No runner feature enabled. Please enable one of: launch, server_app, client."
+		// );
 	}
 }
 
@@ -67,21 +67,21 @@ impl Plugin for BeetRunner {
 #[allow(unused)]
 fn print_config(pkg_config: Res<PackageConfig>) {
 	// Order matches runner priority (last wins, so check in reverse)
-	#[cfg(feature = "client")]
-	let binary = "Client";
-	#[cfg(feature = "launch")]
-	let binary = "Launch";
-	#[cfg(feature = "server_app")]
-	let binary = "Server";
+	// #[cfg(feature = "client")]
+	// let binary = "Client";
+	// #[cfg(feature = "launch")]
+	// let binary = "Launch";
+	// #[cfg(feature = "server_app")]
+	// let binary = "Server";
 
-	#[cfg(any(feature = "launch", feature = "server_app", feature = "client"))]
-	info!(
-		"\n🌱 Running Beet\nbinary: {binary}\n{}build: {}",
-		*pkg_config,
-		if cfg!(debug_assertions) {
-			"debug"
-		} else {
-			"release"
-		},
-	);
+	// #[cfg(any(feature = "launch", feature = "server_app", feature = "client"))]
+	// info!(
+	// 	"\n🌱 Running Beet\nbinary: {binary}\n{}build: {}",
+	// 	*pkg_config,
+	// 	if cfg!(debug_assertions) {
+	// 		"debug"
+	// 	} else {
+	// 		"release"
+	// 	},
+	// );
 }

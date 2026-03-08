@@ -39,6 +39,7 @@ use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::CommandQueue;
+use bevy::ecs::world::WorldId;
 use bevy::tasks::IoTaskPool;
 use std::future::Future;
 
@@ -96,10 +97,10 @@ pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
+		AsyncWorld::register(app.world_mut());
 		app.init_plugin_with(MainSchedulePlugin)
 			// this will add the system to tick_global_task_pools_on_main_thread() in the Last schedule
 			.init_plugin::<TaskPoolPlugin>()
-			.init_resource::<AsyncChannel>()
 			.add_systems(PreUpdate, append_async_queues);
 	}
 }
@@ -251,7 +252,7 @@ pub struct AsyncCommands<'w, 's> {
 	/// The commands used for spawning entities.
 	pub commands: Commands<'w, 's>,
 	/// The channel used to create an [`AsyncWorld`] passed to the async function.
-	pub channel: Res<'w, AsyncChannel>,
+	pub world_id: WorldId,
 }
 
 
@@ -260,10 +261,12 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 	pub fn reborrow(&mut self) -> AsyncCommands<'w, '_> {
 		AsyncCommands {
 			commands: self.commands.reborrow(),
-			channel: Res::clone(&self.channel),
+			world_id: self.world_id,
 		}
 	}
 
+	/// Creates an [`AsyncWorld`] handle for sending commands.
+	pub fn world(&self) -> AsyncWorld { AsyncWorld::new(self.world_id) }
 
 	/// Spawns an async task that can send commands to the world.
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)
@@ -272,7 +275,7 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 		Fut: 'static + Future<Output = Out> + Send,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task(self.channel.world(), func);
+		spawn_async_task(self.world(), func);
 	}
 
 	/// Spawns an async task on the local thread.
@@ -282,7 +285,7 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task_local(self.channel.world(), func);
+		spawn_async_task_local(self.world(), func);
 	}
 }
 
@@ -313,40 +316,24 @@ impl AsyncTaskOut for Result {
 }
 
 /// Resource containing the channel used by async functions to send [`CommandQueue`]s.
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub struct AsyncChannel {
 	/// The number of tasks currently in flight.
 	task_count: usize,
-	/// The sender for the async channel.
-	tx: Sender<CommandQueue>,
 	/// The receiver for the async channel.
 	rx: Receiver<CommandQueue>,
 }
 
-impl Default for AsyncChannel {
-	fn default() -> Self {
-		let (tx, rx) = async_channel::unbounded();
+impl AsyncChannel {
+	fn new(recv: Receiver<CommandQueue>) -> Self {
 		Self {
-			rx,
-			tx,
+			rx: recv,
 			task_count: 0,
 		}
 	}
-}
 
-impl AsyncChannel {
 	/// Returns the number of tasks currently in flight.
 	pub fn task_count(&self) -> usize { self.task_count }
-
-	/// Returns a clone of the sender.
-	pub fn tx(&self) -> Sender<CommandQueue> { self.tx.clone() }
-
-	/// Creates an [`AsyncWorld`] handle for sending commands.
-	pub fn world(&self) -> AsyncWorld {
-		AsyncWorld {
-			tx: self.tx.clone(),
-		}
-	}
 
 	fn increment_tasks(&mut self) -> &mut Self {
 		self.task_count += 1;
@@ -362,17 +349,42 @@ impl AsyncChannel {
 /// A portable handle for sending [`CommandQueue`]s to the world from async contexts.
 ///
 /// Any async function that accepts a single [`AsyncWorld`] argument is an async system.
-#[derive(Clone)]
+/// This type is [`Copy`] as it only stores a [`WorldId`]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AsyncWorld {
-	tx: Sender<CommandQueue>,
+	world_id: WorldId,
 }
+
+impl From<WorldId> for AsyncWorld {
+	fn from(world_id: WorldId) -> Self { Self::new(world_id) }
+}
+
+static WORLD_SENDERS: std::sync::LazyLock<
+	std::sync::Mutex<HashMap<WorldId, Sender<CommandQueue>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
 
 impl AsyncWorld {
 	/// Creates a new [`AsyncWorld`] from a command queue sender.
-	pub fn new(tx: Sender<CommandQueue>) -> Self { Self { tx } }
+	pub fn new(world_id: WorldId) -> Self { Self { world_id } }
+
+	fn register(world: &mut World) {
+		let mut senders = WORLD_SENDERS.lock().unwrap();
+		if !senders.contains_key(&world.id()) {
+			let (send, recv) = async_channel::unbounded();
+			senders.insert(world.id(), send);
+			world.insert_resource(AsyncChannel::new(recv));
+		}
+	}
 
 	fn send(&self, queue: CommandQueue) {
-		if let Err(err) = self.tx.try_send(queue) {
+		let senders = WORLD_SENDERS.lock().unwrap();
+		let sender = senders.get(&self.world_id).expect(
+			"AsyncWorld sender not found for world, please add the AsyncPlugin",
+		);
+
+		if let Err(err) = sender.try_send(queue) {
+			// we dont unwrap here, its common for this to happen
 			warn!("Failed to send command queue: {}", err);
 		}
 	}
@@ -632,7 +644,8 @@ impl AsyncWorld {
 }
 
 /// A handle for operating on a specific entity from async contexts.
-#[derive(Clone)]
+/// This type is [`Copy`] as it only stores an [`Entity`] and [`WorldId`]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AsyncEntity {
 	entity: Entity,
 	world: AsyncWorld,
@@ -687,7 +700,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -705,7 +718,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found")
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -824,7 +837,7 @@ pub impl World {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task(self.resource::<AsyncChannel>().world(), func);
+		spawn_async_task(AsyncWorld::new(self.id()), func);
 		self
 	}
 
@@ -835,7 +848,7 @@ pub impl World {
 		Fut: 'static + Future<Output = Out>,
 		Out: AsyncTaskOut,
 	{
-		spawn_async_task_local(self.resource::<AsyncChannel>().world(), func);
+		spawn_async_task_local(AsyncWorld::new(self.id()), func);
 		self
 	}
 
@@ -850,7 +863,7 @@ pub impl World {
 		Out: 'static + Send + Sync,
 	{
 		spawn_async_task_then(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.id()),
 			|| self.update_local(),
 			func,
 		)
@@ -867,7 +880,7 @@ pub impl World {
 		Out: 'static,
 	{
 		spawn_async_task_local_then(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.id()),
 			|| self.update_local(),
 			func,
 		)
@@ -886,7 +899,7 @@ pub impl EntityWorldMut<'_> {
 	{
 		let id = self.id();
 		spawn_async_task_local(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.world().id()),
 			move |world| func(world.entity(id)),
 		);
 		self
@@ -901,7 +914,7 @@ pub impl EntityWorldMut<'_> {
 	{
 		let id = self.id();
 		spawn_async_task_local(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.world().id()),
 			move |world| func(world.entity(id)),
 		);
 		self
@@ -919,7 +932,7 @@ pub impl EntityWorldMut<'_> {
 	{
 		let id = self.id();
 		spawn_async_task_then(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.world().id()),
 			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)
@@ -937,7 +950,7 @@ pub impl EntityWorldMut<'_> {
 	{
 		let id = self.id();
 		spawn_async_task_local_then(
-			self.resource::<AsyncChannel>().world(),
+			AsyncWorld::new(self.world().id()),
 			|| self.world_scope(World::update_local),
 			move |world| func(world.entity(id)),
 		)

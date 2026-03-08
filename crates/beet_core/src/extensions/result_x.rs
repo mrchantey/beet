@@ -39,8 +39,9 @@ pub impl<T, E> Result<T, E> {
 
 
 /// Extension trait for [`Result`] with displayable errors.
+#[cfg(feature = "std")]
 #[ext(name=ResultExtDisplay)]
-pub impl<T, E: std::fmt::Display> Result<T, E> {
+pub impl<T, E: core::fmt::Display> Result<T, E> {
 	/// Unwraps the value or exits the process with a formatted error message.
 	///
 	/// Unlike [`unwrap`](Result::unwrap), this prints a user-friendly error

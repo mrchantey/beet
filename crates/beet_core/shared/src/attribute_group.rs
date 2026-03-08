@@ -1,4 +1,8 @@
 //! inspired by [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
+extern crate alloc;
+
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use proc_macro2::TokenStream;
 use syn::Expr;
 use syn::Ident;
@@ -44,7 +48,6 @@ impl AttributeGroup {
 		Ok(args)
 	}
 
-
 	/// ## Errors
 	/// if any of the attributes does not match a provided key
 	pub fn validate_allowed_keys(&self, keys: &[&str]) -> Result<&Self> {
@@ -53,7 +56,7 @@ impl AttributeGroup {
 				if !keys.contains(&name.to_string().as_str()) {
 					return Err(syn::Error::new(
 						name.span(),
-						format!(
+						alloc::format!(
 							"Invalid Attribute key `{}`. Allowed attributes are: {}",
 							name,
 							keys.join(", ")

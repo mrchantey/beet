@@ -1,6 +1,8 @@
+use alloc::vec::Vec;
+
 /// Utility functions for working with [`Vec`].
 pub struct VecExt<T> {
-	phantom: std::marker::PhantomData<T>,
+	phantom: core::marker::PhantomData<T>,
 }
 
 impl<T> VecExt<T> {

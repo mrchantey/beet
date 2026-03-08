@@ -52,7 +52,7 @@ mod tests {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
 				CliServer,
-				handler_exchange(|_, _| StatusCode::ImATeapot.into()),
+				handler_exchange(|_| StatusCode::IM_A_TEAPOT.into()),
 			))
 			.run_async()
 			.await

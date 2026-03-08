@@ -1,0 +1,611 @@
+use crate::prelude::*;
+use beet_core::prelude::*;
+use nu_ansi_term::Color;
+use nu_ansi_term::Style;
+use std::borrow::Cow;
+
+/// Renders an entity tree to styled ANSI terminal output via [`NodeVisitor`].
+///
+/// Maps HTML-like element names to [`Style`] values. When an element has
+/// no explicit style, [`AnsiTermRenderer::default_associations`] is checked
+/// for a fallback element name whose style should be reused. If neither
+/// map contains an entry, [`AnsiTermRenderer::default_style`] is used.
+///
+/// Block-level elements emit newlines following the same rules as HTML,
+/// while inline elements are rendered contiguously. Anchor tags render
+/// as [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
+pub struct AnsiTermRenderer {
+	/// Explicit element-name → style mapping.
+	style_map: HashMap<Cow<'static, str>, Style>,
+	/// Fallback mapping: if an element is missing from `style_map`,
+	/// look up its association here and use that element's style instead.
+	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
+	/// Style used when no mapping or association is found.
+	default_style: Style,
+	/// Render [`Expression`] values verbatim as `{expr}`.
+	render_expressions: bool,
+	/// Whether to prefix headings with `#` markers.
+	heading_hashes: bool,
+	/// Shared block/inline tracking state and output buffer.
+	state: TextRenderState,
+	/// Stack of active styles so nested elements restore correctly.
+	style_stack: Vec<Style>,
+}
+
+impl Default for AnsiTermRenderer {
+	fn default() -> Self { Self::new() }
+}
+
+impl AnsiTermRenderer {
+	pub fn new() -> Self {
+		Self {
+			style_map: default_style_map(),
+			default_associations: default_associations(),
+			default_style: Style::default(),
+			render_expressions: false,
+			heading_hashes: false,
+			state: TextRenderState::new(),
+			style_stack: Vec::new(),
+		}
+	}
+
+	/// Override the element → style mapping.
+	pub fn with_style_map(
+		mut self,
+		map: HashMap<Cow<'static, str>, Style>,
+	) -> Self {
+		self.style_map = map;
+		self
+	}
+
+	/// Override the fallback association mapping.
+	pub fn with_default_associations(
+		mut self,
+		map: HashMap<Cow<'static, str>, Cow<'static, str>>,
+	) -> Self {
+		self.default_associations = map;
+		self
+	}
+
+	/// Override the default style used when no mapping is found.
+	pub fn with_default_style(mut self, style: Style) -> Self {
+		self.default_style = style;
+		self
+	}
+
+	/// Override the set of block-level tags.
+	pub fn with_block_tags(mut self, tags: Vec<Cow<'static, str>>) -> Self {
+		self.state = self.state.with_block_elements(tags);
+		self
+	}
+
+	/// Enable rendering of [`Expression`] nodes as `{expr}`.
+	pub fn with_expressions(mut self) -> Self {
+		self.render_expressions = true;
+		self
+	}
+
+	/// Consume the renderer and return the accumulated string.
+	pub fn into_string(self) -> String { self.state.buffer }
+
+	/// Borrow the accumulated string.
+	pub fn as_str(&self) -> &str { &self.state.buffer }
+
+	/// Resolve the style for an element name, walking through
+	/// associations if needed.
+	fn resolve_style(&self, name: &str) -> Style {
+		let lower = name.to_ascii_lowercase();
+
+		// direct lookup
+		if let Some(style) = self.style_map.get(lower.as_str()) {
+			return *style;
+		}
+
+		// association fallback (one level deep to avoid cycles)
+		if let Some(assoc) = self.default_associations.get(lower.as_str()) {
+			if let Some(style) = self.style_map.get(assoc.as_ref()) {
+				return *style;
+			}
+		}
+
+		self.default_style
+	}
+
+	fn current_style(&self) -> Style {
+		self.style_stack
+			.last()
+			.copied()
+			.unwrap_or(self.default_style)
+	}
+
+	/// Write styled text to the buffer.
+	fn push_styled(&mut self, text: &str) {
+		let style = self.current_style();
+		let painted = format!("{}", style.paint(text));
+		self.state.push_raw(&painted);
+		// push_raw tracks trailing_newline from the painted string, but the
+		// ANSI codes don't contain newlines so we can track from the source
+		self.state.trailing_newline = text.ends_with('\n');
+	}
+
+	/// Write an OSC-8 hyperlink opening sequence.
+	fn open_osc8_link(&mut self, href: &str) {
+		self.state.buffer.push_str("\x1b]8;;");
+		self.state.buffer.push_str(href);
+		self.state.buffer.push_str("\x1b\\");
+	}
+
+	/// Write an OSC-8 hyperlink closing sequence.
+	fn close_osc8_link(&mut self) {
+		self.state.buffer.push_str("\x1b]8;;\x1b\\");
+	}
+}
+
+
+impl NodeVisitor for AnsiTermRenderer {
+	fn visit_element(
+		&mut self,
+		_cx: &VisitContext,
+		element: &Element,
+		attrs: Vec<(Entity, &Attribute, &Value)>,
+	) {
+		let name = element.name().to_ascii_lowercase();
+		let style = self.resolve_style(&name);
+		self.style_stack.push(style);
+
+		match name.as_str() {
+			// ── Headings ──
+			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+				self.state.ensure_block_separator();
+				if self.heading_hashes {
+					let level = name[1..].parse::<usize>().unwrap_or(1);
+					let prefix = "#".repeat(level);
+					// emit immediately so inline children land after the marker
+					self.push_styled(&format!("{prefix} "));
+				}
+			}
+
+			// ── Paragraph ──
+			"p" => {
+				self.state.ensure_block_separator_with_prefix(Some("▌ "));
+				// emit blockquote prefix immediately so inline elements
+				// (eg <em>) that open before the first text node are
+				// correctly placed after the prefix
+				if self.state.blockquote_depth > 0 {
+					let prefix = self.state.blockquote_prefix("▌ ");
+					self.push_styled(&prefix);
+				}
+			}
+
+			// ── Blockquote ──
+			"blockquote" => {
+				self.state.ensure_block_separator_with_prefix(Some("▌ "));
+				self.state.blockquote_depth += 1;
+			}
+
+			// ── Lists ──
+			"ul" => {
+				self.state.enter_ul();
+			}
+			"ol" => {
+				let start = TextRenderState::ol_start(&attrs);
+				self.state.enter_ol(start);
+			}
+			"li" => {
+				self.state.ensure_newline();
+				self.state.write_list_indent();
+				let prefix = self.state.next_list_prefix("• ");
+				self.push_styled(&prefix);
+			}
+
+			// ── Code blocks ──
+			"pre" => {
+				self.state.ensure_block_separator();
+				self.state.in_preformatted = true;
+			}
+			"code" if self.state.in_preformatted => {
+				// code block content rendered directly in visit_value
+			}
+			"code" => {
+				// inline code, style applied via style_stack
+			}
+
+			// ── Links ──
+			"a" => {
+				let href = TextRenderState::find_attr(&attrs, "href")
+					.map(|val| val.to_string())
+					.unwrap_or_default();
+				self.state.pending_link_href = Some(href.clone());
+				self.open_osc8_link(&href);
+			}
+
+			// ── Images ──
+			"img" => {
+				let src = TextRenderState::find_attr(&attrs, "src")
+					.map(|val| val.to_string())
+					.unwrap_or_default();
+				self.state.image_src = Some(src);
+				self.state.image_alt = Some(String::new());
+			}
+
+			// ── Thematic break ──
+			"hr" => {
+				self.state.ensure_block_separator();
+				self.push_styled("────────────────────");
+				self.state.push_raw("\n");
+				self.state.needs_block_separator = true;
+			}
+
+			// ── Line break ──
+			"br" => {
+				self.state.push_raw("\n");
+			}
+
+			// ── Generic block handling ──
+			_ => {
+				if self.state.is_block_element(&name) {
+					self.state.ensure_block_separator();
+				}
+			}
+		}
+	}
+
+	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
+		let name = element.name().to_ascii_lowercase();
+
+		match name.as_str() {
+			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
+			}
+			"p" => {
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
+			}
+			"blockquote" => {
+				self.state.blockquote_depth =
+					self.state.blockquote_depth.saturating_sub(1);
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
+			}
+			"ul" | "ol" => {
+				self.state.leave_list();
+				if self.state.list_depth == 0 {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
+				}
+			}
+			"li" => {
+				self.state.ensure_newline();
+			}
+			"pre" => {
+				self.state.in_preformatted = false;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
+			}
+			"code" if !self.state.in_preformatted => {
+				// inline code, style restored via style_stack pop below
+			}
+			"a" => {
+				self.close_osc8_link();
+				self.state.pending_link_href = None;
+			}
+			"img" => {
+				let src = self.state.image_src.take().unwrap_or_default();
+				let alt = self.state.image_alt.take().unwrap_or_default();
+				let style = self.current_style();
+				let display = if alt.is_empty() {
+					format!("[image: {src}]")
+				} else {
+					format!("[{alt}]")
+				};
+				self.open_osc8_link(&src);
+				self.state.push_raw(&format!("{}", style.paint(&display)));
+				self.close_osc8_link();
+			}
+			"hr" | "br" => {
+				// already handled in visit_element
+			}
+			_ => {
+				if self.state.is_block_element(&name) {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
+				}
+			}
+		}
+
+		self.style_stack.pop();
+	}
+
+	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
+		let text = value.to_string();
+		if text.is_empty() {
+			return;
+		}
+
+		// if inside an <img>, capture text as alt instead of emitting
+		if let Some(ref mut alt) = self.state.image_alt {
+			alt.push_str(&text);
+			return;
+		}
+
+		self.push_styled(&text);
+	}
+
+	fn visit_expression(
+		&mut self,
+		_cx: &VisitContext,
+		expression: &Expression,
+	) {
+		if self.render_expressions {
+			let style = Style::new().italic();
+			let painted =
+				format!("{}", style.paint(format!("{{{}}}", expression.0)));
+			self.state.push_raw(&painted);
+		}
+	}
+
+	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
+		self.state.ensure_block_separator();
+		let style = Style::new().dimmed();
+		let painted =
+			format!("{}", style.paint(format!("<!--{}-->", &**comment)));
+		self.state.push_raw(&painted);
+		self.state.push_raw("\n");
+		self.state.trailing_newline = true;
+		self.state.needs_block_separator = true;
+	}
+}
+
+
+fn default_style_map() -> HashMap<Cow<'static, str>, Style> {
+	vec![
+		("h1", Style::new().bold().fg(Color::Green)),
+		("h2", Style::new().bold().fg(Color::Cyan)),
+		("h3", Style::new().bold().fg(Color::Blue)),
+		("h4", Style::new().bold().fg(Color::Magenta)),
+		("h5", Style::new().bold()),
+		("h6", Style::new().bold().dimmed()),
+		("p", Style::default()),
+		("a", Style::new().fg(Color::Blue).underline()),
+		("strong", Style::new().bold()),
+		("em", Style::new().italic()),
+		("del", Style::new().strikethrough()),
+		("code", Style::new().fg(Color::Yellow)),
+		("pre", Style::new().fg(Color::Yellow).dimmed()),
+		("blockquote", Style::new().italic().dimmed()),
+		("hr", Style::new().dimmed()),
+		("img", Style::new().fg(Color::Magenta).underline()),
+		("li", Style::default()),
+	]
+	.into_iter()
+	.map(|(k, v)| (Cow::Borrowed(k), v))
+	.collect()
+}
+
+fn default_associations() -> HashMap<Cow<'static, str>, Cow<'static, str>> {
+	vec![
+		("b", "strong"),
+		("i", "em"),
+		("s", "del"),
+		("div", "p"),
+		("span", "p"),
+		("section", "p"),
+		("article", "p"),
+		("aside", "blockquote"),
+		("nav", "p"),
+		("header", "p"),
+		("footer", "p"),
+		("main", "p"),
+		("dt", "strong"),
+		("dd", "p"),
+		("th", "strong"),
+		("td", "p"),
+		("sup", "em"),
+		("sub", "em"),
+	]
+	.into_iter()
+	.map(|(k, v)| (Cow::Borrowed(k), Cow::Borrowed(v)))
+	.collect()
+}
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// Parse markdown then render via [`AnsiTermRenderer`].
+	fn render(md: &[u8]) -> String {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		MarkdownParser::new()
+			.parse(&mut world.entity_mut(entity), md, None)
+			.unwrap();
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut render = AnsiTermRenderer::new();
+				walker.walk(&mut render, entity);
+				render.into_string()
+			})
+			.unwrap()
+	}
+
+	fn strip_ansi(input: String) -> String {
+		// strip_ansi takes ownership so callers can use render(...).xmap(strip_ansi)
+		// strip ANSI escape sequences including OSC-8
+		let mut result = String::new();
+		let mut chars = input.chars().peekable();
+		while let Some(ch) = chars.next() {
+			if ch == '\x1b' {
+				match chars.peek() {
+					// OSC sequence: ESC ] ... ST (ST = ESC \)
+					Some(']') => {
+						chars.next();
+						loop {
+							match chars.next() {
+								Some('\x1b') => {
+									chars.next(); // consume the \ of ST
+									break;
+								}
+								Some('\x07') => break, // BEL terminator
+								None => break,
+								_ => {}
+							}
+						}
+					}
+					// CSI sequence: ESC [ ... final byte
+					Some('[') => {
+						chars.next();
+						loop {
+							match chars.next() {
+								Some(ch)
+									if ch.is_ascii_alphabetic()
+										|| ch == 'm' =>
+								{
+									break;
+								}
+								None => break,
+								_ => {}
+							}
+						}
+					}
+					_ => {
+						chars.next();
+					}
+				}
+			} else {
+				result.push(ch);
+			}
+		}
+		result
+	}
+
+	#[test]
+	fn render_paragraph() {
+		render(b"Hello world")
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("Hello world");
+	}
+
+	#[test]
+	fn render_heading_h1() {
+		// heading_hashes is false by default; only the text is emitted
+		render(b"# Title").xmap(strip_ansi).trim().xpect_eq("Title");
+	}
+
+	#[test]
+	fn render_heading_styled() {
+		render(b"# Title")
+			.xpect_contains("\x1b[")
+			.xpect_contains("Title");
+	}
+
+	#[test]
+	fn render_link_has_osc8() {
+		render(b"[click](https://example.com)")
+			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
+			.xpect_contains("click")
+			.xpect_contains("\x1b]8;;\x1b\\");
+	}
+
+	#[test]
+	fn render_link_text_stripped() {
+		render(b"[click](https://example.com)")
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("click");
+	}
+
+	#[test]
+	fn render_code_block() {
+		render(b"```rust\nfn main() {}\n```")
+			.xmap(strip_ansi)
+			.xpect_contains("fn main() {}");
+	}
+
+	#[test]
+	fn render_unordered_list() {
+		render(b"- alpha\n- beta")
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_contains("• alpha")
+			.xpect_contains("• beta");
+	}
+
+	#[test]
+	fn render_image() {
+		render(b"![alt text](image.png)")
+			.xmap(strip_ansi)
+			.xpect_contains("[alt text]");
+	}
+
+	#[test]
+	fn render_image_has_osc8() {
+		render(b"![alt](image.png)").xpect_contains("\x1b]8;;image.png\x1b\\");
+	}
+
+	#[test]
+	fn render_blockquote() {
+		render(b"> quoted text")
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("▌ quoted text");
+	}
+
+	#[test]
+	fn render_blockquote_with_emphasis() {
+		// inline elements inside a blockquote must appear after the prefix
+		render(b"> *notable remark*")
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("▌ notable remark");
+	}
+
+	#[test]
+	fn render_blockquote_multiline() {
+		// a blockquote whose content spans multiple paragraphs should prefix
+		// every paragraph with ▌
+		let input = "> first paragraph\n>\n> second paragraph";
+		render(input.as_bytes())
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("▌ first paragraph\n▌\n▌ second paragraph");
+	}
+
+	#[test]
+	fn render_thematic_break() {
+		render(b"---").xmap(strip_ansi).xpect_contains("────");
+	}
+
+	#[test]
+	fn render_multiple_blocks_separated() {
+		render(b"# Title\n\nParagraph")
+			.xmap(strip_ansi)
+			.xpect_contains("Title")
+			.xpect_contains("Paragraph")
+			.xpect_contains("\n\n");
+	}
+
+	#[test]
+	fn custom_style_map() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		MarkdownParser::new()
+			.parse(&mut world.entity_mut(entity), b"# Hello", None)
+			.unwrap();
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let mut custom_map: HashMap<Cow<'static, str>, Style> =
+					HashMap::default();
+				custom_map.insert("h1".into(), Style::new().fg(Color::Red));
+				let mut render =
+					AnsiTermRenderer::new().with_style_map(custom_map);
+				walker.walk(&mut render, entity);
+				render.into_string()
+			})
+			.unwrap()
+			.xpect_contains("\x1b[")
+			.xpect_contains("Hello");
+	}
+}

@@ -30,7 +30,7 @@ pub(super) fn start_hyper_server(
 	mut async_commands: AsyncCommands,
 ) -> Result {
 	let server = query.get(entity)?;
-	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
+	let addr: SocketAddr = (server.host, server.port).into();
 
 	async_commands.run(async move |world| -> Result {
 		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
@@ -113,7 +113,8 @@ async fn response_to_hyper(
 
 	// Convert our ResponseParts to http::response::Parts
 	let http_parts: http::response::Parts =
-		parts.try_into().unwrap_or_else(|_| {
+		parts.try_into().unwrap_or_else(|err| {
+			error!("Failed to convert response parts: {}", err);
 			http::Response::builder()
 				.status(http::StatusCode::INTERNAL_SERVER_ERROR)
 				.body(())
@@ -274,13 +275,8 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					handler_exchange(move |mut entity, req| {
-						let count = entity.world_scope(|world: &mut World| {
-							world.query_once::<&ExchangeStats>()[0]
-								.request_count()
-						});
-						assert!(count < 99999);
-						Response::ok().with_body(req.body)
+					handler_exchange(move |req| {
+						Response::ok().with_body(req.take().body)
 					}),
 				))
 				.run();
@@ -334,10 +330,10 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
-					handler_exchange(move |_, req| {
+					handler_exchange(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
-							req.body,
+							req.take().body,
 							|mut body| async move {
 								match body.next().await {
 									Ok(Some(chunk)) => {

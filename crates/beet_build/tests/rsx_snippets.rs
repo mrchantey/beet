@@ -98,7 +98,7 @@ fn nested_template() {
 	));
 	world.run_schedule(ParseSourceFiles);
 
-	let scene = world.build_scene();
+	let scene = SceneSaver::new_default(&mut world).save_ron().unwrap();
 	// println!("Exported Scene:\n{}", scene);
 
 	#[template]
@@ -136,14 +136,13 @@ fn build_scene(tokens: TokenStream) -> String {
 		.id();
 	world.run_schedule(ParseSourceFiles);
 
-	world.build_scene()
+	SceneSaver::new_default(&mut world).save_ron().unwrap()
 }
 
 fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	let mut world = ApplyDirectivesPlugin::world();
 
-
-	world.load_scene(scene).unwrap();
+	SceneLoader::new(&mut world).load_ron(scene).unwrap();
 
 	let root = world.spawn((HtmlDocument, common_idx(), bundle)).id();
 

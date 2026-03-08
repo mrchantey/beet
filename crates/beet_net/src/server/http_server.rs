@@ -2,12 +2,13 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// HTTP server that listens for incoming requests and routes them to handlers.
+/// HTTP server that listens for incoming requests, triggering a [`Tool::<Request,Response>`] call.
 ///
 /// When spawned, this component automatically starts a server on the specified port.
 /// The underlying implementation depends on compile-time feature flags:
-/// - `lambda`: Uses AWS Lambda runtime
-/// - Default: Uses Hyper HTTP server
+/// - Default: Lightweight mini HTTP server using `async-io` TCP
+/// - `hyper`: Full-featured Hyper HTTP server
+/// - `lambda`: AWS Lambda runtime
 ///
 /// # Example
 ///
@@ -17,7 +18,7 @@ use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.spawn((
 ///     HttpServer::default(),
-///     HandlerExchange::new(|req| req.mirror()),
+///     handler_exchange(|req| req.mirror()),
 /// ));
 /// ```
 #[derive(Clone, Component)]
@@ -29,19 +30,41 @@ pub struct HttpServer {
 	/// some random available port by the os like `98304`.
 	/// This is ignored by lambda_server
 	pub port: u16,
+	/// The host address to bind to. Defaults to `[127, 0, 0, 1]` (localhost).
+	/// Use `[0, 0, 0, 0]` to listen on all interfaces (required for deployed servers).
+	pub host: [u8; 4],
 }
 
 impl Default for HttpServer {
 	fn default() -> Self {
 		Self {
 			port: DEFAULT_SERVER_PORT,
+			host: [127, 0, 0, 1],
 		}
 	}
 }
 
 impl HttpServer {
 	/// Creates a new server configured to listen on the specified port.
-	pub fn new(port: u16) -> Self { Self { port } }
+	pub fn new(port: u16) -> Self {
+		Self {
+			port,
+			..Default::default()
+		}
+	}
+	/// Creates a new server configured to listen on all interfaces
+	/// (i.e., host address `[0, 0, 0, 0]`) on the specified port.
+	pub fn new_all_interfaces(port: u16) -> Self {
+		Self {
+			port,
+			host: [0, 0, 0, 0],
+		}
+	}
+	/// Sets the host address to bind to.
+	pub fn with_host(mut self, host: [u8; 4]) -> Self {
+		self.host = host;
+		self
+	}
 }
 
 // using commands allows a ServerHandler to be inserted, instead of running immediately
@@ -53,10 +76,15 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.commands()
 		.run_system_cached_with(super::start_lambda_server, cx.entity);
 
-	#[cfg(not(feature = "lambda"))]
+	#[cfg(all(feature = "hyper", not(feature = "lambda")))]
 	world
 		.commands()
 		.run_system_cached_with(super::start_hyper_server, cx.entity);
+
+	#[cfg(all(not(feature = "hyper"), not(feature = "lambda")))]
+	world
+		.commands()
+		.run_system_cached_with(super::start_mini_http_server, cx.entity);
 }
 
 

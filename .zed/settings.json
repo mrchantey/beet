@@ -16,6 +16,10 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
+						"bevy_scene",
+						"json",
+						// "http_server",
+						// "stack",
 						// "server"
 						// "client",
 						// "launch",
@@ -31,13 +35,44 @@
 						// "ml",
 						// "cuda",
 						// "rand"
-					]
-				}
-			}
-		}
+					],
+				},
+			},
+		},
 	},
-	"diagnostics": {},
 	"file_scan_exclusions": [
+		"crates/beet-cli",
+		"crates/beet_build",
+		"crates/beet_clanker",
+		"crates/beet_design",
+		"crates/beet_dom",
+		"crates/beet_examples",
+		"crates/beet_flow",
+		"crates/beet_infra",
+		"crates/beet_ml",
+		// "crates/beet_net",
+		// "crates/beet_stack",
+		// "crates/beet_parse",
+		"crates/beet_router_old",
+		"crates/beet_rsx",
+		"crates/beet_rsx_combinator",
+		"crates/beet_site",
+		"crates/beet_spatial",
+		// "crates/beet_tool",
+		"crates/emby",
+		"infra",
+		"scripts",
+		"tests",
+		"target",
+		".env.example",
+		".beet",
+		".github",
+		".cargo",
+		"launch.ron",
+		"rustfmt.toml",
+		"CHANGELOG.md",
+		"Cargo.lock",
+
 		// ".beet",
 		"**/.git",
 		".gitattributes",
@@ -47,6 +82,6 @@
 		// "**/target",
 		// "**/*.log",
 		// "**/Cargo.lock",
-		"rustc-ice**"
-	]
+		// "rustc-ice**",
+	],
 }

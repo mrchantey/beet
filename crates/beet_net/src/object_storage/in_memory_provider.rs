@@ -27,7 +27,8 @@ impl InMemoryProvider {
 	pub fn new() -> Self { Self::default() }
 }
 
-impl<T: TableRow> TableProvider<T> for InMemoryProvider {
+#[cfg(feature = "json")]
+impl<T: TableStoreRow> TableProvider<T> for InMemoryProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

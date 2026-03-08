@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use crate::prelude::*;
 use bevy::reflect::Reflect;
 
@@ -31,7 +32,7 @@ impl LineCol {
 	}
 	/// Create a LineCol from a std::panic::Location,
 	/// adjusting the column to be zero-indexed.
-	pub fn from_location(location: &std::panic::Location) -> Self {
+	pub fn from_location(location: &core::panic::Location) -> Self {
 		Self {
 			line: location.line(),
 			col: location.column().saturating_sub(1),
@@ -45,6 +46,7 @@ impl LineCol {
 
 	/// Find the start of the first element and the end of the last element,
 	/// or default.
+	#[cfg(feature = "std")]
 	pub fn iter_to_spans(vec: &[impl GetSpan]) -> (LineCol, LineCol) {
 		let start = vec.first().map(|n| n.span().start()).unwrap_or_default();
 		let end = vec.last().map(|n| n.span().end()).unwrap_or_default();
@@ -67,8 +69,8 @@ impl LineCol {
 	// }
 }
 
-impl std::fmt::Display for LineCol {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for LineCol {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}:{}", self.line, self.col)
 	}
 }

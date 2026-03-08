@@ -69,7 +69,7 @@ pub trait Xtend: Sized {
 	/// Uses [`cross_log!`](crate::cross_log) for cross-platform output.
 	fn xprint(self, prefix: impl AsRef<str>) -> Self
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		crate::cross_log!("{}: {:#?}", prefix.as_ref(), self);
 		self
@@ -78,7 +78,7 @@ pub trait Xtend: Sized {
 	/// Prints the display-formatted value and returns `self`.
 	fn xprint_display(self) -> Self
 	where
-		Self: std::fmt::Display,
+		Self: core::fmt::Display,
 	{
 		crate::cross_log!("{}", self);
 		self
@@ -87,7 +87,7 @@ pub trait Xtend: Sized {
 	/// Prints the debug-formatted value and returns `self`.
 	fn xprint_debug(self) -> Self
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		crate::cross_log!("{:?}", self);
 		self
@@ -141,7 +141,7 @@ pub trait Xtend: Sized {
 	/// Returns a pretty-printed `Debug` representation.
 	fn xfmt(&self) -> String
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		format!("{:#?}", self)
 	}
@@ -149,7 +149,7 @@ pub trait Xtend: Sized {
 	/// Returns a compact `Debug` representation.
 	fn xfmt_debug(&self) -> String
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		format!("{:?}", self)
 	}
@@ -157,7 +157,7 @@ pub trait Xtend: Sized {
 	/// Returns a `Display` representation.
 	fn xfmt_display(&self) -> String
 	where
-		Self: std::fmt::Display,
+		Self: core::fmt::Display,
 	{
 		format!("{}", self)
 	}

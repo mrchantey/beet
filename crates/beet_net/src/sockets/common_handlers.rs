@@ -1,8 +1,7 @@
-use std::time::SystemTime;
-
 use super::Message;
 use super::*;
 use beet_core::prelude::*;
+use std::time::SystemTime;
 
 /// Log the received socket message to info output
 pub fn log_recv(ev: On<MessageRecv>) {
@@ -56,6 +55,7 @@ impl Default for PingTime {
 	}
 }
 
+#[cfg(feature = "json")]
 impl PingTime {
 	/// Converts this ping time into a WebSocket [`Message::Ping`].
 	pub fn into_message(&self) -> Message {
@@ -67,6 +67,7 @@ impl PingTime {
 
 /// On receiving a [`Pong`] message which contains a serialized [`PingTime`],
 /// calculate and log the round trip time.
+#[cfg(feature = "json")]
 pub fn echo_pingtime(ev: On<MessageRecv>) {
 	match ev.event().inner() {
 		// 1. print the round trip duration and send a text message
