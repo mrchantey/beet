@@ -131,7 +131,6 @@ dotenv = "0.15"
 send_wrapper = "0.6"
 web-time = "1"
 itertools = "0.14"
-mime_guess = "2"
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
 rand = "0.9"

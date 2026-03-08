@@ -315,16 +315,14 @@ impl Response {
 		}
 	}
 
-	/// Create a response with the given body, guessing the content type
-	/// based on the file extension, defaulting to `application/octet-stream`
-	/// if the extension is not recognized.
-	#[cfg(feature = "http")]
-	pub fn ok_mime_guess(
+	/// Create a response with the given body, inferring the content type
+	/// from the file extension via [`MediaType::from_path`].
+	/// Defaults to `application/octet-stream` for unrecognized extensions.
+	pub fn ok_from_path(
 		body: impl Into<Body>,
 		path: impl AsRef<std::path::Path>,
 	) -> Self {
-		let guessed = mime_guess::from_path(path).first_or_octet_stream();
-		let media_type = MediaType::from_content_type(guessed.as_ref());
+		let media_type = MediaType::from_path(path);
 		Self::ok_body(body, media_type)
 	}
 

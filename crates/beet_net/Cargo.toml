@@ -31,7 +31,7 @@ hyper = [
 "dep:pin-project"
 ]
 lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
-fs = ["beet_core/fs","dep:async-process"]
+fs = ["beet_core/fs","dep:async-process","dep:path-clean"]
 tokens = ["beet_core/tokens"]
 aws = [
 	"serde",
@@ -50,7 +50,6 @@ serde = [
 ]
 http = [
 	"dep:http",
-	"dep:mime_guess",
 	"dep:eventsource-stream",
 ]
 reqwest = ["dep:reqwest","dep:tokio"]
@@ -100,9 +99,11 @@ serde_urlencoded = { version = "0.7", optional = true }
 postcard = { workspace = true, optional = true }
 
 
+# fs
+path-clean = { version = "1", optional = true }
+
 # http
 http = { workspace = true, optional = true }
-mime_guess = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
 url = { workspace = true, optional = true }
 

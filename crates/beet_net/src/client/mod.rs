@@ -23,6 +23,8 @@
 //! ```
 #[cfg(feature = "http")]
 mod event_source;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+mod impl_file;
 #[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
 mod impl_reqwest;
 #[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
@@ -32,4 +34,5 @@ mod impl_web_sys;
 mod send;
 #[cfg(feature = "http")]
 pub use event_source::*;
-pub use send::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub use impl_file::*;
