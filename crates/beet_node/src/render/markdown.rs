@@ -504,7 +504,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
@@ -521,7 +521,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::with_expressions()
-			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {

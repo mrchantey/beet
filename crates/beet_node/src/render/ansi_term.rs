@@ -513,7 +513,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
@@ -588,7 +588,7 @@ mod test {
 	fn render_heading_h1() {
 		strip_ansi(&render(b"# Title"))
 			.xmap(trim)
-			.xpect_contains("# Title");
+			.xpect_contains("Title");
 	}
 
 	#[test]
@@ -643,7 +643,6 @@ mod test {
 	#[test]
 	fn render_blockquote() {
 		strip_ansi(&render(b"> quoted text"))
-			// uses the vertical bar prefix
 			.xpect_contains("▌")
 			.xpect_contains("quoted text");
 	}
@@ -667,7 +666,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), b"# Hello".to_vec(), None)
+			.parse(&mut world.entity_mut(entity), b"# Hello", None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {

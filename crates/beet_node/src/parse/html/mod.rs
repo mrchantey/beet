@@ -134,7 +134,7 @@ impl NodeParser for HtmlParser {
 	fn parse(
 		&mut self,
 		entity: &mut EntityWorldMut,
-		bytes: Vec<u8>,
+		bytes: &[u8],
 		path: Option<WsPathBuf>,
 	) -> Result {
 		let text = std::str::from_utf8(&bytes)?;
@@ -227,7 +227,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
-					.parse(entity, b"<div>hello</div>".to_vec(), None)
+					.parse(entity, b"<div>hello</div>", None)
 					.unwrap();
 			})
 			.children()
@@ -241,7 +241,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
-					.parse(entity, b"hello world".to_vec(), None)
+					.parse(entity, b"hello world", None)
 					.unwrap();
 			})
 			.child(0)
@@ -258,11 +258,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div><span>inner</span></div>".to_vec(),
-						None,
-					)
+					.parse(entity, b"<div><span>inner</span></div>", None)
 					.unwrap();
 			})
 			// root -> div -> span
@@ -283,7 +279,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::with_expressions()
-					.parse(entity, b"<p>hello {name}</p>".to_vec(), None)
+					.parse(entity, b"<p>hello {name}</p>", None)
 					.unwrap();
 			})
 			// root -> p -> expression (index 1, after the "hello " text node)
@@ -304,7 +300,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
-					.parse(entity, b"<div><br>text</div>".to_vec(), None)
+					.parse(entity, b"<div><br>text</div>", None)
 					.unwrap();
 			})
 			// root -> div -> br
@@ -327,7 +323,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div>hello</div>".to_vec(),
+						b"<div>hello</div>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -345,7 +341,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
-					.parse(entity, b"<!-- hello -->".to_vec(), None)
+					.parse(entity, b"<!-- hello -->", None)
 					.unwrap();
 			})
 			.child(0)
@@ -368,9 +364,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				parser
-					.parse(entity, b"<div>42</div>".to_vec(), None)
-					.unwrap();
+				parser.parse(entity, b"<div>42</div>", None).unwrap();
 			})
 			// root -> div -> text node
 			.child(0)
@@ -392,7 +386,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div class=\"foo\" id=\"bar\"></div>".to_vec(),
+						b"<div class=\"foo\" id=\"bar\"></div>",
 						None,
 					)
 					.unwrap();
@@ -423,9 +417,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"<img />".to_vec(), None)
-					.unwrap();
+				HtmlParser::new().parse(entity, b"<img />", None).unwrap();
 			})
 			.children()
 			.len()
@@ -438,9 +430,8 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = HtmlParser::new();
-				let html = b"<div>hello</div>".to_vec();
-				parser.parse(entity, html.clone(), None).unwrap();
-				parser.parse(entity, html, None).unwrap();
+				parser.parse(entity, b"<div>hello</div>", None).unwrap();
+				parser.parse(entity, b"<div>hello</div>", None).unwrap();
 			})
 			.children()
 			.len()
@@ -453,12 +444,8 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = HtmlParser::new();
-				parser
-					.parse(entity, b"<div>hello</div>".to_vec(), None)
-					.unwrap();
-				parser
-					.parse(entity, b"<div>world</div>".to_vec(), None)
-					.unwrap();
+				parser.parse(entity, b"<div>hello</div>", None).unwrap();
+				parser.parse(entity, b"<div>world</div>", None).unwrap();
 			})
 			// root -> div -> text node
 			.child(0)
@@ -479,7 +466,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div>hello</div>".to_vec(),
+						b"<div>hello</div>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -504,7 +491,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div>hello</div>".to_vec(),
+						b"<div>hello</div>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -535,7 +522,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div>\nhello\n</div>".to_vec(),
+						b"<div>\nhello\n</div>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -563,7 +550,7 @@ mod test {
 				HtmlParser::new()
 					.parse(
 						entity,
-						b"<div class=\"foo\"></div>".to_vec(),
+						b"<div class=\"foo\"></div>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -590,7 +577,7 @@ mod test {
 				HtmlParser::with_expressions()
 					.parse(
 						entity,
-						b"<p>{name}</p>".to_vec(),
+						b"<p>{name}</p>",
 						Some(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
@@ -621,7 +608,7 @@ mod test {
 			.xtap(|entity| {
 				HtmlParser::new()
 					.with_markdown()
-					.parse(entity, b"<div>**bold**</div>".to_vec(), None)
+					.parse(entity, b"<div>**bold**</div>", None)
 					.unwrap();
 			})
 			// root -> div -> (replaced text node with subtree)
@@ -646,7 +633,7 @@ mod test {
 			.xtap(|entity| {
 				HtmlParser::new()
 					.with_markdown()
-					.parse(entity, b"<div>hello world</div>".to_vec(), None)
+					.parse(entity, b"<div>hello world</div>", None)
 					.unwrap();
 			})
 			// root -> div -> children count

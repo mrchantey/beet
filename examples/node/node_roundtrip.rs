@@ -5,11 +5,7 @@ fn main() {
 	let mut world = World::new();
 	let entity = world.spawn_empty().id();
 	MarkdownParser::new()
-		.parse(
-			&mut world.entity_mut(entity),
-			MARKDOWN.as_bytes().to_vec(),
-			None,
-		)
+		.parse(&mut world.entity_mut(entity), MARKDOWN.as_bytes(), None)
 		.unwrap();
 	let output = world
 		.run_system_once(move |walker: NodeWalker| {

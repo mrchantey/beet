@@ -247,7 +247,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		HtmlParser::new()
-			.parse(&mut world.entity_mut(entity), html.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), html, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
@@ -263,7 +263,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		HtmlParser::with_expressions()
-			.parse(&mut world.entity_mut(entity), html.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), html, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {

@@ -8,11 +8,14 @@ use beet_core::prelude::*;
 pub trait NodeParser {
 	/// Parse a complete byte buffer and apply the result to `entity`.
 	///
+	/// Accepts anything that can be viewed as a byte slice, ie `&str`,
+	/// `&[u8]`, `Vec<u8>`, `&String`, etc.
+	///
 	/// An optional `path` enables [`FileSpan`] tracking on the produced nodes.
 	fn parse(
 		&mut self,
 		entity: &mut EntityWorldMut,
-		bytes: Vec<u8>,
+		bytes: &[u8],
 		path: Option<WsPathBuf>,
 	) -> Result;
 }
@@ -31,7 +34,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				PlainTextParser::default()
-					.parse(entity, b"hello world".to_vec(), None)
+					.parse(entity, b"hello world", None)
 					.unwrap();
 			})
 			.get::<Value>()
@@ -47,13 +50,9 @@ mod test {
 		let mut parser = PlainTextParser::default();
 		let entity = world.spawn_empty().id();
 		let mut entity_mut = world.entity_mut(entity);
-		parser
-			.parse(&mut entity_mut, b"hello".to_vec(), None)
-			.unwrap();
+		parser.parse(&mut entity_mut, b"hello", None).unwrap();
 		let v1 = entity_mut.get::<Value>().cloned().unwrap();
-		parser
-			.parse(&mut entity_mut, b"hello".to_vec(), None)
-			.unwrap();
+		parser.parse(&mut entity_mut, b"hello", None).unwrap();
 		let v2 = entity_mut.get::<Value>().cloned().unwrap();
 		(v1, v2)
 			.xpect_eq((Value::Str("hello".into()), Value::Str("hello".into())));
@@ -68,7 +67,7 @@ mod test {
 				PlainTextParser::default()
 					.parse(
 						entity,
-						b"line1\nline2".to_vec(),
+						b"line1\nline2",
 						Some(WsPathBuf::new("foo.txt")),
 					)
 					.unwrap();

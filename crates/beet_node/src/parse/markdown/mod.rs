@@ -137,7 +137,7 @@ impl NodeParser for MarkdownParser {
 	fn parse(
 		&mut self,
 		entity: &mut EntityWorldMut,
-		bytes: Vec<u8>,
+		bytes: &[u8],
 		path: Option<WsPathBuf>,
 	) -> Result {
 		let text = std::str::from_utf8(&bytes)?;
@@ -164,7 +164,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"Hello world".to_vec(), None)
+					.parse(entity, b"Hello world", None)
 					.unwrap();
 			})
 			.children()
@@ -178,7 +178,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"Hello world".to_vec(), None)
+					.parse(entity, b"Hello world", None)
 					.unwrap();
 			})
 			.child(0)
@@ -196,7 +196,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"# Title".to_vec(), None)
+					.parse(entity, b"# Title", None)
 					.unwrap();
 			})
 			.child(0)
@@ -214,7 +214,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"# Title\n\nParagraph text".to_vec(), None)
+					.parse(entity, b"# Title\n\nParagraph text", None)
 					.unwrap();
 			})
 			.children()
@@ -229,7 +229,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"*hello*".to_vec(), None)
+					.parse(entity, b"*hello*", None)
 					.unwrap();
 			})
 			.child(0)
@@ -250,11 +250,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(
-						entity,
-						b"[click](https://example.com)".to_vec(),
-						None,
-					)
+					.parse(entity, b"[click](https://example.com)", None)
 					.unwrap();
 			})
 			.child(0)
@@ -274,7 +270,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"```rust\nfn main() {}\n```".to_vec(), None)
+					.parse(entity, b"```rust\nfn main() {}\n```", None)
 					.unwrap();
 			})
 			.child(0)
@@ -291,11 +287,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(
-				&mut world.entity_mut(entity),
-				b"- item 1\n- item 2".to_vec(),
-				None,
-			)
+			.parse(&mut world.entity_mut(entity), b"- item 1\n- item 2", None)
 			.unwrap();
 		let ul = world.entity_mut(entity).child(0).unwrap().id();
 		world
@@ -313,11 +305,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Hello".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+					.parse(entity, b"# Hello", Some(WsPathBuf::new("test.md")))
 					.unwrap();
 			})
 			.get::<FileSpan>()
@@ -335,8 +323,7 @@ mod test {
 				MarkdownParser::new()
 					.parse(
 						entity,
-						b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello"
-							.to_vec(),
+						b"---\ntitle: Hello\nauthor: World\n---\n\n# Hello",
 						None,
 					)
 					.unwrap();
@@ -351,9 +338,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				MarkdownParser::new()
-					.parse(entity, b"---".to_vec(), None)
-					.unwrap();
+				MarkdownParser::new().parse(entity, b"---", None).unwrap();
 			})
 			.child(0)
 			.unwrap()
@@ -371,7 +356,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(entity, b"![alt text](image.png)".to_vec(), None)
+					.parse(entity, b"![alt text](image.png)", None)
 					.unwrap();
 			})
 			.child(0)
@@ -391,9 +376,8 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = MarkdownParser::new();
-				let md = b"# Title\n\nParagraph".to_vec();
-				parser.parse(entity, md.clone(), None).unwrap();
-				parser.parse(entity, md, None).unwrap();
+				parser.parse(entity, b"# Title\n\nParagraph", None).unwrap();
+				parser.parse(entity, b"# Title\n\nParagraph", None).unwrap();
 			})
 			.children()
 			.len()
@@ -406,11 +390,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(
-						entity,
-						b"| A | B |\n|---|---|\n| 1 | 2 |".to_vec(),
-						None,
-					)
+					.parse(entity, b"| A | B |\n|---|---|\n| 1 | 2 |", None)
 					.unwrap();
 			})
 			.child(0)
@@ -427,7 +407,7 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md.to_vec(), None)
+			.parse(&mut world.entity_mut(entity), md, None)
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
@@ -515,10 +495,12 @@ mod test {
 	fn parse_embedded_html_block() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let md =
-			b"# Title\n\n<div class=\"custom\">inner</div>\n\nAfter".to_vec();
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md, None)
+			.parse(
+				&mut world.entity_mut(entity),
+				b"# Title\n\n<div class=\"custom\">inner</div>\n\nAfter",
+				None,
+			)
 			.unwrap();
 		// Should have: h1, raw html text, paragraph
 		(world.entity_mut(entity).children().len() >= 2).xpect_true();
@@ -540,7 +522,7 @@ mod test {
 		MarkdownParser::new()
 			.parse(
 				&mut world.entity_mut(entity),
-				b"Hello <strong>world</strong> end".to_vec(),
+				b"Hello <strong>world</strong> end",
 				None,
 			)
 			.unwrap();
@@ -557,11 +539,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+					.parse(entity, b"# Title", Some(WsPathBuf::new("test.md")))
 					.unwrap();
 			})
 			.child(0)
@@ -577,11 +555,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				MarkdownParser::new()
-					.parse(
-						entity,
-						b"# Title".to_vec(),
-						Some(WsPathBuf::new("test.md")),
-					)
+					.parse(entity, b"# Title", Some(WsPathBuf::new("test.md")))
 					.unwrap();
 			})
 			.child(0)
@@ -604,7 +578,7 @@ mod test {
 				MarkdownParser::new()
 					.parse(
 						entity,
-						b"# Title\n\nParagraph".to_vec(),
+						b"# Title\n\nParagraph",
 						Some(WsPathBuf::new("test.md")),
 					)
 					.unwrap();
@@ -627,7 +601,7 @@ mod test {
 				MarkdownParser::new()
 					.parse(
 						entity,
-						b"# Title\n\nParagraph".to_vec(),
+						b"# Title\n\nParagraph",
 						Some(WsPathBuf::new("test.md")),
 					)
 					.unwrap();

@@ -19,7 +19,7 @@ impl NodeParser for PlainTextParser {
 	fn parse(
 		&mut self,
 		entity: &mut EntityWorldMut,
-		bytes: Vec<u8>,
+		bytes: &[u8],
 		path: Option<WsPathBuf>,
 	) -> Result {
 		let text = std::str::from_utf8(&bytes)
