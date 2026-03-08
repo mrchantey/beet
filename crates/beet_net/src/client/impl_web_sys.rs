@@ -132,7 +132,7 @@ async fn into_response(res: web_sys::Response) -> Result<Response> {
 		.headers
 		.get::<header::ContentType>()
 		.and_then(|res| res.ok())
-		.map_or(false, |mime| mime == MimeType::EventStream);
+		.map_or(false, |media_type| media_type == MediaType::EventStream);
 
 	let is_bytes = !is_event_stream
 		&& parts

@@ -27,7 +27,7 @@ App::new()
       CliServer::default(),
       // HttpServer::default(),
       handler_exchange(|_| {
-        Response::ok_body("hello world", MimeType::Text)
+        Response::ok_body("hello world", MediaType::Text)
       }),
     ));
   })

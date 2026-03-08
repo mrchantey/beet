@@ -50,7 +50,7 @@ use beet_core::prelude::*;
 /// }
 /// ```
 pub fn repl_server() -> impl Bundle {
-	let accept = MimeType::Markdown;
+	let accept = MediaType::Markdown;
 	(
 		OnSpawn::insert_child(mime_render_tool()),
 		OnSpawn::new_async(async move |entity| -> Result {

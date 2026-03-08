@@ -38,7 +38,8 @@ pub fn markdown_render_tool() -> impl Bundle {
 				let world = cx.caller.world();
 
 				// Spawn the card content on demand
-				let card_entity = cx.caller.call_detached(spawn_tool, ()).await?;
+				let card_entity =
+					cx.caller.call_detached(spawn_tool, ()).await?;
 
 				// Render to markdown, then despawn
 				let markdown = world
@@ -49,7 +50,7 @@ pub fn markdown_render_tool() -> impl Bundle {
 					})
 					.await;
 
-				Response::ok_body(markdown, MimeType::Text).xok()
+				Response::ok_body(markdown, MediaType::Text).xok()
 			},
 		),
 	)

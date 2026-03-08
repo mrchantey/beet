@@ -1,12 +1,11 @@
 //! Generic request/response parts for routing.
 //!
 //! This module provides [`RequestParts`] and [`ResponseParts`] types
-//! that abstract over different transport mechanisms (HTTP, CLI, REPL, etc.).
+//! that abstract over different transport mechanisms (HTTP, CLI, etc.).
 //!
 //! These types allow the same routing infrastructure to handle:
 //! - HTTP requests from a web server
 //! - CLI commands parsed from arguments
-//! - REPL commands in interactive sessions
 //!
 //! # Example
 //!
@@ -28,80 +27,7 @@
 
 use super::*;
 use beet_core::prelude::*;
-
-
-/// The transport scheme used for a request or response.
-///
-/// This indicates how the request was received or how the response
-/// should be formatted.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum Scheme {
-	/// No scheme specified
-	#[default]
-	None,
-	/// The request was made over HTTP
-	Http,
-	/// The request was made over HTTPS
-	Https,
-	/// The request was made as CLI arguments
-	Cli,
-	/// The request was made as a REPL command
-	Repl,
-	/// Some other scheme not listed here
-	Other(String),
-}
-
-impl Scheme {
-	/// Parse a scheme from a string
-	pub fn from_str(scheme: &str) -> Self {
-		match scheme.to_ascii_lowercase().as_str() {
-			"http" => Self::Http,
-			"https" => Self::Https,
-			"cli" => Self::Cli,
-			"repl" => Self::Repl,
-			"" => Self::None,
-			other => Self::Other(other.to_string()),
-		}
-	}
-
-	/// Convert the scheme to a string representation
-	pub fn as_str(&self) -> &str {
-		match self {
-			Self::None => "",
-			Self::Http => "http",
-			Self::Https => "https",
-			Self::Cli => "cli",
-			Self::Repl => "repl",
-			Self::Other(scheme) => scheme.as_str(),
-		}
-	}
-
-	/// Whether this is an HTTP-based scheme
-	pub fn is_http(&self) -> bool { matches!(self, Self::Http | Self::Https) }
-
-	/// Whether this is a CLI-based scheme
-	pub fn is_cli(&self) -> bool { matches!(self, Self::Cli | Self::Repl) }
-}
-
-impl std::fmt::Display for Scheme {
-	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(formatter, "{}", self.as_str())
-	}
-}
-
-#[cfg(feature = "http")]
-impl From<&http::uri::Scheme> for Scheme {
-	fn from(scheme: &http::uri::Scheme) -> Self {
-		Self::from_str(scheme.as_str())
-	}
-}
-
-#[cfg(feature = "http")]
-impl From<Option<&http::uri::Scheme>> for Scheme {
-	fn from(scheme: Option<&http::uri::Scheme>) -> Self {
-		scheme.map(Self::from).unwrap_or(Self::None)
-	}
-}
+use std::borrow::Cow;
 
 /// The default HTTP version string.
 const DEFAULT_HTTP_VERSION: &str = "1.1";
@@ -110,10 +36,7 @@ const DEFAULT_HTTP_VERSION: &str = "1.1";
 const DEFAULT_CLI_VERSION: &str = "0.1.0";
 
 
-
-
-
-/// Request-specific parts including HTTP method, scheme, path, params, headers, and version.
+/// Request-specific parts including HTTP method, URL, headers, and version.
 ///
 /// # Example
 ///
@@ -130,39 +53,21 @@ pub struct RequestParts {
 	/// Note: body constraints may be enforced at the protocol level but they
 	/// are not at the framework level, ie a GET request may have a body.
 	method: HttpMethod,
-	/// The scheme of the request (http, https, cli, etc.)
-	scheme: Scheme,
-	/// The authority (host:port) for HTTP, or application name for CLI
-	authority: String,
-	/// The path segments (split by `/` for HTTP, positional args for CLI)
-	path: Vec<String>,
-	/// Query parameters (HTTP) or flags/options (CLI)
-	///
-	/// For CLI flags:
-	/// - Short and long versions are stored separately: `--foo` and `-f`
-	/// - Flags without values have empty vectors
-	///
-	/// ## Param Keys
-	/// - The keys are stored here verbatim with no parsing,
-	///  but `beet_router` will convert keys to `kebab-case` before deserializing
-	/// via [`MultiMap::parse_reflect`], normalizing upper case and underscores.
-	params: MultiMap<String, String>,
-	/// HTTP headers or CLI environment variables
+	/// The URL components of the request.
+	url: Url,
+	/// HTTP headers or CLI environment variables.
 	pub headers: HeaderMap,
-	/// The HTTP version or CLI command version
-	version: String,
+	/// The HTTP version or CLI command version.
+	version: Cow<'static, str>,
 }
 
 impl Default for RequestParts {
 	fn default() -> Self {
 		Self {
 			method: HttpMethod::Get,
-			scheme: Scheme::None,
-			authority: String::new(),
-			path: Vec::new(),
-			params: default(),
+			url: Url::default(),
 			headers: default(),
-			version: DEFAULT_HTTP_VERSION.to_string(),
+			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
 	}
 }
@@ -175,154 +80,117 @@ impl RequestParts {
 	/// - A full URI like `https://example.com/api/users`
 	/// - A CLI-style path like `users list`
 	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
-		let path_str = path.as_ref();
-
-		// Check if this is a full URI with scheme (http://, https://, etc.)
-		if path_str.contains("://") {
-			// Parse as full URI
-			#[cfg(feature = "http")]
-			if let Ok(uri) = path_str.parse::<http::Uri>() {
-				let scheme = Scheme::from(uri.scheme());
-				let authority = uri
-					.authority()
-					.map(|auth| auth.to_string())
-					.unwrap_or_default();
-				let path_segments = split_path(uri.path());
-				let params =
-					uri.query().map(parse_query_string).unwrap_or_default();
-
-				return Self {
-					method,
-					scheme,
-					authority,
-					path: path_segments,
-					params,
-					headers: HeaderMap::default(),
-					version: DEFAULT_HTTP_VERSION.to_string(),
-				};
-			}
-		}
-
-		// Otherwise treat as path (may include query string)
-		let (path_only, query_str) = split_path_and_query(path_str);
-		let path_segments = split_path(path_only);
-		let params = query_str.map(parse_query_string).unwrap_or_default();
-
+		let url = Url::parse(path.as_ref());
 		Self {
 			method,
-			scheme: Scheme::None,
-			authority: String::new(),
-			path: path_segments,
-			params,
+			url,
 			headers: HeaderMap::default(),
-			version: DEFAULT_HTTP_VERSION.to_string(),
+			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
 	}
 
-	/// Creates a GET request for the given path
+	/// Creates a GET request for the given path.
 	pub fn get(path: impl AsRef<str>) -> Self {
 		Self::new(HttpMethod::Get, path)
 	}
 
-	/// Creates a POST request for the given path
+	/// Creates a POST request for the given path.
 	pub fn post(path: impl AsRef<str>) -> Self {
 		Self::new(HttpMethod::Post, path)
 	}
 
-	/// Creates a PUT request for the given path
+	/// Creates a PUT request for the given path.
 	pub fn put(path: impl AsRef<str>) -> Self {
 		Self::new(HttpMethod::Put, path)
 	}
 
-	/// Creates a DELETE request for the given path
+	/// Creates a DELETE request for the given path.
 	pub fn delete(path: impl AsRef<str>) -> Self {
 		Self::new(HttpMethod::Delete, path)
 	}
 
-	/// Creates a PATCH request for the given path
+	/// Creates a PATCH request for the given path.
 	pub fn patch(path: impl AsRef<str>) -> Self {
 		Self::new(HttpMethod::Patch, path)
 	}
 
-	/// Returns the HTTP method
+	/// Returns the HTTP method.
 	pub fn method(&self) -> &HttpMethod { &self.method }
 
-	/// Sets the method
+	/// Sets the method.
 	pub fn with_method(mut self, method: HttpMethod) -> Self {
 		self.method = method;
 		self
 	}
 
-	/// Returns the scheme
-	pub fn scheme(&self) -> &Scheme { &self.scheme }
+	/// Returns the scheme.
+	pub fn scheme(&self) -> &Scheme { self.url.scheme() }
 
-	/// Returns the authority (host:port for HTTP, app name for CLI)
-	pub fn authority(&self) -> &str { &self.authority }
+	/// Returns the authority (host:port for HTTP).
+	pub fn authority(&self) -> &str { self.url.authority().unwrap_or_default() }
 
-	/// Returns the path segments
-	pub fn path(&self) -> &Vec<String> { &self.path }
+	/// Returns the path segments.
+	pub fn path(&self) -> &Vec<String> { self.url.path() }
 
-	/// Returns the version string
+	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
 
-	/// Returns all parameters
-	pub fn params(&self) -> &MultiMap<String, String> { &self.params }
+	/// Returns all parameters.
+	pub fn params(&self) -> &MultiMap<String, String> { self.url.params() }
 
-	/// Returns a mutable reference to the parameters
+	/// Returns a mutable reference to the parameters.
 	pub fn params_mut(&mut self) -> &mut MultiMap<String, String> {
-		&mut self.params
+		self.url.params_mut()
 	}
 
-	/// Returns a mutable reference to the headers
+	/// Returns a mutable reference to the headers.
 	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
 
-	/// Adds a parameter and returns self for chaining
+	/// Adds a parameter and returns self for chaining.
 	pub fn with_flag(mut self, key: impl Into<String>) -> Self {
-		self.params.insert_key(key.into());
+		self.url.params_mut().insert_key(key.into());
 		self
 	}
 
-	/// Adds a parameter and returns self for chaining
+	/// Adds a parameter and returns self for chaining.
 	pub fn with_param(
 		mut self,
 		key: impl Into<String>,
 		value: impl Into<String>,
 	) -> Self {
-		self.params.insert(key.into(), value.into());
+		self.url.params_mut().insert(key.into(), value.into());
 		self
 	}
 
-	/// Adds a flag parameter
+	/// Adds a flag parameter.
 	pub fn insert_flag(&mut self, key: impl Into<String>) {
-		self.params.insert_key(key.into());
+		self.url.params_mut().insert_key(key.into());
 	}
 
-	/// Adds a parameter
+	/// Adds a parameter.
 	pub fn insert_param(
 		&mut self,
 		key: impl Into<String>,
 		value: impl Into<String>,
 	) {
-		self.params.insert(key.into(), value.into());
+		self.url.params_mut().insert(key.into(), value.into());
 	}
 
-	/// Returns all headers
+	/// Returns all headers.
 	pub fn headers(&self) -> &HeaderMap { &self.headers }
 
-	/// Gets the first value for a parameter
+	/// Gets the first value for a parameter.
 	pub fn get_param(&self, key: &str) -> Option<&str> {
-		self.params
-			.get_vec(key)
-			.and_then(|vals| vals.first().map(|s| s.as_str()))
+		self.url.get_param(key)
 	}
 
-	/// Gets all values for a parameter
+	/// Gets all values for a parameter.
 	pub fn get_params(&self, key: &str) -> Option<&Vec<String>> {
-		self.params.get_vec(key)
+		self.url.params().get_vec(key)
 	}
 
-	/// Checks if a parameter exists (useful for CLI flags)
-	pub fn has_param(&self, key: &str) -> bool { self.params.contains_key(key) }
+	/// Checks if a parameter exists (useful for CLI flags).
+	pub fn has_param(&self, key: &str) -> bool { self.url.has_param(key) }
 
 	/// Check if this request indicates a body is present based on headers.
 	pub fn has_body(&self) -> bool {
@@ -341,57 +209,32 @@ impl RequestParts {
 				.unwrap_or(false)
 	}
 
-	/// Returns the path as a joined string with leading slash
-	pub fn path_string(&self) -> String {
-		if self.path.is_empty() {
-			"/".to_string()
-		} else {
-			format!("/{}", self.path.join("/"))
-		}
-	}
+	/// Returns the path as a joined string with leading slash.
+	pub fn path_string(&self) -> String { self.url.path_string() }
 
 	/// Returns the query string built from params.
 	/// This is the canonical way to get the query string.
-	pub fn query_string(&self) -> String { build_query_string(&self.params) }
+	pub fn query_string(&self) -> String { self.url.query_string() }
 
 	/// Returns the full URI string, lazily constructed from scheme, authority, path, and params.
-	pub fn uri(&self) -> String {
-		let path = self.path_string();
-		let query = self.query_string();
+	pub fn uri(&self) -> String { self.url.to_string() }
 
-		// Build base with scheme and authority if present
-		let base = match (&self.scheme, self.authority.is_empty()) {
-			(Scheme::None, _) | (_, true) => path,
-			(scheme, false) => {
-				format!("{}://{}{}", scheme.as_str(), self.authority, path)
-			}
-		};
+	/// Returns the first path segment, if any.
+	pub fn first_segment(&self) -> Option<&str> { self.url.first_segment() }
 
-		if query.is_empty() {
-			base
-		} else {
-			format!("{}?{}", base, query)
-		}
-	}
+	/// Returns the last path segment, if any.
+	pub fn last_segment(&self) -> Option<&str> { self.url.last_segment() }
 
-	/// Returns the first path segment, if any
-	pub fn first_segment(&self) -> Option<&str> {
-		self.path.first().map(|segment| segment.as_str())
-	}
-
-	/// Returns the last path segment, if any
-	pub fn last_segment(&self) -> Option<&str> {
-		self.path.last().map(|segment| segment.as_str())
-	}
-
-	/// Returns path segments starting from the given index
+	/// Returns path segments starting from the given index.
 	pub fn path_from(&self, index: usize) -> &[String] {
-		if index >= self.path.len() {
-			&[]
-		} else {
-			&self.path[index..]
-		}
+		self.url.path_from(index)
 	}
+
+	/// Returns a reference to the inner [`Url`].
+	pub fn url(&self) -> &Url { &self.url }
+
+	/// Returns a mutable reference to the inner [`Url`].
+	pub fn url_mut(&mut self) -> &mut Url { &mut self.url }
 }
 
 
@@ -400,10 +243,10 @@ impl RequestParts {
 pub struct ResponseParts {
 	/// The HTTP status code of the response.
 	pub status: StatusCode,
-	/// HTTP headers
+	/// HTTP headers.
 	pub headers: HeaderMap,
-	/// The HTTP version
-	pub version: String,
+	/// The HTTP version.
+	pub version: Cow<'static, str>,
 }
 
 impl Default for ResponseParts {
@@ -411,143 +254,57 @@ impl Default for ResponseParts {
 		Self {
 			status: StatusCode::OK,
 			headers: default(),
-			version: DEFAULT_HTTP_VERSION.to_string(),
+			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
 	}
 }
 
 impl ResponseParts {
-	/// Creates a new `ResponseParts` with the given status
+	/// Creates a new `ResponseParts` with the given status.
 	pub fn new(status: StatusCode) -> Self {
 		Self {
 			status,
 			headers: default(),
-			version: DEFAULT_HTTP_VERSION.to_string(),
+			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
 	}
 
-	/// Creates an OK (200) response
+	/// Creates an OK (200) response.
 	pub fn ok() -> Self { Self::new(StatusCode::OK) }
 
-	/// Creates a Not Found (404) response
+	/// Creates a Not Found (404) response.
 	pub fn not_found() -> Self { Self::new(StatusCode::NOT_FOUND) }
 
-	/// Creates an Internal Server Error (500) response
+	/// Creates an Internal Server Error (500) response.
 	pub fn internal_error() -> Self {
 		Self::new(StatusCode::INTERNAL_SERVER_ERROR)
 	}
 
-	/// Creates a Bad Request (400) response
+	/// Creates a Bad Request (400) response.
 	pub fn bad_request() -> Self { Self::new(StatusCode::BAD_REQUEST) }
 
-	/// Returns the status code
+	/// Returns the status code.
 	pub fn status(&self) -> StatusCode { self.status }
 
-	/// Use exit code conventions to map a status to an exit code
+	/// Use exit code conventions to map a status to an exit code.
 	pub fn status_to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
 		self.status().to_exit_code()
 	}
 
-	/// Returns the version string
+	/// Returns the version string.
 	pub fn version(&self) -> &str { &self.version }
 
-	/// Returns all headers
+	/// Returns all headers.
 	pub fn headers(&self) -> &HeaderMap { &self.headers }
 
-	/// Returns a mutable reference to the headers
+	/// Returns a mutable reference to the headers.
 	pub fn headers_mut(&mut self) -> &mut HeaderMap { &mut self.headers }
 
-	/// Sets the status code
+	/// Sets the status code.
 	pub fn with_status(mut self, status: StatusCode) -> Self {
 		self.status = status;
 		self
 	}
-}
-
-// ============================================================================
-// Private parsing helpers
-// ============================================================================
-
-/// Split a URI string into path and optional query string.
-fn split_path_and_query(uri: &str) -> (&str, Option<&str>) {
-	uri.split_once('?')
-		.map(|(path, query)| (path, Some(query)))
-		.unwrap_or((uri, None))
-}
-
-/// Convert an [`http::HeaderMap`] to a [`HeaderMap`],
-/// with all keys normalized to kebab-case.
-#[cfg(feature = "http")]
-fn http_header_map_to_header_map(map: &http::HeaderMap) -> HeaderMap {
-	let mut header_map = HeaderMap::new();
-	for (key, value) in map.iter() {
-		// Header values can technically contain opaque bytes
-		// but this is considered bad practice; we use a placeholder
-		let value = value.to_str().unwrap_or("<opaque-bytes>").to_string();
-		header_map.set_raw(key.as_str(), value);
-	}
-	header_map
-}
-
-/// Parse query string into a MultiMap
-fn parse_query_string(query: &str) -> MultiMap<String, String> {
-	let mut params = MultiMap::default();
-	for pair in query.split('&') {
-		if pair.is_empty() {
-			continue;
-		}
-		let (key, value) = match pair.split_once('=') {
-			Some((key, value)) => (key.to_string(), value.to_string()),
-			None => (pair.to_string(), String::new()),
-		};
-		params.insert(key, value);
-	}
-	params
-}
-
-/// Split a path string into segments, filtering empty segments
-fn split_path(path: &str) -> Vec<String> {
-	path.split('/')
-		.filter(|segment| !segment.is_empty())
-		.map(|segment| segment.to_string())
-		.collect()
-}
-
-/// Convert a [`HeaderMap`] back to [`http::HeaderMap`].
-#[cfg(feature = "http")]
-fn header_map_to_http(
-	headers: &HeaderMap,
-) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {
-	use std::str::FromStr;
-	let mut http_headers = http::HeaderMap::new();
-	for (key, values) in headers.iter_all() {
-		let header_name = http::header::HeaderName::from_str(key)
-			.unwrap_or_else(|_| {
-				http::header::HeaderName::from_static("x-invalid")
-			});
-		for value in values {
-			http_headers.append(
-				header_name.clone(),
-				http::header::HeaderValue::from_str(value)?,
-			);
-		}
-	}
-	Ok(http_headers)
-}
-
-/// Build query string from MultiMap
-fn build_query_string(params: &MultiMap<String, String>) -> String {
-	let mut parts = Vec::new();
-	for (key, values) in params.iter_all() {
-		for value in values {
-			if value.is_empty() {
-				parts.push(key.clone());
-			} else {
-				parts.push(format!("{}={}", key, value));
-			}
-		}
-	}
-	parts.join("&")
 }
 
 // ============================================================================
@@ -560,24 +317,20 @@ impl From<http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri
-			.authority()
-			.map(|auth| auth.to_string())
-			.unwrap_or_default();
+		let authority = uri.authority().map(|auth| auth.to_string());
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(http_parts.method);
 
+		let url = Url::new(scheme, authority, path, params, None);
+
 		RequestParts {
 			method,
-			scheme,
-			authority,
-			path,
-			params,
+			url,
 			headers,
-			version,
+			version: Cow::Owned(version),
 		}
 	}
 }
@@ -588,24 +341,20 @@ impl From<&http::request::Parts> for RequestParts {
 		let uri = &http_parts.uri;
 
 		let scheme = Scheme::from(uri.scheme());
-		let authority = uri
-			.authority()
-			.map(|auth| auth.to_string())
-			.unwrap_or_default();
+		let authority = uri.authority().map(|auth| auth.to_string());
 		let path = split_path(uri.path());
 		let params = uri.query().map(parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(&http_parts.method);
 
+		let url = Url::new(scheme, authority, path, params, None);
+
 		RequestParts {
 			method,
-			scheme,
-			authority,
-			path,
-			params,
+			url,
 			headers,
-			version,
+			version: Cow::Owned(version),
 		}
 	}
 }
@@ -623,7 +372,7 @@ impl From<http::response::Parts> for ResponseParts {
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
-			version,
+			version: Cow::Owned(version),
 		}
 	}
 }
@@ -638,7 +387,7 @@ impl From<&http::response::Parts> for ResponseParts {
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
-			version,
+			version: Cow::Owned(version),
 		}
 	}
 }
@@ -649,15 +398,15 @@ impl From<&http::response::Parts> for ResponseParts {
 
 impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
+		let url = Url::new(Scheme::None, None, cli.path, cli.params, None);
 		RequestParts {
 			method: HttpMethod::Get,
-			scheme: Scheme::Cli,
-			authority: env_ext::var("CARGO_PKG_NAME").unwrap_or_default(),
-			path: cli.path,
-			params: cli.params,
+			url,
 			headers: HeaderMap::default(),
-			version: env_ext::var("CARGO_PKG_VERSION")
-				.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
+			version: Cow::Owned(
+				env_ext::var("CARGO_PKG_VERSION")
+					.unwrap_or_else(|_| DEFAULT_CLI_VERSION.to_string()),
+			),
 		}
 	}
 }
@@ -738,7 +487,7 @@ mod test {
 			HttpMethod::Get,
 			"http://example.com/api/users/123?limit=10",
 		);
-		parts.headers.set_content_type(MimeType::Json);
+		parts.headers.set_content_type(MediaType::Json);
 
 		parts.scheme().clone().xpect_eq(Scheme::Http);
 		parts.authority().xpect_eq("example.com");
@@ -753,7 +502,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
@@ -771,7 +520,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::OK);
-		parts.headers.set_content_type(MimeType::Html);
+		parts.headers.set_content_type(MediaType::Html);
 
 		parts.status().xpect_eq(StatusCode::OK);
 		parts
@@ -779,7 +528,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Html);
+			.xpect_eq(MediaType::Html);
 	}
 
 	#[test]
@@ -836,7 +585,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
@@ -858,7 +607,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
@@ -866,14 +615,13 @@ mod test {
 		let cli = CliArgs::parse("users list --limit 10 --verbose");
 		let parts = RequestParts::from(cli);
 
-		parts.scheme().clone().xpect_eq(Scheme::Cli);
+		parts.scheme().clone().xpect_eq(Scheme::None);
 		(*parts.method()).xpect_eq(HttpMethod::Get);
 		parts
 			.path()
 			.xpect_eq(vec!["users".to_string(), "list".to_string()]);
 		parts.get_param("limit").unwrap().xpect_eq("10");
 		parts.has_param("verbose").xpect_true();
-		// parts.version().xpect_eq("0.1.0");
 	}
 
 	#[test]
@@ -923,28 +671,10 @@ mod test {
 	}
 
 	#[test]
-	fn split_path_handles_edge_cases() {
-		split_path("").xpect_empty();
-		split_path("/").xpect_empty();
-		split_path("//").xpect_empty();
-		split_path("/a//b/").xpect_eq(vec!["a".to_string(), "b".to_string()]);
-	}
-
-	#[test]
-	fn scheme_parsing() {
-		Scheme::from_str("http").xpect_eq(Scheme::Http);
-		Scheme::from_str("HTTPS").xpect_eq(Scheme::Https);
-		Scheme::from_str("cli").xpect_eq(Scheme::Cli);
-		Scheme::from_str("").xpect_eq(Scheme::None);
-		Scheme::from_str("custom")
-			.xpect_eq(Scheme::Other("custom".to_string()));
-	}
-
-	#[test]
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let mut parts = RequestParts::post("/api/users?limit=10");
-		parts.headers.set_content_type(MimeType::Json);
+		parts.headers.set_content_type(MediaType::Json);
 
 		let http_parts: http::request::Parts = parts.try_into().unwrap();
 
@@ -956,7 +686,7 @@ mod test {
 	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
 		let mut parts = ResponseParts::new(StatusCode::CREATED);
-		parts.headers.set_content_type(MimeType::Json);
+		parts.headers.set_content_type(MediaType::Json);
 
 		let http_parts: http::response::Parts = parts.try_into().unwrap();
 
@@ -995,5 +725,15 @@ mod test {
 			header::TransferEncodingValue::Chunked,
 		);
 		parts2.has_body().xpect_true();
+	}
+
+	#[test]
+	fn version_is_cow_static() {
+		// Default version uses borrowed static string
+		let parts = RequestParts::default();
+		parts.version().xpect_eq("1.1");
+
+		let response = ResponseParts::default();
+		response.version().xpect_eq("1.1");
 	}
 }

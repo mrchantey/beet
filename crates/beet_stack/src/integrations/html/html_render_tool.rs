@@ -38,7 +38,8 @@ pub fn html_render_tool() -> impl Bundle {
 				let world = cx.caller.world();
 
 				// Spawn the card content on demand
-				let card_entity = cx.caller.call_detached(spawn_tool, ()).await?;
+				let card_entity =
+					cx.caller.call_detached(spawn_tool, ()).await?;
 
 				// Render to HTML, then despawn
 				let html = world
@@ -49,7 +50,7 @@ pub fn html_render_tool() -> impl Bundle {
 					})
 					.await;
 
-				Response::ok_body(html, MimeType::Html).xok()
+				Response::ok_body(html, MediaType::Html).xok()
 			},
 		),
 	)

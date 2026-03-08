@@ -151,7 +151,7 @@ impl From<HttpError> for Response {
 			Response::from_status_body(
 				error.status_code,
 				error.message.as_bytes(),
-				MimeType::Text,
+				MediaType::Text,
 			)
 		}
 	}

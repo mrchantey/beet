@@ -1,7 +1,7 @@
-//! MIME-type-driven serialization and deserialization.
+//! Media-type-driven serialization and deserialization.
 //!
 //! Provides free [`serialize`] and [`deserialize`] functions that dispatch
-//! based on a [`MimeType`] value. Use these instead of reaching for
+//! based on a [`MediaType`] value. Use these instead of reaching for
 //! `serde_json` or `postcard` directly when the format is determined at
 //! runtime from a `content-type` header.
 //!
@@ -10,8 +10,8 @@
 //! ```
 //! # use beet_net::prelude::*;
 //! # #[cfg(feature = "json")] {
-//! let bytes = mime_serde::serialize(MimeType::Json, &42u32).unwrap();
-//! let value: u32 = mime_serde::deserialize(MimeType::Json, &bytes).unwrap();
+//! let bytes = mime_serde::serialize(MediaType::Json, &42u32).unwrap();
+//! let value: u32 = mime_serde::deserialize(MediaType::Json, &bytes).unwrap();
 //! assert_eq!(value, 42);
 //! # }
 //! ```
@@ -29,17 +29,17 @@ use beet_core::prelude::*;
 ///
 /// ## Supported types
 ///
-/// | [`MimeType`]         | Format   | Required feature |
+/// | [`MediaType`]        | Format   | Required feature |
 /// |----------------------|----------|-----------------|
 /// | `Json`               | JSON     | `json`          |
 /// | `Postcard` / `Bytes` | postcard | `postcard`      |
 /// | `Text`               | UTF-8    | —               |
 pub fn serialize<T: serde::Serialize>(
-	mime_type: MimeType,
+	media_type: MediaType,
 	value: &T,
 ) -> Result<Vec<u8>> {
-	match mime_type {
-		MimeType::Json => {
+	match media_type {
+		MediaType::Json => {
 			#[cfg(feature = "json")]
 			{
 				serde_json::to_vec(value)
@@ -53,7 +53,7 @@ pub fn serialize<T: serde::Serialize>(
 				)
 			}
 		}
-		MimeType::Postcard | MimeType::Bytes => {
+		MediaType::Postcard | MediaType::Bytes => {
 			#[cfg(feature = "postcard")]
 			{
 				postcard::to_allocvec(value).map_err(|err| {
@@ -68,33 +68,33 @@ pub fn serialize<T: serde::Serialize>(
 				)
 			}
 		}
-		other => bevybail!("Cannot serialize to mime type {other}"),
+		other => bevybail!("Cannot serialize to media type {other}"),
 	}
 }
 
-/// Deserialize bytes into `T` using the given MIME type's format.
+/// Deserialize bytes into `T` using the given media type's format.
 ///
-/// For [`MimeType::Json`], empty bytes are treated as JSON `null`,
+/// For [`MediaType::Json`], empty bytes are treated as JSON `null`,
 /// enabling unit-type inputs on requests with no body.
 ///
 /// ## Errors
 ///
 /// Returns an error if:
-/// - the MIME type is not a supported deserialization format
+/// - the media type is not a supported deserialization format
 /// - the bytes fail to deserialize
 ///
 /// ## Supported types
 ///
-/// | [`MimeType`]         | Format   | Required feature |
+/// | [`MediaType`]        | Format   | Required feature |
 /// |----------------------|----------|-----------------|
 /// | `Json`               | JSON     | `json`          |
 /// | `Postcard` / `Bytes` | postcard | `postcard`      |
 pub fn deserialize<T: serde::de::DeserializeOwned>(
-	mime_type: MimeType,
+	media_type: MediaType,
 	bytes: &[u8],
 ) -> Result<T> {
-	match mime_type {
-		MimeType::Json => {
+	match media_type {
+		MediaType::Json => {
 			#[cfg(feature = "json")]
 			{
 				let slice = if bytes.is_empty() { b"null" } else { bytes };
@@ -110,7 +110,7 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(
 				)
 			}
 		}
-		MimeType::Postcard | MimeType::Bytes => {
+		MediaType::Postcard | MediaType::Bytes => {
 			#[cfg(feature = "postcard")]
 			{
 				postcard::from_bytes(bytes).map_err(|err| {
@@ -125,7 +125,7 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(
 				)
 			}
 		}
-		other => bevybail!("Cannot deserialize from mime type {other}"),
+		other => bevybail!("Cannot deserialize from media type {other}"),
 	}
 }
 
@@ -145,15 +145,15 @@ mod test {
 	#[test]
 	fn roundtrip_json() {
 		let input = Pair { a: 1, b: 2 };
-		let bytes = serialize(MimeType::Json, &input).unwrap();
-		let output: Pair = deserialize(MimeType::Json, &bytes).unwrap();
+		let bytes = serialize(MediaType::Json, &input).unwrap();
+		let output: Pair = deserialize(MediaType::Json, &bytes).unwrap();
 		output.xpect_eq(input);
 	}
 
 	#[cfg(feature = "json")]
 	#[test]
 	fn json_empty_bytes_null() {
-		let result: () = deserialize(MimeType::Json, b"").unwrap();
+		let result: () = deserialize(MediaType::Json, b"").unwrap();
 		result.xpect_eq(());
 	}
 
@@ -161,24 +161,24 @@ mod test {
 	#[test]
 	fn roundtrip_postcard() {
 		let input = Pair { a: 3, b: 4 };
-		let bytes = serialize(MimeType::Postcard, &input).unwrap();
-		let output: Pair = deserialize(MimeType::Postcard, &bytes).unwrap();
+		let bytes = serialize(MediaType::Postcard, &input).unwrap();
+		let output: Pair = deserialize(MediaType::Postcard, &bytes).unwrap();
 		output.xpect_eq(input);
 	}
 
 	#[cfg(feature = "postcard")]
 	#[test]
-	fn bytes_mime_uses_postcard() {
+	fn bytes_media_type_uses_postcard() {
 		let input = Pair { a: 5, b: 6 };
-		let bytes = serialize(MimeType::Bytes, &input).unwrap();
-		let output: Pair = deserialize(MimeType::Bytes, &bytes).unwrap();
+		let bytes = serialize(MediaType::Bytes, &input).unwrap();
+		let output: Pair = deserialize(MediaType::Bytes, &bytes).unwrap();
 		output.xpect_eq(input);
 	}
 
 	#[cfg(feature = "json")]
 	#[test]
-	fn unsupported_mime_errors() {
-		serialize(MimeType::Html, &42u32).xpect_err();
-		serialize(MimeType::Text, &42u32).xpect_err();
+	fn unsupported_media_type_errors() {
+		serialize(MediaType::Html, &42u32).xpect_err();
+		serialize(MediaType::Text, &42u32).xpect_err();
 	}
 }

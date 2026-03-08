@@ -147,15 +147,15 @@ impl Response {
 	/// # use beet_net::headers;
 	/// let response = Response::with_json(&serde_json::json!({"foo": 42})).unwrap();
 	/// assert_eq!(response.status(), StatusCode::OK);
-	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
-	/// assert_eq!(mime, MimeType::Json);
+	/// let media_type = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(value: &T) -> Result<Self> {
 		let body = Body::from_json(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(MimeType::Json)
+			.with_content_type(MediaType::Json)
 			.xok()
 	}
 
@@ -165,7 +165,7 @@ impl Response {
 		let body = Body::from_postcard(value)?;
 		Self::ok()
 			.with_body(body)
-			.with_content_type(MimeType::Postcard)
+			.with_content_type(MediaType::Postcard)
 			.xok()
 	}
 
@@ -175,14 +175,14 @@ impl Response {
 	/// # use beet_net::prelude::*;
 	/// # use beet_net::headers;
 	/// let response = Response::with_json_str(r#"{"foo": 42}"#);
-	/// let mime = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
-	/// assert_eq!(mime, MimeType::Json);
+	/// let media_type = response.parts.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(json: impl AsRef<str>) -> Self {
 		Self::ok()
 			.with_body(json.as_ref())
-			.with_content_type(MimeType::Json)
+			.with_content_type(MediaType::Json)
 	}
 
 	/// Creates an OK response with raw postcard bytes and `content-type` header.
@@ -190,7 +190,7 @@ impl Response {
 	pub fn with_postcard_bytes(bytes: impl AsRef<[u8]>) -> Self {
 		Self::ok()
 			.with_body(Bytes::copy_from_slice(bytes.as_ref()))
-			.with_content_type(MimeType::Postcard)
+			.with_content_type(MediaType::Postcard)
 	}
 
 	/// Deserializes the response body using the format indicated by
@@ -208,13 +208,13 @@ impl Response {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let mime = self
+		let media_type = self
 			.parts
 			.headers
 			.get::<header::ContentType>()
 			.and_then(|res| res.ok())
-			.unwrap_or(MimeType::Json);
-		self.body.into_mime(mime).await
+			.unwrap_or(MediaType::Json);
+		self.body.into_media_type(media_type).await
 	}
 
 	/// Deserializes the response body using the format indicated by
@@ -237,7 +237,7 @@ impl Response {
 	pub fn from_status_body(
 		status: StatusCode,
 		body: impl AsRef<[u8]>,
-		content_type: MimeType,
+		content_type: MediaType,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
 		parts.headers.set_content_type(content_type);
@@ -306,7 +306,7 @@ impl Response {
 	}
 
 	/// Create a response with the given body and content type
-	pub fn ok_body(body: impl Into<Body>, content_type: MimeType) -> Self {
+	pub fn ok_body(body: impl Into<Body>, content_type: MediaType) -> Self {
 		let mut parts = ResponseParts::ok();
 		parts.headers.set_content_type(content_type);
 		Self {
@@ -323,9 +323,9 @@ impl Response {
 		body: impl Into<Body>,
 		path: impl AsRef<std::path::Path>,
 	) -> Self {
-		let mime_type = mime_guess::from_path(path).first_or_octet_stream();
-		let mime = MimeType::from_content_type(mime_type.as_ref());
-		Self::ok_body(body, mime)
+		let guessed = mime_guess::from_path(path).first_or_octet_stream();
+		let media_type = MediaType::from_content_type(guessed.as_ref());
+		Self::ok_body(body, media_type)
 	}
 
 	/// Returns a reference to the response parts
@@ -397,7 +397,7 @@ impl Response {
 	}
 
 	/// Sets the content type header.
-	pub fn with_content_type(mut self, content_type: MimeType) -> Self {
+	pub fn with_content_type(mut self, content_type: MediaType) -> Self {
 		self.parts.headers.set_content_type(content_type);
 		self
 	}
@@ -469,13 +469,13 @@ impl From<BevyError> for Response {
 
 impl IntoResponse<Self> for Bytes {
 	fn into_response(self) -> Response {
-		Response::ok_body(self, MimeType::Bytes)
+		Response::ok_body(self, MediaType::Bytes)
 	}
 }
 
 impl IntoResponse<Self> for &[u8] {
 	fn into_response(self) -> Response {
-		Response::ok_body(Bytes::copy_from_slice(self), MimeType::Bytes)
+		Response::ok_body(Bytes::copy_from_slice(self), MediaType::Bytes)
 	}
 }
 
@@ -513,13 +513,13 @@ impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
 
 impl<'a> From<&'a str> for Response {
 	fn from(value: &'a str) -> Response {
-		Response::ok_body(value, MimeType::Text)
+		Response::ok_body(value, MediaType::Text)
 	}
 }
 
 impl From<String> for Response {
 	fn from(value: String) -> Response {
-		Response::ok_body(value, MimeType::Text)
+		Response::ok_body(value, MediaType::Text)
 	}
 }
 
@@ -556,8 +556,11 @@ mod test {
 	#[test]
 	#[cfg(feature = "http")]
 	fn response_from_status_body() {
-		let response =
-			Response::from_status_body(StatusCode::OK, b"data", MimeType::Text);
+		let response = Response::from_status_body(
+			StatusCode::OK,
+			b"data",
+			MediaType::Text,
+		);
 		response.status().xpect_eq(StatusCode::OK);
 		response
 			.header_contains(http::header::CONTENT_TYPE, "text/plain")
@@ -640,7 +643,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
@@ -658,7 +661,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		String::from_utf8(body_bytes.to_vec())
@@ -686,7 +689,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Postcard);
+			.xpect_eq(MediaType::Postcard);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
@@ -704,7 +707,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Postcard);
+			.xpect_eq(MediaType::Postcard);
 
 		let body_bytes = response.body.try_into_bytes().unwrap();
 		body_bytes.to_vec().xpect_eq(raw);

@@ -11,9 +11,9 @@
 //! # use beet_net::prelude::*;
 //! # use beet_net::headers;
 //! let mut map = HeaderMap::new();
-//! map.set::<headers::ContentType>(MimeType::Json);
-//! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
-//! assert_eq!(mime, MimeType::Json);
+//! map.set::<headers::ContentType>(MediaType::Json);
+//! let media_type = map.get::<headers::ContentType>().unwrap().unwrap();
+//! assert_eq!(media_type, MediaType::Json);
 //! ```
 
 use super::*;
@@ -92,9 +92,9 @@ impl HeaderMap {
 		}
 	}
 
-	/// Set the `Content-Type` header from a [`MimeType`].
-	pub fn set_content_type(&mut self, mime: MimeType) {
-		self.set::<header::ContentType>(mime);
+	/// Set the `Content-Type` header from a [`MediaType`].
+	pub fn set_content_type(&mut self, media_type: MediaType) {
+		self.set::<header::ContentType>(media_type);
 	}
 
 	/// Check if a header key exists.
@@ -168,136 +168,6 @@ pub trait Header {
 	fn serialize(value: Self::Value) -> Vec<String>;
 }
 
-// ============================================================================
-// MimeType
-// ============================================================================
-
-/// Common MIME types used in HTTP exchange.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub enum MimeType {
-	/// `application/octet-stream` — raw bytes, the default.
-	#[default]
-	Bytes,
-	/// `text/plain`
-	Text,
-	/// `text/html`
-	Html,
-	/// `application/xml` or `text/xml`
-	Xml,
-	/// `application/json`
-	Json,
-	/// `application/x-postcard`
-	Postcard,
-	/// `text/markdown`
-	Markdown,
-	/// `text/event-stream` — Server-Sent Events.
-	EventStream,
-	/// `text/css`
-	Css,
-	/// `application/javascript`
-	Javascript,
-	/// `image/png`
-	Png,
-	/// An unrecognized MIME type.
-	Other(String),
-}
-
-impl MimeType {
-	/// The MIME string for `application/json`.
-	const JSON: &'static str = "application/json";
-	/// The MIME string for `application/x-postcard`.
-	const POSTCARD: &'static str = "application/x-postcard";
-	/// The MIME string for `text/plain`.
-	const TEXT: &'static str = "text/plain";
-	/// The MIME string for `text/html`.
-	const HTML: &'static str = "text/html";
-	/// The MIME string for `application/xml`.
-	const XML: &'static str = "application/xml";
-	/// The MIME string for `text/markdown`.
-	const MARKDOWN: &'static str = "text/markdown";
-	/// The MIME string for `application/octet-stream`.
-	const BYTES: &'static str = "application/octet-stream";
-	/// The MIME string for `text/event-stream`.
-	const EVENT_STREAM: &'static str = "text/event-stream";
-	/// The MIME string for `text/css`.
-	const CSS: &'static str = "text/css";
-	/// The MIME string for `application/javascript`.
-	const JAVASCRIPT: &'static str = "application/javascript";
-	/// The MIME string for `image/png`.
-	const PNG: &'static str = "image/png";
-
-	/// Parse a MIME type from a content-type string.
-	///
-	/// Strips parameters like `; charset=utf-8` before matching.
-	pub fn from_content_type(content_type: &str) -> Self {
-		let mime = content_type
-			.split(';')
-			.next()
-			.unwrap_or(content_type)
-			.trim();
-		match mime {
-			val if val.contains(Self::JSON) => MimeType::Json,
-			val if val.contains(Self::POSTCARD) => MimeType::Postcard,
-			val if val.contains(Self::HTML) => MimeType::Html,
-			val if val.contains(Self::MARKDOWN) => MimeType::Markdown,
-			val if val.contains(Self::EVENT_STREAM) => MimeType::EventStream,
-			val if val.contains("text/xml") || val.contains(Self::XML) => {
-				MimeType::Xml
-			}
-			val if val.contains(Self::TEXT) => MimeType::Text,
-			val if val.contains(Self::BYTES) => MimeType::Bytes,
-			val if val.contains(Self::CSS) => MimeType::Css,
-			val if val.contains(Self::JAVASCRIPT) => MimeType::Javascript,
-			val if val.contains(Self::PNG) => MimeType::Png,
-			other => MimeType::Other(other.to_string()),
-		}
-	}
-
-	/// The canonical MIME string for this type.
-	pub fn as_str(&self) -> &str {
-		match self {
-			MimeType::Bytes => Self::BYTES,
-			MimeType::Text => Self::TEXT,
-			MimeType::Html => Self::HTML,
-			MimeType::Xml => Self::XML,
-			MimeType::Json => Self::JSON,
-			MimeType::Postcard => Self::POSTCARD,
-			MimeType::Markdown => Self::MARKDOWN,
-			MimeType::EventStream => Self::EVENT_STREAM,
-			MimeType::Css => Self::CSS,
-			MimeType::Javascript => Self::JAVASCRIPT,
-			MimeType::Png => Self::PNG,
-			MimeType::Other(val) => val.as_str(),
-		}
-	}
-
-	/// Whether this is a serializable format (JSON or Postcard).
-	pub fn is_serializable(&self) -> bool {
-		matches!(self, MimeType::Json | MimeType::Postcard)
-	}
-}
-
-impl From<&str> for MimeType {
-	fn from(value: &str) -> Self { MimeType::from_content_type(value) }
-}
-
-impl From<String> for MimeType {
-	fn from(value: String) -> Self { MimeType::from_content_type(&value) }
-}
-
-impl Into<Vec<MimeType>> for MimeType {
-	fn into(self) -> Vec<MimeType> { vec![self] }
-}
-
-impl core::fmt::Display for MimeType {
-	fn fmt(
-		&self,
-		formatter: &mut core::fmt::Formatter<'_>,
-	) -> core::fmt::Result {
-		write!(formatter, "{}", self.as_str())
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use super::header as headers;
@@ -332,24 +202,24 @@ mod test {
 	#[test]
 	fn insert_and_get_str() {
 		let mut headers = HeaderMap::new();
-		headers.set::<headers::ContentType>(MimeType::Json);
+		headers.set::<headers::ContentType>(MediaType::Json);
 		headers
 			.get::<headers::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
 	fn case_insensitive_lookup() {
 		let mut headers = HeaderMap::new();
-		headers.set::<headers::ContentType>(MimeType::Html);
+		headers.set::<headers::ContentType>(MediaType::Html);
 		// All casings resolve to the same normalized key
 		headers
 			.get::<headers::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Html);
+			.xpect_eq(MediaType::Html);
 		headers
 			.first_raw("Content-Type")
 			.unwrap()
@@ -395,12 +265,12 @@ mod test {
 	#[test]
 	fn set_content_type_helper() {
 		let mut headers = HeaderMap::new();
-		headers.set_content_type(MimeType::Json);
+		headers.set_content_type(MediaType::Json);
 		headers
 			.get::<headers::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
@@ -412,104 +282,7 @@ mod test {
 			.get::<headers::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Html);
-	}
-
-	// MimeType tests
-
-	#[test]
-	fn mime_type_from_content_type_json() {
-		MimeType::from_content_type("application/json")
-			.xpect_eq(MimeType::Json);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_json_with_charset() {
-		MimeType::from_content_type("application/json; charset=utf-8")
-			.xpect_eq(MimeType::Json);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_postcard() {
-		MimeType::from_content_type("application/x-postcard")
-			.xpect_eq(MimeType::Postcard);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_html() {
-		MimeType::from_content_type("text/html").xpect_eq(MimeType::Html);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_text() {
-		MimeType::from_content_type("text/plain").xpect_eq(MimeType::Text);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_xml() {
-		MimeType::from_content_type("application/xml").xpect_eq(MimeType::Xml);
-		MimeType::from_content_type("text/xml").xpect_eq(MimeType::Xml);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_markdown() {
-		MimeType::from_content_type("text/markdown")
-			.xpect_eq(MimeType::Markdown);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_bytes() {
-		MimeType::from_content_type("application/octet-stream")
-			.xpect_eq(MimeType::Bytes);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_event_stream() {
-		MimeType::from_content_type("text/event-stream")
-			.xpect_eq(MimeType::EventStream);
-	}
-
-	#[test]
-	fn mime_type_from_content_type_unknown() {
-		MimeType::from_content_type("application/x-custom")
-			.xpect_eq(MimeType::Other("application/x-custom".to_string()));
-	}
-
-	#[test]
-	fn mime_type_as_str_roundtrip() {
-		let types = vec![
-			MimeType::Bytes,
-			MimeType::Text,
-			MimeType::Html,
-			MimeType::Xml,
-			MimeType::Json,
-			MimeType::Postcard,
-			MimeType::Markdown,
-			MimeType::EventStream,
-		];
-		for mime in types {
-			MimeType::from_content_type(mime.as_str()).xpect_eq(mime);
-		}
-	}
-
-	#[test]
-	fn mime_type_default_is_bytes() {
-		MimeType::default().xpect_eq(MimeType::Bytes);
-	}
-
-	#[test]
-	fn mime_type_display() {
-		format!("{}", MimeType::Json).xpect_eq("application/json");
-		format!("{}", MimeType::EventStream).xpect_eq("text/event-stream");
-	}
-
-	#[test]
-	fn mime_type_is_serializable() {
-		MimeType::Json.is_serializable().xpect_true();
-		MimeType::Postcard.is_serializable().xpect_true();
-		MimeType::Html.is_serializable().xpect_false();
-		MimeType::Text.is_serializable().xpect_false();
-		MimeType::EventStream.is_serializable().xpect_false();
+			.xpect_eq(MediaType::Html);
 	}
 
 	#[test]

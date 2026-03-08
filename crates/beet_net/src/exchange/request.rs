@@ -204,8 +204,8 @@ impl Request {
 	/// # use beet_net::prelude::*;
 	/// # use beet_net::headers;
 	/// let request = Request::with_json("/api/users", &serde_json::json!({"name": "Ada"})).unwrap();
-	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
-	/// assert_eq!(mime, MimeType::Json);
+	/// let media_type = request.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(
@@ -215,7 +215,7 @@ impl Request {
 		let body = Body::from_json(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request.headers.set_content_type(MimeType::Json);
+		request.headers.set_content_type(MediaType::Json);
 		request.xok()
 	}
 
@@ -229,7 +229,7 @@ impl Request {
 		let body = Body::from_postcard(value)?;
 		let mut request =
 			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
-		request.headers.set_content_type(MimeType::Postcard);
+		request.headers.set_content_type(MediaType::Postcard);
 		request.xok()
 	}
 
@@ -239,13 +239,13 @@ impl Request {
 	/// # use beet_net::prelude::*;
 	/// # use beet_net::headers;
 	/// let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
-	/// let mime = request.headers.get::<headers::ContentType>().unwrap().unwrap();
-	/// assert_eq!(mime, MimeType::Json);
+	/// let media_type = request.headers.get::<headers::ContentType>().unwrap().unwrap();
+	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
 		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
-		request.headers.set_content_type(MimeType::Json);
+		request.headers.set_content_type(MediaType::Json);
 		request
 	}
 
@@ -256,7 +256,7 @@ impl Request {
 		bytes: impl AsRef<[u8]>,
 	) -> Self {
 		let mut request = Self::post(path).with_body(bytes);
-		request.headers.set_content_type(MimeType::Postcard);
+		request.headers.set_content_type(MediaType::Postcard);
 		request
 	}
 
@@ -268,7 +268,7 @@ impl Request {
 	) -> Result<Self, serde_json::Error> {
 		let body = serde_json::to_string(body)?;
 		self.with_body(Bytes::from(body))
-			.with_content_type(MimeType::Json)
+			.with_content_type(MediaType::Json)
 			.xok()
 	}
 
@@ -293,12 +293,12 @@ impl Request {
 	pub async fn deserialize<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
-		let mime = self
+		let media_type = self
 			.headers
 			.get::<header::ContentType>()
 			.and_then(|res| res.ok())
-			.unwrap_or(MimeType::Json);
-		self.body.into_mime(mime).await
+			.unwrap_or(MediaType::Json);
+		self.body.into_media_type(media_type).await
 	}
 
 	/// Deserializes the request body using the format indicated by
@@ -326,15 +326,15 @@ impl Request {
 	}
 
 	/// Sets the content type header.
-	pub fn with_content_type(self, content_type: MimeType) -> Self {
+	pub fn with_content_type(self, content_type: MediaType) -> Self {
 		let mut this = self;
 		this.headers.set_content_type(content_type);
 		this
 	}
 
-	/// Sets the `Accept` header to the given MIME type.
-	pub fn with_accept(mut self, mime: MimeType) -> Self {
-		self.headers.set::<header::Accept>(vec![mime]);
+	/// Sets the `Accept` header to the given media type.
+	pub fn with_accept(mut self, media_type: MediaType) -> Self {
+		self.headers.set::<header::Accept>(vec![media_type]);
 		self
 	}
 
@@ -572,7 +572,7 @@ mod test {
 		let request = Request::from(cli);
 
 		(*request.method()).xpect_eq(HttpMethod::Get);
-		request.scheme().clone().xpect_eq(Scheme::Cli);
+		request.scheme().clone().xpect_eq(Scheme::None);
 		request
 			.path()
 			.xpect_eq(vec!["users".to_string(), "list".to_string()]);
@@ -653,7 +653,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = serde_json::from_slice(&body_bytes).unwrap();
@@ -670,7 +670,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		String::from_utf8(body_bytes.to_vec())
@@ -698,7 +698,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Postcard);
+			.xpect_eq(MediaType::Postcard);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
@@ -715,7 +715,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Postcard);
+			.xpect_eq(MediaType::Postcard);
 
 		let body_bytes = request.body.try_into_bytes().unwrap();
 		body_bytes.to_vec().xpect_eq(raw);

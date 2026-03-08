@@ -51,7 +51,8 @@ pub fn mime_render_tool() -> impl Bundle {
 				let accept = negotiate_format(&cx.input.request);
 
 				// Spawn the card content on demand
-				let card_entity = cx.caller.call_detached(spawn_tool, ()).await?;
+				let card_entity =
+					cx.caller.call_detached(spawn_tool, ()).await?;
 
 				// Render in the negotiated format, then despawn
 				let response = world
@@ -59,19 +60,19 @@ pub fn mime_render_tool() -> impl Bundle {
 						let response = match accept {
 							NegotiatedFormat::Html => {
 								let html = render_html_for(card_entity, world);
-								Response::ok_body(html, MimeType::Html)
+								Response::ok_body(html, MediaType::Html)
 							}
 							#[cfg(feature = "markdown")]
 							NegotiatedFormat::Markdown => {
 								let md =
 									render_markdown_for(card_entity, world);
-								Response::ok_body(md, MimeType::Markdown)
+								Response::ok_body(md, MediaType::Markdown)
 							}
 							#[cfg(not(feature = "markdown"))]
 							NegotiatedFormat::Markdown => {
 								// Fall back to HTML when markdown is unavailable
 								let html = render_html_for(card_entity, world);
-								Response::ok_body(html, MimeType::Html)
+								Response::ok_body(html, MediaType::Html)
 							}
 							#[cfg(all(feature = "bevy_scene", feature = "json"))]
 							NegotiatedFormat::Json => render_scene_json(card_entity, world)?,
@@ -107,7 +108,7 @@ fn render_scene_json(entity: Entity, world: &mut World) -> Result<Response> {
 	let bytes = SceneSaver::new(world)
 		.with_entity_tree(entity)
 		.save_json()?;
-	Response::ok_body(bytes, MimeType::Json).xok()
+	Response::ok_body(bytes, MediaType::Json).xok()
 }
 
 /// Serialize an entity tree to a postcard scene [`Response`].
@@ -119,7 +120,7 @@ fn render_scene_postcard(
 	let bytes = SceneSaver::new(world)
 		.with_entity_tree(entity)
 		.save_postcard()?;
-	Response::ok_body(bytes, MimeType::Postcard).xok()
+	Response::ok_body(bytes, MediaType::Postcard).xok()
 }
 
 /// The format chosen by content negotiation.
@@ -134,7 +135,7 @@ enum NegotiatedFormat {
 /// Inspect the request's `Accept` header and pick the best supported
 /// format. Falls back to HTML when no preference is expressed.
 fn negotiate_format(request: &Request) -> NegotiatedFormat {
-	let accepted: Vec<MimeType> = request
+	let accepted: Vec<MediaType> = request
 		.headers
 		.get::<header::Accept>()
 		.and_then(|result| result.ok())
@@ -146,13 +147,13 @@ fn negotiate_format(request: &Request) -> NegotiatedFormat {
 	}
 
 	// Walk the quality-sorted list and pick the first we support
-	for mime in &accepted {
-		match mime {
-			MimeType::Html => return NegotiatedFormat::Html,
-			MimeType::Markdown => return NegotiatedFormat::Markdown,
-			MimeType::Text => return NegotiatedFormat::Markdown,
-			MimeType::Json => return NegotiatedFormat::Json,
-			MimeType::Postcard | MimeType::Bytes => {
+	for media_type in &accepted {
+		match media_type {
+			MediaType::Html => return NegotiatedFormat::Html,
+			MediaType::Markdown => return NegotiatedFormat::Markdown,
+			MediaType::Text => return NegotiatedFormat::Markdown,
+			MediaType::Json => return NegotiatedFormat::Json,
+			MediaType::Postcard | MediaType::Bytes => {
 				return NegotiatedFormat::Postcard;
 			}
 			_ => continue,

@@ -95,14 +95,14 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 		match self.result {
 			Ok(val) => {
 				let ok_body = serde_json::to_string(&val)?;
-				Response::ok_body(ok_body, MimeType::Json)
+				Response::ok_body(ok_body, MediaType::Json)
 			}
 			Err(err) => {
 				let err_body = serde_json::to_string(&err)?;
 				Response::from_status_body(
 					self.err_status,
 					&err_body,
-					MimeType::Json,
+					MediaType::Json,
 				)
 			}
 		}
@@ -149,7 +149,7 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 
 	fn try_into(self) -> Result<Response, Self::Error> {
 		let json_str = serde_json::to_string(&self.0)?;
-		Ok(Response::ok_body(json_str, MimeType::Json))
+		Ok(Response::ok_body(json_str, MediaType::Json))
 	}
 }
 
@@ -263,21 +263,21 @@ impl<T> Into<Response> for Html<T>
 where
 	T: Into<Body>,
 {
-	fn into(self) -> Response { Response::ok_body(self.0, MimeType::Html) }
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Html) }
 }
 
 impl Into<Response> for Css {
-	fn into(self) -> Response { Response::ok_body(self.0, MimeType::Css) }
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Css) }
 }
 
 impl Into<Response> for Javascript {
 	fn into(self) -> Response {
-		Response::ok_body(self.0, MimeType::Javascript)
+		Response::ok_body(self.0, MediaType::Javascript)
 	}
 }
 
 impl Into<Response> for Png {
-	fn into(self) -> Response { Response::ok_body(self.0, MimeType::Png) }
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Png) }
 }
 
 #[cfg(test)]

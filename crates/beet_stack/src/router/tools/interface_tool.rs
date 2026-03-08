@@ -44,7 +44,7 @@ pub fn exchange_fallback() -> impl Bundle {
 				Fail(req) => Ok(Response::from_status_body(
 					StatusCode::NOT_FOUND,
 					format!("Resource not found: {}", req.path_string()),
-					MimeType::Text,
+					MediaType::Text,
 				)),
 			}
 		}),

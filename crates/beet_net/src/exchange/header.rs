@@ -6,9 +6,9 @@
 //! # use beet_net::prelude::*;
 //! # use beet_net::headers;
 //! let mut map = HeaderMap::new();
-//! map.set::<headers::ContentType>(MimeType::Json);
-//! let mime = map.get::<headers::ContentType>().unwrap().unwrap();
-//! assert_eq!(mime, MimeType::Json);
+//! map.set::<headers::ContentType>(MediaType::Json);
+//! let media_type = map.get::<headers::ContentType>().unwrap().unwrap();
+//! assert_eq!(media_type, MediaType::Json);
 //! ```
 use super::*;
 use beet_core::prelude::*;
@@ -18,30 +18,30 @@ use beet_core::prelude::*;
 // ContentType
 // ============================================================================
 
-/// Typed `Content-Type` header, parsed as a [`MimeType`].
+/// Typed `Content-Type` header, parsed as a [`MediaType`].
 ///
 /// ```
 /// # use beet_net::prelude::*;
 /// # use beet_net::headers;
 /// let mut headers = HeaderMap::new();
 /// headers.set_raw("content-type", "application/json");
-/// let mime: MimeType = headers.get::<headers::ContentType>().unwrap().unwrap();
-/// assert_eq!(mime, MimeType::Json);
+/// let media_type: MediaType = headers.get::<headers::ContentType>().unwrap().unwrap();
+/// assert_eq!(media_type, MediaType::Json);
 /// ```
 pub struct ContentType;
 
 impl Header for ContentType {
-	type Value = MimeType;
+	type Value = MediaType;
 	const KEY: &'static str = "content-type";
 
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
 		values
 			.first()
-			.map(|val| MimeType::from_content_type(val))
+			.map(|val| MediaType::from_content_type(val))
 			.ok_or_else(|| bevyhow!("content-type header has no value"))
 	}
 
-	fn serialize(value: MimeType) -> Vec<String> {
+	fn serialize(value: MediaType) -> Vec<String> {
 		vec![value.as_str().to_string()]
 	}
 }
@@ -50,7 +50,7 @@ impl Header for ContentType {
 // Accept
 // ============================================================================
 
-/// Typed `Accept` header, parsed as a list of [`MimeType`] ordered by quality.
+/// Typed `Accept` header, parsed as a list of [`MediaType`] ordered by quality.
 ///
 /// Quality scores (eg `text/html;q=0.9`) are used for ordering but stripped
 /// from the resulting values. Higher quality types come first.
@@ -60,31 +60,31 @@ impl Header for ContentType {
 /// # use beet_net::headers;
 /// let mut map = HeaderMap::new();
 /// map.set_raw("accept", "text/html;q=0.9, application/json");
-/// let types: Vec<MimeType> = map.get::<headers::Accept>().unwrap().unwrap();
-/// assert_eq!(types, vec![MimeType::Json, MimeType::Html]);
+/// let types: Vec<MediaType> = map.get::<headers::Accept>().unwrap().unwrap();
+/// assert_eq!(types, vec![MediaType::Json, MediaType::Html]);
 /// ```
 pub struct Accept;
 
-struct QualityMime {
-	mime: MimeType,
+struct QualityMediaType {
+	media_type: MediaType,
 	quality: f32,
 }
 
 impl Header for Accept {
-	type Value = Vec<MimeType>;
+	type Value = Vec<MediaType>;
 	const KEY: &'static str = "accept";
 
 	fn parse(values: &Vec<String>) -> Result<Self::Value> {
-		let mut entries: Vec<QualityMime> = Vec::new();
+		let mut entries: Vec<QualityMediaType> = Vec::new();
 		for value in values {
 			for part in value.split(',') {
 				let part = part.trim();
 				if part.is_empty() {
 					continue;
 				}
-				let (mime_str, quality) = parse_quality(part);
-				entries.push(QualityMime {
-					mime: MimeType::from_content_type(mime_str),
+				let (type_str, quality) = parse_quality(part);
+				entries.push(QualityMediaType {
+					media_type: MediaType::from_content_type(type_str),
 					quality,
 				});
 			}
@@ -98,16 +98,16 @@ impl Header for Accept {
 		});
 		entries
 			.into_iter()
-			.map(|entry| entry.mime)
+			.map(|entry| entry.media_type)
 			.collect::<Vec<_>>()
 			.xok()
 	}
 
-	fn serialize(value: Vec<MimeType>) -> Vec<String> {
+	fn serialize(value: Vec<MediaType>) -> Vec<String> {
 		vec![
 			value
 				.iter()
-				.map(|mime| mime.as_str().to_string())
+				.map(|media_type| media_type.as_str().to_string())
 				.collect::<Vec<_>>()
 				.join(", "),
 		]
@@ -566,11 +566,11 @@ mod test {
 	#[test]
 	fn content_type_roundtrip() {
 		let mut map = HeaderMap::new();
-		map.set::<ContentType>(MimeType::Json);
+		map.set::<ContentType>(MediaType::Json);
 		map.get::<ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MimeType::Json);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[test]
@@ -578,8 +578,8 @@ mod test {
 		let mut map = HeaderMap::new();
 		map.set_raw("accept", "text/html;q=0.9, application/json");
 		let types = map.get::<Accept>().unwrap().unwrap();
-		types[0].clone().xpect_eq(MimeType::Json);
-		types[1].clone().xpect_eq(MimeType::Html);
+		types[0].clone().xpect_eq(MediaType::Json);
+		types[1].clone().xpect_eq(MediaType::Html);
 	}
 
 	#[test]
@@ -587,8 +587,8 @@ mod test {
 		let mut map = HeaderMap::new();
 		map.set_raw("accept", "text/html, application/json");
 		let types = map.get::<Accept>().unwrap().unwrap();
-		types[0].clone().xpect_eq(MimeType::Html);
-		types[1].clone().xpect_eq(MimeType::Json);
+		types[0].clone().xpect_eq(MediaType::Html);
+		types[1].clone().xpect_eq(MediaType::Json);
 	}
 
 	#[test]

@@ -234,7 +234,7 @@ mod test {
 		let accepted =
 			request.headers.get::<header::Accept>().unwrap().unwrap();
 		accepted.len().xpect_eq(1);
-		accepted[0].xpect_eq(MimeType::Html);
+		accepted[0].xpect_eq(MediaType::Html);
 	}
 
 	#[test]
@@ -251,7 +251,7 @@ mod test {
 
 	#[test]
 	fn serialize_ok_response() {
-		let response = Response::ok_body("hello", MimeType::Text);
+		let response = Response::ok_body("hello", MediaType::Text);
 		let raw =
 			async_ext::block_on(serialize_http_response(response)).unwrap();
 		let raw_str = String::from_utf8(raw).unwrap();

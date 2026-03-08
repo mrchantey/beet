@@ -10,7 +10,7 @@ mod exchange;
 pub use exchange::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use exchange::headers;
-/// Re-export mime serialization at crate level.
+/// Re-export media-type-driven serialization at crate level.
 #[cfg(feature = "serde")]
 pub use exchange::mime_serde;
 mod object_storage;
