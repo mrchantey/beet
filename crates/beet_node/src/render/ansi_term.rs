@@ -22,41 +22,14 @@ pub struct AnsiTermRenderer {
 	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
 	/// Style used when no mapping or association is found.
 	default_style: Style,
-	/// Elements that produce block-level output with trailing newlines.
-	block_tags: Vec<Cow<'static, str>>,
 	/// Render [`Expression`] values verbatim as `{expr}`.
 	render_expressions: bool,
 	/// Whether to prefix headings with `#` markers.
 	heading_hashes: bool,
-	// ── Internal state ──
-	buffer: String,
+	/// Shared block/inline tracking state and output buffer.
+	state: TextRenderState,
 	/// Stack of active styles so nested elements restore correctly.
 	style_stack: Vec<Style>,
-	/// Whether the last character written was a newline.
-	trailing_newline: bool,
-	/// Whether a blank line separator is needed before the next block.
-	needs_block_separator: bool,
-	/// The href from the current `<a>` element, used for OSC-8 links.
-	pending_link_href: Option<String>,
-	/// When inside an `<img>`, the src URL from its attribute.
-	/// Child text nodes are captured as alt text instead of being emitted.
-	image_src: Option<String>,
-	/// Accumulated alt text while inside an `<img>` element.
-	image_alt: Option<String>,
-	/// Track list contexts for bullets and numbering.
-	list_stack: Vec<ListContext>,
-	/// Nesting depth for lists.
-	list_depth: usize,
-	/// Whether we are inside a `<pre>` block.
-	in_preformatted: bool,
-	/// Pending prefix for the next text node, ie heading markers, list bullets.
-	pending_prefix: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-enum ListContext {
-	Unordered,
-	Ordered(usize),
 }
 
 impl Default for AnsiTermRenderer {
@@ -69,20 +42,10 @@ impl AnsiTermRenderer {
 			style_map: default_style_map(),
 			default_associations: default_associations(),
 			default_style: Style::default(),
-			block_tags: default_block_elements(),
 			render_expressions: false,
-			buffer: String::new(),
-			style_stack: Vec::new(),
-			trailing_newline: true,
 			heading_hashes: false,
-			needs_block_separator: false,
-			pending_link_href: None,
-			image_src: None,
-			image_alt: None,
-			list_stack: Vec::new(),
-			list_depth: 0,
-			in_preformatted: false,
-			pending_prefix: None,
+			state: TextRenderState::new(),
+			style_stack: Vec::new(),
 		}
 	}
 
@@ -112,7 +75,7 @@ impl AnsiTermRenderer {
 
 	/// Override the set of block-level tags.
 	pub fn with_block_tags(mut self, tags: Vec<Cow<'static, str>>) -> Self {
-		self.block_tags = tags;
+		self.state = self.state.with_block_elements(tags);
 		self
 	}
 
@@ -123,10 +86,10 @@ impl AnsiTermRenderer {
 	}
 
 	/// Consume the renderer and return the accumulated string.
-	pub fn into_string(self) -> String { self.buffer }
+	pub fn into_string(self) -> String { self.state.buffer }
 
 	/// Borrow the accumulated string.
-	pub fn as_str(&self) -> &str { &self.buffer }
+	pub fn as_str(&self) -> &str { &self.state.buffer }
 
 	/// Resolve the style for an element name, walking through
 	/// associations if needed.
@@ -155,67 +118,26 @@ impl AnsiTermRenderer {
 			.unwrap_or(self.default_style)
 	}
 
-	fn is_block_tag(&self, name: &str) -> bool {
-		let lower = name.to_ascii_lowercase();
-		self.block_tags.iter().any(|el| el.as_ref() == lower)
-	}
-
-	fn ensure_newline(&mut self) {
-		if !self.trailing_newline {
-			self.buffer.push('\n');
-			self.trailing_newline = true;
-		}
-	}
-
-	fn ensure_block_separator(&mut self) {
-		if self.needs_block_separator && !self.buffer.is_empty() {
-			self.ensure_newline();
-			if !self.buffer.ends_with("\n\n") {
-				self.buffer.push('\n');
-			}
-		}
-		self.needs_block_separator = false;
-	}
-
+	/// Write styled text to the buffer.
 	fn push_styled(&mut self, text: &str) {
 		let style = self.current_style();
 		let painted = format!("{}", style.paint(text));
-		self.buffer.push_str(&painted);
-		self.trailing_newline = text.ends_with('\n');
-	}
-
-	fn push_raw(&mut self, text: &str) {
-		self.buffer.push_str(text);
-		self.trailing_newline = text.ends_with('\n');
+		self.state.push_raw(&painted);
+		// push_raw tracks trailing_newline from the painted string, but the
+		// ANSI codes don't contain newlines so we can track from the source
+		self.state.trailing_newline = text.ends_with('\n');
 	}
 
 	/// Write an OSC-8 hyperlink opening sequence.
 	fn open_osc8_link(&mut self, href: &str) {
-		// ESC ] 8 ; params ; URI ST
-		self.buffer.push_str("\x1b]8;;");
-		self.buffer.push_str(href);
-		self.buffer.push_str("\x1b\\");
+		self.state.buffer.push_str("\x1b]8;;");
+		self.state.buffer.push_str(href);
+		self.state.buffer.push_str("\x1b\\");
 	}
 
 	/// Write an OSC-8 hyperlink closing sequence.
-	fn close_osc8_link(&mut self) { self.buffer.push_str("\x1b]8;;\x1b\\"); }
-
-	fn write_list_indent(&mut self) {
-		if self.list_depth > 1 {
-			for _ in 0..self.list_depth - 1 {
-				self.push_raw("  ");
-			}
-		}
-	}
-
-	fn find_attr<'a>(
-		attrs: &'a [(Entity, &Attribute, &Value)],
-		key: &str,
-	) -> Option<&'a Value> {
-		attrs
-			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(_, _, val)| *val)
+	fn close_osc8_link(&mut self) {
+		self.state.buffer.push_str("\x1b]8;;\x1b\\");
 	}
 }
 
@@ -234,109 +156,95 @@ impl NodeVisitor for AnsiTermRenderer {
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
 				if self.heading_hashes {
 					let level = name[1..].parse::<usize>().unwrap_or(1);
 					let prefix = "#".repeat(level);
-					self.pending_prefix = Some(format!("{prefix} "));
+					// emit immediately so inline children land after the marker
+					self.push_styled(&format!("{prefix} "));
 				}
 			}
 
 			// ── Paragraph ──
 			"p" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
+				// emit blockquote prefix immediately so inline elements
+				// (eg <em>) that open before the first text node are
+				// correctly placed after the prefix
+				if self.state.blockquote_depth > 0 {
+					let prefix = self.state.blockquote_prefix("▌ ");
+					self.push_styled(&prefix);
+				}
 			}
 
 			// ── Blockquote ──
 			"blockquote" => {
-				self.ensure_block_separator();
-				self.pending_prefix = Some("▌ ".to_string());
+				self.state.ensure_block_separator();
+				self.state.blockquote_depth += 1;
 			}
 
 			// ── Lists ──
 			"ul" => {
-				if self.list_depth == 0 {
-					self.ensure_block_separator();
-				}
-				self.list_depth += 1;
-				self.list_stack.push(ListContext::Unordered);
+				self.state.enter_ul();
 			}
 			"ol" => {
-				if self.list_depth == 0 {
-					self.ensure_block_separator();
-				}
-				self.list_depth += 1;
-				let start = Self::find_attr(&attrs, "start")
-					.and_then(|val| match val {
-						Value::Uint(num) => Some(*num as usize),
-						Value::Int(num) => Some(*num as usize),
-						_ => None,
-					})
-					.unwrap_or(1);
-				self.list_stack.push(ListContext::Ordered(start));
+				let start = TextRenderState::ol_start(&attrs);
+				self.state.enter_ol(start);
 			}
 			"li" => {
-				self.ensure_newline();
-				self.write_list_indent();
-				let prefix = match self.list_stack.last_mut() {
-					Some(ListContext::Unordered) => "• ".to_string(),
-					Some(ListContext::Ordered(num)) => {
-						let prefix = format!("{}. ", num);
-						*num += 1;
-						prefix
-					}
-					None => "• ".to_string(),
-				};
+				self.state.ensure_newline();
+				self.state.write_list_indent();
+				let prefix = self.state.next_list_prefix("• ");
 				self.push_styled(&prefix);
 			}
 
 			// ── Code blocks ──
 			"pre" => {
-				self.ensure_block_separator();
-				self.in_preformatted = true;
+				self.state.ensure_block_separator();
+				self.state.in_preformatted = true;
 			}
-			"code" if self.in_preformatted => {
+			"code" if self.state.in_preformatted => {
 				// code block content rendered directly in visit_value
 			}
 			"code" => {
-				// inline code, no special prefix needed
+				// inline code, style applied via style_stack
 			}
 
 			// ── Links ──
 			"a" => {
-				let href = Self::find_attr(&attrs, "href")
+				let href = TextRenderState::find_attr(&attrs, "href")
 					.map(|val| val.to_string())
 					.unwrap_or_default();
-				self.pending_link_href = Some(href.clone());
+				self.state.pending_link_href = Some(href.clone());
 				self.open_osc8_link(&href);
 			}
 
 			// ── Images ──
 			"img" => {
-				let src = Self::find_attr(&attrs, "src")
+				let src = TextRenderState::find_attr(&attrs, "src")
 					.map(|val| val.to_string())
 					.unwrap_or_default();
-				self.image_src = Some(src);
-				self.image_alt = Some(String::new());
+				self.state.image_src = Some(src);
+				self.state.image_alt = Some(String::new());
 			}
 
 			// ── Thematic break ──
 			"hr" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
 				self.push_styled("────────────────────");
-				self.push_raw("\n");
-				self.needs_block_separator = true;
+				self.state.push_raw("\n");
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Line break ──
 			"br" => {
-				self.push_raw("\n");
+				self.state.push_raw("\n");
 			}
 
 			// ── Generic block handling ──
 			_ => {
-				if self.is_block_tag(&name) {
-					self.ensure_block_separator();
+				if self.state.is_block_element(&name) {
+					self.state.ensure_block_separator();
 				}
 			}
 		}
@@ -347,61 +255,61 @@ impl NodeVisitor for AnsiTermRenderer {
 
 		match name.as_str() {
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 			"p" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 			"blockquote" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.blockquote_depth =
+					self.state.blockquote_depth.saturating_sub(1);
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 			"ul" | "ol" => {
-				self.list_depth = self.list_depth.saturating_sub(1);
-				self.list_stack.pop();
-				if self.list_depth == 0 {
-					self.ensure_newline();
-					self.needs_block_separator = true;
+				self.state.leave_list();
+				if self.state.list_depth == 0 {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
 				}
 			}
 			"li" => {
-				self.ensure_newline();
+				self.state.ensure_newline();
 			}
 			"pre" => {
-				self.in_preformatted = false;
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.in_preformatted = false;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
-			"code" if !self.in_preformatted => {
-				// inline code, no suffix needed
+			"code" if !self.state.in_preformatted => {
+				// inline code, style restored via style_stack pop below
 			}
 			"a" => {
 				self.close_osc8_link();
-				self.pending_link_href = None;
+				self.state.pending_link_href = None;
 			}
 			"img" => {
-				let src = self.image_src.take().unwrap_or_default();
-				let alt = self.image_alt.take().unwrap_or_default();
+				let src = self.state.image_src.take().unwrap_or_default();
+				let alt = self.state.image_alt.take().unwrap_or_default();
 				let style = self.current_style();
 				let display = if alt.is_empty() {
 					format!("[image: {src}]")
 				} else {
 					format!("[{alt}]")
 				};
-				// render as an OSC-8 link to the image src
 				self.open_osc8_link(&src);
-				self.push_raw(&format!("{}", style.paint(&display)));
+				self.state.push_raw(&format!("{}", style.paint(&display)));
 				self.close_osc8_link();
 			}
 			"hr" | "br" => {
 				// already handled in visit_element
 			}
 			_ => {
-				if self.is_block_tag(&name) {
-					self.ensure_newline();
-					self.needs_block_separator = true;
+				if self.state.is_block_element(&name) {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
 				}
 			}
 		}
@@ -416,15 +324,9 @@ impl NodeVisitor for AnsiTermRenderer {
 		}
 
 		// if inside an <img>, capture text as alt instead of emitting
-		if let Some(ref mut alt) = self.image_alt {
+		if let Some(ref mut alt) = self.state.image_alt {
 			alt.push_str(&text);
 			return;
-		}
-
-		// emit any pending prefix (heading marker, blockquote, etc.)
-		if let Some(prefix) = self.pending_prefix.take() {
-			self.ensure_newline();
-			self.push_styled(&prefix);
 		}
 
 		self.push_styled(&text);
@@ -439,69 +341,73 @@ impl NodeVisitor for AnsiTermRenderer {
 			let style = Style::new().italic();
 			let painted =
 				format!("{}", style.paint(format!("{{{}}}", expression.0)));
-			self.push_raw(&painted);
+			self.state.push_raw(&painted);
 		}
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
-		self.ensure_block_separator();
+		self.state.ensure_block_separator();
 		let style = Style::new().dimmed();
 		let painted =
 			format!("{}", style.paint(format!("<!--{}-->", &**comment)));
-		self.push_raw(&painted);
-		self.push_raw("\n");
-		self.trailing_newline = true;
-		self.needs_block_separator = true;
+		self.state.push_raw(&painted);
+		self.state.push_raw("\n");
+		self.state.trailing_newline = true;
+		self.state.needs_block_separator = true;
 	}
 }
 
 
 fn default_style_map() -> HashMap<Cow<'static, str>, Style> {
-	let mut map = HashMap::default();
-	map.insert("h1".into(), Style::new().bold().fg(Color::Green));
-	map.insert("h2".into(), Style::new().bold().fg(Color::Cyan));
-	map.insert("h3".into(), Style::new().bold().fg(Color::Blue));
-	map.insert("h4".into(), Style::new().bold().fg(Color::Magenta));
-	map.insert("h5".into(), Style::new().bold());
-	map.insert("h6".into(), Style::new().bold().dimmed());
-	map.insert("p".into(), Style::default());
-	map.insert("a".into(), Style::new().fg(Color::Blue).underline());
-	map.insert("strong".into(), Style::new().bold());
-	map.insert("em".into(), Style::new().italic());
-	map.insert("del".into(), Style::new().strikethrough());
-	map.insert("code".into(), Style::new().fg(Color::Yellow));
-	map.insert("pre".into(), Style::new().fg(Color::Yellow).dimmed());
-	map.insert("blockquote".into(), Style::new().italic().dimmed());
-	map.insert("hr".into(), Style::new().dimmed());
-	map.insert("img".into(), Style::new().fg(Color::Magenta).underline());
-	map.insert("li".into(), Style::default());
-	map
+	vec![
+		("h1", Style::new().bold().fg(Color::Green)),
+		("h2", Style::new().bold().fg(Color::Cyan)),
+		("h3", Style::new().bold().fg(Color::Blue)),
+		("h4", Style::new().bold().fg(Color::Magenta)),
+		("h5", Style::new().bold()),
+		("h6", Style::new().bold().dimmed()),
+		("p", Style::default()),
+		("a", Style::new().fg(Color::Blue).underline()),
+		("strong", Style::new().bold()),
+		("em", Style::new().italic()),
+		("del", Style::new().strikethrough()),
+		("code", Style::new().fg(Color::Yellow)),
+		("pre", Style::new().fg(Color::Yellow).dimmed()),
+		("blockquote", Style::new().italic().dimmed()),
+		("hr", Style::new().dimmed()),
+		("img", Style::new().fg(Color::Magenta).underline()),
+		("li", Style::default()),
+	]
+	.into_iter()
+	.map(|(k, v)| (Cow::Borrowed(k), v))
+	.collect()
 }
 
 fn default_associations() -> HashMap<Cow<'static, str>, Cow<'static, str>> {
-	let mut map = HashMap::default();
-	map.insert("b".into(), "strong".into());
-	map.insert("i".into(), "em".into());
-	map.insert("s".into(), "del".into());
-	map.insert("div".into(), "p".into());
-	map.insert("span".into(), "p".into());
-	map.insert("section".into(), "p".into());
-	map.insert("article".into(), "p".into());
-	map.insert("aside".into(), "blockquote".into());
-	map.insert("nav".into(), "p".into());
-	map.insert("header".into(), "p".into());
-	map.insert("footer".into(), "p".into());
-	map.insert("main".into(), "p".into());
-	map.insert("dt".into(), "strong".into());
-	map.insert("dd".into(), "p".into());
-	map.insert("th".into(), "strong".into());
-	map.insert("td".into(), "p".into());
-	map.insert("sup".into(), "em".into());
-	map.insert("sub".into(), "em".into());
-	map
+	vec![
+		("b", "strong"),
+		("i", "em"),
+		("s", "del"),
+		("div", "p"),
+		("span", "p"),
+		("section", "p"),
+		("article", "p"),
+		("aside", "blockquote"),
+		("nav", "p"),
+		("header", "p"),
+		("footer", "p"),
+		("main", "p"),
+		("dt", "strong"),
+		("dd", "p"),
+		("th", "strong"),
+		("td", "p"),
+		("sup", "em"),
+		("sub", "em"),
+	]
+	.into_iter()
+	.map(|(k, v)| (Cow::Borrowed(k), Cow::Borrowed(v)))
+	.collect()
 }
-
-
 
 
 #[cfg(test)]
@@ -537,8 +443,7 @@ mod test {
 						loop {
 							match chars.next() {
 								Some('\x1b') => {
-									// consume the backslash of ST
-									chars.next();
+									chars.next(); // consume the \ of ST
 									break;
 								}
 								Some('\x07') => break, // BEL terminator
@@ -564,7 +469,6 @@ mod test {
 						}
 					}
 					_ => {
-						// other escape, skip next char
 						chars.next();
 					}
 				}
@@ -581,20 +485,18 @@ mod test {
 	fn render_paragraph() {
 		strip_ansi(&render(b"Hello world"))
 			.xmap(trim)
-			.xpect_eq("Hello world".to_string());
+			.xpect_eq("Hello world");
 	}
 
 	#[test]
 	fn render_heading_h1() {
-		strip_ansi(&render(b"# Title"))
-			.xmap(trim)
-			.xpect_contains("Title");
+		// heading_hashes is false by default; only the text is emitted
+		strip_ansi(&render(b"# Title")).xmap(trim).xpect_eq("Title");
 	}
 
 	#[test]
 	fn render_heading_styled() {
 		render(b"# Title")
-			// should contain ANSI escape codes for bold green
 			.xpect_contains("\x1b[")
 			.xpect_contains("Title");
 	}
@@ -602,7 +504,6 @@ mod test {
 	#[test]
 	fn render_link_has_osc8() {
 		render(b"[click](https://example.com)")
-			// should contain OSC-8 opening and closing sequences
 			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
 			.xpect_contains("click")
 			.xpect_contains("\x1b]8;;\x1b\\");
@@ -612,7 +513,7 @@ mod test {
 	fn render_link_text_stripped() {
 		strip_ansi(&render(b"[click](https://example.com)"))
 			.xmap(trim)
-			.xpect_contains("click");
+			.xpect_eq("click");
 	}
 
 	#[test]
@@ -624,9 +525,9 @@ mod test {
 	#[test]
 	fn render_unordered_list() {
 		strip_ansi(&render(b"- alpha\n- beta"))
-			.xpect_contains("alpha")
-			.xpect_contains("beta")
-			.xpect_contains("•");
+			.xmap(trim)
+			.xpect_contains("• alpha")
+			.xpect_contains("• beta");
 	}
 
 	#[test]
@@ -643,8 +544,26 @@ mod test {
 	#[test]
 	fn render_blockquote() {
 		strip_ansi(&render(b"> quoted text"))
-			.xpect_contains("▌")
-			.xpect_contains("quoted text");
+			.xmap(trim)
+			.xpect_eq("▌ quoted text");
+	}
+
+	#[test]
+	fn render_blockquote_with_emphasis() {
+		// inline elements inside a blockquote must appear after the prefix
+		strip_ansi(&render(b"> *notable remark*"))
+			.xmap(trim)
+			.xpect_eq("▌ notable remark");
+	}
+
+	#[test]
+	fn render_blockquote_multiline() {
+		// a blockquote whose content spans multiple paragraphs should prefix
+		// every paragraph with ▌
+		let input = b"> first paragraph\n>\n> second paragraph";
+		let out = strip_ansi(&render(input));
+		let trimmed = trim(out);
+		trimmed.xpect_eq("▌ first paragraph\n\n▌ second paragraph");
 	}
 
 	#[test]
@@ -657,7 +576,6 @@ mod test {
 		strip_ansi(&render(b"# Title\n\nParagraph"))
 			.xpect_contains("Title")
 			.xpect_contains("Paragraph")
-			// should have a blank line between blocks
 			.xpect_contains("\n\n");
 	}
 
@@ -679,7 +597,6 @@ mod test {
 				render.into_string()
 			})
 			.unwrap()
-			// red foreground escape code
 			.xpect_contains("\x1b[")
 			.xpect_contains("Hello");
 	}

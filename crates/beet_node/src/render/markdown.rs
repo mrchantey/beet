@@ -9,34 +9,12 @@ use std::borrow::Cow;
 /// strong, links, images, lists, code blocks, blockquotes, thematic
 /// breaks, inline code, and optional expression rendering.
 pub struct MarkdownRenderer {
-	buffer: String,
+	/// Shared block/inline tracking state and output buffer.
+	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
 	render_expressions: bool,
-	/// Elements that produce block-level output with trailing newlines.
-	block_elements: Vec<Cow<'static, str>>,
-	/// Track nested list depth for indentation.
-	list_depth: usize,
 	/// Stack of active inline wrappers to emit on leave.
 	inline_stack: Vec<InlineWrapper>,
-	/// Stack tracking list item contexts for ordered list numbering.
-	list_stack: Vec<ListContext>,
-	/// Whether we are inside a `<pre>` block (suppresses markdown formatting).
-	in_preformatted: bool,
-	/// Pending prefix for the next text node, ie heading markers, list bullets.
-	pending_prefix: Option<String>,
-	/// Whether a blank line is needed before the next block element.
-	needs_block_separator: bool,
-	/// Tracks whether we just wrote a newline to avoid doubling.
-	trailing_newline: bool,
-	/// The href captured from the most recent `<a>` element.
-	pending_link_href: Option<String>,
-	/// When inside an `<img>`, the src URL from its attribute.
-	/// Child text nodes are captured as alt text instead of being emitted.
-	image_src: Option<String>,
-	/// Accumulated alt text while inside an `<img>` element.
-	image_alt: Option<String>,
-	/// Code fence info string from `<code>` inside `<pre>`.
-	code_fence_info: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,12 +31,6 @@ enum InlineWrapper {
 	Sub,
 }
 
-#[derive(Debug, Clone)]
-enum ListContext {
-	Unordered,
-	Ordered(usize),
-}
-
 impl Default for MarkdownRenderer {
 	fn default() -> Self { Self::new() }
 }
@@ -66,20 +38,9 @@ impl Default for MarkdownRenderer {
 impl MarkdownRenderer {
 	pub fn new() -> Self {
 		Self {
-			buffer: String::new(),
+			state: TextRenderState::new(),
 			render_expressions: false,
-			block_elements: default_block_elements(),
-			list_depth: 0,
 			inline_stack: Vec::new(),
-			list_stack: Vec::new(),
-			in_preformatted: false,
-			pending_prefix: None,
-			needs_block_separator: false,
-			trailing_newline: true, // start of document counts as newline
-			pending_link_href: None,
-			image_src: None,
-			image_alt: None,
-			code_fence_info: None,
 		}
 	}
 
@@ -94,67 +55,19 @@ impl MarkdownRenderer {
 		mut self,
 		elements: Vec<Cow<'static, str>>,
 	) -> Self {
-		self.block_elements = elements;
+		self.state = self.state.with_block_elements(elements);
 		self
 	}
 
 	/// Consume the renderer and return the accumulated markdown string.
-	pub fn into_string(self) -> String { self.buffer }
+	pub fn into_string(self) -> String { self.state.buffer }
 
 	/// Borrow the accumulated markdown string.
-	pub fn as_str(&self) -> &str { &self.buffer }
+	pub fn as_str(&self) -> &str { &self.state.buffer }
 
-	fn is_block_element(&self, name: &str) -> bool {
-		let lower = name.to_ascii_lowercase();
-		self.block_elements.iter().any(|el| el.as_ref() == lower)
-	}
+	fn push_str(&mut self, text: &str) { self.state.push_raw(text); }
 
-	fn ensure_newline(&mut self) {
-		if !self.trailing_newline {
-			self.buffer.push('\n');
-			self.trailing_newline = true;
-		}
-	}
-
-	fn ensure_block_separator(&mut self) {
-		if self.needs_block_separator && !self.buffer.is_empty() {
-			self.ensure_newline();
-			// add blank line between blocks
-			if !self.buffer.ends_with("\n\n") {
-				self.buffer.push('\n');
-			}
-		}
-		self.needs_block_separator = false;
-	}
-
-	fn push_str(&mut self, text: &str) {
-		self.buffer.push_str(text);
-		self.trailing_newline = text.ends_with('\n');
-	}
-
-	fn push_char(&mut self, ch: char) {
-		self.buffer.push(ch);
-		self.trailing_newline = ch == '\n';
-	}
-
-	fn write_list_indent(&mut self) {
-		// indent for nested lists (depth > 1 means we are inside a sub-list)
-		if self.list_depth > 1 {
-			for _ in 0..self.list_depth - 1 {
-				self.push_str("  ");
-			}
-		}
-	}
-
-	fn find_attr<'a>(
-		attrs: &'a [(Entity, &Attribute, &Value)],
-		key: &str,
-	) -> Option<&'a Value> {
-		attrs
-			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(_, _, val)| *val)
-	}
+	fn push_char(&mut self, ch: char) { self.state.push_raw_char(ch); }
 }
 
 
@@ -170,80 +83,62 @@ impl NodeVisitor for MarkdownRenderer {
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
 				let level = name[1..].parse::<usize>().unwrap_or(1);
 				let prefix = "#".repeat(level);
-				self.pending_prefix = Some(format!("{prefix} "));
+				self.push_str(&format!("{prefix} "));
 			}
 
 			// ── Paragraph ──
 			"p" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
+				// emit blockquote prefix immediately so inline elements
+				// (eg <em>) that open before the first text node are
+				// correctly placed after the prefix
+				if self.state.blockquote_depth > 0 {
+					let prefix = self.state.blockquote_prefix("> ");
+					self.push_str(&prefix);
+				}
 			}
 
 			// ── Blockquote ──
 			"blockquote" => {
-				self.ensure_block_separator();
-				self.pending_prefix = Some("> ".to_string());
+				self.state.ensure_block_separator();
+				self.state.blockquote_depth += 1;
 			}
 
 			// ── Lists ──
 			"ul" => {
-				if self.list_depth == 0 {
-					self.ensure_block_separator();
-				}
-				self.list_depth += 1;
-				self.list_stack.push(ListContext::Unordered);
+				self.state.enter_ul();
 			}
 			"ol" => {
-				if self.list_depth == 0 {
-					self.ensure_block_separator();
-				}
-				self.list_depth += 1;
-				let start = Self::find_attr(&attrs, "start")
-					.and_then(|val| match val {
-						Value::Uint(num) => Some(*num as usize),
-						Value::Int(num) => Some(*num as usize),
-						_ => None,
-					})
-					.unwrap_or(1);
-				self.list_stack.push(ListContext::Ordered(start));
+				let start = TextRenderState::ol_start(&attrs);
+				self.state.enter_ol(start);
 			}
 			"li" => {
-				self.ensure_newline();
-				self.write_list_indent();
-				let prefix = match self.list_stack.last_mut() {
-					Some(ListContext::Unordered) => "- ".to_string(),
-					Some(ListContext::Ordered(num)) => {
-						let prefix = format!("{}. ", num);
-						*num += 1;
-						prefix
-					}
-					None => "- ".to_string(),
-				};
+				self.state.ensure_newline();
+				self.state.write_list_indent();
+				let prefix = self.state.next_list_prefix("- ");
 				self.push_str(&prefix);
 			}
 
 			// ── Code blocks ──
 			"pre" => {
-				self.ensure_block_separator();
-				self.in_preformatted = true;
+				self.state.ensure_block_separator();
+				self.state.in_preformatted = true;
 			}
-			"code" if self.in_preformatted => {
+			"code" if self.state.in_preformatted => {
 				// fenced code block: extract language from class
-				let info = Self::find_attr(&attrs, "class")
+				let info = TextRenderState::find_attr(&attrs, "class")
 					.and_then(|val| match val {
-						Value::Str(class) => {
-							// pulldown-cmark uses "language-rust" style classes
-							class
-								.strip_prefix("language-")
-								.map(|lang| lang.to_string())
-								.or_else(|| Some(class.clone()))
-						}
+						Value::Str(class) => class
+							.strip_prefix("language-")
+							.map(|lang| lang.to_string())
+							.or_else(|| Some(class.clone())),
 						_ => None,
 					})
 					.unwrap_or_default();
-				self.code_fence_info = Some(info.clone());
+				self.state.code_fence_info = Some(info.clone());
 				self.push_str("```");
 				self.push_str(&info);
 				self.push_char('\n');
@@ -278,29 +173,29 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Links ──
 			"a" => {
-				let href = Self::find_attr(&attrs, "href")
+				let href = TextRenderState::find_attr(&attrs, "href")
 					.map(|val| val.to_string())
 					.unwrap_or_default();
-				self.pending_link_href = Some(href);
+				self.state.pending_link_href = Some(href);
 				self.push_char('[');
 				self.inline_stack.push(InlineWrapper::Link);
 			}
 
 			// ── Images ──
 			"img" => {
-				let src = Self::find_attr(&attrs, "src")
+				let src = TextRenderState::find_attr(&attrs, "src")
 					.map(|val| val.to_string())
 					.unwrap_or_default();
-				self.image_src = Some(src);
-				self.image_alt = Some(String::new());
+				self.state.image_src = Some(src);
+				self.state.image_alt = Some(String::new());
 			}
 
 			// ── Thematic break ──
 			"hr" => {
-				self.ensure_block_separator();
+				self.state.ensure_block_separator();
 				self.push_str("---");
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Line break ──
@@ -309,17 +204,14 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 
 			// ── Tables ──
-			// Tables are complex; fall through to raw rendering for now.
-			// A full table renderer could be added here.
 			"table" | "thead" | "tbody" | "tr" | "th" | "td" => {
-				// For tables, we don't add markdown wrappers.
-				// The text content flows through visit_value.
+				// text content flows through visit_value
 			}
 
 			// ── Catch-all for unknown block/inline elements ──
 			_ => {
-				if self.is_block_element(&name) {
-					self.ensure_block_separator();
+				if self.state.is_block_element(&name) {
+					self.state.ensure_block_separator();
 				}
 			}
 		}
@@ -331,42 +223,42 @@ impl NodeVisitor for MarkdownRenderer {
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Paragraph ──
 			"p" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Blockquote ──
 			"blockquote" => {
-				self.ensure_newline();
-				self.needs_block_separator = true;
+				self.state.blockquote_depth =
+					self.state.blockquote_depth.saturating_sub(1);
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Lists ──
 			"ul" | "ol" => {
-				self.list_depth = self.list_depth.saturating_sub(1);
-				self.list_stack.pop();
-				if self.list_depth == 0 {
-					self.ensure_newline();
-					self.needs_block_separator = true;
+				self.state.leave_list();
+				if self.state.list_depth == 0 {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
 				}
 			}
 			"li" => {
-				self.ensure_newline();
+				self.state.ensure_newline();
 			}
 
 			// ── Code blocks ──
-			"code" if self.in_preformatted => {
-				// close fenced code block
-				self.ensure_newline();
+			"code" if self.state.in_preformatted => {
+				self.state.ensure_newline();
 				self.push_str("```");
 				self.push_char('\n');
-				self.code_fence_info = None;
+				self.state.code_fence_info = None;
 			}
 			"code" => {
 				if let Some(InlineWrapper::InlineCode) =
@@ -377,8 +269,8 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_char('`');
 			}
 			"pre" => {
-				self.in_preformatted = false;
-				self.needs_block_separator = true;
+				self.state.in_preformatted = false;
+				self.state.needs_block_separator = true;
 			}
 
 			// ── Inline formatting ──
@@ -418,7 +310,8 @@ impl NodeVisitor for MarkdownRenderer {
 				if let Some(InlineWrapper::Link) = self.inline_stack.last() {
 					self.inline_stack.pop();
 				}
-				let href = self.pending_link_href.take().unwrap_or_default();
+				let href =
+					self.state.pending_link_href.take().unwrap_or_default();
 				self.push_str("](");
 				self.push_str(&href);
 				self.push_char(')');
@@ -426,8 +319,8 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Images ──
 			"img" => {
-				let src = self.image_src.take().unwrap_or_default();
-				let alt = self.image_alt.take().unwrap_or_default();
+				let src = self.state.image_src.take().unwrap_or_default();
+				let alt = self.state.image_alt.take().unwrap_or_default();
 				self.push_str("![");
 				self.push_str(&alt);
 				self.push_str("](");
@@ -441,9 +334,9 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 
 			_ => {
-				if self.is_block_element(&name) {
-					self.ensure_newline();
-					self.needs_block_separator = true;
+				if self.state.is_block_element(&name) {
+					self.state.ensure_newline();
+					self.state.needs_block_separator = true;
 				}
 			}
 		}
@@ -456,15 +349,9 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 
 		// if inside an <img>, capture text as alt instead of emitting
-		if let Some(ref mut alt) = self.image_alt {
+		if let Some(ref mut alt) = self.state.image_alt {
 			alt.push_str(&text);
 			return;
-		}
-
-		// emit any pending prefix (heading marker, blockquote, etc.)
-		if let Some(prefix) = self.pending_prefix.take() {
-			self.ensure_newline();
-			self.push_str(&prefix);
 		}
 
 		self.push_str(&text);
@@ -483,12 +370,12 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
-		self.ensure_block_separator();
+		self.state.ensure_block_separator();
 		self.push_str("<!--");
 		self.push_str(comment);
 		self.push_str("-->");
-		self.ensure_newline();
-		self.needs_block_separator = true;
+		self.state.ensure_newline();
+		self.state.needs_block_separator = true;
 	}
 }
 
@@ -536,80 +423,81 @@ mod test {
 
 	#[test]
 	fn render_paragraph() {
-		trim(roundtrip(b"Hello world")).xpect_eq("Hello world".to_string());
+		trim(roundtrip(b"Hello world")).xpect_eq("Hello world");
 	}
 
 	#[test]
-	fn render_heading_h1() {
-		trim(roundtrip(b"# Title")).xpect_eq("# Title".to_string());
-	}
+	fn render_heading_h1() { trim(roundtrip(b"# Title")).xpect_eq("# Title"); }
 
 	#[test]
 	fn render_heading_h2() {
-		trim(roundtrip(b"## Subtitle")).xpect_eq("## Subtitle".to_string());
+		trim(roundtrip(b"## Subtitle")).xpect_eq("## Subtitle");
 	}
 
 	#[test]
-	fn render_emphasis() {
-		trim(roundtrip(b"*hello*")).xpect_contains("*hello*");
-	}
+	fn render_emphasis() { trim(roundtrip(b"*hello*")).xpect_eq("*hello*"); }
 
 	#[test]
-	fn render_strong() {
-		trim(roundtrip(b"**hello**")).xpect_contains("**hello**");
-	}
+	fn render_strong() { trim(roundtrip(b"**hello**")).xpect_eq("**hello**"); }
 
 	#[test]
 	fn render_link() {
 		trim(roundtrip(b"[click](https://example.com)"))
-			.xpect_contains("[click]")
-			.xpect_contains("(https://example.com)");
+			.xpect_eq("[click](https://example.com)");
 	}
 
 	#[test]
 	fn render_image() {
-		trim(roundtrip(b"![alt](image.png)"))
-			.xpect_contains("![alt]")
-			.xpect_contains("(image.png)");
+		trim(roundtrip(b"![alt](image.png)")).xpect_eq("![alt](image.png)");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		trim(roundtrip(b"- a\n- b"))
-			.xpect_contains("- a")
-			.xpect_contains("- b");
+		trim(roundtrip(b"- alpha\n- beta")).xpect_eq("- alpha\n- beta");
 	}
 
 	#[test]
 	fn render_code_block() {
 		trim(roundtrip(b"```rust\nfn main() {}\n```"))
-			.xpect_contains("```rust")
-			.xpect_contains("fn main() {}")
-			.xpect_contains("```");
+			.xpect_eq("```rust\nfn main() {}\n```");
 	}
 
 	#[test]
 	fn render_inline_code() {
-		trim(roundtrip(b"use `foo()` here")).xpect_contains("`foo()`");
+		trim(roundtrip(b"use `foo()` here")).xpect_eq("use `foo()` here");
 	}
 
 	#[test]
 	fn render_blockquote() {
-		trim(roundtrip(b"> quoted text")).xpect_contains("> quoted text");
+		trim(roundtrip(b"> quoted text")).xpect_eq("> quoted text");
 	}
 
 	#[test]
-	fn render_thematic_break() { roundtrip(b"---").xpect_contains("---"); }
+	fn render_blockquote_with_emphasis() {
+		// inline elements inside a blockquote must appear after the prefix
+		trim(roundtrip(b"> *notable remark*")).xpect_eq("> *notable remark*");
+	}
+
+	#[test]
+	fn render_blockquote_multiline() {
+		// a blockquote whose content spans multiple paragraphs should prefix
+		// every paragraph with "> "
+		let input = b"> first paragraph\n>\n> second paragraph";
+		trim(roundtrip(input))
+			.xpect_eq("> first paragraph\n\n> second paragraph");
+	}
+
+	#[test]
+	fn render_thematic_break() { trim(roundtrip(b"---")).xpect_eq("---"); }
 
 	#[test]
 	fn render_multiple_blocks() {
 		trim(roundtrip(b"# Title\n\nParagraph"))
-			.xpect_contains("# Title")
-			.xpect_contains("Paragraph");
+			.xpect_eq("# Title\n\nParagraph");
 	}
 
 	#[test]
 	fn render_comment() {
-		trim(roundtrip(b"<!-- hello -->")).xpect_contains("<!-- hello -->");
+		trim(roundtrip(b"<!-- hello -->")).xpect_eq("<!-- hello -->");
 	}
 }
