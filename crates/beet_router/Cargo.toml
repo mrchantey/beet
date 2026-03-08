@@ -1,5 +1,5 @@
 [package]
-name = "beet_stack2"
+name = "beet_router"
 version.workspace = true
 edition.workspace = true
 description = "An opinionated semantic layer between applications and interfaces"
@@ -24,7 +24,8 @@ http = ["beet_net/server"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
-beet_core = { workspace = true }
+beet_core.workspace = true
+beet_tool.workspace = true
 beet_net.workspace = true
 bevy.workspace = true
 extend.workspace = true

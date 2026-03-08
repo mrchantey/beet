@@ -51,7 +51,7 @@ members = [
 	"crates/beet_tool",
 	"crates/beet_node",
 	"crates/beet_stack",
-	"crates/beet_stack2",
+	"crates/beet_router",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -85,7 +85,7 @@ beet_net = { path = "crates/beet_net", version = "0.0.9-dev.4" }
 beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.4" }
 beet_node = { path = "crates/beet_node", version = "0.0.9-dev.4" }
 beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.4" }
-beet_stack2 = { path = "crates/beet_stack2", version = "0.0.9-dev.4" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.4" }
 beet = { path = "", version = "0.0.9-dev.4" }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.4" }
@@ -222,8 +222,8 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["stack"]
-# default = ["nightly"]
+# default = ["stack"]
+default = ["node"]
 
 # 💡 Top Level
 
@@ -250,6 +250,7 @@ net = ["dep:beet_net", "beet_stack?/http"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
+router = ["dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -267,6 +268,7 @@ hyper = ["net", "beet_net?/hyper"]
 # 💡 Stack
 
 tool = ["dep:beet_tool"]
+node = ["dep:beet_node"]
 stack = ["tool", "dep:beet_stack"]
 tui = ["stack", "beet_stack/tui"]
 markdown = ["beet_stack?/markdown"]
@@ -305,9 +307,10 @@ markdown = ["beet_stack?/markdown"]
 [dependencies]
 bevy = { workspace = true }
 
-#💡 utils
 beet_core.workspace = true
 beet_net = { workspace = true, optional = true }
+beet_node = { workspace = true, optional = true }
+beet_router = { workspace = true, optional = true }
 beet_tool = { workspace = true, optional = true }
 beet_stack = { workspace = true, optional = true }
 
@@ -315,7 +318,6 @@ beet_stack = { workspace = true, optional = true }
 # beet_dom = { workspace = true, optional = true }
 # beet_parse = { workspace = true, optional = true }
 # beet_rsx = { workspace = true, optional = true }
-# beet_router = { workspace = true, optional = true }
 # beet_build = { workspace = true, optional = true }
 # beet_design = { workspace = true, optional = true }
 # beet_clanker = { workspace = true, optional = true }
@@ -379,6 +381,14 @@ required-features = ["tungstenite"]
 name = "templating"
 path = "examples/net/templating.rs"
 required-features = ["http_server"]
+
+# 💡 Examples - Node
+
+[[example]]
+name = "node_roundtrip"
+path = "examples/node/node_roundtrip.rs"
+required-features = ["node"]
+
 
 # 💡 Examples - Stack
 

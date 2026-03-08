@@ -26,7 +26,8 @@ pub struct AnsiTermRenderer {
 	block_tags: Vec<Cow<'static, str>>,
 	/// Render [`Expression`] values verbatim as `{expr}`.
 	render_expressions: bool,
-
+	/// Whether to prefix headings with `#` markers.
+	heading_hashes: bool,
 	// ── Internal state ──
 	buffer: String,
 	/// Stack of active styles so nested elements restore correctly.
@@ -73,6 +74,7 @@ impl AnsiTermRenderer {
 			buffer: String::new(),
 			style_stack: Vec::new(),
 			trailing_newline: true,
+			heading_hashes: false,
 			needs_block_separator: false,
 			pending_link_href: None,
 			image_src: None,
@@ -233,9 +235,11 @@ impl NodeVisitor for AnsiTermRenderer {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				self.ensure_block_separator();
-				let level = name[1..].parse::<usize>().unwrap_or(1);
-				let prefix = "#".repeat(level);
-				self.pending_prefix = Some(format!("{prefix} "));
+				if self.heading_hashes {
+					let level = name[1..].parse::<usize>().unwrap_or(1);
+					let prefix = "#".repeat(level);
+					self.pending_prefix = Some(format!("{prefix} "));
+				}
 			}
 
 			// ── Paragraph ──

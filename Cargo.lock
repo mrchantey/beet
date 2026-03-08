@@ -1048,6 +1048,8 @@ dependencies = [
  "beet",
  "beet_core",
  "beet_net",
+ "beet_node",
+ "beet_router",
  "beet_stack",
  "beet_tool",
  "bevy",
@@ -1203,7 +1205,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_stack"
+name = "beet_router"
 version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
@@ -1222,11 +1224,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_stack2"
+name = "beet_stack"
 version = "0.0.9-dev.4"
 dependencies = [
  "beet_core",
  "beet_net",
+ "beet_tool",
  "bevy",
  "bevy_ratatui",
  "bitflags 2.10.0",

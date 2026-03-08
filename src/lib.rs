@@ -17,6 +17,10 @@ pub use beet_core::test_runner;
 pub use beet_core::testing;
 #[cfg(feature = "net")]
 pub use beet_net as net;
+#[cfg(feature = "node")]
+pub use beet_node as node;
+#[cfg(feature = "router")]
+pub use beet_router as router;
 #[cfg(feature = "stack")]
 pub use beet_stack as stack;
 #[cfg(feature = "tool")]
@@ -33,8 +37,6 @@ pub use beet_tool as tool;
 // pub use beet_ml as ml;
 // #[cfg(feature = "parse")]
 // pub use beet_parse as parse;
-// #[cfg(feature = "router")]
-// pub use beet_router as router;
 // #[cfg(feature = "rsx")]
 // pub use beet_rsx as rsx;
 // #[cfg(feature = "spatial")]
@@ -44,6 +46,10 @@ pub mod prelude {
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::*;
+	#[cfg(feature = "router")]
+	pub use crate::router::prelude::*;
 	#[cfg(feature = "stack")]
 	pub use crate::stack::prelude::*;
 	// #[cfg(feature = "tool")]
@@ -64,8 +70,6 @@ pub mod prelude {
 	// pub use crate::ml::prelude::*;
 	// #[cfg(feature = "parse")]
 	// pub use crate::parse::prelude::*;
-	// #[cfg(feature = "router")]
-	// pub use crate::router::prelude::*;
 	// #[cfg(feature = "rsx")]
 	// pub use crate::rsx::prelude::*;
 	// #[cfg(feature = "spatial")]
