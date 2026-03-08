@@ -87,10 +87,29 @@ impl TextRenderState {
 
 	/// Emit a blank-line block separator if one is pending.
 	pub fn ensure_block_separator(&mut self) {
+		self.ensure_block_separator_with_prefix(None);
+	}
+
+	/// Emit a blank-line block separator, prefixing the blank line with the
+	/// blockquote marker when inside a blockquote.
+	///
+	/// `marker` is the per-level prefix string, eg `"> "` or `"▌ "`.
+	/// Pass `None` when outside a blockquote or when no prefix is needed.
+	pub fn ensure_block_separator_with_prefix(&mut self, marker: Option<&str>) {
 		if self.needs_block_separator && !self.buffer.is_empty() {
 			self.ensure_newline();
 			if !self.buffer.ends_with("\n\n") {
-				self.buffer.push('\n');
+				if let Some(marker) =
+					marker.filter(|_| self.blockquote_depth > 0)
+				{
+					// trim trailing spaces so blank blockquote lines are
+					// eg `>\n` not `> \n`
+					let prefix = self.blockquote_prefix(marker);
+					self.buffer.push_str(prefix.trim_end());
+					self.buffer.push('\n');
+				} else {
+					self.buffer.push('\n');
+				}
 			}
 		}
 		self.needs_block_separator = false;

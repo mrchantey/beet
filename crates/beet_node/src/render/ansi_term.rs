@@ -167,7 +167,7 @@ impl NodeVisitor for AnsiTermRenderer {
 
 			// ── Paragraph ──
 			"p" => {
-				self.state.ensure_block_separator();
+				self.state.ensure_block_separator_with_prefix(Some("▌ "));
 				// emit blockquote prefix immediately so inline elements
 				// (eg <em>) that open before the first text node are
 				// correctly placed after the prefix
@@ -179,7 +179,7 @@ impl NodeVisitor for AnsiTermRenderer {
 
 			// ── Blockquote ──
 			"blockquote" => {
-				self.state.ensure_block_separator();
+				self.state.ensure_block_separator_with_prefix(Some("▌ "));
 				self.state.blockquote_depth += 1;
 			}
 
@@ -430,7 +430,8 @@ mod test {
 			.unwrap()
 	}
 
-	fn strip_ansi(input: &str) -> String {
+	fn strip_ansi(input: String) -> String {
+		// strip_ansi takes ownership so callers can use render(...).xmap(strip_ansi)
 		// strip ANSI escape sequences including OSC-8
 		let mut result = String::new();
 		let mut chars = input.chars().peekable();
@@ -479,19 +480,18 @@ mod test {
 		result
 	}
 
-	fn trim(input: String) -> String { input.trim().to_string() }
-
 	#[test]
 	fn render_paragraph() {
-		strip_ansi(&render(b"Hello world"))
-			.xmap(trim)
+		render(b"Hello world")
+			.xmap(strip_ansi)
+			.trim()
 			.xpect_eq("Hello world");
 	}
 
 	#[test]
 	fn render_heading_h1() {
 		// heading_hashes is false by default; only the text is emitted
-		strip_ansi(&render(b"# Title")).xmap(trim).xpect_eq("Title");
+		render(b"# Title").xmap(strip_ansi).trim().xpect_eq("Title");
 	}
 
 	#[test]
@@ -511,28 +511,32 @@ mod test {
 
 	#[test]
 	fn render_link_text_stripped() {
-		strip_ansi(&render(b"[click](https://example.com)"))
-			.xmap(trim)
+		render(b"[click](https://example.com)")
+			.xmap(strip_ansi)
+			.trim()
 			.xpect_eq("click");
 	}
 
 	#[test]
 	fn render_code_block() {
-		strip_ansi(&render(b"```rust\nfn main() {}\n```"))
+		render(b"```rust\nfn main() {}\n```")
+			.xmap(strip_ansi)
 			.xpect_contains("fn main() {}");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		strip_ansi(&render(b"- alpha\n- beta"))
-			.xmap(trim)
+		render(b"- alpha\n- beta")
+			.xmap(strip_ansi)
+			.trim()
 			.xpect_contains("• alpha")
 			.xpect_contains("• beta");
 	}
 
 	#[test]
 	fn render_image() {
-		strip_ansi(&render(b"![alt text](image.png)"))
+		render(b"![alt text](image.png)")
+			.xmap(strip_ansi)
 			.xpect_contains("[alt text]");
 	}
 
@@ -543,16 +547,18 @@ mod test {
 
 	#[test]
 	fn render_blockquote() {
-		strip_ansi(&render(b"> quoted text"))
-			.xmap(trim)
+		render(b"> quoted text")
+			.xmap(strip_ansi)
+			.trim()
 			.xpect_eq("▌ quoted text");
 	}
 
 	#[test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
-		strip_ansi(&render(b"> *notable remark*"))
-			.xmap(trim)
+		render(b"> *notable remark*")
+			.xmap(strip_ansi)
+			.trim()
 			.xpect_eq("▌ notable remark");
 	}
 
@@ -560,20 +566,22 @@ mod test {
 	fn render_blockquote_multiline() {
 		// a blockquote whose content spans multiple paragraphs should prefix
 		// every paragraph with ▌
-		let input = b"> first paragraph\n>\n> second paragraph";
-		let out = strip_ansi(&render(input));
-		let trimmed = trim(out);
-		trimmed.xpect_eq("▌ first paragraph\n\n▌ second paragraph");
+		let input = "> first paragraph\n>\n> second paragraph";
+		render(input.as_bytes())
+			.xmap(strip_ansi)
+			.trim()
+			.xpect_eq("▌ first paragraph\n▌\n▌ second paragraph");
 	}
 
 	#[test]
 	fn render_thematic_break() {
-		strip_ansi(&render(b"---")).xpect_contains("────");
+		render(b"---").xmap(strip_ansi).xpect_contains("────");
 	}
 
 	#[test]
 	fn render_multiple_blocks_separated() {
-		strip_ansi(&render(b"# Title\n\nParagraph"))
+		render(b"# Title\n\nParagraph")
+			.xmap(strip_ansi)
 			.xpect_contains("Title")
 			.xpect_contains("Paragraph")
 			.xpect_contains("\n\n");

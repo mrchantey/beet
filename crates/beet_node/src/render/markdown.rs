@@ -91,7 +91,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Paragraph ──
 			"p" => {
-				self.state.ensure_block_separator();
+				self.state.ensure_block_separator_with_prefix(Some("> "));
 				// emit blockquote prefix immediately so inline elements
 				// (eg <em>) that open before the first text node are
 				// correctly placed after the prefix
@@ -103,7 +103,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Blockquote ──
 			"blockquote" => {
-				self.state.ensure_block_separator();
+				self.state.ensure_block_separator_with_prefix(Some("> "));
 				self.state.blockquote_depth += 1;
 			}
 
@@ -419,85 +419,93 @@ mod test {
 			.unwrap()
 	}
 
-	fn trim(input: String) -> String { input.trim().to_string() }
-
 	#[test]
 	fn render_paragraph() {
-		trim(roundtrip(b"Hello world")).xpect_eq("Hello world");
+		roundtrip(b"Hello world").trim().xpect_eq("Hello world");
 	}
 
 	#[test]
-	fn render_heading_h1() { trim(roundtrip(b"# Title")).xpect_eq("# Title"); }
+	fn render_heading_h1() { roundtrip(b"# Title").trim().xpect_eq("# Title"); }
 
 	#[test]
 	fn render_heading_h2() {
-		trim(roundtrip(b"## Subtitle")).xpect_eq("## Subtitle");
+		roundtrip(b"## Subtitle").trim().xpect_eq("## Subtitle");
 	}
 
 	#[test]
-	fn render_emphasis() { trim(roundtrip(b"*hello*")).xpect_eq("*hello*"); }
+	fn render_emphasis() { roundtrip(b"*hello*").trim().xpect_eq("*hello*"); }
 
 	#[test]
-	fn render_strong() { trim(roundtrip(b"**hello**")).xpect_eq("**hello**"); }
+	fn render_strong() { roundtrip(b"**hello**").trim().xpect_eq("**hello**"); }
 
 	#[test]
 	fn render_link() {
-		trim(roundtrip(b"[click](https://example.com)"))
+		roundtrip(b"[click](https://example.com)")
+			.trim()
 			.xpect_eq("[click](https://example.com)");
 	}
 
 	#[test]
 	fn render_image() {
-		trim(roundtrip(b"![alt](image.png)")).xpect_eq("![alt](image.png)");
+		roundtrip(b"![alt](image.png)")
+			.trim()
+			.xpect_eq("![alt](image.png)");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		trim(roundtrip(b"- alpha\n- beta")).xpect_eq("- alpha\n- beta");
+		roundtrip(b"- alpha\n- beta")
+			.trim()
+			.xpect_eq("- alpha\n- beta");
 	}
 
 	#[test]
 	fn render_code_block() {
-		trim(roundtrip(b"```rust\nfn main() {}\n```"))
+		roundtrip(b"```rust\nfn main() {}\n```")
+			.trim()
 			.xpect_eq("```rust\nfn main() {}\n```");
 	}
 
 	#[test]
 	fn render_inline_code() {
-		trim(roundtrip(b"use `foo()` here")).xpect_eq("use `foo()` here");
+		roundtrip(b"use `foo()` here")
+			.trim()
+			.xpect_eq("use `foo()` here");
 	}
 
 	#[test]
 	fn render_blockquote() {
-		trim(roundtrip(b"> quoted text")).xpect_eq("> quoted text");
+		roundtrip(b"> quoted text").trim().xpect_eq("> quoted text");
 	}
 
 	#[test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
-		trim(roundtrip(b"> *notable remark*")).xpect_eq("> *notable remark*");
+		roundtrip(b"> *notable remark*")
+			.trim()
+			.xpect_eq("> *notable remark*");
 	}
 
 	#[test]
 	fn render_blockquote_multiline() {
-		// a blockquote whose content spans multiple paragraphs should prefix
-		// every paragraph with "> "
-		let input = b"> first paragraph\n>\n> second paragraph";
-		trim(roundtrip(input))
-			.xpect_eq("> first paragraph\n\n> second paragraph");
+		let input = "> first paragraph\n>\n> second paragraph";
+		roundtrip(input.as_bytes()).trim().xpect_eq(input);
 	}
 
 	#[test]
-	fn render_thematic_break() { trim(roundtrip(b"---")).xpect_eq("---"); }
+	fn render_thematic_break() { roundtrip(b"---").trim().xpect_eq("---"); }
 
 	#[test]
 	fn render_multiple_blocks() {
-		trim(roundtrip(b"# Title\n\nParagraph"))
+		roundtrip(b"# Title\n\nParagraph")
+			.trim()
 			.xpect_eq("# Title\n\nParagraph");
 	}
 
 	#[test]
 	fn render_comment() {
-		trim(roundtrip(b"<!-- hello -->")).xpect_eq("<!-- hello -->");
+		roundtrip(b"<!-- hello -->")
+			.trim()
+			.xpect_eq("<!-- hello -->");
 	}
 }

@@ -38,7 +38,9 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 	- FooContext: `cx`
 	- Entities: `entity`
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type. Prefer `.xok(foo)` instead of `Ok(foo)`
-
+- avoid nested functions and always use method chainining where possible:
+	- Bad: `foo(bar(bazz))`
+	- Good: `bar(bazz).xmap(foo)`
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be concise
