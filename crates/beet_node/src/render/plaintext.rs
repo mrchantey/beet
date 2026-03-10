@@ -7,6 +7,7 @@ use beet_core::prelude::*;
 /// When `plaintext_only` is `true`, only [`MediaType::Text`] is accepted
 /// in the `accepts` list. When `false` (the default), any text-based media
 /// type is accepted.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlainTextRenderer {
 	did_newline: bool,
 	buffer: String,

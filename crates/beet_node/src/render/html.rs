@@ -6,6 +6,7 @@ use std::borrow::Cow;
 ///
 /// Supports pretty-printing with configurable indentation,
 /// void elements, and optional expression rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlRenderer {
 	buffer: String,
 	/// If `Some`, creates newlines after open/close tags
@@ -21,6 +22,7 @@ pub struct HtmlRenderer {
 }
 
 /// Indentation style for pretty-printing.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Indent {
 	Tabs(u8),
 	Spaces(u8),

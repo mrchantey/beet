@@ -8,6 +8,7 @@ use std::borrow::Cow;
 /// back into CommonMark-compatible markdown. Supports headings, emphasis,
 /// strong, links, images, lists, code blocks, blockquotes, thematic
 /// breaks, inline code, and optional expression rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkdownRenderer {
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,

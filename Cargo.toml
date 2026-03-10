@@ -259,6 +259,8 @@ tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
+_pretty_curl = ["net","node","ureq","native-tls"]
+
 
 # clanker = ["dep:beet_clanker","net","router"]
 # dom = ["css", "dep:beet_dom"]
@@ -387,6 +389,11 @@ required-features = ["http_server"]
 name = "media_renderer"
 path = "examples/node/media_renderer.rs"
 required-features = ["node"]
+
+[[example]]
+name = "pretty_curl"
+path = "examples/node/pretty_curl.rs"
+required-features = ["_pretty_curl"]
 
 
 # 💡 Examples - Stack

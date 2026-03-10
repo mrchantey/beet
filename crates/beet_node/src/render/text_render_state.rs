@@ -7,6 +7,7 @@ use std::borrow::Cow;
 /// Tracks block/inline structure, list nesting, blockquote depth, image
 /// capture, and the output buffer. Renderers that need styled output (eg ANSI)
 /// wrap the push methods and apply colour before delegating to [`push_raw`].
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextRenderState {
 	/// Output buffer.
 	pub buffer: String,
@@ -35,7 +36,7 @@ pub struct TextRenderState {
 }
 
 /// Tracks the context of a list for bullets and numbering.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListContext {
 	Unordered,
 	Ordered(usize),

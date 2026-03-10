@@ -14,6 +14,7 @@ use std::borrow::Cow;
 /// Block-level elements emit newlines following the same rules as HTML,
 /// while inline elements are rendered contiguously. Anchor tags render
 /// as [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnsiTermRenderer {
 	/// Explicit element-name → style mapping.
 	style_map: HashMap<Cow<'static, str>, Style>,

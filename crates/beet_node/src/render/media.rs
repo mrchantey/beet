@@ -16,6 +16,7 @@ use beet_core::prelude::*;
 /// renderer. If `accepts` is empty, falls back to `default_media_type`.
 /// When `plaintext_fallback` is enabled, any text-based media type
 /// without a dedicated renderer falls back to [`PlainTextRenderer`].
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MediaRenderer {
 	/// Used when [`RenderContext::accepts`] is empty.
 	default_media_type: MediaType,

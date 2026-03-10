@@ -14,34 +14,25 @@ use beet::prelude::*;
 
 fn main() {
 	let mut world = World::new();
-	let entity = world.spawn_empty().id();
+	let mut entity = world.spawn_empty();
 	let md_bytes = MediaBytes::markdown(MARKDOWN);
 
 	// 1. Load the markdown into ecs
 	MarkdownParser::new()
-		.parse(ParseContext::new(&mut world.entity_mut(entity), &md_bytes))
+		.parse(ParseContext::new(&mut entity, &md_bytes))
 		.unwrap();
+	// 2. Get the requested media type
+	let media_type = CliArgs::parse_env()
+		.params
+		.get_multikey(["media-type", "t"])
+		.map(|val| val.parse().unwrap())
+		.unwrap_or(MediaType::AnsiTerm);
 
-	let output = world
-		.run_system_once(move |walker: NodeWalker| {
-			// 2. Get the requested media type
-			let args = CliArgs::parse_env();
-			let media_type: MediaType = args
-				.params
-				.get_multikey(["media-type", "t"])
-				.map(|val| val.parse().unwrap())
-				.unwrap_or(MediaType::AnsiTerm);
-
-			// 3. Render to the requested media type
-			MediaRenderer::default()
-				.render(
-					&RenderContext::new(entity, &walker)
-						.with_accepts(vec![media_type]),
-				)
-				.unwrap()
-				.to_string()
-		})
-		.unwrap();
+	// 3. Render to the requested media type
+	let output = MediaRenderer::default()
+		.run(&mut entity, vec![media_type])
+		.unwrap()
+		.to_string();
 	println!("{output}");
 }
 

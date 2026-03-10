@@ -13,6 +13,38 @@ pub trait NodeRenderer {
 		&mut self,
 		cx: &RenderContext,
 	) -> Result<RenderOutput, RenderError>;
+
+
+	fn run(
+		&self,
+		entity: &mut EntityWorldMut,
+		accepts: Vec<MediaType>,
+	) -> Result<RenderOutput, RenderError>
+	where
+		Self: 'static + Sized + Clone,
+	{
+		let id = entity.id();
+		entity.world_scope(|world| {
+			world
+				.run_system_cached_with(
+					move |In((mut renderer, entity, accepts)): In<(
+						Self,
+						Entity,
+						Vec<MediaType>,
+					)>,
+					      walker: NodeWalker| {
+						// 3. Render to the requested media type
+						renderer.render(
+							&RenderContext::new(entity, &walker)
+								.with_accepts(accepts),
+						)
+					},
+					(self.clone(), id, accepts),
+				)
+				// no fallible systemparams
+				.unwrap()
+		})
+	}
 }
 
 
