@@ -1,5 +1,5 @@
 //! Media-type-driven parser that dispatches to format-specific [`NodeParser`]
-//! implementations based on a [`MediaType`] value.
+//! implementations based on the media type of [`ParseContext::bytes`].
 //!
 //! Enable additional parsers via feature flags:
 //! - `html_parser` — adds [`HtmlParser`] support for [`MediaType::Html`]
@@ -9,15 +9,13 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A [`NodeParser`] that selects the appropriate format-specific parser
-/// based on a [`MediaType`].
+/// based on [`ParseContext::bytes`]` media type.
 ///
 /// Plain text is always available. HTML and markdown require their
 /// respective feature flags. When `plaintext_fallback` is enabled,
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
 pub struct MediaParser {
-	/// The media type to parse as.
-	media_type: MediaType,
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
 	plaintext_fallback: bool,
 	plain_text_parser: PlainTextParser,
@@ -28,10 +26,9 @@ pub struct MediaParser {
 }
 
 impl MediaParser {
-	/// Create a parser targeting the given media type.
-	pub fn new(media_type: MediaType) -> Self {
+	/// Create a parser with the plain-text fallback enabled.
+	pub fn new() -> Self {
 		Self {
-			media_type,
 			plaintext_fallback: true,
 			plain_text_parser: PlainTextParser::default(),
 			#[cfg(feature = "html_parser")]
@@ -66,42 +63,37 @@ impl MediaParser {
 		self.markdown_parser = parser;
 		self
 	}
+}
 
-	/// Change the target media type.
-	pub fn with_media_type(mut self, media_type: MediaType) -> Self {
-		self.media_type = media_type;
-		self
-	}
-
-	/// Change the target media type.
-	pub fn set_media_type(&mut self, media_type: MediaType) {
-		self.media_type = media_type;
-	}
-
-	/// Returns the currently configured media type.
-	pub fn media_type(&self) -> &MediaType { &self.media_type }
+impl Default for MediaParser {
+	fn default() -> Self { Self::new() }
 }
 
 impl NodeParser for MediaParser {
 	fn parse(
 		&mut self,
-		entity: &mut EntityWorldMut,
-		bytes: &[u8],
-		path: Option<WsPathBuf>,
-	) -> Result {
-		match self.media_type {
-			MediaType::Text => {
-				self.plain_text_parser.parse(entity, bytes, path)
-			}
+		cx: ParseContext,
+	) -> Result<(), ParseError> {
+		let media_type = cx.bytes.media_type().clone();
+		match media_type {
+			MediaType::Text => self.plain_text_parser.parse(cx),
 			#[cfg(feature = "html_parser")]
-			MediaType::Html => self.html_parser.parse(entity, bytes, path),
+			MediaType::Html => self.html_parser.parse(cx),
 			#[cfg(feature = "markdown_parser")]
-			MediaType::Markdown => self.markdown_parser.parse(entity, bytes, path),
+			MediaType::Markdown => self.markdown_parser.parse(cx),
 			ref other if self.plaintext_fallback && other.is_text() => {
-				self.plain_text_parser.parse(entity, bytes, path)
+				self.plain_text_parser.parse(cx)
 			}
-			ref other => {
-				bevybail!("no parser available for media type: {other}")
+			other => {
+				let mut supported = vec![MediaType::Text];
+				#[cfg(feature = "html_parser")]
+				supported.push(MediaType::Html);
+				#[cfg(feature = "markdown_parser")]
+				supported.push(MediaType::Markdown);
+				Err(ParseError::UnsupportedType {
+					unsupported: other,
+					supported,
+				})
 			}
 		}
 	}
@@ -115,11 +107,12 @@ mod test {
 
 	#[test]
 	fn parse_plain_text() {
+		let bytes = MediaBytes::from_str(MediaType::Text, "hello");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				MediaParser::new(MediaType::Text)
-					.parse(entity, b"hello", None)
+				MediaParser::new()
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			.get::<Value>()
@@ -131,11 +124,12 @@ mod test {
 	#[cfg(feature = "html_parser")]
 	#[test]
 	fn parse_html() {
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				MediaParser::new(MediaType::Html)
-					.parse(entity, b"<div>hello</div>", None)
+				MediaParser::new()
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			.children()
@@ -146,11 +140,12 @@ mod test {
 	#[cfg(feature = "markdown_parser")]
 	#[test]
 	fn parse_markdown() {
+		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Title");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				MediaParser::new(MediaType::Markdown)
-					.parse(entity, b"# Title", None)
+				MediaParser::new()
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			.child(0)
@@ -166,11 +161,13 @@ mod test {
 	fn fallback_text_type() {
 		// CSS has no dedicated parser but is a text type,
 		// so it should fall back to plain text.
+		let bytes =
+			MediaBytes::from_str(MediaType::Css, "body { color: red; }");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				MediaParser::new(MediaType::Css)
-					.parse(entity, b"body { color: red; }", None)
+				MediaParser::new()
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			.get::<Value>()
@@ -181,16 +178,18 @@ mod test {
 
 	#[test]
 	fn no_fallback_errors() {
-		MediaParser::new(MediaType::Css)
+		let bytes = MediaBytes::from_str(MediaType::Css, "body {}");
+		MediaParser::new()
 			.without_fallback()
-			.parse(&mut World::new().spawn_empty(), b"body {}", None)
+			.parse(ParseContext::new(&mut World::new().spawn_empty(), &bytes))
 			.xpect_err();
 	}
 
 	#[test]
 	fn binary_type_errors() {
-		MediaParser::new(MediaType::Png)
-			.parse(&mut World::new().spawn_empty(), b"\x89PNG", None)
+		let bytes = MediaBytes::new(MediaType::Png, b"\x89PNG".as_slice());
+		MediaParser::new()
+			.parse(ParseContext::new(&mut World::new().spawn_empty(), &bytes))
 			.xpect_err();
 	}
 }

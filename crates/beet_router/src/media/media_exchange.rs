@@ -55,16 +55,18 @@ fn parse_body_to_render_target(
 	media_type: MediaType,
 	bytes: &[u8],
 ) -> Result {
+	let mb = MediaBytes::new(media_type.clone(), bytes);
+	let cx = ParseContext::new(render_target, &mb);
 	match media_type {
-		MediaType::Text => {
-			PlainTextParser::default().parse(render_target, bytes, None)
-		}
-		MediaType::Html => {
-			HtmlParser::default().parse(render_target, bytes, None)
-		}
-		MediaType::Markdown => {
-			MarkdownParser::default().parse(render_target, bytes, None)
-		}
+		MediaType::Text => PlainTextParser::default()
+			.parse(cx)
+			.map_err(|err| bevyhow!("{err}")),
+		MediaType::Html => HtmlParser::default()
+			.parse(cx)
+			.map_err(|err| bevyhow!("{err}")),
+		MediaType::Markdown => MarkdownParser::default()
+			.parse(cx)
+			.map_err(|err| bevyhow!("{err}")),
 		MediaType::Json => todo!("beet_node json parser"),
 		MediaType::Bytes | MediaType::Postcard => {
 			todo!("beet_node postcard parser")

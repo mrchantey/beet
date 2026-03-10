@@ -15,7 +15,7 @@ use bevy::ecs::system::RunSystemError;
 use tracing::error;
 
 /// Result type alias using [`HttpError`].
-pub type HttpResult<T> = std::result::Result<T, HttpError>;
+pub type HttpResult<T> = Result<T, HttpError>;
 
 
 /// A non-200 response from an HTTP request.

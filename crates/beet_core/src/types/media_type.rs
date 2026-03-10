@@ -7,6 +7,8 @@
 
 use crate::prelude::*;
 
+
+
 /// Common media types used in HTTP exchange.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub enum MediaType {
@@ -438,26 +440,12 @@ impl MediaType {
 				| MediaType::Java
 		)
 	}
+}
 
-	/// Serialize `value` into bytes using this media type's format.
-	///
-	/// Delegates to [`media_serde::serialize`]. See that module for
-	/// supported types and required feature flags.
-	#[cfg(feature = "serde")]
-	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
-		crate::types::media_serde::serialize(self.clone(), value)
-	}
-
-	/// Deserialize bytes into `T` using this media type's format.
-	///
-	/// Delegates to [`media_serde::deserialize`]. See that module for
-	/// supported types and required feature flags.
-	#[cfg(feature = "serde")]
-	pub fn deserialize<T: serde::de::DeserializeOwned>(
-		&self,
-		bytes: &[u8],
-	) -> Result<T> {
-		crate::types::media_serde::deserialize(self.clone(), bytes)
+impl core::str::FromStr for MediaType {
+	type Err = core::convert::Infallible;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(MediaType::from_content_type(s))
 	}
 }
 

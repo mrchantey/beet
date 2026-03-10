@@ -131,17 +131,21 @@ impl HtmlParser {
 }
 
 impl NodeParser for HtmlParser {
-	fn parse(
-		&mut self,
-		entity: &mut EntityWorldMut,
-		bytes: &[u8],
-		path: Option<WsPathBuf>,
-	) -> Result {
-		let text = std::str::from_utf8(&bytes)?;
-		let id = entity.id();
-		entity.world_scope(|world| {
-			self.parse_text(world, id, text, path.as_ref())
-		})
+	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
+		let media_type = cx.bytes.media_type();
+		if *media_type != MediaType::Html {
+			return Err(ParseError::UnsupportedType {
+				unsupported: media_type.clone(),
+				supported: vec![MediaType::Html],
+			});
+		}
+		let text = core::str::from_utf8(cx.bytes.bytes())?;
+		let id = cx.entity.id();
+		cx.entity
+			.world_scope(|world| {
+				self.parse_text(world, id, text, cx.path.as_ref())
+			})?
+			.xok()
 	}
 }
 
@@ -221,15 +225,34 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// Parse HTML bytes into a freshly spawned entity, returning the entity ref.
+	fn parse_html(entity: &mut EntityWorldMut<'_>, html: &str) {
+		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		HtmlParser::new()
+			.parse(ParseContext::new(entity, &bytes))
+			.unwrap();
+	}
+
+	/// Parse HTML with a path for span tracking.
+	fn parse_html_with_path(
+		entity: &mut EntityWorldMut<'_>,
+		html: &str,
+		path: &str,
+	) {
+		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		HtmlParser::new()
+			.parse(
+				ParseContext::new(entity, &bytes)
+					.with_path(WsPathBuf::new(path)),
+			)
+			.unwrap();
+	}
+
 	#[test]
 	fn parse_simple_element() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"<div>hello</div>", None)
-					.unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "<div>hello</div>"))
 			.children()
 			.len()
 			.xpect_eq(1);
@@ -239,11 +262,7 @@ mod test {
 	fn parse_text_node() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"hello world", None)
-					.unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "hello world"))
 			.child(0)
 			.unwrap()
 			.get::<Value>()
@@ -256,11 +275,7 @@ mod test {
 	fn parse_nested_elements() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"<div><span>inner</span></div>", None)
-					.unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "<div><span>inner</span></div>"))
 			// root -> div -> span
 			.child(0)
 			.unwrap()
@@ -275,11 +290,13 @@ mod test {
 
 	#[test]
 	fn parse_with_expressions() {
+		let bytes =
+			MediaBytes::from_str(MediaType::Html, "<p>hello {name}</p>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::with_expressions()
-					.parse(entity, b"<p>hello {name}</p>", None)
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			// root -> p -> expression (index 1, after the "hello " text node)
@@ -298,11 +315,7 @@ mod test {
 	fn parse_void_element() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"<div><br>text</div>", None)
-					.unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "<div><br>text</div>"))
 			// root -> div -> br
 			.child(0)
 			.unwrap()
@@ -320,13 +333,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div>hello</div>",
-						Some(WsPathBuf::new("test.html")),
-					)
-					.unwrap();
+				parse_html_with_path(entity, "<div>hello</div>", "test.html")
 			})
 			.get::<FileSpan>()
 			.cloned()
@@ -339,11 +346,7 @@ mod test {
 	fn parse_comment() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(entity, b"<!-- hello -->", None)
-					.unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "<!-- hello -->"))
 			.child(0)
 			.unwrap()
 			.get::<Comment>()
@@ -361,10 +364,11 @@ mod test {
 			},
 			..default()
 		};
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>42</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				parser.parse(entity, b"<div>42</div>", None).unwrap();
+				parser.parse(ParseContext::new(entity, &bytes)).unwrap();
 			})
 			// root -> div -> text node
 			.child(0)
@@ -383,13 +387,7 @@ mod test {
 		let entity = world
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div class=\"foo\" id=\"bar\"></div>",
-						None,
-					)
-					.unwrap();
+				parse_html(entity, "<div class=\"foo\" id=\"bar\"></div>")
 			})
 			.id();
 		let div = world.entity_mut(entity).child(0).unwrap().id();
@@ -416,9 +414,7 @@ mod test {
 	fn parse_self_closing() {
 		World::new()
 			.spawn_empty()
-			.xtap(|entity| {
-				HtmlParser::new().parse(entity, b"<img />", None).unwrap();
-			})
+			.xtap(|entity| parse_html(entity, "<img />"))
 			.children()
 			.len()
 			.xpect_eq(1);
@@ -426,12 +422,13 @@ mod test {
 
 	#[test]
 	fn reparse_unchanged_no_change() {
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = HtmlParser::new();
-				parser.parse(entity, b"<div>hello</div>", None).unwrap();
-				parser.parse(entity, b"<div>hello</div>", None).unwrap();
+				parser.parse(ParseContext::new(entity, &bytes)).unwrap();
+				parser.parse(ParseContext::new(entity, &bytes)).unwrap();
 			})
 			.children()
 			.len()
@@ -440,12 +437,14 @@ mod test {
 
 	#[test]
 	fn reparse_changed_content() {
+		let bytes_a = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
+		let bytes_b = MediaBytes::from_str(MediaType::Html, "<div>world</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				let mut parser = HtmlParser::new();
-				parser.parse(entity, b"<div>hello</div>", None).unwrap();
-				parser.parse(entity, b"<div>world</div>", None).unwrap();
+				parser.parse(ParseContext::new(entity, &bytes_a)).unwrap();
+				parser.parse(ParseContext::new(entity, &bytes_b)).unwrap();
 			})
 			// root -> div -> text node
 			.child(0)
@@ -463,13 +462,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div>hello</div>",
-						Some(WsPathBuf::new("test.html")),
-					)
-					.unwrap();
+				parse_html_with_path(entity, "<div>hello</div>", "test.html")
 			})
 			.child(0)
 			.unwrap()
@@ -488,13 +481,7 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div>hello</div>",
-						Some(WsPathBuf::new("test.html")),
-					)
-					.unwrap();
+				parse_html_with_path(entity, "<div>hello</div>", "test.html")
 			})
 			// root -> div -> text node
 			.child(0)
@@ -519,13 +506,11 @@ mod test {
 				// line 1: <div>\n
 				// line 2: hello\n
 				// line 3: </div>
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div>\nhello\n</div>",
-						Some(WsPathBuf::new("test.html")),
-					)
-					.unwrap();
+				parse_html_with_path(
+					entity,
+					"<div>\nhello\n</div>",
+					"test.html",
+				)
 			})
 			// root -> div -> text node
 			.child(0)
@@ -547,13 +532,11 @@ mod test {
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
-				HtmlParser::new()
-					.parse(
-						entity,
-						b"<div class=\"foo\"></div>",
-						Some(WsPathBuf::new("test.html")),
-					)
-					.unwrap();
+				parse_html_with_path(
+					entity,
+					"<div class=\"foo\"></div>",
+					"test.html",
+				)
 			})
 			.child(0)
 			.unwrap()
@@ -571,14 +554,14 @@ mod test {
 
 	#[test]
 	fn expression_node_span() {
+		let bytes = MediaBytes::from_str(MediaType::Html, "<p>{name}</p>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::with_expressions()
 					.parse(
-						entity,
-						b"<p>{name}</p>",
-						Some(WsPathBuf::new("test.html")),
+						ParseContext::new(entity, &bytes)
+							.with_path(WsPathBuf::new("test.html")),
 					)
 					.unwrap();
 			})
@@ -603,12 +586,14 @@ mod test {
 	fn parse_markdown_text_nodes() {
 		// The div contains markdown text "**bold**" which should
 		// be re-parsed into <p><strong>bold</strong></p>
+		let bytes =
+			MediaBytes::from_str(MediaType::Html, "<div>**bold**</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
 					.with_markdown()
-					.parse(entity, b"<div>**bold**</div>", None)
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			// root -> div -> (replaced text node with subtree)
@@ -628,12 +613,14 @@ mod test {
 		// get wrapped in a <p> element by the markdown parser.
 		// "hello world" parsed as markdown becomes <p>hello world</p>
 		// so the original text node is replaced with structure.
+		let bytes =
+			MediaBytes::from_str(MediaType::Html, "<div>hello world</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
 				HtmlParser::new()
 					.with_markdown()
-					.parse(entity, b"<div>hello world</div>", None)
+					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
 			// root -> div -> children count

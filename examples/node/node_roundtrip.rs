@@ -1,38 +1,39 @@
 use beet::prelude::*;
 
-
 fn main() {
 	let mut world = World::new();
 	let entity = world.spawn_empty().id();
+	let md_bytes = MediaBytes::from_str(MediaType::Markdown, MARKDOWN);
 	MarkdownParser::new()
-		.parse(&mut world.entity_mut(entity), MARKDOWN.as_bytes(), None)
+		.parse(ParseContext::new(&mut world.entity_mut(entity), &md_bytes))
 		.unwrap();
+
 	let output = world
 		.run_system_once(move |walker: NodeWalker| {
 			let args = CliArgs::parse_env();
-			let media_type = match args.params.get("format").map(|s| s.as_str())
+
+			// If --media-type or -t is provided, use MediaRenderer.
+			// Otherwise default to AnsiTermRenderer for terminal output.
+			if let Some(type_str) = args
+				.params
+				.get("media-type")
+				.or_else(|| args.params.get("t"))
 			{
-				Some("html") => MediaType::Html,
-				Some("markdown") | Some("md") => MediaType::Markdown,
-				Some("ansi") | None => {
-					// default to ansi terminal output
-					let mut renderer = AnsiTermRenderer::new();
-					return renderer.render(&walker, entity).to_string();
-				}
-				Some(other) => {
-					panic!("Unknown format: {other}");
-				}
-			};
-			MediaRenderer::new(media_type)
-				.render(&walker, entity)
-				.to_string()
+				let media_type: MediaType = type_str.parse().unwrap();
+				let cx = RenderContext::new(entity, &walker)
+					.with_accepts(vec![media_type.clone()]);
+				MediaRenderer::new(media_type)
+					.render(&cx)
+					.unwrap()
+					.to_string()
+			} else {
+				let cx = RenderContext::new(entity, &walker);
+				AnsiTermRenderer::new().render(&cx).unwrap().to_string()
+			}
 		})
 		.unwrap();
 	println!("{output}");
 }
-
-
-
 
 const MARKDOWN: &str = r#"
 # All about crystals

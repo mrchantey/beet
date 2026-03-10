@@ -219,12 +219,13 @@ impl NodeVisitor for HtmlRenderer {
 
 
 impl NodeRenderer for HtmlRenderer {
-	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
-		walker.walk(self, entity);
+	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Html,
 			std::mem::take(&mut self.buffer),
 		)
+		.xok()
 	}
 }
 
@@ -254,31 +255,37 @@ mod test {
 	use super::*;
 
 	/// Parse HTML then render it back via [`HtmlRenderer`].
-	fn roundtrip(html: &[u8]) -> String {
+	fn roundtrip(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, html);
 		HtmlParser::new()
-			.parse(&mut world.entity_mut(entity), html, None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				HtmlRenderer::new().render(&walker, entity).to_string()
+				HtmlRenderer::new()
+					.render(&RenderContext::new(entity, &walker))
+					.unwrap()
+					.to_string()
 			})
 			.unwrap()
 	}
 
 	/// Parse then render with expression support.
-	fn roundtrip_expressions(html: &[u8]) -> String {
+	fn roundtrip_expressions(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, html);
 		HtmlParser::with_expressions()
-			.parse(&mut world.entity_mut(entity), html, None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
 				HtmlRenderer::new()
 					.with_expressions()
-					.render(&walker, entity)
+					.render(&RenderContext::new(entity, &walker))
+					.unwrap()
 					.to_string()
 			})
 			.unwrap()
@@ -286,47 +293,47 @@ mod test {
 
 	#[test]
 	fn render_simple_element() {
-		roundtrip(b"<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
+		roundtrip("<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
 	#[test]
 	fn render_nested_elements() {
-		roundtrip(b"<div><span>inner</span></div>")
+		roundtrip("<div><span>inner</span></div>")
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
 	#[test]
 	fn render_void_element() {
-		roundtrip(b"<div><br>text</div>")
+		roundtrip("<div><br>text</div>")
 			.xpect_eq("<div><br />text</div>".to_string());
 	}
 
 	#[test]
 	fn render_comment() {
-		roundtrip(b"<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
+		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
 	}
 
 	#[test]
 	fn render_text_only() {
-		roundtrip(b"hello world").xpect_eq("hello world".to_string());
+		roundtrip("hello world").xpect_eq("hello world".to_string());
 	}
 
 	#[test]
 	fn render_expression() {
-		roundtrip_expressions(b"<p>{name}</p>")
+		roundtrip_expressions("<p>{name}</p>")
 			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
 	#[test]
 	fn render_attributes() {
-		roundtrip(b"<div class=\"foo\" id=\"bar\"></div>")
+		roundtrip("<div class=\"foo\" id=\"bar\"></div>")
 			.xpect_contains("class=\"foo\"")
 			.xpect_contains("id=\"bar\"");
 	}
 
 	#[test]
 	fn render_self_closing() {
-		roundtrip(b"<img src=\"foo.png\" />")
+		roundtrip("<img src=\"foo.png\" />")
 			.xpect_contains("<img")
 			.xpect_contains("/>");
 	}

@@ -358,12 +358,13 @@ impl NodeVisitor for AnsiTermRenderer {
 }
 
 impl NodeRenderer for AnsiTermRenderer {
-	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
-		walker.walk(self, entity);
+	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Text,
 			std::mem::take(&mut self.state.buffer),
 		)
+		.xok()
 	}
 }
 
@@ -425,15 +426,17 @@ mod test {
 	use super::*;
 
 	/// Parse markdown then render via [`AnsiTermRenderer`].
-	fn render(md: &[u8]) -> String {
+	fn render(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md, None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				AnsiTermRenderer::new().render(&walker, entity).to_string()
+				let cx = RenderContext::new(entity, &walker);
+				AnsiTermRenderer::new().render(&cx).unwrap().to_string()
 			})
 			.unwrap()
 	}
@@ -490,7 +493,7 @@ mod test {
 
 	#[test]
 	fn render_paragraph() {
-		render(b"Hello world")
+		render("Hello world")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_eq("Hello world");
@@ -499,19 +502,19 @@ mod test {
 	#[test]
 	fn render_heading_h1() {
 		// heading_hashes is false by default; only the text is emitted
-		render(b"# Title").xmap(strip_ansi).trim().xpect_eq("Title");
+		render("# Title").xmap(strip_ansi).trim().xpect_eq("Title");
 	}
 
 	#[test]
 	fn render_heading_styled() {
-		render(b"# Title")
+		render("# Title")
 			.xpect_contains("\x1b[")
 			.xpect_contains("Title");
 	}
 
 	#[test]
 	fn render_link_has_osc8() {
-		render(b"[click](https://example.com)")
+		render("[click](https://example.com)")
 			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
 			.xpect_contains("click")
 			.xpect_contains("\x1b]8;;\x1b\\");
@@ -519,7 +522,7 @@ mod test {
 
 	#[test]
 	fn render_link_text_stripped() {
-		render(b"[click](https://example.com)")
+		render("[click](https://example.com)")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_eq("click");
@@ -527,14 +530,14 @@ mod test {
 
 	#[test]
 	fn render_code_block() {
-		render(b"```rust\nfn main() {}\n```")
+		render("```rust\nfn main() {}\n```")
 			.xmap(strip_ansi)
 			.xpect_contains("fn main() {}");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		render(b"- alpha\n- beta")
+		render("- alpha\n- beta")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_contains("• alpha")
@@ -543,19 +546,19 @@ mod test {
 
 	#[test]
 	fn render_image() {
-		render(b"![alt text](image.png)")
+		render("![alt text](image.png)")
 			.xmap(strip_ansi)
 			.xpect_contains("[alt text]");
 	}
 
 	#[test]
 	fn render_image_has_osc8() {
-		render(b"![alt](image.png)").xpect_contains("\x1b]8;;image.png\x1b\\");
+		render("![alt](image.png)").xpect_contains("\x1b]8;;image.png\x1b\\");
 	}
 
 	#[test]
 	fn render_blockquote() {
-		render(b"> quoted text")
+		render("> quoted text")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_eq("▌ quoted text");
@@ -564,7 +567,7 @@ mod test {
 	#[test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
-		render(b"> *notable remark*")
+		render("> *notable remark*")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_eq("▌ notable remark");
@@ -574,8 +577,7 @@ mod test {
 	fn render_blockquote_multiline() {
 		// a blockquote whose content spans multiple paragraphs should prefix
 		// every paragraph with ▌
-		let input = "> first paragraph\n>\n> second paragraph";
-		render(input.as_bytes())
+		render("> first paragraph\n>\n> second paragraph")
 			.xmap(strip_ansi)
 			.trim()
 			.xpect_eq("▌ first paragraph\n▌\n▌ second paragraph");
@@ -583,12 +585,12 @@ mod test {
 
 	#[test]
 	fn render_thematic_break() {
-		render(b"---").xmap(strip_ansi).xpect_contains("────");
+		render("---").xmap(strip_ansi).xpect_contains("────");
 	}
 
 	#[test]
 	fn render_multiple_blocks_separated() {
-		render(b"# Title\n\nParagraph")
+		render("# Title\n\nParagraph")
 			.xmap(strip_ansi)
 			.xpect_contains("Title")
 			.xpect_contains("Paragraph")
@@ -599,8 +601,9 @@ mod test {
 	fn custom_style_map() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Hello");
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), b"# Hello", None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
@@ -609,7 +612,8 @@ mod test {
 				custom_map.insert("h1".into(), Style::new().fg(Color::Red));
 				AnsiTermRenderer::new()
 					.with_style_map(custom_map)
-					.render(&walker, entity)
+					.render(&RenderContext::new(entity, &walker))
+					.unwrap()
 					.to_string()
 			})
 			.unwrap()

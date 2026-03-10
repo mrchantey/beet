@@ -46,10 +46,8 @@ async fn run_lambda(entity: AsyncEntity) -> Result {
 async fn handle_request(
 	entity: AsyncEntity,
 	lambda_req: lambda_http::Request,
-) -> std::result::Result<
-	lambda_http::Response<lambda_http::Body>,
-	std::convert::Infallible,
-> {
+) -> Result<lambda_http::Response<lambda_http::Body>, std::convert::Infallible>
+{
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
 		let req = lambda_to_request(lambda_req)?;
 		let res = entity.exchange(req).await;

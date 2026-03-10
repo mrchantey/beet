@@ -381,12 +381,13 @@ impl NodeVisitor for MarkdownRenderer {
 
 
 impl NodeRenderer for MarkdownRenderer {
-	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
-		walker.walk(self, entity);
+	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Markdown,
 			std::mem::take(&mut self.state.buffer),
 		)
+		.xok()
 	}
 }
 
@@ -396,32 +397,38 @@ mod test {
 	use super::*;
 
 	/// Parse markdown then render it back via [`MarkdownRenderer`].
-	fn roundtrip(md: &[u8]) -> String {
+	fn roundtrip(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), md, None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				MarkdownRenderer::new().render(&walker, entity).to_string()
+				MarkdownRenderer::new()
+					.render(&RenderContext::new(entity, &walker))
+					.unwrap()
+					.to_string()
 			})
 			.unwrap()
 	}
 
 	/// Parse markdown then render with expression support.
 	#[allow(dead_code)]
-	fn roundtrip_expressions(md: &[u8]) -> String {
+	fn roundtrip_expressions(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
 		MarkdownParser::with_expressions()
-			.parse(&mut world.entity_mut(entity), md, None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
 				MarkdownRenderer::new()
 					.with_expressions()
-					.render(&walker, entity)
+					.render(&RenderContext::new(entity, &walker))
+					.unwrap()
 					.to_string()
 			})
 			.unwrap()
@@ -429,67 +436,67 @@ mod test {
 
 	#[test]
 	fn render_paragraph() {
-		roundtrip(b"Hello world").trim().xpect_eq("Hello world");
+		roundtrip("Hello world").trim().xpect_eq("Hello world");
 	}
 
 	#[test]
-	fn render_heading_h1() { roundtrip(b"# Title").trim().xpect_eq("# Title"); }
+	fn render_heading_h1() { roundtrip("# Title").trim().xpect_eq("# Title"); }
 
 	#[test]
 	fn render_heading_h2() {
-		roundtrip(b"## Subtitle").trim().xpect_eq("## Subtitle");
+		roundtrip("## Subtitle").trim().xpect_eq("## Subtitle");
 	}
 
 	#[test]
-	fn render_emphasis() { roundtrip(b"*hello*").trim().xpect_eq("*hello*"); }
+	fn render_emphasis() { roundtrip("*hello*").trim().xpect_eq("*hello*"); }
 
 	#[test]
-	fn render_strong() { roundtrip(b"**hello**").trim().xpect_eq("**hello**"); }
+	fn render_strong() { roundtrip("**hello**").trim().xpect_eq("**hello**"); }
 
 	#[test]
 	fn render_link() {
-		roundtrip(b"[click](https://example.com)")
+		roundtrip("[click](https://example.com)")
 			.trim()
 			.xpect_eq("[click](https://example.com)");
 	}
 
 	#[test]
 	fn render_image() {
-		roundtrip(b"![alt](image.png)")
+		roundtrip("![alt](image.png)")
 			.trim()
 			.xpect_eq("![alt](image.png)");
 	}
 
 	#[test]
 	fn render_unordered_list() {
-		roundtrip(b"- alpha\n- beta")
+		roundtrip("- alpha\n- beta")
 			.trim()
 			.xpect_eq("- alpha\n- beta");
 	}
 
 	#[test]
 	fn render_code_block() {
-		roundtrip(b"```rust\nfn main() {}\n```")
+		roundtrip("```rust\nfn main() {}\n```")
 			.trim()
 			.xpect_eq("```rust\nfn main() {}\n```");
 	}
 
 	#[test]
 	fn render_inline_code() {
-		roundtrip(b"use `foo()` here")
+		roundtrip("use `foo()` here")
 			.trim()
 			.xpect_eq("use `foo()` here");
 	}
 
 	#[test]
 	fn render_blockquote() {
-		roundtrip(b"> quoted text").trim().xpect_eq("> quoted text");
+		roundtrip("> quoted text").trim().xpect_eq("> quoted text");
 	}
 
 	#[test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
-		roundtrip(b"> *notable remark*")
+		roundtrip("> *notable remark*")
 			.trim()
 			.xpect_eq("> *notable remark*");
 	}
@@ -497,22 +504,22 @@ mod test {
 	#[test]
 	fn render_blockquote_multiline() {
 		let input = "> first paragraph\n>\n> second paragraph";
-		roundtrip(input.as_bytes()).trim().xpect_eq(input);
+		roundtrip(input).trim().xpect_eq(input);
 	}
 
 	#[test]
-	fn render_thematic_break() { roundtrip(b"---").trim().xpect_eq("---"); }
+	fn render_thematic_break() { roundtrip("---").trim().xpect_eq("---"); }
 
 	#[test]
 	fn render_multiple_blocks() {
-		roundtrip(b"# Title\n\nParagraph")
+		roundtrip("# Title\n\nParagraph")
 			.trim()
 			.xpect_eq("# Title\n\nParagraph");
 	}
 
 	#[test]
 	fn render_comment() {
-		roundtrip(b"<!-- hello -->")
+		roundtrip("<!-- hello -->")
 			.trim()
 			.xpect_eq("<!-- hello -->");
 	}

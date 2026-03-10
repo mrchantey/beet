@@ -156,11 +156,12 @@ impl NodeVisitor for PlainTextRenderer {
 }
 
 impl NodeRenderer for PlainTextRenderer {
-	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
-		walker.walk(self, entity);
+	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Text,
 			std::mem::take(&mut self.buffer),
 		)
+		.xok()
 	}
 }

@@ -1,5 +1,6 @@
 //! Media-type-driven renderer that dispatches to format-specific
-//! [`NodeRenderer`] implementations based on a [`MediaType`] value.
+//! [`NodeRenderer`] implementations based on the `accepts` field of
+//! [`RenderContext`].
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
@@ -8,15 +9,15 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A [`NodeRenderer`] that selects the appropriate format-specific renderer
-/// based on a [`MediaType`].
+/// based on the [`RenderContext::accepts`] list.
 ///
-/// Plain text, HTML, and markdown renderers are always available.
-/// The ANSI terminal renderer requires the `ansi_term` feature flag.
+/// Iterates `accepts` in priority order, delegating to the first matching
+/// renderer. If `accepts` is empty, falls back to `default_media_type`.
 /// When `plaintext_fallback` is enabled, any text-based media type
 /// without a dedicated renderer falls back to [`PlainTextRenderer`].
 pub struct MediaRenderer {
-	/// The media type to render as.
-	media_type: MediaType,
+	/// Used when [`RenderContext::accepts`] is empty.
+	default_media_type: MediaType,
 	/// Fall back to [`PlainTextRenderer`] for unrecognized text types.
 	plaintext_fallback: bool,
 	plain_text_renderer: PlainTextRenderer,
@@ -27,10 +28,10 @@ pub struct MediaRenderer {
 }
 
 impl MediaRenderer {
-	/// Create a renderer targeting the given media type.
-	pub fn new(media_type: MediaType) -> Self {
+	/// Create a renderer with the given default media type.
+	pub fn new(default_media_type: MediaType) -> Self {
 		Self {
-			media_type,
+			default_media_type,
 			plaintext_fallback: true,
 			plain_text_renderer: PlainTextRenderer::default(),
 			html_renderer: HtmlRenderer::new(),
@@ -80,32 +81,63 @@ impl MediaRenderer {
 		self
 	}
 
-	/// Change the target media type.
-	pub fn with_media_type(mut self, media_type: MediaType) -> Self {
-		self.media_type = media_type;
+	/// Set the default media type used when `accepts` is empty.
+	pub fn with_default_media_type(mut self, media_type: MediaType) -> Self {
+		self.default_media_type = media_type;
 		self
 	}
 
-	/// Returns the currently configured media type.
-	pub fn media_type(&self) -> &MediaType { &self.media_type }
+	/// Returns the default media type.
+	pub fn default_media_type(&self) -> &MediaType { &self.default_media_type }
+
+	/// Render using a specific media type, ignoring `accepts`.
+	fn render_media_type(
+		&mut self,
+		cx: &RenderContext,
+		media_type: &MediaType,
+	) -> Option<Result<RenderOutput>> {
+		match media_type {
+			MediaType::Text => Some(self.plain_text_renderer.render(cx)),
+			MediaType::Html => Some(self.html_renderer.render(cx)),
+			MediaType::Markdown => Some(self.markdown_renderer.render(cx)),
+			#[cfg(feature = "ansi_term")]
+			// ansi_term renders as text/plain with ANSI escape codes
+			_ if *media_type == MediaType::Text => {
+				Some(self.ansi_term_renderer.render(cx))
+			}
+			other if self.plaintext_fallback && other.is_text() => {
+				Some(self.plain_text_renderer.render(cx))
+			}
+			_ => None,
+		}
+	}
 }
 
 impl NodeRenderer for MediaRenderer {
-	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
-		match self.media_type {
-			MediaType::Text => self.plain_text_renderer.render(walker, entity),
-			MediaType::Html => self.html_renderer.render(walker, entity),
-			MediaType::Markdown => {
-				self.markdown_renderer.render(walker, entity)
+	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+		// Resolve the list of types to try: accepts list, or fallback to default.
+		// Collect into an owned Vec to avoid holding a borrow on `self` during
+		// the mutable dispatch calls below.
+		let candidates: Vec<MediaType> = if cx.accepts.is_empty() {
+			vec![self.default_media_type.clone()]
+		} else {
+			cx.accepts.clone()
+		};
+
+		for media_type in &candidates {
+			if let Some(result) = self.render_media_type(cx, media_type) {
+				return result;
 			}
-			ref other if self.plaintext_fallback && other.is_text() => {
-				self.plain_text_renderer.render(walker, entity)
-			}
-			ref other => RenderOutput::media_string(
-				other.clone(),
-				format!("no renderer available for media type: {other}"),
-			),
 		}
+
+		// Nothing matched — report what was requested vs what is available.
+		let available =
+			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
+		bevybail!(
+			"no renderer available for any of the requested types: {:?}, available: {:?}",
+			candidates,
+			available
+		)
 	}
 }
 
@@ -115,22 +147,35 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	fn render(
+		world: &mut World,
+		entity: Entity,
+		default_media_type: MediaType,
+		accepts: Vec<MediaType>,
+	) -> String {
+		world
+			.run_system_once(move |walker: NodeWalker| {
+				let cx = RenderContext::new(entity, &walker)
+					.with_accepts(accepts.clone());
+				MediaRenderer::new(default_media_type.clone())
+					.render(&cx)
+					.unwrap()
+					.to_string()
+			})
+			.unwrap()
+	}
+
 	/// Parse HTML then render back via [`MediaRenderer`] targeting HTML.
 	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_html() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
 		HtmlParser::new()
-			.parse(&mut world.entity_mut(entity), b"<div>hello</div>", None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				MediaRenderer::new(MediaType::Html)
-					.render(&walker, entity)
-					.to_string()
-			})
-			.unwrap()
+		render(&mut world, entity, MediaType::Html, vec![])
 			.xpect_eq("<div>hello</div>".to_string());
 	}
 
@@ -140,16 +185,11 @@ mod test {
 	fn render_plain_text() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, "<p>hello</p>");
 		HtmlParser::new()
-			.parse(&mut world.entity_mut(entity), b"<p>hello</p>", None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				MediaRenderer::new(MediaType::Text)
-					.render(&walker, entity)
-					.to_string()
-			})
-			.unwrap()
+		render(&mut world, entity, MediaType::Text, vec![])
 			.xpect_contains("hello");
 	}
 
@@ -159,16 +199,11 @@ mod test {
 	fn render_markdown() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Title");
 		MarkdownParser::new()
-			.parse(&mut world.entity_mut(entity), b"# Title", None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				MediaRenderer::new(MediaType::Markdown)
-					.render(&walker, entity)
-					.to_string()
-			})
-			.unwrap()
+		render(&mut world, entity, MediaType::Markdown, vec![])
 			.trim()
 			.xpect_eq("# Title");
 	}
@@ -180,16 +215,52 @@ mod test {
 	fn fallback_text_type() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, "<p>hello</p>");
 		HtmlParser::new()
-			.parse(&mut world.entity_mut(entity), b"<p>hello</p>", None)
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
+		render(&mut world, entity, MediaType::Css, vec![])
+			.xpect_contains("hello");
+	}
+
+	/// `accepts` list is consulted in priority order.
+	#[cfg(feature = "html_parser")]
+	#[test]
+	fn accepts_priority() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hi</div>");
+		HtmlParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		// Html is first in accepts, so we should get HTML output.
+		render(&mut world, entity, MediaType::Text, vec![
+			MediaType::Html,
+			MediaType::Text,
+		])
+		.xpect_eq("<div>hi</div>".to_string());
+	}
+
+	/// When no type in `accepts` matches and fallback is disabled, errors.
+	#[cfg(feature = "html_parser")]
+	#[test]
+	fn no_match_errors() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hi</div>");
+		HtmlParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		// Render with only Png accepted and fallback disabled — should error.
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				MediaRenderer::new(MediaType::Css)
-					.render(&walker, entity)
-					.to_string()
+				let cx = RenderContext::new(entity, &walker)
+					.with_accepts(vec![MediaType::Png]);
+				let result = MediaRenderer::new(MediaType::Text)
+					.without_fallback()
+					.render(&cx);
+				result.is_err().xpect_true();
 			})
-			.unwrap()
-			.xpect_contains("hello");
+			.unwrap();
 	}
 }
