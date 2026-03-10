@@ -438,6 +438,27 @@ impl MediaType {
 				| MediaType::Java
 		)
 	}
+
+	/// Serialize `value` into bytes using this media type's format.
+	///
+	/// Delegates to [`media_serde::serialize`]. See that module for
+	/// supported types and required feature flags.
+	#[cfg(feature = "serde")]
+	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+		crate::types::media_serde::serialize(self.clone(), value)
+	}
+
+	/// Deserialize bytes into `T` using this media type's format.
+	///
+	/// Delegates to [`media_serde::deserialize`]. See that module for
+	/// supported types and required feature flags.
+	#[cfg(feature = "serde")]
+	pub fn deserialize<T: serde::de::DeserializeOwned>(
+		&self,
+		bytes: &[u8],
+	) -> Result<T> {
+		crate::types::media_serde::deserialize(self.clone(), bytes)
+	}
 }
 
 impl From<&str> for MediaType {
@@ -697,7 +718,7 @@ mod test {
 	}
 
 	#[test]
-	fn is_text() {
+	fn is_text_types() {
 		MediaType::Html.is_text().xpect_true();
 		MediaType::Json.is_text().xpect_true();
 		MediaType::Css.is_text().xpect_true();

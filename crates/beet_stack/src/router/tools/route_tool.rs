@@ -97,11 +97,10 @@ where
 		.and_then(|res| res.ok())
 		.unwrap_or(MediaType::Json);
 	let body_bytes = request.body.into_bytes().await?;
-	let input: Input =
-		media_serde::deserialize(media_type.clone(), &body_bytes)?;
+	let input: Input = media_type.deserialize(&body_bytes)?;
 	let output: Output = next.call(input).await?;
 	// Use the same format as the request payload
-	let body_bytes = media_serde::serialize(media_type.clone(), &output)?;
+	let body_bytes = media_type.serialize(&output)?;
 	Response::ok()
 		.with_content_type(media_type)
 		.with_body(body_bytes)

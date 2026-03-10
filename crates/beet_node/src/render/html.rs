@@ -218,6 +218,17 @@ impl NodeVisitor for HtmlRenderer {
 }
 
 
+impl NodeRenderer for HtmlRenderer {
+	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
+		walker.walk(self, entity);
+		RenderOutput::media_string(
+			MediaType::Html,
+			std::mem::take(&mut self.buffer),
+		)
+	}
+}
+
+
 fn default_void_elements() -> Vec<Cow<'static, str>> {
 	vec![
 		"area".into(),
@@ -251,9 +262,7 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = HtmlRenderer::new();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				HtmlRenderer::new().render(&walker, entity).to_string()
 			})
 			.unwrap()
 	}
@@ -267,9 +276,10 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = HtmlRenderer::new().with_expressions();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				HtmlRenderer::new()
+					.with_expressions()
+					.render(&walker, entity)
+					.to_string()
 			})
 			.unwrap()
 	}

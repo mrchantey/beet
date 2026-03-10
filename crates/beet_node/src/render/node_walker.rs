@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
+
 #[derive(SystemParam)]
 pub struct NodeWalker<'w, 's> {
 	// Core node identification
@@ -151,5 +152,15 @@ impl NodeVisitor for PlainTextRenderer {
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
 		self.buffer.push_str(&value.to_string());
 		self.did_newline = false;
+	}
+}
+
+impl NodeRenderer for PlainTextRenderer {
+	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
+		walker.walk(self, entity);
+		RenderOutput::media_string(
+			MediaType::Text,
+			std::mem::take(&mut self.buffer),
+		)
 	}
 }

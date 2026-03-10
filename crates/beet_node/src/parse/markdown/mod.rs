@@ -411,9 +411,7 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut renderer = HtmlRenderer::new();
-				walker.walk(&mut renderer, entity);
-				renderer.into_string()
+				HtmlRenderer::new().render(&walker, entity).to_string()
 			})
 			.unwrap()
 	}

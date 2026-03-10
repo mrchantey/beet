@@ -10,27 +10,22 @@ fn main() {
 	let output = world
 		.run_system_once(move |walker: NodeWalker| {
 			let args = CliArgs::parse_env();
-			match args.params.get("format").map(|s| s.as_str()) {
-				Some("html") => {
-					let mut renderer = HtmlRenderer::new();
-					walker.walk(&mut renderer, entity);
-					renderer.into_string()
-				}
-				Some("markdown") | Some("md") => {
-					let mut renderer = MarkdownRenderer::new();
-					walker.walk(&mut renderer, entity);
-					renderer.into_string()
-				}
+			let media_type = match args.params.get("format").map(|s| s.as_str())
+			{
+				Some("html") => MediaType::Html,
+				Some("markdown") | Some("md") => MediaType::Markdown,
 				Some("ansi") | None => {
-					// default to ansi
+					// default to ansi terminal output
 					let mut renderer = AnsiTermRenderer::new();
-					walker.walk(&mut renderer, entity);
-					renderer.into_string()
+					return renderer.render(&walker, entity).to_string();
 				}
 				Some(other) => {
 					panic!("Unknown format: {other}");
 				}
-			}
+			};
+			MediaRenderer::new(media_type)
+				.render(&walker, entity)
+				.to_string()
 		})
 		.unwrap();
 	println!("{output}");

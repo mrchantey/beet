@@ -357,6 +357,16 @@ impl NodeVisitor for AnsiTermRenderer {
 	}
 }
 
+impl NodeRenderer for AnsiTermRenderer {
+	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
+		walker.walk(self, entity);
+		RenderOutput::media_string(
+			MediaType::Text,
+			std::mem::take(&mut self.state.buffer),
+		)
+	}
+}
+
 
 fn default_style_map() -> HashMap<Cow<'static, str>, Style> {
 	vec![
@@ -423,9 +433,7 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = AnsiTermRenderer::new();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				AnsiTermRenderer::new().render(&walker, entity).to_string()
 			})
 			.unwrap()
 	}
@@ -599,10 +607,10 @@ mod test {
 				let mut custom_map: HashMap<Cow<'static, str>, Style> =
 					HashMap::default();
 				custom_map.insert("h1".into(), Style::new().fg(Color::Red));
-				let mut render =
-					AnsiTermRenderer::new().with_style_map(custom_map);
-				walker.walk(&mut render, entity);
-				render.into_string()
+				AnsiTermRenderer::new()
+					.with_style_map(custom_map)
+					.render(&walker, entity)
+					.to_string()
 			})
 			.unwrap()
 			.xpect_contains("\x1b[")

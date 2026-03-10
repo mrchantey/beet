@@ -380,6 +380,15 @@ impl NodeVisitor for MarkdownRenderer {
 }
 
 
+impl NodeRenderer for MarkdownRenderer {
+	fn render(&mut self, walker: &NodeWalker, entity: Entity) -> RenderOutput {
+		walker.walk(self, entity);
+		RenderOutput::media_string(
+			MediaType::Markdown,
+			std::mem::take(&mut self.state.buffer),
+		)
+	}
+}
 
 
 #[cfg(test)]
@@ -395,9 +404,7 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = MarkdownRenderer::new();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				MarkdownRenderer::new().render(&walker, entity).to_string()
 			})
 			.unwrap()
 	}
@@ -412,9 +419,10 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut render = MarkdownRenderer::new().with_expressions();
-				walker.walk(&mut render, entity);
-				render.into_string()
+				MarkdownRenderer::new()
+					.with_expressions()
+					.render(&walker, entity)
+					.to_string()
 			})
 			.unwrap()
 	}

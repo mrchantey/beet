@@ -1,20 +1,19 @@
 //! Media-type-driven serialization and deserialization.
 //!
-//! Provides free [`serialize`] and [`deserialize`] functions that dispatch
-//! based on a [`MediaType`] value. Use these instead of reaching for
-//! `serde_json` or `postcard` directly when the format is determined at
-//! runtime ie from a `content-type` header.
-//!
-//! # Example
+//! Prefer using [`MediaType::serialize`] and [`MediaType::deserialize`]
+//! directly instead of the free functions in this module:
 //!
 //! ```
 //! # use beet_core::prelude::*;
 //! # #[cfg(feature = "json")] {
-//! let bytes = media_serde::serialize(MediaType::Json, &42u32).unwrap();
-//! let value: u32 = media_serde::deserialize(MediaType::Json, &bytes).unwrap();
+//! let bytes = MediaType::Json.serialize(&42u32).unwrap();
+//! let value: u32 = MediaType::Json.deserialize(&bytes).unwrap();
 //! assert_eq!(value, 42);
 //! # }
 //! ```
+//!
+//! The free [`serialize`] and [`deserialize`] functions are kept for
+//! cases where a standalone function reference is convenient.
 use crate::prelude::*;
 
 /// Serialize `value` into bytes using the given MIME type's format.

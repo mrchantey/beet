@@ -6,9 +6,11 @@ pub use html::*;
 mod markdown;
 #[cfg(feature = "markdown_parser")]
 pub use markdown::*;
+mod media;
 mod node_parser;
 mod plaintext;
 mod span_tracker;
+pub use media::*;
 pub use node_parser::*;
 pub use plaintext::*;
 pub use span_tracker::*;

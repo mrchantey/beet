@@ -1,6 +1,0 @@
-
-
-
-pub struct MediaParser{
-	
-}

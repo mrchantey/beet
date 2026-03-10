@@ -1,5 +1,9 @@
 mod html;
 pub use html::*;
+mod media;
+pub use media::*;
+mod node_renderer;
+pub use node_renderer::*;
 mod node_walker;
 pub use node_walker::*;
 mod text_render_state;
