@@ -171,6 +171,23 @@ where
 		self.inner.get(key).and_then(|values| values.first())
 	}
 
+	/// Get the first value matching any of the provided keys.
+	pub fn get_multikey<'a, Q>(
+		&self,
+		keys: impl IntoIterator<Item = &'a Q>,
+	) -> Option<&V>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized + 'a,
+	{
+		for key in keys.into_iter() {
+			if let Some(value) = self.get(key) {
+				return Some(value);
+			}
+		}
+		None
+	}
+
 	/// Get all values for a key.
 	pub fn get_vec<Q>(&self, key: &Q) -> Option<&Vec<V>>
 	where

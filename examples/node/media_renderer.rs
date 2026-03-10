@@ -1,29 +1,45 @@
 //! The [`MediaRenderer`] will select the best renderer based on a
 //! list of accepted [`MediaType`].
+//!
+//!
+//! ```sh
+//! # ansi-term
+//! cargo run --example media_renderer -- --media-type text/ansi-term
+//! # html
+//! cargo run --example media_renderer -- --media-type text/html
+//! # markdown
+//! cargo run --example media_renderer -- --media-type text/markdown
+//! ```
 use beet::prelude::*;
 
 fn main() {
 	let mut world = World::new();
 	let entity = world.spawn_empty().id();
 	let md_bytes = MediaBytes::markdown(MARKDOWN);
+
+	// 1. Load the markdown into ecs
 	MarkdownParser::new()
 		.parse(ParseContext::new(&mut world.entity_mut(entity), &md_bytes))
 		.unwrap();
 
 	let output = world
 		.run_system_once(move |walker: NodeWalker| {
+			// 2. Get the requested media type
 			let args = CliArgs::parse_env();
-
 			let media_type: MediaType = args
 				.params
-				.get("media-type")
-				.or_else(|| args.params.get("t"))
+				.get_multikey(["media-type", "t"])
 				.map(|val| val.parse().unwrap())
 				.unwrap_or(MediaType::AnsiTerm);
 
-			let cx = RenderContext::new(entity, &walker)
-				.with_accepts(vec![media_type]);
-			MediaRenderer::default().render(&cx).unwrap().to_string()
+			// 3. Render to the requested media type
+			MediaRenderer::default()
+				.render(
+					&RenderContext::new(entity, &walker)
+						.with_accepts(vec![media_type]),
+				)
+				.unwrap()
+				.to_string()
 		})
 		.unwrap();
 	println!("{output}");
