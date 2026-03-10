@@ -39,6 +39,33 @@ impl<'a> MediaBytes<'a> {
 		}
 	}
 
+	/// Create [`MediaBytes`] with [`MediaType::Html`].
+	pub fn html(html: &'a str) -> Self { Self::from_str(MediaType::Html, html) }
+
+	/// Create [`MediaBytes`] with [`MediaType::Text`].
+	pub fn text(text: &'a str) -> Self { Self::from_str(MediaType::Text, text) }
+
+	/// Create [`MediaBytes`] with [`MediaType::Bytes`].
+	pub fn octet(bytes: impl Into<Cow<'a, [u8]>>) -> Self {
+		Self::new(MediaType::Bytes, bytes)
+	}
+
+	/// Create [`MediaBytes`] with [`MediaType::Markdown`].
+	pub fn markdown(text: &'a str) -> Self {
+		Self::from_str(MediaType::Markdown, text)
+	}
+
+	/// Create [`MediaBytes`] with [`MediaType::Json`].
+	pub fn json(text: &'a str) -> Self { Self::from_str(MediaType::Json, text) }
+
+	/// Create [`MediaBytes`] with [`MediaType::Css`].
+	pub fn css(text: &'a str) -> Self { Self::from_str(MediaType::Css, text) }
+
+	/// Create [`MediaBytes`] with [`MediaType::Javascript`].
+	pub fn javascript(text: &'a str) -> Self {
+		Self::from_str(MediaType::Javascript, text)
+	}
+
 	/// The media type of these bytes.
 	pub fn media_type(&self) -> &MediaType { &self.media_type }
 
@@ -46,9 +73,7 @@ impl<'a> MediaBytes<'a> {
 	pub fn bytes(&self) -> &[u8] { &self.bytes }
 
 	/// Try to interpret the bytes as a UTF-8 string slice.
-	pub fn as_str(&self) -> Option<&str> {
-		core::str::from_utf8(&self.bytes).ok()
-	}
+	pub fn as_utf8(&self) -> Result<&str> { core::str::from_utf8(&self.bytes)?.xok() }
 
 	/// Convert into an owned `MediaBytes<'static>`, cloning the bytes if needed.
 	pub fn into_owned(self) -> MediaBytes<'static> {
@@ -117,20 +142,54 @@ mod test {
 			MediaType::Html,
 			Vec::from(b"<p>hi</p>".as_slice()),
 		);
-		mb.as_str().unwrap().xpect_eq("<p>hi</p>");
+		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
 	}
 
 	#[test]
 	fn from_str_ctor() {
 		let mb = MediaBytes::from_str(MediaType::Text, "hello");
-		mb.as_str().unwrap().xpect_eq("hello");
+		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
 	#[test]
 	fn from_string_ctor() {
 		let mb =
 			MediaBytes::from_string(MediaType::Html, "<b>bold</b>".to_string());
-		mb.as_str().unwrap().xpect_eq("<b>bold</b>");
+		mb.as_utf8().unwrap().xpect_eq("<b>bold</b>");
+	}
+
+	#[test]
+	fn html_helper() {
+		let mb = MediaBytes::html("<p>hi</p>");
+		mb.media_type().xpect_eq(MediaType::Html);
+		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
+	}
+
+	#[test]
+	fn text_helper() {
+		let mb = MediaBytes::text("hello");
+		mb.media_type().xpect_eq(MediaType::Text);
+		mb.as_utf8().unwrap().xpect_eq("hello");
+	}
+
+	#[test]
+	fn octet_helper() {
+		let mb = MediaBytes::octet(vec![0xFF, 0xFE]);
+		mb.media_type().xpect_eq(MediaType::Bytes);
+		mb.bytes().xpect_eq(&[0xFF, 0xFE]);
+	}
+
+	#[test]
+	fn markdown_helper() {
+		let mb = MediaBytes::markdown("# Title");
+		mb.media_type().xpect_eq(MediaType::Markdown);
+		mb.as_utf8().unwrap().xpect_eq("# Title");
+	}
+
+	#[test]
+	fn as_utf8_invalid() {
+		let mb = MediaBytes::new(MediaType::Bytes, vec![0xFF, 0xFE]);
+		mb.as_utf8().xpect_err();
 	}
 
 	#[test]

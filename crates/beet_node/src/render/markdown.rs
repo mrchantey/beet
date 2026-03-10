@@ -381,7 +381,11 @@ impl NodeVisitor for MarkdownRenderer {
 
 
 impl NodeRenderer for MarkdownRenderer {
-	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+	fn render(
+		&mut self,
+		cx: &RenderContext,
+	) -> Result<RenderOutput, RenderError> {
+		cx.check_accepts(&[MediaType::Markdown])?;
 		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Markdown,
@@ -400,7 +404,7 @@ mod test {
 	fn roundtrip(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
+		let bytes = MediaBytes::markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -419,7 +423,7 @@ mod test {
 	fn roundtrip_expressions(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
+		let bytes = MediaBytes::markdown(md);
 		MarkdownParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

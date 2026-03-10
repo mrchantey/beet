@@ -6,6 +6,7 @@
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
 
 use crate::prelude::*;
+#[allow(unused_imports)]
 use beet_core::prelude::*;
 
 /// A [`NodeRenderer`] that selects the appropriate format-specific renderer
@@ -25,6 +26,21 @@ pub struct MediaRenderer {
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "ansi_term")]
 	ansi_term_renderer: AnsiTermRenderer,
+}
+
+impl Default for MediaRenderer {
+	fn default() -> Self {
+		#[cfg(feature = "markdown_parser")]
+		let default_media_type = MediaType::Markdown;
+		#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
+		let default_media_type = MediaType::Html;
+		#[cfg(all(
+			not(feature = "markdown_parser"),
+			not(feature = "html_parser")
+		))]
+		let default_media_type = MediaType::Text;
+		Self::new(default_media_type)
+	}
 }
 
 impl MediaRenderer {
@@ -90,31 +106,54 @@ impl MediaRenderer {
 	/// Returns the default media type.
 	pub fn default_media_type(&self) -> &MediaType { &self.default_media_type }
 
-	/// Render using a specific media type, ignoring `accepts`.
-	fn render_media_type(
+	/// Try to render using a specific media type, ignoring `accepts`.
+	///
+	/// Returns `Ok(Some(output))` on success, `Ok(None)` if no renderer
+	/// handles the type, or `Err` on render failure.
+	///
+	/// Sub-renderers are called with an empty `accepts` list so they
+	/// skip their own accept negotiation — `MediaRenderer` has already
+	/// selected the correct renderer.
+	fn try_render_media_type(
 		&mut self,
 		cx: &RenderContext,
 		media_type: &MediaType,
-	) -> Option<Result<RenderOutput>> {
+	) -> Result<Option<RenderOutput>, RenderError> {
+		// Build a context with empty accepts so sub-renderers don't
+		// reject based on the original accepts list.
+		let inner_cx = RenderContext::new(cx.entity, cx.walker);
 		match media_type {
-			MediaType::Text => Some(self.plain_text_renderer.render(cx)),
-			MediaType::Html => Some(self.html_renderer.render(cx)),
-			MediaType::Markdown => Some(self.markdown_renderer.render(cx)),
+			MediaType::Text => {
+				self.plain_text_renderer.render(&inner_cx).map(Some)
+			}
+			MediaType::Html => self.html_renderer.render(&inner_cx).map(Some),
+			MediaType::Markdown => {
+				self.markdown_renderer.render(&inner_cx).map(Some)
+			}
 			#[cfg(feature = "ansi_term")]
-			// ansi_term renders as text/plain with ANSI escape codes
-			_ if *media_type == MediaType::Text => {
-				Some(self.ansi_term_renderer.render(cx))
-			}
+			MediaType::AnsiTerm => self.ansi_term_renderer.render(&inner_cx).map(Some),
 			other if self.plaintext_fallback && other.is_text() => {
-				Some(self.plain_text_renderer.render(cx))
+				self.plain_text_renderer.render(&inner_cx).map(Some)
 			}
-			_ => None,
+			_ => Ok(None),
 		}
+	}
+
+	/// The list of media type this renderer can produce.
+	fn available_types(&self) -> Vec<MediaType> {
+		let mut available =
+			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
+		#[cfg(feature = "ansi_term")]
+		available.push(MediaType::AnsiTerm);
+		available
 	}
 }
 
 impl NodeRenderer for MediaRenderer {
-	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+	fn render(
+		&mut self,
+		cx: &RenderContext,
+	) -> Result<RenderOutput, RenderError> {
 		// Resolve the list of types to try: accepts list, or fallback to default.
 		// Collect into an owned Vec to avoid holding a borrow on `self` during
 		// the mutable dispatch calls below.
@@ -125,19 +164,15 @@ impl NodeRenderer for MediaRenderer {
 		};
 
 		for media_type in &candidates {
-			if let Some(result) = self.render_media_type(cx, media_type) {
-				return result;
+			if let Some(output) = self.try_render_media_type(cx, media_type)? {
+				return Ok(output);
 			}
 		}
 
-		// Nothing matched — report what was requested vs what is available.
-		let available =
-			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
-		bevybail!(
-			"no renderer available for any of the requested types: {:?}, available: {:?}",
-			candidates,
-			available
-		)
+		Err(RenderError::AcceptMismatch {
+			requested: candidates,
+			available: self.available_types(),
+		})
 	}
 }
 
@@ -171,7 +206,7 @@ mod test {
 	fn render_html() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
+		let bytes = MediaBytes::html("<div>hello</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -185,7 +220,7 @@ mod test {
 	fn render_plain_text() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, "<p>hello</p>");
+		let bytes = MediaBytes::html("<p>hello</p>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -199,7 +234,7 @@ mod test {
 	fn render_markdown() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Title");
+		let bytes = MediaBytes::markdown("# Title");
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -215,7 +250,7 @@ mod test {
 	fn fallback_text_type() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, "<p>hello</p>");
+		let bytes = MediaBytes::html("<p>hello</p>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -229,7 +264,7 @@ mod test {
 	fn accepts_priority() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hi</div>");
+		let bytes = MediaBytes::html("<div>hi</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -241,13 +276,14 @@ mod test {
 		.xpect_eq("<div>hi</div>".to_string());
 	}
 
-	/// When no type in `accepts` matches and fallback is disabled, errors.
+	/// When no type in `accepts` matches and fallback is disabled, errors
+	/// with [`RenderError::AcceptMismatch`].
 	#[cfg(feature = "html_parser")]
 	#[test]
 	fn no_match_errors() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hi</div>");
+		let bytes = MediaBytes::html("<div>hi</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -259,7 +295,10 @@ mod test {
 				let result = MediaRenderer::new(MediaType::Text)
 					.without_fallback()
 					.render(&cx);
-				result.is_err().xpect_true();
+				match result {
+					Err(RenderError::AcceptMismatch { .. }) => {}
+					other => panic!("expected AcceptMismatch, got {other:?}"),
+				}
 			})
 			.unwrap();
 	}

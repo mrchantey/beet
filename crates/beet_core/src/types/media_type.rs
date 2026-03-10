@@ -119,6 +119,10 @@ pub enum MediaType {
 	Sql,
 	/// `application/graphql`
 	GraphQl,
+	// Custom types
+	/// `text/ansi-term`, plaintext annotated with
+	/// Ansi escape sequences for pretty terminal output
+	AnsiTerm,
 	/// An unrecognized media type.
 	Other(String),
 }
@@ -178,6 +182,7 @@ impl MediaType {
 	const JAVA: &'static str = "text/x-java";
 	const SQL: &'static str = "application/sql";
 	const GRAPHQL: &'static str = "application/graphql";
+	const ANSI_TERM: &'static str = "text/ansi-term";
 
 	/// Parse a media type from a content-type string.
 	///
@@ -248,6 +253,7 @@ impl MediaType {
 			val if val.contains(Self::JAVA) => MediaType::Java,
 			val if val.contains(Self::SQL) => MediaType::Sql,
 			val if val.contains(Self::GRAPHQL) => MediaType::GraphQl,
+			val if val.contains(Self::ANSI_TERM) => MediaType::AnsiTerm,
 			other => MediaType::Other(other.to_string()),
 		}
 	}
@@ -404,6 +410,7 @@ impl MediaType {
 			MediaType::Java => Self::JAVA,
 			MediaType::Sql => Self::SQL,
 			MediaType::GraphQl => Self::GRAPHQL,
+			MediaType::AnsiTerm => Self::ANSI_TERM,
 			MediaType::Other(val) => val.as_str(),
 		}
 	}
@@ -438,6 +445,7 @@ impl MediaType {
 				| MediaType::C
 				| MediaType::Cpp
 				| MediaType::Java
+				| MediaType::AnsiTerm
 		)
 	}
 }
@@ -679,6 +687,7 @@ mod test {
 			MediaType::Yaml,
 			MediaType::Csv,
 			MediaType::Toml,
+			MediaType::AnsiTerm,
 		];
 		for media_type in types {
 			MediaType::from_content_type(media_type.as_str())

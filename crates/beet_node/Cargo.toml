@@ -29,6 +29,7 @@ serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 nu-ansi-term = { workspace = true, optional = true }
+thiserror.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

@@ -13,7 +13,7 @@ pub async fn media_exchange(
 	render_target: &mut EntityWorldMut<'_>,
 	mut request: Request,
 ) -> Result<Response> {
-	let outer_accept = request
+	let _outer_accept = request
 		.headers
 		.get::<header::Accept>()
 		.map(|headers| headers.ok())

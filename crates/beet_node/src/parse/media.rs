@@ -70,10 +70,7 @@ impl Default for MediaParser {
 }
 
 impl NodeParser for MediaParser {
-	fn parse(
-		&mut self,
-		cx: ParseContext,
-	) -> Result<(), ParseError> {
+	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type().clone();
 		match media_type {
 			MediaType::Text => self.plain_text_parser.parse(cx),
@@ -107,7 +104,7 @@ mod test {
 
 	#[test]
 	fn parse_plain_text() {
-		let bytes = MediaBytes::from_str(MediaType::Text, "hello");
+		let bytes = MediaBytes::text("hello");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -124,7 +121,7 @@ mod test {
 	#[cfg(feature = "html_parser")]
 	#[test]
 	fn parse_html() {
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
+		let bytes = MediaBytes::html("<div>hello</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -140,7 +137,7 @@ mod test {
 	#[cfg(feature = "markdown_parser")]
 	#[test]
 	fn parse_markdown() {
-		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Title");
+		let bytes = MediaBytes::markdown("# Title");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -161,8 +158,7 @@ mod test {
 	fn fallback_text_type() {
 		// CSS has no dedicated parser but is a text type,
 		// so it should fall back to plain text.
-		let bytes =
-			MediaBytes::from_str(MediaType::Css, "body { color: red; }");
+		let bytes = MediaBytes::css("body { color: red; }");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -178,7 +174,7 @@ mod test {
 
 	#[test]
 	fn no_fallback_errors() {
-		let bytes = MediaBytes::from_str(MediaType::Css, "body {}");
+		let bytes = MediaBytes::css("body {}");
 		MediaParser::new()
 			.without_fallback()
 			.parse(ParseContext::new(&mut World::new().spawn_empty(), &bytes))

@@ -2,6 +2,8 @@ mod html;
 pub use html::*;
 mod media;
 pub use media::*;
+mod plaintext;
+pub use plaintext::*;
 mod node_renderer;
 pub use node_renderer::*;
 mod node_walker;

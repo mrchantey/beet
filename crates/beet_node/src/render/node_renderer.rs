@@ -1,5 +1,21 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use thiserror::Error;
+
+/// Renders an entity tree into a [`RenderOutput`].
+///
+/// Implementors walk the entity tree rooted at `cx.entity` using
+/// `cx.walker` and produce either serialized [`MediaBytes`] or a
+/// [`RenderOutput::Stateful`] signal for persistent renderers.
+pub trait NodeRenderer {
+	/// Render the entity tree described by `cx`.
+	fn render(
+		&mut self,
+		cx: &RenderContext,
+	) -> Result<RenderOutput, RenderError>;
+}
+
+
 
 /// Context passed to [`NodeRenderer::render`].
 pub struct RenderContext<'a> {
@@ -27,19 +43,54 @@ impl<'a> RenderContext<'a> {
 		self.accepts = accepts;
 		self
 	}
+
+	/// Check whether the `accepts` list is compatible with the given
+	/// `available` media type.
+	///
+	/// Returns `Ok(())` if `accepts` is empty (meaning any type is fine)
+	/// or if at least one entry in `accepts` matches one of `available`.
+	/// Otherwise returns [`RenderError::AcceptMismatch`].
+	pub fn check_accepts(
+		&self,
+		available: &[MediaType],
+	) -> Result<(), RenderError> {
+		if self.accepts.is_empty() {
+			return Ok(());
+		}
+		if self.accepts.iter().any(|mt| available.contains(mt)) {
+			return Ok(());
+		}
+		Err(RenderError::AcceptMismatch {
+			requested: self.accepts.clone(),
+			available: available.to_vec(),
+		})
+	}
 }
 
-/// Renders an entity tree into a [`RenderOutput`].
-///
-/// Implementors walk the entity tree rooted at `cx.entity` using
-/// `cx.walker` and produce either serialized [`MediaBytes`] or a
-/// [`RenderOutput::Stateful`] signal for persistent renderers.
-pub trait NodeRenderer {
-	/// Render the entity tree described by `cx`.
-	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput>;
+/// Error returned by [`NodeRenderer::render`].
+#[derive(Debug, Error)]
+pub enum RenderError {
+	/// The renderer does not support any of the requested media type.
+	#[error(
+		"accept mismatch: requested {requested:?}, available {available:?}"
+	)]
+	AcceptMismatch {
+		/// The media type requested by the caller.
+		requested: Vec<MediaType>,
+		/// The media type this renderer can produce.
+		available: Vec<MediaType>,
+	},
+	/// Any other render failure.
+	#[error("{0}")]
+	Other(BevyError),
+}
+
+impl From<BevyError> for RenderError {
+	fn from(err: BevyError) -> Self { RenderError::Other(err) }
 }
 
 /// The result of a [`NodeRenderer::render`] call.
+#[derive(Debug)]
 pub enum RenderOutput {
 	/// The render produced typed bytes, ie html, markdown, json.
 	Media(MediaBytes<'static>),
@@ -53,16 +104,6 @@ impl RenderOutput {
 	/// media type and UTF-8 string content.
 	pub fn media_string(media_type: MediaType, content: String) -> Self {
 		Self::Media(MediaBytes::from_string(media_type, content))
-	}
-
-	/// Try to interpret the media bytes as a UTF-8 string.
-	///
-	/// Returns `None` for non-media variants or invalid UTF-8.
-	pub fn as_str(&self) -> Option<&str> {
-		match self {
-			Self::Media(mb) => mb.as_str(),
-			Self::Stateful => None,
-		}
 	}
 
 	/// Returns the inner [`MediaBytes`] if this is a [`RenderOutput::Media`].
@@ -123,14 +164,8 @@ mod test {
 	#[test]
 	fn as_str_media() {
 		RenderOutput::media_string(MediaType::Text, "hello".into())
-			.as_str()
-			.unwrap()
+			.to_string()
 			.xpect_eq("hello");
-	}
-
-	#[test]
-	fn as_str_non_media() {
-		RenderOutput::Stateful.as_str().is_none().xpect_true();
 	}
 
 	#[test]

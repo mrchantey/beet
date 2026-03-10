@@ -1201,6 +1201,7 @@ dependencies = [
  "nu-ansi-term",
  "pulldown-cmark",
  "serde",
+ "thiserror 1.0.69",
  "winnow",
 ]
 

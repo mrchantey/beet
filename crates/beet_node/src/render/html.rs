@@ -219,7 +219,11 @@ impl NodeVisitor for HtmlRenderer {
 
 
 impl NodeRenderer for HtmlRenderer {
-	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+	fn render(
+		&mut self,
+		cx: &RenderContext,
+	) -> Result<RenderOutput, RenderError> {
+		cx.check_accepts(&[MediaType::Html])?;
 		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
 			MediaType::Html,
@@ -258,7 +262,7 @@ mod test {
 	fn roundtrip(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		let bytes = MediaBytes::html(html);
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -276,7 +280,7 @@ mod test {
 	fn roundtrip_expressions(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		let bytes = MediaBytes::html(html);
 		HtmlParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

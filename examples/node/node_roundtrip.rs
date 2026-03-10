@@ -3,7 +3,7 @@ use beet::prelude::*;
 fn main() {
 	let mut world = World::new();
 	let entity = world.spawn_empty().id();
-	let md_bytes = MediaBytes::from_str(MediaType::Markdown, MARKDOWN);
+	let md_bytes = MediaBytes::markdown(MARKDOWN);
 	MarkdownParser::new()
 		.parse(ParseContext::new(&mut world.entity_mut(entity), &md_bytes))
 		.unwrap();
@@ -12,24 +12,19 @@ fn main() {
 		.run_system_once(move |walker: NodeWalker| {
 			let args = CliArgs::parse_env();
 
-			// If --media-type or -t is provided, use MediaRenderer.
-			// Otherwise default to AnsiTermRenderer for terminal output.
-			if let Some(type_str) = args
+			let media_type: MediaType = args
 				.params
 				.get("media-type")
 				.or_else(|| args.params.get("t"))
-			{
-				let media_type: MediaType = type_str.parse().unwrap();
-				let cx = RenderContext::new(entity, &walker)
-					.with_accepts(vec![media_type.clone()]);
-				MediaRenderer::new(media_type)
-					.render(&cx)
-					.unwrap()
-					.to_string()
-			} else {
-				let cx = RenderContext::new(entity, &walker);
-				AnsiTermRenderer::new().render(&cx).unwrap().to_string()
-			}
+				.map(|val| val.parse().unwrap())
+				.unwrap_or(MediaType::AnsiTerm);
+
+			let cx = RenderContext::new(entity, &walker)
+				.with_accepts(vec![media_type.clone()]);
+			MediaRenderer::new(media_type)
+				.render(&cx)
+				.unwrap()
+				.to_string()
 		})
 		.unwrap();
 	println!("{output}");

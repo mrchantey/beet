@@ -139,7 +139,7 @@ impl NodeParser for HtmlParser {
 				supported: vec![MediaType::Html],
 			});
 		}
-		let text = core::str::from_utf8(cx.bytes.bytes())?;
+		let text = cx.bytes.as_utf8()?;
 		let id = cx.entity.id();
 		cx.entity
 			.world_scope(|world| {
@@ -227,7 +227,7 @@ mod test {
 
 	/// Parse HTML bytes into a freshly spawned entity, returning the entity ref.
 	fn parse_html(entity: &mut EntityWorldMut<'_>, html: &str) {
-		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		let bytes = MediaBytes::html(html);
 		HtmlParser::new()
 			.parse(ParseContext::new(entity, &bytes))
 			.unwrap();
@@ -239,7 +239,7 @@ mod test {
 		html: &str,
 		path: &str,
 	) {
-		let bytes = MediaBytes::from_str(MediaType::Html, html);
+		let bytes = MediaBytes::html(html);
 		HtmlParser::new()
 			.parse(
 				ParseContext::new(entity, &bytes)
@@ -290,8 +290,7 @@ mod test {
 
 	#[test]
 	fn parse_with_expressions() {
-		let bytes =
-			MediaBytes::from_str(MediaType::Html, "<p>hello {name}</p>");
+		let bytes = MediaBytes::html("<p>hello {name}</p>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -364,7 +363,7 @@ mod test {
 			},
 			..default()
 		};
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>42</div>");
+		let bytes = MediaBytes::html("<div>42</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -422,7 +421,7 @@ mod test {
 
 	#[test]
 	fn reparse_unchanged_no_change() {
-		let bytes = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
+		let bytes = MediaBytes::html("<div>hello</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -437,8 +436,8 @@ mod test {
 
 	#[test]
 	fn reparse_changed_content() {
-		let bytes_a = MediaBytes::from_str(MediaType::Html, "<div>hello</div>");
-		let bytes_b = MediaBytes::from_str(MediaType::Html, "<div>world</div>");
+		let bytes_a = MediaBytes::html("<div>hello</div>");
+		let bytes_b = MediaBytes::html("<div>world</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -554,7 +553,7 @@ mod test {
 
 	#[test]
 	fn expression_node_span() {
-		let bytes = MediaBytes::from_str(MediaType::Html, "<p>{name}</p>");
+		let bytes = MediaBytes::html("<p>{name}</p>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -586,8 +585,7 @@ mod test {
 	fn parse_markdown_text_nodes() {
 		// The div contains markdown text "**bold**" which should
 		// be re-parsed into <p><strong>bold</strong></p>
-		let bytes =
-			MediaBytes::from_str(MediaType::Html, "<div>**bold**</div>");
+		let bytes = MediaBytes::html("<div>**bold**</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {
@@ -613,8 +611,7 @@ mod test {
 		// get wrapped in a <p> element by the markdown parser.
 		// "hello world" parsed as markdown becomes <p>hello world</p>
 		// so the original text node is replaced with structure.
-		let bytes =
-			MediaBytes::from_str(MediaType::Html, "<div>hello world</div>");
+		let bytes = MediaBytes::html("<div>hello world</div>");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {

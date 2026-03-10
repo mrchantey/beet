@@ -134,10 +134,7 @@ impl MarkdownParser {
 }
 
 impl NodeParser for MarkdownParser {
-	fn parse(
-		&mut self,
-		cx: ParseContext,
-	) -> Result<(), ParseError> {
+	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type();
 		if *media_type != MediaType::Markdown {
 			return Err(ParseError::UnsupportedType {
@@ -145,15 +142,13 @@ impl NodeParser for MarkdownParser {
 				supported: vec![MediaType::Markdown],
 			});
 		}
-		let text = core::str::from_utf8(cx.bytes.bytes()).map_err(|err| {
-			ParseError::Other(bevyhow!("invalid utf-8: {err}"))
-		})?;
+		let text = cx.bytes.as_utf8()?;
 		let id = cx.entity.id();
 		cx.entity
 			.world_scope(|world| {
 				self.parse_text(world, id, text, cx.path.as_ref())
-			})
-			.map_err(ParseError::Other)
+			})?
+			.xok()
 	}
 }
 
@@ -169,7 +164,7 @@ mod test {
 
 	/// Parse markdown bytes into an entity.
 	fn parse_md(entity: &mut EntityWorldMut, md: &str) {
-		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
+		let bytes = MediaBytes::markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(entity, &bytes))
 			.unwrap();
@@ -177,7 +172,7 @@ mod test {
 
 	/// Parse markdown with a path for span tracking.
 	fn parse_md_with_path(entity: &mut EntityWorldMut, md: &str, path: &str) {
-		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
+		let bytes = MediaBytes::markdown(md);
 		MarkdownParser::new()
 			.parse(
 				ParseContext::new(entity, &bytes)
@@ -357,8 +352,7 @@ mod test {
 
 	#[test]
 	fn reparse_unchanged_no_change() {
-		let bytes =
-			MediaBytes::from_str(MediaType::Markdown, "# Title\n\nParagraph");
+		let bytes = MediaBytes::markdown("# Title\n\nParagraph");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {

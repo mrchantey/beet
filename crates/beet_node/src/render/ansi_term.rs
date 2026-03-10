@@ -358,10 +358,14 @@ impl NodeVisitor for AnsiTermRenderer {
 }
 
 impl NodeRenderer for AnsiTermRenderer {
-	fn render(&mut self, cx: &RenderContext) -> Result<RenderOutput> {
+	fn render(
+		&mut self,
+		cx: &RenderContext,
+	) -> Result<RenderOutput, RenderError> {
+		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
 		cx.walker.walk(self, cx.entity);
 		RenderOutput::media_string(
-			MediaType::Text,
+			MediaType::AnsiTerm,
 			std::mem::take(&mut self.state.buffer),
 		)
 		.xok()
@@ -429,7 +433,7 @@ mod test {
 	fn render(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Markdown, md);
+		let bytes = MediaBytes::markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -601,7 +605,7 @@ mod test {
 	fn custom_style_map() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::from_str(MediaType::Markdown, "# Hello");
+		let bytes = MediaBytes::markdown("# Hello");
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
