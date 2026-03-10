@@ -16,13 +16,7 @@ use std::borrow::Cow;
 /// as [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnsiTermRenderer {
-	/// Explicit element-name → style mapping.
-	style_map: HashMap<Cow<'static, str>, Style>,
-	/// Fallback mapping: if an element is missing from `style_map`,
-	/// look up its association here and use that element's style instead.
-	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
-	/// Style used when no mapping or association is found.
-	default_style: Style,
+	style_map: StyleMap<Style>,
 	/// Whether to clear the terminal before rendering.
 	clear_on_render: bool,
 	/// A string prepended to the buffer, defaults to `\n`
@@ -33,8 +27,6 @@ pub struct AnsiTermRenderer {
 	heading_hashes: bool,
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
-	/// Stack of active styles so nested elements restore correctly.
-	style_stack: Vec<Style>,
 }
 
 impl Default for AnsiTermRenderer {
@@ -44,39 +36,18 @@ impl Default for AnsiTermRenderer {
 impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
-			style_map: default_style_map(),
-			default_associations: default_associations(),
-			default_style: Style::default(),
+			style_map: StyleMap::new(Style::default(), default_style_map()),
 			clear_on_render: true,
 			prefix: "\n".into(),
 			render_expressions: false,
 			heading_hashes: false,
 			state: TextRenderState::new(),
-			style_stack: Vec::new(),
 		}
 	}
 
 	/// Override the element → style mapping.
-	pub fn with_style_map(
-		mut self,
-		map: HashMap<Cow<'static, str>, Style>,
-	) -> Self {
+	pub fn with_style_map(mut self, map: StyleMap<Style>) -> Self {
 		self.style_map = map;
-		self
-	}
-
-	/// Override the fallback association mapping.
-	pub fn with_default_associations(
-		mut self,
-		map: HashMap<Cow<'static, str>, Cow<'static, str>>,
-	) -> Self {
-		self.default_associations = map;
-		self
-	}
-
-	/// Override the default style used when no mapping is found.
-	pub fn with_default_style(mut self, style: Style) -> Self {
-		self.default_style = style;
 		self
 	}
 
@@ -104,36 +75,11 @@ impl AnsiTermRenderer {
 	/// Borrow the accumulated string.
 	pub fn as_str(&self) -> &str { &self.state.buffer }
 
-	/// Resolve the style for an element name, walking through
-	/// associations if needed.
-	fn resolve_style(&self, name: &str) -> Style {
-		let lower = name.to_ascii_lowercase();
 
-		// direct lookup
-		if let Some(style) = self.style_map.get(lower.as_str()) {
-			return *style;
-		}
-
-		// association fallback (one level deep to avoid cycles)
-		if let Some(assoc) = self.default_associations.get(lower.as_str()) {
-			if let Some(style) = self.style_map.get(assoc.as_ref()) {
-				return *style;
-			}
-		}
-
-		self.default_style
-	}
-
-	fn current_style(&self) -> Style {
-		self.style_stack
-			.last()
-			.copied()
-			.unwrap_or(self.default_style)
-	}
 
 	/// Write styled text to the buffer.
 	fn push_styled(&mut self, text: &str) {
-		let style = self.current_style();
+		let style = self.style_map.current();
 		let painted = format!("{}", style.paint(text));
 		self.state.push_raw(&painted);
 		// push_raw tracks trailing_newline from the painted string, but the
@@ -163,8 +109,7 @@ impl NodeVisitor for AnsiTermRenderer {
 		attrs: Vec<(Entity, &Attribute, &Value)>,
 	) {
 		let name = element.name().to_ascii_lowercase();
-		let style = self.resolve_style(&name);
-		self.style_stack.push(style);
+		self.style_map.push(&name);
 
 		match name.as_str() {
 			// ── Headings ──
@@ -306,7 +251,7 @@ impl NodeVisitor for AnsiTermRenderer {
 			"img" => {
 				let src = self.state.image_src.take().unwrap_or_default();
 				let alt = self.state.image_alt.take().unwrap_or_default();
-				let style = self.current_style();
+				let style = self.style_map.current();
 				let display = if alt.is_empty() {
 					format!("[image: {src}]")
 				} else {
@@ -327,7 +272,7 @@ impl NodeVisitor for AnsiTermRenderer {
 			}
 		}
 
-		self.style_stack.pop();
+		self.style_map.pop();
 	}
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
@@ -392,7 +337,7 @@ impl NodeRenderer for AnsiTermRenderer {
 }
 
 
-fn default_style_map() -> HashMap<Cow<'static, str>, Style> {
+fn default_style_map() -> Vec<(&'static str, Style)> {
 	vec![
 		("h1", Style::new().bold().fg(Color::Green)),
 		("h2", Style::new().bold().fg(Color::Cyan)),
@@ -412,36 +357,8 @@ fn default_style_map() -> HashMap<Cow<'static, str>, Style> {
 		("img", Style::new().fg(Color::Magenta).underline()),
 		("li", Style::default()),
 	]
-	.into_iter()
-	.map(|(k, v)| (Cow::Borrowed(k), v))
-	.collect()
 }
 
-fn default_associations() -> HashMap<Cow<'static, str>, Cow<'static, str>> {
-	vec![
-		("b", "strong"),
-		("i", "em"),
-		("s", "del"),
-		("div", "p"),
-		("span", "p"),
-		("section", "p"),
-		("article", "p"),
-		("aside", "blockquote"),
-		("nav", "p"),
-		("header", "p"),
-		("footer", "p"),
-		("main", "p"),
-		("dt", "strong"),
-		("dd", "p"),
-		("th", "strong"),
-		("td", "p"),
-		("sup", "em"),
-		("sub", "em"),
-	]
-	.into_iter()
-	.map(|(k, v)| (Cow::Borrowed(k), Cow::Borrowed(v)))
-	.collect()
-}
 
 
 #[cfg(test)]
@@ -630,11 +547,11 @@ mod test {
 			.unwrap();
 		world
 			.run_system_once(move |walker: NodeWalker| {
-				let mut custom_map: HashMap<Cow<'static, str>, Style> =
-					HashMap::default();
-				custom_map.insert("h1".into(), Style::new().fg(Color::Red));
 				AnsiTermRenderer::new()
-					.with_style_map(custom_map)
+					.with_style_map(StyleMap::new(Style::default(), vec![(
+						"h1",
+						Style::new().fg(Color::Red),
+					)]))
 					.render(&RenderContext::new(entity, &walker))
 					.unwrap()
 					.to_string()

@@ -12,13 +12,15 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","html_parser","markdown_parser","ansi_term"]
+default = ["std","html_parser","markdown_parser","ansi_term","tui"]
 std = []
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
 ansi_term = ["dep:nu-ansi-term"]
+tui = ["dep:bevy_ratatui", "dep:ratatui"]
+
 
 [dependencies]
 beet_core = { workspace = true }
@@ -30,6 +32,10 @@ winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 nu-ansi-term = { workspace = true, optional = true }
 thiserror.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy_ratatui = {workspace = true, optional=true}
+ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
