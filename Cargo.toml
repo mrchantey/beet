@@ -384,8 +384,8 @@ required-features = ["http_server"]
 # 💡 Examples - Node
 
 [[example]]
-name = "node_roundtrip"
-path = "examples/node/node_roundtrip.rs"
+name = "media_renderer"
+path = "examples/node/media_renderer.rs"
 required-features = ["node"]
 
 

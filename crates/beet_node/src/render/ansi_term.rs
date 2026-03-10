@@ -22,6 +22,10 @@ pub struct AnsiTermRenderer {
 	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
 	/// Style used when no mapping or association is found.
 	default_style: Style,
+	/// Whether to clear the terminal before rendering.
+	clear_on_render: bool,
+	/// A string prepended to the buffer, defaults to `\n`
+	prefix: Cow<'static, str>,
 	/// Render [`Expression`] values verbatim as `{expr}`.
 	render_expressions: bool,
 	/// Whether to prefix headings with `#` markers.
@@ -42,6 +46,8 @@ impl AnsiTermRenderer {
 			style_map: default_style_map(),
 			default_associations: default_associations(),
 			default_style: Style::default(),
+			clear_on_render: true,
+			prefix: "\n".into(),
 			render_expressions: false,
 			heading_hashes: false,
 			state: TextRenderState::new(),
@@ -82,6 +88,12 @@ impl AnsiTermRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
+		self
+	}
+
+	/// Override whether to clear the terminal before rendering.
+	pub fn with_clear_on_render(mut self, clear: bool) -> Self {
+		self.clear_on_render = clear;
 		self
 	}
 
@@ -364,6 +376,12 @@ impl NodeRenderer for AnsiTermRenderer {
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
 		cx.walker.walk(self, cx.entity);
+		self.state.buffer.insert_str(0, &self.prefix);
+		if self.clear_on_render {
+			// Clear the terminal before rendering.
+			self.state.buffer.insert_str(0, "\x1b[2J\x1b[H");
+		}
+
 		RenderOutput::media_string(
 			MediaType::AnsiTerm,
 			std::mem::take(&mut self.state.buffer),
