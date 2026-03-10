@@ -18,6 +18,7 @@
 					"features": [
 						"bevy_scene",
 						"json",
+						"_pretty_curl",
 						// "http_server",
 						// "stack",
 						// "server"

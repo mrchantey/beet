@@ -17,8 +17,6 @@
 //! # render as plain text
 //! cargo run --example pretty_curl --features _pretty_curl -- http://example.com --media-type=text/plain
 //! ```
-use beet::net::headers;
-use beet::net::prelude::*;
 use beet::prelude::*;
 
 fn main() {
@@ -43,45 +41,30 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.map(|val| val.parse().unwrap());
 
 		// 1. Fetch the URL
-		let response = Request::get(&url)
+		let media_bytes = Request::get(&url)
 			.send()
 			.await
-			.unwrap_or_else(|err| panic!("Failed to fetch {url}: {err}"));
-
-		assert!(
-			response.status().is_ok(),
-			"HTTP {} for {url}",
-			response.status()
-		);
-
-		// 2. Determine the content media type from the response header
-		let content_type: MediaType = response
-			.parts
-			.headers()
-			.get::<headers::ContentType>()
-			.and_then(|result| result.ok())
-			.unwrap_or(MediaType::Html);
-
-		let body = response
-			.text()
+			.unwrap()
+			// check for 200 response
+			.into_result()
 			.await
-			.unwrap_or_else(|err| panic!("Failed to read body: {err}"));
+			.unwrap()
+			// get body
+			.media_bytes()
+			.await
+			.unwrap();
 
-		// 3. Parse the response body into ECS and render it
+		// 2. Parse the response body into ECS and render it
 		let media_type = render_media_type.unwrap_or(MediaType::AnsiTerm);
 
 		world.with(move |world: &mut World| {
 			let mut entity = world.spawn_empty();
-			let media_bytes =
-				MediaBytes::from_string(content_type.clone(), body);
 
 			MediaParser::new()
 				.parse(ParseContext::new(&mut entity, &media_bytes))
-				.unwrap_or_else(|err| {
-					panic!("Failed to parse {content_type} content: {err}")
-				});
+				.unwrap();
 
-			// 4. Render to the requested media type
+			// 3. Render to the requested media type
 			let output = MediaRenderer::default()
 				.run(&mut entity, vec![media_type])
 				.unwrap()

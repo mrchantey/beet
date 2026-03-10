@@ -1,23 +1,20 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+pub type NodeView<'a> = (
+	Option<&'a Doctype>,
+	Option<&'a Comment>,
+	Option<&'a Element>,
+	Option<&'a Children>,
+	Option<&'a Value>,
+	Option<&'a Expression>,
+);
 
 
 #[derive(SystemParam)]
 pub struct NodeWalker<'w, 's> {
 	// Core node identification
-	nodes: Query<
-		'w,
-		's,
-		(
-			Option<&'static Doctype>,
-			Option<&'static Comment>,
-			Option<&'static Element>,
-			Option<&'static Children>,
-			Option<&'static Value>,
-			Option<&'static Expression>,
-		),
-	>,
+	nodes: Query<'w, 's, NodeView<'static>>,
 	attributes: AttributeQuery<'w, 's>,
 }
 
@@ -42,11 +39,15 @@ impl NodeWalker<'_, '_> {
 	}
 
 	fn walk_entity(&self, visitor: &mut impl NodeVisitor, cx: VisitContext) {
-		let Ok((doctype, comment, element, children, value, expression)) =
-			self.nodes.get(cx.entity)
-		else {
+		let Ok(node) = self.nodes.get(cx.entity) else {
 			return;
 		};
+
+		if visitor.skip_node(&node) {
+			return;
+		}
+
+		let (doctype, comment, element, children, value, expression) = node;
 
 		// 1. Doctype
 		if let Some(doctype) = doctype {
@@ -88,8 +89,21 @@ impl NodeWalker<'_, '_> {
 	}
 }
 
-
 pub trait NodeVisitor {
+	/// Return `true` to skip visiting this node and all its children.
+	/// By default skips all non-visible html tags, ie `head, style, ..`
+	fn skip_node(&mut self, (_, _, element, ..): &NodeView) -> bool {
+		const HIDDEN_HTML_TAGS: &[&str] = &[
+			"head", "script", "style", "template", "noscript", "iframe",
+			"object", "embed",
+		];
+		if let Some(element) = element {
+			HIDDEN_HTML_TAGS.iter().any(|tag| element.name() == *tag)
+		} else {
+			false
+		}
+	}
+
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
 	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}
 	fn visit_element(

@@ -117,6 +117,9 @@ impl HtmlRenderer {
 
 
 impl NodeVisitor for HtmlRenderer {
+	// html renderer visits every node
+	fn skip_node(&mut self, _node: &NodeView) -> bool { false }
+
 	fn visit_doctype(&mut self, _cx: &VisitContext, doctype: &Doctype) {
 		self.write_indent();
 		// The stored value is the raw doctype text, ie `"DOCTYPE html"`.

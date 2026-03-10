@@ -340,6 +340,24 @@ impl Response {
 	/// Consumes the response body and returns it as bytes
 	pub async fn bytes(self) -> Result<Bytes> { self.body.into_bytes().await }
 
+	/// Consumes the response body and returns it as bytes
+	pub async fn bytes_vec(self) -> Result<Vec<u8>> {
+		self.bytes().await.map(|b| b.to_vec())
+	}
+	/// Consumes the response body and returns it as [`MediaBytes`],
+	/// using the [`header::ContentType`], or defaulting to [`MediaType::Bytes`].
+	/// Note, the bytes may be empty.
+	pub async fn media_bytes(self) -> Result<MediaBytes<'static>> {
+		let media_type = self
+			.parts
+			.headers
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok())
+			.unwrap_or(MediaType::Bytes);
+		let bytes = self.bytes_vec().await?;
+		Ok(MediaBytes::new(media_type, bytes))
+	}
+
 	/// Consumes the response body and returns it as a string
 	pub async fn text(self) -> Result<String> { self.body.into_string().await }
 
