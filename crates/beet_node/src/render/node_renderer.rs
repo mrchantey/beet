@@ -53,6 +53,12 @@ impl<'a> RenderContext<'a> {
 		}
 	}
 
+	pub fn entity(&mut self) -> EntityRef<'_> { self.world.entity(self.entity) }
+
+	pub fn entity_mut(&mut self) -> EntityWorldMut<'_> {
+		self.world.entity_mut(self.entity)
+	}
+
 	/// Set the accepted media types.
 	pub fn with_accepts(mut self, accepts: Vec<MediaType>) -> Self {
 		self.accepts = accepts;

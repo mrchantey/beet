@@ -7,12 +7,14 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod input;
 mod parse;
 mod render;
 mod types;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	pub use crate::input::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	pub use crate::types::*;

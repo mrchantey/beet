@@ -5,22 +5,11 @@
 //! mouse is interacting with.
 use beet_core::prelude::*;
 
-/// A terminal cell position.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TuiPos {
-	pub row: u16,
-	pub col: u16,
-}
-
-impl TuiPos {
-	pub fn new(row: u16, col: u16) -> Self { Self { row, col } }
-}
-
 /// Maps terminal cell positions to the entity that rendered content there.
 ///
 /// Cleared and rebuilt each frame by the draw system. The input
 /// system reads it to resolve mouse positions into entity targets.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
 pub struct TuiSpanMap {
 	entries: HashMap<TuiPos, Entity>,
 }
@@ -49,6 +38,18 @@ impl TuiSpanMap {
 	/// Whether the map contains any entries.
 	pub fn is_empty(&self) -> bool { self.entries.is_empty() }
 }
+
+/// A terminal cell position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TuiPos {
+	pub row: u16,
+	pub col: u16,
+}
+
+impl TuiPos {
+	pub fn new(row: u16, col: u16) -> Self { Self { row, col } }
+}
+
 
 #[cfg(test)]
 mod test {

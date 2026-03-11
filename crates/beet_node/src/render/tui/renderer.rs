@@ -84,6 +84,34 @@ impl Default for TuiRenderer {
 	fn default() -> Self { Self::new(Rect::default()) }
 }
 
+
+impl NodeRenderer for TuiRenderer {
+	fn render(
+		&mut self,
+		cx: &mut RenderContext,
+	) -> Result<RenderOutput, RenderError> {
+		cx.check_accepts(&[MediaType::Ratatui])?;
+		let area = cx.world.resource_mut::<RatatuiContext>().get_frame().area();
+		self.reset(area);
+		cx.walk(self);
+		self.flush_spans();
+		let buffer = std::mem::take(&mut self.buf);
+		cx.world
+			.resource_mut::<RatatuiContext>()
+			.draw(|frame| {
+				let _ = std::mem::replace(frame.buffer_mut(), buffer);
+			})
+			.map_err(|err| {
+				bevyhow!("Failed to draw to RatatuiContext: {err}")
+			})?;
+		cx.entity_mut().insert(std::mem::take(&mut self.span_map));
+
+		Ok(RenderOutput::Stateful)
+	}
+}
+
+
+
 impl TuiRenderer {
 	/// Create a new TUI renderer targeting the given area.
 	pub fn new(area: Rect) -> Self {
@@ -526,30 +554,6 @@ impl NodeVisitor for TuiRenderer {
 		} else {
 			self.push_span(Span::styled(text, style), entity);
 		}
-	}
-}
-
-
-impl NodeRenderer for TuiRenderer {
-	fn render(
-		&mut self,
-		cx: &mut RenderContext,
-	) -> Result<RenderOutput, RenderError> {
-		cx.check_accepts(&[MediaType::Ratatui])?;
-		let area = cx.world.resource_mut::<RatatuiContext>().get_frame().area();
-		self.reset(area);
-		cx.walk(self);
-		self.flush_spans();
-		let buffer = std::mem::take(&mut self.buf);
-		cx.world
-			.resource_mut::<RatatuiContext>()
-			.draw(|frame| {
-				let _ = std::mem::replace(frame.buffer_mut(), buffer);
-			})
-			.map_err(|err| {
-				bevyhow!("Failed to draw to RatatuiContext: {err}")
-			})?;
-		Ok(RenderOutput::Stateful)
 	}
 }
 

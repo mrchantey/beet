@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::query::QueryEntityError;
 use std::borrow::Cow;
 
 
@@ -16,6 +17,152 @@ impl Element {
 	pub fn new(name: impl Into<String>) -> Self { Self(name.into()) }
 	/// The tag name of this element, ie `div`, `span`, `p`.
 	pub fn name(&self) -> &str { &self.0 }
+}
+
+#[derive(SystemParam)]
+pub struct ElementQuery<'w, 's> {
+	elements:
+		Query<'w, 's, (Entity, &'static Element, Option<&'static Attributes>)>,
+	attributes: Query<'w, 's, (Entity, &'static Attribute, &'static Value)>,
+}
+
+impl ElementQuery<'_, '_> {
+	pub fn iter(&self) -> impl Iterator<Item = ElementView> {
+		self.elements.iter().map(|(entity, element, attrs)| {
+			let attributes = attrs
+				.map(|attrs| {
+					attrs
+						.iter()
+						.filter_map(|attr| self.attributes.get(attr).ok())
+						.collect()
+				})
+				.unwrap_or_default();
+			ElementView::new(entity, element, attributes)
+		})
+	}
+
+	pub fn get(&self, entity: Entity) -> Result<ElementView, QueryEntityError> {
+		self.elements.get(entity).map(|(entity, element, attrs)| {
+			let attributes = attrs
+				.map(|attrs| {
+					attrs
+						.iter()
+						.filter_map(|attr| self.attributes.get(attr).ok())
+						.collect()
+				})
+				.unwrap_or_default();
+			ElementView::new(entity, element, attributes)
+		})
+	}
+
+	pub fn get_as<'a, T>(&'a self, entity: Entity) -> Result<T>
+	where
+		T: TryFrom<&'a ElementView<'a>, Error = BevyError>,
+	{
+		let element = self.get(entity)?;
+		element.try_as::<T>()
+	}
+}
+
+
+/// Read-only view of an element and its attributes, provided to
+/// [`NodeVisitor::visit_element`] for convenient attribute lookup.
+pub struct ElementView<'a> {
+	/// The entity of this element.
+	pub entity: Entity,
+	/// The element component.
+	pub element: &'a Element,
+	/// Attribute triples `(entity, key, value)` for this element.
+	pub attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+}
+
+impl<'a> ElementView<'a> {
+	/// Create a new view from an element reference and its attributes.
+	pub fn new(
+		entity: Entity,
+		element: &'a Element,
+		attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+	) -> Self {
+		Self {
+			entity,
+			element,
+			attributes,
+		}
+	}
+
+	pub fn try_as<'b, T: TryFrom<&'b Self>>(&'b self) -> Result<T, T::Error> {
+		T::try_from(self)
+	}
+
+	/// The tag name of this element, ie `div`, `span`, `p`.
+	pub fn name(&self) -> &str { self.element.name() }
+
+	/// Look up the first attribute matching `key` and return its value.
+	pub fn attribute(&self, key: &str) -> Option<&'a Value> {
+		self.attributes
+			.iter()
+			.find(|(_, attr, _)| attr.as_str() == key)
+			.map(|(_, _, val)| *val)
+	}
+
+	/// Look up the first attribute matching `key` and return its
+	/// `(entity, value)` pair.
+	pub fn attribute_with_entity(
+		&self,
+		key: &str,
+	) -> Option<(Entity, &'a Value)> {
+		self.attributes
+			.iter()
+			.find(|(_, attr, _)| attr.as_str() == key)
+			.map(|(entity, _, val)| (*entity, *val))
+	}
+
+	/// Look up an attribute and convert its value to a [`String`].
+	/// Returns an empty string when the attribute is absent.
+	pub fn attribute_string(&self, key: &str) -> String {
+		self.attribute(key)
+			.map(|val| val.to_string())
+			.unwrap_or_default()
+	}
+
+	/// Extract the `start` attribute as a `usize` for ordered lists.
+	/// Defaults to `1` when absent or not numeric.
+	pub fn ol_start(&self) -> usize {
+		self.attribute("start")
+			.and_then(|val| match val {
+				Value::Uint(num) => Some(*num as usize),
+				Value::Int(num) => Some(*num as usize),
+				_ => None,
+			})
+			.unwrap_or(1)
+	}
+}
+
+
+pub struct LinkView<'a> {
+	element: &'a ElementView<'a>,
+	href: &'a str,
+}
+
+impl<'a> TryFrom<&'a ElementView<'a>> for LinkView<'a> {
+	type Error = BevyError;
+	fn try_from(
+		value: &'a ElementView<'a>,
+	) -> std::result::Result<Self, Self::Error> {
+		if value.name() == "a" {
+			let href = value
+				.attribute("href")
+				.and_then(|val| val.try_string())
+				.unwrap_or("");
+
+			Ok(Self {
+				element: value,
+				href,
+			})
+		} else {
+			bevybail!("not an anchor element")
+		}
+	}
 }
 
 

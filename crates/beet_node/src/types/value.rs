@@ -33,6 +33,45 @@ pub enum Value {
 impl Value {
 	pub fn new(value: impl Into<Self>) -> Self { value.into() }
 
+	pub fn try_bool(&self) -> Option<bool> {
+		match self {
+			Value::Bool(b) => Some(*b),
+			_ => None,
+		}
+	}
+	pub fn try_int(&self) -> Option<i64> {
+		match self {
+			Value::Int(i) => Some(*i),
+			_ => None,
+		}
+	}
+	pub fn try_uint(&self) -> Option<u64> {
+		match self {
+			Value::Uint(u) => Some(*u),
+			_ => None,
+		}
+	}
+	pub fn try_float(&self) -> Option<f64> {
+		match self {
+			Value::Float(f) => Some(f.0),
+			_ => None,
+		}
+	}
+
+	pub fn try_bytes(&self) -> Option<&[u8]> {
+		match self {
+			Value::Bytes(bytes) => Some(bytes),
+			_ => None,
+		}
+	}
+	pub fn try_string(&self) -> Option<&str> {
+		match self {
+			Value::Str(s) => Some(s),
+			_ => None,
+		}
+	}
+
+
 	/// Optimistically parse a string into the most specific [`Value`] variant.
 	///
 	/// Attempts trimmed conversions in order:

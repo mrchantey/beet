@@ -1204,6 +1204,7 @@ dependencies = [
  "ratatui",
  "serde",
  "thiserror 1.0.69",
+ "webbrowser",
  "winnow",
 ]
 
