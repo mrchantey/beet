@@ -62,7 +62,7 @@ impl NodeVisitor for PlainTextRenderer {
 impl NodeRenderer for PlainTextRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		if self.plaintext_only {
 			cx.check_accepts(&[MediaType::Text])?;
@@ -74,7 +74,7 @@ impl NodeRenderer for PlainTextRenderer {
 				available: vec![MediaType::Text],
 			});
 		}
-		cx.walker.walk(self, cx.entity);
+		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Text,
 			std::mem::take(&mut self.buffer),

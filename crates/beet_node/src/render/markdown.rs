@@ -362,10 +362,10 @@ impl NodeVisitor for MarkdownRenderer {
 impl NodeRenderer for MarkdownRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Markdown])?;
-		cx.walker.walk(self, cx.entity);
+		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Markdown,
 			std::mem::take(&mut self.state.buffer),
@@ -387,14 +387,10 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				MarkdownRenderer::new()
-					.render(&RenderContext::new(entity, &walker))
-					.unwrap()
-					.to_string()
-			})
+		MarkdownRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	/// Parse markdown then render with expression support.
@@ -406,15 +402,11 @@ mod test {
 		MarkdownParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				MarkdownRenderer::new()
-					.with_expressions()
-					.render(&RenderContext::new(entity, &walker))
-					.unwrap()
-					.to_string()
-			})
+		MarkdownRenderer::new()
+			.with_expressions()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	#[test]

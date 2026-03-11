@@ -384,12 +384,10 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 		parse_md(&mut world.entity_mut(entity), md);
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				let cx = RenderContext::new(entity, &walker);
-				HtmlRenderer::new().render(&cx).unwrap().to_string()
-			})
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	#[test]

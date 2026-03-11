@@ -32,7 +32,7 @@ pub struct MediaRenderer {
 	/// [`Self::with_tui_renderer`] before requesting
 	/// [`MediaType::Ratatui`].
 	#[cfg(feature = "tui")]
-	tui_renderer: Option<RatatuiRenderer>,
+	tui_renderer: TuiRenderer,
 }
 
 impl Default for MediaRenderer {
@@ -56,13 +56,13 @@ impl MediaRenderer {
 		Self {
 			default_media_type,
 			plaintext_fallback: true,
-			plain_text_renderer: PlainTextRenderer::default(),
-			html_renderer: HtmlRenderer::new(),
-			markdown_renderer: MarkdownRenderer::new(),
+			plain_text_renderer: default(),
+			html_renderer: default(),
+			markdown_renderer: default(),
 			#[cfg(feature = "ansi_term")]
-			ansi_term_renderer: AnsiTermRenderer::new(),
+			ansi_term_renderer: default(),
 			#[cfg(feature = "tui")]
-			tui_renderer: None,
+			tui_renderer: default(),
 		}
 	}
 
@@ -114,8 +114,8 @@ impl MediaRenderer {
 
 	/// Set the [`RatatuiRenderer`] used for [`MediaType::Ratatui`] output.
 	#[cfg(feature = "tui")]
-	pub fn with_tui_renderer(mut self, renderer: RatatuiRenderer) -> Self {
-		self.tui_renderer = Some(renderer);
+	pub fn with_tui_renderer(mut self, renderer: TuiRenderer) -> Self {
+		self.tui_renderer = renderer;
 		self
 	}
 
@@ -132,36 +132,30 @@ impl MediaRenderer {
 	/// selected the correct renderer.
 	fn try_render_media_type(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 		media_type: &MediaType,
 	) -> Result<Option<RenderOutput>, RenderError> {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
-		let inner_cx = RenderContext::new(cx.entity, cx.walker);
+		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
 		match media_type {
 			MediaType::Text => {
-				self.plain_text_renderer.render(&inner_cx).map(Some)
+				self.plain_text_renderer.render(&mut inner_cx).map(Some)
 			}
-			MediaType::Html => self.html_renderer.render(&inner_cx).map(Some),
+			MediaType::Html => {
+				self.html_renderer.render(&mut inner_cx).map(Some)
+			}
 			MediaType::Markdown => {
-				self.markdown_renderer.render(&inner_cx).map(Some)
+				self.markdown_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(feature = "ansi_term")]
-			MediaType::AnsiTerm => self.ansi_term_renderer.render(&inner_cx).map(Some),
-			#[cfg(feature = "tui")]
-			MediaType::Ratatui => {
-				let Some(ref mut renderer) = self.tui_renderer else {
-					return Err(RenderError::Other(
-						bevyhow!(
-							"TUI renderer not set; call with_tui_renderer first"
-						)
-						.into(),
-					));
-				};
-				renderer.render(&inner_cx).map(Some)
+			MediaType::AnsiTerm => {
+				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
+			#[cfg(feature = "tui")]
+			MediaType::Ratatui => self.tui_renderer.render(&mut inner_cx).map(Some),
 			other if self.plaintext_fallback && other.is_text() => {
-				self.plain_text_renderer.render(&inner_cx).map(Some)
+				self.plain_text_renderer.render(&mut inner_cx).map(Some)
 			}
 			_ => Ok(None),
 		}
@@ -182,7 +176,7 @@ impl MediaRenderer {
 impl NodeRenderer for MediaRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		// Resolve the list of types to try: accepts list, or fallback to default.
 		// Collect into an owned Vec to avoid holding a borrow on `self` during
@@ -218,16 +212,11 @@ mod test {
 		default_media_type: MediaType,
 		accepts: Vec<MediaType>,
 	) -> String {
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				let cx = RenderContext::new(entity, &walker)
-					.with_accepts(accepts.clone());
-				MediaRenderer::new(default_media_type.clone())
-					.render(&cx)
-					.unwrap()
-					.to_string()
-			})
+		let mut cx = RenderContext::new(entity, world).with_accepts(accepts);
+		MediaRenderer::new(default_media_type)
+			.render(&mut cx)
 			.unwrap()
+			.to_string()
 	}
 
 	/// Parse HTML then render back via [`MediaRenderer`] targeting HTML.
@@ -318,18 +307,14 @@ mod test {
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		// Render with only Png accepted and fallback disabled — should error.
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				let cx = RenderContext::new(entity, &walker)
-					.with_accepts(vec![MediaType::Png]);
-				let result = MediaRenderer::new(MediaType::Text)
-					.without_fallback()
-					.render(&cx);
-				match result {
-					Err(RenderError::AcceptMismatch { .. }) => {}
-					other => panic!("expected AcceptMismatch, got {other:?}"),
-				}
-			})
-			.unwrap();
+		let mut cx = RenderContext::new(entity, &mut world)
+			.with_accepts(vec![MediaType::Png]);
+		let result = MediaRenderer::new(MediaType::Text)
+			.without_fallback()
+			.render(&mut cx);
+		match result {
+			Err(RenderError::AcceptMismatch { .. }) => {}
+			other => panic!("expected AcceptMismatch, got {other:?}"),
+		}
 	}
 }

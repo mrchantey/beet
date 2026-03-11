@@ -1,48 +1,31 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::system::SystemState;
 use thiserror::Error;
 
 /// Renders an entity tree into a [`RenderOutput`].
 ///
 /// Implementors walk the entity tree rooted at `cx.entity` using
-/// `cx.walker` and produce either serialized [`MediaBytes`] or a
+/// `cx.walk()` and produce either serialized [`MediaBytes`] or a
 /// [`RenderOutput::Stateful`] signal for persistent renderers.
 pub trait NodeRenderer {
 	/// Render the entity tree described by `cx`.
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError>;
 
 
 	fn run(
-		&self,
+		&mut self,
 		entity: &mut EntityWorldMut,
 		accepts: Vec<MediaType>,
-	) -> Result<RenderOutput, RenderError>
-	where
-		Self: 'static + Sized + Clone,
-	{
+	) -> Result<RenderOutput, RenderError> {
 		let id = entity.id();
 		entity.world_scope(|world| {
-			world
-				.run_system_cached_with(
-					move |In((mut renderer, entity, accepts)): In<(
-						Self,
-						Entity,
-						Vec<MediaType>,
-					)>,
-					      walker: NodeWalker| {
-						// 3. Render to the requested media type
-						renderer.render(
-							&RenderContext::new(entity, &walker)
-								.with_accepts(accepts),
-						)
-					},
-					(self.clone(), id, accepts),
-				)
-				// no fallible systemparams
-				.unwrap()
+			self.render(
+				&mut RenderContext::new(id, world).with_accepts(accepts),
+			)
 		})
 	}
 }
@@ -53,19 +36,19 @@ pub trait NodeRenderer {
 pub struct RenderContext<'a> {
 	/// The entity to render.
 	pub entity: Entity,
-	/// Walker for traversing the entity tree.
-	pub walker: &'a NodeWalker<'a, 'a>,
+	/// The world containing the entity tree.
+	pub world: &'a mut World,
 	/// Ordered list of acceptable output types, highest priority first.
 	/// An empty vec means any type is acceptable.
 	pub accepts: Vec<MediaType>,
 }
 
 impl<'a> RenderContext<'a> {
-	/// Create a new [`RenderContext`] with the given entity and walker.
-	pub fn new(entity: Entity, walker: &'a NodeWalker<'a, 'a>) -> Self {
+	/// Create a new [`RenderContext`] with the given entity and world.
+	pub fn new(entity: Entity, world: &'a mut World) -> Self {
 		Self {
 			entity,
-			walker,
+			world,
 			accepts: Vec::new(),
 		}
 	}
@@ -74,6 +57,14 @@ impl<'a> RenderContext<'a> {
 	pub fn with_accepts(mut self, accepts: Vec<MediaType>) -> Self {
 		self.accepts = accepts;
 		self
+	}
+
+	/// Walk the entity tree rooted at [`Self::entity`], visiting each
+	/// node with the provided [`NodeVisitor`].
+	pub fn walk(&mut self, visitor: &mut impl NodeVisitor) {
+		let mut state = SystemState::<NodeWalker>::new(self.world);
+		let walker = state.get(self.world);
+		walker.walk(visitor, self.entity);
 	}
 
 	/// Check whether the `accepts` list is compatible with the given

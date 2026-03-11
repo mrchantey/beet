@@ -300,10 +300,10 @@ impl NodeVisitor for AnsiTermRenderer {
 impl NodeRenderer for AnsiTermRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
-		cx.walker.walk(self, cx.entity);
+		cx.walk(self);
 		self.state.buffer.insert_str(0, &self.prefix);
 		if self.clear_on_render {
 			// Clear the terminal before rendering.
@@ -355,12 +355,10 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				let cx = RenderContext::new(entity, &walker);
-				AnsiTermRenderer::new().render(&cx).unwrap().to_string()
-			})
+		AnsiTermRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	fn strip_ansi(input: String) -> String {
@@ -527,18 +525,14 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				AnsiTermRenderer::new()
-					.with_style_map(StyleMap::new(Style::default(), vec![(
-						"h1",
-						Style::new().fg(Color::Red),
-					)]))
-					.render(&RenderContext::new(entity, &walker))
-					.unwrap()
-					.to_string()
-			})
+		AnsiTermRenderer::new()
+			.with_style_map(StyleMap::new(Style::default(), vec![(
+				"h1",
+				Style::new().fg(Color::Red),
+			)]))
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 			.xpect_contains("\x1b[")
 			.xpect_contains("Hello");
 	}

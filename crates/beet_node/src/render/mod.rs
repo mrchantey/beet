@@ -4,6 +4,8 @@ mod tui;
 pub use tui::*;
 mod html;
 pub use html::*;
+mod html_utils;
+pub use html_utils::*;
 mod style_map;
 pub use style_map::*;
 mod media;

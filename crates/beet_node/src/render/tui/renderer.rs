@@ -28,6 +28,7 @@
 //! as vertical spacing and justification.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy_ratatui::RatatuiContext;
 use ratatui::buffer::Buffer;
 use ratatui::prelude::Rect;
 use ratatui::style::Color;
@@ -47,7 +48,7 @@ use std::borrow::Cow;
 /// rendered. Uses a [`StyleMap<TuiStyle>`] to resolve element styles
 /// and layout metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RatatuiRenderer {
+pub struct TuiRenderer {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
 	/// The owned ratatui buffer to write into.
@@ -76,7 +77,14 @@ pub struct RatatuiRenderer {
 	pub block_quote_indent: u16,
 }
 
-impl RatatuiRenderer {
+
+/// Create a new [`TuiRenderer`], its rect will be updated
+/// on each render call, via [`Self::reset`]
+impl Default for TuiRenderer {
+	fn default() -> Self { Self::new(Rect::default()) }
+}
+
+impl TuiRenderer {
 	/// Create a new TUI renderer targeting the given area.
 	pub fn new(area: Rect) -> Self {
 		Self {
@@ -93,6 +101,16 @@ impl RatatuiRenderer {
 			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
 		}
+	}
+
+	/// Reset the renderer to an initial state with a new target area.
+	pub fn reset(&mut self, area: Rect) {
+		self.area = area;
+		self.buf = Buffer::empty(area);
+		self.spans.clear();
+		self.list_stack.clear();
+		self.in_list_item = false;
+		self.in_code_block = false;
 	}
 
 	/// Override the element → style mapping.
@@ -229,7 +247,7 @@ impl RatatuiRenderer {
 	}
 }
 
-impl NodeVisitor for RatatuiRenderer {
+impl NodeVisitor for TuiRenderer {
 	fn visit_element(&mut self, cx: &VisitContext, view: &ElementView) {
 		let name = view.name();
 
@@ -510,13 +528,15 @@ impl NodeVisitor for RatatuiRenderer {
 }
 
 
-impl NodeRenderer for RatatuiRenderer {
+impl NodeRenderer for TuiRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Ratatui])?;
-		cx.walker.walk(self, cx.entity);
+		let area = cx.world.resource_mut::<RatatuiContext>().get_frame().area();
+		self.reset(area);
+		cx.walk(self);
 		self.flush_spans();
 		Ok(RenderOutput::Stateful)
 	}
@@ -555,7 +575,7 @@ pub fn tui_render_system(
 	In((entity, area)): In<(Entity, Rect)>,
 	walker: NodeWalker,
 ) -> (Buffer, TuiSpanMap) {
-	let mut renderer = RatatuiRenderer::new(area);
+	let mut renderer = TuiRenderer::new(area);
 	walker.walk(&mut renderer, entity);
 	renderer.finish()
 }
@@ -1116,7 +1136,7 @@ mod test {
 				)>,
 				 walker: NodeWalker| {
 					let mut renderer =
-						RatatuiRenderer::new(area).with_style_map(style_map);
+						TuiRenderer::new(area).with_style_map(style_map);
 					walker.walk(&mut renderer, entity);
 					let (buf, _span_map) = renderer.finish();
 					buf

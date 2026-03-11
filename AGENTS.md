@@ -7,6 +7,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 
 ## Workflow
 - when provided a plan or list of work to do, just do it! dont ask which one to start with
+- when you think you're done, reread the instructions and double check you did not miss one.
 
 ## Context
 

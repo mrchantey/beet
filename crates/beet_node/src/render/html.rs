@@ -221,10 +221,10 @@ impl NodeVisitor for HtmlRenderer {
 impl NodeRenderer for HtmlRenderer {
 	fn render(
 		&mut self,
-		cx: &RenderContext,
+		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
-		cx.walker.walk(self, cx.entity);
+		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Html,
 			std::mem::take(&mut self.buffer),
@@ -266,14 +266,10 @@ mod test {
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				HtmlRenderer::new()
-					.render(&RenderContext::new(entity, &walker))
-					.unwrap()
-					.to_string()
-			})
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	/// Parse then render with expression support.
@@ -284,15 +280,11 @@ mod test {
 		HtmlParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		world
-			.run_system_once(move |walker: NodeWalker| {
-				HtmlRenderer::new()
-					.with_expressions()
-					.render(&RenderContext::new(entity, &walker))
-					.unwrap()
-					.to_string()
-			})
+		HtmlRenderer::new()
+			.with_expressions()
+			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
+			.to_string()
 	}
 
 	#[test]
