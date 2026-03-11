@@ -4,7 +4,7 @@
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
-//! - `tui` — adds [`RatatuiRenderer`] support (`state/ratatui`)
+//! - `tui` — adds [`RatatuiRenderer`] support
 
 use crate::prelude::*;
 #[allow(unused_imports)]
@@ -28,6 +28,15 @@ pub struct MediaRenderer {
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "ansi_term")]
 	ansi_term_renderer: AnsiTermRenderer,
+	/// Buffer and area used by the TUI renderer. Callers must set
+	/// these via [`Self::with_tui_buffer`] before requesting
+	/// [`MediaType::Ratatui`].
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	tui_area: Option<ratatui::prelude::Rect>,
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	tui_buf: Option<ratatui::buffer::Buffer>,
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	tui_style_map: Option<StyleMap<TuiStyle>>,
 }
 
 impl Default for MediaRenderer {
@@ -56,6 +65,12 @@ impl MediaRenderer {
 			markdown_renderer: MarkdownRenderer::new(),
 			#[cfg(feature = "ansi_term")]
 			ansi_term_renderer: AnsiTermRenderer::new(),
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+			tui_area: None,
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+			tui_buf: None,
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+			tui_style_map: None,
 		}
 	}
 
@@ -105,6 +120,27 @@ impl MediaRenderer {
 		self
 	}
 
+	/// Set the TUI buffer and area for [`RatatuiRenderer`] output.
+	///
+	/// Must be called before requesting [`MediaType::Ratatui`].
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	pub fn with_tui_buffer(
+		mut self,
+		area: ratatui::prelude::Rect,
+		buf: ratatui::buffer::Buffer,
+	) -> Self {
+		self.tui_area = Some(area);
+		self.tui_buf = Some(buf);
+		self
+	}
+
+	/// Override the [`StyleMap<TuiStyle>`] used by the TUI renderer.
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	pub fn with_tui_style_map(mut self, map: StyleMap<TuiStyle>) -> Self {
+		self.tui_style_map = Some(map);
+		self
+	}
+
 	/// Returns the default media type.
 	pub fn default_media_type(&self) -> &MediaType { &self.default_media_type }
 
@@ -134,6 +170,30 @@ impl MediaRenderer {
 			}
 			#[cfg(feature = "ansi_term")]
 			MediaType::AnsiTerm => self.ansi_term_renderer.render(&inner_cx).map(Some),
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+			MediaType::Ratatui => {
+				let Some(area) = self.tui_area else {
+					return Err(RenderError::Other(
+						bevyhow!(
+							"TUI area not set; call with_tui_buffer first"
+						)
+						.into(),
+					));
+				};
+				let Some(ref mut buf) = self.tui_buf else {
+					return Err(RenderError::Other(
+						bevyhow!(
+							"TUI buffer not set; call with_tui_buffer first"
+						)
+						.into(),
+					));
+				};
+				let mut renderer = RatatuiRenderer::new(area, buf);
+				if let Some(map) = self.tui_style_map.take() {
+					renderer = renderer.with_style_map(map);
+				}
+				renderer.render(&inner_cx).map(Some)
+			}
 			other if self.plaintext_fallback && other.is_text() => {
 				self.plain_text_renderer.render(&inner_cx).map(Some)
 			}

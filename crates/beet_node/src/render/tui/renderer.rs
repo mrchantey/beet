@@ -23,10 +23,11 @@
 //! }
 //! ```
 //!
-//! # Configuration
+//! # Styling
 //!
-//! Use [`TuiConfig`] to customize rendering behavior such as
-//! heading gaps, block quote indentation, and list bullet style.
+//! Uses [`StyleMap<TuiStyle>`] to map element names to [`TuiStyle`]
+//! values that combine a ratatui [`Style`] with layout metadata such
+//! as vertical spacing and justification.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ratatui::buffer::Buffer;
@@ -39,20 +40,23 @@ use ratatui::text::Span;
 use ratatui::text::Text;
 use ratatui::widgets;
 use ratatui::widgets::Widget;
+use std::borrow::Cow;
 
 /// Visitor-based TUI renderer.
 ///
 /// Writes styled content into a ratatui [`Buffer`], consuming
 /// vertical space from `area` as each block-level element is
-/// rendered. Element names are matched to apply appropriate styling
-/// and layout.
+/// rendered. Uses a [`StyleMap<TuiStyle>`] to resolve element styles
+/// and layout metadata.
 pub struct RatatuiRenderer<'buf> {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
 	/// The ratatui buffer to write into.
 	buf: &'buf mut Buffer,
-	/// Style stack pushed by block-level elements like headings.
-	nesting_stack: Vec<Style>,
+	/// Element → style mapping with nesting support.
+	style_map: StyleMap<TuiStyle>,
+	/// Block elements used for fallback block detection.
+	block_elements: Vec<Cow<'static, str>>,
 	/// Current accumulated spans with their owning entity for
 	/// per-span hit-testing.
 	spans: Vec<(Span<'static>, Option<Entity>)>,
@@ -60,22 +64,24 @@ pub struct RatatuiRenderer<'buf> {
 	in_list_item: bool,
 	/// Whether we are inside a code block (pre).
 	in_code_block: bool,
-	/// Rendering configuration.
-	config: TuiConfig,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
-	/// Stack of active element names for leave_element matching.
-	element_stack: Vec<String>,
 	/// Current heading level (0 when not in a heading).
 	heading_level: u8,
 	/// List nesting stack for bullet/number tracking.
 	list_stack: Vec<TuiListContext>,
-	/// Pending link href for underline styling.
+	/// Whether we are inside a link element.
 	in_link: bool,
 	/// Whether we are inside an image element.
 	in_image: bool,
 	/// Accumulated image src for rendering on leave.
 	image_src: Option<String>,
+	/// Unordered list bullet string.
+	pub bullet: String,
+	/// Foreground color for bullet / list number prefixes.
+	pub bullet_fg: Color,
+	/// Indentation width for block quotes (includes the `│ ` bar).
+	pub block_quote_indent: u16,
 }
 
 impl<'buf> RatatuiRenderer<'buf> {
@@ -84,43 +90,27 @@ impl<'buf> RatatuiRenderer<'buf> {
 		Self {
 			area,
 			buf,
-			nesting_stack: Vec::new(),
+			style_map: default_tui_style_map(),
+			block_elements: default_block_elements(),
 			spans: Vec::new(),
 			in_list_item: false,
 			in_code_block: false,
-			config: TuiConfig::default(),
 			span_map: TuiSpanMap::default(),
-			element_stack: Vec::new(),
 			heading_level: 0,
 			list_stack: Vec::new(),
 			in_link: false,
 			in_image: false,
 			image_src: None,
+			bullet: "• ".to_string(),
+			bullet_fg: Color::DarkGray,
+			block_quote_indent: 2,
 		}
 	}
 
-	/// Create a new TUI renderer with custom configuration.
-	pub fn with_config(
-		area: Rect,
-		buf: &'buf mut Buffer,
-		config: TuiConfig,
-	) -> Self {
-		Self {
-			area,
-			buf,
-			nesting_stack: Vec::new(),
-			spans: Vec::new(),
-			in_list_item: false,
-			in_code_block: false,
-			config,
-			span_map: TuiSpanMap::default(),
-			element_stack: Vec::new(),
-			heading_level: 0,
-			list_stack: Vec::new(),
-			in_link: false,
-			in_image: false,
-			image_src: None,
-		}
+	/// Override the element → style mapping.
+	pub fn with_style_map(mut self, map: StyleMap<TuiStyle>) -> Self {
+		self.style_map = map;
+		self
 	}
 
 	/// Returns the remaining drawable area after rendering.
@@ -136,10 +126,8 @@ impl<'buf> RatatuiRenderer<'buf> {
 		self.span_map
 	}
 
-	/// Current composite style from the stack.
-	fn current_style(&self) -> Style {
-		self.nesting_stack.last().copied().unwrap_or_default()
-	}
+	/// Current composite ratatui [`Style`] from the style map stack.
+	fn current_style(&self) -> Style { self.style_map.current().style }
 
 	/// Push a span associated with the given entity for hit-testing.
 	fn push_span(&mut self, span: Span<'static>, entity: Entity) {
@@ -230,9 +218,9 @@ impl<'buf> RatatuiRenderer<'buf> {
 		if self.area.height == 0 {
 			return;
 		}
+		let hr_style = self.style_map.resolve("hr");
 		let rule = "─".repeat(self.area.width as usize);
-		let line =
-			Line::from(Span::styled(rule, Style::new().fg(self.config.hr_fg)));
+		let line = Line::from(Span::styled(rule, hr_style.style));
 		let text = Text::from(line);
 		self.render_text(text);
 	}
@@ -241,33 +229,6 @@ impl<'buf> RatatuiRenderer<'buf> {
 	fn advance_lines(&mut self, count: u16) {
 		self.area.y = self.area.y.saturating_add(count);
 		self.area.height = self.area.height.saturating_sub(count);
-	}
-
-	/// Resolve inline modifiers (bold, italic, code, link) from
-	/// the current element nesting into a ratatui [`Style`].
-	fn inline_style_for_element(&self, name: &str) -> Style {
-		let mut style = Style::new();
-		match name {
-			"strong" | "b" => {
-				style = style.add_modifier(Modifier::BOLD);
-			}
-			"em" | "i" => {
-				style = style.add_modifier(Modifier::ITALIC);
-			}
-			"del" | "s" => {
-				style = style.add_modifier(Modifier::CROSSED_OUT);
-			}
-			"code" if !self.in_code_block => {
-				style = style.bg(Color::DarkGray);
-			}
-			"a" => {
-				style = style
-					.add_modifier(Modifier::UNDERLINED)
-					.fg(self.config.link_fg);
-			}
-			_ => {}
-		}
-		style
 	}
 
 	/// Extract the heading level from an element name like `h1`, `h2`, etc.
@@ -282,29 +243,11 @@ impl<'buf> RatatuiRenderer<'buf> {
 		}
 	}
 
-	/// Whether an element name is a block-level element for TUI layout.
-	fn is_block_element(name: &str) -> bool {
-		matches!(
-			name,
-			"p" | "div"
-				| "section" | "article"
-				| "aside" | "nav"
-				| "header" | "footer"
-				| "main" | "blockquote"
-				| "pre" | "ul"
-				| "ol" | "li"
-				| "table" | "thead"
-				| "tbody" | "tr"
-				| "th" | "td"
-				| "h1" | "h2"
-				| "h3" | "h4"
-				| "h5" | "h6"
-				| "hr" | "details"
-				| "summary" | "figure"
-				| "figcaption"
-				| "dl" | "dt"
-				| "dd"
-		)
+	/// Whether an element name is block-level, using the shared
+	/// [`default_block_elements`] list.
+	fn is_block_element(&self, name: &str) -> bool {
+		let lower = name.to_ascii_lowercase();
+		self.block_elements.iter().any(|el| el.as_ref() == lower)
 	}
 
 	/// Find an attribute value by key in an attrs slice.
@@ -328,34 +271,28 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 		attrs: Vec<(Entity, &Attribute, &Value)>,
 	) {
 		let name = element.name().to_ascii_lowercase();
-		self.element_stack.push(name.clone());
+
+		// Push the style map entry for this element (handles nesting).
+		let tui_style = self.style_map.push(&name);
 
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				let level = Self::parse_heading_level(&name).unwrap_or(3);
 				self.heading_level = level;
-				let style = match level {
-					1 => {
-						self.advance_lines(self.config.h1_gap_before);
-						self.config.h1_style
-					}
-					2 => self.config.h2_style,
-					_ => self.config.h3_style,
-				};
-				self.nesting_stack.push(style);
+				self.advance_lines(tui_style.lines_before);
 			}
 
 			// ── Paragraph ──
 			"p" | "div" | "section" | "article" | "nav" | "header"
 			| "footer" | "main" => {
-				self.nesting_stack.push(Style::new());
+				// style already pushed
 			}
 
 			// ── Blockquote ──
 			"blockquote" | "aside" => {
-				self.advance_lines(self.config.block_quote_gap);
-				let indent = self.config.block_quote_indent;
+				self.advance_lines(tui_style.lines_before);
+				let indent = self.block_quote_indent;
 				if self.area.width > indent {
 					if self.area.height > 0 {
 						let bar = Span::styled(
@@ -369,13 +306,11 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 					self.area.x = self.area.x.saturating_add(indent);
 					self.area.width = self.area.width.saturating_sub(indent);
 				}
-				self.nesting_stack.push(Style::new().italic());
 			}
 
 			// ── Code blocks ──
 			"pre" => {
 				self.in_code_block = true;
-				self.nesting_stack.push(Style::new().bg(Color::DarkGray));
 			}
 
 			// ── Lists ──
@@ -406,17 +341,14 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 						list.current_number += 1;
 						format!("{num}. ")
 					} else {
-						self.config.bullet.clone()
+						self.bullet.clone()
 					}
 				} else {
-					self.config.bullet.clone()
+					self.bullet.clone()
 				};
 
 				self.push_span(
-					Span::styled(
-						bullet,
-						Style::new().fg(self.config.bullet_fg),
-					),
+					Span::styled(bullet, Style::new().fg(self.bullet_fg)),
 					cx.entity,
 				);
 			}
@@ -424,7 +356,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 			// ── Tables ──
 			"table" => {}
 			"thead" => {
-				self.nesting_stack.push(Style::new().bold());
+				// style already pushed (bold via style map)
 			}
 			"tbody" => {}
 			"tr" => {}
@@ -451,10 +383,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 					.unwrap_or_default();
 				self.image_src = Some(src);
 				self.push_span(
-					Span::styled(
-						"[image: ",
-						Style::new().fg(Color::DarkGray).italic(),
-					),
+					Span::styled("[image: ", tui_style.style),
 					cx.entity,
 				);
 			}
@@ -466,12 +395,12 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 
 			// ── Inline formatting ──
 			"strong" | "b" | "em" | "i" | "del" | "s" => {
-				// Style applied in visit_value via inline_style_for_element
+				// Style applied in visit_value via style map
 			}
 
 			// ── Inline code ──
 			"code" => {
-				// Style applied in visit_value via inline_style_for_element
+				// Style applied in visit_value via style map
 			}
 
 			// ── Line break ──
@@ -481,30 +410,26 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 
 			// ── Button-like elements ──
 			"button" => {
-				self.push_span(
-					Span::styled("[", Style::new().fg(self.config.link_fg)),
-					cx.entity,
-				);
+				self.push_span(Span::styled("[", tui_style.style), cx.entity);
 			}
 
 			// ── Generic block handling ──
 			_ => {
-				if Self::is_block_element(&name) {
-					self.nesting_stack.push(Style::new());
-				}
+				// style already pushed by style_map.push above
 			}
 		}
 	}
 
 	fn leave_element(&mut self, cx: &VisitContext, element: &Element) {
 		let name = element.name().to_ascii_lowercase();
-		self.element_stack.pop();
+
+		// Peek the style before popping so we can use lines_after.
+		let tui_style = self.style_map.current();
 
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				let level = Self::parse_heading_level(&name).unwrap_or(3);
-				if level == 1 && self.config.h1_centered {
+				if tui_style.justify == Justify::Center {
 					// Centered headings: render via render_text and map
 					// the whole area to the heading entity since centering
 					// shifts column offsets unpredictably.
@@ -514,9 +439,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 							span_entries.into_iter().unzip();
 						let line = Line::from(raw_spans);
 						let mut text = Text::from(line);
-						if let Some(style) = self.nesting_stack.last() {
-							text = text.style(*style);
-						}
+						text = text.style(tui_style.style);
 						text = text.centered();
 						let before_y = self.area.y;
 						let paragraph = widgets::Paragraph::new(text)
@@ -542,102 +465,113 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 					self.flush_spans();
 				}
 				self.heading_level = 0;
-				self.nesting_stack.pop();
-				self.advance_lines(self.config.heading_gap_after);
+				let lines_after = tui_style.lines_after;
+				self.style_map.pop();
+				self.advance_lines(lines_after);
 			}
 
 			// ── Paragraph ──
 			"p" | "div" | "section" | "article" | "nav" | "header"
 			| "footer" | "main" => {
 				self.flush_spans();
-				self.nesting_stack.pop();
-				self.advance_lines(self.config.paragraph_gap_after);
+				let lines_after = tui_style.lines_after;
+				self.style_map.pop();
+				self.advance_lines(lines_after);
 			}
 
 			// ── Blockquote ──
 			"blockquote" | "aside" => {
 				self.flush_spans();
-				let indent = self.config.block_quote_indent;
+				let indent = self.block_quote_indent;
 				self.area.x = self.area.x.saturating_sub(indent);
 				self.area.width = self.area.width.saturating_add(indent);
-				self.nesting_stack.pop();
-				self.advance_lines(self.config.block_quote_gap);
+				let lines_after = tui_style.lines_after;
+				self.style_map.pop();
+				self.advance_lines(lines_after);
 			}
 
 			// ── Code blocks ──
 			"pre" => {
 				self.flush_spans();
 				self.in_code_block = false;
-				self.nesting_stack.pop();
+				self.style_map.pop();
 			}
 
 			// ── Lists ──
 			"ul" | "ol" => {
 				self.list_stack.pop();
+				self.style_map.pop();
 			}
 			"li" => {
 				self.flush_spans();
 				self.in_list_item = false;
+				self.style_map.pop();
 			}
 
 			// ── Tables ──
-			"table" => {}
+			"table" => {
+				self.style_map.pop();
+			}
 			"thead" => {
 				self.flush_spans();
 				self.render_hr();
-				self.nesting_stack.pop();
+				self.style_map.pop();
 			}
-			"tbody" => {}
+			"tbody" => {
+				self.style_map.pop();
+			}
 			"tr" => {
 				self.flush_spans();
+				self.style_map.pop();
 			}
 			"th" | "td" => {
 				// Cells are collected as spans; the row leave flushes them
+				self.style_map.pop();
 			}
 
 			// ── Links ──
 			"a" => {
 				self.in_link = false;
+				self.style_map.pop();
 			}
 
 			// ── Images ──
 			"img" => {
 				let src = self.image_src.take().unwrap_or_default();
+				let img_style = tui_style.style;
 				self.push_span(
-					Span::styled(
-						format!(": {src}]"),
-						Style::new().fg(Color::DarkGray).italic(),
-					),
+					Span::styled(format!(": {src}]"), img_style),
 					cx.entity,
 				);
 				self.in_image = false;
 				self.flush_spans();
+				self.style_map.pop();
 			}
 
 			// ── Thematic break / line break ──
 			"hr" | "br" => {
 				// already handled in visit_element
+				self.style_map.pop();
 			}
 
 			// ── Button ──
 			"button" => {
-				self.push_span(
-					Span::styled("]", Style::new().fg(self.config.link_fg)),
-					cx.entity,
-				);
+				self.push_span(Span::styled("]", tui_style.style), cx.entity);
+				self.style_map.pop();
 			}
 
 			// ── Inline formatting ──
 			"strong" | "b" | "em" | "i" | "del" | "s" | "code" => {
 				// Style was applied per-span in visit_value
+				self.style_map.pop();
 			}
 
 			// ── Generic block handling ──
 			_ => {
-				if Self::is_block_element(&name) {
+				if self.is_block_element(&name) {
 					self.flush_spans();
-					self.nesting_stack.pop();
 				}
+				self.style_map.pop();
 			}
 		}
 	}
@@ -648,21 +582,8 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 			return;
 		}
 
-		// Build style from the nesting stack and inline element context
-		let mut style = self.current_style();
-
-		// Walk the element stack to accumulate inline styles
-		for elem in &self.element_stack {
-			let inline = self.inline_style_for_element(elem);
-			style = style.patch(inline);
-		}
-
-		// Apply link underline if inside <a>
-		if self.in_link {
-			style = style
-				.add_modifier(Modifier::UNDERLINED)
-				.fg(self.config.link_fg);
-		}
+		// Build style from the style map's current nesting.
+		let style = self.current_style();
 
 		let entity = cx.entity;
 		if self.in_code_block {
@@ -730,60 +651,6 @@ pub fn tui_render_system(
 	(buf, span_map)
 }
 
-/// Configuration for the TUI renderer.
-///
-/// Controls spacing, indentation, and styling behavior. Sensible
-/// defaults are provided via [`Default`].
-#[derive(Debug, Clone)]
-pub struct TuiConfig {
-	/// Number of blank lines before an h1 heading.
-	pub h1_gap_before: u16,
-	/// Number of blank lines after any heading.
-	pub heading_gap_after: u16,
-	/// Number of blank lines after a paragraph.
-	pub paragraph_gap_after: u16,
-	/// Number of blank lines before and after a block quote.
-	pub block_quote_gap: u16,
-	/// Indentation width for block quotes (includes the `│ ` bar).
-	pub block_quote_indent: u16,
-	/// Style applied to h1 headings.
-	pub h1_style: Style,
-	/// Style applied to h2 headings.
-	pub h2_style: Style,
-	/// Style applied to h3+ headings.
-	pub h3_style: Style,
-	/// Whether h1 headings are centered.
-	pub h1_centered: bool,
-	/// Foreground color for link text.
-	pub link_fg: Color,
-	/// Foreground color for the horizontal rule.
-	pub hr_fg: Color,
-	/// Unordered list bullet string.
-	pub bullet: String,
-	/// Foreground color for bullet / list number prefixes.
-	pub bullet_fg: Color,
-}
-
-impl Default for TuiConfig {
-	fn default() -> Self {
-		Self {
-			h1_gap_before: 2,
-			heading_gap_after: 0,
-			paragraph_gap_after: 0,
-			block_quote_gap: 1,
-			block_quote_indent: 2,
-			h1_style: Style::new().bold().fg(Color::Yellow),
-			h2_style: Style::new().bold().fg(Color::Cyan),
-			h3_style: Style::new().bold(),
-			h1_centered: true,
-			link_fg: Color::Cyan,
-			hr_fg: Color::DarkGray,
-			bullet: "• ".to_string(),
-			bullet_fg: Color::DarkGray,
-		}
-	}
-}
-
 /// Tracks the context for a list being rendered.
 #[derive(Debug, Clone)]
 struct TuiListContext {
@@ -791,6 +658,128 @@ struct TuiListContext {
 	current_number: usize,
 }
 
+
+/// Horizontal justification for block-level content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Justify {
+	#[default]
+	Start,
+	Center,
+	End,
+}
+
+/// Style descriptor for TUI rendering.
+///
+/// Wraps a ratatui [`Style`] with layout metadata so the
+/// [`StyleMap`] can drive both visual appearance and block-level
+/// spacing without hand-rolled config structs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TuiStyle {
+	/// The ratatui visual style (colors, modifiers).
+	pub style: Style,
+	/// Blank lines to emit before this element.
+	pub lines_before: u16,
+	/// Blank lines to emit after this element.
+	pub lines_after: u16,
+	/// Horizontal justification for block content.
+	pub justify: Justify,
+}
+
+impl Default for TuiStyle {
+	fn default() -> Self {
+		Self {
+			style: Style::default(),
+			lines_before: 0,
+			lines_after: 0,
+			justify: Justify::Start,
+		}
+	}
+}
+
+impl TuiStyle {
+	pub fn new(style: Style) -> Self {
+		Self {
+			style,
+			..Default::default()
+		}
+	}
+
+	pub fn with_lines_before(mut self, lines: u16) -> Self {
+		self.lines_before = lines;
+		self
+	}
+
+	pub fn with_lines_after(mut self, lines: u16) -> Self {
+		self.lines_after = lines;
+		self
+	}
+
+	pub fn with_justify(mut self, justify: Justify) -> Self {
+		self.justify = justify;
+		self
+	}
+}
+
+/// Build the default element → [`TuiStyle`] mapping used by [`RatatuiRenderer`].
+pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
+	StyleMap::new(TuiStyle::default(), vec![
+		(
+			"h1",
+			TuiStyle::new(Style::new().bold().fg(Color::Yellow))
+				.with_lines_before(2)
+				.with_justify(Justify::Center),
+		),
+		("h2", TuiStyle::new(Style::new().bold().fg(Color::Cyan))),
+		("h3", TuiStyle::new(Style::new().bold())),
+		("h4", TuiStyle::new(Style::new().bold())),
+		("h5", TuiStyle::new(Style::new().bold())),
+		("h6", TuiStyle::new(Style::new().bold())),
+		("p", TuiStyle::default()),
+		("div", TuiStyle::default()),
+		("section", TuiStyle::default()),
+		("article", TuiStyle::default()),
+		("nav", TuiStyle::default()),
+		("header", TuiStyle::default()),
+		("footer", TuiStyle::default()),
+		("main", TuiStyle::default()),
+		(
+			"blockquote",
+			TuiStyle::new(Style::new().italic())
+				.with_lines_before(1)
+				.with_lines_after(1),
+		),
+		(
+			"aside",
+			TuiStyle::new(Style::new().italic())
+				.with_lines_before(1)
+				.with_lines_after(1),
+		),
+		("pre", TuiStyle::new(Style::new().bg(Color::DarkGray))),
+		("code", TuiStyle::new(Style::new().bg(Color::DarkGray))),
+		("strong", TuiStyle::new(Style::new().bold())),
+		("em", TuiStyle::new(Style::new().italic())),
+		(
+			"del",
+			TuiStyle::new(Style::new().add_modifier(Modifier::CROSSED_OUT)),
+		),
+		(
+			"a",
+			TuiStyle::new(
+				Style::new()
+					.fg(Color::Cyan)
+					.add_modifier(Modifier::UNDERLINED),
+			),
+		),
+		("hr", TuiStyle::new(Style::new().fg(Color::DarkGray))),
+		(
+			"img",
+			TuiStyle::new(Style::new().fg(Color::DarkGray).italic()),
+		),
+		("button", TuiStyle::new(Style::new().fg(Color::Cyan))),
+		("li", TuiStyle::default()),
+		("thead", TuiStyle::new(Style::new().bold())),
+	])
+}
 
 #[cfg(test)]
 mod test {
@@ -1198,5 +1187,54 @@ mod test {
 			.as_str()
 			.xpect_contains("• alpha")
 			.xpect_contains("• beta");
+	}
+
+	#[test]
+	fn custom_style_map() {
+		let mut world = World::new();
+		let text_entity = world.spawn(Value::from("Styled")).id();
+		let heading =
+			world.spawn((Element::new("h1"), Children::default())).id();
+		world.entity_mut(heading).add_children(&[text_entity]);
+
+		let area = Rect::new(0, 0, 40, 10);
+		let custom_map = StyleMap::new(TuiStyle::default(), vec![(
+			"h1",
+			TuiStyle::new(Style::new().fg(Color::Red).bold()),
+		)]);
+
+		let buf = world
+			.run_system_once_with(
+				|In((entity, area, style_map)): In<(
+					Entity,
+					Rect,
+					StyleMap<TuiStyle>,
+				)>,
+				 walker: NodeWalker| {
+					let mut buf = Buffer::empty(area);
+					let mut renderer = RatatuiRenderer::new(area, &mut buf)
+						.with_style_map(style_map);
+					walker.walk(&mut renderer, entity);
+					renderer.finish();
+					buf
+				},
+				(heading, area, custom_map),
+			)
+			.unwrap();
+
+		buffer_to_text(&buf).as_str().xpect_contains("Styled");
+		// Verify the custom red foreground was applied
+		let buf_area = buf.area;
+		let mut found_red = false;
+		for row in buf_area.y..buf_area.y + buf_area.height {
+			for col in buf_area.x..buf_area.x + buf_area.width {
+				if buf[(col, row)].symbol() == "S"
+					&& buf[(col, row)].style().fg == Some(Color::Red)
+				{
+					found_red = true;
+				}
+			}
+		}
+		found_red.xpect_true();
 	}
 }
