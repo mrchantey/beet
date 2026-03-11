@@ -123,6 +123,9 @@ pub enum MediaType {
 	/// `text/ansi-term`, plaintext annotated with
 	/// Ansi escape sequences for pretty terminal output
 	AnsiTerm,
+	/// `state/ratatui` — stateful media type represented as changes
+	/// in the state of the program handling the request, not as bytes.
+	Ratatui,
 	/// An unrecognized media type.
 	Other(String),
 }
@@ -183,6 +186,7 @@ impl MediaType {
 	const SQL: &'static str = "application/sql";
 	const GRAPHQL: &'static str = "application/graphql";
 	const ANSI_TERM: &'static str = "text/ansi-term";
+	const RATATUI: &'static str = "state/ratatui";
 
 	/// Parse a media type from a content-type string.
 	///
@@ -254,6 +258,7 @@ impl MediaType {
 			val if val.contains(Self::SQL) => MediaType::Sql,
 			val if val.contains(Self::GRAPHQL) => MediaType::GraphQl,
 			val if val.contains(Self::ANSI_TERM) => MediaType::AnsiTerm,
+			val if val.contains(Self::RATATUI) => MediaType::Ratatui,
 			other => MediaType::Other(other.to_string()),
 		}
 	}
@@ -411,6 +416,7 @@ impl MediaType {
 			MediaType::Sql => Self::SQL,
 			MediaType::GraphQl => Self::GRAPHQL,
 			MediaType::AnsiTerm => Self::ANSI_TERM,
+			MediaType::Ratatui => Self::RATATUI,
 			MediaType::Other(val) => val.as_str(),
 		}
 	}

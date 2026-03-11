@@ -2,32 +2,37 @@ use beet_core::prelude::*;
 use std::borrow::Cow;
 use std::sync::Arc;
 
+/// Maps element names to style values with nesting support.
+///
+/// Maintains a stack of styles pushed/popped as elements are
+/// entered/left, plus a fallback association table for aliasing
+/// element names (eg `b` → `strong`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleMap<S> {
-	/// Explicit element-name → style mapping.
-	style_map: HashMap<Cow<'static, str>, Arc<S>>,
-	/// Fallback mapping: if an element is missing from `style_map`,
-	/// look up its association here and use that element's style instead.
-	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
 	/// Style used when no mapping or association is found.
 	default_style: Arc<S>,
 	/// Stack of active styles so nested elements restore correctly.
-	style_stack: Vec<Arc<S>>,
+	nesting_stack: Vec<Arc<S>>,
+	/// Explicit element-name → style mapping.
+	element_map: HashMap<Cow<'static, str>, Arc<S>>,
+	/// Fallback mapping: if an element is missing from `element_map`,
+	/// look up its association here and use that element's style instead.
+	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
 }
 
 impl<S> StyleMap<S> {
 	pub fn new(
 		default_style: S,
-		style_map: Vec<(impl Into<Cow<'static, str>>, S)>,
+		element_map: Vec<(impl Into<Cow<'static, str>>, S)>,
 	) -> Self {
 		Self {
-			style_map: style_map
+			default_style: Arc::new(default_style),
+			nesting_stack: Vec::new(),
+			element_map: element_map
 				.into_iter()
 				.map(|(k, v)| (k.into(), Arc::new(v)))
 				.collect(),
 			default_associations: default_associations(),
-			default_style: Arc::new(default_style),
-			style_stack: Vec::new(),
 		}
 	}
 
@@ -48,10 +53,10 @@ impl<S> StyleMap<S> {
 	}
 
 	pub fn resolve(&self, element: &str) -> &S {
-		if let Some(style) = self.style_map.get(element) {
+		if let Some(style) = self.element_map.get(element) {
 			style
 		} else if let Some(assoc) = self.default_associations.get(element) {
-			self.style_map.get(assoc).unwrap_or(&self.default_style)
+			self.element_map.get(assoc).unwrap_or(&self.default_style)
 		} else {
 			&self.default_style
 		}
@@ -59,14 +64,14 @@ impl<S> StyleMap<S> {
 
 	pub fn push(&mut self, name: &str) -> Arc<S> {
 		let style = self.resolve_style(name);
-		self.style_stack.push(Arc::clone(&style));
+		self.nesting_stack.push(Arc::clone(&style));
 		style
 	}
 
-	pub fn pop(&mut self) -> Option<Arc<S>> { self.style_stack.pop() }
+	pub fn pop(&mut self) -> Option<Arc<S>> { self.nesting_stack.pop() }
 
 	pub fn current(&self) -> Arc<S> {
-		self.style_stack
+		self.nesting_stack
 			.last()
 			.unwrap_or(&self.default_style)
 			.clone()
@@ -78,13 +83,13 @@ impl<S> StyleMap<S> {
 		let lower = name.to_ascii_lowercase();
 
 		// direct lookup
-		if let Some(style) = self.style_map.get(lower.as_str()) {
+		if let Some(style) = self.element_map.get(lower.as_str()) {
 			return style.clone();
 		}
 
 		// association fallback (one level deep to avoid cycles)
 		if let Some(assoc) = self.default_associations.get(lower.as_str()) {
-			if let Some(style) = self.style_map.get(assoc.as_ref()) {
+			if let Some(style) = self.element_map.get(assoc.as_ref()) {
 				return style.clone();
 			}
 		}

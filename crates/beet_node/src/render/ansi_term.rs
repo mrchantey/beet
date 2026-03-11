@@ -36,7 +36,7 @@ impl Default for AnsiTermRenderer {
 impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
-			style_map: StyleMap::new(Style::default(), default_style_map()),
+			style_map: StyleMap::new(Style::default(), default_element_map()),
 			clear_on_render: true,
 			prefix: "\n".into(),
 			render_expressions: false,
@@ -165,7 +165,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				// code block content rendered directly in visit_value
 			}
 			"code" => {
-				// inline code, style applied via style_stack
+				// inline code, style applied via style_map
 			}
 
 			// ── Links ──
@@ -242,7 +242,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.needs_block_separator = true;
 			}
 			"code" if !self.state.in_preformatted => {
-				// inline code, style restored via style_stack pop below
+				// inline code, style restored via style_map pop below
 			}
 			"a" => {
 				self.close_osc8_link();
@@ -337,7 +337,7 @@ impl NodeRenderer for AnsiTermRenderer {
 }
 
 
-fn default_style_map() -> Vec<(&'static str, Style)> {
+fn default_element_map() -> Vec<(&'static str, Style)> {
 	vec![
 		("h1", Style::new().bold().fg(Color::Green)),
 		("h2", Style::new().bold().fg(Color::Cyan)),

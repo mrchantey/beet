@@ -4,6 +4,7 @@
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
+//! - `tui` — adds [`RatatuiRenderer`] support (`state/ratatui`)
 
 use crate::prelude::*;
 #[allow(unused_imports)]
@@ -146,6 +147,8 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "ansi_term")]
 		available.push(MediaType::AnsiTerm);
+		#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+		available.push(MediaType::Ratatui);
 		available
 	}
 }
