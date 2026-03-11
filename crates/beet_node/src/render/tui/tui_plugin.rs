@@ -19,6 +19,7 @@ use bevy_ratatui::RatatuiPlugins;
 /// # Includes
 /// - [`StackPlugin`]
 /// - [`MinimalPlugins`]
+#[derive(Default)]
 pub struct TuiPlugin;
 
 impl Plugin for TuiPlugin {

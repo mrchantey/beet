@@ -538,6 +538,15 @@ impl NodeRenderer for TuiRenderer {
 		self.reset(area);
 		cx.walk(self);
 		self.flush_spans();
+		let buffer = std::mem::take(&mut self.buf);
+		cx.world
+			.resource_mut::<RatatuiContext>()
+			.draw(|frame| {
+				let _ = std::mem::replace(frame.buffer_mut(), buffer);
+			})
+			.map_err(|err| {
+				bevyhow!("Failed to draw to RatatuiContext: {err}")
+			})?;
 		Ok(RenderOutput::Stateful)
 	}
 }

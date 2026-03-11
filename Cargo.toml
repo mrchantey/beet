@@ -193,7 +193,7 @@ http-body-util = "0.1"
 url = "2"
 
 #💡 tui
-bevy_ratatui = { version = "0.11", default-features=false, features = ["crossterm", "keyboard", "mouse"] }
+bevy_ratatui = { version = "0.11", default-features=false }
 # bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
 ratatui = { version = "0.30", default-features = false }
 
@@ -273,7 +273,7 @@ _pretty_curl = ["net","node","ureq","native-tls"]
 tool = ["dep:beet_tool"]
 node = ["dep:beet_node"]
 stack = ["tool", "dep:beet_stack"]
-tui = ["stack", "beet_stack/tui"]
+tui = ["node", "beet_node/tui"]
 markdown = ["beet_stack?/markdown"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]

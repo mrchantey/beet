@@ -31,7 +31,7 @@ pub struct MediaRenderer {
 	/// Stored TUI renderer. Callers must set this via
 	/// [`Self::with_tui_renderer`] before requesting
 	/// [`MediaType::Ratatui`].
-	#[cfg(feature = "tui")]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	tui_renderer: TuiRenderer,
 }
 
@@ -61,7 +61,7 @@ impl MediaRenderer {
 			markdown_renderer: default(),
 			#[cfg(feature = "ansi_term")]
 			ansi_term_renderer: default(),
-			#[cfg(feature = "tui")]
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 			tui_renderer: default(),
 		}
 	}
@@ -113,7 +113,7 @@ impl MediaRenderer {
 	}
 
 	/// Set the [`RatatuiRenderer`] used for [`MediaType::Ratatui`] output.
-	#[cfg(feature = "tui")]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	pub fn with_tui_renderer(mut self, renderer: TuiRenderer) -> Self {
 		self.tui_renderer = renderer;
 		self
@@ -152,7 +152,7 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(feature = "tui")]
+			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 			MediaType::Ratatui => self.tui_renderer.render(&mut inner_cx).map(Some),
 			other if self.plaintext_fallback && other.is_text() => {
 				self.plain_text_renderer.render(&mut inner_cx).map(Some)
@@ -167,7 +167,7 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "ansi_term")]
 		available.push(MediaType::AnsiTerm);
-		#[cfg(feature = "tui")]
+		#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 		available.push(MediaType::Ratatui);
 		available
 	}

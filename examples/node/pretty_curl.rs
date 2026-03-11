@@ -21,7 +21,13 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, AsyncPlugin::default()))
+		.add_plugins((
+			#[cfg(not(feature = "tui"))]
+			MinimalPlugins,
+			#[cfg(feature = "tui")]
+			TuiPlugin::default(),
+			AsyncPlugin::default(),
+		))
 		.add_systems(Startup, fetch_and_render)
 		.run();
 }
@@ -73,6 +79,7 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			println!("{output}");
 		});
 
+		#[cfg(not(feature = "tui"))]
 		world.write_message(AppExit::Success);
 	});
 }
