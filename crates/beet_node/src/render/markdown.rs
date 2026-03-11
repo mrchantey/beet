@@ -73,20 +73,15 @@ impl MarkdownRenderer {
 
 
 impl NodeVisitor for MarkdownRenderer {
-	fn visit_element(
-		&mut self,
-		_cx: &VisitContext,
-		element: &Element,
-		attrs: Vec<(Entity, &Attribute, &Value)>,
-	) {
-		let name = element.name().to_ascii_lowercase();
+	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
+		let name = view.name();
 
-		match name.as_str() {
+		match name {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				self.state.ensure_block_separator();
-				let level = name[1..].parse::<usize>().unwrap_or(1);
-				let prefix = "#".repeat(level);
+				let level = name.as_bytes()[1] - b'0';
+				let prefix = "#".repeat(level as usize);
 				self.push_str(&format!("{prefix} "));
 			}
 
@@ -113,7 +108,7 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.enter_ul();
 			}
 			"ol" => {
-				let start = TextRenderState::ol_start(&attrs);
+				let start = view.ol_start();
 				self.state.enter_ol(start);
 			}
 			"li" => {
@@ -130,7 +125,8 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 			"code" if self.state.in_preformatted => {
 				// fenced code block: extract language from class
-				let info = TextRenderState::find_attr(&attrs, "class")
+				let info = view
+					.attribute("class")
 					.and_then(|val| match val {
 						Value::Str(class) => class
 							.strip_prefix("language-")
@@ -174,21 +170,17 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Links ──
 			"a" => {
-				let href = TextRenderState::find_attr(&attrs, "href")
-					.map(|val| val.to_string())
-					.unwrap_or_default();
+				let href = view.attribute_string("href");
 				self.state.pending_link_href = Some(href);
 				self.push_char('[');
 				self.inline_stack.push(InlineWrapper::Link);
 			}
 
-			// ── Images ──
+			// ── Images (void element) ──
 			"img" => {
-				let src = TextRenderState::find_attr(&attrs, "src")
-					.map(|val| val.to_string())
-					.unwrap_or_default();
-				self.state.image_src = Some(src);
-				self.state.image_alt = Some(String::new());
+				let src = view.attribute_string("src");
+				let alt = view.attribute_string("alt");
+				self.push_str(&format!("![{}]({})", alt, src));
 			}
 
 			// ── Thematic break ──
@@ -211,7 +203,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Catch-all for unknown block/inline elements ──
 			_ => {
-				if self.state.is_block_element(&name) {
+				if self.state.is_block_element(name) {
 					self.state.ensure_block_separator();
 				}
 			}
@@ -219,9 +211,9 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let name = element.name().to_ascii_lowercase();
+		let name = element.name();
 
-		match name.as_str() {
+		match name {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				self.state.ensure_newline();
@@ -318,16 +310,8 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_char(')');
 			}
 
-			// ── Images ──
-			"img" => {
-				let src = self.state.image_src.take().unwrap_or_default();
-				let alt = self.state.image_alt.take().unwrap_or_default();
-				self.push_str("![");
-				self.push_str(&alt);
-				self.push_str("](");
-				self.push_str(&src);
-				self.push_char(')');
-			}
+			// ── Images (void element, fully handled in visit_element) ──
+			"img" => {}
 
 			// ── Void/self-closing ──
 			"hr" | "br" => {
@@ -335,7 +319,7 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 
 			_ => {
-				if self.state.is_block_element(&name) {
+				if self.state.is_block_element(name) {
 					self.state.ensure_newline();
 					self.state.needs_block_separator = true;
 				}
@@ -346,12 +330,6 @@ impl NodeVisitor for MarkdownRenderer {
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
 		let text = value.to_string();
 		if text.is_empty() {
-			return;
-		}
-
-		// if inside an <img>, capture text as alt instead of emitting
-		if let Some(ref mut alt) = self.state.image_alt {
-			alt.push_str(&text);
 			return;
 		}
 

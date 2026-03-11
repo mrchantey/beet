@@ -20,12 +20,77 @@ pub struct NodeWalker<'w, 's> {
 
 
 pub struct VisitContext {
-	/// The entity from which the walker began
+	/// The entity from which the walker began.
 	pub start: Entity,
-	/// The element/value node currently being visited
+	/// The element/value node currently being visited.
 	pub entity: Entity,
-	/// Current depth in the tree, starting at 0 for the root
+	/// Current depth in the tree, starting at 0 for the root.
 	pub depth: usize,
+}
+
+/// Read-only view of an element and its attributes, provided to
+/// [`NodeVisitor::visit_element`] for convenient attribute lookup.
+pub struct ElementView<'a> {
+	/// The element component.
+	pub element: &'a Element,
+	/// Attribute triples `(entity, key, value)` for this element.
+	pub attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+}
+
+impl<'a> ElementView<'a> {
+	/// Create a new view from an element reference and its attributes.
+	pub fn new(
+		element: &'a Element,
+		attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+	) -> Self {
+		Self {
+			element,
+			attributes,
+		}
+	}
+
+	/// The tag name of this element, ie `div`, `span`, `p`.
+	pub fn name(&self) -> &str { self.element.name() }
+
+	/// Look up the first attribute matching `key` and return its value.
+	pub fn attribute(&self, key: &str) -> Option<&'a Value> {
+		self.attributes
+			.iter()
+			.find(|(_, attr, _)| attr.as_str() == key)
+			.map(|(_, _, val)| *val)
+	}
+
+	/// Look up the first attribute matching `key` and return its
+	/// `(entity, value)` pair.
+	pub fn attribute_with_entity(
+		&self,
+		key: &str,
+	) -> Option<(Entity, &'a Value)> {
+		self.attributes
+			.iter()
+			.find(|(_, attr, _)| attr.as_str() == key)
+			.map(|(entity, _, val)| (*entity, *val))
+	}
+
+	/// Look up an attribute and convert its value to a [`String`].
+	/// Returns an empty string when the attribute is absent.
+	pub fn attribute_string(&self, key: &str) -> String {
+		self.attribute(key)
+			.map(|val| val.to_string())
+			.unwrap_or_default()
+	}
+
+	/// Extract the `start` attribute as a `usize` for ordered lists.
+	/// Defaults to `1` when absent or not numeric.
+	pub fn ol_start(&self) -> usize {
+		self.attribute("start")
+			.and_then(|val| match val {
+				Value::Uint(num) => Some(*num as usize),
+				Value::Int(num) => Some(*num as usize),
+				_ => None,
+			})
+			.unwrap_or(1)
+	}
 }
 
 impl NodeWalker<'_, '_> {
@@ -60,7 +125,8 @@ impl NodeWalker<'_, '_> {
 		// 3. Element
 		if let Some(element) = element {
 			let attrs = self.attributes.all(cx.entity);
-			visitor.visit_element(&cx, element, attrs);
+			let view = ElementView::new(element, attrs);
+			visitor.visit_element(&cx, &view);
 		}
 		// 4. Value
 		if let Some(value) = value {
@@ -106,13 +172,7 @@ pub trait NodeVisitor {
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
 	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}
-	fn visit_element(
-		&mut self,
-		_cx: &VisitContext,
-		_element: &Element,
-		_attrs: Vec<(Entity, &Attribute, &Value)>,
-	) {
-	}
+	fn visit_element(&mut self, _cx: &VisitContext, _view: &ElementView) {}
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {}
 	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value) {}
 	fn visit_expression(

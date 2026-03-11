@@ -52,8 +52,8 @@ pub mod prelude {
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "stack")]
 	pub use crate::stack::prelude::*;
-	// #[cfg(feature = "tool")]
-	// pub use crate::tool::prelude::*;
+	#[cfg(feature = "tool")]
+	pub use crate::tool::prelude::*;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
 	// #[cfg(feature = "clanker")]

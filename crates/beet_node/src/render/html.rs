@@ -138,17 +138,12 @@ impl NodeVisitor for HtmlRenderer {
 		self.write_newline();
 	}
 
-	fn visit_element(
-		&mut self,
-		_cx: &VisitContext,
-		element: &Element,
-		attrs: Vec<(Entity, &Attribute, &Value)>,
-	) {
+	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
 		self.write_indent();
 		self.buffer.push('<');
-		self.buffer.push_str(element.name());
+		self.buffer.push_str(view.name());
 
-		for (_entity, attr, value) in &attrs {
+		for (_entity, attr, value) in &view.attributes {
 			self.buffer.push(' ');
 			self.buffer.push_str(attr);
 			match value {
@@ -163,7 +158,7 @@ impl NodeVisitor for HtmlRenderer {
 			}
 		}
 
-		let is_void = self.is_void_element(element.name());
+		let is_void = self.is_void_element(view.name());
 		if is_void {
 			self.buffer.push_str(" />");
 		} else {

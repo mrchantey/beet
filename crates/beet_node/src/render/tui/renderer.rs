@@ -65,8 +65,9 @@ pub struct RatatuiRenderer {
 	in_code_block: bool,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
-	/// List nesting stack for bullet/number tracking.
-	list_stack: Vec<TuiListContext>,
+	/// List nesting stack for bullet/number tracking, shared with
+	/// [`TextRenderState`].
+	list_stack: Vec<ListContext>,
 	/// Unordered list bullet string.
 	pub bullet_prefix: Cow<'static, str>,
 	/// Style for bullet / list number prefixes.
@@ -224,39 +225,23 @@ impl RatatuiRenderer {
 	/// Whether an element name is block-level, using the shared
 	/// [`default_block_elements`] list.
 	fn is_block_element(&self, name: &str) -> bool {
-		let lower = name.to_ascii_lowercase();
-		self.block_elements.iter().any(|el| el.as_ref() == lower)
-	}
-
-	/// Find an attribute value by key in an attrs slice.
-	fn find_attr<'a>(
-		attrs: &'a [(Entity, &Attribute, &Value)],
-		key: &str,
-	) -> Option<&'a Value> {
-		attrs
-			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(_, _, val)| *val)
+		self.block_elements.iter().any(|el| el.as_ref() == name)
 	}
 }
 
 impl NodeVisitor for RatatuiRenderer {
-	fn visit_element(
-		&mut self,
-		cx: &VisitContext,
-		element: &Element,
-		attrs: Vec<(Entity, &Attribute, &Value)>,
-	) {
-		let name = element.name().to_ascii_lowercase();
+	fn visit_element(&mut self, cx: &VisitContext, view: &ElementView) {
+		let name = view.name();
 
 		// Push the style map entry for this element (handles nesting).
-		let tui_style = self.style_map.push(&name);
+		let tui_style = self.style_map.push(name);
 
-		match name.as_str() {
+		// Apply lines_before from TuiStyle for all elements.
+		self.advance_lines(tui_style.lines_before);
+
+		match name {
 			// ── Headings ──
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.advance_lines(tui_style.lines_before);
-			}
+			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {}
 
 			// ── Paragraph ──
 			"p" | "div" | "section" | "article" | "nav" | "header"
@@ -266,7 +251,6 @@ impl NodeVisitor for RatatuiRenderer {
 
 			// ── Blockquote ──
 			"blockquote" | "aside" => {
-				self.advance_lines(tui_style.lines_before);
 				let indent = self.block_quote_indent;
 				if self.area.width > indent {
 					if self.area.height > 0 {
@@ -290,36 +274,21 @@ impl NodeVisitor for RatatuiRenderer {
 
 			// ── Lists ──
 			"ul" => {
-				self.list_stack.push(TuiListContext {
-					ordered: false,
-					current_number: 1,
-				});
+				self.list_stack.push(ListContext::Unordered);
 			}
 			"ol" => {
-				let start = Self::find_attr(&attrs, "start")
-					.and_then(|val| match val {
-						Value::Uint(num) => Some(*num as usize),
-						Value::Int(num) => Some(*num as usize),
-						_ => None,
-					})
-					.unwrap_or(1);
-				self.list_stack.push(TuiListContext {
-					ordered: true,
-					current_number: start,
-				});
+				let start = view.ol_start();
+				self.list_stack.push(ListContext::Ordered(start));
 			}
 			"li" => {
 				self.in_list_item = true;
-				let bullet = if let Some(list) = self.list_stack.last_mut() {
-					if list.ordered {
-						let num = list.current_number;
-						list.current_number += 1;
-						format!("{num}. ").into()
-					} else {
-						self.bullet_prefix.clone()
+				let bullet = match self.list_stack.last_mut() {
+					Some(ListContext::Ordered(num)) => {
+						let prefix = format!("{num}. ");
+						*num += 1;
+						prefix.into()
 					}
-				} else {
-					self.bullet_prefix.clone()
+					_ => self.bullet_prefix.clone(),
 				};
 
 				self.push_span(
@@ -344,7 +313,7 @@ impl NodeVisitor for RatatuiRenderer {
 				}
 			}
 
-			// ── Thematic break ──
+			// ── Thematic break (void element) ──
 			"hr" => {
 				self.flush_spans();
 				self.render_hr();
@@ -352,10 +321,9 @@ impl NodeVisitor for RatatuiRenderer {
 
 			// ── Images (void element) ──
 			"img" => {
-				let src = Self::find_attr(&attrs, "src")
-					.map(|val| val.to_string())
-					.unwrap_or_default();
-				let alt = Self::find_attr(&attrs, "alt")
+				let src = view.attribute_string("src");
+				let alt = view
+					.attribute("alt")
 					.map(|val| val.to_string())
 					.unwrap_or_else(|| "image".to_string());
 				let label = if src.is_empty() {
@@ -364,6 +332,11 @@ impl NodeVisitor for RatatuiRenderer {
 					format!("[{alt}: {src}]")
 				};
 				self.push_span(Span::styled(label, tui_style.style), cx.entity);
+				self.flush_spans();
+			}
+
+			// ── Line break (void element) ──
+			"br" => {
 				self.flush_spans();
 			}
 
@@ -382,11 +355,6 @@ impl NodeVisitor for RatatuiRenderer {
 				// Style applied in visit_value via style map
 			}
 
-			// ── Line break ──
-			"br" => {
-				self.flush_spans();
-			}
-
 			// ── Button-like elements ──
 			"button" => {
 				self.push_span(Span::styled("[", tui_style.style), cx.entity);
@@ -400,12 +368,12 @@ impl NodeVisitor for RatatuiRenderer {
 	}
 
 	fn leave_element(&mut self, cx: &VisitContext, element: &Element) {
-		let name = element.name().to_ascii_lowercase();
+		let name = element.name();
 
 		// Peek the style before popping so we can use lines_after.
 		let tui_style = self.style_map.current();
 
-		match name.as_str() {
+		match name {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				if tui_style.justify == Justify::Center {
@@ -443,16 +411,12 @@ impl NodeVisitor for RatatuiRenderer {
 				} else {
 					self.flush_spans();
 				}
-				let lines_after = tui_style.lines_after;
-				self.advance_lines(lines_after);
 			}
 
 			// ── Paragraph ──
 			"p" | "div" | "section" | "article" | "nav" | "header"
 			| "footer" | "main" => {
 				self.flush_spans();
-				let lines_after = tui_style.lines_after;
-				self.advance_lines(lines_after);
 			}
 
 			// ── Blockquote ──
@@ -461,8 +425,6 @@ impl NodeVisitor for RatatuiRenderer {
 				let indent = self.block_quote_indent;
 				self.area.x = self.area.x.saturating_sub(indent);
 				self.area.width = self.area.width.saturating_add(indent);
-				let lines_after = tui_style.lines_after;
-				self.advance_lines(lines_after);
 			}
 
 			// ── Code blocks ──
@@ -497,13 +459,8 @@ impl NodeVisitor for RatatuiRenderer {
 			// ── Links ──
 			"a" => {}
 
-			// ── Images (void element, fully handled in visit_element) ──
-			"img" => {}
-
-			// ── Thematic break / line break ──
-			"hr" | "br" => {
-				// already handled in visit_element
-			}
+			// ── Void elements, fully handled in visit_element ──
+			"img" | "hr" | "br" => {}
 
 			// ── Button ──
 			"button" => {
@@ -517,11 +474,14 @@ impl NodeVisitor for RatatuiRenderer {
 
 			// ── Generic block handling ──
 			_ => {
-				if self.is_block_element(&name) {
+				if self.is_block_element(name) {
 					self.flush_spans();
 				}
 			}
 		}
+
+		// Apply lines_after from TuiStyle for all elements.
+		self.advance_lines(tui_style.lines_after);
 
 		// Every push in visit_element is balanced by a pop here.
 		self.style_map.pop();
@@ -600,12 +560,7 @@ pub fn tui_render_system(
 	renderer.finish()
 }
 
-/// Tracks the context for a list being rendered.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TuiListContext {
-	ordered: bool,
-	current_number: usize,
-}
+
 
 
 /// Horizontal justification for block-level content.

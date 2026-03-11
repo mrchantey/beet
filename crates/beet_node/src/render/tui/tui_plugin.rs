@@ -10,6 +10,9 @@ use bevy_ratatui::RatatuiPlugins;
 /// Top level Bevy plugin that sets up [`bevy_ratatui`], inserts TUI resources,
 /// and registers the input/draw systems.
 ///
+/// Only available on non-wasm targets since [`bevy_ratatui`] depends on
+/// a terminal backend (crossterm).
+///
 /// Add this plugin alongside [`StackPlugin`] when building a TUI app.
 /// All boilerplate for the terminal lifecycle is handled here.
 ///

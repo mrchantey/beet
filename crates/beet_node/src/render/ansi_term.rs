@@ -102,16 +102,11 @@ impl AnsiTermRenderer {
 
 
 impl NodeVisitor for AnsiTermRenderer {
-	fn visit_element(
-		&mut self,
-		_cx: &VisitContext,
-		element: &Element,
-		attrs: Vec<(Entity, &Attribute, &Value)>,
-	) {
-		let name = element.name().to_ascii_lowercase();
-		self.style_map.push(&name);
+	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
+		let name = view.name();
+		self.style_map.push(name);
 
-		match name.as_str() {
+		match name {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				self.state.ensure_block_separator();
@@ -146,7 +141,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.enter_ul();
 			}
 			"ol" => {
-				let start = TextRenderState::ol_start(&attrs);
+				let start = view.ol_start();
 				self.state.enter_ol(start);
 			}
 			"li" => {
@@ -170,20 +165,24 @@ impl NodeVisitor for AnsiTermRenderer {
 
 			// ── Links ──
 			"a" => {
-				let href = TextRenderState::find_attr(&attrs, "href")
-					.map(|val| val.to_string())
-					.unwrap_or_default();
+				let href = view.attribute_string("href");
 				self.state.pending_link_href = Some(href.clone());
 				self.open_osc8_link(&href);
 			}
 
-			// ── Images ──
+			// ── Images (void element) ──
 			"img" => {
-				let src = TextRenderState::find_attr(&attrs, "src")
-					.map(|val| val.to_string())
-					.unwrap_or_default();
-				self.state.image_src = Some(src);
-				self.state.image_alt = Some(String::new());
+				let src = view.attribute_string("src");
+				let alt = view.attribute_string("alt");
+				let style = self.style_map.current();
+				let display = if alt.is_empty() {
+					format!("[image: {src}]")
+				} else {
+					format!("[{alt}]")
+				};
+				self.open_osc8_link(&src);
+				self.state.push_raw(&format!("{}", style.paint(&display)));
+				self.close_osc8_link();
 			}
 
 			// ── Thematic break ──
@@ -201,7 +200,7 @@ impl NodeVisitor for AnsiTermRenderer {
 
 			// ── Generic block handling ──
 			_ => {
-				if self.state.is_block_element(&name) {
+				if self.state.is_block_element(name) {
 					self.state.ensure_block_separator();
 				}
 			}
@@ -209,9 +208,9 @@ impl NodeVisitor for AnsiTermRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let name = element.name().to_ascii_lowercase();
+		let name = element.name();
 
-		match name.as_str() {
+		match name {
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
@@ -248,24 +247,13 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.close_osc8_link();
 				self.state.pending_link_href = None;
 			}
-			"img" => {
-				let src = self.state.image_src.take().unwrap_or_default();
-				let alt = self.state.image_alt.take().unwrap_or_default();
-				let style = self.style_map.current();
-				let display = if alt.is_empty() {
-					format!("[image: {src}]")
-				} else {
-					format!("[{alt}]")
-				};
-				self.open_osc8_link(&src);
-				self.state.push_raw(&format!("{}", style.paint(&display)));
-				self.close_osc8_link();
-			}
+			// ── Images (void element, fully handled in visit_element) ──
+			"img" => {}
 			"hr" | "br" => {
 				// already handled in visit_element
 			}
 			_ => {
-				if self.state.is_block_element(&name) {
+				if self.state.is_block_element(name) {
 					self.state.ensure_newline();
 					self.state.needs_block_separator = true;
 				}
@@ -278,12 +266,6 @@ impl NodeVisitor for AnsiTermRenderer {
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
 		let text = value.to_string();
 		if text.is_empty() {
-			return;
-		}
-
-		// if inside an <img>, capture text as alt instead of emitting
-		if let Some(ref mut alt) = self.state.image_alt {
-			alt.push_str(&text);
 			return;
 		}
 

@@ -25,10 +25,6 @@ pub struct TextRenderState {
 	pub trailing_newline: bool,
 	/// Pending href captured from the most recent `<a>` element.
 	pub pending_link_href: Option<String>,
-	/// When inside an `<img>`, the src URL from its attribute.
-	pub image_src: Option<String>,
-	/// Accumulated alt text while inside an `<img>` element.
-	pub image_alt: Option<String>,
 	/// Code fence info string from `<code>` inside `<pre>`.
 	pub code_fence_info: Option<String>,
 	/// Nesting depth of `<blockquote>` elements.
@@ -57,8 +53,6 @@ impl TextRenderState {
 			needs_block_separator: false,
 			trailing_newline: true, // start of document counts as newline
 			pending_link_href: None,
-			image_src: None,
-			image_alt: None,
 			code_fence_info: None,
 			blockquote_depth: 0,
 		}
@@ -184,27 +178,5 @@ impl TextRenderState {
 	/// `prefix` is the per-level marker, eg `"> "` or `"▌ "`.
 	pub fn blockquote_prefix(&self, marker: &str) -> String {
 		marker.repeat(self.blockquote_depth)
-	}
-
-	/// Look up an attribute value by key from a visitor attrs slice.
-	pub fn find_attr<'a>(
-		attrs: &'a [(Entity, &Attribute, &Value)],
-		key: &str,
-	) -> Option<&'a Value> {
-		attrs
-			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(_, _, val)| *val)
-	}
-
-	/// Extract the `start` attribute as a `usize` for ordered lists.
-	pub fn ol_start(attrs: &[(Entity, &Attribute, &Value)]) -> usize {
-		Self::find_attr(attrs, "start")
-			.and_then(|val| match val {
-				Value::Uint(num) => Some(*num as usize),
-				Value::Int(num) => Some(*num as usize),
-				_ => None,
-			})
-			.unwrap_or(1)
 	}
 }

@@ -469,6 +469,30 @@ impl<'a> MdTreeBuilder<'a> {
 					self.handle_html_block(&html_content, frame.source);
 				}
 			}
+			"img" => {
+				// `img` is a void element. pulldown-cmark emits alt text
+				// as child Text events; collect them into an `alt`
+				// attribute and clear children so the element is void.
+				if let Some(frame) = self.stack.last_mut() {
+					let alt_slices: Vec<&'a str> = frame
+						.children
+						.iter()
+						.filter_map(|node| match node {
+							HtmlNode::Text(text) => Some(*text),
+							_ => None,
+						})
+						.collect();
+					if !alt_slices.is_empty() {
+						// Use the first slice as the attribute value.
+						// For simple alt text this is a single contiguous
+						// slice from the source.
+						let alt = alt_slices[0];
+						frame.attributes.push(HtmlAttribute::new("alt", alt));
+					}
+					frame.children.clear();
+				}
+				self.pop();
+			}
 			_ => {
 				self.pop();
 			}
