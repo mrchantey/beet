@@ -35,19 +35,15 @@ pub struct MediaRenderer {
 	tui_renderer: TuiRenderer,
 }
 
+#[allow(unreachable_code)]
 fn get_default_media_type() -> MediaType {
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	return MediaType::Ratatui;
-	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
 	#[cfg(feature = "markdown_parser")]
 	return MediaType::Markdown;
 	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
 	return MediaType::Html;
-	#[cfg(all(
-		not(feature = "markdown_parser"),
-		not(feature = "html_parser")
-	))]
-	return MediaType::Text;
+	MediaType::Text
 }
 
 impl Default for MediaRenderer {
@@ -144,7 +140,7 @@ impl MediaRenderer {
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
 
 		// Short-circuit TUI renderer
-		#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "tui", not(target_arch = "wasm32"), not(test)))]
 		let media_type = MediaType::Ratatui;
 
 		match media_type {
