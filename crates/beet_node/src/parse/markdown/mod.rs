@@ -200,7 +200,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("p".to_string());
 	}
@@ -214,7 +214,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("h1".to_string());
 	}
@@ -241,7 +241,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("em".to_string());
 	}
@@ -258,7 +258,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("a".to_string());
 	}
@@ -272,7 +272,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("pre".to_string());
 	}
@@ -287,7 +287,7 @@ mod test {
 			.entity(ul)
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.xpect_eq("ul");
 		world.entity_mut(ul).children().len().xpect_eq(2);
 	}
@@ -328,7 +328,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("hr".to_string());
 	}
@@ -345,7 +345,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("img".to_string());
 	}
@@ -374,7 +374,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("table".to_string());
 	}
@@ -477,7 +477,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("h1".to_string());
 	}

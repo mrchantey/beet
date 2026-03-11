@@ -283,7 +283,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("span".to_string());
 	}
@@ -322,7 +322,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("br".to_string());
 	}

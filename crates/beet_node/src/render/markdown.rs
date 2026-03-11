@@ -73,8 +73,8 @@ impl MarkdownRenderer {
 
 
 impl NodeVisitor for MarkdownRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
-		let name = view.name();
+	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
+		let name = view.tag();
 
 		match name {
 			// ── Headings ──
@@ -108,7 +108,7 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.enter_ul();
 			}
 			"ol" => {
-				let start = view.ol_start();
+				let start = view.try_as::<OrderedListView>().unwrap().start;
 				self.state.enter_ol(start);
 			}
 			"li" => {
@@ -211,7 +211,7 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let name = element.name();
+		let name = element.tag();
 
 		match name {
 			// ── Headings ──

@@ -18,9 +18,9 @@ fn on_element_added(
 ) -> Result {
 	let element = query.get(ev.entity)?;
 
-	match element.name() {
+	match element.tag() {
 		"a" => {
-			commands.entity(element.entity).observe(link_clicked);
+			commands.entity(element.entity).observe(on_click_link);
 		}
 		_ => {}
 	}
@@ -29,31 +29,22 @@ fn on_element_added(
 	Ok(())
 }
 
-fn link_clicked(ev: On<PointerUp>) {
-	/// Returns `true` if the href is an external URL that should be
-	/// opened by the OS rather than navigated to as a local path.
-	fn is_external_url(href: &str) -> bool {
-		href.contains("://")
-			|| href.starts_with("mailto:")
-			|| href.starts_with("tel:")
-			|| href.starts_with("sms:")
-			|| href.starts_with("javascript:")
-			|| href.starts_with("data:")
-	}
-
-	fn on_click_link(
-		ev: On<PointerUp>,
-		mut commands: Commands,
-		elements: ElementQuery,
-		ancestors: Query<&ChildOf>,
-	) {
-		let link = elements.get_as::<LinkView>(ev.event().target)?;
-		if is_external_url(link.href) {
-			if let Err(err) = webbrowser::open(link.href) {
-				cross_log!("failed to open URL: {err}");
-			}
-		} else {
-			todo!("internal navigation")
+fn is_external_url(href: &str) -> bool {
+	href.contains("://")
+		|| href.starts_with("mailto:")
+		|| href.starts_with("tel:")
+		|| href.starts_with("sms:")
+		|| href.starts_with("javascript:")
+		|| href.starts_with("data:")
+}
+fn on_click_link(ev: On<PointerUp>, elements: ElementQuery) -> Result {
+	let link = elements.get_as::<LinkView>(ev.event().target)?;
+	if is_external_url(link.href) {
+		if let Err(err) = webbrowser::open(link.href) {
+			cross_log!("failed to open URL: {err}");
 		}
+	} else {
+		todo!("internal navigation")
 	}
+	Ok(())
 }

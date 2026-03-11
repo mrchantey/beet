@@ -41,7 +41,7 @@ impl Default for PlainTextRenderer {
 }
 
 impl NodeVisitor for PlainTextRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, _view: &ElementView) {
+	fn visit_element(&mut self, _cx: &VisitContext, _view: ElementView) {
 		// plaintext, ignore elements
 	}
 

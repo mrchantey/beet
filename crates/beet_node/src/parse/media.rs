@@ -149,7 +149,7 @@ mod test {
 			.unwrap()
 			.get::<Element>()
 			.unwrap()
-			.name()
+			.tag()
 			.to_string()
 			.xpect_eq("h1".to_string());
 	}

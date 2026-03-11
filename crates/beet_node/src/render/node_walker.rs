@@ -58,7 +58,7 @@ impl NodeWalker<'_, '_> {
 		}
 		// 3. Element
 		if let Ok(view) = self.elements.get(cx.entity) {
-			visitor.visit_element(&cx, &view);
+			visitor.visit_element(&cx, view);
 		}
 		// 4. Value
 		if let Some(value) = value {
@@ -96,7 +96,7 @@ pub trait NodeVisitor {
 			"object", "embed",
 		];
 		if let Some(element) = element {
-			HIDDEN_HTML_TAGS.iter().any(|tag| element.name() == *tag)
+			HIDDEN_HTML_TAGS.iter().any(|tag| element.tag() == *tag)
 		} else {
 			false
 		}
@@ -104,7 +104,7 @@ pub trait NodeVisitor {
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
 	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}
-	fn visit_element(&mut self, _cx: &VisitContext, _view: &ElementView) {}
+	fn visit_element(&mut self, _cx: &VisitContext, _view: ElementView) {}
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {}
 	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value) {}
 	fn visit_expression(

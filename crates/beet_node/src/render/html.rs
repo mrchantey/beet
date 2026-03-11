@@ -138,10 +138,10 @@ impl NodeVisitor for HtmlRenderer {
 		self.write_newline();
 	}
 
-	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
+	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
 		self.write_indent();
 		self.buffer.push('<');
-		self.buffer.push_str(view.name());
+		self.buffer.push_str(view.tag());
 
 		for (_entity, attr, value) in &view.attributes {
 			self.buffer.push(' ');
@@ -158,7 +158,7 @@ impl NodeVisitor for HtmlRenderer {
 			}
 		}
 
-		let is_void = self.is_void_element(view.name());
+		let is_void = self.is_void_element(view.tag());
 		if is_void {
 			self.buffer.push_str(" />");
 		} else {
@@ -172,7 +172,7 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let is_void = self.is_void_element(element.name());
+		let is_void = self.is_void_element(element.tag());
 		if is_void {
 			return;
 		}
@@ -183,7 +183,7 @@ impl NodeVisitor for HtmlRenderer {
 		}
 
 		self.buffer.push_str("</");
-		self.buffer.push_str(element.name());
+		self.buffer.push_str(element.tag());
 		self.buffer.push('>');
 		self.write_newline();
 	}

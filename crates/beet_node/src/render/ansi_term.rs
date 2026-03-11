@@ -102,8 +102,8 @@ impl AnsiTermRenderer {
 
 
 impl NodeVisitor for AnsiTermRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, view: &ElementView) {
-		let name = view.name();
+	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
+		let name = view.tag();
 		self.style_map.push(name);
 
 		match name {
@@ -141,7 +141,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.enter_ul();
 			}
 			"ol" => {
-				let start = view.ol_start();
+				let start = view.try_as::<OrderedListView>().unwrap().start;
 				self.state.enter_ol(start);
 			}
 			"li" => {
@@ -208,7 +208,7 @@ impl NodeVisitor for AnsiTermRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let name = element.name();
+		let name = element.tag();
 
 		match name {
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {

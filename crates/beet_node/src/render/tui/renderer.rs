@@ -278,8 +278,8 @@ impl TuiRenderer {
 }
 
 impl NodeVisitor for TuiRenderer {
-	fn visit_element(&mut self, cx: &VisitContext, view: &ElementView) {
-		let name = view.name();
+	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
+		let name = view.tag();
 
 		// Push the style map entry for this element (handles nesting).
 		let tui_style = self.style_map.push(name);
@@ -325,7 +325,7 @@ impl NodeVisitor for TuiRenderer {
 				self.list_stack.push(ListContext::Unordered);
 			}
 			"ol" => {
-				let start = view.ol_start();
+				let start = view.try_as::<OrderedListView>().unwrap().start;
 				self.list_stack.push(ListContext::Ordered(start));
 			}
 			"li" => {
@@ -416,7 +416,7 @@ impl NodeVisitor for TuiRenderer {
 	}
 
 	fn leave_element(&mut self, cx: &VisitContext, element: &Element) {
-		let name = element.name();
+		let name = element.tag();
 
 		// Peek the style before popping so we can use lines_after.
 		let tui_style = self.style_map.current();

@@ -5,7 +5,53 @@
 //! and structural entities from the W3C reference.
 
 use beet_core::prelude::*;
+use std::borrow::Cow;
 use std::sync::LazyLock;
+
+
+/// The default set of HTML block-level element names.
+///
+/// Shared by renderers that need to distinguish block vs inline elements
+/// for whitespace and layout decisions.
+pub fn default_block_elements() -> Vec<Cow<'static, str>> {
+	vec![
+		"address".into(),
+		"article".into(),
+		"aside".into(),
+		"blockquote".into(),
+		"details".into(),
+		"dialog".into(),
+		"dd".into(),
+		"div".into(),
+		"dl".into(),
+		"dt".into(),
+		"fieldset".into(),
+		"figcaption".into(),
+		"figure".into(),
+		"footer".into(),
+		"form".into(),
+		"h1".into(),
+		"h2".into(),
+		"h3".into(),
+		"h4".into(),
+		"h5".into(),
+		"h6".into(),
+		"header".into(),
+		"hgroup".into(),
+		"hr".into(),
+		"li".into(),
+		"main".into(),
+		"nav".into(),
+		"ol".into(),
+		"p".into(),
+		"pre".into(),
+		"search".into(),
+		"section".into(),
+		"table".into(),
+		"ul".into(),
+	]
+}
+
 
 /// Entity pairs as `(html_entity, character)`.
 const HTML_ENTITY_PAIRS: &[(&str, &str)] = &[

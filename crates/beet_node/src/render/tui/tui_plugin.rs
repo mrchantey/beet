@@ -34,6 +34,7 @@ impl Plugin for TuiPlugin {
 				enable_input_forwarding: true,
 			},
 		))
+		.init_plugin::<InputPlugin>()
 		.add_systems(PreUpdate, pointer_input_system)
 		// .add_systems(
 		// 	PostUpdate,
