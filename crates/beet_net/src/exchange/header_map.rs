@@ -98,7 +98,10 @@ impl HeaderMap {
 	}
 
 	/// Check if a header key exists.
-	pub fn contains_key(&self, key: &str) -> bool {
+	pub fn contains<H: Header>(&self) -> bool { self.contains_raw(H::KEY) }
+
+	/// Check if a header key exists.
+	pub fn contains_raw(&self, key: &str) -> bool {
 		let key = to_kebab_case(key);
 		self.0.contains_key(key.as_ref())
 	}
@@ -252,9 +255,9 @@ mod test {
 	fn contains_key_normalized() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
-		headers.contains_key("x-custom").xpect_true();
-		headers.contains_key("X_Custom").xpect_true();
-		headers.contains_key("x-missing").xpect_false();
+		headers.contains_raw("x-custom").xpect_true();
+		headers.contains_raw("X_Custom").xpect_true();
+		headers.contains_raw("x-missing").xpect_false();
 	}
 
 	#[test]
@@ -262,7 +265,7 @@ mod test {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
 		headers.remove_raw("x-custom").unwrap().len().xpect_eq(1);
-		headers.contains_key("x-custom").xpect_false();
+		headers.contains_raw("x-custom").xpect_false();
 	}
 
 	#[test]

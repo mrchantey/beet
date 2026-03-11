@@ -5,14 +5,12 @@
 
 
 
-#[cfg(feature = "http")]
 /// Check if HTTP request parts indicate a body is present based on headers.
 pub fn has_body(parts: &http::request::Parts) -> bool {
 	has_body_by_content_length(&parts.headers)
 		|| has_body_by_transfer_encoding(&parts.headers)
 }
 
-#[cfg(feature = "http")]
 /// Check if headers indicate a body by content-length > 0.
 pub fn has_body_by_content_length(headers: &http::HeaderMap) -> bool {
 	headers
@@ -23,7 +21,6 @@ pub fn has_body_by_content_length(headers: &http::HeaderMap) -> bool {
 		.unwrap_or(false)
 }
 
-#[cfg(feature = "http")]
 /// Check if headers indicate a body by chunked transfer encoding.
 pub fn has_body_by_transfer_encoding(headers: &http::HeaderMap) -> bool {
 	headers
@@ -33,7 +30,6 @@ pub fn has_body_by_transfer_encoding(headers: &http::HeaderMap) -> bool {
 		.unwrap_or(false)
 }
 
-#[cfg(feature = "http")]
 /// Convert http version to string representation.
 pub fn version_to_string(version: http::Version) -> String {
 	match version {
@@ -46,7 +42,6 @@ pub fn version_to_string(version: http::Version) -> String {
 	}
 }
 
-#[cfg(feature = "http")]
 /// Parse a version string into an http::Version.
 pub fn parse_version(version: &str) -> http::Version {
 	match version {
@@ -59,7 +54,7 @@ pub fn parse_version(version: &str) -> http::Version {
 	}
 }
 
-#[cfg(all(test, feature = "http"))]
+#[cfg(test)]
 mod test {
 	use super::*;
 	use beet_core::prelude::*;

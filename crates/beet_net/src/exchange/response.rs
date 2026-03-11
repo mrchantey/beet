@@ -247,47 +247,6 @@ impl Response {
 		}
 	}
 
-	/// Gets a header value by name.
-	#[cfg(feature = "http")]
-	pub fn header(
-		&self,
-		header: http::header::HeaderName,
-	) -> Result<Option<&str>> {
-		Ok(self.parts.headers.first_raw(header.as_str()))
-		// NOTE: `first_raw` is intentional here — callers supply an arbitrary
-		// `http::HeaderName` which may not have a typed `Header` impl.
-	}
-
-	/// Check whether a header exactly matches the given value.
-	/// Do not use this for checks like `Content-Type` as they may
-	/// have additional parameters like `application/json; charset=utf-8`.
-	#[cfg(feature = "http")]
-	pub fn header_matches(
-		&self,
-		header: http::header::HeaderName,
-		value: &str,
-	) -> bool {
-		self.parts
-			.headers
-			.first_raw(header.as_str())
-			.map_or(false, |val| val == value)
-	}
-
-	/// Check whether a header contains the given value. Use this for
-	/// checks like `Content-Type` where the value may have additional parameters
-	/// like `application/json; charset=utf-8`.
-	#[cfg(feature = "http")]
-	pub fn header_contains(
-		&self,
-		header: http::header::HeaderName,
-		value: &str,
-	) -> bool {
-		self.parts
-			.headers
-			.first_raw(header.as_str())
-			.map_or(false, |val| val.contains(value))
-	}
-
 	/// Creates a response from parts and body
 	pub fn from_parts(parts: ResponseParts, body: Bytes) -> Self {
 		Self {
@@ -570,7 +529,6 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_from_status_body() {
 		let response = Response::from_status_body(
 			StatusCode::OK,
@@ -579,8 +537,11 @@ mod test {
 		);
 		response.status().xpect_eq(StatusCode::OK);
 		response
-			.header_contains(http::header::CONTENT_TYPE, "text/plain")
-			.xpect_true();
+			.headers
+			.get::<headers::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::Text);
 	}
 
 	#[test]
@@ -590,17 +551,18 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_from_str() {
 		let response: Response = "hello".into();
 		response.status().xpect_eq(StatusCode::OK);
 		response
-			.header_contains(http::header::CONTENT_TYPE, "text/plain")
-			.xpect_true();
+			.headers
+			.get::<headers::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::Text);
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_temporary_redirect() {
 		let response = Response::temporary_redirect("/new-location");
 		response.status().xpect_eq(StatusCode::TEMPORARY_REDIRECT);
@@ -614,7 +576,6 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_permanent_redirect() {
 		let response = Response::permanent_redirect("/new-location");
 		response.status().xpect_eq(StatusCode::MOVED_PERMANENTLY);

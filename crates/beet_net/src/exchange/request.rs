@@ -260,7 +260,7 @@ impl Request {
 	}
 
 	/// Sets a JSON body and content-type header on an existing request.
-	#[cfg(all(feature = "json", feature = "http"))]
+	#[cfg(feature = "json")]
 	pub fn with_json_body<T: serde::Serialize>(
 		self,
 		body: &T,

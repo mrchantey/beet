@@ -481,7 +481,6 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn request_parts_with_headers_and_params() {
 		let mut parts = RequestParts::new(
 			HttpMethod::Get,
@@ -517,7 +516,6 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "http")]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::OK);
 		parts.headers.set_content_type(MediaType::Html);
