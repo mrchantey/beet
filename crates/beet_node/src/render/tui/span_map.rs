@@ -20,7 +20,7 @@ impl TuiPos {
 ///
 /// Cleared and rebuilt each frame by the draw system. The input
 /// system reads it to resolve mouse positions into entity targets.
-#[derive(Debug, Default, Clone, Resource)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
 pub struct TuiSpanMap {
 	entries: HashMap<TuiPos, Entity>,
 }

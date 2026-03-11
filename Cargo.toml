@@ -193,7 +193,8 @@ http-body-util = "0.1"
 url = "2"
 
 #💡 tui
-bevy_ratatui = { version = "0.11" }
+bevy_ratatui = { version = "0.11", default-feature=false, features = [] }
+# bevy_ratatui = { version = "0.11", default-feature=false, features =["std", "async_executor", "crossterm", "keyboard", "mouse"] }
 # bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
 ratatui = { version = "0.30", default-features = false }
 

@@ -11,15 +11,13 @@
 //! ```ignore
 //! use beet_node::prelude::*;
 //! use beet_core::prelude::*;
-//! use ratatui::buffer::Buffer;
 //! use ratatui::prelude::Rect;
 //!
 //! fn render(walker: NodeWalker, entity: Entity) {
 //!     let area = Rect::new(0, 0, 80, 24);
-//!     let mut buf = Buffer::empty(area);
-//!     let mut renderer = RatatuiRenderer::new(area, &mut buf);
+//!     let mut renderer = RatatuiRenderer::new(area);
 //!     walker.walk(&mut renderer, entity);
-//!     let span_map = renderer.finish();
+//!     let (buf, span_map) = renderer.finish();
 //! }
 //! ```
 //!
@@ -44,15 +42,16 @@ use std::borrow::Cow;
 
 /// Visitor-based TUI renderer.
 ///
-/// Writes styled content into a ratatui [`Buffer`], consuming
+/// Writes styled content into an owned ratatui [`Buffer`], consuming
 /// vertical space from `area` as each block-level element is
 /// rendered. Uses a [`StyleMap<TuiStyle>`] to resolve element styles
 /// and layout metadata.
-pub struct RatatuiRenderer<'buf> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RatatuiRenderer {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
-	/// The ratatui buffer to write into.
-	buf: &'buf mut Buffer,
+	/// The owned ratatui buffer to write into.
+	buf: Buffer,
 	/// Element → style mapping with nesting support.
 	style_map: StyleMap<TuiStyle>,
 	/// Block elements used for fallback block detection.
@@ -66,43 +65,31 @@ pub struct RatatuiRenderer<'buf> {
 	in_code_block: bool,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
-	/// Current heading level (0 when not in a heading).
-	heading_level: u8,
 	/// List nesting stack for bullet/number tracking.
 	list_stack: Vec<TuiListContext>,
-	/// Whether we are inside a link element.
-	in_link: bool,
-	/// Whether we are inside an image element.
-	in_image: bool,
-	/// Accumulated image src for rendering on leave.
-	image_src: Option<String>,
 	/// Unordered list bullet string.
-	pub bullet: String,
-	/// Foreground color for bullet / list number prefixes.
-	pub bullet_fg: Color,
+	pub bullet_prefix: Cow<'static, str>,
+	/// Style for bullet / list number prefixes.
+	pub bullet_prefix_style: Style,
 	/// Indentation width for block quotes (includes the `│ ` bar).
 	pub block_quote_indent: u16,
 }
 
-impl<'buf> RatatuiRenderer<'buf> {
-	/// Create a new TUI renderer targeting the given area and buffer.
-	pub fn new(area: Rect, buf: &'buf mut Buffer) -> Self {
+impl RatatuiRenderer {
+	/// Create a new TUI renderer targeting the given area.
+	pub fn new(area: Rect) -> Self {
 		Self {
 			area,
-			buf,
+			buf: Buffer::empty(area),
 			style_map: default_tui_style_map(),
 			block_elements: default_block_elements(),
 			spans: Vec::new(),
 			in_list_item: false,
 			in_code_block: false,
 			span_map: TuiSpanMap::default(),
-			heading_level: 0,
 			list_stack: Vec::new(),
-			in_link: false,
-			in_image: false,
-			image_src: None,
-			bullet: "• ".to_string(),
-			bullet_fg: Color::DarkGray,
+			bullet_prefix: "• ".into(),
+			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
 		}
 	}
@@ -116,14 +103,17 @@ impl<'buf> RatatuiRenderer<'buf> {
 	/// Returns the remaining drawable area after rendering.
 	pub fn remaining_area(&self) -> Rect { self.area }
 
-	/// Flush remaining spans and return the populated [`TuiSpanMap`].
+	/// Returns a reference to the underlying buffer.
+	pub fn buffer(&self) -> &Buffer { &self.buf }
+
+	/// Flush remaining spans and return the buffer and [`TuiSpanMap`].
 	///
 	/// Must be called after walking completes to ensure orphaned
 	/// text nodes (those not wrapped in a block-level element) are
 	/// rendered.
-	pub fn finish(mut self) -> TuiSpanMap {
+	pub fn finish(mut self) -> (Buffer, TuiSpanMap) {
 		self.flush_spans();
-		self.span_map
+		(self.buf, self.span_map)
 	}
 
 	/// Current composite ratatui [`Style`] from the style map stack.
@@ -153,7 +143,7 @@ impl<'buf> RatatuiRenderer<'buf> {
 		let paragraph =
 			widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
 		let line_count = paragraph.line_count(self.area.width) as u16;
-		paragraph.render(self.area, self.buf);
+		paragraph.render(self.area, &mut self.buf);
 
 		// Map each span's cells to its entity at character granularity.
 		let mut col = self.area.x;
@@ -207,20 +197,20 @@ impl<'buf> RatatuiRenderer<'buf> {
 		let paragraph =
 			widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
 		let line_count = paragraph.line_count(self.area.width) as u16;
-		paragraph.render(self.area, self.buf);
+		paragraph.render(self.area, &mut self.buf);
 
 		self.area.y = self.area.y.saturating_add(line_count);
 		self.area.height = self.area.height.saturating_sub(line_count);
 	}
 
-	/// Render a horizontal rule.
+	/// Render a horizontal rule using the current style.
 	fn render_hr(&mut self) {
 		if self.area.height == 0 {
 			return;
 		}
-		let hr_style = self.style_map.resolve("hr");
+		let style = self.current_style();
 		let rule = "─".repeat(self.area.width as usize);
-		let line = Line::from(Span::styled(rule, hr_style.style));
+		let line = Line::from(Span::styled(rule, style));
 		let text = Text::from(line);
 		self.render_text(text);
 	}
@@ -229,18 +219,6 @@ impl<'buf> RatatuiRenderer<'buf> {
 	fn advance_lines(&mut self, count: u16) {
 		self.area.y = self.area.y.saturating_add(count);
 		self.area.height = self.area.height.saturating_sub(count);
-	}
-
-	/// Extract the heading level from an element name like `h1`, `h2`, etc.
-	fn parse_heading_level(name: &str) -> Option<u8> {
-		if name.starts_with('h') && name.len() == 2 {
-			name[1..]
-				.parse::<u8>()
-				.ok()
-				.filter(|level| *level >= 1 && *level <= 6)
-		} else {
-			None
-		}
 	}
 
 	/// Whether an element name is block-level, using the shared
@@ -262,8 +240,7 @@ impl<'buf> RatatuiRenderer<'buf> {
 	}
 }
 
-
-impl NodeVisitor for RatatuiRenderer<'_> {
+impl NodeVisitor for RatatuiRenderer {
 	fn visit_element(
 		&mut self,
 		cx: &VisitContext,
@@ -278,8 +255,6 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 		match name.as_str() {
 			// ── Headings ──
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				let level = Self::parse_heading_level(&name).unwrap_or(3);
-				self.heading_level = level;
 				self.advance_lines(tui_style.lines_before);
 			}
 
@@ -339,16 +314,16 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 					if list.ordered {
 						let num = list.current_number;
 						list.current_number += 1;
-						format!("{num}. ")
+						format!("{num}. ").into()
 					} else {
-						self.bullet.clone()
+						self.bullet_prefix.clone()
 					}
 				} else {
-					self.bullet.clone()
+					self.bullet_prefix.clone()
 				};
 
 				self.push_span(
-					Span::styled(bullet, Style::new().fg(self.bullet_fg)),
+					Span::styled(bullet, self.bullet_prefix_style),
 					cx.entity,
 				);
 			}
@@ -375,22 +350,26 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 				self.render_hr();
 			}
 
-			// ── Images ──
+			// ── Images (void element) ──
 			"img" => {
-				self.in_image = true;
 				let src = Self::find_attr(&attrs, "src")
 					.map(|val| val.to_string())
 					.unwrap_or_default();
-				self.image_src = Some(src);
-				self.push_span(
-					Span::styled("[image: ", tui_style.style),
-					cx.entity,
-				);
+				let alt = Self::find_attr(&attrs, "alt")
+					.map(|val| val.to_string())
+					.unwrap_or_else(|| "image".to_string());
+				let label = if src.is_empty() {
+					format!("[{alt}]")
+				} else {
+					format!("[{alt}: {src}]")
+				};
+				self.push_span(Span::styled(label, tui_style.style), cx.entity);
+				self.flush_spans();
 			}
 
 			// ── Links ──
 			"a" => {
-				self.in_link = true;
+				// Style applied via style map
 			}
 
 			// ── Inline formatting ──
@@ -446,7 +425,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 							.wrap(widgets::Wrap { trim: false });
 						let line_count =
 							paragraph.line_count(self.area.width) as u16;
-						paragraph.render(self.area, self.buf);
+						paragraph.render(self.area, &mut self.buf);
 						// Map whole area; pick the first entity with a value
 						if let Some(entity) = entities.iter().flatten().next() {
 							let rendered = Rect::new(
@@ -464,9 +443,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 				} else {
 					self.flush_spans();
 				}
-				self.heading_level = 0;
 				let lines_after = tui_style.lines_after;
-				self.style_map.pop();
 				self.advance_lines(lines_after);
 			}
 
@@ -475,7 +452,6 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 			| "footer" | "main" => {
 				self.flush_spans();
 				let lines_after = tui_style.lines_after;
-				self.style_map.pop();
 				self.advance_lines(lines_after);
 			}
 
@@ -486,7 +462,6 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 				self.area.x = self.area.x.saturating_sub(indent);
 				self.area.width = self.area.width.saturating_add(indent);
 				let lines_after = tui_style.lines_after;
-				self.style_map.pop();
 				self.advance_lines(lines_after);
 			}
 
@@ -494,76 +469,50 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 			"pre" => {
 				self.flush_spans();
 				self.in_code_block = false;
-				self.style_map.pop();
 			}
 
 			// ── Lists ──
 			"ul" | "ol" => {
 				self.list_stack.pop();
-				self.style_map.pop();
 			}
 			"li" => {
 				self.flush_spans();
 				self.in_list_item = false;
-				self.style_map.pop();
 			}
 
 			// ── Tables ──
-			"table" => {
-				self.style_map.pop();
-			}
+			"table" => {}
 			"thead" => {
 				self.flush_spans();
 				self.render_hr();
-				self.style_map.pop();
 			}
-			"tbody" => {
-				self.style_map.pop();
-			}
+			"tbody" => {}
 			"tr" => {
 				self.flush_spans();
-				self.style_map.pop();
 			}
 			"th" | "td" => {
 				// Cells are collected as spans; the row leave flushes them
-				self.style_map.pop();
 			}
 
 			// ── Links ──
-			"a" => {
-				self.in_link = false;
-				self.style_map.pop();
-			}
+			"a" => {}
 
-			// ── Images ──
-			"img" => {
-				let src = self.image_src.take().unwrap_or_default();
-				let img_style = tui_style.style;
-				self.push_span(
-					Span::styled(format!(": {src}]"), img_style),
-					cx.entity,
-				);
-				self.in_image = false;
-				self.flush_spans();
-				self.style_map.pop();
-			}
+			// ── Images (void element, fully handled in visit_element) ──
+			"img" => {}
 
 			// ── Thematic break / line break ──
 			"hr" | "br" => {
 				// already handled in visit_element
-				self.style_map.pop();
 			}
 
 			// ── Button ──
 			"button" => {
 				self.push_span(Span::styled("]", tui_style.style), cx.entity);
-				self.style_map.pop();
 			}
 
 			// ── Inline formatting ──
 			"strong" | "b" | "em" | "i" | "del" | "s" | "code" => {
 				// Style was applied per-span in visit_value
-				self.style_map.pop();
 			}
 
 			// ── Generic block handling ──
@@ -571,9 +520,11 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 				if self.is_block_element(&name) {
 					self.flush_spans();
 				}
-				self.style_map.pop();
 			}
 		}
+
+		// Every push in visit_element is balanced by a pop here.
+		self.style_map.pop();
 	}
 
 	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
@@ -599,7 +550,7 @@ impl NodeVisitor for RatatuiRenderer<'_> {
 }
 
 
-impl NodeRenderer for RatatuiRenderer<'_> {
+impl NodeRenderer for RatatuiRenderer {
 	fn render(
 		&mut self,
 		cx: &RenderContext,
@@ -644,15 +595,13 @@ pub fn tui_render_system(
 	In((entity, area)): In<(Entity, Rect)>,
 	walker: NodeWalker,
 ) -> (Buffer, TuiSpanMap) {
-	let mut buf = Buffer::empty(area);
-	let mut renderer = RatatuiRenderer::new(area, &mut buf);
+	let mut renderer = RatatuiRenderer::new(area);
 	walker.walk(&mut renderer, entity);
-	let span_map = renderer.finish();
-	(buf, span_map)
+	renderer.finish()
 }
 
 /// Tracks the context for a list being rendered.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct TuiListContext {
 	ordered: bool,
 	current_number: usize,
@@ -1211,11 +1160,10 @@ mod test {
 					StyleMap<TuiStyle>,
 				)>,
 				 walker: NodeWalker| {
-					let mut buf = Buffer::empty(area);
-					let mut renderer = RatatuiRenderer::new(area, &mut buf)
-						.with_style_map(style_map);
+					let mut renderer =
+						RatatuiRenderer::new(area).with_style_map(style_map);
 					walker.walk(&mut renderer, entity);
-					renderer.finish();
+					let (buf, _span_map) = renderer.finish();
 					buf
 				},
 				(heading, area, custom_map),

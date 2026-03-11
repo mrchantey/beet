@@ -1,6 +1,6 @@
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+#[cfg(feature = "tui")]
 mod tui;
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+#[cfg(feature = "tui")]
 pub use tui::*;
 mod html;
 pub use html::*;
