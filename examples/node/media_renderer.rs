@@ -1,7 +1,6 @@
 //! The [`MediaRenderer`] will select the best renderer based on a
 //! list of accepted [`MediaType`].
 //!
-//!
 //! ```sh
 //! # ansi-term
 //! cargo run --example media_renderer -- --media-type text/ansi-term
@@ -21,6 +20,7 @@ fn main() {
 	MarkdownParser::new()
 		.parse(ParseContext::new(&mut entity, &md_bytes))
 		.unwrap();
+
 	// 2. Get the requested media type
 	let media_type = CliArgs::parse_env()
 		.params

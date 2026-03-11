@@ -8,7 +8,6 @@
 //! cargo run --example client --features net,ureq,native-tls
 //! ```
 
-use beet::net::prelude::*;
 use beet::prelude::*;
 
 fn main() {
