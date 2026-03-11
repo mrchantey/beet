@@ -53,22 +53,22 @@ pub struct TuiRenderer {
 	area: Rect,
 	/// The owned ratatui buffer to write into.
 	buf: Buffer,
-	/// Element → style mapping with nesting support.
-	style_map: StyleMap<TuiStyle>,
-	/// Block elements used for fallback block detection.
-	block_elements: Vec<Cow<'static, str>>,
 	/// Current accumulated spans with their owning entity for
 	/// per-span hit-testing.
 	spans: Vec<(Span<'static>, Option<Entity>)>,
+	/// List nesting stack for bullet/number tracking, shared with
+	/// [`TextRenderState`].
+	list_stack: Vec<ListContext>,
 	/// Whether we are inside a list item collecting text.
 	in_list_item: bool,
 	/// Whether we are inside a code block (pre).
 	in_code_block: bool,
+	/// Element → style mapping with nesting support.
+	style_map: StyleMap<TuiStyle>,
+	/// Block elements used for fallback block detection.
+	block_elements: Vec<Cow<'static, str>>,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
-	/// List nesting stack for bullet/number tracking, shared with
-	/// [`TextRenderState`].
-	list_stack: Vec<ListContext>,
 	/// Unordered list bullet string.
 	pub bullet_prefix: Cow<'static, str>,
 	/// Style for bullet / list number prefixes.
@@ -88,15 +88,17 @@ impl TuiRenderer {
 	/// Create a new TUI renderer targeting the given area.
 	pub fn new(area: Rect) -> Self {
 		Self {
+			// state
 			area,
 			buf: Buffer::empty(area),
-			style_map: default_tui_style_map(),
-			block_elements: default_block_elements(),
 			spans: Vec::new(),
+			list_stack: Vec::new(),
 			in_list_item: false,
 			in_code_block: false,
+			// settings
+			style_map: default_tui_style_map(),
+			block_elements: default_block_elements(),
 			span_map: TuiSpanMap::default(),
-			list_stack: Vec::new(),
 			bullet_prefix: "• ".into(),
 			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
@@ -658,7 +660,7 @@ pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
 	StyleMap::new(TuiStyle::default(), vec![
 		(
 			"h1",
-			TuiStyle::new(Style::new().bold().fg(Color::Yellow))
+			TuiStyle::new(Style::new().bold().fg(Color::Green))
 				.with_lines_before(2)
 				.with_justify(Justify::Center),
 		),

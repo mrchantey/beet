@@ -35,19 +35,23 @@ pub struct MediaRenderer {
 	tui_renderer: TuiRenderer,
 }
 
+fn get_default_media_type() -> MediaType {
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+	return MediaType::Ratatui;
+	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
+	#[cfg(feature = "markdown_parser")]
+	return MediaType::Markdown;
+	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
+	return MediaType::Html;
+	#[cfg(all(
+		not(feature = "markdown_parser"),
+		not(feature = "html_parser")
+	))]
+	return MediaType::Text;
+}
+
 impl Default for MediaRenderer {
-	fn default() -> Self {
-		#[cfg(feature = "markdown_parser")]
-		let default_media_type = MediaType::Markdown;
-		#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
-		let default_media_type = MediaType::Html;
-		#[cfg(all(
-			not(feature = "markdown_parser"),
-			not(feature = "html_parser")
-		))]
-		let default_media_type = MediaType::Text;
-		Self::new(default_media_type)
-	}
+	fn default() -> Self { Self::new(get_default_media_type()) }
 }
 
 impl MediaRenderer {
@@ -133,11 +137,16 @@ impl MediaRenderer {
 	fn try_render_media_type(
 		&mut self,
 		cx: &mut RenderContext,
-		media_type: &MediaType,
+		#[allow(unused)] media_type: &MediaType,
 	) -> Result<Option<RenderOutput>, RenderError> {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
+
+		// Short-circuit TUI renderer
+		#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+		let media_type = MediaType::Ratatui;
+
 		match media_type {
 			MediaType::Text => {
 				self.plain_text_renderer.render(&mut inner_cx).map(Some)

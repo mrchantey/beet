@@ -71,11 +71,12 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 				.unwrap();
 
 			// 3. Render to the requested media type
+			#[allow(unused)]
 			let output = MediaRenderer::default()
 				.run(&mut entity, vec![media_type])
 				.unwrap()
 				.to_string();
-
+			#[cfg(not(feature = "tui"))]
 			println!("{output}");
 		});
 
