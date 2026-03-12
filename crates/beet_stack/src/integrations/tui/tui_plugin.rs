@@ -16,9 +16,9 @@ use bevy_ratatui::RatatuiPlugins;
 /// # Includes
 /// - [`StackPlugin`]
 /// - [`MinimalPlugins`]
-pub struct TuiPlugin;
+pub struct TuiPluginOld;
 
-impl Plugin for TuiPlugin {
+impl Plugin for TuiPluginOld {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
 			MinimalPlugins.set(bevy::app::ScheduleRunnerPlugin::run_loop(

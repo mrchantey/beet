@@ -31,7 +31,7 @@ mod content;
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((LogPlugin::default(), TuiPlugin))
+		.add_plugins((LogPlugin::default(), TuiPluginOld))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((tui_server(), content::stack()));
 		})

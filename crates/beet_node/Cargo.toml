@@ -12,7 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","html_parser","markdown_parser","ansi_term","tui"]
+default = ["std","html_parser","markdown_parser","ansi_term"]
 std = []
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]

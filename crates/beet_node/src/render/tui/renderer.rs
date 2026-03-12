@@ -70,11 +70,11 @@ pub struct TuiRenderer {
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
 	/// Unordered list bullet string.
-	pub bullet_prefix: Cow<'static, str>,
+	bullet_prefix: Cow<'static, str>,
 	/// Style for bullet / list number prefixes.
-	pub bullet_prefix_style: Style,
+	bullet_prefix_style: Style,
 	/// Indentation width for block quotes (includes the `│ ` bar).
-	pub block_quote_indent: u16,
+	block_quote_indent: u16,
 }
 
 

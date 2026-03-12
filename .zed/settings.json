@@ -16,6 +16,7 @@
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
 					"features": [
+						"tui",
 						"bevy_scene",
 						"json",
 						"_pretty_curl",

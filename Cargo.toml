@@ -227,7 +227,7 @@ default = ["node"]
 # 💡 Top Level
 
 http_server = ["net", "tool","stack", "beet_net/server"]
-tui_server = ["tui", "markdown"]
+tui_server = ["tui","stack", "markdown"]
 stdio_server = ["stack", "markdown"]
 
 # 💡 Core
@@ -273,7 +273,7 @@ _pretty_curl = ["net","node","ureq","native-tls"]
 tool = ["dep:beet_tool"]
 node = ["dep:beet_node"]
 stack = ["tool", "dep:beet_stack"]
-tui = ["node", "beet_node/tui"]
+tui = ["beet_node?/tui"]
 markdown = ["beet_stack?/markdown"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]

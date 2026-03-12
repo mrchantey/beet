@@ -10,10 +10,11 @@
 
 mod frontmatter;
 mod tree_builder;
+pub use frontmatter::*;
 pub(crate) use tree_builder::*;
 
-pub use frontmatter::*;
-
+// Re-export diff internals used by tree_builder within crate
+use crate::parse::html::diff::diff_children;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Options;
@@ -151,9 +152,6 @@ impl NodeParser for MarkdownParser {
 			.xok()
 	}
 }
-
-// Re-export diff internals used by tree_builder within crate
-use crate::parse::html::diff::diff_children;
 
 
 
