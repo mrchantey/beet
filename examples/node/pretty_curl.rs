@@ -10,6 +10,8 @@
 //! cargo run --example pretty_curl --features _pretty_curl
 //! # specify a url
 //! cargo run --example pretty_curl --features _pretty_curl -- http://example.com
+//! # specify a local file
+//! cargo run --example pretty_curl --features _pretty_curl -- README.md
 //! # render as html
 //! cargo run --example pretty_curl --features _pretty_curl -- http://example.com --media-type=text/html
 //! # render as markdown
@@ -21,13 +23,7 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((
-			#[cfg(not(feature = "tui"))]
-			MinimalPlugins,
-			#[cfg(feature = "tui")]
-			TuiPlugin::default(),
-			AsyncPlugin::default(),
-		))
+		.add_plugins((MinimalPlugins, AsyncPlugin::default()))
 		.add_systems(Startup, fetch_and_render)
 		.run();
 }
@@ -75,11 +71,9 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 				.run(&mut entity, vec![output_type])
 				.unwrap()
 				.to_string();
-			#[cfg(not(feature = "tui"))]
 			println!("{output}");
 		});
 
-		#[cfg(not(feature = "tui"))]
 		world.write_message(AppExit::Success);
 	});
 }

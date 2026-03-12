@@ -261,7 +261,8 @@ tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
-_pretty_curl = ["net","node","ureq","native-tls"]
+_pretty_curl = ["net", "node", "ureq", "native-tls"]
+_mini_browser = ["_pretty_curl", "tui"]
 
 
 # clanker = ["dep:beet_clanker","net","router"]
@@ -396,6 +397,11 @@ required-features = ["node"]
 name = "pretty_curl"
 path = "examples/node/pretty_curl.rs"
 required-features = ["_pretty_curl"]
+
+[[example]]
+name = "mini_browser"
+path = "examples/node/mini_browser.rs"
+required-features = ["_mini_browser"]
 
 
 # 💡 Examples - Stack

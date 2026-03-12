@@ -4,7 +4,6 @@
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
-//! - `tui` — adds [`RatatuiRenderer`] support
 
 use crate::prelude::*;
 #[allow(unused_imports)]
@@ -28,17 +27,10 @@ pub struct MediaRenderer {
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "ansi_term")]
 	ansi_term_renderer: AnsiTermRenderer,
-	/// Stored TUI renderer. Callers must set this via
-	/// [`Self::with_tui_renderer`] before requesting
-	/// [`MediaType::Ratatui`].
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-	tui_renderer: TuiRenderer,
 }
 
 #[allow(unreachable_code)]
 fn get_default_media_type() -> MediaType {
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-	return MediaType::Ratatui;
 	#[cfg(feature = "markdown_parser")]
 	return MediaType::Markdown;
 	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
@@ -61,8 +53,6 @@ impl MediaRenderer {
 			markdown_renderer: default(),
 			#[cfg(feature = "ansi_term")]
 			ansi_term_renderer: default(),
-			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-			tui_renderer: default(),
 		}
 	}
 
@@ -112,13 +102,6 @@ impl MediaRenderer {
 		self
 	}
 
-	/// Set the [`RatatuiRenderer`] used for [`MediaType::Ratatui`] output.
-	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-	pub fn with_tui_renderer(mut self, renderer: TuiRenderer) -> Self {
-		self.tui_renderer = renderer;
-		self
-	}
-
 	/// Returns the default media type.
 	pub fn default_media_type(&self) -> &MediaType { &self.default_media_type }
 
@@ -133,15 +116,11 @@ impl MediaRenderer {
 	fn try_render_media_type(
 		&mut self,
 		cx: &mut RenderContext,
-		#[allow(unused)] media_type: &MediaType,
+		media_type: &MediaType,
 	) -> Result<Option<RenderOutput>, RenderError> {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
-
-		// Short-circuit TUI renderer
-		#[cfg(all(feature = "tui", not(target_arch = "wasm32"), not(test)))]
-		let media_type = MediaType::Ratatui;
 
 		match media_type {
 			MediaType::Text => {
@@ -157,8 +136,6 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-			MediaType::Ratatui => self.tui_renderer.render(&mut inner_cx).map(Some),
 			other if self.plaintext_fallback && other.is_text() => {
 				self.plain_text_renderer.render(&mut inner_cx).map(Some)
 			}
@@ -172,8 +149,6 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "ansi_term")]
 		available.push(MediaType::AnsiTerm);
-		#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
-		available.push(MediaType::Ratatui);
 		available
 	}
 }

@@ -1,5 +1,5 @@
 //! The [`MediaRenderer`] will select the best renderer based on a
-//! list of accepted [`MediaType`].
+//! list of accepted [`MediaType`]. Use cli args to specify the output
 //!
 //! ```sh
 //! # ansi-term

@@ -20,6 +20,7 @@
 						"bevy_scene",
 						"json",
 						"_pretty_curl",
+						"_mini_browser",
 						// "http_server",
 						// "stack",
 						// "server"

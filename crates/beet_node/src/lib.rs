@@ -8,6 +8,8 @@ extern crate alloc;
 extern crate std;
 
 mod input;
+#[cfg(feature = "net")]
+mod navigate;
 mod parse;
 mod render;
 mod types;
@@ -15,6 +17,8 @@ mod types;
 /// Exports the most commonly used items.
 pub mod prelude {
 	pub use crate::input::*;
+	#[cfg(feature = "net")]
+	pub use crate::navigate::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	pub use crate::types::*;
