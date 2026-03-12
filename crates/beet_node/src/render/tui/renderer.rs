@@ -143,7 +143,9 @@ impl NodeRenderer for TuiRenderer {
 			},
 		)?;
 
-		cx.entity_mut().insert(std::mem::take(&mut self.span_map));
+		cx.entity_mut()
+			.insert(std::mem::take(&mut self.span_map))
+			.insert_if_new(TuiScrollState::default());
 
 		Ok(RenderOutput::Stateful)
 	}
@@ -598,45 +600,10 @@ impl NodeVisitor for TuiRenderer {
 	}
 }
 
-
-/// Render a ratatui [`Buffer`] to a plain-text string, stripping
-/// trailing whitespace from each row.
-///
-/// Useful in tests to inspect rendered content without ANSI codes.
-pub fn buffer_to_text(buf: &Buffer) -> String {
-	let area = buf.area;
-	let mut output = String::new();
-	for row in area.y..area.y + area.height {
-		let mut line = String::new();
-		for col in area.x..area.x + area.width {
-			line.push_str(buf[(col, row)].symbol());
-		}
-		let trimmed = line.trim_end();
-		if !trimmed.is_empty() || row < area.y + area.height - 1 {
-			output.push_str(trimmed);
-			output.push('\n');
-		}
-	}
-	// Remove trailing empty lines
-	while output.ends_with("\n\n") {
-		output.pop();
-	}
-	output
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
+pub struct TuiScrollState {
+	position: u16,
 }
-
-
-/// System that renders an entity tree into a ratatui [`Buffer`]
-/// and returns both the buffer and span map.
-pub fn tui_render_system(
-	In((entity, area)): In<(Entity, Rect)>,
-	walker: NodeWalker,
-) -> (Buffer, TuiSpanMap) {
-	let mut renderer = TuiRenderer::new(area);
-	walker.walk(&mut renderer, entity);
-	renderer.finish()
-}
-
-
 
 
 /// Horizontal justification for block-level content.
@@ -765,6 +732,41 @@ pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	/// System that renders an entity tree into a ratatui [`Buffer`]
+	/// and returns both the buffer and span map.
+	fn tui_render_system(
+		In((entity, area)): In<(Entity, Rect)>,
+		walker: NodeWalker,
+	) -> (Buffer, TuiSpanMap) {
+		let mut renderer = TuiRenderer::new(area);
+		walker.walk(&mut renderer, entity);
+		renderer.finish()
+	}
+
+	/// Render a ratatui [`Buffer`] to a plain-text string, stripping
+	/// trailing whitespace from each row.
+	///
+	/// Useful in tests to inspect rendered content without ANSI codes.
+	fn buffer_to_text(buf: &Buffer) -> String {
+		let area = buf.area;
+		let mut output = String::new();
+		for row in area.y..area.y + area.height {
+			let mut line = String::new();
+			for col in area.x..area.x + area.width {
+				line.push_str(buf[(col, row)].symbol());
+			}
+			let trimmed = line.trim_end();
+			if !trimmed.is_empty() || row < area.y + area.height - 1 {
+				output.push_str(trimmed);
+				output.push('\n');
+			}
+		}
+		// Remove trailing empty lines
+		while output.ends_with("\n\n") {
+			output.pop();
+		}
+		output
+	}
 
 	/// Helper: spawn an entity tree, walk it with [`TuiRenderer`],
 	/// return the buffer.
