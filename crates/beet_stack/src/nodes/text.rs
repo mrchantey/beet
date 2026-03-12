@@ -440,10 +440,9 @@ fn on_click_link(
 	let Ok(link) = links.get(ev.event().target) else {
 		return;
 	};
-	let href = &link.href;
 
-	if is_external_url(href) {
-		if let Err(err) = webbrowser::open(href) {
+	if is_external_url(&link.href) {
+		if let Err(err) = webbrowser::open(&link.href) {
 			cross_log!("failed to open URL: {err}");
 		}
 	} else {
@@ -453,8 +452,9 @@ fn on_click_link(
 		while let Ok(child_of) = ancestors.get(root) {
 			root = child_of.parent();
 		}
-		commands
-			.entity(root)
-			.call(Request::get(href), OutHandler::new(|_, _: Response| Ok(())));
+		commands.entity(root).call(
+			Request::get(&link.href),
+			OutHandler::new(|_, _: Response| Ok(())),
+		);
 	}
 }

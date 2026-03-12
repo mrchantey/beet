@@ -12,6 +12,13 @@ pub struct ElementView<'a> {
 	pub attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
 }
 
+
+pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
+	OrderedList(OrderedListView<'a>),
+	Link(LinkView<'a>),
+	Custom(Custom),
+}
+
 impl<'a> ElementView<'a> {
 	/// Create a new view from an element reference and its attributes.
 	pub fn new(

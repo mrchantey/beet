@@ -30,20 +30,14 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy_ratatui::RatatuiContext;
 use ratatui::buffer::Buffer;
-use ratatui::layout::Margin;
 use ratatui::prelude::Rect;
 use ratatui::style::Color;
-use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::text::Text;
 use ratatui::widgets;
 use ratatui::widgets::Block;
-use ratatui::widgets::Scrollbar;
-use ratatui::widgets::ScrollbarOrientation;
-use ratatui::widgets::ScrollbarState;
-use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 use std::borrow::Cow;
 
@@ -116,9 +110,8 @@ impl NodeRenderer for TuiRenderer {
 
 		// Read existing scroll state so we can preserve the offset
 		// across frames.
-		let prev_scroll = cx
-			.world
-			.entity(cx.entity)
+		let mut scroll_state = cx
+			.entity()
 			.get::<TuiScrollState>()
 			.cloned()
 			.unwrap_or_default();
@@ -129,7 +122,6 @@ impl NodeRenderer for TuiRenderer {
 		// mismatch that caused cascading whitespace in terminals with
 		// pre-existing scrollback (eg Zed).
 		let entity = cx.entity;
-		let mut scroll_state = prev_scroll;
 		cx.world.resource_scope(
 			|world: &mut World,
 			 mut context: Mut<RatatuiContext>|
@@ -205,23 +197,7 @@ impl NodeRenderer for TuiRenderer {
 						}
 					}
 
-					// Render scrollbar if content overflows the
-					// viewport.
-					if scroll_state.overflows() {
-						let mut sb_state = scroll_state.scrollbar_state();
-						let scrollbar =
-							Scrollbar::new(ScrollbarOrientation::VerticalRight)
-								.begin_symbol(Some("↑"))
-								.end_symbol(Some("↓"));
-						scrollbar.render(
-							area.inner(Margin {
-								vertical: 1,
-								horizontal: 0,
-							}),
-							buf,
-							&mut sb_state,
-						);
-					}
+					scroll_state.try_render(area, buf);
 				});
 
 				draw_result.map_err(|err| {
@@ -768,184 +744,12 @@ impl NodeVisitor for TuiRenderer {
 	}
 }
 
-/// Tracks vertical scroll position and content dimensions.
-///
-/// Inserted by [`TuiRenderer`] on the root entity after each render pass.
-/// The input system updates `offset` when arrow keys or mouse scroll
-/// events are received. The renderer reads `offset` to determine which
-/// portion of the content buffer is visible.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
-pub struct TuiScrollState {
-	/// Current vertical scroll offset in rows from the top.
-	pub offset: u16,
-	/// Total content height in rows (set by the renderer after layout).
-	pub content_height: u16,
-	/// Visible viewport height in rows (set by the renderer from the
-	/// terminal area, excluding the border).
-	pub viewport_height: u16,
-}
-
-impl TuiScrollState {
-	/// Whether the content overflows the viewport, requiring a scrollbar.
-	pub fn overflows(&self) -> bool {
-		self.content_height > self.viewport_height
-	}
-
-	/// Maximum valid scroll offset.
-	pub fn max_offset(&self) -> u16 {
-		self.content_height.saturating_sub(self.viewport_height)
-	}
-
-	/// Scroll down by `count` rows, clamped to the maximum offset.
-	pub fn scroll_down(&mut self, count: u16) {
-		self.offset = self.offset.saturating_add(count).min(self.max_offset());
-	}
-
-	/// Scroll up by `count` rows.
-	pub fn scroll_up(&mut self, count: u16) {
-		self.offset = self.offset.saturating_sub(count);
-	}
-
-	/// Clamp the current offset to valid bounds, used after content
-	/// height changes between frames.
-	pub fn clamp(&mut self) {
-		self.offset = self.offset.min(self.max_offset());
-	}
-
-	/// Build a ratatui [`ScrollbarState`] from the current values.
-	pub fn scrollbar_state(&self) -> ScrollbarState {
-		ScrollbarState::new(self.max_offset() as usize)
-			.position(self.offset as usize)
-	}
-}
-
-
-/// Horizontal justification for block-level content.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Justify {
-	#[default]
-	Start,
-	Center,
-	End,
-}
-
-/// Style descriptor for TUI rendering.
-///
-/// Wraps a ratatui [`Style`] with layout metadata so the
-/// [`StyleMap`] can drive both visual appearance and block-level
-/// spacing without hand-rolled config structs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TuiStyle {
-	/// The ratatui visual style (colors, modifiers).
-	pub style: Style,
-	/// Blank lines to emit before this element.
-	pub lines_before: u16,
-	/// Blank lines to emit after this element.
-	pub lines_after: u16,
-	/// Horizontal justification for block content.
-	pub justify: Justify,
-}
-
-impl Default for TuiStyle {
-	fn default() -> Self {
-		Self {
-			style: Style::default(),
-			lines_before: 0,
-			lines_after: 0,
-			justify: Justify::Start,
-		}
-	}
-}
-
-impl TuiStyle {
-	pub fn new(style: Style) -> Self {
-		Self {
-			style,
-			..Default::default()
-		}
-	}
-
-	pub fn with_lines_before(mut self, lines: u16) -> Self {
-		self.lines_before = lines;
-		self
-	}
-
-	pub fn with_lines_after(mut self, lines: u16) -> Self {
-		self.lines_after = lines;
-		self
-	}
-
-	pub fn with_justify(mut self, justify: Justify) -> Self {
-		self.justify = justify;
-		self
-	}
-}
-
-/// Build the default element → [`TuiStyle`] mapping used by [`TuiRenderer`].
-pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
-	StyleMap::new(TuiStyle::default(), vec![
-		(
-			"h1",
-			TuiStyle::new(Style::new().bold().fg(Color::Green))
-				.with_lines_before(1)
-				.with_lines_after(1)
-				.with_justify(Justify::Center),
-		),
-		("h2", TuiStyle::new(Style::new().bold().fg(Color::Cyan))),
-		("h3", TuiStyle::new(Style::new().bold())),
-		("h4", TuiStyle::new(Style::new().bold())),
-		("h5", TuiStyle::new(Style::new().bold())),
-		("h6", TuiStyle::new(Style::new().bold())),
-		("p", TuiStyle::default()),
-		("div", TuiStyle::default()),
-		("section", TuiStyle::default()),
-		("article", TuiStyle::default()),
-		("nav", TuiStyle::default()),
-		("header", TuiStyle::default()),
-		("footer", TuiStyle::default()),
-		("main", TuiStyle::default()),
-		(
-			"blockquote",
-			TuiStyle::new(Style::new().italic())
-				.with_lines_before(1)
-				.with_lines_after(1),
-		),
-		(
-			"aside",
-			TuiStyle::new(Style::new().italic())
-				.with_lines_before(1)
-				.with_lines_after(1),
-		),
-		("pre", TuiStyle::new(Style::new().bg(Color::DarkGray))),
-		("code", TuiStyle::new(Style::new().bg(Color::DarkGray))),
-		("strong", TuiStyle::new(Style::new().bold())),
-		("em", TuiStyle::new(Style::new().italic())),
-		(
-			"del",
-			TuiStyle::new(Style::new().add_modifier(Modifier::CROSSED_OUT)),
-		),
-		(
-			"a",
-			TuiStyle::new(
-				Style::new()
-					.fg(Color::Cyan)
-					.add_modifier(Modifier::UNDERLINED),
-			),
-		),
-		("hr", TuiStyle::new(Style::new().fg(Color::DarkGray))),
-		(
-			"img",
-			TuiStyle::new(Style::new().fg(Color::DarkGray).italic()),
-		),
-		("button", TuiStyle::new(Style::new().fg(Color::Cyan))),
-		("li", TuiStyle::default()),
-		("thead", TuiStyle::new(Style::new().bold())),
-	])
-}
 
 #[cfg(test)]
 mod test {
 	use super::*;
+	use ratatui::style::Modifier;
+
 	/// System that renders an entity tree into a ratatui [`Buffer`]
 	/// and returns both the buffer and span map.
 	fn tui_render_system(
@@ -1527,18 +1331,5 @@ mod test {
 		state.content_height = 25;
 		state.clamp();
 		state.offset.xpect_eq(5);
-	}
-
-	#[test]
-	fn scrollbar_state_matches() {
-		let state = TuiScrollState {
-			offset: 5,
-			content_height: 30,
-			viewport_height: 20,
-		};
-		let sb = state.scrollbar_state();
-		// ScrollbarState doesn't expose fields, but we can verify it
-		// was created without panicking.
-		format!("{sb:?}").xpect_contains("ScrollbarState");
 	}
 }

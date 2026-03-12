@@ -398,6 +398,9 @@ impl From<&str> for Url {
 impl From<String> for Url {
 	fn from(value: String) -> Self { Url::parse(value) }
 }
+impl From<&String> for Url {
+	fn from(value: &String) -> Self { Url::parse(value) }
+}
 
 // ============================================================================
 // Shared parsing helpers (also used by parts.rs)
