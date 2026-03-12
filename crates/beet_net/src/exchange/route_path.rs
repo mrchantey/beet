@@ -71,6 +71,13 @@ impl AsRef<str> for RoutePath {
 	fn as_ref(&self) -> &str { self.0.to_str().unwrap_or_default() }
 }
 
+impl From<RoutePath> for Url {
+	fn from(value: RoutePath) -> Url {
+		let path_str: &str = value.as_ref();
+		Url::parse(path_str)
+	}
+}
+
 impl From<RoutePath> for Request {
 	fn from(value: RoutePath) -> Request {
 		Request::new(HttpMethod::Get, value)

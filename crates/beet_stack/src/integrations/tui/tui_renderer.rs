@@ -120,7 +120,7 @@ pub struct TuiRenderer<'buf> {
 	in_list_item: bool,
 	/// Rendering configuration.
 	config: TuiConfig,
-	/// Maps terminal cell positions to entities for input hit-testing.
+	/// Span map for content-buffer-space entity lookups.
 	span_map: TuiSpanMap,
 }
 
@@ -158,15 +158,16 @@ impl<'buf> TuiRenderer<'buf> {
 	/// Returns the remaining drawable area after rendering.
 	pub fn remaining_area(&self) -> Rect { self.area }
 
-	/// Flush remaining spans and return the populated [`TuiSpanMap`].
+	/// Flush remaining spans and return a [`TuiArea`] wrapping the
+	/// populated span map.
 	///
 	/// Must be called after [`CardWalker::walk_card`] returns to
 	/// ensure orphaned text nodes (those not wrapped in a block-level
 	/// element like [`Paragraph`]) are rendered. Without this call,
 	/// bare [`TextNode`] content silently produces blank output.
-	pub fn finish(mut self) -> TuiSpanMap {
+	pub fn finish(mut self) -> TuiArea {
 		self.flush_spans();
-		self.span_map
+		TuiArea::from_span_map(self.span_map)
 	}
 
 	/// Convert [`InlineStyle`] modifiers to a ratatui [`Style`].
@@ -701,12 +702,12 @@ impl CardVisitor for TuiRenderer<'_> {
 pub fn tui_render_system(
 	In((entity, area)): In<(Entity, Rect)>,
 	walker: CardWalker,
-) -> (Buffer, TuiSpanMap) {
+) -> (Buffer, TuiArea) {
 	let mut buf = Buffer::empty(area);
 	let mut renderer = TuiRenderer::new(area, &mut buf);
 	walker.walk_card(&mut renderer, entity);
-	let span_map = renderer.finish();
-	(buf, span_map)
+	let tui_area = renderer.finish();
+	(buf, tui_area)
 }
 
 
@@ -750,7 +751,7 @@ mod test {
 	) -> Buffer {
 		let area = Rect::new(0, 0, width, height);
 
-		let (buf, _span_map) = world
+		let (buf, _tui_area) = world
 			.run_system_once_with(tui_render_system, (entity, area))
 			.unwrap();
 		buf
@@ -1023,13 +1024,13 @@ mod test {
 
 	// -- Span map integration tests --
 
-	/// Helper: render a card and return both buffer and span map.
+	/// Helper: render a card and return both buffer and tui area.
 	fn render_with_span_map(
 		world: &mut World,
 		entity: Entity,
 		width: u16,
 		height: u16,
-	) -> (Buffer, TuiSpanMap) {
+	) -> (Buffer, TuiArea) {
 		let area = Rect::new(0, 0, width, height);
 		world
 			.run_system_once_with(tui_render_system, (entity, area))
@@ -1045,10 +1046,10 @@ mod test {
 			])]))
 			.id();
 
-		let (_buf, span_map) = render_with_span_map(&mut world, entity, 40, 10);
-		span_map.is_empty().xpect_false();
+		let (_buf, tui_area) = render_with_span_map(&mut world, entity, 40, 10);
+		tui_area.is_empty().xpect_false();
 		// Row 0 should map to the text node entity
-		span_map.get(TuiPos::new(0, 0)).xpect_some();
+		tui_area.span_map().get(TuiPos::new(0, 0)).xpect_some();
 	}
 
 	#[test]
@@ -1060,10 +1061,13 @@ mod test {
 		let root = world.spawn((CardTool, children![])).id();
 		world.entity_mut(root).add_children(&[para_entity]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
 
 		// Per-span mapping: cells map to the text node, not the paragraph
-		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(text_entity));
+		tui_area
+			.span_map()
+			.get(TuiPos::new(0, 0))
+			.xpect_eq(Some(text_entity));
 	}
 
 	#[test]
@@ -1078,7 +1082,8 @@ mod test {
 		let root = world.spawn(CardTool).id();
 		world.entity_mut(root).add_children(&[heading, paragraph]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
+		let span_map = tui_area.span_map();
 
 		// Per-span mapping: cells map to text node entities
 		let mut heading_row = None;
@@ -1116,7 +1121,8 @@ mod test {
 		let root = world.spawn(CardTool).id();
 		world.entity_mut(root).add_children(&[paragraph]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
+		let span_map = tui_area.span_map();
 
 		// "[" maps to the button entity
 		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(button));
@@ -1138,7 +1144,8 @@ mod test {
 		let root = world.spawn(CardTool).id();
 		world.entity_mut(root).add_children(&[paragraph]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
+		let span_map = tui_area.span_map();
 
 		// "this is some " is 13 chars (cols 0..12)
 		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(plain_text));
@@ -1155,8 +1162,8 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn(CardTool).id();
 
-		let (_buf, span_map) = render_with_span_map(&mut world, entity, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, entity, 40, 10);
 
-		span_map.is_empty().xpect_true();
+		tui_area.is_empty().xpect_true();
 	}
 }

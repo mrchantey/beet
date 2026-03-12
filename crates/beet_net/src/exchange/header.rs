@@ -314,6 +314,36 @@ impl Header for Origin {
 }
 
 // ============================================================================
+// Host
+// ============================================================================
+
+/// Typed `Host` header.
+///
+/// ```
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
+/// let mut headers = HeaderMap::new();
+/// headers.set::<headers::Host>("example.com:8080".to_string());
+/// let host: String = headers.get::<headers::Host>().unwrap().unwrap();
+/// assert_eq!(host, "example.com:8080");
+/// ```
+pub struct Host;
+
+impl Header for Host {
+	type Value = String;
+	const KEY: &'static str = "host";
+
+	fn parse(values: &Vec<String>) -> Result<Self::Value> {
+		values
+			.first()
+			.cloned()
+			.ok_or_else(|| bevyhow!("host header has no value"))
+	}
+
+	fn serialize(value: String) -> Vec<String> { vec![value] }
+}
+
+// ============================================================================
 // AccessControlAllowOrigin
 // ============================================================================
 
@@ -559,6 +589,37 @@ impl Header for Expires {
 	fn serialize(value: String) -> Vec<String> { vec![value] }
 }
 
+// ============================================================================
+// UserAgent
+// ============================================================================
+
+/// Typed `User-Agent` header.
+///
+/// ```
+/// # use beet_net::prelude::*;
+/// # use beet_net::headers;
+/// let mut headers = HeaderMap::new();
+/// headers.set::<headers::UserAgent>("beet/0.1".to_string());
+/// let agent: String = headers.get::<headers::UserAgent>().unwrap().unwrap();
+/// assert_eq!(agent, "beet/0.1");
+/// ```
+pub struct UserAgent;
+
+impl Header for UserAgent {
+	type Value = String;
+	const KEY: &'static str = "user-agent";
+
+	fn parse(values: &Vec<String>) -> Result<Self::Value> {
+		values
+			.first()
+			.cloned()
+			.ok_or_else(|| bevyhow!("user-agent header has no value"))
+	}
+
+	fn serialize(value: String) -> Vec<String> { vec![value] }
+}
+
+
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -723,5 +784,45 @@ mod test {
 				.unwrap()
 				.xpect_eq(expected);
 		}
+	}
+
+	#[test]
+	fn user_agent_roundtrip() {
+		let mut map = HeaderMap::new();
+		map.set::<UserAgent>("beet/0.1".to_string());
+		map.get::<UserAgent>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("beet/0.1");
+	}
+
+	#[test]
+	fn host_roundtrip() {
+		let mut map = HeaderMap::new();
+		map.set::<Host>("example.com:8080".to_string());
+		map.get::<Host>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("example.com:8080");
+	}
+
+	#[test]
+	fn host_from_raw() {
+		let mut map = HeaderMap::new();
+		map.set_raw("host", "localhost:3000");
+		map.get::<Host>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("localhost:3000");
+	}
+
+	#[test]
+	fn user_agent_from_raw() {
+		let mut map = HeaderMap::new();
+		map.set_raw("user-agent", "Mozilla/5.0");
+		map.get::<UserAgent>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq("Mozilla/5.0");
 	}
 }

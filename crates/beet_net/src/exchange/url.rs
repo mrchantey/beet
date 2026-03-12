@@ -36,6 +36,22 @@ pub enum Scheme {
 	Ws,
 	/// `wss`
 	Wss,
+	/// `data` — inline data URIs (RFC 2397).
+	Data,
+	/// `mailto` — email addresses.
+	MailTo,
+	/// `tel` — telephone numbers.
+	Tel,
+	/// `javascript` — inline script execution.
+	JavaScript,
+	/// `blob` — binary large object references.
+	Blob,
+	/// `cid` — content identifiers (RFC 2392).
+	Cid,
+	/// `about` — browser internal pages, ie `about:blank`.
+	About,
+	/// `chrome` — browser internal pages.
+	Chrome,
 	/// A scheme not covered by the named variants.
 	Other(String),
 }
@@ -49,6 +65,14 @@ impl Scheme {
 			"file" => Self::File,
 			"ws" => Self::Ws,
 			"wss" => Self::Wss,
+			"data" => Self::Data,
+			"mailto" => Self::MailTo,
+			"tel" => Self::Tel,
+			"javascript" => Self::JavaScript,
+			"blob" => Self::Blob,
+			"cid" => Self::Cid,
+			"about" => Self::About,
+			"chrome" => Self::Chrome,
 			"" => Self::None,
 			other => Self::Other(other.to_string()),
 		}
@@ -63,6 +87,14 @@ impl Scheme {
 			Self::File => "file",
 			Self::Ws => "ws",
 			Self::Wss => "wss",
+			Self::Data => "data",
+			Self::MailTo => "mailto",
+			Self::Tel => "tel",
+			Self::JavaScript => "javascript",
+			Self::Blob => "blob",
+			Self::Cid => "cid",
+			Self::About => "about",
+			Self::Chrome => "chrome",
 			Self::Other(scheme) => scheme.as_str(),
 		}
 	}
@@ -75,6 +107,20 @@ impl Scheme {
 
 	/// Whether this scheme uses TLS.
 	pub fn is_secure(&self) -> bool { matches!(self, Self::Https | Self::Wss) }
+
+	/// Whether this scheme uses a hierarchical authority (host) component.
+	///
+	/// Non-hierarchical schemes like `mailto:`, `tel:`, `data:`, `about:`,
+	/// `blob:` place their content directly in the path with no authority.
+	pub fn is_hierarchical(&self) -> bool {
+		matches!(
+			self,
+			Self::Http
+				| Self::Https
+				| Self::File | Self::Ws
+				| Self::Wss | Self::Chrome
+		)
+	}
 }
 
 impl std::fmt::Display for Scheme {
@@ -156,18 +202,25 @@ impl Url {
 			_ => (Scheme::None, before_query),
 		};
 
-		// For scheme-bearing URLs, extract authority (host[:port])
+		// For scheme-bearing URLs, extract authority (host[:port]).
+		// Non-hierarchical schemes (mailto, tel, data, about, etc.)
+		// place their content directly in the path with no authority.
 		let (authority, path_str) = if scheme != Scheme::None {
-			// Authority ends at the first `/` (or end of string)
-			match rest.split_once('/') {
-				Some((auth, path)) if !auth.is_empty() => {
-					(Some(auth.to_string()), format!("/{path}"))
+			if scheme.is_hierarchical() {
+				// Authority ends at the first `/` (or end of string)
+				match rest.split_once('/') {
+					Some((auth, path)) if !auth.is_empty() => {
+						(Some(auth.to_string()), format!("/{path}"))
+					}
+					_ if !rest.is_empty() && !rest.starts_with('/') => {
+						// Entire rest is the authority with no path
+						(Some(rest.to_string()), String::new())
+					}
+					_ => (None, rest.to_string()),
 				}
-				_ if !rest.is_empty() && !rest.starts_with('/') => {
-					// Entire rest is the authority with no path
-					(Some(rest.to_string()), String::new())
-				}
-				_ => (None, rest.to_string()),
+			} else {
+				// Non-hierarchical: everything after the scheme is the path
+				(None, rest.to_string())
 			}
 		} else {
 			(None, rest.to_string())
@@ -308,15 +361,23 @@ impl Url {
 
 impl std::fmt::Display for Url {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let path = self.path_string();
 		let query = self.query_string();
 
 		match (&self.scheme, &self.authority) {
-			(Scheme::None, _) => write!(formatter, "{path}")?,
-			(scheme, Some(auth)) => {
-				write!(formatter, "{scheme}://{auth}{path}")?
+			(Scheme::None, _) => {
+				write!(formatter, "{}", self.path_string())?;
 			}
-			(scheme, None) => write!(formatter, "{scheme}://{path}")?,
+			(scheme, _) if !scheme.is_hierarchical() => {
+				// Non-hierarchical schemes use `scheme:path` (no `//`)
+				let path = self.path.join("/");
+				write!(formatter, "{scheme}:{path}")?;
+			}
+			(scheme, Some(auth)) => {
+				write!(formatter, "{scheme}://{auth}{}", self.path_string())?;
+			}
+			(scheme, None) => {
+				write!(formatter, "{scheme}://{}", self.path_string())?;
+			}
 		};
 
 		if !query.is_empty() {
@@ -431,6 +492,14 @@ mod test {
 		Scheme::from_str("file").xpect_eq(Scheme::File);
 		Scheme::from_str("ws").xpect_eq(Scheme::Ws);
 		Scheme::from_str("wss").xpect_eq(Scheme::Wss);
+		Scheme::from_str("data").xpect_eq(Scheme::Data);
+		Scheme::from_str("mailto").xpect_eq(Scheme::MailTo);
+		Scheme::from_str("tel").xpect_eq(Scheme::Tel);
+		Scheme::from_str("javascript").xpect_eq(Scheme::JavaScript);
+		Scheme::from_str("blob").xpect_eq(Scheme::Blob);
+		Scheme::from_str("cid").xpect_eq(Scheme::Cid);
+		Scheme::from_str("about").xpect_eq(Scheme::About);
+		Scheme::from_str("chrome").xpect_eq(Scheme::Chrome);
 		Scheme::from_str("").xpect_eq(Scheme::None);
 		Scheme::from_str("custom")
 			.xpect_eq(Scheme::Other("custom".to_string()));
@@ -439,6 +508,8 @@ mod test {
 	#[test]
 	fn scheme_display() {
 		Scheme::Http.to_string().xpect_eq("http");
+		Scheme::About.to_string().xpect_eq("about");
+		Scheme::MailTo.to_string().xpect_eq("mailto");
 		Scheme::None.to_string().xpect_eq("");
 	}
 
@@ -461,6 +532,23 @@ mod test {
 		Scheme::Https.is_secure().xpect_true();
 		Scheme::Wss.is_secure().xpect_true();
 		Scheme::Http.is_secure().xpect_false();
+	}
+
+	#[test]
+	fn scheme_is_hierarchical() {
+		Scheme::Http.is_hierarchical().xpect_true();
+		Scheme::Https.is_hierarchical().xpect_true();
+		Scheme::File.is_hierarchical().xpect_true();
+		Scheme::Ws.is_hierarchical().xpect_true();
+		Scheme::Wss.is_hierarchical().xpect_true();
+		Scheme::Blob.is_hierarchical().xpect_false();
+		Scheme::Chrome.is_hierarchical().xpect_true();
+		Scheme::MailTo.is_hierarchical().xpect_false();
+		Scheme::Tel.is_hierarchical().xpect_false();
+		Scheme::Data.is_hierarchical().xpect_false();
+		Scheme::About.is_hierarchical().xpect_false();
+		Scheme::Cid.is_hierarchical().xpect_false();
+		Scheme::JavaScript.is_hierarchical().xpect_false();
 	}
 
 	// -- Url parsing tests --
@@ -529,6 +617,108 @@ mod test {
 	fn parse_empty_fragment() {
 		let url = Url::parse("/path#");
 		url.fragment().xpect_none();
+	}
+
+	// -- Non-hierarchical scheme tests --
+
+	#[test]
+	fn parse_about_blank() {
+		let url = Url::parse("about:blank");
+		url.scheme().clone().xpect_eq(Scheme::About);
+		url.authority().xpect_none();
+		url.path().clone().xpect_eq(vec!["blank".to_string()]);
+		url.to_string().xpect_eq("about:blank");
+	}
+
+	#[test]
+	fn parse_mailto() {
+		let url = Url::parse("mailto:user@example.com");
+		url.scheme().clone().xpect_eq(Scheme::MailTo);
+		url.authority().xpect_none();
+		url.path()
+			.clone()
+			.xpect_eq(vec!["user@example.com".to_string()]);
+		url.to_string().xpect_eq("mailto:user@example.com");
+	}
+
+	#[test]
+	fn parse_tel() {
+		let url = Url::parse("tel:+1-555-0100");
+		url.scheme().clone().xpect_eq(Scheme::Tel);
+		url.authority().xpect_none();
+		url.path().clone().xpect_eq(vec!["+1-555-0100".to_string()]);
+		url.to_string().xpect_eq("tel:+1-555-0100");
+	}
+
+	#[test]
+	fn parse_javascript() {
+		let url = Url::parse("javascript:void(0)");
+		url.scheme().clone().xpect_eq(Scheme::JavaScript);
+		url.authority().xpect_none();
+		url.path().clone().xpect_eq(vec!["void(0)".to_string()]);
+		url.to_string().xpect_eq("javascript:void(0)");
+	}
+
+	#[test]
+	fn parse_data_uri() {
+		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
+		url.scheme().clone().xpect_eq(Scheme::Data);
+		url.authority().xpect_none();
+		url.path().clone().xpect_eq(vec![
+			"text".to_string(),
+			"plain;base64,SGVsbG8=".to_string(),
+		]);
+	}
+
+	#[test]
+	fn parse_blob() {
+		let url = Url::parse("blob:https://example.com/abc-123");
+		url.scheme().clone().xpect_eq(Scheme::Blob);
+		url.authority().xpect_none();
+		// The origin is part of the opaque path, not the authority.
+		// Empty segments from `//` are filtered by `split_path`.
+		url.path().clone().xpect_eq(vec![
+			"https:".to_string(),
+			"example.com".to_string(),
+			"abc-123".to_string(),
+		]);
+	}
+
+	#[test]
+	fn parse_cid() {
+		let url = Url::parse("cid:part1@example.com");
+		url.scheme().clone().xpect_eq(Scheme::Cid);
+		url.authority().xpect_none();
+		url.path()
+			.clone()
+			.xpect_eq(vec!["part1@example.com".to_string()]);
+		url.to_string().xpect_eq("cid:part1@example.com");
+	}
+
+	#[test]
+	fn parse_chrome() {
+		let url = Url::parse("chrome://settings/privacy");
+		url.scheme().clone().xpect_eq(Scheme::Chrome);
+		url.authority().unwrap().xpect_eq("settings");
+		url.path().clone().xpect_eq(vec!["privacy".to_string()]);
+	}
+
+	#[test]
+	fn parse_mailto_with_query() {
+		let url = Url::parse("mailto:user@example.com?subject=Hello");
+		url.scheme().clone().xpect_eq(Scheme::MailTo);
+		url.authority().xpect_none();
+		url.get_param("subject").unwrap().xpect_eq("Hello");
+		url.to_string()
+			.xpect_eq("mailto:user@example.com?subject=Hello");
+	}
+
+	#[test]
+	fn parse_about_srcdoc() {
+		let url = Url::parse("about:srcdoc");
+		url.scheme().clone().xpect_eq(Scheme::About);
+		url.path().clone().xpect_eq(vec!["srcdoc".to_string()]);
+		url.to_string().xpect_eq("about:srcdoc");
 	}
 
 	// -- Display / roundtrip tests --

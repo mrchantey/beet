@@ -38,7 +38,9 @@ impl Navigator {
 				navigator.current_url = url.clone();
 			})
 			.await?;
-		todo!("send request, call Render");
+		todo!(
+			"send request, filter out Scheme::About etc and handle appropriately, call Render"
+		);
 		// Request::get(url);
 		// Ok(())
 	}

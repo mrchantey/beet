@@ -73,45 +73,38 @@ impl Default for RequestParts {
 }
 
 impl RequestParts {
-	/// Creates a new `RequestParts` with the given method and path or URI.
+	/// Creates a new `RequestParts` with the given method and URL.
 	///
-	/// The input can be:
-	/// - A path like `/api/users`
-	/// - A full URI like `https://example.com/api/users`
-	/// - A CLI-style path like `users list`
-	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
-		let url = Url::parse(path.as_ref());
+	/// Accepts anything that converts [`Into<Url>`], including
+	/// `&str`, `String`, and a pre-parsed [`Url`].
+	pub fn new(method: HttpMethod, url: impl Into<Url>) -> Self {
 		Self {
 			method,
-			url,
+			url: url.into(),
 			headers: HeaderMap::default(),
 			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
 	}
 
-	/// Creates a GET request for the given path.
-	pub fn get(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Get, path)
+	/// Creates a GET request for the given URL.
+	pub fn get(url: impl Into<Url>) -> Self { Self::new(HttpMethod::Get, url) }
+
+	/// Creates a POST request for the given URL.
+	pub fn post(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Post, url)
 	}
 
-	/// Creates a POST request for the given path.
-	pub fn post(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Post, path)
+	/// Creates a PUT request for the given URL.
+	pub fn put(url: impl Into<Url>) -> Self { Self::new(HttpMethod::Put, url) }
+
+	/// Creates a DELETE request for the given URL.
+	pub fn delete(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Delete, url)
 	}
 
-	/// Creates a PUT request for the given path.
-	pub fn put(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Put, path)
-	}
-
-	/// Creates a DELETE request for the given path.
-	pub fn delete(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Delete, path)
-	}
-
-	/// Creates a PATCH request for the given path.
-	pub fn patch(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Patch, path)
+	/// Creates a PATCH request for the given URL.
+	pub fn patch(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Patch, url)
 	}
 
 	/// Returns the HTTP method.

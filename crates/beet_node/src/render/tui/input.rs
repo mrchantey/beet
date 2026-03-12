@@ -8,7 +8,7 @@ use ratatui::crossterm::event::MouseEventKind;
 pub fn pointer_input_system(
 	mut messages: MessageReader<MouseMessage>,
 	mut commands: Commands,
-	query: Populated<&TuiSpanMap>,
+	query: Populated<&TuiArea>,
 	mut pointers: Query<(Entity, &mut Pointer), With<PrimaryPointer>>,
 ) -> Result {
 	let Ok((pointer_entity, mut pointer)) = pointers.single_mut() else {
@@ -22,8 +22,8 @@ pub fn pointer_input_system(
 		let pos = TuiPos::new(message.0.row, message.0.column);
 
 		// this should always be single but cant hurt
-		for span_map in query.iter() {
-			let target = span_map.get(pos);
+		for tui_area in query.iter() {
+			let target = tui_area.get(pos);
 			match message.0.kind {
 				MouseEventKind::Down(_) => {
 					if let Some(entity) = target {

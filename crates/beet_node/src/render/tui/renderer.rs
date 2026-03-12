@@ -75,6 +75,10 @@ pub struct TuiRenderer {
 	block_elements: Vec<Cow<'static, str>>,
 	/// Maps terminal cell positions to entities for input hit-testing.
 	span_map: TuiSpanMap,
+	/// The full terminal rect including border chrome, set during render.
+	outer_rect: Rect,
+	/// The inner content viewport rect (inside border), set during render.
+	inner_rect: Rect,
 	/// Unordered list bullet string.
 	bullet_prefix: Cow<'static, str>,
 	/// Style for bullet / list number prefixes.
@@ -139,6 +143,10 @@ impl NodeRenderer for TuiRenderer {
 					let block = Block::bordered();
 					let inner_area = block.inner(area);
 					block.render(area, buf);
+
+					// Store layout rects for TuiArea coordinate translation
+					self.outer_rect = area;
+					self.inner_rect = inner_area;
 
 					// Create an oversized content buffer so we can
 					// measure the full content height before deciding
@@ -217,9 +225,13 @@ impl NodeRenderer for TuiRenderer {
 			},
 		)?;
 
-		cx.entity_mut()
-			.insert(std::mem::take(&mut self.span_map))
-			.insert(scroll_state);
+		let tui_area = TuiArea::new(
+			std::mem::take(&mut self.span_map),
+			self.outer_rect,
+			self.inner_rect,
+			scroll_state.offset,
+		);
+		cx.entity_mut().insert(tui_area).insert(scroll_state);
 
 		Ok(RenderOutput::Stateful)
 	}
@@ -242,6 +254,8 @@ impl TuiRenderer {
 			style_map: default_tui_style_map(),
 			block_elements: default_block_elements(),
 			span_map: TuiSpanMap::default(),
+			outer_rect: Rect::default(),
+			inner_rect: Rect::default(),
 			bullet_prefix: "• ".into(),
 			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
@@ -257,6 +271,7 @@ impl TuiRenderer {
 		self.list_stack.clear();
 		self.in_list_item = false;
 		self.in_code_block = false;
+		self.span_map = TuiSpanMap::default();
 	}
 
 	/// Enable HTML entity unescaping in text output.
@@ -280,14 +295,27 @@ impl TuiRenderer {
 	/// Returns a reference to the underlying buffer.
 	pub fn buffer(&self) -> &Buffer { &self.buf }
 
-	/// Flush remaining spans and return the buffer and [`TuiSpanMap`].
+	/// Flush remaining spans and return the buffer and [`TuiArea`].
 	///
 	/// Must be called after walking completes to ensure orphaned
 	/// text nodes (those not wrapped in a block-level element) are
 	/// rendered.
-	pub fn finish(mut self) -> (Buffer, TuiSpanMap) {
+	pub fn finish(self) -> (Buffer, TuiArea) {
+		self.finish_with_layout(Rect::default(), Rect::default(), 0)
+	}
+
+	/// Flush remaining spans and return the buffer and a [`TuiArea`]
+	/// populated with layout metadata for coordinate translation.
+	pub fn finish_with_layout(
+		mut self,
+		outer_rect: Rect,
+		inner_rect: Rect,
+		scroll_offset: u16,
+	) -> (Buffer, TuiArea) {
 		self.flush_spans();
-		(self.buf, self.span_map)
+		let area =
+			TuiArea::new(self.span_map, outer_rect, inner_rect, scroll_offset);
+		(self.buf, area)
 	}
 
 	/// Current composite ratatui [`Style`] from the style map stack.
@@ -872,7 +900,7 @@ mod test {
 	fn tui_render_system(
 		In((entity, area)): In<(Entity, Rect)>,
 		walker: NodeWalker,
-	) -> (Buffer, TuiSpanMap) {
+	) -> (Buffer, TuiArea) {
 		let mut renderer = TuiRenderer::new(area);
 		walker.walk(&mut renderer, entity);
 		renderer.finish()
@@ -924,7 +952,7 @@ mod test {
 		entity: Entity,
 		width: u16,
 		height: u16,
-	) -> (Buffer, TuiSpanMap) {
+	) -> (Buffer, TuiArea) {
 		let area = Rect::new(0, 0, width, height);
 		world
 			.run_system_once_with(tui_render_system, (entity, area))
@@ -1130,9 +1158,9 @@ mod test {
 		let para = world.spawn((Element::new("p"), Children::default())).id();
 		world.entity_mut(para).add_children(&[text_entity]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, para, 40, 10);
-		span_map.is_empty().xpect_false();
-		span_map.get(TuiPos::new(0, 0)).xpect_some();
+		let (_buf, tui_area) = render_with_span_map(&mut world, para, 40, 10);
+		tui_area.is_empty().xpect_false();
+		tui_area.span_map().get(TuiPos::new(0, 0)).xpect_some();
 	}
 
 	#[test]
@@ -1144,9 +1172,12 @@ mod test {
 		let root = world.spawn(Children::default()).id();
 		world.entity_mut(root).add_children(&[para]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
 		// Per-span mapping: cells map to the text node, not the paragraph
-		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(text_entity));
+		tui_area
+			.span_map()
+			.get(TuiPos::new(0, 0))
+			.xpect_eq(Some(text_entity));
 	}
 
 	#[test]
@@ -1164,7 +1195,8 @@ mod test {
 		let root = world.spawn(Children::default()).id();
 		world.entity_mut(root).add_children(&[para]);
 
-		let (_buf, span_map) = render_with_span_map(&mut world, root, 40, 10);
+		let (_buf, tui_area) = render_with_span_map(&mut world, root, 40, 10);
+		let span_map = tui_area.span_map();
 
 		// "this is some " is 13 chars (cols 0..12)
 		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(plain_text));
@@ -1181,8 +1213,8 @@ mod test {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
 
-		let (_buf, span_map) = render_with_span_map(&mut world, entity, 40, 10);
-		span_map.is_empty().xpect_true();
+		let (_buf, tui_area) = render_with_span_map(&mut world, entity, 40, 10);
+		tui_area.is_empty().xpect_true();
 	}
 
 	#[test]
@@ -1332,7 +1364,7 @@ mod test {
 					let mut renderer =
 						TuiRenderer::new(area).with_style_map(style_map);
 					walker.walk(&mut renderer, entity);
-					let (buf, _span_map) = renderer.finish();
+					let (buf, _tui_area) = renderer.finish();
 					buf
 				},
 				(heading, area, custom_map),

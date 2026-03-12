@@ -1,7 +1,7 @@
 //! TUI input handling: keyboard shortcuts and pointer-to-entity routing.
 //!
 //! The [`pointer_input_system`] reads crossterm mouse messages, resolves
-//! the terminal cell position to an entity via [`TuiSpanMap`], and
+//! the terminal cell position to an entity via [`TuiArea`], and
 //! triggers [`PointerDown`], [`PointerUp`], [`PointerOver`], and
 //! [`PointerOut`] entity events as appropriate.
 use crate::prelude::*;
@@ -15,11 +15,11 @@ use ratatui::crossterm::event::MouseEventKind;
 pub fn pointer_input_system(
 	mut messages: MessageReader<MouseMessage>,
 	mut commands: Commands,
-	span_map: Option<Res<TuiSpanMap>>,
+	tui_area: Option<Res<TuiArea>>,
 	mut pointers: Query<(Entity, &mut Pointer), With<PrimaryPointer>>,
 ) -> Result {
-	let Some(span_map) = span_map else {
-		// No span map yet (nothing rendered), drain messages
+	let Some(tui_area) = tui_area else {
+		// No tui area yet (nothing rendered), drain messages
 		messages.clear();
 		return Ok(());
 	};
@@ -32,7 +32,7 @@ pub fn pointer_input_system(
 
 	for message in messages.read() {
 		let pos = TuiPos::new(message.0.row, message.0.column);
-		let target = span_map.get(pos);
+		let target = tui_area.get(pos);
 
 		match message.0.kind {
 			MouseEventKind::Down(_) => {

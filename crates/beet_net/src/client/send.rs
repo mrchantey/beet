@@ -132,6 +132,19 @@ impl Request {
 					"WebSocket schemes are not supported by Request::send, use the sockets module instead"
 				);
 			}
+			Scheme::Data
+			| Scheme::MailTo
+			| Scheme::Tel
+			| Scheme::JavaScript
+			| Scheme::Blob
+			| Scheme::Cid
+			| Scheme::About
+			| Scheme::Chrome => {
+				bevybail!(
+					"Non-hierarchical scheme '{}' is not supported by Request::send",
+					self.scheme()
+				);
+			}
 			Scheme::Other(scheme) => {
 				bevybail!("Unsupported URL scheme: {scheme}");
 			}

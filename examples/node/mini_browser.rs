@@ -24,7 +24,7 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.unwrap_or_else(|| "http://example.com".to_string());
 
 		// 1. Fetch the URL
-		let input_bytes = Request::get(&url)
+		let input_bytes = Request::get(url)
 			.send()
 			.await
 			.unwrap()

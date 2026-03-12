@@ -111,10 +111,13 @@ impl std::ops::Deref for RequestMeta {
 }
 
 impl Request {
-	/// Creates a new request with the given method and path
-	pub fn new(method: HttpMethod, path: impl AsRef<str>) -> Self {
+	/// Creates a new request with the given method and URL.
+	///
+	/// Accepts anything that converts [`Into<Url>`], including
+	/// `&str`, `String`, and a pre-parsed [`Url`].
+	pub fn new(method: HttpMethod, url: impl Into<Url>) -> Self {
 		Self {
-			parts: RequestParts::new(method, path),
+			parts: RequestParts::new(method, url),
 			body: default(),
 		}
 	}
@@ -127,39 +130,35 @@ impl Request {
 		Self { parts, body }
 	}
 
-	/// Creates a GET request for the given path
-	pub fn get(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Get, path)
+	/// Creates a GET request for the given URL.
+	pub fn get(url: impl Into<Url>) -> Self { Self::new(HttpMethod::Get, url) }
+
+	/// Creates a POST request for the given URL.
+	pub fn post(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Post, url)
 	}
 
-	/// Creates a POST request for the given path
-	pub fn post(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Post, path)
+	/// Creates a PUT request for the given URL.
+	pub fn put(url: impl Into<Url>) -> Self { Self::new(HttpMethod::Put, url) }
+
+	/// Creates a DELETE request for the given URL.
+	pub fn delete(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Delete, url)
 	}
 
-	/// Creates a PUT request for the given path
-	pub fn put(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Put, path)
+	/// Creates a PATCH request for the given URL.
+	pub fn patch(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Patch, url)
 	}
 
-	/// Creates a DELETE request for the given path
-	pub fn delete(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Delete, path)
+	/// Creates a HEAD request for the given URL.
+	pub fn head(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Head, url)
 	}
 
-	/// Creates a PATCH request for the given path
-	pub fn patch(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Patch, path)
-	}
-
-	/// Creates a HEAD request for the given path
-	pub fn head(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Head, path)
-	}
-
-	/// Creates an OPTIONS request for the given path
-	pub fn options(path: impl AsRef<str>) -> Self {
-		Self::new(HttpMethod::Options, path)
+	/// Creates an OPTIONS request for the given URL.
+	pub fn options(url: impl Into<Url>) -> Self {
+		Self::new(HttpMethod::Options, url)
 	}
 
 	/// Sets the HTTP method
@@ -208,12 +207,12 @@ impl Request {
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn with_json<T: serde::Serialize>(
-		path: impl AsRef<str>,
+		url: impl Into<Url>,
 		value: &T,
 	) -> Result<Self> {
 		let body = Body::from_json(value)?;
 		let mut request =
-			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+			Self::from_parts(RequestParts::new(HttpMethod::Post, url), body);
 		request.headers.set_content_type(MediaType::Json);
 		request.xok()
 	}
@@ -222,12 +221,12 @@ impl Request {
 	/// Sets the `content-type` header to `application/x-postcard`.
 	#[cfg(feature = "postcard")]
 	pub fn with_postcard<T: serde::Serialize>(
-		path: impl AsRef<str>,
+		url: impl Into<Url>,
 		value: &T,
 	) -> Result<Self> {
 		let body = Body::from_postcard(value)?;
 		let mut request =
-			Self::from_parts(RequestParts::new(HttpMethod::Post, path), body);
+			Self::from_parts(RequestParts::new(HttpMethod::Post, url), body);
 		request.headers.set_content_type(MediaType::Postcard);
 		request.xok()
 	}
@@ -242,8 +241,8 @@ impl Request {
 	/// assert_eq!(media_type, MediaType::Json);
 	/// ```
 	#[cfg(feature = "json")]
-	pub fn with_json_str(path: impl AsRef<str>, json: impl AsRef<str>) -> Self {
-		let mut request = Self::post(path).with_body(json.as_ref().as_bytes());
+	pub fn with_json_str(url: impl Into<Url>, json: impl AsRef<str>) -> Self {
+		let mut request = Self::post(url).with_body(json.as_ref().as_bytes());
 		request.headers.set_content_type(MediaType::Json);
 		request
 	}
@@ -251,10 +250,10 @@ impl Request {
 	/// Creates a POST request with raw postcard bytes and `content-type` header.
 	#[cfg(feature = "postcard")]
 	pub fn with_postcard_bytes(
-		path: impl AsRef<str>,
+		url: impl Into<Url>,
 		bytes: impl AsRef<[u8]>,
 	) -> Self {
-		let mut request = Self::post(path).with_body(bytes);
+		let mut request = Self::post(url).with_body(bytes);
 		request.headers.set_content_type(MediaType::Postcard);
 		request
 	}
@@ -334,6 +333,12 @@ impl Request {
 	/// Sets the `Accept` header to the given media type.
 	pub fn with_accept(mut self, media_type: MediaType) -> Self {
 		self.headers.set::<header::Accept>(vec![media_type]);
+		self
+	}
+
+	/// Sets the `User-Agent` header.
+	pub fn with_user_agent(mut self, agent: impl Into<String>) -> Self {
+		self.headers.set::<header::UserAgent>(agent.into());
 		self
 	}
 
