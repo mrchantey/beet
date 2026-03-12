@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();
-///     app.add_plugins(TuiPlugin);
+///     app.add_plugins(TuiPluginOld);
 ///     app.world_mut().spawn((
 ///         default_router(),
 ///         tui_server(),

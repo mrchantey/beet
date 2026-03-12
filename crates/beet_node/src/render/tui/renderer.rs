@@ -1,7 +1,7 @@
 //! Render entity trees to a ratatui [`Buffer`] via the
 //! [`NodeVisitor`] pattern.
 //!
-//! [`RatatuiRenderer`] walks an entity tree and writes styled text
+//! [`TuiRenderer`] walks an entity tree and writes styled text
 //! directly into a ratatui [`Buffer`], advancing a cursor [`Rect`]
 //! downward as content is emitted. Element names are matched to
 //! determine block/inline behavior and styling.
@@ -15,7 +15,7 @@
 //!
 //! fn render(walker: NodeWalker, entity: Entity) {
 //!     let area = Rect::new(0, 0, 80, 24);
-//!     let mut renderer = RatatuiRenderer::new(area);
+//!     let mut renderer = TuiRenderer::new(area);
 //!     walker.walk(&mut renderer, entity);
 //!     let (buf, span_map) = renderer.finish();
 //! }
@@ -91,19 +91,58 @@ impl NodeRenderer for TuiRenderer {
 		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Ratatui])?;
-		let area = cx.world.resource_mut::<RatatuiContext>().get_frame().area();
-		self.reset(area);
-		cx.walk(self);
-		self.flush_spans();
-		let buffer = std::mem::take(&mut self.buf);
-		cx.world
-			.resource_mut::<RatatuiContext>()
-			.draw(|frame| {
-				let _ = std::mem::replace(frame.buffer_mut(), buffer);
-			})
-			.map_err(|err| {
-				bevyhow!("Failed to draw to RatatuiContext: {err}")
-			})?;
+
+		// Extract the RatatuiContext so we can access both it and the
+		// world independently, mirroring the beet_stack draw_system
+		// approach. This avoids the `get_frame()` / `draw()` area
+		// mismatch that caused cascading whitespace in terminals with
+		// pre-existing scrollback (eg Zed).
+		let entity = cx.entity;
+		cx.world.resource_scope(
+			|world: &mut World,
+			 mut context: Mut<RatatuiContext>|
+			 -> Result<(), RenderError> {
+				// draw() calls autoresize() internally, so the frame
+				// area is guaranteed to reflect the current terminal
+				// size.
+				let draw_result = context.draw(|frame| {
+					let area = frame.area();
+					let buf = frame.buffer_mut();
+
+					self.reset(area);
+
+					// Build a temporary RenderContext for the walk.
+					// accepts are already checked above so we pass an
+					// empty list.
+					let mut inner_cx = RenderContext::new(entity, world);
+					inner_cx.walk(self);
+					self.flush_spans();
+
+					// Copy rendered cells into the frame buffer,
+					// preserving the frame's own buffer identity so
+					// ratatui's diff/flush works correctly.
+					let rendered = &self.buf;
+					let rendered_area = *rendered.area();
+					for row in
+						rendered_area.y..rendered_area.y + rendered_area.height
+					{
+						for col in rendered_area.x
+							..rendered_area.x + rendered_area.width
+						{
+							if let Some(cell) = buf.cell_mut((col, row)) {
+								*cell = rendered[(col, row)].clone();
+							}
+						}
+					}
+				});
+
+				draw_result.map_err(|err| {
+					bevyhow!("Failed to draw to RatatuiContext: {err}")
+				})?;
+				Ok(())
+			},
+		)?;
+
 		cx.entity_mut().insert(std::mem::take(&mut self.span_map));
 
 		Ok(RenderOutput::Stateful)
@@ -433,12 +472,14 @@ impl NodeVisitor for TuiRenderer {
 						let (raw_spans, entities): (Vec<_>, Vec<_>) =
 							span_entries.into_iter().unzip();
 						let line = Line::from(raw_spans);
-						let mut text = Text::from(line);
-						text = text.style(tui_style.style);
-						text = text.centered();
+						let text = Text::from(line).style(tui_style.style);
 						let before_y = self.area.y;
+						// Alignment must be set on the Paragraph, not
+						// the Text, because Paragraph ignores
+						// Text.alignment and uses its own field.
 						let paragraph = widgets::Paragraph::new(text)
-							.wrap(widgets::Wrap { trim: false });
+							.wrap(widgets::Wrap { trim: false })
+							.centered();
 						let line_count =
 							paragraph.line_count(self.area.width) as u16;
 						paragraph.render(self.area, &mut self.buf);
@@ -659,13 +700,14 @@ impl TuiStyle {
 	}
 }
 
-/// Build the default element → [`TuiStyle`] mapping used by [`RatatuiRenderer`].
+/// Build the default element → [`TuiStyle`] mapping used by [`TuiRenderer`].
 pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
 	StyleMap::new(TuiStyle::default(), vec![
 		(
 			"h1",
 			TuiStyle::new(Style::new().bold().fg(Color::Green))
-				.with_lines_before(2)
+				.with_lines_before(1)
+				.with_lines_after(1)
 				.with_justify(Justify::Center),
 		),
 		("h2", TuiStyle::new(Style::new().bold().fg(Color::Cyan))),
@@ -724,7 +766,7 @@ pub fn default_tui_style_map() -> StyleMap<TuiStyle> {
 mod test {
 	use super::*;
 
-	/// Helper: spawn an entity tree, walk it with `RatatuiRenderer`,
+	/// Helper: spawn an entity tree, walk it with [`TuiRenderer`],
 	/// return the buffer.
 	fn render_to_buffer(
 		world: &mut World,
@@ -1174,5 +1216,35 @@ mod test {
 			}
 		}
 		found_red.xpect_true();
+	}
+
+	/// Verify h1 text is centered horizontally.
+	#[test]
+	fn h1_is_centered() {
+		let mut world = World::new();
+		let text_entity = world.spawn(Value::from("Hello")).id();
+		let heading =
+			world.spawn((Element::new("h1"), Children::default())).id();
+		world.entity_mut(heading).add_children(&[text_entity]);
+
+		let width = 40u16;
+		let buf = render_to_buffer(&mut world, heading, width, 10);
+
+		// Find the column where 'H' appears on the first non-empty row.
+		let area = buf.area;
+		let mut h_col: Option<u16> = None;
+		'outer: for row in area.y..area.y + area.height {
+			for col in area.x..area.x + area.width {
+				if buf[(col, row)].symbol() == "H" {
+					h_col = Some(col);
+					break 'outer;
+				}
+			}
+		}
+		let col = h_col.unwrap();
+		// Ratatui centers with: (area_width / 2) - (text_width / 2)
+		let text_width = 5u16;
+		let expected = (width / 2).saturating_sub(text_width / 2);
+		col.xpect_eq(expected);
 	}
 }
