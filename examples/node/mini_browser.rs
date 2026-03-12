@@ -38,13 +38,14 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.unwrap();
 
 		world.with(move |world: &mut World| {
-			let mut entity = world.spawn_empty();
+			let mut entity = world.spawn(TuiNodeRenderer::default());
+			// let mut entity = world.spawn_empty();
 
 			// 2. Parse the response body into ECS and render it
 			MediaParser::new()
 				.parse(ParseContext::new(&mut entity, &input_bytes))
 				.unwrap();
-			TuiRenderer::default()
+			TuiNodeRenderer::default()
 				.run(&mut entity, vec![MediaType::Ratatui])
 				.unwrap()
 				.to_string();

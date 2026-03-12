@@ -47,8 +47,9 @@ use std::borrow::Cow;
 /// vertical space from `area` as each block-level element is
 /// rendered. Uses a [`StyleMap<TuiStyle>`] to resolve element styles
 /// and layout metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TuiRenderer {
+#[derive(Debug, Clone, PartialEq, Eq, Component)]
+#[require(TuiWidget = tui_node_renderer_widget())]
+pub struct TuiNodeRenderer {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
 	/// The owned ratatui buffer to write into.
@@ -83,10 +84,24 @@ pub struct TuiRenderer {
 	block_quote_indent: u16,
 }
 
+fn tui_node_renderer_widget() -> TuiWidget {
+	TuiWidget::new(|mut entity, _, _| {
+		let renderer = entity
+			.get::<TuiNodeRenderer>()
+			.ok_or_else(|| {
+				bevyhow!("entity has no TuiNodeRenderer, was it removed?")
+			})?
+			.clone();
+
+		// panic!("its working!");
+		Ok(())
+	})
+}
+
 
 /// Create a new [`TuiRenderer`], its rect will be updated
 /// on each render call, via [`Self::reset`]
-impl Default for TuiRenderer {
+impl Default for TuiNodeRenderer {
 	fn default() -> Self { Self::new(Rect::default()) }
 }
 
@@ -98,7 +113,7 @@ impl Default for TuiRenderer {
 /// while allowing generous scroll depth.
 const MAX_CONTENT_HEIGHT: u16 = 4096;
 
-impl NodeRenderer for TuiRenderer {
+impl NodeRenderer for TuiNodeRenderer {
 	fn render(
 		&mut self,
 		cx: &mut RenderContext,
@@ -213,7 +228,7 @@ impl NodeRenderer for TuiRenderer {
 
 
 
-impl TuiRenderer {
+impl TuiNodeRenderer {
 	/// Create a new TUI renderer targeting the given area.
 	pub fn new(area: Rect) -> Self {
 		Self {
@@ -273,6 +288,8 @@ impl TuiRenderer {
 		self.flush_spans();
 		(self.buf, self.span_map)
 	}
+
+	// pub fn render(&self, )
 
 	/// Current composite ratatui [`Style`] from the style map stack.
 	fn current_style(&self) -> Style { self.style_map.current().style }
@@ -444,7 +461,7 @@ impl TuiRenderer {
 	}
 }
 
-impl NodeVisitor for TuiRenderer {
+impl NodeVisitor for TuiNodeRenderer {
 	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
 
@@ -738,7 +755,7 @@ mod test {
 		In((entity, area)): In<(Entity, Rect)>,
 		walker: NodeWalker,
 	) -> (Buffer, TuiSpanMap) {
-		let mut renderer = TuiRenderer::new(area);
+		let mut renderer = TuiNodeRenderer::new(area);
 		walker.walk(&mut renderer, entity);
 		renderer.finish()
 	}
@@ -1195,7 +1212,7 @@ mod test {
 				)>,
 				 walker: NodeWalker| {
 					let mut renderer =
-						TuiRenderer::new(area).with_style_map(style_map);
+						TuiNodeRenderer::new(area).with_style_map(style_map);
 					walker.walk(&mut renderer, entity);
 					let (buf, _tui_area) = renderer.finish();
 					buf

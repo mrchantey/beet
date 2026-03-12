@@ -3,6 +3,7 @@ use crate::prelude::*;
 // use crate::stack::PropagateChanges;
 // use crate::stack::StackPlugin;
 use beet_core::prelude::*;
+use bevy::ecs::schedule::common_conditions;
 use bevy_ratatui::RatatuiPlugins;
 
 
@@ -43,7 +44,15 @@ impl Plugin for TuiPlugin {
 		// 		.after(PropagateChanges),
 		// )
 		.add_systems(Startup, spawn_pointer)
-		.add_systems(PostUpdate, exit_system);
+		.add_systems(
+			PostUpdate,
+			(
+				exit_system,
+				render_widgets.run_if(
+					common_conditions::any_match_filter::<Changed<TuiWidget>>,
+				),
+			),
+		);
 	}
 }
 
