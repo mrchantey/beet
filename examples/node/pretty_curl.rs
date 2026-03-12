@@ -44,7 +44,7 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.unwrap_or(MediaType::AnsiTerm);
 
 		// 1. Fetch the URL
-		let input_bytes = Request::get(&url)
+		let input_bytes = Request::get(url)
 			.send()
 			.await
 			.unwrap()

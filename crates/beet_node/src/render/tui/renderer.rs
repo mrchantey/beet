@@ -231,8 +231,8 @@ impl NodeRenderer for TuiRenderer {
 			},
 		)?;
 
-		cx.world.insert_resource(std::mem::take(&mut self.span_map));
-		cx.entity_mut().insert(scroll_state);
+		cx.entity_mut()
+			.insert((scroll_state, std::mem::take(&mut self.span_map)));
 
 		Ok(RenderOutput::Stateful)
 	}
@@ -326,67 +326,63 @@ impl TuiRenderer {
 		if self.spans.is_empty() {
 			return;
 		}
-
 		let span_entries = std::mem::take(&mut self.spans);
 		let (raw_spans, entities): (Vec<Span<'static>>, Vec<Option<Entity>>) =
 			span_entries.into_iter().unzip();
 
-		let line = Line::from(raw_spans.clone());
-		let text = Text::from(line);
-
 		let before_y = self.area.y;
+		let line_count = self.render_spans_paragraph(&raw_spans);
+		self.map_spans_to_entities(&raw_spans, &entities, before_y);
+
+		self.area.y = self.area.y.saturating_add(line_count);
+		self.area.height = self.area.height.saturating_sub(line_count);
+	}
+
+	/// Build and render a wrapped paragraph from `spans` into `self.buf`,
+	/// returning the number of lines consumed.
+	fn render_spans_paragraph(&mut self, spans: &[Span<'static>]) -> u16 {
+		let line = Line::from(spans.to_vec());
+		let text = Text::from(line);
 		let paragraph =
 			widgets::Paragraph::new(text).wrap(widgets::Wrap { trim: false });
 		let line_count = paragraph.line_count(self.area.width) as u16;
 		paragraph.render(self.area, &mut self.buf);
+		line_count
+	}
 
-		// Map each span's cells to its entity at character granularity,
-		// translating from content-buffer space to terminal space.
+	/// Walk `spans` and record each cell's owning entity in `self.span_map`,
+	/// translating content-buffer coordinates to terminal space.
+	///
+	/// `start_row` is the content-buffer row at which the paragraph begins
+	/// (i.e. `self.area.y` captured before rendering).
+	fn map_spans_to_entities(
+		&mut self,
+		spans: &[Span<'static>],
+		entities: &[Option<Entity>],
+		start_row: u16,
+	) {
 		let mut col = self.area.x;
-		let mut row = before_y;
+		let mut row = start_row;
 		let area_right = self.area.x.saturating_add(self.area.width);
 		let term_origin_y = self.terminal_origin.1 as i32;
 		let term_origin_x = self.terminal_origin.0;
 		let viewport_end = term_origin_y + self.viewport_height as i32;
 
-		for (span, entity) in raw_spans.iter().zip(entities.iter()) {
+		for (span, entity) in spans.iter().zip(entities.iter()) {
 			let span_width = span.width() as u16;
 			if let Some(entity) = entity {
-				let mut remaining = span_width;
-				let mut cur_col = col;
-				let mut cur_row = row;
-				while remaining > 0 {
-					let space = area_right.saturating_sub(cur_col);
-					let chars_this_line = remaining.min(space);
-					if chars_this_line > 0 {
-						// Translate content coords to terminal coords
-						let term_row = (cur_row as i32)
-							- (self.scroll_offset as i32)
-							+ term_origin_y;
-						let term_col = cur_col + term_origin_x;
-						// Only emit cells visible in the viewport
-						if term_row >= term_origin_y && term_row < viewport_end
-						{
-							let span_area = Rect::new(
-								term_col,
-								term_row as u16,
-								chars_this_line,
-								1,
-							);
-							self.span_map.set_area(span_area, *entity);
-						}
-					}
-					remaining = remaining.saturating_sub(chars_this_line);
-					if remaining > 0 {
-						cur_row += 1;
-						cur_col = self.area.x;
-					} else {
-						cur_col += chars_this_line;
-					}
-				}
-				col = cur_col;
-				row = cur_row;
+				(col, row) = self.map_single_span(
+					span_width,
+					*entity,
+					col,
+					row,
+					area_right,
+					term_origin_x,
+					term_origin_y,
+					viewport_end,
+				);
 			} else {
+				// Unowned span — advance the cursor without mapping.
 				col += span_width;
 				while col >= area_right && area_right > self.area.x {
 					col = self.area.x + (col - area_right);
@@ -394,9 +390,53 @@ impl TuiRenderer {
 				}
 			}
 		}
+	}
 
-		self.area.y = self.area.y.saturating_add(line_count);
-		self.area.height = self.area.height.saturating_sub(line_count);
+	/// Map the cells of a single span to `entity` in `self.span_map`,
+	/// handling line-wrapping within the content area.
+	///
+	/// Returns the updated `(col, row)` cursor position.
+	#[allow(clippy::too_many_arguments)]
+	fn map_single_span(
+		&mut self,
+		span_width: u16,
+		entity: Entity,
+		mut col: u16,
+		mut row: u16,
+		area_right: u16,
+		term_origin_x: u16,
+		term_origin_y: i32,
+		viewport_end: i32,
+	) -> (u16, u16) {
+		let mut remaining = span_width;
+		while remaining > 0 {
+			let space = area_right.saturating_sub(col);
+			let chars_this_line = remaining.min(space);
+			if chars_this_line > 0 {
+				// Translate content coords to terminal coords.
+				let term_row =
+					(row as i32) - (self.scroll_offset as i32) + term_origin_y;
+				let term_col = col + term_origin_x;
+				// Only emit cells visible in the viewport.
+				if term_row >= term_origin_y && term_row < viewport_end {
+					let span_area = Rect::new(
+						term_col,
+						term_row as u16,
+						chars_this_line,
+						1,
+					);
+					self.span_map.set_area(span_area, entity);
+				}
+			}
+			remaining = remaining.saturating_sub(chars_this_line);
+			if remaining > 0 {
+				row += 1;
+				col = self.area.x;
+			} else {
+				col += chars_this_line;
+			}
+		}
+		(col, row)
 	}
 
 	/// Render a [`Text`] block into the buffer, consuming vertical space.

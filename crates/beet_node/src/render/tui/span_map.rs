@@ -21,7 +21,7 @@ impl TuiPos {
 ///
 /// Cleared and rebuilt each frame by the draw system. Coordinates are stored
 /// in **terminal space** — the same coordinate system as mouse events.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Resource)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
 pub struct TuiSpanMap {
 	entries: HashMap<TuiPos, Entity>,
 }

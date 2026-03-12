@@ -8,15 +8,9 @@ use ratatui::crossterm::event::MouseEventKind;
 pub fn pointer_input_system(
 	mut messages: MessageReader<MouseMessage>,
 	mut commands: Commands,
-	span_map: Option<Res<TuiSpanMap>>,
+	span_maps: Query<&TuiSpanMap>,
 	mut pointers: Query<(Entity, &mut Pointer), With<PrimaryPointer>>,
 ) -> Result {
-	let Some(span_map) = span_map else {
-		// Nothing rendered yet, drain messages
-		messages.clear();
-		return Ok(());
-	};
-
 	let Ok((pointer_entity, mut pointer)) = pointers.single_mut() else {
 		// No primary pointer spawned yet, drain messages
 		messages.clear();
@@ -25,59 +19,61 @@ pub fn pointer_input_system(
 
 	for message in messages.read() {
 		let pos = TuiPos::new(message.0.row, message.0.column);
-		let target = span_map.get(pos);
+		for span_map in span_maps.iter() {
+			let target = span_map.get(pos);
 
-		match message.0.kind {
-			MouseEventKind::Down(_) => {
-				if let Some(entity) = target {
-					commands
-						.entity(entity)
-						.trigger(PointerDown::new(pointer_entity));
-				}
-			}
-			MouseEventKind::Up(_) => {
-				if let Some(entity) = target {
-					commands
-						.entity(entity)
-						.trigger(PointerUp::new(pointer_entity));
-				}
-			}
-			MouseEventKind::Moved | MouseEventKind::Drag(_) => {
-				let prev = pointer.hover;
-				match (prev, target) {
-					// Pointer moved from one entity to a different one
-					(Some(old), Some(new)) if old != new => {
+			match message.0.kind {
+				MouseEventKind::Down(_) => {
+					if let Some(entity) = target {
 						commands
-							.entity(old)
-							.try_trigger(PointerOut::new(pointer_entity));
-						commands
-							.entity(new)
-							.trigger(PointerOver::new(pointer_entity));
-						pointer.hover = Some(new);
+							.entity(entity)
+							.trigger(PointerDown::new(pointer_entity));
 					}
-					// Pointer entered an entity from empty space
-					(None, Some(new)) => {
-						commands
-							.entity(new)
-							.trigger(PointerOver::new(pointer_entity));
-						pointer.hover = Some(new);
-					}
-					// Pointer left an entity into empty space
-					(Some(old), None) => {
-						commands
-							.entity(old)
-							.trigger(PointerOut::new(pointer_entity));
-						pointer.hover = None;
-					}
-					// Same entity or still empty, nothing to do
-					_ => {}
 				}
+				MouseEventKind::Up(_) => {
+					if let Some(entity) = target {
+						commands
+							.entity(entity)
+							.trigger(PointerUp::new(pointer_entity));
+					}
+				}
+				MouseEventKind::Moved | MouseEventKind::Drag(_) => {
+					let prev = pointer.hover;
+					match (prev, target) {
+						// Pointer moved from one entity to a different one
+						(Some(old), Some(new)) if old != new => {
+							commands
+								.entity(old)
+								.try_trigger(PointerOut::new(pointer_entity));
+							commands
+								.entity(new)
+								.trigger(PointerOver::new(pointer_entity));
+							pointer.hover = Some(new);
+						}
+						// Pointer entered an entity from empty space
+						(None, Some(new)) => {
+							commands
+								.entity(new)
+								.trigger(PointerOver::new(pointer_entity));
+							pointer.hover = Some(new);
+						}
+						// Pointer left an entity into empty space
+						(Some(old), None) => {
+							commands
+								.entity(old)
+								.trigger(PointerOut::new(pointer_entity));
+							pointer.hover = None;
+						}
+						// Same entity or still empty, nothing to do
+						_ => {}
+					}
+				}
+				// Scroll events are handled by scroll_input_system
+				MouseEventKind::ScrollDown
+				| MouseEventKind::ScrollUp
+				| MouseEventKind::ScrollLeft
+				| MouseEventKind::ScrollRight => {}
 			}
-			// Scroll events are handled by scroll_input_system
-			MouseEventKind::ScrollDown
-			| MouseEventKind::ScrollUp
-			| MouseEventKind::ScrollLeft
-			| MouseEventKind::ScrollRight => {}
 		}
 	}
 	Ok(())
