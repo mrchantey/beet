@@ -15,6 +15,7 @@
 use super::combinators::HtmlParseConfig;
 use super::tokens::*;
 use crate::prelude::*;
+
 use beet_core::prelude::*;
 use std::borrow::Cow;
 
@@ -47,6 +48,9 @@ pub struct HtmlDiffConfig {
 	pub parse_text_nodes: bool,
 	/// Use [`Value::parse_string`] for attribute values instead of [`Value::Str`].
 	pub parse_attribute_values: bool,
+	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text nodes
+	/// and attribute values at parse time.
+	pub unescape_html: bool,
 	/// Elements that do not require a closing tag.
 	pub void_elements: Vec<Cow<'static, str>>,
 	/// How to handle children of void elements.
@@ -60,6 +64,7 @@ impl Default for HtmlDiffConfig {
 		Self {
 			parse_text_nodes: false,
 			parse_attribute_values: false,
+			unescape_html: true,
 			void_elements: vec![
 				"area".into(),
 				"base".into(),
@@ -91,19 +96,29 @@ impl HtmlDiffConfig {
 
 	/// Convert an attribute token value to a [`Value`] based on config.
 	pub fn attribute_value(&self, raw: &str) -> Value {
-		if self.parse_attribute_values {
-			Value::parse_string(raw)
+		let val = if self.unescape_html {
+			unescape_html_attribute(raw)
 		} else {
-			Value::new(raw)
+			raw.to_string()
+		};
+		if self.parse_attribute_values {
+			Value::parse_string(&val)
+		} else {
+			Value::new(val)
 		}
 	}
 
 	/// Convert text content to a [`Value`] based on config.
 	fn text_value(&self, raw: &str) -> Value {
-		if self.parse_text_nodes {
-			Value::parse_string(raw)
+		let s = if self.unescape_html {
+			unescape_html_text(raw)
 		} else {
-			Value::new(raw)
+			raw.to_string()
+		};
+		if self.parse_text_nodes {
+			Value::parse_string(&s)
+		} else {
+			Value::new(s)
 		}
 	}
 }

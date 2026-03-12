@@ -15,9 +15,6 @@ pub struct MarkdownRenderer {
 	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
 	render_expressions: bool,
-	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
-	/// content via [`unescape_html_text`].
-	unescape_html: bool,
 	/// Stack of active inline wrappers to emit on leave.
 	inline_stack: Vec<InlineWrapper>,
 }
@@ -45,7 +42,6 @@ impl MarkdownRenderer {
 		Self {
 			state: TextRenderState::new(),
 			render_expressions: false,
-			unescape_html: true,
 			inline_stack: Vec::new(),
 		}
 	}
@@ -53,15 +49,6 @@ impl MarkdownRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
-		self
-	}
-
-	/// Enable HTML entity unescaping in text output.
-	///
-	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
-	/// to their plain-text equivalents in rendered markdown.
-	pub fn with_unescape_html(mut self) -> Self {
-		self.unescape_html = true;
 		self
 	}
 
@@ -346,12 +333,7 @@ impl NodeVisitor for MarkdownRenderer {
 		if text.is_empty() {
 			return;
 		}
-
-		if self.unescape_html {
-			self.push_str(&unescape_html_text(&text));
-		} else {
-			self.push_str(&text);
-		}
+		self.push_str(&text);
 	}
 
 	fn visit_expression(
@@ -517,8 +499,7 @@ mod test {
 			.xpect_eq("<!-- hello -->");
 	}
 
-	/// Parse HTML (with entities), then render as markdown with
-	/// `unescape_html` enabled.
+	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -527,7 +508,6 @@ mod test {
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		MarkdownRenderer::new()
-			.with_unescape_html()
 			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
 			.to_string()
@@ -548,11 +528,7 @@ mod test {
 	}
 
 	#[test]
-	fn no_unescape_without_option() {
-		// Without the option, entities stored as literal text pass through.
-		// The HTML parser already decodes entities, so there is nothing to
-		// unescape in the default case. This test just confirms the default
-		// path does not crash.
+	fn plain_text_passes_through() {
 		roundtrip("hello world").trim().xpect_eq("hello world");
 	}
 }

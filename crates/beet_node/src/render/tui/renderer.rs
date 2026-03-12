@@ -81,9 +81,6 @@ pub struct TuiRenderer {
 	bullet_prefix_style: Style,
 	/// Indentation width for block quotes (includes the `│ ` bar).
 	block_quote_indent: u16,
-	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
-	/// content via [`unescape_html_text`].
-	unescape_html: bool,
 }
 
 
@@ -237,7 +234,6 @@ impl TuiRenderer {
 			bullet_prefix: "• ".into(),
 			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
-			unescape_html: true,
 		}
 	}
 
@@ -254,15 +250,6 @@ impl TuiRenderer {
 		self.in_list_item = false;
 		self.in_code_block = false;
 		self.span_map = TuiSpanMap::default();
-	}
-
-	/// Enable HTML entity unescaping in text output.
-	///
-	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
-	/// to their plain-text equivalents in rendered output.
-	pub fn with_unescape_html(mut self) -> Self {
-		self.unescape_html = true;
-		self
 	}
 
 	/// Override the element → style mapping.
@@ -718,12 +705,7 @@ impl NodeVisitor for TuiRenderer {
 	}
 
 	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
-		let raw = value.to_string();
-		let text = if self.unescape_html {
-			unescape_html_text(&raw)
-		} else {
-			raw
-		};
+		let text = value.to_string();
 		if text.is_empty() {
 			return;
 		}
