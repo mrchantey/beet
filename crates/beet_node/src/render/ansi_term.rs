@@ -25,6 +25,9 @@ pub struct AnsiTermRenderer {
 	render_expressions: bool,
 	/// Whether to prefix headings with `#` markers.
 	heading_hashes: bool,
+	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
+	/// content via [`unescape_html_text`].
+	unescape_html: bool,
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
 }
@@ -41,6 +44,7 @@ impl AnsiTermRenderer {
 			prefix: "\n".into(),
 			render_expressions: false,
 			heading_hashes: false,
+			unescape_html: true,
 			state: TextRenderState::new(),
 		}
 	}
@@ -66,6 +70,15 @@ impl AnsiTermRenderer {
 	/// Override whether to clear the terminal before rendering.
 	pub fn with_clear_on_render(mut self, clear: bool) -> Self {
 		self.clear_on_render = clear;
+		self
+	}
+
+	/// Enable HTML entity unescaping in text output.
+	///
+	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
+	/// to their plain-text equivalents in rendered output.
+	pub fn with_unescape_html(mut self) -> Self {
+		self.unescape_html = true;
 		self
 	}
 
@@ -269,7 +282,11 @@ impl NodeVisitor for AnsiTermRenderer {
 			return;
 		}
 
-		self.push_styled(&text);
+		if self.unescape_html {
+			self.push_styled(&unescape_html_text(&text));
+		} else {
+			self.push_styled(&text);
+		}
 	}
 
 	fn visit_expression(
@@ -515,6 +532,24 @@ mod test {
 			.xpect_contains("Title")
 			.xpect_contains("Paragraph")
 			.xpect_contains("\n\n");
+	}
+
+	#[test]
+	fn unescape_html_entities() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::html("<p>a &amp; b</p>");
+		HtmlParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		AnsiTermRenderer::new()
+			.with_unescape_html()
+			.with_clear_on_render(false)
+			.render(&mut RenderContext::new(entity, &mut world))
+			.unwrap()
+			.to_string()
+			.xmap(strip_ansi)
+			.xpect_contains("a & b");
 	}
 
 	#[test]

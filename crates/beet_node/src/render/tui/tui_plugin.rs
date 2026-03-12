@@ -35,7 +35,7 @@ impl Plugin for TuiPlugin {
 			},
 		))
 		.init_plugin::<InputPlugin>()
-		.add_systems(PreUpdate, pointer_input_system)
+		.add_systems(PreUpdate, (pointer_input_system, scroll_input_system))
 		// .add_systems(
 		// 	PostUpdate,
 		// 	(handle_scroll_input, super::draw_system)

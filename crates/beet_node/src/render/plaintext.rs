@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
+
 /// Renders an entity tree as plain text, stripping all markup.
 ///
 /// When `plaintext_only` is `true`, only [`MediaType::Text`] is accepted
@@ -14,6 +15,9 @@ pub struct PlainTextRenderer {
 	/// When `true`, require an explicit [`MediaType::Text`] in accepts.
 	/// When `false`, accept any text-based media type.
 	plaintext_only: bool,
+	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
+	/// content via [`unescape_html_text`].
+	unescape_html: bool,
 }
 
 impl PlainTextRenderer {
@@ -22,6 +26,7 @@ impl PlainTextRenderer {
 			did_newline: true,
 			buffer: String::new(),
 			plaintext_only: false,
+			unescape_html: false,
 		}
 	}
 
@@ -29,6 +34,15 @@ impl PlainTextRenderer {
 	/// text-based media type like HTML or Markdown.
 	pub fn plaintext_only(mut self) -> Self {
 		self.plaintext_only = true;
+		self
+	}
+
+	/// Enable HTML entity unescaping in text output.
+	///
+	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
+	/// to their plain-text equivalents in rendered output.
+	pub fn with_unescape_html(mut self) -> Self {
+		self.unescape_html = true;
 		self
 	}
 
@@ -54,7 +68,12 @@ impl NodeVisitor for PlainTextRenderer {
 	}
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
-		self.buffer.push_str(&value.to_string());
+		let raw = value.to_string();
+		if self.unescape_html {
+			self.buffer.push_str(&unescape_html_text(&raw));
+		} else {
+			self.buffer.push_str(&raw);
+		}
 		self.did_newline = false;
 	}
 }

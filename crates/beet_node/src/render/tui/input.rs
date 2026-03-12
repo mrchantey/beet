@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy_ratatui::event::MouseMessage;
 use ratatui::crossterm::event::MouseEventKind;
@@ -69,7 +70,7 @@ pub fn pointer_input_system(
 						_ => {}
 					}
 				}
-				// Scroll events are handled by the scrollbar widget
+				// Scroll events are handled by scroll_input_system
 				MouseEventKind::ScrollDown
 				| MouseEventKind::ScrollUp
 				| MouseEventKind::ScrollLeft
@@ -82,11 +83,63 @@ pub fn pointer_input_system(
 
 
 
+/// Updates [`TuiScrollState`] from keyboard arrow keys and mouse
+/// scroll wheel events.
+///
+/// Reads both [`KeyboardInput`] and [`MouseMessage`] messages each
+/// frame and adjusts the scroll offset on any entity that carries a
+/// [`TuiScrollState`] component.
+pub fn scroll_input_system(
+	mut key_messages: MessageReader<KeyboardInput>,
+	mut mouse_messages: MessageReader<MouseMessage>,
+	mut scroll_query: Query<&mut TuiScrollState>,
+) {
+	const SCROLL_LINES: u16 = 1;
+	const MOUSE_SCROLL_LINES: u16 = 3;
+
+	let mut delta: i32 = 0;
+
+	for message in key_messages.read() {
+		match &message.logical_key {
+			Key::ArrowDown => {
+				delta += SCROLL_LINES as i32;
+			}
+			Key::ArrowUp => {
+				delta -= SCROLL_LINES as i32;
+			}
+			_ => {}
+		}
+	}
+
+	for message in mouse_messages.read() {
+		match message.0.kind {
+			MouseEventKind::ScrollDown => {
+				delta += MOUSE_SCROLL_LINES as i32;
+			}
+			MouseEventKind::ScrollUp => {
+				delta -= MOUSE_SCROLL_LINES as i32;
+			}
+			_ => {}
+		}
+	}
+
+	if delta == 0 {
+		return;
+	}
+
+	for mut scroll in scroll_query.iter_mut() {
+		if delta > 0 {
+			scroll.scroll_down(delta as u16);
+		} else {
+			scroll.scroll_up(delta.unsigned_abs() as u16);
+		}
+	}
+}
+
 pub fn exit_system(
 	mut messages: MessageReader<KeyboardInput>,
 	mut commands: Commands,
 ) {
-	use bevy::input::keyboard::Key;
 	for message in messages.read() {
 		match &message.logical_key {
 			Key::Character(val) if val == "q" => {

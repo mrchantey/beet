@@ -19,6 +19,10 @@ pub struct HtmlRenderer {
 	void_elements: Vec<Cow<'static, str>>,
 	/// Current indentation depth, used with `indent`.
 	current_depth: usize,
+	/// When `true`, escape special characters in text content and
+	/// attribute values using [`escape_html_text`] and
+	/// [`escape_html_attribute`] respectively.
+	escape_html: bool,
 }
 
 /// Indentation style for pretty-printing.
@@ -54,6 +58,7 @@ impl HtmlRenderer {
 			render_expressions: false,
 			void_elements: default_void_elements(),
 			current_depth: 0,
+			escape_html: true,
 		}
 	}
 
@@ -72,6 +77,15 @@ impl HtmlRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
+		self
+	}
+
+	/// Enable HTML entity escaping for text content and attribute values.
+	///
+	/// When enabled, characters like `<`, `>`, `&`, `"` are replaced
+	/// with their HTML entity equivalents in the output.
+	pub fn with_escape_html(mut self) -> Self {
+		self.escape_html = true;
 		self
 	}
 
@@ -152,7 +166,12 @@ impl NodeVisitor for HtmlRenderer {
 				}
 				_ => {
 					self.buffer.push_str("=\"");
-					self.buffer.push_str(&value.to_string());
+					let raw = value.to_string();
+					if self.escape_html {
+						self.buffer.push_str(&escape_html_attribute(&raw));
+					} else {
+						self.buffer.push_str(&raw);
+					}
 					self.buffer.push('"');
 				}
 			}
@@ -192,7 +211,12 @@ impl NodeVisitor for HtmlRenderer {
 		if self.is_pretty() {
 			self.write_indent();
 		}
-		self.buffer.push_str(&value.to_string());
+		let raw = value.to_string();
+		if self.escape_html {
+			self.buffer.push_str(&escape_html_text(&raw));
+		} else {
+			self.buffer.push_str(&raw);
+		}
 		if self.is_pretty() {
 			self.buffer.push('\n');
 		}
@@ -332,5 +356,63 @@ mod test {
 		roundtrip("<img src=\"foo.png\" />")
 			.xpect_contains("<img")
 			.xpect_contains("/>");
+	}
+
+	/// Helper: parse HTML then render with escape_html enabled.
+	#[allow(dead_code)]
+	fn roundtrip_escaped(html: &str) -> String {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::html(html);
+		HtmlParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		HtmlRenderer::new()
+			.with_escape_html()
+			.render(&mut RenderContext::new(entity, &mut world))
+			.unwrap()
+			.to_string()
+	}
+
+	#[test]
+	fn escape_text_content() {
+		// The HTML parser stores text verbatim (no entity decoding),
+		// so we manually build an entity tree with a raw `&` in the
+		// Value to verify the renderer escapes it.
+		let mut world = World::new();
+		let root = world.spawn(Element::new("p")).id();
+		let text = world.spawn(Value::new("a & b")).id();
+		world.entity_mut(root).add_children(&[text]);
+
+		HtmlRenderer::new()
+			.with_escape_html()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("a &amp; b");
+	}
+
+	#[test]
+	fn escape_attribute_value() {
+		// Manually build an element with a raw `&` in an attribute
+		// value to verify the renderer escapes it in attribute context.
+		// Attributes use the `AttributeOf` relationship.
+		let mut world = World::new();
+		let root = world.spawn(Element::new("a")).id();
+		let text = world.spawn(Value::new("link")).id();
+		world.entity_mut(root).add_children(&[text]);
+		// Spawn attribute with raw ampersand via the relationship.
+		world.spawn((
+			Attribute::new("href"),
+			Value::new("a&b"),
+			AttributeOf::new(root),
+		));
+
+		HtmlRenderer::new()
+			.with_escape_html()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("href=\"a&amp;b\"");
 	}
 }

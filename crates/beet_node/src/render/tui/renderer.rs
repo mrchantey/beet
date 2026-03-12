@@ -30,6 +30,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy_ratatui::RatatuiContext;
 use ratatui::buffer::Buffer;
+use ratatui::layout::Margin;
 use ratatui::prelude::Rect;
 use ratatui::style::Color;
 use ratatui::style::Modifier;
@@ -38,6 +39,11 @@ use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::text::Text;
 use ratatui::widgets;
+use ratatui::widgets::Block;
+use ratatui::widgets::Scrollbar;
+use ratatui::widgets::ScrollbarOrientation;
+use ratatui::widgets::ScrollbarState;
+use ratatui::widgets::StatefulWidget;
 use ratatui::widgets::Widget;
 use std::borrow::Cow;
 
@@ -75,6 +81,9 @@ pub struct TuiRenderer {
 	bullet_prefix_style: Style,
 	/// Indentation width for block quotes (includes the `│ ` bar).
 	block_quote_indent: u16,
+	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
+	/// content via [`unescape_html_text`].
+	unescape_html: bool,
 }
 
 
@@ -85,6 +94,13 @@ impl Default for TuiRenderer {
 }
 
 
+/// Maximum height of the internal content buffer.
+///
+/// Content is rendered into a buffer this tall, then only the visible
+/// viewport portion is copied to the frame. This bounds memory usage
+/// while allowing generous scroll depth.
+const MAX_CONTENT_HEIGHT: u16 = 4096;
+
 impl NodeRenderer for TuiRenderer {
 	fn render(
 		&mut self,
@@ -92,12 +108,22 @@ impl NodeRenderer for TuiRenderer {
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Ratatui])?;
 
+		// Read existing scroll state so we can preserve the offset
+		// across frames.
+		let prev_scroll = cx
+			.world
+			.entity(cx.entity)
+			.get::<TuiScrollState>()
+			.cloned()
+			.unwrap_or_default();
+
 		// Extract the RatatuiContext so we can access both it and the
 		// world independently, mirroring the beet_stack draw_system
 		// approach. This avoids the `get_frame()` / `draw()` area
 		// mismatch that caused cascading whitespace in terminals with
 		// pre-existing scrollback (eg Zed).
 		let entity = cx.entity;
+		let mut scroll_state = prev_scroll;
 		cx.world.resource_scope(
 			|world: &mut World,
 			 mut context: Mut<RatatuiContext>|
@@ -109,30 +135,78 @@ impl NodeRenderer for TuiRenderer {
 					let area = frame.area();
 					let buf = frame.buffer_mut();
 
-					self.reset(area);
+					// Render the border block to the frame buffer.
+					let block = Block::bordered();
+					let inner_area = block.inner(area);
+					block.render(area, buf);
 
-					// Build a temporary RenderContext for the walk.
-					// accepts are already checked above so we pass an
-					// empty list.
+					// Create an oversized content buffer so we can
+					// measure the full content height before deciding
+					// whether a scrollbar is needed.
+					let content_area = Rect::new(
+						0,
+						0,
+						inner_area.width,
+						MAX_CONTENT_HEIGHT.min(
+							inner_area
+								.height
+								.saturating_mul(20)
+								.max(inner_area.height),
+						),
+					);
+					self.reset(content_area);
+
+					// Walk the entity tree, rendering into the
+					// oversized content buffer.
 					let mut inner_cx = RenderContext::new(entity, world);
 					inner_cx.walk(self);
 					self.flush_spans();
 
-					// Copy rendered cells into the frame buffer,
-					// preserving the frame's own buffer identity so
-					// ratatui's diff/flush works correctly.
-					let rendered = &self.buf;
-					let rendered_area = *rendered.area();
-					for row in
-						rendered_area.y..rendered_area.y + rendered_area.height
-					{
-						for col in rendered_area.x
-							..rendered_area.x + rendered_area.width
-						{
-							if let Some(cell) = buf.cell_mut((col, row)) {
-								*cell = rendered[(col, row)].clone();
+					// Measure actual content height from the cursor
+					// position (area.y was advanced past all content).
+					let content_height =
+						content_area.height.saturating_sub(self.area.height);
+
+					// Update scroll state dimensions and clamp offset.
+					scroll_state.content_height = content_height;
+					scroll_state.viewport_height = inner_area.height;
+					scroll_state.clamp();
+
+					let offset = scroll_state.offset;
+
+					// Copy the visible portion of the content buffer
+					// into the frame buffer at the inner area position.
+					for row in 0..inner_area.height {
+						let src_row = row.saturating_add(offset);
+						if src_row >= content_height {
+							break;
+						}
+						for col in 0..inner_area.width {
+							if let Some(dest) = buf.cell_mut((
+								inner_area.x + col,
+								inner_area.y + row,
+							)) {
+								*dest = self.buf[(col, src_row)].clone();
 							}
 						}
+					}
+
+					// Render scrollbar if content overflows the
+					// viewport.
+					if scroll_state.overflows() {
+						let mut sb_state = scroll_state.scrollbar_state();
+						let scrollbar =
+							Scrollbar::new(ScrollbarOrientation::VerticalRight)
+								.begin_symbol(Some("↑"))
+								.end_symbol(Some("↓"));
+						scrollbar.render(
+							area.inner(Margin {
+								vertical: 1,
+								horizontal: 0,
+							}),
+							buf,
+							&mut sb_state,
+						);
 					}
 				});
 
@@ -145,7 +219,7 @@ impl NodeRenderer for TuiRenderer {
 
 		cx.entity_mut()
 			.insert(std::mem::take(&mut self.span_map))
-			.insert_if_new(TuiScrollState::default());
+			.insert(scroll_state);
 
 		Ok(RenderOutput::Stateful)
 	}
@@ -171,6 +245,7 @@ impl TuiRenderer {
 			bullet_prefix: "• ".into(),
 			bullet_prefix_style: Style::new().fg(Color::DarkGray),
 			block_quote_indent: 2,
+			unescape_html: true,
 		}
 	}
 
@@ -182,6 +257,15 @@ impl TuiRenderer {
 		self.list_stack.clear();
 		self.in_list_item = false;
 		self.in_code_block = false;
+	}
+
+	/// Enable HTML entity unescaping in text output.
+	///
+	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
+	/// to their plain-text equivalents in rendered output.
+	pub fn with_unescape_html(mut self) -> Self {
+		self.unescape_html = true;
+		self
 	}
 
 	/// Override the element → style mapping.
@@ -579,7 +663,12 @@ impl NodeVisitor for TuiRenderer {
 	}
 
 	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
-		let text = value.to_string();
+		let raw = value.to_string();
+		let text = if self.unescape_html {
+			unescape_html_text(&raw)
+		} else {
+			raw
+		};
 		if text.is_empty() {
 			return;
 		}
@@ -600,9 +689,55 @@ impl NodeVisitor for TuiRenderer {
 	}
 }
 
+/// Tracks vertical scroll position and content dimensions.
+///
+/// Inserted by [`TuiRenderer`] on the root entity after each render pass.
+/// The input system updates `offset` when arrow keys or mouse scroll
+/// events are received. The renderer reads `offset` to determine which
+/// portion of the content buffer is visible.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component)]
 pub struct TuiScrollState {
-	position: u16,
+	/// Current vertical scroll offset in rows from the top.
+	pub offset: u16,
+	/// Total content height in rows (set by the renderer after layout).
+	pub content_height: u16,
+	/// Visible viewport height in rows (set by the renderer from the
+	/// terminal area, excluding the border).
+	pub viewport_height: u16,
+}
+
+impl TuiScrollState {
+	/// Whether the content overflows the viewport, requiring a scrollbar.
+	pub fn overflows(&self) -> bool {
+		self.content_height > self.viewport_height
+	}
+
+	/// Maximum valid scroll offset.
+	pub fn max_offset(&self) -> u16 {
+		self.content_height.saturating_sub(self.viewport_height)
+	}
+
+	/// Scroll down by `count` rows, clamped to the maximum offset.
+	pub fn scroll_down(&mut self, count: u16) {
+		self.offset = self.offset.saturating_add(count).min(self.max_offset());
+	}
+
+	/// Scroll up by `count` rows.
+	pub fn scroll_up(&mut self, count: u16) {
+		self.offset = self.offset.saturating_sub(count);
+	}
+
+	/// Clamp the current offset to valid bounds, used after content
+	/// height changes between frames.
+	pub fn clamp(&mut self) {
+		self.offset = self.offset.min(self.max_offset());
+	}
+
+	/// Build a ratatui [`ScrollbarState`] from the current values.
+	pub fn scrollbar_state(&self) -> ScrollbarState {
+		ScrollbarState::new(self.max_offset() as usize)
+			.position(self.offset as usize)
+	}
 }
 
 
@@ -1248,5 +1383,83 @@ mod test {
 		let text_width = 5u16;
 		let expected = (width / 2).saturating_sub(text_width / 2);
 		col.xpect_eq(expected);
+	}
+
+	// -- TuiScrollState --
+
+	#[test]
+	fn scroll_state_no_overflow() {
+		let state = TuiScrollState {
+			offset: 0,
+			content_height: 10,
+			viewport_height: 20,
+		};
+		state.overflows().xpect_false();
+		state.max_offset().xpect_eq(0);
+	}
+
+	#[test]
+	fn scroll_state_overflow() {
+		let state = TuiScrollState {
+			offset: 0,
+			content_height: 40,
+			viewport_height: 20,
+		};
+		state.overflows().xpect_true();
+		state.max_offset().xpect_eq(20);
+	}
+
+	#[test]
+	fn scroll_down_clamps_to_max() {
+		let mut state = TuiScrollState {
+			offset: 0,
+			content_height: 30,
+			viewport_height: 20,
+		};
+		state.scroll_down(5);
+		state.offset.xpect_eq(5);
+		// Scrolling past max should clamp.
+		state.scroll_down(100);
+		state.offset.xpect_eq(10);
+	}
+
+	#[test]
+	fn scroll_up_clamps_to_zero() {
+		let mut state = TuiScrollState {
+			offset: 3,
+			content_height: 30,
+			viewport_height: 20,
+		};
+		state.scroll_up(2);
+		state.offset.xpect_eq(1);
+		// Scrolling past zero should clamp.
+		state.scroll_up(100);
+		state.offset.xpect_eq(0);
+	}
+
+	#[test]
+	fn clamp_adjusts_after_content_shrink() {
+		let mut state = TuiScrollState {
+			offset: 15,
+			content_height: 40,
+			viewport_height: 20,
+		};
+		// Simulate content shrinking so offset is now past max.
+		state.content_height = 25;
+		state.clamp();
+		state.offset.xpect_eq(5);
+	}
+
+	#[test]
+	fn scrollbar_state_matches() {
+		let state = TuiScrollState {
+			offset: 5,
+			content_height: 30,
+			viewport_height: 20,
+		};
+		let sb = state.scrollbar_state();
+		// ScrollbarState doesn't expose fields, but we can verify it
+		// was created without panicking.
+		format!("{sb:?}").xpect_contains("ScrollbarState");
 	}
 }

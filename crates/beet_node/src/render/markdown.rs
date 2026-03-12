@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
 
+
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
 ///
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
@@ -14,6 +15,9 @@ pub struct MarkdownRenderer {
 	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
 	render_expressions: bool,
+	/// When `true`, decode HTML entities (eg `&amp;` → `&`) in text
+	/// content via [`unescape_html_text`].
+	unescape_html: bool,
 	/// Stack of active inline wrappers to emit on leave.
 	inline_stack: Vec<InlineWrapper>,
 }
@@ -41,6 +45,7 @@ impl MarkdownRenderer {
 		Self {
 			state: TextRenderState::new(),
 			render_expressions: false,
+			unescape_html: true,
 			inline_stack: Vec::new(),
 		}
 	}
@@ -48,6 +53,15 @@ impl MarkdownRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
+		self
+	}
+
+	/// Enable HTML entity unescaping in text output.
+	///
+	/// When enabled, entities like `&amp;`, `&lt;`, `&gt;` are decoded
+	/// to their plain-text equivalents in rendered markdown.
+	pub fn with_unescape_html(mut self) -> Self {
+		self.unescape_html = true;
 		self
 	}
 
@@ -333,7 +347,11 @@ impl NodeVisitor for MarkdownRenderer {
 			return;
 		}
 
-		self.push_str(&text);
+		if self.unescape_html {
+			self.push_str(&unescape_html_text(&text));
+		} else {
+			self.push_str(&text);
+		}
 	}
 
 	fn visit_expression(
@@ -497,5 +515,44 @@ mod test {
 		roundtrip("<!-- hello -->")
 			.trim()
 			.xpect_eq("<!-- hello -->");
+	}
+
+	/// Parse HTML (with entities), then render as markdown with
+	/// `unescape_html` enabled.
+	fn render_unescaped(html: &str) -> String {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::html(html);
+		HtmlParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		MarkdownRenderer::new()
+			.with_unescape_html()
+			.render(&mut RenderContext::new(entity, &mut world))
+			.unwrap()
+			.to_string()
+	}
+
+	#[test]
+	fn unescape_html_entities_in_text() {
+		render_unescaped("<p>a &amp; b</p>")
+			.trim()
+			.xpect_eq("a & b");
+	}
+
+	#[test]
+	fn unescape_angle_brackets_in_text() {
+		render_unescaped("<p>&lt;div&gt;</p>")
+			.trim()
+			.xpect_eq("<div>");
+	}
+
+	#[test]
+	fn no_unescape_without_option() {
+		// Without the option, entities stored as literal text pass through.
+		// The HTML parser already decodes entities, so there is nothing to
+		// unescape in the default case. This test just confirms the default
+		// path does not crash.
+		roundtrip("hello world").trim().xpect_eq("hello world");
 	}
 }

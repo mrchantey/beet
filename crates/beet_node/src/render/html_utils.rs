@@ -199,6 +199,50 @@ pub fn escape_html_text(input: &str) -> String {
 	result
 }
 
+/// Escape characters that are special inside HTML attribute values.
+///
+/// Attributes require escaping `&`, `"`, and `'` but do **not** need
+/// to escape `<` or `>` (those are only meaningful in text content).
+/// This function only escapes the structurally required characters,
+/// leaving typographic entities untouched.
+///
+/// ```rust
+/// # use beet_node::prelude::*;
+/// # use beet_core::prelude::*;
+/// escape_html_attribute(r#"say "hello" & 'goodbye'"#)
+///     .xpect_eq("say &quot;hello&quot; &amp; &apos;goodbye&apos;".to_string());
+/// escape_html_attribute("<not escaped>")
+///     .xpect_eq("<not escaped>".to_string());
+/// ```
+pub fn escape_html_attribute(input: &str) -> String {
+	let mut result = String::with_capacity(input.len());
+	for ch in input.chars() {
+		match ch {
+			'&' => result.push_str("&amp;"),
+			'"' => result.push_str("&quot;"),
+			'\'' => result.push_str("&apos;"),
+			other => result.push(other),
+		}
+	}
+	result
+}
+
+/// Unescape HTML entities inside an attribute value.
+///
+/// This is functionally identical to [`unescape_html_text`] since
+/// both contexts use the same entity encoding, but is provided as a
+/// distinct function for clarity at call sites.
+///
+/// ```rust
+/// # use beet_node::prelude::*;
+/// # use beet_core::prelude::*;
+/// unescape_html_attribute("say &quot;hello&quot; &amp; &apos;goodbye&apos;")
+///     .xpect_eq(r#"say "hello" & 'goodbye'"#.to_string());
+/// ```
+pub fn unescape_html_attribute(input: &str) -> String {
+	unescape_html_text(input)
+}
+
 
 #[cfg(test)]
 mod test {
@@ -264,5 +308,31 @@ mod test {
 		let original = "&lt;p&gt;&quot;Hello&quot; &amp; &apos;goodbye&apos; &mdash; world&lt;/p&gt;";
 		let unescaped = unescape_html_text(original);
 		escape_html_text(&unescaped).xpect_eq(original.to_string());
+	}
+
+	#[test]
+	fn escape_attribute_quotes_and_ampersand() {
+		escape_html_attribute(r#"say "hello" & 'goodbye'"#).xpect_eq(
+			"say &quot;hello&quot; &amp; &apos;goodbye&apos;".to_string(),
+		);
+	}
+
+	#[test]
+	fn escape_attribute_preserves_angle_brackets() {
+		escape_html_attribute("<b>bold</b>")
+			.xpect_eq("<b>bold</b>".to_string());
+	}
+
+	#[test]
+	fn unescape_attribute_structural() {
+		unescape_html_attribute("&quot;hello&quot; &amp; &apos;world&apos;")
+			.xpect_eq("\"hello\" & 'world'".to_string());
+	}
+
+	#[test]
+	fn roundtrip_attribute_escape_unescape() {
+		let original = r#"font-family: "Helvetica" & 'Arial'"#;
+		let escaped = escape_html_attribute(original);
+		unescape_html_attribute(&escaped).xpect_eq(original.to_string());
 	}
 }
