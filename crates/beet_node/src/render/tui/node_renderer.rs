@@ -85,15 +85,17 @@ pub struct TuiNodeRenderer {
 }
 
 fn tui_node_renderer_widget() -> TuiWidget {
-	TuiWidget::new(|mut entity, _, _| {
-		let renderer = entity
+	TuiWidget::new(|cx| {
+		let mut renderer = cx
+			.entity
 			.get::<TuiNodeRenderer>()
 			.ok_or_else(|| {
 				bevyhow!("entity has no TuiNodeRenderer, was it removed?")
 			})?
 			.clone();
-
-		// panic!("its working!");
+		// TODO do we need cx.terminal_area or does draw_area contain
+		// enough information to map positions to 'global terminal space'
+		renderer.render_inner(cx.entity, cx.draw_area, cx.buffer)?;
 		Ok(())
 	})
 }
@@ -106,12 +108,6 @@ impl Default for TuiNodeRenderer {
 }
 
 
-/// Maximum height of the internal content buffer.
-///
-/// Content is rendered into a buffer this tall, then only the visible
-/// viewport portion is copied to the frame. This bounds memory usage
-/// while allowing generous scroll depth.
-const MAX_CONTENT_HEIGHT: u16 = 4096;
 
 impl NodeRenderer for TuiNodeRenderer {
 	fn render(
@@ -119,109 +115,26 @@ impl NodeRenderer for TuiNodeRenderer {
 		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::Ratatui])?;
-
-		// Read existing scroll state so we can preserve the offset
-		// across frames.
-		let mut scroll_state = cx
-			.entity()
-			.get::<TuiScrollState>()
-			.cloned()
-			.unwrap_or_default();
-
-		// Extract the RatatuiContext so we can access both it and the
-		// world independently, mirroring the beet_stack draw_system
-		// approach. This avoids the `get_frame()` / `draw()` area
-		// mismatch that caused cascading whitespace in terminals with
-		// pre-existing scrollback (eg Zed).
-		let entity = cx.entity;
+		let id = cx.entity;
 		cx.world.resource_scope(
-			|world: &mut World,
-			 mut context: Mut<RatatuiContext>|
-			 -> Result<(), RenderError> {
-				// draw() calls autoresize() internally, so the frame
-				// area is guaranteed to reflect the current terminal
-				// size.
-				let draw_result = context.draw(|frame| {
-					let area = frame.area();
-					let buf = frame.buffer_mut();
-
-					// Render the border block to the frame buffer.
-					let block = Block::bordered();
-					let inner_area = block.inner(area);
-					block.render(area, buf);
-
-					// Create an oversized content buffer so we can
-					// measure the full content height before deciding
-					// whether a scrollbar is needed.
-					let content_area = Rect::new(
-						0,
-						0,
-						inner_area.width,
-						MAX_CONTENT_HEIGHT.min(
-							inner_area
-								.height
-								.saturating_mul(20)
-								.max(inner_area.height),
-						),
-					);
-
-					// Clamp scroll before we render so flush_spans
-					// gets the correct offset.
-					scroll_state.viewport_height = inner_area.height;
-					scroll_state.clamp();
-
-					// Set terminal-space context so flush_spans can
-					// translate content coords → terminal coords.
-					self.terminal_origin = (inner_area.x, inner_area.y);
-					self.scroll_offset = scroll_state.offset;
-					self.viewport_height = inner_area.height;
-					self.reset(content_area);
-
-					// Walk the entity tree, rendering into the
-					// oversized content buffer.
-					let mut inner_cx = RenderContext::new(entity, world);
-					inner_cx.walk(self);
-					self.flush_spans();
-
-					// Measure actual content height from the cursor
-					// position (area.y was advanced past all content).
-					let content_height =
-						content_area.height.saturating_sub(self.area.height);
-
-					// Update scroll state content height and re-clamp.
-					scroll_state.content_height = content_height;
-					scroll_state.clamp();
-
-					// Copy the visible portion of the content buffer
-					// into the frame buffer at the inner area position.
-					for row in 0..inner_area.height {
-						let src_row = row.saturating_add(scroll_state.offset);
-						if src_row >= content_height {
-							break;
-						}
-						for col in 0..inner_area.width {
-							if let Some(dest) = buf.cell_mut((
-								inner_area.x + col,
-								inner_area.y + row,
-							)) {
-								*dest = self.buf[(col, src_row)].clone();
-							}
-						}
-					}
-
-					scroll_state.try_render(area, buf);
-				});
-
-				draw_result.map_err(|err| {
-					bevyhow!("Failed to draw to RatatuiContext: {err}")
-				})?;
-				Ok(())
+			|world: &mut World, mut context: Mut<RatatuiContext>| -> Result {
+				let mut result = None;
+				context
+					.draw(|frame| {
+						result = self
+							.render_inner(
+								world.entity_mut(id),
+								frame.area(),
+								frame.buffer_mut(),
+							)
+							.xsome();
+					})
+					.map_err(|err| {
+						bevyhow!("Failed to draw to RatatuiContext: {err}")
+					})?;
+				result.expect("was certainly set")
 			},
 		)?;
-
-		cx.entity_mut()
-			.insert((scroll_state, std::mem::take(&mut self.span_map)));
-
 		Ok(RenderOutput::Stateful)
 	}
 }
@@ -289,7 +202,102 @@ impl TuiNodeRenderer {
 		(self.buf, self.span_map)
 	}
 
-	// pub fn render(&self, )
+
+
+
+	pub fn render_inner(
+		&mut self,
+		mut entity: EntityWorldMut,
+		area: Rect,
+		buf: &mut Buffer,
+	) -> Result {
+		/// Maximum height of the internal content buffer.
+		///
+		/// Content is rendered into a buffer this tall, then only the visible
+		/// viewport portion is copied to the frame. This bounds memory usage
+		/// while allowing generous scroll depth.
+		const MAX_CONTENT_HEIGHT: u16 = 4096;
+
+		// Read existing scroll state so we can preserve the offset
+		// across frames.
+		let mut scroll_state =
+			entity.get::<TuiScrollState>().cloned().unwrap_or_default();
+
+		// Extract the RatatuiContext so we can access both it and the
+		// world independently, mirroring the beet_stack draw_system
+		// approach. This avoids the `get_frame()` / `draw()` area
+		// mismatch that caused cascading whitespace in terminals with
+		// pre-existing scrollback (eg Zed).
+		let id = entity.id();
+		entity.world_scope(|world| -> Result {
+			// Render the border block to the frame buffer.
+			let block = Block::bordered();
+			let inner_area = block.inner(area);
+			block.render(area, buf);
+
+			// Create an oversized content buffer so we can
+			// measure the full content height before deciding
+			// whether a scrollbar is needed.
+			let content_area = Rect::new(
+				0,
+				0,
+				inner_area.width,
+				MAX_CONTENT_HEIGHT.min(
+					inner_area.height.saturating_mul(20).max(inner_area.height),
+				),
+			);
+
+			// Clamp scroll before we render so flush_spans
+			// gets the correct offset.
+			scroll_state.viewport_height = inner_area.height;
+			scroll_state.clamp();
+
+			// Set terminal-space context so flush_spans can
+			// translate content coords → terminal coords.
+			self.terminal_origin = (inner_area.x, inner_area.y);
+			self.scroll_offset = scroll_state.offset;
+			self.viewport_height = inner_area.height;
+			self.reset(content_area);
+
+			// Walk the entity tree, rendering into the
+			// oversized content buffer.
+			let mut inner_cx = RenderContext::new(id, world);
+			inner_cx.walk(self);
+			self.flush_spans();
+
+			// Measure actual content height from the cursor
+			// position (area.y was advanced past all content).
+			let content_height =
+				content_area.height.saturating_sub(self.area.height);
+
+			// Update scroll state content height and re-clamp.
+			scroll_state.content_height = content_height;
+			scroll_state.clamp();
+
+			// Copy the visible portion of the content buffer
+			// into the frame buffer at the inner area position.
+			for row in 0..inner_area.height {
+				let src_row = row.saturating_add(scroll_state.offset);
+				if src_row >= content_height {
+					break;
+				}
+				for col in 0..inner_area.width {
+					if let Some(dest) =
+						buf.cell_mut((inner_area.x + col, inner_area.y + row))
+					{
+						*dest = self.buf[(col, src_row)].clone();
+					}
+				}
+			}
+
+			scroll_state.try_render(area, buf);
+
+			Ok(())
+		})?;
+
+		entity.insert((scroll_state, std::mem::take(&mut self.span_map)));
+		Ok(())
+	}
 
 	/// Current composite ratatui [`Style`] from the style map stack.
 	fn current_style(&self) -> Style { self.style_map.current().style }

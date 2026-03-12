@@ -45,10 +45,10 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			MediaParser::new()
 				.parse(ParseContext::new(&mut entity, &input_bytes))
 				.unwrap();
-			TuiNodeRenderer::default()
-				.run(&mut entity, vec![MediaType::Ratatui])
-				.unwrap()
-				.to_string();
+			// TuiNodeRenderer::default()
+			// 	.run(&mut entity, vec![MediaType::Ratatui])
+			// 	.unwrap()
+			// 	.to_string();
 		});
 	});
 }

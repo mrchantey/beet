@@ -8,34 +8,29 @@ use ratatui::prelude::*;
 
 #[derive(Clone, Component)]
 pub struct TuiWidget {
-	render: Arc<
-		dyn 'static
-			+ Send
-			+ Sync
-			+ Fn(EntityWorldMut, Rect, &mut Buffer) -> Result,
-	>,
+	render: Arc<dyn 'static + Send + Sync + Fn(RenderWidgetContext) -> Result>,
 }
 
+pub struct RenderWidgetContext<'a> {
+	pub entity: EntityWorldMut<'a>,
+	/// The full area of the terminal
+	pub terminal_area: Rect,
+	/// A subset of the terminal area
+	pub draw_area: Rect,
+	pub buffer: &'a mut Buffer,
+}
 
 impl TuiWidget {
 	pub fn new(
-		render: impl 'static
-		+ Send
-		+ Sync
-		+ Fn(EntityWorldMut, Rect, &mut Buffer) -> Result,
+		render: impl 'static + Send + Sync + Fn(RenderWidgetContext) -> Result,
 	) -> Self {
 		Self {
 			render: Arc::new(render),
 		}
 	}
 
-	pub fn render(
-		&mut self,
-		world: EntityWorldMut,
-		area: Rect,
-		buf: &mut Buffer,
-	) -> Result {
-		(self.render)(world, area, buf)
+	pub fn render(&mut self, cx: RenderWidgetContext) -> Result {
+		(self.render)(cx)
 	}
 }
 
@@ -59,10 +54,14 @@ pub fn render_widgets(world: &mut World) -> Result {
 			// capture the callback render result
 			let mut result = None;
 			context.draw(|frame| {
-				let area = frame.area();
-				let buf = frame.buffer_mut();
 				result = widget
-					.render(world.entity_mut(root_entity), area, buf)
+					.render(RenderWidgetContext {
+						entity: world.entity_mut(root_entity),
+						// for top level, draw and terminal area are the same
+						terminal_area: frame.area(),
+						draw_area: frame.area(),
+						buffer: frame.buffer_mut(),
+					})
 					.xsome();
 			})?;
 			result.expect("certainly assigned")
