@@ -19,6 +19,56 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
 
+/// Returns true if an open tag named `open_tag` implicitly closes the
+/// current `parent_tag`, per HTML5 optional end-tag rules.
+///
+/// Examples:
+/// - `<body>` implicitly closes `<head>`
+/// - `<li>` implicitly closes a previous `<li>`
+/// - `<dt>` / `<dd>` close each other
+/// - Block-level elements implicitly close `<p>`
+fn implicitly_closes(parent_tag: &str, open_tag: &str) -> bool {
+	match parent_tag {
+		// head is implicitly closed by body or frameset
+		"head" => matches!(open_tag, "body" | "frameset"),
+		// li closes a previous open li
+		"li" => open_tag == "li",
+		// dt and dd close each other
+		"dt" => matches!(open_tag, "dt" | "dd"),
+		"dd" => matches!(open_tag, "dt" | "dd"),
+		// p is closed by any block-level element
+		"p" => {
+			matches!(
+				open_tag,
+				"address"
+					| "article" | "aside"
+					| "blockquote" | "details"
+					| "div" | "dl" | "fieldset"
+					| "figcaption" | "figure"
+					| "footer" | "form"
+					| "h1" | "h2" | "h3"
+					| "h4" | "h5" | "h6"
+					| "header" | "hgroup"
+					| "hr" | "main" | "menu"
+					| "nav" | "ol" | "p"
+					| "pre" | "section"
+					| "summary" | "table"
+					| "ul"
+			)
+		}
+		// option / optgroup close each other
+		"option" => matches!(open_tag, "option" | "optgroup"),
+		"optgroup" => matches!(open_tag, "optgroup"),
+		// table body / row / cell elements
+		"tbody" | "thead" | "tfoot" => {
+			matches!(open_tag, "tbody" | "thead" | "tfoot")
+		}
+		"tr" => open_tag == "tr",
+		"td" | "th" => matches!(open_tag, "td" | "th"),
+		_ => false,
+	}
+}
+
 /// Controls how children of void elements are handled.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum VoidElementChildrenOpts {
@@ -217,6 +267,18 @@ fn build_tree_children<'a>(
 				self_closing,
 				source,
 			} => {
+				// check if this open tag implicitly closes the current parent
+				if let Some(parent) = parent_tag {
+					if matches!(
+						diff_config.malformed_elements,
+						MalformedElementsOpts::Fix
+					) && implicitly_closes(parent, name)
+					{
+						// do not consume — let the parent caller handle it
+						return Ok(children);
+					}
+				}
+
 				*cursor += 1;
 				let is_void = diff_config.is_void_element(name);
 				let _is_raw = parse_config.is_raw_text_element(name);
@@ -722,6 +784,45 @@ pub(crate) fn spawn_node(
 
 
 #[cfg(test)]
+mod implicit_close_test {
+	use super::implicitly_closes;
+
+	#[test]
+	fn head_closes_on_body() {
+		assert!(implicitly_closes("head", "body"));
+		assert!(!implicitly_closes("head", "div"));
+	}
+
+	#[test]
+	fn li_closes_on_li() {
+		assert!(implicitly_closes("li", "li"));
+		assert!(!implicitly_closes("li", "div"));
+	}
+
+	#[test]
+	fn p_closes_on_block() {
+		assert!(implicitly_closes("p", "div"));
+		assert!(implicitly_closes("p", "p"));
+		assert!(implicitly_closes("p", "h1"));
+		assert!(!implicitly_closes("p", "span"));
+		assert!(!implicitly_closes("p", "em"));
+	}
+
+	#[test]
+	fn dt_dd_close_each_other() {
+		assert!(implicitly_closes("dt", "dd"));
+		assert!(implicitly_closes("dd", "dt"));
+		assert!(!implicitly_closes("dt", "li"));
+	}
+
+	#[test]
+	fn unrelated_tags_do_not_close() {
+		assert!(!implicitly_closes("div", "span"));
+		assert!(!implicitly_closes("body", "div"));
+	}
+}
+
+#[cfg(test)]
 mod test {
 	use super::*;
 
@@ -860,6 +961,97 @@ mod test {
 			}
 			other => panic!("expected Element, got {other:?}"),
 		}
+	}
+
+	#[test]
+	fn build_tree_head_body_implicit_close() {
+		// <head> has no close tag; <body> should implicitly close it,
+		// so body ends up as a sibling of head, not nested inside it.
+		let config = HtmlParseConfig::default();
+		let diff_config = HtmlDiffConfig::default();
+		let tokens = super::super::combinators::parse_document(
+			"<html><head><meta charset=UTF-8><title>T</title><body><p>hello</p></html>",
+			&config,
+		)
+		.unwrap();
+		let tree = build_html_tree(&tokens, &diff_config, &config).unwrap();
+		// tree root should be [html]
+		assert_eq!(tree.len(), 1, "expected one root element");
+		let HtmlNode::Element { name, children, .. } = &tree[0] else {
+			panic!("expected html element");
+		};
+		assert_eq!(*name, "html");
+		// html should have two children: head and body (not body inside head)
+		let names: Vec<&str> = children
+			.iter()
+			.filter_map(|n| {
+				if let HtmlNode::Element { name, .. } = n {
+					Some(*name)
+				} else {
+					None
+				}
+			})
+			.collect();
+		assert_eq!(
+			names,
+			vec!["head", "body"],
+			"head and body should be siblings under html, got {names:?}"
+		);
+	}
+
+	#[test]
+	fn build_tree_li_implicit_close() {
+		// a second <li> should implicitly close the first
+		let config = HtmlParseConfig::default();
+		let diff_config = HtmlDiffConfig::default();
+		let tokens = super::super::combinators::parse_document(
+			"<ul><li>one<li>two</ul>",
+			&config,
+		)
+		.unwrap();
+		let tree = build_html_tree(&tokens, &diff_config, &config).unwrap();
+		let HtmlNode::Element { children, .. } = &tree[0] else {
+			panic!("expected ul");
+		};
+		let li_count = children
+			.iter()
+			.filter(
+				|n| matches!(n, HtmlNode::Element { name, .. } if *name == "li"),
+			)
+			.count();
+		assert_eq!(li_count, 2, "expected 2 li children, got {li_count}");
+	}
+
+	#[test]
+	fn build_tree_p_implicit_close() {
+		// <div> should implicitly close <p>
+		let config = HtmlParseConfig::default();
+		let diff_config = HtmlDiffConfig::default();
+		let tokens = super::super::combinators::parse_document(
+			"<div><p>text<div>inner</div></div>",
+			&config,
+		)
+		.unwrap();
+		let tree = build_html_tree(&tokens, &diff_config, &config).unwrap();
+		// root div's children should be [p, div] not [p[div]]
+		let HtmlNode::Element { children, .. } = &tree[0] else {
+			panic!("expected outer div");
+		};
+		let names: Vec<&str> = children
+			.iter()
+			.filter_map(|n| {
+				if let HtmlNode::Element { name, .. } = n {
+					Some(*name)
+				} else {
+					None
+				}
+			})
+			.collect();
+		assert_eq!(
+			names,
+			vec!["p", "div"],
+			"p and inner div should be siblings, got {names:?}"
+		);
 	}
 
 	#[test]
