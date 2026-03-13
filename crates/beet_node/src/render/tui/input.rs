@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
+use bevy_ratatui::event::KeyMessage;
 use bevy_ratatui::event::MouseMessage;
 use ratatui::crossterm::event::MouseEventKind;
 
@@ -88,21 +89,22 @@ pub fn pointer_input_system(
 /// frame and adjusts the scroll offset on any entity that carries a
 /// [`TuiScrollState`] component.
 pub fn scroll_input_system(
-	mut key_messages: MessageReader<KeyboardInput>,
+	mut key_messages: MessageReader<KeyMessage>,
 	mut mouse_messages: MessageReader<MouseMessage>,
-	mut scroll_query: Query<&mut TuiScrollState>,
+	mut scroll_query: Query<(&mut TuiWidget, &mut TuiScrollState)>,
 ) {
 	const SCROLL_LINES: u16 = 1;
 	const MOUSE_SCROLL_LINES: u16 = 3;
 
 	let mut delta: i32 = 0;
 
-	for message in key_messages.read() {
-		match &message.logical_key {
-			Key::ArrowDown => {
+	for message in key_messages.read().filter(|msg| msg.is_press()) {
+		use ratatui::crossterm::event::KeyCode;
+		match message.code {
+			KeyCode::Down => {
 				delta += SCROLL_LINES as i32;
 			}
-			Key::ArrowUp => {
+			KeyCode::Up => {
 				delta -= SCROLL_LINES as i32;
 			}
 			_ => {}
@@ -125,7 +127,8 @@ pub fn scroll_input_system(
 		return;
 	}
 
-	for mut scroll in scroll_query.iter_mut() {
+	for (mut widget, mut scroll) in scroll_query.iter_mut() {
+		widget.set_changed();
 		if delta > 0 {
 			scroll.scroll_down(delta as u16);
 		} else {

@@ -1,13 +1,15 @@
-use std::sync::Arc;
-
 use beet_core::prelude::*;
 use bevy_ratatui::RatatuiContext;
 use ratatui::prelude::Rect;
 use ratatui::prelude::*;
+use std::sync::Arc;
 
 
 #[derive(Clone, Component)]
 pub struct TuiWidget {
+	/// Specify the constraint to use when used in a [`Layout`],
+	/// currently only vertical layouts are supported.
+	vertical_constrait: Constraint,
 	render: Arc<dyn 'static + Send + Sync + Fn(RenderWidgetContext) -> Result>,
 }
 
@@ -22,9 +24,11 @@ pub struct RenderWidgetContext<'a> {
 
 impl TuiWidget {
 	pub fn new(
+		constrait: Constraint,
 		render: impl 'static + Send + Sync + Fn(RenderWidgetContext) -> Result,
 	) -> Self {
 		Self {
+			vertical_constrait: constrait,
 			render: Arc::new(render),
 		}
 	}
@@ -32,6 +36,8 @@ impl TuiWidget {
 	pub fn render(&mut self, cx: RenderWidgetContext) -> Result {
 		(self.render)(cx)
 	}
+
+	pub fn constraint(&self) -> Constraint { self.vertical_constrait }
 }
 
 /// Render the widget tree to the terminal. This runs on

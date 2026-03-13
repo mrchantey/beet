@@ -14,15 +14,21 @@ fn main() {
 		.run();
 }
 
-fn fetch_and_render(mut async_commands: AsyncCommands) {
-	async_commands.run(|world| async move {
-		let args = CliArgs::parse_env();
-		let url = args
-			.path
-			.first()
-			.cloned()
-			.unwrap_or_else(|| "http://example.com".to_string());
+fn fetch_and_render(mut commands: Commands) {
+	let args = CliArgs::parse_env();
+	let url = args
+		.path
+		.first()
+		.cloned()
+		.unwrap_or_else(|| "http://example.com".to_string());
+	commands.spawn((Layout::vertical(), children![
+		TuiTextBox::new("url", &url),
+		(TuiNodeRenderer::default(), render_on_spawn(url))
+	]));
+}
 
+fn render_on_spawn(url: String) -> impl Bundle {
+	OnSpawn::new_async(async move |entity| {
 		// 1. Fetch the URL
 		let input_bytes = Request::get(url)
 			.send()
@@ -37,18 +43,18 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.await
 			.unwrap();
 
-		world.with(move |world: &mut World| {
-			let mut entity = world.spawn(TuiNodeRenderer::default());
-			// let mut entity = world.spawn_empty();
+		entity
+			.with_then(move |mut entity| {
+				MediaParser::new()
+					.parse(ParseContext::new(&mut entity, &input_bytes))
+					.unwrap();
+			})
+			.await;
 
-			// 2. Parse the response body into ECS and render it
-			MediaParser::new()
-				.parse(ParseContext::new(&mut entity, &input_bytes))
-				.unwrap();
-			// TuiNodeRenderer::default()
-			// 	.run(&mut entity, vec![MediaType::Ratatui])
-			// 	.unwrap()
-			// 	.to_string();
-		});
-	});
+		// Mark widget as changed to trigger rerender
+		entity
+			.get_mut::<TuiWidget, _>(|mut widget| widget.set_changed())
+			.await?;
+		Ok(())
+	})
 }

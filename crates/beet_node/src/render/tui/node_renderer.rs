@@ -30,6 +30,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy_ratatui::RatatuiContext;
 use ratatui::buffer::Buffer;
+use ratatui::layout::Constraint;
 use ratatui::prelude::Rect;
 use ratatui::style::Color;
 use ratatui::style::Style;
@@ -48,7 +49,7 @@ use std::borrow::Cow;
 /// rendered. Uses a [`StyleMap<TuiStyle>`] to resolve element styles
 /// and layout metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
-#[require(TuiWidget = tui_node_renderer_widget())]
+#[require(TuiScrollState, TuiWidget = widget())]
 pub struct TuiNodeRenderer {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
@@ -84,8 +85,8 @@ pub struct TuiNodeRenderer {
 	block_quote_indent: u16,
 }
 
-fn tui_node_renderer_widget() -> TuiWidget {
-	TuiWidget::new(|cx| {
+fn widget() -> TuiWidget {
+	TuiWidget::new(Constraint::Fill(1), |cx| {
 		let mut renderer = cx
 			.entity
 			.get::<TuiNodeRenderer>()
@@ -93,8 +94,6 @@ fn tui_node_renderer_widget() -> TuiWidget {
 				bevyhow!("entity has no TuiNodeRenderer, was it removed?")
 			})?
 			.clone();
-		// TODO do we need cx.terminal_area or does draw_area contain
-		// enough information to map positions to 'global terminal space'
 		renderer.render_inner(cx.entity, cx.draw_area, cx.buffer)?;
 		Ok(())
 	})
