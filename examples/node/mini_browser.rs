@@ -3,18 +3,18 @@
 //! This demo parses html and markdown only, SPAs and css/js heavy sites need not apply
 //!
 //! ```sh
-//! cargo run --example mini_browser --features _mini_browser
+//! cargo run --example mini_browser --features _mini_browser -- https://wikipedia.org
 //! ```
 use beet::prelude::*;
 
 fn main() {
 	App::new()
 		.add_plugins((TuiPlugin::default(), AsyncPlugin::default()))
-		.add_systems(Startup, fetch_and_render)
+		.add_systems(Startup, setup)
 		.run();
 }
 
-fn fetch_and_render(mut commands: Commands) {
+fn setup(mut commands: Commands) {
 	let args = CliArgs::parse_env();
 	let url = args
 		.path
@@ -45,16 +45,16 @@ fn render_on_spawn(url: String) -> impl Bundle {
 
 		entity
 			.with_then(move |mut entity| {
+				// 2. Parse the media and insert the entity tree for rendering
 				MediaParser::new()
 					.parse(ParseContext::new(&mut entity, &input_bytes))
 					.unwrap();
+
+				// 3. Mark widget as changed to trigger rerender
+				entity.get_mut::<TuiWidget>().unwrap().set_changed();
 			})
 			.await;
 
-		// Mark widget as changed to trigger rerender
-		entity
-			.get_mut::<TuiWidget, _>(|mut widget| widget.set_changed())
-			.await?;
 		Ok(())
 	})
 }

@@ -8,6 +8,7 @@
 //! parsing. Owned strings are only created when building ECS components.
 
 use super::tokens::*;
+use std::fmt::Write;
 use winnow::ModalResult;
 use winnow::Parser;
 use winnow::error::ContextError;
@@ -16,6 +17,65 @@ use winnow::token::any;
 use winnow::token::take_till;
 use winnow::token::take_until;
 use winnow::token::take_while;
+
+/// Build a human-readable parse error message with line/column info and
+/// a snippet of the surrounding source text.
+fn format_parse_error(
+	full_input: &str,
+	byte_offset: usize,
+	hint: &str,
+) -> String {
+	let (line, col) = byte_offset_to_line_col(full_input, byte_offset);
+	let snippet = excerpt(full_input, byte_offset, 40);
+	let mut msg = format!("HTML parse error at line {line}, column {col}");
+	if !hint.is_empty() {
+		write!(msg, ": {hint}").unwrap();
+	}
+	write!(msg, "\n  --> {snippet}").unwrap();
+	msg
+}
+
+/// Convert a byte offset into 1-based line and column numbers.
+fn byte_offset_to_line_col(input: &str, offset: usize) -> (usize, usize) {
+	let clamped = offset.min(input.len());
+	let before = &input[..clamped];
+	let line = before.chars().filter(|&ch| ch == '\n').count() + 1;
+	let col = match before.rfind('\n') {
+		Some(nl) => clamped - nl - 1,
+		None => clamped,
+	};
+	(line, col + 1)
+}
+
+/// Extract a short excerpt around `offset`, showing up to `radius`
+/// characters on either side with `...` when truncated. Non-printable
+/// characters are escaped.
+fn excerpt(input: &str, offset: usize, radius: usize) -> String {
+	let clamped = offset.min(input.len());
+	let start = clamped.saturating_sub(radius);
+	let end = (clamped + radius).min(input.len());
+	// snap to char boundaries
+	let start = input.floor_char_boundary(start);
+	let end = input.ceil_char_boundary(end);
+	let slice = &input[start..end];
+
+	let mut out = String::new();
+	if start > 0 {
+		out.push_str("...");
+	}
+	for ch in slice.chars() {
+		match ch {
+			'\n' => out.push_str("\\n"),
+			'\r' => out.push_str("\\r"),
+			'\t' => out.push_str("\\t"),
+			_ => out.push(ch),
+		}
+	}
+	if end < input.len() {
+		out.push_str("...");
+	}
+	out
+}
 
 /// Parser configuration passed through combinators to control behavior.
 #[derive(Debug, Clone)]
@@ -108,19 +168,25 @@ pub fn parse_document<'a>(
 					)(&mut remaining)
 					{
 						Ok(raw_tokens) => tokens.extend(raw_tokens),
-						Err(err) => {
-							return Err(format!(
-								"parse error in raw text element <{tag_name}> at byte {}: {err}",
-								input.len() - remaining.len()
+						Err(_) => {
+							let offset = input.len() - remaining.len();
+							return Err(format_parse_error(
+								input,
+								offset,
+								&format!(
+									"inside raw text element <{tag_name}>"
+								),
 							));
 						}
 					}
 				}
 			}
-			Err(err) => {
-				return Err(format!(
-					"parse error at byte {}: {err}",
-					input.len() - remaining.len()
+			Err(_) => {
+				let offset = input.len() - remaining.len();
+				return Err(format_parse_error(
+					input,
+					offset,
+					"unexpected token",
 				));
 			}
 		}
@@ -232,6 +298,21 @@ fn parse_open_tag<'a>(
 		}
 
 		if input.is_empty() {
+			// EOF inside open tag — return a cut error
+			return Err(ErrMode::Cut(ContextError::new()));
+		}
+
+		// guard: if the next char cannot start an attribute name or
+		// expression, skip it to avoid an infinite loop
+		let next = input.chars().next().unwrap();
+		if !next.is_ascii_alphanumeric()
+			&& next != '-'
+			&& next != '_'
+			&& next != ':'
+			&& next != '.'
+			&& next != '@'
+			&& next != '{'
+		{
 			return Err(ErrMode::Cut(ContextError::new()));
 		}
 
@@ -339,12 +420,14 @@ fn parse_attribute_value<'a>(
 		let _ = '\''.parse_next(input)?;
 		Ok(val)
 	} else {
-		// unquoted: terminated by whitespace, >, or /
+		// unquoted: per HTML spec, terminated by whitespace, `>`, `"`,
+		// `'`, `=`, or `` ` ``. Notably `/` does NOT terminate an
+		// unquoted value (URLs like `https://example.com` are valid).
 		let val = take_while(1.., |ch: char| {
 			!ch.is_ascii_whitespace()
-				&& ch != '>' && ch != '/'
-				&& ch != '\''
-				&& ch != '"'
+				&& ch != '>' && ch != '\''
+				&& ch != '"' && ch != '='
+				&& ch != '`'
 		})
 		.parse_next(input)?;
 		Ok(val)
@@ -1023,6 +1106,80 @@ mod test {
 			HtmlToken::OpenTag { attributes, .. } => {
 				attributes[0].key.xpect_eq("xlink:href");
 				attributes[0].value.unwrap().xpect_eq("#icon");
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn unquoted_attr_with_slashes() {
+		let config = HtmlParseConfig::default();
+		let tokens = parse_document(
+			"<meta content=https://bevy.org// property=og:url>",
+			&config,
+		)
+		.unwrap();
+		match &tokens[0] {
+			HtmlToken::OpenTag { attributes, .. } => {
+				attributes[0].key.xpect_eq("content");
+				attributes[0].value.unwrap().xpect_eq("https://bevy.org//");
+				attributes[1].key.xpect_eq("property");
+				attributes[1].value.unwrap().xpect_eq("og:url");
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn unquoted_attr_simple() {
+		let config = HtmlParseConfig::default();
+		let tokens = parse_document("<html lang=en>", &config).unwrap();
+		match &tokens[0] {
+			HtmlToken::OpenTag { attributes, .. } => {
+				attributes[0].key.xpect_eq("lang");
+				attributes[0].value.unwrap().xpect_eq("en");
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn error_message_includes_context() {
+		let config = HtmlParseConfig::default();
+		let err = parse_document("<div <span>", &config).unwrap_err();
+		err.clone().xpect_contains("line");
+		err.clone().xpect_contains("column");
+		err.xpect_contains("-->");
+	}
+
+	#[test]
+	fn self_closing_after_unquoted_slash() {
+		// ensure a trailing `/` right before `>` still self-closes
+		let config = HtmlParseConfig::default();
+		let tokens = parse_document("<img src=foo.png />", &config).unwrap();
+		match &tokens[0] {
+			HtmlToken::OpenTag { self_closing, .. } => {
+				self_closing.xpect_true();
+			}
+			other => panic!("expected OpenTag, got {other:?}"),
+		}
+	}
+
+	#[test]
+	fn unquoted_value_consumes_trailing_slash() {
+		// per HTML spec, `<img src=foo/>` is NOT self-closing;
+		// the unquoted value is `foo/` and `>` closes the tag.
+		// This matches browser behavior.
+		let config = HtmlParseConfig::default();
+		let tokens = parse_document("<img src=foo/>", &config).unwrap();
+		match &tokens[0] {
+			HtmlToken::OpenTag {
+				self_closing,
+				attributes,
+				..
+			} => {
+				self_closing.xpect_false();
+				attributes[0].value.unwrap().xpect_eq("foo/");
 			}
 			other => panic!("expected OpenTag, got {other:?}"),
 		}
