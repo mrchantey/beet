@@ -159,6 +159,16 @@ pub struct Url {
 }
 
 impl Url {
+	/// A URL with no scheme, authority, path, params, or fragment.
+	pub const NONE: Url = Url {
+		scheme: Scheme::None,
+		authority: None,
+		path: Vec::new(),
+		params: MultiMap::new(),
+		fragment: None,
+	};
+
+
 	/// Parse a URL string.
 	///
 	/// Accepts full URLs (`https://example.com/path`), scheme-relative

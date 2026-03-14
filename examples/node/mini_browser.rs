@@ -10,7 +10,10 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((TuiPlugin::default(), AsyncPlugin::default()))
-		.add_systems(PreUpdate, (url_bar_input, update_url_bar_on_navigate))
+		.add_systems(
+			PreUpdate,
+			(url_bar_input, history_input, update_url_bar_on_navigate),
+		)
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -42,9 +45,13 @@ fn setup(mut commands: Commands) {
 
 
 use beet::exports::bevy_ratatui::event::KeyMessage;
+use beet::exports::bevy_ratatui::event::MouseMessage;
 use beet::exports::ratatui::crossterm::event::KeyCode;
+use beet::exports::ratatui::crossterm::event::KeyModifiers;
+use beet::exports::ratatui::crossterm::event::MouseButton;
+use beet::exports::ratatui::crossterm::event::MouseEventKind;
 
-/// handler character input, backspace and enter key
+/// Handle character input, backspace and enter key in the URL bar.
 fn url_bar_input(
 	mut commands: Commands,
 	mut key_messages: MessageReader<KeyMessage>,
@@ -75,9 +82,64 @@ fn url_bar_input(
 	Ok(())
 }
 
+/// Handle browser back/forward navigation via:
+///
+/// - `Alt+Left` / `Alt+Right` — standard terminal binding, also fired by
+///   most mice that report side-buttons (button 4 / button 5) through the
+///   terminal's mouse protocol.
+/// - `[` / `]` — keyboard shortcuts.
+/// - Middle-click fires back as a convenience (uncommon but handy in testing).
+fn history_input(
+	mut commands: Commands,
+	mut key_messages: MessageReader<KeyMessage>,
+	mut mouse_messages: MessageReader<MouseMessage>,
+	navigators: Query<Entity, With<Navigator>>,
+) -> Result {
+	let Ok(navigator) = navigators.single() else {
+		return Ok(());
+	};
 
-// navigation without url bar ie clicking links
-// needs to propagate changes to url bar
+	let mut go_back = false;
+	let mut go_forward = false;
+
+	for message in key_messages.read().filter(|msg| msg.is_press()) {
+		match message.code {
+			// Alt+Left — back (also triggered by mouse button 4 in most terminals)
+			KeyCode::Left if message.modifiers.contains(KeyModifiers::ALT) => {
+				go_back = true;
+			}
+			// Alt+Right — forward (also triggered by mouse button 5 in most terminals)
+			KeyCode::Right if message.modifiers.contains(KeyModifiers::ALT) => {
+				go_forward = true;
+			}
+			// Keyboard shortcuts
+			KeyCode::Char('[') => go_back = true,
+			KeyCode::Char(']') => go_forward = true,
+			_ => {}
+		}
+	}
+
+	// Some terminals / mouse drivers report side-buttons as middle-button
+	// variants; handle ScrollLeft/ScrollRight which kitty and some others emit.
+	for message in mouse_messages.read() {
+		match message.0.kind {
+			MouseEventKind::Down(MouseButton::Middle) => go_back = true,
+			MouseEventKind::ScrollLeft => go_back = true,
+			MouseEventKind::ScrollRight => go_forward = true,
+			_ => {}
+		}
+	}
+
+	if go_back {
+		commands.entity(navigator).queue_async(Navigator::back);
+	} else if go_forward {
+		commands.entity(navigator).queue_async(Navigator::forward);
+	}
+
+	Ok(())
+}
+
+/// Propagate URL changes (eg link clicks) back to the URL bar.
 fn update_url_bar_on_navigate(
 	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
 	navigators: Populated<&Navigator, Changed<Navigator>>,

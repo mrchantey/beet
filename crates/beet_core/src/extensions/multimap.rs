@@ -139,14 +139,23 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
 
+impl<K, V> MultiMap<K, V>
+where
+	K: Eq + Hash,
+{
+	/// Create a new empty multimap.
+	pub const fn new() -> Self {
+		Self {
+			inner: HashMap::new(),
+		}
+	}
+}
+
 impl<K, V, S> MultiMap<K, V, S>
 where
 	K: Eq + Hash,
 	S: BuildHasher + Default,
 {
-	/// Create a new empty multimap.
-	pub fn new() -> Self { Self::default() }
-
 	/// Insert a key with no values.
 	/// If the key already exists, this is a no-op.
 	pub fn insert_key(&mut self, key: K) { self.inner.entry(key).or_default(); }
