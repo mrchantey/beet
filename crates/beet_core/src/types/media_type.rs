@@ -262,6 +262,10 @@ impl MediaType {
 			other => MediaType::Other(other.to_string()),
 		}
 	}
+	/// Create a custom media type from a string.
+	pub fn other(other: impl Into<String>) -> Self {
+		MediaType::Other(other.into())
+	}
 
 	/// Infer the media type from a file extension.
 	///

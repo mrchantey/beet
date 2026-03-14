@@ -48,6 +48,7 @@ impl Default for Navigator {
 		// let mut history = VecDeque::new();
 		// history.push_back(home.clone());
 		Self {
+			// user_agent: "curl/8.17.0".into(),
 			user_agent: "Mozilla/5.0 Beet/0.1".into(),
 			home_url: home.clone(),
 			accepts: vec![
@@ -55,6 +56,8 @@ impl Default for Navigator {
 				// means faster rendering
 				MediaType::Markdown,
 				MediaType::Html,
+				// MediaType::Markdown,
+				// MediaType::other("*/*"),
 			],
 			loading: false,
 			// home navigated to by on_add
@@ -91,15 +94,7 @@ impl Navigator {
 	}
 
 	/// Resolve `url` against the current page, handling relative paths.
-	fn resolve(&self, url: Url) -> Url {
-		if url.authority().is_none() {
-			let mut resolved = self.current_url().clone();
-			resolved.set_path(url.path().clone());
-			resolved
-		} else {
-			url
-		}
-	}
+	fn resolve(&self, url: Url) -> Url { self.current_url().join(url) }
 
 	/// Push a resolved URL onto the history stack, truncating any forward
 	/// entries and enforcing [`HISTORY_LIMIT`].
@@ -196,15 +191,29 @@ impl Navigator {
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
-		let media_bytes = Request::get(url)
+		let response = Request::get(&url)
 			.with_header::<header::UserAgent>(user_agent)
 			.with_header::<header::Accept>(accepts)
 			.send()
 			.await?
 			.into_result()
-			.await?
-			.media_bytes()
 			.await?;
+
+		let redirect = if response.status().is_redirect_location() {
+			response
+				.headers
+				.get::<header::Location>()
+				.map(|loc| {
+					loc.ok().map(|loc|
+					// resolve relative redirect URLs against the original URL
+					url.join(Url::parse(loc)))
+				})
+				.flatten()
+		} else {
+			None
+		};
+
+		let media_bytes = response.media_bytes().await?;
 
 		let render_targets = entity.get_cloned::<RenderTargets>().await?;
 		entity
@@ -224,6 +233,11 @@ impl Navigator {
 				nav.loading = false;
 			})
 			.await?;
+
+		if let Some(_redirect_url) = redirect {
+			todo!("handle redirects");
+			// Self::navigate_to(entity, redirect_url).await?;
+		}
 
 		Ok(())
 	}

@@ -154,3 +154,106 @@ fn update_url_bar_on_navigate(
 		}
 	}
 }
+
+
+
+//*
+//
+// # 🌐 Classic Web-1.0 Sites That Work Great in TUI Browsers
+//
+// ---
+//
+// # 📚 Text-heavy knowledge sites
+//
+// * **HTML Writers Guild Archive**
+//   http://www.hwg.org/
+//
+// * **Internet Archive**
+//   https://archive.org/
+//
+// * **Project Gutenberg**
+//   https://www.gutenberg.org/
+//
+// * **The Jargon File**
+//   http://www.catb.org/jargon/html/
+//
+// * **The Hitchhiker’s Guide to the Galaxy (Earth Edition)**
+//   https://www.hhgproject.org/
+//
+// ---
+//
+// # 🧠 Hacker / nerd culture sites
+//
+// * **Eric S. Raymond (catb.org)**
+//   http://www.catb.org/
+//
+// * **The UNIX Heritage Society**
+//   https://www.tuhs.org/
+//
+// * **The TCP/IP Guide**
+//   http://www.tcpipguide.com/
+//
+// * **Linux Documentation Project**
+//   https://tldp.org/
+//
+// ---
+//
+// # 🎮 Weird / fun old-school sites
+//
+// * **Zombo.com**
+//   http://zombo.com/
+//
+// * **Dinosaur Comics Archive**
+//   https://qwantz.com/
+//
+// * **textfiles.com**
+//   http://textfiles.com/
+//
+// * **Space Jam (1996 website)**
+//   https://www.spacejam.com/1996/
+//
+// ---
+//
+// # 🗂 Personal / indie Web-1.0 pages
+//
+// * **Paul Graham Essays**
+//   http://www.paulgraham.com/articles.html
+//
+// * **ArsDigita Community System Archive**
+//   http://philip.greenspun.com/ancient-history/
+//
+// * **Coding Horror (older posts)**
+//   https://blog.codinghorror.com/
+//
+// ---
+//
+// # 📜 Sites friendly to text browsers
+//
+// * **Lynx Browser Project**
+//   https://lynx.invisible-island.net/
+//
+// * **Tildeverse Directory**
+//   https://tildeverse.org/
+//
+// * **SDF Public Access UNIX System**
+//   https://sdf.org/
+//
+// ---
+//
+// # 🧭 Search engines for the small / classic web
+//
+// * **Wiby**
+//   https://wiby.me/
+//
+// * **Marginalia Search**
+//   https://search.marginalia.nu/
+//
+// ---
+//
+// # 💡 Tip
+//
+// Jump to a random old-school site from your terminal:
+//
+// ```bash
+// w3m https://wiby.me/surprise
+// ```

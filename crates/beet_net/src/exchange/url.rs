@@ -373,6 +373,19 @@ impl Url {
 			&self.path[index..]
 		}
 	}
+
+	/// Resolve `other` against `self`, treating `other` as relative if it has no authority.
+	pub fn join(&self, other: Url) -> Url {
+		if other.authority().is_none() {
+			let mut resolved = self.clone();
+			resolved.set_path(other.path);
+			resolved.params = other.params;
+			resolved.fragment = other.fragment;
+			resolved
+		} else {
+			other
+		}
+	}
 }
 
 impl std::fmt::Display for Url {
@@ -416,6 +429,9 @@ impl From<String> for Url {
 }
 impl From<&String> for Url {
 	fn from(value: &String) -> Self { Url::parse(value) }
+}
+impl From<&Url> for Url {
+	fn from(value: &Url) -> Self { value.clone() }
 }
 
 // ============================================================================

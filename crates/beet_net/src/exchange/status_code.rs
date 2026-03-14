@@ -45,8 +45,14 @@ impl StatusCode {
 impl StatusCode {
 	/// 301 Moved Permanently
 	pub const MOVED_PERMANENTLY: StatusCode = StatusCode(301);
+	/// 302 Moved Permanently
+	pub const FOUND: StatusCode = StatusCode(302);
+	/// 303 See Other
+	pub const SEE_OTHER: StatusCode = StatusCode(303);
 	/// 307 Temporary Redirect
 	pub const TEMPORARY_REDIRECT: StatusCode = StatusCode(307);
+	/// 308 Temporary Redirect
+	pub const PERMANENT_REDIRECT: StatusCode = StatusCode(308);
 }
 
 // 4xx Client Error
@@ -117,6 +123,11 @@ impl StatusCode {
 	/// Returns `true` if this is a 5xx server error status.
 	pub const fn is_server_error(&self) -> bool {
 		self.0 >= 500 && self.0 < 600
+	}
+
+	/// Returns `true` if this status is a known redirect code (301, 302, 303, 307, 308).
+	pub const fn is_redirect_location(&self) -> bool {
+		matches!(self.0, 301 | 302 | 303 | 307 | 308)
 	}
 
 	/// Returns `true` if this status represents an error (4xx or 5xx).
