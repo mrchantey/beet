@@ -79,6 +79,8 @@ pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
+	#[cfg(feature = "node")]
+	pub use beet_node::exports::*;
 	pub use bevy;
 }
 #[cfg(test)]

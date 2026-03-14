@@ -23,3 +23,11 @@ pub mod prelude {
 	pub use crate::render::*;
 	pub use crate::types::*;
 }
+
+
+pub mod exports {
+	#[cfg(feature = "tui")]
+	pub use bevy_ratatui;
+	#[cfg(feature = "tui")]
+	pub use ratatui;
+}

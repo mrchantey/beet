@@ -10,6 +10,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((TuiPlugin::default(), AsyncPlugin::default()))
+		.add_systems(PreUpdate, url_bar_system)
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -37,4 +38,38 @@ fn setup(mut commands: Commands) {
 			TuiNodeRenderer::default(),
 		)
 	]));
+}
+
+
+use beet::exports::bevy_ratatui::event::KeyMessage;
+use beet::exports::ratatui::crossterm::event::KeyCode;
+
+fn url_bar_system(
+	mut commands: Commands,
+	mut key_messages: MessageReader<KeyMessage>,
+	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
+	navigators: Query<Entity, With<Navigator>>,
+) -> Result {
+	let (mut widget, mut textbox) = textbox.single_mut()?;
+
+	for message in key_messages.read().filter(|msg| msg.is_press()) {
+		match message.code {
+			KeyCode::Enter => {
+				let url = Url::parse(&textbox.value);
+				commands
+					.entity(navigators.single()?)
+					.queue_async(|entity| Navigator::navigate_to(entity, url))
+			}
+			KeyCode::Backspace => {
+				textbox.value.pop();
+				widget.set_changed();
+			}
+			KeyCode::Char(char) => {
+				textbox.value.push(char);
+				widget.set_changed();
+			}
+			_ => {}
+		}
+	}
+	Ok(())
 }

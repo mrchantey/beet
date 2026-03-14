@@ -9,8 +9,8 @@ use ratatui::widgets::Paragraph;
 #[derive(Clone, Component)]
 #[require(TuiWidget=widget())]
 pub struct TuiTextBox {
-	label: Cow<'static, str>,
-	value: String,
+	pub label: Cow<'static, str>,
+	pub value: String,
 }
 
 impl TuiTextBox {
