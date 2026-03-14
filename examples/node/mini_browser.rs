@@ -21,40 +21,20 @@ fn setup(mut commands: Commands) {
 		.first()
 		.cloned()
 		.unwrap_or_else(|| "http://example.com".to_string());
+
+	let navigator = commands.spawn(Navigator::new(url.clone())).id();
+
 	commands.spawn((Layout::vertical(), children![
 		TuiTextBox::new("url", &url),
-		(TuiNodeRenderer::default(), render_on_spawn(url))
+		(
+			// listens for responses delivered by Navigator
+			RenderedBy(navigator),
+			// parses the RenderMedia observer into the entity
+			MediaParser::default(),
+			// renders this entity on a NodeParsed event,
+			// triggering a Changed<TuiWidget> which results in
+			// a ratatui refresh
+			TuiNodeRenderer::default(),
+		)
 	]));
-}
-
-fn render_on_spawn(url: String) -> impl Bundle {
-	OnSpawn::new_async(async move |entity| {
-		// 1. Fetch the URL
-		let input_bytes = Request::get(url)
-			.send()
-			.await
-			.unwrap()
-			// check for 200 status
-			.into_result()
-			.await
-			.unwrap()
-			// get body typed by the content-type header
-			.media_bytes()
-			.await
-			.unwrap();
-
-		entity
-			.with_then(move |mut entity| {
-				// 2. Parse the media and insert the entity tree for rendering
-				MediaParser::new()
-					.parse(ParseContext::new(&mut entity, &input_bytes))
-					.unwrap();
-
-				// 3. Mark widget as changed to trigger rerender
-				entity.get_mut::<TuiWidget>().unwrap().set_changed();
-			})
-			.await;
-
-		Ok(())
-	})
 }

@@ -127,6 +127,11 @@ impl Request {
 					}
 				}
 			}
+			Scheme::About
+				if self.path().first() == Some(&String::from("blank")) =>
+			{
+				Ok(Response::ok())
+			}
 			Scheme::Ws | Scheme::Wss => {
 				bevybail!(
 					"WebSocket schemes are not supported by Request::send, use the sockets module instead"

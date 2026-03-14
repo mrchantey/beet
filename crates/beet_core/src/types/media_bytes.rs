@@ -73,7 +73,9 @@ impl<'a> MediaBytes<'a> {
 	pub fn bytes(&self) -> &[u8] { &self.bytes }
 
 	/// Try to interpret the bytes as a UTF-8 string slice.
-	pub fn as_utf8(&self) -> Result<&str> { core::str::from_utf8(&self.bytes)?.xok() }
+	pub fn as_utf8(&self) -> Result<&str> {
+		core::str::from_utf8(&self.bytes)?.xok()
+	}
 
 	/// Convert into an owned `MediaBytes<'static>`, cloning the bytes if needed.
 	pub fn into_owned(self) -> MediaBytes<'static> {

@@ -15,6 +15,8 @@ use beet_core::prelude::*;
 /// respective feature flags. When `plaintext_fallback` is enabled,
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
+#[derive(Component)]
+#[component(on_add=on_add)]
 pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
 	plaintext_fallback: bool,
@@ -24,6 +26,33 @@ pub struct MediaParser {
 	#[cfg(feature = "markdown_parser")]
 	markdown_parser: MarkdownParser,
 }
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).observe(render_media);
+}
+fn render_media(ev: On<RenderMedia>, mut commands: Commands) -> Result {
+	let entity = ev.event_target();
+	let media_bytes = ev.event().clone();
+	commands.queue(move |world: &mut World| -> Result {
+		let Some(mut parser) = world.entity_mut(entity).take::<MediaParser>()
+		else {
+			return Ok(());
+		};
+		parser.parse(ParseContext::new(
+			&mut world.entity_mut(entity),
+			&media_bytes,
+		))?;
+
+		world.entity_mut(entity).insert(parser).trigger(NodeParsed);
+
+		Ok(())
+	});
+
+	Ok(())
+}
+
+
+
 
 impl MediaParser {
 	/// Create a parser with the plain-text fallback enabled.

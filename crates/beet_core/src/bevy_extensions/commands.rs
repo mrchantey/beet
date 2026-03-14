@@ -65,4 +65,17 @@ pub impl EntityCommands<'_> {
 		self.commands_mut().queue_silenced(command::trigger(event));
 		self
 	}
+
+	/// Queues an asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
+	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		let id = self.id();
+		self.commands()
+			.queue_async(async move |world| func(world.entity(id)).await);
+	}
 }
