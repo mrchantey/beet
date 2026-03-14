@@ -4,7 +4,8 @@ use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-#[beet_core::test]
+#[beet_core::test(timeout_ms = 60_000)]
+#[ignore = "expensive"]
 async fn works() {
 	dotenv::dotenv().ok();
 	let res = Request::post("https://api.openai.com/v1/images/generations")

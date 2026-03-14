@@ -7,7 +7,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::BodyStream;
+use beet_net::prelude::Body;
 
 
 /// A component that configures an action entity to interact with an AI model.

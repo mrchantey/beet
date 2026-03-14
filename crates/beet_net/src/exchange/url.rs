@@ -18,6 +18,8 @@
 //! assert_eq!(url.to_string(), "https://example.com/api/users?limit=10#results");
 //! ```
 
+use std::borrow::Cow;
+
 use beet_core::prelude::*;
 
 /// The transport scheme of a URL.
@@ -432,6 +434,13 @@ impl From<&String> for Url {
 }
 impl From<&Url> for Url {
 	fn from(value: &Url) -> Self { value.clone() }
+}
+
+impl From<Cow<'_, str>> for Url {
+	fn from(value: Cow<'_, str>) -> Self { Url::parse(value) }
+}
+impl From<&Cow<'_, str>> for Url {
+	fn from(value: &Cow<'_, str>) -> Self { Url::parse(value) }
 }
 
 // ============================================================================

@@ -4,12 +4,13 @@ use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-#[beet_core::test]
+#[beet_core::test(timeout_ms = 10_000)]
+#[ignore = "expensive"]
 async fn works() {
 	dotenv::dotenv().ok();
 	//https://ai.google.dev/api/generate-content#method:-models.generatecontent
-	let res = Request::post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent")
-		.with_header("x-goog-api-key", &env_ext::var("GEMINI_API_KEY").unwrap())
+	let res = Request::post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent")
+		.with_header_raw("x-goog-api-key", &env_ext::var("GEMINI_API_KEY").unwrap())
 		.with_json_body(&serde_json::json! {{
 			"contents": [{
 				"role": "user",

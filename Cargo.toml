@@ -52,6 +52,7 @@ members = [
 	"crates/beet_node",
 	"crates/beet_stack",
 	"crates/beet_router",
+	"crates/beet_clanker",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -60,7 +61,6 @@ members = [
 	# "crates/beet_spatial",
 
 	## 💡 RSX
-	# "crates/beet_clanker",
 	# "crates/beet_build",
 	# "crates/beet_design",
 	# "crates/beet_dom",
@@ -78,15 +78,16 @@ members = [
 [workspace.dependencies]
 ## internal
 
+beet = { path = "", version = "0.0.9-dev.5" }
+beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.5" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.5" }
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.5" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.5" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.5" }
 beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.5" }
 beet_node = { path = "crates/beet_node", version = "0.0.9-dev.5" }
-beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.5" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
-beet = { path = "", version = "0.0.9-dev.5" }
+beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.5" }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.5" }
 # beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.5" }
@@ -101,7 +102,6 @@ beet = { path = "", version = "0.0.9-dev.5" }
 # beet_design = { path = "crates/beet_design", version = "0.0.9-dev.5" }
 # beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
 # beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.5" }
-# beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.5" }
 
 #💡 local
 bevy = { version = "0.18", default-features = false, features = [
@@ -265,7 +265,7 @@ _pretty_curl = ["net", "node", "ureq", "native-tls"]
 _mini_browser = ["_pretty_curl", "tui"]
 
 
-# clanker = ["dep:beet_clanker","net","router"]
+clanker = ["dep:beet_clanker","net"]
 # dom = ["css", "dep:beet_dom"]
 
 
@@ -312,6 +312,7 @@ markdown = ["beet_stack?/markdown"]
 bevy = { workspace = true }
 
 beet_core.workspace = true
+beet_clanker = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
@@ -324,7 +325,6 @@ beet_stack = { workspace = true, optional = true }
 # beet_rsx = { workspace = true, optional = true }
 # beet_build = { workspace = true, optional = true }
 # beet_design = { workspace = true, optional = true }
-# beet_clanker = { workspace = true, optional = true }
 
 #💡 flow
 # beet_flow = { workspace = true, optional = true }
@@ -428,10 +428,10 @@ required-features = ["http_server"]
 
 # 💡 Examples - Clanker
 
-# [[example]]
-# name = "chat"
-# path = "examples/clanker/chat.rs"
-# required-features = ["clanker"]
+[[example]]
+name = "chat"
+path = "examples/clanker/chat.rs"
+required-features = ["clanker"]
 
 
 # 💡 Examples - flow

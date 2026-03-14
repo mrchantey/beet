@@ -61,7 +61,12 @@ pub async fn streaming_response(provider: impl ModelProvider) {
 		.xpect_true();
 
 	// Verify we accumulated text via deltas
-	accumulated_text.is_empty().xpect_false();
+	accumulated_text
+		.xpect_contains("1")
+		.xpect_contains("2")
+		.xpect_contains("3")
+		.xpect_contains("4")
+		.xpect_contains("5");
 
 	// Verify final response is valid
 	let response = final_response.unwrap();
