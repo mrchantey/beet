@@ -109,10 +109,6 @@ impl Navigator {
 		self.history_cursor = self.history.len() - 1;
 	}
 
-	// ------------------------------------------------------------------ //
-	// Async commands
-	// ------------------------------------------------------------------ //
-
 	/// Navigate to `url`, pushing it onto the history stack.
 	///
 	/// ## Errors

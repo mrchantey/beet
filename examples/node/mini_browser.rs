@@ -43,7 +43,6 @@ fn setup(mut commands: Commands) {
 	]));
 }
 
-
 use beet::exports::bevy_ratatui::event::KeyMessage;
 use beet::exports::bevy_ratatui::event::MouseMessage;
 use beet::exports::ratatui::crossterm::event::KeyCode;
@@ -154,7 +153,6 @@ fn update_url_bar_on_navigate(
 		}
 	}
 }
-
 
 
 //*
