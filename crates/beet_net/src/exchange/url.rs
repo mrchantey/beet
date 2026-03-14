@@ -284,6 +284,12 @@ impl Url {
 		self
 	}
 
+	/// Set the path segments.
+	pub fn set_path(&mut self, path: Vec<String>) -> &mut Self {
+		self.path = path;
+		self
+	}
+
 	/// All query parameters.
 	pub fn params(&self) -> &MultiMap<String, String> { &self.params }
 

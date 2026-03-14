@@ -555,4 +555,46 @@ mod test {
 		span.start().xpect_eq(LineCol::new(1, 0));
 		span.path().xpect_eq(WsPathBuf::new("test.md"));
 	}
+
+	/// Root entity must not receive any content components — only metadata
+	/// like [`Frontmatter`] and [`FileSpan`]. All parsed content lives in
+	/// children.
+	#[test]
+	fn root_has_no_content_components_heading() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_md(&mut world.entity_mut(entity), "# Title");
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		root.get::<Value>().is_none().xpect_true();
+		root.get::<Comment>().is_none().xpect_true();
+		root.get::<Expression>().is_none().xpect_true();
+	}
+
+	#[test]
+	fn root_has_no_content_components_paragraph() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_md(&mut world.entity_mut(entity), "Hello world");
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		root.get::<Value>().is_none().xpect_true();
+		root.get::<Comment>().is_none().xpect_true();
+		root.get::<Expression>().is_none().xpect_true();
+	}
+
+	#[test]
+	fn root_has_no_content_components_multiple_blocks() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_md(
+			&mut world.entity_mut(entity),
+			"# Title\n\nParagraph\n\n- list item",
+		);
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		root.get::<Value>().is_none().xpect_true();
+		// all three blocks are children, not on the root
+		world.entity_mut(entity).children().len().xpect_eq(3);
+	}
 }

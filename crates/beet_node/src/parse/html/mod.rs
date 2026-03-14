@@ -627,4 +627,44 @@ mod test {
 			.len()
 			.xpect_eq(1);
 	}
+
+	/// Root entity must not receive any content components after HTML parsing.
+	/// All parsed content lives in children.
+	#[test]
+	fn root_has_no_content_components_element() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_html(&mut world.entity_mut(entity), "<h1>Title</h1>");
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		root.get::<Value>().is_none().xpect_true();
+		root.get::<Comment>().is_none().xpect_true();
+		root.get::<Expression>().is_none().xpect_true();
+	}
+
+	#[test]
+	fn root_has_no_content_components_text() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_html(&mut world.entity_mut(entity), "hello world");
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		// text nodes are children, not on root
+		world.entity_mut(entity).children().len().xpect_eq(1);
+	}
+
+	#[test]
+	fn root_has_no_content_components_multiple_elements() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		parse_html(
+			&mut world.entity_mut(entity),
+			"<h1>Title</h1><p>Paragraph</p><ul><li>item</li></ul>",
+		);
+		let root = world.entity(entity);
+		root.get::<Element>().is_none().xpect_true();
+		root.get::<Value>().is_none().xpect_true();
+		// all three elements are children, not on the root
+		world.entity_mut(entity).children().len().xpect_eq(3);
+	}
 }

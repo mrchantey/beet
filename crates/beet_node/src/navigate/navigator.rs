@@ -71,6 +71,18 @@ impl Navigator {
 
 	pub fn current_url(&self) -> &Url { &self.current_url }
 
+	pub fn is_loading(&self) -> bool { self.loading }
+
+	/// Sets the current url, handling relative urls by appending to the
+	/// current.
+	pub fn set_current_url(&mut self, url: Url) {
+		if url.authority().is_none() {
+			self.current_url.set_path(url.path().clone());
+		} else {
+			self.current_url = url;
+		}
+	}
+
 	/// ## Errors
 	/// - Errors if no [`Navigator`]
 	/// - Errors if request failes
@@ -80,13 +92,19 @@ impl Navigator {
 		url: impl Into<Url>,
 	) -> Result {
 		let url = url.into();
-		let url2 = url.clone();
 		// 1. set current url and loading state
-		let (user_agent, accepts) = entity
+		// the url must be handed to and from the
+		// navigator to handle relative urls like `/about`,
+		// prepending the current authority and scheme
+		let (user_agent, url, accepts) = entity
 			.get_mut(move |mut navigator: Mut<Navigator>| {
 				navigator.loading = true;
-				navigator.current_url = url2;
-				(navigator.user_agent.clone(), navigator.accepts.clone())
+				navigator.set_current_url(url);
+				(
+					navigator.user_agent.clone(),
+					navigator.current_url.clone(),
+					navigator.accepts.clone(),
+				)
 			})
 			.await?;
 

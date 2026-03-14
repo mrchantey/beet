@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// respective feature flags. When `plaintext_fallback` is enabled,
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
-#[derive(Component)]
+#[derive(Debug, Clone, Component)]
 #[component(on_add=on_add)]
 pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
@@ -34,16 +34,20 @@ fn render_media(ev: On<RenderMedia>, mut commands: Commands) -> Result {
 	let entity = ev.event_target();
 	let media_bytes = ev.event().clone();
 	commands.queue(move |world: &mut World| -> Result {
-		let Some(mut parser) = world.entity_mut(entity).take::<MediaParser>()
-		else {
+		let mut entity = world.entity_mut(entity);
+		// let mut parser = entity.get::<MediaParser>().unwrap().clone();
+		let Some(mut parser) = entity.take::<MediaParser>() else {
 			return Ok(());
 		};
-		parser.parse(ParseContext::new(
-			&mut world.entity_mut(entity),
-			&media_bytes,
-		))?;
 
-		world.entity_mut(entity).insert(parser).trigger(NodeParsed);
+		// TODO this is a hack because our diffing is resulting in
+		// stale data.. though we are visiting a new site, probs
+		// fair to be clearing all anyway..
+		entity.despawn_related::<Children>();
+
+		parser.parse(ParseContext::new(&mut entity, &media_bytes))?;
+
+		entity.insert(parser).trigger(NodeParsed);
 
 		Ok(())
 	});

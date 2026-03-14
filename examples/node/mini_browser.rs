@@ -10,7 +10,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((TuiPlugin::default(), AsyncPlugin::default()))
-		.add_systems(PreUpdate, url_bar_system)
+		.add_systems(PreUpdate, (url_bar_input, update_url_bar_on_navigate))
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -44,7 +44,8 @@ fn setup(mut commands: Commands) {
 use beet::exports::bevy_ratatui::event::KeyMessage;
 use beet::exports::ratatui::crossterm::event::KeyCode;
 
-fn url_bar_system(
+/// handler character input, backspace and enter key
+fn url_bar_input(
 	mut commands: Commands,
 	mut key_messages: MessageReader<KeyMessage>,
 	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
@@ -72,4 +73,22 @@ fn url_bar_system(
 		}
 	}
 	Ok(())
+}
+
+
+// navigation without url bar ie clicking links
+// needs to propagate changes to url bar
+fn update_url_bar_on_navigate(
+	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
+	navigators: Populated<&Navigator, Changed<Navigator>>,
+) {
+	for navigator in navigators.iter() {
+		for (mut widget, mut textbox) in textbox.iter_mut() {
+			textbox.value = navigator.current_url().to_string();
+			if navigator.is_loading() {
+				textbox.value.push_str(" (loading...)");
+			}
+			widget.set_changed();
+		}
+	}
 }
