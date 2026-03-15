@@ -3,7 +3,7 @@
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
 // mod actions;
-// mod context;
+mod types;
 pub mod openresponses;
 mod providers;
 pub mod realtime;
@@ -12,7 +12,7 @@ pub mod realtime;
 
 pub mod prelude {
 	// pub use crate::actions::*;
-	// pub use crate::context::*;
+	pub use crate::types::*;
 	pub use crate::openresponses;
 	pub use crate::providers::*;
 	pub use crate::realtime;

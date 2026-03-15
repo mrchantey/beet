@@ -256,6 +256,10 @@ pub enum ContentPart {
 	#[serde(rename = "reasoning_text")]
 	ReasoningText(ReasoningText),
 	/// Summary text.
+	/// This is very confusing against Item::Reasoning::summary,
+	/// which is the `im thinking about airplanes..` text, whereas
+	/// this is the `i decided airplanes dont exist`.
+	/// Should be called SummaryOutput...
 	#[serde(rename = "summary_text")]
 	SummaryText(SummaryText),
 }

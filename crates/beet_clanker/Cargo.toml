@@ -22,12 +22,12 @@ fs = ["beet_core/fs"]
 beet_net = { workspace = true, features = ["ureq","json"] }
 beet_core = { workspace = true, features = ["serde"] }
 
+serde.workspace = true
 futures.workspace = true
 strum.workspace = true
 thiserror.workspace = true
 bevy.workspace = true
 dotenv.workspace = true
-serde.workspace = true
 base64.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"
