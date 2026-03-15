@@ -1,0 +1,47 @@
+[package]
+name = "beet_router"
+version.workspace = true
+edition.workspace = true
+description = "Transport agnostic routing for bevy applications"
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["bevy","server","router"]
+categories.workspace = true
+publish = true
+
+[features]
+default = ["serde", "fs"]
+server = [
+	"beet_net/server",
+	# technically only required for internal tests
+	"beet_net/ureq"
+]
+tokens = ["beet_core/tokens"]
+# for conditional compilation in hooks
+client = ["beet_net/client"]
+fs = ["beet_net/fs"]
+serde = [
+	"dep:serde",
+	"dep:serde_json",
+	"beet_core/serde",
+]
+
+[dependencies]
+beet_core = {workspace = true, features=["ansi_paint"]}
+beet_net.workspace = true
+beet_dom.workspace = true
+beet_rsx.workspace = true
+
+bevy.workspace = true
+
+url.workspace = true
+
+# serde
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }

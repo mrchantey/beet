@@ -7,7 +7,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_flow::prelude::*;
-use beet_net::prelude::ExchangeTarget;
+use beet_net::prelude::*;
 
 /// Creates an action that executes pending tool calls in the thread context.
 ///
@@ -116,13 +116,10 @@ async fn execute_tool_call(
 	};
 
 	// Build a request for the tool endpoint
-	let request = Request::post(path)
-		.with_header("content-type", "application/json")
-		.with_body(func_call.arguments.clone());
+	let request = Request::with_json_str(path, &func_call.arguments);
 
 	// Execute via the exchange system
-	let response: beet_core::prelude::Response =
-		world.entity(tool_entity).exchange(request).await;
+	let response = world.entity(tool_entity).exchange(request).await;
 
 	// Check for errors
 	if !response.status().is_ok() {

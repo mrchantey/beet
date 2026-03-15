@@ -12,7 +12,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.9-rc.1.0"
+version = "0.0.9-dev.5"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A personal application framework"
@@ -21,7 +21,7 @@ readme = "README.md"
 homepage = "https://beetstack.dev"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["folk-technology", "web", "behavior", "game-ai", "robotics"]
+keywords = ["malleable-software", "local-first", "cross-platform", "framework", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
@@ -47,54 +47,61 @@ members = [
 	"crates/beet_core",
 	"crates/beet_core/macros",
 	"crates/beet_core/shared",
+	"crates/beet_net",
+	"crates/beet_tool",
+	"crates/beet_node",
+	"crates/beet_stack",
+	"crates/beet_router",
+	"crates/beet_clanker",
 
 	## 💡 Flow
-	"crates/beet_examples",
-	"crates/beet_flow",
-	"crates/beet_ml",
-	"crates/beet_spatial",
+	# "crates/beet_examples",
+	# "crates/beet_flow",
+	# "crates/beet_ml",
+	# "crates/beet_spatial",
 
 	## 💡 RSX
-	"crates/beet_net",
-	"crates/beet_clanker",
-	"crates/beet_build",
-	"crates/beet_design",
-	"crates/beet_dom",
-	"crates/beet_parse",
-	"crates/beet_router",
-	"crates/beet_rsx_combinator",
-	"crates/beet_rsx/macros",
-	"crates/beet_rsx",
+	# "crates/beet_build",
+	# "crates/beet_design",
+	# "crates/beet_dom",
+	# "crates/beet_parse",
+	# "crates/beet_router",
+	# "crates/beet_rsx_combinator",
+	# "crates/beet_rsx/macros",
+	# "crates/beet_rsx",
 
 	## 💡 Beet
-	"crates/beet_site",
-	"crates/beet-cli",
+	# "crates/beet_site",
+	# "crates/beet-cli",
 ]
 
 [workspace.dependencies]
 ## internal
 
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-rc.1.0" }
-beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-rc.1.0" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-rc.1.0" }
+beet = { path = "", version = "0.0.9-dev.5" }
+beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.5" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.5" }
+beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.5" }
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.5" }
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.5" }
+beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.5" }
+beet_node = { path = "crates/beet_node", version = "0.0.9-dev.5" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
+beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.5" }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.9-rc.1.0" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-rc.1.0" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.9-rc.1.0" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.9-rc.1.0" }
+# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.5" }
+# beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.5" }
+# beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.5" }
+# beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.5" }
 
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-rc.1.0" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.9-rc.1.0" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-rc.1.0" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-rc.1.0" }
-beet_build = { path = "crates/beet_build", version = "0.0.9-rc.1.0" }
-beet_design = { path = "crates/beet_design", version = "0.0.9-rc.1.0" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-rc.1.0" }
-beet_router = { path = "crates/beet_router", version = "0.0.9-rc.1.0" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.9-rc.1.0" }
-beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-rc.1.0" }
-
-beet = { path = "", version = "0.0.9-rc.1.0" }
+# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.5" }
+# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.5" }
+# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.5" }
+# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.5" }
+# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.5" }
+# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.5" }
+# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
+# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.5" }
 
 #💡 local
 bevy = { version = "0.18", default-features = false, features = [
@@ -124,7 +131,6 @@ dotenv = "0.15"
 send_wrapper = "0.6"
 web-time = "1"
 itertools = "0.14"
-mime_guess = "2"
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
 rand = "0.9"
@@ -132,6 +138,7 @@ rand_chacha = "0.9"
 # wasm_js ignored in native
 getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
+webbrowser = "1"
 
 #💡 logging
 log = "0.4"
@@ -174,6 +181,7 @@ extend = "1"
 #💡 io
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+postcard = { version = "1", features = ["alloc"] }
 base64 = "0.22"
 ron = "0.8"
 toml = "0.8"
@@ -182,6 +190,12 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
+url = "2"
+
+#💡 tui
+bevy_ratatui = { version = "0.11", default-features=false }
+# bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
+ratatui = { version = "0.30", default-features = false }
 
 #💡 web
 js-sys = "0.3"
@@ -207,72 +221,86 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["flow"]
-# default = ["nightly"]
-#💡 helper features
-launch = ["dom", "net", "build", "router"]
-server_app = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
-client = [
-	"rsx",
-	"design",
-	"net",
-	"dom",
-	"serde",
-	"router",
-	"beet_net/client",
-	"beet_dom/client",
-	"beet_design/client",
-]
-http_server = ["net", "beet_net/server"]
+# default = ["stack"]
+default = ["node"]
 
-#💡 fine-grained
-native-tls = [
-	"beet_clanker?/native-tls",
-	"beet_net?/native-tls",
-]
-rustls-tls = [
-	"beet_clanker?/rustls-tls",
-	"beet_net?/rustls-tls",
-]
-serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
-nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
+# 💡 Top Level
+
+http_server = ["net", "tool","stack", "beet_net/server"]
+tui_server = ["tui","stack", "markdown"]
+stdio_server = ["stack", "markdown"]
+
+# 💡 Core
+
+serde = ["beet_core/serde", "beet_net?/serde"]
+nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
-clanker = ["dep:beet_clanker","net","router"]
+json = ["serde", "beet_core/json", "beet_net?/json"]
+postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 testing = ["beet_core/testing"]
-dom = ["css", "dep:beet_dom"]
-router = ["dep:beet_router"]
-examples = ["bevy_default", "spatial", "dep:beet_examples"]
-flow = ["dep:beet_flow"]
-css = ["beet_parse?/css", "beet_rsx?/css"]
-design = ["rsx", "dep:beet_design"]
-webdriver = ["dom","beet_dom?/webdriver"]
-parse = ["dep:beet_parse"]
-rsx = ["dep:beet_rsx"]
-ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-cuda = ["ml","beet_ml/cuda"]
-# 💡 Server
-lambda = ["rustls-tls", "beet_net?/lambda"]
-aws = ["beet_net?/aws"]
-
-spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
-build = ["parse", "dep:beet_build"]
+fs = ["beet_core/fs","beet_net?/fs"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
-	"beet_core/bevy_default",
-	"beet_dom/bevy_scene",
-	"beet_dom/bevy_text",
-	"beet_examples?/bevy_default",
-	"beet_flow?/bevy_default",
-	"beet_ml?/bevy_default",
-	"beet_spatial?/bevy_default",
+	"beet_core/bevy_default"
 ]
-#💡 utils
-fs = ["beet_clanker?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
-net = ["dep:beet_net"]
+
+# 💡 Net
+
+net = ["dep:beet_net", "beet_stack?/http"]
+native-tls = [
+"net", "beet_net/native-tls",
+]
+router = ["dep:beet_router"]
+rustls-tls = [
+"net", "beet_net/rustls-tls",
+]
+lambda = ["rustls-tls", "beet_net?/lambda"]
+aws = ["net", "beet_net?/aws"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
+hyper = ["net", "beet_net?/hyper"]
+_pretty_curl = ["net", "node", "ureq", "native-tls"]
+_mini_browser = ["_pretty_curl", "tui"]
+
+
+clanker = ["dep:beet_clanker","net"]
+# dom = ["css", "dep:beet_dom"]
+
+
+# 💡 Stack
+
+tool = ["dep:beet_tool"]
+node = ["dep:beet_node"]
+stack = ["tool", "dep:beet_stack"]
+tui = ["beet_node?/tui"]
+markdown = ["beet_stack?/markdown"]
+
+# examples = ["bevy_default", "spatial", "dep:beet_examples"]
+# flow = ["dep:beet_flow"]
+# css = ["beet_parse?/css", "beet_rsx?/css"]
+# design = ["rsx", "dep:beet_design"]
+# webdriver = ["dom","beet_dom?/webdriver"]
+# parse = ["dep:beet_parse"]
+# rsx = ["dep:beet_rsx"]
+# ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
+# cuda = ["ml","beet_ml/cuda"]
+# 💡 Server
+
+# spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
+# build = ["parse", "dep:beet_build"]
+# bevy_scene = ["beet_core/bevy_scene"]
+# bevy_default = [
+# 	"bevy/default",
+# 	"beet_core/bevy_default",
+	# "beet_dom/bevy_scene",
+	# "beet_dom/bevy_text",
+	# "beet_examples?/bevy_default",
+	# "beet_flow?/bevy_default",
+	# "beet_ml?/bevy_default",
+	# "beet_spatial?/bevy_default",
+# ]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -283,35 +311,35 @@ reqwest = ["net", "beet_net?/reqwest"]
 [dependencies]
 bevy = { workspace = true }
 
-#💡 utils
 beet_core.workspace = true
+beet_clanker = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
+beet_node = { workspace = true, optional = true }
+beet_router = { workspace = true, optional = true }
+beet_tool = { workspace = true, optional = true }
+beet_stack = { workspace = true, optional = true }
 
 #💡 web
-beet_net = { workspace = true, optional = true }
-beet_dom = { workspace = true, optional = true }
-beet_parse = { workspace = true, optional = true }
-beet_rsx = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
-beet_build = { workspace = true, optional = true }
-beet_design = { workspace = true, optional = true }
-beet_clanker = { workspace = true, optional = true }
+# beet_dom = { workspace = true, optional = true }
+# beet_parse = { workspace = true, optional = true }
+# beet_rsx = { workspace = true, optional = true }
+# beet_build = { workspace = true, optional = true }
+# beet_design = { workspace = true, optional = true }
 
 #💡 flow
-beet_flow = { workspace = true, optional = true }
-beet_ml = { workspace = true, optional = true }
-beet_spatial = { workspace = true, optional = true }
+# beet_flow = { workspace = true, optional = true }
+# beet_ml = { workspace = true, optional = true }
+# beet_spatial = { workspace = true, optional = true }
 
-beet_examples = { workspace = true, optional = true }
+# beet_examples = { workspace = true, optional = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
 uuid = { workspace = true, features = ["rng-getrandom"] }
-# getrandom = { workspace = true }
-getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-beet = { path = ".", features = ["flow"] }
+# beet = { path = ".", features = ["flow"] }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
@@ -331,35 +359,22 @@ web-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
 
-# 💡 Examples - agent
+# 💡 Examples - Net
 
 [[example]]
-name = "chat"
-path = "examples/clanker/chat.rs"
-required-features = ["clanker"]
-
-
-# 💡 Examples - net
-
-[[example]]
-name = "server"
-path = "examples/net/server.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "templating"
-path = "examples/net/templating.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "client"
-path = "examples/net/client.rs"
+name = "http_client"
+path = "examples/net/http_client.rs"
 required-features = ["net", "ureq", "native-tls"]
 
 [[example]]
-name = "server_bench"
-path = "examples/net/server_bench.rs"
-required-features = ["server_app"]
+name = "http_server"
+path = "examples/net/http_server.rs"
+required-features = ["http_server"]
+
+[[example]]
+name = "socket_client"
+path = "examples/net/socket_client.rs"
+required-features = ["tungstenite"]
 
 [[example]]
 name = "socket_server"
@@ -367,189 +382,148 @@ path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
 
 [[example]]
-name = "socket_client"
-path = "examples/net/socket_client.rs"
-required-features = ["tungstenite"]
+name = "templating"
+path = "examples/net/templating.rs"
+required-features = ["http_server"]
+
+# 💡 Examples - Node
+
+[[example]]
+name = "media_renderer"
+path = "examples/node/media_renderer.rs"
+required-features = ["node"]
+
+[[example]]
+name = "pretty_curl"
+path = "examples/node/pretty_curl.rs"
+required-features = ["_pretty_curl"]
+
+[[example]]
+name = "mini_browser"
+path = "examples/node/mini_browser.rs"
+required-features = ["_mini_browser"]
+
+
+# 💡 Examples - Stack
+
+[[example]]
+name = "tui"
+path = "examples/stack/tui.rs"
+required-features = ["tui_server"]
+
+[[example]]
+name = "cli"
+path = "examples/stack/cli.rs"
+required-features = ["stdio_server"]
+
+[[example]]
+name = "repl"
+path = "examples/stack/repl.rs"
+required-features = ["stdio_server"]
+
+[[example]]
+name = "http"
+path = "examples/stack/http.rs"
+required-features = ["http_server"]
+
+# 💡 Examples - Clanker
+
+[[example]]
+name = "chat"
+path = "examples/clanker/chat.rs"
+required-features = ["clanker"]
+
 
 # 💡 Examples - flow
 
-[[example]]
-name = "hello_world"
-path = "examples/flow/hello_world.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "hello_world"
+# path = "examples/flow/hello_world.rs"
+# required-features = ["flow"]
 
-[[example]]
-name = "long_running"
-path = "examples/flow/long_running.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "long_running"
+# path = "examples/flow/long_running.rs"
+# required-features = ["flow"]
 
-[[example]]
-name = "malenia"
-path = "examples/flow/malenia.rs"
-required-features = ["flow", "rand"]
+# [[example]]
+# name = "malenia"
+# path = "examples/flow/malenia.rs"
+# required-features = ["flow", "rand"]
 
-[[example]]
-name = "repeat_while"
-path = "examples/flow/repeat_while.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "repeat_while"
+# path = "examples/flow/repeat_while.rs"
+# required-features = ["flow"]
 
-[[example]]
-name = "simple_action"
-path = "examples/flow/simple_action.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "simple_action"
+# path = "examples/flow/simple_action.rs"
+# required-features = ["flow"]
 
-[[example]]
-name = "state_machine"
-path = "examples/flow/state_machine.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "state_machine"
+# path = "examples/flow/state_machine.rs"
+# required-features = ["flow"]
 
-[[example]]
-name = "utility_ai"
-path = "examples/flow/utility_ai.rs"
-required-features = ["flow"]
+# [[example]]
+# name = "utility_ai"
+# path = "examples/flow/utility_ai.rs"
+# required-features = ["flow"]
 
-# 💡 Examples - router
+# 💡 Examples - Router
 
-[[example]]
-name = "http_router"
-path = "examples/router/http_router.rs"
-required-features = ["server_app"]
-
-[[example]]
-name = "router_bench"
-path = "examples/router/router_bench.rs"
-required-features = ["server_app"]
-
+# [[example]]
+# name = "http_router"
+# path = "examples/router/http_router.rs"
+# required-features = ["server_app"]
 
 # [[example]]
 # name = "app_ml"
 # path = "examples/app_ml.rs"
 
-# [[package.metadata.scene]]
-# name = "app-ml"
-# thumb-text = "🔨"
-# description = "Full Beet App with machine learning, networking, and UI."
-# app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
-# app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
-# app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
-# app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
-
 # [[example]]
 # name = "app"
 # path = "examples/app.rs"
 
-# [[package.metadata.scene]]
-# name = "app"
-# thumb-text = "🔨"
-# description = "Basic Beet App with debugging, camera, and UI."
-# app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app.js"
-# app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_bg.wasm"
-# app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry.json"
-# app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry.json"
-
-# [[package.metadata.scene]]
-# name = "beet-debug"
-# thumb-text = "🐛"
-# description = "Enable debugging for printing to the console, and screen if used with bevyhub/ui-terminal."
-# path = "scenes/beet-debug.json"
+# [[example]]
+# name = "fetch"
+# path = "examples/ml/fetch.rs"
+# required-features = ["examples", "ml"]
 
 # [[example]]
-# name = "export_scenes"
-# path = "examples/export_scenes.rs"
+# name = "frozen_lake_train"
+# path = "examples/ml/frozen_lake_train.rs"
+# required-features = ["examples", "ml"]
 
-# 💡 Examples - ml
+# [[example]]
+# name = "frozen_lake_run"
+# path = "examples/ml/frozen_lake_run.rs"
+# required-features = ["examples", "ml"]
 
-# [[package.metadata.scene]]
-# name = "fetch-scene"
-# thumb-text = "🏠"
-# description = "A camera and the items that the fetch character can go to."
-# path = "scenes/fetch-scene.json"
+# [[example]]
+# name = "hello_ml_chat"
+# path = "examples/ml/hello_ml_chat.rs"
+# required-features = ["examples", "ml"]
 
-[[example]]
-name = "fetch"
-path = "examples/ml/fetch.rs"
-required-features = ["examples", "ml"]
-
-# [[package.metadata.scene]]
-# name = "fetch"
-# description = "Combining LLM, steering and animation behaviors."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/fetch.png"
-# app = "app-ml"
-# path = "scenes/fetch-npc.json"
-# include = [
-# 	"bevyhub/ui-terminal-input",
-# 	"bevyhub/lighting-3d",
-# 	"bevyhub/ground-3d",
-# 	"fetch-scene",
-# ]
-# events.playerMessage.initial = "I'm hungry!"
+# [[example]]
+# name = "hello_ml"
+# path = "examples/ml/hello_ml.rs"
+# required-features = ["examples", "ml"]
 
 # [[package.metadata.scene]]
-# name = "frozen-lake-scene"
-# thumb-text = "❄️"
-# description = "The static scene for the frozen lake environment."
-# path = "scenes/frozen-lake-scene.json"
+# name = "hello-ml"
+# description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
+# path = "scenes/hello-ml.json"
+# include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
+# 💡 Examples - Spatial
 
-[[example]]
-name = "frozen_lake_train"
-path = "examples/ml/frozen_lake_train.rs"
-required-features = ["examples", "ml"]
-
-# [[package.metadata.scene]]
-# name = "frozen-lake-train"
-# description = "Train a Q-learning agent to navigate the frozen lake environment."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-# app = "app-ml"
-# path = "scenes/frozen-lake-train.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"beet-debug",
-# 	"frozen-lake-scene",
-# ]
-
-[[example]]
-name = "frozen_lake_run"
-path = "examples/ml/frozen_lake_run.rs"
-required-features = ["examples", "ml"]
-
-# [[package.metadata.scene]]
-# name = "frozen-lake-run"
-# description = "Use a trained Q-learning agent to navigate the frozen lake environment."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-# app = "app-ml"
-# path = "scenes/frozen-lake-run.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"beet-debug",
-# 	"frozen-lake-scene",
-# ]
-
-[[example]]
-name = "hello_ml_chat"
-path = "examples/ml/hello_ml_chat.rs"
-required-features = ["examples", "ml"]
-
-[[example]]
-name = "hello_ml"
-path = "examples/ml/hello_ml.rs"
-required-features = ["examples", "ml"]
-
-[[package.metadata.scene]]
-name = "hello-ml"
-description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-path = "scenes/hello-ml.json"
-include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
-
-# 💡 Examples - spatial
-
-[[example]]
-name = "flock"
-path = "examples/spatial/flock.rs"
-required-features = ["examples", "spatial"]
+# [[example]]
+# name = "flock"
+# path = "examples/spatial/flock.rs"
+# required-features = ["examples", "spatial"]
 
 # Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]
@@ -560,40 +534,38 @@ required-features = ["examples", "spatial"]
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
+# [[example]]
+# name = "hello_animation"
+# path = "examples/spatial/hello_animation.rs"
+# required-features = ["examples", "spatial"]
 
-[[example]]
-name = "hello_animation"
-path = "examples/spatial/hello_animation.rs"
-required-features = ["examples", "spatial"]
+# [[package.metadata.scene]]
+# name = "hello-animation"
+# description = "A simple behavior demonstrating animation control."
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+# app = "app"
+# path = "scenes/hello-animation.json"
+# include = [
+# 	"bevyhub/ui-terminal",
+# 	"bevyhub/lighting-3d",
+# 	"bevyhub/ground-3d",
+# 	"beet-debug",
+# ]
 
+# [[example]]
+# name = "inverse_kinematics"
+# path = "examples/spatial/inverse_kinematics.rs"
+# required-features = ["examples", "spatial"]
 
-[[package.metadata.scene]]
-name = "hello-animation"
-description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-app = "app"
-path = "scenes/hello-animation.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"beet-debug",
-]
+# [[example]]
+# name = "seek"
+# path = "examples/spatial/seek.rs"
+# required-features = ["examples", "spatial"]
 
-[[example]]
-name = "inverse_kinematics"
-path = "examples/spatial/inverse_kinematics.rs"
-required-features = ["examples", "spatial"]
-
-[[example]]
-name = "seek"
-path = "examples/spatial/seek.rs"
-required-features = ["examples", "spatial"]
-
-[[example]]
-name = "seek_3d"
-path = "examples/spatial/seek_3d.rs"
-required-features = ["examples", "spatial"]
+# [[example]]
+# name = "seek_3d"
+# path = "examples/spatial/seek_3d.rs"
+# required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "seek"
@@ -631,4 +603,26 @@ harness = false
 [[bench]]
 name = "entity_spawn"
 path = "tests/benches/entity_spawn.rs"
+harness = false
+
+[[bench]]
+name = "server_bench"
+path = "tests/benches/beet_net/server_bench.rs"
+harness = false
+required-features = ["server_app"]
+
+# [[bench]]
+# name = "router_bench"
+# path = "tests/benches/beet_router/router_bench.rs"
+# harness = false
+# required-features = ["server_app"]
+
+[[bench]]
+name = "bench_observer_global"
+path = "tests/benches/bench_observer_global.rs"
+harness = false
+
+[[bench]]
+name = "bench_observer_local"
+path = "tests/benches/bench_observer_local.rs"
 harness = false

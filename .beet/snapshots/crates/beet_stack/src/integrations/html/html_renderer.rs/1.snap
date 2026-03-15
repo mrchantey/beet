@@ -1,0 +1,2 @@
+<h1>Welcome to Beet</h1><p>This is a <strong>bold</strong> and <em>italic</em> intro.</p><h2>Features</h2><ul><li>Fast</li><li>Cross-platform</li><li><a href="https://example.com">Documentation</a></li></ul><hr /><blockquote><p>A block quote with <em>emphasis</em>.</p></blockquote><pre><code class="language-rust">fn main() {}
+</code></pre>

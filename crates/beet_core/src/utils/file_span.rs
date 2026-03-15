@@ -6,6 +6,7 @@
 use crate::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
+use std::sync::Arc;
 
 
 /// Represents a section of a text file.
@@ -31,18 +32,19 @@ pub struct FileSpan {
 	/// It's essential to use consistent paths as this struct is created in several
 	/// places from all kinds of concatenations, and we need [`PartialEq`] and [`Hash`]
 	/// to be identical.
-	pub file: WsPathBuf,
+	/// This field is [`Arc`] as FileSpan is frequently cloned.
+	path: Arc<WsPathBuf>,
 	/// The position of the first token in this span.
-	pub start: LineCol,
+	start: LineCol,
 	/// The position of the last token in this span.
 	///
 	/// In cases where the end is not known, this will be the same as start.
-	pub end: LineCol,
+	end: LineCol,
 }
 
 impl std::fmt::Display for FileSpan {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}:{}", self.file.display(), self.start)
+		write!(f, "{}:{}", self.path.display(), self.start)
 	}
 }
 
@@ -54,7 +56,7 @@ impl FileSpan {
 		end: LineCol,
 	) -> Self {
 		Self {
-			file: WsPathBuf::new(workspace_file_path),
+			path: Arc::new(WsPathBuf::new(workspace_file_path)),
 			start,
 			end,
 		}
@@ -62,11 +64,11 @@ impl FileSpan {
 
 	/// Creates a new [`FileSpan`] from a panic [`Location`](std::panic::Location).
 	pub fn new_from_location(location: &std::panic::Location) -> Self {
-		Self {
-			file: WsPathBuf::new(location.file()),
-			start: LineCol::from_location(location),
-			end: LineCol::from_location(location),
-		}
+		Self::new(
+			WsPathBuf::new(location.file()),
+			LineCol::from_location(location),
+			LineCol::from_location(location),
+		)
 	}
 
 	/// Creates a new [`FileSpan`] from a syn spanned item.
@@ -76,22 +78,15 @@ impl FileSpan {
 		spanned: &impl syn::spanned::Spanned,
 	) -> Self {
 		let span = spanned.span();
-		Self {
-			file,
-			start: span.start().into(),
-			end: span.end().into(),
-		}
+		Self::new(file, span.start().into(), span.end().into())
 	}
+
 
 	/// Creates a new [`FileSpan`] representing an entire file.
 	///
 	/// The line and column are set to 1 and 0 respectively.
 	pub fn new_for_file(file: impl AsRef<Path>) -> Self {
-		Self {
-			file: WsPathBuf::new(file),
-			start: LineCol::default(),
-			end: LineCol::default(),
-		}
+		Self::new(WsPathBuf::new(file), LineCol::default(), LineCol::default())
 	}
 
 
@@ -114,15 +109,15 @@ impl FileSpan {
 		line: u32,
 		col: u32,
 	) -> Self {
-		Self {
-			file: WsPathBuf::new(workspace_file_path),
-			start: LineCol::new(line, col),
-			end: LineCol::new(line, col),
-		}
+		Self::new(
+			WsPathBuf::new(workspace_file_path),
+			LineCol::new(line, col),
+			LineCol::new(line, col),
+		)
 	}
 
 	/// Returns the file path.
-	pub fn file(&self) -> &WsPathBuf { &self.file }
+	pub fn path(&self) -> &WsPathBuf { &self.path }
 
 	/// Returns the start position.
 	pub fn start(&self) -> LineCol { self.start }

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use eventsource_stream::Event;
@@ -153,7 +154,7 @@ pub impl Response {
 	///     println!("{}: {}", sse.data.user, sse.data.text);
 	/// }
 	/// ```
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	#[allow(async_fn_in_trait)]
 	async fn event_source_typed<T>(
 		self,
@@ -188,7 +189,6 @@ pub impl Response {
 ))]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	#[derive(serde::Deserialize, Debug)]
 	struct TestEvent {
@@ -223,6 +223,7 @@ mod test {
 		}
 	}
 
+	#[cfg(feature = "json")]
 	#[cfg_attr(
 		feature = "reqwest",
 		beet_core::test(tokio, timeout_ms = 30_000)
@@ -251,6 +252,7 @@ mod test {
 		}
 	}
 
+	#[cfg(feature = "json")]
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
 	async fn mapped_works() {

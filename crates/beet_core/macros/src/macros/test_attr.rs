@@ -1,4 +1,8 @@
-use beet_core_shared::*;
+extern crate alloc;
+
+use alloc::string::ToString;
+use alloc::vec;
+use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;

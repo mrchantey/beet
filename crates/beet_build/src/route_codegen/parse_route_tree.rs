@@ -5,7 +5,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_router::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;

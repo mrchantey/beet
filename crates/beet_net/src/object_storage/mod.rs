@@ -21,14 +21,18 @@
 //! # Ok(())
 //! # }
 //! ```
+#[cfg(feature = "json")]
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 mod bucket;
+#[cfg(feature = "json")]
 mod table;
+#[cfg(feature = "json")]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
+#[cfg(feature = "json")]
 pub use table::*;
 mod bucket_item;
 mod in_memory_provider;

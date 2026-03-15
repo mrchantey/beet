@@ -9,7 +9,7 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
 		.spawn_then((
-			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
+			TestRunnerConfig::from_env(),
 			tests_bundle_borrowed(tests),
 		))
 		.run();

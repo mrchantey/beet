@@ -1,0 +1,45 @@
+[package]
+name = "beet_node"
+version.workspace = true
+edition.workspace = true
+description = "Agnostic structured data representations in Bevy ECS"
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["std","net", "html_parser","markdown_parser","ansi_term"]
+std = []
+net = ["std", "dep:beet_net"]
+tokens = ["beet_core/tokens"]
+serde = ["dep:serde"]
+html_parser = ["dep:winnow"]
+markdown_parser = ["html_parser", "dep:pulldown-cmark"]
+ansi_term = ["dep:nu-ansi-term"]
+tui = ["dep:bevy_ratatui", "dep:ratatui"]
+
+
+[dependencies]
+beet_core = { workspace = true }
+beet_net = { workspace = true,optional=true }
+bevy.workspace = true
+extend.workspace = true
+bytes.workspace = true
+serde = { workspace = true, optional = true }
+winnow = { version = "0.7", optional = true }
+pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
+nu-ansi-term = { workspace = true, optional = true }
+thiserror.workspace = true
+webbrowser.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ratatui = {workspace = true, optional = true, features=["crossterm","unstable-rendered-line-info"]}
+bevy_ratatui = {workspace = true, optional = true, features = ["crossterm","keyboard", "mouse"] }
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
+beet_net.workspace = true

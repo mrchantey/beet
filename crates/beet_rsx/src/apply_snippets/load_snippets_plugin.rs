@@ -1,3 +1,4 @@
+use beet_core::bevy_utils::scene_serde::SceneLoader;
 use beet_core::prelude::*;
 
 
@@ -20,10 +21,11 @@ pub fn load_all_file_snippets(world: &mut World) -> Result {
 	let config = world.resource::<WorkspaceConfig>();
 	let file = config.snippets_dir().into_abs().join("snippets.ron");
 	if let Ok(file) = fs_ext::read_to_string(file) {
-		world.load_scene(file)?;
+		SceneLoader::new(world).load_ron(file)?;
 	}
 	Ok(())
 }
+
 pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	let config = world.resource::<WorkspaceConfig>();
 
@@ -46,9 +48,9 @@ pub fn load_all_file_snippets_fine_grained(world: &mut World) -> Result {
 	let mut snippet_entity_map = Default::default();
 	for file in files {
 		let file = fs_ext::read_to_string(file)?;
-		{
-			world.load_scene_with(file, &mut snippet_entity_map)?;
-		}
+		SceneLoader::new(world)
+			.with_entity_map(&mut snippet_entity_map)
+			.load_ron(file)?;
 	}
 	debug!(
 		"Loaded {} file snippets in {}ms",

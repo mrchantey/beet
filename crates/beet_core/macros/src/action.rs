@@ -1,5 +1,8 @@
-use beet_core_shared::AttributeGroup;
-use beet_core_shared::pkg_ext;
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::ToString;
+use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
@@ -83,6 +86,7 @@ struct MyAction;
 #[cfg(test)]
 mod test {
 	use super::parse;
+	use alloc::string::ToString;
 	use quote::quote;
 	use syn::DeriveInput;
 

@@ -72,7 +72,7 @@ impl TestFail {
 			TestFail::Panic { location, .. }
 				if let Some(location) = location =>
 			{
-				location.file().clone()
+				location.path().clone()
 			}
 			_ => test.path(),
 		}

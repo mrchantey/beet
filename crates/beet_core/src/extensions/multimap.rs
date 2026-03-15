@@ -83,12 +83,12 @@ use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use core::any::TypeId;
+use core::borrow::Borrow;
+use core::hash::BuildHasher;
+use core::hash::Hash;
+use core::str::FromStr;
 use heck::ToSnakeCase;
-use std::any::TypeId;
-use std::borrow::Borrow;
-use std::hash::BuildHasher;
-use std::hash::Hash;
-use std::str::FromStr;
 
 /// Marker attribute indicating a field is required during MultiMap parsing.
 ///
@@ -139,14 +139,23 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
 
+impl<K, V> MultiMap<K, V>
+where
+	K: Eq + Hash,
+{
+	/// Create a new empty multimap.
+	pub const fn new() -> Self {
+		Self {
+			inner: HashMap::new(),
+		}
+	}
+}
+
 impl<K, V, S> MultiMap<K, V, S>
 where
 	K: Eq + Hash,
 	S: BuildHasher + Default,
 {
-	/// Create a new empty multimap.
-	pub fn new() -> Self { Self::default() }
-
 	/// Insert a key with no values.
 	/// If the key already exists, this is a no-op.
 	pub fn insert_key(&mut self, key: K) { self.inner.entry(key).or_default(); }
@@ -169,6 +178,23 @@ where
 		Q: Hash + Eq + ?Sized,
 	{
 		self.inner.get(key).and_then(|values| values.first())
+	}
+
+	/// Get the first value matching any of the provided keys.
+	pub fn get_multikey<'a, Q>(
+		&self,
+		keys: impl IntoIterator<Item = &'a Q>,
+	) -> Option<&V>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized + 'a,
+	{
+		for key in keys.into_iter() {
+			if let Some(value) = self.get(key) {
+				return Some(value);
+			}
+		}
+		None
 	}
 
 	/// Get all values for a key.
@@ -601,7 +627,7 @@ fn parse_number_field<T: FromStr + PartialReflect>(
 	field_name: &str,
 ) -> Result<Option<Box<dyn PartialReflect>>>
 where
-	T::Err: std::fmt::Display,
+	T::Err: core::fmt::Display,
 {
 	let value_str = values.first();
 

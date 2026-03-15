@@ -5,7 +5,8 @@ use bytes::Bytes;
 /// Cross-service storage bucket for S3, filesystem, memory, or other providers
 #[derive(Component)]
 pub struct Bucket {
-	/// Bucket name
+	/// Bucket name, used by providers to distinguish buckets. In the filesystem
+	/// this will be a directory name appended to the workspace directory.
 	name: String,
 	/// Provider that handles bucket operations (S3, filesystem, memory, etc.)
 	provider: Box<dyn BucketProvider>,

@@ -1,6 +1,7 @@
 //! Extension methods for Bevy's [`Commands`].
 
 use crate::prelude::*;
+use bevy::ecs::system::command;
 
 /// Extension trait adding utility methods to [`Commands`].
 #[extend::ext(name=CommandsExt)]
@@ -14,14 +15,15 @@ pub impl Commands<'_, '_> {
 
 	/// Loads a scene from a serialized string.
 	#[cfg(feature = "bevy_scene")]
-	fn load_scene(&mut self, scene: impl Into<String>) {
+	fn load_scene_ron(&mut self, scene: impl Into<String>) {
 		let scene = scene.into();
 		self.queue(move |world: &mut World| -> Result {
-			world.load_scene(&scene)
+			SceneLoader::new(world).load_ron(&scene)
 		});
 	}
 
 	/// Queues an asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
@@ -46,5 +48,34 @@ pub impl Commands<'_, '_> {
 		self.queue(move |world: &mut World| {
 			world.run_system_once_with(system, input).ok();
 		});
+	}
+}
+
+
+/// Extension trait adding utility methods to [`EntityCommands`].
+#[extend::ext(name=EntityCommandsExt)]
+pub impl EntityCommands<'_> {
+	/// Triggers an entity event on this entity,
+	/// discarding the error if any.
+	fn try_trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
+		&mut self,
+		event_fn: impl FnOnce(Entity) -> E,
+	) -> &mut Self {
+		let event = (event_fn)(self.id());
+		self.commands_mut().queue_silenced(command::trigger(event));
+		self
+	}
+
+	/// Queues an asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
+	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: AsyncTaskOut,
+	{
+		let id = self.id();
+		self.commands()
+			.queue_async(async move |world| func(world.entity(id)).await);
 	}
 }

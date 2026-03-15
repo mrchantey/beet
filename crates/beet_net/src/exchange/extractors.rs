@@ -10,6 +10,8 @@
 //! - [`Json`]: Parse JSON request body
 //! - [`Html`], [`Css`], [`Javascript`], [`Png`]: Response type wrappers
 #[allow(unused)]
+use super::*;
+#[allow(unused)]
 use beet_core::prelude::*;
 
 /// Wrapper for HTML content responses.
@@ -48,18 +50,13 @@ pub struct JsonResult<T, E> {
 	pub result: Result<T, E>,
 	/// The status code to return in case of an error.
 	/// Defaults to 418 (I'm a teapot).
-	#[cfg_attr(feature = "serde", serde(with = "status_code_serde"))]
 	pub err_status: StatusCode,
 }
 
 
 impl JsonResult<(), ()> {
-	/// Default error status code when the `http` feature is enabled.
-	#[cfg(feature = "http")]
-	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::ImATeapot;
-	/// Default error status code when the `http` feature is disabled.
-	#[cfg(not(feature = "http"))]
-	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::InternalError;
+	/// Default error status code for failed server action responses.
+	pub const DEFAULT_ERR_STATUS: StatusCode = StatusCode::IM_A_TEAPOT;
 }
 
 impl<T, E> From<Result<T, E>> for JsonResult<T, E> {
@@ -88,7 +85,7 @@ impl<T, E> JsonResult<T, E> {
 		}
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 	for JsonResult<T, E>
 {
@@ -98,14 +95,14 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 		match self.result {
 			Ok(val) => {
 				let ok_body = serde_json::to_string(&val)?;
-				Response::ok_body(ok_body, "application/json")
+				Response::ok_body(ok_body, MediaType::Json)
 			}
 			Err(err) => {
 				let err_body = serde_json::to_string(&err)?;
 				Response::from_status_body(
 					self.err_status,
 					&err_body,
-					"application/json",
+					MediaType::Json,
 				)
 			}
 		}
@@ -129,7 +126,7 @@ impl<T> Json<T> {
 }
 
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 	fn from_request(
 		req: Request,
@@ -146,16 +143,13 @@ impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 		})
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	type Error = HttpError;
 
 	fn try_into(self) -> Result<Response, Self::Error> {
 		let json_str = serde_json::to_string(&self.0)?;
-		Ok(Response::ok_body(
-			json_str,
-			"application/json; charset=utf-8",
-		))
+		Ok(Response::ok_body(json_str, MediaType::Json))
 	}
 }
 
@@ -168,13 +162,13 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 pub struct JsonQueryParams<T>(pub T);
 
 /// Internal representation for JSON query params.
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct JsonQueryParamsInner {
 	data: String,
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::Serialize> JsonQueryParams<T> {
 	/// Serializes a value to a URL-encoded query string.
 	pub fn to_query_string(value: &T) -> Result<String> {
@@ -183,7 +177,7 @@ impl<T: serde::Serialize> JsonQueryParams<T> {
 	}
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	/// Deserializes a value from a URL-encoded query string.
 	pub fn from_query_string(query: &str) -> Result<T> {
@@ -191,7 +185,7 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 		serde_json::from_str::<T>(&inner.data)?.xok()
 	}
 }
-#[cfg(feature = "serde")]
+#[cfg(feature = "json")]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
@@ -269,25 +263,21 @@ impl<T> Into<Response> for Html<T>
 where
 	T: Into<Body>,
 {
-	fn into(self) -> Response {
-		Response::ok_body(self.0, "text/html; charset=utf-8")
-	}
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Html) }
 }
 
 impl Into<Response> for Css {
-	fn into(self) -> Response {
-		Response::ok_body(self.0, "text/css; charset=utf-8")
-	}
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Css) }
 }
 
 impl Into<Response> for Javascript {
 	fn into(self) -> Response {
-		Response::ok_body(self.0, "application/javascript; charset=utf-8")
+		Response::ok_body(self.0, MediaType::Javascript)
 	}
 }
 
 impl Into<Response> for Png {
-	fn into(self) -> Response { Response::ok_body(self.0, "image/png") }
+	fn into(self) -> Response { Response::ok_body(self.0, MediaType::Png) }
 }
 
 #[cfg(test)]
@@ -297,16 +287,17 @@ mod test {
 	#[test]
 	fn request_response_cycle() {
 		let mut app = App::new();
-		let req = Request::post("/test")
-			.with_header("content-length", "5")
-			.with_body(b"hello");
+		let mut req = Request::post("/test").with_body(b"hello");
+		req.headers.set::<header::ContentLength>(5u64);
+		let req = req;
 
 		let entity = app.world_mut().spawn(req).id();
 		app.add_systems(
 			Update,
 			move |mut commands: Commands, query: Query<&Request>| {
 				let _req = query.single().unwrap();
-				let res = Response::ok().with_header("content-length", "5");
+				let mut res = Response::ok();
+				res.parts.headers.set::<header::ContentLength>(5u64);
 				commands.entity(entity).insert(res);
 			},
 		);
@@ -316,17 +307,18 @@ mod test {
 			.entity_mut(entity)
 			.take::<Response>()
 			.unwrap()
-			.get_header("content-length")
+			.parts
+			.headers
+			.get::<header::ContentLength>()
 			.unwrap()
-			.xpect_eq("5");
+			.unwrap()
+			.xpect_eq(5u64);
 	}
 
 	#[test]
 	fn parts_has_body() {
-		let parts = PartsBuilder::new()
-			.path_str("/test")
-			.header("content-length", "5")
-			.build_request_parts(HttpMethod::Post);
+		let mut parts = RequestParts::post("/test");
+		parts.headers.set::<header::ContentLength>(5u64);
 
 		parts.has_body().xpect_true();
 
@@ -335,7 +327,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	fn json_query_params() {
 		#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
 		struct Foo(u32, String);

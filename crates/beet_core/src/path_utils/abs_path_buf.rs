@@ -273,7 +273,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		// Create an AbsPathBuf instance
 		let original = abs_file!();

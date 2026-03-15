@@ -258,18 +258,11 @@ impl GeminiProvider {
 								let mime_type = file
 									.filename
 									.as_ref()
-									.map(|f| {
-										mime_guess::from_path(f)
-											.first_or_octet_stream()
-											.essence_str()
-											.to_string()
-									})
-									.unwrap_or_else(|| {
-										"application/octet-stream".to_string()
-									});
+									.map(|f| MediaType::from_path(f))
+									.unwrap_or(MediaType::Bytes);
 								gemini_parts.push(json!({
 									"inlineData": {
-										"mimeType": mime_type,
+										"mimeType": mime_type.to_string(),
 										"data": data
 									}
 								}));
@@ -292,7 +285,7 @@ impl GeminiProvider {
 	fn build_request(&self, model: &str, body: &Value) -> Result<Request> {
 		let url = format!("{BASE_URL}/models/{model}:generateContent");
 		Request::post(url)
-			.with_header("x-goog-api-key", &self.api_key)
+			.with_header_raw("x-goog-api-key", &self.api_key)
 			.with_json_body(body)?
 			.xok()
 	}
@@ -306,7 +299,7 @@ impl GeminiProvider {
 		let url =
 			format!("{BASE_URL}/models/{model}:streamGenerateContent?alt=sse");
 		Request::post(url)
-			.with_header("x-goog-api-key", &self.api_key)
+			.with_header_raw("x-goog-api-key", &self.api_key)
 			.with_json_body(body)?
 			.xok()
 	}

@@ -12,6 +12,10 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
 syn.workspace = true
 quote.workspace = true

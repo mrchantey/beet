@@ -8,7 +8,7 @@ use bevy::ecs::relationship::DescendantDepthFirstIter;
 use bevy::ecs::relationship::DescendantIter;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::relationship::SourceIter;
-use std::iter::Chain;
+use core::iter::Chain;
 
 
 
@@ -37,35 +37,38 @@ pub impl<
 	fn iter_ancestors_inclusive<R: Relationship>(
 		&'w self,
 		entity: Entity,
-	) -> Chain<std::iter::Once<Entity>, AncestorIter<'w, 's, D, F, R>>
+	) -> Chain<core::iter::Once<Entity>, AncestorIter<'w, 's, D, F, R>>
 	where
 		D::ReadOnly: QueryData<Item<'w, 's> = &'w R>,
 	{
-		Iterator::chain(std::iter::once(entity), self.iter_ancestors(entity))
+		Iterator::chain(core::iter::once(entity), self.iter_ancestors(entity))
 	}
 
 	/// Iterates over all descendants of the given entity, including the entity itself.
 	fn iter_descendants_inclusive<S: RelationshipTarget>(
 		&'w self,
 		entity: Entity,
-	) -> Chain<std::iter::Once<Entity>, DescendantIter<'w, 's, D, F, S>>
+	) -> Chain<core::iter::Once<Entity>, DescendantIter<'w, 's, D, F, S>>
 	where
 		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 	{
-		Iterator::chain(std::iter::once(entity), self.iter_descendants(entity))
+		Iterator::chain(core::iter::once(entity), self.iter_descendants(entity))
 	}
 
 	/// Iterates depth first over all descendants of the given entity, including the entity itself.
 	fn iter_descendants_inclusive_depth_first<S: RelationshipTarget>(
 		&'w self,
 		entity: Entity,
-	) -> Chain<std::iter::Once<Entity>, DescendantDepthFirstIter<'w, 's, D, F, S>>
+	) -> Chain<
+		core::iter::Once<Entity>,
+		DescendantDepthFirstIter<'w, 's, D, F, S>,
+	>
 	where
 		D::ReadOnly: QueryData<Item<'w, 's> = &'w S>,
 		SourceIter<'w, S>: DoubleEndedIterator,
 	{
 		Iterator::chain(
-			std::iter::once(entity),
+			core::iter::once(entity),
 			self.iter_descendants_depth_first(entity),
 		)
 	}

@@ -3,11 +3,12 @@
 //! This module provides [`bevyhow!`](crate::bevyhow) and [`bevybail!`](crate::bevybail)
 //! macros for creating errors compatible with Bevy's [`BevyError`] type.
 
+use alloc::string::String;
 use bevy::prelude::BevyError;
 
 /// Intermediary type for converting formatted strings to [`BevyError`].
 ///
-/// This type implements [`std::error::Error`] and can be converted into a
+/// This type implements [`core::error::Error`] and can be converted into a
 /// [`BevyError`] for use in Bevy systems.
 pub struct BevyhowError(pub String);
 
@@ -19,16 +20,16 @@ impl BevyhowError {
 	pub fn into_bevy(self) -> BevyError { self.into() }
 }
 
-impl std::error::Error for BevyhowError {}
+impl core::error::Error for BevyhowError {}
 
-impl std::fmt::Display for BevyhowError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for BevyhowError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.0)
 	}
 }
 
-impl std::fmt::Debug for BevyhowError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for BevyhowError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.0)
 	}
 }
@@ -48,7 +49,7 @@ impl std::fmt::Debug for BevyhowError {
 #[macro_export]
 macro_rules! bevyhow {
 		($($arg:tt)*) => {
-			$crate::prelude::BevyhowError::new(std::format!($($arg)*)).into_bevy()
+			$crate::prelude::BevyhowError::new($crate::_alloc::format!($($arg)*)).into_bevy()
 		};
 }
 
@@ -71,7 +72,7 @@ macro_rules! bevyhow {
 #[macro_export]
 macro_rules! bevybail {
 	($($arg:tt)*) => {
-		return Err($crate::prelude::BevyhowError::new(std::format!($($arg)*)).into_bevy())
+		return Err($crate::prelude::BevyhowError::new($crate::_alloc::format!($($arg)*)).into_bevy())
 	};
 }
 

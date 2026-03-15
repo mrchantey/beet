@@ -28,14 +28,14 @@ use uuid::Uuid;
 /// # }
 /// ```
 #[derive(Component)]
-pub struct TableStore<T: TableRow> {
+pub struct TableStore<T: TableStoreRow> {
 	/// The resource name of the table bucket
 	name: String,
 	/// The provider that handles table operations (S3, filesystem, memory, etc)
 	provider: Box<dyn TableProvider<T>>,
 }
 
-impl<T: TableRow> Clone for TableStore<T> {
+impl<T: TableStoreRow> Clone for TableStore<T> {
 	fn clone(&self) -> Self {
 		Self {
 			name: self.name.clone(),
@@ -44,7 +44,7 @@ impl<T: TableRow> Clone for TableStore<T> {
 	}
 }
 
-impl<T: TableRow> TableStore<T> {
+impl<T: TableStoreRow> TableStore<T> {
 	/// Create a new table store with the given provider and name
 	///
 	/// # Example
@@ -294,7 +294,7 @@ impl<T: TableRow> TableStore<T> {
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - [`'static`] - For type safety across async boundaries
-pub trait TableRow: TableContent {
+pub trait TableStoreRow: TableContent {
 	/// Unique identifier for the object, used as the primary key in the table
 	fn id(&self) -> Uuid;
 	/// Decodes uuid timestamp as time since unix epoch
@@ -340,7 +340,7 @@ impl<T> TableItem<T> {
 		}
 	}
 }
-impl<T: TableContent> TableRow for TableItem<T> {
+impl<T: TableContent> TableStoreRow for TableItem<T> {
 	fn id(&self) -> Uuid { self.id }
 }
 
@@ -351,7 +351,7 @@ impl<T: TableContent> TableRow for TableItem<T> {
 /// and retrieving serializable objects. Implementors only need to provide
 /// [`box_clone_table`], as the default implementations just use the [`BucketProvider`] api
 /// to store the data as json.
-pub trait TableProvider<T: TableRow>:
+pub trait TableProvider<T: TableStoreRow>:
 	BucketProvider + 'static + Send + Sync
 {
 	/// Returns a boxed clone of this provider for type erasure.
@@ -391,13 +391,13 @@ pub trait TableProvider<T: TableRow>:
 }
 
 /// Create temporary in-memory bucket for testing
-pub fn temp_table<T: TableRow>() -> TableStore<T> {
+pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
 	TableStore::new(InMemoryProvider::new(), "temp")
 }
 
 /// Select filesystem or DynamoDb TableProvider based on [`ServiceAccess`] and feature flags
 #[allow(unused_variables)]
-pub async fn dynamo_fs_selector<T: TableRow>(
+pub async fn dynamo_fs_selector<T: TableStoreRow>(
 	fs_path: &AbsPathBuf,
 	table_name: &str,
 	access: ServiceAccess,

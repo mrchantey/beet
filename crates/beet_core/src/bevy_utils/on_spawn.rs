@@ -88,6 +88,16 @@ impl OnSpawn {
 			entity.insert(bundle);
 		})
 	}
+	/// Inserts a bundle into the entities children on spawn,
+	/// avoiding bevy's duplicate component gotya with children!
+	pub fn insert_child(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world.spawn((bundle, ChildOf(id)));
+			});
+		})
+	}
 
 	/// Inserts the bundle if it is `Some`.
 	pub fn insert_option(bundle: Option<impl Bundle>) -> Self {
@@ -100,7 +110,7 @@ impl OnSpawn {
 
 	/// Runs the system and inserts the resulting bundle into the entity on spawn.
 	pub fn run_insert<
-		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
+		System: 'static + Send + Sync + IntoSystem<In<Entity>, Out, M1>,
 		M1,
 		Out: ApplyToEntity<M2>,
 		M2,
@@ -108,8 +118,11 @@ impl OnSpawn {
 		system: System,
 	) -> Self {
 		Self::new(move |entity| {
+			let id = entity.id();
 			entity
-				.world_scope(move |world| world.run_system_once(system))
+				.world_scope(move |world| {
+					world.run_system_once_with(system, id)
+				})
 				.unwrap()
 				.apply(entity);
 		})
@@ -153,6 +166,7 @@ impl OnSpawn {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function.
+	#[cfg(feature = "std")]
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
@@ -170,6 +184,7 @@ impl OnSpawn {
 	}
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function on the local thread.
+	#[cfg(feature = "std")]
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
@@ -300,10 +315,10 @@ impl OnSpawnDeferred {
 	///
 	/// Panics if the method has already been taken.
 	pub fn take(&mut self) -> Self {
-		Self::new(std::mem::replace(
+		Self::new(core::mem::replace(
 			&mut self.0,
 			Box::new(|_| {
-				panic!("OnSpawwnDeferred: This method has already been taken")
+				panic!("OnSpawnDeferred: This method has already been taken")
 			}),
 		))
 	}
@@ -355,6 +370,7 @@ where
 
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod test {
 	use crate::prelude::*;
 

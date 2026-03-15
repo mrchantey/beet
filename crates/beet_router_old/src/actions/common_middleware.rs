@@ -1,0 +1,651 @@
+//! Common middleware actions for HTTP requests and responses.
+//!
+//! Unlike predicates which gate execution, middleware modifies requests or responses
+//! and typically triggers [`Outcome::Pass`] to continue the flow.
+//!
+//! ## Request vs Response Middleware
+//!
+//! **Response middleware** runs **after** endpoints in the behavior tree, modifying the
+//! [`Response`] component that was inserted by the endpoint handler. Use these with
+//! [`InfallibleSequence`] to ensure all middleware runs.
+//!
+//! **Request middleware** runs **before** endpoints, validating and storing information
+//! from the [`Request`] before it is consumed by the endpoint handler.
+//!
+//! ## Pattern: Response Middleware
+//!
+//! Response middleware like [`no_cache_headers`] should run after endpoints:
+//!
+//! ```
+//! # use beet_router::prelude::*;
+//! # use beet_core::prelude::*;
+//! # use beet_flow::prelude::*;
+//! # use beet_net::prelude::*;
+//! flow_exchange(|| {
+//!     (InfallibleSequence, children![
+//!         EndpointBuilder::get().with_action(|| "Hello"),
+//!         common_middleware::no_cache_headers(),
+//!     ])
+//! });
+//! ```
+//!
+//! ## Pattern: Request + Response Middleware (CORS)
+//!
+//! CORS requires both request-phase validation and response-phase header insertion:
+//!
+//! ```
+//! # use beet_router::prelude::*;
+//! # use beet_core::prelude::*;
+//! # use beet_flow::prelude::*;
+//! # use beet_net::prelude::*;
+//! let config = CorsConfig::new(true, vec![]);
+//! flow_exchange(move || {
+//!     (InfallibleSequence, children![
+//!         // Request phase: validate origin, store in ValidatedOrigin component
+//!         common_middleware::cors_request(config.clone()),
+//!         // Endpoint handles the request
+//!         EndpointBuilder::get().with_action(|| "Hello"),
+//!         // Response phase: add CORS headers from ValidatedOrigin
+//!         common_middleware::cors_response(config),
+//!     ])
+//! });
+//! ```
+//!
+//! ## Pattern: CORS Preflight
+//!
+//! For OPTIONS preflight requests, use [`Fallback`] so the endpoint only runs if
+//! preflight didn't handle the request:
+//!
+//! ```
+//! # use beet_router::prelude::*;
+//! # use beet_core::prelude::*;
+//! # use beet_flow::prelude::*;
+//! # use beet_net::prelude::*;
+//! let config = CorsConfig::new(true, vec![]);
+//! flow_exchange(move || {
+//!     (Fallback, children![
+//!         // Handle OPTIONS preflight and return early
+//!         common_middleware::cors_preflight(config.clone()),
+//!         // Endpoint only runs if not OPTIONS
+//!         EndpointBuilder::any_method().with_action(|| "Hello"),
+//!     ])
+//! });
+//! ```
+
+use beet_core::prelude::*;
+use beet_flow::prelude::*;
+
+/// Add no-cache headers to a response.
+///
+/// This middleware modifies the Response component on the agent entity if one exists.
+/// If no Response exists, it triggers [`Outcome::Fail`].
+///
+/// # Example
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// flow_exchange(|| {
+///     (InfallibleSequence, children![
+///         EndpointBuilder::get().with_action(|| "Hello"),
+///         common_middleware::no_cache_headers(),
+///     ])
+/// });
+/// ```
+pub fn no_cache_headers() -> impl Bundle {
+	(
+		Name::new("No-Cache Headers Middleware"),
+		OnSpawn::observe(
+			|ev: On<GetOutcome>, agents: AgentQuery, mut commands: Commands| {
+				let action = ev.target();
+				let agent = agents.entity(action);
+
+				commands.queue(move |world: &mut World| -> Result {
+					let mut entity = world.entity_mut(agent);
+					let Some(mut response) = entity.get_mut::<Response>()
+					else {
+						cross_log!(
+							"No Response found for no_cache_headers middleware"
+						);
+						return Ok(());
+					};
+
+					let parts = response.response_parts_mut();
+					parts.headers.set::<header::CacheControl>(
+						"no-cache, no-store, must-revalidate".to_string(),
+					);
+					parts.headers.set::<header::Pragma>("no-cache".to_string());
+					parts.headers.set::<header::Expires>("0".to_string());
+					Ok(())
+				});
+
+				commands.entity(action).trigger_target(Outcome::Pass);
+			},
+		),
+	)
+}
+
+/// Configuration for CORS middleware.
+///
+/// Specifies which origins are allowed to make cross-origin requests.
+#[derive(Debug, Default, Clone, Resource, Reflect)]
+#[reflect(Resource)]
+pub struct CorsConfig {
+	/// Whether to allow requests from any origin.
+	pub allow_any_origin: bool,
+	/// List of specific allowed origins when `allow_any_origin` is `false`.
+	allowed_origins: Vec<String>,
+}
+
+impl CorsConfig {
+	/// The wildcard origin value for Access-Control-Allow-Origin.
+	pub const ANY_ORIGIN: &'static str = "*";
+
+	/// Creates a new CORS configuration.
+	pub fn new(
+		allow_any_origin: bool,
+		allowed_origins: Vec<&'static str>,
+	) -> Self {
+		Self {
+			allow_any_origin,
+			allowed_origins: allowed_origins
+				.into_iter()
+				.map(|s| s.to_string())
+				.collect(),
+		}
+	}
+
+	/// Returns `true` if the given origin is allowed by this configuration.
+	pub fn origin_allowed(&self, origin: &str) -> bool {
+		self.allow_any_origin
+			|| self.allowed_origins.iter().any(|o| o == origin)
+	}
+}
+
+/// Component that stores the validated CORS origin for later use
+#[derive(Debug, Clone, Component)]
+pub struct ValidatedOrigin(pub String);
+
+/// Request-phase CORS middleware that validates origin and stores it.
+///
+/// This middleware:
+/// - Reads the Request component to get the origin header
+/// - Validates the origin against the CorsConfig
+/// - Stores the validated origin in a [`ValidatedOrigin`] component
+/// - Returns an error response and triggers [`Outcome::Fail`] if validation fails
+///
+/// Should be paired with [`cors_response`] to add CORS headers to the response.
+///
+/// # Example
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// let config = CorsConfig::new(false, vec!["https://example.com"]);
+/// flow_exchange(|| {
+///     (InfallibleSequence, children![
+///         common_middleware::cors_request(config.clone()),
+///         EndpointBuilder::get().with_action(|| "Hello"),
+///         common_middleware::cors_response(config),
+///     ])
+/// });
+/// ```
+pub fn cors_request(config: CorsConfig) -> impl Bundle {
+	(
+		Name::new("CORS Request Middleware"),
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      agents: AgentQuery,
+			      mut commands: Commands| {
+				let action = ev.target();
+				let agent = agents.entity(action);
+				let config = config.clone();
+
+				commands.queue(move |world: &mut World| -> Result {
+					// Get request to read origin header
+					let origin_header = world
+						.entity(agent)
+						.get::<Request>()
+						.ok_or_else(|| {
+							bevyhow!("No Request found for CORS middleware")
+						})?
+						.parts
+						.headers
+						.get::<header::Origin>()
+						.and_then(|r| r.ok());
+
+					let origin = match (config.allow_any_origin, origin_header)
+					{
+						(true, None) => CorsConfig::ANY_ORIGIN.to_string(),
+						(true, Some(origin)) => origin,
+						(false, None) => {
+							world.entity_mut(agent).insert(
+								Response::from_status_body(
+									StatusCode::BAD_REQUEST,
+									b"Origin header not found",
+									"text/plain",
+								),
+							);
+							world
+								.entity_mut(action)
+								.trigger_target(Outcome::Fail);
+							return Ok(());
+						}
+						(false, Some(origin)) => origin,
+					};
+
+					if !config.origin_allowed(&origin) {
+						world.entity_mut(agent).insert(
+							Response::from_status_body(
+								StatusCode::FORBIDDEN,
+								b"Origin not allowed",
+								"text/plain",
+							),
+						);
+						world.entity_mut(action).trigger_target(Outcome::Fail);
+						return Ok(());
+					}
+
+					// Store validated origin for response phase
+					world.entity_mut(agent).insert(ValidatedOrigin(origin));
+					world.entity_mut(action).trigger_target(Outcome::Pass);
+					Ok(())
+				});
+			},
+		),
+	)
+}
+
+/// Response-phase CORS middleware that adds CORS headers.
+///
+/// This middleware:
+/// - Reads the [`ValidatedOrigin`] component
+/// - Adds CORS headers to the Response component
+/// - Triggers [`Outcome::Fail`] if no Response or ValidatedOrigin exists
+///
+/// Should be paired with [`cors_request`] which validates and stores the origin.
+///
+/// # Example
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// let config = CorsConfig::new(true, vec![]);
+/// flow_exchange(|| {
+///     (InfallibleSequence, children![
+///         common_middleware::cors_request(config.clone()),
+///         EndpointBuilder::get().with_action(|| "Hello"),
+///         common_middleware::cors_response(config),
+///     ])
+/// });
+/// ```
+pub fn cors_response(_config: CorsConfig) -> impl Bundle {
+	(
+		Name::new("CORS Response Middleware"),
+		OnSpawn::observe(
+			|ev: On<GetOutcome>, agents: AgentQuery, mut commands: Commands| {
+				let action = ev.target();
+				let agent = agents.entity(action);
+
+				commands.queue(move |world: &mut World| -> Result {
+					// Get the validated origin
+					let origin = world
+						.entity(agent)
+						.get::<ValidatedOrigin>()
+						.ok_or_else(|| {
+							bevyhow!(
+								"No ValidatedOrigin found for CORS response middleware"
+							)
+						})?
+						.0
+						.clone();
+
+					// Modify the response to add CORS headers
+					let mut entity = world.entity_mut(agent);
+					let Some(mut response) = entity.get_mut::<Response>()
+					else {
+						cross_log!(
+							"No Response found for CORS response middleware"
+						);
+						return Ok(());
+					};
+
+					response
+						.response_parts_mut()
+						.headers
+						.set::<header::AccessControlAllowOrigin>(origin);
+
+					Ok(())
+				});
+
+				commands.entity(action).trigger_target(Outcome::Pass);
+			},
+		),
+	)
+}
+
+/// Handle CORS preflight OPTIONS requests.
+///
+/// This middleware checks if the request method is OPTIONS and if so,
+/// inserts a response with appropriate CORS preflight headers and triggers [`Outcome::Pass`].
+/// For non-OPTIONS requests, it triggers [`Outcome::Pass`] without inserting a response.
+///
+/// This combines both request and response phases for preflight handling, storing
+/// the validated origin in a [`ValidatedOrigin`] component.
+///
+/// ## Important: Use with Fallback
+///
+/// This middleware should be used with [`Fallback`] pattern to prevent endpoints from
+/// clobbering the preflight response. The endpoint will only run if preflight didn't
+/// insert a response.
+///
+/// # Example
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// let config = CorsConfig::new(true, vec![]);
+/// flow_exchange(move || {
+///     (Fallback, children![
+///         // Handles OPTIONS and inserts complete response
+///         common_middleware::cors_preflight(config.clone()),
+///         // Only runs if not OPTIONS (no response exists yet)
+///         EndpointBuilder::any_method().with_action(|| "Hello"),
+///     ])
+/// });
+/// ```
+pub fn cors_preflight(config: CorsConfig) -> impl Bundle {
+	(
+		Name::new("CORS Preflight Middleware"),
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      agents: AgentQuery,
+			      mut commands: Commands| {
+				let action = ev.target();
+				let agent = agents.entity(action);
+				let config = config.clone();
+
+				commands.queue(move |world: &mut World| -> Result {
+					let request = world
+						.entity(agent)
+						.get::<Request>()
+						.ok_or_else(|| {
+							bevyhow!(
+								"No Request found for CORS preflight middleware"
+							)
+						})?;
+
+					// Only handle OPTIONS requests
+					if *request.method() != HttpMethod::Options {
+						world.entity_mut(action).trigger_target(Outcome::Pass);
+						return Ok(());
+					}
+
+					let origin_header = request
+						.parts
+						.headers
+						.get::<header::Origin>()
+						.and_then(|r| r.ok());
+
+					let origin = match (config.allow_any_origin, origin_header)
+					{
+						(true, Some(origin)) => origin,
+						(true, None) => CorsConfig::ANY_ORIGIN.to_string(),
+						(false, None) => {
+							world.entity_mut(agent).insert(
+								Response::from_status_body(
+									StatusCode::BAD_REQUEST,
+									b"Origin header not found",
+									"text/plain",
+								),
+							);
+							world
+								.entity_mut(action)
+								.trigger_target(Outcome::Fail);
+							return Ok(());
+						}
+						(false, Some(origin)) => origin,
+					};
+
+					if !config.origin_allowed(&origin) {
+						world.entity_mut(agent).insert(
+							Response::from_status_body(
+								StatusCode::FORBIDDEN,
+								b"Origin not allowed",
+								"text/plain",
+							),
+						);
+						world.entity_mut(action).trigger_target(Outcome::Fail);
+						return Ok(());
+					}
+
+					// Store validated origin for potential response middleware
+					world
+						.entity_mut(agent)
+						.insert(ValidatedOrigin(origin.clone()));
+
+					let mut response = Response::ok();
+					let parts = response.response_parts_mut();
+					parts.headers.set::<header::AccessControlMaxAge>(60u32);
+					parts.headers.set::<header::AccessControlAllowHeaders>(
+						"content-type".to_string(),
+					);
+					parts
+						.headers
+						.set::<header::AccessControlAllowOrigin>(origin);
+
+					world.entity_mut(agent).insert(response);
+					world.entity_mut(action).trigger_target(Outcome::Pass);
+					Ok(())
+				});
+			},
+		),
+	)
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::prelude::*;
+	use beet_net::prelude::*;
+
+	#[beet_core::test]
+	async fn no_cache_headers_works() {
+		RouterPlugin::world()
+			.spawn(flow_exchange(|| {
+				(InfallibleSequence, children![
+					EndpointBuilder::get().with_action(|| "Hello"),
+					no_cache_headers(),
+				])
+			}))
+			.exchange(Request::get("/"))
+			.await
+			.xtap(|response| {
+				response
+					.headers
+					.get::<header::CacheControl>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("no-cache, no-store, must-revalidate");
+				response
+					.headers
+					.get::<header::Pragma>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("no-cache");
+				response
+					.headers
+					.get::<header::Expires>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("0");
+			});
+	}
+
+	#[beet_core::test]
+	async fn cors_allows_origin() {
+		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(|| {
+				(InfallibleSequence, children![
+					cors_request(config.clone()),
+					EndpointBuilder::get().with_action(|| "Hello"),
+					cors_response(config),
+				])
+			}))
+			.exchange(
+				Request::get("/").with_header("origin", "https://allowed.com"),
+			)
+			.await
+			.xtap(|response| {
+				response.status().xpect_eq(StatusCode::OK);
+				response
+					.headers
+					.get::<header::AccessControlAllowOrigin>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("https://allowed.com");
+			});
+	}
+
+	#[beet_core::test]
+	async fn cors_blocks_origin() {
+		let config = CorsConfig::new(false, vec![]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(|| {
+				(Sequence, children![
+					cors_request(config.clone()),
+					EndpointBuilder::get().with_action(|| "Hello"),
+					cors_response(config),
+				])
+			}))
+			.exchange(
+				Request::get("/").with_header("origin", "https://blocked.com"),
+			)
+			.await
+			.status()
+			.xpect_eq(StatusCode::FORBIDDEN);
+	}
+
+	#[beet_core::test]
+	async fn cors_allows_any() {
+		let config = CorsConfig::new(true, vec![]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(|| {
+				(InfallibleSequence, children![
+					cors_request(config.clone()),
+					EndpointBuilder::get().with_action(|| "Hello"),
+					cors_response(config),
+				])
+			}))
+			.exchange(
+				Request::get("/").with_header("origin", "https://anything.com"),
+			)
+			.await
+			.xtap(|response| {
+				response.status().xpect_eq(StatusCode::OK);
+				response
+					.headers
+					.get::<header::AccessControlAllowOrigin>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("https://anything.com");
+			});
+	}
+
+	#[beet_core::test]
+	async fn cors_preflight_works() {
+		let config = CorsConfig::new(false, vec!["https://allowed.com"]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(move || {
+				(Fallback, children![
+					cors_preflight(config.clone()),
+					EndpointBuilder::any_method().with_action(|| "Hello"),
+				])
+			}))
+			.exchange(
+				Request::options("/")
+					.with_header("origin", "https://allowed.com"),
+			)
+			.await
+			.xtap(|response| {
+				response.status().xpect_eq(StatusCode::OK);
+				response
+					.headers
+					.get::<header::AccessControlAllowOrigin>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("https://allowed.com");
+				response
+					.headers
+					.get::<header::AccessControlMaxAge>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq(60);
+			});
+	}
+
+	#[beet_core::test]
+	async fn cors_preflight_non_options_passthrough() {
+		let config = CorsConfig::new(true, vec![]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(move || {
+				(InfallibleSequence, children![
+					cors_preflight(config.clone()),
+					cors_request(config.clone()),
+					EndpointBuilder::get().with_action(|| "Hello"),
+					cors_response(config),
+				])
+			}))
+			.exchange(
+				Request::get("/").with_header("origin", "https://example.com"),
+			)
+			.await
+			.xtap(|response| {
+				response.status().xpect_eq(StatusCode::OK);
+				response
+					.headers
+					.get::<header::AccessControlAllowOrigin>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("https://example.com");
+			});
+	}
+
+	#[beet_core::test]
+	async fn multiple_middleware_chain() {
+		let config = CorsConfig::new(true, vec![]);
+		RouterPlugin::world()
+			.spawn(flow_exchange(move || {
+				(InfallibleSequence, children![
+					cors_request(config.clone()),
+					EndpointBuilder::get().with_action(|| "Hello"),
+					cors_response(config),
+					no_cache_headers(),
+				])
+			}))
+			.exchange(
+				Request::get("/").with_header("origin", "https://example.com"),
+			)
+			.await
+			.xtap(|response| {
+				response.status().xpect_eq(StatusCode::OK);
+				response
+					.headers
+					.get::<header::AccessControlAllowOrigin>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("https://example.com");
+				response
+					.headers
+					.get::<header::CacheControl>()
+					.unwrap()
+					.unwrap()
+					.xpect_eq("no-cache, no-store, must-revalidate");
+			});
+	}
+}

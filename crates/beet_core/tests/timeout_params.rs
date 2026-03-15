@@ -7,7 +7,6 @@
 use beet_core::testing;
 
 
-
 /// Test with custom timeout - async function
 /// This test has a 100ms timeout which is plenty for a 10ms sleep
 #[beet_core::test(timeout_ms = 100)]
