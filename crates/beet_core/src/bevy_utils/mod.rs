@@ -48,6 +48,8 @@ pub mod observer_ext;
 mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
+#[cfg(feature = "json")]
+pub mod reflect_ext;
 #[cfg(feature = "bevy_scene")]
 pub mod scene_serde;
 mod when;

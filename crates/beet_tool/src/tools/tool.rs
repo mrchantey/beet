@@ -1,5 +1,7 @@
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
+use bevy::reflect::TypeInfo;
+use bevy::reflect::Typed;
 use std::sync::Arc;
 
 #[derive(Component)]
@@ -136,6 +138,7 @@ where
 }
 
 #[derive(Copy, Clone, Debug, Component)]
+#[component(on_add=try_add_reflect_tool_meta)]
 pub struct ToolMeta {
 	/// Type metadata for the tool handler.
 	handler: TypeMeta,
@@ -188,6 +191,68 @@ impl ToolMeta {
 		} else {
 			Ok(())
 		}
+	}
+}
+
+fn try_add_reflect_tool_meta(mut world: DeferredWorld, cx: HookContext) {
+	let entity = world.entity(cx.entity);
+	if entity.contains::<ReflectToolMeta>() {
+		// already added, ususally by `into_reflect_tool`
+		return;
+	}
+	let Some(registry) = world.get_resource::<AppTypeRegistry>() else {
+		// no registry, can't add ReflectToolMeta
+		return;
+	};
+	let tool_meta = entity.get::<ToolMeta>().unwrap().clone();
+	let registry = registry.read();
+
+	let input = registry
+		.get(tool_meta.input().type_id())
+		.map(|info| info.type_info());
+	let output = registry
+		.get(tool_meta.output().type_id())
+		.map(|info| info.type_info());
+
+	drop(registry);
+
+	if let (Some(input), Some(output)) = (input, output) {
+		// both input and output types are registered in the AppTypeRegistry
+		// so we can add ReflectToolMeta
+		world.commands().entity(cx.entity).insert(ReflectToolMeta {
+			tool_meta,
+			input_info: input,
+			output_info: output,
+		});
+	}
+}
+
+/// Superset of ToolMeta, added in one of two ways:
+/// 1. When a tool is added via `world.spawn(my_tool.into_reflect_tool())`
+/// 2. Alternatively by a `ToolMeta` on_add hook
+/// if both the input and output are registered in the [`AppTypeRegistry`]
+#[derive(Debug, Clone, Copy, Component)]
+pub struct ReflectToolMeta {
+	tool_meta: ToolMeta,
+	input_info: &'static TypeInfo,
+	output_info: &'static TypeInfo,
+}
+impl std::ops::Deref for ReflectToolMeta {
+	type Target = ToolMeta;
+	fn deref(&self) -> &Self::Target { &self.tool_meta }
+}
+
+impl ReflectToolMeta {
+	pub fn input_info(&self) -> &'static TypeInfo { self.input_info }
+	pub fn output_info(&self) -> &'static TypeInfo { self.output_info }
+
+	#[cfg(feature = "json")]
+	pub fn input_json_schema(&self) -> serde_json::Value {
+		reflect_ext::type_info_to_json_schema(self.input_info)
+	}
+	#[cfg(feature = "json")]
+	pub fn output_json_schema(&self) -> serde_json::Value {
+		reflect_ext::type_info_to_json_schema(self.output_info)
 	}
 }
 
@@ -314,6 +379,78 @@ where
 	fn into_tool(self) -> Tool<Self::In, Self::Out> { self }
 }
 
+pub trait IntoReflectTool<M>: IntoTool<M>
+where
+	Self::In: Typed,
+	Self::Out: Typed,
+{
+	fn reflect_meta() -> ReflectToolMeta;
+	fn into_reflect_tool(self) -> (Tool<Self::In, Self::Out>, ReflectToolMeta);
+}
+
+impl<T, M> IntoReflectTool<M> for T
+where
+	T: 'static + IntoTool<M>,
+	T::In: Typed,
+	T::Out: Typed,
+{
+	fn into_reflect_tool(self) -> (Tool<Self::In, Self::Out>, ReflectToolMeta) {
+		(self.into_tool(), Self::reflect_meta())
+	}
+
+	fn reflect_meta() -> ReflectToolMeta {
+		{
+			ReflectToolMeta {
+				tool_meta: ToolMeta::of::<Self, Self::In, Self::Out>(),
+				input_info: Self::In::type_info(),
+				output_info: Self::Out::type_info(),
+			}
+		}
+	}
+}
+
+
+
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[relationship(relationship_target = Tools)]
+pub struct ToolOf(Entity);
+
+impl ToolOf {
+	pub fn new(value: Entity) -> Self { Self(value) }
+}
+
+/// Component for storing the tools associated with an entity,
+/// useful for defining available behaviors on a page, or a clanker tool set.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[relationship_target(relationship = ToolOf,linked_spawn)]
+pub struct Tools(Vec<Entity>);
+
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -327,5 +464,31 @@ mod test {
 			.call::<(), ()>(())
 			.await
 			.unwrap();
+	}
+
+	#[tool]
+	fn add(a: u32, b: u32) -> u32 { a + b }
+	#[test]
+	fn missing_reflect_tool() {
+		// not registered
+		let mut world = World::new();
+		let entity = world.spawn(add.into_tool());
+		entity.get::<ToolMeta>().xpect_some();
+		entity.get::<ReflectToolMeta>().xpect_none();
+	}
+	#[test]
+	fn register_reflect_tool() {
+		let mut app = App::new();
+		app.register_type::<u32>();
+		app.register_type::<(u32, u32)>();
+		let world = app.world_mut();
+		let entity = world.spawn(add.into_tool());
+		entity.get::<ReflectToolMeta>().xpect_some();
+	}
+	#[test]
+	fn into_reflect_tool() {
+		let mut world = World::new();
+		let entity = world.spawn(add.into_reflect_tool());
+		entity.get::<ReflectToolMeta>().xpect_some();
 	}
 }

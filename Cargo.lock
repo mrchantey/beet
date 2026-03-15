@@ -1282,6 +1282,7 @@ dependencies = [
  "bevy",
  "extend",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

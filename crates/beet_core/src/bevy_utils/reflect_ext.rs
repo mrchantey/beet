@@ -31,11 +31,19 @@ use bevy::reflect::StructInfo;
 use bevy::reflect::TupleInfo;
 use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
+use bevy::reflect::Typed;
 use bevy::reflect::UnnamedField;
 use bevy::reflect::VariantInfo;
 use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
+
+/// Generates a JSON Schema [`Value`] for a given Bevy reflect type `T`,
+/// see [`type_info_to_json_schema`]
+pub fn json_schema<T: Typed>() -> Value {
+	type_info_to_json_schema(T::type_info())
+}
+
 
 /// Converts a Bevy [`TypeInfo`] to a JSON Schema [`Value`].
 ///

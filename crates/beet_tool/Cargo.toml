@@ -12,13 +12,15 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-serde = ["dep:serde"]
+serde = ["dep:serde", "beet_core/serde"]
+json = ["serde","dep:serde_json","beet_core/json"]
 
 [dependencies]
 beet_core = { workspace = true }
 bevy.workspace = true
 extend.workspace = true
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
 beet_net.workspace = true

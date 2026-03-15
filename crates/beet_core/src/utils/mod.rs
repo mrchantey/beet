@@ -54,8 +54,6 @@ pub mod terminal_ext;
 #[cfg(feature = "std")]
 pub mod time_ext;
 mod tree;
-#[cfg(feature = "json")]
-pub mod type_info_to_json_schema;
 /// Timer utilities for WebAssembly environments.
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
