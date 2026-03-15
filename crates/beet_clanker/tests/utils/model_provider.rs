@@ -1,3 +1,5 @@
+// This module defines a set of test cases for validating the behavior
+// of language model providers that implement the [`ModelProvider`] trait.
 use beet_clanker::prelude::*;
 use beet_core::exports::futures_lite::pin;
 use beet_core::prelude::*;

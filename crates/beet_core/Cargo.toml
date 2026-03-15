@@ -44,9 +44,9 @@ bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = [
+	"bevy/serialize",
 	"dep:serde",
 	"dep:ron",
-	"dep:toml",
 	"dep:serde_urlencoded",
 ]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
@@ -96,7 +96,6 @@ serde = { workspace = true, optional = true, features=["rc"] }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
-toml = { workspace = true, optional = true }
 
 heck.workspace = true
 

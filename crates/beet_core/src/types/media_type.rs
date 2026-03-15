@@ -10,7 +10,8 @@ use crate::prelude::*;
 
 
 /// Common media types used in HTTP exchange.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MediaType {
 	/// `application/octet-stream` — raw bytes, the default.
 	#[default]

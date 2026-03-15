@@ -23,7 +23,8 @@ use std::borrow::Cow;
 use beet_core::prelude::*;
 
 /// The transport scheme of a URL.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Scheme {
 	/// No scheme specified, ie an absolute or relative path.
 	#[default]
@@ -151,7 +152,8 @@ impl From<Option<&http::uri::Scheme>> for Scheme {
 /// Stores the components of a URL in parsed form for easy manipulation.
 /// When parsing, the `://` separator is flexible — `http:example.com`
 /// is treated the same as `http://example.com`.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Url {
 	scheme: Scheme,
 	authority: Option<String>,

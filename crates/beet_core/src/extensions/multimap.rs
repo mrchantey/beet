@@ -116,6 +116,14 @@ pub struct RequiredField;
 /// Unlike a standard `HashMap`, this allows multiple values to be associated
 /// with the same key. Values are stored in insertion order per key.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "serde",
+	serde(bound(
+		serialize = "K: serde::Serialize + Eq + Hash, V: serde::Serialize, S: BuildHasher",
+		deserialize = "K: serde::Deserialize<'de> + Eq + Hash, V: serde::Deserialize<'de>, S: BuildHasher + Default"
+	))
+)]
 pub struct MultiMap<K, V, S = FixedHasher> {
 	inner: HashMap<K, Vec<V>, S>,
 }
@@ -138,6 +146,50 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 }
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
+
+impl<K, V, S> std::hash::Hash for MultiMap<K, V, S>
+where
+	K: Eq + Ord + Hash,
+	V: Eq + Hash,
+	S: BuildHasher,
+{
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		// order of keys doesn't matter, but order of values per key does
+		let mut entries: Vec<_> = self.inner.iter().collect();
+		entries.sort_by(|a, b| a.0.cmp(b.0)); // sort by key for consistent hashing
+		for (key, values) in entries {
+			key.hash(state);
+			values.hash(state);
+		}
+	}
+}
+
+impl<K, V, S> Ord for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		let mut a: Vec<_> = self.inner.iter().collect();
+		let mut b: Vec<_> = other.inner.iter().collect();
+
+		a.sort_by(|x, y| x.0.cmp(y.0));
+		b.sort_by(|x, y| x.0.cmp(y.0));
+
+		a.cmp(&b)
+	}
+}
+impl<K, V, S> PartialOrd for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
 
 impl<K, V> MultiMap<K, V>
 where
