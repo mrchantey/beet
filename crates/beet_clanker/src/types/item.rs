@@ -1,49 +1,106 @@
-//!
-//!```
-//!Entity Structure
-//!
-//! Context
-//!   Actor::human
-//!   Actor::human
-//!   Tools, Actor::agent
-//!   Tools, Actor::agent
-//!```
-use crate::openresponses::MessageRole;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Url;
 use serde::Deserialize;
 use serde::Serialize;
+use uuid::Uuid;
 
-#[derive(Component)]
-pub struct Context {
-	/// An append-only list of content created by various actors.
-	items: Vec<Item>,
-	actor_id_increment: u64,
-	function_call_id_increment: u64,
+/// Note that MessageRole is not stored
+/// as this is relative to the Actor.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+	Component,
+)]
+#[component(on_add=on_add)]
+pub struct Item {
+	id: ItemId,
+	actor_id: ActorId,
+	created: Timestamp,
+	scope: ItemScope,
+	content: Content,
 }
 
-impl Context {
-	pub fn new() -> Self {
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	let item_id = world.entity(cx.entity).get::<Item>().unwrap().id;
+	world
+		.resource_mut::<ContextMap>()
+		.add_item(item_id, cx.entity);
+}
+
+
+impl Item {
+	pub fn new(actor_id: ActorId, content: Content, scope: ItemScope) -> Self {
 		Self {
-			items: Vec::new(),
-			actor_id_increment: 0,
-			function_call_id_increment: 0,
+			id: ItemId::default(),
+			actor_id,
+			scope,
+			content,
+			created: Timestamp::now(),
 		}
 	}
-	pub fn items(&self) -> &[Item] { &self.items }
-	pub fn new_actor(&mut self, kind: ActorKind) -> Actor {
-		let id = self.actor_id_increment;
-		self.actor_id_increment += 1;
-		Actor {
-			kind,
-			id: ActorId(id),
-		}
+	pub fn actor_id(&self) -> ActorId { self.actor_id }
+	pub fn created(&self) -> Timestamp { self.created }
+	pub fn content(&self) -> &Content { &self.content }
+	pub fn scope(&self) -> ItemScope { self.scope }
+}
+
+/// Id associated with an [`Item`].
+/// Items are components and already have an associated [`Entity`],
+/// but we need something more easily handled by distributed systems,
+/// databases etc. See also [`ActorId`]
+#[derive(
+	Debug,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+)]
+pub struct ItemId(Uuid);
+
+impl std::fmt::Display for ItemId {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
 	}
-	pub fn new_function_call_id(&mut self) -> FunctionCallId {
-		let id = self.function_call_id_increment;
-		self.function_call_id_increment += 1;
-		FunctionCallId(id)
-	}
+}
+
+impl Default for ItemId {
+	fn default() -> Self { Self(Uuid::now_v7()) }
+}
+
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+)]
+pub enum ItemScope {
+	/// The item is scoped only to this actor and its context,
+	/// it should generally not be merged by other contexts.
+	#[default]
+	Actor,
+	/// The item is accessible to all actors in the world.
+	World,
 }
 
 #[derive(
@@ -73,27 +130,6 @@ impl Timestamp {
 	pub fn unix_epoch_elapsed(&self) -> Duration { self.0 }
 }
 
-
-/// Note that MessageRole is not stored
-/// as this is relative to the Actor.
-pub struct Item {
-	actor_id: ActorId,
-	created: Timestamp,
-	content: Content,
-}
-
-impl Item {
-	pub fn new(actor_id: ActorId, content: Content) -> Self {
-		Self {
-			actor_id,
-			created: Timestamp::now(),
-			content,
-		}
-	}
-	pub fn actor_id(&self) -> ActorId { self.actor_id }
-	pub fn created(&self) -> Timestamp { self.created }
-	pub fn content(&self) -> &Content { &self.content }
-}
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
@@ -101,7 +137,6 @@ pub enum Content {
 	Text(TextContent),
 	File(FileContent),
 	FunctionCall(FunctionCall),
-	FunctionCallOutput(FunctionCallOutput),
 }
 
 /// Common type for several openresponses types
@@ -115,6 +150,9 @@ pub enum Content {
 )]
 pub struct TextContent {
 	content: String,
+}
+impl TextContent {
+	pub fn content(&self) -> &str { &self.content }
 }
 
 /// Common type for several openresponses types
@@ -136,24 +174,11 @@ pub struct FileContent {
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct FunctionCall {
-	/// The unique ID of the function tool call, shared
-	/// by both this item and its associated [`FunctionCallOutput`]
-	pub call_id: FunctionCallId,
-	/// The name of the function that was called.
+	/// The name of the function that was called, in beet this is usually
+	/// the [`std::any::TypeId`] for matching against a [`ToolMeta::handler`]
 	pub name: String,
 	/// The arguments JSON string that was generated.
 	pub arguments: String,
-}
-
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct FunctionCallOutput {
-	/// The unique ID of the function tool call, shared
-	/// by both this item and its associated [`FunctionCall`]
-	pub call_id: FunctionCallId,
-	/// The name of the function that was called.
-	pub name: String,
 	/// The JSON string that was output from the tool call.
 	/// Note that this should always be sent as a FunctionOutputContent::Text,
 	/// regardless of if this text is json, raw text, files etc. The only purpose
@@ -161,43 +186,6 @@ pub struct FunctionCallOutput {
 	/// a tool specific json structure than a vec of text, file, text etc.
 	/// The only reason [`FunctionOutputContent`] is so complex is a unified type system.
 	pub output: String,
-}
-
-
-pub enum Message {}
-
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-	Component,
-)]
-pub struct Actor {
-	kind: ActorKind,
-	id: ActorId,
-}
-
-impl Actor {
-	pub fn message_role(&self, agent_id: ActorId) -> MessageRole {
-		match self.kind {
-			ActorKind::System => MessageRole::System,
-			ActorKind::Developer => MessageRole::Developer,
-			ActorKind::Human => MessageRole::User,
-			ActorKind::Agent => {
-				if self.id == agent_id {
-					MessageRole::Assistant
-				} else {
-					MessageRole::User
-				}
-			}
-		}
-	}
 }
 
 /// The kind of actor this entity is.
@@ -231,51 +219,21 @@ pub enum ActorKind {
 }
 
 
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Deref,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-)]
-pub struct ActorId(u64);
-
-impl ActorId {
-	pub fn new(id: u64) -> Self { Self(id) }
-	pub fn inner(&self) -> u64 { self.0 }
-}
-
-/// A unique identifier for a function call, shared between the [`FunctionCall`] and its associated [`FunctionCallOutput`]
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	Deref,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-)]
-pub struct FunctionCallId(u64);
-
-impl FunctionCallId {
-	pub fn new(id: u64) -> Self { Self(id) }
-	pub fn inner(&self) -> u64 { self.0 }
-}
-
-
-pub enum PartialContext {
+/// A partial content item, which may be created from various sources and
+/// may be merged into a full content item if it fully resolves.
+pub enum PartialContent {
+	FunctionCall {
+		/// The unique ID of the function tool call, shared
+		/// by both this item and its associated [`FunctionCall`]
+		call_id: String,
+		/// The name of the function that was called, in beet this is usually
+		/// the [`std::any::TypeId`] for matching against a [`ToolMeta::handler`]
+		name: String,
+		/// The arguments JSON string that was generated.
+		arguments: String,
+	},
 	/// Created by an `OutputItem::Message(Message::content)`
-	MessageContent(String),
+	Text(String),
 	/// Created by an `OutputItem::Reasoning(ReasoningItem::summary)`
 	ReasoningDescription(Vec<String>),
 	/// The actual reasoning

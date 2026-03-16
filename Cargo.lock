@@ -1083,6 +1083,7 @@ dependencies = [
  "serde_with",
  "strum 0.26.3",
  "thiserror 1.0.69",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
