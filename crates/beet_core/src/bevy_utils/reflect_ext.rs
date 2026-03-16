@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use bevy::reflect::{Reflect, Typed};
-//! use beet_core::utils::type_info_to_json_schema::type_info_to_json_schema;
+//! use beet_core::prelude::*;
 //!
 //! #[derive(Reflect)]
 //! struct MyRequest {
@@ -17,8 +17,8 @@
 //!     enabled: Option<bool>,
 //! }
 //!
-//! let schema = type_info_to_json_schema(MyRequest::type_info());
 //! // Returns a JSON Schema object with properties, required fields, etc.
+//! let schema = reflect_ext::type_info_to_json_schema(MyRequest::type_info());
 //! ```
 
 use bevy::reflect::ArrayInfo;

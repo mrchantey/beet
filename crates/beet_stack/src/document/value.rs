@@ -564,6 +564,9 @@ fn value_from_reflect(reflect: &dyn PartialReflect) -> Result<Value> {
 				reflect.reflect_kind()
 			)
 		}
+		other => {
+			bevybail!("unsupported reflect kind: {:?}", other.kind())
+		}
 	}
 }
 

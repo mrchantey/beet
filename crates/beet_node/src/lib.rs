@@ -26,8 +26,8 @@ pub mod prelude {
 
 
 pub mod exports {
-	#[cfg(feature = "tui")]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	pub use bevy_ratatui;
-	#[cfg(feature = "tui")]
+	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	pub use ratatui;
 }

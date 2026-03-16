@@ -177,6 +177,32 @@ impl Url {
 		}
 	}
 
+	/// Build a data URI [`Url`] from an encoding, media type, and raw data string.
+	///
+	/// The data string must already be encoded per `encoding`
+	/// (ie base64 text for [`Encoding::Base64`], percent-encoded text for
+	/// [`Encoding::UrlEncoded`]).
+	pub fn new_data(
+		encoding: DataUrlEncoding,
+		media_type: MediaType,
+		data: String,
+	) -> Self {
+		Self {
+			scheme: Scheme::Data,
+			path: vec![format!("{}{},{}", media_type, encoding, data)],
+			authority: None,
+			params: default(),
+			fragment: None,
+		}
+	}
+
+	/// Build a `data:<media_type>;base64,<data>` [`Url`].
+	///
+	/// `data` must already be base64-encoded.
+	pub fn new_base64(media_type: MediaType, data: String) -> Self {
+		Self::new_data(DataUrlEncoding::Base64, media_type, data)
+	}
+
 	/// The scheme of the URL.
 	pub fn scheme(&self) -> &Scheme { &self.scheme }
 
@@ -481,7 +507,7 @@ impl From<Option<&http::uri::Scheme>> for Scheme {
 /// The transfer encoding used in a data URI.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Encoding {
+pub enum DataUrlEncoding {
 	/// Percent-encoded text (default for data URIs per RFC 2397).
 	#[default]
 	UrlEncoded,
@@ -491,6 +517,27 @@ pub enum Encoding {
 	Binary,
 }
 
+impl DataUrlEncoding {
+	/// The token used in a data URI header for this encoding.
+	///
+	/// [`Encoding::UrlEncoded`] returns `""` (no separator token needed),
+	/// [`Encoding::Base64`] returns `";base64"`, and
+	/// [`Encoding::Binary`] returns `";binary"`.
+	pub fn as_str(&self) -> &'static str {
+		match self {
+			Self::UrlEncoded => "",
+			Self::Base64 => ";base64",
+			Self::Binary => ";binary",
+		}
+	}
+}
+
+impl std::fmt::Display for DataUrlEncoding {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.as_str())
+	}
+}
+
 /// A parsed data URI (`data:<mediatype>[;base64],<data>`).
 ///
 /// Data URIs embed content inline inside a URL.  The entire payload after
@@ -498,77 +545,72 @@ pub enum Encoding {
 /// string. [`Url`] stores this opaque string as a single path segment;
 /// `DataUrl` decodes it into its three logical parts.
 ///
+/// The `'a` lifetime allows [`DataUrl::from_url`] to borrow the data string
+/// directly from the source [`Url`] (zero-clone). Use [`DataUrl::parse_payload`]
+/// when you need an owned `DataUrl<'static>` instead.
+///
 /// # Example
 ///
 /// ```
 /// # use beet_net::prelude::*;
 /// let url = Url::parse("data:text/html,<h1>Hello</h1>");
-/// let data_url = DataUrl::try_from(url).unwrap();
+/// let data_url = DataUrl::from_url(&url).unwrap();
 /// assert_eq!(data_url.media_type, MediaType::Html);
-/// assert_eq!(data_url.encoding, Encoding::UrlEncoded);
+/// assert_eq!(data_url.encoding, DataUrlEncoding::UrlEncoded);
 /// assert_eq!(data_url.data, "<h1>Hello</h1>");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataUrl {
+pub struct DataUrl<'a> {
 	/// The media type declared in the URI.
 	pub media_type: MediaType,
 	/// How the data portion is encoded.
-	pub encoding: Encoding,
-	/// The raw data string (still encoded per [`Encoding`]).
-	pub data: String,
+	pub encoding: DataUrlEncoding,
+	/// The raw data string (still encoded per [`Encoding`]), borrowed from the source when possible.
+	pub data: Cow<'a, str>,
 }
 
-impl DataUrl {
-	/// Parse a [`DataUrl`] from a [`Url`].
+impl<'a> DataUrl<'a> {
+	/// Parse a [`DataUrl`] from a [`Url`], borrowing the data string (zero-clone).
 	///
 	/// ## Errors
 	///
 	/// - If `url` does not use [`Scheme::Data`].
 	/// - If the data URI payload cannot be parsed.
-	pub fn from_url(url: &Url) -> Result<Self> {
+	pub fn from_url(url: &'a Url) -> Result<DataUrl<'a>> {
 		if url.scheme() != &Scheme::Data {
 			bevybail!("expected a data: URL, got scheme '{}'", url.scheme());
 		}
 		// The entire payload is stored as a single path segment.
 		let payload = url.path().first().map(|seg| seg.as_str()).unwrap_or("");
-
 		Self::parse_payload(payload)
 	}
 
-	/// Parse a data URI payload string (the part after `data:`).
-	///
-	/// Accepts `<mediatype>[;base64],<data>` or just `,<data>` (defaulting
-	/// to `text/plain`).
-	pub fn parse_payload(payload: &str) -> Result<Self> {
-		// The comma separates the header from the data.
+	/// Parse a data URI payload (the part after `data:`), borrowing `data` from the slice.
+	fn parse_payload(payload: &'a str) -> Result<DataUrl<'a>> {
 		let comma = payload.find(',').ok_or_else(|| {
 			bevyhow!("data URI missing ',' separator: {payload:?}")
 		})?;
 		let header = &payload[..comma];
-		let data = payload[comma + 1..].to_string();
+		let data = Cow::Borrowed(&payload[comma + 1..]);
 
-		// Header format: `<mediatype>[;base64]`
-		// The mediatype itself may contain `;` for parameters
-		// (eg `text/plain;charset=utf-8`), so we scan from the right.
 		let (media_str, encoding) =
 			if header.ends_with(";base64") || header == ";base64" {
 				let media_str = header
 					.strip_suffix(";base64")
 					.unwrap_or("")
 					.trim_start_matches(';');
-				(media_str, Encoding::Base64)
+				(media_str, DataUrlEncoding::Base64)
 			} else {
-				(header.trim_start_matches(';'), Encoding::UrlEncoded)
+				(header.trim_start_matches(';'), DataUrlEncoding::UrlEncoded)
 			};
 
 		let media_type = if media_str.is_empty() {
-			// RFC 2397 default: `text/plain;charset=US-ASCII`
 			MediaType::Text
 		} else {
 			MediaType::from_content_type(media_str)
 		};
 
-		Ok(Self {
+		Ok(DataUrl {
 			media_type,
 			encoding,
 			data,
@@ -587,12 +629,12 @@ impl DataUrl {
 	/// not enabled for a base64-encoded payload.
 	pub fn decode(&self) -> Result<Vec<u8>> {
 		match self.encoding {
-			Encoding::Base64 => {
+			DataUrlEncoding::Base64 => {
 				#[cfg(feature = "serde")]
 				{
 					use base64::Engine as _;
 					base64::engine::general_purpose::STANDARD
-						.decode(&self.data)
+						.decode(self.data.as_ref())
 						.map_err(|err| bevyhow!("base64 decode failed: {err}"))
 				}
 				#[cfg(not(feature = "serde"))]
@@ -600,7 +642,7 @@ impl DataUrl {
 					bevybail!("base64 decoding requires the 'serde' feature");
 				}
 			}
-			Encoding::UrlEncoded => {
+			DataUrlEncoding::UrlEncoded => {
 				// Percent-decode
 				let decoded = self.data.split('%').enumerate().fold(
 					String::new(),
@@ -626,7 +668,7 @@ impl DataUrl {
 				);
 				Ok(decoded.into_bytes())
 			}
-			Encoding::Binary => Ok(self.data.as_bytes().to_vec()),
+			DataUrlEncoding::Binary => Ok(self.data.as_bytes().to_vec()),
 		}
 	}
 }
@@ -920,7 +962,7 @@ mod test {
 		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
 		let data_url = DataUrl::from_url(&url).unwrap();
 		data_url.media_type.xpect_eq(MediaType::Text);
-		data_url.encoding.xpect_eq(Encoding::Base64);
+		data_url.encoding.xpect_eq(DataUrlEncoding::Base64);
 		data_url.data.xpect_eq("SGVsbG8=");
 		// "SGVsbG8=" decodes to "Hello"
 		let bytes = data_url.decode().unwrap();
@@ -932,7 +974,7 @@ mod test {
 		let url = Url::parse("data:text/html,<h1>Hello</h1>");
 		let data_url = DataUrl::from_url(&url).unwrap();
 		data_url.media_type.xpect_eq(MediaType::Html);
-		data_url.encoding.xpect_eq(Encoding::UrlEncoded);
+		data_url.encoding.xpect_eq(DataUrlEncoding::UrlEncoded);
 		data_url.data.xpect_eq("<h1>Hello</h1>");
 	}
 
@@ -942,7 +984,7 @@ mod test {
 		let url = Url::parse("data:,Hello%20World");
 		let data_url = DataUrl::from_url(&url).unwrap();
 		data_url.media_type.xpect_eq(MediaType::Text);
-		data_url.encoding.xpect_eq(Encoding::UrlEncoded);
+		data_url.encoding.xpect_eq(DataUrlEncoding::UrlEncoded);
 	}
 
 	#[test]
@@ -1089,5 +1131,48 @@ mod test {
 	fn from_str_impl() {
 		let url: Url = "https://example.com/path".into();
 		url.scheme().clone().xpect_eq(Scheme::Https);
+	}
+
+	#[test]
+	fn encoding_display() {
+		DataUrlEncoding::UrlEncoded.to_string().xpect_eq("");
+		DataUrlEncoding::Base64.to_string().xpect_eq(";base64");
+		DataUrlEncoding::Binary.to_string().xpect_eq(";binary");
+	}
+
+	#[test]
+	fn new_data_url_encoded() {
+		let url = Url::new_data(
+			DataUrlEncoding::UrlEncoded,
+			MediaType::Html,
+			"<h1>Hi</h1>".to_string(),
+		);
+		url.scheme().clone().xpect_eq(Scheme::Data);
+		let data_url = DataUrl::from_url(&url).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Html);
+		data_url.encoding.xpect_eq(DataUrlEncoding::UrlEncoded);
+		data_url.data.xpect_eq("<h1>Hi</h1>");
+	}
+
+	#[test]
+	fn new_base64_url() {
+		// "Hello" base64-encoded
+		let url = Url::new_base64(MediaType::Text, "SGVsbG8=".to_string());
+		url.scheme().clone().xpect_eq(Scheme::Data);
+		let data_url = DataUrl::from_url(&url).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Text);
+		data_url.encoding.xpect_eq(DataUrlEncoding::Base64);
+		data_url.data.xpect_eq("SGVsbG8=");
+	}
+
+	#[test]
+	fn new_data_round_trips_display() {
+		let url = Url::new_base64(MediaType::Text, "SGVsbG8=".to_string());
+		// Round-trip: display then re-parse should produce the same DataUrl.
+		let reparsed = Url::parse(url.to_string());
+		let data_url = DataUrl::from_url(&reparsed).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Text);
+		data_url.encoding.xpect_eq(DataUrlEncoding::Base64);
+		data_url.data.xpect_eq("SGVsbG8=");
 	}
 }
