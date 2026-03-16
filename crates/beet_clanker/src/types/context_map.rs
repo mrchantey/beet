@@ -1,13 +1,7 @@
-use crate::openresponses::request::Input;
-use crate::openresponses::request::InputItem;
-use crate::openresponses::request::MessageContent;
-use crate::openresponses::request::MessageParam;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::atomic::AtomicU64;
-
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Resource)]
@@ -41,93 +35,64 @@ impl ContextMap {
 
 #[derive(SystemParam)]
 pub struct ContextQuery<'w, 's> {
+	commands: Commands<'w, 's>,
 	context_map: Res<'w, ContextMap>,
-	actors: Query<'w, 's, &'static Actor>,
-	items: Query<'w, 's, &'static Item>,
+	actors: Query<'w, 's, (Entity, &'static mut Actor)>,
+	items: Query<'w, 's, (Entity, &'static mut Item)>,
 }
 impl ContextQuery<'_, '_> {
+	pub fn reborrow(&mut self) -> ContextQuery<'_, '_> {
+		ContextQuery {
+			commands: self.commands.reborrow(),
+			context_map: Res::clone(&self.context_map),
+			actors: self.actors.reborrow(),
+			items: self.items.reborrow(),
+		}
+	}
+
 	pub fn actor(&self, actor_id: ActorId) -> Result<&Actor> {
 		self.context_map
 			.actor(actor_id)
-			.and_then(|entity| self.actors.get(entity)?.xok())
+			.and_then(|entity| self.actors.get(entity)?.1.xok())
 	}
 	pub fn item(&self, item_id: ItemId) -> Result<&Item> {
 		self.context_map
 			.item(item_id)
-			.and_then(|entity| self.items.get(entity)?.xok())
+			.and_then(|entity| self.items.get(entity)?.1.xok())
+	}
+	pub fn actor_mut(&mut self, actor_id: ActorId) -> Result<Mut<'_, Actor>> {
+		self.context_map
+			.actor(actor_id)
+			.and_then(|entity| self.actors.get_mut(entity)?.1.xok())
+	}
+	pub fn item_mut(&mut self, item_id: ItemId) -> Result<Mut<'_, Item>> {
+		self.context_map
+			.item(item_id)
+			.and_then(|entity| self.items.get_mut(entity)?.1.xok())
 	}
 
-	pub fn build_input(
-		&self,
-		actor_id: ActorId,
-	) -> Result<openresponses::request::Input> {
-		let actor = self.actor(actor_id)?;
 
-		let items = actor
-			.items()
+
+	/// Items that do not appear in any [`Actor::context`] will never be
+	/// used, so should be despawned.
+	pub fn despawn_orphan_items(&mut self) -> Result<&mut Self> {
+		let parented_items = self
+			.actors
 			.iter()
-			.xtry_map(|item_id| self.item_to_input(&actor, *item_id))?
-			.into_iter()
-			.flatten()
+			.flat_map(|(_, actor)| actor.unsorted_context())
+			.collect::<HashSet<_>>();
+
+		let orphan_items = self
+			.items
+			.iter()
+			.filter(|(_, item)| !parented_items.contains(&item.id()))
+			.map(|(e, _)| e)
 			.collect::<Vec<_>>();
-		Input::Items(items).xok()
-	}
 
-	/// Map an item to a list of openresponses input, relative to agiven actor.
-	/// The provided actor is used to correctly assign a [`MessageRole::Assistant`]
-	/// for 'self' messages, and [`MessageRole::User`] for all others.
-	///
-	/// this may be several items, for example a [`Item::FunctionCall`]
-	/// is split into an openresponses FunctionCall + FunctionCallOutput,
-	/// assigned a call_id on the fly.
-	pub fn item_to_input(
-		&self,
-		actor: &Actor,
-		item_id: ItemId,
-	) -> Result<Vec<openresponses::request::InputItem>> {
-		let item = self.item(item_id)?;
-		let role = actor.relative_message_role(item.actor_id());
-
-
-		match item.content() {
-			Content::Text(text_content) => {
-				vec![InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Text(
-						text_content.content().to_string(),
-					),
-					status: None,
-				})]
-			}
-			Content::File(file_content) => todo!(),
-			Content::FunctionCall(function_call) => {
-				static CALL_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
-
-				let call_id = CALL_ID_COUNTER
-					.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-				vec![
-					InputItem::FunctionCall(openresponses::FunctionCallParam {
-						id: None,
-						role,
-						function_name: function_call
-							.function_name()
-							.to_string(),
-						args: function_call.args().clone(),
-						call_id: Some(call_id),
-					}),
-					InputItem::FunctionCallOutput(
-						openresponses::request::FunctionCallOutputParam {
-							id: None,
-							role,
-							output: function_call.output().clone(),
-							call_id: Some(call_id),
-						},
-					),
-				]
-			}
+		for entity in orphan_items {
+			self.commands.entity(entity).despawn();
 		}
-		.xok()
+		drop(parented_items);
+		self.xok()
 	}
 }

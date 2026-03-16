@@ -22,7 +22,9 @@ use uuid::Uuid;
 #[component(on_add=on_add)]
 pub struct Item {
 	id: ItemId,
-	actor_id: ActorId,
+	/// The actor that created this item, used for attribution and scoping.
+	owner: ActorId,
+	/// For function calls this is the time the call was completed.
 	created: Timestamp,
 	scope: ItemScope,
 	content: Content,
@@ -41,16 +43,17 @@ impl Item {
 	pub fn new(actor_id: ActorId, content: Content, scope: ItemScope) -> Self {
 		Self {
 			id: ItemId::default(),
-			actor_id,
+			owner: actor_id,
 			scope,
 			content,
 			created: Timestamp::now(),
 		}
 	}
-	pub fn actor_id(&self) -> ActorId { self.actor_id }
+	pub fn id(&self) -> ItemId { self.id }
+	pub fn owner(&self) -> ActorId { self.owner }
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn content(&self) -> &Content { &self.content }
-	pub fn scope(&self) -> ItemScope { self.scope }
+	pub fn scope(&self) -> &ItemScope { &self.scope }
 }
 
 /// Id associated with an [`Item`].
@@ -85,7 +88,6 @@ impl Default for ItemId {
 	Debug,
 	Default,
 	Clone,
-	Copy,
 	PartialEq,
 	Eq,
 	PartialOrd,
@@ -99,6 +101,9 @@ pub enum ItemScope {
 	/// it should generally not be merged by other contexts.
 	#[default]
 	Actor,
+	/// The item is added only to a specific list of actors,
+	/// which may or may not include its owner
+	Actors(Vec<ActorId>),
 	/// The item is accessible to all actors in the world.
 	World,
 }
@@ -167,7 +172,20 @@ pub struct FileContent {
 	pub file_stem: Option<String>,
 	pub media_type: MediaType,
 	/// The file data.
-	pub file_data: Url,
+	pub url: Url,
+}
+
+impl FileContent {
+	pub fn filename(&self) -> String {
+		let filename = self.file_stem.as_deref().unwrap_or_else(|| "file");
+		if let Some(ext) = self.media_type.extension() {
+			format!("{filename}.{}", ext)
+		} else {
+			filename.to_string()
+		}
+	}
+	pub fn media_type(&self) -> &MediaType { &self.media_type }
+	pub fn url(&self) -> &Url { &self.url }
 }
 
 #[derive(
@@ -183,9 +201,18 @@ pub struct FunctionCall {
 	/// Note that this should always be sent as a FunctionOutputContent::Text,
 	/// regardless of if this text is json, raw text, files etc. The only purpose
 	/// of sending this to models is for context, and we can provide more context through
-	/// a tool specific json structure than a vec of text, file, text etc.
+	/// a tool specific json structure than a text, file, text etc.
 	/// The only reason [`FunctionOutputContent`] is so complex is a unified type system.
 	pub output: String,
+}
+
+impl FunctionCall {
+	/// The name of the function that was called.
+	pub fn function_name(&self) -> &str { &self.name }
+	/// The arguments JSON string.
+	pub fn args(&self) -> &str { &self.arguments }
+	/// The output JSON string.
+	pub fn output(&self) -> &str { &self.output }
 }
 
 /// The kind of actor this entity is.

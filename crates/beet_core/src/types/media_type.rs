@@ -341,9 +341,11 @@ impl MediaType {
 			"java" => MediaType::Java,
 			// jsx is still javascript
 			"jsx" => MediaType::Javascript,
-			_ => MediaType::Bytes,
+			"bin" | _ => MediaType::Bytes,
 		}
 	}
+	/// The canonical file extension for this media type, if any.
+	pub fn extension(&self) -> Option<&'static str> { todo!("") }
 
 	/// Infer the media type from a file path by extracting its extension.
 	///

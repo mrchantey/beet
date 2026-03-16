@@ -22,7 +22,14 @@ pub struct Actor {
 	name: String,
 	id: ActorId,
 	kind: ActorKind,
-	items: Vec<ItemId>,
+	/// A list of items that may have been created by this
+	/// actor or others, to be included in clanker context
+	/// or rendered in ui.
+	///
+	/// ## Note
+	/// This list is **not** nessecarily
+	/// sorted by timestamp, sorting happens when building context.
+	context: Vec<ItemId>,
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -38,37 +45,18 @@ impl Actor {
 			name: name.as_ref().to_string(),
 			kind,
 			id: ActorId::default(),
-			items: Vec::new(),
+			context: Vec::new(),
 		}
 	}
 	pub fn system() -> Self { Self::new("System", ActorKind::System) }
 	pub fn developer() -> Self { Self::new("Developer", ActorKind::Developer) }
 	pub fn user() -> Self { Self::new("User", ActorKind::Human) }
 	pub fn clanker() -> Self { Self::new("Clanker", ActorKind::Agent) }
+	pub fn kind(&self) -> ActorKind { self.kind }
+	pub fn id(&self) -> ActorId { self.id }
 
-	/// Get the message role for this actor, relative to the given agent ID.
-	/// This is useful when an agent is constructing its context for an
-	/// openresponses request.
-	pub fn relative_message_role(
-		&self,
-		agent_id: ActorId,
-	) -> openresponses::MessageRole {
-		use openresponses::MessageRole;
-		match self.kind {
-			ActorKind::System => MessageRole::System,
-			ActorKind::Developer => MessageRole::Developer,
-			ActorKind::Human => MessageRole::User,
-			ActorKind::Agent => {
-				if self.id == agent_id {
-					MessageRole::Assistant
-				} else {
-					MessageRole::User
-				}
-			}
-		}
-	}
-
-	pub fn items(&self) -> &[ItemId] { &self.items }
+	pub fn unsorted_context(&self) -> &[ItemId] { &self.context }
+	pub fn push(&mut self, item_id: ItemId) { self.context.push(item_id); }
 }
 
 /// Id associated with an [`Actor`].

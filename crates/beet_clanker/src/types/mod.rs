@@ -1,6 +1,10 @@
 mod actor;
+mod commands;
+mod context_builder;
 pub use actor::*;
 mod item;
 pub use item::*;
 mod context_map;
+pub use commands::*;
+pub use context_builder::*;
 pub use context_map::*;

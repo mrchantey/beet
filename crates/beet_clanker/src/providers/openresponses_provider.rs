@@ -31,46 +31,38 @@ impl OpenResponsesProvider {
 	pub fn inline_text_file_data(
 		mut request: openresponses::RequestBody,
 	) -> openresponses::RequestBody {
-		if let openresponses::request::Input::Items(items) = &mut request.input
-		{
-			for item in items {
-				if let openresponses::request::InputItem::Message(msg) = item {
-					if let openresponses::request::MessageContent::Parts(
-						parts,
-					) = &mut msg.content
-					{
-						for part in parts {
-							if let openresponses::ContentPart::InputFile(file) =
-								part
-							{
-								let text = if let Some(data) = &file.file_data {
-									match BASE64_STANDARD.decode(data) {
-										Ok(bytes) => String::from_utf8(bytes)
-											.unwrap_or_else(|_| {
-												"[Binary data]".to_string()
-											}),
-										Err(_) => {
-											"[Invalid base64 data]".to_string()
-										}
-									}
-								} else if let Some(url) = &file.file_url {
-									format!("[File URL: {}]", url)
-								} else {
-									"[Empty file]".to_string()
-								};
-								let filename = file
-									.filename
-									.as_deref()
-									.unwrap_or("unknown");
-								let content =
-									format!("File: {}\n\n{}", filename, text);
-								*part = openresponses::ContentPart::input_text(
-									content,
-								);
-							}
-						}
+		let openresponses::request::Input::Items(items) = &mut request.input
+		else {
+			return request;
+		};
+		for item in items {
+			let openresponses::request::InputItem::Message(msg) = item else {
+				continue;
+			};
+			let openresponses::request::MessageContent::Parts(parts) =
+				&mut msg.content
+			else {
+				continue;
+			};
+			for part in parts {
+				let openresponses::ContentPart::InputFile(file) = part else {
+					continue;
+				};
+				let text = if let Some(data) = &file.file_data {
+					match BASE64_STANDARD.decode(data) {
+						Ok(bytes) => String::from_utf8(bytes)
+							.unwrap_or_else(|_| "[Binary data]".to_string()),
+						Err(_) => "[Invalid base64 data]".to_string(),
 					}
-				}
+					// TODO actually fetch the url..
+				} else if let Some(url) = &file.file_url {
+					format!("[File URL: {}]", url)
+				} else {
+					"[Empty file]".to_string()
+				};
+				let filename = file.filename.as_deref().unwrap_or("unknown");
+				let content = format!("File: {}\n\n{}", filename, text);
+				*part = openresponses::ContentPart::input_text(content);
 			}
 		}
 		request
