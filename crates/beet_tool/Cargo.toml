@@ -12,8 +12,10 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
+default = ["reflect"]
 serde = ["dep:serde", "beet_core/serde"]
 json = ["serde","dep:serde_json","beet_core/json"]
+reflect = ["bevy/reflect_functions"]
 
 [dependencies]
 beet_core = { workspace = true }

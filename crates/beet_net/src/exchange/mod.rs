@@ -29,12 +29,14 @@ pub mod header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use header as headers;
 mod header_map;
+mod media_bytes_ext;
 mod parts;
 mod request;
 mod response;
 mod url;
 pub use body::*;
 pub use header_map::*;
+pub use media_bytes_ext::*;
 pub use response::*;
 pub use url::*;
 mod param_pattern;

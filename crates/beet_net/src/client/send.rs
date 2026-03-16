@@ -166,7 +166,7 @@ impl Request {
 /// respected — if the declared media type is not acceptable a 406 response is
 /// returned.
 async fn send_data(request: Request) -> Result<Response> {
-	let data_url = DataUrl::from_url(request.url())?;
+	let mb = MediaBytes::from_url(request.url())?;
 
 	// Content negotiation: check Accept header if present.
 	let accepts = request
@@ -175,14 +175,14 @@ async fn send_data(request: Request) -> Result<Response> {
 		.and_then(|res| res.ok())
 		.unwrap_or_default();
 
-	if !accepts.is_empty() && !accepts.contains(&data_url.media_type) {
+	if !accepts.is_empty() && !accepts.contains(mb.media_type()) {
 		return Ok(Response::from_status(StatusCode::NOT_ACCEPTABLE));
 	}
 
-	let body_bytes = data_url.decode()?;
-	Ok(Response::ok()
-		.with_content_type(data_url.media_type)
-		.with_body(body_bytes))
+	Response::ok()
+		.with_content_type(mb.media_type().clone())
+		.with_body(mb.bytes().to_vec())
+		.xok()
 }
 
 
