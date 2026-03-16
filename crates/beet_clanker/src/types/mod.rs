@@ -1,10 +1,10 @@
 mod actor;
-mod commands;
+mod clanker_plugin;
 mod context_builder;
 pub use actor::*;
 mod item;
 pub use item::*;
 mod context_map;
-pub use commands::*;
+pub use clanker_plugin::*;
 pub use context_builder::*;
 pub use context_map::*;

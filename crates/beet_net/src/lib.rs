@@ -5,11 +5,11 @@
 #![deny(missing_docs)]
 
 mod client;
-mod exchange;
+mod types;
 /// Re-export the typed header module at crate level.
-pub use exchange::header;
+pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
-pub use exchange::headers;
+pub use types::headers;
 /// Re-export media-type-driven serialization at crate level.
 mod object_storage;
 mod server;
@@ -37,10 +37,10 @@ pub mod prelude {
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
 	pub use crate::client::*;
-	pub use crate::exchange::*;
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
+	pub use crate::types::*;
 	pub use beet_core::prelude::*;
 
 	// Re-export common types from dependencies

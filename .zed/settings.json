@@ -19,6 +19,7 @@
 						"tui",
 						"bevy_scene",
 						"json",
+						"clanker",
 						"_pretty_curl",
 						"_mini_browser",
 						// "http_server",

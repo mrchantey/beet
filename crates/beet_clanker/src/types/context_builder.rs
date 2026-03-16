@@ -27,7 +27,7 @@ impl ContextBuilder {
 		let actor = query.actor(actor_id)?;
 
 		let mut timestamped_items = actor
-			.unsorted_context()
+			.items()
 			.iter()
 			.xtry_map(|item_id| self.item_to_input(query, &actor, *item_id))?;
 

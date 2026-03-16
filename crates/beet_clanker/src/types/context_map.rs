@@ -4,10 +4,13 @@ use serde::Deserialize;
 use serde::Serialize;
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Resource)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Resource,
+)]
 pub struct ContextMap {
 	actors: HashMap<ActorId, Entity>,
-	items: HashMap<ItemId, Entity>,
+	/// List of items loaded in memory
+	items: HashMap<ItemId, Item>,
 }
 
 
@@ -15,19 +18,27 @@ impl ContextMap {
 	pub(super) fn add_actor(&mut self, actor_id: ActorId, entity: Entity) {
 		self.actors.insert(actor_id, entity);
 	}
-	pub(super) fn add_item(&mut self, item_id: ItemId, entity: Entity) {
-		self.items.insert(item_id, entity);
+	pub(super) fn remove_actor(&mut self, actor_id: ActorId) -> Option<Entity> {
+		self.actors.remove(&actor_id)
 	}
+	// fn add_item(&mut self, item: Item) { self.items.insert(item.id(), item); }
+	// fn remove_item(&mut self, item_id: ItemId) -> Option<Item> {
+	// 	self.items.remove(&item_id)
+	// }
 
 	pub fn actor(&self, actor_id: ActorId) -> Result<Entity> {
 		self.actors.get(&actor_id).copied().ok_or_else(|| {
 			bevyhow!("ActorId {actor_id} not found in ContextMap")
 		})
 	}
-	pub fn item(&self, item_id: ItemId) -> Result<Entity> {
+	pub fn item(&self, item_id: ItemId) -> Result<&Item> {
 		self.items
 			.get(&item_id)
-			.copied()
+			.ok_or_else(|| bevyhow!("ItemId {item_id} not found in ContextMap"))
+	}
+	pub fn item_mut(&mut self, item_id: ItemId) -> Result<&mut Item> {
+		self.items
+			.get_mut(&item_id)
 			.ok_or_else(|| bevyhow!("ItemId {item_id} not found in ContextMap"))
 	}
 }
@@ -36,18 +47,18 @@ impl ContextMap {
 #[derive(SystemParam)]
 pub struct ContextQuery<'w, 's> {
 	commands: Commands<'w, 's>,
-	context_map: Res<'w, ContextMap>,
+	context_map: ResMut<'w, ContextMap>,
+	ancestors: Query<'w, 's, &'static ChildOf>,
+	children: Query<'w, 's, &'static Children>,
 	actors: Query<'w, 's, (Entity, &'static mut Actor)>,
-	items: Query<'w, 's, (Entity, &'static mut Item)>,
 }
 impl ContextQuery<'_, '_> {
-	pub fn reborrow(&mut self) -> ContextQuery<'_, '_> {
-		ContextQuery {
-			commands: self.commands.reborrow(),
-			context_map: Res::clone(&self.context_map),
-			actors: self.actors.reborrow(),
-			items: self.items.reborrow(),
-		}
+	pub fn spawn_actor(&mut self, actor: Actor) -> EntityCommands<'_> {
+		let id = actor.id();
+		let entity = self.commands.spawn(actor);
+		self.context_map.add_actor(id, entity.id());
+		println!("Spawned actor {id} at entity {:?}", entity.id());
+		entity
 	}
 
 	pub fn actor(&self, actor_id: ActorId) -> Result<&Actor> {
@@ -55,44 +66,47 @@ impl ContextQuery<'_, '_> {
 			.actor(actor_id)
 			.and_then(|entity| self.actors.get(entity)?.1.xok())
 	}
-	pub fn item(&self, item_id: ItemId) -> Result<&Item> {
-		self.context_map
-			.item(item_id)
-			.and_then(|entity| self.items.get(entity)?.1.xok())
-	}
 	pub fn actor_mut(&mut self, actor_id: ActorId) -> Result<Mut<'_, Actor>> {
 		self.context_map
 			.actor(actor_id)
 			.and_then(|entity| self.actors.get_mut(entity)?.1.xok())
 	}
-	pub fn item_mut(&mut self, item_id: ItemId) -> Result<Mut<'_, Item>> {
-		self.context_map
-			.item(item_id)
-			.and_then(|entity| self.items.get_mut(entity)?.1.xok())
+	pub fn item(&self, item_id: ItemId) -> Result<&Item> {
+		self.context_map.item(item_id)
+	}
+	pub fn item_mut(&mut self, item_id: ItemId) -> Result<&mut Item> {
+		self.context_map.item_mut(item_id)
 	}
 
-
-
-	/// Items that do not appear in any [`Actor::context`] will never be
-	/// used, so should be despawned.
-	pub fn despawn_orphan_items(&mut self) -> Result<&mut Self> {
-		let parented_items = self
-			.actors
-			.iter()
-			.flat_map(|(_, actor)| actor.unsorted_context())
-			.collect::<HashSet<_>>();
-
-		let orphan_items = self
-			.items
-			.iter()
-			.filter(|(_, item)| !parented_items.contains(&item.id()))
-			.map(|(e, _)| e)
-			.collect::<Vec<_>>();
-
-		for entity in orphan_items {
-			self.commands.entity(entity).despawn();
+	pub fn add_item(&mut self, item: Item) -> Result {
+		let item_id = item.id();
+		let item_scope = item.scope();
+		let owner = self.context_map.actor(item.owner())?;
+		match item_scope {
+			ItemScope::Actor => {
+				self.actors.get_mut(owner)?.1.push(item_id);
+			}
+			ItemScope::ActorList(actor_list) => {
+				for actor_id in actor_list {
+					let actor_entity = self.context_map.actor(*actor_id)?;
+					self.actors.get_mut(actor_entity)?.1.push(item_id);
+				}
+			}
+			ItemScope::Family => {
+				let root = self.ancestors.root_ancestor(owner);
+				for entity in self.children.iter_descendants_inclusive(root) {
+					let Ok((_, mut actor)) = self.actors.get_mut(entity) else {
+						continue;
+					};
+					actor.push(item_id);
+				}
+			}
+			ItemScope::World => {
+				for (_, mut actor) in self.actors.iter_mut() {
+					actor.push(item_id);
+				}
+			}
 		}
-		drop(parented_items);
-		self.xok()
+		Ok(())
 	}
 }
