@@ -67,6 +67,8 @@ impl StatusCode {
 	pub const NOT_FOUND: StatusCode = StatusCode(404);
 	/// 405 Method Not Allowed
 	pub const METHOD_NOT_ALLOWED: StatusCode = StatusCode(405);
+	/// 406 Not Acceptable
+	pub const NOT_ACCEPTABLE: StatusCode = StatusCode(406);
 	/// 408 Request Timeout
 	pub const REQUEST_TIMEOUT: StatusCode = StatusCode(408);
 	/// 409 Conflict
@@ -183,6 +185,7 @@ impl StatusCode {
 			Self::FORBIDDEN => "Forbidden",
 			Self::NOT_FOUND => "Not Found",
 			Self::METHOD_NOT_ALLOWED => "Method Not Allowed",
+			Self::NOT_ACCEPTABLE => "Not Acceptable",
 			Self::REQUEST_TIMEOUT => "Request Timeout",
 			Self::CONFLICT => "Conflict",
 			Self::PRECONDITION_FAILED => "Precondition Failed",

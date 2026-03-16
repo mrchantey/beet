@@ -5,6 +5,10 @@
 //! after the scheme may be omitted (ie `http:example.com`), but they are
 //! always included when rendering to string.
 //!
+//! Data URIs (RFC 2397) are treated specially: everything after `data:` is
+//! stored as a single opaque path segment. Use [`DataUrl::try_from`] to parse
+//! the media type, encoding, and data out of a data URI.
+//!
 //! # Example
 //!
 //! ```
@@ -21,131 +25,6 @@
 use std::borrow::Cow;
 
 use beet_core::prelude::*;
-
-/// The transport scheme of a URL.
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Scheme {
-	/// No scheme specified, ie an absolute or relative path.
-	#[default]
-	None,
-	/// `http`
-	Http,
-	/// `https`
-	Https,
-	/// `file`
-	File,
-	/// `ws`
-	Ws,
-	/// `wss`
-	Wss,
-	/// `data` — inline data URIs (RFC 2397).
-	Data,
-	/// `mailto` — email addresses.
-	MailTo,
-	/// `tel` — telephone numbers.
-	Tel,
-	/// `javascript` — inline script execution.
-	JavaScript,
-	/// `blob` — binary large object references.
-	Blob,
-	/// `cid` — content identifiers (RFC 2392).
-	Cid,
-	/// `about` — browser internal pages, ie `about:blank`.
-	About,
-	/// `chrome` — browser internal pages.
-	Chrome,
-	/// A scheme not covered by the named variants.
-	Other(String),
-}
-
-impl Scheme {
-	/// Parse a scheme from a string.
-	pub fn from_str(scheme: &str) -> Self {
-		match scheme.to_ascii_lowercase().as_str() {
-			"http" => Self::Http,
-			"https" => Self::Https,
-			"file" => Self::File,
-			"ws" => Self::Ws,
-			"wss" => Self::Wss,
-			"data" => Self::Data,
-			"mailto" => Self::MailTo,
-			"tel" => Self::Tel,
-			"javascript" => Self::JavaScript,
-			"blob" => Self::Blob,
-			"cid" => Self::Cid,
-			"about" => Self::About,
-			"chrome" => Self::Chrome,
-			"" => Self::None,
-			other => Self::Other(other.to_string()),
-		}
-	}
-
-	/// The canonical string representation of the scheme.
-	pub fn as_str(&self) -> &str {
-		match self {
-			Self::None => "",
-			Self::Http => "http",
-			Self::Https => "https",
-			Self::File => "file",
-			Self::Ws => "ws",
-			Self::Wss => "wss",
-			Self::Data => "data",
-			Self::MailTo => "mailto",
-			Self::Tel => "tel",
-			Self::JavaScript => "javascript",
-			Self::Blob => "blob",
-			Self::Cid => "cid",
-			Self::About => "about",
-			Self::Chrome => "chrome",
-			Self::Other(scheme) => scheme.as_str(),
-		}
-	}
-
-	/// Whether this is an HTTP-based scheme.
-	pub fn is_http(&self) -> bool { matches!(self, Self::Http | Self::Https) }
-
-	/// Whether this is a WebSocket scheme.
-	pub fn is_ws(&self) -> bool { matches!(self, Self::Ws | Self::Wss) }
-
-	/// Whether this scheme uses TLS.
-	pub fn is_secure(&self) -> bool { matches!(self, Self::Https | Self::Wss) }
-
-	/// Whether this scheme uses a hierarchical authority (host) component.
-	///
-	/// Non-hierarchical schemes like `mailto:`, `tel:`, `data:`, `about:`,
-	/// `blob:` place their content directly in the path with no authority.
-	pub fn is_hierarchical(&self) -> bool {
-		matches!(
-			self,
-			Self::Http
-				| Self::Https
-				| Self::File | Self::Ws
-				| Self::Wss | Self::Chrome
-		)
-	}
-}
-
-impl std::fmt::Display for Scheme {
-	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(formatter, "{}", self.as_str())
-	}
-}
-
-#[cfg(feature = "http")]
-impl From<&http::uri::Scheme> for Scheme {
-	fn from(scheme: &http::uri::Scheme) -> Self {
-		Self::from_str(scheme.as_str())
-	}
-}
-
-#[cfg(feature = "http")]
-impl From<Option<&http::uri::Scheme>> for Scheme {
-	fn from(scheme: Option<&http::uri::Scheme>) -> Self {
-		scheme.map(Self::from).unwrap_or(Self::None)
-	}
-}
-
 
 /// An application-friendly URL type.
 ///
@@ -180,6 +59,24 @@ impl Url {
 	/// bare paths (`/api/users?q=1`).
 	pub fn parse(input: impl AsRef<str>) -> Self {
 		let input = input.as_ref();
+
+		// Data URIs are fully opaque — `#` and `?` inside the payload are
+		// content characters, not URL delimiters. Short-circuit before the
+		// generic delimiter stripping below.
+		if input.starts_with("data:") {
+			let payload = &input["data:".len()..];
+			return Self {
+				scheme: Scheme::Data,
+				path: if payload.is_empty() {
+					vec![]
+				} else {
+					vec![payload.to_string()]
+				},
+				authority: None,
+				params: default(),
+				fragment: None,
+			};
+		}
 
 		// Split off fragment first
 		let (before_fragment, fragment) = match input.split_once('#') {
@@ -240,7 +137,19 @@ impl Url {
 			(None, rest.to_string())
 		};
 
-		let path = split_path(&path_str);
+		// Data URIs are fully opaque — the entire payload (mediatype + data)
+		// is a single segment that must not be split on `/`.
+		let path = if scheme == Scheme::Data {
+			// note that this shouldn't be reachable
+			// as we have already checked the data: prefix
+			if path_str.is_empty() {
+				vec![]
+			} else {
+				vec![path_str]
+			}
+		} else {
+			split_path(&path_str)
+		};
 
 		Self {
 			scheme,
@@ -444,6 +353,284 @@ impl From<Cow<'_, str>> for Url {
 impl From<&Cow<'_, str>> for Url {
 	fn from(value: &Cow<'_, str>) -> Self { Url::parse(value) }
 }
+
+/// The transport scheme of a URL.
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Scheme {
+	/// No scheme specified, ie an absolute or relative path.
+	#[default]
+	None,
+	/// `http`
+	Http,
+	/// `https`
+	Https,
+	/// `file`
+	File,
+	/// `ws`
+	Ws,
+	/// `wss`
+	Wss,
+	/// `data` — inline data URIs (RFC 2397).
+	Data,
+	/// `mailto` — email addresses.
+	MailTo,
+	/// `tel` — telephone numbers.
+	Tel,
+	/// `javascript` — inline script execution.
+	JavaScript,
+	/// `blob` — binary large object references.
+	Blob,
+	/// `cid` — content identifiers (RFC 2392).
+	Cid,
+	/// `about` — browser internal pages, ie `about:blank`.
+	About,
+	/// `chrome` — browser internal pages.
+	Chrome,
+	/// A scheme not covered by the named variants.
+	Other(String),
+}
+
+impl Scheme {
+	/// Parse a scheme from a string.
+	pub fn from_str(scheme: &str) -> Self {
+		match scheme.to_ascii_lowercase().as_str() {
+			"http" => Self::Http,
+			"https" => Self::Https,
+			"file" => Self::File,
+			"ws" => Self::Ws,
+			"wss" => Self::Wss,
+			"data" => Self::Data,
+			"mailto" => Self::MailTo,
+			"tel" => Self::Tel,
+			"javascript" => Self::JavaScript,
+			"blob" => Self::Blob,
+			"cid" => Self::Cid,
+			"about" => Self::About,
+			"chrome" => Self::Chrome,
+			"" => Self::None,
+			other => Self::Other(other.to_string()),
+		}
+	}
+
+	/// The canonical string representation of the scheme.
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::None => "",
+			Self::Http => "http",
+			Self::Https => "https",
+			Self::File => "file",
+			Self::Ws => "ws",
+			Self::Wss => "wss",
+			Self::Data => "data",
+			Self::MailTo => "mailto",
+			Self::Tel => "tel",
+			Self::JavaScript => "javascript",
+			Self::Blob => "blob",
+			Self::Cid => "cid",
+			Self::About => "about",
+			Self::Chrome => "chrome",
+			Self::Other(scheme) => scheme.as_str(),
+		}
+	}
+
+	/// Whether this is an HTTP-based scheme.
+	pub fn is_http(&self) -> bool { matches!(self, Self::Http | Self::Https) }
+
+	/// Whether this is a WebSocket scheme.
+	pub fn is_ws(&self) -> bool { matches!(self, Self::Ws | Self::Wss) }
+
+	/// Whether this scheme uses TLS.
+	pub fn is_secure(&self) -> bool { matches!(self, Self::Https | Self::Wss) }
+
+	/// Whether this scheme uses a hierarchical authority (host) component.
+	///
+	/// Non-hierarchical schemes like `mailto:`, `tel:`, `data:`, `about:`,
+	/// `blob:` place their content directly in the path with no authority.
+	pub fn is_hierarchical(&self) -> bool {
+		matches!(
+			self,
+			Self::Http
+				| Self::Https
+				| Self::File | Self::Ws
+				| Self::Wss | Self::Chrome
+		)
+	}
+}
+
+impl std::fmt::Display for Scheme {
+	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(formatter, "{}", self.as_str())
+	}
+}
+
+#[cfg(feature = "http")]
+impl From<&http::uri::Scheme> for Scheme {
+	fn from(scheme: &http::uri::Scheme) -> Self {
+		Self::from_str(scheme.as_str())
+	}
+}
+
+#[cfg(feature = "http")]
+impl From<Option<&http::uri::Scheme>> for Scheme {
+	fn from(scheme: Option<&http::uri::Scheme>) -> Self {
+		scheme.map(Self::from).unwrap_or(Self::None)
+	}
+}
+
+/// The transfer encoding used in a data URI.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Encoding {
+	/// Percent-encoded text (default for data URIs per RFC 2397).
+	#[default]
+	UrlEncoded,
+	/// Base64-encoded binary data (`data:...;base64,...`).
+	Base64,
+	/// Raw binary (non-standard, used internally).
+	Binary,
+}
+
+/// A parsed data URI (`data:<mediatype>[;base64],<data>`).
+///
+/// Data URIs embed content inline inside a URL.  The entire payload after
+/// `data:` is an opaque string — there is no host, path hierarchy, or query
+/// string. [`Url`] stores this opaque string as a single path segment;
+/// `DataUrl` decodes it into its three logical parts.
+///
+/// # Example
+///
+/// ```
+/// # use beet_net::prelude::*;
+/// let url = Url::parse("data:text/html,<h1>Hello</h1>");
+/// let data_url = DataUrl::try_from(url).unwrap();
+/// assert_eq!(data_url.media_type, MediaType::Html);
+/// assert_eq!(data_url.encoding, Encoding::UrlEncoded);
+/// assert_eq!(data_url.data, "<h1>Hello</h1>");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataUrl {
+	/// The media type declared in the URI.
+	pub media_type: MediaType,
+	/// How the data portion is encoded.
+	pub encoding: Encoding,
+	/// The raw data string (still encoded per [`Encoding`]).
+	pub data: String,
+}
+
+impl DataUrl {
+	/// Parse a [`DataUrl`] from a [`Url`].
+	///
+	/// ## Errors
+	///
+	/// - If `url` does not use [`Scheme::Data`].
+	/// - If the data URI payload cannot be parsed.
+	pub fn from_url(url: &Url) -> Result<Self> {
+		if url.scheme() != &Scheme::Data {
+			bevybail!("expected a data: URL, got scheme '{}'", url.scheme());
+		}
+		// The entire payload is stored as a single path segment.
+		let payload = url.path().first().map(|seg| seg.as_str()).unwrap_or("");
+
+		Self::parse_payload(payload)
+	}
+
+	/// Parse a data URI payload string (the part after `data:`).
+	///
+	/// Accepts `<mediatype>[;base64],<data>` or just `,<data>` (defaulting
+	/// to `text/plain`).
+	pub fn parse_payload(payload: &str) -> Result<Self> {
+		// The comma separates the header from the data.
+		let comma = payload.find(',').ok_or_else(|| {
+			bevyhow!("data URI missing ',' separator: {payload:?}")
+		})?;
+		let header = &payload[..comma];
+		let data = payload[comma + 1..].to_string();
+
+		// Header format: `<mediatype>[;base64]`
+		// The mediatype itself may contain `;` for parameters
+		// (eg `text/plain;charset=utf-8`), so we scan from the right.
+		let (media_str, encoding) =
+			if header.ends_with(";base64") || header == ";base64" {
+				let media_str = header
+					.strip_suffix(";base64")
+					.unwrap_or("")
+					.trim_start_matches(';');
+				(media_str, Encoding::Base64)
+			} else {
+				(header.trim_start_matches(';'), Encoding::UrlEncoded)
+			};
+
+		let media_type = if media_str.is_empty() {
+			// RFC 2397 default: `text/plain;charset=US-ASCII`
+			MediaType::Text
+		} else {
+			MediaType::from_content_type(media_str)
+		};
+
+		Ok(Self {
+			media_type,
+			encoding,
+			data,
+		})
+	}
+
+	/// Decode the data portion to raw bytes.
+	///
+	/// For [`Encoding::Base64`] this decodes base64 (requires `serde` feature);
+	/// for [`Encoding::UrlEncoded`] this percent-decodes the string; for
+	/// [`Encoding::Binary`] the bytes of the string are returned as-is.
+	///
+	/// ## Errors
+	///
+	/// Returns an error if base64 decoding fails or the `serde` feature is
+	/// not enabled for a base64-encoded payload.
+	pub fn decode(&self) -> Result<Vec<u8>> {
+		match self.encoding {
+			Encoding::Base64 => {
+				#[cfg(feature = "serde")]
+				{
+					use base64::Engine as _;
+					base64::engine::general_purpose::STANDARD
+						.decode(&self.data)
+						.map_err(|err| bevyhow!("base64 decode failed: {err}"))
+				}
+				#[cfg(not(feature = "serde"))]
+				{
+					bevybail!("base64 decoding requires the 'serde' feature");
+				}
+			}
+			Encoding::UrlEncoded => {
+				// Percent-decode
+				let decoded = self.data.split('%').enumerate().fold(
+					String::new(),
+					|mut acc, (i, chunk)| {
+						if i == 0 {
+							acc.push_str(chunk);
+						} else if chunk.len() >= 2 {
+							if let Ok(byte) =
+								u8::from_str_radix(&chunk[..2], 16)
+							{
+								acc.push(byte as char);
+								acc.push_str(&chunk[2..]);
+							} else {
+								acc.push('%');
+								acc.push_str(chunk);
+							}
+						} else {
+							acc.push('%');
+							acc.push_str(chunk);
+						}
+						acc
+					},
+				);
+				Ok(decoded.into_bytes())
+			}
+			Encoding::Binary => Ok(self.data.as_bytes().to_vec()),
+		}
+	}
+}
+
 
 // ============================================================================
 // Shared parsing helpers (also used by parts.rs)
@@ -710,10 +897,58 @@ mod test {
 		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
 		url.scheme().clone().xpect_eq(Scheme::Data);
 		url.authority().xpect_none();
-		url.path().clone().xpect_eq(vec![
-			"text".to_string(),
-			"plain;base64,SGVsbG8=".to_string(),
-		]);
+		// The entire payload is one opaque segment — never split on `/`.
+		url.path()
+			.clone()
+			.xpect_eq(vec!["text/plain;base64,SGVsbG8=".to_string()]);
+	}
+
+	#[test]
+	fn parse_data_uri_html() {
+		let raw = "data:text/html,<h1>Hello!</h1><p>not-query-param=no</p>";
+		let url = Url::parse(raw);
+		url.scheme().clone().xpect_eq(Scheme::Data);
+		url.authority().xpect_none();
+		// Preserved as one opaque segment; `?` and `/` are NOT treated as
+		// URL delimiters inside a data URI payload.
+		url.path().first().unwrap().xpect_contains("text/html,");
+		url.to_string().xpect_eq(raw);
+	}
+
+	#[test]
+	fn data_url_try_from_base64() {
+		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
+		let data_url = DataUrl::from_url(&url).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Text);
+		data_url.encoding.xpect_eq(Encoding::Base64);
+		data_url.data.xpect_eq("SGVsbG8=");
+		// "SGVsbG8=" decodes to "Hello"
+		let bytes = data_url.decode().unwrap();
+		String::from_utf8(bytes).unwrap().xpect_eq("Hello");
+	}
+
+	#[test]
+	fn data_url_try_from_url_encoded() {
+		let url = Url::parse("data:text/html,<h1>Hello</h1>");
+		let data_url = DataUrl::from_url(&url).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Html);
+		data_url.encoding.xpect_eq(Encoding::UrlEncoded);
+		data_url.data.xpect_eq("<h1>Hello</h1>");
+	}
+
+	#[test]
+	fn data_url_default_media_type() {
+		// RFC 2397: missing media type defaults to text/plain
+		let url = Url::parse("data:,Hello%20World");
+		let data_url = DataUrl::from_url(&url).unwrap();
+		data_url.media_type.xpect_eq(MediaType::Text);
+		data_url.encoding.xpect_eq(Encoding::UrlEncoded);
+	}
+
+	#[test]
+	fn data_url_wrong_scheme() {
+		let url = Url::parse("https://example.com");
+		DataUrl::from_url(&url).xpect_err();
 	}
 
 	#[test]

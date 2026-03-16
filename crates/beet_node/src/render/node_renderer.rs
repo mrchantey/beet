@@ -132,7 +132,7 @@ impl RenderOutput {
 	/// Convenience constructor for a [`RenderOutput::Media`] with the given
 	/// media type and UTF-8 string content.
 	pub fn media_string(media_type: MediaType, content: String) -> Self {
-		Self::Media(MediaBytes::from_string(media_type, content))
+		Self::Media(MediaBytes::new_owned_str(media_type, content))
 	}
 
 	/// Returns the inner [`MediaBytes`] if this is a [`RenderOutput::Media`].

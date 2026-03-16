@@ -5,6 +5,7 @@
 //!
 //! - `http` | `https` → HTTP client (ureq, reqwest, or web-sys)
 //! - `file` → local filesystem via [`FileClient`]
+//! - `data` → inline data URI, decoded to a 200 response
 //! - No scheme with authority → HTTP client
 //! - No scheme without authority → local filesystem via [`FileClient`]
 //! - Other → returns an error
@@ -85,6 +86,7 @@ impl Request {
 	/// |--------|---------|
 	/// | `http` / `https` | HTTP client (ureq, reqwest, or web-sys) |
 	/// | `file` | Local filesystem via [`FileClient`] |
+	/// | `data` | Inline data URI decoded to a 200 response |
 	/// | None + authority present | HTTP client |
 	/// | None + no authority | Local filesystem via [`FileClient`] |
 	/// | Other | Returns an error |
@@ -137,8 +139,8 @@ impl Request {
 					"WebSocket schemes are not supported by Request::send, use the sockets module instead"
 				);
 			}
-			Scheme::Data
-			| Scheme::MailTo
+			Scheme::Data => send_data(self).await,
+			Scheme::MailTo
 			| Scheme::Tel
 			| Scheme::JavaScript
 			| Scheme::Blob
@@ -157,13 +159,87 @@ impl Request {
 	}
 }
 
+/// Serve an inline data URI as a synthetic 200 response.
+///
+/// Parses the data URI payload, decodes the body, and sets the `Content-Type`
+/// header to the declared media type. The `Accept` header on the request is
+/// respected — if the declared media type is not acceptable a 406 response is
+/// returned.
+async fn send_data(request: Request) -> Result<Response> {
+	let data_url = DataUrl::from_url(request.url())?;
+
+	// Content negotiation: check Accept header if present.
+	let accepts = request
+		.headers()
+		.get::<header::Accept>()
+		.and_then(|res| res.ok())
+		.unwrap_or_default();
+
+	if !accepts.is_empty() && !accepts.contains(&data_url.media_type) {
+		return Ok(Response::from_status(StatusCode::NOT_ACCEPTABLE));
+	}
+
+	let body_bytes = data_url.decode()?;
+	Ok(Response::ok()
+		.with_content_type(data_url.media_type)
+		.with_body(body_bytes))
+}
 
 
-#[cfg(any(
-	all(feature = "ureq", feature = "native-tls"),
-	all(feature = "reqwest", feature = "native-tls"),
-	target_arch = "wasm32"
-))]
+#[cfg(test)]
+mod test_data_scheme {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	async fn data_text_plain() {
+		let response = Request::get("data:text/plain,Hello%20World")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response
+			.parts
+			.headers
+			.get::<crate::headers::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::Text);
+	}
+
+	#[beet_core::test]
+	async fn data_html() {
+		let response = Request::get("data:text/html,<h1>Hi</h1>")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		let text = response.text().await.unwrap();
+		text.xpect_contains("<h1>Hi</h1>");
+	}
+
+	#[beet_core::test]
+	async fn data_base64() {
+		// "Hello" base64-encoded
+		let response = Request::get("data:text/plain;base64,SGVsbG8=")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response.text().await.unwrap().xpect_eq("Hello");
+	}
+
+	#[beet_core::test]
+	async fn data_accept_mismatch_returns_406() {
+		let response = Request::get("data:text/html,<h1>Hi</h1>")
+			.with_accept(MediaType::Json)
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::NOT_ACCEPTABLE);
+	}
+}
+
 #[cfg(test)]
 #[cfg(feature = "json")]
 mod test_request {

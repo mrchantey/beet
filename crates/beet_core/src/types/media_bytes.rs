@@ -24,12 +24,12 @@ impl<'a> MediaBytes<'a> {
 	}
 
 	/// Create a [`MediaBytes`] from a UTF-8 string.
-	pub fn from_str(media_type: MediaType, content: &'a str) -> Self {
+	pub fn new_str(media_type: MediaType, content: &'a str) -> Self {
 		Self::new(media_type, content.as_bytes())
 	}
 
 	/// Create an owned [`MediaBytes<'static>`] from a [`String`].
-	pub fn from_string(
+	pub fn new_owned_str(
 		media_type: MediaType,
 		content: String,
 	) -> MediaBytes<'static> {
@@ -40,10 +40,10 @@ impl<'a> MediaBytes<'a> {
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Html`].
-	pub fn html(html: &'a str) -> Self { Self::from_str(MediaType::Html, html) }
+	pub fn html(html: &'a str) -> Self { Self::new_str(MediaType::Html, html) }
 
 	/// Create [`MediaBytes`] with [`MediaType::Text`].
-	pub fn text(text: &'a str) -> Self { Self::from_str(MediaType::Text, text) }
+	pub fn text(text: &'a str) -> Self { Self::new_str(MediaType::Text, text) }
 
 	/// Create [`MediaBytes`] with [`MediaType::Bytes`].
 	pub fn octet(bytes: impl Into<Cow<'a, [u8]>>) -> Self {
@@ -52,18 +52,18 @@ impl<'a> MediaBytes<'a> {
 
 	/// Create [`MediaBytes`] with [`MediaType::Markdown`].
 	pub fn markdown(text: &'a str) -> Self {
-		Self::from_str(MediaType::Markdown, text)
+		Self::new_str(MediaType::Markdown, text)
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Json`].
-	pub fn json(text: &'a str) -> Self { Self::from_str(MediaType::Json, text) }
+	pub fn json(text: &'a str) -> Self { Self::new_str(MediaType::Json, text) }
 
 	/// Create [`MediaBytes`] with [`MediaType::Css`].
-	pub fn css(text: &'a str) -> Self { Self::from_str(MediaType::Css, text) }
+	pub fn css(text: &'a str) -> Self { Self::new_str(MediaType::Css, text) }
 
 	/// Create [`MediaBytes`] with [`MediaType::Javascript`].
 	pub fn javascript(text: &'a str) -> Self {
-		Self::from_str(MediaType::Javascript, text)
+		Self::new_str(MediaType::Javascript, text)
 	}
 
 	/// The media type of these bytes.
@@ -149,14 +149,14 @@ mod test {
 
 	#[test]
 	fn from_str_ctor() {
-		let mb = MediaBytes::from_str(MediaType::Text, "hello");
+		let mb = MediaBytes::new_str(MediaType::Text, "hello");
 		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
 	#[test]
 	fn from_string_ctor() {
 		let mb =
-			MediaBytes::from_string(MediaType::Html, "<b>bold</b>".to_string());
+			MediaBytes::new_owned_str(MediaType::Html, "<b>bold</b>".to_string());
 		mb.as_utf8().unwrap().xpect_eq("<b>bold</b>");
 	}
 
@@ -204,7 +204,7 @@ mod test {
 
 	#[test]
 	fn display_text() {
-		MediaBytes::from_str(MediaType::Text, "hello world")
+		MediaBytes::new_str(MediaType::Text, "hello world")
 			.to_string()
 			.xpect_eq("hello world".to_string());
 	}
