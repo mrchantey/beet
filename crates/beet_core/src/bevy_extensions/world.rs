@@ -10,6 +10,7 @@ use bevy::ecs::query::QueryFilter;
 #[cfg(feature = "multi_threaded")]
 use bevy::ecs::schedule::ExecutorKind;
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use core::marker::PhantomData;
 use extend::ext;
@@ -36,6 +37,11 @@ pub impl World {
 				return exit;
 			}
 		}
+	}
+
+	/// Creates a new [`SystemState`] for the given system parameter type.
+	fn state<T: SystemParam>(&mut self) -> SystemState<T> {
+		SystemState::new(self)
 	}
 
 	/// The world equivalent of [`App::update`].

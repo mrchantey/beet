@@ -51,7 +51,7 @@ fn next_id(prefix: &str) -> String {
 /// let response = provider.send(body).await.unwrap();
 /// assert!(!response.function_calls().is_empty());
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MockModelProvider {
 	/// Optional custom response text (overrides default echo behavior)
 	pub custom_response: Option<String>,
@@ -259,6 +259,8 @@ impl MockModelProvider {
 }
 
 impl ModelProvider for MockModelProvider {
+	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
+
 	fn provider_slug(&self) -> &'static str { "mock" }
 
 	fn default_small_model(&self) -> &'static str { "mock-small" }
@@ -445,8 +447,8 @@ mod test {
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
 		let provider = MockModelProvider::default();
-		let body =
-			openresponses::RequestBody::new("mock").with_input("Hello world!");
+		let body = openresponses::RequestBody::new("mock")
+			.with_simple_input("Hello world!");
 
 		let response = provider.send(body).await.unwrap();
 
@@ -470,7 +472,7 @@ mod test {
 			}));
 
 		let body = openresponses::RequestBody::new("mock")
-			.with_input("Greet someone")
+			.with_simple_input("Greet someone")
 			.with_tool(tool);
 
 		let response = provider.send(body).await.unwrap();
@@ -489,7 +491,8 @@ mod test {
 	#[beet_core::test]
 	async fn custom_response_overrides_echo() {
 		let provider = MockModelProvider::with_response("Custom answer");
-		let body = openresponses::RequestBody::new("mock").with_input("Hello!");
+		let body =
+			openresponses::RequestBody::new("mock").with_simple_input("Hello!");
 
 		let response = provider.send(body).await.unwrap();
 		response.first_text().unwrap().xpect_eq("Custom answer");
@@ -499,7 +502,7 @@ mod test {
 	async fn streaming_echoes_input() {
 		let provider = MockModelProvider::default();
 		let body = openresponses::RequestBody::new("mock")
-			.with_input("Stream test")
+			.with_simple_input("Stream test")
 			.with_stream(true);
 
 		let stream = provider.stream(body).await.unwrap();
@@ -535,7 +538,7 @@ mod test {
 			}));
 
 		let body = openresponses::RequestBody::new("mock")
-			.with_input("Call tool")
+			.with_simple_input("Call tool")
 			.with_tool(tool)
 			.with_stream(true);
 

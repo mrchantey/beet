@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpenResponsesProvider {
 	auth: Option<Cow<'static, str>>,
 	url: Cow<'static, str>,

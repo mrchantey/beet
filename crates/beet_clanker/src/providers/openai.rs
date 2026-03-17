@@ -5,22 +5,12 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::BoxedFuture;
 
-impl OpenAiProvider {
-	/// GPT-5 Nano - smallest and fastest model.
-	pub const GPT_5_NANO: &str = "gpt-5-nano";
-	/// GPT-5 Mini - balanced speed and capability.
-	pub const GPT_5_MINI: &str = "gpt-5-mini";
-	/// GPT-5.2 - most capable model.
-	pub const GPT_5_2: &str = "gpt-5.2";
-
-	/// OpenAI Responses API URL.
-	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
-}
 
 /// An OpenResponses-compatible provider for OpenAI API.
 ///
 /// OpenAI API key must be set via the `OPENAI_API_KEY` environment variable.
 /// By default, connects to `https://api.openai.com/v1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpenAiProvider {
 	inner: OpenResponsesProvider,
 }
@@ -41,6 +31,8 @@ impl OpenAiProvider {
 }
 
 impl ModelProvider for OpenAiProvider {
+	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
+
 	fn provider_slug(&self) -> &'static str { "openai" }
 
 	fn default_small_model(&self) -> &'static str { Self::GPT_5_NANO }
@@ -62,4 +54,15 @@ impl ModelProvider for OpenAiProvider {
 		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.stream(request))
 	}
+}
+impl OpenAiProvider {
+	/// GPT-5 Nano - smallest and fastest model.
+	pub const GPT_5_NANO: &str = "gpt-5-nano";
+	/// GPT-5 Mini - balanced speed and capability.
+	pub const GPT_5_MINI: &str = "gpt-5-mini";
+	/// GPT-5.2 - most capable model.
+	pub const GPT_5_2: &str = "gpt-5.2";
+
+	/// OpenAI Responses API URL.
+	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
 }

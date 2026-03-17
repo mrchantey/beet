@@ -26,6 +26,7 @@ where
 /// Wires a channel-based [`OutHandler`] and calls [`call_world`].
 ///
 /// Returns the receiving end of the channel so the caller can await the result.
+#[track_caller]
 fn call_with_channel<Input, Out>(
 	entity: Entity,
 	world: &mut World,
@@ -76,12 +77,17 @@ fn call_tool_system<Input, Out>(
 	commands: AsyncCommands,
 	tools: Query<&Tool<Input, Out>>,
 ) -> Result {
-	tools.get(caller)?.call(ToolCall {
-		commands,
-		caller,
-		input,
-		out_handler,
-	})?;
+	tools
+		.get(caller)
+		.map_err(|err| {
+			bevyhow!("Failed to find tool for entity {caller:?}: {err:?}")
+		})?
+		.call(ToolCall {
+			commands,
+			caller,
+			input,
+			out_handler,
+		})?;
 	Ok(())
 }
 
@@ -144,6 +150,7 @@ pub impl AsyncEntity {
 	/// # Errors
 	/// Errors if the entity has no matching [`Tool`] or the
 	/// tool call fails.
+	#[track_caller]
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&self,
 		input: Input,
@@ -152,9 +159,12 @@ pub impl AsyncEntity {
 		let world = self.world().clone();
 		async move {
 			let recv = world
-				.with_then(move |w: &mut World| {
-					call_with_channel::<Input, Out>(entity_id, w, input)
-				})
+				.with_then(
+					// #[track_caller]
+					move |w: &mut World| {
+						call_with_channel::<Input, Out>(entity_id, w, input)
+					},
+				)
 				.await?;
 			recv.recv().await.map_err(|_| {
 				bevyhow!("Tool call response channel closed unexpectedly.")
@@ -169,7 +179,10 @@ pub impl AsyncEntity {
 	///
 	/// # Errors
 	/// Errors if the tool handler fails or the response channel closes.
-	fn call_detached<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
+	fn call_detached<
+		Input: 'static + Send + Sync,
+		Out: 'static + Send + Sync,
+	>(
 		&self,
 		tool: Tool<Input, Out>,
 		input: Input,

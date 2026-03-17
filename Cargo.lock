@@ -1074,6 +1074,7 @@ dependencies = [
  "beet_clanker",
  "beet_core",
  "beet_net",
+ "beet_tool",
  "bevy",
  "dotenv",
  "futures",

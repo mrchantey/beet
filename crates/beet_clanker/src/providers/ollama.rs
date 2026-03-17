@@ -5,22 +5,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::BoxedFuture;
 
-impl OllamaProvider {
-	/// Qwen 3 Abliterated 14B - large uncensored model.
-	pub const QWEN_3_ABLITERATED_14B: &str = "huihui_ai/qwen3-abliterated:14b";
-	/// Function Gemma 270M IT - small function calling model.
-	pub const FUNCTION_GEMMA_270M_IT: &str = "functiongemma:270m-it-fp16";
-	/// Qwen 3 8B - balanced model.
-	pub const QWEN_3_8B: &str = "qwen3:8b";
-
-	/// Default responses URL for local Ollama.
-	pub const RESPONSES_URL: &str = "http://localhost:11434/v1/responses";
-}
-
 /// An OpenResponses-compatible provider for local Ollama inference.
 ///
 /// Ollama must be running locally with OpenResponses API support enabled.
 /// By default, connects to `http://localhost:11434/v1/responses`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OllamaProvider {
 	/// The full URL to the OpenResponses-compatible Ollama endpoint.
 	/// Defaults to `http://localhost:11434/v1/responses`.
@@ -38,6 +27,8 @@ impl Default for OllamaProvider {
 impl OllamaProvider {}
 
 impl ModelProvider for OllamaProvider {
+	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
+
 	fn provider_slug(&self) -> &'static str { "ollama" }
 
 	fn default_small_model(&self) -> &'static str { Self::QWEN_3_8B }
@@ -63,4 +54,17 @@ impl ModelProvider for OllamaProvider {
 		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.stream(request))
 	}
+}
+
+
+impl OllamaProvider {
+	/// Qwen 3 Abliterated 14B - large uncensored model.
+	pub const QWEN_3_ABLITERATED_14B: &str = "huihui_ai/qwen3-abliterated:14b";
+	/// Function Gemma 270M IT - small function calling model.
+	pub const FUNCTION_GEMMA_270M_IT: &str = "functiongemma:270m-it-fp16";
+	/// Qwen 3 8B - balanced model.
+	pub const QWEN_3_8B: &str = "qwen3:8b";
+
+	/// Default responses URL for local Ollama.
+	pub const RESPONSES_URL: &str = "http://localhost:11434/v1/responses";
 }

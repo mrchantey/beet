@@ -14,6 +14,7 @@ use std::task::Context;
 use std::task::Poll;
 
 impl GeminiProvider {
+	const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
 	/// Gemini 2.5 Flash - fast and efficient.
 	pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
 	/// Gemini 2.5 Flash with image generation support.
@@ -22,11 +23,11 @@ impl GeminiProvider {
 	pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
 }
 
-const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
 
 /// An OpenResponses-compatible provider for Google Gemini API.
 ///
 /// Gemini API key must be set via the `GEMINI_API_KEY` environment variable.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeminiProvider {
 	api_key: String,
 }
@@ -283,7 +284,7 @@ impl GeminiProvider {
 
 	/// Builds the request for non-streaming.
 	fn build_request(&self, model: &str, body: &Value) -> Result<Request> {
-		let url = format!("{BASE_URL}/models/{model}:generateContent");
+		let url = format!("{}/models/{model}:generateContent", Self::BASE_URL);
 		Request::post(url)
 			.with_header_raw("x-goog-api-key", &self.api_key)
 			.with_json_body(body)?
@@ -296,8 +297,10 @@ impl GeminiProvider {
 		model: &str,
 		body: &Value,
 	) -> Result<Request> {
-		let url =
-			format!("{BASE_URL}/models/{model}:streamGenerateContent?alt=sse");
+		let url = format!(
+			"{}/models/{model}:streamGenerateContent?alt=sse",
+			Self::BASE_URL
+		);
 		Request::post(url)
 			.with_header_raw("x-goog-api-key", &self.api_key)
 			.with_json_body(body)?
@@ -435,6 +438,7 @@ impl GeminiProvider {
 }
 
 impl ModelProvider for GeminiProvider {
+	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
 	fn provider_slug(&self) -> &'static str { "gemini" }
 
 	fn default_small_model(&self) -> &'static str { Self::GEMINI_2_5_FLASH }

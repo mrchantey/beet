@@ -20,10 +20,13 @@ pub struct Item {
 	content: Content,
 }
 
+
+
+
 impl Item {
 	pub fn new(actor_id: ActorId, content: Content, scope: ItemScope) -> Self {
 		Self {
-			id: ItemId::default(),
+			id: ItemId::new_now(),
 			owner: actor_id,
 			scope,
 			content,
@@ -40,7 +43,8 @@ impl Item {
 /// Id associated with an [`Item`].
 /// Items are components and already have an associated [`Entity`],
 /// but we need something more easily handled by distributed systems,
-/// databases etc. See also [`ActorId`]
+/// databases etc. See also [`ActorId`].
+/// Items created in the same process are guaranteed to have correct ordering.
 #[derive(
 	Debug,
 	Clone,
@@ -61,8 +65,8 @@ impl std::fmt::Display for ItemId {
 	}
 }
 
-impl Default for ItemId {
-	fn default() -> Self { Self(Uuid::now_v7()) }
+impl ItemId {
+	fn new_now() -> Self { Self(Uuid::now_v7()) }
 }
 
 #[derive(
@@ -85,10 +89,13 @@ pub enum ItemScope {
 	/// The item is accessible to only a specific list of actors,
 	/// possibly exclusive of its owner, ie System items.
 	ActorList(Vec<ActorId>),
-	/// The item is accessible to all descendants from this
-	/// actors root.
+	/// All actor enti with a matching [`ActorId`] to the item owner.
+	/// The item is accessible to all descendants from the root of
+	/// any actor with this items [`ActorId`]
 	Family,
 	/// The item is accessible to all actors in the world.
+	/// Note this is very verbose, resulting in the item being added
+	/// to *all* actors in the world, something like a discord @everyone
 	World,
 }
 
@@ -135,10 +142,20 @@ pub enum Content {
 }
 
 impl Content {
-	pub fn text(text: impl Into<String>) -> Self {
-		Self::Text(TextContent {
-			content: text.into(),
-		})
+	pub fn message(text: impl Into<String>) -> Self {
+		TextContent::message(text).into()
+	}
+}
+
+impl From<TextContent> for Content {
+	fn from(text_content: TextContent) -> Self { Self::Text(text_content) }
+}
+impl From<FileContent> for Content {
+	fn from(file_content: FileContent) -> Self { Self::File(file_content) }
+}
+impl From<FunctionCall> for Content {
+	fn from(function_call: FunctionCall) -> Self {
+		Self::FunctionCall(function_call)
 	}
 }
 
@@ -152,10 +169,65 @@ impl Content {
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct TextContent {
+	kind: TextKind,
 	content: String,
 }
 impl TextContent {
+	pub fn message(text: impl Into<String>) -> Self {
+		Self {
+			kind: TextKind::Message,
+			content: text.into(),
+		}
+	}
+	pub fn refusal(text: impl Into<String>) -> Self {
+		Self {
+			kind: TextKind::Refusal,
+			content: text.into(),
+		}
+	}
+	pub fn reasoning_summary(text: impl Into<String>) -> Self {
+		Self {
+			kind: TextKind::ReasoningSummary,
+			content: text.into(),
+		}
+	}
+	pub fn reasoning_content(text: impl Into<String>) -> Self {
+		Self {
+			kind: TextKind::ReasoningContent,
+			content: text.into(),
+		}
+	}
+	pub fn reasoning_encrypted_content(text: impl Into<String>) -> Self {
+		Self {
+			kind: TextKind::ReasoningEncryptedContent,
+			content: text.into(),
+		}
+	}
+
+	pub fn kind(&self) -> &TextKind { &self.kind }
+
 	pub fn content(&self) -> &str { &self.content }
+}
+
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+)]
+pub enum TextKind {
+	#[default]
+	Message,
+	Refusal,
+	ReasoningSummary,
+	ReasoningContent,
+	ReasoningEncryptedContent,
 }
 
 /// Common type for several openresponses types

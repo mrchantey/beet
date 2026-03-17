@@ -1,7 +1,9 @@
 mod actor;
 mod clanker_plugin;
 mod context_builder;
+mod model_action;
 pub use actor::*;
+pub use model_action::*;
 mod item;
 pub use item::*;
 mod context_map;

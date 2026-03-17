@@ -13,14 +13,16 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["fs"]
+default = ["fs","tool"]
 rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
 fs = ["beet_core/fs"]
+tool = ["dep:beet_tool"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["ureq","json"] }
 beet_core = { workspace = true, features = ["serde"] }
+beet_tool = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["v7", "js"] }
 serde.workspace = true
 futures.workspace = true

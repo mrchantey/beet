@@ -183,8 +183,13 @@ impl RequestBody {
 	}
 
 	/// Sets the input as a simple string (interpreted as a user message).
-	pub fn with_input(mut self, input: impl Into<String>) -> Self {
+	pub fn with_simple_input(mut self, input: impl Into<String>) -> Self {
 		self.input = Input::Text(input.into());
+		self
+	}
+
+	pub fn with_input(mut self, input: Input) -> Self {
+		self.input = input;
 		self
 	}
 
@@ -556,7 +561,7 @@ mod test {
 
 	#[test]
 	fn serializes_simple_request() {
-		let body = RequestBody::new("gpt-4o-mini").with_input("Hello");
+		let body = RequestBody::new("gpt-4o-mini").with_simple_input("Hello");
 		let json = serde_json::to_value(&body).unwrap();
 		assert_eq!(json["model"], "gpt-4o-mini");
 		assert_eq!(json["input"], "Hello");

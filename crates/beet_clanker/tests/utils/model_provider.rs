@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// Basic text response - simple user message, validates ResponseResource schema.
 pub async fn basic_text_response(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
-		.with_input(
+		.with_simple_input(
 			"Say hello in exactly 3 words. Do not include any punctuation.",
 		);
 
@@ -30,7 +30,7 @@ pub async fn basic_text_response(provider: impl ModelProvider) {
 /// Streaming response - validates SSE streaming events and final response.
 pub async fn streaming_response(provider: impl ModelProvider) {
 	let body = openresponses::RequestBody::new(provider.default_small_model())
-		.with_input("Count from 1 to 5.")
+		.with_simple_input("Count from 1 to 5.")
 		.with_stream(true);
 	let stream = provider.stream(body).await.unwrap();
 	pin!(stream);
@@ -118,7 +118,7 @@ pub async fn tool_calling(provider: impl ModelProvider) {
 		}));
 
 	let body = openresponses::RequestBody::new(provider.default_small_model())
-		.with_input("What's the weather like in San Francisco?")
+		.with_simple_input("What's the weather like in San Francisco?")
 		.with_tool(tool);
 
 	let response = provider.send(body).await.unwrap();

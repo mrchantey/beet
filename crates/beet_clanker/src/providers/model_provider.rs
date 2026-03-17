@@ -52,6 +52,8 @@ pub type StreamingEventStream =
 /// # }
 /// ```
 pub trait ModelProvider: 'static + Send + Sync {
+	fn box_clone(&self) -> Box<dyn ModelProvider>;
+
 	/// A short slug identifying this provider (e.g., "openai", "ollama").
 	fn provider_slug(&self) -> &'static str;
 
@@ -84,3 +86,35 @@ pub trait ModelProvider: 'static + Send + Sync {
 
 /// Alias for a boxed, sendable model provider.
 pub type BoxedModelProvider = Box<dyn ModelProvider>;
+
+impl ModelProvider for Box<dyn ModelProvider> {
+	fn box_clone(&self) -> Box<dyn ModelProvider> { self.as_ref().box_clone() }
+
+	fn provider_slug(&self) -> &'static str { self.as_ref().provider_slug() }
+
+	fn default_small_model(&self) -> &'static str {
+		self.as_ref().default_small_model()
+	}
+
+	fn default_tool_model(&self) -> &'static str {
+		self.as_ref().default_tool_model()
+	}
+
+	fn default_large_model(&self) -> &'static str {
+		self.as_ref().default_large_model()
+	}
+
+	fn send(
+		&self,
+		request: openresponses::RequestBody,
+	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		self.as_ref().send(request)
+	}
+
+	fn stream(
+		&self,
+		request: openresponses::RequestBody,
+	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
+		self.as_ref().stream(request)
+	}
+}

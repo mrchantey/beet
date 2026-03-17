@@ -5,19 +5,8 @@ use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-	Component,
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-#[component(on_add=on_add)]
-#[component(on_remove=on_remove)]
 pub struct Actor {
 	/// The name of the actor used when building context
 	name: String,
@@ -34,17 +23,6 @@ pub struct Actor {
 	/// creation. This is generally acceptible for the use-case of
 	/// agent context.
 	items: Vec<ItemId>,
-}
-
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let actor_id = world.entity(cx.entity).get::<Actor>().unwrap().id;
-	world
-		.resource_mut::<ContextMap>()
-		.add_actor(actor_id, cx.entity);
-}
-fn on_remove(mut world: DeferredWorld, cx: HookContext) {
-	let actor_id = world.entity(cx.entity).get::<Actor>().unwrap().id;
-	world.resource_mut::<ContextMap>().remove_actor(actor_id);
 }
 
 impl Actor {
@@ -65,6 +43,14 @@ impl Actor {
 
 	/// Get the list of items associated with this actor, sorted by creation time.
 	pub fn items(&self) -> &[ItemId] { &self.items }
+
+	/// Get the list of items created after the given item, sorted by creation time.
+	pub fn items_after(&self, item_id: ItemId) -> &[ItemId] {
+		match self.items.binary_search(&item_id) {
+			Ok(i) => &self.items[i + 1..],
+			Err(i) => &self.items[i..],
+		}
+	}
 	/// Add the item to the list, maintaining uniqueness and sort order.
 	/// Returns `true` if the item was inserted.
 	pub fn push(&mut self, item_id: ItemId) -> bool {
@@ -136,6 +122,7 @@ pub enum ActorKind {
 	Deref,
 	Serialize,
 	Deserialize,
+	Component,
 )]
 pub struct ActorId(Uuid);
 

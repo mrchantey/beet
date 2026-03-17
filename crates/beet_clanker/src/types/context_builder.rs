@@ -1,5 +1,9 @@
 use crate::openresponses::ContentPart;
 use crate::openresponses::InputFile;
+use crate::openresponses::MessageStatus;
+use crate::openresponses::OutputContent;
+use crate::openresponses::OutputItem;
+use crate::openresponses::RequestBody;
 use crate::openresponses::request::FunctionCallOutputParam;
 use crate::openresponses::request::FunctionCallParam;
 use crate::openresponses::request::FunctionOutputContent;
@@ -19,17 +23,23 @@ pub struct ContextBuilder {}
 
 impl ContextBuilder {
 	pub fn new() -> Self { Self {} }
-	pub fn build(
+	pub fn build_input(
 		&self,
-		query: &ContextQuery,
+		map: &ContextMap,
 		actor_id: ActorId,
+		last_sent_item: Option<ItemId>,
 	) -> Result<openresponses::request::Input> {
-		let actor = query.actor(actor_id)?;
+		let actor = map.actor(actor_id)?;
 
-		let mut timestamped_items = actor
-			.items()
+		let items = if let Some(last_sent_item) = last_sent_item {
+			actor.items_after(last_sent_item)
+		} else {
+			actor.items()
+		};
+
+		let mut timestamped_items = items
 			.iter()
-			.xtry_map(|item_id| self.item_to_input(query, &actor, *item_id))?;
+			.xtry_map(|item_id| self.item_to_input(map, &actor, *item_id))?;
 
 		timestamped_items.sort_by_key(|(timestamp, _)| *timestamp);
 
@@ -51,12 +61,13 @@ impl ContextBuilder {
 	/// assigned a call_id on the fly.
 	pub fn item_to_input(
 		&self,
-		query: &ContextQuery,
-		actor: &Actor,
+		map: &ContextMap,
+		agent: &Actor,
 		item_id: ItemId,
 	) -> Result<(Timestamp, Vec<openresponses::request::InputItem>)> {
-		let item = query.item(item_id)?;
-		let role = item_message_role(actor, item);
+		let item = map.item(item_id)?;
+		let owner = map.actor(item.owner())?;
+		let role = item_message_role(agent, owner);
 
 		let items = match item.content() {
 			Content::Text(text_content) => {
@@ -112,19 +123,98 @@ impl ContextBuilder {
 		};
 		(item.created(), items).xok()
 	}
+
+	pub fn parse_output(
+		&self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		items: Vec<OutputItem>,
+	) -> Result<()> {
+		let scope = ItemScope::Family;
+		for content in items
+			.into_iter()
+			.xtry_map(|item| self.output_item_to_content(item))?
+			.into_iter()
+			.flatten()
+		{
+			context_query.add_item(Item::new(actor_id, content, scope.clone()));
+		}
+		Ok(())
+	}
+
+	fn output_item_to_content(&self, item: OutputItem) -> Result<Vec<Content>> {
+		match item {
+			OutputItem::Message(message)
+				if message.status == MessageStatus::Completed =>
+			{
+				message
+					.content
+					.into_iter()
+					.map(|content| match content {
+						OutputContent::OutputText(output_text) => {
+							if !output_text.annotations.is_empty() {
+								todo!("inline annotations as markdown links");
+							}
+							TextContent::message(output_text.text).into()
+						}
+						OutputContent::Refusal(refusal) => {
+							TextContent::refusal(refusal.refusal).into()
+						}
+					})
+					.collect::<Vec<_>>()
+					.xok()
+			}
+			OutputItem::Message(_message) => {
+				todo!("incomplete message");
+			}
+			OutputItem::FunctionCall(_function_call) => {
+				todo!("incomplete function call");
+			}
+			OutputItem::FunctionCallOutput(_function_call_output_item) => {
+				todo!("find incomplete function call and match with output")
+			}
+			OutputItem::Reasoning(reasoning_item) => {
+				let mut out = Vec::new();
+				let summary = reasoning_item.all_summary();
+				if !summary.is_empty() {
+					out.push(Content::Text(TextContent::reasoning_summary(
+						summary,
+					)));
+				}
+				let content = reasoning_item.all_content();
+				if !content.is_empty() {
+					out.push(Content::Text(TextContent::reasoning_content(
+						content,
+					)));
+				}
+				let encrypted_content = reasoning_item.all_encrypted_content();
+				if !encrypted_content.is_empty() {
+					out.push(Content::Text(
+						TextContent::reasoning_encrypted_content(
+							encrypted_content,
+						),
+					));
+				}
+				out.xok()
+			}
+		}
+	}
 }
 
 /// Get the message role for this actor, relative to the items actor id.
 /// This is useful when an agent is constructing its context for an
 /// openresponses request.
-fn item_message_role(actor: &Actor, item: &Item) -> openresponses::MessageRole {
+fn item_message_role(
+	agent: &Actor,
+	owner: &Actor,
+) -> openresponses::MessageRole {
 	use openresponses::MessageRole;
-	match actor.kind() {
+	match owner.kind() {
 		ActorKind::System => MessageRole::System,
 		ActorKind::Developer => MessageRole::Developer,
 		ActorKind::Human => MessageRole::User,
 		ActorKind::Agent => {
-			if actor.id() == item.owner() {
+			if owner.id() == agent.id() {
 				MessageRole::Assistant
 			} else {
 				MessageRole::User

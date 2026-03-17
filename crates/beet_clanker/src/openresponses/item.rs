@@ -205,22 +205,43 @@ pub struct ReasoningItem {
 }
 
 impl ReasoningItem {
-	/// Returns the summary if available, otherwise the full text.
+	/// Returns the summary if available, otherwise the content, otherwise encrypted content.
 	pub fn summary_or_text(&self) -> String {
-		if !self.summary.is_empty() {
-			self.all_summary()
+		let summary = self.all_summary();
+		if summary.is_empty() {
+			let text = self.all_text();
+			if text.is_empty() {
+				self.all_encrypted_content()
+			} else {
+				text
+			}
 		} else {
-			self.all_text()
+			summary
 		}
 	}
 
+	pub fn all_encrypted_content(&self) -> String {
+		self.encrypted_content.clone().unwrap_or_default()
+	}
 
-	pub fn all_text(&self) -> String {
+	pub fn all_content(&self) -> String {
 		self.content
 			.iter()
 			.map(|text| text.text.as_str())
 			.collect::<Vec<_>>()
 			.join("")
+	}
+
+	pub fn all_text(&self) -> String {
+		if self.content.is_empty() {
+			self.encrypted_content.clone().unwrap_or_default()
+		} else {
+			self.content
+				.iter()
+				.map(|text| text.text.as_str())
+				.collect::<Vec<_>>()
+				.join("")
+		}
 	}
 	pub fn all_summary(&self) -> String {
 		self.summary
