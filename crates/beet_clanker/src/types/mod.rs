@@ -1,11 +1,15 @@
 mod actor;
 mod clanker_plugin;
 mod context_builder;
+mod document;
+pub use document::*;
+mod thread;
+pub use thread::*;
+mod item;
+pub use item::*;
 mod model_action;
 pub use actor::*;
 pub use model_action::*;
-mod item;
-pub use item::*;
 mod context_map;
 pub use clanker_plugin::*;
 pub use context_builder::*;

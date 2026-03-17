@@ -25,20 +25,21 @@ impl ContextBuilder {
 	pub fn build_input(
 		&self,
 		map: &ContextMap,
-		actor_id: ActorId,
+		agent_id: ActorId,
+		thread_id: ThreadId,
 		last_sent_item: Option<ItemId>,
 	) -> Result<openresponses::request::Input> {
-		let actor = map.actor(actor_id)?;
+		let thread = map.threads().get(thread_id)?;
 
 		let items = if let Some(last_sent_item) = last_sent_item {
-			actor.items_after(last_sent_item)
+			thread.items_after(last_sent_item)
 		} else {
-			actor.items()
+			thread.items()
 		};
 
 		let mut timestamped_items = items
 			.iter()
-			.xtry_map(|item_id| self.item_to_input(map, &actor, *item_id))?;
+			.xtry_map(|item_id| self.item_to_input(map, agent_id, *item_id))?;
 
 		timestamped_items.sort_by_key(|(timestamp, _)| *timestamp);
 
@@ -61,12 +62,12 @@ impl ContextBuilder {
 	pub fn item_to_input(
 		&self,
 		map: &ContextMap,
-		agent: &Actor,
+		agent_id: ActorId,
 		item_id: ItemId,
 	) -> Result<(Timestamp, Vec<openresponses::request::InputItem>)> {
-		let item = map.item(item_id)?;
-		let owner = map.actor(item.owner())?;
-		let role = item_message_role(agent, owner);
+		let item = map.items().get(item_id)?;
+		let owner = map.actors().get(item.owner())?;
+		let role = item_message_role(agent_id, owner);
 
 		let items = match item.content() {
 			Content::Text(text_content) => {
@@ -129,13 +130,12 @@ impl ContextBuilder {
 		actor_id: ActorId,
 		items: Vec<OutputItem>,
 	) -> Result<()> {
-		let scope = ItemScope::Family;
 		let items = items
 			.into_iter()
 			.xtry_map(|item| self.output_item_to_content(item))?
 			.into_iter()
 			.flatten()
-			.map(|content| Item::new(actor_id, content, scope.clone()));
+			.map(|content| Item::new(actor_id, content));
 
 		context_query.add_items(items)?;
 
@@ -205,7 +205,7 @@ impl ContextBuilder {
 /// This is useful when an agent is constructing its context for an
 /// openresponses request.
 fn item_message_role(
-	agent: &Actor,
+	agent_id: ActorId,
 	owner: &Actor,
 ) -> openresponses::MessageRole {
 	use openresponses::MessageRole;
@@ -214,7 +214,7 @@ fn item_message_role(
 		ActorKind::Developer => MessageRole::Developer,
 		ActorKind::Human => MessageRole::User,
 		ActorKind::Agent => {
-			if owner.id() == agent.id() {
+			if owner.id() == agent_id {
 				MessageRole::Assistant
 			} else {
 				MessageRole::User

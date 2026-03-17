@@ -144,8 +144,9 @@ impl ModelAction {
 		&mut self,
 		context_map: &ContextMap,
 		actor_id: ActorId,
+		thread_id: ThreadId,
 	) -> Result<openresponses::RequestBody> {
-		let input = self.build_input(context_map, actor_id)?;
+		let input = self.build_input(context_map, actor_id, thread_id)?;
 		let tools = vec![];
 
 		let mut body = openresponses::RequestBody::new(&self.model)
@@ -170,6 +171,7 @@ impl ModelAction {
 		&mut self,
 		context_map: &ContextMap,
 		actor_id: ActorId,
+		thread_id: ThreadId,
 	) -> Result<openresponses::request::Input> {
 		// only provide the last item sent if last response was cached
 		let last_item_sent = if self.previous_response_id.is_some() {
@@ -182,12 +184,17 @@ impl ModelAction {
 		let input = self.context_builder.build_input(
 			context_map,
 			actor_id,
+			thread_id,
 			last_item_sent,
 		)?;
 
 		// remember the most recent item
-		self.last_item_sent =
-			context_map.actor(actor_id)?.items().last().cloned();
+		self.last_item_sent = context_map
+			.threads()
+			.get(thread_id)?
+			.items()
+			.last()
+			.cloned();
 
 		input.xok()
 	}
@@ -243,10 +250,11 @@ pub async fn call_model(input: AsyncToolIn<()>) -> Result {
 fn build_request(
 	In(entity): In<Entity>,
 	context_map: Res<ContextMap>,
-	mut query: Query<(&ActorId, &mut ModelAction)>,
+	mut query: Query<(&ActorId, &ThreadId, &mut ModelAction)>,
 ) -> Result<(Box<dyn ModelProvider>, openresponses::RequestBody)> {
-	let (actor_id, mut model_action) = query.get_mut(entity)?;
-	let request = model_action.build_request(&context_map, *actor_id)?;
+	let (actor_id, thread_id, mut model_action) = query.get_mut(entity)?;
+	let request =
+		model_action.build_request(&context_map, *actor_id, *thread_id)?;
 
 	Ok((model_action.provider().box_clone(), request))
 }

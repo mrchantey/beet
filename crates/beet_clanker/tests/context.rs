@@ -19,12 +19,21 @@ fn main() {
 
 fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	// 1. define actors
-	let clanker_id = query.add_actor(Actor::clanker());
-	let system_id = query.add_actor(Actor::system());
-	let user_id = query.add_actor(Actor::user());
+	let clanker_id = query.actors_mut().insert(Actor::clanker());
+	let system_id = query.actors_mut().insert(Actor::system());
+	let user_id = query.actors_mut().insert(Actor::user());
+
+	let clanker_thread = query.threads_mut().insert(
+		Thread::default().with_actors([system_id, clanker_id, user_id]),
+	);
+
 	// 2. define relations
 	commands.spawn((system_id, children![
-		(clanker_id, ModelAction::new(OllamaProvider::default())),
+		(
+			clanker_id,
+			clanker_thread,
+			ModelAction::new(OllamaProvider::default())
+		),
 		user_id
 	]));
 
@@ -32,14 +41,16 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	query.add_items([Item::new(
 		system_id,
 		Content::message("you are robot, make beep boop noises"),
-		ItemScope::single_actor(clanker_id),
+		// ItemScope::single_actor(clanker_id),
 	)])?;
 	Ok(())
 }
 
 fn run_clanker(mut commands: Commands, query: ContextQuery) {
+	// hack until beet_tool sequence
 	let clanker = query
 		.actors()
+		.values()
 		.find(|actor| actor.kind() == ActorKind::Agent)
 		.unwrap();
 
@@ -52,15 +63,13 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 }
 
 fn listen_for_changes(
-	ev: On<ItemsAdded>,
-	mut commands: Commands,
+	ev: On<ItemAdded>,
+	// mut _commands: Commands,
 	context_query: ContextQuery,
 ) -> Result {
-	for item in &ev.items {
-		let item = context_query.item(*item)?;
-		let actor = context_query.actor(item.owner())?;
-		println!("{} > {:?}", actor.name(), item.content());
-	}
+	let item = context_query.items().get(ev.item)?;
+	let actor = context_query.actors().get(item.owner())?;
+	println!("{} > {:?}\n\n\n", actor.name(), item.content());
 	// commands.write_message(AppExit::Success);
 	Ok(())
 }

@@ -3,7 +3,8 @@ use beet_core::prelude::*;
 use beet_net::prelude::Url;
 use serde::Deserialize;
 use serde::Serialize;
-use uuid::Uuid;
+
+pub type ItemId = DocId<Item>;
 
 /// Note that MessageRole is not stored
 /// as this is relative to the Actor.
@@ -16,57 +17,26 @@ pub struct Item {
 	owner: ActorId,
 	/// For function calls this is the time the call was completed.
 	created: Timestamp,
-	scope: ItemScope,
 	content: Content,
 }
 
-
+impl Document for Item {
+	fn id(&self) -> DocId<Self> { self.id }
+}
 
 
 impl Item {
-	pub fn new(actor_id: ActorId, content: Content, scope: ItemScope) -> Self {
+	pub fn new(owner: ActorId, content: Content) -> Self {
 		Self {
-			id: ItemId::new_now(),
-			owner: actor_id,
-			scope,
+			id: DocId::new_now(),
+			owner,
 			content,
 			created: Timestamp::now(),
 		}
 	}
-	pub fn id(&self) -> ItemId { self.id }
 	pub fn owner(&self) -> ActorId { self.owner }
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn content(&self) -> &Content { &self.content }
-	pub fn scope(&self) -> &ItemScope { &self.scope }
-}
-
-/// Id associated with an [`Item`].
-/// Items are components and already have an associated [`Entity`],
-/// but we need something more easily handled by distributed systems,
-/// databases etc. See also [`ActorId`].
-/// Items created in the same process are guaranteed to have correct ordering.
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-)]
-pub struct ItemId(Uuid);
-
-impl std::fmt::Display for ItemId {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-impl ItemId {
-	fn new_now() -> Self { Self(Uuid::now_v7()) }
 }
 
 #[derive(
