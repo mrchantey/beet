@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -33,6 +34,7 @@ pub struct Thread {
 	/// creation. This is generally acceptible for the use-case of
 	/// agent context.
 	items: Vec<ItemId>,
+	deny_items: Vec<ItemKind>,
 }
 
 impl Document for Thread {
@@ -41,6 +43,15 @@ impl Document for Thread {
 
 
 impl Thread {
+	/// Deny all non-display items like reasoning and function calls
+	pub fn new_display() -> Self {
+		Self {
+			deny_items: ItemKind::non_display_kinds(),
+			..default()
+		}
+	}
+
+
 	pub fn items(&self) -> &[ItemId] { &self.items }
 	pub fn actors(&self) -> &[ActorId] { &self.actors }
 

@@ -13,7 +13,7 @@ fn main() {
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, create_scene)
 		.add_systems(PostStartup, run_clanker)
-		.add_observer(listen_for_changes)
+		// .add_observer(listen_for_changes)
 		.run();
 }
 
@@ -23,9 +23,15 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	let system_id = query.actors_mut().insert(Actor::system());
 	let user_id = query.actors_mut().insert(Actor::user());
 
+	// clanker thread is the thread sent to the model
 	let clanker_thread = query.threads_mut().insert(
 		Thread::default().with_actors([system_id, clanker_id, user_id]),
 	);
+
+	// user thread is the thread printed to stdout
+	let user_thread = query
+		.threads_mut()
+		.insert(Thread::default().with_actors([clanker_id, user_id]));
 
 	// 2. define relations
 	commands.spawn((system_id, children![
@@ -34,15 +40,20 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 			clanker_thread,
 			ModelAction::new(OllamaProvider::default())
 		),
-		user_id
+		(
+			user_id,
+			user_thread,
+			StdoutCursor::default(),
+			OnSpawn::observe(listen_for_changes)
+		)
 	]));
 
 	// 3. define items
-	query.add_items([Item::new(
+	query.add_items(Item::new(
 		system_id,
-		Content::message("you are robot, make beep boop noises"),
-		// ItemScope::single_actor(clanker_id),
-	)])?;
+		ItemStatus::Completed,
+		"you are robot, make beep boop noises",
+	))?;
 	Ok(())
 }
 
@@ -62,14 +73,17 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 		.call::<(), ()>((), default());
 }
 
+#[derive(Default, Component)]
+struct StdoutCursor(u32);
+
 fn listen_for_changes(
-	ev: On<ItemAdded>,
+	ev: On<EntityItemAdded>,
 	// mut _commands: Commands,
 	context_query: ContextQuery,
 ) -> Result {
 	let item = context_query.items().get(ev.item)?;
 	let actor = context_query.actors().get(item.owner())?;
-	println!("{} > {:?}\n\n\n", actor.name(), item.content());
+	println!("{} > {}\n\n\n", actor.name(), item.content());
 	// commands.write_message(AppExit::Success);
 	Ok(())
 }

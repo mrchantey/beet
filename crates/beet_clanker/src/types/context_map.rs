@@ -70,22 +70,17 @@ impl ContextQuery<'_, '_> {
 			.collect()
 	}
 
-	/// Adds items to actors based on their scope,
-	/// and triggers an `ItemsAdded` event for each affected actor entity.
-	pub fn add_items(
+	pub fn add_items<M>(
 		&mut self,
-		items: impl IntoIterator<Item = Item>,
+		items: impl XIntoIterator<M, Item>,
 	) -> Result<()> {
-		for item in items {
+		for item in items.xinto_iterator() {
 			self.add_item(item)?;
 		}
 		Ok(())
 	}
 
-	/// Adds an item to the actors based on the provided scope,
-	/// and returns the actors who had the item added.
-	/// This excludes actors who already own the item.
-	pub fn add_item(&mut self, item: Item) -> Result {
+	fn add_item(&mut self, item: Item) -> Result {
 		let item_id = item.id();
 		let owner_id = item.owner();
 
@@ -125,7 +120,6 @@ impl ContextQuery<'_, '_> {
 	}
 }
 
-/// Called on each actor entity with a list of items added
 #[derive(EntityEvent)]
 pub struct EntityItemAdded {
 	pub entity: Entity,

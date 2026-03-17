@@ -12,12 +12,9 @@ use crate::openresponses::request::MessageContent;
 use crate::openresponses::request::MessageParam;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::atomic::AtomicU64;
 
 #[derive(Debug, Default, Clone)]
 pub struct ContextBuilder {}
-
-
 
 
 impl ContextBuilder {
@@ -37,17 +34,11 @@ impl ContextBuilder {
 			thread.items()
 		};
 
-		let mut timestamped_items = items
-			.iter()
-			.xtry_map(|item_id| self.item_to_input(map, agent_id, *item_id))?;
-
-		timestamped_items.sort_by_key(|(timestamp, _)| *timestamp);
-
-		let items = timestamped_items
-			.into_iter()
-			.map(|(_, items)| items)
-			.flatten()
-			.collect::<Vec<_>>();
+		// threads are strictly already chronologically sorted by uuidv7,
+		// no need to sort here.
+		let items = items.into_iter().xtry_map(|item_id| {
+			self.into_openresponses_input(map, agent_id, *item_id)
+		})?;
 
 		Input::Items(items).xok()
 	}
@@ -59,113 +50,161 @@ impl ContextBuilder {
 	/// this may be several items, for example a [`Item::FunctionCall`]
 	/// is split into an openresponses FunctionCall + FunctionCallOutput,
 	/// assigned a call_id on the fly.
-	pub fn item_to_input(
+	fn into_openresponses_input(
 		&self,
 		map: &ContextMap,
 		agent_id: ActorId,
 		item_id: ItemId,
-	) -> Result<(Timestamp, Vec<openresponses::request::InputItem>)> {
+	) -> Result<openresponses::request::InputItem> {
 		let item = map.items().get(item_id)?;
 		let owner = map.actors().get(item.owner())?;
 		let role = item_message_role(agent_id, owner);
 
-		let items = match item.content() {
-			Content::Text(text_content) => {
-				vec![InputItem::Message(MessageParam {
+		let item = match item.content() {
+			Content::Text(TextItem(value)) => {
+				InputItem::Message(MessageParam {
 					id: None,
 					role,
-					content: MessageContent::Text(
-						text_content.content().to_string(),
-					),
+					// TODO prefix with owner name, ie billy says: >
+					content: MessageContent::Text(value.clone()),
 					status: None,
-				})]
+				})
 			}
-			Content::File(file_content) => {
-				vec![InputItem::Message(MessageParam {
+			Content::Refusal(RefusalItem(value)) => {
+				InputItem::Message(MessageParam {
+					id: None,
+					role,
+					content: MessageContent::Text(value.clone()),
+					status: None,
+				})
+			}
+			Content::ReasoningSummary(ReasoningSummaryItem(value)) => {
+				InputItem::Message(MessageParam {
+					id: None,
+					role,
+					content: MessageContent::Text(value.clone()),
+					status: None,
+				})
+			}
+			Content::ReasoningContent(ReasoningContentItem(value)) => {
+				InputItem::Message(MessageParam {
+					id: None,
+					role,
+					content: MessageContent::Text(value.clone()),
+					status: None,
+				})
+			}
+			Content::ReasoningEncryptedContent(
+				ReasoningEncryptedContentItem(value),
+			) => InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Text(value.clone()),
+				status: None,
+			}),
+			Content::Url(url_item) => {
+				InputItem::Message(MessageParam {
 					id: None,
 					role,
 					content: MessageContent::Parts(vec![
 						ContentPart::InputFile(InputFile {
-							filename: Some(file_content.filename()),
+							filename: Some(url_item.filename()),
 							// TODO distinguish base64 encoded urls..
 							file_data: None,
-							file_url: Some(file_content.url().to_string()),
+							file_url: Some(url_item.url().to_string()),
 						}),
 					]),
 					status: None,
-				})]
+				})
 			}
+			Content::Bytes(bytes_item) => InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Parts(vec![ContentPart::InputFile(
+					InputFile {
+						filename: Some(bytes_item.filename()),
+						file_data: Some(bytes_item.bytes_base64()),
+						file_url: None,
+					},
+				)]),
+				status: None,
+			}),
 			Content::FunctionCall(function_call) => {
-				static CALL_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
-
-				let call_id = CALL_ID_COUNTER
-					.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-					.to_string();
-
-				vec![
-					InputItem::FunctionCall(FunctionCallParam {
-						id: None,
-						call_id: call_id.clone(),
-						name: function_call.function_name().to_string(),
-						arguments: function_call.args().to_string(),
-						status: None,
-					}),
-					InputItem::FunctionCallOutput(FunctionCallOutputParam {
-						id: None,
-						call_id,
-						output: FunctionOutputContent::Text(
-							function_call.output().to_string(),
-						),
-						status: None,
-					}),
-				]
+				InputItem::FunctionCall(FunctionCallParam {
+					id: None,
+					// call_id is the function call item id
+					call_id: item.id().to_string(),
+					name: function_call.function_name().to_string(),
+					arguments: function_call.args().to_string(),
+					status: None,
+				})
+			}
+			Content::FunctionCallOutput(output_item) => {
+				InputItem::FunctionCallOutput(FunctionCallOutputParam {
+					id: None,
+					call_id: output_item.function_call_item.to_string(),
+					output: FunctionOutputContent::Text(
+						output_item.output().to_string(),
+					),
+					status: None,
+				})
 			}
 		};
-		(item.created(), items).xok()
+		item.xok()
 	}
 
 	pub fn parse_output(
 		&self,
 		context_query: &mut ContextQuery,
-		actor_id: ActorId,
+		owner: ActorId,
 		items: Vec<OutputItem>,
 	) -> Result<()> {
 		let items = items
 			.into_iter()
-			.xtry_map(|item| self.output_item_to_content(item))?
+			.xtry_map(|item| self.from_openresponses_output(owner, item))?
 			.into_iter()
-			.flatten()
-			.map(|content| Item::new(actor_id, content));
+			.flatten();
 
 		context_query.add_items(items)?;
 
 		Ok(())
 	}
 
-	fn output_item_to_content(&self, item: OutputItem) -> Result<Vec<Content>> {
+	fn from_openresponses_output(
+		&self,
+		owner: ActorId,
+		item: OutputItem,
+	) -> Result<Vec<Item>> {
+		let mut out = Vec::new();
+		// Item::new(actor_id, content)
 		match item {
-			OutputItem::Message(message)
-				if message.status == MessageStatus::Completed =>
-			{
-				message
-					.content
-					.into_iter()
-					.map(|content| match content {
+			OutputItem::Message(message) => {
+				let status = match message.status {
+					MessageStatus::InProgress => ItemStatus::InProgress,
+					MessageStatus::Completed => ItemStatus::Completed,
+					MessageStatus::Incomplete => ItemStatus::Interrupted,
+				};
+				for content in message.content.into_iter() {
+					match content {
 						OutputContent::OutputText(output_text) => {
 							if !output_text.annotations.is_empty() {
 								todo!("inline annotations as markdown links");
 							}
-							TextContent::message(output_text.text).into()
+							out.push(Item::new(
+								owner,
+								status,
+								TextItem(output_text.text),
+							));
 						}
 						OutputContent::Refusal(refusal) => {
-							TextContent::refusal(refusal.refusal).into()
+							out.push(Item::new(
+								owner,
+								status,
+								RefusalItem(refusal.refusal),
+							));
 						}
-					})
-					.collect::<Vec<_>>()
-					.xok()
-			}
-			OutputItem::Message(_message) => {
-				todo!("incomplete message");
+					}
+				}
 			}
 			OutputItem::FunctionCall(_function_call) => {
 				todo!("incomplete function call");
@@ -174,30 +213,33 @@ impl ContextBuilder {
 				todo!("find incomplete function call and match with output")
 			}
 			OutputItem::Reasoning(reasoning_item) => {
-				let mut out = Vec::new();
 				let summary = reasoning_item.all_summary();
 				if !summary.is_empty() {
-					out.push(Content::Text(TextContent::reasoning_summary(
-						summary,
-					)));
+					out.push(Item::new(
+						owner,
+						ItemStatus::Completed,
+						ReasoningSummaryItem(summary),
+					));
 				}
 				let content = reasoning_item.all_content();
 				if !content.is_empty() {
-					out.push(Content::Text(TextContent::reasoning_content(
-						content,
-					)));
+					out.push(Item::new(
+						owner,
+						ItemStatus::Completed,
+						ReasoningContentItem(content),
+					));
 				}
 				let encrypted_content = reasoning_item.all_encrypted_content();
 				if !encrypted_content.is_empty() {
-					out.push(Content::Text(
-						TextContent::reasoning_encrypted_content(
-							encrypted_content,
-						),
+					out.push(Item::new(
+						owner,
+						ItemStatus::Completed,
+						ReasoningEncryptedContentItem(encrypted_content),
 					));
 				}
-				out.xok()
 			}
 		}
+		out.xok()
 	}
 }
 
