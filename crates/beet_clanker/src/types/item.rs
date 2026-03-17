@@ -147,8 +147,8 @@ impl Content {
 				function_call.args()
 			),
 			Self::FunctionCallOutput(function_call_output) => format!(
-				"FunctionCallOutputItem: name={}, output={}",
-				function_call_output.function_name(),
+				"FunctionCallOutputItem: function_call_item={}, output={}",
+				function_call_output.function_call_item,
 				function_call_output.output()
 			),
 		}
@@ -400,9 +400,6 @@ impl FunctionCallItem {
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct FunctionCallOutputItem {
-	/// The name of the function that was called, in beet this is usually
-	/// the [`std::any::TypeId`] for matching against a [`ToolMeta::handler`]
-	pub name: String,
 	pub function_call_item: ItemId,
 	/// The JSON string that was output from the tool call.
 	/// Note that this should always be sent as a FunctionOutputContent::Text,
@@ -414,8 +411,6 @@ pub struct FunctionCallOutputItem {
 }
 
 impl FunctionCallOutputItem {
-	/// The name of the function that was called.
-	pub fn function_name(&self) -> &str { &self.name }
-	/// The output JSON string.
+	pub fn function_call_item(&self) -> ItemId { self.function_call_item }
 	pub fn output(&self) -> &str { &self.output }
 }

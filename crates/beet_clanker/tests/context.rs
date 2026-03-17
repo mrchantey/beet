@@ -31,7 +31,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	// user thread is the thread printed to stdout
 	let user_thread = query
 		.threads_mut()
-		.insert(Thread::default().with_actors([clanker_id, user_id]));
+		.insert(Thread::display_only().with_actors([clanker_id, user_id]));
 
 	// 2. define relations
 	commands.spawn((system_id, children![
@@ -73,6 +73,7 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 		.call::<(), ()>((), default());
 }
 
+#[allow(unused)]
 #[derive(Default, Component)]
 struct StdoutCursor(u32);
 

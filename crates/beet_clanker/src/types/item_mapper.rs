@@ -1,4 +1,5 @@
 use crate::openresponses::ContentPart;
+use crate::openresponses::FunctionCallStatus;
 use crate::openresponses::InputFile;
 use crate::openresponses::MessageStatus;
 use crate::openresponses::OutputContent;
@@ -14,11 +15,20 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(Debug, Default, Clone)]
-pub struct ContextBuilder {}
+pub struct ItemMapper {
+	/// Map an openresponses call id to an [`ItemId`]
+	call_id_to_item_id: HashMap<String, ItemId>,
+	item_id_to_call_id: HashMap<ItemId, String>,
+}
 
 
-impl ContextBuilder {
-	pub fn new() -> Self { Self {} }
+impl ItemMapper {
+	pub fn new() -> Self {
+		Self {
+			call_id_to_item_id: default(),
+			item_id_to_call_id: default(),
+		}
+	}
 	pub fn build_input(
 		&self,
 		map: &ContextMap,
@@ -41,6 +51,33 @@ impl ContextBuilder {
 		})?;
 
 		Input::Items(items).xok()
+	}
+
+	fn set_call_id(&mut self, item_id: ItemId, call_id: String) -> Result {
+		if self.item_id_to_call_id.contains_key(&item_id) {
+			bevybail!("item_id {item_id} already has a call_id");
+		} else if self.call_id_to_item_id.contains_key(&call_id) {
+			bevybail!("call_id {call_id} already has an item_id");
+		}
+		self.call_id_to_item_id.insert(call_id.clone(), item_id);
+		self.item_id_to_call_id.insert(item_id, call_id);
+		Ok(())
+	}
+	fn get_call_id(&self, item_id: ItemId) -> Result<String> {
+		self.item_id_to_call_id
+			.get(&item_id)
+			.cloned()
+			.ok_or_else(|| {
+				bevyhow!("no call_id registered for item_id {item_id}")
+			})
+	}
+	fn get_item_id(&self, call_id: &str) -> Result<ItemId> {
+		self.call_id_to_item_id
+			.get(call_id)
+			.cloned()
+			.ok_or_else(|| {
+				bevyhow!("no item_id registered for call_id {call_id}")
+			})
 	}
 
 	/// Map an item to a list of openresponses input, relative to agiven actor.
@@ -133,7 +170,7 @@ impl ContextBuilder {
 				InputItem::FunctionCall(FunctionCallParam {
 					id: None,
 					// call_id is the function call item id
-					call_id: item.id().to_string(),
+					call_id: self.get_call_id(item.id())?,
 					name: function_call.function_name().to_string(),
 					arguments: function_call.args().to_string(),
 					status: None,
@@ -142,7 +179,8 @@ impl ContextBuilder {
 			Content::FunctionCallOutput(output_item) => {
 				InputItem::FunctionCallOutput(FunctionCallOutputParam {
 					id: None,
-					call_id: output_item.function_call_item.to_string(),
+					call_id: self
+						.get_call_id(output_item.function_call_item)?,
 					output: FunctionOutputContent::Text(
 						output_item.output().to_string(),
 					),
@@ -154,29 +192,26 @@ impl ContextBuilder {
 	}
 
 	pub fn parse_output(
-		&self,
-		context_query: &mut ContextQuery,
+		&mut self,
 		owner: ActorId,
 		items: Vec<OutputItem>,
-	) -> Result<()> {
-		let items = items
+	) -> Result<Vec<Item>> {
+		items
 			.into_iter()
 			.xtry_map(|item| self.from_openresponses_output(owner, item))?
 			.into_iter()
-			.flatten();
-
-		context_query.add_items(items)?;
-
-		Ok(())
+			.flatten()
+			.collect::<Vec<_>>()
+			.xok()
 	}
 
+	/// Self must be mutable to update function call id maps
 	fn from_openresponses_output(
-		&self,
+		&mut self,
 		owner: ActorId,
 		item: OutputItem,
 	) -> Result<Vec<Item>> {
 		let mut out = Vec::new();
-		// Item::new(actor_id, content)
 		match item {
 			OutputItem::Message(message) => {
 				let status = match message.status {
@@ -206,11 +241,24 @@ impl ContextBuilder {
 					}
 				}
 			}
-			OutputItem::FunctionCall(_function_call) => {
-				todo!("incomplete function call");
+			OutputItem::FunctionCall(function_call) => {
+				let status = map_function_call_status(function_call.status);
+				let item = Item::new(owner, status, FunctionCallItem {
+					name: function_call.name,
+					arguments: function_call.arguments,
+				});
+				self.set_call_id(item.id(), function_call.call_id)?;
+				out.push(item);
 			}
-			OutputItem::FunctionCallOutput(_function_call_output_item) => {
-				todo!("find incomplete function call and match with output")
+			OutputItem::FunctionCallOutput(function_call_output_item) => {
+				let status = map_function_call_status(Some(
+					function_call_output_item.status,
+				));
+				out.push(Item::new(owner, status, FunctionCallOutputItem {
+					function_call_item: self
+						.get_item_id(&function_call_output_item.call_id)?,
+					output: function_call_output_item.output,
+				}))
 			}
 			OutputItem::Reasoning(reasoning_item) => {
 				let summary = reasoning_item.all_summary();
@@ -240,6 +288,16 @@ impl ContextBuilder {
 			}
 		}
 		out.xok()
+	}
+}
+
+fn map_function_call_status(status: Option<FunctionCallStatus>) -> ItemStatus {
+	match status {
+		Some(FunctionCallStatus::InProgress) => ItemStatus::InProgress,
+		Some(FunctionCallStatus::Completed) => ItemStatus::Completed,
+		Some(FunctionCallStatus::Incomplete) => ItemStatus::Interrupted,
+		// completed? i have no idea
+		None => ItemStatus::Completed,
 	}
 }
 

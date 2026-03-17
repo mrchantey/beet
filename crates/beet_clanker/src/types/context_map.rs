@@ -84,8 +84,6 @@ impl ContextQuery<'_, '_> {
 		let item_id = item.id();
 		let owner_id = item.owner();
 
-		// 1. insert item
-		self.items.insert(item);
 
 		// 2. get threads subscribed to items owner
 		let threads_to_insert = self
@@ -98,11 +96,13 @@ impl ContextQuery<'_, '_> {
 		// 3. try push to to threads
 		let threads_changed = threads_to_insert.into_iter().xtry_filter(
 			|thread_id| -> Result<bool> {
-				self.threads.get_mut(*thread_id)?.push(item_id).xok()
+				self.threads.get_mut(*thread_id)?.try_push(&item).xok()
 			},
 		)?;
 
-		// 4. mark changed thread components
+		// insert item
+		self.items.insert(item);
+
 		for (entity, _) in self
 			.thread_query
 			.iter()

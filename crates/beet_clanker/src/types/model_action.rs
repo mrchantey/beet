@@ -59,7 +59,7 @@ pub struct ModelAction {
 	/// Track which item was sent last, for skipping sent
 	/// items when a previous_response_id is used.
 	last_item_sent: Option<ItemId>,
-	context_builder: ContextBuilder,
+	item_mapper: ItemMapper,
 }
 
 
@@ -94,7 +94,7 @@ impl ModelAction {
 			model: model.into(),
 			stream: false,
 			instructions: None,
-			context_builder: default(),
+			item_mapper: default(),
 			previous_response_id: None,
 			last_item_sent: None,
 		}
@@ -181,7 +181,7 @@ impl ModelAction {
 		};
 
 		// collect input
-		let input = self.context_builder.build_input(
+		let input = self.item_mapper.build_input(
 			context_map,
 			actor_id,
 			thread_id,
@@ -208,11 +208,8 @@ impl ModelAction {
 		if let Some(prev_response_id) = response.previous_response_id {
 			self.previous_response_id = Some(prev_response_id);
 		}
-		self.context_builder.parse_output(
-			context_query,
-			actor_id,
-			response.output,
-		)?;
+		let items = self.item_mapper.parse_output(actor_id, response.output)?;
+		context_query.add_items(items)?;
 
 		Ok(())
 	}

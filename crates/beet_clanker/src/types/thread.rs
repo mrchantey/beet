@@ -44,7 +44,7 @@ impl Document for Thread {
 
 impl Thread {
 	/// Deny all non-display items like reasoning and function calls
-	pub fn new_display() -> Self {
+	pub fn display_only() -> Self {
 		Self {
 			deny_items: ItemKind::non_display_kinds(),
 			..default()
@@ -88,7 +88,12 @@ impl Thread {
 	}
 	/// Add the item to the list, maintaining uniqueness and sort order.
 	/// Returns `true` if the item was inserted.
-	pub fn push(&mut self, item_id: ItemId) -> bool {
+	pub fn try_push(&mut self, item: &Item) -> bool {
+		if self.deny_items.contains(&item.content().kind()) {
+			return false;
+		}
+		let item_id = item.id();
+
 		if let Some(last) = self.items.last() {
 			// usually already sorted
 			if item_id >= *last {
