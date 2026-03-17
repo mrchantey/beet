@@ -287,6 +287,11 @@ where
 		self.inner.iter()
 	}
 
+	/// Consume the multimap and iterate over all key-values pairs.
+	pub fn into_iter_all(self) -> impl Iterator<Item = (K, Vec<V>)> {
+		self.inner.into_iter()
+	}
+
 	/// Iterate over all keys.
 	pub fn keys(&self) -> impl Iterator<Item = &K> { self.inner.keys() }
 

@@ -310,8 +310,16 @@ impl<'w, 's, In, Out> ToolCall<'w, 's, In, Out> {}
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
 /// pipe chains, etc.) share a uniform interface.
-pub struct OutHandler<Out> {
+pub struct OutHandler<Out = ()> {
 	func: Box<dyn 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result>,
+}
+
+impl<Out> Default for OutHandler<Out> {
+	fn default() -> Self {
+		Self {
+			func: Box::new(|_, _| Ok(())),
+		}
+	}
 }
 
 impl<Out> OutHandler<Out> {

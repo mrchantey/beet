@@ -13,6 +13,7 @@ fn main() {
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, create_scene)
 		.add_systems(PostStartup, run_clanker)
+		.add_observer(listen_for_changes)
 		.run();
 }
 
@@ -28,11 +29,11 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	]));
 
 	// 3. define items
-	query.add_item(Item::new(
+	query.add_items([Item::new(
 		system_id,
 		Content::message("you are robot, make beep boop noises"),
 		ItemScope::single_actor(clanker_id),
-	))?;
+	)])?;
 	Ok(())
 }
 
@@ -45,19 +46,21 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 	let clanker_entity = *query.actor_entities(clanker.id()).first().unwrap();
 
 	// println!("Running clanker with input: {input:#?}");
-	commands.entity(clanker_entity).call(
-		(),
-		OutHandler::new(|commands, val: ()| {
-			// println!("Clanker output: {out:#?}");
-			Ok(())
-		}),
-	);
+	commands
+		.entity(clanker_entity)
+		.call::<(), ()>((), default());
 }
 
-
-#[tool]
-async fn my_tool(
-	req: openresponses::RequestBody,
-) -> Result<openresponses::ResponseBody> {
-	OllamaProvider::default().send(req).await
+fn listen_for_changes(
+	ev: On<ItemsAdded>,
+	mut commands: Commands,
+	context_query: ContextQuery,
+) -> Result {
+	for item in &ev.items {
+		let item = context_query.item(*item)?;
+		let actor = context_query.actor(item.owner())?;
+		println!("{} > {:?}", actor.name(), item.content());
+	}
+	// commands.write_message(AppExit::Success);
+	Ok(())
 }

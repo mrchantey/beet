@@ -38,6 +38,8 @@ impl Actor {
 	pub fn developer() -> Self { Self::new("Developer", ActorKind::Developer) }
 	pub fn user() -> Self { Self::new("User", ActorKind::Human) }
 	pub fn clanker() -> Self { Self::new("Clanker", ActorKind::Agent) }
+
+	pub fn name(&self) -> &str { &self.name }
 	pub fn kind(&self) -> ActorKind { self.kind }
 	pub fn id(&self) -> ActorId { self.id }
 

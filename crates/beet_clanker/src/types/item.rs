@@ -85,7 +85,7 @@ pub enum ItemScope {
 	/// The item is scoped only to this actor,
 	/// and should not be added to the items of other actors.
 	#[default]
-	Actor,
+	Owner,
 	/// The item is accessible to only a specific list of actors,
 	/// possibly exclusive of its owner, ie System items.
 	ActorList(Vec<ActorId>),

@@ -224,14 +224,17 @@ pub async fn call_model(input: AsyncToolIn<()>) -> Result {
 	let world = input.caller.world();
 	let (provider, request) =
 		world.run_system_cached_with(build_request, entity).await?;
-	let response = provider.send(request).await?;
-
-	if let Some(true) = request.stream {
+	if request.stream == Some(true) {
+		let _stream = provider.stream(request).await?;
 		todo!("streaming");
 	} else {
+		let response = provider.send(request).await?;
 		world
-			.run_system_cached_with(handle_response, (entity, response))
-			.await?;
+			.run_system_cached_with::<_, Result, _, _>(
+				handle_response,
+				(entity, response),
+			)
+			.await??;
 	}
 
 	Ok(())
@@ -255,22 +258,6 @@ fn handle_response(
 ) -> Result {
 	let (actor_id, mut model_action) = query.get_mut(entity)?;
 	model_action.handle_response(&mut context_query, *actor_id, response)?;
-
-	Ok(())
-}
-
-async fn streaming(
-	_entity: AsyncEntity,
-	provider: impl ModelProvider,
-	request: openresponses::RequestBody,
-) -> Result {
-	let mut stream = provider.stream(request).await?;
-
-	while let Some(event) = stream.next().await {
-		let event = event?;
-		// match event {}
-		println!("Got streaming event: {:#?}", event);
-	}
 
 	Ok(())
 }

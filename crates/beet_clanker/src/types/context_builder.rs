@@ -3,7 +3,6 @@ use crate::openresponses::InputFile;
 use crate::openresponses::MessageStatus;
 use crate::openresponses::OutputContent;
 use crate::openresponses::OutputItem;
-use crate::openresponses::RequestBody;
 use crate::openresponses::request::FunctionCallOutputParam;
 use crate::openresponses::request::FunctionCallParam;
 use crate::openresponses::request::FunctionOutputContent;
@@ -131,14 +130,15 @@ impl ContextBuilder {
 		items: Vec<OutputItem>,
 	) -> Result<()> {
 		let scope = ItemScope::Family;
-		for content in items
+		let items = items
 			.into_iter()
 			.xtry_map(|item| self.output_item_to_content(item))?
 			.into_iter()
 			.flatten()
-		{
-			context_query.add_item(Item::new(actor_id, content, scope.clone()));
-		}
+			.map(|content| Item::new(actor_id, content, scope.clone()));
+
+		context_query.add_items(items)?;
+
 		Ok(())
 	}
 
