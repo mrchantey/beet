@@ -212,12 +212,23 @@ impl ModelAction {
 		// if let Some(prev_response_id) = response.previous_response_id {
 		// 	self.previous_response_id = Some(prev_response_id);
 		// }
-		self.previous_response_id = Some(response.id);
+		self.previous_response_id = Some(response.id.clone());
 
 		let partial_items =
 			PartialItem::from_output_items(response.output, status);
 
 		self.handle_partial_items(context_query, actor_id, partial_items)?;
+
+		match status {
+			ItemStatus::Completed => {
+				context_query.response_complete(response.id, false)
+			}
+			ItemStatus::Interrupted => {
+				context_query.response_complete(response.id, true)
+			}
+			ItemStatus::InProgress => {}
+		}
+
 		Ok(())
 	}
 

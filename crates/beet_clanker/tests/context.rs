@@ -13,7 +13,7 @@ fn main() {
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, create_scene)
 		.add_systems(PostStartup, run_clanker)
-		// .add_observer(listen_for_changes)
+		.add_observer(exit_on_complete)
 		.run();
 }
 
@@ -76,6 +76,10 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 #[allow(unused)]
 #[derive(Default, Component)]
 struct StdoutCursor(u32);
+
+fn exit_on_complete(ev: On<ResponseComplete>, mut commands: Commands) {
+	commands.write_message(AppExit::Success);
+}
 
 fn listen_for_changes(
 	ev: On<EntityItemCreated>,

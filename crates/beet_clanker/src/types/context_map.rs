@@ -70,6 +70,17 @@ impl ContextQuery<'_, '_> {
 			.collect()
 	}
 
+	pub fn response_complete(
+		&mut self,
+		response_id: impl Into<String>,
+		interrupted: bool,
+	) {
+		self.commands.trigger(ResponseComplete {
+			id: response_id.into(),
+			interrupted,
+		});
+	}
+
 	pub fn add_items<M>(
 		&mut self,
 		items: impl XIntoIterator<M, Item>,
@@ -151,4 +162,11 @@ pub struct ItemUpdated {
 pub struct EntityItemUpdated {
 	pub entity: Entity,
 	pub item: ItemId,
+}
+
+#[derive(Event)]
+pub struct ResponseComplete {
+	/// The openresponses id for this response
+	id: String,
+	interrupted: bool,
 }

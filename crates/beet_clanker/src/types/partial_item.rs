@@ -27,8 +27,8 @@ impl PartialItemMap {
 		owner: ActorId,
 		partial_items: impl IntoIterator<Item = PartialItem>,
 		// ) -> impl Iterator<Item = Item> {
-	) -> Result<ApplyItemsOutcome> {
-		let mut outcomes = ApplyItemsOutcome::default();
+	) -> Result<ItemChanges> {
+		let mut outcomes = ItemChanges::default();
 		for partial_item in partial_items {
 			if let Some(other) = self.partial_items.get(&partial_item.key)
 				&& other == &partial_item
@@ -56,7 +56,7 @@ impl PartialItemMap {
 }
 
 #[derive(Default)]
-pub struct ApplyItemsOutcome {
+pub struct ItemChanges {
 	created: Vec<ItemId>,
 	modified: Vec<ItemId>,
 }
@@ -295,459 +295,253 @@ pub enum PartialContent {
 impl PartialContent {
 	pub fn into_content(self) -> Result<Content> {
 		match self {
-			PartialContent::OutputContent(output_content) => todo!(),
-			PartialContent::ContentPart(content_part) => todo!(),
-			PartialContent::FunctionCall {
-				name,
-				call_id,
-				arguments,
-			} => todo!(),
-			PartialContent::FunctionCallOutput { call_id, output } => todo!(),
-			PartialContent::ReasoningContent(_) => todo!(),
-			PartialContent::ReasoningSummary(_) => todo!(),
+			PartialContent::OutputContent(OutputContent::OutputText(t)) => {
+				Content::Text(TextItem(t.text))
+			}
+			PartialContent::OutputContent(OutputContent::Refusal(r)) => {
+				Content::Refusal(RefusalItem(r.refusal))
+			}
+			PartialContent::ContentPart(ContentPart::InputText(t)) => {
+				Content::Text(TextItem(t.text))
+			}
+			PartialContent::ContentPart(ContentPart::OutputText(t)) => {
+				if !t.annotations.is_empty(){
+					todo!("inline annotations as markdown")
+				}
+				Content::Text(TextItem(t.text))
+			}
+			PartialContent::ContentPart(ContentPart::Refusal(r)) => {
+				Content::Refusal(RefusalItem(r.refusal))
+			}
+			PartialContent::ContentPart(ContentPart::ReasoningText(r)) => {
+				Content::ReasoningContent(ReasoningContentItem(r.text))
+			}
+			PartialContent::ContentPart(ContentPart::SummaryText(s)) => {
+				Content::ReasoningSummary(ReasoningSummaryItem(s.text))
+			}
+			PartialContent::ContentPart(ContentPart::InputImage(img)) => {
+				Content::Url(UrlItem {
+					file_stem: None,
+					media_type: MediaType::from_path(&img.image_url),
+					url: img.image_url.into(),
+				})
+			}
+			PartialContent::ContentPart(ContentPart::InputVideo(vid)) => {
+				Content::Url(UrlItem {
+					file_stem: None,
+					// this is an assumption?
+					media_type: MediaType::Mp4,
+					url: vid.video_url.into(),
+				})
+			}
+			PartialContent::ContentPart(ContentPart::InputFile(file)) => {
+				let media_type = file
+					.filename
+					.as_deref()
+					.map(MediaType::from_path)
+					.unwrap_or(MediaType::Bytes);
+				let file_stem = file.filename.as_deref().and_then(|f| {
+					std::path::Path::new(f)
+						.file_stem()
+						.and_then(|s| s.to_str())
+						.map(|s| s.to_string())
+				});
+				if let Some(url) = file.file_url {
+					Content::Url(UrlItem {
+						file_stem,
+						media_type,
+						url: url.into(),
+					})
+				} else if let Some(data) = file.file_data {
+					use base64::Engine;
+					let bytes = base64::prelude::BASE64_STANDARD
+						.decode(&data)
+						.map_err(|err| bevyhow!("Failed to decode base64 file data: {err}"))?;
+					Content::Bytes(BytesItem {
+						file_stem,
+						media_type,
+						bytes,
+					})
+				} else {
+					bevybail!("InputFile has neither file_url nor file_data")
+				}
+			}
+			PartialContent::FunctionCall { name, arguments, call_id:_ } => {
+				// we represent call id as the function call item id
+				Content::FunctionCall(FunctionCallItem { name, arguments })
+			}
+			PartialContent::FunctionCallOutput { .. } => {
+				bevybail!("Cannot create FunctionCallOutput content without item id context")
+			}
+			PartialContent::ReasoningContent(text) => {
+				Content::ReasoningContent(ReasoningContentItem(text))
+			}
+			PartialContent::ReasoningSummary(text) => {
+				Content::ReasoningSummary(ReasoningSummaryItem(text))
+			}
 			PartialContent::Delta(_) => {
 				bevybail!("Cannot create content from a delta")
 			}
-			PartialContent::TextDone { text, logprobs } => todo!(),
-			PartialContent::RefusalDone { refusal } => todo!(),
-			PartialContent::ReasoningDone { content } => todo!(),
-			PartialContent::AnnotationAdded {
-				annotation_index,
-				annotation,
-			} => todo!(),
-			PartialContent::FunctionCallArgumentsDone(_) => todo!(),
+			PartialContent::TextDone { text, .. } => {
+				Content::Text(TextItem(text))
+			}
+			PartialContent::RefusalDone { refusal } => {
+				Content::Refusal(RefusalItem(refusal))
+			}
+			PartialContent::ReasoningDone { content } => {
+				Content::ReasoningContent(ReasoningContentItem(content))
+			}
+			PartialContent::AnnotationAdded { .. } => {
+				bevybail!("Cannot create content from an annotation event")
+			}
+			PartialContent::FunctionCallArgumentsDone(_) => {
+				bevybail!("Cannot create content from FunctionCallArgumentsDone without name and call_id context")
+			}
 		}
 		.xok()
 	}
 
 	pub fn apply(self, content: &mut Content) -> Result {
 		match (self, content) {
+			// OutputContent replaces matching content wholesale
 			(
-				PartialContent::OutputContent(output_content),
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::OutputContent(output_content),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::ContentPart(content_part),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCall {
-					name,
-					call_id,
-					arguments,
-				},
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallOutput { call_id, output },
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(PartialContent::ReasoningContent(_), Content::Text(text_item)) => {
-				todo!()
+				PartialContent::OutputContent(OutputContent::OutputText(t)),
+				Content::Text(item),
+			) => {
+				if !t.annotations.is_empty() {
+					todo!("inline annotations as markdown")
+				}
+				item.0 = t.text;
 			}
 			(
-				PartialContent::ReasoningContent(_),
-				Content::Refusal(refusal_item),
-			) => todo!(),
+				PartialContent::OutputContent(OutputContent::Refusal(r)),
+				Content::Refusal(item),
+			) => {
+				item.0 = r.refusal;
+			}
+			// ContentPart replaces matching content wholesale
 			(
-				PartialContent::ReasoningContent(_),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningContent(_),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(PartialContent::ReasoningContent(_), Content::Url(url_item)) => {
-				todo!()
+				PartialContent::ContentPart(ContentPart::InputText(t)),
+				Content::Text(item),
+			) => {
+				item.0 = t.text;
 			}
 			(
-				PartialContent::ReasoningContent(_),
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningContent(_),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningContent(_),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(PartialContent::ReasoningSummary(_), Content::Text(text_item)) => {
-				todo!()
+				PartialContent::ContentPart(ContentPart::OutputText(t)),
+				Content::Text(item),
+			) => {
+				if !t.annotations.is_empty() {
+					todo!("inline annotations as markdown")
+				}
+				item.0 = t.text;
 			}
 			(
-				PartialContent::ReasoningSummary(_),
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningSummary(_),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningSummary(_),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(PartialContent::ReasoningSummary(_), Content::Url(url_item)) => {
-				todo!()
+				PartialContent::ContentPart(ContentPart::Refusal(r)),
+				Content::Refusal(item),
+			) => {
+				item.0 = r.refusal;
 			}
 			(
-				PartialContent::ReasoningSummary(_),
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningSummary(_),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningSummary(_),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(PartialContent::Delta(_), Content::Text(text_item)) => todo!(),
-			(PartialContent::Delta(_), Content::Refusal(refusal_item)) => {
-				todo!()
+				PartialContent::ContentPart(ContentPart::ReasoningText(r)),
+				Content::ReasoningContent(item),
+			) => {
+				item.0 = r.text;
 			}
 			(
-				PartialContent::Delta(_),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
+				PartialContent::ContentPart(ContentPart::SummaryText(s)),
+				Content::ReasoningSummary(item),
+			) => {
+				item.0 = s.text;
+			}
+			// FunctionCall updates name and arguments
 			(
-				PartialContent::Delta(_),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(PartialContent::Delta(_), Content::Url(url_item)) => todo!(),
-			(PartialContent::Delta(_), Content::Bytes(bytes_item)) => todo!(),
+				PartialContent::FunctionCall {
+					name,
+					arguments,
+					// we represent call id as the function call item id
+					call_id: _,
+				},
+				Content::FunctionCall(item),
+			) => {
+				item.name = name;
+				item.arguments = arguments;
+			}
+			// FunctionCallOutput updates the output string
 			(
-				PartialContent::Delta(_),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
+				PartialContent::FunctionCallOutput { output, call_id },
+				Content::FunctionCallOutput(item),
+			) => {
+				item.output = output;
+				todo!(
+					"resolve call id,even if already resolved we should overwrite"
+				);
+			}
+			// ReasoningContent/Summary replace in place
 			(
-				PartialContent::Delta(_),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
+				PartialContent::ReasoningContent(text),
+				Content::ReasoningContent(item),
+			) => {
+				item.0 = text;
+			}
 			(
-				PartialContent::TextDone { text, logprobs },
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::TextDone { text, logprobs },
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
+				PartialContent::ReasoningSummary(text),
+				Content::ReasoningSummary(item),
+			) => {
+				item.0 = text;
+			}
+			// Deltas append to the appropriate content type
+			(PartialContent::Delta(delta), Content::Text(item)) => {
+				item.0.push_str(&delta);
+			}
+			(PartialContent::Delta(delta), Content::Refusal(item)) => {
+				item.0.push_str(&delta);
+			}
+			(PartialContent::Delta(delta), Content::ReasoningContent(item)) => {
+				item.0.push_str(&delta);
+			}
+			(PartialContent::Delta(delta), Content::ReasoningSummary(item)) => {
+				item.0.push_str(&delta);
+			}
+			(PartialContent::Delta(delta), Content::FunctionCall(item)) => {
+				item.arguments.push_str(&delta);
+			}
+			// TextDone overwrites text content
+			(PartialContent::TextDone { text, .. }, Content::Text(item)) => {
+				item.0 = text;
+			}
+			// RefusalDone overwrites refusal content
 			(
 				PartialContent::RefusalDone { refusal },
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::RefusalDone { refusal },
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
+				Content::Refusal(item),
+			) => {
+				item.0 = refusal;
+			}
+			// ReasoningDone overwrites reasoning content
 			(
 				PartialContent::ReasoningDone { content },
-				Content::Text(text_item),
-			) => todo!(),
+				Content::ReasoningContent(item),
+			) => {
+				item.0 = content;
+			}
+			// AnnotationAdded: todo — inline as markdown link
+			(PartialContent::AnnotationAdded { .. }, Content::Text(_)) => {
+				// TODO inline annotation as markdown link
+			}
+			// FunctionCallArgumentsDone overwrites arguments
 			(
-				PartialContent::ReasoningDone { content },
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::ReasoningDone { content },
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::AnnotationAdded {
-					annotation_index,
-					annotation,
-				},
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::Text(text_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::Refusal(refusal_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::ReasoningSummary(reasoning_summary_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::ReasoningContent(reasoning_content_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::Url(url_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::Bytes(bytes_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::FunctionCall(function_call_item),
-			) => todo!(),
-			(
-				PartialContent::FunctionCallArgumentsDone(_),
-				Content::FunctionCallOutput(function_call_output_item),
-			) => todo!(),
+				PartialContent::FunctionCallArgumentsDone(args),
+				Content::FunctionCall(item),
+			) => {
+				item.arguments = args;
+			}
+			// Mismatched or unsupported combinations
+			(partial, content) => {
+				bevybail!(
+					"Cannot apply {:?} to {:?}",
+					std::mem::discriminant(&partial),
+					content.kind()
+				)
+			}
 		}
 		Ok(())
 	}
