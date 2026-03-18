@@ -24,10 +24,6 @@ pub struct PartialItemMap {
 	/// Map an openresponses call id to an [`ItemId`]
 	call_id_to_item_id: HashMap<String, ItemId>,
 	item_id_to_call_id: HashMap<ItemId, String>,
-	/// Cache of partial items that have been parsed,
-	/// used for comparison against incoming items to
-	/// determine if they are unique.
-	partial_items: HashMap<PartialItemKey, PartialItem>,
 	/// Map partial item keys to the created [`ItemId`]
 	item_key_map: HashMap<PartialItemKey, ItemId>,
 }
@@ -235,24 +231,23 @@ impl PartialItemMap {
 	) -> Result<ItemChanges> {
 		let mut changes = ItemChanges::default();
 		for partial_item in partial_items {
-			if let Some(other) = self.partial_items.get(&partial_item.key)
-				&& other == &partial_item
-			{
-				// dedup: skip if identical to cached version
-				continue;
-			} else if let Some(&item_id) =
-				self.item_key_map.get(&partial_item.key)
-			{
+			if let Some(&item_id) = self.item_key_map.get(&partial_item.key) {
 				// item already exists, update it in place
 				let item = item_map.get_mut(item_id)?;
+				let before_mutation = item.hash();
+
 				item.set_status(partial_item.status);
 				self.apply_partial_content(
 					partial_item.content.clone(),
 					item.content_mut(),
 				)?;
-				// discard already registered error on updates
-				let _ = self.register_call_id(&partial_item, item_id);
-				changes.modified.push(item_id);
+				let after_mutation = item.hash();
+				if before_mutation != after_mutation {
+					// it changed!
+					changes.modified.push(item_id);
+					// discard already registered error on updates
+					let _ = self.register_call_id(&partial_item, item_id);
+				}
 			} else {
 				// create new item
 				let content = self.partial_content_into_content(
@@ -271,10 +266,6 @@ impl PartialItemMap {
 				changes.created.push(item_id);
 				item_map.insert(item);
 			}
-
-			// cache this partial item for future dedup
-			self.partial_items
-				.insert(partial_item.key.clone(), partial_item);
 		}
 		changes.xok()
 	}
