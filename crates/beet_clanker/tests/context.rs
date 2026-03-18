@@ -44,6 +44,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 			user_id,
 			user_thread,
 			StdoutCursor::default(),
+			OnSpawn::observe(on_create),
 			OnSpawn::observe(listen_for_changes)
 		)
 	]));
@@ -75,20 +76,33 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 
 #[allow(unused)]
 #[derive(Default, Component)]
-struct StdoutCursor(u32);
+struct StdoutCursor(HashMap<ItemId, u32>);
 
 fn exit_on_complete(_ev: On<ResponseComplete>, mut commands: Commands) {
+	println!("");
 	commands.write_message(AppExit::Success);
+}
+
+fn on_create(ev: On<EntityItemCreated>, context_query: ContextQuery) -> Result {
+	let item = context_query.items().get(ev.item)?;
+	let actor = context_query.actors().get(item.owner())?;
+	println!("<< {} >> ", actor.name());
+	Ok(())
 }
 
 fn listen_for_changes(
 	ev: On<EntityItemUpdated>,
-	// mut _commands: Commands,
 	context_query: ContextQuery,
+	mut query: Query<&mut StdoutCursor>,
 ) -> Result {
+	let mut cursor = query.get_mut(ev.entity)?;
 	let item = context_query.items().get(ev.item)?;
-	let actor = context_query.actors().get(item.owner())?;
-	println!("{} > {}\n\n\n", actor.name(), item.content());
-	// commands.write_message(AppExit::Success);
+	let content = item.content().to_string();
+	let cursor_item = cursor.0.entry(ev.item).or_insert(0);
+
+	let new_content = &content[*cursor_item as usize..];
+	print!("{}", new_content);
+	*cursor_item = content.len() as u32;
+
 	Ok(())
 }
