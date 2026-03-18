@@ -4,6 +4,9 @@
 //! with an AI model. When added to an entity, it automatically inserts the
 //! request behavior via an `on_add` hook.
 
+use std::ops::ControlFlow;
+
+use crate::openresponses::StreamingEvent;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
@@ -199,7 +202,7 @@ impl ModelAction {
 		input.xok()
 	}
 
-	fn handle_response(
+	fn parse_response_body(
 		&mut self,
 		context_query: &mut ContextQuery,
 		actor_id: ActorId,
@@ -212,6 +215,81 @@ impl ModelAction {
 		context_query.add_items(items)?;
 
 		Ok(())
+	}
+
+	fn handle_event(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		event: StreamingEvent,
+	) -> Result<ControlFlow<()>> {
+		use openresponses::StreamingEvent::*;
+		// info!("Handling streaming event: {:#?}", event);
+		match event {
+			ResponseCreated(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+			}
+			ResponseQueued(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+			}
+			ResponseInProgress(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+			}
+			ResponseCompleted(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+				return ControlFlow::Break(()).xok();
+			}
+			ResponseFailed(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+				return ControlFlow::Break(()).xok();
+			}
+			ResponseIncomplete(ev) => {
+				// usually empty but parse anyway
+				self.parse_response_body(context_query, actor_id, ev.response)?;
+				return ControlFlow::Break(()).xok();
+			}
+			OutputItemAdded(_output_item_added_event) => todo!(),
+			OutputItemDone(_output_item_done_event) => todo!(),
+			ContentPartAdded(_content_part_added_event) => todo!(),
+			ContentPartDone(_content_part_done_event) => todo!(),
+			OutputTextDelta(_output_text_delta_event) => todo!(),
+			OutputTextDone(_output_text_done_event) => todo!(),
+			OutputTextAnnotationAdded(_output_text_annotation_added_event) => {
+				todo!()
+			}
+			RefusalDelta(_refusal_delta_event) => todo!(),
+			RefusalDone(_refusal_done_event) => todo!(),
+			ReasoningDelta(_reasoning_delta_event) => todo!(),
+			ReasoningDone(_reasoning_done_event) => todo!(),
+			ReasoningSummaryTextDelta(_reasoning_summary_text_delta_event) => {
+				todo!()
+			}
+			ReasoningSummaryTextDone(_reasoning_summary_text_done_event) => {
+				todo!()
+			}
+			ReasoningSummaryPartAdded(_reasoning_summary_part_added_event) => {
+				todo!()
+			}
+			ReasoningSummaryPartDone(_reasoning_summary_part_done_event) => {
+				todo!()
+			}
+			FunctionCallArgumentsDelta(
+				_function_call_arguments_delta_event,
+			) => {
+				todo!()
+			}
+			FunctionCallArgumentsDone(_function_call_arguments_done_event) => {
+				todo!()
+			}
+			Error(_error_event) => todo!(),
+		}
+
+		ControlFlow::Continue(()).xok()
 	}
 }
 
@@ -229,16 +307,30 @@ pub async fn call_model(input: AsyncToolIn<()>) -> Result {
 	let (provider, request) =
 		world.run_system_cached_with(build_request, entity).await?;
 	if request.stream == Some(true) {
-		let _stream = provider.stream(request).await?;
-		todo!("streaming");
+		let mut stream = provider.stream(request).await?;
+		while let Some(event) = stream.next().await {
+			let event = event?;
+			match world
+				.run_system_cached_with::<_, ControlFlow<()>, _, _>(
+					handle_event,
+					(entity, event),
+				)
+				.await?
+			{
+				ControlFlow::Continue(_) => {}
+				ControlFlow::Break(_) => {
+					break;
+				}
+			}
+		}
 	} else {
 		let response = provider.send(request).await?;
 		world
-			.run_system_cached_with::<_, Result, _, _>(
+			.run_system_cached_with::<_, (), _, _>(
 				handle_response,
 				(entity, response),
 			)
-			.await??;
+			.await?;
 	}
 
 	Ok(())
@@ -262,9 +354,15 @@ fn handle_response(
 	mut query: Query<(&ActorId, &mut ModelAction)>,
 ) -> Result {
 	let (actor_id, mut model_action) = query.get_mut(entity)?;
-	model_action.handle_response(&mut context_query, *actor_id, response)?;
-
-	Ok(())
+	model_action.parse_response_body(&mut context_query, *actor_id, response)
+}
+fn handle_event(
+	In((entity, event)): In<(Entity, openresponses::StreamingEvent)>,
+	mut context_query: ContextQuery,
+	mut query: Query<(&ActorId, &mut ModelAction)>,
+) -> Result<ControlFlow<()>> {
+	let (actor_id, mut model_action) = query.get_mut(entity)?;
+	model_action.handle_event(&mut context_query, *actor_id, event)
 }
 
 

@@ -19,14 +19,48 @@ pub struct ItemMapper {
 	/// Map an openresponses call id to an [`ItemId`]
 	call_id_to_item_id: HashMap<String, ItemId>,
 	item_id_to_call_id: HashMap<ItemId, String>,
+	/// for each responses::Item.id(), there are several
+	/// content parts, we remember which item they map to
+	/// for streaming and updating.
+	/// We need a nested hashmap because *technically* content parts
+	/// may appear out of order.
+	/// In the case of single content items like function calls,
+	/// it is always the first index `0`
+	responses_item_map: HashMap<ResponsesItemKey, ItemId>,
 }
 
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+enum ResponsesItemKey {
+	// shared by text and refusal
+	Message {
+		responses_id: String,
+		content_index: u32,
+	},
+	FunctionCall {
+		responses_id: String,
+	},
+	FunctionCallOutput {
+		responses_id: String,
+	},
+	ReasoningContent {
+		responses_id: String,
+		content_index: u32,
+	},
+	ReasoningSummary {
+		responses_id: String,
+		// defaults to 0 when ommited
+		// by streaming
+		content_index: u32,
+	},
+}
 
 impl ItemMapper {
 	pub fn new() -> Self {
 		Self {
 			call_id_to_item_id: default(),
 			item_id_to_call_id: default(),
+			responses_item_map: default(),
 		}
 	}
 	pub fn build_input(
@@ -80,6 +114,19 @@ impl ItemMapper {
 			})
 	}
 
+	fn set_response_item(
+		&mut self,
+		key: ResponsesItemKey,
+		item_id: ItemId,
+	) -> Result {
+		if self.responses_item_map.contains_key(&key) {
+			bevybail!("responses item map already has content for key {key:?}");
+		} else {
+			self.responses_item_map.insert(key, item_id);
+		}
+		Ok(())
+	}
+
 	/// Map an item to a list of openresponses input, relative to agiven actor.
 	/// The provided actor is used to correctly assign a [`MessageRole::Assistant`]
 	/// for 'self' messages, and [`MessageRole::User`] for all others.
@@ -131,14 +178,6 @@ impl ItemMapper {
 					status: None,
 				})
 			}
-			Content::ReasoningEncryptedContent(
-				ReasoningEncryptedContentItem(value),
-			) => InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Text(value.clone()),
-				status: None,
-			}),
 			Content::Url(url_item) => {
 				InputItem::Message(MessageParam {
 					id: None,
@@ -205,86 +244,111 @@ impl ItemMapper {
 			.xok()
 	}
 
-	/// Self must be mutable to update function call id maps
+	/// Self must be mutable to update id maps
 	fn from_openresponses_output(
 		&mut self,
 		owner: ActorId,
-		item: OutputItem,
+		responses_item: OutputItem,
 	) -> Result<Vec<Item>> {
 		let mut out = Vec::new();
-		match item {
+		match responses_item {
 			OutputItem::Message(message) => {
 				let status = match message.status {
 					MessageStatus::InProgress => ItemStatus::InProgress,
 					MessageStatus::Completed => ItemStatus::Completed,
 					MessageStatus::Incomplete => ItemStatus::Interrupted,
 				};
-				for content in message.content.into_iter() {
-					match content {
+				for (content_index, content) in
+					message.content.into_iter().enumerate()
+				{
+					let item = match content {
 						OutputContent::OutputText(output_text) => {
 							if !output_text.annotations.is_empty() {
 								todo!("inline annotations as markdown links");
 							}
-							out.push(Item::new(
-								owner,
-								status,
-								TextItem(output_text.text),
-							));
+							Item::new(owner, status, TextItem(output_text.text))
 						}
-						OutputContent::Refusal(refusal) => {
-							out.push(Item::new(
-								owner,
-								status,
-								RefusalItem(refusal.refusal),
-							));
-						}
-					}
+						OutputContent::Refusal(refusal) => Item::new(
+							owner,
+							status,
+							RefusalItem(refusal.refusal),
+						),
+					};
+					self.set_response_item(
+						ResponsesItemKey::Message {
+							responses_id: message.id.clone(),
+							content_index: content_index as u32,
+						},
+						item.id(),
+					)?;
+					out.push(item);
 				}
 			}
-			OutputItem::FunctionCall(function_call) => {
-				let status = map_function_call_status(function_call.status);
+			OutputItem::FunctionCall(fc_call) => {
+				let status = map_function_call_status(fc_call.status);
 				let item = Item::new(owner, status, FunctionCallItem {
-					name: function_call.name,
-					arguments: function_call.arguments,
+					name: fc_call.name,
+					arguments: fc_call.arguments,
 				});
-				self.set_call_id(item.id(), function_call.call_id)?;
+				self.set_call_id(item.id(), fc_call.call_id)?;
+				self.set_response_item(
+					ResponsesItemKey::FunctionCall {
+						responses_id: fc_call.id,
+					},
+					item.id(),
+				)?;
 				out.push(item);
 			}
-			OutputItem::FunctionCallOutput(function_call_output_item) => {
-				let status = map_function_call_status(Some(
-					function_call_output_item.status,
-				));
-				out.push(Item::new(owner, status, FunctionCallOutputItem {
-					function_call_item: self
-						.get_item_id(&function_call_output_item.call_id)?,
-					output: function_call_output_item.output,
-				}))
+			OutputItem::FunctionCallOutput(fc_output) => {
+				let status = map_function_call_status(Some(fc_output.status));
+				let item = Item::new(owner, status, FunctionCallOutputItem {
+					function_call_item: self.get_item_id(&fc_output.call_id)?,
+					output: fc_output.output,
+				});
+				self.set_response_item(
+					ResponsesItemKey::FunctionCallOutput {
+						responses_id: fc_output.id,
+					},
+					item.id(),
+				)?;
+				out.push(item);
 			}
 			OutputItem::Reasoning(reasoning_item) => {
-				let summary = reasoning_item.all_summary();
-				if !summary.is_empty() {
-					out.push(Item::new(
+				for (index, summary) in
+					reasoning_item.summary.into_iter().enumerate()
+				{
+					let item = Item::new(
 						owner,
 						ItemStatus::Completed,
-						ReasoningSummaryItem(summary),
-					));
+						ReasoningSummaryItem(summary.text),
+					);
+					self.set_response_item(
+						ResponsesItemKey::ReasoningSummary {
+							responses_id: reasoning_item.id.clone(),
+							content_index: index as u32,
+						},
+						item.id(),
+					)?;
+					out.push(item);
 				}
-				let content = reasoning_item.all_content();
-				if !content.is_empty() {
-					out.push(Item::new(
+				for (index, content) in
+					reasoning_item.content.into_iter().enumerate()
+				{
+					let item = Item::new(
 						owner,
 						ItemStatus::Completed,
-						ReasoningContentItem(content),
-					));
+						ReasoningContentItem(content.text),
+					);
+					self.set_response_item(
+						ResponsesItemKey::ReasoningContent {
+							responses_id: reasoning_item.id.clone(),
+							content_index: index as u32,
+						},
+						item.id(),
+					)?;
+					out.push(item);
 				}
-				let encrypted_content = reasoning_item.all_encrypted_content();
-				if !encrypted_content.is_empty() {
-					out.push(Item::new(
-						owner,
-						ItemStatus::Completed,
-						ReasoningEncryptedContentItem(encrypted_content),
-					));
-				}
+				// we disregard encrypted content
 			}
 		}
 		out.xok()

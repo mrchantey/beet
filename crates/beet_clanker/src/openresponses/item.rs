@@ -65,12 +65,12 @@ pub enum OutputItem {
 
 impl OutputItem {
 	/// Returns the item ID, if available.
-	pub fn id(&self) -> Option<&str> {
+	pub fn id(&self) -> &str {
 		match self {
-			Self::Message(msg) => Some(&msg.id),
-			Self::FunctionCall(fc) => Some(&fc.id),
-			Self::FunctionCallOutput(fco) => Some(&fco.id),
-			Self::Reasoning(reasoning) => Some(&reasoning.id),
+			Self::Message(msg) => &msg.id,
+			Self::FunctionCall(fc) => &fc.id,
+			Self::FunctionCallOutput(fco) => &fco.id,
+			Self::Reasoning(reasoning) => &reasoning.id,
 		}
 	}
 

@@ -98,7 +98,6 @@ pub enum Content {
 	Refusal(RefusalItem),
 	ReasoningSummary(ReasoningSummaryItem),
 	ReasoningContent(ReasoningContentItem),
-	ReasoningEncryptedContent(ReasoningEncryptedContentItem),
 	Url(UrlItem),
 	Bytes(BytesItem),
 	FunctionCall(FunctionCallItem),
@@ -112,9 +111,6 @@ impl Content {
 			Self::Refusal(_) => ItemKind::Refusal,
 			Self::ReasoningSummary(_) => ItemKind::ReasoningSummary,
 			Self::ReasoningContent(_) => ItemKind::ReasoningContent,
-			Self::ReasoningEncryptedContent(_) => {
-				ItemKind::ReasoningEncryptedContent
-			}
 			Self::Url(_) => ItemKind::Url,
 			Self::Bytes(_) => ItemKind::Media,
 			Self::FunctionCall(_) => ItemKind::FunctionCall,
@@ -130,9 +126,6 @@ impl Content {
 			}
 			Self::ReasoningContent(reasoning_content) => {
 				reasoning_content.to_string()
-			}
-			Self::ReasoningEncryptedContent(reasoning_encrypted_content) => {
-				reasoning_encrypted_content.to_string()
 			}
 			Self::Url(url_item) => url_item.url().to_string(),
 			Self::Bytes(bytes_item) => format!(
@@ -186,14 +179,6 @@ impl From<ReasoningSummaryItem> for Content {
 impl From<ReasoningContentItem> for Content {
 	fn from(reasoning_content: ReasoningContentItem) -> Self {
 		Self::ReasoningContent(reasoning_content)
-	}
-}
-
-impl From<ReasoningEncryptedContentItem> for Content {
-	fn from(
-		reasoning_encrypted_content: ReasoningEncryptedContentItem,
-	) -> Self {
-		Self::ReasoningEncryptedContent(reasoning_encrypted_content)
 	}
 }
 

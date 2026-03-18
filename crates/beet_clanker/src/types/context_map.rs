@@ -130,3 +130,10 @@ pub struct EntityItemAdded {
 pub struct ItemAdded {
 	pub item: ItemId,
 }
+
+
+pub enum ItemLifecycle {
+	Created,
+	Updated,
+	Completed,
+}
