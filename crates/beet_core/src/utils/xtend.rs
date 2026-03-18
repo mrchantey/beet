@@ -209,11 +209,11 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 	/// Filters each item with a fallible function, short-circuiting on error.
 	fn xtry_filter<E>(
 		self,
-		mut func: impl FnMut(&T) -> Result<bool, E>,
+		mut func: impl FnMut(&mut T) -> Result<bool, E>,
 	) -> Result<Vec<T>, E> {
 		let mut out = Vec::new();
-		for item in self.into_iter() {
-			match (func)(&item) {
+		for mut item in self.into_iter() {
+			match (func)(&mut item) {
 				Ok(true) => out.push(item),
 				Ok(false) => {}
 				Err(e) => return Err(e),

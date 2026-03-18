@@ -83,6 +83,9 @@ impl<T> Default for DocMap<T> {
 
 impl<T> DocMap<T> {
 	pub fn new() -> Self { Self(HashMap::new()) }
+	pub fn contains_key(&self, id: DocId<T>) -> bool {
+		self.0.contains_key(&id)
+	}
 	pub fn insert(&mut self, doc: T) -> DocId<T>
 	where
 		T: Document,

@@ -89,9 +89,12 @@ impl Thread {
 	/// Add the item to the list, maintaining uniqueness and sort order.
 	/// Returns `true` if the item was inserted.
 	pub fn try_push(&mut self, item: &Item) -> bool {
-		if self.deny_items.contains(&item.content().kind()) {
+		if self.deny_items.contains(&item.content().kind())
+			|| !self.actors.contains(&item.owner())
+		{
 			return false;
 		}
+
 		let item_id = item.id();
 
 		if let Some(last) = self.items.last() {

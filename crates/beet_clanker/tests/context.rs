@@ -78,7 +78,7 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 struct StdoutCursor(u32);
 
 fn listen_for_changes(
-	ev: On<EntityItemAdded>,
+	ev: On<EntityItemCreated>,
 	// mut _commands: Commands,
 	context_query: ContextQuery,
 ) -> Result {

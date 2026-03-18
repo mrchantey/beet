@@ -82,58 +82,73 @@ impl ContextQuery<'_, '_> {
 
 	fn add_item(&mut self, item: Item) -> Result {
 		let item_id = item.id();
-		let owner_id = item.owner();
 
-
-		// 2. get threads subscribed to items owner
-		let threads_to_insert = self
+		// 1. try push to to threads
+		let threads_changed = self
 			.threads
-			.values()
-			.filter(|thread| thread.actors().contains(&owner_id))
+			.values_mut()
+			.xtry_filter(|thread| -> Result<bool> {
+				thread.try_push(&item).xok()
+			})?
+			.into_iter()
 			.map(|thread| thread.id())
 			.collect::<Vec<_>>();
 
-		// 3. try push to to threads
-		let threads_changed = threads_to_insert.into_iter().xtry_filter(
-			|thread_id| -> Result<bool> {
-				self.threads.get_mut(*thread_id)?.try_push(&item).xok()
-			},
-		)?;
-
-		// insert item
+		// 2. insert item
+		let exists = self.items.contains_key(item_id);
 		self.items.insert(item);
 
-		for (entity, _) in self
+
+		// 3. trigger events
+		let changed_entities = self
 			.thread_query
 			.iter()
 			.filter(|(_, thread_id)| threads_changed.contains(thread_id))
-		{
-			self.commands.trigger(EntityItemAdded {
-				entity,
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>();
+
+		if !exists {
+			self.commands.trigger(ItemCreated { item: item_id });
+			for entity in changed_entities.iter() {
+				self.commands.trigger(EntityItemCreated {
+					entity: *entity,
+					item: item_id,
+				});
+			}
+		}
+
+		self.commands.trigger(ItemUpdated { item: item_id });
+		for entity in changed_entities.iter() {
+			self.commands.trigger(EntityItemUpdated {
+				entity: *entity,
 				item: item_id,
 			});
 		}
-
-		self.commands.trigger(ItemAdded { item: item_id });
 
 		Ok(())
 	}
 }
 
+/// Item created event, runs before [`EntityItemCreated`] and [`ItemUpdated`]
+#[derive(Event)]
+pub struct ItemCreated {
+	pub item: ItemId,
+}
+
+/// Item created event, runs before [`EntityItemUpdated`]
 #[derive(EntityEvent)]
-pub struct EntityItemAdded {
+pub struct EntityItemCreated {
 	pub entity: Entity,
 	pub item: ItemId,
 }
 
 #[derive(Event)]
-pub struct ItemAdded {
+pub struct ItemUpdated {
 	pub item: ItemId,
 }
 
-
-pub enum ItemLifecycle {
-	Created,
-	Updated,
-	Completed,
+#[derive(EntityEvent)]
+pub struct EntityItemUpdated {
+	pub entity: Entity,
+	pub item: ItemId,
 }

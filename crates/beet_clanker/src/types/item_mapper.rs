@@ -19,34 +19,22 @@ pub struct ItemMapper {
 	/// Map an openresponses call id to an [`ItemId`]
 	call_id_to_item_id: HashMap<String, ItemId>,
 	item_id_to_call_id: HashMap<ItemId, String>,
-	/// for each responses::Item.id(), there are several
-	/// content parts, we remember which item they map to
-	/// for streaming and updating.
-	/// We need a nested hashmap because *technically* content parts
-	/// may appear out of order.
-	/// In the case of single content items like function calls,
-	/// it is always the first index `0`
+	/// map responses output items to an [`ItemId`]
 	responses_item_map: HashMap<ResponsesItemKey, ItemId>,
 }
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum ResponsesItemKey {
-	// shared by text and refusal
-	Message {
+	/// There is only one piece of content, ie a function call
+	Single { responses_id: String },
+	/// The item has multiple pieces of content, ie text, reasoning
+	Content {
 		responses_id: String,
 		content_index: u32,
 	},
-	FunctionCall {
-		responses_id: String,
-	},
-	FunctionCallOutput {
-		responses_id: String,
-	},
-	ReasoningContent {
-		responses_id: String,
-		content_index: u32,
-	},
+	/// Reasoning summary is a special case that shares the same
+	/// item id as content.
 	ReasoningSummary {
 		responses_id: String,
 		// defaults to 0 when ommited
@@ -275,7 +263,7 @@ impl ItemMapper {
 						),
 					};
 					self.set_response_item(
-						ResponsesItemKey::Message {
+						ResponsesItemKey::Content {
 							responses_id: message.id.clone(),
 							content_index: content_index as u32,
 						},
@@ -285,14 +273,14 @@ impl ItemMapper {
 				}
 			}
 			OutputItem::FunctionCall(fc_call) => {
-				let status = map_function_call_status(fc_call.status);
+				let status = function_call_status(fc_call.status);
 				let item = Item::new(owner, status, FunctionCallItem {
 					name: fc_call.name,
 					arguments: fc_call.arguments,
 				});
 				self.set_call_id(item.id(), fc_call.call_id)?;
 				self.set_response_item(
-					ResponsesItemKey::FunctionCall {
+					ResponsesItemKey::Single {
 						responses_id: fc_call.id,
 					},
 					item.id(),
@@ -300,13 +288,13 @@ impl ItemMapper {
 				out.push(item);
 			}
 			OutputItem::FunctionCallOutput(fc_output) => {
-				let status = map_function_call_status(Some(fc_output.status));
+				let status = function_call_status(Some(fc_output.status));
 				let item = Item::new(owner, status, FunctionCallOutputItem {
 					function_call_item: self.get_item_id(&fc_output.call_id)?,
 					output: fc_output.output,
 				});
 				self.set_response_item(
-					ResponsesItemKey::FunctionCallOutput {
+					ResponsesItemKey::Single {
 						responses_id: fc_output.id,
 					},
 					item.id(),
@@ -314,6 +302,24 @@ impl ItemMapper {
 				out.push(item);
 			}
 			OutputItem::Reasoning(reasoning_item) => {
+				// note: we disregard encrypted content
+				for (index, content) in
+					reasoning_item.content.into_iter().enumerate()
+				{
+					let item = Item::new(
+						owner,
+						ItemStatus::Completed,
+						ReasoningContentItem(content.text),
+					);
+					self.set_response_item(
+						ResponsesItemKey::Content {
+							responses_id: reasoning_item.id.clone(),
+							content_index: index as u32,
+						},
+						item.id(),
+					)?;
+					out.push(item);
+				}
 				for (index, summary) in
 					reasoning_item.summary.into_iter().enumerate()
 				{
@@ -331,31 +337,13 @@ impl ItemMapper {
 					)?;
 					out.push(item);
 				}
-				for (index, content) in
-					reasoning_item.content.into_iter().enumerate()
-				{
-					let item = Item::new(
-						owner,
-						ItemStatus::Completed,
-						ReasoningContentItem(content.text),
-					);
-					self.set_response_item(
-						ResponsesItemKey::ReasoningContent {
-							responses_id: reasoning_item.id.clone(),
-							content_index: index as u32,
-						},
-						item.id(),
-					)?;
-					out.push(item);
-				}
-				// we disregard encrypted content
 			}
 		}
 		out.xok()
 	}
 }
 
-fn map_function_call_status(status: Option<FunctionCallStatus>) -> ItemStatus {
+fn function_call_status(status: Option<FunctionCallStatus>) -> ItemStatus {
 	match status {
 		Some(FunctionCallStatus::InProgress) => ItemStatus::InProgress,
 		Some(FunctionCallStatus::Completed) => ItemStatus::Completed,
