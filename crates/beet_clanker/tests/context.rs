@@ -82,7 +82,7 @@ fn exit_on_complete(_ev: On<ResponseComplete>, mut commands: Commands) {
 }
 
 fn listen_for_changes(
-	ev: On<EntityItemCreated>,
+	ev: On<EntityItemUpdated>,
 	// mut _commands: Commands,
 	context_query: ContextQuery,
 ) -> Result {

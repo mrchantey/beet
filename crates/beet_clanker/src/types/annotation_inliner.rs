@@ -1,18 +1,35 @@
 use crate::openresponses::Annotation;
 use crate::openresponses::UrlCitation;
+use beet_core::prelude::*;
+
+use super::PartialItemKey;
+
+#[derive(Debug, Clone, Default)]
+struct AnnotationState {
+	original_text: String,
+	annotations: Vec<Annotation>,
+}
 
 // Inlines openresponses annotations into text as markdown links.
 // Supports footnote style (default) where citations are appended
 // at the bottom, or inline style where they replace the annotated span.
+//
+// Tracks per-item original text and accumulated annotations to avoid
+// position drift from incremental insertion. Annotations always reference
+// positions in the original text, so we re-render from scratch each time.
 #[derive(Debug, Clone)]
 pub struct AnnotationInliner {
 	footnote_style: bool,
+	/// Per-item state keyed by [`PartialItemKey`], storing original text
+	/// and all annotations received so far.
+	item_state: HashMap<PartialItemKey, AnnotationState>,
 }
 
 impl Default for AnnotationInliner {
 	fn default() -> Self {
 		Self {
 			footnote_style: true,
+			item_state: HashMap::default(),
 		}
 	}
 }
@@ -25,8 +42,36 @@ impl AnnotationInliner {
 		self
 	}
 
-	/// Inline all annotations into the given text, returning the modified text.
-	/// Annotations are sorted by start_index descending so replacements
+	/// Store the original (un-annotated) text for a given item key.
+	/// Called when `TextDone` arrives or when full content is first known.
+	pub fn set_original_text(&mut self, key: PartialItemKey, text: String) {
+		self.item_state.entry(key).or_default().original_text = text;
+	}
+
+	/// Add an annotation for the given item key and re-render the full
+	/// annotated text from the original. Returns the rendered text, or
+	/// `None` if no original text has been stored for this key.
+	pub fn push_annotation(
+		&mut self,
+		key: &PartialItemKey,
+		annotation: Annotation,
+	) -> Option<String> {
+		self.item_state.get_mut(key)?.annotations.push(annotation);
+		self.render(key)
+	}
+
+	/// Render the current annotated text for a key without adding a new
+	/// annotation. Returns `None` if no original text is stored.
+	pub fn render(&self, key: &PartialItemKey) -> Option<String> {
+		let state = self.item_state.get(key)?;
+		if state.annotations.is_empty() {
+			return Some(state.original_text.clone());
+		}
+		Some(self.inline_annotations(&state.original_text, &state.annotations))
+	}
+
+	/// Stateless one-shot: inline all annotations into the given text.
+	/// Annotations are sorted by start_index so replacements
 	/// dont shift indices of earlier annotations.
 	pub fn inline_annotations(
 		&self,
@@ -184,6 +229,13 @@ mod test {
 		})
 	}
 
+	fn make_key(id: &str, index: u32) -> PartialItemKey {
+		PartialItemKey::Content {
+			responses_id: id.to_string(),
+			content_index: index,
+		}
+	}
+
 	#[test]
 	fn footnote_single_citation() {
 		let inliner = AnnotationInliner::new();
@@ -244,5 +296,72 @@ mod test {
 		assert!(
 			result.contains("[^1]: [https://example.com](https://example.com)")
 		);
+	}
+
+	#[test]
+	fn incremental_annotations_avoid_position_drift() {
+		let mut inliner = AnnotationInliner::new();
+		let key = make_key("resp1", 0);
+		let text = "First source and second source are both great.";
+
+		inliner.set_original_text(key.clone(), text.to_string());
+
+		// first annotation arrives
+		let result = inliner
+			.push_annotation(
+				&key,
+				make_citation("https://a.com", "Source A", 0, 12),
+			)
+			.unwrap();
+		assert!(result.contains("[^1]"));
+		assert!(!result.contains("[^2]"));
+
+		// second annotation arrives incrementally
+		let result = inliner
+			.push_annotation(
+				&key,
+				make_citation("https://b.com", "Source B", 17, 30),
+			)
+			.unwrap();
+
+		// both annotations rendered correctly from original positions
+		assert!(result.contains("[^1]"));
+		assert!(result.contains("[^2]"));
+		assert!(result.contains("[^1]: [Source A](https://a.com)"));
+		assert!(result.contains("[^2]: [Source B](https://b.com)"));
+
+		// verify it matches one-shot rendering
+		let oneshot = inliner.inline_annotations(text, &[
+			make_citation("https://a.com", "Source A", 0, 12),
+			make_citation("https://b.com", "Source B", 17, 30),
+		]);
+		assert_eq!(result, oneshot);
+	}
+
+	#[test]
+	fn render_without_annotations() {
+		let mut inliner = AnnotationInliner::new();
+		let key = make_key("resp1", 0);
+		let text = "Hello world.";
+
+		inliner.set_original_text(key.clone(), text.to_string());
+		let result = inliner.render(&key).unwrap();
+		assert_eq!(result, text);
+	}
+
+	#[test]
+	fn render_missing_key_returns_none() {
+		let inliner = AnnotationInliner::new();
+		let key = make_key("missing", 0);
+		assert!(inliner.render(&key).is_none());
+	}
+
+	#[test]
+	fn push_annotation_missing_key_returns_none() {
+		let mut inliner = AnnotationInliner::new();
+		let key = make_key("missing", 0);
+		let result = inliner
+			.push_annotation(&key, make_citation("https://a.com", "A", 0, 5));
+		assert!(result.is_none());
 	}
 }

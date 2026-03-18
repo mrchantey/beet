@@ -231,58 +231,55 @@ impl PartialItemMap {
 	) -> Result<ItemChanges> {
 		let mut changes = ItemChanges::default();
 		for partial_item in partial_items {
-			if let Some(&item_id) = self.item_key_map.get(&partial_item.key) {
+			let PartialItem {
+				key,
+				status,
+				content,
+			} = partial_item;
+
+			// extract call_id before content is moved
+			let call_id = match &content {
+				PartialContent::FunctionCall { call_id, .. } => {
+					Some(call_id.clone())
+				}
+				_ => None,
+			};
+
+			if let Some(&item_id) = self.item_key_map.get(&key) {
 				// item already exists, update it in place
 				let item = item_map.get_mut(item_id)?;
 				let before_mutation = item.hash();
 
-				item.set_status(partial_item.status);
-				self.apply_partial_content(
-					partial_item.content.clone(),
-					item.content_mut(),
-				)?;
+				item.set_status(status);
+				self.apply_partial_content(&key, content, item.content_mut())?;
 				let after_mutation = item.hash();
 				if before_mutation != after_mutation {
-					// it changed!
 					changes.modified.push(item_id);
 					// discard already registered error on updates
-					let _ = self.register_call_id(&partial_item, item_id);
+					if let Some(call_id) = call_id {
+						let _ = self.set_call_id(item_id, call_id);
+					}
 				}
 			} else {
 				// create new item
-				let content = self.partial_content_into_content(
-					&partial_item.key,
-					partial_item.content.clone(),
-				)?;
-				let item = Item::new(owner, partial_item.status, content);
+				let content =
+					self.partial_content_into_content(&key, content)?;
+				let item = Item::new(owner, status, content);
 				let item_id = item.id();
 
 				// register response key -> item id
-				self.set_response_item(partial_item.key.clone(), item_id)?;
+				self.set_response_item(key, item_id)?;
 
-				// register call_id mappings for function calls
-				self.register_call_id(&partial_item, item_id)?;
+				// register call_id mapping for function calls
+				if let Some(call_id) = call_id {
+					self.set_call_id(item_id, call_id)?;
+				}
 
 				changes.created.push(item_id);
 				item_map.insert(item);
 			}
 		}
 		changes.xok()
-	}
-
-	// try to extract and register a call_id from a partial item
-	fn register_call_id(
-		&mut self,
-		partial: &PartialItem,
-		item_id: ItemId,
-	) -> Result {
-		match &partial.content {
-			PartialContent::FunctionCall { call_id, .. } => {
-				self.set_call_id(item_id, call_id.clone())?;
-			}
-			_ => {}
-		}
-		Ok(())
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════
@@ -452,7 +449,8 @@ impl PartialItemMap {
 	/// Apply a [`PartialContent`] to an existing [`Content`], mutating
 	/// it in place. Handles deltas, replacements, and annotation inlining.
 	fn apply_partial_content(
-		&self,
+		&mut self,
+		key: &PartialItemKey,
 		partial: PartialContent,
 		content: &mut Content,
 	) -> Result {
@@ -561,8 +559,10 @@ impl PartialItemMap {
 			(PartialContent::Delta(delta), Content::FunctionCall(item)) => {
 				item.arguments.push_str(&delta);
 			}
-			// TextDone overwrites text content
+			// TextDone overwrites text content and caches original for annotation re-rendering
 			(PartialContent::TextDone { text, .. }, Content::Text(item)) => {
+				self.annotation_inliner
+					.set_original_text(key.clone(), text.clone());
 				item.0 = text;
 			}
 			// RefusalDone overwrites refusal content
@@ -579,13 +579,16 @@ impl PartialItemMap {
 			) => {
 				item.0 = content;
 			}
-			// AnnotationAdded: inline annotation into existing text
+			// AnnotationAdded: re-render from original text with all accumulated annotations
 			(
 				PartialContent::AnnotationAdded { annotation, .. },
 				Content::Text(item),
 			) => {
-				item.0 =
-					self.inline_output_text_annotations(&item.0, &[annotation]);
+				if let Some(rendered) =
+					self.annotation_inliner.push_annotation(key, annotation)
+				{
+					item.0 = rendered;
+				}
 			}
 			// FunctionCallArgumentsDone overwrites arguments
 			(
