@@ -6,7 +6,14 @@
 
 use std::ops::ControlFlow;
 
+use crate::openresponses::Annotation;
+use crate::openresponses::ContentPart;
+use crate::openresponses::OutputItem;
+use crate::openresponses::OutputText;
+use crate::openresponses::ReasoningText;
+use crate::openresponses::Refusal;
 use crate::openresponses::StreamingEvent;
+use crate::openresponses::SummaryText;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
@@ -211,11 +218,65 @@ impl ModelAction {
 		if let Some(prev_response_id) = response.previous_response_id {
 			self.previous_response_id = Some(prev_response_id);
 		}
-		let items = self.item_mapper.parse_output(actor_id, response.output)?;
-		context_query.add_items(items)?;
 
+		self.handle_output_items(context_query, actor_id, response.output)?;
 		Ok(())
 	}
+
+	fn handle_output_items(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		items: impl IntoIterator<Item = OutputItem>,
+	) -> Result {
+		let items = self.item_mapper.parse_output(actor_id, items)?;
+		context_query.add_items(items)?;
+		Ok(())
+	}
+
+	/// handles both part added and part done
+	fn handle_content_part(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		key: ResponsesItemKey,
+		status: ItemStatus,
+		part: ContentPart,
+	) {
+		todo!()
+	}
+	/// handles both part added and part done
+	fn handle_delta(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		key: ResponsesItemKey,
+		delta: String,
+	) {
+		todo!()
+	}
+	/// handles both part added and part done
+	fn handle_annotation_added(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		key: ResponsesItemKey,
+		annotation_index: u32,
+		annotation: Annotation,
+	) {
+		todo!()
+	}
+	/// handles both part added and part done
+	fn handle_arguments_done(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		key: ResponsesItemKey,
+		arguments: String,
+	) {
+		todo!()
+	}
+
 
 	fn handle_event(
 		&mut self,
@@ -224,7 +285,7 @@ impl ModelAction {
 		event: StreamingEvent,
 	) -> Result<ControlFlow<()>> {
 		use openresponses::StreamingEvent::*;
-		// info!("Handling streaming event: {:#?}", event);
+		trace!("Streaming Event: {:#?}", event);
 		match event {
 			ResponseCreated(ev) => {
 				// usually empty but parse anyway
@@ -253,40 +314,212 @@ impl ModelAction {
 				self.parse_response_body(context_query, actor_id, ev.response)?;
 				return ControlFlow::Break(()).xok();
 			}
-			OutputItemAdded(_output_item_added_event) => todo!(),
-			OutputItemDone(_output_item_done_event) => todo!(),
-			ContentPartAdded(_content_part_added_event) => todo!(),
-			ContentPartDone(_content_part_done_event) => todo!(),
-			OutputTextDelta(_output_text_delta_event) => todo!(),
-			OutputTextDone(_output_text_done_event) => todo!(),
-			OutputTextAnnotationAdded(_output_text_annotation_added_event) => {
-				todo!()
+			OutputItemAdded(item_added) => {
+				self.handle_output_items(
+					context_query,
+					actor_id,
+					item_added.item,
+				)?;
 			}
-			RefusalDelta(_refusal_delta_event) => todo!(),
-			RefusalDone(_refusal_done_event) => todo!(),
-			ReasoningDelta(_reasoning_delta_event) => todo!(),
-			ReasoningDone(_reasoning_done_event) => todo!(),
-			ReasoningSummaryTextDelta(_reasoning_summary_text_delta_event) => {
-				todo!()
+			OutputItemDone(item_done) => {
+				self.handle_output_items(
+					context_query,
+					actor_id,
+					item_done.item,
+				)?;
 			}
-			ReasoningSummaryTextDone(_reasoning_summary_text_done_event) => {
-				todo!()
+			ContentPartAdded(part_added) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: part_added.item_id,
+						content_index: part_added.content_index,
+					},
+					ItemStatus::InProgress,
+					part_added.part,
+				);
 			}
-			ReasoningSummaryPartAdded(_reasoning_summary_part_added_event) => {
-				todo!()
+			ContentPartDone(part_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: part_done.item_id,
+						content_index: part_done.content_index,
+					},
+					ItemStatus::Completed,
+					part_done.part,
+				);
 			}
-			ReasoningSummaryPartDone(_reasoning_summary_part_done_event) => {
-				todo!()
+			OutputTextDelta(text_delta) => {
+				self.handle_delta(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: text_delta.item_id,
+						content_index: text_delta.content_index,
+					},
+					text_delta.delta,
+				);
 			}
-			FunctionCallArgumentsDelta(
-				_function_call_arguments_delta_event,
-			) => {
-				todo!()
+			OutputTextDone(text_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: text_done.item_id,
+						content_index: text_done.content_index,
+					},
+					ItemStatus::Completed,
+					// map to content part, same thing
+					ContentPart::OutputText(OutputText {
+						text: text_done.text,
+						annotations: Vec::new(),
+						logprobs: text_done.logprobs,
+					}),
+				);
 			}
-			FunctionCallArgumentsDone(_function_call_arguments_done_event) => {
-				todo!()
+			OutputTextAnnotationAdded(annotation_added) => {
+				if let Some(annotation) = annotation_added.annotation {
+					self.handle_annotation_added(
+						context_query,
+						actor_id,
+						ResponsesItemKey::Content {
+							responses_id: annotation_added.item_id,
+							content_index: annotation_added.content_index,
+						},
+						annotation_added.annotation_index,
+						annotation,
+					);
+				} else {
+					// no annotation, who cares..
+				}
 			}
-			Error(_error_event) => todo!(),
+			RefusalDelta(refusal_delta) => {
+				self.handle_delta(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: refusal_delta.item_id,
+						content_index: refusal_delta.content_index,
+					},
+					refusal_delta.delta,
+				);
+			}
+			RefusalDone(refusal_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: refusal_done.item_id,
+						content_index: refusal_done.content_index,
+					},
+					ItemStatus::Completed,
+					ContentPart::Refusal(Refusal {
+						refusal: refusal_done.refusal,
+					}),
+				);
+			}
+			ReasoningDelta(reasoning_delta) => {
+				self.handle_delta(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: reasoning_delta.item_id,
+						content_index: reasoning_delta.content_index,
+					},
+					reasoning_delta.delta,
+				);
+			}
+			ReasoningDone(reasoning_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Content {
+						responses_id: reasoning_done.item_id,
+						content_index: reasoning_done.content_index,
+					},
+					ItemStatus::Completed,
+					ContentPart::ReasoningText(ReasoningText {
+						text: reasoning_done.text,
+					}),
+				);
+			}
+			ReasoningSummaryTextDelta(summary_delta) => {
+				self.handle_delta(
+					context_query,
+					actor_id,
+					ResponsesItemKey::ReasoningSummary {
+						responses_id: summary_delta.item_id,
+						// we default to 0 if no index provided
+						content_index: summary_delta.summary_index.unwrap_or(0),
+					},
+					summary_delta.delta,
+				);
+			}
+			ReasoningSummaryTextDone(summary_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::ReasoningSummary {
+						responses_id: summary_done.item_id,
+						// we default to 0 if no index provided
+						content_index: summary_done.summary_index.unwrap_or(0),
+					},
+					ItemStatus::Completed,
+					ContentPart::SummaryText(SummaryText {
+						text: summary_done.text,
+					}),
+				);
+			}
+			ReasoningSummaryPartAdded(summary_added) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::ReasoningSummary {
+						responses_id: summary_added.item_id,
+						content_index: summary_added.summary_index.unwrap_or(0),
+					},
+					ItemStatus::InProgress,
+					summary_added.part,
+				);
+			}
+			ReasoningSummaryPartDone(summary_done) => {
+				self.handle_content_part(
+					context_query,
+					actor_id,
+					ResponsesItemKey::ReasoningSummary {
+						responses_id: summary_done.item_id,
+						content_index: summary_done.summary_index.unwrap_or(0),
+					},
+					ItemStatus::Completed,
+					summary_done.part,
+				);
+			}
+			FunctionCallArgumentsDelta(arguments_delta) => {
+				self.handle_delta(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Single {
+						responses_id: arguments_delta.item_id,
+					},
+					arguments_delta.delta,
+				);
+			}
+			FunctionCallArgumentsDone(arguments_done) => {
+				self.handle_arguments_done(
+					context_query,
+					actor_id,
+					ResponsesItemKey::Single {
+						responses_id: arguments_done.item_id,
+					},
+					arguments_done.arguments,
+				);
+			}
+			Error(error) => {
+				bevybail!("Model streaming error: {:?}", error.error);
+			}
 		}
 
 		ControlFlow::Continue(()).xok()

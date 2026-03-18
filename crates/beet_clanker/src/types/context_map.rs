@@ -74,7 +74,7 @@ impl ContextQuery<'_, '_> {
 		&mut self,
 		items: impl XIntoIterator<M, Item>,
 	) -> Result<()> {
-		for item in items.xinto_iterator() {
+		for item in items.xinto_iter() {
 			self.add_item(item)?;
 		}
 		Ok(())

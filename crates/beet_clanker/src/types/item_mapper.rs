@@ -25,7 +25,7 @@ pub struct ItemMapper {
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-enum ResponsesItemKey {
+pub enum ResponsesItemKey {
 	/// There is only one piece of content, ie a function call
 	Single { responses_id: String },
 	/// The item has multiple pieces of content, ie text, reasoning
@@ -221,7 +221,7 @@ impl ItemMapper {
 	pub fn parse_output(
 		&mut self,
 		owner: ActorId,
-		items: Vec<OutputItem>,
+		items: impl IntoIterator<Item = OutputItem>,
 	) -> Result<Vec<Item>> {
 		items
 			.into_iter()

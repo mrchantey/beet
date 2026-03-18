@@ -325,7 +325,7 @@ impl XtendString for String {
 /// Extension trait for types that can be converted into an iterator.
 pub trait XIntoIterator<M, T> {
 	/// Converts `self` into an iterator of items of type `T`.
-	fn xinto_iterator(self) -> impl Iterator<Item = T>;
+	fn xinto_iter(self) -> impl Iterator<Item = T>;
 }
 /// Marker type for the `IntoIterator` implementation of `XIntoIterator`.
 pub struct IteratorIntoIteratorMarker;
@@ -334,9 +334,9 @@ impl<T, I> XIntoIterator<IteratorIntoIteratorMarker, T> for I
 where
 	I: IntoIterator<Item = T>,
 {
-	fn xinto_iterator(self) -> impl Iterator<Item = T> { self.into_iter() }
+	fn xinto_iter(self) -> impl Iterator<Item = T> { self.into_iter() }
 }
 
 impl<T> XIntoIterator<Self, T> for T {
-	fn xinto_iterator(self) -> impl Iterator<Item = T> { [self].into_iter() }
+	fn xinto_iter(self) -> impl Iterator<Item = T> { [self].into_iter() }
 }
