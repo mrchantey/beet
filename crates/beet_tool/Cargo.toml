@@ -25,4 +25,3 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net.workspace = true

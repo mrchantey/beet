@@ -1,7 +1,6 @@
 # beet_tool
 
-Entities as async functions.
-
+Functions as entities.
 
 ```rust
 
@@ -10,8 +9,10 @@ fn add(a:i32, b:i32) -> i32 {
 	a + b
 }
 
-world.spawn(add)
-	.call::<(i32, i32), i32>((5, 5))
+let out = World::new().spawn(add.into_tool())
+	.call::<(i32, i32), i32>((1, 2))
 	.await
-;
+	.unwrap();
+
+assert_eq!(out, 3);
 ```

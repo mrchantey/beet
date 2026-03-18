@@ -71,7 +71,6 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use beet_net::prelude::*;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
 		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())
@@ -92,10 +91,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![(
-				PathPartial::new("foo"),
-				outcome_fail(),
-			)]))
+			.spawn((fallback::<(), ()>(), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -104,10 +100,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![(
-				PathPartial::new("foo"),
-				outcome_pass(),
-			)]))
+			.spawn((fallback::<(), ()>(), children![outcome_pass()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -117,10 +110,10 @@ mod tests {
 	async fn passing_nth_child() {
 		AsyncPlugin::world()
 			.spawn((fallback::<(), ()>(), children![
-				(PathPartial::new("foo"), outcome_fail()),
-				(PathPartial::new("bar"), outcome_fail()),
-				(PathPartial::new("bazz"), outcome_pass()),
-				(PathPartial::new("boo"), outcome_fail()),
+				outcome_fail(),
+				outcome_fail(),
+				outcome_pass(),
+				outcome_fail(),
 			]))
 			.call::<(), Outcome>(())
 			.await

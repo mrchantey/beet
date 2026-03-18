@@ -1280,7 +1280,6 @@ name = "beet_tool"
 version = "0.0.9-dev.5"
 dependencies = [
  "beet_core",
- "beet_net",
  "bevy",
  "extend",
  "serde",

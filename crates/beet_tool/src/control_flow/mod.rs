@@ -1,5 +1,7 @@
 mod fallback;
 pub use fallback::*;
+mod sequence;
+pub use sequence::*;
 
 use beet_core::prelude::*;
 
