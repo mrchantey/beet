@@ -24,6 +24,13 @@ impl ContextMap {
 	pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
 	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
 
+	/// Split borrow: immutable items + mutable threads
+	pub fn items_and_threads_mut(
+		&mut self,
+	) -> (&DocMap<Item>, &mut DocMap<Thread>) {
+		(&self.items, &mut self.threads)
+	}
+
 	pub fn thread_items(
 		&self,
 		thread_id: ThreadId,
@@ -81,59 +88,76 @@ impl ContextQuery<'_, '_> {
 		});
 	}
 
+	/// Insert items into the map and handle thread pushing + events.
+	/// For items that are already in the map (ie from [`PartialItemMap::apply_items`]),
+	/// use [`handle_item_changes`] directly.
 	pub fn add_items<M>(
 		&mut self,
 		items: impl XIntoIterator<M, Item>,
 	) -> Result<()> {
+		let mut changes = ItemChanges::default();
 		for item in items.xinto_iter() {
-			self.add_item(item)?;
+			let item_id = item.id();
+			let exists = self.items.contains_key(item_id);
+			self.items.insert(item);
+			if exists {
+				changes.modified.push(item_id);
+			} else {
+				changes.created.push(item_id);
+			}
 		}
-		Ok(())
+		self.handle_item_changes(changes)
 	}
 
-	fn add_item(&mut self, item: Item) -> Result {
-		let item_id = item.id();
+	/// Push items to matching threads and trigger creation/update events.
+	/// Items must already exist in the item map.
+	pub fn handle_item_changes(&mut self, changes: ItemChanges) -> Result {
+		if changes.is_empty() {
+			return Ok(());
+		}
 
-		// 1. try push to to threads
-		let threads_changed = self
-			.threads
-			.values_mut()
-			.xtry_filter(|thread| -> Result<bool> {
-				thread.try_push(&item).xok()
-			})?
-			.into_iter()
-			.map(|thread| thread.id())
-			.collect::<Vec<_>>();
+		// split borrows: items (immutable) and threads (mutable)
+		let (items, threads) = self.context_map.items_and_threads_mut();
 
-		// 2. insert item
-		let exists = self.items.contains_key(item_id);
-		self.items.insert(item);
+		for &item_id in changes.all_items() {
+			let item = items.get(item_id)?;
 
+			// push to matching threads
+			let threads_changed = threads
+				.values_mut()
+				.xtry_filter(|thread| -> Result<bool> {
+					thread.try_push(item).xok()
+				})?
+				.into_iter()
+				.map(|thread| thread.id())
+				.collect::<Vec<_>>();
 
-		// 3. trigger events
-		let changed_entities = self
-			.thread_query
-			.iter()
-			.filter(|(_, thread_id)| threads_changed.contains(thread_id))
-			.map(|(entity, _)| entity)
-			.collect::<Vec<_>>();
+			let changed_entities = self
+				.thread_query
+				.iter()
+				.filter(|(_, thread_id)| threads_changed.contains(thread_id))
+				.map(|(entity, _)| entity)
+				.collect::<Vec<_>>();
 
-		if !exists {
-			self.commands.trigger(ItemCreated { item: item_id });
+			let is_created = changes.created.contains(&item_id);
+
+			if is_created {
+				self.commands.trigger(ItemCreated { item: item_id });
+				for entity in changed_entities.iter() {
+					self.commands.trigger(EntityItemCreated {
+						entity: *entity,
+						item: item_id,
+					});
+				}
+			}
+
+			self.commands.trigger(ItemUpdated { item: item_id });
 			for entity in changed_entities.iter() {
-				self.commands.trigger(EntityItemCreated {
+				self.commands.trigger(EntityItemUpdated {
 					entity: *entity,
 					item: item_id,
 				});
 			}
-		}
-
-		self.commands.trigger(ItemUpdated { item: item_id });
-		for entity in changed_entities.iter() {
-			self.commands.trigger(EntityItemUpdated {
-				entity: *entity,
-				item: item_id,
-			});
 		}
 
 		Ok(())
@@ -167,6 +191,6 @@ pub struct EntityItemUpdated {
 #[derive(Event)]
 pub struct ResponseComplete {
 	/// The openresponses id for this response
-	id: String,
-	interrupted: bool,
+	pub id: String,
+	pub interrupted: bool,
 }

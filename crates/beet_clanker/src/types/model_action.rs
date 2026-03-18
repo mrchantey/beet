@@ -60,7 +60,6 @@ pub struct ModelAction {
 	/// Track which item was sent last, for skipping sent
 	/// items when a previous_response_id is used.
 	last_item_sent: Option<ItemId>,
-	item_mapper: ItemMapper,
 	partial_items: PartialItemMap,
 }
 
@@ -96,7 +95,6 @@ impl ModelAction {
 			model: model.into(),
 			stream: false,
 			instructions: None,
-			item_mapper: default(),
 			partial_items: default(),
 			previous_response_id: None,
 			last_item_sent: None,
@@ -184,7 +182,7 @@ impl ModelAction {
 		};
 
 		// collect input
-		let input = self.item_mapper.build_input(
+		let input = self.partial_items.build_input(
 			context_map,
 			actor_id,
 			thread_id,
@@ -235,19 +233,22 @@ impl ModelAction {
 	fn handle_partial_items(
 		&mut self,
 		context_query: &mut ContextQuery,
-		actor_id: ActorId,
+		owner: ActorId,
 		items: impl IntoIterator<Item = PartialItem>,
 	) -> Result {
-		todo!("map partial items to items");
-		// let items = self.item_mapper.parse_output(actor_id, items)?;
-		// context_query.add_items(items)?;
+		let changes = self.partial_items.apply_items(
+			context_query.items_mut(),
+			owner,
+			items,
+		)?;
+		context_query.handle_item_changes(changes)?;
 		Ok(())
 	}
 
 	fn handle_event(
 		&mut self,
 		context_query: &mut ContextQuery,
-		actor_id: ActorId,
+		owner: ActorId,
 		event: openresponses::StreamingEvent,
 	) -> Result<ControlFlow<()>> {
 		use openresponses::StreamingEvent::*;
@@ -257,7 +258,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::InProgress,
 				)?;
@@ -266,7 +267,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::InProgress,
 				)?;
@@ -275,7 +276,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::InProgress,
 				)?;
@@ -284,7 +285,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::Completed,
 				)?;
@@ -294,7 +295,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::Interrupted,
 				)?;
@@ -304,7 +305,7 @@ impl ModelAction {
 				// usually empty but parse anyway
 				self.parse_response_body(
 					context_query,
-					actor_id,
+					owner,
 					ev.response,
 					ItemStatus::Interrupted,
 				)?;
@@ -313,7 +314,7 @@ impl ModelAction {
 			OutputItemAdded(item_added) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem::from_output_items(
 						item_added.item,
 						ItemStatus::InProgress,
@@ -323,7 +324,7 @@ impl ModelAction {
 			OutputItemDone(item_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem::from_output_items(
 						item_done.item,
 						ItemStatus::Completed,
@@ -333,7 +334,7 @@ impl ModelAction {
 			ContentPartAdded(part_added) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: part_added.item_id,
@@ -348,7 +349,7 @@ impl ModelAction {
 			ContentPartDone(part_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: part_done.item_id,
@@ -363,7 +364,7 @@ impl ModelAction {
 			OutputTextDelta(text_delta) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: text_delta.item_id,
@@ -378,7 +379,7 @@ impl ModelAction {
 			OutputTextDone(text_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: text_done.item_id,
@@ -397,7 +398,7 @@ impl ModelAction {
 				if let Some(annotation) = annotation_added.annotation {
 					self.handle_partial_items(
 						context_query,
-						actor_id,
+						owner,
 						PartialItem {
 							key: PartialItemKey::Content {
 								responses_id: annotation_added.item_id,
@@ -419,7 +420,7 @@ impl ModelAction {
 			RefusalDelta(refusal_delta) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: refusal_delta.item_id,
@@ -434,7 +435,7 @@ impl ModelAction {
 			RefusalDone(refusal_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: refusal_done.item_id,
@@ -451,7 +452,7 @@ impl ModelAction {
 			ReasoningDelta(reasoning_delta) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: reasoning_delta.item_id,
@@ -466,7 +467,7 @@ impl ModelAction {
 			ReasoningDone(reasoning_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: reasoning_done.item_id,
@@ -483,7 +484,7 @@ impl ModelAction {
 			ReasoningSummaryTextDelta(summary_delta) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_delta.item_id,
@@ -500,7 +501,7 @@ impl ModelAction {
 			ReasoningSummaryTextDone(summary_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
@@ -519,7 +520,7 @@ impl ModelAction {
 			ReasoningSummaryPartAdded(summary_added) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_added.item_id,
@@ -538,7 +539,7 @@ impl ModelAction {
 			ReasoningSummaryPartDone(summary_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
@@ -555,7 +556,7 @@ impl ModelAction {
 			FunctionCallArgumentsDelta(arguments_delta) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Single {
 							responses_id: arguments_delta.item_id,
@@ -569,7 +570,7 @@ impl ModelAction {
 			FunctionCallArgumentsDone(arguments_done) => {
 				self.handle_partial_items(
 					context_query,
-					actor_id,
+					owner,
 					PartialItem {
 						key: PartialItemKey::Single {
 							responses_id: arguments_done.item_id,

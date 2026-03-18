@@ -38,7 +38,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 		(
 			clanker_id,
 			clanker_thread,
-			ModelAction::new(OllamaProvider::default())
+			ModelAction::new(OllamaProvider::default()).streaming()
 		),
 		(
 			user_id,
@@ -77,7 +77,7 @@ fn run_clanker(mut commands: Commands, query: ContextQuery) {
 #[derive(Default, Component)]
 struct StdoutCursor(u32);
 
-fn exit_on_complete(ev: On<ResponseComplete>, mut commands: Commands) {
+fn exit_on_complete(_ev: On<ResponseComplete>, mut commands: Commands) {
 	commands.write_message(AppExit::Success);
 }
 

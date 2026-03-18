@@ -46,6 +46,13 @@ impl Item {
 	pub(super) fn set_status(&mut self, status: ItemStatus) {
 		self.status = status;
 	}
+	pub fn hash(&self) -> u64 {
+		use std::hash::Hash;
+		use std::hash::Hasher;
+		let mut hasher = std::collections::hash_map::DefaultHasher::new();
+		self.content.hash(&mut hasher);
+		hasher.finish()
+	}
 	pub(super) fn content_mut(&mut self) -> &mut Content { &mut self.content }
 }
 

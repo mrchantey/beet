@@ -1,7 +1,7 @@
 mod actor;
+mod annotation_inliner;
 mod clanker_plugin;
 mod document;
-mod item_mapper;
 mod partial_item;
 pub use document::*;
 pub use partial_item::*;
@@ -11,8 +11,8 @@ mod item;
 pub use item::*;
 mod model_action;
 pub use actor::*;
+pub use annotation_inliner::*;
 pub use model_action::*;
 mod context_map;
 pub use clanker_plugin::*;
 pub use context_map::*;
-pub use item_mapper::*;
