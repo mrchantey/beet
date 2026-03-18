@@ -4,19 +4,10 @@
 //! with an AI model. When added to an entity, it automatically inserts the
 //! request behavior via an `on_add` hook.
 
-use std::ops::ControlFlow;
-
-use crate::openresponses::Annotation;
-use crate::openresponses::ContentPart;
-use crate::openresponses::OutputItem;
-use crate::openresponses::OutputText;
-use crate::openresponses::ReasoningText;
-use crate::openresponses::Refusal;
-use crate::openresponses::StreamingEvent;
-use crate::openresponses::SummaryText;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
+use std::ops::ControlFlow;
 
 /// A component that configures an action entity to interact with an AI model.
 ///
@@ -70,6 +61,7 @@ pub struct ModelAction {
 	/// items when a previous_response_id is used.
 	last_item_sent: Option<ItemId>,
 	item_mapper: ItemMapper,
+	partial_items: PartialItemMap,
 }
 
 
@@ -105,6 +97,7 @@ impl ModelAction {
 			stream: false,
 			instructions: None,
 			item_mapper: default(),
+			partial_items: default(),
 			previous_response_id: None,
 			last_item_sent: None,
 		}
@@ -214,308 +207,369 @@ impl ModelAction {
 		context_query: &mut ContextQuery,
 		actor_id: ActorId,
 		response: openresponses::ResponseBody,
-	) -> Result {
-		if let Some(prev_response_id) = response.previous_response_id {
-			self.previous_response_id = Some(prev_response_id);
-		}
-
-		self.handle_output_items(context_query, actor_id, response.output)?;
-		Ok(())
-	}
-
-	fn handle_output_items(
-		&mut self,
-		context_query: &mut ContextQuery,
-		actor_id: ActorId,
-		items: impl IntoIterator<Item = OutputItem>,
-	) -> Result {
-		let items = self.item_mapper.parse_output(actor_id, items)?;
-		context_query.add_items(items)?;
-		Ok(())
-	}
-
-	/// handles both part added and part done
-	fn handle_content_part(
-		&mut self,
-		context_query: &mut ContextQuery,
-		actor_id: ActorId,
-		key: ResponsesItemKey,
 		status: ItemStatus,
-		part: ContentPart,
-	) {
-		todo!()
-	}
-	/// handles both part added and part done
-	fn handle_delta(
-		&mut self,
-		context_query: &mut ContextQuery,
-		actor_id: ActorId,
-		key: ResponsesItemKey,
-		delta: String,
-	) {
-		todo!()
-	}
-	/// handles both part added and part done
-	fn handle_annotation_added(
-		&mut self,
-		context_query: &mut ContextQuery,
-		actor_id: ActorId,
-		key: ResponsesItemKey,
-		annotation_index: u32,
-		annotation: Annotation,
-	) {
-		todo!()
-	}
-	/// handles both part added and part done
-	fn handle_arguments_done(
-		&mut self,
-		context_query: &mut ContextQuery,
-		actor_id: ActorId,
-		key: ResponsesItemKey,
-		arguments: String,
-	) {
-		todo!()
+	) -> Result {
+		// if let Some(prev_response_id) = response.previous_response_id {
+		// 	self.previous_response_id = Some(prev_response_id);
+		// }
+		self.previous_response_id = Some(response.id);
+
+		let partial_items =
+			PartialItem::from_output_items(response.output, status);
+
+		self.handle_partial_items(context_query, actor_id, partial_items)?;
+		Ok(())
 	}
 
+	fn handle_partial_items(
+		&mut self,
+		context_query: &mut ContextQuery,
+		actor_id: ActorId,
+		items: impl IntoIterator<Item = PartialItem>,
+	) -> Result {
+		todo!("map partial items to items");
+		// let items = self.item_mapper.parse_output(actor_id, items)?;
+		// context_query.add_items(items)?;
+		Ok(())
+	}
 
 	fn handle_event(
 		&mut self,
 		context_query: &mut ContextQuery,
 		actor_id: ActorId,
-		event: StreamingEvent,
+		event: openresponses::StreamingEvent,
 	) -> Result<ControlFlow<()>> {
 		use openresponses::StreamingEvent::*;
 		trace!("Streaming Event: {:#?}", event);
 		match event {
 			ResponseCreated(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::InProgress,
+				)?;
 			}
 			ResponseQueued(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::InProgress,
+				)?;
 			}
 			ResponseInProgress(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::InProgress,
+				)?;
 			}
 			ResponseCompleted(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::Completed,
+				)?;
 				return ControlFlow::Break(()).xok();
 			}
 			ResponseFailed(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::Interrupted,
+				)?;
 				return ControlFlow::Break(()).xok();
 			}
 			ResponseIncomplete(ev) => {
 				// usually empty but parse anyway
-				self.parse_response_body(context_query, actor_id, ev.response)?;
+				self.parse_response_body(
+					context_query,
+					actor_id,
+					ev.response,
+					ItemStatus::Interrupted,
+				)?;
 				return ControlFlow::Break(()).xok();
 			}
 			OutputItemAdded(item_added) => {
-				self.handle_output_items(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					item_added.item,
+					PartialItem::from_output_items(
+						item_added.item,
+						ItemStatus::InProgress,
+					),
 				)?;
 			}
 			OutputItemDone(item_done) => {
-				self.handle_output_items(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					item_done.item,
+					PartialItem::from_output_items(
+						item_done.item,
+						ItemStatus::Completed,
+					),
 				)?;
 			}
 			ContentPartAdded(part_added) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: part_added.item_id,
-						content_index: part_added.content_index,
-					},
-					ItemStatus::InProgress,
-					part_added.part,
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: part_added.item_id,
+							content_index: part_added.content_index,
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::ContentPart(part_added.part),
+					}
+					.xsome(),
+				)?;
 			}
 			ContentPartDone(part_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: part_done.item_id,
-						content_index: part_done.content_index,
-					},
-					ItemStatus::Completed,
-					part_done.part,
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: part_done.item_id,
+							content_index: part_done.content_index,
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::ContentPart(part_done.part),
+					}
+					.xsome(),
+				)?;
 			}
 			OutputTextDelta(text_delta) => {
-				self.handle_delta(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: text_delta.item_id,
-						content_index: text_delta.content_index,
-					},
-					text_delta.delta,
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: text_delta.item_id,
+							content_index: text_delta.content_index,
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::Delta(text_delta.delta),
+					}
+					.xsome(),
+				)?;
 			}
 			OutputTextDone(text_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: text_done.item_id,
-						content_index: text_done.content_index,
-					},
-					ItemStatus::Completed,
-					// map to content part, same thing
-					ContentPart::OutputText(OutputText {
-						text: text_done.text,
-						annotations: Vec::new(),
-						logprobs: text_done.logprobs,
-					}),
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: text_done.item_id,
+							content_index: text_done.content_index,
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::TextDone {
+							text: text_done.text,
+							logprobs: text_done.logprobs,
+						},
+					}
+					.xsome(),
+				)?;
 			}
 			OutputTextAnnotationAdded(annotation_added) => {
 				if let Some(annotation) = annotation_added.annotation {
-					self.handle_annotation_added(
+					self.handle_partial_items(
 						context_query,
 						actor_id,
-						ResponsesItemKey::Content {
-							responses_id: annotation_added.item_id,
-							content_index: annotation_added.content_index,
-						},
-						annotation_added.annotation_index,
-						annotation,
-					);
+						PartialItem {
+							key: PartialItemKey::Content {
+								responses_id: annotation_added.item_id,
+								content_index: annotation_added.content_index,
+							},
+							status: ItemStatus::InProgress,
+							content: PartialContent::AnnotationAdded {
+								annotation,
+								annotation_index: annotation_added
+									.annotation_index,
+							},
+						}
+						.xsome(),
+					)?;
 				} else {
-					// no annotation, who cares..
+					// no annotation, nothing to do
 				}
 			}
 			RefusalDelta(refusal_delta) => {
-				self.handle_delta(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: refusal_delta.item_id,
-						content_index: refusal_delta.content_index,
-					},
-					refusal_delta.delta,
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: refusal_delta.item_id,
+							content_index: refusal_delta.content_index,
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::Delta(refusal_delta.delta),
+					}
+					.xsome(),
+				)?;
 			}
 			RefusalDone(refusal_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: refusal_done.item_id,
-						content_index: refusal_done.content_index,
-					},
-					ItemStatus::Completed,
-					ContentPart::Refusal(Refusal {
-						refusal: refusal_done.refusal,
-					}),
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: refusal_done.item_id,
+							content_index: refusal_done.content_index,
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::RefusalDone {
+							refusal: refusal_done.refusal,
+						},
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningDelta(reasoning_delta) => {
-				self.handle_delta(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: reasoning_delta.item_id,
-						content_index: reasoning_delta.content_index,
-					},
-					reasoning_delta.delta,
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: reasoning_delta.item_id,
+							content_index: reasoning_delta.content_index,
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::Delta(reasoning_delta.delta),
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningDone(reasoning_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Content {
-						responses_id: reasoning_done.item_id,
-						content_index: reasoning_done.content_index,
-					},
-					ItemStatus::Completed,
-					ContentPart::ReasoningText(ReasoningText {
-						text: reasoning_done.text,
-					}),
-				);
+					PartialItem {
+						key: PartialItemKey::Content {
+							responses_id: reasoning_done.item_id,
+							content_index: reasoning_done.content_index,
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::ReasoningDone {
+							content: reasoning_done.text,
+						},
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningSummaryTextDelta(summary_delta) => {
-				self.handle_delta(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::ReasoningSummary {
-						responses_id: summary_delta.item_id,
-						// we default to 0 if no index provided
-						content_index: summary_delta.summary_index.unwrap_or(0),
-					},
-					summary_delta.delta,
-				);
+					PartialItem {
+						key: PartialItemKey::ReasoningSummary {
+							responses_id: summary_delta.item_id,
+							summary_index: summary_delta
+								.summary_index
+								.unwrap_or(0),
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::Delta(summary_delta.delta),
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningSummaryTextDone(summary_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::ReasoningSummary {
-						responses_id: summary_done.item_id,
-						// we default to 0 if no index provided
-						content_index: summary_done.summary_index.unwrap_or(0),
-					},
-					ItemStatus::Completed,
-					ContentPart::SummaryText(SummaryText {
-						text: summary_done.text,
-					}),
-				);
+					PartialItem {
+						key: PartialItemKey::ReasoningSummary {
+							responses_id: summary_done.item_id,
+							summary_index: summary_done
+								.summary_index
+								.unwrap_or(0),
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::ReasoningSummary(
+							summary_done.text,
+						),
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningSummaryPartAdded(summary_added) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::ReasoningSummary {
-						responses_id: summary_added.item_id,
-						content_index: summary_added.summary_index.unwrap_or(0),
-					},
-					ItemStatus::InProgress,
-					summary_added.part,
-				);
+					PartialItem {
+						key: PartialItemKey::ReasoningSummary {
+							responses_id: summary_added.item_id,
+							summary_index: summary_added
+								.summary_index
+								.unwrap_or(0),
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::ContentPart(
+							summary_added.part,
+						),
+					}
+					.xsome(),
+				)?;
 			}
 			ReasoningSummaryPartDone(summary_done) => {
-				self.handle_content_part(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::ReasoningSummary {
-						responses_id: summary_done.item_id,
-						content_index: summary_done.summary_index.unwrap_or(0),
-					},
-					ItemStatus::Completed,
-					summary_done.part,
-				);
+					PartialItem {
+						key: PartialItemKey::ReasoningSummary {
+							responses_id: summary_done.item_id,
+							summary_index: summary_done
+								.summary_index
+								.unwrap_or(0),
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::ContentPart(summary_done.part),
+					}
+					.xsome(),
+				)?;
 			}
 			FunctionCallArgumentsDelta(arguments_delta) => {
-				self.handle_delta(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Single {
-						responses_id: arguments_delta.item_id,
-					},
-					arguments_delta.delta,
-				);
+					PartialItem {
+						key: PartialItemKey::Single {
+							responses_id: arguments_delta.item_id,
+						},
+						status: ItemStatus::InProgress,
+						content: PartialContent::Delta(arguments_delta.delta),
+					}
+					.xsome(),
+				)?;
 			}
 			FunctionCallArgumentsDone(arguments_done) => {
-				self.handle_arguments_done(
+				self.handle_partial_items(
 					context_query,
 					actor_id,
-					ResponsesItemKey::Single {
-						responses_id: arguments_done.item_id,
-					},
-					arguments_done.arguments,
-				);
+					PartialItem {
+						key: PartialItemKey::Single {
+							responses_id: arguments_done.item_id,
+						},
+						status: ItemStatus::Completed,
+						content: PartialContent::FunctionCallArgumentsDone(
+							arguments_done.arguments,
+						),
+					}
+					.xsome(),
+				)?;
 			}
 			Error(error) => {
 				bevybail!("Model streaming error: {:?}", error.error);
@@ -587,7 +641,12 @@ fn handle_response(
 	mut query: Query<(&ActorId, &mut ModelAction)>,
 ) -> Result {
 	let (actor_id, mut model_action) = query.get_mut(entity)?;
-	model_action.parse_response_body(&mut context_query, *actor_id, response)
+	model_action.parse_response_body(
+		&mut context_query,
+		*actor_id,
+		response,
+		ItemStatus::Completed,
+	)
 }
 fn handle_event(
 	In((entity, event)): In<(Entity, openresponses::StreamingEvent)>,

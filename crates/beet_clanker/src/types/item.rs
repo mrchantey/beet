@@ -43,6 +43,10 @@ impl Item {
 	pub fn owner(&self) -> ActorId { self.owner }
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn content(&self) -> &Content { &self.content }
+	pub(super) fn set_status(&mut self, status: ItemStatus) {
+		self.status = status;
+	}
+	pub(super) fn content_mut(&mut self) -> &mut Content { &mut self.content }
 }
 
 #[derive(
@@ -88,7 +92,6 @@ pub enum ItemStatus {
 	Interrupted,
 	InProgress,
 }
-
 
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,

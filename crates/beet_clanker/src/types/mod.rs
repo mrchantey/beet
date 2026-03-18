@@ -1,8 +1,10 @@
 mod actor;
 mod clanker_plugin;
-mod item_mapper;
 mod document;
+mod item_mapper;
+mod partial_item;
 pub use document::*;
+pub use partial_item::*;
 mod thread;
 pub use thread::*;
 mod item;
@@ -12,5 +14,5 @@ pub use actor::*;
 pub use model_action::*;
 mod context_map;
 pub use clanker_plugin::*;
-pub use item_mapper::*;
 pub use context_map::*;
+pub use item_mapper::*;

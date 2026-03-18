@@ -20,28 +20,9 @@ pub struct ItemMapper {
 	call_id_to_item_id: HashMap<String, ItemId>,
 	item_id_to_call_id: HashMap<ItemId, String>,
 	/// map responses output items to an [`ItemId`]
-	responses_item_map: HashMap<ResponsesItemKey, ItemId>,
+	responses_item_map: HashMap<PartialItemKey, ItemId>,
 }
 
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum ResponsesItemKey {
-	/// There is only one piece of content, ie a function call
-	Single { responses_id: String },
-	/// The item has multiple pieces of content, ie text, reasoning
-	Content {
-		responses_id: String,
-		content_index: u32,
-	},
-	/// Reasoning summary is a special case that shares the same
-	/// item id as content.
-	ReasoningSummary {
-		responses_id: String,
-		// defaults to 0 when ommited
-		// by streaming
-		content_index: u32,
-	},
-}
 
 impl ItemMapper {
 	pub fn new() -> Self {
@@ -104,7 +85,7 @@ impl ItemMapper {
 
 	fn set_response_item(
 		&mut self,
-		key: ResponsesItemKey,
+		key: PartialItemKey,
 		item_id: ItemId,
 	) -> Result {
 		if self.responses_item_map.contains_key(&key) {
@@ -113,6 +94,15 @@ impl ItemMapper {
 			self.responses_item_map.insert(key, item_id);
 		}
 		Ok(())
+	}
+
+	pub(super) fn get_response_item(
+		&self,
+		key: &PartialItemKey,
+	) -> Result<ItemId> {
+		self.responses_item_map.get(key).cloned().ok_or_else(|| {
+			bevyhow!("no item_id registered for responses item key {key:?}")
+		})
 	}
 
 	/// Map an item to a list of openresponses input, relative to agiven actor.
@@ -263,7 +253,7 @@ impl ItemMapper {
 						),
 					};
 					self.set_response_item(
-						ResponsesItemKey::Content {
+						PartialItemKey::Content {
 							responses_id: message.id.clone(),
 							content_index: content_index as u32,
 						},
@@ -280,7 +270,7 @@ impl ItemMapper {
 				});
 				self.set_call_id(item.id(), fc_call.call_id)?;
 				self.set_response_item(
-					ResponsesItemKey::Single {
+					PartialItemKey::Single {
 						responses_id: fc_call.id,
 					},
 					item.id(),
@@ -294,7 +284,7 @@ impl ItemMapper {
 					output: fc_output.output,
 				});
 				self.set_response_item(
-					ResponsesItemKey::Single {
+					PartialItemKey::Single {
 						responses_id: fc_output.id,
 					},
 					item.id(),
@@ -312,7 +302,7 @@ impl ItemMapper {
 						ReasoningContentItem(content.text),
 					);
 					self.set_response_item(
-						ResponsesItemKey::Content {
+						PartialItemKey::Content {
 							responses_id: reasoning_item.id.clone(),
 							content_index: index as u32,
 						},
@@ -329,9 +319,9 @@ impl ItemMapper {
 						ReasoningSummaryItem(summary.text),
 					);
 					self.set_response_item(
-						ResponsesItemKey::ReasoningSummary {
+						PartialItemKey::ReasoningSummary {
 							responses_id: reasoning_item.id.clone(),
-							content_index: index as u32,
+							summary_index: index as u32,
 						},
 						item.id(),
 					)?;
