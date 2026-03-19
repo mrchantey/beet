@@ -66,8 +66,17 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 }
 
 #[tool]
-async fn stdin(input: AsyncToolIn) -> Result<Outcome> {
-	// panic!("here");
+fn stdin(
+	entity: SystemToolIn,
+	mut query: ContextQuery,
+	actors: Query<&ActorId>,
+) -> Result<Outcome> {
+	let owner = actors.get(entity.caller)?;
+	let mut input = String::new();
+	print!("User > ");
+	std::io::Write::flush(&mut std::io::stdout())?;
+	std::io::stdin().read_line(&mut input)?;
+	query.add_items(Item::new(*owner, ItemStatus::Completed, input))?;
 	Ok(Pass(()))
 }
 

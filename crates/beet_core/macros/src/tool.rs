@@ -26,16 +26,24 @@ fn collect_params(item: &ItemFn) -> syn::Result<Vec<(syn::Ident, Box<Type>)>> {
 	let mut params = Vec::new();
 	for arg in &item.sig.inputs {
 		match arg {
-			FnArg::Typed(pat_type) => {
-				if let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
+			FnArg::Typed(pat_type) => match pat_type.pat.as_ref() {
+				syn::Pat::Ident(pat_ident) => {
 					params.push((pat_ident.ident.clone(), pat_type.ty.clone()));
-				} else {
+				}
+				syn::Pat::Wild(_) => {
+					let discard_ident = syn::Ident::new(
+						&alloc::format!("__tool_discard_{}", params.len()),
+						proc_macro2::Span::call_site(),
+					);
+					params.push((discard_ident, pat_type.ty.clone()));
+				}
+				_ => {
 					synbail!(
 						&pat_type.pat,
-						"tool parameters must be simple identifiers",
+						"tool parameters must be simple identifiers or `_`",
 					);
 				}
-			}
+			},
 			FnArg::Receiver(recv) => {
 				synbail!(
 					recv,
@@ -60,11 +68,13 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let first_param_type = params.first().map(|(_, ty)| ty.as_ref());
 
 	if is_async {
-		// Check for async passthrough: first param is AsyncToolIn<T>.
+		// Check for async passthrough: first param is AsyncToolIn<T> or AsyncToolIn.
 		if let Some(first_ty) = first_param_type {
-			if let Some(inner) = extract_wrapper_type(first_ty, "AsyncToolIn") {
+			if let Some(inner) =
+				extract_wrapper_type_or_unit(first_ty, "AsyncToolIn")
+			{
 				return parse_async_passthrough(
-					&item, result_out, inner, &params,
+					&item, result_out, &inner, &params,
 				);
 			}
 		}
@@ -72,23 +82,30 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	} else if let Some(first_ty) = first_param_type {
 		if let Some(in_inner) = extract_wrapper_type(first_ty, "In") {
 			// First param is In<T>, determine which sub-case.
-			if let Some(inner) = extract_wrapper_type(in_inner, "SystemToolIn")
+			if let Some(inner) =
+				extract_wrapper_type_or_unit(in_inner, "SystemToolIn")
 			{
-				// In<SystemToolIn<T>> → system passthrough
-				parse_system_passthrough(&item, result_out, inner, &params)
+				// In<SystemToolIn<T>> or In<SystemToolIn> → system passthrough
+				parse_system_passthrough(&item, result_out, &inner, &params)
 			} else if let Some(inner) =
-				extract_wrapper_type(in_inner, "FuncToolIn")
+				extract_wrapper_type_or_unit(in_inner, "FuncToolIn")
 			{
-				// In<FuncToolIn<T>> → func passthrough
-				parse_func_passthrough(&item, result_out, inner, &params)
+				// In<FuncToolIn<T>> or In<FuncToolIn> → func passthrough
+				parse_func_passthrough(&item, result_out, &inner, &params)
 			} else {
 				// In<T> → system tool
 				parse_system_tool(&item, result_out, in_inner, &params)
 			}
-		} else if let Some(inner) = extract_wrapper_type(first_ty, "FuncToolIn")
+		} else if let Some(inner) =
+			extract_wrapper_type_or_unit(first_ty, "SystemToolIn")
 		{
-			// FuncToolIn<T> (no In<>) → func passthrough
-			parse_func_passthrough(&item, result_out, inner, &params)
+			// SystemToolIn<T> or SystemToolIn (no In<>) → system passthrough
+			parse_system_passthrough(&item, result_out, &inner, &params)
+		} else if let Some(inner) =
+			extract_wrapper_type_or_unit(first_ty, "FuncToolIn")
+		{
+			// FuncToolIn<T> or FuncToolIn (no In<>) → func passthrough
+			parse_func_passthrough(&item, result_out, &inner, &params)
 		} else {
 			// No special first param → func tool (current behavior)
 			parse_func_tool(&item, result_out, &params)
@@ -478,6 +495,29 @@ fn extract_wrapper_type<'a>(ty: &'a Type, name: &str) -> Option<&'a Type> {
 	None
 }
 
+/// Extract inner type for wrappers with default generic unit:
+/// `Wrapper<T>` -> `T`, `Wrapper` -> `()`.
+fn extract_wrapper_type_or_unit(ty: &Type, name: &str) -> Option<Type> {
+	if let Some(inner) = extract_wrapper_type(ty, name) {
+		Some(inner.clone())
+	} else if is_wrapper_without_args(ty, name) {
+		Some(syn::parse_quote! { () })
+	} else {
+		None
+	}
+}
+
+/// Whether a type path is `Wrapper` with no generic args.
+fn is_wrapper_without_args(ty: &Type, name: &str) -> bool {
+	if let Type::Path(type_path) = ty {
+		if let Some(segment) = type_path.path.segments.last() {
+			return segment.ident == name
+				&& matches!(segment.arguments, syn::PathArguments::None);
+		}
+	}
+	false
+}
+
 /// Whether the return type path ends with `Result`.
 fn is_result_type(ty: &Type) -> bool {
 	if let Type::Path(type_path) = ty {
@@ -595,6 +635,28 @@ mod test {
 		assert!(result.contains("| cx : "));
 	}
 
+	#[test]
+	fn func_passthrough_default_unit() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: FuncToolIn) -> i32 { 1 }
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("func_tool"));
+		assert!(result.contains("| cx : "));
+		assert!(!result.contains("let cx = input"));
+	}
+
+	#[test]
+	fn func_passthrough_in_func_tool_in_default_unit() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: In<FuncToolIn>) -> i32 { 1 }
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("func_tool"));
+		assert!(result.contains("| cx : "));
+		assert!(!result.contains("let cx = input"));
+	}
+
 	// -----------------------------------------------------------------------
 	// Async tool tests
 	// -----------------------------------------------------------------------
@@ -663,6 +725,17 @@ mod test {
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("async_tool"));
 		// The param name should be forwarded directly.
+		assert!(result.contains("| cx : "));
+		assert!(!result.contains("let cx = input"));
+	}
+
+	#[test]
+	fn async_passthrough_default_unit() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn my_tool(cx: AsyncToolIn) -> i32 { 42 }
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("async_tool"));
 		assert!(result.contains("| cx : "));
 		assert!(!result.contains("let cx = input"));
 	}
@@ -738,5 +811,38 @@ mod test {
 		assert!(result.contains("system_tool"));
 		assert!(result.contains("time : Res < Time >"));
 		assert!(result.contains("In (cx)"));
+	}
+
+	#[test]
+	fn system_passthrough_default_unit() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: In<SystemToolIn>) -> Entity { cx.caller }
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("In (cx)"));
+		assert!(!result.contains("__tool_in"));
+	}
+
+	#[test]
+	fn system_passthrough_direct() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: SystemToolIn<i32>) -> Entity { cx.caller }
+		});
+		assert!(result.contains("type In = i32"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("In (cx)"));
+		assert!(!result.contains("__tool_in"));
+	}
+
+	#[test]
+	fn system_passthrough_direct_default_unit() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(cx: SystemToolIn) -> Entity { cx.caller }
+		});
+		assert!(result.contains("type In = ()"));
+		assert!(result.contains("system_tool"));
+		assert!(result.contains("In (cx)"));
+		assert!(!result.contains("__tool_in"));
 	}
 }

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Url;
@@ -166,6 +168,14 @@ impl std::fmt::Display for Content {
 
 impl From<&str> for Content {
 	fn from(text_content: &str) -> Self {
+		Self::Text(TextItem(text_content.to_string()))
+	}
+}
+impl From<String> for Content {
+	fn from(text_content: String) -> Self { Self::Text(TextItem(text_content)) }
+}
+impl<'a> From<Cow<'a, String>> for Content {
+	fn from(text_content: Cow<'a, String>) -> Self {
 		Self::Text(TextItem(text_content.to_string()))
 	}
 }
