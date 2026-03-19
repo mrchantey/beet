@@ -41,21 +41,25 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 	// 2. define relations
 	commands
-		.spawn((system_id, Sequence::new(), Repeat, children![
-			(
-				clanker_id,
-				clanker_thread,
-				ModelAction::new(OllamaProvider::default()).streaming()
-			),
-			(
-				user_id,
-				user_thread,
-				stdin.into_tool(),
-				StdoutCursor::default(),
-				OnSpawn::observe(log_name),
-				OnSpawn::observe(listen_for_changes)
-			)
-		]))
+		.spawn((Repeat::new(), children![(
+			system_id,
+			Sequence::new(),
+			children![
+				(
+					clanker_id,
+					clanker_thread,
+					ModelAction::new(OllamaProvider::default()).streaming()
+				),
+				(
+					user_id,
+					user_thread,
+					stdin.into_tool(),
+					StdoutCursor::default(),
+					OnSpawn::observe(log_name),
+					OnSpawn::observe(listen_for_changes)
+				)
+			]
+		)]))
 		.call::<(), Outcome>((), default());
 
 	// 3. define items
