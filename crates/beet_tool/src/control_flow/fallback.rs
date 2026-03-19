@@ -47,6 +47,11 @@ where
 	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
 
+impl Fallback {
+	/// Create a default `Fallback<(), ()>`.
+	pub fn new() -> Self { Self::default() }
+}
+
 /// Try children in order, returning the first pass or final fail.
 ///
 /// Child error handling is controlled by [`Fallback::exclude_errors`].
@@ -140,7 +145,7 @@ mod tests {
 	#[beet_core::test]
 	async fn no_children() {
 		AsyncPlugin::world()
-			.spawn(Fallback::default())
+			.spawn(Fallback::new())
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -150,7 +155,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((Fallback::default(), children![outcome_fail()]))
+			.spawn((Fallback::new(), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -160,7 +165,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((Fallback::default(), children![outcome_pass()]))
+			.spawn((Fallback::new(), children![outcome_pass()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -170,7 +175,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_nth_child() {
 		AsyncPlugin::world()
-			.spawn((Fallback::default(), children![
+			.spawn((Fallback::new(), children![
 				outcome_fail(),
 				outcome_fail(),
 				outcome_pass(),
@@ -185,10 +190,10 @@ mod tests {
 	#[beet_core::test]
 	async fn default_exclude_errors_with_compatible_children() {
 		AsyncPlugin::world()
-			.spawn((Fallback::default(), children![
-				outcome_fail(),
-				outcome_pass(),
-			]))
+			.spawn((
+				Fallback::new(),
+				children![outcome_fail(), outcome_pass(),],
+			))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -199,7 +204,7 @@ mod tests {
 	async fn exclude_no_tool_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::default().with_exclude_errors(ChildError::NO_TOOL),
+				Fallback::new().with_exclude_errors(ChildError::NO_TOOL),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
@@ -212,8 +217,7 @@ mod tests {
 	async fn exclude_tool_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::default()
-					.with_exclude_errors(ChildError::TOOL_MISMATCH),
+				Fallback::new().with_exclude_errors(ChildError::TOOL_MISMATCH),
 				children![wrong_signature_tool(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())

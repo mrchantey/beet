@@ -41,7 +41,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 	// 2. define relations
 	commands
-		.spawn((system_id, Sequence::default(), Repeat, children![
+		.spawn((system_id, Sequence::new(), Repeat, children![
 			(
 				clanker_id,
 				clanker_thread,

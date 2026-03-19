@@ -33,7 +33,7 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 	// 2. define relations
 	commands
-		.spawn((system_id, Sequence::default(), children![
+		.spawn((system_id, Sequence::new(), children![
 			(
 				clanker_id,
 				clanker_thread,

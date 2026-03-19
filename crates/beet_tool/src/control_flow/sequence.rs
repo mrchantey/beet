@@ -47,6 +47,11 @@ where
 	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
 
+impl Sequence {
+	/// Create a default `Sequence<(), ()>`.
+	pub fn new() -> Self { Self::default() }
+}
+
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.
 /// Returns [`Outcome::Pass`] only if all compatible children pass.
 ///
@@ -141,7 +146,7 @@ mod tests {
 	#[beet_core::test]
 	async fn no_children() {
 		AsyncPlugin::world()
-			.spawn(Sequence::default())
+			.spawn(Sequence::new())
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -151,7 +156,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((Sequence::default(), children![outcome_fail()]))
+			.spawn((Sequence::new(), children![outcome_fail()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -161,7 +166,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((Sequence::default(), children![outcome_pass()]))
+			.spawn((Sequence::new(), children![outcome_pass()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -171,7 +176,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_nth_child() {
 		AsyncPlugin::world()
-			.spawn((Sequence::default(), children![
+			.spawn((Sequence::new(), children![
 				outcome_pass(),
 				outcome_pass(),
 				outcome_fail(),
@@ -186,7 +191,7 @@ mod tests {
 	#[beet_core::test]
 	async fn all_passing_children() {
 		AsyncPlugin::world()
-			.spawn((Sequence::default(), children![
+			.spawn((Sequence::new(), children![
 				outcome_pass(),
 				outcome_pass(),
 				outcome_pass(),
@@ -200,10 +205,7 @@ mod tests {
 	#[beet_core::test]
 	async fn default_exclude_errors_with_compatible_children() {
 		AsyncPlugin::world()
-			.spawn((Sequence::default(), children![
-				outcome_pass(),
-				outcome_pass()
-			]))
+			.spawn((Sequence::new(), children![outcome_pass(), outcome_pass()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -214,8 +216,7 @@ mod tests {
 	async fn exclude_tool_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::default()
-					.with_exclude_errors(ChildError::TOOL_MISMATCH),
+				Sequence::new().with_exclude_errors(ChildError::TOOL_MISMATCH),
 				children![wrong_signature_tool(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -228,8 +229,7 @@ mod tests {
 	async fn exclude_no_tool_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::default()
-					.with_exclude_errors(ChildError::NO_TOOL),
+				Sequence::new().with_exclude_errors(ChildError::NO_TOOL),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())

@@ -96,7 +96,7 @@ pub fn fetch_npc(
 		children![(
 			Name::new("Fetch Behavior"),
 			TriggerWithUserSentence::default(),
-			Sequence::default(),
+			Sequence::new(),
 			children![
 				(
 					Name::new("Apply Sentence Steer Target"),

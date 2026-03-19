@@ -46,7 +46,7 @@ fn run_app() {
 			Name::new("Malenia"),
 			Health::default(),
 			HealingPotions(2),
-			Fallback::default(),
+			Fallback::new(),
 			Retrigger::default(),
 		))
 		.with_children(|root| {
