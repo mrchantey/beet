@@ -1281,6 +1281,7 @@ version = "0.0.9-dev.6"
 dependencies = [
  "beet_core",
  "bevy",
+ "bitflags 2.10.0",
  "extend",
  "serde",
  "serde_json",

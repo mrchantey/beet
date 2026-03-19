@@ -20,6 +20,7 @@ reflect = ["bevy/reflect_functions"]
 [dependencies]
 beet_core = { workspace = true }
 bevy.workspace = true
+bitflags.workspace = true
 extend.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

@@ -43,6 +43,7 @@ mod id_counter;
 mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
+mod observer_adder;
 #[cfg(feature = "std")]
 pub mod observer_ext;
 mod on_spawn;

@@ -41,7 +41,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 	// 2. define relations
 	commands
-		.spawn((system_id, sequence::<(), ()>(), children![
+		.spawn((system_id, Sequence::default(), Repeat, children![
 			(
 				clanker_id,
 				clanker_thread,
@@ -75,7 +75,7 @@ fn stdin(
 ) -> Result<Outcome> {
 	let owner = actors.get(entity.caller)?;
 	let mut input = String::new();
-	print!("User > ");
+	print!("\nUser > ");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	std::io::stdin().read_line(&mut input)?;
 	query.add_items(Item::new(*owner, ItemStatus::Completed, input))?;

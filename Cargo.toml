@@ -124,6 +124,7 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 
 #💡 utility
+bitflags = "2"
 thiserror = "1"
 heck = "0.4"
 glob = "0.3"

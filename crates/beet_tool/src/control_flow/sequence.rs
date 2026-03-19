@@ -8,14 +8,14 @@ use beet_core::prelude::*;
 /// with the final input if all compatible children pass.
 #[derive(Debug, Clone, Copy, Component)]
 #[require(Tool<Input, Outcome<Input, Output>> = async_tool(sequence_tool::<Input, Output>))]
-pub struct Sequence<Input, Output>
+pub struct Sequence<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Whether to propagate or ignore child-tool mismatches.
-	/// Defaults to [`ChildMismatch::Any`].
-	child_mismatch: ChildMismatch,
+	/// Which child errors to skip instead of propagating.
+	/// Defaults to [`ChildError::empty`].
+	exclude_errors: ChildError,
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
@@ -26,7 +26,7 @@ where
 {
 	fn default() -> Self {
 		Self {
-			child_mismatch: ChildMismatch::Any,
+			exclude_errors: ChildError::empty(),
 			_marker: PhantomData,
 		}
 	}
@@ -37,48 +37,36 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Set the child mismatch policy.
-	pub fn with_child_mismatch(
-		mut self,
-		child_mismatch: ChildMismatch,
-	) -> Self {
-		self.child_mismatch = child_mismatch;
+	/// Set which child errors to exclude.
+	pub fn with_exclude_errors(mut self, exclude_errors: ChildError) -> Self {
+		self.exclude_errors = exclude_errors;
 		self
 	}
 
-	/// Get the current child mismatch policy.
-	pub fn child_mismatch(&self) -> ChildMismatch { self.child_mismatch }
-}
-
-/// Convenience constructor for [`Sequence`].
-pub fn sequence<Input, Output>() -> Sequence<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	Sequence::default()
+	/// Get the current excluded errors.
+	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
 
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.
 /// Returns [`Outcome::Pass`] only if all compatible children pass.
 ///
-/// Child mismatch handling is controlled by [`Sequence::child_mismatch`].
+/// Child error handling is controlled by [`Sequence::exclude_errors`].
 ///
 /// ## Errors
 ///
-/// Errors depending on [`ChildMismatch`] policy when a child has:
+/// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ToolMeta`]
 /// - incompatible [`ToolMeta`] signature
-pub async fn sequence_tool<Input, Output>(
+async fn sequence_tool<Input, Output>(
 	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let child_mismatch = cx
+	let exclude_errors = cx
 		.caller
-		.get(|sequence: &Sequence<Input, Output>| sequence.child_mismatch())
+		.get(|sequence: &Sequence<Input, Output>| sequence.exclude_errors())
 		.await
 		.unwrap_or_default();
 
@@ -100,27 +88,25 @@ where
 
 		let tool_meta = match tool_meta_result {
 			Ok(tool_meta) => tool_meta,
-			Err(child_error) => match child_mismatch {
-				ChildMismatch::Any | ChildMismatch::NoTool => {
-					bevybail!(
-						"sequence child has no tool: {child:?}, error: {child_error}"
-					);
+			Err(child_error) => {
+				if exclude_errors.contains(ChildError::NO_TOOL) {
+					continue;
 				}
-				ChildMismatch::WrongTool => continue,
-			},
+				bevybail!(
+					"sequence child has no tool: {child:?}, error: {child_error}"
+				);
+			}
 		};
 
 		if let Err(mismatch_error) =
 			tool_meta.assert_match::<Input, Outcome<Input, Output>>()
 		{
-			match child_mismatch {
-				ChildMismatch::Any | ChildMismatch::WrongTool => {
-					bevybail!(
-						"sequence child wrong tool signature: {child:?}, error: {mismatch_error}"
-					);
-				}
-				ChildMismatch::NoTool => continue,
+			if exclude_errors.contains(ChildError::TOOL_MISMATCH) {
+				continue;
 			}
+			bevybail!(
+				"sequence child wrong tool signature: {child:?}, error: {mismatch_error}"
+			);
 		}
 
 		match world
@@ -155,7 +141,7 @@ mod tests {
 	#[beet_core::test]
 	async fn no_children() {
 		AsyncPlugin::world()
-			.spawn(sequence::<(), ()>())
+			.spawn(Sequence::default())
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -165,7 +151,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((sequence::<(), ()>(), children![outcome_fail()]))
+			.spawn((Sequence::default(), children![outcome_fail()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -175,7 +161,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((sequence::<(), ()>(), children![outcome_pass()]))
+			.spawn((Sequence::default(), children![outcome_pass()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -185,7 +171,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_nth_child() {
 		AsyncPlugin::world()
-			.spawn((sequence::<(), ()>(), children![
+			.spawn((Sequence::default(), children![
 				outcome_pass(),
 				outcome_pass(),
 				outcome_fail(),
@@ -200,7 +186,7 @@ mod tests {
 	#[beet_core::test]
 	async fn all_passing_children() {
 		AsyncPlugin::world()
-			.spawn((sequence::<(), ()>(), children![
+			.spawn((Sequence::default(), children![
 				outcome_pass(),
 				outcome_pass(),
 				outcome_pass(),
@@ -212,9 +198,9 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_any_with_compatible_children() {
+	async fn default_exclude_errors_with_compatible_children() {
 		AsyncPlugin::world()
-			.spawn((sequence::<(), ()>(), children![
+			.spawn((Sequence::default(), children![
 				outcome_pass(),
 				outcome_pass()
 			]))
@@ -225,10 +211,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_no_tool_ignores_wrong_signature() {
+	async fn exclude_tool_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				sequence::<(), ()>().with_child_mismatch(ChildMismatch::NoTool),
+				Sequence::default()
+					.with_exclude_errors(ChildError::TOOL_MISMATCH),
 				children![wrong_signature_tool(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -238,11 +225,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_wrong_tool_ignores_missing_tool() {
+	async fn exclude_no_tool_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				sequence::<(), ()>()
-					.with_child_mismatch(ChildMismatch::WrongTool),
+				Sequence::default()
+					.with_exclude_errors(ChildError::NO_TOOL),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())

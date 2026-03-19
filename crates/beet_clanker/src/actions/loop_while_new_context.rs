@@ -32,8 +32,10 @@ use beet_flow::prelude::*;
 /// ])
 /// # ;
 /// ```
-#[action(loop_while_new_context)]
+observer_adder!(on_add_loop_while_new_context, loop_while_new_context);
+
 #[derive(Debug, Clone, Component, Reflect)]
+#[component(on_add = on_add_loop_while_new_context)]
 #[reflect(Component)]
 pub struct LoopWhileNewContext {
 	/// Maximum iterations to prevent infinite loops,

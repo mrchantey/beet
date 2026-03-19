@@ -8,14 +8,14 @@ use beet_core::prelude::*;
 /// [`Outcome::Fail`] with the latest input after all children are tried.
 #[derive(Debug, Clone, Copy, Component)]
 #[require(Tool<Input, Outcome<Output, Input>> = async_tool(fallback_tool::<Input, Output>))]
-pub struct Fallback<Input, Output>
+pub struct Fallback<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Whether to propagate or ignore child-tool mismatches.
-	/// Defaults to [`ChildMismatch::Any`].
-	child_mismatch: ChildMismatch,
+	/// Which child errors to skip rather than propagate.
+	/// Defaults to [`ChildError::empty`].
+	exclude_errors: ChildError,
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
@@ -26,7 +26,7 @@ where
 {
 	fn default() -> Self {
 		Self {
-			child_mismatch: ChildMismatch::Any,
+			exclude_errors: ChildError::empty(),
 			_marker: PhantomData,
 		}
 	}
@@ -37,47 +37,35 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Set the child mismatch policy.
-	pub fn with_child_mismatch(
-		mut self,
-		child_mismatch: ChildMismatch,
-	) -> Self {
-		self.child_mismatch = child_mismatch;
+	/// Set the excluded child errors.
+	pub fn with_exclude_errors(mut self, exclude_errors: ChildError) -> Self {
+		self.exclude_errors = exclude_errors;
 		self
 	}
 
-	/// Get the current child mismatch policy.
-	pub fn child_mismatch(&self) -> ChildMismatch { self.child_mismatch }
-}
-
-/// Convenience constructor for [`Fallback`].
-pub fn fallback<Input, Output>() -> Fallback<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	Fallback::default()
+	/// Get the current excluded child errors.
+	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
 
 /// Try children in order, returning the first pass or final fail.
 ///
-/// Child mismatch handling is controlled by [`Fallback::child_mismatch`].
+/// Child error handling is controlled by [`Fallback::exclude_errors`].
 ///
 /// ## Errors
 ///
-/// Errors depending on [`ChildMismatch`] policy when a child has:
+/// Errors depending on [`ChildError`] exclusions when a child has:
 /// - no [`ToolMeta`]
 /// - incompatible [`ToolMeta`] signature
-pub async fn fallback_tool<Input, Output>(
+async fn fallback_tool<Input, Output>(
 	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	let child_mismatch = cx
+	let exclude_errors = cx
 		.caller
-		.get(|fallback: &Fallback<Input, Output>| fallback.child_mismatch())
+		.get(|fallback: &Fallback<Input, Output>| fallback.exclude_errors())
 		.await
 		.unwrap_or_default();
 
@@ -99,27 +87,25 @@ where
 
 		let tool_meta = match tool_meta_result {
 			Ok(tool_meta) => tool_meta,
-			Err(child_error) => match child_mismatch {
-				ChildMismatch::Any | ChildMismatch::NoTool => {
-					bevybail!(
-						"fallback child has no tool: {child:?}, error: {child_error}"
-					);
+			Err(child_error) => {
+				if exclude_errors.contains(ChildError::NO_TOOL) {
+					continue;
 				}
-				ChildMismatch::WrongTool => continue,
-			},
+				bevybail!(
+					"fallback child has no tool: {child:?}, error: {child_error}"
+				);
+			}
 		};
 
 		if let Err(mismatch_error) =
 			tool_meta.assert_match::<Input, Outcome<Output, Input>>()
 		{
-			match child_mismatch {
-				ChildMismatch::Any | ChildMismatch::WrongTool => {
-					bevybail!(
-						"fallback child wrong tool signature: {child:?}, error: {mismatch_error}"
-					);
-				}
-				ChildMismatch::NoTool => continue,
+			if exclude_errors.contains(ChildError::TOOL_MISMATCH) {
+				continue;
 			}
+			bevybail!(
+				"fallback child wrong tool signature: {child:?}, error: {mismatch_error}"
+			);
 		}
 
 		match world
@@ -154,7 +140,7 @@ mod tests {
 	#[beet_core::test]
 	async fn no_children() {
 		AsyncPlugin::world()
-			.spawn(fallback::<(), ()>())
+			.spawn(Fallback::default())
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -164,7 +150,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![outcome_fail()]))
+			.spawn((Fallback::default(), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -174,7 +160,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![outcome_pass()]))
+			.spawn((Fallback::default(), children![outcome_pass()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -184,7 +170,7 @@ mod tests {
 	#[beet_core::test]
 	async fn passing_nth_child() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![
+			.spawn((Fallback::default(), children![
 				outcome_fail(),
 				outcome_fail(),
 				outcome_pass(),
@@ -197,9 +183,9 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_any_with_compatible_children() {
+	async fn default_exclude_errors_with_compatible_children() {
 		AsyncPlugin::world()
-			.spawn((fallback::<(), ()>(), children![
+			.spawn((Fallback::default(), children![
 				outcome_fail(),
 				outcome_pass(),
 			]))
@@ -210,11 +196,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_wrong_tool_ignores_missing_tool() {
+	async fn exclude_no_tool_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				fallback::<(), ()>()
-					.with_child_mismatch(ChildMismatch::WrongTool),
+				Fallback::default().with_exclude_errors(ChildError::NO_TOOL),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
@@ -224,10 +209,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn child_mismatch_no_tool_ignores_wrong_signature() {
+	async fn exclude_tool_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				fallback::<(), ()>().with_child_mismatch(ChildMismatch::NoTool),
+				Fallback::default()
+					.with_exclude_errors(ChildError::TOOL_MISMATCH),
 				children![wrong_signature_tool(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())

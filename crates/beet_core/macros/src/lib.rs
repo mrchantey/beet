@@ -1,7 +1,6 @@
 #![no_std]
 extern crate alloc;
 
-mod action;
 mod as_any;
 mod bundle_effect;
 mod entity_target_event;
@@ -88,28 +87,6 @@ pub fn bundle_effect(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	bundle_effect::impl_bundle_effect(input).into()
-}
-
-/// Convenience helper to directly add observers to this entity.
-/// This macro must be placed above `#[derive(Component)]` as it
-/// sets the `on_add` hook.
-/// ## Example
-/// ```rust ignore
-/// #[action(log_on_run)]
-/// #[derive(Component)]
-/// struct LogOnRun(pub String);
-///
-/// fn log_on_run(trigger: On<GetOutcome>, query: Populated<&LogOnRun>) {
-/// 	let name = query.get(trigger.target()).unwrap();
-/// 	println!("log_name_on_run: {}", name.0);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn action(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	action::impl_action(attr, item)
 }
 
 /// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
