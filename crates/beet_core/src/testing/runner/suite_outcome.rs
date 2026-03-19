@@ -122,14 +122,16 @@ pub(crate) fn trigger_timeouts(
 }
 
 
+/// These tests require the custom test runner (ECS-driven async with
+/// `test_runner_ext::run`) which is only available on nightly.
 #[cfg(test)]
+#[cfg(feature = "custom_test_framework")]
 mod tests {
-	use test::TestDescAndFn;
-	use test::TestFn;
-
 	use super::*;
+	use crate::testing::runner::TestDescAndFn;
+	use crate::testing::runner::TestFn;
 
-	
+
 	async fn did_timeout(test: TestDescAndFn) -> bool {
 		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await

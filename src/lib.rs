@@ -1,4 +1,3 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![doc = include_str!("../README.md")]
 mod beet_plugins;
 

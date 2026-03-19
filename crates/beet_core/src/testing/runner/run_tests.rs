@@ -64,7 +64,7 @@ fn run_test(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	entity: Entity,
-	should_panic: test::ShouldPanic,
+	should_panic: ShouldPanic,
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result {
 	let TestRunResult {
@@ -96,10 +96,13 @@ fn run_test(
 
 
 
+/// These tests require the custom test runner (ECS-driven async with
+/// `test_runner_ext::run`) which is only available on nightly.
 #[cfg(test)]
+#[cfg(feature = "custom_test_framework")]
 mod tests {
 	use super::*;
-	use test::TestDescAndFn;
+	use crate::testing::runner::TestDescAndFn;
 
 	async fn run_test(test: TestDescAndFn) -> TestOutcome {
 		test_runner_ext::run(None, test).await

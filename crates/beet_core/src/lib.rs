@@ -23,8 +23,15 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(crate::test_runner))]
+// Nightly custom_test_framework path: uses the unstable test harness
+#![cfg_attr(
+	all(test, feature = "custom_test_framework"),
+	feature(test, custom_test_frameworks)
+)]
+#![cfg_attr(
+	all(test, feature = "custom_test_framework"),
+	test_runner(crate::testing::test_runner_nightly)
+)]
 #![cfg_attr(
 	feature = "nightly",
 	feature(
@@ -35,18 +42,14 @@
 		closure_track_caller
 	)
 )]
-// The test crate is needed for the test runner infrastructure
-// Note: `test` feature is already enabled by cfg(test) above, so only add if_let_guard here
-#![cfg_attr(feature = "testing", feature(if_let_guard))]
 // never_type is needed for IntoFut impl for Future<Output = !>
-// Only enable if nightly feature is not already enabling it
 #![cfg_attr(
-	all(feature = "testing", not(feature = "nightly")),
+	all(feature = "nightly", not(feature = "custom_test_framework")),
 	feature(never_type)
 )]
-// Enable test feature for non-test builds that use the testing feature (e.g., other crates)
-#![cfg_attr(all(feature = "testing", not(test)), feature(test))]
-// allow name collision until exit_ok stablized
+// Enable the nightly `test` crate for non-test builds that use custom_test_framework
+#![cfg_attr(all(feature = "custom_test_framework", not(test)), feature(test))]
+// allow name collision until exit_ok stabilized
 #![allow(unstable_name_collisions)]
 
 extern crate alloc;
@@ -58,8 +61,12 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc as _alloc;
 
-#[cfg(feature = "testing")]
+#[cfg(feature = "custom_test_framework")]
 extern crate test;
+
+/// Re-export inventory for use by the `#[test]` macro on stable.
+#[cfg(feature = "testing")]
+pub use inventory;
 
 #[cfg(feature = "std")]
 pub use utils::async_ext;
@@ -95,6 +102,8 @@ pub mod utils;
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
 // Re-export for ergonomic `#[beet_core::test]` usage
+/// Re-export the test macro for use as `#[beet_core::test]` or
+/// as a `#[test]` replacement via `use beet_core::prelude::*`.
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
@@ -102,6 +111,12 @@ pub use web_utils::js_runtime;
 
 #[cfg(feature = "std")]
 mod workspace_config;
+
+/// Nightly test runner entry point, receives tests from `custom_test_frameworks`.
+#[cfg(feature = "custom_test_framework")]
+pub use crate::testing::test_runner_nightly;
+
+/// Stable test runner entry point, collects tests from `inventory`.
 #[cfg(feature = "testing")]
 pub use crate::testing::test_runner;
 

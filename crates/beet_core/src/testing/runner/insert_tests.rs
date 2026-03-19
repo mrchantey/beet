@@ -7,51 +7,27 @@ use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
 use send_wrapper::SendWrapper;
-use test::TestDesc;
-use test::TestDescAndFn;
 
-
-/// Inserts the provided tests into the [`World`] by cloning.
-///
-/// # Panics
-///
-/// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`].
-pub fn tests_bundle_borrowed(tests: &[&TestDescAndFn]) -> impl Bundle {
-	let tests = tests
-		.iter()
-		.map(|test| test_ext::clone_static(test))
-		.collect();
-	tests_bundle(tests)
-}
 
 /// Inserts an owned set of tests.
 pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
 	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
-	(
-		// Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
-		Children::spawn(SpawnIter(test_bundles.into_iter())),
-	)
+	(Children::spawn(SpawnIter(test_bundles.into_iter())),)
 }
 
 fn test_bundle(test: TestDescAndFn) -> impl Bundle {
 	(test_desc_bundle(test.desc), test_fn_bundle(test.testfn))
 }
 
-fn test_fn_bundle(func: test::TestFn) -> impl Bundle {
+fn test_fn_bundle(func: TestFn) -> impl Bundle {
 	match func {
-		test::TestFn::StaticTestFn(func) => {
-			OnSpawn::insert(TestFunc::new(func))
-		}
-		test::TestFn::DynTestFn(fn_once) => {
+		TestFn::StaticTestFn(func) => OnSpawn::insert(TestFunc::new(func)),
+		TestFn::DynTestFn(fn_once) => {
 			OnSpawn::insert(NonSendTestFunc::new(fn_once))
 		}
-		test::TestFn::StaticBenchFn(_) => todo!(),
-		test::TestFn::DynBenchFn(_) => todo!(),
-		test::TestFn::StaticBenchAsTestFn(_) => todo!(),
-		test::TestFn::DynBenchAsTestFn(_) => todo!(),
 	}
 }
-fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
+fn test_desc_bundle(desc: TestDesc) -> impl Bundle {
 	(
 		Name::new(desc.name.to_string()),
 		FileSpan::new(
@@ -158,7 +134,7 @@ impl TestFunc {
 
 /// Component wrapping a dynamic test function.
 ///
-/// The [`test::TestFn::DynTestFn`] is [`Send`] but not [`Sync`].
+/// Some test functions are [`Send`] but not [`Sync`].
 /// This type is for running these tests on the main thread.
 #[derive(Component)]
 pub struct NonSendTestFunc(
@@ -182,15 +158,13 @@ impl NonSendTestFunc {
 mod tests {
 	use super::*;
 
-	fn setup() -> Vec<test::TestDescAndFn> {
+	fn setup() -> Vec<TestDescAndFn> {
 		vec![
 			test_ext::new("test1", "crates/crate1/file1.rs", || Ok(())),
 			test_ext::new("test2", "crates/crate1/file1.rs", || Ok(())),
 			test_ext::new("test1", "crates/crate2/file1.rs", || Ok(())),
 			test_ext::new("test1", "crates/crate2/dir1/file1.rs", || Ok(())),
 			test_ext::new("test2", "crates/crate2/dir1/file1.rs", || Ok(())),
-			// test_ext::new("bar", file!(), || Err("poop".into())),
-			// test_ext::new("bar", file!(), || Ok(())),
 		]
 	}
 

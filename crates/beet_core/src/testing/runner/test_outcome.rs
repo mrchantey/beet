@@ -69,11 +69,10 @@ impl TestFail {
 	/// Returns the panic location if available, otherwise the test file path.
 	pub fn path(&self, test: &Test) -> WsPathBuf {
 		match self {
-			TestFail::Panic { location, .. }
-				if let Some(location) = location =>
-			{
-				location.path().clone()
-			}
+			TestFail::Panic {
+				location: Some(location),
+				..
+			} => location.path().clone(),
 			_ => test.path(),
 		}
 	}
@@ -83,11 +82,10 @@ impl TestFail {
 	/// Returns the panic location if available, otherwise the test location.
 	pub fn start(&self, test: &Test) -> LineCol {
 		match self {
-			TestFail::Panic { location, .. }
-				if let Some(location) = location =>
-			{
-				location.start()
-			}
+			TestFail::Panic {
+				location: Some(location),
+				..
+			} => location.start(),
 			_ => test.start(),
 		}
 	}
@@ -97,11 +95,10 @@ impl TestFail {
 	/// Returns the panic location if available, otherwise the test location.
 	pub fn end(&self, test: &Test) -> LineCol {
 		match self {
-			TestFail::Panic { location, .. }
-				if let Some(location) = location =>
-			{
-				location.end()
-			}
+			TestFail::Panic {
+				location: Some(location),
+				..
+			} => location.end(),
 			_ => test.end(),
 		}
 	}
@@ -155,19 +152,19 @@ impl TestOutcome {
 	/// The `should_panic` parameter is retrieved via [`Test::should_panic`].
 	pub fn from_panic_result(
 		result: PanicResult,
-		should_panic: test::ShouldPanic,
+		should_panic: ShouldPanic,
 	) -> Self {
 		match (result, should_panic) {
-			(PanicResult::Ok, test::ShouldPanic::No) => {
-				//ok
+			(PanicResult::Ok, ShouldPanic::No) => {
+				// ok
 				TestOutcome::Pass
 			}
-			(PanicResult::Ok, test::ShouldPanic::Yes) => {
-				//ok but should have panicked
+			(PanicResult::Ok, ShouldPanic::Yes) => {
+				// ok but should have panicked
 				TestOutcome::Fail(TestFail::ExpectedPanic { message: None })
 			}
-			(PanicResult::Ok, test::ShouldPanic::YesWithMessage(message)) => {
-				//ok but should have panicked
+			(PanicResult::Ok, ShouldPanic::YesWithMessage(message)) => {
+				// ok but should have panicked
 				TestOutcome::Fail(TestFail::ExpectedPanic {
 					message: Some(message.to_string()),
 				})
@@ -178,16 +175,13 @@ impl TestOutcome {
 			}
 			(
 				PanicResult::Panic { .. },
-				test::ShouldPanic::Yes | test::ShouldPanic::YesWithMessage(_),
+				ShouldPanic::Yes | ShouldPanic::YesWithMessage(_),
 			) => {
 				// panicked and should have
 				TestOutcome::Pass
 			}
-			(
-				PanicResult::Panic { location, payload },
-				test::ShouldPanic::No,
-			) => {
-				// panicked but shouldnt have
+			(PanicResult::Panic { location, payload }, ShouldPanic::No) => {
+				// panicked but shouldn't have
 				TestOutcome::Fail(TestFail::Panic { location, payload })
 			}
 		}

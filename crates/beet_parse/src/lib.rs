@@ -7,8 +7,7 @@
 //! - [`parse_rsx_tokens`]: RSX template parsing
 //! - [`tokenize`]: Tokenization utilities
 //! - [`utils`]: Common parsing helpers
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+
 #![feature(if_let_guard, exact_size_is_empty)]
 #![deny(missing_docs)]
 

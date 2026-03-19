@@ -10,66 +10,40 @@
 //! - **Per-test timeouts**: Configure timeouts at the test level
 //! - **Snapshot testing**: Compare test output against saved snapshots
 //!
-//! # Usage
+//! # Stable vs Nightly
 //!
-//! ## Basic Tests
+//! The test runner supports two modes:
 //!
-//! ```rust
-//! #![cfg_attr(test, feature(test, custom_test_frameworks))]
-//! #![cfg_attr(test, test_runner(beet_core::test_runner))]
+//! ## Stable (default)
+//!
+//! Tests are registered via `inventory` and collected at runtime.
+//! The `#[test]` macro from `use beet_core::prelude::*` handles registration
+//! automatically.
+//!
+//! ```rust,ignore
 //! use beet_core::prelude::*;
 //!
 //! #[test]
 //! fn it_passes() {
-//!     // regular assertions work as expected
-//!     assert!(1 + 1 == 2);
-//!     // type-specific matchers are also available
 //!     "foobar".xpect_contains("foo");
 //! }
 //! ```
 //!
-//! ## Async Tests
+//! ## Nightly (`custom_test_framework` feature)
 //!
-//! ```rust
-//! #[beet_core::test]
-//! async fn async_test() {
-//!     beet_core::time_ext::sleep_millis(10).await;
-//!     assert_eq!(2 + 2, 4);
+//! Uses the unstable `custom_test_frameworks` feature for tighter integration
+//! with the Rust test harness.
+//!
+//! ```rust,ignore
+//! #![cfg_attr(test, feature(test, custom_test_frameworks))]
+//! #![cfg_attr(test, test_runner(beet_core::test_runner_nightly))]
+//! use beet_core::prelude::*;
+//!
+//! #[test]
+//! fn it_passes() {
+//!     "foobar".xpect_contains("foo");
 //! }
 //! ```
-//!
-//! ## Per-Test Timeouts
-//!
-//! Individual tests can specify custom timeout values:
-//!
-//! ```rust
-//! #[beet_core::test(timeout_ms = 100)]
-//! async fn quick_test() {
-//!     // this test will timeout after 100ms instead of the default 5000ms
-//!     beet_core::time_ext::sleep_millis(10).await;
-//! }
-//! ```
-//!
-//! ## Setup
-//!
-//! To use the test runner in your crate:
-//!
-//! 1. Add `beet_core` with the `testing` feature in `dev-dependencies`:
-//!    ```toml
-//!    [dev-dependencies]
-//!    beet_core = { workspace = true, features = ["testing"] }
-//!    ```
-//!
-//! 2. Add the following attributes to your test files:
-//!    ```rust
-//!    #![cfg_attr(test, feature(test, custom_test_frameworks))]
-//!    #![cfg_attr(test, test_runner(beet_core::test_runner))]
-//!    ```
-//!
-//! 3. Import the prelude:
-//!    ```rust
-//!    use beet_core::prelude::*;
-//!    ```
 
 mod matchers;
 pub use matchers::*;
@@ -77,3 +51,10 @@ mod runner;
 mod utils;
 pub use runner::*;
 pub use utils::*;
+
+// Re-export the nightly test runner entry point
+#[cfg(feature = "custom_test_framework")]
+pub use runner::test_runner_nightly;
+
+// Re-export the stable test runner entry point
+pub use runner::test_runner;

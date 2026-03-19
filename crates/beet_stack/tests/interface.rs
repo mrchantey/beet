@@ -1,6 +1,3 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-
 //! Integration tests for the markdown interface.
 //!
 //! All tests dispatch through [`default_router`] using [`Request`]

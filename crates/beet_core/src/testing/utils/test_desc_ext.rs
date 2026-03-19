@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use test::ShouldPanic;
-use test::TestDesc;
-use test::TestDescAndFn;
-use test::TestType;
+use crate::testing::runner::ShouldPanic;
+use crate::testing::runner::TestDesc;
+use crate::testing::runner::TestDescAndFn;
+use crate::testing::runner::TestType;
 
 /// Extension trait for building and modifying TestDesc instances with a fluent API.
 ///
@@ -59,7 +59,7 @@ pub trait TestDescExt {
 		}
 	}
 
-	/// Spits the file name at 'src' and returns the final part
+	/// Splits the file name at 'src' and returns the final part
 	fn short_file(&self) -> &str {
 		let full_file = self.desc().source_file;
 		match full_file.rfind("src/") {

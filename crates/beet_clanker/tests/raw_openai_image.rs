@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use base64::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

@@ -34,6 +34,7 @@ std = [
 	"dep:async-task",
 ]
 nightly = []
+custom_test_framework = ["testing", "nightly", "beet_core_macros/custom_test_framework"]
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["ansi_paint"]
 http = ["dep:http"]
@@ -118,6 +119,7 @@ getrandom = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["v4"] }
 
 ## utils
+inventory.workspace = true
 thiserror.workspace = true
 extend.workspace = true
 glob = { workspace = true, optional = true }

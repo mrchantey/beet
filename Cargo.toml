@@ -124,6 +124,7 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 
 #💡 utility
+inventory = "0.3"
 thiserror = "1"
 heck = "0.4"
 glob = "0.3"
@@ -238,6 +239,7 @@ rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 testing = ["beet_core/testing"]
+custom_test_framework = ["testing", "beet_core/custom_test_framework"]
 fs = ["beet_core/fs","beet_net?/fs"]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [

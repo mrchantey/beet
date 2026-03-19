@@ -4,14 +4,27 @@ use super::*;
 use crate::prelude::*;
 use bevy::time::TimePlugin;
 
-/// Entry point for the custom test runner, invoked by the test harness.
-pub fn test_runner(tests: &[&test::TestDescAndFn]) {
+/// Entry point for the nightly custom test runner, invoked by the test harness.
+///
+/// Only available with the `custom_test_framework` feature.
+#[cfg(feature = "custom_test_framework")]
+pub fn test_runner_nightly(tests: &[&test::TestDescAndFn]) {
+	let beet_tests: Vec<TestDescAndFn> =
+		tests.iter().map(|t| from_nightly_ref(t)).collect();
+	run_test_app(beet_tests);
+}
+
+/// Entry point for the stable test runner, collects tests from `inventory`.
+pub fn test_runner() {
+	let tests = collect_inventory_tests();
+	run_test_app(tests);
+}
+
+/// Shared implementation that launches the Bevy test app with the given tests.
+fn run_test_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((
-			TestRunnerConfig::from_env(),
-			tests_bundle_borrowed(tests),
-		))
+		.spawn_then((TestRunnerConfig::from_env(), tests_bundle(tests)))
 		.run();
 }
 

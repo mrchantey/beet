@@ -465,7 +465,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	#[should_panic = "No Tool"]
+	#[should_panic = "Failed to find tool for entity"]
 	async fn missing_tool_component() {
 		AsyncPlugin::world()
 			.spawn_empty()

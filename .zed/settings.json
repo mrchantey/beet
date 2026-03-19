@@ -71,7 +71,7 @@
 		".env.example",
 		".beet",
 		".github",
-		".cargo",
+		// ".cargo",
 		"launch.ron",
 		"rustfmt.toml",
 		"CHANGELOG.md",
@@ -79,6 +79,8 @@
 
 		// ".beet",
 		"**/.git",
+		".cache",
+		".vscode",
 		".gitattributes",
 		"LICENSE-APACHE.txt",
 		"LICENSE-MIT.txt",

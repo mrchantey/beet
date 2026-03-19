@@ -1,17 +1,20 @@
 //! Example usage of the test runner
 use beet_core::prelude::*;
 
-
-
 fn main() {
-	test_runner(&[
-		&test_ext::new_auto_static(returns_ok),
-		&test_ext::new_auto_static(returns_err).with_ignore(true),
-		&test_ext::new_auto_static(panics).with_should_panic(),
-		&test_ext::new_auto_static(returns_ok_async),
-		&test_ext::new_auto_static(returns_err_async).with_ignore(true),
-		&test_ext::new_auto_static(panics_async).with_should_panic(),
-	]);
+	let tests = vec![
+		test_ext::new_auto_static(returns_ok),
+		test_ext::new_auto_static(returns_err).with_ignore(true),
+		test_ext::new_auto_static(panics).with_should_panic(),
+		test_ext::new_auto_static(returns_ok_async),
+		test_ext::new_auto_static(returns_err_async).with_ignore(true),
+		test_ext::new_auto_static(panics_async).with_should_panic(),
+	];
+
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
+		.spawn_then((TestRunnerConfig::from_env(), tests_bundle(tests)))
+		.run();
 }
 
 
@@ -33,6 +36,8 @@ fn returns_err_async() -> Result<(), String> {
 fn panics_async() -> Result<(), String> {
 	register_test(TestCaseParams::new(), async {
 		panic!("whoops");
+		#[allow(unreachable_code)]
+		Ok::<(), String>(())
 	});
 	Ok(())
 }

@@ -36,6 +36,7 @@ where
 		}
 	}
 }
+#[cfg(feature = "nightly")]
 impl<T> IntoFut<ReturnsNever> for T
 where
 	T: 'static + Future<Output = !>,

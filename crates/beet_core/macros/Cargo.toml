@@ -16,6 +16,9 @@ keywords.workspace = true
 [lib]
 proc-macro = true
 
+[features]
+custom_test_framework = []
+
 [dependencies]
 beet_core_shared.workspace = true
 syn.workspace = true

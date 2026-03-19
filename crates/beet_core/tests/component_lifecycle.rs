@@ -1,8 +1,5 @@
 //! Not actually testing anything in beet_core but its very
 //! hard to remember bevy's lifecycle rules.
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-
 use beet_core::prelude::*;
 
 

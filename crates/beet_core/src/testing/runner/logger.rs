@@ -280,9 +280,10 @@ fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
 }
 
 #[cfg(test)]
+#[cfg(feature = "custom_test_framework")]
 mod tests {
 	use super::*;
-	use test::TestDescAndFn;
+	use crate::testing::runner::TestDescAndFn;
 
 	fn run_tests(tests: Vec<TestDescAndFn>) {
 		let mut app = App::new().with_plugins((

@@ -1,7 +1,5 @@
 //! Tests to verify panic locations are correctly reported when panics
 //! occur in different files than the test file itself.
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::testing::panic_in_other_file;
 
 /// This test panics in a different file, verifying that the error location
