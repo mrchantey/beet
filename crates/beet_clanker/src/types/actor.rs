@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub type ActorId = DocId<Actor>;
+pub type ActorId = Uuid7<Actor>;
 
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
@@ -16,7 +16,8 @@ pub struct Actor {
 }
 
 impl Document for Actor {
-	fn id(&self) -> DocId<Self> { self.id }
+	type Id = ActorId;
+	fn id(&self) -> Self::Id { self.id }
 }
 
 impl Actor {

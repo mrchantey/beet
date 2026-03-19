@@ -1,19 +1,14 @@
 //! # Clanker Chat
 //!
-//! An example of a chat CLI
-//!
-//! If the clanker read the tool call it should mention the hidden number 777.
-//! ```sh
-//! cargo run --example chat --features=clanker,native-tls whats 1+1. use the tool.
-//!	```
-//!
-//! Note that I get about a 50/50 success that it read the tool call.
-//!
+//! - note that the ollama models like qwen3 will occasionally think only, without text output..
 use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins(MinimalPlugins)
+		.add_plugins((MinimalPlugins, LogPlugin {
+			level: Level::TRACE,
+			..default()
+		}))
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, create_scene)
 		// .add_systems(PostStartup, run_clanker)

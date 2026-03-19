@@ -6,7 +6,7 @@ use beet_net::prelude::Url;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub type ItemId = DocId<Item>;
+pub type ItemId = Uuid7<Item>;
 
 /// Note that MessageRole is not stored
 /// as this is relative to the Actor.
@@ -24,7 +24,8 @@ pub struct Item {
 }
 
 impl Document for Item {
-	fn id(&self) -> DocId<Self> { self.id }
+	type Id = ItemId;
+	fn id(&self) -> Self::Id { self.id }
 }
 
 
@@ -35,7 +36,7 @@ impl Item {
 		content: impl Into<Content>,
 	) -> Self {
 		Self {
-			id: DocId::new_now(),
+			id: Uuid7::new_now(),
 			owner,
 			status,
 			content: content.into(),

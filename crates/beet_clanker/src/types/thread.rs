@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub type ThreadId = DocId<Thread>;
+pub type ThreadId = Uuid7<Thread>;
 
 #[derive(
 	Debug,
@@ -38,7 +38,8 @@ pub struct Thread {
 }
 
 impl Document for Thread {
-	fn id(&self) -> DocId<Self> { self.id }
+	type Id = ThreadId;
+	fn id(&self) -> Self::Id { self.id }
 }
 
 
