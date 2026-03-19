@@ -75,19 +75,23 @@ where
 fn call_tool_system<Input, Out>(
 	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
-	tools: Query<&Tool<Input, Out>>,
+	// use an option in case mismatch, we can still do an assert_match
+	tools: Query<(&ToolMeta, Option<&Tool<Input, Out>>)>,
 ) -> Result {
-	tools
+	let (meta, tool) = tools
 		.get(caller)
-		.map_err(|err| {
-			bevyhow!("Failed to find tool for entity {caller:?}: {err:?}")
-		})?
-		.call(ToolCall {
-			commands,
-			caller,
-			input,
-			out_handler,
-		})?;
+		.map_err(|err| bevyhow!("Entity has no tool {caller:?}: {err:?}"))?;
+	meta.assert_match::<Input, Out>()?;
+
+	tool.ok_or_else(|| {
+		bevyhow!("meta matches but tool missing.. this shouldnt happen.")
+	})?
+	.call(ToolCall {
+		commands,
+		caller,
+		input,
+		out_handler,
+	})?;
 	Ok(())
 }
 

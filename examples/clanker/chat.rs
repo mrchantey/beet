@@ -9,99 +9,92 @@
 //!
 //! Note that I get about a 50/50 success that it read the tool call.
 //!
-
 use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			LogPlugin::default(),
-			FlowAgentPlugin::default(),
-			DebugFlowPlugin::with_all(),
-		))
-		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				CliServer,
-				router_exchange_stream(|| {
-					(tools(), Fallback, children![
-						help_handler(HelpHandlerConfig {
-							introduction: String::from(
-								"Welcome to the chat CLI"
-							),
-							default_format: HelpFormat::Cli,
-							match_root: false,
-							no_color: false,
-						}),
-						EndpointBuilder::new()
-							.with_path("/*any?")
-							.with_params::<ModelRequestParams>()
-							.with_handler(oneshot()),
-					])
-				}),
-			));
-		})
+		.add_plugins(MinimalPlugins)
+		.init_plugin::<ClankerPlugin>()
+		.add_systems(Startup, create_scene)
+		// .add_systems(PostStartup, run_clanker)
+		// .add_observer(exit_on_complete)
 		.run();
 }
-fn oneshot() -> impl Bundle {
-	let provider = OpenAiProvider::default();
-	// let provider = OllamaProvider::default();
 
-	(Name::new("Oneshot"), Sequence, children![
-		(Name::new("Request to context"), request_to_context()),
-		(Name::new("Model Action Loop"), Sequence, children![
+fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
+	// 1. define actors
+	let clanker_id = query.actors_mut().insert(Actor::clanker());
+	let system_id = query.actors_mut().insert(Actor::system());
+	let user_id = query.actors_mut().insert(Actor::user());
+
+	// clanker thread is the thread sent to the model
+	let clanker_thread = query.threads_mut().insert(
+		Thread::default().with_actors([system_id, clanker_id, user_id]),
+	);
+
+	// user thread is the thread printed to stdout
+	let user_thread = query
+		.threads_mut()
+		.insert(Thread::display_only().with_actors([clanker_id, user_id]));
+
+	// 2. define relations
+	commands
+		.spawn((system_id, sequence::<(), ()>(), children![
 			(
-				Name::new("Model Action"),
-				ModelAction::new(provider).streaming()
+				clanker_id,
+				clanker_thread,
+				ModelAction::new(OllamaProvider::default()).streaming()
 			),
-			(Name::new("Call Tool"), call_tool()),
 			(
-				Name::new("Loop While New Context"),
-				LoopWhileNewContext::default()
-			),
-		]) // (
-		   // 	Name::new("Model Action"),
-		   // ),
-		   // not nessecary with streaming
-		   // (Name::new("Context to response"), context_to_response())
-	])
+				user_id,
+				user_thread,
+				stdin.into_tool(),
+				StdoutCursor::default(),
+				OnSpawn::observe(log_name),
+				OnSpawn::observe(listen_for_changes)
+			)
+		]))
+		.call::<(), Outcome>((), default());
+
+	// 3. define items
+	query.add_items(Item::new(
+		system_id,
+		ItemStatus::Completed,
+		"you are robot, make beep boop noises",
+	))?;
+	Ok(())
 }
 
-fn tools() -> impl Bundle {
-	#[derive(Reflect)]
-	struct AddReq {
-		a: f32,
-		b: f32,
-	}
-
-
-
-	related![
-		Tools[tool_exchange(|| (InfallibleSequence, children![
-			EndpointBuilder::post()
-				.with_path("/add")
-				.with_params::<ModelRequestParams>()
-				.with_description(
-					"Add two numbers together, with a secret unguessable twist"
-				)
-				.with_request_body(BodyType::json::<AddReq>())
-				.with_response_body(BodyType::json::<f32>())
-				.with_action(|| { Json(777) })
-		]))]
-	]
+#[tool]
+async fn stdin(input: AsyncToolIn) -> Result<Outcome> {
+	// panic!("here");
+	Ok(Pass(()))
 }
 
-// fn secret_tool() -> impl Bundle {
-// 	#[derive(Reflect)]
-// 	struct SecretRes {
-// 		text: String,
-// 	}
+#[allow(unused)]
+#[derive(Default, Component)]
+struct StdoutCursor(HashMap<ItemId, u32>);
 
-// 	EndpointBuilder::new()
-// 		.with_path("/get-secret")
-// 		.with_params::<ModelRequestParams>()
-// 		.with_description("Get the secret answer")
-// 		.with_request_body(BodyType::json::<()>())
-// 		.with_response_body(BodyType::json::<SecretRes>())
-// 		.with_action(|| {})
-// }
+fn log_name(ev: On<EntityItemCreated>, context_query: ContextQuery) -> Result {
+	let item = context_query.items().get(ev.item)?;
+	let actor = context_query.actors().get(item.owner())?;
+	println!("<< {} >> ", actor.name());
+	Ok(())
+}
+
+fn listen_for_changes(
+	ev: On<EntityItemUpdated>,
+	context_query: ContextQuery,
+	mut query: Query<&mut StdoutCursor>,
+) -> Result {
+	let mut cursor = query.get_mut(ev.entity)?;
+	let item = context_query.items().get(ev.item)?;
+	let content = item.content().to_string();
+	let cursor_item = cursor.0.entry(ev.item).or_insert(0);
+
+	let new_content = &content[*cursor_item as usize..];
+	print!("{}", new_content);
+	*cursor_item = content.len() as u32;
+
+	Ok(())
+}

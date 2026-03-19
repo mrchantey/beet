@@ -12,7 +12,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.9-dev.5"
+version = "0.0.9-dev.6"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A personal application framework"
@@ -78,30 +78,30 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet = { path = "", version = "0.0.9-dev.5" }
-beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.5" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.5" }
-beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.5" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-dev.5" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-dev.5" }
-beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.5" }
-beet_node = { path = "crates/beet_node", version = "0.0.9-dev.5" }
-beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
-beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.5" }
+beet = { path = "", version = "0.0.9-dev.6" }
+beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.6" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.6" }
+beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.6" }
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.6" }
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.6" }
+beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.6" }
+beet_node = { path = "crates/beet_node", version = "0.0.9-dev.6" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.6" }
+beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.6" }
 
-# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.5" }
-# beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.5" }
-# beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.5" }
-# beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.5" }
+# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.6" }
+# beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.6" }
+# beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.6" }
+# beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.6" }
 
-# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.5" }
-# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.5" }
-# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.5" }
-# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.5" }
-# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.5" }
-# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.5" }
-# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.5" }
-# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.5" }
+# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.6" }
+# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.6" }
+# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.6" }
+# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.6" }
+# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.6" }
+# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.6" }
+# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.6" }
+# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.6" }
 
 #💡 local
 bevy = { version = "0.18", default-features = false, features = [
@@ -265,7 +265,7 @@ _pretty_curl = ["net", "node", "ureq", "native-tls"]
 _mini_browser = ["_pretty_curl", "tui"]
 
 
-clanker = ["dep:beet_clanker","net"]
+clanker = ["dep:beet_clanker","net","tool"]
 # dom = ["css", "dep:beet_dom"]
 
 
@@ -428,10 +428,10 @@ required-features = ["http_server"]
 
 # 💡 Examples - Clanker
 
-# [[example]]
-# name = "chat"
-# path = "examples/clanker/chat.rs"
-# required-features = ["clanker"]
+[[example]]
+name = "chat"
+path = "examples/clanker/chat.rs"
+required-features = ["clanker"]
 
 
 # 💡 Examples - flow

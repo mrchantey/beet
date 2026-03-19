@@ -11,13 +11,11 @@ fn main() {
 	App::new()
 		.add_plugins(MinimalPlugins)
 		.init_plugin::<ClankerPlugin>()
-		.add_systems(Startup, create_scene)
-		.add_systems(PostStartup, run_clanker)
-		.add_observer(exit_on_complete)
+		.add_systems(Startup, setup)
 		.run();
 }
 
-fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
+fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 	// 1. define actors
 	let clanker_id = query.actors_mut().insert(Actor::clanker());
 	let system_id = query.actors_mut().insert(Actor::system());
@@ -34,20 +32,23 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 		.insert(Thread::display_only().with_actors([clanker_id, user_id]));
 
 	// 2. define relations
-	commands.spawn((system_id, children![
-		(
-			clanker_id,
-			clanker_thread,
-			ModelAction::new(OllamaProvider::default()).streaming()
-		),
-		(
-			user_id,
-			user_thread,
-			StdoutCursor::default(),
-			OnSpawn::observe(on_create),
-			OnSpawn::observe(listen_for_changes)
-		)
-	]));
+	commands
+		.spawn((system_id, sequence::<(), ()>(), children![
+			(
+				clanker_id,
+				clanker_thread,
+				ModelAction::new(OllamaProvider::default()).streaming()
+			),
+			(
+				user_id,
+				user_thread,
+				StdoutCursor::default(),
+				OnSpawn::observe(log_clanker_name),
+				OnSpawn::observe(log_clanker_delta),
+				exit_on_user_turn.into_tool()
+			)
+		]))
+		.call::<(), Outcome>((), default());
 
 	// 3. define items
 	query.add_items(Item::new(
@@ -58,39 +59,24 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	Ok(())
 }
 
-fn run_clanker(mut commands: Commands, query: ContextQuery) {
-	// hack until beet_tool sequence
-	let clanker = query
-		.actors()
-		.values()
-		.find(|actor| actor.kind() == ActorKind::Agent)
-		.unwrap();
 
-	let clanker_entity = *query.actor_entities(clanker.id()).first().unwrap();
-
-	// println!("Running clanker with input: {input:#?}");
-	commands
-		.entity(clanker_entity)
-		.call::<(), ()>((), default());
-}
-
-#[allow(unused)]
-#[derive(Default, Component)]
-struct StdoutCursor(HashMap<ItemId, u32>);
-
-fn exit_on_complete(_ev: On<ResponseComplete>, mut commands: Commands) {
-	println!("");
-	commands.write_message(AppExit::Success);
-}
-
-fn on_create(ev: On<EntityItemCreated>, context_query: ContextQuery) -> Result {
+fn log_clanker_name(
+	ev: On<EntityItemCreated>,
+	context_query: ContextQuery,
+) -> Result {
 	let item = context_query.items().get(ev.item)?;
 	let actor = context_query.actors().get(item.owner())?;
 	println!("<< {} >> ", actor.name());
 	Ok(())
 }
 
-fn listen_for_changes(
+
+#[allow(unused)]
+#[derive(Default, Component)]
+struct StdoutCursor(HashMap<ItemId, u32>);
+
+
+fn log_clanker_delta(
 	ev: On<EntityItemUpdated>,
 	context_query: ContextQuery,
 	mut query: Query<&mut StdoutCursor>,
@@ -105,4 +91,28 @@ fn listen_for_changes(
 	*cursor_item = content.len() as u32;
 
 	Ok(())
+}
+
+#[tool]
+fn exit_on_user_turn(
+	_val: In<()>,
+	mut commands: Commands,
+	context_query: ContextQuery,
+) -> Outcome {
+	let item = context_query
+		.items()
+		.values()
+		.find(|item| {
+			item.content().kind() == ItemKind::Text
+				&& context_query.actors().get(item.owner()).unwrap().kind()
+					== ActorKind::Agent
+		})
+		.unwrap();
+	item.content()
+		.to_string()
+		.to_lowercase()
+		.xpect_contains("beep");
+	println!("");
+	commands.write_message(AppExit::Success);
+	Pass(())
 }

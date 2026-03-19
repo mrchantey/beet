@@ -4,8 +4,8 @@ mod beet_plugins;
 
 // #[cfg(feature = "build")]
 // pub use beet_build as build;
-// #[cfg(feature = "clanker")]
-// pub use beet_clanker as clanker;
+#[cfg(feature = "clanker")]
+pub use beet_clanker as clanker;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
@@ -56,8 +56,8 @@ pub mod prelude {
 	pub use crate::tool::prelude::*;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
-	// #[cfg(feature = "clanker")]
-	// pub use crate::clanker::prelude::*;
+	#[cfg(feature = "clanker")]
+	pub use crate::clanker::prelude::*;
 	// #[cfg(feature = "design")]
 	// pub use crate::design::prelude::*;
 	// #[cfg(feature = "dom")]
@@ -80,6 +80,7 @@ pub mod exports {
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "node")]
+	#[allow(unused)]
 	pub use beet_node::exports::*;
 	pub use bevy;
 }

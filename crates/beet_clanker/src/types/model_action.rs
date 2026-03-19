@@ -600,7 +600,7 @@ fn on_add_model_action(mut world: DeferredWorld, cx: HookContext) {
 }
 
 #[tool]
-pub async fn call_model(input: AsyncToolIn<()>) -> Result {
+pub async fn call_model(input: AsyncToolIn<()>) -> Result<Outcome> {
 	let entity = input.caller.id();
 	let world = input.caller.world();
 	let (provider, request) =
@@ -632,7 +632,7 @@ pub async fn call_model(input: AsyncToolIn<()>) -> Result {
 			.await?;
 	}
 
-	Ok(())
+	Ok(Pass(()))
 }
 
 fn build_request(

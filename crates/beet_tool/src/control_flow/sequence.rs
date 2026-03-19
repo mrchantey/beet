@@ -50,13 +50,14 @@ where
 		let is_compatible = world
 			.entity(child)
 			.get(|meta: &ToolMeta| {
-				meta.assert_match::<Input, Outcome<Input, Output>>().is_ok()
+				meta.assert_match::<Input, Outcome<Input, Output>>()
 			})
 			.await
-			.unwrap_or(false);
+			.flatten();
 
-		if !is_compatible {
-			continue;
+		if let Err(is_compatible) = is_compatible {
+			bevybail!("sequence mismatch: {}", is_compatible);
+			// continue;
 		}
 
 		match world
