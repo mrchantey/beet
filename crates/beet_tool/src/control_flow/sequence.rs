@@ -1,31 +1,74 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-
-pub fn sequence<Input, Output>() -> impl Bundle
+/// Sequence control-flow component.
+///
+/// Runs child tools in order, threading `Input` through each child.
+/// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
+/// with the final input if all compatible children pass.
+#[derive(Debug, Clone, Copy, Component)]
+#[require(Tool<Input, Outcome<Input, Output>> = async_tool(sequence_tool::<Input, Output>))]
+pub struct Sequence<Input, Output>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	async_tool(sequence_tool::<Input, Output>)
+	/// Whether to propagate or ignore child-tool mismatches.
+	/// Defaults to [`ChildMismatch::Any`].
+	child_mismatch: ChildMismatch,
+	_marker: PhantomData<fn() -> (Input, Output)>,
+}
+
+impl<Input, Output> Default for Sequence<Input, Output>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	fn default() -> Self {
+		Self {
+			child_mismatch: ChildMismatch::Any,
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl<Input, Output> Sequence<Input, Output>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	/// Set the child mismatch policy.
+	pub fn with_child_mismatch(
+		mut self,
+		child_mismatch: ChildMismatch,
+	) -> Self {
+		self.child_mismatch = child_mismatch;
+		self
+	}
+
+	/// Get the current child mismatch policy.
+	pub fn child_mismatch(&self) -> ChildMismatch { self.child_mismatch }
+}
+
+/// Convenience constructor for [`Sequence`].
+pub fn sequence<Input, Output>() -> Sequence<Input, Output>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	Sequence::default()
 }
 
 /// Runs children in order, returning the first [`Outcome::Fail`] immediately.
 /// Returns [`Outcome::Pass`] only if all compatible children pass.
 ///
-/// This is the dual of [`fallback_tool`]: input is threaded forward through
-/// [`Outcome::Pass`] arms, and the sequence short-circuits on the first
-/// [`Outcome::Fail`].
+/// Child mismatch handling is controlled by [`Sequence::child_mismatch`].
 ///
 /// ## Errors
 ///
-/// Returns [`Outcome::Fail`] if the entity has no children.
-///
-/// Children whose [`ToolMeta`] input/output types don't match
-/// `Input`/`Outcome<Input, Output>` are silently skipped, preventing
-/// unrelated tools (like render tools) from being called with the
-/// wrong types.
+/// Errors depending on [`ChildMismatch`] policy when a child has:
+/// - no [`ToolMeta`]
+/// - incompatible [`ToolMeta`] signature
 pub async fn sequence_tool<Input, Output>(
 	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Input, Output>>
@@ -33,6 +76,12 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
+	let child_mismatch = cx
+		.caller
+		.get(|sequence: &Sequence<Input, Output>| sequence.child_mismatch())
+		.await
+		.unwrap_or_default();
+
 	let children =
 		match cx.caller.get(|children: &Children| children.to_vec()).await {
 			Ok(children) => children,
@@ -42,22 +91,36 @@ where
 			}
 		};
 
-	// try each child in order, returning the first fail or the last pass
 	let mut input = cx.input;
 	let world = cx.caller.world();
-	for child in children {
-		// skip children whose ToolMeta doesn't match our types
-		let is_compatible = world
-			.entity(child)
-			.get(|meta: &ToolMeta| {
-				meta.assert_match::<Input, Outcome<Input, Output>>()
-			})
-			.await
-			.flatten();
 
-		if let Err(is_compatible) = is_compatible {
-			bevybail!("sequence mismatch: {}", is_compatible);
-			// continue;
+	for child in children {
+		let tool_meta_result =
+			world.entity(child).get(|meta: &ToolMeta| *meta).await;
+
+		let tool_meta = match tool_meta_result {
+			Ok(tool_meta) => tool_meta,
+			Err(child_error) => match child_mismatch {
+				ChildMismatch::Any | ChildMismatch::NoTool => {
+					bevybail!(
+						"sequence child has no tool: {child:?}, error: {child_error}"
+					);
+				}
+				ChildMismatch::WrongTool => continue,
+			},
+		};
+
+		if let Err(mismatch_error) =
+			tool_meta.assert_match::<Input, Outcome<Input, Output>>()
+		{
+			match child_mismatch {
+				ChildMismatch::Any | ChildMismatch::WrongTool => {
+					bevybail!(
+						"sequence child wrong tool signature: {child:?}, error: {mismatch_error}"
+					);
+				}
+				ChildMismatch::NoTool => continue,
+			}
 		}
 
 		match world
@@ -66,15 +129,14 @@ where
 			.await?
 		{
 			Outcome::Pass(next_input) => {
-				// thread input forward to the next child
 				input = next_input;
 			}
 			Outcome::Fail(output) => return Ok(Outcome::Fail(output)),
 		}
 	}
+
 	Ok(Outcome::Pass(input))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -86,6 +148,9 @@ mod tests {
 	fn outcome_pass() -> Tool<(), Outcome<(), ()>> {
 		func_tool(|_: FuncToolIn<()>| Outcome::Pass(()).xok())
 	}
+	fn wrong_signature_tool() -> Tool<(), i32> {
+		func_tool(|_: FuncToolIn<()>| 7.xok())
+	}
 
 	#[beet_core::test]
 	async fn no_children() {
@@ -96,6 +161,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(Outcome::Pass(()));
 	}
+
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
@@ -105,6 +171,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(Outcome::Fail(()));
 	}
+
 	#[beet_core::test]
 	async fn passing_child() {
 		AsyncPlugin::world()
@@ -114,6 +181,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(Outcome::Pass(()));
 	}
+
 	#[beet_core::test]
 	async fn failing_nth_child() {
 		AsyncPlugin::world()
@@ -128,6 +196,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(Outcome::Fail(()));
 	}
+
 	#[beet_core::test]
 	async fn all_passing_children() {
 		AsyncPlugin::world()
@@ -136,6 +205,46 @@ mod tests {
 				outcome_pass(),
 				outcome_pass(),
 			]))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Pass(()));
+	}
+
+	#[beet_core::test]
+	async fn child_mismatch_any_with_compatible_children() {
+		AsyncPlugin::world()
+			.spawn((sequence::<(), ()>(), children![
+				outcome_pass(),
+				outcome_pass()
+			]))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Pass(()));
+	}
+
+	#[beet_core::test]
+	async fn child_mismatch_no_tool_ignores_wrong_signature() {
+		AsyncPlugin::world()
+			.spawn((
+				sequence::<(), ()>().with_child_mismatch(ChildMismatch::NoTool),
+				children![wrong_signature_tool(), outcome_pass()],
+			))
+			.call::<(), Outcome<(), ()>>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Pass(()));
+	}
+
+	#[beet_core::test]
+	async fn child_mismatch_wrong_tool_ignores_missing_tool() {
+		AsyncPlugin::world()
+			.spawn((
+				sequence::<(), ()>()
+					.with_child_mismatch(ChildMismatch::WrongTool),
+				children![(), outcome_pass()],
+			))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()

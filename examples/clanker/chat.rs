@@ -21,6 +21,8 @@ fn main() {
 		.run();
 }
 
+
+
 fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	// 1. define actors
 	let clanker_id = query.actors_mut().insert(Actor::clanker());
