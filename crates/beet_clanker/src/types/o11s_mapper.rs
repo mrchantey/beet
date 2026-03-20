@@ -1,5 +1,7 @@
 use crate::openresponses::ContentPart;
 use crate::openresponses::MessageRole;
+use crate::openresponses::OutputItem;
+use crate::openresponses::ResponseBody;
 use crate::openresponses::StreamingEvent;
 use crate::openresponses::request::FunctionCallOutputParam;
 use crate::openresponses::request::FunctionCallParam;
@@ -126,11 +128,155 @@ pub fn action_to_o11s_input(
 
 
 pub fn o11s_stream_event_to_output(
+	action_store: impl ActionStore,
+	prev_state: Option<ActionStreamState>,
 	ev: StreamingEvent,
 	// agent_id: ActorId,
 	// action: Action,
 	// author: Actor,
 	// meta: ActionMeta,
-) -> Result<ActionStreamOut> {
-	todo!();
+) -> Result<ActionStreamState> {
+	use StreamingEvent::*;
+	match ev {
+		ResponseCreated(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		ResponseQueued(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		ResponseInProgress(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		ResponseCompleted(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		ResponseFailed(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		ResponseIncomplete(ev) => {
+			response_to_stream_state(action_store, ev.response)
+		}
+		OutputItemAdded(output_item_added_event) => todo!(),
+		OutputItemDone(output_item_done_event) => todo!(),
+		ContentPartAdded(content_part_added_event) => todo!(),
+		ContentPartDone(content_part_done_event) => todo!(),
+		OutputTextDelta(output_text_delta_event) => todo!(),
+		OutputTextDone(output_text_done_event) => todo!(),
+		OutputTextAnnotationAdded(output_text_annotation_added_event) => {
+			todo!()
+		}
+		RefusalDelta(refusal_delta_event) => todo!(),
+		RefusalDone(refusal_done_event) => todo!(),
+		ReasoningDelta(reasoning_delta_event) => todo!(),
+		ReasoningDone(reasoning_done_event) => todo!(),
+		ReasoningSummaryTextDelta(reasoning_summary_text_delta_event) => {
+			todo!()
+		}
+		ReasoningSummaryTextDone(reasoning_summary_text_done_event) => todo!(),
+		ReasoningSummaryPartAdded(reasoning_summary_part_added_event) => {
+			todo!()
+		}
+		ReasoningSummaryPartDone(reasoning_summary_part_done_event) => todo!(),
+		FunctionCallArgumentsDelta(function_call_arguments_delta_event) => {
+			todo!()
+		}
+		FunctionCallArgumentsDone(function_call_arguments_done_event) => {
+			todo!()
+		}
+		Error(error_event) => todo!(),
+	}
+}
+
+
+fn response_to_stream_state(
+	action_store: impl ActionStore,
+	response: ResponseBody,
+) -> Result<ActionStreamState> {
+	ActionStreamState {
+		mutations: output_items_to_mutations(
+			action_store,
+			&response.id,
+			response.store.unwrap_or(false),
+			response.output,
+		)?,
+		response_id: response.id,
+		response_stored: response.store.unwrap_or(false),
+		status: {
+			use openresponses::response::Status::*;
+			match response.status {
+				InProgress => ActionStreamStatus::InProgress,
+				Completed => ActionStreamStatus::Completed,
+				Incomplete => ActionStreamStatus::Incomplete(
+					response.incomplete_details.map(|d| d.reason),
+				),
+				Failed => match response.error {
+					Some(err) => ActionStreamStatus::Failed {
+						code: Some(err.code),
+						message: Some(err.message),
+					},
+					None => ActionStreamStatus::Failed {
+						code: None,
+						message: None,
+					},
+				},
+				Cancelled => ActionStreamStatus::Cancelled,
+				Queued => ActionStreamStatus::Queued,
+			}
+		},
+		token_usage: response.usage.map(|usage| TokenUsage {
+			input_tokens: usage.input_tokens,
+			output_tokens: usage.output_tokens,
+			total_tokens: usage.total_tokens,
+			cached_input_tokens: usage
+				.input_tokens_details
+				.map(|d| d.cached_tokens),
+			reasoning_tokens: usage
+				.output_tokens_details
+				.map(|d| d.reasoning_tokens),
+		}),
+	}
+	.xok()
+}
+
+
+fn require_prev_state(
+	prev_state: Option<ActionStreamState>,
+) -> Result<ActionStreamState> {
+	prev_state.ok_or_else(|| {
+		bevyhow!(
+			"Stream Order Error: Previous state is required for partial streams"
+		)
+	})
+}
+
+
+fn output_items_to_mutations(
+	action_store: impl ActionStore,
+	response_id: &str,
+	respose_stored: bool,
+	items: Vec<OutputItem>,
+) -> Result<HashMap<ActionId, ActionMutation>> {
+	let mut map = HashMap::default();
+	/// Only insert if no existing key or it is a lower level,
+	/// ie Updated does not clobber Created.
+	fn selective_insert(
+		map: &mut HashMap<ActionId, ActionMutation>,
+		id: ActionId,
+		mutation: ActionMutation,
+	) {
+		use ActionMutation::*;
+		match mutation {
+			Created => {
+				map.entry(id).or_insert(Created);
+			}
+			Updated => {
+				map.entry(id).or_insert(Updated);
+			}
+		}
+	}
+	for item in items {
+		todo!()
+	}
+
+	Ok(map)
 }

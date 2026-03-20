@@ -25,28 +25,54 @@ pub trait ActionStreamer {
 }
 
 pub type ActionStream =
-	Pin<Box<dyn Stream<Item = Result<ActionStreamOut>> + Send>>;
+	Pin<Box<dyn Stream<Item = Result<ActionStreamState>> + Send>>;
 
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ActionStreamOut {
-	state: ActionStreamState,
-	mutations: Vec<(ActionId, ActionMutationKind)>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionStreamState {
+	pub response_id: String,
+	/// whether the response was stored, enabling usage of
+	/// `previous_response_id` in the next request.
+	pub response_stored: bool,
+	pub status: ActionStreamStatus,
+	pub token_usage: Option<TokenUsage>,
+	pub mutations: HashMap<ActionId, ActionMutation>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ActionStreamState {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ActionStreamStatus {
 	Created,
 	Queued,
 	InProgress,
 	Completed,
-	Failed,
-	Incomplete,
+	Failed {
+		code: Option<String>,
+		message: Option<String>,
+	},
+	Incomplete(Option<String>),
+	Cancelled,
 }
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ActionMutationKind {
+pub enum ActionMutation {
 	Created,
 	Updated,
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TokenUsage {
+	/// The number of input tokens used to generate the response.
+	pub input_tokens: u32,
+	/// The number of input tokens used to generate the response.
+	pub output_tokens: u32,
+	/// The total number of tokens used.
+	pub total_tokens: u32,
+	/// The number of input tokens that were served from cache.
+	pub cached_input_tokens: Option<u32>,
+	/// The number of output tokens attributed to reasoning.
+	pub reasoning_tokens: Option<u32>,
 }

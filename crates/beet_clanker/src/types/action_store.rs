@@ -32,6 +32,34 @@ pub trait ActionStore: Send + Sync {
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
 }
 
+impl ActionStore for Arc<dyn ActionStore> {
+	fn previous_meta<'a>(
+		&'a self,
+		provider_slug: &'a str,
+		model_slug: &'a str,
+		thread_id: ThreadId,
+	) -> BoxedFuture<'a, Result<Option<ActionMeta>>> {
+		self.as_ref()
+			.previous_meta(provider_slug, model_slug, thread_id)
+	}
+
+	fn thread_actions(
+		&self,
+		thread_id: ThreadId,
+		after_action: Option<ActionId>,
+	) -> BoxedFuture<'_, Result<Vec<Action>>> {
+		self.as_ref().thread_actions(thread_id, after_action)
+	}
+
+	fn full_thread_actions(
+		&self,
+		thread_id: ThreadId,
+		after_action: Option<ActionId>,
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>> {
+		self.as_ref().full_thread_actions(thread_id, after_action)
+	}
+}
+
 /// An in-memory action store
 pub struct MemoryActionStore {
 	map: Arc<RwLock<ContextMap>>,

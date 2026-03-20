@@ -14,9 +14,9 @@ pub struct O11sStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
 	stream: bool,
-	/// whether to find the previous response if it exists in the thread,
+	/// Whether to find the previous response if it exists in the thread,
 	/// and attempt to pick up where it left off. This should be disabled
-	/// for providers who ignore it or are stateless between calls, like ollama
+	/// for providers who ignore it or are stateless between calls, like ollama.
 	use_previous_response_id: bool,
 	/// System instructions to include with each request.
 	instructions: Option<String>,
@@ -44,11 +44,12 @@ impl O11sStreamer {
 		}
 	}
 
-	/// Enables streaming mode.
+	/// Disables streaming mode, returning the full response as a single event.
 	pub fn without_streaming(mut self) -> Self {
 		self.stream = false;
 		self
 	}
+
 	/// Sets the instructions for this model action.
 	pub fn with_instructions(
 		mut self,
@@ -57,12 +58,12 @@ impl O11sStreamer {
 		self.instructions = Some(instructions.into());
 		self
 	}
+
 	pub fn with_use_previous_response_id(mut self) -> Self {
 		self.use_previous_response_id = true;
 		self
 	}
 }
-
 
 impl ActionStreamer for O11sStreamer {
 	fn stream_actions(
@@ -99,6 +100,7 @@ impl ActionStreamer for O11sStreamer {
 						agent_id, action, author, meta,
 					)
 				})?;
+
 			// 3. build tool items
 			let tools = vec![];
 
@@ -111,76 +113,58 @@ impl ActionStreamer for O11sStreamer {
 			if let Some(last) = last_received {
 				req_body = req_body.with_previous_response_id(last.response_id);
 			}
-
 			if let Some(instructions) = &self.instructions {
 				req_body = req_body.with_instructions(instructions);
 			}
 
-			// 5. build request
+			// 5. build and send request
 			let mut request =
 				Request::post(&self.model.url)
 					.with_json_body::<openresponses::RequestBody>(&req_body)?;
 			if let Some(auth) = &self.model.auth {
 				request = request.with_auth_bearer(auth);
 			}
+			let response = request.send().await?.into_result().await?;
 
-			let response = request
-				.send()
-				.await?
-				// only accept 2xx and 3xx responses
-				.into_result()
-				.await?;
-
-			if self.stream {
+			// 6. unify streaming and non-streaming into a single typed stream
+			let typed_stream: StreamingEventStream = if self.stream {
 				let raw_stream = response.event_source_raw().await?;
-				Box::pin(O11sStream::new(
-					Arc::clone(&self.action_store),
-					raw_stream,
-				))
+				Box::pin(SseToTypedStream::new(raw_stream))
 			} else {
 				let res_body =
 					response.json::<openresponses::ResponseBody>().await?;
+				// coherse a oneshot into a 'completed' sse event
+				let event = openresponses::StreamingEvent::ResponseCompleted(
+					openresponses::streaming::ResponseCompletedEvent {
+						sequence_number: 0,
+						response: res_body,
+					},
+				);
+				Box::pin(futures::stream::once(async move { Ok(event) }))
+			};
 
-				let once_stream = futures::stream::once(async {
-					Ok(openresponses::StreamingEvent::ResponseCompleted(
-						openresponses::streaming::ResponseCompletedEvent {
-							sequence_number: 0,
-							response: res_body,
-						},
-					))
-				});
-				Box::pin(O11sStream::new(
-					Arc::clone(&self.action_store),
-					once_stream,
-				))
-			}
-			.xok()
+			let stream: ActionStream = Box::pin(O11sStream::new(
+				Arc::clone(&self.action_store),
+				typed_stream,
+			));
+			stream.xok()
 		})
 	}
 }
 
-
-
-/// A stream that parses raw SSE events into typed `StreamingEvent` values.
+/// Parses raw SSE events into typed [`StreamingEvent`](openresponses::StreamingEvent) values.
 ///
 /// Handles the `[DONE]` sentinel by cleanly terminating the stream.
-struct O11sStream<S> {
+struct SseToTypedStream<S> {
 	inner: S,
 	done: bool,
-	action_store: Arc<dyn ActionStore>,
 }
 
-impl<S> O11sStream<S> {
-	pub(super) fn new(action_store: Arc<dyn ActionStore>, inner: S) -> Self {
-		Self {
-			action_store,
-			inner,
-			done: false,
-		}
-	}
+impl<S> SseToTypedStream<S> {
+	fn new(inner: S) -> Self { Self { inner, done: false } }
 }
 
-impl<S, E> Stream for O11sStream<S>
+impl<S, E> Stream for SseToTypedStream<S>
 where
 	S: Stream<
 			Item = std::result::Result<
@@ -191,7 +175,7 @@ where
 		+ Send,
 	E: std::fmt::Display,
 {
-	type Item = Result<ActionStreamOut>;
+	type Item = Result<openresponses::StreamingEvent>;
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
@@ -200,17 +184,13 @@ where
 		if self.done {
 			return Poll::Ready(None);
 		}
-
 		match Pin::new(&mut self.inner).poll_next(cx) {
 			Poll::Ready(Some(Ok(event))) => {
-				// Handle the [DONE] sentinel
 				if event.data == "[DONE]" {
 					self.done = true;
 					return Poll::Ready(None);
 				}
-
-				// Parse the event data as a StreamingEvent
-				let o11s_event = serde_json::from_str::<
+				let result = serde_json::from_str::<
 					openresponses::StreamingEvent,
 				>(&event.data)
 				.map_err(|err| {
@@ -219,15 +199,60 @@ where
 						err,
 						event.data
 					)
-				})?;
-
-				todo!("handle result");
-
-				Poll::Ready(Some(Ok(vec![])))
+				});
+				Poll::Ready(Some(result))
 			}
 			Poll::Ready(Some(Err(err))) => {
 				Poll::Ready(Some(Err(bevyhow!("SSE parse error: {}", err))))
 			}
+			Poll::Ready(None) => Poll::Ready(None),
+			Poll::Pending => Poll::Pending,
+		}
+	}
+}
+
+
+/// Processes typed streaming events into [`ActionStreamOut`] values.
+struct O11sStream {
+	inner: Pin<
+		Box<dyn Stream<Item = Result<openresponses::StreamingEvent>> + Send>,
+	>,
+	action_store: Arc<dyn ActionStore>,
+	prev_state: Option<ActionStreamState>,
+}
+
+impl O11sStream {
+	fn new(
+		action_store: Arc<dyn ActionStore>,
+		inner: StreamingEventStream,
+	) -> Self {
+		Self {
+			action_store,
+			inner,
+			prev_state: None,
+		}
+	}
+}
+
+impl Stream for O11sStream {
+	type Item = Result<ActionStreamState>;
+
+	fn poll_next(
+		self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<Option<Self::Item>> {
+		let this = self.get_mut();
+		let store = Arc::clone(&this.action_store);
+		let state = this.prev_state.clone();
+		match this.inner.as_mut().poll_next(cx) {
+			Poll::Ready(Some(Ok(event))) => {
+				let state = o11s_mapper::o11s_stream_event_to_output(
+					store, state, event,
+				)?;
+				this.prev_state = Some(state.clone());
+				Poll::Ready(Some(Ok(state)))
+			}
+			Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),
 			Poll::Ready(None) => Poll::Ready(None),
 			Poll::Pending => Poll::Pending,
 		}
