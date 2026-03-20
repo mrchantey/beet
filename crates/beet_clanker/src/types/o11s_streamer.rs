@@ -133,17 +133,32 @@ impl ActionStreamer for O11sStreamer {
 
 			if self.stream {
 				let raw_stream = response.event_source_raw().await?;
-				let action_stream: ActionStream =
-					Box::pin(O11sStream::new(raw_stream));
-				Ok(action_stream)
+				Box::pin(O11sStream::new(
+					Arc::clone(&self.action_store),
+					raw_stream,
+				))
 			} else {
 				let res_body =
 					response.json::<openresponses::ResponseBody>().await?;
-				bevybail!("todo")
+
+				let once_stream = futures::stream::once(async {
+					Ok(openresponses::StreamingEvent::ResponseCompleted(
+						openresponses::streaming::ResponseCompletedEvent {
+							sequence_number: 0,
+							response: res_body,
+						},
+					))
+				});
+				Box::pin(O11sStream::new(
+					Arc::clone(&self.action_store),
+					once_stream,
+				))
 			}
+			.xok()
 		})
 	}
 }
+
 
 
 /// A stream that parses raw SSE events into typed `StreamingEvent` values.
@@ -152,10 +167,17 @@ impl ActionStreamer for O11sStreamer {
 struct O11sStream<S> {
 	inner: S,
 	done: bool,
+	action_store: Arc<dyn ActionStore>,
 }
 
 impl<S> O11sStream<S> {
-	pub(super) fn new(inner: S) -> Self { Self { inner, done: false } }
+	pub(super) fn new(action_store: Arc<dyn ActionStore>, inner: S) -> Self {
+		Self {
+			action_store,
+			inner,
+			done: false,
+		}
+	}
 }
 
 impl<S, E> Stream for O11sStream<S>
@@ -169,7 +191,7 @@ where
 		+ Send,
 	E: std::fmt::Display,
 {
-	type Item = Result<Vec<ActionMutation>>;
+	type Item = Result<ActionStreamOut>;
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,

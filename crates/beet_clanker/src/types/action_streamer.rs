@@ -25,14 +25,26 @@ pub trait ActionStreamer {
 }
 
 pub type ActionStream =
-	Pin<Box<dyn Stream<Item = Result<Vec<ActionMutation>>> + Send>>;
+	Pin<Box<dyn Stream<Item = Result<ActionStreamOut>> + Send>>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ActionMutation {
-	action: ActionId,
-	mutation: ActionMutationKind,
+
+
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ActionStreamOut {
+	state: ActionStreamState,
+	mutations: Vec<(ActionId, ActionMutationKind)>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ActionStreamState {
+	Created,
+	Queued,
+	InProgress,
+	Completed,
+	Failed,
+	Incomplete,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ActionMutationKind {
 	Created,

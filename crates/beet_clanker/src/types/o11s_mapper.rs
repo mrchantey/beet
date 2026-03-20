@@ -1,5 +1,6 @@
 use crate::openresponses::ContentPart;
 use crate::openresponses::MessageRole;
+use crate::openresponses::StreamingEvent;
 use crate::openresponses::request::FunctionCallOutputParam;
 use crate::openresponses::request::FunctionCallParam;
 use crate::openresponses::request::FunctionOutputContent;
@@ -120,4 +121,16 @@ pub fn action_to_o11s_input(
 		}
 	};
 	input_item.xok()
+}
+
+
+
+pub fn o11s_stream_event_to_output(
+	ev: StreamingEvent,
+	// agent_id: ActorId,
+	// action: Action,
+	// author: Actor,
+	// meta: ActionMeta,
+) -> Result<ActionStreamOut> {
+	todo!();
 }
