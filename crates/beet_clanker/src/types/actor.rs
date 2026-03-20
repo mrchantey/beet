@@ -64,3 +64,26 @@ pub enum ActorKind {
 	/// depending on the originator of the message.
 	Agent,
 }
+
+impl std::fmt::Display for ActorKind {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			ActorKind::System => write!(f, "system"),
+			ActorKind::App => write!(f, "app"),
+			ActorKind::User => write!(f, "user"),
+			ActorKind::Agent => write!(f, "agent"),
+		}
+	}
+}
+
+
+impl ActorKind {
+	pub fn input_str(&self) -> &'static str {
+		match self {
+			ActorKind::System => "system",
+			ActorKind::App => "developer",
+			ActorKind::User => "human",
+			ActorKind::Agent => "clanker",
+		}
+	}
+}

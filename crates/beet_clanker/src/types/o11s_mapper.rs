@@ -14,7 +14,7 @@ pub fn action_to_o11s_input(
 	agent_id: ActorId,
 	action: Action,
 	author: Actor,
-	meta: Option<O11sMeta>,
+	meta: ActionMeta,
 ) -> Result<openresponses::request::InputItem> {
 	let role = match author.kind() {
 		ActorKind::System => MessageRole::System,
@@ -31,10 +31,17 @@ pub fn action_to_o11s_input(
 
 	let input_item = match action.payload() {
 		ActionPayload::Text(TextItem(value)) => {
+			let actor_text = format!(
+				"<actor name={} kind={} id={}>{}</actor>",
+				author.name(),
+				author.kind().input_str(),
+				author.id(),
+				value
+			);
 			InputItem::Message(MessageParam {
 				id: None,
 				role,
-				content: MessageContent::Text(value.clone()),
+				content: MessageContent::Text(actor_text),
 				status: None,
 			})
 		}
@@ -89,7 +96,10 @@ pub fn action_to_o11s_input(
 		ActionPayload::FunctionCall(function_call) => {
 			InputItem::FunctionCall(FunctionCallParam {
 				id: None,
-				call_id: get_call_id(&meta)?,
+				call_id: meta
+					.call_id()
+					.ok_or_else(|| bevyhow!("ActionMeta has no call_id"))?
+					.to_string(),
 				name: function_call.function_name().to_string(),
 				arguments: function_call.args().to_string(),
 				status: None,
@@ -98,10 +108,10 @@ pub fn action_to_o11s_input(
 		ActionPayload::FunctionCallOutput(output_item) => {
 			InputItem::FunctionCallOutput(FunctionCallOutputParam {
 				id: None,
-				// NOTE: in the case of a function call output without an O11sMeta,
-				// this will actually be the meta of the FunctionCall, we do that
-				// to get the correct call id.
-				call_id: get_call_id(&meta)?,
+				call_id: meta
+					.call_id()
+					.ok_or_else(|| bevyhow!("ActionMeta has no call_id"))?
+					.to_string(),
 				output: FunctionOutputContent::Text(
 					output_item.output().to_string(),
 				),
@@ -110,12 +120,4 @@ pub fn action_to_o11s_input(
 		}
 	};
 	input_item.xok()
-}
-
-fn get_call_id(meta: &Option<O11sMeta>) -> Result<String> {
-	meta.as_ref()
-		.ok_or_else(|| bevyhow!("O11sMeta missing for function call"))?
-		.call_id()
-		.map(|s| s.to_string())
-		.ok_or_else(|| bevyhow!("O11sMeta has no call_id"))
 }

@@ -24,15 +24,17 @@ pub trait ActionStreamer {
 	) -> BoxedFuture<'_, Result<ActionStream>>;
 }
 
-pub type ActionStream = Pin<
-	Box<dyn Stream<Item = Result<Vec<PartialItem>, ActionStreamError>> + Send>,
->;
+pub type ActionStream =
+	Pin<Box<dyn Stream<Item = Result<Vec<ActionMutation>>> + Send>>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ActionMutation {
+	action: ActionId,
+	mutation: ActionMutationKind,
+}
 
-#[derive(Debug, thiserror::Error)]
-pub enum ActionStreamError {
-	#[error("stream interrupted")]
-	Interrupted,
-	#[error("{0}")]
-	Opaque(BevyError),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ActionMutationKind {
+	Created,
+	Updated,
 }

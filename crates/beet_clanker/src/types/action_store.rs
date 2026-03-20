@@ -14,12 +14,12 @@ pub trait ActionStore: Send + Sync {
 	/// The provider and model slugs are also checked to ensure
 	/// we get the most recent meta *for this match*, supporting
 	/// multi-agent and model-switching scenarios.
-	fn previous_o11s_meta<'a>(
+	fn previous_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
 		model_slug: &'a str,
 		thread_id: ThreadId,
-	) -> BoxedFuture<'a, Result<Option<ActionId>>>;
+	) -> BoxedFuture<'a, Result<Option<ActionMeta>>>;
 	fn thread_actions(
 		&self,
 		thread_id: ThreadId,
@@ -29,7 +29,7 @@ pub trait ActionStore: Send + Sync {
 		&self,
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
-	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, Option<O11sMeta>)>>>;
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
 }
 
 /// An in-memory action store
@@ -38,25 +38,25 @@ pub struct MemoryActionStore {
 }
 
 impl ActionStore for MemoryActionStore {
-	fn previous_o11s_meta<'a>(
+	fn previous_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
 		model_slug: &'a str,
 		thread_id: ThreadId,
-	) -> BoxedFuture<'a, Result<Option<ActionId>>> {
+	) -> BoxedFuture<'a, Result<Option<ActionMeta>>> {
 		Box::pin(async move {
 			let map = self.map.read().await;
 			map.thread_actions(thread_id, None)
 				.into_iter()
 				.filter_map(|action| {
-					map.o11s_metas()
+					map.metas()
 						.values()
 						.find(|meta| {
 							meta.action_id == action.id()
 								&& meta.provider_slug == provider_slug
 								&& meta.model_slug == model_slug
 						})
-						.map(|_meta| action.id())
+						.cloned()
 				})
 				.last()
 				.xok()
@@ -97,34 +97,19 @@ impl ActionStore for MemoryActionStore {
 		&self,
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
-	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, Option<O11sMeta>)>>> {
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>> {
 		Box::pin(async move {
 			let map = self.map.read().await;
-			let metas = map.o11s_metas();
+			let metas = map.metas();
 			let actors = map.actors();
 			self.thread_actions(thread_id, after_action)
 				.await?
 				.into_iter()
-				.xtry_map(
-					|action| -> Result<(Action, Actor, Option<O11sMeta>)> {
-						let actor = actors.get(action.author())?;
-						let mut meta = metas.get(action.id()).ok().cloned();
-
-						// hack: for output calls we created, need to get
-						// the call_id of the function call item, so use that.
-						// this is used in `o11s_mapper`
-						if meta.is_none()
-							&& let ActionPayload::FunctionCallOutput(output) =
-								action.payload()
-						{
-							meta = metas
-								.get(output.function_call_item)
-								.ok()
-								.cloned();
-						}
-						Ok((action, actor.clone(), meta))
-					},
-				)?
+				.xtry_map(|action| -> Result<(Action, Actor, ActionMeta)> {
+					let actor = actors.get(action.author())?.clone();
+					let meta = metas.get(action.id())?.clone();
+					Ok((action, actor, meta))
+				})?
 				.xok()
 		})
 	}

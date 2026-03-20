@@ -13,7 +13,7 @@ pub struct ContextMap {
 	actors: DocMap<Actor>,
 	actions: DocMap<Action>,
 	threads: DocMap<Thread>,
-	o11s_metas: DocMap<O11sMeta>,
+	o11s_metas: DocMap<ActionMeta>,
 }
 
 
@@ -26,8 +26,8 @@ impl ContextMap {
 
 	pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
 	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
-	pub fn o11s_metas(&self) -> &DocMap<O11sMeta> { &self.o11s_metas }
-	pub fn o11s_metas_mut(&mut self) -> &mut DocMap<O11sMeta> {
+	pub fn metas(&self) -> &DocMap<ActionMeta> { &self.o11s_metas }
+	pub fn o11s_metas_mut(&mut self) -> &mut DocMap<ActionMeta> {
 		&mut self.o11s_metas
 	}
 

@@ -3,7 +3,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::tasks::BoxedFuture;
+use futures::Stream;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
 
 pub struct O11sStreamer {
 	action_store: Arc<dyn ActionStore>,
@@ -57,19 +61,6 @@ impl O11sStreamer {
 		self.use_previous_response_id = true;
 		self
 	}
-
-	fn build_request(
-		&self,
-		request: openresponses::RequestBody,
-	) -> Result<Request> {
-		let mut request =
-			Request::post(&self.model.url)
-				.with_json_body::<openresponses::RequestBody>(&request)?;
-		if let Some(auth) = &self.model.auth {
-			request = request.with_auth_bearer(auth);
-		}
-		request.xok()
-	}
 }
 
 
@@ -80,9 +71,11 @@ impl ActionStreamer for O11sStreamer {
 		thread_id: ThreadId,
 	) -> BoxedFuture<'_, Result<ActionStream>> {
 		Box::pin(async move {
+			// 1. find last received from this provider match
+			// last_received may still be None if no match was found
 			let last_received = if self.use_previous_response_id {
 				self.action_store
-					.previous_o11s_meta(
+					.previous_meta(
 						&self.model.provider_slug,
 						&self.model.model_slug,
 						thread_id,
@@ -92,9 +85,13 @@ impl ActionStreamer for O11sStreamer {
 				None
 			};
 
+			// 2. build input items
 			let items = self
 				.action_store
-				.full_thread_actions(thread_id, last_received)
+				.full_thread_actions(
+					thread_id,
+					last_received.as_ref().map(|meta| meta.action_id()),
+				)
 				.await?
 				.into_iter()
 				.xtry_map(|(action, author, meta)| {
@@ -102,12 +99,115 @@ impl ActionStreamer for O11sStreamer {
 						agent_id, action, author, meta,
 					)
 				})?;
-
+			// 3. build tool items
 			let tools = vec![];
-			let mut body = openresponses::RequestBody::new(&*self.model.url)
-				.with_input(Input::Items(items))
-				.with_tools(tools);
-			bevybail!("todo")
+
+			// 4. build request body
+			let mut req_body =
+				openresponses::RequestBody::new(&*self.model.url)
+					.with_input(Input::Items(items))
+					.with_tools(tools)
+					.with_stream(self.stream);
+			if let Some(last) = last_received {
+				req_body = req_body.with_previous_response_id(last.response_id);
+			}
+
+			if let Some(instructions) = &self.instructions {
+				req_body = req_body.with_instructions(instructions);
+			}
+
+			// 5. build request
+			let mut request =
+				Request::post(&self.model.url)
+					.with_json_body::<openresponses::RequestBody>(&req_body)?;
+			if let Some(auth) = &self.model.auth {
+				request = request.with_auth_bearer(auth);
+			}
+
+			let response = request
+				.send()
+				.await?
+				// only accept 2xx and 3xx responses
+				.into_result()
+				.await?;
+
+			if self.stream {
+				let raw_stream = response.event_source_raw().await?;
+				let action_stream: ActionStream =
+					Box::pin(O11sStream::new(raw_stream));
+				Ok(action_stream)
+			} else {
+				let res_body =
+					response.json::<openresponses::ResponseBody>().await?;
+				bevybail!("todo")
+			}
 		})
+	}
+}
+
+
+/// A stream that parses raw SSE events into typed `StreamingEvent` values.
+///
+/// Handles the `[DONE]` sentinel by cleanly terminating the stream.
+struct O11sStream<S> {
+	inner: S,
+	done: bool,
+}
+
+impl<S> O11sStream<S> {
+	pub(super) fn new(inner: S) -> Self { Self { inner, done: false } }
+}
+
+impl<S, E> Stream for O11sStream<S>
+where
+	S: Stream<
+			Item = std::result::Result<
+				beet_net::exports::eventsource_stream::Event,
+				E,
+			>,
+		> + Unpin
+		+ Send,
+	E: std::fmt::Display,
+{
+	type Item = Result<Vec<ActionMutation>>;
+
+	fn poll_next(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<Option<Self::Item>> {
+		if self.done {
+			return Poll::Ready(None);
+		}
+
+		match Pin::new(&mut self.inner).poll_next(cx) {
+			Poll::Ready(Some(Ok(event))) => {
+				// Handle the [DONE] sentinel
+				if event.data == "[DONE]" {
+					self.done = true;
+					return Poll::Ready(None);
+				}
+
+				// Parse the event data as a StreamingEvent
+				let o11s_event = serde_json::from_str::<
+					openresponses::StreamingEvent,
+				>(&event.data)
+				.map_err(|err| {
+					bevyhow!(
+						"Failed to parse streaming event: {}\nRaw: {}",
+						err,
+						event.data
+					)
+				})?;
+
+				todo!("handle result");
+
+				Poll::Ready(Some(Ok(vec![])))
+			}
+			Poll::Ready(Some(Err(err))) => {
+				Poll::Ready(Some(Err(bevyhow!("SSE parse error: {}", err))))
+			}
+			Poll::Ready(None) => Poll::Ready(None),
+			Poll::Pending => Poll::Pending,
+		}
 	}
 }
