@@ -61,7 +61,8 @@ impl Fallback {
 /// Errors depending on [`ChildError`] exclusions when a child has:
 /// - no [`ToolMeta`]
 /// - incompatible [`ToolMeta`] signature
-async fn fallback_tool<Input, Output>(
+// TOD make private when beet_stack -> beet_node migration done?
+pub async fn fallback_tool<Input, Output>(
 	cx: AsyncToolIn<Input>,
 ) -> Result<Outcome<Output, Input>>
 where

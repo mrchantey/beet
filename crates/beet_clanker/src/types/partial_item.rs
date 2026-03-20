@@ -867,8 +867,8 @@ fn item_message_role(
 	use openresponses::MessageRole;
 	match owner.kind() {
 		ActorKind::System => MessageRole::System,
-		ActorKind::Developer => MessageRole::Developer,
-		ActorKind::Human => MessageRole::User,
+		ActorKind::App => MessageRole::Developer,
+		ActorKind::User => MessageRole::User,
 		ActorKind::Agent => {
 			if owner.id() == agent_id {
 				MessageRole::Assistant
