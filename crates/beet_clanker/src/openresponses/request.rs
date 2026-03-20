@@ -19,7 +19,7 @@
 //!    ```no_run
 //!    # use beet_clanker::prelude::openresponses;
 //!    let body = openresponses::RequestBody::new("gpt-4o")
-//!        .with_input("Hello!");
+//!        .with_simple_input("Hello!");
 //!    ```
 //!
 //! 2. **Structured items**: Array of messages, function calls, or reasoning items
@@ -59,7 +59,7 @@
 //!     }));
 //!
 //! let body = openresponses::RequestBody::new("gpt-4o")
-//!     .with_input("What's the weather in Tokyo?")
+//!     .with_simple_input("What's the weather in Tokyo?")
 //!     .with_tool(tool);
 //! ```
 

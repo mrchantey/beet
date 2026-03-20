@@ -3,10 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::tasks::BoxedFuture;
-use futures::Stream;
-use std::borrow::Cow;
-use std::fmt::Debug;
-use std::pin::Pin;
 use std::sync::Arc;
 
 pub struct O11sStreamer {
@@ -108,7 +104,7 @@ impl ActionStreamer for O11sStreamer {
 				})?;
 
 			let tools = vec![];
-			let mut body = openresponses::RequestBody::new(&self.model.url)
+			let mut body = openresponses::RequestBody::new(&*self.model.url)
 				.with_input(Input::Items(items))
 				.with_tools(tools);
 			bevybail!("todo")

@@ -35,7 +35,7 @@ fn next_id(prefix: &str) -> String {
 ///
 /// // Without tools - echoes input
 /// let body = openresponses::RequestBody::new("mock")
-///     .with_input("Hello!");
+///     .with_simple_input("Hello!");
 /// let response = provider.send(body).await.unwrap();
 /// assert!(response.first_text().unwrap().contains("you said:"));
 ///
@@ -46,7 +46,7 @@ fn next_id(prefix: &str) -> String {
 ///         "properties": { "name": { "type": "string" } }
 ///     }));
 /// let body = openresponses::RequestBody::new("mock")
-///     .with_input("Say hi to Bob")
+///     .with_simple_input("Say hi to Bob")
 ///     .with_tool(tool);
 /// let response = provider.send(body).await.unwrap();
 /// assert!(!response.function_calls().is_empty());

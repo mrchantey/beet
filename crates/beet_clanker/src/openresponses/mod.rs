@@ -52,7 +52,7 @@
 //! dotenv::dotenv().ok();
 //!
 //! let body = openresponses::RequestBody::new("gpt-4o-mini")
-//!     .with_input("Say hello in exactly 3 words.");
+//!     .with_simple_input("Say hello in exactly 3 words.");
 //!
 //! let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)
@@ -80,7 +80,7 @@
 //! let mut provider = OllamaProvider::default();
 //!
 //! let body = openresponses::RequestBody::new(provider.default_small_model())
-//!     .with_input("Write a haiku.")
+//!     .with_simple_input("Write a haiku.")
 //!     .with_stream(true);
 //!
 //! let stream = provider.stream(body).await?;

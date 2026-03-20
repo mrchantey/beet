@@ -30,12 +30,12 @@ pub type StreamingEventStream =
 ///
 /// // Non-streaming request
 /// let body = openresponses::RequestBody::new(provider.default_small_model())
-///     .with_input("Hello!");
+///     .with_simple_input("Hello!");
 /// let response = provider.send(body).await?;
 ///
 /// // Streaming request
 /// let body = openresponses::RequestBody::new(provider.default_small_model())
-///     .with_input("Write a poem.")
+///     .with_simple_input("Write a poem.")
 ///     .with_stream(true);
 /// let mut stream = provider.stream(body).await?;
 ///

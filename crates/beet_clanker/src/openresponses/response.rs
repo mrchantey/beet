@@ -66,7 +66,7 @@
 //! dotenv::dotenv().ok();
 //!
 //! let request_body = openresponses::RequestBody::new("gpt-4o-mini")
-//!     .with_input("Hello!");
+//!     .with_simple_input("Hello!");
 //!
 //! let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)

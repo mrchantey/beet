@@ -98,6 +98,9 @@ pub fn action_to_o11s_input(
 		ActionPayload::FunctionCallOutput(output_item) => {
 			InputItem::FunctionCallOutput(FunctionCallOutputParam {
 				id: None,
+				// NOTE: in the case of a function call output without an O11sMeta,
+				// this will actually be the meta of the FunctionCall, we do that
+				// to get the correct call id.
 				call_id: get_call_id(&meta)?,
 				output: FunctionOutputContent::Text(
 					output_item.output().to_string(),
@@ -109,8 +112,10 @@ pub fn action_to_o11s_input(
 	input_item.xok()
 }
 
-fn get_call_id(meta: Option<O11sMeta>) -> Result<&str> {
-	meta.ok_or_else(|| bevyhow!("O11sMeta missing for function call"))?
+fn get_call_id(meta: &Option<O11sMeta>) -> Result<String> {
+	meta.as_ref()
+		.ok_or_else(|| bevyhow!("O11sMeta missing for function call"))?
 		.call_id()
+		.map(|s| s.to_string())
 		.ok_or_else(|| bevyhow!("O11sMeta has no call_id"))
 }

@@ -71,7 +71,7 @@
 //! let mut provider = OllamaProvider::default();
 //!
 //! let body = openresponses::RequestBody::new(provider.default_small_model())
-//!     .with_input("Write a haiku about streaming.")
+//!     .with_simple_input("Write a haiku about streaming.")
 //!     .with_stream(true);
 //!
 //! let mut stream = provider.stream(body).await?;
