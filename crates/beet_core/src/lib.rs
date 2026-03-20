@@ -143,6 +143,12 @@ pub mod prelude {
 	pub use crate::types::*;
 	pub use crate::utils::*;
 	pub use either::Either;
+	#[cfg(feature = "serde")]
+	pub use serde::Deserialize;
+	#[cfg(feature = "serde")]
+	pub use serde::Serialize;
+	#[cfg(feature = "serde")]
+	pub use serde::de::DeserializeOwned;
 	// as a metaframework we're a superset of bevy,
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros

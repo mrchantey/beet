@@ -39,9 +39,8 @@ impl<M1, M2> DocId for (Uuid7<M1>, Uuid7<M2>) {
 	}
 }
 
-// constraining to copy for now, so much more ergonomic
 pub trait DocId:
-	Debug + Clone + Copy + Hash + PartialEq + Eq + Serialize + DeserializeOwned
+	Debug + Clone + Hash + PartialEq + Eq + Serialize + DeserializeOwned
 {
 	/// Convenience for usage like hashmap keys
 	fn into_bytes(&self) -> Vec<u8>;
