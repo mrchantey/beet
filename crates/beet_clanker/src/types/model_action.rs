@@ -182,7 +182,7 @@ impl ModelAction {
 		};
 
 		// collect input
-		let input = self.partial_items.build_input(
+		let input = self.partial_items.build_o11s_input(
 			context_map,
 			actor_id,
 			thread_id,

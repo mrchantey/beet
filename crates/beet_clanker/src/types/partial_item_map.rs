@@ -93,7 +93,7 @@ impl PartialItemMap {
 	// Input building - converts our actions to openresponses input format
 	// ═══════════════════════════════════════════════════════════════════════
 
-	pub fn build_input(
+	pub fn build_o11s_input(
 		&self,
 		map: &ContextMap,
 		agent_id: ActorId,
@@ -120,7 +120,7 @@ impl PartialItemMap {
 
 		// actions are strictly already chronologically sorted by uuidv7
 		let items = action_ids.into_iter().xtry_map(|action_id| {
-			self.into_openresponses_input(map, agent_id, action_id)
+			self.action_to_o11s_input(map, agent_id, action_id)
 		})?;
 
 		Input::Items(items).xok()
@@ -129,7 +129,7 @@ impl PartialItemMap {
 	/// Map an action to an openresponses input, relative to a given actor.
 	/// The provided actor is used to correctly assign [`MessageRole::Assistant`]
 	/// for 'self' messages, and [`MessageRole::User`] for all others.
-	fn into_openresponses_input(
+	fn action_to_o11s_input(
 		&self,
 		map: &ContextMap,
 		agent_id: ActorId,
