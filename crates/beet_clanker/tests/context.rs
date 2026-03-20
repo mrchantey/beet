@@ -22,26 +22,19 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 	let user_id = query.actors_mut().insert(Actor::user());
 
 	// clanker thread is the thread sent to the model
-	let clanker_thread = query.threads_mut().insert(
-		Thread::default().with_actors([system_id, clanker_id, user_id]),
-	);
-
-	// user thread is the thread printed to stdout
-	let user_thread = query
-		.threads_mut()
-		.insert(Thread::display_only().with_actors([clanker_id, user_id]));
+	let thread_id = query.threads_mut().insert(Thread::default());
 
 	// 2. define relations
 	commands
 		.spawn((system_id, Sequence::new(), children![
 			(
 				clanker_id,
-				clanker_thread,
+				thread_id,
 				ModelAction::new(OllamaProvider::default()).streaming()
 			),
 			(
 				user_id,
-				user_thread,
+				thread_id,
 				StdoutCursor::default(),
 				OnSpawn::observe(log_clanker_name),
 				OnSpawn::observe(log_clanker_delta),
@@ -51,9 +44,10 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 		.call::<(), Outcome>((), default());
 
 	// 3. define items
-	query.add_items(Item::new(
+	query.add_actions(Action::new(
 		system_id,
-		ItemStatus::Completed,
+		thread_id,
+		ActionStatus::Completed,
 		"you are robot, make beep boop noises",
 	))?;
 	Ok(())
@@ -61,11 +55,11 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 
 fn log_clanker_name(
-	ev: On<EntityItemCreated>,
+	ev: On<EntityActionCreated>,
 	context_query: ContextQuery,
 ) -> Result {
-	let item = context_query.items().get(ev.item)?;
-	let actor = context_query.actors().get(item.owner())?;
+	let action = context_query.actions().get(ev.action)?;
+	let actor = context_query.actors().get(action.author())?;
 	println!("<< {} >> ", actor.name());
 	Ok(())
 }
@@ -73,18 +67,18 @@ fn log_clanker_name(
 
 #[allow(unused)]
 #[derive(Default, Component)]
-struct StdoutCursor(HashMap<ItemId, u32>);
+struct StdoutCursor(HashMap<ActionId, u32>);
 
 
 fn log_clanker_delta(
-	ev: On<EntityItemUpdated>,
+	ev: On<EntityActionUpdated>,
 	context_query: ContextQuery,
 	mut query: Query<&mut StdoutCursor>,
 ) -> Result {
 	let mut cursor = query.get_mut(ev.entity)?;
-	let item = context_query.items().get(ev.item)?;
-	let content = item.content().to_string();
-	let cursor_item = cursor.0.entry(ev.item).or_insert(0);
+	let action = context_query.actions().get(ev.action)?;
+	let content = action.payload().to_string();
+	let cursor_item = cursor.0.entry(ev.action).or_insert(0);
 
 	let new_content = &content[*cursor_item as usize..];
 	print!("{}", new_content);
@@ -99,16 +93,17 @@ fn exit_on_user_turn(
 	mut commands: Commands,
 	context_query: ContextQuery,
 ) -> Outcome {
-	let item = context_query
-		.items()
+	let text_action = context_query
+		.actions()
 		.values()
-		.find(|item| {
-			item.content().kind() == ItemKind::Text
-				&& context_query.actors().get(item.owner()).unwrap().kind()
+		.find(|action| {
+			action.payload().kind() == ActionKind::Text
+				&& context_query.actors().get(action.author()).unwrap().kind()
 					== ActorKind::Agent
 		})
 		.unwrap();
-	item.content()
+	text_action
+		.payload()
 		.to_string()
 		.to_lowercase()
 		.xpect_contains("beep");

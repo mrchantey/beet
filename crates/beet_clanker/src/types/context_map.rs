@@ -3,13 +3,15 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-
+/// An in-memory unindexed table store for short-lived queries.
+/// Correctness is prioritized over efficiencty, ie no indexes are
+/// maintained, and actions are sorted per each 'get'.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Resource,
 )]
 pub struct ContextMap {
 	actors: DocMap<Actor>,
-	items: DocMap<Item>,
+	actions: DocMap<Action>,
 	threads: DocMap<Thread>,
 }
 
@@ -18,32 +20,35 @@ impl ContextMap {
 	pub fn actors(&self) -> &DocMap<Actor> { &self.actors }
 	pub fn actors_mut(&mut self) -> &mut DocMap<Actor> { &mut self.actors }
 
-	pub fn items(&self) -> &DocMap<Item> { &self.items }
-	pub fn items_mut(&mut self) -> &mut DocMap<Item> { &mut self.items }
+	pub fn actions(&self) -> &DocMap<Action> { &self.actions }
+	pub fn actions_mut(&mut self) -> &mut DocMap<Action> { &mut self.actions }
 
 	pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
 	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
 
-	/// Split borrow: immutable items + mutable threads
-	pub fn items_and_threads_mut(
-		&mut self,
-	) -> (&DocMap<Item>, &mut DocMap<Thread>) {
-		(&self.items, &mut self.threads)
-	}
-
-	pub fn thread_items(
+	/// Returns all actions belonging to the given thread, sorted chronologically.
+	pub fn thread_actions(
 		&self,
 		thread_id: ThreadId,
-		items_after: Option<ItemId>,
-	) -> Result<Vec<&Item>> {
-		let thread = self.threads.get(thread_id)?;
-		match items_after {
-			Some(item_id) => thread.items_after(item_id),
-			None => thread.items(),
+		actions_after: Option<ActionId>,
+	) -> Vec<&Action> {
+		let mut actions: Vec<&Action> = self
+			.actions
+			.values()
+			.filter(|action| action.thread() == thread_id)
+			.collect();
+		actions.sort_by_key(|action| action.id());
+
+		if let Some(after) = actions_after {
+			let pos = actions
+				.iter()
+				.position(|action| action.id() == after)
+				.map(|i| i + 1)
+				.unwrap_or(0);
+			actions[pos..].to_vec()
+		} else {
+			actions
 		}
-		.into_iter()
-		.map(|item_id| self.items.get(*item_id))
-		.collect()
 	}
 }
 
@@ -88,74 +93,62 @@ impl ContextQuery<'_, '_> {
 		});
 	}
 
-	/// Insert items into the map and handle thread pushing + events.
-	/// For items that are already in the map (ie from [`PartialItemMap::apply_items`]),
-	/// use [`handle_item_changes`] directly.
-	pub fn add_items<M>(
+	/// Insert actions into the map and trigger creation/update events.
+	/// For actions already in the map (ie from [`PartialItemMap::apply_actions`]),
+	/// use [`handle_action_changes`] directly.
+	pub fn add_actions<M>(
 		&mut self,
-		items: impl XIntoIterator<M, Item>,
+		actions: impl XIntoIterator<M, Action>,
 	) -> Result<()> {
-		let mut changes = ItemChanges::default();
-		for item in items.xinto_iter() {
-			let item_id = item.id();
-			let exists = self.items.contains_key(item_id);
-			self.items.insert(item);
+		let mut changes = ActionChanges::default();
+		for action in actions.xinto_iter() {
+			let action_id = action.id();
+			let exists = self.actions.contains_key(action_id);
+			self.actions.insert(action);
 			if exists {
-				changes.modified.push(item_id);
+				changes.modified.push(action_id);
 			} else {
-				changes.created.push(item_id);
+				changes.created.push(action_id);
 			}
 		}
-		self.handle_item_changes(changes)
+		self.handle_action_changes(changes)
 	}
 
-	/// Push items to matching threads and trigger creation/update events.
-	/// Items must already exist in the item map.
-	pub fn handle_item_changes(&mut self, changes: ItemChanges) -> Result {
+	/// Trigger creation/update events for the given action changes.
+	/// Actions must already exist in the action map.
+	pub fn handle_action_changes(&mut self, changes: ActionChanges) -> Result {
 		if changes.is_empty() {
 			return Ok(());
 		}
 
-		// split borrows: items (immutable) and threads (mutable)
-		let (items, threads) = self.context_map.items_and_threads_mut();
+		for &action_id in changes.all_actions() {
+			let action = self.context_map.actions.get(action_id)?;
+			let thread_id = action.thread();
 
-		for &item_id in changes.all_items() {
-			let item = items.get(item_id)?;
-
-			// push to matching threads
-			let threads_changed = threads
-				.values_mut()
-				.xtry_filter(|thread| -> Result<bool> {
-					thread.try_push(item).xok()
-				})?
-				.into_iter()
-				.map(|thread| thread.id())
-				.collect::<Vec<_>>();
-
-			let changed_entities = self
+			let thread_entities: Vec<Entity> = self
 				.thread_query
 				.iter()
-				.filter(|(_, thread_id)| threads_changed.contains(thread_id))
+				.filter(|(_, tid)| **tid == thread_id)
 				.map(|(entity, _)| entity)
-				.collect::<Vec<_>>();
+				.collect();
 
-			let is_created = changes.created.contains(&item_id);
+			let is_created = changes.created.contains(&action_id);
 
 			if is_created {
-				self.commands.trigger(ItemCreated { item: item_id });
-				for entity in changed_entities.iter() {
-					self.commands.trigger(EntityItemCreated {
+				self.commands.trigger(ActionCreated { action: action_id });
+				for entity in thread_entities.iter() {
+					self.commands.trigger(EntityActionCreated {
 						entity: *entity,
-						item: item_id,
+						action: action_id,
 					});
 				}
 			}
 
-			self.commands.trigger(ItemUpdated { item: item_id });
-			for entity in changed_entities.iter() {
-				self.commands.trigger(EntityItemUpdated {
+			self.commands.trigger(ActionUpdated { action: action_id });
+			for entity in thread_entities.iter() {
+				self.commands.trigger(EntityActionUpdated {
 					entity: *entity,
-					item: item_id,
+					action: action_id,
 				});
 			}
 		}
@@ -164,28 +157,45 @@ impl ContextQuery<'_, '_> {
 	}
 }
 
-/// Item created event, runs before [`EntityItemCreated`] and [`ItemUpdated`]
+#[derive(Default)]
+pub struct ActionChanges {
+	pub created: Vec<ActionId>,
+	pub modified: Vec<ActionId>,
+}
+
+impl ActionChanges {
+	pub fn is_empty(&self) -> bool {
+		self.created.is_empty() && self.modified.is_empty()
+	}
+
+	/// All action ids that were either created or modified
+	pub fn all_actions(&self) -> impl Iterator<Item = &ActionId> {
+		self.created.iter().chain(self.modified.iter())
+	}
+}
+
+/// Action created event, runs before [`EntityActionCreated`] and [`ActionUpdated`]
 #[derive(Event)]
-pub struct ItemCreated {
-	pub item: ItemId,
+pub struct ActionCreated {
+	pub action: ActionId,
 }
 
-/// Item created event, runs before [`EntityItemUpdated`]
+/// Action created event, runs before [`EntityActionUpdated`]
 #[derive(EntityEvent)]
-pub struct EntityItemCreated {
+pub struct EntityActionCreated {
 	pub entity: Entity,
-	pub item: ItemId,
+	pub action: ActionId,
 }
 
 #[derive(Event)]
-pub struct ItemUpdated {
-	pub item: ItemId,
+pub struct ActionUpdated {
+	pub action: ActionId,
 }
 
 #[derive(EntityEvent)]
-pub struct EntityItemUpdated {
+pub struct EntityActionUpdated {
 	pub entity: Entity,
-	pub item: ItemId,
+	pub action: ActionId,
 }
 
 #[derive(Event)]

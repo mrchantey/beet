@@ -57,9 +57,9 @@ pub struct ModelAction {
 	instructions: Option<String>,
 	/// Providers may track the last sent id
 	previous_response_id: Option<String>,
-	/// Track which item was sent last, for skipping sent
-	/// items when a previous_response_id is used.
-	last_item_sent: Option<ItemId>,
+	/// Track which action was sent last, for skipping sent
+	/// actions when a previous_response_id is used.
+	last_action_sent: Option<ActionId>,
 	partial_items: PartialItemMap,
 }
 
@@ -71,7 +71,7 @@ impl std::fmt::Debug for ModelAction {
 			.field("stream", &self.stream)
 			.field("instructions", &self.instructions)
 			.field("previous_response_id", &self.previous_response_id)
-			.field("last_item_sent", &self.last_item_sent)
+			.field("last_action_sent", &self.last_action_sent)
 			.finish_non_exhaustive()
 	}
 }
@@ -97,12 +97,12 @@ impl ModelAction {
 			instructions: None,
 			partial_items: default(),
 			previous_response_id: None,
-			last_item_sent: None,
+			last_action_sent: None,
 		}
 	}
 
 
-	pub fn last_item_sent(&self) -> Option<ItemId> { self.last_item_sent }
+	pub fn last_action_sent(&self) -> Option<ActionId> { self.last_action_sent }
 	pub fn previous_response_id(&self) -> Option<&str> {
 		self.previous_response_id.as_deref()
 	}
@@ -174,9 +174,9 @@ impl ModelAction {
 		actor_id: ActorId,
 		thread_id: ThreadId,
 	) -> Result<openresponses::request::Input> {
-		// only provide the last item sent if last response was cached
-		let last_item_sent = if self.previous_response_id.is_some() {
-			self.last_item_sent
+		// only provide the last action sent if last response was cached
+		let last_action_sent = if self.previous_response_id.is_some() {
+			self.last_action_sent
 		} else {
 			None
 		};
@@ -186,16 +186,16 @@ impl ModelAction {
 			context_map,
 			actor_id,
 			thread_id,
-			last_item_sent,
+			last_action_sent,
 		)?;
 
-		// remember the most recent item
-		self.last_item_sent = context_map
-			.threads()
-			.get(thread_id)?
-			.items()
-			.last()
-			.cloned();
+		// remember the most recent action
+		self.last_action_sent = context_map
+			.actions()
+			.values()
+			.filter(|action| action.thread() == thread_id)
+			.max_by_key(|action| action.id())
+			.map(|action| action.id());
 
 		input.xok()
 	}
@@ -204,8 +204,9 @@ impl ModelAction {
 		&mut self,
 		context_query: &mut ContextQuery,
 		actor_id: ActorId,
+		thread_id: ThreadId,
 		response: openresponses::ResponseBody,
-		status: ItemStatus,
+		status: ActionStatus,
 	) -> Result {
 		// if let Some(prev_response_id) = response.previous_response_id {
 		// 	self.previous_response_id = Some(prev_response_id);
@@ -215,16 +216,21 @@ impl ModelAction {
 		let partial_items =
 			PartialItem::from_output_items(response.output, status);
 
-		self.handle_partial_items(context_query, actor_id, partial_items)?;
+		self.handle_partial_items(
+			context_query,
+			actor_id,
+			thread_id,
+			partial_items,
+		)?;
 
 		match status {
-			ItemStatus::Completed => {
+			ActionStatus::Completed => {
 				context_query.response_complete(response.id, false)
 			}
-			ItemStatus::Interrupted => {
+			ActionStatus::Interrupted => {
 				context_query.response_complete(response.id, true)
 			}
-			ItemStatus::InProgress => {}
+			ActionStatus::InProgress => {}
 		}
 
 		Ok(())
@@ -233,15 +239,17 @@ impl ModelAction {
 	fn handle_partial_items(
 		&mut self,
 		context_query: &mut ContextQuery,
-		owner: ActorId,
+		author: ActorId,
+		thread: ThreadId,
 		items: impl IntoIterator<Item = PartialItem>,
 	) -> Result {
-		let changes = self.partial_items.apply_items(
-			context_query.items_mut(),
-			owner,
+		let changes = self.partial_items.apply_actions(
+			context_query.actions_mut(),
+			author,
+			thread,
 			items,
 		)?;
-		context_query.handle_item_changes(changes)?;
+		context_query.handle_action_changes(changes)?;
 		Ok(())
 	}
 
@@ -249,6 +257,7 @@ impl ModelAction {
 		&mut self,
 		context_query: &mut ContextQuery,
 		owner: ActorId,
+		thread_id: ThreadId,
 		event: openresponses::StreamingEvent,
 	) -> Result<ControlFlow<()>> {
 		use openresponses::StreamingEvent::*;
@@ -259,8 +268,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::InProgress,
+					ActionStatus::InProgress,
 				)?;
 			}
 			ResponseQueued(ev) => {
@@ -268,8 +278,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::InProgress,
+					ActionStatus::InProgress,
 				)?;
 			}
 			ResponseInProgress(ev) => {
@@ -277,8 +288,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::InProgress,
+					ActionStatus::InProgress,
 				)?;
 			}
 			ResponseCompleted(ev) => {
@@ -286,8 +298,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::Completed,
+					ActionStatus::Completed,
 				)?;
 				return ControlFlow::Break(()).xok();
 			}
@@ -296,8 +309,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::Interrupted,
+					ActionStatus::Interrupted,
 				)?;
 				return ControlFlow::Break(()).xok();
 			}
@@ -306,8 +320,9 @@ impl ModelAction {
 				self.parse_response_body(
 					context_query,
 					owner,
+					thread_id,
 					ev.response,
-					ItemStatus::Interrupted,
+					ActionStatus::Interrupted,
 				)?;
 				return ControlFlow::Break(()).xok();
 			}
@@ -315,9 +330,10 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem::from_output_items(
 						item_added.item,
-						ItemStatus::InProgress,
+						ActionStatus::InProgress,
 					),
 				)?;
 			}
@@ -325,9 +341,10 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem::from_output_items(
 						item_done.item,
-						ItemStatus::Completed,
+						ActionStatus::Completed,
 					),
 				)?;
 			}
@@ -335,12 +352,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: part_added.item_id,
 							content_index: part_added.content_index,
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::ContentPart(part_added.part),
 					}
 					.xsome(),
@@ -350,12 +368,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: part_done.item_id,
 							content_index: part_done.content_index,
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::ContentPart(part_done.part),
 					}
 					.xsome(),
@@ -365,12 +384,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: text_delta.item_id,
 							content_index: text_delta.content_index,
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::Delta(text_delta.delta),
 					}
 					.xsome(),
@@ -380,12 +400,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: text_done.item_id,
 							content_index: text_done.content_index,
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::TextDone {
 							text: text_done.text,
 							logprobs: text_done.logprobs,
@@ -399,12 +420,13 @@ impl ModelAction {
 					self.handle_partial_items(
 						context_query,
 						owner,
+						thread_id,
 						PartialItem {
 							key: PartialItemKey::Content {
 								responses_id: annotation_added.item_id,
 								content_index: annotation_added.content_index,
 							},
-							status: ItemStatus::InProgress,
+							status: ActionStatus::InProgress,
 							content: PartialContent::AnnotationAdded {
 								annotation,
 								annotation_index: annotation_added
@@ -421,12 +443,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: refusal_delta.item_id,
 							content_index: refusal_delta.content_index,
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::Delta(refusal_delta.delta),
 					}
 					.xsome(),
@@ -436,12 +459,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: refusal_done.item_id,
 							content_index: refusal_done.content_index,
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::RefusalDone {
 							refusal: refusal_done.refusal,
 						},
@@ -453,12 +477,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: reasoning_delta.item_id,
 							content_index: reasoning_delta.content_index,
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::Delta(reasoning_delta.delta),
 					}
 					.xsome(),
@@ -468,12 +493,13 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Content {
 							responses_id: reasoning_done.item_id,
 							content_index: reasoning_done.content_index,
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::ReasoningDone {
 							content: reasoning_done.text,
 						},
@@ -485,6 +511,7 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_delta.item_id,
@@ -492,7 +519,7 @@ impl ModelAction {
 								.summary_index
 								.unwrap_or(0),
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::Delta(summary_delta.delta),
 					}
 					.xsome(),
@@ -502,6 +529,7 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
@@ -509,7 +537,7 @@ impl ModelAction {
 								.summary_index
 								.unwrap_or(0),
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::ReasoningSummary(
 							summary_done.text,
 						),
@@ -521,6 +549,7 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_added.item_id,
@@ -528,7 +557,7 @@ impl ModelAction {
 								.summary_index
 								.unwrap_or(0),
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::ContentPart(
 							summary_added.part,
 						),
@@ -540,6 +569,7 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
@@ -547,7 +577,7 @@ impl ModelAction {
 								.summary_index
 								.unwrap_or(0),
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::ContentPart(summary_done.part),
 					}
 					.xsome(),
@@ -557,11 +587,12 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Single {
 							responses_id: arguments_delta.item_id,
 						},
-						status: ItemStatus::InProgress,
+						status: ActionStatus::InProgress,
 						content: PartialContent::Delta(arguments_delta.delta),
 					}
 					.xsome(),
@@ -571,11 +602,12 @@ impl ModelAction {
 				self.handle_partial_items(
 					context_query,
 					owner,
+					thread_id,
 					PartialItem {
 						key: PartialItemKey::Single {
 							responses_id: arguments_done.item_id,
 						},
-						status: ItemStatus::Completed,
+						status: ActionStatus::Completed,
 						content: PartialContent::FunctionCallArgumentsDone(
 							arguments_done.arguments,
 						),
@@ -650,23 +682,24 @@ fn build_request(
 fn handle_response(
 	In((entity, response)): In<(Entity, openresponses::ResponseBody)>,
 	mut context_query: ContextQuery,
-	mut query: Query<(&ActorId, &mut ModelAction)>,
+	mut query: Query<(&ActorId, &ThreadId, &mut ModelAction)>,
 ) -> Result {
-	let (actor_id, mut model_action) = query.get_mut(entity)?;
+	let (actor_id, thread_id, mut model_action) = query.get_mut(entity)?;
 	model_action.parse_response_body(
 		&mut context_query,
 		*actor_id,
+		*thread_id,
 		response,
-		ItemStatus::Completed,
+		ActionStatus::Completed,
 	)
 }
 fn handle_event(
 	In((entity, event)): In<(Entity, openresponses::StreamingEvent)>,
 	mut context_query: ContextQuery,
-	mut query: Query<(&ActorId, &mut ModelAction)>,
+	mut query: Query<(&ActorId, &ThreadId, &mut ModelAction)>,
 ) -> Result<ControlFlow<()>> {
-	let (actor_id, mut model_action) = query.get_mut(entity)?;
-	model_action.handle_event(&mut context_query, *actor_id, event)
+	let (actor_id, thread_id, mut model_action) = query.get_mut(entity)?;
+	model_action.handle_event(&mut context_query, *actor_id, *thread_id, event)
 }
 
 

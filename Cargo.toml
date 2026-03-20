@@ -230,7 +230,7 @@ default = ["node"]
 http_server = ["net", "tool","stack", "beet_net/server"]
 tui_server = ["tui","stack", "markdown"]
 stdio_server = ["stack", "markdown"]
-
+ansi_paint = ["beet_core/ansi_paint"]
 # 💡 Core
 
 serde = ["beet_core/serde", "beet_net?/serde"]
@@ -340,7 +340,7 @@ beet_stack = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["rng-getrandom"] }
 
 [dev-dependencies]
-# beet = { path = ".", features = ["flow"] }
+beet = { path = ".", features = ["ansi_paint"] }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }

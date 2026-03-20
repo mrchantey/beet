@@ -6,57 +6,65 @@ use beet_net::prelude::Url;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub type ItemId = Uuid7<Item>;
+pub type ActionId = Uuid7<Action>;
 
+/// An action performed by an actor on a thread.
+///
 /// Note that MessageRole is not stored
 /// as this is relative to the Actor.
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-pub struct Item {
-	id: ItemId,
-	/// The actor that created this item, used for attribution and scoping.
-	owner: ActorId,
-	status: ItemStatus,
+pub struct Action {
+	id: ActionId,
+	/// The actor that created this action.
+	author: ActorId,
+	thread: ThreadId,
+	status: ActionStatus,
 	/// For function calls this is the time the call was completed.
 	created: Timestamp,
-	content: Content,
+	payload: ActionPayload,
 }
 
-impl Document for Item {
-	type Id = ItemId;
+impl Document for Action {
+	type Id = ActionId;
 	fn id(&self) -> Self::Id { self.id }
 }
 
 
-impl Item {
+impl Action {
 	pub fn new(
-		owner: ActorId,
-		status: ItemStatus,
-		content: impl Into<Content>,
+		author: ActorId,
+		thread: ThreadId,
+		status: ActionStatus,
+		payload: impl Into<ActionPayload>,
 	) -> Self {
 		Self {
 			id: Uuid7::new_now(),
-			owner,
+			author,
+			thread,
 			status,
-			content: content.into(),
+			payload: payload.into(),
 			created: Timestamp::now(),
 		}
 	}
-	pub fn owner(&self) -> ActorId { self.owner }
+	pub fn author(&self) -> ActorId { self.author }
+	pub fn thread(&self) -> ThreadId { self.thread }
 	pub fn created(&self) -> Timestamp { self.created }
-	pub fn content(&self) -> &Content { &self.content }
-	pub(super) fn set_status(&mut self, status: ItemStatus) {
+	pub fn payload(&self) -> &ActionPayload { &self.payload }
+	pub(super) fn set_status(&mut self, status: ActionStatus) {
 		self.status = status;
 	}
 	pub fn hash(&self) -> u64 {
 		use std::hash::Hash;
 		use std::hash::Hasher;
 		let mut hasher = std::collections::hash_map::DefaultHasher::new();
-		self.content.hash(&mut hasher);
+		self.payload.hash(&mut hasher);
 		hasher.finish()
 	}
-	pub(super) fn content_mut(&mut self) -> &mut Content { &mut self.content }
+	pub(super) fn payload_mut(&mut self) -> &mut ActionPayload {
+		&mut self.payload
+	}
 }
 
 #[derive(
@@ -85,6 +93,11 @@ impl Timestamp {
 	}
 	pub fn unix_epoch_elapsed(&self) -> Duration { self.0 }
 }
+
+impl Default for Timestamp {
+	fn default() -> Self { Self(Duration::ZERO) }
+}
+
 #[derive(
 	Debug,
 	Clone,
@@ -97,7 +110,7 @@ impl Timestamp {
 	Serialize,
 	Deserialize,
 )]
-pub enum ItemStatus {
+pub enum ActionStatus {
 	Completed,
 	Interrupted,
 	InProgress,
@@ -106,7 +119,7 @@ pub enum ItemStatus {
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-pub enum Content {
+pub enum ActionPayload {
 	Text(TextItem),
 	Refusal(RefusalItem),
 	ReasoningSummary(ReasoningSummaryItem),
@@ -117,17 +130,17 @@ pub enum Content {
 	FunctionCallOutput(FunctionCallOutputItem),
 }
 
-impl Content {
-	pub fn kind(&self) -> ItemKind {
+impl ActionPayload {
+	pub fn kind(&self) -> ActionKind {
 		match self {
-			Self::Text(_) => ItemKind::Text,
-			Self::Refusal(_) => ItemKind::Refusal,
-			Self::ReasoningSummary(_) => ItemKind::ReasoningSummary,
-			Self::ReasoningContent(_) => ItemKind::ReasoningContent,
-			Self::Url(_) => ItemKind::Url,
-			Self::Bytes(_) => ItemKind::Media,
-			Self::FunctionCall(_) => ItemKind::FunctionCall,
-			Self::FunctionCallOutput(_) => ItemKind::FunctionCallOutput,
+			Self::Text(_) => ActionKind::Text,
+			Self::Refusal(_) => ActionKind::Refusal,
+			Self::ReasoningSummary(_) => ActionKind::ReasoningSummary,
+			Self::ReasoningContent(_) => ActionKind::ReasoningContent,
+			Self::Url(_) => ActionKind::Url,
+			Self::Bytes(_) => ActionKind::Media,
+			Self::FunctionCall(_) => ActionKind::FunctionCall,
+			Self::FunctionCallOutput(_) => ActionKind::FunctionCallOutput,
 		}
 	}
 	pub fn to_string(&self) -> String {
@@ -161,61 +174,61 @@ impl Content {
 	}
 }
 
-impl std::fmt::Display for Content {
+impl std::fmt::Display for ActionPayload {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.to_string())
 	}
 }
 
-impl From<&str> for Content {
+impl From<&str> for ActionPayload {
 	fn from(text_content: &str) -> Self {
 		Self::Text(TextItem(text_content.to_string()))
 	}
 }
-impl From<String> for Content {
+impl From<String> for ActionPayload {
 	fn from(text_content: String) -> Self { Self::Text(TextItem(text_content)) }
 }
-impl<'a> From<Cow<'a, String>> for Content {
+impl<'a> From<Cow<'a, String>> for ActionPayload {
 	fn from(text_content: Cow<'a, String>) -> Self {
 		Self::Text(TextItem(text_content.to_string()))
 	}
 }
 
-impl From<TextItem> for Content {
+impl From<TextItem> for ActionPayload {
 	fn from(text_content: TextItem) -> Self { Self::Text(text_content) }
 }
 
-impl From<RefusalItem> for Content {
+impl From<RefusalItem> for ActionPayload {
 	fn from(refusal_content: RefusalItem) -> Self {
 		Self::Refusal(refusal_content)
 	}
 }
 
-impl From<ReasoningSummaryItem> for Content {
+impl From<ReasoningSummaryItem> for ActionPayload {
 	fn from(reasoning_summary: ReasoningSummaryItem) -> Self {
 		Self::ReasoningSummary(reasoning_summary)
 	}
 }
 
-impl From<ReasoningContentItem> for Content {
+impl From<ReasoningContentItem> for ActionPayload {
 	fn from(reasoning_content: ReasoningContentItem) -> Self {
 		Self::ReasoningContent(reasoning_content)
 	}
 }
 
-impl From<UrlItem> for Content {
+impl From<UrlItem> for ActionPayload {
 	fn from(file_content: UrlItem) -> Self { Self::Url(file_content) }
 }
-impl From<BytesItem> for Content {
+impl From<BytesItem> for ActionPayload {
 	fn from(bytes_content: BytesItem) -> Self { Self::Bytes(bytes_content) }
 }
-impl From<FunctionCallItem> for Content {
+impl From<FunctionCallItem> for ActionPayload {
 	fn from(function_call: FunctionCallItem) -> Self {
 		Self::FunctionCall(function_call)
 	}
 }
 
-impl From<FunctionCallOutputItem> for Content {
+impl From<FunctionCallOutputItem> for ActionPayload {
 	fn from(function_call_output: FunctionCallOutputItem) -> Self {
 		Self::FunctionCallOutput(function_call_output)
 	}
@@ -224,7 +237,7 @@ impl From<FunctionCallOutputItem> for Content {
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-pub enum ItemKind {
+pub enum ActionKind {
 	Text,
 	Refusal,
 	ReasoningSummary,
@@ -236,19 +249,19 @@ pub enum ItemKind {
 	FunctionCallOutput,
 }
 
-impl ItemKind {
-	pub fn non_display_kinds() -> Vec<Self> {
-		vec![
-			// TODO ollama swap reasoning and content
-			Self::ReasoningSummary,
-			Self::ReasoningContent,
-			Self::ReasoningEncryptedContent,
-			Self::FunctionCall,
-			Self::FunctionCallOutput,
-		]
-	}
-	pub fn display_kinds() -> Vec<Self> {
-		vec![Self::ReasoningContent, Self::Media, Self::Url]
+impl ActionKind {
+	/// whether this action is the kind that is
+	/// usually presented to users.
+	pub fn is_display(&self) -> bool {
+		matches!(
+			self,
+			Self::Text
+				| Self::Refusal
+				| Self::ReasoningSummary
+				// | Self::ReasoningContent
+				| Self::Media
+				| Self::Url
+		)
 	}
 }
 
@@ -406,7 +419,7 @@ impl FunctionCallItem {
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct FunctionCallOutputItem {
-	pub function_call_item: ItemId,
+	pub function_call_item: ActionId,
 	/// The JSON string that was output from the tool call.
 	/// Note that this should always be sent as a FunctionOutputContent::Text,
 	/// regardless of if this text is json, raw text, files etc. The only purpose
@@ -417,6 +430,6 @@ pub struct FunctionCallOutputItem {
 }
 
 impl FunctionCallOutputItem {
-	pub fn function_call_item(&self) -> ItemId { self.function_call_item }
+	pub fn function_call_item(&self) -> ActionId { self.function_call_item }
 	pub fn output(&self) -> &str { &self.output }
 }

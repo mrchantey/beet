@@ -194,5 +194,5 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["testing"] }
+beet_core = {path = ".", features=["ansi_paint", "testing"] }
 # beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}

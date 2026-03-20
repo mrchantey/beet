@@ -21,11 +21,11 @@ use serde::Serialize;
 #[derive(Debug, Default)]
 pub struct PartialItemMap {
 	annotation_inliner: AnnotationInliner,
-	/// Map an openresponses call id to an [`ItemId`]
-	call_id_to_item_id: HashMap<String, ItemId>,
-	item_id_to_call_id: HashMap<ItemId, String>,
-	/// Map partial item keys to the created [`ItemId`]
-	item_key_map: HashMap<PartialItemKey, ItemId>,
+	/// Map an openresponses call id to an [`ActionId`]
+	call_id_to_action_id: HashMap<String, ActionId>,
+	action_id_to_call_id: HashMap<ActionId, String>,
+	/// Map partial item keys to the created [`ActionId`]
+	action_key_map: HashMap<PartialItemKey, ActionId>,
 }
 
 impl PartialItemMap {
@@ -43,32 +43,32 @@ impl PartialItemMap {
 	// Call ID mapping
 	// ═══════════════════════════════════════════════════════════════════════
 
-	fn set_call_id(&mut self, item_id: ItemId, call_id: String) -> Result {
-		if self.item_id_to_call_id.contains_key(&item_id) {
-			bevybail!("item_id {item_id} already has a call_id");
-		} else if self.call_id_to_item_id.contains_key(&call_id) {
-			bevybail!("call_id {call_id} already has an item_id");
+	fn set_call_id(&mut self, action_id: ActionId, call_id: String) -> Result {
+		if self.action_id_to_call_id.contains_key(&action_id) {
+			bevybail!("action_id {action_id} already has a call_id");
+		} else if self.call_id_to_action_id.contains_key(&call_id) {
+			bevybail!("call_id {call_id} already has an action_id");
 		}
-		self.call_id_to_item_id.insert(call_id.clone(), item_id);
-		self.item_id_to_call_id.insert(item_id, call_id);
+		self.call_id_to_action_id.insert(call_id.clone(), action_id);
+		self.action_id_to_call_id.insert(action_id, call_id);
 		Ok(())
 	}
 
-	fn get_call_id(&self, item_id: ItemId) -> Result<String> {
-		self.item_id_to_call_id
-			.get(&item_id)
+	fn get_call_id(&self, action_id: ActionId) -> Result<String> {
+		self.action_id_to_call_id
+			.get(&action_id)
 			.cloned()
 			.ok_or_else(|| {
-				bevyhow!("no call_id registered for item_id {item_id}")
+				bevyhow!("no call_id registered for action_id {action_id}")
 			})
 	}
 
-	fn get_item_id_for_call(&self, call_id: &str) -> Result<ItemId> {
-		self.call_id_to_item_id
+	fn get_action_id_for_call(&self, call_id: &str) -> Result<ActionId> {
+		self.call_id_to_action_id
 			.get(call_id)
 			.cloned()
 			.ok_or_else(|| {
-				bevyhow!("no item_id registered for call_id {call_id}")
+				bevyhow!("no action_id registered for call_id {call_id}")
 			})
 	}
 
@@ -79,24 +79,24 @@ impl PartialItemMap {
 	fn set_response_item(
 		&mut self,
 		key: PartialItemKey,
-		item_id: ItemId,
+		action_id: ActionId,
 	) -> Result {
-		if self.item_key_map.contains_key(&key) {
-			bevybail!("item_key_map already has an entry for key {key:?}");
+		if self.action_key_map.contains_key(&key) {
+			bevybail!("action_key_map already has an entry for key {key:?}");
 		} else {
-			self.item_key_map.insert(key, item_id);
+			self.action_key_map.insert(key, action_id);
 		}
 		Ok(())
 	}
 
-	pub fn get_response_item(&self, key: &PartialItemKey) -> Result<ItemId> {
-		self.item_key_map.get(key).cloned().ok_or_else(|| {
-			bevyhow!("no item_id registered for responses item key {key:?}")
+	pub fn get_response_item(&self, key: &PartialItemKey) -> Result<ActionId> {
+		self.action_key_map.get(key).cloned().ok_or_else(|| {
+			bevyhow!("no action_id registered for responses item key {key:?}")
 		})
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// Input building - converts our items to openresponses input format
+	// Input building - converts our actions to openresponses input format
 	// ═══════════════════════════════════════════════════════════════════════
 
 	pub fn build_input(
@@ -104,39 +104,49 @@ impl PartialItemMap {
 		map: &ContextMap,
 		agent_id: ActorId,
 		thread_id: ThreadId,
-		last_sent_item: Option<ItemId>,
+		last_sent_action: Option<ActionId>,
 	) -> Result<openresponses::request::Input> {
-		let thread = map.threads().get(thread_id)?;
+		// collect and sort action ids for this thread (uuid7 = chronological)
+		let mut action_ids: Vec<ActionId> = map
+			.actions()
+			.values()
+			.filter(|action| action.thread() == thread_id)
+			.map(|action| action.id())
+			.collect();
+		action_ids.sort();
 
-		let items = if let Some(last_sent_item) = last_sent_item {
-			thread.items_after(last_sent_item)
+		let action_ids = if let Some(last_sent) = last_sent_action {
+			match action_ids.binary_search(&last_sent) {
+				Ok(i) => action_ids[i + 1..].to_vec(),
+				Err(i) => action_ids[i..].to_vec(),
+			}
 		} else {
-			thread.items()
+			action_ids
 		};
 
-		// threads are strictly already chronologically sorted by uuidv7
-		let items = items.into_iter().xtry_map(|item_id| {
-			self.into_openresponses_input(map, agent_id, *item_id)
+		// actions are strictly already chronologically sorted by uuidv7
+		let items = action_ids.into_iter().xtry_map(|action_id| {
+			self.into_openresponses_input(map, agent_id, action_id)
 		})?;
 
 		Input::Items(items).xok()
 	}
 
-	/// Map an item to an openresponses input, relative to a given actor.
+	/// Map an action to an openresponses input, relative to a given actor.
 	/// The provided actor is used to correctly assign [`MessageRole::Assistant`]
 	/// for 'self' messages, and [`MessageRole::User`] for all others.
 	fn into_openresponses_input(
 		&self,
 		map: &ContextMap,
 		agent_id: ActorId,
-		item_id: ItemId,
+		action_id: ActionId,
 	) -> Result<openresponses::request::InputItem> {
-		let item = map.items().get(item_id)?;
-		let owner = map.actors().get(item.owner())?;
-		let role = item_message_role(agent_id, owner);
+		let action = map.actions().get(action_id)?;
+		let author = map.actors().get(action.author())?;
+		let role = message_role(agent_id, author);
 
-		let input_item = match item.content() {
-			Content::Text(TextItem(value)) => {
+		let input_item = match action.payload() {
+			ActionPayload::Text(TextItem(value)) => {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
@@ -144,7 +154,7 @@ impl PartialItemMap {
 					status: None,
 				})
 			}
-			Content::Refusal(RefusalItem(value)) => {
+			ActionPayload::Refusal(RefusalItem(value)) => {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
@@ -152,7 +162,7 @@ impl PartialItemMap {
 					status: None,
 				})
 			}
-			Content::ReasoningSummary(ReasoningSummaryItem(value)) => {
+			ActionPayload::ReasoningSummary(ReasoningSummaryItem(value)) => {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
@@ -160,7 +170,7 @@ impl PartialItemMap {
 					status: None,
 				})
 			}
-			Content::ReasoningContent(ReasoningContentItem(value)) => {
+			ActionPayload::ReasoningContent(ReasoningContentItem(value)) => {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
@@ -168,7 +178,7 @@ impl PartialItemMap {
 					status: None,
 				})
 			}
-			Content::Url(url_item) => InputItem::Message(MessageParam {
+			ActionPayload::Url(url_item) => InputItem::Message(MessageParam {
 				id: None,
 				role,
 				content: MessageContent::Parts(vec![ContentPart::InputFile(
@@ -180,28 +190,30 @@ impl PartialItemMap {
 				)]),
 				status: None,
 			}),
-			Content::Bytes(bytes_item) => InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputFile(
-					openresponses::InputFile {
-						filename: Some(bytes_item.filename()),
-						file_data: Some(bytes_item.bytes_base64()),
-						file_url: None,
-					},
-				)]),
-				status: None,
-			}),
-			Content::FunctionCall(function_call) => {
+			ActionPayload::Bytes(bytes_item) => {
+				InputItem::Message(MessageParam {
+					id: None,
+					role,
+					content: MessageContent::Parts(vec![
+						ContentPart::InputFile(openresponses::InputFile {
+							filename: Some(bytes_item.filename()),
+							file_data: Some(bytes_item.bytes_base64()),
+							file_url: None,
+						}),
+					]),
+					status: None,
+				})
+			}
+			ActionPayload::FunctionCall(function_call) => {
 				InputItem::FunctionCall(FunctionCallParam {
 					id: None,
-					call_id: self.get_call_id(item.id())?,
+					call_id: self.get_call_id(action.id())?,
 					name: function_call.function_name().to_string(),
 					arguments: function_call.args().to_string(),
 					status: None,
 				})
 			}
-			Content::FunctionCallOutput(output_item) => {
+			ActionPayload::FunctionCallOutput(output_item) => {
 				InputItem::FunctionCallOutput(FunctionCallOutputParam {
 					id: None,
 					call_id: self
@@ -217,19 +229,20 @@ impl PartialItemMap {
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// Output parsing - converts partial items into our item format
+	// Output parsing - converts partial items into our action format
 	// ═══════════════════════════════════════════════════════════════════════
 
-	/// Apply a stream of partial items against the item map, producing
-	/// [`ItemChanges`] describing what was created or modified.
-	/// Also registers call_id and response_item mappings for new items.
-	pub fn apply_items(
+	/// Apply a stream of partial items against the action map, producing
+	/// [`ActionChanges`] describing what was created or modified.
+	/// Also registers call_id and response_item mappings for new actions.
+	pub fn apply_actions(
 		&mut self,
-		item_map: &mut DocMap<Item>,
-		owner: ActorId,
+		action_map: &mut DocMap<Action>,
+		author: ActorId,
+		thread: ThreadId,
 		partial_items: impl IntoIterator<Item = PartialItem>,
-	) -> Result<ItemChanges> {
-		let mut changes = ItemChanges::default();
+	) -> Result<ActionChanges> {
+		let mut changes = ActionChanges::default();
 		for partial_item in partial_items {
 			let PartialItem {
 				key,
@@ -245,45 +258,49 @@ impl PartialItemMap {
 				_ => None,
 			};
 
-			if let Some(&item_id) = self.item_key_map.get(&key) {
-				// item already exists, update it in place
-				let item = item_map.get_mut(item_id)?;
-				let before_mutation = item.hash();
+			if let Some(&action_id) = self.action_key_map.get(&key) {
+				// action already exists, update it in place
+				let action = action_map.get_mut(action_id)?;
+				let before_mutation = action.hash();
 
-				item.set_status(status);
-				self.apply_partial_content(&key, content, item.content_mut())?;
-				let after_mutation = item.hash();
+				action.set_status(status);
+				self.apply_partial_content(
+					&key,
+					content,
+					action.payload_mut(),
+				)?;
+				let after_mutation = action.hash();
 				if before_mutation != after_mutation {
-					changes.modified.push(item_id);
+					changes.modified.push(action_id);
 					// discard already registered error on updates
 					if let Some(call_id) = call_id {
-						let _ = self.set_call_id(item_id, call_id);
+						let _ = self.set_call_id(action_id, call_id);
 					}
 				}
 			} else {
-				// create new item
-				let content =
-					self.partial_content_into_content(&key, content)?;
-				let item = Item::new(owner, status, content);
-				let item_id = item.id();
+				// create new action
+				let payload =
+					self.partial_content_into_payload(&key, content)?;
+				let action = Action::new(author, thread, status, payload);
+				let action_id = action.id();
 
-				// register response key -> item id
-				self.set_response_item(key, item_id)?;
+				// register response key -> action id
+				self.set_response_item(key, action_id)?;
 
 				// register call_id mapping for function calls
 				if let Some(call_id) = call_id {
-					self.set_call_id(item_id, call_id)?;
+					self.set_call_id(action_id, call_id)?;
 				}
 
-				changes.created.push(item_id);
-				item_map.insert(item);
+				changes.created.push(action_id);
+				action_map.insert(action);
 			}
 		}
 		changes.xok()
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// Content conversion helpers using the annotation inliner
+	// Payload conversion helpers using the annotation inliner
 	// ═══════════════════════════════════════════════════════════════════════
 
 	fn inline_output_text_annotations(
@@ -295,15 +312,15 @@ impl PartialItemMap {
 			.inline_annotations(text, annotations)
 	}
 
-	/// Convert a [`PartialContent`] into a finalized [`Content`], inlining
+	/// Convert a [`PartialContent`] into a finalized [`ActionPayload`], inlining
 	/// annotations as markdown where appropriate.
 	/// The key is used to disambiguate content types for generic variants
 	/// like [`PartialContent::Delta`].
-	fn partial_content_into_content(
+	fn partial_content_into_payload(
 		&self,
 		key: &PartialItemKey,
 		partial: PartialContent,
-	) -> Result<Content> {
+	) -> Result<ActionPayload> {
 		match partial {
 			PartialContent::OutputContent(OutputContent::OutputText(t)) => {
 				let text = if t.annotations.is_empty() {
@@ -314,13 +331,13 @@ impl PartialItemMap {
 						&t.annotations,
 					)
 				};
-				Content::Text(TextItem(text))
+				ActionPayload::Text(TextItem(text))
 			}
 			PartialContent::OutputContent(OutputContent::Refusal(r)) => {
-				Content::Refusal(RefusalItem(r.refusal))
+				ActionPayload::Refusal(RefusalItem(r.refusal))
 			}
 			PartialContent::ContentPart(ContentPart::InputText(t)) => {
-				Content::Text(TextItem(t.text))
+				ActionPayload::Text(TextItem(t.text))
 			}
 			PartialContent::ContentPart(ContentPart::OutputText(t)) => {
 				let text = if t.annotations.is_empty() {
@@ -331,26 +348,26 @@ impl PartialItemMap {
 						&t.annotations,
 					)
 				};
-				Content::Text(TextItem(text))
+				ActionPayload::Text(TextItem(text))
 			}
 			PartialContent::ContentPart(ContentPart::Refusal(r)) => {
-				Content::Refusal(RefusalItem(r.refusal))
+				ActionPayload::Refusal(RefusalItem(r.refusal))
 			}
 			PartialContent::ContentPart(ContentPart::ReasoningText(r)) => {
-				Content::ReasoningContent(ReasoningContentItem(r.text))
+				ActionPayload::ReasoningContent(ReasoningContentItem(r.text))
 			}
 			PartialContent::ContentPart(ContentPart::SummaryText(s)) => {
-				Content::ReasoningSummary(ReasoningSummaryItem(s.text))
+				ActionPayload::ReasoningSummary(ReasoningSummaryItem(s.text))
 			}
 			PartialContent::ContentPart(ContentPart::InputImage(img)) => {
-				Content::Url(UrlItem {
+				ActionPayload::Url(UrlItem {
 					file_stem: None,
 					media_type: MediaType::from_path(&img.image_url),
 					url: img.image_url.into(),
 				})
 			}
 			PartialContent::ContentPart(ContentPart::InputVideo(vid)) => {
-				Content::Url(UrlItem {
+				ActionPayload::Url(UrlItem {
 					file_stem: None,
 					media_type: MediaType::Mp4,
 					url: vid.video_url.into(),
@@ -369,7 +386,7 @@ impl PartialItemMap {
 						.map(|s| s.to_string())
 				});
 				if let Some(url) = file.file_url {
-					Content::Url(UrlItem {
+					ActionPayload::Url(UrlItem {
 						file_stem,
 						media_type,
 						url: url.into(),
@@ -378,8 +395,12 @@ impl PartialItemMap {
 					use base64::Engine;
 					let bytes = base64::prelude::BASE64_STANDARD
 						.decode(&data)
-						.map_err(|err| bevyhow!("Failed to decode base64 file data: {err}"))?;
-					Content::Bytes(BytesItem {
+						.map_err(|err| {
+							bevyhow!(
+								"Failed to decode base64 file data: {err}"
+							)
+						})?;
+					ActionPayload::Bytes(BytesItem {
 						file_stem,
 						media_type,
 						bytes,
@@ -388,77 +409,86 @@ impl PartialItemMap {
 					bevybail!("InputFile has neither file_url nor file_data")
 				}
 			}
-			PartialContent::FunctionCall { name, arguments, call_id: _ } => {
-				Content::FunctionCall(FunctionCallItem { name, arguments })
-			}
+			PartialContent::FunctionCall {
+				name,
+				arguments,
+				call_id: _,
+			} => ActionPayload::FunctionCall(FunctionCallItem {
+				name,
+				arguments,
+			}),
 			PartialContent::FunctionCallOutput { call_id, output } => {
-				// resolve call_id to item_id
+				// resolve call_id to action_id
 				let function_call_item =
-					self.get_item_id_for_call(&call_id)?;
-				Content::FunctionCallOutput(FunctionCallOutputItem {
+					self.get_action_id_for_call(&call_id)?;
+				ActionPayload::FunctionCallOutput(FunctionCallOutputItem {
 					function_call_item,
 					output,
 				})
 			}
 			PartialContent::ReasoningContent(text) => {
-				Content::ReasoningContent(ReasoningContentItem(text))
+				ActionPayload::ReasoningContent(ReasoningContentItem(text))
 			}
 			PartialContent::ReasoningSummary(text) => {
-				Content::ReasoningSummary(ReasoningSummaryItem(text))
+				ActionPayload::ReasoningSummary(ReasoningSummaryItem(text))
 			}
 			PartialContent::Delta(delta) => {
-				// during streaming, a delta may arrive before the item
+				// during streaming, a delta may arrive before the action
 				// is created (eg OutputTextDelta before OutputItemAdded
-				// has content). Use the key to determine the content type.
+				// has content). Use the key to determine the payload type.
 				match key {
 					PartialItemKey::ReasoningSummary { .. } => {
-						Content::ReasoningSummary(ReasoningSummaryItem(delta))
+						ActionPayload::ReasoningSummary(
+							ReasoningSummaryItem(delta),
+						)
 					}
 					PartialItemKey::Single { .. } => {
 						// single-key items are function calls
-						Content::FunctionCall(FunctionCallItem {
+						ActionPayload::FunctionCall(FunctionCallItem {
 							name: String::new(),
 							arguments: delta,
 						})
 					}
 					PartialItemKey::Content { .. } => {
 						// default to text for content-keyed deltas
-						Content::Text(TextItem(delta))
+						ActionPayload::Text(TextItem(delta))
 					}
 				}
 			}
 			PartialContent::TextDone { text, .. } => {
-				Content::Text(TextItem(text))
+				ActionPayload::Text(TextItem(text))
 			}
 			PartialContent::RefusalDone { refusal } => {
-				Content::Refusal(RefusalItem(refusal))
+				ActionPayload::Refusal(RefusalItem(refusal))
 			}
 			PartialContent::ReasoningDone { content } => {
-				Content::ReasoningContent(ReasoningContentItem(content))
+				ActionPayload::ReasoningContent(ReasoningContentItem(content))
 			}
 			PartialContent::AnnotationAdded { .. } => {
-				bevybail!("Cannot create content from an annotation event alone")
+				bevybail!(
+					"Cannot create payload from an annotation event alone"
+				)
 			}
 			PartialContent::FunctionCallArgumentsDone(_) => {
-				bevybail!("Cannot create content from FunctionCallArgumentsDone without name and call_id context")
+				bevybail!("Cannot create payload from FunctionCallArgumentsDone without name and call_id context")
 			}
 		}
 		.xok()
 	}
 
-	/// Apply a [`PartialContent`] to an existing [`Content`], mutating
+	/// Apply a [`PartialContent`] to an existing [`ActionPayload`], mutating
 	/// it in place. Handles deltas, replacements, and annotation inlining.
 	fn apply_partial_content(
 		&mut self,
 		key: &PartialItemKey,
 		partial: PartialContent,
-		content: &mut Content,
+		payload: &mut ActionPayload,
 	) -> Result {
-		match (partial, content) {
-			// OutputContent replaces matching content wholesale
+		match (partial, payload) {
+			// OutputContent replaces matching payload wholesale
 			(
 				PartialContent::OutputContent(OutputContent::OutputText(t)),
-				Content::Text(item),
+				ActionPayload::Text(item),
 			) => {
 				item.0 = if t.annotations.is_empty() {
 					t.text
@@ -468,20 +498,20 @@ impl PartialItemMap {
 			}
 			(
 				PartialContent::OutputContent(OutputContent::Refusal(r)),
-				Content::Refusal(item),
+				ActionPayload::Refusal(item),
 			) => {
 				item.0 = r.refusal;
 			}
-			// ContentPart replaces matching content wholesale
+			// ContentPart replaces matching payload wholesale
 			(
 				PartialContent::ContentPart(ContentPart::InputText(t)),
-				Content::Text(item),
+				ActionPayload::Text(item),
 			) => {
 				item.0 = t.text;
 			}
 			(
 				PartialContent::ContentPart(ContentPart::OutputText(t)),
-				Content::Text(item),
+				ActionPayload::Text(item),
 			) => {
 				item.0 = if t.annotations.is_empty() {
 					t.text
@@ -491,19 +521,19 @@ impl PartialItemMap {
 			}
 			(
 				PartialContent::ContentPart(ContentPart::Refusal(r)),
-				Content::Refusal(item),
+				ActionPayload::Refusal(item),
 			) => {
 				item.0 = r.refusal;
 			}
 			(
 				PartialContent::ContentPart(ContentPart::ReasoningText(r)),
-				Content::ReasoningContent(item),
+				ActionPayload::ReasoningContent(item),
 			) => {
 				item.0 = r.text;
 			}
 			(
 				PartialContent::ContentPart(ContentPart::SummaryText(s)),
-				Content::ReasoningSummary(item),
+				ActionPayload::ReasoningSummary(item),
 			) => {
 				item.0 = s.text;
 			}
@@ -514,7 +544,7 @@ impl PartialItemMap {
 					arguments,
 					call_id: _,
 				},
-				Content::FunctionCall(item),
+				ActionPayload::FunctionCall(item),
 			) => {
 				item.name = name;
 				item.arguments = arguments;
@@ -522,67 +552,79 @@ impl PartialItemMap {
 			// FunctionCallOutput updates the output string and resolves call_id
 			(
 				PartialContent::FunctionCallOutput { output, call_id },
-				Content::FunctionCallOutput(item),
+				ActionPayload::FunctionCallOutput(item),
 			) => {
 				item.output = output;
 				// update the function_call_item reference if possible
-				if let Ok(fc_item_id) = self.get_item_id_for_call(&call_id) {
-					item.function_call_item = fc_item_id;
+				if let Ok(action_id) = self.get_action_id_for_call(&call_id) {
+					item.function_call_item = action_id;
 				}
 			}
 			// ReasoningContent/Summary replace in place
 			(
 				PartialContent::ReasoningContent(text),
-				Content::ReasoningContent(item),
+				ActionPayload::ReasoningContent(item),
 			) => {
 				item.0 = text;
 			}
 			(
 				PartialContent::ReasoningSummary(text),
-				Content::ReasoningSummary(item),
+				ActionPayload::ReasoningSummary(item),
 			) => {
 				item.0 = text;
 			}
-			// Deltas append to the appropriate content type
-			(PartialContent::Delta(delta), Content::Text(item)) => {
+			// Deltas append to the appropriate payload type
+			(PartialContent::Delta(delta), ActionPayload::Text(item)) => {
 				item.0.push_str(&delta);
 			}
-			(PartialContent::Delta(delta), Content::Refusal(item)) => {
+			(PartialContent::Delta(delta), ActionPayload::Refusal(item)) => {
 				item.0.push_str(&delta);
 			}
-			(PartialContent::Delta(delta), Content::ReasoningContent(item)) => {
+			(
+				PartialContent::Delta(delta),
+				ActionPayload::ReasoningContent(item),
+			) => {
 				item.0.push_str(&delta);
 			}
-			(PartialContent::Delta(delta), Content::ReasoningSummary(item)) => {
+			(
+				PartialContent::Delta(delta),
+				ActionPayload::ReasoningSummary(item),
+			) => {
 				item.0.push_str(&delta);
 			}
-			(PartialContent::Delta(delta), Content::FunctionCall(item)) => {
+			(
+				PartialContent::Delta(delta),
+				ActionPayload::FunctionCall(item),
+			) => {
 				item.arguments.push_str(&delta);
 			}
-			// TextDone overwrites text content and caches original for annotation re-rendering
-			(PartialContent::TextDone { text, .. }, Content::Text(item)) => {
+			// TextDone overwrites text and caches original for annotation re-rendering
+			(
+				PartialContent::TextDone { text, .. },
+				ActionPayload::Text(item),
+			) => {
 				self.annotation_inliner
 					.set_original_text(key.clone(), text.clone());
 				item.0 = text;
 			}
-			// RefusalDone overwrites refusal content
+			// RefusalDone overwrites refusal payload
 			(
 				PartialContent::RefusalDone { refusal },
-				Content::Refusal(item),
+				ActionPayload::Refusal(item),
 			) => {
 				item.0 = refusal;
 			}
-			// ReasoningDone overwrites reasoning content
+			// ReasoningDone overwrites reasoning payload
 			(
 				PartialContent::ReasoningDone { content },
-				Content::ReasoningContent(item),
+				ActionPayload::ReasoningContent(item),
 			) => {
 				item.0 = content;
 			}
 			// AnnotationAdded: re-render from original text with all accumulated annotations
 			(
 				PartialContent::AnnotationAdded { annotation, .. },
-				Content::Text(item),
+				ActionPayload::Text(item),
 			) => {
 				if let Some(rendered) =
 					self.annotation_inliner.push_annotation(key, annotation)
@@ -593,40 +635,22 @@ impl PartialItemMap {
 			// FunctionCallArgumentsDone overwrites arguments
 			(
 				PartialContent::FunctionCallArgumentsDone(args),
-				Content::FunctionCall(item),
+				ActionPayload::FunctionCall(item),
 			) => {
 				item.arguments = args;
 			}
 			// Mismatched or unsupported combinations
-			(partial, content) => {
+			(partial, payload) => {
 				bevybail!(
 					"Cannot apply {:?} to {:?}",
 					std::mem::discriminant(&partial),
-					content.kind()
+					payload.kind()
 				)
 			}
 		}
 		Ok(())
 	}
 }
-
-#[derive(Default)]
-pub struct ItemChanges {
-	pub created: Vec<ItemId>,
-	pub modified: Vec<ItemId>,
-}
-
-impl ItemChanges {
-	pub fn is_empty(&self) -> bool {
-		self.created.is_empty() && self.modified.is_empty()
-	}
-
-	/// All item ids that were either created or modified
-	pub fn all_items(&self) -> impl Iterator<Item = &ItemId> {
-		self.created.iter().chain(self.modified.iter())
-	}
-}
-
 
 /// Items come from model providers in all sorts of weird and wonderful ways.
 /// The first step is to translate these forms into a unified type,
@@ -635,25 +659,25 @@ impl ItemChanges {
 /// state.
 ///
 ///
-/// openresponses ----> PartialItem ----> Item
+/// openresponses ----> PartialItem ----> Action
 ///
 /// ## Duplicate Events
 ///
 /// This type will reduce many matching events into an identical representation,
 /// for example OutputTextDone and OutputItemDone, which is intended
-/// as an equality check is used before reifying into an [`Item`].
+/// as an equality check is used before reifying into an [`Action`].
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PartialItem {
 	pub key: PartialItemKey,
-	pub status: ItemStatus,
+	pub status: ActionStatus,
 	pub content: PartialContent,
 }
 
 impl PartialItem {
 	pub fn from_output_items(
 		items: impl IntoIterator<Item = OutputItem>,
-		status: ItemStatus,
+		status: ActionStatus,
 	) -> impl IntoIterator<Item = PartialItem> {
 		items
 			.into_iter()
@@ -666,14 +690,17 @@ impl PartialItem {
 	/// The status field is used for variants where the status is optional:
 	/// - [`OutputItem::FunctionCall`]
 	/// - [`OutputItem::Reasoning`]
-	/// defaulting to [`ItemStatus::Completed`]
-	pub fn from_output_item(item: OutputItem, status: ItemStatus) -> Vec<Self> {
+	/// defaulting to [`ActionStatus::Completed`]
+	pub fn from_output_item(
+		item: OutputItem,
+		status: ActionStatus,
+	) -> Vec<Self> {
 		match item {
 			OutputItem::Message(message) => {
 				let status = match message.status {
-					MessageStatus::InProgress => ItemStatus::InProgress,
-					MessageStatus::Completed => ItemStatus::Completed,
-					MessageStatus::Incomplete => ItemStatus::Interrupted,
+					MessageStatus::InProgress => ActionStatus::InProgress,
+					MessageStatus::Completed => ActionStatus::Completed,
+					MessageStatus::Incomplete => ActionStatus::Interrupted,
 				};
 				message
 					.content
@@ -697,11 +724,13 @@ impl PartialItem {
 					.status
 					.map(|status| match status {
 						FunctionCallStatus::InProgress => {
-							ItemStatus::InProgress
+							ActionStatus::InProgress
 						}
-						FunctionCallStatus::Completed => ItemStatus::Completed,
+						FunctionCallStatus::Completed => {
+							ActionStatus::Completed
+						}
 						FunctionCallStatus::Incomplete => {
-							ItemStatus::Interrupted
+							ActionStatus::Interrupted
 						}
 					})
 					.unwrap_or(status);
@@ -719,9 +748,9 @@ impl PartialItem {
 			}
 			OutputItem::FunctionCallOutput(fc_output) => {
 				let status = match fc_output.status {
-					FunctionCallStatus::InProgress => ItemStatus::InProgress,
-					FunctionCallStatus::Completed => ItemStatus::Completed,
-					FunctionCallStatus::Incomplete => ItemStatus::Interrupted,
+					FunctionCallStatus::InProgress => ActionStatus::InProgress,
+					FunctionCallStatus::Completed => ActionStatus::Completed,
+					FunctionCallStatus::Incomplete => ActionStatus::Interrupted,
 				};
 				vec![PartialItem {
 					key: PartialItemKey::Single {
@@ -776,7 +805,7 @@ impl PartialItem {
 				responses_id,
 				content_index,
 			},
-			status: ItemStatus::InProgress,
+			status: ActionStatus::InProgress,
 			content: PartialContent::Delta(delta),
 		}
 	}
@@ -857,24 +886,24 @@ pub enum PartialContent {
 }
 
 
-/// Get the message role for this actor, relative to the items actor id.
+/// Get the message role for this actor, relative to the action's author id.
 /// This is useful when an agent is constructing its context for an
 /// openresponses request.
-fn item_message_role(
+fn message_role(
 	agent_id: ActorId,
-	owner: &Actor,
+	author: &Actor,
 ) -> openresponses::MessageRole {
 	use openresponses::MessageRole;
-	match owner.kind() {
+	match author.kind() {
 		ActorKind::System => MessageRole::System,
 		ActorKind::App => MessageRole::Developer,
-		ActorKind::User => MessageRole::User,
 		ActorKind::Agent => {
-			if owner.id() == agent_id {
+			if author.id() == agent_id {
 				MessageRole::Assistant
 			} else {
 				MessageRole::User
 			}
 		}
+		ActorKind::User => MessageRole::User,
 	}
 }

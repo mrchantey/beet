@@ -6,7 +6,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin {
-			level: Level::TRACE,
+			// level: Level::TRACE,
 			..default()
 		}))
 		.init_plugin::<ClankerPlugin>()
@@ -24,15 +24,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 	let system_id = query.actors_mut().insert(Actor::system());
 	let user_id = query.actors_mut().insert(Actor::user());
 
-	// clanker thread is the thread sent to the model
-	let clanker_thread = query.threads_mut().insert(
-		Thread::default().with_actors([system_id, clanker_id, user_id]),
-	);
-
-	// user thread is the thread printed to stdout
-	let user_thread = query
-		.threads_mut()
-		.insert(Thread::display_only().with_actors([clanker_id, user_id]));
+	let thread_id = query.threads_mut().insert(Thread::default());
 
 	// 2. define relations
 	commands
@@ -42,12 +34,12 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 			children![
 				(
 					clanker_id,
-					clanker_thread,
+					thread_id,
 					ModelAction::new(OllamaProvider::default()).streaming()
 				),
 				(
 					user_id,
-					user_thread,
+					thread_id,
 					stdin.into_tool(),
 					StdoutCursor::default(),
 					OnSpawn::observe(log_name),
@@ -58,9 +50,10 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 		.call::<(), Outcome>((), default());
 
 	// 3. define items
-	query.add_items(Item::new(
+	query.add_actions(Action::new(
 		system_id,
-		ItemStatus::Completed,
+		thread_id,
+		ActionStatus::Completed,
 		"you are robot, make beep boop noises",
 	))?;
 	Ok(())
@@ -70,41 +63,70 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 fn stdin(
 	entity: SystemToolIn,
 	mut query: ContextQuery,
-	actors: Query<&ActorId>,
+	actors: Query<(&ActorId, &ThreadId)>,
 ) -> Result<Outcome> {
-	let owner = actors.get(entity.caller)?;
+	let (actor, thread) = actors.get(entity.caller)?;
 	let mut input = String::new();
+	// let
 	print!("\nUser > ");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	std::io::stdin().read_line(&mut input)?;
-	query.add_items(Item::new(*owner, ItemStatus::Completed, input))?;
+	query.add_actions(Action::new(
+		*actor,
+		*thread,
+		ActionStatus::Completed,
+		input,
+	))?;
 	Ok(Pass(()))
 }
 
 #[allow(unused)]
 #[derive(Default, Component)]
-struct StdoutCursor(HashMap<ItemId, u32>);
+struct StdoutCursor(HashMap<ActionId, u32>);
 
-fn log_name(ev: On<EntityItemCreated>, context_query: ContextQuery) -> Result {
-	let item = context_query.items().get(ev.item)?;
-	let actor = context_query.actors().get(item.owner())?;
-	println!("<< {} >> ", actor.name());
+fn log_name(
+	ev: On<EntityActionCreated>,
+	context_query: ContextQuery,
+) -> Result {
+	let action = context_query.actions().get(ev.action)?;
+	let action_kind = action.payload().kind();
+	if !action_kind.is_display() {
+		return Ok(());
+	}
+	let actor = context_query.actors().get(action.author())?;
+
+	use ActionKind::*;
+	let suffix = match action_kind {
+		Refusal => "refusal ",
+		ReasoningSummary | ReasoningContent | ReasoningEncryptedContent => {
+			"thinking.. "
+		}
+		Media | Url => "media ",
+		_ => "",
+	};
+
+	let heading =
+		paint_ext::cyan_bold(format!("{} {}>\n", actor.name(), suffix));
+	println!("{heading}");
 	Ok(())
 }
 
 fn listen_for_changes(
-	ev: On<EntityItemUpdated>,
+	ev: On<EntityActionUpdated>,
 	context_query: ContextQuery,
 	mut query: Query<&mut StdoutCursor>,
 ) -> Result {
 	let mut cursor = query.get_mut(ev.entity)?;
-	let item = context_query.items().get(ev.item)?;
-	let content = item.content().to_string();
-	let cursor_item = cursor.0.entry(ev.item).or_insert(0);
+	let action = context_query.actions().get(ev.action)?;
+	if !action.payload().kind().is_display() {
+		return Ok(());
+	}
+	let payload = action.payload().to_string();
+	let cursor_item = cursor.0.entry(ev.action).or_insert(0);
 
-	let new_content = &content[*cursor_item as usize..];
+	let new_content = &payload[*cursor_item as usize..];
 	print!("{}", new_content);
-	*cursor_item = content.len() as u32;
+	*cursor_item = payload.len() as u32;
 
 	Ok(())
 }
