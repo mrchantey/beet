@@ -9,10 +9,11 @@ fn main() {
 			// level: Level::TRACE,
 			..default()
 		}))
+		.init_resource::<StdoutCursor>()
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, create_scene)
-		// .add_systems(PostStartup, run_clanker)
-		// .add_observer(exit_on_complete)
+		.add_observer(log_name)
+		.add_observer(log_delta)
 		.run();
 }
 
@@ -37,14 +38,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 					thread_id,
 					ModelAction::new(OllamaProvider::default()).streaming()
 				),
-				(
-					user_id,
-					thread_id,
-					stdin.into_tool(),
-					StdoutCursor::default(),
-					OnSpawn::observe(log_name),
-					OnSpawn::observe(listen_for_changes)
-				)
+				(user_id, thread_id, stdin.into_tool())
 			]
 		)]))
 		.call::<(), Outcome>((), default());
@@ -67,8 +61,8 @@ fn stdin(
 ) -> Result<Outcome> {
 	let (actor, thread) = actors.get(entity.caller)?;
 	let mut input = String::new();
-	// let
-	print!("\nUser > ");
+	let heading = paint_ext::cyan_bold(format!("\n\nUser > "));
+	print!("{heading}");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	std::io::stdin().read_line(&mut input)?;
 	query.add_actions(Action::new(
@@ -80,14 +74,15 @@ fn stdin(
 	Ok(Pass(()))
 }
 
-#[allow(unused)]
-#[derive(Default, Component)]
+// cursor to track which part of action deltas have already been printed
+#[derive(Default, Deref, DerefMut, Resource)]
 struct StdoutCursor(HashMap<ActionId, u32>);
 
-fn log_name(
-	ev: On<EntityActionCreated>,
-	context_query: ContextQuery,
-) -> Result {
+fn log_name(ev: On<ActionCreated>, context_query: ContextQuery) -> Result {
+	let actor = context_query.actors().get(ev.actor)?;
+	if actor.kind() != ActorKind::Agent {
+		return Ok(());
+	}
 	let action = context_query.actions().get(ev.action)?;
 	let action_kind = action.payload().kind();
 	if !action_kind.is_display() {
@@ -97,35 +92,47 @@ fn log_name(
 
 	use ActionKind::*;
 	let suffix = match action_kind {
-		Refusal => "refusal ",
+		Refusal => "refusal >",
 		ReasoningSummary | ReasoningContent | ReasoningEncryptedContent => {
 			"thinking.. "
 		}
 		Media | Url => "media ",
-		_ => "",
+		_ => ">",
 	};
 
 	let heading =
-		paint_ext::cyan_bold(format!("{} {}>\n", actor.name(), suffix));
+		paint_ext::cyan_bold(format!("\n{} {}\n", actor.name(), suffix));
 	println!("{heading}");
 	Ok(())
 }
 
-fn listen_for_changes(
-	ev: On<EntityActionUpdated>,
+fn log_delta(
+	ev: On<ActionUpdated>,
 	context_query: ContextQuery,
-	mut query: Query<&mut StdoutCursor>,
+	mut cursor: ResMut<StdoutCursor>,
 ) -> Result {
-	let mut cursor = query.get_mut(ev.entity)?;
+	let actor = context_query.actors().get(ev.actor)?;
+	if actor.kind() != ActorKind::Agent {
+		return Ok(());
+	}
 	let action = context_query.actions().get(ev.action)?;
 	if !action.payload().kind().is_display() {
 		return Ok(());
 	}
 	let payload = action.payload().to_string();
-	let cursor_item = cursor.0.entry(ev.action).or_insert(0);
+	let cursor_item = cursor.entry(ev.action).or_insert(0);
 
 	let new_content = &payload[*cursor_item as usize..];
-	print!("{}", new_content);
+	use ActionKind::*;
+	let colored = match action.payload().kind() {
+		Refusal => paint_ext::red(new_content),
+		ReasoningSummary | ReasoningContent | ReasoningEncryptedContent => {
+			paint_ext::dimmed(new_content)
+		}
+		_ => new_content.to_string(),
+	};
+
+	print!("{}", colored);
 	*cursor_item = payload.len() as u32;
 
 	Ok(())

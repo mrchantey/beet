@@ -124,33 +124,23 @@ impl ContextQuery<'_, '_> {
 		for &action_id in changes.all_actions() {
 			let action = self.context_map.actions.get(action_id)?;
 			let thread_id = action.thread();
-
-			let thread_entities: Vec<Entity> = self
-				.thread_query
-				.iter()
-				.filter(|(_, tid)| **tid == thread_id)
-				.map(|(entity, _)| entity)
-				.collect();
+			let actor_id = action.author();
 
 			let is_created = changes.created.contains(&action_id);
 
 			if is_created {
-				self.commands.trigger(ActionCreated { action: action_id });
-				for entity in thread_entities.iter() {
-					self.commands.trigger(EntityActionCreated {
-						entity: *entity,
-						action: action_id,
-					});
-				}
-			}
-
-			self.commands.trigger(ActionUpdated { action: action_id });
-			for entity in thread_entities.iter() {
-				self.commands.trigger(EntityActionUpdated {
-					entity: *entity,
+				self.commands.trigger(ActionCreated {
 					action: action_id,
+					thread: thread_id,
+					actor: actor_id,
 				});
 			}
+
+			self.commands.trigger(ActionUpdated {
+				action: action_id,
+				thread: thread_id,
+				actor: actor_id,
+			});
 		}
 
 		Ok(())
@@ -178,24 +168,15 @@ impl ActionChanges {
 #[derive(Event)]
 pub struct ActionCreated {
 	pub action: ActionId,
-}
-
-/// Action created event, runs before [`EntityActionUpdated`]
-#[derive(EntityEvent)]
-pub struct EntityActionCreated {
-	pub entity: Entity,
-	pub action: ActionId,
+	pub thread: ThreadId,
+	pub actor: ActorId,
 }
 
 #[derive(Event)]
 pub struct ActionUpdated {
 	pub action: ActionId,
-}
-
-#[derive(EntityEvent)]
-pub struct EntityActionUpdated {
-	pub entity: Entity,
-	pub action: ActionId,
+	pub thread: ThreadId,
+	pub actor: ActorId,
 }
 
 #[derive(Event)]

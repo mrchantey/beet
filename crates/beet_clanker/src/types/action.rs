@@ -50,6 +50,7 @@ impl Action {
 	}
 	pub fn author(&self) -> ActorId { self.author }
 	pub fn thread(&self) -> ThreadId { self.thread }
+	pub fn status(&self) -> ActionStatus { self.status }
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn payload(&self) -> &ActionPayload { &self.payload }
 	pub(super) fn set_status(&mut self, status: ActionStatus) {
@@ -263,6 +264,7 @@ impl ActionKind {
 				| Self::Url
 		)
 	}
+
 }
 
 /// Common type for several openresponses types

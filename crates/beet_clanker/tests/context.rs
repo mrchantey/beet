@@ -12,6 +12,12 @@ fn main() {
 		.add_plugins(MinimalPlugins)
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, setup)
+		// .add_observer(|_ev: On<ActionCreated>| {
+		// 	println!("action created");
+		// })
+		// .add_observer(|_ev: On<ActionUpdated>| {
+		// 	println!("action updated");
+		// })
 		.run();
 }
 
@@ -32,14 +38,7 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 				thread_id,
 				ModelAction::new(OllamaProvider::default()).streaming()
 			),
-			(
-				user_id,
-				thread_id,
-				StdoutCursor::default(),
-				OnSpawn::observe(log_clanker_name),
-				OnSpawn::observe(log_clanker_delta),
-				exit_on_user_turn.into_tool()
-			)
+			(user_id, thread_id, exit_on_user_turn.into_tool())
 		]))
 		.call::<(), Outcome>((), default());
 
@@ -53,39 +52,6 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 	Ok(())
 }
 
-
-fn log_clanker_name(
-	ev: On<EntityActionCreated>,
-	context_query: ContextQuery,
-) -> Result {
-	let action = context_query.actions().get(ev.action)?;
-	let actor = context_query.actors().get(action.author())?;
-	println!("<< {} >> ", actor.name());
-	Ok(())
-}
-
-
-#[allow(unused)]
-#[derive(Default, Component)]
-struct StdoutCursor(HashMap<ActionId, u32>);
-
-
-fn log_clanker_delta(
-	ev: On<EntityActionUpdated>,
-	context_query: ContextQuery,
-	mut query: Query<&mut StdoutCursor>,
-) -> Result {
-	let mut cursor = query.get_mut(ev.entity)?;
-	let action = context_query.actions().get(ev.action)?;
-	let content = action.payload().to_string();
-	let cursor_item = cursor.0.entry(ev.action).or_insert(0);
-
-	let new_content = &content[*cursor_item as usize..];
-	print!("{}", new_content);
-	*cursor_item = content.len() as u32;
-
-	Ok(())
-}
 
 #[tool]
 fn exit_on_user_turn(
