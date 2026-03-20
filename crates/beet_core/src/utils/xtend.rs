@@ -206,6 +206,23 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		Ok(out)
 	}
 
+	/// like map but async
+	fn xmap_async<O, E>(
+		self,
+		mut func: impl AsyncFnMut(T) -> Result<O, E>,
+	) -> impl Future<Output = Result<Vec<O>, E>> {
+		async move {
+			let mut out = Vec::new();
+			for item in self.into_iter() {
+				match (func)(item).await {
+					Ok(o) => out.push(o),
+					Err(e) => return Err(e),
+				}
+			}
+			Ok(out)
+		}
+	}
+
 	/// Filters each item with a fallible function, short-circuiting on error.
 	fn xtry_filter<E>(
 		self,

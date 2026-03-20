@@ -1,48 +1,49 @@
-#![allow(unused, reason = "todo")]
+use crate::openresponses::request::Input;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::tasks::BoxedFuture;
 use futures::Stream;
+use std::borrow::Cow;
+use std::fmt::Debug;
 use std::pin::Pin;
+use std::sync::Arc;
 
-
-
-#[derive(Debug)]
 pub struct O11sStreamer {
-	/// The model name to use for requests.
-	model: String,
+	action_store: Arc<dyn ActionStore>,
+	model: ModelDef,
 	/// Whether to use streaming mode.
 	stream: bool,
+	/// whether to find the previous response if it exists in the thread,
+	/// and attempt to pick up where it left off. This should be disabled
+	/// for providers who ignore it or are stateless between calls, like ollama
+	use_previous_response_id: bool,
 	/// System instructions to include with each request.
 	instructions: Option<String>,
-	/// Providers may track the last sent id
-	previous_response_id: Option<String>,
-	/// Track which action was sent last, for skipping sent
-	/// actions when a previous_response_id is used.
-	last_action_sent: Option<ActionId>,
-	partial_items: PartialItemMap,
-	auth: Option<String>,
-	url: String,
+}
+
+impl std::fmt::Debug for O11sStreamer {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("O11sStreamer")
+			.field("model", &self.model)
+			.field("stream", &self.stream)
+			.field("use_previous_response_id", &self.use_previous_response_id)
+			.field("instructions", &self.instructions)
+			.finish()
+	}
 }
 
 impl O11sStreamer {
-	pub fn new(url: impl Into<String>, model: impl Into<String>) -> Self {
+	pub fn new(store: impl 'static + ActionStore, model: ModelDef) -> Self {
 		Self {
-			model: model.into(),
-			url: url.into(),
+			action_store: Arc::new(store),
+			model,
 			stream: true,
+			use_previous_response_id: false,
 			instructions: None,
-			previous_response_id: None,
-			last_action_sent: None,
-			partial_items: default(),
-			auth: None,
 		}
 	}
-	pub fn with_auth(mut self, auth: impl Into<String>) -> Self {
-		self.auth = Some(auth.into());
-		self
-	}
+
 	/// Enables streaming mode.
 	pub fn without_streaming(mut self) -> Self {
 		self.stream = false;
@@ -56,13 +57,19 @@ impl O11sStreamer {
 		self.instructions = Some(instructions.into());
 		self
 	}
+	pub fn with_use_previous_response_id(mut self) -> Self {
+		self.use_previous_response_id = true;
+		self
+	}
+
 	fn build_request(
 		&self,
 		request: openresponses::RequestBody,
 	) -> Result<Request> {
-		let mut request = Request::post(&self.url)
-			.with_json_body::<openresponses::RequestBody>(&request)?;
-		if let Some(auth) = &self.auth {
+		let mut request =
+			Request::post(&self.model.url)
+				.with_json_body::<openresponses::RequestBody>(&request)?;
+		if let Some(auth) = &self.model.auth {
 			request = request.with_auth_bearer(auth);
 		}
 		request.xok()
@@ -71,13 +78,40 @@ impl O11sStreamer {
 
 
 impl ActionStreamer for O11sStreamer {
-	fn last_action_sent(&self) -> Option<ActionId> { self.last_action_sent }
 	fn stream_actions(
 		&mut self,
-		_actor: ActorId,
-		_thread: ThreadId,
-		_context_map: &ContextMap,
+		agent_id: ActorId,
+		thread_id: ThreadId,
 	) -> BoxedFuture<'_, Result<ActionStream>> {
-		Box::pin(async move { bevybail!("todo") })
+		Box::pin(async move {
+			let last_received = if self.use_previous_response_id {
+				self.action_store
+					.previous_o11s_meta(
+						&self.model.provider_slug,
+						&self.model.model_slug,
+						thread_id,
+					)
+					.await?
+			} else {
+				None
+			};
+
+			let items = self
+				.action_store
+				.full_thread_actions(thread_id, last_received)
+				.await?
+				.into_iter()
+				.xtry_map(|(action, author, meta)| {
+					o11s_mapper::action_to_o11s_input(
+						agent_id, action, author, meta,
+					)
+				})?;
+
+			let tools = vec![];
+			let mut body = openresponses::RequestBody::new(&self.model.url)
+				.with_input(Input::Items(items))
+				.with_tools(tools);
+			bevybail!("todo")
+		})
 	}
 }

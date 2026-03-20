@@ -5,18 +5,21 @@ use beet_core::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct O11sMeta {
-	actor_id: ActorId,
-	provider_slug: String,
-	response_id: String,
-	item_id: String,
-	model_name: String,
-	content_index: Option<u32>,
-	call_id: Option<String>,
-	original_text: Option<String>,
-	annotations: Vec<Annotation>,
+	pub action_id: ActionId,
+	pub provider_slug: String,
+	pub model_slug: String,
+	pub response_id: String,
+	pub item_id: String,
+	pub content_index: Option<u32>,
+	pub call_id: Option<String>,
+	pub original_text: Option<String>,
+	pub annotations: Vec<Annotation>,
 }
 
 impl Document for O11sMeta {
-	type Id = (ActorId, String, String, Option<u32>);
-	fn id(&self) -> Self::Id { self.id }
+	type Id = ActionId;
+	fn id(&self) -> Self::Id { self.action_id }
+}
+impl O11sMeta {
+	pub fn call_id(&self) -> Option<&str> { self.call_id.as_deref() }
 }

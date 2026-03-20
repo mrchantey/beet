@@ -2,23 +2,25 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::BoxedFuture;
 use futures::Stream;
+use std::borrow::Cow;
 use std::pin::Pin;
 
 
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelDef {
+	pub provider_slug: Cow<'static, str>,
+	pub model_slug: Cow<'static, str>,
+	pub url: Cow<'static, str>,
+	pub auth: Option<String>,
+}
+
 
 pub trait ActionStreamer {
-	/// Streamers like the [`OrStreamer`] support caching
-	/// previously sent items, this allows them to opt into
-	/// specifying which point in the thread they are up to,
-	/// for preloading into the [`ContextMap`] before calling
-	/// [`stream_actions`].
-	fn last_action_sent(&self) -> Option<ActionId>;
 	fn stream_actions(
 		&mut self,
 		actor: ActorId,
 		thread: ThreadId,
-		context_map: &ContextMap,
 	) -> BoxedFuture<'_, Result<ActionStream>>;
 }
 

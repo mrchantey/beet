@@ -1,12 +1,15 @@
+mod action_store;
 mod action_streamer;
 mod actor;
 mod annotation_inliner;
 mod clanker_plugin;
 mod document;
+pub mod o11s_mapper;
 mod o11s_meta;
 mod o11s_streamer;
 mod partial_item;
 mod partial_item_map;
+pub use action_store::*;
 pub use action_streamer::*;
 pub use document::*;
 pub use o11s_meta::*;

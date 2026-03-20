@@ -1070,6 +1070,7 @@ dependencies = [
 name = "beet_clanker"
 version = "0.0.9-dev.6"
 dependencies = [
+ "async-lock",
  "base64 0.22.1",
  "beet_clanker",
  "beet_core",
