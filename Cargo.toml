@@ -434,6 +434,11 @@ name = "chat"
 path = "examples/clanker/chat.rs"
 required-features = ["clanker"]
 
+[[example]]
+name = "oneshot"
+path = "examples/clanker/oneshot.rs"
+required-features = ["clanker"]
+
 
 # 💡 Examples - flow
 

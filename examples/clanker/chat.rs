@@ -1,6 +1,5 @@
 //! # Clanker Chat
-//!
-//! - note that the ollama models like qwen3 will occasionally think only, without text output..
+
 use beet::prelude::*;
 
 fn main() {
@@ -55,11 +54,11 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 
 #[tool]
 fn stdin(
-	entity: SystemToolIn,
+	input: SystemToolIn,
 	mut query: ContextQuery,
 	actors: Query<(&ActorId, &ThreadId)>,
 ) -> Result<Outcome> {
-	let (actor, thread) = actors.get(entity.caller)?;
+	let (actor, thread) = actors.get(input.caller)?;
 	let mut input = String::new();
 	let heading = paint_ext::cyan_bold(format!("\n\nUser > "));
 	print!("{heading}");
