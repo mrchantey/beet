@@ -63,6 +63,11 @@ impl ActionStream {
 		}
 	}
 
+	/// Returns an iterator over the collected actions.
+	pub fn actions(&self) -> impl Iterator<Item = &Action> {
+		self.action_map.values()
+	}
+
 	/// Commit the created actions to the ActionStore.
 	pub async fn write(self) -> Result {
 		self.action_store

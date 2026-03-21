@@ -123,11 +123,13 @@ impl<T: Document> DocMap<T> {
 		self.0.insert(id.clone(), doc);
 		id
 	}
+	#[track_caller]
 	pub fn get(&self, id: T::Id) -> Result<&T> {
 		self.0
 			.get(&id)
 			.ok_or_else(|| bevyhow!("Id {id:?} not found in DocMap"))
 	}
+	#[track_caller]
 	pub fn get_mut(&mut self, id: T::Id) -> Result<&mut T> {
 		self.0
 			.get_mut(&id)

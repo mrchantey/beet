@@ -30,7 +30,7 @@ where
 
 	while let Some(ev) = stream.next().await {
 		let changes = ev?;
-		println!("got changes: {changes:#?}");
+		trace!("action stream changes: {changes:#?}");
 	}
 	stream.write().await?;
 
