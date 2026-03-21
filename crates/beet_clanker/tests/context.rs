@@ -9,11 +9,14 @@ use beet_tool::prelude::*;
 #[beet_core::test(timeout_ms = 15_000)]
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin {
-			level: Level::TRACE,
-			filter: format!("{}=trace,ureq=off,ureq_proto=off", module_path!()),
-			..default()
-		}))
+		.add_plugins((
+			MinimalPlugins,
+			// 	LogPlugin {
+			// 	level: Level::TRACE,
+			// 	filter: format!("{}=trace,ureq=off,ureq_proto=off", module_path!()),
+			// 	..default()
+			// }
+		))
 		.init_plugin::<ClankerPlugin>()
 		.add_systems(Startup, setup)
 		// .add_observer(|_ev: On<ActionCreated>| {
@@ -46,7 +49,7 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 		store.insert_actor(user.clone()).await.unwrap();
 
 		store
-			.insert_actions(&vec![&Action::new(
+			.insert_actions(vec![Action::new(
 				system_id,
 				thread_id,
 				ActionStatus::Completed,
@@ -66,13 +69,13 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 	commands
 		.spawn((system_id, Sequence::new(), children![
 			(
-				store,
+				store.clone(),
 				clanker_id,
 				thread_id,
 				action_tool(OllamaProvider::qwen_3_8b()),
 				// ModelAction::new(OllamaProvider::default()).streaming()
 			),
-			(user_id, thread_id, exit_on_user_turn.into_tool())
+			(store, user_id, thread_id, exit_on_user_turn.into_tool())
 		]))
 		.call::<(), Outcome>((), default());
 
@@ -86,27 +89,24 @@ fn setup(mut commands: Commands, mut query: ContextQuery) -> Result {
 	Ok(())
 }
 
-
 #[tool]
-fn exit_on_user_turn(
-	_val: In<()>,
-	mut commands: Commands,
-	context_query: ContextQuery,
-) -> Outcome {
-	let text_action = context_query
-		.actions()
-		.values()
-		.find(|action| {
+async fn exit_on_user_turn(input: AsyncToolIn) -> Result<Outcome> {
+	let (store, thread_id) =
+		input.caller.get_cloned2::<ActionStore, ThreadId>().await?;
+	let (action, _) = store
+		.full_thread_actions(thread_id, None)
+		.await?
+		.into_iter()
+		.find(|(action, actor)| {
 			action.payload().kind() == ActionKind::Text
-				&& context_query.actors().get(action.author()).unwrap().kind()
-					== ActorKind::Agent
+				&& actor.kind() == ActorKind::Agent
 		})
 		.unwrap();
-	text_action
+	action
 		.payload()
 		.to_string()
 		.to_lowercase()
 		.xpect_contains("beep");
-	commands.write_message(AppExit::Success);
-	Pass(())
+	input.caller.world().write_message(AppExit::Success);
+	Ok(Pass(()))
 }

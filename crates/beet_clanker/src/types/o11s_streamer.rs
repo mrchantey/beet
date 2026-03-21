@@ -66,7 +66,7 @@ impl ActionStreamer for O11sStreamer {
 			// last_received may still be None if no match was found
 			let last_received = if self.use_previous_response_id {
 				action_store
-					.previous_meta(
+					.stored_response_meta(
 						&self.model.provider_slug,
 						&self.model.model_slug,
 						thread,
@@ -84,10 +84,8 @@ impl ActionStreamer for O11sStreamer {
 				)
 				.await?
 				.into_iter()
-				.xtry_map(|(action, author, meta)| {
-					o11s_mapper::action_to_o11s_input(
-						agent, action, author, meta,
-					)
+				.xtry_map(|(action, author)| {
+					o11s_mapper::action_to_o11s_input(agent, action, author)
 				})?;
 
 			// 3. build tool items
@@ -128,6 +126,8 @@ impl ActionStreamer for O11sStreamer {
 			};
 			ActionStream::new(
 				Arc::new(action_store),
+				self.model.provider_slug.clone(),
+				self.model.model_slug.clone(),
 				agent,
 				thread,
 				typed_stream,

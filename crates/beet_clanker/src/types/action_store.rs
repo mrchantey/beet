@@ -23,18 +23,18 @@ impl Default for ActionStore {
 
 pub trait ActionStoreProvider: 'static + Send + Sync {
 	/// Searches the thread for the most recent action with
-	/// a [`O11sMeta`], which will contain useful information
-	/// for use in types like `previous_response_id`.
+	/// a [`O11sMeta`] that was stored by the provider,
+	/// for use with `previous_response_id` patterns.
 	///
 	/// The provider and model slugs are also checked to ensure
 	/// we get the most recent meta *for this match*, supporting
 	/// multi-agent and model-switching scenarios.
-	fn previous_meta<'a>(
+	fn stored_response_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
 		model_slug: &'a str,
 		thread_id: ThreadId,
-	) -> BoxedFuture<'a, Result<Option<ActionMeta>>>;
+	) -> BoxedFuture<'a, Result<Option<ResponseMeta>>>;
 	fn thread_actions(
 		&self,
 		thread_id: ThreadId,
@@ -44,28 +44,29 @@ pub trait ActionStoreProvider: 'static + Send + Sync {
 		&self,
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
-	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor)>>>;
 
-	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>>;
-	fn insert_thread<'a>(
-		&'a self,
-		thread: Thread,
-	) -> BoxedFuture<'a, Result<()>>;
-	fn insert_actions<'a>(
-		&'a self,
-		actions: &'a [&'a Action],
-	) -> BoxedFuture<'a, Result<()>>;
+	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<()>>;
+	fn insert_thread(&self, thread: Thread) -> BoxedFuture<'_, Result<()>>;
+	fn insert_actions(
+		&self,
+		actions: Vec<Action>,
+	) -> BoxedFuture<'_, Result<()>>;
+	fn insert_response_metas(
+		&self,
+		metas: Vec<ResponseMeta>,
+	) -> BoxedFuture<'_, Result<()>>;
 }
 
 impl ActionStoreProvider for Arc<dyn ActionStoreProvider> {
-	fn previous_meta<'a>(
+	fn stored_response_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
 		model_slug: &'a str,
 		thread_id: ThreadId,
-	) -> BoxedFuture<'a, Result<Option<ActionMeta>>> {
+	) -> BoxedFuture<'a, Result<Option<ResponseMeta>>> {
 		self.as_ref()
-			.previous_meta(provider_slug, model_slug, thread_id)
+			.stored_response_meta(provider_slug, model_slug, thread_id)
 	}
 
 	fn thread_actions(
@@ -80,25 +81,29 @@ impl ActionStoreProvider for Arc<dyn ActionStoreProvider> {
 		&self,
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
-	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>> {
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor)>>> {
 		self.as_ref().full_thread_actions(thread_id, after_action)
 	}
 
-	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>> {
+	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<()>> {
 		self.as_ref().insert_actor(actor)
 	}
 
-	fn insert_thread<'a>(
-		&'a self,
-		thread: Thread,
-	) -> BoxedFuture<'a, Result<()>> {
+	fn insert_thread(&self, thread: Thread) -> BoxedFuture<'_, Result<()>> {
 		self.as_ref().insert_thread(thread)
 	}
-	fn insert_actions<'a>(
-		&'a self,
-		actions: &'a [&'a Action],
-	) -> BoxedFuture<'a, Result<()>> {
+	fn insert_actions(
+		&self,
+		actions: Vec<Action>,
+	) -> BoxedFuture<'_, Result<()>> {
 		self.as_ref().insert_actions(actions)
+	}
+
+	fn insert_response_metas(
+		&self,
+		metas: Vec<ResponseMeta>,
+	) -> BoxedFuture<'_, Result<()>> {
+		self.as_ref().insert_response_metas(metas)
 	}
 }
 
@@ -109,12 +114,12 @@ pub struct MemoryActionStore {
 }
 
 impl ActionStoreProvider for MemoryActionStore {
-	fn previous_meta<'a>(
+	fn stored_response_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
 		model_slug: &'a str,
 		thread_id: ThreadId,
-	) -> BoxedFuture<'a, Result<Option<ActionMeta>>> {
+	) -> BoxedFuture<'a, Result<Option<ResponseMeta>>> {
 		Box::pin(async move {
 			let map = self.map.read().await;
 			map.thread_actions(thread_id, None)
@@ -126,6 +131,8 @@ impl ActionStoreProvider for MemoryActionStore {
 							meta.action_id == action.id()
 								&& meta.provider_slug == provider_slug
 								&& meta.model_slug == model_slug
+								// even if its a match, ignore if no response stored
+								&& meta.response_stored
 						})
 						.cloned()
 				})
@@ -168,33 +175,18 @@ impl ActionStoreProvider for MemoryActionStore {
 		&self,
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
-	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>> {
+	) -> BoxedFuture<'_, Result<Vec<(Action, Actor)>>> {
 		Box::pin(async move {
 			let map = self.map.read().await;
-			let metas = map.metas();
 			let actors = map.actors();
 			self.thread_actions(thread_id, after_action)
 				.await?
 				.into_iter()
-				.xtry_map(|action| -> Result<(Action, Actor, ActionMeta)> {
+				.xtry_map(|action| -> Result<(Action, Actor)> {
 					let actor = actors.get(action.author())?.clone();
-					let meta = metas.get(action.id())?.clone();
-					Ok((action, actor, meta))
+					Ok((action, actor))
 				})?
 				.xok()
-		})
-	}
-
-	fn insert_actions<'a>(
-		&'a self,
-		actions: &'a [&'a Action],
-	) -> BoxedFuture<'a, Result<()>> {
-		Box::pin(async move {
-			let mut map = self.map.write().await;
-			for action in actions {
-				map.actions_mut().insert((*action).clone());
-			}
-			Ok(())
 		})
 	}
 
@@ -213,6 +205,32 @@ impl ActionStoreProvider for MemoryActionStore {
 		Box::pin(async move {
 			let mut map = self.map.write().await;
 			map.threads_mut().insert(thread.clone());
+			Ok(())
+		})
+	}
+
+	fn insert_actions(
+		&self,
+		actions: Vec<Action>,
+	) -> BoxedFuture<'_, Result<()>> {
+		Box::pin(async move {
+			let mut map = self.map.write().await;
+			for action in actions {
+				map.actions_mut().insert(action);
+			}
+			Ok(())
+		})
+	}
+
+	fn insert_response_metas(
+		&self,
+		metas: Vec<ResponseMeta>,
+	) -> BoxedFuture<'_, Result<()>> {
+		Box::pin(async move {
+			let mut map = self.map.write().await;
+			for meta in metas {
+				map.metas_mut().insert(meta);
+			}
 			Ok(())
 		})
 	}

@@ -1,4 +1,4 @@
-mod action_meta;
+mod response_meta;
 mod action_partial;
 mod action_partial_map;
 mod action_store;
@@ -11,7 +11,7 @@ mod document;
 pub mod o11s_mapper;
 mod o11s_streamer;
 mod response_partial;
-pub use action_meta::*;
+pub use response_meta::*;
 pub use action_partial::*;
 pub use action_partial_map::*;
 pub use action_store::*;

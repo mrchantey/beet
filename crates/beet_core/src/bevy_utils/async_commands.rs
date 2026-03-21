@@ -728,6 +728,20 @@ impl AsyncEntity {
 	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
 		self.get::<T, _>(|comp| comp.clone()).await
 	}
+	/// Gets two cloned components.
+	pub async fn get_cloned2<T1: Component + Clone, T2: Component + Clone>(
+		&self,
+	) -> Result<(T1, T2)> {
+		self.with_then(|entity| {
+			(
+				entity.try_get::<T1>()?.clone(),
+				entity.try_get::<T2>()?.clone(),
+			)
+				.xok()
+		})
+		.await
+	}
+
 
 	/// Takes a component from the entity.
 	pub async fn take<T: Component>(&self) -> Option<T> {

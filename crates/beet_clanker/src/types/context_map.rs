@@ -13,7 +13,7 @@ pub struct ContextMap {
 	actors: DocMap<Actor>,
 	actions: DocMap<Action>,
 	threads: DocMap<Thread>,
-	o11s_metas: DocMap<ActionMeta>,
+	response_metas: DocMap<ResponseMeta>,
 }
 
 
@@ -26,9 +26,9 @@ impl ContextMap {
 
 	pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
 	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
-	pub fn metas(&self) -> &DocMap<ActionMeta> { &self.o11s_metas }
-	pub fn o11s_metas_mut(&mut self) -> &mut DocMap<ActionMeta> {
-		&mut self.o11s_metas
+	pub fn metas(&self) -> &DocMap<ResponseMeta> { &self.response_metas }
+	pub fn metas_mut(&mut self) -> &mut DocMap<ResponseMeta> {
+		&mut self.response_metas
 	}
 
 	/// Returns all actions belonging to the given thread, sorted chronologically.

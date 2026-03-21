@@ -22,7 +22,6 @@ pub fn action_to_o11s_input(
 	agent_id: ActorId,
 	action: Action,
 	author: Actor,
-	meta: ActionMeta,
 ) -> Result<openresponses::request::InputItem> {
 	let role = match author.kind() {
 		ActorKind::System => MessageRole::System,
@@ -37,7 +36,7 @@ pub fn action_to_o11s_input(
 		ActorKind::User => MessageRole::User,
 	};
 
-	let input_item = match action.payload() {
+	let input_item = match action.payload().clone() {
 		ActionPayload::Text(TextItem(value)) => {
 			let actor_text = format!(
 				"<actor name={} kind={} id={}>{}</actor>",
@@ -57,7 +56,7 @@ pub fn action_to_o11s_input(
 			InputItem::Message(MessageParam {
 				id: None,
 				role,
-				content: MessageContent::Text(value.clone()),
+				content: MessageContent::Text(value),
 				status: None,
 			})
 		}
@@ -65,7 +64,7 @@ pub fn action_to_o11s_input(
 			InputItem::Message(MessageParam {
 				id: None,
 				role,
-				content: MessageContent::Text(value.clone()),
+				content: MessageContent::Text(value),
 				status: None,
 			})
 		}
@@ -73,7 +72,7 @@ pub fn action_to_o11s_input(
 			InputItem::Message(MessageParam {
 				id: None,
 				role,
-				content: MessageContent::Text(value.clone()),
+				content: MessageContent::Text(value),
 				status: None,
 			})
 		}
@@ -84,7 +83,7 @@ pub fn action_to_o11s_input(
 				openresponses::InputFile {
 					filename: Some(url_item.filename()),
 					file_data: None,
-					file_url: Some(url_item.url().to_string()),
+					file_url: Some(url_item.url.to_string()),
 				},
 			)]),
 			status: None,
@@ -104,25 +103,17 @@ pub fn action_to_o11s_input(
 		ActionPayload::FunctionCall(function_call) => {
 			InputItem::FunctionCall(FunctionCallParam {
 				id: None,
-				call_id: meta
-					.call_id()
-					.ok_or_else(|| bevyhow!("ActionMeta has no call_id"))?
-					.to_string(),
-				name: function_call.function_name().to_string(),
-				arguments: function_call.args().to_string(),
+				call_id: function_call.call_id,
+				name: function_call.name,
+				arguments: function_call.arguments,
 				status: None,
 			})
 		}
 		ActionPayload::FunctionCallOutput(output_item) => {
 			InputItem::FunctionCallOutput(FunctionCallOutputParam {
 				id: None,
-				call_id: meta
-					.call_id()
-					.ok_or_else(|| bevyhow!("ActionMeta has no call_id"))?
-					.to_string(),
-				output: FunctionOutputContent::Text(
-					output_item.output().to_string(),
-				),
+				call_id: output_item.call_id,
+				output: FunctionOutputContent::Text(output_item.output),
 				status: None,
 			})
 		}

@@ -42,39 +42,67 @@ pub struct ActionStream {
 	thread: ThreadId,
 	// store partial actions as they are built,
 	// cloning and returning on each stream part
-	action_map: DocMap<Action>,
+	actions: DocMap<Action>,
 	action_partial_map: ActionPartialMap,
+	provider_slug: Cow<'static, str>,
+	model_slug: Cow<'static, str>,
+	/// store the response partial with all actions drained,
+	/// for using metadata.
+	response: Option<ResponsePartial>,
 }
 
 impl ActionStream {
 	pub fn new(
 		action_store: Arc<dyn ActionStoreProvider>,
+		provider_slug: Cow<'static, str>,
+		model_slug: Cow<'static, str>,
 		agent: ActorId,
 		thread: ThreadId,
 		inner: ResPartialStream,
 	) -> Self {
 		Self {
 			action_store,
+			provider_slug,
+			model_slug,
 			agent,
 			thread,
 			inner,
-			action_map: default(),
+			actions: default(),
 			action_partial_map: default(),
+			response: None,
 		}
 	}
 
 	/// Returns an iterator over the collected actions.
 	pub fn actions(&self) -> impl Iterator<Item = &Action> {
-		self.action_map.values()
+		self.actions.values()
 	}
 
 	/// Commit the created actions to the ActionStore.
-	pub async fn write(self) -> Result {
+	pub async fn write(mut self) -> Result {
+		let actions = self.actions.values().collect::<Vec<_>>();
+		let response = self.response.ok_or_else(|| {
+			bevyhow!(
+				"response id is required to write actions, did the stream finish?"
+			)
+		})?;
+
+		let metas = actions.iter().map(|action| ResponseMeta {
+			action_id: action.id(),
+			provider_slug: self.provider_slug.to_string(),
+			model_slug: self.model_slug.to_string(),
+			response_id: response.response_id.clone(),
+			response_stored: response.response_stored,
+		});
 		self.action_store
-			.insert_actions(&self.action_map.values().collect::<Vec<_>>())
+			.insert_response_metas(metas.collect())
+			.await?;
+		self.action_store
+			.insert_actions(self.actions.drain().collect())
 			.await
 	}
 }
+
 
 impl Stream for ActionStream {
 	type Item = Result<ActionChanges>;
@@ -85,14 +113,17 @@ impl Stream for ActionStream {
 	) -> Poll<Option<Self::Item>> {
 		let this = self.get_mut();
 		match this.inner.as_mut().poll_next(cx) {
-			Poll::Ready(Some(Ok(res_partial))) => {
+			Poll::Ready(Some(Ok(mut res_partial))) => {
 				trace!("Streaming Event: {:#?}", res_partial);
+				let action_partials = res_partial.take_actions();
+				this.response = res_partial.xsome();
+
 				// get next state without the actions
 				let changes = this.action_partial_map.apply_actions(
-					&mut this.action_map,
+					&mut this.actions,
 					this.agent,
 					this.thread,
-					res_partial.actions,
+					action_partials,
 				)?;
 
 				Poll::Ready(Some(Ok(changes)))

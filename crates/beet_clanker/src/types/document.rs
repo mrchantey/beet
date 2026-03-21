@@ -138,6 +138,9 @@ impl<T: Document> DocMap<T> {
 		)
 	}
 	pub fn remove(&mut self, id: T::Id) -> Option<T> { self.0.remove(&id) }
+	pub fn drain(&mut self) -> impl Iterator<Item = T> {
+		self.0.drain().map(|(_, v)| v)
+	}
 	pub fn iter(&self) -> impl Iterator<Item = (&T::Id, &T)> { self.0.iter() }
 	pub fn iter_mut(&mut self) -> impl Iterator<Item = (&T::Id, &mut T)> {
 		self.0.iter_mut()

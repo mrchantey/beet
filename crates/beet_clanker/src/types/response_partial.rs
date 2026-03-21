@@ -16,6 +16,20 @@ pub struct ResponsePartial {
 	pub actions: Vec<ActionPartial>,
 }
 
+impl ResponsePartial {
+	pub fn is_final(&self) -> bool {
+		matches!(
+			self.status,
+			ResponseStatus::Completed
+				| ResponseStatus::Failed { .. }
+				| ResponseStatus::Cancelled
+		)
+	}
+	pub fn take_actions(&mut self) -> Vec<ActionPartial> {
+		std::mem::take(&mut self.actions)
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ResponseStatus {
 	Created,

@@ -23,6 +23,13 @@ pub impl<'a> EntityWorldMut<'a> {
 			.collect()
 	}
 
+	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
+	fn try_get<T: Component>(&self) -> Result<&T> {
+		self.get::<T>().ok_or_else(|| {
+			bevyhow!("Component not found: {}", std::any::type_name::<T>())
+		})
+	}
+
 	/// Gets a mutable reference to the child entity at the specified index, if it exists.
 	fn child(self, index: usize) -> Option<EntityWorldMut<'a>> {
 		let children = self.get::<Children>()?;

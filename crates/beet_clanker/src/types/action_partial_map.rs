@@ -57,15 +57,6 @@ impl ActionPartialMap {
 			})
 	}
 
-	fn get_action_id_for_call(&self, call_id: &str) -> Result<ActionId> {
-		self.call_id_to_action_id
-			.get(call_id)
-			.cloned()
-			.ok_or_else(|| {
-				bevyhow!("no action_id registered for call_id {call_id}")
-			})
-	}
-
 	// ═══════════════════════════════════════════════════════════════════════
 	// Response item key mapping
 	// ═══════════════════════════════════════════════════════════════════════
@@ -83,7 +74,10 @@ impl ActionPartialMap {
 		Ok(())
 	}
 
-	pub fn get_response_item(&self, key: &ActionPartialKey) -> Result<ActionId> {
+	pub fn get_response_item(
+		&self,
+		key: &ActionPartialKey,
+	) -> Result<ActionId> {
 		self.action_key_map.get(key).cloned().ok_or_else(|| {
 			bevyhow!("no action_id registered for responses item key {key:?}")
 		})
@@ -150,12 +144,12 @@ impl ActionPartialMap {
 			ActorKind::User => MessageRole::User,
 		};
 
-		let input_item = match action.payload() {
+		let input_item = match action.payload().clone() {
 			ActionPayload::Text(TextItem(value)) => {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
-					content: MessageContent::Text(value.clone()),
+					content: MessageContent::Text(value),
 					status: None,
 				})
 			}
@@ -163,7 +157,7 @@ impl ActionPartialMap {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
-					content: MessageContent::Text(value.clone()),
+					content: MessageContent::Text(value),
 					status: None,
 				})
 			}
@@ -171,7 +165,7 @@ impl ActionPartialMap {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
-					content: MessageContent::Text(value.clone()),
+					content: MessageContent::Text(value),
 					status: None,
 				})
 			}
@@ -179,7 +173,7 @@ impl ActionPartialMap {
 				InputItem::Message(MessageParam {
 					id: None,
 					role,
-					content: MessageContent::Text(value.clone()),
+					content: MessageContent::Text(value),
 					status: None,
 				})
 			}
@@ -190,7 +184,7 @@ impl ActionPartialMap {
 					openresponses::InputFile {
 						filename: Some(url_item.filename()),
 						file_data: None,
-						file_url: Some(url_item.url().to_string()),
+						file_url: Some(url_item.url.to_string()),
 					},
 				)]),
 				status: None,
@@ -221,11 +215,8 @@ impl ActionPartialMap {
 			ActionPayload::FunctionCallOutput(output_item) => {
 				InputItem::FunctionCallOutput(FunctionCallOutputParam {
 					id: None,
-					call_id: self
-						.get_call_id(output_item.function_call_item)?,
-					output: FunctionOutputContent::Text(
-						output_item.output().to_string(),
-					),
+					call_id: output_item.call_id,
+					output: FunctionOutputContent::Text(output_item.output),
 					status: None,
 				})
 			}
@@ -242,7 +233,7 @@ impl ActionPartialMap {
 	/// Also registers call_id and response_item mappings for new actions.
 	pub fn apply_actions(
 		&mut self,
-		action_map: &mut DocMap<Action>,
+		actions: &mut DocMap<Action>,
 		author: ActorId,
 		thread: ThreadId,
 		partial_items: impl IntoIterator<Item = ActionPartial>,
@@ -265,7 +256,7 @@ impl ActionPartialMap {
 
 			if let Some(&action_id) = self.action_key_map.get(&key) {
 				// action already exists, update it in place
-				let action = action_map.get_mut(action_id)?;
+				let action = actions.get_mut(action_id)?;
 				let before_mutation = action.hash();
 
 				action.set_status(status);
@@ -285,7 +276,7 @@ impl ActionPartialMap {
 			} else {
 				// create new action
 				let payload =
-					self.partial_content_into_payload(&key, content)?;
+					self.partial_content_into_payload(actions, &key, content)?;
 				let action = Action::new(author, thread, status, payload);
 				let action_id = action.id();
 
@@ -298,7 +289,7 @@ impl ActionPartialMap {
 				}
 
 				changes.created.push(action_id);
-				action_map.insert(action);
+				actions.insert(action);
 			}
 		}
 		changes.xok()
@@ -323,6 +314,7 @@ impl ActionPartialMap {
 	/// like [`PartialContent::Delta`].
 	fn partial_content_into_payload(
 		&self,
+		actions: &mut DocMap<Action>,
 		key: &ActionPartialKey,
 		partial: PartialContent,
 	) -> Result<ActionPayload> {
@@ -417,18 +409,16 @@ impl ActionPartialMap {
 			PartialContent::FunctionCall {
 				name,
 				arguments,
-				call_id: _,
+				call_id,
 			} => ActionPayload::FunctionCall(FunctionCallItem {
 				name,
 				arguments,
+				call_id
 			}),
 			PartialContent::FunctionCallOutput { call_id, output } => {
-				// resolve call_id to action_id
-				let function_call_item =
-					self.get_action_id_for_call(&call_id)?;
 				ActionPayload::FunctionCallOutput(FunctionCallOutputItem {
-					function_call_item,
 					output,
+					call_id
 				})
 			}
 			PartialContent::ReasoningContent(text) => {
@@ -448,10 +438,20 @@ impl ActionPartialMap {
 						)
 					}
 					ActionPartialKey::Single { .. } => {
+						let action_id = self.get_response_item(key)?;
+						let action = actions.get(action_id)?;
+						let ActionPayload::FunctionCall(item) = action.payload() else {
+							bevybail!(
+								"Expected FunctionCall payload for key {:?}, found {:?}",
+								key,
+								action.payload().kind()
+							)
+						};
 						// single-key items are function calls
 						ActionPayload::FunctionCall(FunctionCallItem {
 							name: String::new(),
 							arguments: delta,
+							call_id: item.call_id.clone()
 						})
 					}
 					ActionPartialKey::Content { .. } => {
@@ -560,10 +560,7 @@ impl ActionPartialMap {
 				ActionPayload::FunctionCallOutput(item),
 			) => {
 				item.output = output;
-				// update the function_call_item reference if possible
-				if let Ok(action_id) = self.get_action_id_for_call(&call_id) {
-					item.function_call_item = action_id;
-				}
+				item.call_id = call_id;
 			}
 			// ReasoningContent/Summary replace in place
 			(
