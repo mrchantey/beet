@@ -140,6 +140,12 @@ pub trait Xtend: Sized {
 	/// assert_eq!("foo".xsome(), Some("foo"));
 	/// ```
 	fn xsome(self) -> Option<Self> { Some(self) }
+	/// Wraps `self` in a `Vec`.
+	fn xvec(self) -> Vec<Self> {
+		let mut vec = Vec::with_capacity(1);
+		vec.push(self);
+		vec
+	}
 
 	/// Converts `self` using [`Into::into`].
 	///

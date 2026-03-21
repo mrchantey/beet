@@ -32,7 +32,7 @@ pub trait ActionStore: Send + Sync {
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
 }
 
-impl ActionStore for Arc<dyn ActionStore> {
+impl ActionStore for &Arc<dyn ActionStore> {
 	fn previous_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,

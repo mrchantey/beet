@@ -9,7 +9,14 @@ use crate::openresponses::request::FunctionOutputContent;
 use crate::openresponses::request::InputItem;
 use crate::openresponses::request::MessageContent;
 use crate::openresponses::request::MessageParam;
+use crate::openresponses::streaming::ResponseCompletedEvent;
+use crate::openresponses::streaming::ResponseCreatedEvent;
+use crate::openresponses::streaming::ResponseFailedEvent;
+use crate::openresponses::streaming::ResponseInProgressEvent;
+use crate::openresponses::streaming::ResponseIncompleteEvent;
+use crate::openresponses::streaming::ResponseQueuedEvent;
 use crate::prelude::*;
+use crate::types::StreamContext;
 use beet_core::prelude::*;
 
 
@@ -126,80 +133,271 @@ pub fn action_to_o11s_input(
 }
 
 
-
-pub fn o11s_stream_event_to_output(
-	action_store: impl ActionStore,
-	prev_state: Option<ActionStreamState>,
-	ev: StreamingEvent,
-	// agent_id: ActorId,
-	// action: Action,
-	// author: Actor,
-	// meta: ActionMeta,
-) -> Result<ActionStreamState> {
+/// ## Errors
+/// Errors if a [`StreamingEvent::Error`] is received
+pub fn o11s_stream_to_partial_actions(
+	event: StreamingEvent,
+) -> Result<Vec<PartialItem>> {
 	use StreamingEvent::*;
-	match ev {
+	// trace!("Streaming Event: {:#?}", event);
+	match event {
 		ResponseCreated(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::InProgress,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
 		ResponseQueued(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::InProgress,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
 		ResponseInProgress(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::InProgress,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
 		ResponseCompleted(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::Completed,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
 		ResponseFailed(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::Interrupted,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
 		ResponseIncomplete(ev) => {
-			response_to_stream_state(action_store, ev.response)
+			// usually empty but parse anyway
+			PartialItem::from_output_items(
+				ev.response.output,
+				ActionStatus::Interrupted,
+			)
+			.into_iter()
+			.collect::<Vec<_>>()
 		}
-		OutputItemAdded(output_item_added_event) => todo!(),
-		OutputItemDone(output_item_done_event) => todo!(),
-		ContentPartAdded(content_part_added_event) => todo!(),
-		ContentPartDone(content_part_done_event) => todo!(),
-		OutputTextDelta(output_text_delta_event) => todo!(),
-		OutputTextDone(output_text_done_event) => todo!(),
-		OutputTextAnnotationAdded(output_text_annotation_added_event) => {
-			todo!()
+		OutputItemAdded(item_added) => PartialItem::from_output_items(
+			item_added.item,
+			ActionStatus::InProgress,
+		)
+		.into_iter()
+		.collect::<Vec<_>>(),
+		OutputItemDone(item_done) => PartialItem::from_output_items(
+			item_done.item,
+			ActionStatus::Completed,
+		)
+		.into_iter()
+		.collect::<Vec<_>>(),
+		ContentPartAdded(part_added) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: part_added.item_id,
+				content_index: part_added.content_index,
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::ContentPart(part_added.part),
 		}
-		RefusalDelta(refusal_delta_event) => todo!(),
-		RefusalDone(refusal_done_event) => todo!(),
-		ReasoningDelta(reasoning_delta_event) => todo!(),
-		ReasoningDone(reasoning_done_event) => todo!(),
-		ReasoningSummaryTextDelta(reasoning_summary_text_delta_event) => {
-			todo!()
+		.xvec(),
+		ContentPartDone(part_done) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: part_done.item_id,
+				content_index: part_done.content_index,
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::ContentPart(part_done.part),
 		}
-		ReasoningSummaryTextDone(reasoning_summary_text_done_event) => todo!(),
-		ReasoningSummaryPartAdded(reasoning_summary_part_added_event) => {
-			todo!()
+		.xvec(),
+		OutputTextDelta(text_delta) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: text_delta.item_id,
+				content_index: text_delta.content_index,
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::Delta(text_delta.delta),
 		}
-		ReasoningSummaryPartDone(reasoning_summary_part_done_event) => todo!(),
-		FunctionCallArgumentsDelta(function_call_arguments_delta_event) => {
-			todo!()
+		.xvec(),
+		OutputTextDone(text_done) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: text_done.item_id,
+				content_index: text_done.content_index,
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::TextDone {
+				text: text_done.text,
+				logprobs: text_done.logprobs,
+			},
 		}
-		FunctionCallArgumentsDone(function_call_arguments_done_event) => {
-			todo!()
+		.xvec(),
+		OutputTextAnnotationAdded(annotation_added) => {
+			if let Some(annotation) = annotation_added.annotation {
+				PartialItem {
+					key: PartialItemKey::Content {
+						responses_id: annotation_added.item_id,
+						content_index: annotation_added.content_index,
+					},
+					status: ActionStatus::InProgress,
+					content: PartialContent::AnnotationAdded {
+						annotation,
+						annotation_index: annotation_added.annotation_index,
+					},
+				}
+				.xvec()
+			} else {
+				default()
+				// no annotation, nothing to do
+			}
 		}
-		Error(error_event) => todo!(),
+		RefusalDelta(refusal_delta) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: refusal_delta.item_id,
+				content_index: refusal_delta.content_index,
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::Delta(refusal_delta.delta),
+		}
+		.xvec(),
+		RefusalDone(refusal_done) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: refusal_done.item_id,
+				content_index: refusal_done.content_index,
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::RefusalDone {
+				refusal: refusal_done.refusal,
+			},
+		}
+		.xvec(),
+		ReasoningDelta(reasoning_delta) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: reasoning_delta.item_id,
+				content_index: reasoning_delta.content_index,
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::Delta(reasoning_delta.delta),
+		}
+		.xvec(),
+		ReasoningDone(reasoning_done) => PartialItem {
+			key: PartialItemKey::Content {
+				responses_id: reasoning_done.item_id,
+				content_index: reasoning_done.content_index,
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::ReasoningDone {
+				content: reasoning_done.text,
+			},
+		}
+		.xvec(),
+		ReasoningSummaryTextDelta(summary_delta) => PartialItem {
+			key: PartialItemKey::ReasoningSummary {
+				responses_id: summary_delta.item_id,
+				summary_index: summary_delta.summary_index.unwrap_or(0),
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::Delta(summary_delta.delta),
+		}
+		.xvec(),
+		ReasoningSummaryTextDone(summary_done) => PartialItem {
+			key: PartialItemKey::ReasoningSummary {
+				responses_id: summary_done.item_id,
+				summary_index: summary_done.summary_index.unwrap_or(0),
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::ReasoningSummary(summary_done.text),
+		}
+		.xvec(),
+		ReasoningSummaryPartAdded(summary_added) => PartialItem {
+			key: PartialItemKey::ReasoningSummary {
+				responses_id: summary_added.item_id,
+				summary_index: summary_added.summary_index.unwrap_or(0),
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::ContentPart(summary_added.part),
+		}
+		.xvec(),
+		ReasoningSummaryPartDone(summary_done) => PartialItem {
+			key: PartialItemKey::ReasoningSummary {
+				responses_id: summary_done.item_id,
+				summary_index: summary_done.summary_index.unwrap_or(0),
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::ContentPart(summary_done.part),
+		}
+		.xvec(),
+		FunctionCallArgumentsDelta(arguments_delta) => PartialItem {
+			key: PartialItemKey::Single {
+				responses_id: arguments_delta.item_id,
+			},
+			status: ActionStatus::InProgress,
+			content: PartialContent::Delta(arguments_delta.delta),
+		}
+		.xvec(),
+		FunctionCallArgumentsDone(arguments_done) => PartialItem {
+			key: PartialItemKey::Single {
+				responses_id: arguments_done.item_id,
+			},
+			status: ActionStatus::Completed,
+			content: PartialContent::FunctionCallArgumentsDone(
+				arguments_done.arguments,
+			),
+		}
+		.xvec(),
+		Error(error) => {
+			bevybail!("Model streaming error: {:?}", error.error);
+		}
 	}
+	.xok()
 }
 
 
+
+pub fn ev_to_stream_state(
+	prev: Option<ActionStreamState>,
+	ev: &StreamingEvent,
+) -> Result<ActionStreamState> {
+	use StreamingEvent::*;
+	match ev {
+		ResponseCreated(ResponseCreatedEvent { response, .. })
+		| ResponseQueued(ResponseQueuedEvent { response, .. })
+		| ResponseInProgress(ResponseInProgressEvent { response, .. })
+		| ResponseIncomplete(ResponseIncompleteEvent { response, .. })
+		| ResponseCompleted(ResponseCompletedEvent { response, .. })
+		| ResponseFailed(ResponseFailedEvent { response, .. }) => {
+			response_to_stream_state(response)
+		}
+		Error(err) => {
+			bevybail!("Received error event in stream: {:?}", err.error);
+		}
+		_ => prev.ok_or_else(|| {
+			bevyhow!("Received non-response event with no previous state")
+		}),
+	}
+}
+
+/// Create a stream state with no actions
 fn response_to_stream_state(
-	action_store: impl ActionStore,
-	response: ResponseBody,
+	response: &ResponseBody,
 ) -> Result<ActionStreamState> {
 	ActionStreamState {
-		mutations: output_items_to_mutations(
-			action_store,
-			&response.id,
-			response.store.unwrap_or(false),
-			response.output,
-		)?,
-		response_id: response.id,
+		actions: default(),
+		response_id: response.id.clone(),
 		response_stored: response.store.unwrap_or(false),
 		status: {
 			use openresponses::response::Status::*;
@@ -207,9 +405,9 @@ fn response_to_stream_state(
 				InProgress => ActionStreamStatus::InProgress,
 				Completed => ActionStreamStatus::Completed,
 				Incomplete => ActionStreamStatus::Incomplete(
-					response.incomplete_details.map(|d| d.reason),
+					response.incomplete_details.clone().map(|d| d.reason),
 				),
-				Failed => match response.error {
+				Failed => match response.error.clone() {
 					Some(err) => ActionStreamStatus::Failed {
 						code: Some(err.code),
 						message: Some(err.message),
@@ -223,7 +421,7 @@ fn response_to_stream_state(
 				Queued => ActionStreamStatus::Queued,
 			}
 		},
-		token_usage: response.usage.map(|usage| TokenUsage {
+		token_usage: response.usage.clone().map(|usage| TokenUsage {
 			input_tokens: usage.input_tokens,
 			output_tokens: usage.output_tokens,
 			total_tokens: usage.total_tokens,
@@ -236,47 +434,4 @@ fn response_to_stream_state(
 		}),
 	}
 	.xok()
-}
-
-
-fn require_prev_state(
-	prev_state: Option<ActionStreamState>,
-) -> Result<ActionStreamState> {
-	prev_state.ok_or_else(|| {
-		bevyhow!(
-			"Stream Order Error: Previous state is required for partial streams"
-		)
-	})
-}
-
-
-fn output_items_to_mutations(
-	action_store: impl ActionStore,
-	response_id: &str,
-	respose_stored: bool,
-	items: Vec<OutputItem>,
-) -> Result<HashMap<ActionId, ActionMutation>> {
-	let mut map = HashMap::default();
-	/// Only insert if no existing key or it is a lower level,
-	/// ie Updated does not clobber Created.
-	fn selective_insert(
-		map: &mut HashMap<ActionId, ActionMutation>,
-		id: ActionId,
-		mutation: ActionMutation,
-	) {
-		use ActionMutation::*;
-		match mutation {
-			Created => {
-				map.entry(id).or_insert(Created);
-			}
-			Updated => {
-				map.entry(id).or_insert(Updated);
-			}
-		}
-	}
-	for item in items {
-		todo!()
-	}
-
-	Ok(map)
 }

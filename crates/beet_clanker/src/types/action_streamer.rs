@@ -38,7 +38,9 @@ pub struct ActionStreamState {
 	pub response_stored: bool,
 	pub status: ActionStreamStatus,
 	pub token_usage: Option<TokenUsage>,
-	pub mutations: HashMap<ActionId, ActionMutation>,
+	/// List of actions that were inserted, these may have
+	/// been created or updated.
+	pub actions: Vec<Action>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -54,14 +56,6 @@ pub enum ActionStreamStatus {
 	Incomplete(Option<String>),
 	Cancelled,
 }
-
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ActionMutation {
-	Created,
-	Updated,
-}
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TokenUsage {
