@@ -125,15 +125,17 @@ impl<T: Document> DocMap<T> {
 	}
 	#[track_caller]
 	pub fn get(&self, id: T::Id) -> Result<&T> {
-		self.0
-			.get(&id)
-			.ok_or_else(|| bevyhow!("Id {id:?} not found in DocMap"))
+		self.0.get(&id).ok_or_else(
+			#[cfg_attr(feature = "nightly", track_caller)]
+			|| bevyhow!("Id {id:?} not found in DocMap"),
+		)
 	}
 	#[track_caller]
 	pub fn get_mut(&mut self, id: T::Id) -> Result<&mut T> {
-		self.0
-			.get_mut(&id)
-			.ok_or_else(|| bevyhow!("Id {id:?} not found in DocMap"))
+		self.0.get_mut(&id).ok_or_else(
+			#[cfg_attr(feature = "nightly", track_caller)]
+			|| bevyhow!("Id {id:?} not found in DocMap"),
+		)
 	}
 	pub fn remove(&mut self, id: T::Id) -> Option<T> { self.0.remove(&id) }
 	pub fn iter(&self) -> impl Iterator<Item = (&T::Id, &T)> { self.0.iter() }

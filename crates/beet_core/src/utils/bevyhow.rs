@@ -6,15 +6,29 @@
 use alloc::string::String;
 use bevy::prelude::BevyError;
 
+#[cfg(feature = "ansi_paint")]
+use crate::utils::paint_ext;
+
 /// Intermediary type for converting formatted strings to [`BevyError`].
 ///
 /// This type implements [`core::error::Error`] and can be converted into a
 /// [`BevyError`] for use in Bevy systems.
-pub struct BevyhowError(pub String);
+pub struct BevyhowError {
+	/// The error message
+	pub message: String,
+	/// The location where the error was created, captured using `#[track_caller]`.
+	pub location: &'static core::panic::Location<'static>,
+}
 
 impl BevyhowError {
 	/// Creates a new error from any string-like type.
-	pub fn new(msg: impl Into<String>) -> Self { BevyhowError(msg.into()) }
+	#[track_caller]
+	pub fn new(msg: impl Into<String>) -> Self {
+		BevyhowError {
+			message: msg.into(),
+			location: core::panic::Location::caller(),
+		}
+	}
 
 	/// Converts this error into a [`BevyError`].
 	pub fn into_bevy(self) -> BevyError { self.into() }
@@ -24,13 +38,16 @@ impl core::error::Error for BevyhowError {}
 
 impl core::fmt::Display for BevyhowError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{}", self.0)
+		let location = format!("  at {}", self.location);
+		#[cfg(feature = "ansi_paint")]
+		let location = paint_ext::dimmed(location);
+		write!(f, "{}\n{}", self.message, location)
 	}
 }
 
 impl core::fmt::Debug for BevyhowError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{}", self.0)
+		write!(f, "{}\n\tat {}", self.message, self.location)
 	}
 }
 

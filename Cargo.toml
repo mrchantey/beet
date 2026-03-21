@@ -104,6 +104,7 @@ beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.6" }
 # beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.6" }
 
 #💡 local
+# bevy_ecs = {version = "0.18", default-features = false, features = ["backtrace"]}
 bevy = { version = "0.18", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
