@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::tasks::BoxedFuture;
 use futures::Stream;
-use std::borrow::Cow;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -146,12 +145,9 @@ impl ActionStreamer for O11sStreamer {
 
 			let stream: ActionStream = Box::pin(O11sStream::new(
 				StreamContext {
-					action_store: Arc::clone(&self.action_store),
 					agent,
 					thread,
 					prev_state: None,
-					provider_slug: self.model.provider_slug.clone(),
-					model_slug: self.model.model_slug.clone(),
 				},
 				typed_stream,
 			));
@@ -222,24 +218,9 @@ where
 
 #[derive(Clone)]
 pub(super) struct StreamContext {
-	pub provider_slug: Cow<'static, str>,
-	pub model_slug: Cow<'static, str>,
 	pub agent: ActorId,
 	pub thread: ThreadId,
-	pub action_store: Arc<dyn ActionStore>,
 	pub prev_state: Option<ActionStreamState>,
-}
-impl StreamContext {
-	fn clone_take_state(&mut self) -> Self {
-		Self {
-			provider_slug: self.provider_slug.clone(),
-			model_slug: self.model_slug.clone(),
-			agent: self.agent,
-			thread: self.thread,
-			action_store: Arc::clone(&self.action_store),
-			prev_state: self.prev_state.take(),
-		}
-	}
 }
 
 /// Processes typed streaming events into [`ActionStreamOut`] values.
@@ -248,7 +229,9 @@ struct O11sStream {
 		Box<dyn Stream<Item = Result<openresponses::StreamingEvent>> + Send>,
 	>,
 	cx: StreamContext,
-	context_map: ContextMap,
+	// store partial actions as they are built,
+	// cloning and returning on each stream part
+	action_map: DocMap<Action>,
 	partial_item_map: PartialItemMap,
 }
 
@@ -257,7 +240,7 @@ impl O11sStream {
 		Self {
 			cx,
 			inner,
-			context_map: default(),
+			action_map: default(),
 			partial_item_map: default(),
 		}
 	}
@@ -274,21 +257,24 @@ impl Stream for O11sStream {
 		match this.inner.as_mut().poll_next(cx) {
 			Poll::Ready(Some(Ok(event))) => {
 				trace!("Streaming Event: {:#?}", event);
-				let state = o11s_mapper::ev_to_stream_state(
+				// get next state without the actions
+				let mut state = o11s_mapper::ev_to_stream_state(
 					this.cx.prev_state.take(),
 					&event,
 				)?;
 				let partials =
 					o11s_mapper::o11s_stream_to_partial_actions(event)?;
 				let changes = this.partial_item_map.apply_actions(
-					this.context_map.actions_mut(),
+					&mut this.action_map,
 					this.cx.agent,
 					this.cx.thread,
 					partials,
 				)?;
-				// state.actions = changes.into_iter().map(|(action, _)| action).collect();
+				// clone state without actions, they arent used
 				this.cx.prev_state = Some(state.clone());
-				todo!("map changes to actions..");
+				state.actions = changes
+					.all_actions()
+					.xtry_map(|id| this.action_map.get(*id).cloned())?;
 				Poll::Ready(Some(Ok(state)))
 			}
 			Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),

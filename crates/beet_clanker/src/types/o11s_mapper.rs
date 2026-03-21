@@ -1,6 +1,5 @@
 use crate::openresponses::ContentPart;
 use crate::openresponses::MessageRole;
-use crate::openresponses::OutputItem;
 use crate::openresponses::ResponseBody;
 use crate::openresponses::StreamingEvent;
 use crate::openresponses::request::FunctionCallOutputParam;
@@ -16,7 +15,6 @@ use crate::openresponses::streaming::ResponseInProgressEvent;
 use crate::openresponses::streaming::ResponseIncompleteEvent;
 use crate::openresponses::streaming::ResponseQueuedEvent;
 use crate::prelude::*;
-use crate::types::StreamContext;
 use beet_core::prelude::*;
 
 
