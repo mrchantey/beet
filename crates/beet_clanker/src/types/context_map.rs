@@ -126,7 +126,7 @@ impl ContextQuery<'_, '_> {
 			return Ok(());
 		}
 
-		for &action_id in changes.all_actions() {
+		for action_id in changes.all_actions() {
 			let action = self.context_map.actions.get(action_id)?;
 			let thread_id = action.thread();
 			let actor_id = action.author();
@@ -164,8 +164,12 @@ impl ActionChanges {
 	}
 
 	/// All action ids that were either created or modified
-	pub fn all_actions(&self) -> impl Iterator<Item = &ActionId> {
-		self.created.iter().chain(self.modified.iter())
+	pub fn all_actions(&self) -> Vec<ActionId> {
+		self.created
+			.iter()
+			.chain(self.modified.iter())
+			.copied()
+			.collect()
 	}
 }
 

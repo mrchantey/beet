@@ -46,8 +46,11 @@ pub trait ActionStoreProvider: 'static + Send + Sync {
 		after_action: Option<ActionId>,
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor)>>>;
 
-	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<()>>;
-	fn insert_thread(&self, thread: Thread) -> BoxedFuture<'_, Result<()>>;
+	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>>;
+	fn insert_thread(
+		&self,
+		thread: Thread,
+	) -> BoxedFuture<'_, Result<ThreadId>>;
 	fn insert_actions(
 		&self,
 		actions: Vec<Action>,
@@ -85,11 +88,14 @@ impl ActionStoreProvider for Arc<dyn ActionStoreProvider> {
 		self.as_ref().full_thread_actions(thread_id, after_action)
 	}
 
-	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<()>> {
+	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>> {
 		self.as_ref().insert_actor(actor)
 	}
 
-	fn insert_thread(&self, thread: Thread) -> BoxedFuture<'_, Result<()>> {
+	fn insert_thread(
+		&self,
+		thread: Thread,
+	) -> BoxedFuture<'_, Result<ThreadId>> {
 		self.as_ref().insert_thread(thread)
 	}
 	fn insert_actions(
@@ -190,22 +196,24 @@ impl ActionStoreProvider for MemoryActionStore {
 		})
 	}
 
-	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>> {
+	fn insert_actor(&self, actor: Actor) -> BoxedFuture<'_, Result<ActorId>> {
 		Box::pin(async move {
+			let id = actor.id();
 			let mut map = self.map.write().await;
 			map.actors_mut().insert(actor.clone());
-			Ok(())
+			Ok(id)
 		})
 	}
 
-	fn insert_thread<'a>(
-		&'a self,
+	fn insert_thread(
+		&self,
 		thread: Thread,
-	) -> BoxedFuture<'a, Result<()>> {
+	) -> BoxedFuture<'_, Result<ThreadId>> {
 		Box::pin(async move {
+			let id = thread.id();
 			let mut map = self.map.write().await;
 			map.threads_mut().insert(thread.clone());
-			Ok(())
+			Ok(id)
 		})
 	}
 

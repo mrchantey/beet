@@ -6,7 +6,6 @@ use beet_net::prelude::*;
 use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
@@ -125,7 +124,6 @@ impl ActionStreamer for O11sStreamer {
 				Box::pin(futures::stream::once(async move { Ok(res_partial) }))
 			};
 			ActionStream::new(
-				Arc::new(action_store),
 				self.model.provider_slug.clone(),
 				self.model.model_slug.clone(),
 				agent,

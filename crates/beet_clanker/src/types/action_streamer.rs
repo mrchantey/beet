@@ -4,7 +4,6 @@ use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use std::borrow::Cow;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
@@ -21,7 +20,7 @@ pub struct ModelDef {
 pub trait ActionStreamer {
 	fn stream_actions(
 		&mut self,
-		action_store: impl ActionStoreProvider,
+		store: impl ActionStoreProvider,
 		actor: ActorId,
 		thread: ThreadId,
 	) -> BoxedFuture<'_, Result<ActionStream>>;
@@ -31,12 +30,11 @@ pub trait ActionStreamer {
 
 
 pub(super) type ResPartialStream =
-	Pin<Box<dyn Stream<Item = Result<ResponsePartial>> + Send>>;
+	Pin<Box<dyn Stream<Item = Result<ResponsePartial>> + Send + Sync>>;
 
 
 /// Processes typed streaming events into [`ActionStreamOut`] values.
 pub struct ActionStream {
-	action_store: Arc<dyn ActionStoreProvider>,
 	inner: ResPartialStream,
 	agent: ActorId,
 	thread: ThreadId,
@@ -53,7 +51,6 @@ pub struct ActionStream {
 
 impl ActionStream {
 	pub fn new(
-		action_store: Arc<dyn ActionStoreProvider>,
 		provider_slug: Cow<'static, str>,
 		model_slug: Cow<'static, str>,
 		agent: ActorId,
@@ -61,7 +58,6 @@ impl ActionStream {
 		inner: ResPartialStream,
 	) -> Self {
 		Self {
-			action_store,
 			provider_slug,
 			model_slug,
 			agent,
@@ -78,10 +74,20 @@ impl ActionStream {
 		self.actions.values()
 	}
 
-	/// Commit the created actions to the ActionStore.
-	pub async fn write(mut self) -> Result {
-		let actions = self.actions.values().collect::<Vec<_>>();
-		let response = self.response.ok_or_else(|| {
+	/// Commit the specified actions to the store,
+	/// ignoring any not in its map.
+	pub async fn write(
+		&self,
+		store: impl ActionStoreProvider,
+		actions: Vec<ActionId>,
+	) -> Result {
+		let actions = self
+			.actions
+			.values()
+			.filter(|action| actions.contains(&&action.id()))
+			.map(|action| action.clone())
+			.collect::<Vec<_>>();
+		let response = self.response.as_ref().ok_or_else(|| {
 			bevyhow!(
 				"response id is required to write actions, did the stream finish?"
 			)
@@ -94,12 +100,9 @@ impl ActionStream {
 			response_id: response.response_id.clone(),
 			response_stored: response.response_stored,
 		});
-		self.action_store
-			.insert_response_metas(metas.collect())
-			.await?;
-		self.action_store
-			.insert_actions(self.actions.drain().collect())
-			.await
+		store.insert_response_metas(metas.collect()).await?;
+		store.insert_actions(actions).await?;
+		Ok(())
 	}
 }
 

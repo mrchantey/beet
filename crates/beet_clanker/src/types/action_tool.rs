@@ -31,8 +31,9 @@ where
 	while let Some(ev) = stream.next().await {
 		let changes = ev?;
 		trace!("action stream changes: {changes:#?}");
+		stream.write(store.inner(), changes.all_actions()).await?;
 	}
-	stream.write().await?;
+
 
 	Ok(Pass(()))
 }
