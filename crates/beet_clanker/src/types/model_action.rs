@@ -60,7 +60,7 @@ pub struct ModelAction {
 	/// Track which action was sent last, for skipping sent
 	/// actions when a previous_response_id is used.
 	last_action_sent: Option<ActionId>,
-	partial_items: PartialItemMap,
+	partial_items: ActionPartialMap,
 }
 
 
@@ -214,7 +214,7 @@ impl ModelAction {
 		self.previous_response_id = Some(response.id.clone());
 
 		let partial_items =
-			PartialItem::from_output_items(response.output, status);
+			ActionPartial::from_output_items(response.output, status);
 
 		self.handle_partial_items(
 			context_query,
@@ -241,7 +241,7 @@ impl ModelAction {
 		context_query: &mut ContextQuery,
 		author: ActorId,
 		thread: ThreadId,
-		items: impl IntoIterator<Item = PartialItem>,
+		items: impl IntoIterator<Item = ActionPartial>,
 	) -> Result {
 		let changes = self.partial_items.apply_actions(
 			context_query.actions_mut(),
@@ -331,7 +331,7 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem::from_output_items(
+					ActionPartial::from_output_items(
 						item_added.item,
 						ActionStatus::InProgress,
 					),
@@ -342,7 +342,7 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem::from_output_items(
+					ActionPartial::from_output_items(
 						item_done.item,
 						ActionStatus::Completed,
 					),
@@ -353,8 +353,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: part_added.item_id,
 							content_index: part_added.content_index,
 						},
@@ -369,8 +369,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: part_done.item_id,
 							content_index: part_done.content_index,
 						},
@@ -385,8 +385,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: text_delta.item_id,
 							content_index: text_delta.content_index,
 						},
@@ -401,8 +401,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: text_done.item_id,
 							content_index: text_done.content_index,
 						},
@@ -421,8 +421,8 @@ impl ModelAction {
 						context_query,
 						owner,
 						thread_id,
-						PartialItem {
-							key: PartialItemKey::Content {
+						ActionPartial {
+							key: ActionPartialKey::Content {
 								responses_id: annotation_added.item_id,
 								content_index: annotation_added.content_index,
 							},
@@ -444,8 +444,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: refusal_delta.item_id,
 							content_index: refusal_delta.content_index,
 						},
@@ -460,8 +460,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: refusal_done.item_id,
 							content_index: refusal_done.content_index,
 						},
@@ -478,8 +478,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: reasoning_delta.item_id,
 							content_index: reasoning_delta.content_index,
 						},
@@ -494,8 +494,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Content {
+					ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: reasoning_done.item_id,
 							content_index: reasoning_done.content_index,
 						},
@@ -512,8 +512,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::ReasoningSummary {
+					ActionPartial {
+						key: ActionPartialKey::ReasoningSummary {
 							responses_id: summary_delta.item_id,
 							summary_index: summary_delta
 								.summary_index
@@ -530,8 +530,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::ReasoningSummary {
+					ActionPartial {
+						key: ActionPartialKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
 							summary_index: summary_done
 								.summary_index
@@ -550,8 +550,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::ReasoningSummary {
+					ActionPartial {
+						key: ActionPartialKey::ReasoningSummary {
 							responses_id: summary_added.item_id,
 							summary_index: summary_added
 								.summary_index
@@ -570,8 +570,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::ReasoningSummary {
+					ActionPartial {
+						key: ActionPartialKey::ReasoningSummary {
 							responses_id: summary_done.item_id,
 							summary_index: summary_done
 								.summary_index
@@ -588,8 +588,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Single {
+					ActionPartial {
+						key: ActionPartialKey::Single {
 							responses_id: arguments_delta.item_id,
 						},
 						status: ActionStatus::InProgress,
@@ -603,8 +603,8 @@ impl ModelAction {
 					context_query,
 					owner,
 					thread_id,
-					PartialItem {
-						key: PartialItemKey::Single {
+					ActionPartial {
+						key: ActionPartialKey::Single {
 							responses_id: arguments_done.item_id,
 						},
 						status: ActionStatus::Completed,

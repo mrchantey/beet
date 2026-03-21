@@ -220,7 +220,7 @@ where
 pub(super) struct StreamContext {
 	pub agent: ActorId,
 	pub thread: ThreadId,
-	pub prev_state: Option<ActionStreamState>,
+	pub prev_state: Option<ResponsePartial>,
 }
 
 /// Processes typed streaming events into [`ActionStreamOut`] values.
@@ -232,7 +232,7 @@ struct O11sStream {
 	// store partial actions as they are built,
 	// cloning and returning on each stream part
 	action_map: DocMap<Action>,
-	partial_item_map: PartialItemMap,
+	partial_item_map: ActionPartialMap,
 }
 
 impl O11sStream {
@@ -247,7 +247,7 @@ impl O11sStream {
 }
 
 impl Stream for O11sStream {
-	type Item = Result<ActionStreamState>;
+	type Item = Result<ResponsePartial>;
 
 	fn poll_next(
 		self: Pin<&mut Self>,

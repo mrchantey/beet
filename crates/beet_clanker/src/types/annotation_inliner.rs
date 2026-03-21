@@ -2,7 +2,7 @@ use crate::openresponses::Annotation;
 use crate::openresponses::UrlCitation;
 use beet_core::prelude::*;
 
-use super::PartialItemKey;
+use super::ActionPartialKey;
 
 #[derive(Debug, Clone, Default)]
 struct AnnotationState {
@@ -22,7 +22,7 @@ pub struct AnnotationInliner {
 	footnote_style: bool,
 	/// Per-item state keyed by [`PartialItemKey`], storing original text
 	/// and all annotations received so far.
-	item_state: HashMap<PartialItemKey, AnnotationState>,
+	item_state: HashMap<ActionPartialKey, AnnotationState>,
 }
 
 impl Default for AnnotationInliner {
@@ -44,7 +44,7 @@ impl AnnotationInliner {
 
 	/// Store the original (un-annotated) text for a given item key.
 	/// Called when `TextDone` arrives or when full content is first known.
-	pub fn set_original_text(&mut self, key: PartialItemKey, text: String) {
+	pub fn set_original_text(&mut self, key: ActionPartialKey, text: String) {
 		self.item_state.entry(key).or_default().original_text = text;
 	}
 
@@ -53,7 +53,7 @@ impl AnnotationInliner {
 	/// `None` if no original text has been stored for this key.
 	pub fn push_annotation(
 		&mut self,
-		key: &PartialItemKey,
+		key: &ActionPartialKey,
 		annotation: Annotation,
 	) -> Option<String> {
 		self.item_state.get_mut(key)?.annotations.push(annotation);
@@ -62,7 +62,7 @@ impl AnnotationInliner {
 
 	/// Render the current annotated text for a key without adding a new
 	/// annotation. Returns `None` if no original text is stored.
-	pub fn render(&self, key: &PartialItemKey) -> Option<String> {
+	pub fn render(&self, key: &ActionPartialKey) -> Option<String> {
 		let state = self.item_state.get(key)?;
 		if state.annotations.is_empty() {
 			return Some(state.original_text.clone());
@@ -229,8 +229,8 @@ mod test {
 		})
 	}
 
-	fn make_key(id: &str, index: u32) -> PartialItemKey {
-		PartialItemKey::Content {
+	fn make_key(id: &str, index: u32) -> ActionPartialKey {
+		ActionPartialKey::Content {
 			responses_id: id.to_string(),
 			content_index: index,
 		}

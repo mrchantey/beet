@@ -27,17 +27,17 @@ use serde::Serialize;
 /// as an equality check is used before reifying into an [`Action`].
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PartialItem {
-	pub key: PartialItemKey,
+pub struct ActionPartial {
+	pub key: ActionPartialKey,
 	pub status: ActionStatus,
 	pub content: PartialContent,
 }
 
-impl PartialItem {
+impl ActionPartial {
 	pub fn from_output_items(
 		items: impl IntoIterator<Item = OutputItem>,
 		status: ActionStatus,
-	) -> impl IntoIterator<Item = PartialItem> {
+	) -> impl IntoIterator<Item = ActionPartial> {
 		items
 			.into_iter()
 			.flat_map(move |item| Self::from_output_item(item, status))
@@ -66,11 +66,11 @@ impl PartialItem {
 					.into_iter()
 					.enumerate()
 					.map(|(content_index, content)| {
-						let key = PartialItemKey::Content {
+						let key = ActionPartialKey::Content {
 							responses_id: message.id.clone(),
 							content_index: content_index as u32,
 						};
-						PartialItem {
+						ActionPartial {
 							key,
 							status,
 							content: PartialContent::OutputContent(content),
@@ -93,8 +93,8 @@ impl PartialItem {
 						}
 					})
 					.unwrap_or(status);
-				vec![PartialItem {
-					key: PartialItemKey::Single {
+				vec![ActionPartial {
+					key: ActionPartialKey::Single {
 						responses_id: fc_call.id,
 					},
 					status,
@@ -111,8 +111,8 @@ impl PartialItem {
 					FunctionCallStatus::Completed => ActionStatus::Completed,
 					FunctionCallStatus::Incomplete => ActionStatus::Interrupted,
 				};
-				vec![PartialItem {
-					key: PartialItemKey::Single {
+				vec![ActionPartial {
+					key: ActionPartialKey::Single {
 						responses_id: fc_output.id,
 					},
 					status,
@@ -129,8 +129,8 @@ impl PartialItem {
 				for (index, content) in
 					reasoning_item.content.into_iter().enumerate()
 				{
-					out.push(PartialItem {
-						key: PartialItemKey::Content {
+					out.push(ActionPartial {
+						key: ActionPartialKey::Content {
 							responses_id: reasoning_item.id.clone(),
 							content_index: index as u32,
 						},
@@ -141,8 +141,8 @@ impl PartialItem {
 				for (index, summary) in
 					reasoning_item.summary.into_iter().enumerate()
 				{
-					out.push(PartialItem {
-						key: PartialItemKey::ReasoningSummary {
+					out.push(ActionPartial {
+						key: ActionPartialKey::ReasoningSummary {
 							responses_id: reasoning_item.id.clone(),
 							summary_index: index as u32,
 						},
@@ -160,7 +160,7 @@ impl PartialItem {
 		delta: String,
 	) -> Self {
 		Self {
-			key: PartialItemKey::Content {
+			key: ActionPartialKey::Content {
 				responses_id,
 				content_index,
 			},
@@ -174,7 +174,7 @@ impl PartialItem {
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-pub enum PartialItemKey {
+pub enum ActionPartialKey {
 	/// There is only one piece of content, ie a function call
 	Single { responses_id: String },
 	/// The item has multiple pieces of content, ie text, reasoning

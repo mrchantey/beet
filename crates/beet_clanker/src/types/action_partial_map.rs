@@ -13,16 +13,16 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(Debug, Default)]
-pub struct PartialItemMap {
+pub struct ActionPartialMap {
 	annotation_inliner: AnnotationInliner,
 	/// Map an openresponses call id to an [`ActionId`]
 	call_id_to_action_id: HashMap<String, ActionId>,
 	action_id_to_call_id: HashMap<ActionId, String>,
 	/// Map partial item keys to the created [`ActionId`]
-	action_key_map: HashMap<PartialItemKey, ActionId>,
+	action_key_map: HashMap<ActionPartialKey, ActionId>,
 }
 
-impl PartialItemMap {
+impl ActionPartialMap {
 	pub fn new() -> Self { Self::default() }
 
 	pub fn with_annotation_inliner(
@@ -72,7 +72,7 @@ impl PartialItemMap {
 
 	fn set_response_item(
 		&mut self,
-		key: PartialItemKey,
+		key: ActionPartialKey,
 		action_id: ActionId,
 	) -> Result {
 		if self.action_key_map.contains_key(&key) {
@@ -83,7 +83,7 @@ impl PartialItemMap {
 		Ok(())
 	}
 
-	pub fn get_response_item(&self, key: &PartialItemKey) -> Result<ActionId> {
+	pub fn get_response_item(&self, key: &ActionPartialKey) -> Result<ActionId> {
 		self.action_key_map.get(key).cloned().ok_or_else(|| {
 			bevyhow!("no action_id registered for responses item key {key:?}")
 		})
@@ -245,11 +245,11 @@ impl PartialItemMap {
 		action_map: &mut DocMap<Action>,
 		author: ActorId,
 		thread: ThreadId,
-		partial_items: impl IntoIterator<Item = PartialItem>,
+		partial_items: impl IntoIterator<Item = ActionPartial>,
 	) -> Result<ActionChanges> {
 		let mut changes = ActionChanges::default();
 		for partial_item in partial_items {
-			let PartialItem {
+			let ActionPartial {
 				key,
 				status,
 				content,
@@ -323,7 +323,7 @@ impl PartialItemMap {
 	/// like [`PartialContent::Delta`].
 	fn partial_content_into_payload(
 		&self,
-		key: &PartialItemKey,
+		key: &ActionPartialKey,
 		partial: PartialContent,
 	) -> Result<ActionPayload> {
 		match partial {
@@ -442,19 +442,19 @@ impl PartialItemMap {
 				// is created (eg OutputTextDelta before OutputItemAdded
 				// has content). Use the key to determine the payload type.
 				match key {
-					PartialItemKey::ReasoningSummary { .. } => {
+					ActionPartialKey::ReasoningSummary { .. } => {
 						ActionPayload::ReasoningSummary(
 							ReasoningSummaryItem(delta),
 						)
 					}
-					PartialItemKey::Single { .. } => {
+					ActionPartialKey::Single { .. } => {
 						// single-key items are function calls
 						ActionPayload::FunctionCall(FunctionCallItem {
 							name: String::new(),
 							arguments: delta,
 						})
 					}
-					PartialItemKey::Content { .. } => {
+					ActionPartialKey::Content { .. } => {
 						// default to text for content-keyed deltas
 						ActionPayload::Text(TextItem(delta))
 					}
@@ -485,7 +485,7 @@ impl PartialItemMap {
 	/// it in place. Handles deltas, replacements, and annotation inlining.
 	fn apply_partial_content(
 		&mut self,
-		key: &PartialItemKey,
+		key: &ActionPartialKey,
 		partial: PartialContent,
 		payload: &mut ActionPayload,
 	) -> Result {

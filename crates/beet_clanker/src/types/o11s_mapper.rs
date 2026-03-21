@@ -135,13 +135,13 @@ pub fn action_to_o11s_input(
 /// Errors if a [`StreamingEvent::Error`] is received
 pub fn o11s_stream_to_partial_actions(
 	event: StreamingEvent,
-) -> Result<Vec<PartialItem>> {
+) -> Result<Vec<ActionPartial>> {
 	use StreamingEvent::*;
 	// trace!("Streaming Event: {:#?}", event);
 	match event {
 		ResponseCreated(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::InProgress,
 			)
@@ -150,7 +150,7 @@ pub fn o11s_stream_to_partial_actions(
 		}
 		ResponseQueued(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::InProgress,
 			)
@@ -159,7 +159,7 @@ pub fn o11s_stream_to_partial_actions(
 		}
 		ResponseInProgress(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::InProgress,
 			)
@@ -168,7 +168,7 @@ pub fn o11s_stream_to_partial_actions(
 		}
 		ResponseCompleted(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::Completed,
 			)
@@ -177,7 +177,7 @@ pub fn o11s_stream_to_partial_actions(
 		}
 		ResponseFailed(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::Interrupted,
 			)
@@ -186,27 +186,27 @@ pub fn o11s_stream_to_partial_actions(
 		}
 		ResponseIncomplete(ev) => {
 			// usually empty but parse anyway
-			PartialItem::from_output_items(
+			ActionPartial::from_output_items(
 				ev.response.output,
 				ActionStatus::Interrupted,
 			)
 			.into_iter()
 			.collect::<Vec<_>>()
 		}
-		OutputItemAdded(item_added) => PartialItem::from_output_items(
+		OutputItemAdded(item_added) => ActionPartial::from_output_items(
 			item_added.item,
 			ActionStatus::InProgress,
 		)
 		.into_iter()
 		.collect::<Vec<_>>(),
-		OutputItemDone(item_done) => PartialItem::from_output_items(
+		OutputItemDone(item_done) => ActionPartial::from_output_items(
 			item_done.item,
 			ActionStatus::Completed,
 		)
 		.into_iter()
 		.collect::<Vec<_>>(),
-		ContentPartAdded(part_added) => PartialItem {
-			key: PartialItemKey::Content {
+		ContentPartAdded(part_added) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: part_added.item_id,
 				content_index: part_added.content_index,
 			},
@@ -214,8 +214,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::ContentPart(part_added.part),
 		}
 		.xvec(),
-		ContentPartDone(part_done) => PartialItem {
-			key: PartialItemKey::Content {
+		ContentPartDone(part_done) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: part_done.item_id,
 				content_index: part_done.content_index,
 			},
@@ -223,8 +223,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::ContentPart(part_done.part),
 		}
 		.xvec(),
-		OutputTextDelta(text_delta) => PartialItem {
-			key: PartialItemKey::Content {
+		OutputTextDelta(text_delta) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: text_delta.item_id,
 				content_index: text_delta.content_index,
 			},
@@ -232,8 +232,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::Delta(text_delta.delta),
 		}
 		.xvec(),
-		OutputTextDone(text_done) => PartialItem {
-			key: PartialItemKey::Content {
+		OutputTextDone(text_done) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: text_done.item_id,
 				content_index: text_done.content_index,
 			},
@@ -246,8 +246,8 @@ pub fn o11s_stream_to_partial_actions(
 		.xvec(),
 		OutputTextAnnotationAdded(annotation_added) => {
 			if let Some(annotation) = annotation_added.annotation {
-				PartialItem {
-					key: PartialItemKey::Content {
+				ActionPartial {
+					key: ActionPartialKey::Content {
 						responses_id: annotation_added.item_id,
 						content_index: annotation_added.content_index,
 					},
@@ -263,8 +263,8 @@ pub fn o11s_stream_to_partial_actions(
 				// no annotation, nothing to do
 			}
 		}
-		RefusalDelta(refusal_delta) => PartialItem {
-			key: PartialItemKey::Content {
+		RefusalDelta(refusal_delta) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: refusal_delta.item_id,
 				content_index: refusal_delta.content_index,
 			},
@@ -272,8 +272,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::Delta(refusal_delta.delta),
 		}
 		.xvec(),
-		RefusalDone(refusal_done) => PartialItem {
-			key: PartialItemKey::Content {
+		RefusalDone(refusal_done) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: refusal_done.item_id,
 				content_index: refusal_done.content_index,
 			},
@@ -283,8 +283,8 @@ pub fn o11s_stream_to_partial_actions(
 			},
 		}
 		.xvec(),
-		ReasoningDelta(reasoning_delta) => PartialItem {
-			key: PartialItemKey::Content {
+		ReasoningDelta(reasoning_delta) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: reasoning_delta.item_id,
 				content_index: reasoning_delta.content_index,
 			},
@@ -292,8 +292,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::Delta(reasoning_delta.delta),
 		}
 		.xvec(),
-		ReasoningDone(reasoning_done) => PartialItem {
-			key: PartialItemKey::Content {
+		ReasoningDone(reasoning_done) => ActionPartial {
+			key: ActionPartialKey::Content {
 				responses_id: reasoning_done.item_id,
 				content_index: reasoning_done.content_index,
 			},
@@ -303,8 +303,8 @@ pub fn o11s_stream_to_partial_actions(
 			},
 		}
 		.xvec(),
-		ReasoningSummaryTextDelta(summary_delta) => PartialItem {
-			key: PartialItemKey::ReasoningSummary {
+		ReasoningSummaryTextDelta(summary_delta) => ActionPartial {
+			key: ActionPartialKey::ReasoningSummary {
 				responses_id: summary_delta.item_id,
 				summary_index: summary_delta.summary_index.unwrap_or(0),
 			},
@@ -312,8 +312,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::Delta(summary_delta.delta),
 		}
 		.xvec(),
-		ReasoningSummaryTextDone(summary_done) => PartialItem {
-			key: PartialItemKey::ReasoningSummary {
+		ReasoningSummaryTextDone(summary_done) => ActionPartial {
+			key: ActionPartialKey::ReasoningSummary {
 				responses_id: summary_done.item_id,
 				summary_index: summary_done.summary_index.unwrap_or(0),
 			},
@@ -321,8 +321,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::ReasoningSummary(summary_done.text),
 		}
 		.xvec(),
-		ReasoningSummaryPartAdded(summary_added) => PartialItem {
-			key: PartialItemKey::ReasoningSummary {
+		ReasoningSummaryPartAdded(summary_added) => ActionPartial {
+			key: ActionPartialKey::ReasoningSummary {
 				responses_id: summary_added.item_id,
 				summary_index: summary_added.summary_index.unwrap_or(0),
 			},
@@ -330,8 +330,8 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::ContentPart(summary_added.part),
 		}
 		.xvec(),
-		ReasoningSummaryPartDone(summary_done) => PartialItem {
-			key: PartialItemKey::ReasoningSummary {
+		ReasoningSummaryPartDone(summary_done) => ActionPartial {
+			key: ActionPartialKey::ReasoningSummary {
 				responses_id: summary_done.item_id,
 				summary_index: summary_done.summary_index.unwrap_or(0),
 			},
@@ -339,16 +339,16 @@ pub fn o11s_stream_to_partial_actions(
 			content: PartialContent::ContentPart(summary_done.part),
 		}
 		.xvec(),
-		FunctionCallArgumentsDelta(arguments_delta) => PartialItem {
-			key: PartialItemKey::Single {
+		FunctionCallArgumentsDelta(arguments_delta) => ActionPartial {
+			key: ActionPartialKey::Single {
 				responses_id: arguments_delta.item_id,
 			},
 			status: ActionStatus::InProgress,
 			content: PartialContent::Delta(arguments_delta.delta),
 		}
 		.xvec(),
-		FunctionCallArgumentsDone(arguments_done) => PartialItem {
-			key: PartialItemKey::Single {
+		FunctionCallArgumentsDone(arguments_done) => ActionPartial {
+			key: ActionPartialKey::Single {
 				responses_id: arguments_done.item_id,
 			},
 			status: ActionStatus::Completed,
@@ -367,9 +367,9 @@ pub fn o11s_stream_to_partial_actions(
 
 
 pub fn ev_to_stream_state(
-	prev: Option<ActionStreamState>,
+	prev: Option<ResponsePartial>,
 	ev: &StreamingEvent,
-) -> Result<ActionStreamState> {
+) -> Result<ResponsePartial> {
 	use StreamingEvent::*;
 	match ev {
 		ResponseCreated(ResponseCreatedEvent { response, .. })
@@ -392,8 +392,8 @@ pub fn ev_to_stream_state(
 /// Create a stream state with no actions
 fn response_to_stream_state(
 	response: &ResponseBody,
-) -> Result<ActionStreamState> {
-	ActionStreamState {
+) -> Result<ResponsePartial> {
+	ResponsePartial {
 		actions: default(),
 		response_id: response.id.clone(),
 		response_stored: response.store.unwrap_or(false),

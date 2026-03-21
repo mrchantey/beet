@@ -1,0 +1,44 @@
+use crate::prelude::*;
+use beet_core::prelude::*;
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResponsePartial {
+	pub response_id: String,
+	/// whether the response was stored, enabling usage of
+	/// `previous_response_id` in the next request.
+	pub response_stored: bool,
+	pub status: ActionStreamStatus,
+	pub token_usage: Option<TokenUsage>,
+	/// List of actions that were inserted, these may have
+	/// been created or updated.
+	pub actions: Vec<Action>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ActionStreamStatus {
+	Created,
+	Queued,
+	InProgress,
+	Completed,
+	Failed {
+		code: Option<String>,
+		message: Option<String>,
+	},
+	Incomplete(Option<String>),
+	Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TokenUsage {
+	/// The number of input tokens used to generate the response.
+	pub input_tokens: u32,
+	/// The number of input tokens used to generate the response.
+	pub output_tokens: u32,
+	/// The total number of tokens used.
+	pub total_tokens: u32,
+	/// The number of input tokens that were served from cache.
+	pub cached_input_tokens: Option<u32>,
+	/// The number of output tokens attributed to reasoning.
+	pub reasoning_tokens: Option<u32>,
+}
