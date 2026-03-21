@@ -30,6 +30,11 @@ pub trait ActionStore: Send + Sync {
 		thread_id: ThreadId,
 		after_action: Option<ActionId>,
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
+
+	fn insert_actions<'a>(
+		&'a self,
+		actions: &'a [&'a Action],
+	) -> BoxedFuture<'a, Result<()>>;
 }
 
 impl ActionStore for &Arc<dyn ActionStore> {
@@ -57,6 +62,13 @@ impl ActionStore for &Arc<dyn ActionStore> {
 		after_action: Option<ActionId>,
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>> {
 		self.as_ref().full_thread_actions(thread_id, after_action)
+	}
+
+	fn insert_actions<'a>(
+		&'a self,
+		actions: &'a [&'a Action],
+	) -> BoxedFuture<'a, Result<()>> {
+		self.as_ref().insert_actions(actions)
 	}
 }
 
@@ -139,6 +151,19 @@ impl ActionStore for MemoryActionStore {
 					Ok((action, actor, meta))
 				})?
 				.xok()
+		})
+	}
+
+	fn insert_actions<'a>(
+		&'a self,
+		actions: &'a [&'a Action],
+	) -> BoxedFuture<'a, Result<()>> {
+		Box::pin(async move {
+			let mut map = self.map.write().await;
+			for action in actions {
+				map.actions_mut().insert((*action).clone());
+			}
+			Ok(())
 		})
 	}
 }

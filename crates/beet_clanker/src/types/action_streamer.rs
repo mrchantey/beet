@@ -4,7 +4,9 @@ use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use std::borrow::Cow;
 use std::pin::Pin;
-
+use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,9 +26,74 @@ pub trait ActionStreamer {
 	) -> BoxedFuture<'_, Result<ActionStream>>;
 }
 
-pub type ActionStream =
+
+
+
+pub(super) type ResPartialStream =
 	Pin<Box<dyn Stream<Item = Result<ResponsePartial>> + Send>>;
 
 
+/// Processes typed streaming events into [`ActionStreamOut`] values.
+pub struct ActionStream {
+	action_store: Arc<dyn ActionStore>,
+	inner: ResPartialStream,
+	agent: ActorId,
+	thread: ThreadId,
+	// store partial actions as they are built,
+	// cloning and returning on each stream part
+	action_map: DocMap<Action>,
+	action_partial_map: ActionPartialMap,
+}
 
+impl ActionStream {
+	pub fn new(
+		action_store: Arc<dyn ActionStore>,
+		agent: ActorId,
+		thread: ThreadId,
+		inner: ResPartialStream,
+	) -> Self {
+		Self {
+			action_store,
+			agent,
+			thread,
+			inner,
+			action_map: default(),
+			action_partial_map: default(),
+		}
+	}
 
+	/// Commit the created actions to the ActionStore.
+	pub async fn write(self) -> Result {
+		self.action_store
+			.insert_actions(&self.action_map.values().collect::<Vec<_>>())
+			.await
+	}
+}
+
+impl Stream for ActionStream {
+	type Item = Result<ActionChanges>;
+
+	fn poll_next(
+		self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<Option<Self::Item>> {
+		let this = self.get_mut();
+		match this.inner.as_mut().poll_next(cx) {
+			Poll::Ready(Some(Ok(res_partial))) => {
+				trace!("Streaming Event: {:#?}", res_partial);
+				// get next state without the actions
+				let changes = this.action_partial_map.apply_actions(
+					&mut this.action_map,
+					this.agent,
+					this.thread,
+					res_partial.actions,
+				)?;
+
+				Poll::Ready(Some(Ok(changes)))
+			}
+			Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),
+			Poll::Ready(None) => Poll::Ready(None),
+			Poll::Pending => Poll::Pending,
+		}
+	}
+}

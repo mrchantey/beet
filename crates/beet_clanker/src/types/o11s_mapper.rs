@@ -131,9 +131,79 @@ pub fn action_to_o11s_input(
 }
 
 
+
+pub fn ev_to_response_partial(
+	prev: Option<ResponsePartial>,
+	ev: StreamingEvent,
+) -> Result<ResponsePartial> {
+	use StreamingEvent::*;
+	match ev {
+		ResponseCreated(ResponseCreatedEvent { response, .. })
+		| ResponseQueued(ResponseQueuedEvent { response, .. })
+		| ResponseInProgress(ResponseInProgressEvent { response, .. })
+		| ResponseIncomplete(ResponseIncompleteEvent { response, .. })
+		| ResponseCompleted(ResponseCompletedEvent { response, .. })
+		| ResponseFailed(ResponseFailedEvent { response, .. }) => {
+			response_to_partial(response)
+		}
+		ev => {
+			let mut partial = prev.ok_or_else(|| {
+				bevyhow!("Received non-response event with no previous state")
+			})?;
+			partial.actions = stream_to_partial_actions(ev)?;
+
+			partial.xok()
+		}
+	}
+}
+
+/// Create a stream state with no actions
+pub fn response_to_partial(response: ResponseBody) -> Result<ResponsePartial> {
+	ResponsePartial {
+		actions: default(),
+		response_id: response.id,
+		response_stored: response.store.unwrap_or(false),
+		status: {
+			use openresponses::response::Status::*;
+			match response.status {
+				InProgress => ResponseStatus::InProgress,
+				Completed => ResponseStatus::Completed,
+				Incomplete => ResponseStatus::Incomplete(
+					response.incomplete_details.map(|d| d.reason),
+				),
+				Failed => match response.error {
+					Some(err) => ResponseStatus::Failed {
+						code: Some(err.code),
+						message: Some(err.message),
+					},
+					None => ResponseStatus::Failed {
+						code: None,
+						message: None,
+					},
+				},
+				Cancelled => ResponseStatus::Cancelled,
+				Queued => ResponseStatus::Queued,
+			}
+		},
+		token_usage: response.usage.map(|usage| TokenUsage {
+			input_tokens: usage.input_tokens,
+			output_tokens: usage.output_tokens,
+			total_tokens: usage.total_tokens,
+			cached_input_tokens: usage
+				.input_tokens_details
+				.map(|d| d.cached_tokens),
+			reasoning_tokens: usage
+				.output_tokens_details
+				.map(|d| d.reasoning_tokens),
+		}),
+	}
+	.xok()
+}
+
+
 /// ## Errors
 /// Errors if a [`StreamingEvent::Error`] is received
-pub fn o11s_stream_to_partial_actions(
+fn stream_to_partial_actions(
 	event: StreamingEvent,
 ) -> Result<Vec<ActionPartial>> {
 	use StreamingEvent::*;
@@ -360,76 +430,6 @@ pub fn o11s_stream_to_partial_actions(
 		Error(error) => {
 			bevybail!("Model streaming error: {:?}", error.error);
 		}
-	}
-	.xok()
-}
-
-
-
-pub fn ev_to_stream_state(
-	prev: Option<ResponsePartial>,
-	ev: &StreamingEvent,
-) -> Result<ResponsePartial> {
-	use StreamingEvent::*;
-	match ev {
-		ResponseCreated(ResponseCreatedEvent { response, .. })
-		| ResponseQueued(ResponseQueuedEvent { response, .. })
-		| ResponseInProgress(ResponseInProgressEvent { response, .. })
-		| ResponseIncomplete(ResponseIncompleteEvent { response, .. })
-		| ResponseCompleted(ResponseCompletedEvent { response, .. })
-		| ResponseFailed(ResponseFailedEvent { response, .. }) => {
-			response_to_stream_state(response)
-		}
-		Error(err) => {
-			bevybail!("Received error event in stream: {:?}", err.error);
-		}
-		_ => prev.ok_or_else(|| {
-			bevyhow!("Received non-response event with no previous state")
-		}),
-	}
-}
-
-/// Create a stream state with no actions
-fn response_to_stream_state(
-	response: &ResponseBody,
-) -> Result<ResponsePartial> {
-	ResponsePartial {
-		actions: default(),
-		response_id: response.id.clone(),
-		response_stored: response.store.unwrap_or(false),
-		status: {
-			use openresponses::response::Status::*;
-			match response.status {
-				InProgress => ActionStreamStatus::InProgress,
-				Completed => ActionStreamStatus::Completed,
-				Incomplete => ActionStreamStatus::Incomplete(
-					response.incomplete_details.clone().map(|d| d.reason),
-				),
-				Failed => match response.error.clone() {
-					Some(err) => ActionStreamStatus::Failed {
-						code: Some(err.code),
-						message: Some(err.message),
-					},
-					None => ActionStreamStatus::Failed {
-						code: None,
-						message: None,
-					},
-				},
-				Cancelled => ActionStreamStatus::Cancelled,
-				Queued => ActionStreamStatus::Queued,
-			}
-		},
-		token_usage: response.usage.clone().map(|usage| TokenUsage {
-			input_tokens: usage.input_tokens,
-			output_tokens: usage.output_tokens,
-			total_tokens: usage.total_tokens,
-			cached_input_tokens: usage
-				.input_tokens_details
-				.map(|d| d.cached_tokens),
-			reasoning_tokens: usage
-				.output_tokens_details
-				.map(|d| d.reasoning_tokens),
-		}),
 	}
 	.xok()
 }

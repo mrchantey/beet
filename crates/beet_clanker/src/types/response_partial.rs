@@ -1,22 +1,23 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Represents a section or a whole of a response,
+/// unifying both streaming and non-streaming transports
+/// for model responses.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResponsePartial {
 	pub response_id: String,
 	/// whether the response was stored, enabling usage of
 	/// `previous_response_id` in the next request.
 	pub response_stored: bool,
-	pub status: ActionStreamStatus,
+	pub status: ResponseStatus,
 	pub token_usage: Option<TokenUsage>,
-	/// List of actions that were inserted, these may have
-	/// been created or updated.
-	pub actions: Vec<Action>,
+	/// list of actions in this partial
+	pub actions: Vec<ActionPartial>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ActionStreamStatus {
+pub enum ResponseStatus {
 	Created,
 	Queued,
 	InProgress,
