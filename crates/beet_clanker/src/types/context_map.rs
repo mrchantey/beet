@@ -152,7 +152,7 @@ impl ContextQuery<'_, '_> {
 	}
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ActionChanges {
 	pub created: Vec<ActionId>,
 	pub modified: Vec<ActionId>,

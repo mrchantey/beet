@@ -29,7 +29,7 @@ impl OllamaProvider {}
 impl ModelProvider for OllamaProvider {
 	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
 
-	fn provider_slug(&self) -> &'static str { "ollama" }
+	fn provider_slug(&self) -> &'static str { Self::PROVIDER_SLUG }
 
 	fn default_small_model(&self) -> &'static str { Self::QWEN_3_8B }
 	fn default_tool_model(&self) -> &'static str {
@@ -58,6 +58,7 @@ impl ModelProvider for OllamaProvider {
 
 
 impl OllamaProvider {
+	pub const PROVIDER_SLUG: &str = "ollama";
 	/// Qwen 3 Abliterated 14B - large uncensored model.
 	pub const QWEN_3_ABLITERATED_14B: &str = "huihui_ai/qwen3-abliterated:14b";
 	/// Function Gemma 270M IT - small function calling model.
@@ -67,4 +68,14 @@ impl OllamaProvider {
 
 	/// Default responses URL for local Ollama.
 	pub const RESPONSES_URL: &str = "http://localhost:11434/v1/responses";
+
+
+	pub fn qwen_3_8b() -> O11sStreamer {
+		O11sStreamer::new(ModelDef {
+			provider_slug: Self::PROVIDER_SLUG.into(),
+			model_slug: Self::QWEN_3_8B.into(),
+			url: Self::RESPONSES_URL.into(),
+			auth: None,
+		})
+	}
 }

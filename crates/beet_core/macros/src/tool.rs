@@ -130,6 +130,9 @@ fn parse_func_tool(
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
 
@@ -137,10 +140,9 @@ fn parse_func_tool(
 	let body_wrap = make_body_wrap(body, item, result_out);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -174,16 +176,18 @@ fn parse_func_passthrough(
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
 	let param_name = &params[0].0;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let in_type = quote! { #inner_type };
 	let out_type = compute_out_type(item, result_out);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -210,6 +214,9 @@ fn parse_async_tool(
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
 
@@ -217,10 +224,9 @@ fn parse_async_tool(
 	let body_wrap = make_body_wrap(body, item, result_out);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -253,16 +259,18 @@ fn parse_async_passthrough(
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
 	let param_name = &params[0].0;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let in_type = quote! { #inner_type };
 	let out_type = compute_out_type(item, result_out);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -291,6 +299,9 @@ fn parse_system_tool(
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let first_param_name = &params[0].0;
 	let in_type = quote! { #in_inner };
@@ -301,10 +312,9 @@ fn parse_system_tool(
 	let system_params = collect_system_params(item, 1);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -332,6 +342,9 @@ fn parse_system_passthrough(
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_def = make_struct_def(vis, fn_name, generics);
 
 	let first_param_name = &params[0].0;
 	let in_type = quote! { #inner_type };
@@ -341,10 +354,9 @@ fn parse_system_passthrough(
 	let system_params = collect_system_params(item, 1);
 
 	Ok(quote! {
-		#[allow(non_camel_case_types)]
-		#vis struct #fn_name;
+		#struct_def
 
-		impl #beet_tool::prelude::IntoTool<#fn_name> for #fn_name {
+		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
@@ -469,6 +481,35 @@ fn collect_system_params(item: &ItemFn, skip: usize) -> Vec<&FnArg> {
 	item.sig.inputs.iter().skip(skip).collect()
 }
 
+/// Generate a struct definition, adding `PhantomData` for any type params.
+fn make_struct_def(
+	vis: &syn::Visibility,
+	fn_name: &syn::Ident,
+	generics: &syn::Generics,
+) -> TokenStream {
+	let type_params: Vec<&syn::Ident> =
+		generics.type_params().map(|tp| &tp.ident).collect();
+
+	if type_params.is_empty() {
+		quote! {
+			#[allow(non_camel_case_types)]
+			#vis struct #fn_name;
+		}
+	} else {
+		let (impl_generics, _, where_clause) = generics.split_for_impl();
+		let phantom = if type_params.len() == 1 {
+			let tp = type_params[0];
+			quote! { ::core::marker::PhantomData<#tp> }
+		} else {
+			quote! { ::core::marker::PhantomData<(#(#type_params),*)> }
+		};
+		quote! {
+			#[allow(non_camel_case_types)]
+			#vis struct #fn_name #impl_generics (#phantom) #where_clause;
+		}
+	}
+}
+
 
 // ---------------------------------------------------------------------------
 // Type extraction helpers
@@ -540,6 +581,55 @@ mod test {
 	use alloc::string::String;
 	use alloc::string::ToString;
 	use quote::quote;
+
+	// -----------------------------------------------------------------------
+	// Generics propagation
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn async_passthrough_with_generics() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn my_tool<T>(input: AsyncToolIn<()>) -> ()
+			where
+				T: Send + Sync,
+			{}
+		});
+		assert!(result.contains("struct my_tool"));
+		assert!(result.contains("PhantomData"));
+		assert!(result.contains("where T : Send + Sync"));
+		assert!(result.contains("impl < T >"));
+		assert!(
+			result.contains("IntoTool < my_tool < T > > for my_tool < T >")
+		);
+	}
+
+	#[test]
+	fn func_tool_with_generics() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool<T>(val: i32) -> i32
+			where
+				T: Clone,
+			{ val }
+		});
+		assert!(result.contains("PhantomData"));
+		assert!(result.contains("where T : Clone"));
+		assert!(result.contains("impl < T >"));
+		assert!(
+			result.contains("IntoTool < my_tool < T > > for my_tool < T >")
+		);
+	}
+
+	#[test]
+	fn multi_generic_struct() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			async fn my_tool<A, B>(input: AsyncToolIn<()>) -> ()
+			where
+				A: Send,
+				B: Sync,
+			{}
+		});
+		assert!(result.contains("PhantomData < (A , B) >"));
+	}
 
 	fn parse_str(attr: TokenStream, item: syn::ItemFn) -> String {
 		parse(attr, item).unwrap().to_string()

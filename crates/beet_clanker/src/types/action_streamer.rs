@@ -21,6 +21,7 @@ pub struct ModelDef {
 pub trait ActionStreamer {
 	fn stream_actions(
 		&mut self,
+		action_store: impl ActionStoreProvider,
 		actor: ActorId,
 		thread: ThreadId,
 	) -> BoxedFuture<'_, Result<ActionStream>>;
@@ -35,7 +36,7 @@ pub(super) type ResPartialStream =
 
 /// Processes typed streaming events into [`ActionStreamOut`] values.
 pub struct ActionStream {
-	action_store: Arc<dyn ActionStore>,
+	action_store: Arc<dyn ActionStoreProvider>,
 	inner: ResPartialStream,
 	agent: ActorId,
 	thread: ThreadId,
@@ -47,7 +48,7 @@ pub struct ActionStream {
 
 impl ActionStream {
 	pub fn new(
-		action_store: Arc<dyn ActionStore>,
+		action_store: Arc<dyn ActionStoreProvider>,
 		agent: ActorId,
 		thread: ThreadId,
 		inner: ResPartialStream,

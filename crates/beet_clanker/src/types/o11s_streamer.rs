@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
+#[derive(Debug, Clone, Component)]
 pub struct O11sStreamer {
-	action_store: Arc<dyn ActionStore>,
 	model: ModelDef,
 	/// Whether to use streaming mode.
 	stream: bool,
@@ -23,21 +23,9 @@ pub struct O11sStreamer {
 	instructions: Option<String>,
 }
 
-impl std::fmt::Debug for O11sStreamer {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("O11sStreamer")
-			.field("model", &self.model)
-			.field("stream", &self.stream)
-			.field("use_previous_response_id", &self.use_previous_response_id)
-			.field("instructions", &self.instructions)
-			.finish()
-	}
-}
-
 impl O11sStreamer {
-	pub fn new(store: impl 'static + ActionStore, model: ModelDef) -> Self {
+	pub fn new(model: ModelDef) -> Self {
 		Self {
-			action_store: Arc::new(store),
 			model,
 			stream: true,
 			use_previous_response_id: false,
@@ -69,6 +57,7 @@ impl O11sStreamer {
 impl ActionStreamer for O11sStreamer {
 	fn stream_actions(
 		&mut self,
+		action_store: impl ActionStoreProvider,
 		agent: ActorId,
 		thread: ThreadId,
 	) -> BoxedFuture<'_, Result<ActionStream>> {
@@ -76,7 +65,7 @@ impl ActionStreamer for O11sStreamer {
 			// 1. find last received from this provider match
 			// last_received may still be None if no match was found
 			let last_received = if self.use_previous_response_id {
-				self.action_store
+				action_store
 					.previous_meta(
 						&self.model.provider_slug,
 						&self.model.model_slug,
@@ -88,8 +77,7 @@ impl ActionStreamer for O11sStreamer {
 			};
 
 			// 2. build input items
-			let input_items = self
-				.action_store
+			let input_items = action_store
 				.full_thread_actions(
 					thread,
 					last_received.as_ref().map(|meta| meta.action_id()),
@@ -107,7 +95,7 @@ impl ActionStreamer for O11sStreamer {
 
 			// 4. build request body
 			let mut req_body =
-				openresponses::RequestBody::new(&*self.model.url)
+				openresponses::RequestBody::new(&*self.model.model_slug)
 					.with_input(Input::Items(input_items))
 					.with_tools(tools)
 					.with_stream(self.stream);
@@ -139,7 +127,7 @@ impl ActionStreamer for O11sStreamer {
 				Box::pin(futures::stream::once(async move { Ok(res_partial) }))
 			};
 			ActionStream::new(
-				Arc::clone(&self.action_store),
+				Arc::new(action_store),
 				agent,
 				thread,
 				typed_stream,

@@ -6,7 +6,22 @@ use std::sync::Arc;
 
 use crate::types::ActionId;
 
-pub trait ActionStore: Send + Sync {
+#[derive(Clone, Deref, Component)]
+pub struct ActionStore(Arc<dyn ActionStoreProvider>);
+
+impl ActionStore {
+	pub fn new(provider: impl ActionStoreProvider + 'static) -> Self {
+		Self(Arc::new(provider))
+	}
+	pub fn inner(&self) -> Arc<dyn ActionStoreProvider> { self.0.clone() }
+}
+
+
+impl Default for ActionStore {
+	fn default() -> Self { Self::new(MemoryActionStore::default()) }
+}
+
+pub trait ActionStoreProvider: 'static + Send + Sync {
 	/// Searches the thread for the most recent action with
 	/// a [`O11sMeta`], which will contain useful information
 	/// for use in types like `previous_response_id`.
@@ -31,13 +46,18 @@ pub trait ActionStore: Send + Sync {
 		after_action: Option<ActionId>,
 	) -> BoxedFuture<'_, Result<Vec<(Action, Actor, ActionMeta)>>>;
 
+	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>>;
+	fn insert_thread<'a>(
+		&'a self,
+		thread: Thread,
+	) -> BoxedFuture<'a, Result<()>>;
 	fn insert_actions<'a>(
 		&'a self,
 		actions: &'a [&'a Action],
 	) -> BoxedFuture<'a, Result<()>>;
 }
 
-impl ActionStore for &Arc<dyn ActionStore> {
+impl ActionStoreProvider for Arc<dyn ActionStoreProvider> {
 	fn previous_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
@@ -64,6 +84,16 @@ impl ActionStore for &Arc<dyn ActionStore> {
 		self.as_ref().full_thread_actions(thread_id, after_action)
 	}
 
+	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>> {
+		self.as_ref().insert_actor(actor)
+	}
+
+	fn insert_thread<'a>(
+		&'a self,
+		thread: Thread,
+	) -> BoxedFuture<'a, Result<()>> {
+		self.as_ref().insert_thread(thread)
+	}
 	fn insert_actions<'a>(
 		&'a self,
 		actions: &'a [&'a Action],
@@ -73,11 +103,12 @@ impl ActionStore for &Arc<dyn ActionStore> {
 }
 
 /// An in-memory action store
+#[derive(Default)]
 pub struct MemoryActionStore {
 	map: Arc<RwLock<ContextMap>>,
 }
 
-impl ActionStore for MemoryActionStore {
+impl ActionStoreProvider for MemoryActionStore {
 	fn previous_meta<'a>(
 		&'a self,
 		provider_slug: &'a str,
@@ -163,6 +194,25 @@ impl ActionStore for MemoryActionStore {
 			for action in actions {
 				map.actions_mut().insert((*action).clone());
 			}
+			Ok(())
+		})
+	}
+
+	fn insert_actor<'a>(&'a self, actor: Actor) -> BoxedFuture<'a, Result<()>> {
+		Box::pin(async move {
+			let mut map = self.map.write().await;
+			map.actors_mut().insert(actor.clone());
+			Ok(())
+		})
+	}
+
+	fn insert_thread<'a>(
+		&'a self,
+		thread: Thread,
+	) -> BoxedFuture<'a, Result<()>> {
+		Box::pin(async move {
+			let mut map = self.map.write().await;
+			map.threads_mut().insert(thread.clone());
 			Ok(())
 		})
 	}
