@@ -61,12 +61,7 @@ where
 				},
 			)
 			.await?;
-
-		// stream.write(store.inner(), changes.all_actions()).await?;
 	}
-	println!("Done!");
-
-	// todo!("spawn/update action entities");
 
 	Ok(Pass(()))
 }

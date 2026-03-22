@@ -73,6 +73,39 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 				bevyhow!("No actor ancestor found for action {action:?}")
 			})
 	}
+
+	pub fn spawn_action(
+		&mut self,
+		parent: Entity,
+		status: ActionStatus,
+		payload: impl Into<ActionPayload>,
+	) -> Result<Entity> {
+		let actor_id = self
+			.ancestors
+			.iter_ancestors_inclusive(parent)
+			.find_map(|entity| {
+				self.actors.get(entity).map(|(_, actor)| actor.id()).ok()
+			})
+			.ok_or_else(|| {
+				bevyhow!("No actor ancestor found for {parent:?}")
+			})?;
+		let thread_id = self
+			.ancestors
+			.iter_ancestors_inclusive(parent)
+			.find_map(|entity| {
+				self.threads.get(entity).map(|(_, thread)| thread.id()).ok()
+			})
+			.ok_or_else(|| {
+				bevyhow!("No thread ancestor found for {parent:?}")
+			})?;
+		self.commands
+			.spawn((
+				ChildOf(parent),
+				Action::new(actor_id, thread_id, status, payload),
+			))
+			.id()
+			.xok()
+	}
 }
 #[derive(Debug, Clone)]
 pub struct ThreadView<'a> {
