@@ -20,14 +20,13 @@ use beet_core::prelude::*;
 
 pub fn action_to_o11s_input(
 	agent_id: ActorId,
-	action: Action,
-	author: Actor,
+	action: ActionView,
 ) -> Result<o11s::request::InputItem> {
-	let role = match author.kind() {
+	let role = match action.actor.kind() {
 		ActorKind::System => MessageRole::System,
 		ActorKind::App => MessageRole::Developer,
 		ActorKind::Agent => {
-			if author.id() == agent_id {
+			if action.actor_id() == agent_id {
 				MessageRole::Assistant
 			} else {
 				MessageRole::User
@@ -40,9 +39,9 @@ pub fn action_to_o11s_input(
 		ActionPayload::Text(TextItem(value)) => {
 			let actor_text = format!(
 				"<actor name={} kind={} id={}>{}</actor>",
-				author.name(),
-				author.kind().input_str(),
-				author.id(),
+				action.actor.name(),
+				action.actor.kind().input_str(),
+				action.actor.id(),
 				value
 			);
 			InputItem::Message(MessageParam {

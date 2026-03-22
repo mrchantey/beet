@@ -1,4 +1,5 @@
 use crate::o11s::request::Input;
+use crate::o11s::request::InputItem;
 use crate::prelude::*;
 use crate::types::ResPartialStream;
 use beet_core::prelude::*;
@@ -55,46 +56,68 @@ impl O11sStreamer {
 impl ActionStreamer for O11sStreamer {
 	fn stream_actions(
 		&mut self,
-		action_store: impl ActionStoreProvider,
-		agent: ActorId,
-		thread: ThreadId,
+		actor: AsyncEntity,
 	) -> BoxedFuture<'_, Result<ActionStream>> {
 		Box::pin(async move {
 			// 1. find last received from this provider match
 			// last_received may still be None if no match was found
-			let last_received = if self.use_previous_response_id {
-				action_store
-					.stored_response_meta(
-						&self.model.provider_slug,
-						&self.model.model_slug,
-						thread,
-					)
-					.await?
-			} else {
-				None
-			};
 
-			// 2. build input items
-			let input_items = action_store
-				.full_thread_actions(
-					thread,
-					last_received.as_ref().map(|meta| meta.action_id()),
+			let use_previous_response_id = self.use_previous_response_id;
+			let provider_slug = self.model.provider_slug.clone();
+			let model_slug = self.model.model_slug.clone();
+
+			let (thread, agent, last_received, input_items) = actor
+				.with_state::<ThreadQuery, _>(
+					move |actor_entity,
+					      query|
+					      -> Result<(
+						ThreadId,
+						ActorId,
+						Option<ResponseMeta>,
+						Vec<InputItem>,
+					)> {
+						let thread = query.view(actor_entity)?;
+						let agent = thread.actor(actor_entity)?;
+						let last_received = if use_previous_response_id {
+							thread.stored_response(
+								actor_entity,
+								&provider_slug,
+								&model_slug,
+							)
+						} else {
+							None
+						};
+
+						let items = thread
+							.actions_from(
+								last_received.map(|(action, _)| action.id()),
+							)
+							.into_iter()
+							.xtry_map(|action| {
+								o11s_mapper::action_to_o11s_input(
+									agent.id(),
+									action,
+								)
+							})?;
+
+						Ok((
+							thread.id(),
+							agent.id(),
+							last_received.map(|(_, meta)| meta.clone()),
+							items,
+						))
+					},
 				)
-				.await?
-				.into_iter()
-				.xtry_map(|(action, author)| {
-					o11s_mapper::action_to_o11s_input(agent, action, author)
-				})?;
+				.await?;
 
 			// 3. build tool items
 			let tools = vec![];
 
 			// 4. build request body
-			let mut req_body =
-				o11s::RequestBody::new(&*self.model.model_slug)
-					.with_input(Input::Items(input_items))
-					.with_tools(tools)
-					.with_stream(self.stream);
+			let mut req_body = o11s::RequestBody::new(&*self.model.model_slug)
+				.with_input(Input::Items(input_items))
+				.with_tools(tools)
+				.with_stream(self.stream);
 			if let Some(last) = last_received {
 				req_body = req_body.with_previous_response_id(last.response_id);
 			}
@@ -103,9 +126,8 @@ impl ActionStreamer for O11sStreamer {
 			}
 
 			// 5. build and send request
-			let mut request =
-				Request::post(&self.model.url)
-					.with_json_body::<o11s::RequestBody>(&req_body)?;
+			let mut request = Request::post(&self.model.url)
+				.with_json_body::<o11s::RequestBody>(&req_body)?;
 			if let Some(auth) = &self.model.auth {
 				request = request.with_auth_bearer(auth);
 			}
@@ -116,8 +138,7 @@ impl ActionStreamer for O11sStreamer {
 				let raw_stream = response.event_source_raw().await?;
 				Box::pin(SseToTypedStream::new(raw_stream))
 			} else {
-				let res_body =
-					response.json::<o11s::ResponseBody>().await?;
+				let res_body = response.json::<o11s::ResponseBody>().await?;
 				// coherse a oneshot into a 'completed' sse event
 				let res_partial = o11s_mapper::response_to_partial(res_body)?;
 				Box::pin(futures::stream::once(async move { Ok(res_partial) }))
@@ -179,16 +200,15 @@ where
 					self.done = true;
 					return Poll::Ready(None);
 				}
-				let ev_result = serde_json::from_str::<
-					o11s::StreamingEvent,
-				>(&event.data)
-				.map_err(|err| {
-					bevyhow!(
-						"Failed to parse streaming event: {}\nRaw: {}",
-						err,
-						event.data
-					)
-				});
+				let ev_result =
+					serde_json::from_str::<o11s::StreamingEvent>(&event.data)
+						.map_err(|err| {
+							bevyhow!(
+								"Failed to parse streaming event: {}\nRaw: {}",
+								err,
+								event.data
+							)
+						});
 
 				let res_partial = ev_result
 					.map(|ev| {

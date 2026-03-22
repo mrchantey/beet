@@ -20,49 +20,46 @@ fn main() {
 		.run();
 }
 
-fn setup(mut commands: Commands) -> Result {
-	commands.queue_async(async |world| {
-		// 1. define actors
-		let store = ActionStore::default();
-		let thread_id = store.insert_thread(Thread::default()).await?;
-		let clanker_id = store.insert_actor(Actor::agent()).await?;
-		let system_id = store.insert_actor(Actor::system()).await?;
-		store
-			.insert_actions(vec![Action::new(
-				system_id,
-				thread_id,
-				ActionStatus::Completed,
-				"you are robot, make beep boop noises",
-			)])
-			.await?;
+fn setup(mut commands: Commands) {
+	commands
+		.spawn((
+			Thread::default(),
+			Sequence::new().allow_no_tool(),
+			children![
+				(
+					Actor::system(),
+					related!(
+						Actions[Action::spawn(
+							"you are robot, make beep boop noises"
+						)]
+					)
+				),
+				(Actor::agent(), action_tool(OllamaProvider::qwen_3_8b())),
+				(system_tool(assert_and_exit))
+			],
+		))
+		.call::<(), Outcome>((), default());
+}
 
-		let entity = world
-			.spawn_then((
-				store.clone(),
-				clanker_id,
-				thread_id,
-				action_tool(OllamaProvider::qwen_3_8b()),
-			))
-			.await;
-		entity.call::<(), Outcome>(()).await?;
 
-		let (action, _) = store
-			.full_thread_actions(thread_id, None)
-			.await?
-			.into_iter()
-			.find(|(action, actor)| {
-				action.payload().kind() == ActionKind::Text
-					&& actor.kind() == ActorKind::Agent
-			})
-			.unwrap();
-		action
-			.payload()
-			.to_string()
-			.to_lowercase()
-			.xpect_contains("beep");
+fn assert_and_exit(
+	input: In<SystemToolIn>,
+	mut commands: Commands,
+	query: ThreadQuery,
+) -> Result<Outcome> {
+	let view = query.view(input.caller)?;
+	view.actions
+		.into_iter()
+		.find(|action| {
+			action.payload().kind() == ActionKind::Text
+				&& action.actor.kind() == ActorKind::Agent
+		})
+		.unwrap()
+		.payload()
+		.to_string()
+		.to_lowercase()
+		.xpect_contains("beep");
 
-		world.write_message(AppExit::Success);
-		Ok(())
-	});
-	Ok(())
+	commands.write_message(AppExit::Success);
+	Ok(Pass(()))
 }

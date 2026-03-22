@@ -63,12 +63,13 @@ impl Action {
 		let payload = payload.into();
 		OnSpawn::new(move |entity| {
 			let action = entity.with_state::<ThreadQuery, _>(
-				move |entity, query| -> Result<Action> {
-					let view = query.view(entity)?;
-					let (_, actor, _) = view.actor(entity)?;
+				move |action_entity, query| -> Result<Action> {
+					let thread = query.view(action_entity)?;
+					let actor =
+						thread.actor_from_action_entity(action_entity)?;
 					Ok(Action::new(
 						actor.id(),
-						view.thread_id(),
+						thread.id(),
 						ActionStatus::Completed,
 						payload,
 					))

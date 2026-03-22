@@ -705,7 +705,7 @@ impl AsyncEntity {
 
 	/// Runs a function with access to the entity id and system parameter state.
 	pub fn with_state<T: 'static + SystemParam, O>(
-		&mut self,
+		&self,
 		func: impl 'static + Send + FnOnce(Entity, T::Item<'_, '_>) -> O,
 	) -> impl Future<Output = O>
 	where

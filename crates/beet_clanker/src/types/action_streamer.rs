@@ -19,13 +19,9 @@ pub struct ModelDef {
 pub trait ActionStreamer {
 	fn stream_actions(
 		&mut self,
-		store: impl ActionStoreProvider,
-		actor: ActorId,
-		thread: ThreadId,
+		actor: AsyncEntity,
 	) -> BoxedFuture<'_, Result<ActionStream>>;
 }
-
-
 
 
 pub(super) type ResPartialStream =
