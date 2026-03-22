@@ -1,4 +1,4 @@
-use crate::openresponses;
+use crate::o11s;
 use beet_core::prelude::*;
 use futures::Stream;
 use std::pin::Pin;
@@ -8,7 +8,7 @@ use std::pin::Pin;
 /// This type alias provides ergonomic stream handling without requiring
 /// callers to manually pin the stream.
 pub type StreamingEventStream =
-	Pin<Box<dyn Stream<Item = Result<openresponses::StreamingEvent>> + Send>>;
+	Pin<Box<dyn Stream<Item = Result<o11s::StreamingEvent>> + Send>>;
 
 /// A trait for providers that implement the OpenResponses API.
 ///
@@ -67,8 +67,8 @@ pub trait ModelProvider: 'static + Send + Sync {
 	/// Sends a non-streaming request and returns the complete response.
 	fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>>;
+		request: o11s::RequestBody,
+	) -> BoxedFuture<'_, Result<o11s::ResponseBody>>;
 
 	/// Sends a streaming request and returns a pinned stream of typed events.
 	///
@@ -79,7 +79,7 @@ pub trait ModelProvider: 'static + Send + Sync {
 	/// The stream is returned pre-pinned for ergonomic use - no `pin!()` macro needed.
 	fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>>;
 }
 
@@ -105,14 +105,14 @@ impl ModelProvider for Box<dyn ModelProvider> {
 
 	fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		request: o11s::RequestBody,
+	) -> BoxedFuture<'_, Result<o11s::ResponseBody>> {
 		self.as_ref().send(request)
 	}
 
 	fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		self.as_ref().stream(request)
 	}

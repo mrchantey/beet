@@ -1,4 +1,4 @@
-use crate::openresponses::request::Input;
+use crate::o11s::request::Input;
 use crate::prelude::*;
 use crate::types::ResPartialStream;
 use beet_core::prelude::*;
@@ -91,7 +91,7 @@ impl ActionStreamer for O11sStreamer {
 
 			// 4. build request body
 			let mut req_body =
-				openresponses::RequestBody::new(&*self.model.model_slug)
+				o11s::RequestBody::new(&*self.model.model_slug)
 					.with_input(Input::Items(input_items))
 					.with_tools(tools)
 					.with_stream(self.stream);
@@ -105,7 +105,7 @@ impl ActionStreamer for O11sStreamer {
 			// 5. build and send request
 			let mut request =
 				Request::post(&self.model.url)
-					.with_json_body::<openresponses::RequestBody>(&req_body)?;
+					.with_json_body::<o11s::RequestBody>(&req_body)?;
 			if let Some(auth) = &self.model.auth {
 				request = request.with_auth_bearer(auth);
 			}
@@ -117,7 +117,7 @@ impl ActionStreamer for O11sStreamer {
 				Box::pin(SseToTypedStream::new(raw_stream))
 			} else {
 				let res_body =
-					response.json::<openresponses::ResponseBody>().await?;
+					response.json::<o11s::ResponseBody>().await?;
 				// coherse a oneshot into a 'completed' sse event
 				let res_partial = o11s_mapper::response_to_partial(res_body)?;
 				Box::pin(futures::stream::once(async move { Ok(res_partial) }))
@@ -180,7 +180,7 @@ where
 					return Poll::Ready(None);
 				}
 				let ev_result = serde_json::from_str::<
-					openresponses::StreamingEvent,
+					o11s::StreamingEvent,
 				>(&event.data)
 				.map_err(|err| {
 					bevyhow!(

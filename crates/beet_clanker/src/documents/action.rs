@@ -62,9 +62,7 @@ impl Action {
 	pub fn status(&self) -> ActionStatus { self.status }
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn payload(&self) -> &ActionPayload { &self.payload }
-	pub(super) fn set_status(&mut self, status: ActionStatus) {
-		self.status = status;
-	}
+	pub fn set_status(&mut self, status: ActionStatus) { self.status = status; }
 	pub fn hash(&self) -> u64 {
 		use std::hash::Hash;
 		use std::hash::Hasher;
@@ -72,9 +70,7 @@ impl Action {
 		self.payload.hash(&mut hasher);
 		hasher.finish()
 	}
-	pub(super) fn payload_mut(&mut self) -> &mut ActionPayload {
-		&mut self.payload
-	}
+	pub fn payload_mut(&mut self) -> &mut ActionPayload { &mut self.payload }
 }
 
 #[derive(

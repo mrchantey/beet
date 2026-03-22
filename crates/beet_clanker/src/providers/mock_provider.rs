@@ -4,7 +4,7 @@
 //! - If the request contains tools, it calls the first tool with default argument values
 //! - If no tools are present, it echoes the input prefixed with "you said:"
 
-use crate::openresponses;
+use crate::o11s;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::sync::atomic::AtomicU64;
@@ -68,20 +68,20 @@ impl MockModelProvider {
 	}
 
 	/// Extracts the user's input text from the request.
-	fn extract_input_text(request: &openresponses::RequestBody) -> String {
+	fn extract_input_text(request: &o11s::RequestBody) -> String {
 		match &request.input {
-			openresponses::request::Input::Text(text) => text.clone(),
-			openresponses::request::Input::Items(items) => {
+			o11s::request::Input::Text(text) => text.clone(),
+			o11s::request::Input::Items(items) => {
 				for item in items {
-					if let openresponses::request::InputItem::Message(msg) =
+					if let o11s::request::InputItem::Message(msg) =
 						item
 					{
-						if msg.role == openresponses::MessageRole::User {
+						if msg.role == o11s::MessageRole::User {
 							match &msg.content {
-								openresponses::request::MessageContent::Text(
+								o11s::request::MessageContent::Text(
 									text,
 								) => return text.clone(),
-								openresponses::request::MessageContent::Parts(
+								o11s::request::MessageContent::Parts(
 									parts,
 								) => {
 									for part in parts {
@@ -146,24 +146,24 @@ impl MockModelProvider {
 	}
 
 	/// Creates a response with a text message.
-	fn create_text_response(text: &str) -> openresponses::response::Body {
-		openresponses::response::Body {
+	fn create_text_response(text: &str) -> o11s::response::Body {
+		o11s::response::Body {
 			id: next_id("mock-resp"),
 			object: "response".to_string(),
 			created_at: Some(0),
 			completed_at: Some(0),
-			status: openresponses::response::Status::Completed,
+			status: o11s::response::Status::Completed,
 			error: None,
 			incomplete_details: None,
 			instructions: None,
 			model: Some("mock".to_string()),
-			output: vec![openresponses::OutputItem::Message(
-				openresponses::Message {
+			output: vec![o11s::OutputItem::Message(
+				o11s::Message {
 					id: next_id("msg"),
-					role: openresponses::MessageRole::Assistant,
-					status: openresponses::MessageStatus::Completed,
-					content: vec![openresponses::OutputContent::OutputText(
-						openresponses::OutputText {
+					role: o11s::MessageRole::Assistant,
+					status: o11s::MessageStatus::Completed,
+					content: vec![o11s::OutputContent::OutputText(
+						o11s::OutputText {
 							text: text.to_string(),
 							annotations: vec![],
 							logprobs: vec![],
@@ -178,7 +178,7 @@ impl MockModelProvider {
 			text: None,
 			top_p: None,
 			truncation: None,
-			usage: Some(openresponses::Usage {
+			usage: Some(o11s::Usage {
 				input_tokens: 10,
 				output_tokens: 10,
 				total_tokens: 20,
@@ -205,25 +205,25 @@ impl MockModelProvider {
 	fn create_function_call_response(
 		name: &str,
 		arguments: &str,
-	) -> openresponses::response::Body {
+	) -> o11s::response::Body {
 		let call_id = next_id("call");
-		openresponses::response::Body {
+		o11s::response::Body {
 			id: next_id("mock-resp"),
 			object: "response".to_string(),
 			created_at: Some(0),
 			completed_at: Some(0),
-			status: openresponses::response::Status::Completed,
+			status: o11s::response::Status::Completed,
 			error: None,
 			incomplete_details: None,
 			instructions: None,
 			model: Some("mock".to_string()),
-			output: vec![openresponses::OutputItem::FunctionCall(
-				openresponses::FunctionCall {
+			output: vec![o11s::OutputItem::FunctionCall(
+				o11s::FunctionCall {
 					id: next_id("fc"),
 					call_id,
 					name: name.to_string(),
 					arguments: arguments.to_string(),
-					status: Some(openresponses::FunctionCallStatus::Completed),
+					status: Some(o11s::FunctionCallStatus::Completed),
 				},
 			)],
 			parallel_tool_calls: None,
@@ -233,7 +233,7 @@ impl MockModelProvider {
 			text: None,
 			top_p: None,
 			truncation: None,
-			usage: Some(openresponses::Usage {
+			usage: Some(o11s::Usage {
 				input_tokens: 10,
 				output_tokens: 10,
 				total_tokens: 20,
@@ -270,8 +270,8 @@ impl ModelProvider for MockModelProvider {
 
 	fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		request: o11s::RequestBody,
+	) -> BoxedFuture<'_, Result<o11s::ResponseBody>> {
 		let custom_response = self.custom_response.clone();
 
 		Box::pin(async move {
@@ -304,7 +304,7 @@ impl ModelProvider for MockModelProvider {
 
 	fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		let custom_response = self.custom_response.clone();
 
@@ -347,8 +347,8 @@ impl ModelProvider for MockModelProvider {
 					// Send response.created
 					let _ = sender
 						.send(Ok(
-							openresponses::StreamingEvent::ResponseCreated(
-								openresponses::streaming::ResponseCreatedEvent {
+							o11s::StreamingEvent::ResponseCreated(
+								o11s::streaming::ResponseCreatedEvent {
 									sequence_number: 0,
 									response: response.clone(),
 								},
@@ -361,8 +361,8 @@ impl ModelProvider for MockModelProvider {
 						if let Some(item) = response.output.first() {
 							let _ = sender
 								.send(Ok(
-									openresponses::StreamingEvent::OutputItemAdded(
-										openresponses::streaming::OutputItemAddedEvent {
+									o11s::StreamingEvent::OutputItemAdded(
+										o11s::streaming::OutputItemAddedEvent {
 											sequence_number: 1,
 											output_index: 0,
 											item: Some(item.clone()),
@@ -373,7 +373,7 @@ impl ModelProvider for MockModelProvider {
 						}
 					} else {
 						// For text responses, send text deltas
-						if let Some(openresponses::OutputItem::Message(msg)) =
+						if let Some(o11s::OutputItem::Message(msg)) =
 							response.output.first()
 						{
 							if let Some(text) = msg.first_text() {
@@ -390,8 +390,8 @@ impl ModelProvider for MockModelProvider {
 											.to_string();
 									let _ = sender
 										.send(Ok(
-											openresponses::StreamingEvent::OutputTextDelta(
-												openresponses::streaming::OutputTextDeltaEvent {
+											o11s::StreamingEvent::OutputTextDelta(
+												o11s::streaming::OutputTextDeltaEvent {
 													sequence_number: (idx + 1) as i64,
 													item_id: msg_id.clone(),
 													output_index: 0,
@@ -411,10 +411,10 @@ impl ModelProvider for MockModelProvider {
 					// Send response.completed
 					let _ = sender
 						.send(Ok(
-							openresponses::StreamingEvent::ResponseCompleted(
-								openresponses::streaming::ResponseCompletedEvent {
+							o11s::StreamingEvent::ResponseCompleted(
+								o11s::streaming::ResponseCompletedEvent {
 									sequence_number: 100,
-									response: openresponses::response::Body {
+									response: o11s::response::Body {
 										id: response_id,
 										..response
 									},
@@ -446,14 +446,14 @@ mod test {
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
 		let provider = MockModelProvider::default();
-		let body = openresponses::RequestBody::new("mock")
+		let body = o11s::RequestBody::new("mock")
 			.with_simple_input("Hello world!");
 
 		let response = provider.send(body).await.unwrap();
 
 		response
 			.status
-			.xpect_eq(openresponses::response::Status::Completed);
+			.xpect_eq(o11s::response::Status::Completed);
 		let text = response.first_text().unwrap();
 		text.xpect_eq("you said: Hello world!");
 	}
@@ -461,7 +461,7 @@ mod test {
 	#[beet_core::test]
 	async fn calls_first_tool_when_present() {
 		let provider = MockModelProvider::default();
-		let tool = openresponses::FunctionToolParam::new("greet")
+		let tool = o11s::FunctionToolParam::new("greet")
 			.with_parameters(serde_json::json!({
 				"type": "object",
 				"properties": {
@@ -470,7 +470,7 @@ mod test {
 				}
 			}));
 
-		let body = openresponses::RequestBody::new("mock")
+		let body = o11s::RequestBody::new("mock")
 			.with_simple_input("Greet someone")
 			.with_tool(tool);
 
@@ -491,7 +491,7 @@ mod test {
 	async fn custom_response_overrides_echo() {
 		let provider = MockModelProvider::with_response("Custom answer");
 		let body =
-			openresponses::RequestBody::new("mock").with_simple_input("Hello!");
+			o11s::RequestBody::new("mock").with_simple_input("Hello!");
 
 		let response = provider.send(body).await.unwrap();
 		response.first_text().unwrap().xpect_eq("Custom answer");
@@ -500,7 +500,7 @@ mod test {
 	#[beet_core::test]
 	async fn streaming_echoes_input() {
 		let provider = MockModelProvider::default();
-		let body = openresponses::RequestBody::new("mock")
+		let body = o11s::RequestBody::new("mock")
 			.with_simple_input("Stream test")
 			.with_stream(true);
 
@@ -513,10 +513,10 @@ mod test {
 		while let Some(result) = stream.next().await {
 			let event = result.unwrap();
 			match event {
-				openresponses::StreamingEvent::OutputTextDelta(ev) => {
+				o11s::StreamingEvent::OutputTextDelta(ev) => {
 					accumulated.push_str(&ev.delta);
 				}
-				openresponses::StreamingEvent::ResponseCompleted(_) => {
+				o11s::StreamingEvent::ResponseCompleted(_) => {
 					completed = true;
 				}
 				_ => {}
@@ -530,13 +530,13 @@ mod test {
 	#[beet_core::test]
 	async fn streaming_calls_tool() {
 		let provider = MockModelProvider::default();
-		let tool = openresponses::FunctionToolParam::new("test_tool")
+		let tool = o11s::FunctionToolParam::new("test_tool")
 			.with_parameters(serde_json::json!({
 				"type": "object",
 				"properties": { "value": { "type": "boolean" } }
 			}));
 
-		let body = openresponses::RequestBody::new("mock")
+		let body = o11s::RequestBody::new("mock")
 			.with_simple_input("Call tool")
 			.with_tool(tool)
 			.with_stream(true);
@@ -548,8 +548,8 @@ mod test {
 
 		while let Some(result) = stream.next().await {
 			let event = result.unwrap();
-			if let openresponses::StreamingEvent::OutputItemAdded(ev) = event {
-				if let Some(openresponses::OutputItem::FunctionCall(fc)) =
+			if let o11s::StreamingEvent::OutputItemAdded(ev) = event {
+				if let Some(o11s::OutputItem::FunctionCall(fc)) =
 					ev.item
 				{
 					fc.name.xpect_eq("test_tool");

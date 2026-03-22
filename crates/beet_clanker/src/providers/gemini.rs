@@ -45,7 +45,7 @@ impl GeminiProvider {
 	/// Converts an OpenResponses request to Gemini format.
 	fn convert_request(
 		&self,
-		request: &openresponses::RequestBody,
+		request: &o11s::RequestBody,
 	) -> Result<(String, Value)> {
 		let (contents, system_messages) = self.convert_input(&request.input)?;
 
@@ -115,31 +115,31 @@ impl GeminiProvider {
 	/// Converts OpenResponses input to Gemini contents format.
 	fn convert_input(
 		&self,
-		input: &openresponses::request::Input,
+		input: &o11s::request::Input,
 	) -> Result<(Vec<Value>, Vec<String>)> {
 		match input {
-			openresponses::request::Input::Text(text) => Ok((
+			o11s::request::Input::Text(text) => Ok((
 				vec![json!({
 					"role": "user",
 					"parts": [{ "text": text }]
 				})],
 				Vec::new(),
 			)),
-			openresponses::request::Input::Items(items) => {
+			o11s::request::Input::Items(items) => {
 				let mut contents = Vec::new();
 				let mut system_messages = Vec::new();
 				for item in items {
 					match item {
-						openresponses::request::InputItem::Message(msg) => {
+						o11s::request::InputItem::Message(msg) => {
 							let role = match msg.role {
-								openresponses::MessageRole::User => "user",
-								openresponses::MessageRole::Assistant => "model",
-								openresponses::MessageRole::System
-								| openresponses::MessageRole::Developer => {
+								o11s::MessageRole::User => "user",
+								o11s::MessageRole::Assistant => "model",
+								o11s::MessageRole::System
+								| o11s::MessageRole::Developer => {
 									// Extract system/developer messages for systemInstruction
-									if let openresponses::request::MessageContent::Text(text) = &msg.content {
+									if let o11s::request::MessageContent::Text(text) = &msg.content {
 										system_messages.push(text.clone());
-									} else if let openresponses::request::MessageContent::Parts(parts) = &msg.content {
+									} else if let o11s::request::MessageContent::Parts(parts) = &msg.content {
 										// Collect text from parts
 										for part in parts {
 											if let Some(text) = part.as_text() {
@@ -159,7 +159,7 @@ impl GeminiProvider {
 								}));
 							}
 						}
-						openresponses::request::InputItem::FunctionCall(fc) => {
+						o11s::request::InputItem::FunctionCall(fc) => {
 							contents.push(json!({
 								"role": "model",
 								"parts": [{
@@ -171,7 +171,7 @@ impl GeminiProvider {
 								}]
 							}));
 						}
-						openresponses::request::InputItem::FunctionCallOutput(fco) => {
+						o11s::request::InputItem::FunctionCallOutput(fco) => {
 							contents.push(json!({
 								"role": "user",
 								"parts": [{
@@ -184,10 +184,10 @@ impl GeminiProvider {
 								}]
 							}));
 						}
-						openresponses::request::InputItem::ItemReference(_) => {
+						o11s::request::InputItem::ItemReference(_) => {
 							// Skip item references - not supported in Gemini
 						}
-						openresponses::request::InputItem::Reasoning(_) => {
+						o11s::request::InputItem::Reasoning(_) => {
 							// Skip reasoning items - not directly supported
 						}
 					}
@@ -200,23 +200,23 @@ impl GeminiProvider {
 	/// Converts message content to Gemini parts.
 	fn convert_message_content(
 		&self,
-		content: &openresponses::request::MessageContent,
+		content: &o11s::request::MessageContent,
 	) -> Result<Vec<Value>> {
 		match content {
-			openresponses::request::MessageContent::Text(text) => {
+			o11s::request::MessageContent::Text(text) => {
 				Ok(vec![json!({ "text": text })])
 			}
-			openresponses::request::MessageContent::Parts(parts) => {
+			o11s::request::MessageContent::Parts(parts) => {
 				let mut gemini_parts = Vec::new();
 				for part in parts {
 					match part {
-						openresponses::ContentPart::InputText(text) => {
+						o11s::ContentPart::InputText(text) => {
 							gemini_parts.push(json!({ "text": text.text }));
 						}
-						openresponses::ContentPart::OutputText(text) => {
+						o11s::ContentPart::OutputText(text) => {
 							gemini_parts.push(json!({ "text": text.text }));
 						}
-						openresponses::ContentPart::InputImage(img) => {
+						o11s::ContentPart::InputImage(img) => {
 							let url = &img.image_url;
 							if url.starts_with("data:") {
 								// Parse data URL
@@ -246,7 +246,7 @@ impl GeminiProvider {
 								}));
 							}
 						}
-						openresponses::ContentPart::InputFile(file) => {
+						o11s::ContentPart::InputFile(file) => {
 							if let Some(url) = &file.file_url {
 								gemini_parts.push(json!({
 									"fileData": {
@@ -268,7 +268,7 @@ impl GeminiProvider {
 								}));
 							}
 						}
-						openresponses::ContentPart::Refusal(_) => {
+						o11s::ContentPart::Refusal(_) => {
 							// Skip refusals
 						}
 						_ => {
@@ -311,7 +311,7 @@ impl GeminiProvider {
 		&self,
 		model: &str,
 		gemini_response: Value,
-	) -> Result<openresponses::ResponseBody> {
+	) -> Result<o11s::ResponseBody> {
 		let candidates = gemini_response["candidates"]
 			.as_array()
 			.ok_or_else(|| bevyhow!("No candidates in Gemini response"))?;
@@ -339,14 +339,14 @@ impl GeminiProvider {
 					.map(|a| serde_json::to_string(a).unwrap_or_default())
 					.unwrap_or_else(|| "{}".to_string());
 
-				output.push(openresponses::OutputItem::FunctionCall(
-					openresponses::FunctionCall {
+				output.push(o11s::OutputItem::FunctionCall(
+					o11s::FunctionCall {
 						id: format!("fc_{idx}"),
 						call_id: format!("call_{idx}"),
 						name,
 						arguments: args,
 						status: Some(
-							openresponses::FunctionCallStatus::Completed,
+							o11s::FunctionCallStatus::Completed,
 						),
 					},
 				));
@@ -355,21 +355,21 @@ impl GeminiProvider {
 
 		// Add text message if we have any
 		if !text_content.is_empty() {
-			output.push(openresponses::OutputItem::Message(
-				openresponses::Message {
+			output.push(o11s::OutputItem::Message(
+				o11s::Message {
 					id: "msg_0".to_string(),
-					role: openresponses::MessageRole::Assistant,
-					content: vec![openresponses::OutputContent::OutputText(
-						openresponses::OutputText::new(text_content),
+					role: o11s::MessageRole::Assistant,
+					content: vec![o11s::OutputContent::OutputText(
+						o11s::OutputText::new(text_content),
 					)],
-					status: openresponses::MessageStatus::Completed,
+					status: o11s::MessageStatus::Completed,
 				},
 			));
 		}
 
 		// Extract usage info
 		let usage = gemini_response["usageMetadata"].as_object().map(|u| {
-			openresponses::Usage::new(
+			o11s::Usage::new(
 				u["promptTokenCount"].as_u64().unwrap_or(0) as u32,
 				u["candidatesTokenCount"].as_u64().unwrap_or(0) as u32,
 			)
@@ -381,15 +381,15 @@ impl GeminiProvider {
 	/// Helper to create a ResponseBody with default fields.
 	fn create_response_body(
 		model: &str,
-		output: Vec<openresponses::OutputItem>,
-		usage: Option<openresponses::Usage>,
-	) -> openresponses::ResponseBody {
-		openresponses::ResponseBody {
+		output: Vec<o11s::OutputItem>,
+		usage: Option<o11s::Usage>,
+	) -> o11s::ResponseBody {
+		o11s::ResponseBody {
 			id: format!("gemini_{}", time_ext::now_millis()),
 			object: "response".to_string(),
 			created_at: None,
 			completed_at: None,
-			status: openresponses::response::Status::Completed,
+			status: o11s::response::Status::Completed,
 			incomplete_details: None,
 			model: Some(model.to_string()),
 			previous_response_id: None,
@@ -423,13 +423,13 @@ impl GeminiProvider {
 	fn create_message(
 		id: &str,
 		text: String,
-		status: openresponses::MessageStatus,
-	) -> openresponses::Message {
-		openresponses::Message {
+		status: o11s::MessageStatus,
+	) -> o11s::Message {
+		o11s::Message {
 			id: id.to_string(),
-			role: openresponses::MessageRole::Assistant,
-			content: vec![openresponses::OutputContent::OutputText(
-				openresponses::OutputText::new(text),
+			role: o11s::MessageRole::Assistant,
+			content: vec![o11s::OutputContent::OutputText(
+				o11s::OutputText::new(text),
 			)],
 			status,
 		}
@@ -446,8 +446,8 @@ impl ModelProvider for GeminiProvider {
 
 	fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		request: o11s::RequestBody,
+	) -> BoxedFuture<'_, Result<o11s::ResponseBody>> {
 		Box::pin(async move {
 			let (model, body) = self.convert_request(&request)?;
 			let response = self
@@ -465,7 +465,7 @@ impl ModelProvider for GeminiProvider {
 
 	fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		Box::pin(async move {
 			let (model, body) = self.convert_request(&request)?;
@@ -492,7 +492,7 @@ struct GeminiStream<S> {
 	item_added: bool,
 	sequence: i64,
 	accumulated_text: String,
-	event_buffer: Vec<openresponses::StreamingEvent>,
+	event_buffer: Vec<o11s::StreamingEvent>,
 }
 
 impl<S> GeminiStream<S> {
@@ -527,7 +527,7 @@ where
 		+ Send,
 	E: std::fmt::Display,
 {
-	type Item = Result<openresponses::StreamingEvent>;
+	type Item = Result<o11s::StreamingEvent>;
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
@@ -567,8 +567,8 @@ where
 						None,
 					);
 					events.push(
-						openresponses::StreamingEvent::ResponseCreated(
-							openresponses::streaming::ResponseCreatedEvent {
+						o11s::StreamingEvent::ResponseCreated(
+							o11s::streaming::ResponseCreatedEvent {
 								sequence_number: seq,
 								response,
 							},
@@ -581,15 +581,15 @@ where
 					self.item_added = true;
 					let seq = self.next_sequence();
 					events
-						.push(openresponses::StreamingEvent::OutputItemAdded(
-						openresponses::streaming::OutputItemAddedEvent {
+						.push(o11s::StreamingEvent::OutputItemAdded(
+						o11s::streaming::OutputItemAddedEvent {
 							sequence_number: seq,
 							output_index: 0,
-							item: Some(openresponses::OutputItem::Message(
+							item: Some(o11s::OutputItem::Message(
 								GeminiProvider::create_message(
 									"msg_0",
 									String::new(),
-									openresponses::MessageStatus::InProgress,
+									o11s::MessageStatus::InProgress,
 								),
 							)),
 						},
@@ -622,8 +622,8 @@ where
 									if !delta.is_empty() {
 										let seq = self.next_sequence();
 										events.push(
-											openresponses::StreamingEvent::OutputTextDelta(
-												openresponses::streaming::OutputTextDeltaEvent {
+											o11s::StreamingEvent::OutputTextDelta(
+												o11s::streaming::OutputTextDeltaEvent {
 													sequence_number: seq,
 													item_id: "msg_0".to_string(),
 													output_index: 0,
@@ -649,12 +649,12 @@ where
 
 							// Send output_item.done
 							let seq = self.next_sequence();
-							events.push(openresponses::StreamingEvent::OutputItemDone(
-								openresponses::streaming::OutputItemDoneEvent {
+							events.push(o11s::StreamingEvent::OutputItemDone(
+								o11s::streaming::OutputItemDoneEvent {
 									sequence_number: seq,
 									output_index: 0,
-									item: Some(openresponses::OutputItem::Message(
-										GeminiProvider::create_message("msg_0", self.accumulated_text.clone(), openresponses::MessageStatus::Completed),
+									item: Some(o11s::OutputItem::Message(
+										GeminiProvider::create_message("msg_0", self.accumulated_text.clone(), o11s::MessageStatus::Completed),
 									)),
 								},
 							));
@@ -662,7 +662,7 @@ where
 							// Extract usage info
 							let usage =
 								body["usageMetadata"].as_object().map(|u| {
-									openresponses::Usage::new(
+									o11s::Usage::new(
 										u["promptTokenCount"]
 											.as_u64()
 											.unwrap_or(0) as u32,
@@ -675,11 +675,11 @@ where
 							// Send response.completed
 							let seq = self.next_sequence();
 							let output =
-								vec![openresponses::OutputItem::Message(
+								vec![o11s::OutputItem::Message(
 									GeminiProvider::create_message(
 										"msg_0",
 										self.accumulated_text.clone(),
-										openresponses::MessageStatus::Completed,
+										o11s::MessageStatus::Completed,
 									),
 								)];
 							let mut response =
@@ -689,10 +689,10 @@ where
 									usage,
 								);
 							response.status =
-								openresponses::response::Status::Completed;
+								o11s::response::Status::Completed;
 							events.push(
-								openresponses::StreamingEvent::ResponseCompleted(
-									openresponses::streaming::ResponseCompletedEvent {
+								o11s::StreamingEvent::ResponseCompleted(
+									o11s::streaming::ResponseCompletedEvent {
 										sequence_number: seq,
 										response,
 									},
@@ -723,11 +723,11 @@ where
 					// Stream ended without finish reason, send completion
 					self.done = true;
 					let seq = self.next_sequence();
-					let output = vec![openresponses::OutputItem::Message(
+					let output = vec![o11s::OutputItem::Message(
 						GeminiProvider::create_message(
 							"msg_0",
 							self.accumulated_text.clone(),
-							openresponses::MessageStatus::Completed,
+							o11s::MessageStatus::Completed,
 						),
 					)];
 					let mut response = GeminiProvider::create_response_body(
@@ -736,10 +736,10 @@ where
 						None,
 					);
 					response.status =
-						openresponses::response::Status::Completed;
+						o11s::response::Status::Completed;
 					Poll::Ready(Some(Ok(
-						openresponses::StreamingEvent::ResponseCompleted(
-							openresponses::streaming::ResponseCompletedEvent {
+						o11s::StreamingEvent::ResponseCompleted(
+							o11s::streaming::ResponseCompletedEvent {
 								sequence_number: seq,
 								response,
 							},

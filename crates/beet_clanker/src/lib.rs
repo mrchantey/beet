@@ -4,7 +4,8 @@
 #![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 
 // mod actions;
-pub mod openresponses;
+pub mod documents;
+pub mod o11s;
 mod providers;
 pub mod realtime;
 mod types;
@@ -14,7 +15,8 @@ mod types;
 pub mod prelude {
 	// pub use crate::actions::*;
 	// pub use crate::tools::*;
-	pub use crate::openresponses;
+	pub use crate::documents::*;
+	pub use crate::o11s;
 	pub use crate::providers::*;
 	pub use crate::realtime;
 	pub use crate::types::*;

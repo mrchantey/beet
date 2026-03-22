@@ -30,23 +30,23 @@ impl OpenResponsesProvider {
 	/// Converts any input files in the request to inline text content,
 	/// as input files are not yet supported by openai and ollama
 	pub fn inline_text_file_data(
-		mut request: openresponses::RequestBody,
-	) -> openresponses::RequestBody {
-		let openresponses::request::Input::Items(items) = &mut request.input
+		mut request: o11s::RequestBody,
+	) -> o11s::RequestBody {
+		let o11s::request::Input::Items(items) = &mut request.input
 		else {
 			return request;
 		};
 		for item in items {
-			let openresponses::request::InputItem::Message(msg) = item else {
+			let o11s::request::InputItem::Message(msg) = item else {
 				continue;
 			};
-			let openresponses::request::MessageContent::Parts(parts) =
+			let o11s::request::MessageContent::Parts(parts) =
 				&mut msg.content
 			else {
 				continue;
 			};
 			for part in parts {
-				let openresponses::ContentPart::InputFile(file) = part else {
+				let o11s::ContentPart::InputFile(file) = part else {
 					continue;
 				};
 				let text = if let Some(data) = &file.file_data {
@@ -63,7 +63,7 @@ impl OpenResponsesProvider {
 				};
 				let filename = file.filename.as_deref().unwrap_or("unknown");
 				let content = format!("File: {}\n\n{}", filename, text);
-				*part = openresponses::ContentPart::input_text(content);
+				*part = o11s::ContentPart::input_text(content);
 			}
 		}
 		request
@@ -71,10 +71,10 @@ impl OpenResponsesProvider {
 
 	fn build_request(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> Result<Request> {
 		let mut request = Request::post(&self.url)
-			.with_json_body::<openresponses::RequestBody>(&request)?;
+			.with_json_body::<o11s::RequestBody>(&request)?;
 		if let Some(auth) = &self.auth {
 			request = request.with_auth_bearer(auth);
 		}
@@ -83,8 +83,8 @@ impl OpenResponsesProvider {
 
 	pub fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> impl Future<Output = Result<openresponses::ResponseBody>> {
+		request: o11s::RequestBody,
+	) -> impl Future<Output = Result<o11s::ResponseBody>> {
 		async move {
 			if request.stream == Some(true) {
 				bevybail!(
@@ -98,14 +98,14 @@ impl OpenResponsesProvider {
 				// even a 404 should return a valid ResponseBody
 				.into_result()
 				.await?
-				.json::<openresponses::ResponseBody>()
+				.json::<o11s::ResponseBody>()
 				.await
 		}
 	}
 
 	pub async fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> Result<StreamingEventStream> {
 		if request.stream != Some(true) {
 			bevybail!(
@@ -148,7 +148,7 @@ where
 		+ Send,
 	E: std::fmt::Display,
 {
-	type Item = Result<openresponses::StreamingEvent>;
+	type Item = Result<o11s::StreamingEvent>;
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
@@ -168,7 +168,7 @@ where
 
 				// Parse the event data as a StreamingEvent
 				let result = serde_json::from_str::<
-					openresponses::StreamingEvent,
+					o11s::StreamingEvent,
 				>(&event.data)
 				.map_err(|err| {
 					bevyhow!(

@@ -1,6 +1,6 @@
-use crate::openresponses::Annotation;
-use crate::openresponses::ContentPart;
-use crate::openresponses::OutputContent;
+use crate::o11s::Annotation;
+use crate::o11s::ContentPart;
+use crate::o11s::OutputContent;
 use crate::prelude::*;
 use beet_core::prelude::*;
 

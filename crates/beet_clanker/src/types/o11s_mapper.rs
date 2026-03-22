@@ -1,19 +1,19 @@
-use crate::openresponses::ContentPart;
-use crate::openresponses::MessageRole;
-use crate::openresponses::ResponseBody;
-use crate::openresponses::StreamingEvent;
-use crate::openresponses::request::FunctionCallOutputParam;
-use crate::openresponses::request::FunctionCallParam;
-use crate::openresponses::request::FunctionOutputContent;
-use crate::openresponses::request::InputItem;
-use crate::openresponses::request::MessageContent;
-use crate::openresponses::request::MessageParam;
-use crate::openresponses::streaming::ResponseCompletedEvent;
-use crate::openresponses::streaming::ResponseCreatedEvent;
-use crate::openresponses::streaming::ResponseFailedEvent;
-use crate::openresponses::streaming::ResponseInProgressEvent;
-use crate::openresponses::streaming::ResponseIncompleteEvent;
-use crate::openresponses::streaming::ResponseQueuedEvent;
+use crate::o11s::ContentPart;
+use crate::o11s::MessageRole;
+use crate::o11s::ResponseBody;
+use crate::o11s::StreamingEvent;
+use crate::o11s::request::FunctionCallOutputParam;
+use crate::o11s::request::FunctionCallParam;
+use crate::o11s::request::FunctionOutputContent;
+use crate::o11s::request::InputItem;
+use crate::o11s::request::MessageContent;
+use crate::o11s::request::MessageParam;
+use crate::o11s::streaming::ResponseCompletedEvent;
+use crate::o11s::streaming::ResponseCreatedEvent;
+use crate::o11s::streaming::ResponseFailedEvent;
+use crate::o11s::streaming::ResponseInProgressEvent;
+use crate::o11s::streaming::ResponseIncompleteEvent;
+use crate::o11s::streaming::ResponseQueuedEvent;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -22,7 +22,7 @@ pub fn action_to_o11s_input(
 	agent_id: ActorId,
 	action: Action,
 	author: Actor,
-) -> Result<openresponses::request::InputItem> {
+) -> Result<o11s::request::InputItem> {
 	let role = match author.kind() {
 		ActorKind::System => MessageRole::System,
 		ActorKind::App => MessageRole::Developer,
@@ -80,7 +80,7 @@ pub fn action_to_o11s_input(
 			id: None,
 			role,
 			content: MessageContent::Parts(vec![ContentPart::InputFile(
-				openresponses::InputFile {
+				o11s::InputFile {
 					filename: Some(url_item.filename()),
 					file_data: None,
 					file_url: Some(url_item.url.to_string()),
@@ -92,7 +92,7 @@ pub fn action_to_o11s_input(
 			id: None,
 			role,
 			content: MessageContent::Parts(vec![ContentPart::InputFile(
-				openresponses::InputFile {
+				o11s::InputFile {
 					filename: Some(bytes_item.filename()),
 					file_data: Some(bytes_item.bytes_base64()),
 					file_url: None,
@@ -155,7 +155,7 @@ pub fn response_to_partial(response: ResponseBody) -> Result<ResponsePartial> {
 		response_id: response.id,
 		response_stored: response.store.unwrap_or(false),
 		status: {
-			use openresponses::response::Status::*;
+			use o11s::response::Status::*;
 			match response.status {
 				InProgress => ResponseStatus::InProgress,
 				Completed => ResponseStatus::Completed,

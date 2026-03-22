@@ -3,8 +3,6 @@ use async_lock::RwLock;
 use beet_core::prelude::*;
 use std::sync::Arc;
 
-use crate::types::ActionId;
-
 #[derive(Clone, Deref, Component)]
 pub struct ActionStore(Arc<dyn ActionStoreProvider>);
 

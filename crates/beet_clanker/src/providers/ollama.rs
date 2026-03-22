@@ -40,15 +40,15 @@ impl ModelProvider for OllamaProvider {
 
 	fn send(
 		&self,
-		request: openresponses::RequestBody,
-	) -> BoxedFuture<'_, Result<openresponses::ResponseBody>> {
+		request: o11s::RequestBody,
+	) -> BoxedFuture<'_, Result<o11s::ResponseBody>> {
 		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.send(request))
 	}
 
 	fn stream(
 		&self,
-		request: openresponses::RequestBody,
+		request: o11s::RequestBody,
 	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
 		let request = OpenResponsesProvider::inline_text_file_data(request);
 		Box::pin(self.inner.stream(request))

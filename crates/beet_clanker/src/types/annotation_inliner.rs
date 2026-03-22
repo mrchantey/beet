@@ -1,5 +1,5 @@
-use crate::openresponses::Annotation;
-use crate::openresponses::UrlCitation;
+use crate::o11s::Annotation;
+use crate::o11s::UrlCitation;
 use beet_core::prelude::*;
 
 use super::ActionPartialKey;

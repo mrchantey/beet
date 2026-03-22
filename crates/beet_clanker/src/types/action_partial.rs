@@ -1,10 +1,10 @@
-use crate::openresponses::Annotation;
-use crate::openresponses::ContentPart;
-use crate::openresponses::FunctionCallStatus;
-use crate::openresponses::LogProb;
-use crate::openresponses::MessageStatus;
-use crate::openresponses::OutputContent;
-use crate::openresponses::OutputItem;
+use crate::o11s::Annotation;
+use crate::o11s::ContentPart;
+use crate::o11s::FunctionCallStatus;
+use crate::o11s::LogProb;
+use crate::o11s::MessageStatus;
+use crate::o11s::OutputContent;
+use crate::o11s::OutputItem;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
