@@ -17,6 +17,9 @@ pub struct ModelDef {
 
 
 pub trait ActionStreamer {
+	fn provider_slug(&self) -> Cow<'static, str>;
+	fn model_slug(&self) -> Cow<'static, str>;
+
 	fn stream_actions(
 		&mut self,
 		actor: AsyncEntity,

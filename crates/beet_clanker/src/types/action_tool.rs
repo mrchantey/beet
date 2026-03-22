@@ -38,6 +38,7 @@ where
 						.map(|modified| (modified.id(), modified))
 						.collect::<HashMap<_, _>>();
 
+					// 1. apply modified actions
 					for mut action in query.iter_mut() {
 						if allow_multiple_modified
 							&& let Some(new) =
@@ -50,6 +51,7 @@ where
 							action.set_if_neq(new);
 						}
 					}
+					// 2. spawn created actions
 					for created_action in created {
 						let meta = meta_builder.build(created_action.id());
 						commands

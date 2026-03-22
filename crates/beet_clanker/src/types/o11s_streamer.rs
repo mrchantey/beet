@@ -5,6 +5,7 @@ use crate::types::ResPartialStream;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use futures::Stream;
+use std::borrow::Cow;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -54,6 +55,12 @@ impl O11sStreamer {
 }
 
 impl ActionStreamer for O11sStreamer {
+	fn provider_slug(&self) -> Cow<'static, str> {
+		self.model.provider_slug.clone()
+	}
+	fn model_slug(&self) -> Cow<'static, str> { self.model.model_slug.clone() }
+
+
 	fn stream_actions(
 		&mut self,
 		actor: AsyncEntity,
@@ -78,6 +85,8 @@ impl ActionStreamer for O11sStreamer {
 					)> {
 						let thread = query.view(actor_entity)?;
 						let agent = thread.actor(actor_entity)?;
+
+						// get last received response meta
 						let last_received = if use_previous_response_id {
 							thread.stored_response(
 								actor_entity,
@@ -88,6 +97,7 @@ impl ActionStreamer for O11sStreamer {
 							None
 						};
 
+						// get input items (from last received if caching)
 						let items = thread
 							.actions_from(
 								last_received.map(|(action, _)| action.id()),
@@ -196,9 +206,18 @@ where
 		}
 		match Pin::new(&mut self.inner).poll_next(cx) {
 			Poll::Ready(Some(Ok(event))) => {
-				if event.data == "[DONE]" {
+				if event.data.trim() == "[DONE]" {
+					// do not attempt reconnect
 					self.done = true;
 					return Poll::Ready(None);
+				}
+				match event.event.as_str().trim() {
+					"response.completed"
+					| "response.failed"
+					| "response.incomplete" => {
+						self.done = true;
+					}
+					_ev => {}
 				}
 				let ev_result =
 					serde_json::from_str::<o11s::StreamingEvent>(&event.data)
@@ -209,6 +228,7 @@ where
 								event.data
 							)
 						});
+				// if matches!(ev_result,Ok(o11s::StreamingEvent::ResponseCreated(_)))
 
 				let res_partial = ev_result
 					.map(|ev| {
