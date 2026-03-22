@@ -53,7 +53,9 @@ pub impl World {
 	) -> O {
 		let mut state = self.state::<T>();
 		let item = state.get_mut(self);
-		func(item)
+		let result = func(item);
+		state.apply(self);
+		result
 	}
 
 	/// Handle a command error, printing with a location.

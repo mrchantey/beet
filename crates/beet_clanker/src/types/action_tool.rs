@@ -24,6 +24,7 @@ where
 	let mut streamer = input.caller.get_cloned::<T>().await?;
 	let mut stream = streamer.stream_actions(input.caller.clone()).await?;
 	while let Some(changes) = stream.next().await {
+		trace!("Received action changes: {:#?}", changes);
 		let meta_builder = stream.meta_builder()?;
 		let ActionChanges { created, modified } = changes?;
 		input

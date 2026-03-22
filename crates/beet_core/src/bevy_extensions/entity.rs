@@ -32,7 +32,9 @@ pub impl<'a> EntityWorldMut<'a> {
 		self.world_scope(|world| {
 			let mut state = world.state::<T>();
 			let item = state.get_mut(world);
-			func(id, item)
+			let result = func(id, item);
+			state.apply(world);
+			result
 		})
 	}
 

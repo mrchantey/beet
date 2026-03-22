@@ -147,33 +147,41 @@ pub fn ev_to_response_partial(
 	}
 }
 
-/// Create a stream state with no actions
+/// Create a [`ResponsePartial`] from a [`ResponseBody`], including any output items.
 pub fn response_to_partial(response: ResponseBody) -> Result<ResponsePartial> {
+	use o11s::response::Status::*;
+	let action_status = match response.status {
+		Completed => ActionStatus::Completed,
+		InProgress | Queued => ActionStatus::InProgress,
+		Incomplete | Failed | Cancelled => ActionStatus::Interrupted,
+	};
 	ResponsePartial {
-		actions: default(),
+		actions: ActionPartial::from_output_items(
+			response.output,
+			action_status,
+		)
+		.into_iter()
+		.collect(),
 		response_id: response.id,
 		response_stored: response.store.unwrap_or(false),
-		status: {
-			use o11s::response::Status::*;
-			match response.status {
-				InProgress => ResponseStatus::InProgress,
-				Completed => ResponseStatus::Completed,
-				Incomplete => ResponseStatus::Incomplete(
-					response.incomplete_details.map(|d| d.reason),
-				),
-				Failed => match response.error {
-					Some(err) => ResponseStatus::Failed {
-						code: Some(err.code),
-						message: Some(err.message),
-					},
-					None => ResponseStatus::Failed {
-						code: None,
-						message: None,
-					},
+		status: match response.status {
+			InProgress => ResponseStatus::InProgress,
+			Completed => ResponseStatus::Completed,
+			Incomplete => ResponseStatus::Incomplete(
+				response.incomplete_details.map(|d| d.reason),
+			),
+			Failed => match response.error {
+				Some(err) => ResponseStatus::Failed {
+					code: Some(err.code),
+					message: Some(err.message),
 				},
-				Cancelled => ResponseStatus::Cancelled,
-				Queued => ResponseStatus::Queued,
-			}
+				None => ResponseStatus::Failed {
+					code: None,
+					message: None,
+				},
+			},
+			Cancelled => ResponseStatus::Cancelled,
+			Queued => ResponseStatus::Queued,
 		},
 		token_usage: response.usage.map(|usage| TokenUsage {
 			input_tokens: usage.input_tokens,
