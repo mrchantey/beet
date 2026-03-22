@@ -62,9 +62,8 @@ impl<'a> From<&'a mut App> for AsWorldMut<'a> {
 #[derive(Debug)]
 pub struct ThreadViewMut<'a> {
 	world: AsWorldMut<'a>,
+	id: ThreadId,
 	entity: Entity,
-	actors: Vec<Actor>,
-	actions: Vec<Action>,
 }
 
 
@@ -73,7 +72,7 @@ impl ThreadViewMut<'static> {
 	pub fn new_logging<M>(level: Level) -> Self {
 		Self::new_with_plugins(LogPlugin {
 			level,
-			filter: format!("{}=trace,ureq=off,ureq_proto=off", module_path!()),
+			filter: format!("ureq=off,ureq_proto=off"),
 			..default()
 		})
 	}
@@ -89,21 +88,23 @@ impl ThreadViewMut<'static> {
 impl<'a> ThreadViewMut<'a> {
 	pub fn new_with_world(world: impl Into<AsWorldMut<'a>>) -> Self {
 		let mut world = world.into();
-		let thread_entity = world.spawn(Thread::new("Oneshot Thread")).id();
+		let thread = Thread::new("Oneshot Thread");
+		let id = thread.id();
+		let entity = world.spawn(thread).id();
 
-		Self {
-			world,
-			entity: thread_entity,
-			actors: Vec::new(),
-			actions: Vec::new(),
-		}
+		Self { world, id, entity }
 	}
-	pub fn thread(&self) -> Thread {
+	pub fn id(&self) -> ThreadId { self.id }
+	pub fn entity(&self) -> Entity { self.entity }
+	pub fn world(&self) -> &World { &self.world }
+	pub fn world_mut(&mut self) -> &mut World { self.world.world_mut() }
+
+
+	pub fn thread(&self) -> &Thread {
 		self.world
 			.entity(self.entity)
 			.get::<Thread>()
 			.expect("thread entity should have Thread component")
-			.clone()
 	}
 
 	pub fn insert_actor(&'a mut self, actor: Actor) -> ActorViewMut<'a> {
@@ -115,10 +116,31 @@ impl<'a> ThreadViewMut<'a> {
 			entity,
 		}
 	}
-	pub fn actor(&'a mut self, actor_id: ActorId) -> ActorViewMut<'a> {
-		self.try_actor(actor_id).unwrap()
+
+	pub fn actor(&'a mut self, entity: Entity) -> ActorViewMut<'a> {
+		self.try_actor(entity).unwrap()
 	}
-	pub fn try_actor(
+
+	pub fn try_actor(&'a mut self, entity: Entity) -> Result<ActorViewMut<'a>> {
+		let actor = self
+			.world
+			.entity(entity)
+			.get::<Actor>()
+			.ok_or_else(|| {
+				bevyhow!("Entity {entity:?} does not have an Actor component")
+			})?
+			.clone();
+		Ok(ActorViewMut {
+			thread_view: self,
+			id: actor.id(),
+			entity,
+		})
+	}
+
+	pub fn actor_from_id(&'a mut self, actor_id: ActorId) -> ActorViewMut<'a> {
+		self.try_actor_from_id(actor_id).unwrap()
+	}
+	pub fn try_actor_from_id(
 		&'a mut self,
 		actor_id: ActorId,
 	) -> Result<ActorViewMut<'a>> {
@@ -145,60 +167,79 @@ impl<'a> ThreadViewMut<'a> {
 
 pub struct ActorViewMut<'a> {
 	thread_view: &'a mut ThreadViewMut<'a>,
-	entity: Entity,
 	id: ActorId,
+	entity: Entity,
 }
 
 impl<'a> ActorViewMut<'a> {
 	pub fn insert_action(
-		&mut self,
+		&'a mut self,
 		payload: impl Into<ActionPayload>,
-	) -> &mut Self {
-		self.thread_view.actions.push(Action::new(
-			self.actor_id,
-			self.thread_view.thread.id(),
+	) -> ActionViewMut<'a> {
+		let action = Action::new(
+			self.id,
+			self.thread_view.id,
 			ActionStatus::Completed,
 			payload,
-		));
-		self
+		);
+		let id = action.id();
+		let entity = self
+			.thread_view
+			.world
+			.spawn((ChildOf(self.entity), action))
+			.id();
+		ActionViewMut {
+			entity,
+			id,
+			actor_view: self,
+		}
 	}
-	pub fn id(&self) -> ActorId { self.actor_id }
-	pub fn thread(self) -> &'a mut ThreadViewMut { self.thread_view }
+	pub fn world(&self) -> &World { &self.thread_view.world }
+	pub fn world_mut(&mut self) -> &mut World {
+		self.thread_view.world.world_mut()
+	}
+	pub fn id(&self) -> ActorId { self.id }
+	pub fn entity(&self) -> Entity { self.entity }
+	pub fn thread_view(self) -> &'a mut ThreadViewMut<'a> { self.thread_view }
+
 	pub fn actor(&self) -> &Actor {
 		self.thread_view
-			.actors
-			.iter()
-			.find(|a| a.id() == self.actor_id)
-			.expect("creating a OneshotActor is already guarded")
+			.world
+			.entity(self.entity)
+			.get::<Actor>()
+			.expect("actor entity should have Actor component")
 	}
-
-
-	pub async fn send(
+	pub fn with_streamer(
 		&mut self,
 		streamer: impl Clone + Component + ActionStreamer,
-	) -> Result<Vec<ActionId>> {
-		let existing_actions = self
+	) -> &mut Self {
+		self.thread_view
+			.world
+			.entity_mut(self.entity)
+			.insert(streamer);
+		self
+	}
+
+	pub async fn send(&mut self) -> Result<Vec<ActionId>> {
+		let thread_id = self.thread_view.id;
+		let existing_actions =
+			self.world_mut().with_state::<Query<&Action>, _>(|query| {
+				query
+					.iter()
+					.filter(|action| action.thread() == thread_id)
+					.map(|action| action.id())
+					.collect::<HashSet<_>>()
+			});
+
+		let _outcome = self
 			.thread_view
-			.actions
-			.iter()
-			.map(|action| action.id())
-			.collect::<HashSet<_>>();
-
-		let world = app.world_mut();
-		let thread_id = self.thread_view.thread.id();
-		let thread_entity = world.spawn(self.thread_view.thread.clone()).id();
-
-		let _ = world
-			.spawn((
-				ChildOf(thread_entity),
-				self.actor().clone(),
-				action_tool(streamer),
-			))
-			.id();
-		world.entity().call::<(), Outcome>(()).await?;
+			.world
+			.entity_mut(self.entity)
+			.call::<(), Outcome>(())
+			.await?;
 
 		let new_actions =
-			world.with_state::<Query<&Action>, _>(move |actions| {
+			self.world_mut().with_state::<Query<&Action>, _>(|actions| {
 				actions
 					.iter()
 					.filter_map(|action| {
@@ -215,5 +256,37 @@ impl<'a> ActorViewMut<'a> {
 
 
 		Ok(new_actions)
+	}
+}
+
+
+pub struct ActionViewMut<'a> {
+	actor_view: &'a mut ActorViewMut<'a>,
+	id: ActionId,
+	entity: Entity,
+}
+
+impl<'a> ActionViewMut<'a> {
+	pub fn world(&self) -> &World { &self.actor_view.thread_view.world }
+	pub fn world_mut(&mut self) -> &mut World {
+		self.actor_view.thread_view.world.world_mut()
+	}
+	pub fn id(&self) -> ActionId { self.id }
+	pub fn entity(&self) -> Entity { self.entity }
+	pub fn actor_id(&self) -> ActorId { self.actor_view.id }
+	pub fn thread_id(&self) -> ThreadId { self.actor_view.thread_view.id }
+
+	pub fn thread_view(self) -> &'a mut ThreadViewMut<'a> {
+		self.actor_view.thread_view
+	}
+	pub fn actor_view(self) -> &'a mut ActorViewMut<'a> { self.actor_view }
+
+	pub fn action(&self) -> &Action {
+		self.actor_view
+			.thread_view
+			.world
+			.entity(self.entity)
+			.get::<Action>()
+			.expect("action entity should have Action component")
 	}
 }
