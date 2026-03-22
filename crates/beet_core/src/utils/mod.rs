@@ -7,14 +7,10 @@
 //! # Key Types
 //!
 //! - [`Xtend`] - Method chaining utilities for any type
-//! - [`BevyhowError`] - Error type for use with Bevy's error handling
 //! - [`Tree`] - Simple tree data structure
 //! - [`GlobFilter`] - Glob pattern matching utilities (requires `std`)
-//!
 //! # Macros
 //!
-//! - [`bevyhow!`](crate::bevyhow) - Create a [`BevyError`](bevy::ecs::error::BevyError) with formatting
-//! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 //! - [`cross_log!`](crate::cross_log) - Cross-platform logging (works in wasm)
 
 mod as_any;
@@ -22,7 +18,6 @@ mod as_any;
 #[cfg(feature = "std")]
 pub mod async_ext;
 mod backoff;
-mod bevyhow;
 #[cfg(feature = "std")]
 mod cli_args;
 mod clone_func;
@@ -68,7 +63,6 @@ pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
-pub use bevyhow::*;
 #[cfg(feature = "std")]
 pub use cli_args::*;
 pub use clone_func::*;

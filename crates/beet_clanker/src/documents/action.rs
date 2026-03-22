@@ -57,6 +57,28 @@ impl Action {
 			created: Timestamp::now(),
 		}
 	}
+	/// For a given payload, resolve the author id and thread id
+	/// on spawn by recursing up the tree.
+	pub fn spawn(payload: impl Into<ActionPayload>) -> OnSpawn {
+		let payload = payload.into();
+		OnSpawn::new(move |entity| {
+			let action = entity.with_state::<ThreadQuery, _>(
+				move |entity, query| -> Result<Action> {
+					let view = query.view(entity)?;
+					let (_, actor, _) = view.actor(entity)?;
+					Ok(Action::new(
+						actor.id(),
+						view.thread_id(),
+						ActionStatus::Completed,
+						payload,
+					))
+				},
+			)?;
+			entity.insert(action);
+			Ok(())
+		})
+	}
+
 	pub fn author(&self) -> ActorId { self.author }
 	pub fn thread(&self) -> ThreadId { self.thread }
 	pub fn status(&self) -> ActionStatus { self.status }

@@ -33,7 +33,6 @@ use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::app::MainSchedulePlugin;
 use bevy::ecs::component::Mutable;
-use bevy::ecs::error::ErrorContext;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
@@ -42,6 +41,7 @@ use bevy::ecs::world::CommandQueue;
 use bevy::ecs::world::WorldId;
 use bevy::tasks::IoTaskPool;
 use std::future::Future;
+use std::panic::Location;
 
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
@@ -119,15 +119,15 @@ fn append_async_queues(world: &mut World) -> Result {
 	Ok(())
 }
 
+#[cfg_attr(feature = "nightly", track_caller)]
 async fn run_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func) -> Result
 where
 	Func: 'static + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + Future<Output = Out>,
-	Out: AsyncTaskOut,
+	Out: 'static + Send + Sync + IntoResult,
 {
 	use futures_lite::future::FutureExt;
 
-	let world2 = world.clone();
 	let world3 = world.clone();
 	// 1. increment task count
 	world3
@@ -148,7 +148,12 @@ where
 
 	// 4. handle result
 	match result {
-		Ok(output) => output.apply(world2),
+		Ok(output) => {
+			if let Err(err) = output.into_result() {
+				let location = std::panic::Location::caller();
+				world.handle_command_error::<Func>(err, location).await;
+			}
+		}
 		Err(panic) => {
 			let msg = display_ext::try_downcast_str(&panic)
 				.unwrap_or_else(|| "unknown panic".to_string());
@@ -159,11 +164,12 @@ where
 	Ok(())
 }
 
+#[track_caller]
 fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + MaybeSend + Future<Output = Out>,
-	Out: AsyncTaskOut,
+	Out: 'static + Send + Sync + IntoResult,
 {
 	IoTaskPool::get()
 		.spawn(run_async_task(world, func))
@@ -172,11 +178,12 @@ where
 		.detach();
 }
 
+#[track_caller]
 fn spawn_async_task_local<Func, Fut, Out>(world: AsyncWorld, func: Func)
 where
 	Func: 'static + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + Future<Output = Out>,
-	Out: AsyncTaskOut,
+	Out: 'static + Send + Sync + IntoResult,
 {
 	IoTaskPool::get()
 		.spawn_local(run_async_task(world, func))
@@ -186,6 +193,7 @@ where
 }
 
 /// Spawns the async task, flushes all async tasks and returns the output.
+#[track_caller]
 fn spawn_async_task_then<Func, Fut, Out>(
 	world: AsyncWorld,
 	update: impl FnMut(),
@@ -206,6 +214,7 @@ where
 }
 
 /// Spawns the async local task, flushes all async tasks and returns the output.
+#[track_caller]
 fn spawn_async_task_local_then<Func, Fut, Out>(
 	world: AsyncWorld,
 	update: impl FnMut(),
@@ -273,7 +282,7 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		spawn_async_task(self.world(), func);
 	}
@@ -283,35 +292,9 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 	where
 		Func: 'static + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		spawn_async_task_local(self.world(), func);
-	}
-}
-
-/// Trait for types that can be returned from async tasks.
-pub trait AsyncTaskOut: 'static + Send + Sync {
-	/// Applies the result to the world.
-	fn apply(self, world: AsyncWorld);
-}
-
-impl AsyncTaskOut for () {
-	fn apply(self, _: AsyncWorld) {}
-}
-
-#[cfg(feature = "nightly")]
-impl AsyncTaskOut for ! {
-	fn apply(self, _: AsyncWorld) {}
-}
-
-
-impl AsyncTaskOut for Result {
-	fn apply(self, world: AsyncWorld) {
-		if let Err(err) = self {
-			world.handle_error(err, ErrorContext::Command {
-				name: "AsyncCommands".into(),
-			});
-		}
 	}
 }
 
@@ -597,7 +580,7 @@ impl AsyncWorld {
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		self.with_then(move |world| {
 			world.run_async(func);
@@ -612,7 +595,7 @@ impl AsyncWorld {
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		self.with_then(move |world| {
 			world.run_async_local(func);
@@ -644,10 +627,15 @@ impl AsyncWorld {
 	}
 
 	/// Handles an error using the world's default error handler.
-	pub fn handle_error(&self, err: BevyError, cx: ErrorContext) -> &Self {
-		self.with(|world| {
-			world.default_error_handler()(err.into(), cx);
-		});
+	pub async fn handle_command_error<F>(
+		&self,
+		err: BevyError,
+		location: &'static Location<'static>,
+	) -> &Self {
+		self.with_then(|world| {
+			world.handle_command_error::<F>(err, location);
+		})
+		.await;
 		self
 	}
 }
@@ -723,10 +711,7 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		let id = self.id();
-		self.world().with_then(move |world| {
-			world.with_state::<T, O>(move |state| func(id, state))
-		})
+		self.with_then(|mut entity| entity.with_state(func))
 	}
 
 	/// Gets a mutable component and runs a function with it.
@@ -868,28 +853,31 @@ impl AsyncEntity {
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
 	/// Spawns an async task.
+	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + MaybeSend + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		spawn_async_task(AsyncWorld::new(self.id()), func);
 		self
 	}
 
 	/// Spawns an async task on the local thread.
+	#[track_caller]
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		spawn_async_task_local(AsyncWorld::new(self.id()), func);
 		self
 	}
 
 	/// Spawns an async task, flushes all async tasks and returns the output.
+	#[track_caller]
 	fn run_async_then<Func, Fut, Out>(
 		&mut self,
 		func: Func,
@@ -907,6 +895,7 @@ pub impl World {
 	}
 
 	/// Spawns an async local task, flushes all async tasks and returns the output.
+	#[track_caller]
 	fn run_async_local_then<Func, Fut, Out>(
 		&mut self,
 		func: Func,
@@ -928,11 +917,12 @@ pub impl World {
 #[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
 pub impl EntityWorldMut<'_> {
 	/// Spawns an async task for this entity.
+	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
 		spawn_async_task_local(
@@ -943,11 +933,12 @@ pub impl EntityWorldMut<'_> {
 	}
 
 	/// Spawns an async task on the local thread for this entity.
+	#[track_caller]
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
 		spawn_async_task_local(
@@ -958,6 +949,7 @@ pub impl EntityWorldMut<'_> {
 	}
 
 	/// Spawns an async task, flushes all async tasks and returns the output.
+	#[track_caller]
 	fn run_async_then<Func, Fut, Out>(
 		&mut self,
 		func: Func,
@@ -976,6 +968,7 @@ pub impl EntityWorldMut<'_> {
 	}
 
 	/// Spawns an async local task, flushes all async tasks and returns the output.
+	#[track_caller]
 	fn run_async_local_then<Func, Fut, Out>(
 		&mut self,
 		func: Func,

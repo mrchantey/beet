@@ -13,7 +13,6 @@
 
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
-use bevy::ecs::error::ErrorContext;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -41,45 +40,22 @@ pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
-/// Trait for allowing bundles and results to be returned from methods.
-pub trait ApplyToEntity<M>: 'static + Send + Sync {
-	/// Applies this value to the entity.
-	fn apply(self, entity: &mut EntityWorldMut);
-}
-
-/// Marker type for bundle implementations of [`ApplyToEntity`].
-pub struct BundleApplyToEntityMarker;
-
-/// Marker type for result implementations of [`ApplyToEntity`].
-pub struct ResultApplyToEntityMarker;
-
-impl<T: Bundle> ApplyToEntity<BundleApplyToEntityMarker> for T {
-	fn apply(self, entity: &mut EntityWorldMut) { entity.insert(self); }
-}
-
-impl<T: Bundle> ApplyToEntity<ResultApplyToEntityMarker> for Result<T> {
-	fn apply(self, entity: &mut EntityWorldMut) {
-		match self {
-			Ok(bundle) => {
-				entity.insert(bundle);
-			}
-			Err(err) => entity.world_scope(|world| {
-				world.default_error_handler()(
-					err.into(),
-					ErrorContext::Command {
-						name: "ApplyToEntity".into(),
-					},
-				);
-			}),
-		}
-	}
-}
 impl OnSpawn {
 	/// Creates a new [`OnSpawn`] effect.
-	pub fn new(
-		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
-	) -> Self {
-		Self(Box::new(func))
+	#[track_caller]
+	pub fn new<F, O>(func: F) -> Self
+	where
+		F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> O,
+		O: IntoResult,
+	{
+		let location = std::panic::Location::caller();
+		Self(Box::new(move |entity| {
+			if let Err(err) = func(entity).into_result() {
+				entity.world_scope(move |world| {
+					world.handle_command_error::<F>(err, location);
+				});
+			}
+		}))
 	}
 
 	/// Inserts a bundle into the entity on spawn.
@@ -109,22 +85,25 @@ impl OnSpawn {
 	}
 
 	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
 	pub fn run_insert<
 		System: 'static + Send + Sync + IntoSystem<In<Entity>, Out, M1>,
 		M1,
-		Out: ApplyToEntity<M2>,
-		M2,
+		Out: IntoResult<B>,
+		B: Bundle,
 	>(
 		system: System,
 	) -> Self {
-		Self::new(move |entity| {
+		Self::new(move |entity| -> Result {
 			let id = entity.id();
-			entity
+			let bundle = entity
 				.world_scope(move |world| {
 					world.run_system_once_with(system, id)
 				})
-				.unwrap()
-				.apply(entity);
+				.map_err(|err| bevyhow!("{}", err))?
+				.into_result()?;
+			entity.insert(bundle);
+			Ok(())
 		})
 	}
 
@@ -172,7 +151,7 @@ impl OnSpawn {
 	) -> Self
 	where
 		Fut: 'static + Send + Sync + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();
@@ -190,7 +169,7 @@ impl OnSpawn {
 	) -> Self
 	where
 		Fut: 'static + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();

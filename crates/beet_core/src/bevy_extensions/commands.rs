@@ -28,7 +28,7 @@ pub impl Commands<'_, '_> {
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + MaybeSend + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		self.queue(move |world: &mut World| {
 			world.run_async(move |world| func(world));
@@ -72,7 +72,7 @@ pub impl EntityCommands<'_> {
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + MaybeSend + Future<Output = Out>,
-		Out: AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
 		self.commands()

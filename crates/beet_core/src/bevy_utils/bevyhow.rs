@@ -3,11 +3,22 @@
 //! This module provides [`bevyhow!`](crate::bevyhow) and [`bevybail!`](crate::bevybail)
 //! macros for creating errors compatible with Bevy's [`BevyError`] type.
 
+use crate::prelude::*;
 use alloc::string::String;
 use bevy::prelude::BevyError;
 
-#[cfg(feature = "ansi_paint")]
-use crate::utils::paint_ext;
+/// Trait for converting a value or Result into a `Result`.
+pub trait IntoResult<T = (), E = BevyError> {
+	/// Converts this value into a `Result`.
+	fn into_result(self) -> Result<T, E>;
+}
+impl<T, E> IntoResult<T, E> for T {
+	fn into_result(self) -> Result<T, E> { self.xok() }
+}
+impl<T, E> IntoResult<T, E> for Result<T, E> {
+	fn into_result(self) -> Result<T, E> { self }
+}
+
 
 /// Intermediary type for converting formatted strings to [`BevyError`].
 ///

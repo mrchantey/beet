@@ -23,6 +23,19 @@ pub impl<'a> EntityWorldMut<'a> {
 			.collect()
 	}
 
+	/// Runs a function with access to a system parameter state.
+	fn with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl FnOnce(Entity, T::Item<'_, '_>) -> O,
+	) -> O {
+		let id = self.id();
+		self.world_scope(|world| {
+			let mut state = world.state::<T>();
+			let item = state.get_mut(world);
+			func(id, item)
+		})
+	}
+
 	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
 	fn try_get<T: Component>(&self) -> Result<&T> {
 		self.get::<T>().ok_or_else(|| {

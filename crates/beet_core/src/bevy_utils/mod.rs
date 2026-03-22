@@ -23,6 +23,7 @@
 //!
 //! # Debugging
 //!
+//! - [`BevyhowError`] - Error type for use with Bevy's error handling
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
 //! - [`IdCounter`] - Unique ID generation
 //!
@@ -30,12 +31,18 @@
 //!
 //! - [`SceneSaver`] - Serialize world or entity subtrees to RON, JSON, or postcard
 //! - [`SceneLoader`] - Deserialize scenes back into a world
+//!
+//! # Macros
+//!
+//! - [`bevyhow!`](crate::bevyhow) - Create a [`BevyError`](bevy::ecs::error::BevyError) with formatting
+//! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 
 mod ancestor_query;
 #[cfg(feature = "std")]
 mod async_commands;
 #[cfg(feature = "std")]
 mod async_runner;
+mod bevyhow;
 mod common_systems;
 mod entity_target_event;
 mod garbage_collect;
@@ -43,6 +50,8 @@ mod id_counter;
 mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
+
+pub use bevyhow::*;
 mod observer_adder;
 #[cfg(feature = "std")]
 pub mod observer_ext;

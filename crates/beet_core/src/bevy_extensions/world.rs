@@ -4,6 +4,7 @@
 use crate::prelude::*;
 use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
+use bevy::ecs::error::ErrorContext;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
@@ -14,6 +15,7 @@ use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use core::marker::PhantomData;
 use extend::ext;
+use std::panic::Location;
 
 /// System that logs component names for an entity.
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
@@ -52,6 +54,18 @@ pub impl World {
 		let mut state = self.state::<T>();
 		let item = state.get_mut(self);
 		func(item)
+	}
+
+	/// Handle a command error, printing with a location.
+	fn handle_command_error<F>(
+		&self,
+		err: BevyError,
+		location: &'static Location<'static>,
+	) {
+		self.default_error_handler()(err.into(), ErrorContext::Command {
+			name: format!("{}\nat {:?}", std::any::type_name::<F>(), location)
+				.into(),
+		});
 	}
 
 	/// The world equivalent of [`App::update`].
