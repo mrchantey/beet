@@ -28,9 +28,25 @@ where
 		.stream_actions(store.inner(), actor, thread)
 		.await?;
 
+	// let mut threads = DocMap::<Thread>::new();
+	// let mut actors = DocMap::<Actor>::new();
+	// let get_or_create_actor = async |id:ActorId|->Result<Actor>{
+	// if let Some(actor) = actors.get(id) {
+	// 	Ok(actor.clone())
+	// } else {
+	// 	let actor = store.insert_actor(actor)
+	// 	actors.insert(id, actor.clone());
+	// 	Ok(actor)
+	// };
+
 	while let Some(ev) = stream.next().await {
 		let changes = ev?;
-		trace!("action stream changes: {changes:#?}");
+		// for created in changes.created.into_iter() {
+		// 	let action = stream.actions().get(created)?;
+		// 	trace!("action cr: {changes:#?}");
+		// 	// let thread = threads.get(change
+		// }
+
 		stream.write(store.inner(), changes.all_actions()).await?;
 	}
 

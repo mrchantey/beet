@@ -6,7 +6,16 @@ use serde::Serialize;
 pub type ThreadId = Uuid7<Thread>;
 
 #[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+	Component,
 )]
 pub struct Thread {
 	id: ThreadId,

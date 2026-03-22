@@ -13,7 +13,16 @@ pub type ActionId = Uuid7<Action>;
 /// Note that MessageRole is not stored
 /// as this is relative to the Actor.
 #[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+	Component,
 )]
 pub struct Action {
 	id: ActionId,

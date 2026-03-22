@@ -490,7 +490,16 @@ impl AsyncWorld {
 	{
 		self.with_then(move |world| func(world.resource_mut::<R>()))
 	}
-
+	/// Runs a function with access to a system parameter state.
+	pub fn with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl 'static + Send + FnOnce(T::Item<'_, '_>) -> O,
+	) -> impl Future<Output = O>
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with_then(|world| world.with_state(func))
+	}
 
 	/// Clones a resource and returns it.
 	pub fn resource<R: Resource + Clone>(&self) -> impl Future<Output = R>
@@ -704,6 +713,20 @@ impl AsyncEntity {
 			}
 		})
 		.await
+	}
+
+	/// Runs a function with access to the entity id and system parameter state.
+	pub fn with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl 'static + Send + FnOnce(Entity, T::Item<'_, '_>) -> O,
+	) -> impl Future<Output = O>
+	where
+		O: 'static + Send + Sync,
+	{
+		let id = self.id();
+		self.world().with_then(move |world| {
+			world.with_state::<T, O>(move |state| func(id, state))
+		})
 	}
 
 	/// Gets a mutable component and runs a function with it.

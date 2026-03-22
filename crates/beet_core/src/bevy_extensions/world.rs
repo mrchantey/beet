@@ -44,6 +44,16 @@ pub impl World {
 		SystemState::new(self)
 	}
 
+	/// Runs a function with access to a system parameter state.
+	fn with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl FnOnce(T::Item<'_, '_>) -> O,
+	) -> O {
+		let mut state = self.state::<T>();
+		let item = state.get_mut(self);
+		func(item)
+	}
+
 	/// The world equivalent of [`App::update`].
 	///
 	/// In multi_threaded mode, this temporarily sets all schedules to use

@@ -18,7 +18,7 @@ fn main() {
 
 
 
-fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
+fn create_scene(mut commands: Commands, mut query: ActionQuery) -> Result {
 	// 1. define actors
 	let clanker_id = query.actors_mut().insert(Actor::agent());
 	let system_id = query.actors_mut().insert(Actor::system());
@@ -55,7 +55,7 @@ fn create_scene(mut commands: Commands, mut query: ContextQuery) -> Result {
 #[tool]
 fn stdin(
 	input: SystemToolIn,
-	mut query: ContextQuery,
+	mut query: ActionQuery,
 	actors: Query<(&ActorId, &ThreadId)>,
 ) -> Result<Outcome> {
 	let (actor, thread) = actors.get(input.caller)?;
@@ -77,7 +77,7 @@ fn stdin(
 #[derive(Default, Deref, DerefMut, Resource)]
 struct StdoutCursor(HashMap<ActionId, u32>);
 
-fn log_name(ev: On<ActionCreated>, context_query: ContextQuery) -> Result {
+fn log_name(ev: On<ActionCreated>, context_query: ActionQuery) -> Result {
 	let actor = context_query.actors().get(ev.actor)?;
 	if actor.kind() != ActorKind::Agent {
 		return Ok(());
@@ -107,7 +107,7 @@ fn log_name(ev: On<ActionCreated>, context_query: ContextQuery) -> Result {
 
 fn log_delta(
 	ev: On<ActionUpdated>,
-	context_query: ContextQuery,
+	context_query: ActionQuery,
 	mut cursor: ResMut<StdoutCursor>,
 ) -> Result {
 	let actor = context_query.actors().get(ev.actor)?;

@@ -104,6 +104,10 @@ impl<M> std::fmt::Display for Uuid7<M> {
 	}
 }
 
+// pub trait DocStore<T: Document> {
+// #[track_caller]
+// pub fn get(&self, id: T::Id) -> BoxedFuture<'a, Result<T>>;
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocMap<T: Document>(HashMap<T::Id, T>);

@@ -1,23 +1,12 @@
 use crate::openresponses::Annotation;
 use crate::openresponses::ContentPart;
-use crate::openresponses::MessageRole;
 use crate::openresponses::OutputContent;
-use crate::openresponses::request::FunctionCallOutputParam;
-use crate::openresponses::request::FunctionCallParam;
-use crate::openresponses::request::FunctionOutputContent;
-use crate::openresponses::request::Input;
-use crate::openresponses::request::InputItem;
-use crate::openresponses::request::MessageContent;
-use crate::openresponses::request::MessageParam;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(Debug, Default)]
 pub struct ActionPartialMap {
 	annotation_inliner: AnnotationInliner,
-	/// Map an openresponses call id to an [`ActionId`]
-	call_id_to_action_id: HashMap<String, ActionId>,
-	action_id_to_call_id: HashMap<ActionId, String>,
 	/// Map partial item keys to the created [`ActionId`]
 	action_key_map: HashMap<ActionPartialKey, ActionId>,
 }
@@ -33,200 +22,6 @@ impl ActionPartialMap {
 		self
 	}
 
-	// ═══════════════════════════════════════════════════════════════════════
-	// Call ID mapping
-	// ═══════════════════════════════════════════════════════════════════════
-
-	fn set_call_id(&mut self, action_id: ActionId, call_id: String) -> Result {
-		if self.action_id_to_call_id.contains_key(&action_id) {
-			bevybail!("action_id {action_id} already has a call_id");
-		} else if self.call_id_to_action_id.contains_key(&call_id) {
-			bevybail!("call_id {call_id} already has an action_id");
-		}
-		self.call_id_to_action_id.insert(call_id.clone(), action_id);
-		self.action_id_to_call_id.insert(action_id, call_id);
-		Ok(())
-	}
-
-	fn get_call_id(&self, action_id: ActionId) -> Result<String> {
-		self.action_id_to_call_id
-			.get(&action_id)
-			.cloned()
-			.ok_or_else(|| {
-				bevyhow!("no call_id registered for action_id {action_id}")
-			})
-	}
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Response item key mapping
-	// ═══════════════════════════════════════════════════════════════════════
-
-	fn set_response_item(
-		&mut self,
-		key: ActionPartialKey,
-		action_id: ActionId,
-	) -> Result {
-		if self.action_key_map.contains_key(&key) {
-			bevybail!("action_key_map already has an entry for key {key:?}");
-		} else {
-			self.action_key_map.insert(key, action_id);
-		}
-		Ok(())
-	}
-
-	pub fn get_response_item(
-		&self,
-		key: &ActionPartialKey,
-	) -> Result<ActionId> {
-		self.action_key_map.get(key).cloned().ok_or_else(|| {
-			bevyhow!("no action_id registered for responses item key {key:?}")
-		})
-	}
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Input building - converts our actions to openresponses input format
-	// ═══════════════════════════════════════════════════════════════════════
-
-	pub fn build_o11s_input(
-		&self,
-		map: &ContextMap,
-		agent_id: ActorId,
-		thread_id: ThreadId,
-		last_sent_action: Option<ActionId>,
-	) -> Result<openresponses::request::Input> {
-		// collect and sort action ids for this thread (uuid7 = chronological)
-		let mut action_ids: Vec<ActionId> = map
-			.actions()
-			.values()
-			.filter(|action| action.thread() == thread_id)
-			.map(|action| action.id())
-			.collect();
-		action_ids.sort();
-
-		let action_ids = if let Some(last_sent) = last_sent_action {
-			match action_ids.binary_search(&last_sent) {
-				Ok(i) => action_ids[i + 1..].to_vec(),
-				Err(i) => action_ids[i..].to_vec(),
-			}
-		} else {
-			action_ids
-		};
-
-		// actions are strictly already chronologically sorted by uuidv7
-		let items = action_ids.into_iter().xtry_map(|action_id| {
-			self.action_to_o11s_input(map, agent_id, action_id)
-		})?;
-
-		Input::Items(items).xok()
-	}
-
-	/// Map an action to an openresponses input, relative to a given actor.
-	/// The provided actor is used to correctly assign [`MessageRole::Assistant`]
-	/// for 'self' messages, and [`MessageRole::User`] for all others.
-	fn action_to_o11s_input(
-		&self,
-		map: &ContextMap,
-		agent_id: ActorId,
-		action_id: ActionId,
-	) -> Result<openresponses::request::InputItem> {
-		let action = map.actions().get(action_id)?;
-		let author = map.actors().get(action.author())?;
-		let role = match author.kind() {
-			ActorKind::System => MessageRole::System,
-			ActorKind::App => MessageRole::Developer,
-			ActorKind::Agent => {
-				if author.id() == agent_id {
-					MessageRole::Assistant
-				} else {
-					MessageRole::User
-				}
-			}
-			ActorKind::User => MessageRole::User,
-		};
-
-		let input_item = match action.payload().clone() {
-			ActionPayload::Text(TextItem(value)) => {
-				InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Text(value),
-					status: None,
-				})
-			}
-			ActionPayload::Refusal(RefusalItem(value)) => {
-				InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Text(value),
-					status: None,
-				})
-			}
-			ActionPayload::ReasoningSummary(ReasoningSummaryItem(value)) => {
-				InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Text(value),
-					status: None,
-				})
-			}
-			ActionPayload::ReasoningContent(ReasoningContentItem(value)) => {
-				InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Text(value),
-					status: None,
-				})
-			}
-			ActionPayload::Url(url_item) => InputItem::Message(MessageParam {
-				id: None,
-				role,
-				content: MessageContent::Parts(vec![ContentPart::InputFile(
-					openresponses::InputFile {
-						filename: Some(url_item.filename()),
-						file_data: None,
-						file_url: Some(url_item.url.to_string()),
-					},
-				)]),
-				status: None,
-			}),
-			ActionPayload::Bytes(bytes_item) => {
-				InputItem::Message(MessageParam {
-					id: None,
-					role,
-					content: MessageContent::Parts(vec![
-						ContentPart::InputFile(openresponses::InputFile {
-							filename: Some(bytes_item.filename()),
-							file_data: Some(bytes_item.bytes_base64()),
-							file_url: None,
-						}),
-					]),
-					status: None,
-				})
-			}
-			ActionPayload::FunctionCall(function_call) => {
-				InputItem::FunctionCall(FunctionCallParam {
-					id: None,
-					call_id: self.get_call_id(action.id())?,
-					name: function_call.function_name().to_string(),
-					arguments: function_call.args().to_string(),
-					status: None,
-				})
-			}
-			ActionPayload::FunctionCallOutput(output_item) => {
-				InputItem::FunctionCallOutput(FunctionCallOutputParam {
-					id: None,
-					call_id: output_item.call_id,
-					output: FunctionOutputContent::Text(output_item.output),
-					status: None,
-				})
-			}
-		};
-		input_item.xok()
-	}
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Output parsing - converts partial items into our action format
-	// ═══════════════════════════════════════════════════════════════════════
 
 	/// Apply a stream of partial items against the action map, producing
 	/// [`ActionChanges`] describing what was created or modified.
@@ -245,15 +40,6 @@ impl ActionPartialMap {
 				status,
 				content,
 			} = partial_item;
-
-			// extract call_id before content is moved
-			let call_id = match &content {
-				PartialContent::FunctionCall { call_id, .. } => {
-					Some(call_id.clone())
-				}
-				_ => None,
-			};
-
 			if let Some(&action_id) = self.action_key_map.get(&key) {
 				// action already exists, update it in place
 				let action = actions.get_mut(action_id)?;
@@ -268,10 +54,6 @@ impl ActionPartialMap {
 				let after_mutation = action.hash();
 				if before_mutation != after_mutation {
 					changes.modified.push(action_id);
-					// discard already registered error on updates
-					if let Some(call_id) = call_id {
-						let _ = self.set_call_id(action_id, call_id);
-					}
 				}
 			} else {
 				// create new action
@@ -283,16 +65,35 @@ impl ActionPartialMap {
 				// register response key -> action id
 				self.set_response_item(key, action_id)?;
 
-				// register call_id mapping for function calls
-				if let Some(call_id) = call_id {
-					self.set_call_id(action_id, call_id)?;
-				}
-
 				changes.created.push(action_id);
 				actions.insert(action);
 			}
 		}
 		changes.xok()
+	}
+
+
+	// ═══════════════════════════════════════════════════════════════════════
+	// Response item key mapping
+	// ═══════════════════════════════════════════════════════════════════════
+
+	fn set_response_item(
+		&mut self,
+		key: ActionPartialKey,
+		action_id: ActionId,
+	) -> Result {
+		if self.action_key_map.contains_key(&key) {
+			bevybail!("action_key_map already has an entry for key {key:?}");
+		} else {
+			self.action_key_map.insert(key, action_id);
+		}
+		Ok(())
+	}
+
+	fn get_response_item(&self, key: &ActionPartialKey) -> Result<ActionId> {
+		self.action_key_map.get(key).cloned().ok_or_else(|| {
+			bevyhow!("no action_id registered for responses item key {key:?}")
+		})
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════

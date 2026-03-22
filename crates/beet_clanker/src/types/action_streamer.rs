@@ -70,9 +70,7 @@ impl ActionStream {
 	}
 
 	/// Returns an iterator over the collected actions.
-	pub fn actions(&self) -> impl Iterator<Item = &Action> {
-		self.actions.values()
-	}
+	pub fn actions(&self) -> &DocMap<Action> { &self.actions }
 
 	/// Commit the specified actions to the store,
 	/// ignoring any not in its map.

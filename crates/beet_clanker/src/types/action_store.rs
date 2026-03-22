@@ -20,8 +20,13 @@ impl ActionStore {
 impl Default for ActionStore {
 	fn default() -> Self { Self::new(MemoryActionStore::default()) }
 }
+pub trait DocStore: 'static + Send + Sync {}
 
 pub trait ActionStoreProvider: 'static + Send + Sync {
+	// fn actors(&self) -> &DocMap<Actor>;
+	// fn threads(&self) -> &DocMap<Actor>;
+	// fn actions(&self) -> &DocMap<Actor>;
+
 	/// Searches the thread for the most recent action with
 	/// a [`O11sMeta`] that was stored by the provider,
 	/// for use with `previous_response_id` patterns.
@@ -118,6 +123,60 @@ impl ActionStoreProvider for Arc<dyn ActionStoreProvider> {
 pub struct MemoryActionStore {
 	map: Arc<RwLock<ContextMap>>,
 }
+
+
+/// An in-memory unindexed table store for short-lived queries.
+/// Correctness is prioritized over efficiencty, ie no indexes are
+/// maintained, and actions are sorted per each 'get'.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct ContextMap {
+	actors: DocMap<Actor>,
+	actions: DocMap<Action>,
+	threads: DocMap<Thread>,
+	response_metas: DocMap<ResponseMeta>,
+}
+
+
+impl ContextMap {
+	pub fn actors(&self) -> &DocMap<Actor> { &self.actors }
+	pub fn actors_mut(&mut self) -> &mut DocMap<Actor> { &mut self.actors }
+
+	pub fn actions(&self) -> &DocMap<Action> { &self.actions }
+	pub fn actions_mut(&mut self) -> &mut DocMap<Action> { &mut self.actions }
+
+	// pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
+	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
+	pub fn metas(&self) -> &DocMap<ResponseMeta> { &self.response_metas }
+	pub fn metas_mut(&mut self) -> &mut DocMap<ResponseMeta> {
+		&mut self.response_metas
+	}
+
+	/// Returns all actions belonging to the given thread, sorted chronologically.
+	pub fn thread_actions(
+		&self,
+		thread_id: ThreadId,
+		actions_after: Option<ActionId>,
+	) -> Vec<&Action> {
+		let mut actions: Vec<&Action> = self
+			.actions
+			.values()
+			.filter(|action| action.thread() == thread_id)
+			.collect();
+		actions.sort_by_key(|action| action.id());
+
+		if let Some(after) = actions_after {
+			let pos = actions
+				.iter()
+				.position(|action| action.id() == after)
+				.map(|i| i + 1)
+				.unwrap_or(0);
+			actions[pos..].to_vec()
+		} else {
+			actions
+		}
+	}
+}
+
 
 impl ActionStoreProvider for MemoryActionStore {
 	fn stored_response_meta<'a>(

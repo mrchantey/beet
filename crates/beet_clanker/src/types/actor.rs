@@ -4,7 +4,16 @@ use beet_core::prelude::*;
 pub type ActorId = Uuid7<Actor>;
 
 #[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Serialize,
+	Deserialize,
+	Component,
 )]
 pub struct Actor {
 	id: ActorId,
