@@ -1,7 +1,6 @@
 use crate::o11s::request::Input;
 use crate::o11s::request::InputItem;
 use crate::prelude::*;
-use crate::types::ResPartialStream;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use futures::Stream;

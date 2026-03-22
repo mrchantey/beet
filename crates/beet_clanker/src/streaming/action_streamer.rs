@@ -27,7 +27,7 @@ pub trait ActionStreamer {
 }
 
 
-pub(super) type ResPartialStream =
+pub type ResPartialStream =
 	Pin<Box<dyn Stream<Item = Result<ResponsePartial>> + Send + Sync>>;
 
 
