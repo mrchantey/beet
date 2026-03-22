@@ -44,7 +44,7 @@ pub impl<
 		Iterator::chain(core::iter::once(entity), self.iter_ancestors(entity))
 	}
 
-	/// Iterates over all descendants of the given entity, including the entity itself.
+	/// Iterates breadth-first over all descendants of the given entity, including the entity itself.
 	fn iter_descendants_inclusive<S: RelationshipTarget>(
 		&'w self,
 		entity: Entity,
@@ -55,7 +55,7 @@ pub impl<
 		Iterator::chain(core::iter::once(entity), self.iter_descendants(entity))
 	}
 
-	/// Iterates depth first over all descendants of the given entity, including the entity itself.
+	/// Iterates depth-first over all descendants of the given entity, including the entity itself.
 	fn iter_descendants_inclusive_depth_first<S: RelationshipTarget>(
 		&'w self,
 		entity: Entity,

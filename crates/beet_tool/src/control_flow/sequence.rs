@@ -43,6 +43,11 @@ where
 		self
 	}
 
+	pub fn allow_no_tool(mut self) -> Self {
+		self.exclude_errors |= ChildError::NO_TOOL;
+		self
+	}
+
 	/// Get the current excluded errors.
 	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
