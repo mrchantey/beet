@@ -53,7 +53,7 @@ impl ActionPartialMap {
 				)?;
 				let after_mutation = action.hash();
 				if before_mutation != after_mutation {
-					changes.modified.push(action_id);
+					changes.modified.push(action.clone());
 				}
 			} else {
 				// create new action
@@ -63,9 +63,9 @@ impl ActionPartialMap {
 				let action_id = action.id();
 
 				// register response key -> action id
-				self.set_response_item(key, action_id)?;
+				self.set_action_key(key, action_id)?;
 
-				changes.created.push(action_id);
+				changes.created.push(action.clone());
 				actions.insert(action);
 			}
 		}
@@ -77,7 +77,7 @@ impl ActionPartialMap {
 	// Response item key mapping
 	// ═══════════════════════════════════════════════════════════════════════
 
-	fn set_response_item(
+	fn set_action_key(
 		&mut self,
 		key: ActionPartialKey,
 		action_id: ActionId,

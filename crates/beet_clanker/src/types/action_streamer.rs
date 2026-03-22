@@ -67,35 +67,55 @@ impl ActionStream {
 	/// Returns an iterator over the collected actions.
 	pub fn actions(&self) -> &DocMap<Action> { &self.actions }
 
-	/// Commit the specified actions to the store,
-	/// ignoring any not in its map.
-	pub async fn write(
-		&self,
-		store: impl ActionStoreProvider,
-		actions: Vec<ActionId>,
-	) -> Result {
-		let actions = self
-			.actions
-			.values()
-			.filter(|action| actions.contains(&&action.id()))
-			.map(|action| action.clone())
-			.collect::<Vec<_>>();
-		let response = self.response.as_ref().ok_or_else(|| {
-			bevyhow!(
-				"response id is required to write actions, did the stream finish?"
-			)
-		})?;
-
-		let metas = actions.iter().map(|action| ResponseMeta {
-			action_id: action.id(),
-			provider_slug: self.provider_slug.to_string(),
-			model_slug: self.model_slug.to_string(),
+	pub fn meta_builder(&self) -> Result<MetaBuilder> {
+		let response = self
+			.response
+			.as_ref()
+			.ok_or_else(|| {
+				bevyhow!(
+					"response id is required to write actions, did the stream finish?"
+				)
+			})?
+			.clone();
+		let provider_slug = self.provider_slug.to_string();
+		let model_slug = self.model_slug.to_string();
+		MetaBuilder {
+			provider_slug,
+			model_slug,
 			response_id: response.response_id.clone(),
 			response_stored: response.response_stored,
-		});
-		store.insert_response_metas(metas.collect()).await?;
-		store.insert_actions(actions).await?;
-		Ok(())
+		}
+		.xok()
+	}
+}
+
+pub struct MetaBuilder {
+	provider_slug: String,
+	model_slug: String,
+	response_id: String,
+	response_stored: bool,
+}
+impl MetaBuilder {
+	pub fn build(&self, action_id: ActionId) -> ResponseMeta {
+		ResponseMeta {
+			action_id,
+			provider_slug: self.provider_slug.clone(),
+			model_slug: self.model_slug.clone(),
+			response_id: self.response_id.clone(),
+			response_stored: self.response_stored,
+		}
+	}
+}
+
+#[derive(Debug, Default)]
+pub struct ActionChanges {
+	pub created: Vec<Action>,
+	pub modified: Vec<Action>,
+}
+
+impl ActionChanges {
+	pub fn is_empty(&self) -> bool {
+		self.created.is_empty() && self.modified.is_empty()
 	}
 }
 

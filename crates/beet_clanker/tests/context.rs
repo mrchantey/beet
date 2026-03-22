@@ -26,14 +26,9 @@ fn setup(mut commands: Commands) {
 			Thread::default(),
 			Sequence::new().allow_no_tool(),
 			children![
-				(
-					Actor::system(),
-					related!(
-						Actions[Action::spawn(
-							"you are robot, make beep boop noises"
-						)]
-					)
-				),
+				(Actor::system(), children![Action::spawn(
+					"you are robot, make beep boop noises"
+				)]),
 				(Actor::agent(), action_tool(OllamaProvider::qwen_3_8b())),
 				(system_tool(assert_and_exit))
 			],

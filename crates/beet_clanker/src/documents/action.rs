@@ -66,7 +66,7 @@ impl Action {
 				move |action_entity, query| -> Result<Action> {
 					let thread = query.view(action_entity)?;
 					let actor =
-						thread.actor_from_action_entity(action_entity)?;
+						query.actor_from_action_entity(action_entity)?;
 					Ok(Action::new(
 						actor.id(),
 						thread.id(),

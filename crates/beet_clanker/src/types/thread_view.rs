@@ -7,9 +7,7 @@ pub struct ThreadQuery<'w, 's> {
 	pub ancestors: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
 	pub threads: Query<'w, 's, (Entity, &'static Thread)>,
-	pub action_ofs: Query<'w, 's, &'static ActionOf>,
-	pub actors:
-		Query<'w, 's, (Entity, &'static Actor, Option<&'static Actions>)>,
+	pub actors: Query<'w, 's, (Entity, &'static Actor)>,
 	pub actions:
 		Query<'w, 's, (Entity, &'static Action, Option<&'static ResponseMeta>)>,
 }
@@ -20,12 +18,7 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 	/// Valid positions are:
 	/// - any descendant of a thread, ie an Actor
 	/// - any `ActionOf`
-	pub fn view(&self, mut entity: Entity) -> Result<ThreadView<'_>> {
-		// handle the action position
-		if let Ok(actor) = self.action_ofs.get(entity) {
-			entity = actor.get()
-		};
-
+	pub fn view(&self, entity: Entity) -> Result<ThreadView<'_>> {
 		let (thread_entity, thread) = self
 			.ancestors
 			.iter_ancestors_inclusive(entity)
@@ -36,31 +29,26 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 			.children
 			.iter_descendants_inclusive(thread_entity)
 			.filter_map(|entity| self.actors.get(entity).ok())
-			.map(|(entity, actor, actions)| ActorView {
-				entity,
-				actor,
-				actions,
-			})
+			.map(|(entity, actor)| ActorView { entity, actor })
 			.collect();
 
-		let mut actions: Vec<ActionView<'_>> = actors
-			.iter()
-			.filter_map(|av| {
-				av.actions.map(|actions| {
-					actions
-						.iter()
-						.filter_map(|entity| self.actions.get(entity).ok())
-						.map(|(entity, action, response_meta)| ActionView {
-							entity,
-							action,
-							actor: av.actor,
-							actor_entity: av.entity,
-							response_meta,
-						})
-				})
-			})
-			.flatten()
-			.collect();
+		let mut actions: Vec<ActionView<'_>> = self
+			.children
+			.iter_descendants_inclusive(thread_entity)
+			.filter_map(|entity| self.actions.get(entity).ok())
+			.xtry_map(
+				|(entity, action, response_meta)| -> Result<ActionView> {
+					let actor = self.actor_from_action_entity(entity)?;
+					ActionView {
+						entity,
+						action,
+						actor: actor.actor,
+						actor_entity: actor.entity,
+						response_meta,
+					}
+					.xok()
+				},
+			)?;
 		actions.sort_by_key(|av| av.action.id());
 
 		ThreadView {
@@ -70,6 +58,20 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 			actions,
 		}
 		.xok()
+	}
+
+	/// Find the [`ActorView`] that owns the given action entity.
+	pub fn actor_from_action_entity<'a>(
+		&'a self,
+		action: Entity,
+	) -> Result<ActorView<'a>> {
+		self.ancestors
+			.iter_ancestors_inclusive(action)
+			.find_map(|entity| self.actors.get(entity).ok())
+			.map(|(entity, actor)| ActorView { entity, actor })
+			.ok_or_else(|| {
+				bevyhow!("No actor ancestor found for action {action:?}")
+			})
 	}
 }
 #[derive(Debug, Clone)]
@@ -113,22 +115,16 @@ impl<'a> ThreadView<'a> {
 				)
 			})
 	}
-
-	/// Find the [`ActorView`] that owns the given action entity.
-	pub fn actor_from_action_entity(
+	pub fn action_from_id(
 		&self,
-		action: Entity,
-	) -> Result<&ActorView<'a>> {
-		self.actors
+		action_id: ActionId,
+	) -> Result<&ActionView<'a>> {
+		self.actions
 			.iter()
-			.find(|av| {
-				av.actions
-					.map(|actions| actions.iter().any(|other| action == other))
-					.unwrap_or(false)
-			})
+			.find(|av| av.action.id() == action_id)
 			.ok_or_else(|| {
 				bevyhow!(
-					"No actor found for action {action:?} in thread {thread:?}",
+					"No action with id {action_id} found in thread {thread:?}",
 					thread = self.thread
 				)
 			})
@@ -172,7 +168,6 @@ impl<'a> ThreadView<'a> {
 pub struct ActorView<'a> {
 	pub entity: Entity,
 	pub actor: &'a Actor,
-	pub actions: Option<&'a Actions>,
 }
 
 impl std::ops::Deref for ActorView<'_> {
@@ -196,5 +191,6 @@ impl std::ops::Deref for ActionView<'_> {
 }
 
 impl ActionView<'_> {
+	pub fn entity(&self) -> Entity { self.entity }
 	pub fn actor_id(&self) -> ActorId { self.actor.id() }
 }
