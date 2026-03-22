@@ -67,6 +67,7 @@ pub use async_ext::MaybeSendBoxedFuture;
 #[cfg(feature = "std")]
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
+pub use bevy::tasks::BoxedFuture;
 pub use bevyhow::*;
 #[cfg(feature = "std")]
 pub use cli_args::*;

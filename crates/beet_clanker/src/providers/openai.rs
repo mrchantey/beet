@@ -3,7 +3,6 @@
 //! OpenAI provides cloud-based LLM inference with OpenResponses-compatible streaming.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::tasks::BoxedFuture;
 
 
 /// An OpenResponses-compatible provider for OpenAI API.

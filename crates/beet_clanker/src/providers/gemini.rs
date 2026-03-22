@@ -5,7 +5,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use serde_json::Value;
 use serde_json::json;

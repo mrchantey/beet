@@ -3,7 +3,6 @@ use crate::prelude::*;
 use crate::types::ResPartialStream;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use std::pin::Pin;
 use std::task::Context;

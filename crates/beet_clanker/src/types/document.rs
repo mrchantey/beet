@@ -1,3 +1,4 @@
+use async_lock::RwLock;
 // use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
@@ -6,10 +7,11 @@ use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use uuid::Uuid;
 
 
-pub trait Document: Sized {
+pub trait Document: 'static + Send + Sync + Sized {
 	type Id: DocId;
 	fn id(&self) -> Self::Id;
 }
@@ -39,8 +41,20 @@ impl<M1, M2> DocId for (Uuid7<M1>, Uuid7<M2>) {
 	}
 }
 
+unsafe impl<M> Send for Uuid7<M> {}
+unsafe impl<M> Sync for Uuid7<M> {}
+
 pub trait DocId:
-	Debug + Clone + Hash + PartialEq + Eq + Serialize + DeserializeOwned
+	// 'static
+	Send
+	+ Sync
+	+ Debug
+	+ Clone
+	+ Hash
+	+ PartialEq
+	+ Eq
+	+ Serialize
+	+ DeserializeOwned
 {
 	/// Convenience for usage like hashmap keys
 	fn into_bytes(&self) -> Vec<u8>;
@@ -104,11 +118,42 @@ impl<M> std::fmt::Display for Uuid7<M> {
 	}
 }
 
-// pub trait DocStore<T: Document> {
-// #[track_caller]
-// pub fn get(&self, id: T::Id) -> BoxedFuture<'a, Result<T>>;
-// }
+pub trait DocStore<T: Document> {
+	#[track_caller]
+	fn insert(&self, value: T) -> BoxedFuture<'_, Result<T::Id>>;
+	#[track_caller]
+	fn get(&self, id: T::Id) -> BoxedFuture<'_, Result<T>>
+	where
+		T: Clone;
+}
 
+#[derive(Debug, Default, Clone)]
+pub struct ArcDocMap<T: Document>(Arc<RwLock<DocMap<T>>>);
+impl<T: Document> ArcDocMap<T> {
+	pub fn new(map: DocMap<T>) -> Self { Self(Arc::new(RwLock::new(map))) }
+}
+
+impl<T> DocStore<T> for ArcDocMap<T>
+where
+	T: Document,
+{
+	fn insert(&self, value: T) -> BoxedFuture<'_, Result<T::Id>> {
+		// let map = self.0.clone();
+		Box::pin(async move {
+			let mut map = self.0.write().await;
+			Ok(map.insert(value))
+		})
+	}
+	fn get(&self, id: T::Id) -> BoxedFuture<'_, Result<T>>
+	where
+		T: Clone,
+	{
+		Box::pin(async move { self.0.read().await.get(id).cloned() })
+	}
+}
+
+
+/// In-memory collection of documents, mapped by their id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DocMap<T: Document>(HashMap<T::Id, T>);
 

@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use async_lock::RwLock;
 use beet_core::prelude::*;
-use bevy::tasks::BoxedFuture;
 use std::sync::Arc;
 
 use crate::types::ActionId;
@@ -20,7 +19,6 @@ impl ActionStore {
 impl Default for ActionStore {
 	fn default() -> Self { Self::new(MemoryActionStore::default()) }
 }
-pub trait DocStore: 'static + Send + Sync {}
 
 pub trait ActionStoreProvider: 'static + Send + Sync {
 	// fn actors(&self) -> &DocMap<Actor>;

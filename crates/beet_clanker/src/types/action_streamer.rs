@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::tasks::BoxedFuture;
 use futures::Stream;
 use std::borrow::Cow;
 use std::pin::Pin;
