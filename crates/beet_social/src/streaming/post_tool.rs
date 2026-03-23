@@ -1,0 +1,65 @@
+use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_tool::prelude::*;
+
+
+
+
+
+pub fn post_tool<T>(streamer: T) -> impl Bundle
+where
+	T: Clone + Component + PostStreamer,
+{
+	(streamer, async_tool(insert_stream::<T>))
+}
+
+
+async fn insert_stream<T>(input: AsyncToolIn<()>) -> Result<Outcome>
+where
+	T: Clone + Component + PostStreamer,
+{
+	// TODO somehow expose settings.. PostTool component?
+	let allow_multiple_modified = false;
+
+	let mut streamer = input.caller.get_cloned::<T>().await?;
+	let mut stream = streamer.stream_posts(input.caller.clone()).await?;
+	while let Some(changes) = stream.next().await {
+		trace!("Received post changes: {:#?}", changes);
+		let meta_builder = stream.meta_builder()?;
+		let PostChanges { created, modified } = changes?;
+		input
+			.caller
+			.with_state::<(Commands, Query<&mut Post>), _>(
+				move |agent, (mut commands, mut query)| -> Result {
+					// let view = query.view(entity)?;
+
+					let mut modified = modified
+						.into_iter()
+						.map(|modified| (modified.id(), modified))
+						.collect::<HashMap<_, _>>();
+
+					// 1. apply modified posts
+					for mut post in query.iter_mut() {
+						if allow_multiple_modified
+							&& let Some(new) = modified.get(&post.id()).cloned()
+						{
+							// clone if allow multiple
+							post.set_if_neq(new);
+						} else if let Some(new) = modified.remove(&post.id()) {
+							post.set_if_neq(new);
+						}
+					}
+					// 2. spawn created posts
+					for created_post in created {
+						let meta = meta_builder.build(created_post.id());
+						commands.entity(agent).with_child((created_post, meta));
+					}
+
+					Ok(())
+				},
+			)
+			.await?;
+	}
+
+	Ok(Pass(()))
+}

@@ -52,7 +52,7 @@ members = [
 	"crates/beet_node",
 	"crates/beet_stack",
 	"crates/beet_router",
-	"crates/beet_clanker",
+	"crates/beet_social",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -79,7 +79,7 @@ members = [
 ## internal
 
 beet = { path = "", version = "0.0.9-dev.6" }
-beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.6" }
+beet_social = { path = "crates/beet_social", version = "0.0.9-dev.6" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.6" }
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.6" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.6" }
@@ -267,7 +267,7 @@ _pretty_curl = ["net", "node", "ureq", "native-tls"]
 _mini_browser = ["_pretty_curl", "tui"]
 
 
-clanker = ["dep:beet_clanker","net","tool"]
+social = ["dep:beet_social","net","tool"]
 # dom = ["css", "dep:beet_dom"]
 
 
@@ -314,7 +314,7 @@ markdown = ["beet_stack?/markdown"]
 bevy = { workspace = true }
 
 beet_core.workspace = true
-beet_clanker = { workspace = true, optional = true }
+beet_social = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
@@ -428,17 +428,17 @@ name = "http"
 path = "examples/stack/http.rs"
 required-features = ["http_server"]
 
-# 💡 Examples - Clanker
+# 💡 Examples - Social
 
 [[example]]
 name = "chat"
-path = "examples/clanker/chat.rs"
-required-features = ["clanker"]
+path = "examples/social/chat.rs"
+required-features = ["social"]
 
 [[example]]
 name = "oneshot"
-path = "examples/clanker/oneshot.rs"
-required-features = ["clanker"]
+path = "examples/social/oneshot.rs"
+required-features = ["social"]
 
 
 # 💡 Examples - flow

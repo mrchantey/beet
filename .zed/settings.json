@@ -19,7 +19,7 @@
 						// "tui",
 						// "bevy_scene",
 						// "json",
-						"clanker",
+						"social",
 						// "_pretty_curl",
 						// "_mini_browser",
 						// "http_server",
@@ -47,7 +47,7 @@
 	"file_scan_exclusions": [
 		"crates/beet-cli",
 		"crates/beet_build",
-		// "crates/beet_clanker",
+		// "crates/beet_social",
 		"crates/beet_design",
 		"crates/beet_dom",
 		"crates/beet_examples",

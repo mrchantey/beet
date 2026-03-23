@@ -150,7 +150,7 @@ Planned interfaces:
 - `http`: HTTP server interface
 - `dom`: Web-based interfaces
 - `wgpu`: Bevy's native UI rendering
-- `clanker`: LLM tool calls and context trees
+- `social`: Social platform types and systems
 - `embedded`: Microcontrollers like the ESP32
 
 ## Modules

@@ -1,4 +1,6 @@
-Implement the Open Responses API in `crates/beet_clanker/src/flow_agent/openresponses` using sensible Rust conventions:
+Implement the Open Responses API in `crates/beet_social/src/flow_agent/o11s` using sensible Rust conventions:
+
+- OpenResponses = `o11s`
 
 - Separate code by files with all public items exposed via `mod.rs`
 - Use beautiful Rust conventions, docs, and doc examples instead of relying on openapi auto-generation, which typically results in language-specific antipatterns
@@ -6,25 +8,25 @@ Implement the Open Responses API in `crates/beet_clanker/src/flow_agent/openresp
 
 ## Testing
 
-- Create the six integration tests in `crates/beet_clanker/tests/openresponses.rs`
+- Create the six integration tests in `crates/beet_social/tests/o11s.rs`
 An example integration test may look something like this (the exact API may differ):
 
 ```rust
-use beet_clanker::prelude::*;
+use beet_social::prelude::*;
 use beet_net::prelude::*;
 
 #[beet_core::test]
 async fn basic_text_response(){
 Request::post("https://api.openai.com/v1/responses")
 	.with_auth(env_ext::get("OPENAI_API_KEY"))
-	.with_body(openresponses::request::Body{
+	.with_body(o11s::request::Body{
 		model: providers::openai::GPT_5_MINI,
 		input:"respond exactly with the phrase 'foobar' and nothing else"})
 	.send()
 	.await()
 	.into_result()
 	.unwrap()
-	.body::<openresponses::response::Body>().unwrap().items[0]
+	.body::<o11s::response::Body>().unwrap().items[0]
 	.xpect_eq("foobar")
 }
 ```

@@ -440,7 +440,7 @@ impl ToolOf {
 }
 
 /// Component for storing the tools associated with an entity,
-/// useful for defining available behaviors on a page, or a clanker tool set.
+/// useful for defining available behaviors on a page, or a social tool set.
 #[derive(
 	Debug,
 	Clone,
