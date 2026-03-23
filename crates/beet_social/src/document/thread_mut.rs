@@ -60,14 +60,14 @@ impl<'a> From<&'a mut App> for AsWorldMut<'a> {
 }
 
 #[derive(Debug)]
-pub struct ThreadViewMut<'a> {
+pub struct ThreadMut<'a> {
 	world: AsWorldMut<'a>,
 	id: ThreadId,
 	entity: Entity,
 }
 
 
-impl ThreadViewMut<'static> {
+impl ThreadMut<'static> {
 	pub fn new<M>() -> Self { Self::new_with_plugins(()) }
 	pub fn new_logging<M>(level: Level) -> Self {
 		Self::new_with_plugins(LogPlugin {
@@ -85,7 +85,7 @@ impl ThreadViewMut<'static> {
 	}
 }
 
-impl<'a> ThreadViewMut<'a> {
+impl<'a> ThreadMut<'a> {
 	pub fn new_with_world(world: impl Into<AsWorldMut<'a>>) -> Self {
 		let mut world = world.into();
 		let thread = Thread::new("Oneshot Thread");
@@ -166,7 +166,7 @@ impl<'a> ThreadViewMut<'a> {
 
 
 pub struct UserViewMut<'a> {
-	thread_view: &'a mut ThreadViewMut<'a>,
+	thread_view: &'a mut ThreadMut<'a>,
 	id: UserId,
 	entity: Entity,
 }
@@ -200,7 +200,7 @@ impl<'a> UserViewMut<'a> {
 	}
 	pub fn id(&self) -> UserId { self.id }
 	pub fn entity(&self) -> Entity { self.entity }
-	pub fn thread_view(self) -> &'a mut ThreadViewMut<'a> { self.thread_view }
+	pub fn thread_view(self) -> &'a mut ThreadMut<'a> { self.thread_view }
 
 	pub fn user(&self) -> &User {
 		self.thread_view
@@ -276,7 +276,7 @@ impl<'a> PostViewMut<'a> {
 	pub fn user_id(&self) -> UserId { self.user_view.id }
 	pub fn thread_id(&self) -> ThreadId { self.user_view.thread_view.id }
 
-	pub fn thread_view(self) -> &'a mut ThreadViewMut<'a> {
+	pub fn thread_view(self) -> &'a mut ThreadMut<'a> {
 		self.user_view.thread_view
 	}
 	pub fn user_view(self) -> &'a mut UserViewMut<'a> { self.user_view }

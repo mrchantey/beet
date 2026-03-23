@@ -40,7 +40,7 @@ Do not respond with this format.
 #[tool]
 fn stdin_post_tool(
 	cx: SystemToolIn,
-	mut query: ThreadQuery,
+	mut query: SocialQuery,
 ) -> Result<Outcome> {
 	let heading = paint_ext::cyan_bold(format!("\n\nUser > "));
 	print!("{heading}");
@@ -58,7 +58,7 @@ struct StdoutCursor(u32);
 fn on_create(
 	mut commands: Commands,
 	query: Populated<(Entity, &Post), Added<Post>>,
-	thread_query: ThreadQuery,
+	thread_query: SocialQuery,
 ) -> Result {
 	for (entity, post) in query.iter() {
 		commands.entity(entity).insert(StdoutCursor::default());
@@ -92,7 +92,7 @@ fn on_create(
 
 fn on_change(
 	mut query: Populated<(Entity, &Post, &mut StdoutCursor), Changed<Post>>,
-	thread_query: ThreadQuery,
+	thread_query: SocialQuery,
 ) -> Result {
 	for (entity, post, mut cursor) in query.iter_mut() {
 		let user = thread_query.user_from_post_entity(entity)?;

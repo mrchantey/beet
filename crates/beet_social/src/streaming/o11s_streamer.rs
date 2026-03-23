@@ -73,7 +73,7 @@ impl PostStreamer for O11sStreamer {
 			let model_slug = self.model.model_slug.clone();
 
 			let (thread, agent, last_received, input_items) = caller
-				.with_state::<ThreadQuery, _>(
+				.with_state::<SocialQuery, _>(
 					move |user_entity,
 					      query|
 					      -> Result<(
@@ -82,7 +82,7 @@ impl PostStreamer for O11sStreamer {
 						Option<ResponseMeta>,
 						Vec<InputItem>,
 					)> {
-						let thread = query.view(user_entity)?;
+						let thread = query.thread(user_entity)?;
 						let agent = thread.user(user_entity)?;
 
 						// get last received response meta

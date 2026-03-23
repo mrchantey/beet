@@ -62,9 +62,9 @@ impl Post {
 	pub fn spawn(payload: impl Into<PostPayload>) -> OnSpawn {
 		let payload = payload.into();
 		OnSpawn::new(move |entity| {
-			let post = entity.with_state::<ThreadQuery, _>(
+			let post = entity.with_state::<SocialQuery, _>(
 				move |post_entity, query| -> Result<Post> {
-					let thread = query.view(post_entity)?;
+					let thread = query.thread(post_entity)?;
 					let user = query.user_from_post_entity(post_entity)?;
 					Ok(Post::new(
 						user.id(),
