@@ -60,15 +60,18 @@ impl<'a> From<&'a mut App> for AsWorldMut<'a> {
 }
 
 #[derive(Debug)]
-pub struct ThreadMut<'a> {
-	world: AsWorldMut<'a>,
+pub struct ThreadMut<'w> {
+	world: AsWorldMut<'w>,
 	id: ThreadId,
 	entity: Entity,
 }
 
+impl Default for ThreadMut<'static> {
+	fn default() -> Self { Self::new() }
+}
 
 impl ThreadMut<'static> {
-	pub fn new<M>() -> Self { Self::new_with_plugins(()) }
+	pub fn new() -> Self { Self::new_with_plugins(()) }
 	pub fn new_logging<M>(level: Level) -> Self {
 		Self::new_with_plugins(LogPlugin {
 			level,
@@ -85,8 +88,8 @@ impl ThreadMut<'static> {
 	}
 }
 
-impl<'a> ThreadMut<'a> {
-	pub fn new_with_world(world: impl Into<AsWorldMut<'a>>) -> Self {
+impl<'w> ThreadMut<'w> {
+	pub fn new_with_world(world: impl Into<AsWorldMut<'w>>) -> Self {
 		let mut world = world.into();
 		let thread = Thread::new("Oneshot Thread");
 		let id = thread.id();
@@ -99,7 +102,6 @@ impl<'a> ThreadMut<'a> {
 	pub fn world(&self) -> &World { &self.world }
 	pub fn world_mut(&mut self) -> &mut World { self.world.world_mut() }
 
-
 	pub fn thread(&self) -> &Thread {
 		self.world
 			.entity(self.entity)
@@ -107,7 +109,8 @@ impl<'a> ThreadMut<'a> {
 			.expect("thread entity should have Thread component")
 	}
 
-	pub fn insert_user(&'a mut self, user: User) -> UserViewMut<'a> {
+	/// Inserts a [`User`] as a child of this thread and returns a mutable view.
+	pub fn insert_user<'t>(&'t mut self, user: User) -> UserViewMut<'t, 'w> {
 		let id = user.id();
 		let entity = self.world.spawn((ChildOf(self.entity), user)).id();
 		UserViewMut {
@@ -117,11 +120,14 @@ impl<'a> ThreadMut<'a> {
 		}
 	}
 
-	pub fn user(&'a mut self, entity: Entity) -> UserViewMut<'a> {
+	pub fn user<'t>(&'t mut self, entity: Entity) -> UserViewMut<'t, 'w> {
 		self.try_user(entity).unwrap()
 	}
 
-	pub fn try_user(&'a mut self, entity: Entity) -> Result<UserViewMut<'a>> {
+	pub fn try_user<'t>(
+		&'t mut self,
+		entity: Entity,
+	) -> Result<UserViewMut<'t, 'w>> {
 		let user = self
 			.world
 			.entity(entity)
@@ -137,13 +143,17 @@ impl<'a> ThreadMut<'a> {
 		})
 	}
 
-	pub fn user_from_id(&'a mut self, user_id: UserId) -> UserViewMut<'a> {
+	pub fn user_from_id<'t>(
+		&'t mut self,
+		user_id: UserId,
+	) -> UserViewMut<'t, 'w> {
 		self.try_user_from_id(user_id).unwrap()
 	}
-	pub fn try_user_from_id(
-		&'a mut self,
+
+	pub fn try_user_from_id<'t>(
+		&'t mut self,
 		user_id: UserId,
-	) -> Result<UserViewMut<'a>> {
+	) -> Result<UserViewMut<'t, 'w>> {
 		let (entity, id) = self
 			.world
 			.with_state::<Query<(Entity, &User)>, _>(|query| {
@@ -164,18 +174,22 @@ impl<'a> ThreadMut<'a> {
 	}
 }
 
-
-pub struct UserViewMut<'a> {
-	thread_view: &'a mut ThreadMut<'a>,
+/// Mutable view into a [`User`] entity within a [`ThreadMut`].
+///
+/// `'t` is the lifetime of the borrow of [`ThreadMut`].
+/// `'w` is the lifetime of the underlying world data.
+pub struct UserViewMut<'t, 'w> {
+	thread_view: &'t mut ThreadMut<'w>,
 	id: UserId,
 	entity: Entity,
 }
 
-impl<'a> UserViewMut<'a> {
-	pub fn insert_post(
-		&'a mut self,
+impl<'t, 'w> UserViewMut<'t, 'w> {
+	/// Inserts a [`Post`] as a child of this user and returns a mutable view.
+	pub fn insert_post<'u>(
+		&'u mut self,
 		payload: impl Into<PostPayload>,
-	) -> PostViewMut<'a> {
+	) -> PostViewMut<'u, 't, 'w> {
 		let post = Post::new(
 			self.id,
 			self.thread_view.id,
@@ -194,13 +208,16 @@ impl<'a> UserViewMut<'a> {
 			user_view: self,
 		}
 	}
+
 	pub fn world(&self) -> &World { &self.thread_view.world }
 	pub fn world_mut(&mut self) -> &mut World {
 		self.thread_view.world.world_mut()
 	}
 	pub fn id(&self) -> UserId { self.id }
 	pub fn entity(&self) -> Entity { self.entity }
-	pub fn thread_view(self) -> &'a mut ThreadMut<'a> { self.thread_view }
+
+	/// Consumes this view and returns the underlying [`ThreadMut`] reference.
+	pub fn thread_view(self) -> &'t mut ThreadMut<'w> { self.thread_view }
 
 	pub fn user(&self) -> &User {
 		self.thread_view
@@ -209,6 +226,7 @@ impl<'a> UserViewMut<'a> {
 			.get::<User>()
 			.expect("user entity should have User component")
 	}
+
 	pub fn with_streamer(
 		&mut self,
 		streamer: impl Clone + Component + PostStreamer,
@@ -216,8 +234,23 @@ impl<'a> UserViewMut<'a> {
 		self.thread_view
 			.world
 			.entity_mut(self.entity)
-			.insert(streamer);
+			.insert(post_tool(streamer));
 		self
+	}
+
+	pub async fn send_and_collect(&mut self) -> Result<Vec<Post>> {
+		let post_ids = self.send().await?;
+		self.thread_view
+			.world
+			.with_state::<Query<&Post>, _>(|query| {
+				post_ids
+					.iter()
+					.filter_map(|post_id| {
+						query.iter().find(|post| post.id() == *post_id).cloned()
+					})
+					.collect::<Vec<_>>()
+			})
+			.xok()
 	}
 
 	pub async fn send(&mut self) -> Result<Vec<PostId>> {
@@ -254,19 +287,22 @@ impl<'a> UserViewMut<'a> {
 					.collect::<Vec<_>>()
 			});
 
-
 		Ok(new_posts)
 	}
 }
 
-
-pub struct PostViewMut<'a> {
-	user_view: &'a mut UserViewMut<'a>,
+/// Mutable view into a [`Post`] entity within a [`UserViewMut`].
+///
+/// `'u` is the lifetime of the borrow of [`UserViewMut`].
+/// `'t` is the lifetime of the borrow of [`ThreadMut`].
+/// `'w` is the lifetime of the underlying world data.
+pub struct PostViewMut<'u, 't, 'w> {
+	user_view: &'u mut UserViewMut<'t, 'w>,
 	id: PostId,
 	entity: Entity,
 }
 
-impl<'a> PostViewMut<'a> {
+impl<'u, 't, 'w> PostViewMut<'u, 't, 'w> {
 	pub fn world(&self) -> &World { &self.user_view.thread_view.world }
 	pub fn world_mut(&mut self) -> &mut World {
 		self.user_view.thread_view.world.world_mut()
@@ -276,10 +312,16 @@ impl<'a> PostViewMut<'a> {
 	pub fn user_id(&self) -> UserId { self.user_view.id }
 	pub fn thread_id(&self) -> ThreadId { self.user_view.thread_view.id }
 
-	pub fn thread_view(self) -> &'a mut ThreadMut<'a> {
+	/// Consumes this view and returns the underlying [`ThreadMut`] reference.
+	pub fn thread_view(self) -> &'t mut ThreadMut<'w>
+	where
+		'u: 't,
+	{
 		self.user_view.thread_view
 	}
-	pub fn user_view(self) -> &'a mut UserViewMut<'a> { self.user_view }
+
+	/// Consumes this view and returns the underlying [`UserViewMut`] reference.
+	pub fn user_view(self) -> &'u mut UserViewMut<'t, 'w> { self.user_view }
 
 	pub fn post(&self) -> &Post {
 		self.user_view
@@ -288,5 +330,21 @@ impl<'a> PostViewMut<'a> {
 			.entity(self.entity)
 			.get::<Post>()
 			.expect("post entity should have Post component")
+	}
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn compiles() {
+		let mut world = World::new();
+		world.spawn_empty();
+		world.spawn_empty();
+
+		let mut thread = ThreadMut::new();
+		thread.insert_user(User::system());
+		thread.insert_user(User::agent());
 	}
 }

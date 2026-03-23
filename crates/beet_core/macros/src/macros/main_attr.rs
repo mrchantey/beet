@@ -41,7 +41,7 @@ pub fn parse_main_attr(
 	Ok(quote! {
 		#(#attrs)*
 		#vis fn main() #output {
-			#beet_core::async_ext::block_on_local_executor(async #block)
+			#beet_core::prelude::async_ext::block_on_local_executor(async #block)
 		}
 	})
 }
