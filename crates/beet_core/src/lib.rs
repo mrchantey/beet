@@ -94,7 +94,8 @@ pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
-// Re-export for ergonomic `#[beet_core::test]` usage
+// Re-export for ergonomic `#[beet_core::test]` and `#[beet_core::main]` usage
+pub use beet_core_macros::beet_main as main;
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]

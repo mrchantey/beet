@@ -7,6 +7,7 @@ mod beet_plugins;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
+pub use beet_core::main;
 #[cfg(feature = "testing")]
 pub use beet_core::test;
 #[cfg(feature = "testing")]

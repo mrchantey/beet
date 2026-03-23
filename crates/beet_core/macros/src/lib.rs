@@ -1,5 +1,6 @@
 #![no_std]
 extern crate alloc;
+use macros::*;
 
 mod as_any;
 mod bundle_effect;
@@ -10,7 +11,7 @@ mod sendit;
 mod to_tokens;
 mod tool;
 mod utils;
-use macros::*;
+
 
 
 
@@ -185,6 +186,39 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	mdx::impl_mdx(input)
 }
 
+
+/// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
+///
+/// Works like `tokio::main` but uses `async-executor` for a lightweight, dependency-light runtime.
+///
+/// # Requirements
+///
+/// - Must be applied to an `async fn main()`
+/// - Not supported on `wasm32` targets
+///
+/// # Example
+///
+/// ```ignore
+/// #[beet::main]
+/// async fn main() {
+///     // async code here
+/// }
+///
+/// #[beet::main]
+/// async fn main() -> anyhow::Result<()> {
+///     // async code that returns a Result
+///     Ok(())
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn beet_main(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	parse_main_attr(attr, input)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
+}
 
 #[proc_macro_attribute]
 pub fn tool(

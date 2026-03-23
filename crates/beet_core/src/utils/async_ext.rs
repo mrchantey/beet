@@ -14,6 +14,17 @@ use crate::prelude::*;
 pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }
+
+/// Blocks the current thread on a future, running it on a [`LocalExecutor`].
+///
+/// This is the underlying driver for [`#[beet::main]`](beet_core_macros::beet_main).
+///
+/// [`LocalExecutor`]: async_executor::LocalExecutor
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+pub fn block_on_local_executor<F: Future>(fut: F) -> F::Output {
+	let ex = async_executor::LocalExecutor::new();
+	futures_lite::future::block_on(ex.run(fut))
+}
 /// Yields execution back to the async runtime.
 pub fn yield_now() -> YieldNow { futures_lite::future::yield_now() }
 
