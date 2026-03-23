@@ -15,35 +15,6 @@ pub trait Document: 'static + Send + Sync + Sized {
 	type Id: DocId;
 	fn id(&self) -> Self::Id;
 }
-
-#[derive(Serialize, Deserialize, Component)]
-pub struct Uuid7<M = ()> {
-	uuid_v7: Uuid,
-	#[serde(skip)]
-	phantom_data: PhantomData<M>,
-}
-
-impl<M> std::fmt::Debug for Uuid7<M> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.uuid_v7)
-	}
-}
-
-impl<M> DocId for Uuid7<M> {
-	fn into_bytes(&self) -> Vec<u8> { self.uuid_v7.as_bytes().to_vec() }
-}
-impl<M1, M2> DocId for (Uuid7<M1>, Uuid7<M2>) {
-	fn into_bytes(&self) -> Vec<u8> {
-		let mut bytes = Vec::with_capacity(32);
-		bytes.extend_from_slice(self.0.uuid_v7.as_bytes());
-		bytes.extend_from_slice(self.1.uuid_v7.as_bytes());
-		bytes
-	}
-}
-
-unsafe impl<M> Send for Uuid7<M> {}
-unsafe impl<M> Sync for Uuid7<M> {}
-
 pub trait DocId:
 	// 'static
 	Send
@@ -58,7 +29,48 @@ pub trait DocId:
 {
 	/// Convenience for usage like hashmap keys
 	fn into_bytes(&self) -> Vec<u8>;
+	/// Convenience for usage like URL paths, etc,
+	/// by default converting the bytes to base64
+	fn into_string(&self) -> String {
+			use base64::Engine;
+			base64::engine::general_purpose::STANDARD.encode(self.into_bytes())
+	}
 }
+
+impl<T1: DocId, T2: DocId> DocId for (T1, T2) {
+	fn into_bytes(&self) -> Vec<u8> {
+		let mut bytes = Vec::new();
+		bytes.extend_from_slice(&self.0.into_bytes());
+		bytes.extend_from_slice(&self.1.into_bytes());
+		bytes
+	}
+}
+
+#[derive(Serialize, Deserialize, Component)]
+pub struct Uuid7<M = ()> {
+	uuid_v7: Uuid,
+	#[serde(skip)]
+	phantom_data: PhantomData<M>,
+}
+
+impl<M> std::fmt::Debug for Uuid7<M> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.uuid_v7)
+	}
+}
+
+impl DocId for String {
+	fn into_bytes(&self) -> Vec<u8> { self.as_bytes().to_vec() }
+	fn into_string(&self) -> String { self.clone() }
+}
+
+impl<M> DocId for Uuid7<M> {
+	fn into_bytes(&self) -> Vec<u8> { self.uuid_v7.as_bytes().to_vec() }
+	fn into_string(&self) -> String { self.uuid_v7.to_string() }
+}
+
+unsafe impl<M> Send for Uuid7<M> {}
+unsafe impl<M> Sync for Uuid7<M> {}
 
 
 impl<M> Uuid7<M> {
