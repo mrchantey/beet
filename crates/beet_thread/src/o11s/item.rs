@@ -24,7 +24,7 @@
 //! # Extracting Content
 //!
 //! ```no_run
-//! # use beet_actor::prelude::*;
+//! # use beet_thread::prelude::*;
 //! # fn example(output: &[o11s::OutputItem]) {
 //! for item in output {
 //!     match item {

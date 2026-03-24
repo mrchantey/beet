@@ -1050,12 +1050,12 @@ version = "0.0.9-dev.6"
 dependencies = [
  "async-executor",
  "beet",
- "beet_actor",
  "beet_core",
  "beet_net",
  "beet_node",
  "beet_router",
  "beet_stack",
+ "beet_thread",
  "beet_tool",
  "bevy",
  "console_error_panic_hook",
@@ -1063,31 +1063,6 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
- "web-sys",
-]
-
-[[package]]
-name = "beet_actor"
-version = "0.0.9-dev.6"
-dependencies = [
- "async-lock",
- "base64 0.22.1",
- "beet_actor",
- "beet_core",
- "beet_net",
- "beet_tool",
- "bevy",
- "dotenv",
- "futures",
- "js-sys",
- "serde",
- "serde_json",
- "serde_with",
- "strum 0.26.3",
- "thiserror 1.0.69",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -1274,6 +1249,31 @@ dependencies = [
  "thiserror 1.0.69",
  "variadics_please",
  "webbrowser",
+]
+
+[[package]]
+name = "beet_thread"
+version = "0.0.9-dev.6"
+dependencies = [
+ "async-lock",
+ "base64 0.22.1",
+ "beet_core",
+ "beet_net",
+ "beet_thread",
+ "beet_tool",
+ "bevy",
+ "dotenv",
+ "futures",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "strum 0.26.3",
+ "thiserror 1.0.69",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

@@ -63,7 +63,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use beet_actor::prelude::*;
+//! use beet_thread::prelude::*;
 //! use beet_core::prelude::*;
 //! use beet_net::prelude::*;
 //!

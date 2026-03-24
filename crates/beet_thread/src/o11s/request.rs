@@ -17,14 +17,14 @@
 //!
 //! 1. **Simple string**: Interpreted as a user message
 //!    ```no_run
-//!    # use beet_actor::prelude::*;
+//!    # use beet_thread::prelude::*;
 //!    let body = o11s::RequestBody::new("gpt-4o")
 //!        .with_simple_input("Hello!");
 //!    ```
 //!
 //! 2. **Structured items**: Array of messages, function calls, or reasoning items
 //!    ```no_run
-//!    # use beet_actor::prelude::*;
+//!    # use beet_thread::prelude::*;
 //!    let body = o11s::RequestBody::new("gpt-4o")
 //!        .with_input_items(vec![
 //!            o11s::request::InputItem::Message(
@@ -47,7 +47,7 @@
 //! Define functions the model can invoke:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::*;
+//! # use beet_thread::prelude::*;
 //! let tool = o11s::FunctionToolParam::new("get_weather")
 //!     .with_description("Get current weather for a location")
 //!     .with_parameters(serde_json::json!({

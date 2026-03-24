@@ -28,7 +28,7 @@ fn next_id(prefix: &str) -> String {
 /// ## Example
 ///
 /// ```ignore
-/// use beet_actor::prelude::*;
+/// use beet_thread::prelude::*;
 ///
 /// let provider = MockModelProvider::default();
 ///

@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 
-use beet_actor::prelude::*;
+use beet_thread::prelude::*;
 
 #[path = "utils/model_provider.rs"]
 mod model_provider;

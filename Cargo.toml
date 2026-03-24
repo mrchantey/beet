@@ -52,7 +52,7 @@ members = [
 	"crates/beet_node",
 	"crates/beet_stack",
 	"crates/beet_router",
-	"crates/beet_actor",
+	"crates/beet_thread",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -79,7 +79,7 @@ members = [
 ## internal
 
 beet = { path = "", version = "0.0.9-dev.6" }
-beet_actor = { path = "crates/beet_actor", version = "0.0.9-dev.6" }
+beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.6" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.6" }
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.6" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.6" }
@@ -267,7 +267,7 @@ _pretty_curl = ["net", "node", "ureq", "native-tls"]
 _mini_browser = ["_pretty_curl", "tui"]
 
 
-actor = ["dep:beet_actor","net","tool"]
+thread = ["dep:beet_thread","net","tool"]
 # dom = ["css", "dep:beet_dom"]
 
 
@@ -314,7 +314,7 @@ markdown = ["beet_stack?/markdown"]
 bevy = { workspace = true }
 
 beet_core.workspace = true
-beet_actor = { workspace = true, optional = true }
+beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
@@ -428,17 +428,17 @@ name = "http"
 path = "examples/stack/http.rs"
 required-features = ["http_server"]
 
-# 💡 Examples - Actor
+# 💡 Examples - Thread
 
 [[example]]
 name = "chat"
-path = "examples/actor/chat.rs"
-required-features = ["actor"]
+path = "examples/thread/chat.rs"
+required-features = ["thread"]
 
 [[example]]
 name = "oneshot"
-path = "examples/actor/oneshot.rs"
-required-features = ["actor"]
+path = "examples/thread/oneshot.rs"
+required-features = ["thread"]
 
 
 # 💡 Examples - flow

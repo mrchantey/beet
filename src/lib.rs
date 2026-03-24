@@ -4,8 +4,6 @@ mod beet_plugins;
 
 // #[cfg(feature = "build")]
 // pub use beet_build as build;
-#[cfg(feature = "actor")]
-pub use beet_actor as actor;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
@@ -24,6 +22,8 @@ pub use beet_node as node;
 pub use beet_router as router;
 #[cfg(feature = "stack")]
 pub use beet_stack as stack;
+#[cfg(feature = "thread")]
+pub use beet_thread as thread;
 #[cfg(feature = "tool")]
 pub use beet_tool as tool;
 // #[cfg(feature = "design")]
@@ -57,8 +57,8 @@ pub mod prelude {
 	pub use crate::tool::prelude::*;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
-	#[cfg(feature = "actor")]
-	pub use crate::actor::prelude::*;
+	#[cfg(feature = "thread")]
+	pub use crate::thread::prelude::*;
 	// #[cfg(feature = "design")]
 	// pub use crate::design::prelude::*;
 	// #[cfg(feature = "dom")]

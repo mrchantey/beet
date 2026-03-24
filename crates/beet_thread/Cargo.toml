@@ -1,11 +1,11 @@
 [package]
-name = "beet_actor"
+name = "beet_thread"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 readme.workspace = true
-description = "Actor types and systems for bevy applications"
+description = "Thread and conversation types for bevy applications"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -65,4 +65,4 @@ web-sys = { workspace = true, features = [
 beet_core = { workspace = true, features = ["testing"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet_actor = { path = ".", features = ["native-tls"] }
+beet_thread = { path = ".", features = ["native-tls"] }

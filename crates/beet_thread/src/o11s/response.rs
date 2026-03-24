@@ -38,7 +38,7 @@
 //! Use convenience methods to extract text content:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::*;
+//! # use beet_thread::prelude::*;
 //! # fn example(response: o11s::ResponseBody) {
 //! // Get first text output
 //! if let Some(text) = response.first_text() {
@@ -58,7 +58,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use beet_actor::prelude::*;
+//! use beet_thread::prelude::*;
 //! use beet_core::prelude::*;
 //! use beet_net::prelude::*;
 //!

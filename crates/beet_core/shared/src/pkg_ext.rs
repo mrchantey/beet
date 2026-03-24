@@ -31,7 +31,7 @@ fn crate_name() -> alloc::string::String {
 /// checks the CARGO_PKG_NAME against a list of internal packages
 pub fn is_internal() -> bool {
 	const INTERNAL_PKGS: &[&str] = &[
-		"beet_actor",
+		"beet_thread",
 		"beet_build",
 		"beet_core",
 		"beet_core_macros",
