@@ -47,7 +47,7 @@
 	"file_scan_exclusions": [
 		"crates/beet-cli",
 		"crates/beet_build",
-		// "crates/beet_social",
+		// "crates/beet_actor",
 		"crates/beet_design",
 		"crates/beet_dom",
 		"crates/beet_examples",
