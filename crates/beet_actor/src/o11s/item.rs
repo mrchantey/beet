@@ -24,16 +24,16 @@
 //! # Extracting Content
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
-//! # fn example(output: &[openresponses::OutputItem]) {
+//! # use beet_actor::prelude::o11s;
+//! # fn example(output: &[o11s::OutputItem]) {
 //! for item in output {
 //!     match item {
-//!         openresponses::OutputItem::Message(msg) => {
+//!         o11s::OutputItem::Message(msg) => {
 //!             if let Some(text) = msg.first_text() {
 //!                 println!("Assistant: {}", text);
 //!             }
 //!         }
-//!         openresponses::OutputItem::FunctionCall(fc) => {
+//!         o11s::OutputItem::FunctionCall(fc) => {
 //!             println!("Call {}: {}", fc.name, fc.arguments);
 //!         }
 //!         _ => {}

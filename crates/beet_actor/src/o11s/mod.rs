@@ -51,20 +51,20 @@
 //! # async fn example() -> Result<()> {
 //! dotenv::dotenv().ok();
 //!
-//! let body = openresponses::RequestBody::new("gpt-4o-mini")
+//! let body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Say hello in exactly 3 words.");
 //!
-//! let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
+//! let response = Request::post(o11s::OPENAI_RESPONSES_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)
 //!     .with_json_body(&body)?
 //!     .send()
 //!     .await?
 //!     .into_result()
 //!     .await?
-//!     .json::<openresponses::ResponseBody>()
+//!     .json::<o11s::ResponseBody>()
 //!     .await?;
 //!
-//! assert_eq!(response.status, openresponses::response::Status::Completed);
+//! assert_eq!(response.status, o11s::response::Status::Completed);
 //! println!("Response: {}", response.first_text().unwrap_or_default());
 //! # Ok(())
 //! # }
@@ -79,7 +79,7 @@
 //! # async fn example() -> Result<()> {
 //! let mut provider = OllamaProvider::default();
 //!
-//! let body = openresponses::RequestBody::new(provider.default_small_model())
+//! let body = o11s::RequestBody::new(provider.default_small_model())
 //!     .with_simple_input("Write a haiku.")
 //!     .with_stream(true);
 //!
@@ -88,10 +88,10 @@
 //!
 //! while let Some(event) = stream.next().await {
 //!     match event? {
-//!         openresponses::StreamingEvent::OutputTextDelta(ev) => {
+//!         o11s::StreamingEvent::OutputTextDelta(ev) => {
 //!             print!("{}", ev.delta);
 //!         }
-//!         openresponses::StreamingEvent::ResponseCompleted(_) => break,
+//!         o11s::StreamingEvent::ResponseCompleted(_) => break,
 //!         _ => {}
 //!     }
 //! }

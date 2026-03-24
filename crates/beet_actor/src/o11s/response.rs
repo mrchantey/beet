@@ -38,8 +38,8 @@
 //! Use convenience methods to extract text content:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
-//! # fn example(response: openresponses::ResponseBody) {
+//! # use beet_actor::prelude::o11s;
+//! # fn example(response: o11s::ResponseBody) {
 //! // Get first text output
 //! if let Some(text) = response.first_text() {
 //!     println!("Response: {}", text);
@@ -65,25 +65,25 @@
 //! # async fn example() -> Result<()> {
 //! dotenv::dotenv().ok();
 //!
-//! let request_body = openresponses::RequestBody::new("gpt-4o-mini")
+//! let request_body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Hello!");
 //!
-//! let response = Request::post(openresponses::OPENAI_RESPONSES_URL)
+//! let response = Request::post(o11s::OPENAI_RESPONSES_URL)
 //!     .with_auth_bearer(&env_ext::var("OPENAI_API_KEY")?)
 //!     .with_json_body(&request_body)?
 //!     .send()
 //!     .await?
 //!     .into_result()
 //!     .await?
-//!     .json::<openresponses::ResponseBody>()
+//!     .json::<o11s::ResponseBody>()
 //!     .await?;
 //!
 //! assert_eq!(response.object, "response");
-//! assert_eq!(response.status, openresponses::response::Status::Completed);
+//! assert_eq!(response.status, o11s::response::Status::Completed);
 //!
 //! // Extract the first text output
-//! if let Some(openresponses::OutputItem::Message(msg)) = response.output.first() {
-//!     if let Some(openresponses::OutputContent::OutputText(text)) = msg.content.first() {
+//! if let Some(o11s::OutputItem::Message(msg)) = response.output.first() {
+//!     if let Some(o11s::OutputContent::OutputText(text)) = msg.content.first() {
 //!         println!("Response: {}", text.text);
 //!     }
 //! }

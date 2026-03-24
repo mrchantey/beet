@@ -70,7 +70,7 @@
 //! # async fn example() -> Result<()> {
 //! let mut provider = OllamaProvider::default();
 //!
-//! let body = openresponses::RequestBody::new(provider.default_small_model())
+//! let body = o11s::RequestBody::new(provider.default_small_model())
 //!     .with_simple_input("Write a haiku about streaming.")
 //!     .with_stream(true);
 //!
@@ -78,10 +78,10 @@
 //!
 //! while let Some(event) = stream.next().await {
 //!     match event? {
-//!         openresponses::StreamingEvent::OutputTextDelta(ev) => {
+//!         o11s::StreamingEvent::OutputTextDelta(ev) => {
 //!             print!("{}", ev.delta);
 //!         }
-//!         openresponses::StreamingEvent::ResponseCompleted(ev) => {
+//!         o11s::StreamingEvent::ResponseCompleted(ev) => {
 //!             println!("\n\nDone! Used {} tokens", ev.response.usage.map(|u| u.total_tokens).unwrap_or(0));
 //!         }
 //!         _ => {}

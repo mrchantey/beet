@@ -17,21 +17,21 @@
 //!
 //! 1. **Simple string**: Interpreted as a user message
 //!    ```no_run
-//!    # use beet_actor::prelude::openresponses;
-//!    let body = openresponses::RequestBody::new("gpt-4o")
+//!    # use beet_actor::prelude::o11s;
+//!    let body = o11s::RequestBody::new("gpt-4o")
 //!        .with_simple_input("Hello!");
 //!    ```
 //!
 //! 2. **Structured items**: Array of messages, function calls, or reasoning items
 //!    ```no_run
-//!    # use beet_actor::prelude::openresponses;
-//!    let body = openresponses::RequestBody::new("gpt-4o")
+//!    # use beet_actor::prelude::o11s;
+//!    let body = o11s::RequestBody::new("gpt-4o")
 //!        .with_input_items(vec![
-//!            openresponses::request::InputItem::Message(
-//!                openresponses::request::MessageParam::system("You are helpful."),
+//!            o11s::request::InputItem::Message(
+//!                o11s::request::MessageParam::system("You are helpful."),
 //!            ),
-//!            openresponses::request::InputItem::Message(
-//!                openresponses::request::MessageParam::user("Hello!"),
+//!            o11s::request::InputItem::Message(
+//!                o11s::request::MessageParam::user("Hello!"),
 //!            ),
 //!        ]);
 //!    ```
@@ -47,8 +47,8 @@
 //! Define functions the model can invoke:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
-//! let tool = openresponses::FunctionToolParam::new("get_weather")
+//! # use beet_actor::prelude::o11s;
+//! let tool = o11s::FunctionToolParam::new("get_weather")
 //!     .with_description("Get current weather for a location")
 //!     .with_parameters(serde_json::json!({
 //!         "type": "object",
@@ -58,7 +58,7 @@
 //!         "required": ["location"]
 //!     }));
 //!
-//! let body = openresponses::RequestBody::new("gpt-4o")
+//! let body = o11s::RequestBody::new("gpt-4o")
 //!     .with_simple_input("What's the weather in Tokyo?")
 //!     .with_tool(tool);
 //! ```

@@ -28,22 +28,22 @@ pub type StreamingEventStream =
 /// let mut provider = OllamaProvider::default();
 ///
 /// // Non-streaming request
-/// let body = openresponses::RequestBody::new(provider.default_small_model())
+/// let body = o11s::RequestBody::new(provider.default_small_model())
 ///     .with_simple_input("Hello!");
 /// let response = provider.send(body).await?;
 ///
 /// // Streaming request
-/// let body = openresponses::RequestBody::new(provider.default_small_model())
+/// let body = o11s::RequestBody::new(provider.default_small_model())
 ///     .with_simple_input("Write a poem.")
 ///     .with_stream(true);
 /// let mut stream = provider.stream(body).await?;
 ///
 /// while let Some(event) = stream.next().await {
 ///     match event? {
-///         openresponses::StreamingEvent::OutputTextDelta(ev) => {
+///         o11s::StreamingEvent::OutputTextDelta(ev) => {
 ///             print!("{}", ev.delta);
 ///         }
-///         openresponses::StreamingEvent::ResponseCompleted(_) => break,
+///         o11s::StreamingEvent::ResponseCompleted(_) => break,
 ///         _ => {}
 ///     }
 /// }
@@ -73,7 +73,7 @@ pub trait ModelProvider: 'static + Send + Sync {
 	/// Sends a streaming request and returns a pinned stream of typed events.
 	///
 	/// The request must have `stream: true` set, otherwise this will error.
-	/// The returned stream yields strongly-typed [`StreamingEvent`](openresponses::StreamingEvent)
+	/// The returned stream yields strongly-typed [`StreamingEvent`](o11s::StreamingEvent)
 	/// values and terminates cleanly when the `[DONE]` sentinel is received.
 	///
 	/// The stream is returned pre-pinned for ergonomic use - no `pin!()` macro needed.

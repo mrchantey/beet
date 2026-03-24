@@ -33,18 +33,18 @@ fn next_id(prefix: &str) -> String {
 /// let provider = MockModelProvider::default();
 ///
 /// // Without tools - echoes input
-/// let body = openresponses::RequestBody::new("mock")
+/// let body = o11s::RequestBody::new("mock")
 ///     .with_simple_input("Hello!");
 /// let response = provider.send(body).await.unwrap();
 /// assert!(response.first_text().unwrap().contains("you said:"));
 ///
 /// // With tools - calls the first tool
-/// let tool = openresponses::FunctionToolParam::new("greet")
+/// let tool = o11s::FunctionToolParam::new("greet")
 ///     .with_parameters(serde_json::json!({
 ///         "type": "object",
 ///         "properties": { "name": { "type": "string" } }
 ///     }));
-/// let body = openresponses::RequestBody::new("mock")
+/// let body = o11s::RequestBody::new("mock")
 ///     .with_simple_input("Say hi to Bob")
 ///     .with_tool(tool);
 /// let response = provider.send(body).await.unwrap();

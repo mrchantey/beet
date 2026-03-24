@@ -19,11 +19,11 @@
 //! Messages contain arrays of content parts, allowing mixed content:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
+//! # use beet_actor::prelude::o11s;
 //! let parts = vec![
-//!     openresponses::ContentPart::input_text("What's in this image?"),
-//!     openresponses::ContentPart::InputImage(
-//!         openresponses::InputImage::from_url("https://example.com/photo.jpg"),
+//!     o11s::ContentPart::input_text("What's in this image?"),
+//!     o11s::ContentPart::InputImage(
+//!         o11s::InputImage::from_url("https://example.com/photo.jpg"),
 //!     ),
 //! ];
 //! ```
@@ -33,12 +33,12 @@
 //! Images can be provided as URLs or base64-encoded data:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
+//! # use beet_actor::prelude::o11s;
 //! // From URL
-//! let img = openresponses::InputImage::from_url("https://example.com/photo.jpg");
+//! let img = o11s::InputImage::from_url("https://example.com/photo.jpg");
 //!
 //! // From base64
-//! let img = openresponses::InputImage::from_base64("image/png", "iVBORw0KGgo...");
+//! let img = o11s::InputImage::from_base64("image/png", "iVBORw0KGgo...");
 //! ```
 
 use super::enums::*;

@@ -14,8 +14,8 @@
 //! Use [`FunctionToolParam`] to define tools available to the model:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::openresponses;
-//! let tool = openresponses::FunctionToolParam::new("search_web")
+//! # use beet_actor::prelude::o11s;
+//! let tool = o11s::FunctionToolParam::new("search_web")
 //!     .with_description("Search the web for information")
 //!     .with_parameters(serde_json::json!({
 //!         "type": "object",
@@ -66,7 +66,7 @@ impl FunctionToolParam {
 	/// # Example
 	///
 	/// ```no_run
-	/// use beet_actor::prelude::openresponses::FunctionToolParam;
+	/// use beet_actor::prelude::o11s::FunctionToolParam;
 	///
 	/// let tool = FunctionToolParam::new("get_weather")
 	///     .with_description("Get the current weather for a location")
