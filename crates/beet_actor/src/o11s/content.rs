@@ -19,7 +19,7 @@
 //! Messages contain arrays of content parts, allowing mixed content:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::o11s;
+//! # use beet_actor::prelude::*;
 //! let parts = vec![
 //!     o11s::ContentPart::input_text("What's in this image?"),
 //!     o11s::ContentPart::InputImage(
@@ -33,7 +33,7 @@
 //! Images can be provided as URLs or base64-encoded data:
 //!
 //! ```no_run
-//! # use beet_actor::prelude::o11s;
+//! # use beet_actor::prelude::*;
 //! // From URL
 //! let img = o11s::InputImage::from_url("https://example.com/photo.jpg");
 //!

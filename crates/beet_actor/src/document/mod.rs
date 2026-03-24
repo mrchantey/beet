@@ -1,10 +1,8 @@
 mod document;
 mod social_query;
 mod thread;
-mod topic;
 mod actor;
 pub use document::*;
-pub use topic::*;
 mod post;
 pub use post::*;
 pub use social_query::*;

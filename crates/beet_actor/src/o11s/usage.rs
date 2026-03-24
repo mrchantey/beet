@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```no_run
-//! # use beet_actor::prelude::o11s;
+//! # use beet_actor::prelude::*;
 //! # fn example(response: o11s::ResponseBody) {
 //! if let Some(usage) = &response.usage {
 //!     println!("Input: {} tokens", usage.input_tokens);
