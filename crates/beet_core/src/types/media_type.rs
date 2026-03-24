@@ -92,6 +92,8 @@ pub enum MediaType {
 	Yaml,
 	/// `text/csv`
 	Csv,
+	/// `text/uri-list`
+	Url,
 	/// `application/toml`
 	Toml,
 	/// `application/x-www-form-urlencoded`
@@ -170,8 +172,7 @@ impl MediaType {
 	const MP4: &'static str = "video/mp4";
 	const VIDEO_WEBM: &'static str = "video/webm";
 	const VIDEO_OGG: &'static str = "video/ogg";
-	const YAML: &'static str = "application/x-yaml";
-	const CSV: &'static str = "text/csv";
+	const URL: &'static str = "text/uri-list";
 	const TOML: &'static str = "application/toml";
 	const FORM_URL_ENCODED: &'static str = "application/x-www-form-urlencoded";
 	const FORM_DATA: &'static str = "multipart/form-data";
@@ -184,6 +185,8 @@ impl MediaType {
 	const C_LANG: &'static str = "text/x-c";
 	const CPP_LANG: &'static str = "text/x-c++";
 	const JAVA: &'static str = "text/x-java";
+	const YAML: &'static str = "application/x-yaml";
+	const CSV: &'static str = "text/csv";
 	const SQL: &'static str = "application/sql";
 	const GRAPHQL: &'static str = "application/graphql";
 	const ANSI_TERM: &'static str = "text/ansi-term";
@@ -242,6 +245,7 @@ impl MediaType {
 				MediaType::Yaml
 			}
 			val if val.contains(Self::CSV) => MediaType::Csv,
+			val if val.contains(Self::URL) => MediaType::Url,
 			val if val.contains(Self::TOML) => MediaType::Toml,
 			val if val.contains(Self::FORM_URL_ENCODED) => {
 				MediaType::FormUrlEncoded
@@ -284,14 +288,15 @@ impl MediaType {
 		match ext.to_ascii_lowercase().as_str() {
 			// text
 			"txt" | "text" | "log" => MediaType::Text,
+			"md" | "markdown" => MediaType::Markdown,
 			"html" | "htm" => MediaType::Html,
 			"css" => MediaType::Css,
 			"js" | "mjs" | "cjs" => MediaType::Javascript,
 			"json" | "jsonl" | "geojson" => MediaType::Json,
 			"xml" | "xsl" | "xsd" => MediaType::Xml,
-			"md" | "markdown" => MediaType::Markdown,
-			"csv" => MediaType::Csv,
+			"url" => MediaType::Url,
 			"yaml" | "yml" => MediaType::Yaml,
+			"csv" => MediaType::Csv,
 			"toml" => MediaType::Toml,
 			"sql" => MediaType::Sql,
 			"graphql" | "gql" => MediaType::GraphQl,
@@ -344,8 +349,61 @@ impl MediaType {
 			"bin" | _ => MediaType::Bytes,
 		}
 	}
-	/// The canonical file extension for this media type, if any.
-	pub fn extension(&self) -> Option<&'static str> { todo!("") }
+	/// Returns the file extension for this media type, if known.
+	pub fn extension(&self) -> Option<&'static str> {
+		match self {
+			MediaType::Text => Some("txt"),
+			MediaType::Html => Some("html"),
+			MediaType::Css => Some("css"),
+			MediaType::Javascript => Some("js"),
+			MediaType::Json => Some("json"),
+			MediaType::Xml => Some("xml"),
+			MediaType::Markdown => Some("md"),
+			MediaType::Csv => Some("csv"),
+			MediaType::Url => Some("url"),
+			MediaType::Yaml => Some("yaml"),
+			MediaType::Toml => Some("toml"),
+			MediaType::Sql => Some("sql"),
+			MediaType::GraphQl => Some("graphql"),
+			MediaType::Png => Some("png"),
+			MediaType::Jpeg => Some("jpg"),
+			MediaType::Gif => Some("gif"),
+			MediaType::Webp => Some("webp"),
+			MediaType::Svg => Some("svg"),
+			MediaType::Ico => Some("ico"),
+			MediaType::Avif => Some("avif"),
+			MediaType::Bmp => Some("bmp"),
+			MediaType::Tiff => Some("tiff"),
+			MediaType::Woff => Some("woff"),
+			MediaType::Woff2 => Some("woff2"),
+			MediaType::Ttf => Some("ttf"),
+			MediaType::Otf => Some("otf"),
+			MediaType::Mp3 => Some("mp3"),
+			MediaType::Ogg => Some("ogg"),
+			MediaType::Wav => Some("wav"),
+			MediaType::Flac => Some("flac"),
+			MediaType::Aac => Some("aac"),
+			MediaType::Mp4 => Some("mp4"),
+			MediaType::VideoWebm => Some("webm"),
+			MediaType::VideoOgg => Some("ogv"),
+			MediaType::Zip => Some("zip"),
+			MediaType::Gzip => Some("gz"),
+			MediaType::Tar => Some("tar"),
+			MediaType::Pdf => Some("pdf"),
+			MediaType::Wasm => Some("wasm"),
+			MediaType::Postcard => Some("postcard"),
+			MediaType::Protobuf => Some("proto"),
+			MediaType::MessagePack => Some("msgpack"),
+			MediaType::Shell => Some("sh"),
+			MediaType::Rust => Some("rs"),
+			MediaType::Python => Some("py"),
+			MediaType::TypeScript => Some("ts"),
+			MediaType::C => Some("c"),
+			MediaType::Cpp => Some("cpp"),
+			MediaType::Java => Some("java"),
+			_ => None,
+		}
+	}
 
 	/// Infer the media type from a file path by extracting its extension.
 	///
@@ -408,6 +466,7 @@ impl MediaType {
 			MediaType::VideoOgg => Self::VIDEO_OGG,
 			MediaType::Yaml => Self::YAML,
 			MediaType::Csv => Self::CSV,
+			MediaType::Url => Self::URL,
 			MediaType::Toml => Self::TOML,
 			MediaType::FormUrlEncoded => Self::FORM_URL_ENCODED,
 			MediaType::FormData => Self::FORM_DATA,
@@ -446,11 +505,11 @@ impl MediaType {
 				| MediaType::Css
 				| MediaType::Javascript
 				| MediaType::Svg
-				| MediaType::Yaml
-				| MediaType::Csv
+				| MediaType::Url
 				| MediaType::Toml
 				| MediaType::Sql
 				| MediaType::GraphQl
+				| MediaType::Csv
 				| MediaType::Shell
 				| MediaType::Rust
 				| MediaType::Python

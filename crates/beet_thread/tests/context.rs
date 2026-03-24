@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
-use beet_thread::prelude::*;
 use beet_core::prelude::*;
+use beet_thread::prelude::*;
 use beet_tool::prelude::*;
 
 #[beet_core::test(timeout_ms = 15_000)]
@@ -44,13 +44,9 @@ fn assert_and_exit(
 ) -> Result<Outcome> {
 	let view = query.thread(input.caller)?;
 	view.posts
-		.into_iter()
-		.find(|post| {
-			post.payload().kind() == PostKind::Text
-				&& post.actor.kind() == ActorKind::Agent
-		})
+		.iter()
+		.find(|post| post.intent().is_display() && post.actor.kind() == ActorKind::Agent)
 		.unwrap()
-		.payload()
 		.to_string()
 		.to_lowercase()
 		.xpect_contains("beep");

@@ -208,9 +208,9 @@ impl PostStoreProvider for MemoryPostStore {
 				.posts()
 				.values()
 				.filter(|post| post.thread() == thread_id)
-				.map(|post| post.clone())
+				.cloned()
 				.collect();
-			posts.sort();
+			posts.sort_by_key(|post| post.id());
 
 			// 2. filter by after if provided
 			if let Some(after) = after_post {

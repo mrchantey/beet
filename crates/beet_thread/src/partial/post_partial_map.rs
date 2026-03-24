@@ -41,21 +41,20 @@ impl PostPartialMap {
 				content,
 			} = partial_item;
 			if let Some(&post_id) = self.post_key_map.get(&key) {
-				// post already exists, update it in place
 				let post = posts.get_mut(post_id)?;
-				let before_mutation = post.hash();
+				let before_mutation = post.hash_self();
 
 				post.set_status(status);
-				self.apply_partial_content(&key, content, post.payload_mut())?;
-				let after_mutation = post.hash();
+				self.apply_partial_content(&key, content, post)?;
+				let after_mutation = post.hash_self();
 				if before_mutation != after_mutation {
 					changes.modified.push(post.clone());
 				}
 			} else {
 				// create new post
-				let payload =
-					self.partial_content_into_payload(posts, &key, content)?;
-				let post = Post::new(author, thread, status, payload);
+				let post = self.partial_content_into_post(
+					posts, &key, content, author, thread, status,
+				)?;
 				let post_id = post.id();
 
 				// register response key -> post id
@@ -87,9 +86,7 @@ impl PostPartialMap {
 			bevyhow!("no post_id registered for responses item key {key:?}")
 		})
 	}
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Payload conversion helpers using the annotation inliner
+	// Annotation helpers
 	// ═══════════════════════════════════════════════════════════════════════
 
 	fn inline_output_text_annotations(
@@ -101,16 +98,23 @@ impl PostPartialMap {
 			.inline_annotations(text, annotations)
 	}
 
-	/// Convert a [`PartialContent`] into a finalized [`PostPayload`], inlining
+	// ═══════════════════════════════════════════════════════════════════════
+	// Post creation from partial content
+	// ═══════════════════════════════════════════════════════════════════════
+
+	/// Convert a [`PartialContent`] into a new [`Post`], inlining
 	/// annotations as markdown where appropriate.
 	/// The key is used to disambiguate content types for generic variants
 	/// like [`PartialContent::Delta`].
-	fn partial_content_into_payload(
+	fn partial_content_into_post(
 		&self,
 		posts: &mut DocMap<Post>,
 		key: &PostPartialKey,
 		partial: PartialContent,
-	) -> Result<PostPayload> {
+		author: ActorId,
+		thread: ThreadId,
+		status: PostStatus,
+	) -> Result<Post> {
 		match partial {
 			PartialContent::OutputContent(OutputContent::OutputText(t)) => {
 				let text = if t.annotations.is_empty() {
@@ -121,13 +125,20 @@ impl PostPartialMap {
 						&t.annotations,
 					)
 				};
-				PostPayload::Text(TextItem(text))
+				let mut post = TextView::into_post(author, thread, text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::OutputContent(OutputContent::Refusal(r)) => {
-				PostPayload::Refusal(RefusalItem(r.refusal))
+				let mut post =
+					RefusalView::into_post(author, thread, r.refusal);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::InputText(t)) => {
-				PostPayload::Text(TextItem(t.text))
+				let mut post = TextView::into_post(author, thread, t.text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::OutputText(t)) => {
 				let text = if t.annotations.is_empty() {
@@ -138,30 +149,47 @@ impl PostPartialMap {
 						&t.annotations,
 					)
 				};
-				PostPayload::Text(TextItem(text))
+				let mut post = TextView::into_post(author, thread, text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::Refusal(r)) => {
-				PostPayload::Refusal(RefusalItem(r.refusal))
+				let mut post =
+					RefusalView::into_post(author, thread, r.refusal);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::ReasoningText(r)) => {
-				PostPayload::ReasoningContent(ReasoningContentItem(r.text))
+				let mut post =
+					reasoning_content_post(author, thread, r.text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::SummaryText(s)) => {
-				PostPayload::ReasoningSummary(ReasoningSummaryItem(s.text))
+				let mut post =
+					reasoning_summary_post(author, thread, s.text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::InputImage(img)) => {
-				PostPayload::Url(UrlItem {
-					file_stem: None,
-					media_type: MediaType::from_path(&img.image_url),
-					url: img.image_url.into(),
-				})
+				let mut post = UrlView::into_post(
+					author,
+					thread,
+					img.image_url,
+					None,
+				);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::InputVideo(vid)) => {
-				PostPayload::Url(UrlItem {
-					file_stem: None,
-					media_type: MediaType::Mp4,
-					url: vid.video_url.into(),
-				})
+				let mut post = UrlView::into_post(
+					author,
+					thread,
+					vid.video_url,
+					None,
+				);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ContentPart(ContentPart::InputFile(file)) => {
 				let media_type = file
@@ -176,11 +204,11 @@ impl PostPartialMap {
 						.map(|s| s.to_string())
 				});
 				if let Some(url) = file.file_url {
-					PostPayload::Url(UrlItem {
-						file_stem,
-						media_type,
-						url: url.into(),
-					})
+					let mut post = UrlView::into_post(
+						author, thread, url, file_stem,
+					);
+					post.set_status(status);
+					post
 				} else if let Some(data) = file.file_data {
 					use base64::Engine;
 					let bytes = base64::prelude::BASE64_STANDARD
@@ -190,253 +218,236 @@ impl PostPartialMap {
 								"Failed to decode base64 file data: {err}"
 							)
 						})?;
-					PostPayload::Bytes(BytesItem {
-						file_stem,
-						media_type,
-						bytes,
-					})
+					let mut post = BytesView::into_post(
+						author, thread, media_type, bytes, file_stem,
+					);
+					post.set_status(status);
+					post
 				} else {
 					bevybail!("InputFile has neither file_url nor file_data")
 				}
 			}
 			PartialContent::FunctionCall {
 				name,
-				arguments,
 				call_id,
-			} => PostPayload::FunctionCall(FunctionCallItem {
-				name,
 				arguments,
-				call_id
-			}),
+			} => {
+				let mut post = FunctionCallView::into_post(
+					author, thread, name, call_id, arguments,
+				);
+				post.set_status(status);
+				post
+			}
 			PartialContent::FunctionCallOutput { call_id, output } => {
-				PostPayload::FunctionCallOutput(FunctionCallOutputItem {
-					output,
-					call_id
-				})
+				let mut post = FunctionCallOutputView::into_post(
+					author, thread, call_id, output, None,
+				);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ReasoningContent(text) => {
-				PostPayload::ReasoningContent(ReasoningContentItem(text))
+				let mut post =
+					reasoning_content_post(author, thread, text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ReasoningSummary(text) => {
-				PostPayload::ReasoningSummary(ReasoningSummaryItem(text))
+				let mut post =
+					reasoning_summary_post(author, thread, text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::Delta(delta) => {
-				// during streaming, a delta may arrive before the post
+				// During streaming, a delta may arrive before the post
 				// is created (eg OutputTextDelta before OutputItemAdded
-				// has content). Use the key to determine the payload type.
+				// has content). Use the key to determine the post type.
 				match key {
 					PostPartialKey::ReasoningSummary { .. } => {
-						PostPayload::ReasoningSummary(
-							ReasoningSummaryItem(delta),
-						)
+						let mut post = reasoning_summary_post(
+							author, thread, delta,
+						);
+						post.set_status(status);
+						post
 					}
 					PostPartialKey::Single { .. } => {
+						// Single-key items are function calls; look up the
+						// existing post to get the call_id.
 						let post_id = self.get_response_item(key)?;
 						let post = posts.get(post_id)?;
-						let PostPayload::FunctionCall(item) = post.payload() else {
-							bevybail!(
-								"Expected FunctionCall payload for key {:?}, found {:?}",
+						let fc = post.as_function_call().ok_or_else(|| {
+							bevyhow!(
+								"Expected FunctionCall post for key {:?}",
 								key,
-								post.payload().kind()
 							)
-						};
-						// single-key items are function calls
-						PostPayload::FunctionCall(FunctionCallItem {
-							name: String::new(),
-							arguments: delta,
-							call_id: item.call_id.clone()
-						})
+						})?;
+						let mut post = FunctionCallView::into_post(
+							author,
+							thread,
+							"",
+							fc.call_id(),
+							delta,
+						);
+						post.set_status(status);
+						post
 					}
 					PostPartialKey::Content { .. } => {
 						// default to text for content-keyed deltas
-						PostPayload::Text(TextItem(delta))
+						let mut post =
+							TextView::into_post(author, thread, delta);
+						post.set_status(status);
+						post
 					}
 				}
 			}
 			PartialContent::TextDone { text, .. } => {
-				PostPayload::Text(TextItem(text))
+				let mut post = TextView::into_post(author, thread, text);
+				post.set_status(status);
+				post
 			}
 			PartialContent::RefusalDone { refusal } => {
-				PostPayload::Refusal(RefusalItem(refusal))
+				let mut post =
+					RefusalView::into_post(author, thread, refusal);
+				post.set_status(status);
+				post
 			}
 			PartialContent::ReasoningDone { content } => {
-				PostPayload::ReasoningContent(ReasoningContentItem(content))
+				let mut post =
+					reasoning_content_post(author, thread, content);
+				post.set_status(status);
+				post
 			}
 			PartialContent::AnnotationAdded { .. } => {
 				bevybail!(
-					"Cannot create payload from an annotation event alone"
+					"Cannot create post from an annotation event alone"
 				)
 			}
 			PartialContent::FunctionCallArgumentsDone(_) => {
-				bevybail!("Cannot create payload from FunctionCallArgumentsDone without name and call_id context")
+				bevybail!("Cannot create post from FunctionCallArgumentsDone without name and call_id context")
 			}
 		}
 		.xok()
 	}
 
-	/// Apply a [`PartialContent`] to an existing [`PostPayload`], mutating
+	// ═══════════════════════════════════════════════════════════════════════
+	// Mutation of existing posts from partial content
+	// ═══════════════════════════════════════════════════════════════════════
+
+	/// Apply a [`PartialContent`] to an existing [`Post`], mutating
 	/// it in place. Handles deltas, replacements, and annotation inlining.
 	fn apply_partial_content(
 		&mut self,
 		key: &PostPartialKey,
 		partial: PartialContent,
-		payload: &mut PostPayload,
+		post: &mut Post,
 	) -> Result {
-		match (partial, payload) {
-			// OutputContent replaces matching payload wholesale
-			(
-				PartialContent::OutputContent(OutputContent::OutputText(t)),
-				PostPayload::Text(item),
-			) => {
-				item.0 = if t.annotations.is_empty() {
+		match partial {
+			// ── OutputContent replaces matching post wholesale ───────
+			PartialContent::OutputContent(OutputContent::OutputText(t)) => {
+				let text = if t.annotations.is_empty() {
 					t.text
 				} else {
 					self.inline_output_text_annotations(&t.text, &t.annotations)
 				};
+				post.set_text(text);
 			}
-			(
-				PartialContent::OutputContent(OutputContent::Refusal(r)),
-				PostPayload::Refusal(item),
-			) => {
-				item.0 = r.refusal;
+			PartialContent::OutputContent(OutputContent::Refusal(r)) => {
+				post.set_text(r.refusal);
 			}
-			// ContentPart replaces matching payload wholesale
-			(
-				PartialContent::ContentPart(ContentPart::InputText(t)),
-				PostPayload::Text(item),
-			) => {
-				item.0 = t.text;
+
+			// ── ContentPart replaces matching post wholesale ────────
+			PartialContent::ContentPart(ContentPart::InputText(t)) => {
+				post.set_text(t.text);
 			}
-			(
-				PartialContent::ContentPart(ContentPart::OutputText(t)),
-				PostPayload::Text(item),
-			) => {
-				item.0 = if t.annotations.is_empty() {
+			PartialContent::ContentPart(ContentPart::OutputText(t)) => {
+				let text = if t.annotations.is_empty() {
 					t.text
 				} else {
 					self.inline_output_text_annotations(&t.text, &t.annotations)
 				};
+				post.set_text(text);
 			}
-			(
-				PartialContent::ContentPart(ContentPart::Refusal(r)),
-				PostPayload::Refusal(item),
-			) => {
-				item.0 = r.refusal;
+			PartialContent::ContentPart(ContentPart::Refusal(r)) => {
+				post.set_text(r.refusal);
 			}
-			(
-				PartialContent::ContentPart(ContentPart::ReasoningText(r)),
-				PostPayload::ReasoningContent(item),
-			) => {
-				item.0 = r.text;
+			PartialContent::ContentPart(ContentPart::ReasoningText(r)) => {
+				post.set_text(r.text);
 			}
-			(
-				PartialContent::ContentPart(ContentPart::SummaryText(s)),
-				PostPayload::ReasoningSummary(item),
-			) => {
-				item.0 = s.text;
+			PartialContent::ContentPart(ContentPart::SummaryText(s)) => {
+				post.set_text(s.text);
 			}
-			// FunctionCall updates name and arguments
-			(
-				PartialContent::FunctionCall {
-					name,
-					arguments,
-					call_id: _,
-				},
-				PostPayload::FunctionCall(item),
-			) => {
-				item.name = name;
-				item.arguments = arguments;
+
+			// ── FunctionCall updates name and arguments ─────────────
+			PartialContent::FunctionCall {
+				name,
+				arguments,
+				call_id: _,
+			} => {
+				post.set_text(arguments);
+				post.metadata_mut()["fc_name"] =
+					serde_json::Value::String(name);
 			}
-			// FunctionCallOutput updates the output string and resolves call_id
-			(
-				PartialContent::FunctionCallOutput { output, call_id },
-				PostPayload::FunctionCallOutput(item),
-			) => {
-				item.output = output;
-				item.call_id = call_id;
+
+			// ── FunctionCallOutput updates output and call_id ───────
+			PartialContent::FunctionCallOutput { output, call_id } => {
+				post.set_text(output);
+				post.metadata_mut()["fc_id"] =
+					serde_json::Value::String(call_id);
 			}
-			// ReasoningContent/Summary replace in place
-			(
-				PartialContent::ReasoningContent(text),
-				PostPayload::ReasoningContent(item),
-			) => {
-				item.0 = text;
+
+			// ── ReasoningContent/Summary replace in place ───────────
+			PartialContent::ReasoningContent(text) => {
+				post.set_text(text);
 			}
-			(
-				PartialContent::ReasoningSummary(text),
-				PostPayload::ReasoningSummary(item),
-			) => {
-				item.0 = text;
+			PartialContent::ReasoningSummary(text) => {
+				post.set_text(text);
 			}
-			// Deltas append to the appropriate payload type
-			(PartialContent::Delta(delta), PostPayload::Text(item)) => {
-				item.0.push_str(&delta);
+
+			// ── Deltas append to the appropriate post type ──────────
+			PartialContent::Delta(delta) => {
+				// function call deltas append to arguments
+				// text, refusal, reasoning content/summary all
+				// store their content as text body
+				// either way, all are just appending to the body
+				post.push_str(&delta);
 			}
-			(PartialContent::Delta(delta), PostPayload::Refusal(item)) => {
-				item.0.push_str(&delta);
-			}
-			(
-				PartialContent::Delta(delta),
-				PostPayload::ReasoningContent(item),
-			) => {
-				item.0.push_str(&delta);
-			}
-			(
-				PartialContent::Delta(delta),
-				PostPayload::ReasoningSummary(item),
-			) => {
-				item.0.push_str(&delta);
-			}
-			(PartialContent::Delta(delta), PostPayload::FunctionCall(item)) => {
-				item.arguments.push_str(&delta);
-			}
-			// TextDone overwrites text and caches original for annotation re-rendering
-			(
-				PartialContent::TextDone { text, .. },
-				PostPayload::Text(item),
-			) => {
+
+			// ── TextDone overwrites text and caches original ────────
+			PartialContent::TextDone { text, .. } => {
 				self.annotation_inliner
 					.set_original_text(key.clone(), text.clone());
-				item.0 = text;
+				post.set_text(text);
 			}
-			// RefusalDone overwrites refusal payload
-			(
-				PartialContent::RefusalDone { refusal },
-				PostPayload::Refusal(item),
-			) => {
-				item.0 = refusal;
+
+			// ── RefusalDone overwrites refusal body ─────────────────
+			PartialContent::RefusalDone { refusal } => {
+				post.set_text(refusal);
 			}
-			// ReasoningDone overwrites reasoning payload
-			(
-				PartialContent::ReasoningDone { content },
-				PostPayload::ReasoningContent(item),
-			) => {
-				item.0 = content;
+
+			// ── ReasoningDone overwrites reasoning body ─────────────
+			PartialContent::ReasoningDone { content } => {
+				post.set_text(content);
 			}
-			// AnnotationAdded: re-render from original text with all accumulated annotations
-			(
-				PartialContent::AnnotationAdded { annotation, .. },
-				PostPayload::Text(item),
-			) => {
+
+			// ── AnnotationAdded: re-render from original text ───────
+			PartialContent::AnnotationAdded { annotation, .. } => {
 				if let Some(rendered) =
 					self.annotation_inliner.push_annotation(key, annotation)
 				{
-					item.0 = rendered;
+					post.set_text(rendered);
 				}
 			}
-			// FunctionCallArgumentsDone overwrites arguments
-			(
-				PartialContent::FunctionCallArgumentsDone(args),
-				PostPayload::FunctionCall(item),
-			) => {
-				item.arguments = args;
+
+			// ── FunctionCallArgumentsDone overwrites arguments ──────
+			PartialContent::FunctionCallArgumentsDone(args) => {
+				post.set_text(args);
 			}
-			// Mismatched or unsupported combinations
-			(partial, payload) => {
+
+			// ── Remaining ContentPart variants (images, files, etc)
+			// are not expected as mutations to existing posts.
+			other => {
 				bevybail!(
-					"Cannot apply {:?} to {:?}",
-					std::mem::discriminant(&partial),
-					payload.kind()
+					"Cannot apply {:?} to existing post",
+					std::mem::discriminant(&other),
 				)
 			}
 		}

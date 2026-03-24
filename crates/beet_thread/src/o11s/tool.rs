@@ -66,7 +66,7 @@ impl FunctionToolParam {
 	/// # Example
 	///
 	/// ```no_run
-	/// use beet_thread::prelude::*::FunctionToolParam;
+	/// use beet_thread::o11s::FunctionToolParam;
 	///
 	/// let tool = FunctionToolParam::new("get_weather")
 	///     .with_description("Get the current weather for a location")

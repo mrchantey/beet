@@ -72,11 +72,13 @@ impl<'w, 's> SocialQuery<'w, 's> {
 			})
 	}
 
+	/// Spawn a new text post under the given parent entity,
+	/// resolving the actor and thread from ancestors.
 	pub fn spawn_post(
 		&mut self,
 		parent: Entity,
 		status: PostStatus,
-		payload: impl Into<PostPayload>,
+		text: impl Into<String>,
 	) -> Result<Entity> {
 		let actor_id = self
 			.ancestors
@@ -96,12 +98,8 @@ impl<'w, 's> SocialQuery<'w, 's> {
 			.ok_or_else(|| {
 				bevyhow!("No thread ancestor found for {parent:?}")
 			})?;
-		self.commands
-			.spawn((
-				ChildOf(parent),
-				Post::new(actor_id, thread_id, status, payload),
-			))
-			.id()
-			.xok()
+		let mut post = TextView::into_post(actor_id, thread_id, text);
+		post.set_status(status);
+		self.commands.spawn((ChildOf(parent), post)).id().xok()
 	}
 }

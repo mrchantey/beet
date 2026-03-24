@@ -21,17 +21,8 @@ fn setup(mut commands: Commands) {
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"
 				)]),
-				(
-					Actor::agent(),
-					post_tool(OllamaProvider::qwen_3_8b().with_instructions(
-						r#"
-To assist your understanding of the authorship of a post in multi-actor environments.
-you are provided input in xml format <actor name="foo" id="bar>{content}</actor>.
-Do not respond with this format.
-"#
-					))
-				),
-				(Actor::human(), stdin_post_tool.into_tool()),
+				(Actor::agent(), post_tool(OllamaProvider::qwen_3_8b())),
+				(Actor::named_human("billy"), stdin_post_tool.into_tool()),
 			]
 		),]))
 		.call::<(), Outcome>((), default());
@@ -67,19 +58,21 @@ fn on_create(
 		if actor.kind() != ActorKind::Agent {
 			continue;
 		}
-		let post_kind = post.payload().kind();
-		if !post_kind.is_display() {
+
+		// hide reasoning in release builds
+		#[cfg(not(debug_assertions))]
+		if !post.intent().is_display() {
 			continue;
 		}
 
-		use PostKind::*;
-		let suffix = match post_kind {
-			Refusal => "refusal >",
-			ReasoningSummary | ReasoningContent | ReasoningEncryptedContent => {
-				"thinking.. "
-			}
-			Media | Url => "media ",
-			_ => ">",
+		let suffix = if post.is_refusal() {
+			"refusal >"
+		} else if post.is_reasoning_summary() || post.is_reasoning_content() {
+			"thinking.. "
+		} else if post.is_url() || !post.media_type().is_text() {
+			"media "
+		} else {
+			">"
 		};
 
 		let heading =
@@ -99,23 +92,25 @@ fn on_change(
 		if actor.kind() != ActorKind::Agent {
 			continue;
 		}
-		if !post.payload().kind().is_display() {
+
+		// hide reasoning in release builds
+		#[cfg(not(debug_assertions))]
+		if !post.intent().is_display() {
 			continue;
 		}
-		let payload = post.payload().to_string();
+		let body = post.to_string();
 
-		let new_content = &payload[**cursor as usize..];
-		use PostKind::*;
-		let colored = match post.payload().kind() {
-			Refusal => paint_ext::red(new_content),
-			ReasoningSummary | ReasoningContent | ReasoningEncryptedContent => {
-				paint_ext::dimmed(new_content)
-			}
-			_ => new_content.to_string(),
+		let new_content = &body[**cursor as usize..];
+		let colored = if post.is_refusal() {
+			paint_ext::red(new_content)
+		} else if post.is_reasoning_summary() || post.is_reasoning_content() {
+			paint_ext::dimmed(new_content)
+		} else {
+			new_content.to_string()
 		};
 
 		print!("{}", colored);
-		**cursor = payload.len() as u32;
+		**cursor = body.len() as u32;
 	}
 
 	Ok(())

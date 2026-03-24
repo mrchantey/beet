@@ -1,13 +1,15 @@
+mod actor;
 mod document;
 mod social_query;
 mod thread;
-mod actor;
 pub use document::*;
+mod agent_post;
+pub use agent_post::*;
 mod post;
+pub use actor::*;
 pub use post::*;
 pub use social_query::*;
 pub use thread::*;
-pub use actor::*;
 mod response_meta;
 mod thread_mut;
 mod thread_ref;

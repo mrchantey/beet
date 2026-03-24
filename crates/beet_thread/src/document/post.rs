@@ -1,20 +1,16 @@
-use std::borrow::Cow;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::Url;
 use serde::Deserialize;
 use serde::Serialize;
+use std::borrow::Cow;
 
 pub type PostId = Uuid7<Post>;
 
-/// A post by an actor on a thread.
-///
-/// Note that MessageRole is not stored
-/// as this is relative to the Actor.
+/// Analogous to a simplified HTTP status code, declaring the intent of the post.
 #[derive(
 	Debug,
 	Clone,
+	Copy,
 	PartialEq,
 	Eq,
 	PartialOrd,
@@ -22,17 +18,87 @@ pub type PostId = Uuid7<Post>;
 	Hash,
 	Serialize,
 	Deserialize,
-	Component,
+)]
+pub struct PostIntent(u16);
+
+impl PostIntent {
+	/// 1xx informational: reasoning content from a model.
+	pub const REASONING_CONTENT: PostIntent = PostIntent(102);
+	/// 1xx informational: reasoning summary from a model.
+	pub const REASONING_SUMMARY: PostIntent = PostIntent(103);
+	/// 2xx success: a successful response to be surfaced to the user.
+	pub const OK: PostIntent = PostIntent(200);
+	/// 4xx client error: the model refused the request.
+	pub const REFUSAL: PostIntent = PostIntent(403);
+	/// 5xx server error: an internal error occurred.
+	pub const INTERNAL_ERROR: PostIntent = PostIntent(500);
+
+	/// Creates a new [`PostIntent`] with the given code.
+	pub const fn new(code: u16) -> Self { Self(code) }
+
+	/// Returns the raw numeric code.
+	pub const fn code(&self) -> u16 { self.0 }
+
+	/// Returns `true` if this is a 1xx informational status.
+	pub const fn is_informational(&self) -> bool {
+		self.0 >= 100 && self.0 < 200
+	}
+
+	/// Returns `true` if this is a 2xx success status.
+	pub const fn is_success(&self) -> bool { self.0 >= 200 && self.0 < 300 }
+
+	/// Returns `true` if this is a 4xx client error status.
+	pub const fn is_client_error(&self) -> bool {
+		self.0 >= 400 && self.0 < 500
+	}
+
+	/// Returns `true` if this is a 5xx server error status.
+	pub const fn is_server_error(&self) -> bool {
+		self.0 >= 500 && self.0 < 600
+	}
+
+	/// Whether this intent should usually be surfaced to the user.
+	pub const fn is_display(&self) -> bool {
+		self.is_success() || self.is_client_error()
+	}
+}
+
+impl std::fmt::Display for PostIntent {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match *self {
+			Self::REASONING_CONTENT => write!(f, "102 Reasoning Content"),
+			Self::REASONING_SUMMARY => write!(f, "103 Reasoning Summary"),
+			Self::OK => write!(f, "200 OK"),
+			Self::REFUSAL => write!(f, "403 Refusal"),
+			Self::INTERNAL_ERROR => write!(f, "500 Internal Error"),
+			other => write!(f, "{}", other.0),
+		}
+	}
+}
+
+/// A post by an actor on a thread.
+///
+/// The body is stored as untyped bytes. Use [`Post::as_str`]
+/// for text-based content, or the view types in [`AgentPost`]
+/// for structured access.
+///
+/// Note that `MessageRole` is not stored
+/// as this is relative to the Actor.
+#[derive(
+	Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Component,
 )]
 pub struct Post {
 	id: PostId,
+	created: Timestamp,
 	/// The actor that created this post.
 	author: ActorId,
 	thread: ThreadId,
-	status: PostStatus,
-	/// For function calls this is the time the call was completed.
-	created: Timestamp,
-	payload: PostPayload,
+	intent: PostIntent,
+	media_type: MediaType,
+	/// The untyped body for this post.
+	body: Vec<u8>,
+	/// Extensible key-value metadata.
+	metadata: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Document for Post {
@@ -40,38 +106,118 @@ impl Document for Post {
 	fn id(&self) -> Self::Id { self.id }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Core accessors
+// ═══════════════════════════════════════════════════════════════════════
 
 impl Post {
-	pub fn new(
+	pub fn author(&self) -> ActorId { self.author }
+	pub fn thread(&self) -> ThreadId { self.thread }
+	pub fn created(&self) -> Timestamp { self.created }
+	pub fn intent(&self) -> PostIntent { self.intent }
+	pub fn media_type(&self) -> &MediaType { &self.media_type }
+	pub fn body_bytes(&self) -> &[u8] { &self.body }
+	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
+		&self.metadata
+	}
+
+	pub fn set_intent(&mut self, intent: PostIntent) { self.intent = intent; }
+
+	/// Returns the body as a `&str`.
+	/// ## Errors
+	/// Errors if the body is not valid utf-8.
+	pub fn as_str(&self) -> Result<&str> {
+		std::str::from_utf8(&self.body)?.xok()
+	}
+
+	/// Returns a mutable reference to the raw body bytes.
+	pub fn body_bytes_mut(&mut self) -> &mut Vec<u8> { &mut self.body }
+
+	/// Returns a mutable reference to the metadata.
+	pub fn metadata_mut(
+		&mut self,
+	) -> &mut serde_json::Map<String, serde_json::Value> {
+		&mut self.metadata
+	}
+
+	/// Returns the `file_stem` from metadata, if present.
+	pub fn file_stem(&self) -> Option<&str> {
+		self.metadata.get("file_stem").and_then(|val| val.as_str())
+	}
+
+	/// Hash self, used for change detection during streaming.
+	pub fn hash_self(&self) -> u64 {
+		use std::hash::Hash;
+		use std::hash::Hasher;
+		let mut hasher = std::collections::hash_map::DefaultHasher::new();
+		self.hash(&mut hasher);
+		hasher.finish()
+	}
+
+	/// Append text to the body. Only valid for text-based media types.
+	pub fn push_str(&mut self, text: &str) {
+		self.body.extend_from_slice(text.as_bytes());
+	}
+
+	/// Replace the body with the given text.
+	pub fn set_text(&mut self, text: impl Into<String>) {
+		let text = text.into();
+		self.body = text.into_bytes();
+	}
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// Display
+// ═══════════════════════════════════════════════════════════════════════
+
+impl std::fmt::Display for Post {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		if let Ok(text) = self.as_str() {
+			write!(f, "{}", text)
+		} else {
+			write!(f, "[{} body, {} bytes]", self.media_type, self.body.len())
+		}
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Constructor
+// ═══════════════════════════════════════════════════════════════════════
+
+impl Post {
+	/// Low-level constructor. Prefer the typed view constructors,
+	/// ie [`TextView::into_post`], [`FunctionCallView::into_post`], etc.
+	pub fn new_raw(
 		author: ActorId,
 		thread: ThreadId,
-		status: PostStatus,
-		payload: impl Into<PostPayload>,
+		intent: PostIntent,
+		media_type: MediaType,
+		body: Vec<u8>,
+		metadata: serde_json::Map<String, serde_json::Value>,
 	) -> Self {
 		Self {
 			id: Uuid7::new_now(),
+			created: Timestamp::now(),
 			author,
 			thread,
-			status,
-			payload: payload.into(),
-			created: Timestamp::now(),
+			intent,
+			media_type,
+			body,
+			metadata,
 		}
 	}
-	/// For a given payload, resolve the author id and thread id
+
+	/// For a given body, resolve the author id and thread id
 	/// on spawn by recursing up the tree.
-	pub fn spawn(payload: impl Into<PostPayload>) -> OnSpawn {
-		let payload = payload.into();
+	pub fn spawn(text: impl Into<String>) -> OnSpawn {
+		let text = text.into();
 		OnSpawn::new(move |entity| {
 			let post = entity.with_state::<SocialQuery, _>(
 				move |post_entity, query| -> Result<Post> {
 					let thread = query.thread(post_entity)?;
 					let actor = query.actor_from_post_entity(post_entity)?;
-					Ok(Post::new(
-						actor.id(),
-						thread.id(),
-						PostStatus::Completed,
-						payload,
-					))
+					Ok(TextView::into_post(actor.id(), thread.id(), text))
 				},
 			)?;
 			entity.insert(post);
@@ -79,21 +225,50 @@ impl Post {
 		})
 	}
 
-	pub fn author(&self) -> ActorId { self.author }
-	pub fn thread(&self) -> ThreadId { self.thread }
-	pub fn status(&self) -> PostStatus { self.status }
-	pub fn created(&self) -> Timestamp { self.created }
-	pub fn payload(&self) -> &PostPayload { &self.payload }
-	pub fn set_status(&mut self, status: PostStatus) { self.status = status; }
-	pub fn hash(&self) -> u64 {
-		use std::hash::Hash;
-		use std::hash::Hasher;
-		let mut hasher = std::collections::hash_map::DefaultHasher::new();
-		self.payload.hash(&mut hasher);
-		hasher.finish()
+	/// Returns the body as base64.
+	pub fn body_base64(&self) -> String {
+		base64::Engine::encode(
+			&base64::prelude::BASE64_STANDARD,
+			self.body_bytes(),
+		)
 	}
-	pub fn payload_mut(&mut self) -> &mut PostPayload { &mut self.payload }
 }
+
+/// Compat constructor: builds a text post from `&str`.
+impl From<&str> for Post {
+	fn from(text: &str) -> Self {
+		Post::new_raw(
+			ActorId::default(),
+			ThreadId::default(),
+			PostIntent::OK,
+			MediaType::Text,
+			text.as_bytes().to_vec(),
+			serde_json::Map::new(),
+		)
+	}
+}
+
+impl From<String> for Post {
+	fn from(text: String) -> Self {
+		Post::new_raw(
+			ActorId::default(),
+			ThreadId::default(),
+			PostIntent::OK,
+			MediaType::Text,
+			text.into_bytes(),
+			serde_json::Map::new(),
+		)
+	}
+}
+
+impl<'a> From<Cow<'a, String>> for Post {
+	fn from(text: Cow<'a, String>) -> Self { Post::from(text.into_owned()) }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// Timestamp
+// ═══════════════════════════════════════════════════════════════════════
 
 #[derive(
 	Debug,
@@ -124,347 +299,4 @@ impl Timestamp {
 
 impl Default for Timestamp {
 	fn default() -> Self { Self(Duration::ZERO) }
-}
-
-#[derive(
-	Debug,
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Serialize,
-	Deserialize,
-)]
-pub enum PostStatus {
-	Completed,
-	Interrupted,
-	InProgress,
-}
-
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub enum PostPayload {
-	Text(TextItem),
-	Refusal(RefusalItem),
-	ReasoningSummary(ReasoningSummaryItem),
-	ReasoningContent(ReasoningContentItem),
-	Url(UrlItem),
-	Bytes(BytesItem),
-	FunctionCall(FunctionCallItem),
-	FunctionCallOutput(FunctionCallOutputItem),
-}
-
-impl PostPayload {
-	pub fn kind(&self) -> PostKind {
-		match self {
-			Self::Text(_) => PostKind::Text,
-			Self::Refusal(_) => PostKind::Refusal,
-			Self::ReasoningSummary(_) => PostKind::ReasoningSummary,
-			Self::ReasoningContent(_) => PostKind::ReasoningContent,
-			Self::Url(_) => PostKind::Url,
-			Self::Bytes(_) => PostKind::Media,
-			Self::FunctionCall(_) => PostKind::FunctionCall,
-			Self::FunctionCallOutput(_) => PostKind::FunctionCallOutput,
-		}
-	}
-	pub fn to_string(&self) -> String {
-		match self {
-			Self::Text(text) => text.to_string(),
-			Self::Refusal(refusal) => refusal.to_string(),
-			Self::ReasoningSummary(reasoning_summary) => {
-				reasoning_summary.to_string()
-			}
-			Self::ReasoningContent(reasoning_content) => {
-				reasoning_content.to_string()
-			}
-			Self::Url(url_item) => url_item.url().to_string(),
-			Self::Bytes(bytes_item) => format!(
-				"BytesItem: filename={}, media_type={}, bytes_length={}",
-				bytes_item.filename(),
-				bytes_item.media_type(),
-				bytes_item.bytes().len()
-			),
-			Self::FunctionCall(function_call) => format!(
-				"FunctionCallItem: name={}, call_id={}, arguments={}",
-				function_call.function_name(),
-				function_call.args(),
-				function_call.call_id()
-			),
-			Self::FunctionCallOutput(function_call_output) => format!(
-				"FunctionCallOutputItem: call_id={}, output={}",
-				function_call_output.call_id(),
-				function_call_output.output()
-			),
-		}
-	}
-}
-
-impl std::fmt::Display for PostPayload {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.to_string())
-	}
-}
-
-impl From<&str> for PostPayload {
-	fn from(text_content: &str) -> Self {
-		Self::Text(TextItem(text_content.to_string()))
-	}
-}
-impl From<String> for PostPayload {
-	fn from(text_content: String) -> Self { Self::Text(TextItem(text_content)) }
-}
-impl<'a> From<Cow<'a, String>> for PostPayload {
-	fn from(text_content: Cow<'a, String>) -> Self {
-		Self::Text(TextItem(text_content.to_string()))
-	}
-}
-
-impl From<TextItem> for PostPayload {
-	fn from(text_content: TextItem) -> Self { Self::Text(text_content) }
-}
-
-impl From<RefusalItem> for PostPayload {
-	fn from(refusal_content: RefusalItem) -> Self {
-		Self::Refusal(refusal_content)
-	}
-}
-
-impl From<ReasoningSummaryItem> for PostPayload {
-	fn from(reasoning_summary: ReasoningSummaryItem) -> Self {
-		Self::ReasoningSummary(reasoning_summary)
-	}
-}
-
-impl From<ReasoningContentItem> for PostPayload {
-	fn from(reasoning_content: ReasoningContentItem) -> Self {
-		Self::ReasoningContent(reasoning_content)
-	}
-}
-
-impl From<UrlItem> for PostPayload {
-	fn from(file_content: UrlItem) -> Self { Self::Url(file_content) }
-}
-impl From<BytesItem> for PostPayload {
-	fn from(bytes_content: BytesItem) -> Self { Self::Bytes(bytes_content) }
-}
-impl From<FunctionCallItem> for PostPayload {
-	fn from(function_call: FunctionCallItem) -> Self {
-		Self::FunctionCall(function_call)
-	}
-}
-
-impl From<FunctionCallOutputItem> for PostPayload {
-	fn from(function_call_output: FunctionCallOutputItem) -> Self {
-		Self::FunctionCallOutput(function_call_output)
-	}
-}
-
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub enum PostKind {
-	Text,
-	Refusal,
-	ReasoningSummary,
-	ReasoningContent,
-	ReasoningEncryptedContent,
-	Media,
-	Url,
-	FunctionCall,
-	FunctionCallOutput,
-}
-
-impl PostKind {
-	/// Whether this post is the kind that is
-	/// usually presented to actors.
-	pub fn is_display(&self) -> bool {
-		matches!(
-			self,
-			Self::Text
-				| Self::Refusal
-				| Self::ReasoningSummary
-				// | Self::ReasoningContent
-				| Self::Media
-				| Self::Url
-		)
-	}
-}
-
-/// Common type for several openresponses types
-/// [`ContentPart::InputText`]
-/// [`ContentPart::OutputText`] - annotations inlined as markdown
-/// [`ContentPart::ReasoningSummary`]
-///
-/// Note that [`ContentPart::ReasoningText`] is discarded and not stored.
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-)]
-pub struct TextItem(pub String);
-
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-)]
-pub struct RefusalItem(pub String);
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-)]
-pub struct ReasoningSummaryItem(pub String);
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-)]
-pub struct ReasoningContentItem(pub String);
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-)]
-pub struct ReasoningEncryptedContentItem(pub String);
-
-/// Common type for several openresponses types
-/// [`ContentPart::InputImage`]
-/// [`ContentPart::InputFile`]
-/// [`ContentPart::InputVideo`]
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct UrlItem {
-	/// The name of the file without a path or extension.
-	pub file_stem: Option<String>,
-	pub media_type: MediaType,
-	/// The file data.
-	pub url: Url,
-}
-
-impl UrlItem {
-	pub fn filename(&self) -> String {
-		let filename = self.file_stem.as_deref().unwrap_or_else(|| "file");
-		if let Some(ext) = self.media_type.extension() {
-			format!("{filename}.{}", ext)
-		} else {
-			filename.to_string()
-		}
-	}
-	pub fn media_type(&self) -> &MediaType { &self.media_type }
-	pub fn url(&self) -> &Url { &self.url }
-}
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct BytesItem {
-	/// The name of the file without a path or extension.
-	pub file_stem: Option<String>,
-	pub media_type: MediaType,
-	/// The file data.
-	pub bytes: Vec<u8>,
-}
-
-impl BytesItem {
-	pub fn filename(&self) -> String {
-		let filename = self.file_stem.as_deref().unwrap_or_else(|| "file");
-		if let Some(ext) = self.media_type.extension() {
-			format!("{filename}.{}", ext)
-		} else {
-			filename.to_string()
-		}
-	}
-	pub fn media_type(&self) -> &MediaType { &self.media_type }
-	pub fn bytes(&self) -> &[u8] { &self.bytes }
-	pub fn bytes_base64(&self) -> String {
-		base64::Engine::encode(&base64::prelude::BASE64_STANDARD, &self.bytes)
-	}
-}
-
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct FunctionCallItem {
-	/// The name of the function that was called, in beet this is usually
-	/// the [`std::any::TypeId`] for matching against a [`ToolMeta::handler`]
-	pub name: String,
-	/// The arguments JSON string that was generated.
-	pub arguments: String,
-	/// A unique string generated by the caller for matching against the associated output
-	pub call_id: String,
-}
-
-impl FunctionCallItem {
-	/// The name of the function that was called.
-	pub fn function_name(&self) -> &str { &self.name }
-	/// The arguments JSON string.
-	pub fn args(&self) -> &str { &self.arguments }
-	/// A unique string generated by the caller for matching against the associated output
-	pub fn call_id(&self) -> &str { &self.call_id }
-}
-
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct FunctionCallOutputItem {
-	/// The JSON string that was output from the tool call.
-	/// Note that this should always be sent as a FunctionOutputContent::Text,
-	/// regardless of if this text is json, raw text, files etc. The only purpose
-	/// of sending this to models is for context, and we can provide more context through
-	/// a tool specific json structure than a text, file, text etc.
-	/// The only reason [`FunctionOutputContent`] is so complex is a unified type system.
-	pub output: String,
-	/// A unique string generated by the caller for matching against the associated output
-	pub call_id: String,
-}
-
-impl FunctionCallOutputItem {
-	pub fn output(&self) -> &str { &self.output }
-	/// A unique string generated by the caller for matching against the associated output
-	pub fn call_id(&self) -> &str { &self.call_id }
 }
