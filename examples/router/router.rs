@@ -27,35 +27,41 @@ use beet::prelude::*;
 mod content;
 
 fn main() -> AppExit {
-	let args = CliArgs::parse_env();
-	let server_kind = args
+	App::new()
+		.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin))
+		.add_systems(Startup, setup)
+		.run()
+}
+
+fn setup(mut commands: Commands) -> Result {
+	commands.spawn((
+		server_from_cli()?,
+		content::stack(),
+		OnSpawn::insert_child(mime_render_tool()),
+	));
+	Ok(())
+}
+
+
+fn server_from_cli() -> Result<OnSpawn> {
+	match CliArgs::parse_env()
 		.params
 		.get("server")
 		.map(|val: &String| val.to_lowercase())
-		.unwrap_or_else(|| "cli".into());
-
-	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin))
-		.add_systems(Startup, move |mut commands: Commands| {
-			match server_kind.as_str() {
-				#[cfg(feature = "http_server")]
-				"http" => {
-					commands.spawn((http_server(3000), content::stack()));
-				}
-				#[cfg(not(feature = "http_server"))]
-				"http" => {
-					cross_log_error!(
-						"HTTP server requires the `http_server` feature.\n\
-						 Run with: cargo run --example router --features http_server -- --server=http"
-					);
-				}
-				"repl" => {
-					commands.spawn((repl_server(), content::stack()));
-				}
-				"cli" | _ => {
-					commands.spawn((cli_server(), content::stack()));
-				}
-			}
-		})
-		.run()
+		.unwrap_or_else(|| "cli".into())
+		.as_str()
+	{
+		#[cfg(feature = "http_server")]
+		"http" => OnSpawn::insert(HttpServer::default()),
+		#[cfg(not(feature = "http_server"))]
+		"http" => bevybail!("Add the 'http_server' feature for http servers"),
+		"repl" => OnSpawn::insert(ReplServer::default()),
+		"cli" => OnSpawn::insert(CliServer::default()),
+		_ => {
+			bevybail!(
+				"Invalid server type specified. Accepted options are http,repl,cli"
+			);
+		}
+	}
+	.xok()
 }

@@ -14,8 +14,6 @@ pub fn try_router() -> impl Bundle {
 pub fn router() -> impl Bundle {
 	(
 		Name::new("Router"),
-		// the router itself shouldn't show up in the route tree
-		RouteHidden,
 		exchange_fallback(),
 		OnSpawn::insert_child((RouteHidden, async_tool(router_tool))),
 	)

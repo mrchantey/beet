@@ -14,7 +14,7 @@ categories.workspace = true
 [features]
 default = ["std","net", "html_parser","markdown_parser","ansi_term","tool"]
 std = []
-tool = []
+tool = ["dep:beet_tool"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]

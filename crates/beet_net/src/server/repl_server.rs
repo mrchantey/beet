@@ -6,11 +6,10 @@
 //!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
-use super::cli_server::stream_response_to_stdout;
+use super::cli_server::stream_body_to_stdout;
 use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use beet_tool::prelude::*;
 
 /// A REPL (read-eval-print loop) server [`Bundle`].
@@ -52,43 +51,47 @@ use beet_tool::prelude::*;
 ///     async_ext::block_on(app.run_async());
 /// }
 /// ```
-pub fn repl_server() -> impl Bundle {
-	let accept = MediaType::Markdown;
-	(
-		OnSpawn::insert_child(mime_render_tool()),
-		OnSpawn::new_async(async move |entity| -> Result {
-			// Dispatch CLI args as the initial request, rendering the
-			// root content when no args are provided.
-			call(
-				&entity,
-				Request::from_cli_args(CliArgs::parse_env())?
-					.with_header::<header::Accept>(accept.clone()),
-			)
-			.await?;
 
-			cross_log_noline!("> ");
-			let stdin = stdin_lines();
+#[derive(Default, Component)]
+#[component(on_add=on_add)]
+pub struct ReplServer;
 
-			while let Ok(line) = stdin.recv().await {
-				let trimmed = line.trim();
-				if trimmed == "exit" || trimmed == "quit" {
-					break;
-				}
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).queue_async(repl_loop);
+}
 
-				call(
-					&entity,
-					Request::from_cli_str(trimmed)?
-						.with_header::<header::Accept>(accept.clone()),
-				)
-				.await?;
-
-				cross_log_noline!("> ");
-			}
-
-			entity.world().write_message(AppExit::Success);
-			Ok(())
-		}),
+async fn repl_loop(entity: AsyncEntity) -> Result {
+	let accept = vec![MediaType::AnsiTerm, MediaType::Markdown];
+	// Dispatch CLI args as the initial request, rendering the
+	// root content when no args are provided.
+	call(
+		&entity,
+		Request::from_cli_args(CliArgs::parse_env())?
+			.with_header::<header::Accept>(accept.clone()),
 	)
+	.await?;
+
+	cross_log_noline!("> ");
+	let stdin = stdin_lines();
+
+	while let Ok(line) = stdin.recv().await {
+		let trimmed = line.trim();
+		if trimmed == "exit" || trimmed == "quit" {
+			break;
+		}
+
+		call(
+			&entity,
+			Request::from_cli_str(trimmed)?
+				.with_header::<header::Accept>(accept.clone()),
+		)
+		.await?;
+
+		cross_log_noline!("> ");
+	}
+
+	entity.world().write_message(AppExit::Success);
+	Ok(())
 }
 
 async fn call(entity: &AsyncEntity, request: Request) -> Result {
@@ -104,7 +107,8 @@ async fn call(entity: &AsyncEntity, request: Request) -> Result {
 	};
 
 	let response: Response = entity.call(request).await?;
-	let parts = stream_response_to_stdout(response).await?;
+	let (parts, body) = response.into_parts();
+	stream_body_to_stdout(body).await?;
 	cross_log!("");
 	if parts.status().is_err() {
 		error!("command failed\nStatus: {}", parts.status());

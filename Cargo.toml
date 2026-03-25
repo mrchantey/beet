@@ -229,7 +229,6 @@ default = ["node"]
 
 http_server = ["net", "tool","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["tui","router", "markdown"]
-stdio_server = ["router", "markdown"]
 ansi_paint = ["beet_core/ansi_paint"]
 # 💡 Core
 
@@ -408,7 +407,7 @@ required-features = ["_mini_browser"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
-required-features = ["stdio_server"]
+required-features = ["router"]
 
 # 💡 Examples - Thread
 

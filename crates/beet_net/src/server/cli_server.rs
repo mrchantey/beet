@@ -17,15 +17,14 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
-	let req = Request::from_cli_args(CliArgs::parse_env())?;
-	let res = entity.exchange(req).await;
-	let (parts, mut body) = res.into_parts();
+	let accept = vec![MediaType::AnsiTerm, MediaType::Markdown];
 
-	// stream body to stdout
-	while let Some(chunk) = body.next().await? {
-		let chunk_str = String::from_utf8_lossy(&chunk);
-		cross_log_noline!("{}", chunk_str);
-	}
+	let req = Request::from_cli_args(CliArgs::parse_env())?
+		.with_header::<header::Accept>(accept);
+
+	let res = entity.exchange(req).await;
+	let (parts, body) = res.into_parts();
+
 	let exit = match parts.status_to_exit_code() {
 		Ok(()) => AppExit::Success,
 		Err(code) => {
@@ -33,9 +32,23 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 			AppExit::Error(code)
 		}
 	};
+
+	stream_body_to_stdout(body).await?;
+
 	entity.world().write_message(exit);
 	Ok(())
 }
+
+/// Streams a [`Response`] body to stdout chunk-by-chunk, returning
+/// the response parts for exit-code inspection.
+pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
+	while let Some(chunk) = body.next().await? {
+		let chunk_str = String::from_utf8_lossy(&chunk);
+		cross_log_noline!("{}", chunk_str);
+	}
+	Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {
