@@ -32,7 +32,7 @@ impl OpenAiProvider {
 impl ModelProvider for OpenAiProvider {
 	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
 
-	fn provider_slug(&self) -> &'static str { "openai" }
+	fn provider_slug(&self) -> &'static str { Self::PROVIDER_SLUG }
 
 	fn default_small_model(&self) -> &'static str { Self::GPT_5_NANO }
 	fn default_tool_model(&self) -> &'static str { Self::GPT_5_MINI }
@@ -55,6 +55,10 @@ impl ModelProvider for OpenAiProvider {
 	}
 }
 impl OpenAiProvider {
+	pub const AUTH_ENV: &str = "OPENAI_API_KEY";
+
+	/// Provider slug for OpenAI.
+	pub const PROVIDER_SLUG: &str = "openai";
 	/// GPT-5 Nano - smallest and fastest model.
 	pub const GPT_5_NANO: &str = "gpt-5-nano";
 	/// GPT-5 Mini - balanced speed and capability.
@@ -64,4 +68,14 @@ impl OpenAiProvider {
 
 	/// OpenAI Responses API URL.
 	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
+
+	pub fn gpt_5_mini() -> Result<O11sStreamer> {
+		O11sStreamer::new(ModelDef {
+			provider_slug: Self::PROVIDER_SLUG.into(),
+			model_slug: Self::GPT_5_MINI.into(),
+			url: Self::RESPONSES_URL.into(),
+			auth: env_ext::var(Self::AUTH_ENV)?.xsome(),
+		})
+		.xok()
+	}
 }

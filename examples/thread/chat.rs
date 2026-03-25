@@ -1,6 +1,7 @@
 use beet::prelude::*;
 
 fn main() {
+	env_ext::load_dotenv();
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin {
 			// level: Level::TRACE,
@@ -23,7 +24,8 @@ fn setup(mut commands: Commands) {
 				)]),
 				(
 					Actor::new("BeepBot", ActorKind::Agent),
-					OllamaProvider::qwen_3_8b()
+					// OllamaProvider::qwen_3_8b()
+					OpenAiProvider::gpt_5_mini().unwrap()
 				),
 				(
 					Actor::new("Billy", ActorKind::Human),

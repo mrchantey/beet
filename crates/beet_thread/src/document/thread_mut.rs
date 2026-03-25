@@ -225,14 +225,11 @@ impl<'t, 'w> ActorViewMut<'t, 'w> {
 			.expect("actor entity should have Actor component")
 	}
 
-	pub fn with_streamer(
-		&mut self,
-		streamer: impl Clone + Component + PostStreamer,
-	) -> &mut Self {
+	pub fn with_streamer(&mut self, streamer: impl Component) -> &mut Self {
 		self.thread_view
 			.world
 			.entity_mut(self.entity)
-			.insert(post_tool(streamer));
+			.insert(streamer);
 		self
 	}
 

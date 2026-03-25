@@ -7,7 +7,7 @@ use beet_thread::prelude::*;
 mod model_provider;
 
 fn provider() -> impl ModelProvider {
-	dotenv::dotenv().ok();
+	env_ext::load_dotenv();
 	OllamaProvider::default()
 }
 

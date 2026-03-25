@@ -63,7 +63,7 @@
 //! use beet_net::prelude::*;
 //!
 //! # async fn example() -> Result<()> {
-//! dotenv::dotenv().ok();
+//! env_ext::load_dotenv();
 //!
 //! let request_body = o11s::RequestBody::new("gpt-4o-mini")
 //!     .with_simple_input("Hello!");

@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 #[beet_core::test(timeout_ms = 10_000)]
 #[ignore = "expensive"]
 async fn works() {
-	dotenv::dotenv().ok();
+	env_ext::load_dotenv();
 	//https://ai.google.dev/api/generate-content#method:-models.generatecontent
 	let res = Request::post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent")
 		.with_header_raw("x-goog-api-key", &env_ext::var("GEMINI_API_KEY").unwrap())

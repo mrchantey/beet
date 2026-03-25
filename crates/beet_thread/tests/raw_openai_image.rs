@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 #[beet_core::test(timeout_ms = 60_000)]
 #[ignore = "expensive"]
 async fn works() {
-	dotenv::dotenv().ok();
+	env_ext::load_dotenv();
 	let res = Request::post("https://api.openai.com/v1/images/generations")
 		.with_auth_bearer(&env_ext::var("OPENAI_API_KEY").unwrap())
 		.with_json_body(&serde_json::json! {{

@@ -79,6 +79,7 @@ tracing.workspace = true
 itertools.workspace = true
 send_wrapper.workspace = true
 web-time.workspace = true
+dotenv.workspace = true
 nu-ansi-term = { workspace = true, optional = true }
 
 #💡 http
