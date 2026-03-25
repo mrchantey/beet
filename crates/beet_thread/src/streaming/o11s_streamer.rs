@@ -157,6 +157,7 @@ impl PostStreamer for O11sStreamer {
 				Box::pin(SseToTypedStream::new(raw_stream))
 			} else {
 				let res_body = response.json::<o11s::ResponseBody>().await?;
+				trace!("Received full response body: {:#?}", res_body);
 				// coherse a oneshot into a 'completed' sse event
 				let res_partial = o11s_mapper::response_to_partial(res_body)?;
 				Box::pin(futures::stream::once(async move { Ok(res_partial) }))
@@ -214,6 +215,7 @@ where
 		}
 		match Pin::new(&mut self.inner).poll_next(cx) {
 			Poll::Ready(Some(Ok(event))) => {
+				trace!("Received raw SSE event: {:#?}", event);
 				if event.data.trim() == "[DONE]" {
 					// do not attempt reconnect
 					self.done = true;

@@ -120,6 +120,10 @@ impl PostChanges {
 	pub fn is_empty(&self) -> bool {
 		self.created.is_empty() && self.modified.is_empty()
 	}
+
+	pub fn iter_all(&self) -> impl Iterator<Item = &Post> {
+		self.created.iter().chain(self.modified.iter())
+	}
 }
 
 

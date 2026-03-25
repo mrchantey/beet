@@ -13,9 +13,17 @@ where
 	let mut streamer = input.caller.get_cloned::<T>().await?;
 	let mut stream = streamer.stream_posts(input.caller.clone()).await?;
 	while let Some(changes) = stream.next().await {
-		trace!("Received post changes: {:#?}", changes);
+		let changes = changes?;
+		for post in changes
+			.iter_all()
+			.filter(|post| post.status() == PostStatus::Completed)
+		// .map(|post| post.as_agent_post())
+		{
+			info!("Received post changes: {:#?}", post);
+		}
+		// info!("Received post changes: {:#?}", changes);
 		let meta_builder = stream.meta_builder()?;
-		let PostChanges { created, modified } = changes?;
+		let PostChanges { created, modified } = changes;
 		input
 			.caller
 			.with_state::<(Commands, Query<&mut Post>), _>(

@@ -83,9 +83,7 @@ impl std::fmt::Display for PostIntent {
 ///
 /// Note that `MessageRole` is not stored
 /// as this is relative to the Actor.
-#[derive(
-	Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Component,
-)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Component)]
 pub struct Post {
 	id: PostId,
 	created: Timestamp,
@@ -99,6 +97,24 @@ pub struct Post {
 	/// Extensible key-value metadata.
 	metadata: serde_json::Map<String, serde_json::Value>,
 }
+impl std::fmt::Debug for Post {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Post")
+			.field("id", &self.id)
+			.field("created", &self.created)
+			.field("author", &self.author)
+			.field("thread", &self.thread)
+			.field("intent", &self.intent)
+			.field("media_type", &self.media_type)
+			.field("body", &match self.as_str() {
+				Ok(s) => s.to_string(),
+				Err(_) => format!("{} bytes", self.body.len()),
+			})
+			.field("metadata", &self.metadata)
+			.finish()
+	}
+}
+
 
 impl Document for Post {
 	type Id = PostId;
