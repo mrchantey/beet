@@ -83,12 +83,12 @@ pub fn post_to_o11s_input(
 		}),
 		// Text-like posts: Text, Refusal, ReasoningContent, ReasoningSummary, Error
 		_ => {
-			let value = post.as_str()?;
+			let value = post.body_str()?;
 			// using xml on assistant messages is likely to confuse them,
 			// ie they start using them in their own responses
 			let text = if role != MessageRole::Assistant {
 				format!(
-					"<post actor_name={} actor_kind={} actor_id={}>{}</post>",
+					"<post author={} author_kind={} author_id={}>{}</post>",
 					post.actor.name(),
 					post.actor.kind().input_str(),
 					post.actor.id(),

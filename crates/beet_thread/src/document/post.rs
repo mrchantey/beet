@@ -77,7 +77,7 @@ impl std::fmt::Display for PostIntent {
 
 /// A post by an actor on a thread.
 ///
-/// The body is stored as untyped bytes. Use [`Post::as_str`]
+/// The body is stored as untyped bytes. Use [`Post::body_str`]
 /// for text-based content, or the view types in [`AgentPost`]
 /// for structured access.
 ///
@@ -106,7 +106,7 @@ impl std::fmt::Debug for Post {
 			.field("thread", &self.thread)
 			.field("intent", &self.intent)
 			.field("media_type", &self.media_type)
-			.field("body", &match self.as_str() {
+			.field("body", &match self.body_str() {
 				Ok(s) => s.to_string(),
 				Err(_) => format!("{} bytes", self.body.len()),
 			})
@@ -141,8 +141,11 @@ impl Post {
 	/// Returns the body as a `&str`.
 	/// ## Errors
 	/// Errors if the body is not valid utf-8.
-	pub fn as_str(&self) -> Result<&str> {
+	pub fn body_str(&self) -> Result<&str> {
 		std::str::from_utf8(&self.body)?.xok()
+	}
+	pub fn body_string(self) -> Result<String> {
+		Ok(String::from_utf8(self.body)?)
 	}
 
 	/// Returns a mutable reference to the raw body bytes.
@@ -188,7 +191,7 @@ impl Post {
 
 impl std::fmt::Display for Post {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		if let Ok(text) = self.as_str() {
+		if let Ok(text) = self.body_str() {
 			write!(f, "{}", text)
 		} else {
 			write!(f, "[{} body, {} bytes]", self.media_type, self.body.len())

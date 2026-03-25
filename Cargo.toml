@@ -341,7 +341,7 @@ beet_stack = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["rng-getrandom"] }
 
 [dev-dependencies]
-beet = { path = ".", features = ["ansi_paint"] }
+beet = { path = ".", features = ["ansi_paint", "thread"] }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }

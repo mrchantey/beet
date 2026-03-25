@@ -67,7 +67,7 @@
 		"scripts",
 		// "tests",
 		// "target",
-		".env.example",
+		// ".env.example",
 		".beet",
 		".github",
 		// ".cargo",

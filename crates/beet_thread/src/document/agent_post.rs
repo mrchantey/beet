@@ -511,7 +511,7 @@ impl<'a> TextView<'a> {
 	}
 	pub fn text(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("text view validated on construction")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
@@ -528,7 +528,7 @@ impl<'a> RefusalView<'a> {
 	}
 	pub fn text(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("refusal view validated on construction")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
@@ -545,7 +545,7 @@ impl<'a> UrlView<'a> {
 	}
 	pub fn url(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("url view validated on construction")
 	}
 	pub fn file_stem(&self) -> Option<&str> {
@@ -614,7 +614,7 @@ impl<'a> ErrorView<'a> {
 		post.intent().is_server_error().then_some(Self { post })
 	}
 	pub fn message(&self) -> &str {
-		self.post.as_str().unwrap_or("[non-utf8 error]")
+		self.post.body_str().unwrap_or("[non-utf8 error]")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
 }
@@ -653,7 +653,7 @@ impl<'a> FunctionCallView<'a> {
 	/// The arguments as a JSON string (the body).
 	pub fn arguments(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("function call body should be valid utf-8")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
@@ -692,7 +692,7 @@ impl<'a> FunctionCallOutputView<'a> {
 	/// The output string (the body).
 	pub fn output(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("function call output body should be valid utf-8")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
@@ -710,7 +710,7 @@ impl<'a> ReasoningContentView<'a> {
 	}
 	pub fn text(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("reasoning content view validated on construction")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
@@ -728,7 +728,7 @@ impl<'a> ReasoningSummaryView<'a> {
 	}
 	pub fn text(&self) -> &str {
 		self.post
-			.as_str()
+			.body_str()
 			.expect("reasoning summary view validated on construction")
 	}
 	pub fn post(&self) -> &'a Post { self.post }

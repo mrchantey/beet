@@ -4,8 +4,8 @@ fn main() {
 	env_ext::load_dotenv();
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin {
-			// level: Level::DEBUG,
-			level: Level::TRACE,
+			level: Level::DEBUG,
+			// level: Level::TRACE,
 			filter: format!("bevy_time=off,ureq=off,ureq_proto=off"),
 			..default()
 		}))
