@@ -28,7 +28,7 @@ impl PostPartialMap {
 	/// Also registers call_id and response_item mappings for new posts.
 	pub fn apply_posts(
 		&mut self,
-		posts: &mut DocMap<Post>,
+		posts: &mut TableMap<Post>,
 		author: ActorId,
 		thread: ThreadId,
 		partial_items: impl IntoIterator<Item = PostPartial>,
@@ -108,7 +108,7 @@ impl PostPartialMap {
 	/// like [`PartialContent::Delta`].
 	fn partial_content_into_post(
 		&self,
-		posts: &mut DocMap<Post>,
+		posts: &mut TableMap<Post>,
 		key: &PostPartialKey,
 		partial: PartialContent,
 		author: ActorId,

@@ -46,6 +46,9 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "net")]
+	// TODO disambiguate tablestore
+	pub use crate::net::prelude::TableStore;
+	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "node")]
 	pub use crate::node::prelude::*;

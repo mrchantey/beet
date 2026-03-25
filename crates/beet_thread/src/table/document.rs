@@ -167,7 +167,7 @@ where
 }
 
 
-/// In-memory collection of tabless, mapped by their id.
+/// In-memory collection of tables, mapped by their id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableMap<T: Table>(HashMap<T::Id, T>);
 

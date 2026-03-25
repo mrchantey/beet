@@ -19,9 +19,9 @@ impl Default for PostStore {
 }
 
 pub trait PostStoreProvider: 'static + Send + Sync {
-	// fn actors(&self) -> &DocMap<Actor>;
-	// fn threads(&self) -> &DocMap<Actor>;
-	// fn posts(&self) -> &DocMap<Actor>;
+	// fn actors(&self) -> &TableMap<Actor>;
+	// fn threads(&self) -> &TableMap<Actor>;
+	// fn posts(&self) -> &TableMap<Actor>;
 
 	/// Searches the thread for the most recent post with
 	/// a [`O11sMeta`] that was stored by the provider,
@@ -120,24 +120,24 @@ pub struct MemoryPostStore {
 /// maintained, and posts are sorted per each 'get'.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ContextMap {
-	actors: DocMap<Actor>,
-	posts: DocMap<Post>,
-	threads: DocMap<Thread>,
-	response_metas: DocMap<ResponseMeta>,
+	actors: TableMap<Actor>,
+	posts: TableMap<Post>,
+	threads: TableMap<Thread>,
+	response_metas: TableMap<ResponseMeta>,
 }
 
 
 impl ContextMap {
-	pub fn actors(&self) -> &DocMap<Actor> { &self.actors }
-	pub fn actors_mut(&mut self) -> &mut DocMap<Actor> { &mut self.actors }
+	pub fn actors(&self) -> &TableMap<Actor> { &self.actors }
+	pub fn actors_mut(&mut self) -> &mut TableMap<Actor> { &mut self.actors }
 
-	pub fn posts(&self) -> &DocMap<Post> { &self.posts }
-	pub fn posts_mut(&mut self) -> &mut DocMap<Post> { &mut self.posts }
+	pub fn posts(&self) -> &TableMap<Post> { &self.posts }
+	pub fn posts_mut(&mut self) -> &mut TableMap<Post> { &mut self.posts }
 
-	// pub fn threads(&self) -> &DocMap<Thread> { &self.threads }
-	pub fn threads_mut(&mut self) -> &mut DocMap<Thread> { &mut self.threads }
-	pub fn metas(&self) -> &DocMap<ResponseMeta> { &self.response_metas }
-	pub fn metas_mut(&mut self) -> &mut DocMap<ResponseMeta> {
+	// pub fn threads(&self) -> &TableMap<Thread> { &self.threads }
+	pub fn threads_mut(&mut self) -> &mut TableMap<Thread> { &mut self.threads }
+	pub fn metas(&self) -> &TableMap<ResponseMeta> { &self.response_metas }
+	pub fn metas_mut(&mut self) -> &mut TableMap<ResponseMeta> {
 		&mut self.response_metas
 	}
 

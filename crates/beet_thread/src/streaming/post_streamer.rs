@@ -38,7 +38,7 @@ pub struct PostStream {
 	thread: ThreadId,
 	// store partial posts as they are built,
 	// cloning and returning on each stream part
-	posts: DocMap<Post>,
+	posts: TableMap<Post>,
 	post_partial_map: PostPartialMap,
 	provider_slug: Cow<'static, str>,
 	model_slug: Cow<'static, str>,
@@ -68,7 +68,7 @@ impl PostStream {
 	}
 
 	/// Returns an iterator over the collected posts.
-	pub fn posts(&self) -> &DocMap<Post> { &self.posts }
+	pub fn posts(&self) -> &TableMap<Post> { &self.posts }
 
 	pub fn meta_builder(&self) -> Result<MetaBuilder> {
 		let response = self
