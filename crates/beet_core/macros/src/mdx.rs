@@ -282,7 +282,7 @@ fn parse_raw_tokens(tokens: Vec<TokenTree>) -> Vec<Segment> {
 
 /// Generate the output token stream from parsed segments.
 fn generate_output(segments: Vec<Segment>) -> TokenStream {
-	let crate_path = pkg_ext::internal_or_beet("beet_stack");
+	let crate_path = pkg_ext::internal_or_beet("beet_node");
 
 	// Filter out empty markdown segments
 	let segments: Vec<Segment> = segments

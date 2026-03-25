@@ -4,7 +4,7 @@
 //! It loads assets and uses string replacement to create dynamic html pages.
 //! Assets are loaded on each request so can be modified without restarting the server.
 //!
-//! For a full routing example see the `http_router` example which uses `beet_router`.
+//! For a full routing example see the `router` example which uses `beet_router`.
 //!
 //! ## Running the Example
 //!

@@ -13,7 +13,7 @@ categories.workspace = true
 
 
 [features]
-default = ["tui", "markdown"]
+default = ["markdown"]
 interface = ["serde"]
 json = ["serde", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
@@ -41,7 +41,7 @@ pulldown-cmark = { version = "0.13", optional = true }
 webbrowser.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-bevy_ratatui = {workspace = true, optional=true}
+bevy_ratatui = {workspace = true, optional=true,features=["crossterm"]}
 ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 [dev-dependencies]

@@ -20,8 +20,6 @@ pub use beet_net as net;
 pub use beet_node as node;
 #[cfg(feature = "router")]
 pub use beet_router as router;
-#[cfg(feature = "stack")]
-pub use beet_stack as stack;
 #[cfg(feature = "thread")]
 pub use beet_thread as thread;
 #[cfg(feature = "tool")]
@@ -46,16 +44,19 @@ pub mod prelude {
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "net")]
-	// TODO disambiguate tablestore
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "node")]
+	pub use crate::node::prelude::Justify;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::Pointer;
+	#[cfg(feature = "node")]
 	pub use crate::node::prelude::*;
+	#[cfg(feature = "node")]
+	pub use crate::node::val;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
-	#[cfg(feature = "stack")]
-	pub use crate::stack::prelude::*;
 	#[cfg(feature = "tool")]
 	pub use crate::tool::prelude::*;
 	// #[cfg(feature = "build")]
@@ -84,7 +85,6 @@ pub mod exports {
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "node")]
-	#[allow(unused)]
 	pub use beet_node::exports::*;
 	pub use bevy;
 }

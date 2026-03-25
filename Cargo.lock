@@ -1054,7 +1054,6 @@ dependencies = [
  "beet_net",
  "beet_node",
  "beet_router",
- "beet_stack",
  "beet_thread",
  "beet_tool",
  "bevy",
@@ -1220,25 +1219,6 @@ dependencies = [
  "beet_core",
  "beet_net",
  "beet_node",
- "beet_tool",
- "bevy",
- "bevy_ratatui",
- "bitflags 2.10.0",
- "extend",
- "pulldown-cmark",
- "ratatui",
- "serde",
- "thiserror 1.0.69",
- "variadics_please",
- "webbrowser",
-]
-
-[[package]]
-name = "beet_stack"
-version = "0.0.9-dev.6"
-dependencies = [
- "beet_core",
- "beet_net",
  "beet_tool",
  "bevy",
  "bevy_ratatui",

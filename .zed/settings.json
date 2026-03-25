@@ -15,30 +15,72 @@
 			"initialization_options": {
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
-					"features": [
-						// "tui",
-						// "bevy_scene",
-						// "json",
-						// "_pretty_curl",
-						// "_mini_browser",
-						// "http_server",
-						// "stack",
-						// "server"
-						// "client",
-						// "launch",
-						// "tungstenite"
-						// "lambda"
-						// "aws"
-						// "webdriver",
-						// "css",
-						// "sim",
-						// "bevy_default",
-						// "spatial",
-						// "examples",
-						// "ml",
-						// "cuda",
-						// "rand"
-					],
+					"features": "all",
+					// [
+					// "all",
+					// "tui",
+					// "bevy_scene",
+					// "json",
+					// "_pretty_curl",
+					// "_mini_browser",
+					// "http_server",
+					// "stack",
+					// "server"
+					// "client",
+					// "launch",
+					// "tungstenite"
+					// "lambda"
+					// "aws"
+					// "webdriver",
+					// "css",
+					// "sim",
+					// "bevy_default",
+					// "spatial",
+					// "examples",
+					// "ml",
+					// "cuda",
+					// "rand"
+					// ],
+				},
+				"completion": {
+					"snippets": {
+						"custom": {
+							"Arc::new": {
+								"postfix": "arc",
+								"body": ["Arc::new(${receiver})"],
+								"requires": "std::sync::Arc",
+								"scope": "expr",
+							},
+							"Some": {
+								"postfix": "some",
+								"body": ["Some(${receiver})"],
+								"scope": "expr",
+							},
+							"Ok": {
+								"postfix": "ok",
+								"body": ["Ok(${receiver})"],
+								"scope": "expr",
+							},
+							"Rc::new": {
+								"postfix": "rc",
+								"body": ["Rc::new(${receiver})"],
+								"requires": "std::rc::Rc",
+								"scope": "expr",
+							},
+							"Box::pin": {
+								"postfix": "boxpin",
+								"body": ["Box::pin(${receiver})"],
+								"requires": "std::boxed::Box",
+								"scope": "expr",
+							},
+							"vec!": {
+								"postfix": "vec",
+								"body": ["vec![${receiver}]"],
+								"description": "vec![]",
+								"scope": "expr",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -51,7 +93,7 @@
 		"crates/beet_dom",
 		"crates/beet_examples",
 		"crates/beet_flow",
-		"crates/beet_infra",
+		// "crates/beet_infra",
 		"crates/beet_ml",
 		// "crates/beet_net",
 		// "crates/beet_stack",
@@ -63,7 +105,7 @@
 		"crates/beet_spatial",
 		// "crates/beet_tool",
 		"crates/emby",
-		"infra",
+		// "infra",
 		"scripts",
 		// "tests",
 		// "target",

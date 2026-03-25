@@ -6,7 +6,7 @@ use lambda_http::tracing;
 
 
 /// Starts the Lambda runtime for the HttpServer
-pub(super) fn start_lambda_server(
+pub fn start_lambda_server(
 	In(entity): In<Entity>,
 	mut async_commands: AsyncCommands,
 ) -> Result {

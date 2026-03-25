@@ -13,43 +13,26 @@
 //! All implementations route requests through the tool-based exchange
 //! pattern, allowing the same handler code to work in every environment.
 mod cli_server;
-#[cfg(all(
-	feature = "server",
-	feature = "hyper",
-	not(feature = "lambda"),
-	not(target_arch = "wasm32")
-))]
+pub use cli_server::*;
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+mod http_server;
+#[cfg(all(feature = "hyper", not(target_arch = "wasm32")))]
 mod hyper_server;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
 mod lambda_server;
-#[cfg(all(
-	feature = "server",
-	not(feature = "hyper"),
-	not(feature = "lambda"),
-	not(target_arch = "wasm32")
-))]
-mod mini_http_server;
-
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-mod http_server;
+mod mini_http_server;
 mod server_plugin;
-pub use cli_server::*;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub use http_server::*;
 #[cfg(all(
 	feature = "server",
 	feature = "hyper",
-	not(feature = "lambda"),
 	not(target_arch = "wasm32")
 ))]
-use hyper_server::*;
+pub use hyper_server::*;
 #[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-use lambda_server::*;
-#[cfg(all(
-	feature = "server",
-	not(feature = "hyper"),
-	not(feature = "lambda"),
-	not(target_arch = "wasm32")
-))]
-use mini_http_server::*;
+pub use lambda_server::*;
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub use mini_http_server::*;
 pub use server_plugin::*;

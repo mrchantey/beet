@@ -26,6 +26,7 @@
 //! Uses [`StyleMap<TuiStyle>`] to map element names to [`TuiStyle`]
 //! values that combine a ratatui [`Style`] with layout metadata such
 //! as vertical spacing and justification.
+use crate::prelude::Justify;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy_ratatui::RatatuiContext;
@@ -241,7 +242,7 @@ impl TuiNodeRenderer {
 			entity.get::<TuiScrollState>().cloned().unwrap_or_default();
 
 		// Extract the RatatuiContext so we can access both it and the
-		// world independently, mirroring the beet_stack draw_system
+		// world independently, mirroring the draw system
 		// approach. This avoids the `get_frame()` / `draw()` area
 		// mismatch that caused cascading whitespace in terminals with
 		// pre-existing scrollback (eg Zed).

@@ -14,12 +14,9 @@ use bevy_ratatui::RatatuiPlugins;
 /// Only available on non-wasm targets since [`bevy_ratatui`] depends on
 /// a terminal backend (crossterm).
 ///
-/// Add this plugin alongside [`StackPlugin`] when building a TUI app.
+/// Add this plugin when building a TUI app. For link navigation,
+/// also add `beet_router`'s `InputPlugin`.
 /// All boilerplate for the terminal lifecycle is handled here.
-///
-/// # Includes
-/// - [`StackPlugin`]
-/// - [`MinimalPlugins`]
 #[derive(Default)]
 pub struct TuiPlugin;
 
@@ -35,7 +32,6 @@ impl Plugin for TuiPlugin {
 				enable_input_forwarding: true,
 			},
 		))
-		.init_plugin::<InputPlugin>()
 		.add_systems(PreUpdate, (pointer_input_system, scroll_input_system))
 		// .add_systems(
 		// 	PostUpdate,

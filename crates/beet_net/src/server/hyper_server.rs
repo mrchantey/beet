@@ -11,7 +11,6 @@ use hyper::rt::Timer;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use pin_project::pin_project;
-use send_wrapper::SendWrapper;
 use std::convert::Infallible;
 use std::future::Future;
 use std::io;
@@ -24,7 +23,7 @@ use std::task::Poll;
 /// This bevy system contains unopinionated machinery for handling
 /// hyper requests.
 /// See [`Server::handler`] for customizing handlers
-pub(super) fn start_hyper_server(
+pub fn start_hyper_server(
 	In(entity): In<Entity>,
 	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,

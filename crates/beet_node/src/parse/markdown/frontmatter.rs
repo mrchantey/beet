@@ -49,13 +49,13 @@ impl Frontmatter {
 			FrontmatterKind::Yaml => parse_yaml_kv(content)?,
 			FrontmatterKind::Toml => parse_toml_kv(content)?,
 		};
-		let value = build_dynamic_struct(pairs);
+		let value = build_dynamic_struct(pairs)?;
 		Ok(Self { value, kind })
 	}
 }
 
 /// Build a [`DynamicStruct`] from a list of key-value pairs.
-fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> DynamicStruct {
+fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 	let mut dynamic = DynamicStruct::default();
 	for (key, value) in pairs {
 		match value {
@@ -80,9 +80,15 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> DynamicStruct {
 			Value::Bytes(val) => {
 				dynamic.insert(&key, val);
 			}
+			Value::Map(_) | Value::List(_) => {
+				bevybail!(
+					"Unsupported complex value for frontmatter key '{}'",
+					key
+				);
+			}
 		}
 	}
-	dynamic
+	dynamic.xok()
 }
 
 /// Parse simple YAML key-value pairs.

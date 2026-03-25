@@ -50,7 +50,6 @@ members = [
 	"crates/beet_net",
 	"crates/beet_tool",
 	"crates/beet_node",
-	"crates/beet_stack",
 	"crates/beet_router",
 	"crates/beet_thread",
 
@@ -87,7 +86,7 @@ beet_net = { path = "crates/beet_net", version = "0.0.9-dev.6" }
 beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.6" }
 beet_node = { path = "crates/beet_node", version = "0.0.9-dev.6" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.6" }
-beet_stack = { path = "crates/beet_stack", version = "0.0.9-dev.6" }
+
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.6" }
 # beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.6" }
@@ -228,9 +227,9 @@ default = ["node"]
 
 # 💡 Top Level
 
-http_server = ["net", "tool","stack", "beet_net/server"]
-tui_server = ["tui","stack", "markdown"]
-stdio_server = ["stack", "markdown"]
+http_server = ["net", "tool","router", "beet_net/server", "beet_router?/http"]
+tui_server = ["tui","router", "markdown"]
+stdio_server = ["router", "markdown"]
 ansi_paint = ["beet_core/ansi_paint"]
 # 💡 Core
 
@@ -249,11 +248,11 @@ bevy_default = [
 
 # 💡 Net
 
-net = ["dep:beet_net", "beet_stack?/http"]
+net = ["dep:beet_net", "beet_router?/http"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-router = ["dep:beet_router"]
+router = ["tool", "node", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -264,7 +263,7 @@ ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
 _pretty_curl = ["net", "node", "ureq", "native-tls"]
-_mini_browser = ["_pretty_curl", "tui"]
+_mini_browser = ["_pretty_curl", "tui", "router"]
 
 
 thread = ["dep:beet_thread","net","tool"]
@@ -275,9 +274,8 @@ thread = ["dep:beet_thread","net","tool"]
 
 tool = ["dep:beet_tool"]
 node = ["dep:beet_node"]
-stack = ["tool", "dep:beet_stack"]
 tui = ["beet_node?/tui"]
-markdown = ["beet_stack?/markdown"]
+markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]
@@ -319,7 +317,6 @@ beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_tool = { workspace = true, optional = true }
-beet_stack = { workspace = true, optional = true }
 
 #💡 web
 # beet_dom = { workspace = true, optional = true }
@@ -402,31 +399,16 @@ required-features = ["_pretty_curl"]
 
 [[example]]
 name = "mini_browser"
-path = "examples/node/mini_browser.rs"
+path = "examples/router/mini_browser.rs"
 required-features = ["_mini_browser"]
 
 
-# 💡 Examples - Stack
+# 💡 Examples - Router
 
 [[example]]
-name = "tui"
-path = "examples/stack/tui.rs"
-required-features = ["tui_server"]
-
-[[example]]
-name = "cli"
-path = "examples/stack/cli.rs"
+name = "router"
+path = "examples/router/router.rs"
 required-features = ["stdio_server"]
-
-[[example]]
-name = "repl"
-path = "examples/stack/repl.rs"
-required-features = ["stdio_server"]
-
-[[example]]
-name = "http"
-path = "examples/stack/http.rs"
-required-features = ["http_server"]
 
 # 💡 Examples - Thread
 
@@ -477,13 +459,6 @@ required-features = ["thread"]
 # name = "utility_ai"
 # path = "examples/flow/utility_ai.rs"
 # required-features = ["flow"]
-
-# 💡 Examples - Router
-
-# [[example]]
-# name = "http_router"
-# path = "examples/router/http_router.rs"
-# required-features = ["server_app"]
 
 # [[example]]
 # name = "app_ml"

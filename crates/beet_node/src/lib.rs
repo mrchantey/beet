@@ -7,25 +7,26 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod document;
 mod input;
-#[cfg(feature = "net")]
-mod navigate;
 mod parse;
 mod render;
 mod types;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	pub use crate::document::*;
 	pub use crate::input::*;
-	#[cfg(feature = "net")]
-	pub use crate::navigate::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	pub use crate::types::*;
+	pub use crate::val;
 }
 
 
 pub mod exports {
+	// used by the val! macro
+	pub use beet_core::prelude::HashMap;
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	pub use bevy_ratatui;
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]

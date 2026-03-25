@@ -18,7 +18,7 @@ use std::net::SocketAddr;
 /// This system mirrors the signature of `start_hyper_server` and
 /// `start_lambda_server` so the `HttpServer` component can swap
 /// backends via feature flags.
-pub(super) fn start_mini_http_server(
+pub fn start_mini_http_server(
 	In(entity): In<Entity>,
 	query: Query<&HttpServer>,
 	mut async_commands: AsyncCommands,
@@ -205,7 +205,7 @@ pub(crate) async fn serialize_http_response(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::header;
+	use crate::header;
 
 	// -- parse_http_request --
 

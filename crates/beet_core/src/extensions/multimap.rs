@@ -615,64 +615,62 @@ fn build_field_value(
 
 	// Handle primitive/leaf types
 	match field_type_id {
-		id if id == TypeId::of::<String>() => {
-			return parse_string_field(map_item);
-		}
+		id if id == TypeId::of::<String>() => parse_string_field(map_item),
 		id if id == TypeId::of::<Option<String>>() => {
-			return Ok(Some(Box::new(parse_option_string_field(map_item))));
+			Ok(Some(Box::new(parse_option_string_field(map_item))))
 		}
 		id if id == TypeId::of::<Vec<String>>() => {
-			return Ok(Some(Box::new(parse_vec_string_field(map_item))));
+			Ok(Some(Box::new(parse_vec_string_field(map_item))))
 		}
 		id if id == TypeId::of::<i8>() => {
-			return parse_number_field::<i8>(map_item, field_name);
+			parse_number_field::<i8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i16>() => {
-			return parse_number_field::<i16>(map_item, field_name);
+			parse_number_field::<i16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i32>() => {
-			return parse_number_field::<i32>(map_item, field_name);
+			parse_number_field::<i32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i64>() => {
-			return parse_number_field::<i64>(map_item, field_name);
+			parse_number_field::<i64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i128>() => {
-			return parse_number_field::<i128>(map_item, field_name);
+			parse_number_field::<i128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<isize>() => {
-			return parse_number_field::<isize>(map_item, field_name);
+			parse_number_field::<isize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u8>() => {
-			return parse_number_field::<u8>(map_item, field_name);
+			parse_number_field::<u8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u16>() => {
-			return parse_number_field::<u16>(map_item, field_name);
+			parse_number_field::<u16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u32>() => {
-			return parse_number_field::<u32>(map_item, field_name);
+			parse_number_field::<u32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u64>() => {
-			return parse_number_field::<u64>(map_item, field_name);
+			parse_number_field::<u64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u128>() => {
-			return parse_number_field::<u128>(map_item, field_name);
+			parse_number_field::<u128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<usize>() => {
-			return parse_number_field::<usize>(map_item, field_name);
+			parse_number_field::<usize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f32>() => {
-			return parse_number_field::<f32>(map_item, field_name);
+			parse_number_field::<f32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f64>() => {
-			return parse_number_field::<f64>(map_item, field_name);
+			parse_number_field::<f64>(map_item, field_name)
 		}
-		_ => {}
+		_ => {
+			bevybail!(
+				"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
+				field_name
+			)
+		}
 	}
-
-	bevybail!(
-		"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
-		field_name
-	)
 }
 
 /// Parse a number field from the multimap.
