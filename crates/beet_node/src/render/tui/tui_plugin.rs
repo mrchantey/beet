@@ -15,7 +15,7 @@ use bevy_ratatui::RatatuiPlugins;
 /// a terminal backend (crossterm).
 ///
 /// Add this plugin when building a TUI app. For link navigation,
-/// also add `beet_router`'s `InputPlugin`.
+/// also add `beet_router`'s `NavigatorPlugin`.
 /// All boilerplate for the terminal lifecycle is handled here.
 #[derive(Default)]
 pub struct TuiPlugin;

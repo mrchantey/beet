@@ -106,6 +106,22 @@ impl OnSpawn {
 			Ok(())
 		})
 	}
+	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
+	pub fn run<S, M>(system: S) -> Self
+	where
+		S: 'static + Send + Sync + IntoSystem<In<Entity>, Result, M>,
+	{
+		Self::new(move |entity| -> Result {
+			let id = entity.id();
+			entity
+				.world_scope(move |world| {
+					world.run_system_once_with::<_, _, Result, _>(system, id)
+				})
+				.map_err(|err| bevyhow!("{}", err))??;
+			Ok(())
+		})
+	}
 
 	/// Inserts the resource into the world when the entity is spawned.
 	pub fn insert_resource(resource: impl Resource) -> Self {

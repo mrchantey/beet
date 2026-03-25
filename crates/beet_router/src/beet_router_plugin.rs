@@ -18,7 +18,6 @@ impl Plugin for BeetRouterPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<DocumentPlugin>()
 			.init_plugin::<RouterPlugin>()
-			.init_plugin::<InterfacePlugin>()
-			.init_plugin::<InputPlugin>();
+			.init_plugin::<NavigatorPlugin>();
 	}
 }

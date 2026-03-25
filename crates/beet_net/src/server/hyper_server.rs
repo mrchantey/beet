@@ -264,11 +264,11 @@ mod test {
 	use std::time::Duration;
 	use std::time::Instant;
 
+
 	#[beet_core::test]
 	async fn works() {
-		let server = HttpServer::new_test();
-
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_hyper_server);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
@@ -293,8 +293,8 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_hyper_server);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
@@ -323,8 +323,8 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_hyper_server);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))

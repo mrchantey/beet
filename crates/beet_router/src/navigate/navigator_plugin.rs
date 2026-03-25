@@ -5,11 +5,14 @@ use beet_node::prelude::*;
 
 
 #[derive(Default)]
-pub struct InputPlugin;
+pub struct NavigatorPlugin;
 
 
-impl Plugin for InputPlugin {
-	fn build(&self, app: &mut App) { app.add_observer(on_element_added); }
+impl Plugin for NavigatorPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_observer(on_element_added)
+			.add_observer(single_current_scene);
+	}
 }
 
 

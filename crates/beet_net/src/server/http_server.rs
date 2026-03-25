@@ -71,6 +71,8 @@ impl HttpServer {
 // and using the one inserted via Required.
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	#[cfg(test)]
+	return;
 	#[cfg(feature = "lambda")]
 	world
 		.commands()
@@ -93,14 +95,22 @@ impl HttpServer {
 	///
 	/// Each call returns a server on a different port, starting from
 	/// [`DEFAULT_SERVER_TEST_PORT`], to avoid collisions in parallel tests.
-	pub fn new_test() -> Self {
+	///
+	/// We dont automatically assign server in tests so it must be provided
+	pub fn new_test<S, M>(run_server: S) -> (HttpServer, OnSpawn)
+	where
+		S: 'static + Send + Sync + IntoSystem<In<Entity>, Result, M>,
+	{
 		use std::sync::atomic::AtomicU16;
 		use std::sync::atomic::Ordering;
 		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SERVER_TEST_PORT);
-		Self {
-			port: PORT.fetch_add(1, Ordering::SeqCst),
-			..default()
-		}
+		(
+			Self {
+				port: PORT.fetch_add(1, Ordering::SeqCst),
+				..default()
+			},
+			OnSpawn::run(run_server),
+		)
 	}
 
 	/// Returns the local URL for connecting to this server.

@@ -14,3 +14,7 @@ pub use media::*;
 pub use node_parser::*;
 pub use plaintext::*;
 pub use span_tracker::*;
+#[cfg(feature = "net")]
+mod render_media;
+#[cfg(feature = "net")]
+pub use render_media::*;

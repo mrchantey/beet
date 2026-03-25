@@ -11,7 +11,7 @@ fn main() {
 	App::new()
 		.add_plugins((
 			TuiPlugin::default(),
-			InputPlugin::default(),
+			NavigatorPlugin::default(),
 			AsyncPlugin::default(),
 		))
 		.add_systems(
