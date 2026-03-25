@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 
 pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
 where
-	F: 'static + Send + Sync + Fn(FuncToolIn<Input>) -> Result<Out>,
+	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<Input>) -> Result<Out>,
 {
 	Tool::<Input, Out>::new(
 		TypeMeta::of::<F>(),
@@ -16,7 +16,7 @@ where
 		          out_handler,
 		      }| {
 			let cx = FuncToolIn { caller, input };
-			let out = func(cx)?;
+			let out = func.clone()(cx)?;
 			out_handler.call(commands, out)
 		},
 	)
@@ -47,7 +47,7 @@ pub struct FuncToolMarker;
 
 impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + Fn(FuncToolIn<I>) -> Result<O>,
+	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<I>) -> Result<O>,
 {
 	type In = I;
 	type Out = O;
@@ -59,7 +59,7 @@ pub struct TypedFuncToolMarker;
 
 impl<F, I, O> IntoTool<(TypedFuncToolMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + Fn(I) -> O,
+	F: 'static + Send + Sync + Clone + FnOnce(I) -> O,
 	O: bevy::reflect::Typed,
 {
 	type In = I;

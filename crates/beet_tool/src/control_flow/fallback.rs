@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// Runs child tools in order until one passes.
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Component)]
 #[require(Tool<Input, Outcome<Output, Input>> = async_tool(fallback_tool::<Input, Output>))]
 pub struct Fallback<Input = (), Output = ()>
 where
@@ -17,6 +17,25 @@ where
 	/// Defaults to [`ChildError::empty`].
 	exclude_errors: ChildError,
 	_marker: PhantomData<fn() -> (Input, Output)>,
+}
+
+impl<Input, Output> Clone for Fallback<Input, Output>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	fn clone(&self) -> Self {
+		Self {
+			exclude_errors: self.exclude_errors,
+			_marker: PhantomData,
+		}
+	}
+}
+impl<Input, Output> Copy for Fallback<Input, Output>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
 }
 
 impl<Input, Output> Default for Fallback<Input, Output>
@@ -30,6 +49,10 @@ where
 			_marker: PhantomData,
 		}
 	}
+}
+impl Fallback {
+	/// Create a default `Fallback<(), ()>`.
+	pub fn new() -> Self { Self::default() }
 }
 
 impl<Input, Output> Fallback<Input, Output>
@@ -45,38 +68,28 @@ where
 
 	/// Get the current excluded child errors.
 	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
-}
-
-impl Fallback {
-	/// Create a default `Fallback<(), ()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Try children in order, returning the first pass or final fail.
-///
-/// Child error handling is controlled by [`Fallback::exclude_errors`].
-///
-/// ## Errors
-///
-/// Errors depending on [`ChildError`] exclusions when a child has:
-/// - no [`ToolMeta`]
-/// - incompatible [`ToolMeta`] signature
-
-pub async fn fallback_tool<Input, Output>(
-	cx: AsyncToolIn<Input>,
-) -> Result<Outcome<Output, Input>>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	let exclude_errors = cx
-		.caller
-		.get(|fallback: &Fallback<Input, Output>| fallback.exclude_errors())
-		.await
-		.unwrap_or_default();
-
-	let children =
-		match cx.caller.get(|children: &Children| children.to_vec()).await {
+	/// Try children in order, returning the first pass or final fail.
+	///
+	/// Child error handling is controlled by [`Fallback::exclude_errors`].
+	///
+	/// ## Errors
+	///
+	/// Errors depending on [`ChildError`] exclusions when a child has:
+	/// - no [`ToolMeta`]
+	/// - incompatible [`ToolMeta`] signature
+	pub async fn run(
+		&self,
+		cx: AsyncToolIn<Input>,
+	) -> Result<Outcome<Output, Input>>
+	where
+		Input: 'static + Send + Sync,
+		Output: 'static + Send + Sync,
+	{
+		let children = match cx
+			.caller
+			.get(|children: &Children| children.to_vec())
+			.await
+		{
 			Ok(children) => children,
 			Err(_) => {
 				// entity has no children, fail returning the input
@@ -84,49 +97,65 @@ where
 			}
 		};
 
-	let mut input = cx.input;
-	let world = cx.caller.world();
+		let mut input = cx.input;
+		let world = cx.caller.world();
 
-	for child in children {
-		let tool_meta_result =
-			world.entity(child).get(|meta: &ToolMeta| *meta).await;
+		for child in children {
+			let tool_meta_result =
+				world.entity(child).get(|meta: &ToolMeta| *meta).await;
 
-		let tool_meta = match tool_meta_result {
-			Ok(tool_meta) => tool_meta,
-			Err(child_error) => {
-				if exclude_errors.contains(ChildError::NO_TOOL) {
+			let tool_meta = match tool_meta_result {
+				Ok(tool_meta) => tool_meta,
+				Err(child_error) => {
+					if self.exclude_errors.contains(ChildError::NO_TOOL) {
+						continue;
+					}
+					bevybail!(
+						"fallback child has no tool: {child:?}, error: {child_error}"
+					);
+				}
+			};
+
+			if let Err(mismatch_error) =
+				tool_meta.assert_match::<Input, Outcome<Output, Input>>()
+			{
+				if self.exclude_errors.contains(ChildError::TOOL_MISMATCH) {
 					continue;
 				}
 				bevybail!(
-					"fallback child has no tool: {child:?}, error: {child_error}"
+					"fallback child has incorrect tool signature: {child:?}, error: {mismatch_error}"
 				);
 			}
-		};
 
-		if let Err(mismatch_error) =
-			tool_meta.assert_match::<Input, Outcome<Output, Input>>()
-		{
-			if exclude_errors.contains(ChildError::TOOL_MISMATCH) {
-				continue;
-			}
-			bevybail!(
-				"fallback child wrong tool signature: {child:?}, error: {mismatch_error}"
-			);
-		}
-
-		match world
-			.entity(child)
-			.call::<Input, Outcome<Output, Input>>(input)
-			.await?
-		{
-			Outcome::Pass(output) => return Ok(Outcome::Pass(output)),
-			Outcome::Fail(next_input) => {
-				input = next_input;
+			match world
+				.entity(child)
+				.call::<Input, Outcome<Output, Input>>(input)
+				.await?
+			{
+				Outcome::Pass(output) => return Ok(Outcome::Pass(output)),
+				Outcome::Fail(next_input) => {
+					input = next_input;
+				}
 			}
 		}
+
+		Ok(Outcome::Fail(input))
 	}
+}
 
-	Ok(Outcome::Fail(input))
+async fn fallback_tool<Input, Output>(
+	cx: AsyncToolIn<Input>,
+) -> Result<Outcome<Output, Input>>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	cx.caller
+		.get_cloned::<Fallback<Input, Output>>()
+		.await
+		.unwrap_or_default()
+		.run(cx)
+		.await
 }
 
 #[cfg(test)]

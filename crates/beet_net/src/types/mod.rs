@@ -62,8 +62,6 @@ pub mod http_ext;
 mod exchange;
 mod exchange_stats;
 mod extractors;
-mod handler_exchange;
 pub use exchange::*;
 pub use exchange_stats::*;
 pub use extractors::*;
-pub use handler_exchange::*;

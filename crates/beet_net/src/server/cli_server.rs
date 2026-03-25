@@ -13,32 +13,28 @@ use beet_core::prelude::*;
 pub struct CliServer;
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let entity = cx.entity;
-	world.commands().queue(move |world: &mut World| -> Result {
-		world.entity_mut(entity).run_async_local(
-			async move |entity| -> Result {
-				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res = entity.exchange(req).await;
-				let (parts, mut body) = res.into_parts();
+	world.commands().entity(cx.entity).queue_async(run_and_exit);
+}
 
-				// stream body to stdout
-				while let Some(chunk) = body.next().await? {
-					let chunk_str = String::from_utf8_lossy(&chunk);
-					cross_log_noline!("{}", chunk_str);
-				}
-				let exit = match parts.status_to_exit_code() {
-					Ok(()) => AppExit::Success,
-					Err(code) => {
-						error!("Command failed\nStatus code: {code}");
-						AppExit::Error(code)
-					}
-				};
-				entity.world().write_message(exit);
-				Ok(())
-			},
-		);
-		Ok(())
-	});
+async fn run_and_exit(entity: AsyncEntity) -> Result {
+	let req = Request::from_cli_args(CliArgs::parse_env())?;
+	let res = entity.exchange(req).await;
+	let (parts, mut body) = res.into_parts();
+
+	// stream body to stdout
+	while let Some(chunk) = body.next().await? {
+		let chunk_str = String::from_utf8_lossy(&chunk);
+		cross_log_noline!("{}", chunk_str);
+	}
+	let exit = match parts.status_to_exit_code() {
+		Ok(()) => AppExit::Success,
+		Err(code) => {
+			error!("Command failed\nStatus code: {code}");
+			AppExit::Error(code)
+		}
+	};
+	entity.world().write_message(exit);
+	Ok(())
 }
 
 #[cfg(test)]

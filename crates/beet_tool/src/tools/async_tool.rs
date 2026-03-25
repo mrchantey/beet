@@ -37,7 +37,7 @@ impl<In> std::ops::DerefMut for AsyncToolIn<In> {
 /// ```
 pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> Tool<Input, Out>
 where
-	Func: 'static + Send + Sync + Clone + Fn(AsyncToolIn<Input>) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(AsyncToolIn<Input>) -> Fut,
 	Input: 'static + Send + Sync,
 	Fut: 'static + Send + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,

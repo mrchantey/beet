@@ -3,7 +3,7 @@
 //! These convenience functions create tools for common request/response
 //! patterns, wrapping the `beet_tool` primitives with HTTP-friendly APIs.
 
-use super::*;
+use crate::prelude::*;
 use beet_tool::prelude::*;
 
 /// Creates a synchronous [`Tool<Request, Response>`] from a closure.
@@ -20,7 +20,7 @@ use beet_tool::prelude::*;
 /// ```
 pub fn handler_exchange<F>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Fn(FuncToolIn<Request>) -> Response,
+	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<Request>) -> Response,
 {
 	func_tool(move |input: FuncToolIn<Request>| Ok(func(input)))
 }
@@ -39,7 +39,7 @@ where
 /// ```
 pub fn handler_exchange_async<F, Fut>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Clone + Fn(Request) -> Fut,
+	F: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
 	Fut: 'static + Send + Future<Output = Response>,
 {
 	async_tool(move |input: AsyncToolIn<Request>| {

@@ -43,21 +43,19 @@ use beet_tool::prelude::*;
 pub fn cli_server() -> impl Bundle {
 	(
 		OnSpawn::insert_child(mime_render_tool()),
-		OnSpawn::new(|entity| {
-			entity.run_async(async |entity| -> Result {
-				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res: Response = entity.call(req).await?;
-				let parts = stream_response_to_stdout(res).await?;
-				let exit = match parts.status_to_exit_code() {
-					Ok(()) => AppExit::Success,
-					Err(code) => {
-						error!("Command failed\nStatus code: {code}");
-						AppExit::Error(code)
-					}
-				};
-				entity.world().write_message(exit);
-				Ok(())
-			});
+		OnSpawn::new_async(async |entity| -> Result {
+			let req = Request::from_cli_args(CliArgs::parse_env())?;
+			let res: Response = entity.call(req).await?;
+			let parts = stream_response_to_stdout(res).await?;
+			let exit = match parts.status_to_exit_code() {
+				Ok(()) => AppExit::Success,
+				Err(code) => {
+					error!("Command failed\nStatus code: {code}");
+					AppExit::Error(code)
+				}
+			};
+			entity.world().write_message(exit);
+			Ok(())
 		}),
 	)
 }

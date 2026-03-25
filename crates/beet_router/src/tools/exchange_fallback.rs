@@ -31,10 +31,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_tool::prelude::*;
 
-/// Create an interface from a handler, inserting a [`RouteHidden`]
-/// component and exchange fallback on the entity.
-pub fn interface() -> impl Bundle { (RouteHidden, exchange_fallback()) }
-
 /// A Request/Response tool that will try each child until an
 /// Outcome::Response is reached, or else returns a NotFound.
 /// Errors are converted to a response.
@@ -44,9 +40,12 @@ pub fn interface() -> impl Bundle { (RouteHidden, exchange_fallback()) }
 /// [`RenderRequest`]) are silently skipped so they can coexist on
 /// the same entity without causing fallback errors.
 pub fn exchange_fallback() -> impl Bundle {
-	(async_tool(
-		async |cx: AsyncToolIn<Request>| -> Result<Response> {
-			match tolerant_fallback_impl(cx).await? {
+	let fallback = Fallback::<Request, Response>::default()
+		.with_exclude_errors(ChildError::NO_TOOL);
+	(
+		RouteHidden,
+		async_tool(async move |cx: AsyncToolIn<Request>| -> Result<Response> {
+			match fallback.run(cx).await? {
 				Pass(res) => Ok(res),
 				// no child matched — return a simple plaintext not-found
 				Fail(req) => Ok(Response::from_status_body(
@@ -55,53 +54,8 @@ pub fn exchange_fallback() -> impl Bundle {
 					MediaType::Text,
 				)),
 			}
-		},
-	),)
-}
-
-/// Iterate children in order, skipping those without a tool or with a
-/// mismatched signature, returning the first pass or final fail.
-///
-/// This avoids using the [`Fallback`] component whose
-/// `#[require(Tool)]` would overwrite the entity's [`ToolMeta`].
-async fn tolerant_fallback_impl(
-	cx: AsyncToolIn<Request>,
-) -> Result<Outcome<Response, Request>> {
-	let children =
-		match cx.caller.get(|children: &Children| children.to_vec()).await {
-			Ok(children) => children,
-			Err(_) => return Ok(Outcome::Fail(cx.input)),
-		};
-
-	let mut input = cx.input;
-	let world = cx.caller.world();
-
-	for child in children {
-		// Skip children without a tool
-		let tool_meta =
-			match world.entity(child).get(|meta: &ToolMeta| *meta).await {
-				Ok(meta) => meta,
-				Err(_) => continue,
-			};
-		// Skip children whose signature doesn't match
-		if tool_meta
-			.assert_match::<Request, Outcome<Response, Request>>()
-			.is_err()
-		{
-			continue;
-		}
-
-		match world
-			.entity(child)
-			.call::<Request, Outcome<Response, Request>>(input)
-			.await?
-		{
-			Outcome::Pass(output) => return Ok(Outcome::Pass(output)),
-			Outcome::Fail(next_input) => input = next_input,
-		}
-	}
-
-	Ok(Outcome::Fail(input))
+		}),
+	)
 }
 
 /// Creates a standard router with help, navigation, routing, and
@@ -120,7 +74,7 @@ async fn tolerant_fallback_impl(
 ///    scene of the unmatched path.
 pub fn default_router() -> impl Bundle {
 	(
-		interface(),
+		exchange_fallback(),
 		OnSpawn::insert_child((
 			Name::new("Help Tool"),
 			RouteHidden,

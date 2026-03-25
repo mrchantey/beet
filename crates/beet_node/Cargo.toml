@@ -12,8 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_term"]
+default = ["std","net", "html_parser","markdown_parser","ansi_term","tool"]
 std = []
+tool = []
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]
@@ -25,7 +26,8 @@ tui = ["dep:bevy_ratatui", "dep:ratatui"]
 
 [dependencies]
 beet_core = { workspace = true }
-beet_net = { workspace = true,optional=true }
+beet_net = { workspace = true, optional = true }
+beet_tool = {workspace = true,optional = true }
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true

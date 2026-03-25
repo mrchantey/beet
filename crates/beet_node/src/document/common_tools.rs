@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
 use beet_tool::prelude::*;
 use bevy::reflect::Typed;
 
@@ -17,13 +17,12 @@ use bevy::reflect::Typed;
 /// # Example
 ///
 /// ```no_run
-/// use beet_router::prelude::*;
 /// use beet_core::prelude::*;
 /// use beet_node::prelude::*;
 ///
 /// let mut world = AsyncPlugin::world();
 /// let field = FieldRef::new("counter");
-/// let entity = world.spawn((SceneRoute, increment(field))).id();
+/// let entity = world.spawn(increment(field)).id();
 /// ```
 pub fn increment(field: FieldRef) -> impl Bundle {
 	(
@@ -197,14 +196,13 @@ where
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
 
 	#[beet_core::test]
 	async fn increment_initializes_to_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((SceneRoute, increment(count_field()))).id();
+		let entity = world.spawn(increment(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -217,7 +215,7 @@ mod test {
 	#[beet_core::test]
 	async fn increment_works_multiple_times() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((SceneRoute, increment(count_field()))).id();
+		let entity = world.spawn(increment(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -244,7 +242,7 @@ mod test {
 	#[beet_core::test]
 	async fn decrement_initializes_to_negative_one() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn((SceneRoute, decrement(count_field()))).id();
+		let entity = world.spawn(decrement(count_field())).id();
 
 		world
 			.entity_mut(entity)
@@ -259,7 +257,6 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "count": 5i64 })),
 				decrement(count_field()),
 			))
@@ -278,7 +275,6 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "count": 10i64 })),
 				add(count_field()),
 			))
@@ -303,7 +299,7 @@ mod test {
 	async fn set_field_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn((SceneRoute, set_field(field))).id();
+		let entity = world.spawn(set_field(field)).id();
 
 		world
 			.entity_mut(entity)
@@ -326,7 +322,6 @@ mod test {
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "status": "pending" })),
 				set_field(field),
 			))
@@ -351,9 +346,7 @@ mod test {
 	async fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world
-			.spawn((SceneRoute, set_field_typed::<String>(field)))
-			.id();
+		let entity = world.spawn(set_field_typed::<String>(field)).id();
 
 		world
 			.entity_mut(entity)
@@ -376,7 +369,6 @@ mod test {
 		let field = FieldRef::new("status");
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "status": "pending" })),
 				set_field_typed::<String>(field),
 			))
@@ -402,11 +394,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
-			.spawn((
-				SceneRoute,
-				Document::new(val!({ "data": 42i64 })),
-				get_field(field),
-			))
+			.spawn((Document::new(val!({ "data": 42i64 })), get_field(field)))
 			.id();
 
 		let result = world
@@ -424,7 +412,6 @@ mod test {
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "user": { "name": "Alice" } })),
 				get_field(field),
 			))
@@ -445,7 +432,6 @@ mod test {
 		let field = FieldRef::new("data");
 		world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "data": 42i64 })),
 				get_field_typed::<i64>(field),
 			))
@@ -461,7 +447,6 @@ mod test {
 		let field = FieldRef::new(vec!["user", "name"]);
 		let entity = world
 			.spawn((
-				SceneRoute,
 				Document::new(val!({ "user": { "name": "Alice" } })),
 				get_field_typed::<String>(field),
 			))
