@@ -22,7 +22,7 @@ impl RenderMedia {
 	}
 }
 
-impl std::ops::Deref for RenderMedia {
+impl core::ops::Deref for RenderMedia {
 	type Target = MediaBytes<'static>;
 	fn deref(&self) -> &Self::Target { &self.media_bytes }
 }

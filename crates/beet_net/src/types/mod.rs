@@ -19,8 +19,8 @@
 //! - [`ExchangeExt`] / [`AsyncExchangeExt`]: Convenience traits for calling
 //!   `Tool<Request, Response>` on entities
 //! - [`ExchangeEnd`]: Event triggered when an exchange completes
-//! - [`handler_exchange`]: Creates a sync `Tool<Request, Response>` from a closure
-//! - [`handler_exchange_async`]: Creates an async `Tool<Request, Response>` from a closure
+//! - [`exchange_handler`]: Creates a sync `Tool<Request, Response>` from a closure
+//! - [`exchange_handler_async`]: Creates an async `Tool<Request, Response>` from a closure
 //! - [`mirror_exchange`]: Echoes requests back as responses
 
 // core types (moved from beet_core)

@@ -19,41 +19,44 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// A hyper/bevy server
-/// This bevy system contains unopinionated machinery for handling
+/// A hyper/bevy server.
+///
+/// This async function contains unopinionated machinery for handling
 /// hyper requests.
-/// See [`Server::handler`] for customizing handlers
-pub fn start_hyper_server(
-	In(entity): In<Entity>,
-	query: Query<&HttpServer>,
-	mut async_commands: AsyncCommands,
-) -> Result {
-	let server = query.get(entity)?;
-	let addr: SocketAddr = (server.host, server.port).into();
+/// See [`HttpServer`] for customizing handlers.
+pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
+	let addr: SocketAddr = entity
+		.get::<HttpServer, SocketAddr>(|server| {
+			(server.host, server.port).into()
+		})
+		.await?;
 
-	async_commands.run(async move |world| -> Result {
-		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
-			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
+	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
+		.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
 
-		info!("Server listening on http://{}", addr);
+	info!("Server listening on http://{}", addr);
 
-		loop {
-			let (tcp, addr) = listener
-				.accept()
-				.await
-				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))
-				.unwrap();
-			trace!("New connection from: {}", addr);
-			let io = BevyIo::new(tcp);
+	loop {
+		let (tcp, addr) = listener
+			.accept()
+			.await
+			.map_err(|err| bevyhow!("Failed to accept connection: {}", err))
+			.unwrap();
+		trace!("New connection from: {}", addr);
+		let io = BevyIo::new(tcp);
 
-			let _entity_fut = world.run_async(async move |world| {
-				// pass an AsyncWorld to the service_fn
+		let entity = entity.clone();
+		entity
+			.world()
+			.run_async(async move |world| {
+				let entity = world.entity(entity.id());
+				// pass an AsyncEntity to the service_fn
 				let service = service_fn(move |req| {
-					let world = world.clone();
+					let entity = entity.clone();
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = world.entity(entity).exchange(req).await;
+						let res = entity.exchange(req).await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
@@ -76,10 +79,9 @@ pub fn start_hyper_server(
 						error!("Error serving connection: {:?}", err);
 					}
 				}
-			});
-		}
-	});
-	Ok(())
+			})
+			.await;
+	}
 }
 
 
@@ -264,6 +266,10 @@ mod test {
 	use std::time::Duration;
 	use std::time::Instant;
 
+	#[beet_core::test]
+	async fn roundtrip() {
+		super::super::http_server::test::test_server(start_hyper_server).await;
+	}
 
 	#[beet_core::test]
 	async fn works() {
@@ -274,7 +280,7 @@ mod test {
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					handler_exchange(move |req| {
+					exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
 					}),
 				))
@@ -329,7 +335,7 @@ mod test {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
-					handler_exchange(move |req| {
+					exchange_handler(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
 							req.take().body,

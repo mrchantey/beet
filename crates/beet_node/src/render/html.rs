@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 /// Renders an entity tree back to an HTML string via [`NodeVisitor`].
 ///
@@ -251,7 +251,7 @@ impl NodeRenderer for HtmlRenderer {
 		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Html,
-			std::mem::take(&mut self.buffer),
+			core::mem::take(&mut self.buffer),
 		)
 		.xok()
 	}
@@ -282,6 +282,7 @@ fn default_void_elements() -> Vec<Cow<'static, str>> {
 mod test {
 	use super::*;
 
+	#[cfg(feature = "html_parser")]
 	/// Parse HTML then render it back via [`HtmlRenderer`].
 	fn roundtrip(html: &str) -> String {
 		let mut world = World::new();
@@ -296,6 +297,7 @@ mod test {
 			.to_string()
 	}
 
+	#[cfg(feature = "html_parser")]
 	/// Parse then render with expression support.
 	fn roundtrip_expressions(html: &str) -> String {
 		let mut world = World::new();
@@ -311,39 +313,46 @@ mod test {
 			.to_string()
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_simple_element() {
 		roundtrip("<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_nested_elements() {
 		roundtrip("<div><span>inner</span></div>")
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_void_element() {
 		roundtrip("<div><br>text</div>")
 			.xpect_eq("<div><br />text</div>".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_text_only() {
 		roundtrip("hello world").xpect_eq("hello world".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_expression() {
 		roundtrip_expressions("<p>{name}</p>")
 			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_attributes() {
 		roundtrip("<div class=\"foo\" id=\"bar\"></div>")
@@ -351,6 +360,7 @@ mod test {
 			.xpect_contains("id=\"bar\"");
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn render_self_closing() {
 		roundtrip("<img src=\"foo.png\" />")
@@ -358,6 +368,7 @@ mod test {
 			.xpect_contains("/>");
 	}
 
+	#[cfg(feature = "html_parser")]
 	/// Helper: parse HTML then render with escape_html enabled.
 	#[allow(dead_code)]
 	fn roundtrip_escaped(html: &str) -> String {

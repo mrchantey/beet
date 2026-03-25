@@ -4,9 +4,8 @@
 //! corresponding characters, covering the most common typographic
 //! and structural entities from the W3C reference.
 
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
-use std::borrow::Cow;
-use std::sync::LazyLock;
 
 
 /// The default set of HTML block-level element names.
@@ -110,23 +109,21 @@ const HTML_ENTITY_PAIRS: &[(&str, &str)] = &[
 	("&trade;", "\u{2122}"),
 ];
 
-/// Map from HTML entity to character, ie `"&amp;"` → `"&"`.
-static UNESCAPE_MAP: LazyLock<HashMap<&'static str, &'static str>> =
-	LazyLock::new(|| {
-		HTML_ENTITY_PAIRS
-			.iter()
-			.map(|(entity, ch)| (*entity, *ch))
-			.collect()
-	});
+/// Look up the character replacement for an HTML entity.
+fn unescape_entity(entity: &str) -> Option<&'static str> {
+	HTML_ENTITY_PAIRS
+		.iter()
+		.find(|(ent, _)| *ent == entity)
+		.map(|(_, ch)| *ch)
+}
 
-/// Map from character to HTML entity, ie `"&"` → `"&amp;"`.
-static ESCAPE_MAP: LazyLock<HashMap<&'static str, &'static str>> =
-	LazyLock::new(|| {
-		HTML_ENTITY_PAIRS
-			.iter()
-			.map(|(entity, ch)| (*ch, *entity))
-			.collect()
-	});
+/// Look up the HTML entity for a character.
+fn escape_char(ch: &str) -> Option<&'static str> {
+	HTML_ENTITY_PAIRS
+		.iter()
+		.find(|(_, c)| *c == ch)
+		.map(|(ent, _)| *ent)
+}
 
 /// Replace HTML entities with their corresponding characters.
 ///
@@ -138,7 +135,6 @@ static ESCAPE_MAP: LazyLock<HashMap<&'static str, &'static str>> =
 /// unescape_html_text("no entities").xpect_eq("no entities".to_string());
 /// ```
 pub fn unescape_html_text(input: &str) -> String {
-	let map = &*UNESCAPE_MAP;
 	let mut result = String::with_capacity(input.len());
 	let mut remaining = input;
 
@@ -150,7 +146,7 @@ pub fn unescape_html_text(input: &str) -> String {
 		// Look for the closing `;`.
 		if let Some(semi_pos) = remaining.find(';') {
 			let entity = &remaining[..=semi_pos];
-			if let Some(replacement) = map.get(entity) {
+			if let Some(replacement) = unescape_entity(entity) {
 				result.push_str(replacement);
 				remaining = &remaining[semi_pos + 1..];
 			} else {
@@ -183,13 +179,12 @@ pub fn unescape_html_text(input: &str) -> String {
 /// escape_html_text("no special").xpect_eq("no special".to_string());
 /// ```
 pub fn escape_html_text(input: &str) -> String {
-	let map = &*ESCAPE_MAP;
 	let mut result = String::with_capacity(input.len());
 
 	for ch in input.chars() {
 		let mut buf = [0u8; 4];
 		let ch_str = ch.encode_utf8(&mut buf);
-		if let Some(entity) = map.get(ch_str) {
+		if let Some(entity) = escape_char(ch_str) {
 			result.push_str(entity);
 		} else {
 			result.push(ch);

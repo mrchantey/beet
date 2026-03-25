@@ -210,7 +210,7 @@ mod test {
 			.spawn((
 				ChildOf(child),
 				Value::default(),
-				FieldRef::new("card_val"), // Default is DocumentPath::Card
+				FieldRef::new("card_val"), // Default is DocumentPath::Ancestor
 			))
 			.id();
 

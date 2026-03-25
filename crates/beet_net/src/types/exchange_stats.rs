@@ -85,7 +85,7 @@ mod test {
 		let entity = world
 			.spawn((
 				ExchangeStats::default(),
-				handler_exchange(|req| req.mirror_parts()),
+				exchange_handler(|req| req.mirror_parts()),
 			))
 			.id();
 

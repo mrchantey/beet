@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
@@ -368,7 +368,7 @@ impl NodeRenderer for MarkdownRenderer {
 		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Markdown,
-			std::mem::take(&mut self.state.buffer),
+			core::mem::take(&mut self.state.buffer),
 		)
 		.xok()
 	}
@@ -376,6 +376,7 @@ impl NodeRenderer for MarkdownRenderer {
 
 
 #[cfg(test)]
+#[cfg(feature = "markdown_parser")]
 mod test {
 	use super::*;
 
@@ -499,6 +500,7 @@ mod test {
 			.xpect_eq("<!-- hello -->");
 	}
 
+	#[cfg(feature = "html_parser")]
 	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
 		let mut world = World::new();
@@ -513,6 +515,7 @@ mod test {
 			.to_string()
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn unescape_html_entities_in_text() {
 		render_unescaped("<p>a &amp; b</p>")
@@ -520,6 +523,7 @@ mod test {
 			.xpect_eq("a & b");
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn unescape_angle_brackets_in_text() {
 		render_unescaped("<p>&lt;div&gt;</p>")

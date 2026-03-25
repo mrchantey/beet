@@ -1,6 +1,7 @@
 //! HTTP server component for handling incoming requests.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::future::Future;
 
 /// HTTP server that listens for incoming requests, triggering a [`Tool::<Request,Response>`] call.
 ///
@@ -18,7 +19,7 @@ use beet_core::prelude::*;
 /// let mut world = World::new();
 /// world.spawn((
 ///     HttpServer::default(),
-///     handler_exchange(|req| req.mirror()),
+///     exchange_handler(|req| req.mirror()),
 /// ));
 /// ```
 #[derive(Clone, Component)]
@@ -67,8 +68,8 @@ impl HttpServer {
 	}
 }
 
-// using commands allows a ServerHandler to be inserted, instead of running immediately
-// and using the one inserted via Required.
+// Using queue_async allows a ServerHandler to be inserted, instead of running
+// immediately and using the one inserted via Required.
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(test)]
@@ -76,17 +77,20 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(feature = "lambda")]
 	world
 		.commands()
-		.run_system_cached_with(super::start_lambda_server, cx.entity);
+		.entity(cx.entity)
+		.queue_async(super::start_lambda_server);
 
 	#[cfg(all(feature = "hyper", not(feature = "lambda")))]
 	world
 		.commands()
-		.run_system_cached_with(super::start_hyper_server, cx.entity);
+		.entity(cx.entity)
+		.queue_async(super::start_hyper_server);
 
 	#[cfg(all(not(feature = "hyper"), not(feature = "lambda")))]
 	world
 		.commands()
-		.run_system_cached_with(super::start_mini_http_server, cx.entity);
+		.entity(cx.entity)
+		.queue_async(super::start_mini_http_server);
 }
 
 
@@ -96,10 +100,11 @@ impl HttpServer {
 	/// Each call returns a server on a different port, starting from
 	/// [`DEFAULT_SERVER_TEST_PORT`], to avoid collisions in parallel tests.
 	///
-	/// We dont automatically assign server in tests so it must be provided
-	pub fn new_test<S, M>(run_server: S) -> (HttpServer, OnSpawn)
+	/// We don't automatically assign server in tests so it must be provided.
+	pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 	where
-		S: 'static + Send + Sync + IntoSystem<In<Entity>, Result, M>,
+		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
 		use std::sync::atomic::AtomicU16;
 		use std::sync::atomic::Ordering;
@@ -109,12 +114,69 @@ impl HttpServer {
 				port: PORT.fetch_add(1, Ordering::SeqCst),
 				..default()
 			},
-			OnSpawn::run(run_server),
+			OnSpawn::new_async(run_server),
 		)
 	}
 
 	/// Returns the local URL for connecting to this server.
 	pub fn local_url(&self) -> String {
 		format!("http://127.0.0.1:{}", self.port)
+	}
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "ureq")]
+pub(crate) mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// Shared test suite runner for HTTP server implementations.
+	///
+	/// Spawns a server with a mirror exchange handler, sends requests,
+	/// and verifies responses round-trip correctly.
+	#[track_caller]
+	pub async fn test_server<Func, Fut>(run_server: Func)
+	where
+		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Send + Sync + Future<Output = Result>,
+	{
+		let server = HttpServer::new_test(run_server);
+		let url = server.0.local_url();
+		let _handle = std::thread::spawn(|| {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn_then((
+					server,
+					exchange_handler(move |req| {
+						Response::ok().with_body(req.take().body)
+					}),
+				))
+				.run();
+		});
+		time_ext::sleep_millis(100).await;
+
+		// basic request-response roundtrip
+		for _ in 0..3 {
+			Request::post(&url)
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.xpect_ok();
+		}
+
+		// roundtrip with a text body
+		let response = Request::post(&url)
+			.with_body("hello")
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.unwrap();
+		let body_text = response.text().await.unwrap();
+		body_text.xpect_eq("hello");
 	}
 }

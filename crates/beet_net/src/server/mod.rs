@@ -14,7 +14,9 @@
 //! pattern, allowing the same handler code to work in every environment.
 mod cli_server;
 pub use cli_server::*;
+#[cfg(not(target_arch = "wasm32"))]
 mod repl_server;
+#[cfg(not(target_arch = "wasm32"))]
 pub use repl_server::*;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod http_server;

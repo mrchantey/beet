@@ -229,7 +229,7 @@ default = ["node"]
 
 http_server = ["net", "tool","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["tui","router", "markdown"]
-ansi_paint = ["beet_core/ansi_paint"]
+ansi_paint = ["beet_core/ansi_paint","beet_node?/ansi_paint"]
 # 💡 Core
 
 serde = ["beet_core/serde", "beet_net?/serde"]

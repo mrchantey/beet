@@ -78,7 +78,7 @@ impl NodeRenderer for PlainTextRenderer {
 		cx.walk(self);
 		RenderOutput::media_string(
 			MediaType::Text,
-			std::mem::take(&mut self.buffer),
+			core::mem::take(&mut self.buffer),
 		)
 		.xok()
 	}

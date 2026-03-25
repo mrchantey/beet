@@ -25,7 +25,7 @@ pub struct MediaRenderer {
 	plain_text_renderer: PlainTextRenderer,
 	html_renderer: HtmlRenderer,
 	markdown_renderer: MarkdownRenderer,
-	#[cfg(feature = "ansi_term")]
+	#[cfg(feature = "ansi_paint")]
 	ansi_term_renderer: AnsiTermRenderer,
 }
 
@@ -51,7 +51,7 @@ impl MediaRenderer {
 			plain_text_renderer: default(),
 			html_renderer: default(),
 			markdown_renderer: default(),
-			#[cfg(feature = "ansi_term")]
+			#[cfg(feature = "ansi_paint")]
 			ansi_term_renderer: default(),
 		}
 	}
@@ -87,7 +87,7 @@ impl MediaRenderer {
 	}
 
 	/// Override the [`AnsiTermRenderer`] instance.
-	#[cfg(feature = "ansi_term")]
+	#[cfg(feature = "ansi_paint")]
 	pub fn with_ansi_term_renderer(
 		mut self,
 		renderer: AnsiTermRenderer,
@@ -132,7 +132,7 @@ impl MediaRenderer {
 			MediaType::Markdown => {
 				self.markdown_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(feature = "ansi_term")]
+			#[cfg(feature = "ansi_paint")]
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
@@ -147,7 +147,7 @@ impl MediaRenderer {
 	fn available_types(&self) -> Vec<MediaType> {
 		let mut available =
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
-		#[cfg(feature = "ansi_term")]
+		#[cfg(feature = "ansi_paint")]
 		available.push(MediaType::AnsiTerm);
 		available
 	}

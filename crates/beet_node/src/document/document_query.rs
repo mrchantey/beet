@@ -18,7 +18,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	pub fn entity(&mut self, subject: Entity, path: &DocumentPath) -> Entity {
 		match path {
 			DocumentPath::Root => self.ancestors.root_ancestor(subject),
-			DocumentPath::Card => self
+			DocumentPath::Ancestor => self
 				.ancestors
 				.iter_ancestors(subject)
 				.find(|entity| self.scope_query.get(*entity).is_ok())
@@ -138,7 +138,8 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
-					let doc = query.get(entity, &DocumentPath::Card).unwrap();
+					let doc =
+						query.get(entity, &DocumentPath::Ancestor).unwrap();
 					doc.get_field_ref(&[FieldPath::ObjectKey(
 						"value".to_string(),
 					)])
@@ -156,7 +157,7 @@ mod test {
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let mut doc =
-						query.get_mut(entity, &DocumentPath::Card).unwrap();
+						query.get_mut(entity, &DocumentPath::Ancestor).unwrap();
 					let val = doc
 						.get_field_mut(&[FieldPath::ObjectKey(
 							"value".to_string(),
@@ -172,7 +173,8 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
-					let doc = query.get(entity, &DocumentPath::Card).unwrap();
+					let doc =
+						query.get(entity, &DocumentPath::Ancestor).unwrap();
 					doc.get_field::<i64>(&[FieldPath::ObjectKey(
 						"value".to_string(),
 					)])
@@ -211,7 +213,8 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
-					let doc = query.get(entity, &DocumentPath::Card).unwrap();
+					let doc =
+						query.get(entity, &DocumentPath::Ancestor).unwrap();
 					doc.get_field::<i64>(&[FieldPath::ObjectKey(
 						"count".to_string(),
 					)])
@@ -247,7 +250,8 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
-					let doc = query.get(entity, &DocumentPath::Card).unwrap();
+					let doc =
+						query.get(entity, &DocumentPath::Ancestor).unwrap();
 					doc.get_field::<String>(&[FieldPath::ObjectKey(
 						"new_field".to_string(),
 					)])
@@ -273,7 +277,8 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
-					let doc = query.get(entity, &DocumentPath::Card).unwrap();
+					let doc =
+						query.get(entity, &DocumentPath::Ancestor).unwrap();
 					doc.get_field::<String>(&[FieldPath::ObjectKey(
 						"card_data".to_string(),
 					)])

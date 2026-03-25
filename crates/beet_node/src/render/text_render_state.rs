@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 /// Shared rendering state used by both [`MarkdownRenderer`] and [`AnsiTermRenderer`].
 ///

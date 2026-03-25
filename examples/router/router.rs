@@ -37,7 +37,7 @@ fn setup(mut commands: Commands) -> Result {
 	commands.spawn((
 		server_from_cli()?,
 		content::stack(),
-		OnSpawn::insert_child(mime_render_tool()),
+		OnSpawn::insert_child(media_render_tool()),
 	));
 	Ok(())
 }

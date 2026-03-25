@@ -22,7 +22,7 @@ pub struct FieldRef {
 impl FieldRef {
 	/// Create a new field reference with the given field path.
 	///
-	/// Uses the default [`DocumentPath::Card`] for document resolution.
+	/// Uses the default [`DocumentPath::Ancestor`] for document resolution.
 	/// Use [`with_document`](Self::with_document) to specify a different document.
 	///
 	/// By default, missing fields are initialized with [`Value::Null`].
@@ -162,7 +162,7 @@ mod test {
 	fn field_ref_new() {
 		let field = FieldRef::new("field");
 
-		field.document.xpect_eq(DocumentPath::Card);
+		field.document.xpect_eq(DocumentPath::Ancestor);
 		field
 			.field_path
 			.xpect_eq(vec![FieldPath::ObjectKey("field".to_string())]);

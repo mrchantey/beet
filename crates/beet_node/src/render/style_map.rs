@@ -1,6 +1,6 @@
+use alloc::borrow::Cow;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
-use std::borrow::Cow;
-use std::sync::Arc;
 
 /// Maps element names to style values with nesting support.
 ///

@@ -33,6 +33,7 @@
 //! # let value = Value::Map(Default::default());
 //! let player: Player = value.into_reflect().unwrap();
 //! ```
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
 use bevy::reflect::DynamicList;
 use bevy::reflect::DynamicStruct;
@@ -44,8 +45,7 @@ use bevy::reflect::StructInfo;
 use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
-use std::any::TypeId;
-use std::borrow::Cow;
+use core::any::TypeId;
 
 
 /// Used either as an element node (xml text node) or as an attribute value.
@@ -74,8 +74,8 @@ pub enum Value {
 
 impl Eq for Value {}
 
-impl std::hash::Hash for Value {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for Value {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		core::mem::discriminant(self).hash(state);
 		match self {
 			Value::Null => {}
@@ -122,35 +122,35 @@ impl Value {
 	/// Returns `true` if this value is a list.
 	pub fn is_list(&self) -> bool { matches!(self, Self::List(_)) }
 
-	/// Returns this value as a map reference, if it is one.
-	pub fn as_map(&self) -> Option<&HashMap<String, Value>> {
+	/// Returns this value as a map reference.
+	pub fn as_map(&self) -> Result<&HashMap<String, Value>> {
 		match self {
-			Self::Map(map) => Some(map),
-			_ => None,
+			Self::Map(map) => Ok(map),
+			other => bevybail!("expected map, got {:?}", other),
 		}
 	}
 
-	/// Returns this value as a mutable map reference, if it is one.
-	pub fn as_map_mut(&mut self) -> Option<&mut HashMap<String, Value>> {
+	/// Returns this value as a mutable map reference.
+	pub fn as_map_mut(&mut self) -> Result<&mut HashMap<String, Value>> {
 		match self {
-			Self::Map(map) => Some(map),
-			_ => None,
+			Self::Map(map) => Ok(map),
+			other => bevybail!("expected map, got {:?}", other),
 		}
 	}
 
-	/// Returns this value as a list reference, if it is one.
-	pub fn as_list(&self) -> Option<&Vec<Value>> {
+	/// Returns this value as a list reference.
+	pub fn as_list(&self) -> Result<&Vec<Value>> {
 		match self {
-			Self::List(list) => Some(list),
-			_ => None,
+			Self::List(list) => Ok(list),
+			other => bevybail!("expected list, got {:?}", other),
 		}
 	}
 
-	/// Returns this value as a mutable list reference, if it is one.
-	pub fn as_list_mut(&mut self) -> Option<&mut Vec<Value>> {
+	/// Returns this value as a mutable list reference.
+	pub fn as_list_mut(&mut self) -> Result<&mut Vec<Value>> {
 		match self {
-			Self::List(list) => Some(list),
-			_ => None,
+			Self::List(list) => Ok(list),
+			other => bevybail!("expected list, got {:?}", other),
 		}
 	}
 
@@ -206,18 +206,15 @@ impl Value {
 		}
 	}
 
-	/// Inserts a key-value pair into this value if it's a map.
+	/// Inserts a key-value pair into this map value.
 	///
-	/// Returns the previous value if the key existed, or `None` if not a map.
+	/// Returns the previous value if the key existed.
 	pub fn insert(
 		&mut self,
 		key: impl Into<String>,
 		value: impl Into<Value>,
-	) -> Option<Value> {
-		match self {
-			Self::Map(map) => map.insert(key.into(), value.into()),
-			_ => None,
-		}
+	) -> Result<Option<Value>> {
+		self.as_map_mut()?.insert(key.into(), value.into()).xok()
 	}
 
 	/// Gets a value from a map by key.
@@ -236,11 +233,9 @@ impl Value {
 		}
 	}
 
-	/// Pushes a value onto this list if it is one.
-	pub fn push(&mut self, value: impl Into<Value>) {
-		if let Self::List(list) = self {
-			list.push(value.into());
-		}
+	/// Pushes a value onto this list.
+	pub fn push(&mut self, value: impl Into<Value>) -> Result {
+		self.as_list_mut()?.push(value.into()).xok()
 	}
 
 	/// Gets a value from a list by index.
@@ -300,8 +295,8 @@ impl Value {
 	}
 }
 
-impl std::fmt::Display for Value {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Value {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Value::Null => write!(f, "null"),
 			Value::Bool(val) => write!(f, "{}", val),
@@ -368,17 +363,17 @@ pub struct Float(pub f64);
 
 impl Eq for Float {}
 
-impl std::hash::Hash for Float {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for Float {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		self.0.to_bits().hash(state);
 	}
 }
 
 impl Ord for Float {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
 		self.0
 			.partial_cmp(&other.0)
-			.unwrap_or(std::cmp::Ordering::Equal)
+			.unwrap_or(core::cmp::Ordering::Equal)
 	}
 }
 
@@ -749,9 +744,7 @@ fn build_dynamic_struct(
 	value: &Value,
 	info: &StructInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	let map = value.as_map().ok_or_else(|| {
-		bevyhow!("expected Map value for struct, found {:?}", value)
-	})?;
+	let map = value.as_map()?;
 
 	let mut dynamic = DynamicStruct::default();
 
@@ -800,9 +793,7 @@ fn build_dynamic_tuple_struct(
 			dynamic.insert_boxed(built);
 		}
 	} else {
-		let list = value.as_list().ok_or_else(|| {
-			bevyhow!("expected List value for multi-field tuple struct")
-		})?;
+		let list = value.as_list()?;
 
 		for field_idx in 0..info.field_len() {
 			let field = info.field_at(field_idx).ok_or_else(|| {
@@ -830,9 +821,7 @@ fn build_dynamic_tuple(
 	value: &Value,
 	info: &bevy::reflect::TupleInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	let list = value.as_list().ok_or_else(|| {
-		bevyhow!("expected List value for tuple, found {:?}", value)
-	})?;
+	let list = value.as_list()?;
 
 	let mut dynamic = bevy::reflect::DynamicTuple::default();
 
@@ -863,9 +852,7 @@ fn build_dynamic_list(
 	value: &Value,
 	info: &bevy::reflect::ListInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	let list = value.as_list().ok_or_else(|| {
-		bevyhow!("expected List value for list type, found {:?}", value)
-	})?;
+	let list = value.as_list()?;
 
 	let mut dynamic = DynamicList::default();
 	let item_type_info = info.item_info();
@@ -889,9 +876,7 @@ fn build_dynamic_array(
 	value: &Value,
 	info: &bevy::reflect::ArrayInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	let list = value.as_list().ok_or_else(|| {
-		bevyhow!("expected List value for array type, found {:?}", value)
-	})?;
+	let list = value.as_list()?;
 
 	let mut dynamic = DynamicList::default();
 	let item_type_info = info.item_info();
@@ -917,9 +902,7 @@ fn build_dynamic_map(
 ) -> Result<Box<dyn PartialReflect>> {
 	use bevy::reflect::Map;
 
-	let map = value.as_map().ok_or_else(|| {
-		bevyhow!("expected Map value for map type, found {:?}", value)
-	})?;
+	let map = value.as_map()?;
 
 	let mut dynamic = bevy::reflect::DynamicMap::default();
 	let value_type_info = info.value_info();
@@ -1016,9 +999,7 @@ fn build_dynamic_enum(
 					);
 				}
 				bevy::reflect::VariantInfo::Tuple(tuple_info) => {
-					let list = fields.as_list().ok_or_else(|| {
-						bevyhow!("expected list for tuple variant fields")
-					})?;
+					let list = fields.as_list()?;
 
 					let mut tuple = bevy::reflect::DynamicTuple::default();
 					for (idx, field_info) in tuple_info.iter().enumerate() {
@@ -1038,9 +1019,7 @@ fn build_dynamic_enum(
 					);
 				}
 				bevy::reflect::VariantInfo::Struct(struct_info) => {
-					let field_map = fields.as_map().ok_or_else(|| {
-						bevyhow!("expected map for struct variant fields")
-					})?;
+					let field_map = fields.as_map()?;
 
 					let mut struct_variant =
 						bevy::reflect::DynamicStruct::default();
@@ -1353,15 +1332,15 @@ mod test {
 	#[test]
 	fn value_map_operations() {
 		let mut val = Value::map();
-		val.insert("key", "value");
+		val.insert("key", "value").unwrap();
 		val.get("key").unwrap().as_str().unwrap().xpect_eq("value");
 	}
 
 	#[test]
 	fn value_list_operations() {
 		let mut val = Value::list();
-		val.push(1i64);
-		val.push(2i64);
+		val.push(1i64).unwrap();
+		val.push(2i64).unwrap();
 		val.get_index(0).unwrap().as_i64().unwrap().xpect_eq(1);
 		val.get_index(1).unwrap().as_i64().unwrap().xpect_eq(2);
 	}
@@ -1369,17 +1348,17 @@ mod test {
 	#[test]
 	fn display_map() {
 		let mut val = Value::map();
-		val.insert("a", 1i64);
-		val.insert("b", 2i64);
+		val.insert("a", 1i64).unwrap();
+		val.insert("b", 2i64).unwrap();
 		val.to_string().xpect_eq("{a: 1, b: 2}");
 	}
 
 	#[test]
 	fn display_list() {
 		let mut val = Value::list();
-		val.push(1i64);
-		val.push(2i64);
-		val.push(3i64);
+		val.push(1i64).unwrap();
+		val.push(2i64).unwrap();
+		val.push(3i64).unwrap();
 		val.to_string().xpect_eq("[1, 2, 3]");
 	}
 
@@ -1553,6 +1532,7 @@ mod test {
 		user.get("name").unwrap().as_str().unwrap().xpect_eq("Bob");
 	}
 
+	#[cfg(feature = "std")]
 	#[test]
 	fn value_hash_consistency() {
 		use std::hash::DefaultHasher;

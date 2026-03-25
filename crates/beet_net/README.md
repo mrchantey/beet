@@ -26,7 +26,7 @@ App::new()
       // swap out the server to handle http requests!
       CliServer::default(),
       // HttpServer::default(),
-      handler_exchange(|_| {
+      exchange_handler(|_| {
         Response::ok_body("hello world", MediaType::Text)
       }),
     ));

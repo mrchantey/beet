@@ -15,48 +15,51 @@ use std::net::SocketAddr;
 
 /// Start a mini HTTP server on the entity's [`HttpServer`] address.
 ///
-/// This system mirrors the signature of `start_hyper_server` and
+/// This async function mirrors the signature of `start_hyper_server` and
 /// `start_lambda_server` so the `HttpServer` component can swap
 /// backends via feature flags.
-pub fn start_mini_http_server(
-	In(entity): In<Entity>,
-	query: Query<&HttpServer>,
-	mut async_commands: AsyncCommands,
-) -> Result {
-	let server = query.get(entity)?;
-	let addr: SocketAddr = (server.host, server.port).into();
+pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
+	let addr: SocketAddr = entity
+		.get::<HttpServer, SocketAddr>(|server| {
+			(server.host, server.port).into()
+		})
+		.await?;
 
-	async_commands.run(async move |world| -> Result {
-		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
-			.map_err(|err| {
-				bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
-			})?;
+	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
+		.map_err(|err| {
+			bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
+		})?;
 
-		cross_log!("Mini HTTP server listening on http://{addr}");
+	cross_log!("Mini HTTP server listening on http://{addr}");
 
-		loop {
-			let accept_result = listener.accept().await;
-			let (stream, peer_addr) = match accept_result {
-				Ok(pair) => pair,
-				Err(err) => {
-					cross_log_error!("Failed to accept connection: {err}");
-					continue;
-				}
-			};
+	loop {
+		let accept_result = listener.accept().await;
+		let (stream, peer_addr) = match accept_result {
+			Ok(pair) => pair,
+			Err(err) => {
+				cross_log_error!("Failed to accept connection: {err}");
+				continue;
+			}
+		};
 
-			let _entity_fut = world.run_async(async move |world| {
-				if let Err(err) =
-					handle_connection(world.entity(entity), stream, peer_addr)
-						.await
+		let entity = entity.clone();
+		entity
+			.world()
+			.run_async(async move |world| {
+				if let Err(err) = handle_connection(
+					world.entity(entity.id()),
+					stream,
+					peer_addr,
+				)
+				.await
 				{
 					cross_log_error!(
 						"Error handling connection from {peer_addr}: {err}"
 					);
 				}
-			});
-		}
-	});
-	Ok(())
+			})
+			.await;
+	}
 }
 
 
@@ -268,5 +271,14 @@ mod test {
 		let raw_str = String::from_utf8(raw).unwrap();
 		raw_str.as_str().xpect_contains("HTTP/1.1 200 OK");
 		raw_str.as_str().xpect_contains("content-length: 0");
+	}
+
+	// -- integration test via shared suite --
+
+	#[cfg(feature = "ureq")]
+	#[beet_core::test]
+	async fn roundtrip() {
+		super::super::http_server::test::test_server(start_mini_http_server)
+			.await;
 	}
 }

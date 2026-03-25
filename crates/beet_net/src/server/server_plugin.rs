@@ -54,14 +54,14 @@ mod test {
 	#[beet_core::test]
 	// #[ignore = "flaky with all features?"]
 	async fn http_server() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_mini_http_server);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					handler_exchange(|_| Response::ok().with_body("hello")),
+					exchange_handler(|_| Response::ok().with_body("hello")),
 				))
 				.run();
 		});

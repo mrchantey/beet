@@ -59,12 +59,11 @@ impl Document {
 					if current.is_null() {
 						*current = Value::List(Vec::new());
 					}
-					let current_clone = current.clone();
-					let path_clone = path.to_vec();
-					let array = current.as_list_mut().ok_or_else(|| {
+					let current_snapshot = current.clone();
+					let array = current.as_list_mut().map_err(|_| {
 						DocumentError::ExpectedArray {
-							current: current_clone,
-							path: path_clone,
+							current: current_snapshot,
+							path: path.to_vec(),
 						}
 					})?;
 					// expand array if needed
@@ -78,12 +77,11 @@ impl Document {
 					if current.is_null() {
 						*current = Value::Map(Default::default());
 					}
-					let current_clone = current.clone();
-					let path_clone = path.to_vec();
-					let object = current.as_map_mut().ok_or_else(|| {
+					let current_snapshot = current.clone();
+					let object = current.as_map_mut().map_err(|_| {
 						DocumentError::ExpectedObject {
-							current: current_clone,
-							path: path_clone,
+							current: current_snapshot,
+							path: path.to_vec(),
 						}
 					})?;
 					if !object.contains_key(key) {
@@ -130,7 +128,7 @@ impl Document {
 				FieldPath::ArrayIndex(idx) => {
 					current = current
 						.as_list()
-						.ok_or_else(|| DocumentError::ExpectedArray {
+						.map_err(|_| DocumentError::ExpectedArray {
 							current: current.clone(),
 							path: path.to_vec(),
 						})?
@@ -145,7 +143,7 @@ impl Document {
 				FieldPath::ObjectKey(key) => {
 					current = current
 						.as_map()
-						.ok_or_else(|| DocumentError::ExpectedObject {
+						.map_err(|_| DocumentError::ExpectedObject {
 							current: current.clone(),
 							path: path.to_vec(),
 						})?
@@ -175,14 +173,13 @@ impl Document {
 			match segment {
 				FieldPath::ArrayIndex(idx) => {
 					let idx_val = *idx;
-					// Check type first before attempting mutation
-					if !current.is_list() {
-						return Err(DocumentError::ExpectedArray {
-							current: current.clone(),
+					let current_snapshot = current.clone();
+					let array = current.as_list_mut().map_err(|_| {
+						DocumentError::ExpectedArray {
+							current: current_snapshot,
 							path: path.to_vec(),
-						});
-					}
-					let array = current.as_list_mut().unwrap();
+						}
+					})?;
 					if idx_val >= array.len() {
 						return Err(DocumentError::ArrayIndexOutOfBounds {
 							index: idx_val,
@@ -192,14 +189,13 @@ impl Document {
 					current = &mut array[idx_val];
 				}
 				FieldPath::ObjectKey(key) => {
-					// Check type first before attempting mutation
-					if !current.is_map() {
-						return Err(DocumentError::ExpectedObject {
-							current: current.clone(),
+					let current_snapshot = current.clone();
+					let object = current.as_map_mut().map_err(|_| {
+						DocumentError::ExpectedObject {
+							current: current_snapshot,
 							path: path.to_vec(),
-						});
-					}
-					let object = current.as_map_mut().unwrap();
+						}
+					})?;
 					if !object.contains_key(key) {
 						return Err(DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
@@ -280,14 +276,14 @@ impl Default for OnMissingField {
 
 /// Specifies which document to operate on.
 ///
-/// Documents can be attached to cards, the root entity, or any specific entity.
+/// Documents can be attached to ancestors, the root entity, or any specific entity.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 pub enum DocumentPath {
 	/// The document for the nearest ancestor with [`DocumentScope`].
 	#[default]
-	Card,
+	Ancestor,
 	/// The root entity.
 	Root,
 	/// A specific document by entity id.

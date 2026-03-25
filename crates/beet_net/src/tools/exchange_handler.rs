@@ -14,11 +14,11 @@ use beet_tool::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let mut entity = world.spawn(handler_exchange(|request| {
+/// let mut entity = world.spawn(exchange_handler(|request| {
 ///     request.take().mirror()
 /// }));
 /// ```
-pub fn handler_exchange<F>(func: F) -> Tool<Request, Response>
+pub fn exchange_handler<F>(func: F) -> Tool<Request, Response>
 where
 	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<Request>) -> Response,
 {
@@ -33,11 +33,11 @@ where
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// let mut world = World::new();
-/// let mut entity = world.spawn(handler_exchange_async(|request| async move {
+/// let mut entity = world.spawn(exchange_handler_async(|request| async move {
 ///     request.mirror_parts()
 /// }));
 /// ```
-pub fn handler_exchange_async<F, Fut>(func: F) -> Tool<Request, Response>
+pub fn exchange_handler_async<F, Fut>(func: F) -> Tool<Request, Response>
 where
 	F: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
 	Fut: 'static + Send + Future<Output = Response>,
@@ -52,7 +52,7 @@ where
 ///
 /// Useful for testing and debugging exchange infrastructure.
 pub fn mirror_exchange() -> Tool<Request, Response> {
-	handler_exchange(|req| req.take().mirror())
+	exchange_handler(|req| req.take().mirror())
 }
 
 #[cfg(test)]
@@ -63,7 +63,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_sync_works() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange(|req| req.mirror_parts()))
+			.spawn(exchange_handler(|req| req.mirror_parts()))
 			.exchange(Request::get("/foo"))
 			.await
 			.status()
@@ -73,7 +73,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_sync_custom_response() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange(|_| {
+			.spawn(exchange_handler(|_| {
 				Response::from_status(StatusCode::IM_A_TEAPOT)
 			}))
 			.exchange(Request::get("/foo"))
@@ -85,7 +85,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_works() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange_async(
+			.spawn(exchange_handler_async(
 				|req| async move { req.mirror_parts() },
 			))
 			.exchange(Request::get("/bar"))
@@ -97,7 +97,7 @@ mod test {
 	#[beet_core::test]
 	async fn handler_async_custom_response() {
 		AsyncPlugin::world()
-			.spawn(handler_exchange_async(|_| async move {
+			.spawn(exchange_handler_async(|_| async move {
 				Response::from_status(StatusCode::IM_A_TEAPOT)
 			}))
 			.exchange(Request::get("/bar"))

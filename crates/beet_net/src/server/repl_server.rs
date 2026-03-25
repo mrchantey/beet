@@ -1,8 +1,8 @@
 //! A REPL server that reads lines from stdin in a loop, dispatching
 //! each as a [`Request`] and streaming the [`Response`] body to stdout.
 //!
-//! Includes a [`mime_render_tool`] so that scenes render their
-//! content to markdown for terminal output.
+//! Typically paired with a [`media_render_tool`] so that scenes
+//! render their content to markdown for terminal output.
 //!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
@@ -22,8 +22,8 @@ use beet_tool::prelude::*;
 /// [`Request`], dispatched through the owning entity's tool pipeline,
 /// and the response body is streamed to stdout.
 ///
-/// Includes a [`mime_render_tool`] for rendering scene content
-/// to markdown in the terminal, and a [`History`] component for
+/// Typically paired with a [`media_render_tool`] for rendering
+/// scene content to markdown in the terminal, and a [`History`] component for
 /// tracking the current path, enabling relative navigation via
 /// `--navigate=<direction>`.
 ///
@@ -33,16 +33,16 @@ use beet_tool::prelude::*;
 /// Typically combined with a [`default_router`] and child tools
 /// to build an interactive CLI application:
 ///
-/// ```no_run
-/// # use beet_core::prelude::*;
-/// # use beet_router::prelude::*;
+/// ```ignore
+/// use beet_core::prelude::*;
+/// use beet_router::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin));
 ///     app.world_mut().spawn((
 ///         default_router(),
-///         repl_server(),
+///         ReplServer,
 ///         children![
 ///             scene_route("", || Name::new("welcome!")),
 ///             scene_route("about", || Name::new("about")),

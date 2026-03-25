@@ -16,7 +16,7 @@ use beet_core::prelude::*;
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
 #[derive(Debug, Clone, Component)]
-#[component(on_add=on_add)]
+#[cfg_attr(feature = "net", component(on_add=on_add))]
 pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
 	plaintext_fallback: bool,
@@ -27,9 +27,11 @@ pub struct MediaParser {
 	markdown_parser: MarkdownParser,
 }
 
+#[cfg(feature = "net")]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).observe(render_media);
 }
+#[cfg(feature = "net")]
 fn render_media(ev: On<RenderMedia>, mut commands: Commands) -> Result {
 	let entity = ev.event_target();
 	let media_bytes = ev.event().clone();

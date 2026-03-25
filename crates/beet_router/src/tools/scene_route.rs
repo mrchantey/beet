@@ -294,7 +294,7 @@ fn file_route_parse_content(
 ///
 /// Returns an error if no render tool is found in the hierarchy.
 /// Ensure a render tool is added to the server, ie
-/// `mime_render_tool` for CLI/REPL or `tui_render_tool` for TUI.
+/// `media_render_tool` for CLI/REPL or `tui_render_tool` for TUI.
 pub fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 	world
 		.run_system_once_with(
@@ -314,7 +314,7 @@ pub fn find_render_tool(world: &mut World, entity: Entity) -> Result<Entity> {
 		.ok_or_else(|| {
 			bevyhow!(
 				"No render tool found. Add a render tool like \
-				 `mime_render_tool()` to the server's entity tree."
+				 `media_render_tool()` to the server's entity tree."
 			)
 		})
 }

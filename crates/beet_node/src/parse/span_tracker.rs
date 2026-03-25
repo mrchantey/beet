@@ -1,5 +1,5 @@
+use alloc::sync::Arc;
 use beet_core::prelude::*;
-use std::sync::Arc;
 
 /// Pre-indexed line boundary lookup for random-access byte-offset to [`LineCol`]
 /// conversion.
