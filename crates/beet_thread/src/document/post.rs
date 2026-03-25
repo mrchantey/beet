@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::borrow::Cow;
 
 pub type PostId = Uuid7<Post>;
 
@@ -186,8 +185,8 @@ impl std::fmt::Display for Post {
 // ═══════════════════════════════════════════════════════════════════════
 
 impl Post {
-	/// Low-level constructor. Prefer the typed view constructors,
-	/// ie [`TextView::into_post`], [`FunctionCallView::into_post`], etc.
+	/// Low-level constructor. Prefer the [`AgentPost`] constructors,
+	/// ie [`AgentPost::new_text`], [`AgentPost::new_function_call`], etc.
 	pub fn new_raw(
 		author: ActorId,
 		thread: ThreadId,
@@ -210,14 +209,14 @@ impl Post {
 
 	/// For a given body, resolve the author id and thread id
 	/// on spawn by recursing up the tree.
-	pub fn spawn(text: impl Into<String>) -> OnSpawn {
-		let text = text.into();
+	pub fn spawn(content: impl Into<IntoPost>) -> OnSpawn {
+		let content = content.into();
 		OnSpawn::new(move |entity| {
 			let post = entity.with_state::<SocialQuery, _>(
 				move |post_entity, query| -> Result<Post> {
 					let thread = query.thread(post_entity)?;
 					let actor = query.actor_from_post_entity(post_entity)?;
-					Ok(TextView::into_post(actor.id(), thread.id(), text))
+					content.into_post(actor.id(), thread.id()).xok()
 				},
 			)?;
 			entity.insert(post);
@@ -234,35 +233,79 @@ impl Post {
 	}
 }
 
-/// Compat constructor: builds a text post from `&str`.
-impl From<&str> for Post {
-	fn from(text: &str) -> Self {
-		Post::new_raw(
-			ActorId::default(),
-			ThreadId::default(),
-			PostIntent::OK,
-			MediaType::Text,
-			text.as_bytes().to_vec(),
-			serde_json::Map::new(),
-		)
+// ═══════════════════════════════════════════════════════════════════════
+// IntoPost
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Content for constructing a new [`Post`].
+///
+/// Used by spawners like [`Post::spawn`] and [`SocialQuery::spawn_post`].
+/// Prefer [`AgentPost`] constructors for full control over intent and status.
+pub enum IntoPost {
+	Text(String),
+	Url {
+		url: String,
+		file_stem: Option<String>,
+	},
+	Bytes {
+		media_type: MediaType,
+		bytes: Vec<u8>,
+		file_stem: Option<String>,
+	},
+	FunctionCall {
+		name: String,
+		call_id: String,
+		arguments: String,
+	},
+	FunctionCallOutput {
+		call_id: String,
+		output: String,
+		name: Option<String>,
+	},
+}
+
+impl IntoPost {
+	/// Converts into a completed [`Post`] with the given author and thread.
+	pub fn into_post(self, author: ActorId, thread: ThreadId) -> Post {
+		let status = PostStatus::Completed;
+		match self {
+			IntoPost::Text(text) => {
+				AgentPost::new_text(author, thread, text, status)
+			}
+			IntoPost::Url { url, file_stem } => {
+				AgentPost::new_url(author, thread, url, file_stem, status)
+			}
+			IntoPost::Bytes {
+				media_type,
+				bytes,
+				file_stem,
+			} => AgentPost::new_bytes(
+				author, thread, media_type, bytes, file_stem, status,
+			),
+			IntoPost::FunctionCall {
+				name,
+				call_id,
+				arguments,
+			} => AgentPost::new_function_call(
+				author, thread, name, call_id, arguments, status,
+			),
+			IntoPost::FunctionCallOutput {
+				call_id,
+				output,
+				name,
+			} => AgentPost::new_function_call_output(
+				author, thread, call_id, output, name, status,
+			),
+		}
 	}
 }
 
-impl From<String> for Post {
-	fn from(text: String) -> Self {
-		Post::new_raw(
-			ActorId::default(),
-			ThreadId::default(),
-			PostIntent::OK,
-			MediaType::Text,
-			text.into_bytes(),
-			serde_json::Map::new(),
-		)
-	}
+impl From<String> for IntoPost {
+	fn from(text: String) -> Self { IntoPost::Text(text) }
 }
 
-impl<'a> From<Cow<'a, String>> for Post {
-	fn from(text: Cow<'a, String>) -> Self { Post::from(text.into_owned()) }
+impl From<&str> for IntoPost {
+	fn from(text: &str) -> Self { IntoPost::Text(text.to_string()) }
 }
 
 

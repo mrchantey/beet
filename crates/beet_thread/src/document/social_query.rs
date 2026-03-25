@@ -78,7 +78,7 @@ impl<'w, 's> SocialQuery<'w, 's> {
 		&mut self,
 		parent: Entity,
 		status: PostStatus,
-		text: impl Into<String>,
+		content: impl Into<IntoPost>,
 	) -> Result<Entity> {
 		let actor_id = self
 			.ancestors
@@ -98,7 +98,7 @@ impl<'w, 's> SocialQuery<'w, 's> {
 			.ok_or_else(|| {
 				bevyhow!("No thread ancestor found for {parent:?}")
 			})?;
-		let mut post = TextView::into_post(actor_id, thread_id, text);
+		let mut post = content.into().into_post(actor_id, thread_id);
 		post.set_status(status);
 		self.commands.spawn((ChildOf(parent), post)).id().xok()
 	}

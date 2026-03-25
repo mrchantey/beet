@@ -18,6 +18,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
+/// Maps a [`PostView`] into an OpenResponses [`InputItem`] for request building.
+/// Classification is performed via [`AgentPost`] for clean dispatch.
 pub fn post_to_o11s_input(
 	agent_id: ActorId,
 	post: PostView,
@@ -34,72 +36,74 @@ pub fn post_to_o11s_input(
 		}
 		ActorKind::Human => MessageRole::User,
 	};
-	let input_item = if let Some(fc) = post.as_function_call() {
-		InputItem::FunctionCall(FunctionCallParam {
-			id: None,
-			call_id: fc.call_id().to_string(),
-			name: fc.name().to_string(),
-			arguments: fc.arguments().to_string(),
-			status: None,
-		})
-	} else if let Some(fco) = post.as_function_call_output() {
-		InputItem::FunctionCallOutput(FunctionCallOutputParam {
-			id: None,
-			call_id: fco.call_id().to_string(),
-			output: FunctionOutputContent::Text(fco.output().to_string()),
-			status: None,
-		})
-	} else if post.is_url() {
-		let url_str = post
-			.as_url_str()
-			.ok_or_else(|| bevyhow!("URL post has no URL string"))?;
-		InputItem::Message(MessageParam {
+
+	let agent_post = post.post.as_agent_post();
+
+	let input_item = match &agent_post {
+		AgentPost::FunctionCall(fc) => {
+			InputItem::FunctionCall(FunctionCallParam {
+				id: None,
+				call_id: fc.call_id().to_string(),
+				name: fc.name().to_string(),
+				arguments: fc.arguments().to_string(),
+				status: None,
+			})
+		}
+		AgentPost::FunctionCallOutput(fco) => {
+			InputItem::FunctionCallOutput(FunctionCallOutputParam {
+				id: None,
+				call_id: fco.call_id().to_string(),
+				output: FunctionOutputContent::Text(fco.output().to_string()),
+				status: None,
+			})
+		}
+		AgentPost::Url(url_view) => InputItem::Message(MessageParam {
 			id: None,
 			role,
 			content: MessageContent::Parts(vec![ContentPart::InputFile(
 				o11s::InputFile {
-					filename: post.filename(),
+					filename: url_view.filename(),
 					file_data: None,
-					file_url: Some(url_str.to_string()),
+					file_url: Some(url_view.url().to_string()),
 				},
 			)]),
 			status: None,
-		})
-	} else if !post.media_type().is_text() {
-		InputItem::Message(MessageParam {
+		}),
+		AgentPost::Bytes(bytes_view) => InputItem::Message(MessageParam {
 			id: None,
 			role,
 			content: MessageContent::Parts(vec![ContentPart::InputFile(
 				o11s::InputFile {
-					filename: post.filename(),
-					file_data: Some(post.body_base64()),
+					filename: bytes_view.filename(),
+					file_data: Some(bytes_view.body_base64()),
 					file_url: None,
 				},
 			)]),
 			status: None,
-		})
-	} else {
-		// Text-like posts: OK, REFUSAL, REASONING_CONTENT, REASONING_SUMMARY
-		let value = post.as_str()?;
-		// using xml on assistant messages is likely to confuse them,
-		// ie they start using them in their own responses
-		let text = if role != MessageRole::Assistant {
-			format!(
-				"<post actor_name={} actor_kind={} actor_id={}>{}</post>",
-				post.actor.name(),
-				post.actor.kind().input_str(),
-				post.actor.id(),
-				value
-			)
-		} else {
-			value.to_string()
-		};
-		InputItem::Message(MessageParam {
-			id: None,
-			role,
-			content: MessageContent::Text(text),
-			status: None,
-		})
+		}),
+		// Text-like posts: Text, Refusal, ReasoningContent, ReasoningSummary, Error
+		_ => {
+			let value = post.as_str()?;
+			// using xml on assistant messages is likely to confuse them,
+			// ie they start using them in their own responses
+			let text = if role != MessageRole::Assistant {
+				format!(
+					"<post actor_name={} actor_kind={} actor_id={}>{}</post>",
+					post.actor.name(),
+					post.actor.kind().input_str(),
+					post.actor.id(),
+					value
+				)
+			} else {
+				value.to_string()
+			};
+			InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Text(text),
+				status: None,
+			})
+		}
 	};
 	input_item.xok()
 }

@@ -65,11 +65,14 @@ fn on_create(
 			continue;
 		}
 
-		let suffix = if post.is_refusal() {
+		let agent_post = post.as_agent_post();
+		let suffix = if agent_post.is_refusal() {
 			"refusal >"
-		} else if post.is_reasoning_summary() || post.is_reasoning_content() {
+		} else if agent_post.is_reasoning_summary()
+			|| agent_post.is_reasoning_content()
+		{
 			"thinking.. "
-		} else if post.is_url() || !post.media_type().is_text() {
+		} else if agent_post.is_url() || agent_post.is_bytes() {
 			"media "
 		} else {
 			">"
@@ -101,9 +104,12 @@ fn on_change(
 		let body = post.to_string();
 
 		let new_content = &body[**cursor as usize..];
-		let colored = if post.is_refusal() {
+		let agent_post = post.as_agent_post();
+		let colored = if agent_post.is_refusal() {
 			paint_ext::red(new_content)
-		} else if post.is_reasoning_summary() || post.is_reasoning_content() {
+		} else if agent_post.is_reasoning_summary()
+			|| agent_post.is_reasoning_content()
+		{
 			paint_ext::dimmed(new_content)
 		} else {
 			new_content.to_string()

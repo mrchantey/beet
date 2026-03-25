@@ -191,9 +191,9 @@ impl<'t, 'w> ActorViewMut<'t, 'w> {
 	/// Inserts a [`Post`] as a child of this actor and returns a mutable view.
 	pub fn insert_post<'u>(
 		&'u mut self,
-		text: impl Into<String>,
+		content: impl Into<IntoPost>,
 	) -> PostViewMut<'u, 't, 'w> {
-		let post = TextView::into_post(self.id, self.thread_view.id, text);
+		let post = content.into().into_post(self.id, self.thread_view.id);
 		let id = post.id();
 		let entity = self
 			.thread_view

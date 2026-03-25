@@ -125,20 +125,13 @@ impl PostPartialMap {
 						&t.annotations,
 					)
 				};
-				let mut post = TextView::into_post(author, thread, text);
-				post.set_status(status);
-				post
+				AgentPost::new_text(author, thread, text, status)
 			}
 			PartialContent::OutputContent(OutputContent::Refusal(r)) => {
-				let mut post =
-					RefusalView::into_post(author, thread, r.refusal);
-				post.set_status(status);
-				post
+				AgentPost::new_refusal(author, thread, r.refusal, status)
 			}
 			PartialContent::ContentPart(ContentPart::InputText(t)) => {
-				let mut post = TextView::into_post(author, thread, t.text);
-				post.set_status(status);
-				post
+				AgentPost::new_text(author, thread, t.text, status)
 			}
 			PartialContent::ContentPart(ContentPart::OutputText(t)) => {
 				let text = if t.annotations.is_empty() {
@@ -149,47 +142,28 @@ impl PostPartialMap {
 						&t.annotations,
 					)
 				};
-				let mut post = TextView::into_post(author, thread, text);
-				post.set_status(status);
-				post
+				AgentPost::new_text(author, thread, text, status)
 			}
 			PartialContent::ContentPart(ContentPart::Refusal(r)) => {
-				let mut post =
-					RefusalView::into_post(author, thread, r.refusal);
-				post.set_status(status);
-				post
+				AgentPost::new_refusal(author, thread, r.refusal, status)
 			}
 			PartialContent::ContentPart(ContentPart::ReasoningText(r)) => {
-				let mut post =
-					reasoning_content_post(author, thread, r.text);
-				post.set_status(status);
-				post
+				AgentPost::new_reasoning(author, thread, r.text, status)
 			}
 			PartialContent::ContentPart(ContentPart::SummaryText(s)) => {
-				let mut post =
-					reasoning_summary_post(author, thread, s.text);
-				post.set_status(status);
-				post
+				AgentPost::new_reasoning_summary(
+					author, thread, s.text, status,
+				)
 			}
 			PartialContent::ContentPart(ContentPart::InputImage(img)) => {
-				let mut post = UrlView::into_post(
-					author,
-					thread,
-					img.image_url,
-					None,
-				);
-				post.set_status(status);
-				post
+				AgentPost::new_url(
+					author, thread, img.image_url, None, status,
+				)
 			}
 			PartialContent::ContentPart(ContentPart::InputVideo(vid)) => {
-				let mut post = UrlView::into_post(
-					author,
-					thread,
-					vid.video_url,
-					None,
-				);
-				post.set_status(status);
-				post
+				AgentPost::new_url(
+					author, thread, vid.video_url, None, status,
+				)
 			}
 			PartialContent::ContentPart(ContentPart::InputFile(file)) => {
 				let media_type = file
@@ -204,11 +178,9 @@ impl PostPartialMap {
 						.map(|s| s.to_string())
 				});
 				if let Some(url) = file.file_url {
-					let mut post = UrlView::into_post(
-						author, thread, url, file_stem,
-					);
-					post.set_status(status);
-					post
+					AgentPost::new_url(
+						author, thread, url, file_stem, status,
+					)
 				} else if let Some(data) = file.file_data {
 					use base64::Engine;
 					let bytes = base64::prelude::BASE64_STANDARD
@@ -218,11 +190,9 @@ impl PostPartialMap {
 								"Failed to decode base64 file data: {err}"
 							)
 						})?;
-					let mut post = BytesView::into_post(
-						author, thread, media_type, bytes, file_stem,
-					);
-					post.set_status(status);
-					post
+					AgentPost::new_bytes(
+						author, thread, media_type, bytes, file_stem, status,
+					)
 				} else {
 					bevybail!("InputFile has neither file_url nor file_data")
 				}
@@ -231,31 +201,19 @@ impl PostPartialMap {
 				name,
 				call_id,
 				arguments,
-			} => {
-				let mut post = FunctionCallView::into_post(
-					author, thread, name, call_id, arguments,
-				);
-				post.set_status(status);
-				post
-			}
+			} => AgentPost::new_function_call(
+				author, thread, name, call_id, arguments, status,
+			),
 			PartialContent::FunctionCallOutput { call_id, output } => {
-				let mut post = FunctionCallOutputView::into_post(
-					author, thread, call_id, output, None,
-				);
-				post.set_status(status);
-				post
+				AgentPost::new_function_call_output(
+					author, thread, call_id, output, None, status,
+				)
 			}
 			PartialContent::ReasoningContent(text) => {
-				let mut post =
-					reasoning_content_post(author, thread, text);
-				post.set_status(status);
-				post
+				AgentPost::new_reasoning(author, thread, text, status)
 			}
 			PartialContent::ReasoningSummary(text) => {
-				let mut post =
-					reasoning_summary_post(author, thread, text);
-				post.set_status(status);
-				post
+				AgentPost::new_reasoning_summary(author, thread, text, status)
 			}
 			PartialContent::Delta(delta) => {
 				// During streaming, a delta may arrive before the post
@@ -263,58 +221,46 @@ impl PostPartialMap {
 				// has content). Use the key to determine the post type.
 				match key {
 					PostPartialKey::ReasoningSummary { .. } => {
-						let mut post = reasoning_summary_post(
-							author, thread, delta,
-						);
-						post.set_status(status);
-						post
+						AgentPost::new_reasoning_summary(
+							author, thread, delta, status,
+						)
 					}
 					PostPartialKey::Single { .. } => {
 						// Single-key items are function calls; look up the
 						// existing post to get the call_id.
 						let post_id = self.get_response_item(key)?;
 						let post = posts.get(post_id)?;
-						let fc = post.as_function_call().ok_or_else(|| {
-							bevyhow!(
-								"Expected FunctionCall post for key {:?}",
-								key,
-							)
-						})?;
-						let mut post = FunctionCallView::into_post(
+						let agent_post = post.as_agent_post();
+						let fc =
+							agent_post.as_function_call().ok_or_else(|| {
+								bevyhow!(
+									"Expected FunctionCall post for key {:?}",
+									key,
+								)
+							})?;
+						AgentPost::new_function_call(
 							author,
 							thread,
 							"",
 							fc.call_id(),
 							delta,
-						);
-						post.set_status(status);
-						post
+							status,
+						)
 					}
 					PostPartialKey::Content { .. } => {
 						// default to text for content-keyed deltas
-						let mut post =
-							TextView::into_post(author, thread, delta);
-						post.set_status(status);
-						post
+						AgentPost::new_text(author, thread, delta, status)
 					}
 				}
 			}
 			PartialContent::TextDone { text, .. } => {
-				let mut post = TextView::into_post(author, thread, text);
-				post.set_status(status);
-				post
+				AgentPost::new_text(author, thread, text, status)
 			}
 			PartialContent::RefusalDone { refusal } => {
-				let mut post =
-					RefusalView::into_post(author, thread, refusal);
-				post.set_status(status);
-				post
+				AgentPost::new_refusal(author, thread, refusal, status)
 			}
 			PartialContent::ReasoningDone { content } => {
-				let mut post =
-					reasoning_content_post(author, thread, content);
-				post.set_status(status);
-				post
+				AgentPost::new_reasoning(author, thread, content, status)
 			}
 			PartialContent::AnnotationAdded { .. } => {
 				bevybail!(
