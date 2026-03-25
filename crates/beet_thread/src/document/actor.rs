@@ -38,9 +38,6 @@ impl Actor {
 	pub fn system() -> Self { Self::new("System", ActorKind::System) }
 	pub fn developer() -> Self { Self::new("Developer", ActorKind::Developer) }
 	pub fn human() -> Self { Self::new("Human", ActorKind::Human) }
-	pub fn named_human(name: impl Into<String>) -> Self {
-		Self::new(name, ActorKind::Human)
-	}
 	pub fn agent() -> Self { Self::new("Agent", ActorKind::Agent) }
 
 	pub fn name(&self) -> &str { &self.name }

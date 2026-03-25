@@ -28,6 +28,8 @@ impl<In> std::ops::DerefMut for SystemToolIn<In> {
 impl<In> SystemToolIn<In> {
 	/// Consume the context and return the inner input payload.
 	pub fn take(self) -> In { self.input }
+
+	pub fn caller(&self) -> Entity { self.caller }
 }
 
 /// Create a [`Tool`] from a Bevy system that returns [`Result<Out>`].

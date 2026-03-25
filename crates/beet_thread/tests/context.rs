@@ -29,7 +29,7 @@ fn setup(mut commands: Commands) {
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"
 				)]),
-				(Actor::agent(), post_tool(OllamaProvider::qwen_3_8b())),
+				(Actor::agent(), OllamaProvider::qwen_3_8b()),
 				(system_tool(assert_and_exit))
 			],
 		))

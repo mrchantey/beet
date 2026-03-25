@@ -21,8 +21,14 @@ fn setup(mut commands: Commands) {
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"
 				)]),
-				(Actor::agent(), post_tool(OllamaProvider::qwen_3_8b())),
-				(Actor::named_human("billy"), stdin_post_tool.into_tool()),
+				(
+					Actor::new("BeepBot", ActorKind::Agent),
+					OllamaProvider::qwen_3_8b()
+				),
+				(
+					Actor::new("Billy", ActorKind::Human),
+					stdin_post_tool.into_tool()
+				),
 			]
 		),]))
 		.call::<(), Outcome>((), default());
@@ -32,8 +38,10 @@ fn setup(mut commands: Commands) {
 fn stdin_post_tool(
 	cx: SystemToolIn,
 	mut query: SocialQuery,
+	actors: Query<&Actor>,
 ) -> Result<Outcome> {
-	let heading = paint_ext::cyan_bold(format!("\n\nHuman > "));
+	let actor = actors.get(cx.caller)?;
+	let heading = paint_ext::cyan_bold(format!("\n\n{} > ", actor.name()));
 	print!("{heading}");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	let mut input = String::new();

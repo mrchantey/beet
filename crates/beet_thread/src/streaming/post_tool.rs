@@ -2,19 +2,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
 
-
-
-
-
-pub fn post_tool<T>(streamer: T) -> impl Bundle
-where
-	T: Clone + Component + PostStreamer,
-{
-	(streamer, async_tool(insert_stream::<T>))
-}
-
-
-async fn insert_stream<T>(input: AsyncToolIn<()>) -> Result<Outcome>
+/// often added alongside streamers, ie `O11sStreamer`
+pub async fn post_streamer_tool<T>(input: AsyncToolIn<()>) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {

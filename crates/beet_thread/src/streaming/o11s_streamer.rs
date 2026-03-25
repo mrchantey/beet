@@ -3,6 +3,7 @@ use crate::o11s::request::InputItem;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_tool::prelude::*;
 use futures::Stream;
 use std::borrow::Cow;
 use std::pin::Pin;
@@ -10,6 +11,7 @@ use std::task::Context;
 use std::task::Poll;
 
 #[derive(Debug, Clone, Component)]
+#[component(on_add=on_add)]
 pub struct O11sStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
@@ -20,6 +22,13 @@ pub struct O11sStreamer {
 	use_previous_response_id: bool,
 	/// System instructions to include with each request.
 	instructions: Option<String>,
+}
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(async_tool(post_streamer_tool::<O11sStreamer>));
 }
 
 impl O11sStreamer {
