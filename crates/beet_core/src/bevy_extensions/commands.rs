@@ -35,6 +35,19 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
+	/// Queues a local asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
+	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.queue(move |world: &mut World| {
+			world.run_async_local(move |world| func(world));
+		});
+	}
+
 	/// Runs a system once with the given input.
 	fn run_system_once_with<I, M, S>(
 		&mut self,
@@ -77,5 +90,18 @@ pub impl EntityCommands<'_> {
 		let id = self.id();
 		self.commands()
 			.queue_async(async move |world| func(world.entity(id)).await);
+	}
+
+	/// Queues a local asynchronous task to be run in the world context.
+	#[cfg(feature = "std")]
+	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		let id = self.id();
+		self.commands()
+			.queue_async_local(async move |world| func(world.entity(id)).await);
 	}
 }

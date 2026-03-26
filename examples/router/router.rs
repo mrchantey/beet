@@ -28,7 +28,14 @@ mod content;
 
 fn main() -> AppExit {
 	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin))
+		.add_plugins((
+			MinimalPlugins,
+			LogPlugin {
+				level: Level::TRACE,
+				..default()
+			},
+			BeetRouterPlugin,
+		))
 		.add_systems(Startup, setup)
 		.run()
 }

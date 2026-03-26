@@ -78,19 +78,19 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.queue_async(super::start_lambda_server);
+		.queue_async_local(super::start_lambda_server);
 
 	#[cfg(all(feature = "hyper", not(feature = "lambda")))]
 	world
 		.commands()
 		.entity(cx.entity)
-		.queue_async(super::start_hyper_server);
+		.queue_async_local(super::start_hyper_server);
 
 	#[cfg(all(not(feature = "hyper"), not(feature = "lambda")))]
 	world
 		.commands()
 		.entity(cx.entity)
-		.queue_async(super::start_mini_http_server);
+		.queue_async_local(super::start_mini_http_server);
 }
 
 
@@ -135,7 +135,7 @@ pub(crate) mod test {
 	///
 	/// Spawns a server with a mirror exchange handler, sends requests,
 	/// and verifies responses round-trip correctly.
-	#[track_caller]
+	// #[track_caller]
 	pub async fn test_server<Func, Fut>(run_server: Func)
 	where
 		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,

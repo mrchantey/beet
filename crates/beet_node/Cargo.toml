@@ -12,17 +12,19 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_paint","tool"]
+default = ["std","net", "html_parser","markdown_parser","ansi_paint", "tool", "bevy_scene"]
 std = []
 tool = ["dep:beet_tool"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 serde = ["dep:serde"]
+json = ["dep:serde_json", "serde", "beet_core/json"]
+postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
 ansi_paint = ["beet_core/ansi_paint", "dep:nu-ansi-term"]
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
-
+bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
 beet_core = { workspace = true }
@@ -35,6 +37,8 @@ serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 nu-ansi-term = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
 thiserror.workspace = true
 webbrowser.workspace = true
 

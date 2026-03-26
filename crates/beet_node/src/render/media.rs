@@ -20,10 +20,10 @@ use beet_core::prelude::*;
 pub struct MediaRenderer {
 	/// Used when [`RenderContext::accepts`] is empty.
 	default_media_type: MediaType,
-	/// Fall back to [`PlainTextRenderer`] for unrecognized text types.
-	plaintext_fallback: bool,
 	plain_text_renderer: PlainTextRenderer,
 	html_renderer: HtmlRenderer,
+	#[cfg(feature = "bevy_scene")]
+	scene_renderer: SceneRenderer,
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "ansi_paint")]
 	ansi_term_renderer: AnsiTermRenderer,
@@ -47,19 +47,14 @@ impl MediaRenderer {
 	pub fn new(default_media_type: MediaType) -> Self {
 		Self {
 			default_media_type,
-			plaintext_fallback: true,
 			plain_text_renderer: default(),
 			html_renderer: default(),
 			markdown_renderer: default(),
 			#[cfg(feature = "ansi_paint")]
 			ansi_term_renderer: default(),
+			#[cfg(feature = "bevy_scene")]
+			scene_renderer: default(),
 		}
-	}
-
-	/// Disable the plain-text fallback for unrecognized text types.
-	pub fn without_fallback(mut self) -> Self {
-		self.plaintext_fallback = false;
-		self
 	}
 
 	/// Override the [`PlainTextRenderer`] instance.
@@ -96,6 +91,12 @@ impl MediaRenderer {
 		self
 	}
 
+	#[cfg(feature = "bevy_scene")]
+	pub fn with_scene_renderer(mut self, renderer: SceneRenderer) -> Self {
+		self.scene_renderer = renderer;
+		self
+	}
+
 	/// Set the default media type used when `accepts` is empty.
 	pub fn with_default_media_type(mut self, media_type: MediaType) -> Self {
 		self.default_media_type = media_type;
@@ -121,11 +122,8 @@ impl MediaRenderer {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
-
+		trace!("Trying to render {media_type} for entity {}", cx.entity);
 		match media_type {
-			MediaType::Text => {
-				self.plain_text_renderer.render(&mut inner_cx).map(Some)
-			}
 			MediaType::Html => {
 				self.html_renderer.render(&mut inner_cx).map(Some)
 			}
@@ -136,9 +134,10 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			other if self.plaintext_fallback && other.is_text() => {
-				self.plain_text_renderer.render(&mut inner_cx).map(Some)
-			}
+			#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+			MediaType::Postcard => self.scene_renderer.render(&mut inner_cx).map(Some),
+			#[cfg(all(feature = "bevy_scene", feature = "json"))]
+			MediaType::Json => self.scene_renderer.render(&mut inner_cx).map(Some),
 			_ => Ok(None),
 		}
 	}
@@ -149,6 +148,10 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "ansi_paint")]
 		available.push(MediaType::AnsiTerm);
+		#[cfg(all(feature = "bevy_scene", feature = "json"))]
+		available.push(MediaType::Json);
+		#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+		available.push(MediaType::Postcard);
 		available
 	}
 }
@@ -167,16 +170,20 @@ impl NodeRenderer for MediaRenderer {
 			cx.accepts.clone()
 		};
 
+		// 1. first try each media type and see if we can do an exact match
 		for media_type in &candidates {
 			if let Some(output) = self.try_render_media_type(cx, media_type)? {
 				return Ok(output);
 			}
 		}
-
-		Err(RenderError::AcceptMismatch {
-			requested: candidates,
-			available: self.available_types(),
-		})
+		// 2. failing that, try to render as plaintext
+		self.plain_text_renderer
+			.render(cx)
+			// failing that, create a custom error showing all possible renderers
+			.map_err(|_| RenderError::AcceptMismatch {
+				requested: candidates,
+				available: self.available_types(),
+			})
 	}
 }
 
@@ -289,9 +296,7 @@ mod test {
 		// Render with only Png accepted and fallback disabled — should error.
 		let mut cx = RenderContext::new(entity, &mut world)
 			.with_accepts(vec![MediaType::Png]);
-		let result = MediaRenderer::new(MediaType::Text)
-			.without_fallback()
-			.render(&mut cx);
+		let result = MediaRenderer::new(MediaType::Text).render(&mut cx);
 		match result {
 			Err(RenderError::AcceptMismatch { .. }) => {}
 			other => panic!("expected AcceptMismatch, got {other:?}"),
