@@ -249,60 +249,6 @@ mod test {
 	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
 
-	/// A simple render tool for tests that spawns the scene content,
-	/// collects [`Value`] text from children, and returns it as a
-	/// plain-text response.
-	fn test_render_tool() -> impl Bundle {
-		(
-			Name::new("Test Render Tool"),
-			RenderToolMarker,
-			RouteHidden,
-			async_tool(
-				async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
-					let spawn_tool = cx.input.spawn_tool.clone();
-					let world = cx.caller.world();
-
-					let scene_entity =
-						cx.caller.call_detached(spawn_tool, ()).await?;
-
-					let text = world
-						.with_then(move |world: &mut World| -> String {
-							collect_scene_text(world, scene_entity)
-						})
-						.await;
-
-					Response::ok_body(text, MediaType::Text).xok()
-				},
-			),
-		)
-	}
-
-	/// Recursively collect text from [`Value::Str`] components in an
-	/// entity tree, then despawn the root.
-	fn collect_scene_text(world: &mut World, entity: Entity) -> String {
-		let mut parts = Vec::new();
-		collect_text_recursive(world, entity, &mut parts);
-		world.entity_mut(entity).despawn();
-		parts.join("")
-	}
-
-	fn collect_text_recursive(
-		world: &World,
-		entity: Entity,
-		parts: &mut Vec<String>,
-	) {
-		if let Some(value) = world.entity(entity).get::<Value>() {
-			if let Value::Str(text) = value {
-				parts.push(text.clone());
-			}
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				collect_text_recursive(world, child, parts);
-			}
-		}
-	}
-
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	#[test]
@@ -334,8 +280,7 @@ mod test {
 	async fn navigate_parent_from_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("", || {
 					(Element::new("h1"), children![Value::Str("Root".into())])
 				}),
@@ -364,8 +309,7 @@ mod test {
 	async fn navigate_first_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
@@ -396,8 +340,7 @@ mod test {
 	async fn navigate_next_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
@@ -440,8 +383,7 @@ mod test {
 	async fn navigate_prev_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
@@ -472,8 +414,7 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()

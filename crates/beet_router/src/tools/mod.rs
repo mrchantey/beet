@@ -1,9 +1,3 @@
-mod media_render_tool;
-mod scene_route;
-mod scene_route_query;
-pub use media_render_tool::*;
-pub use scene_route::*;
-pub use scene_route_query::*;
 mod help;
 mod router;
 pub use help::*;

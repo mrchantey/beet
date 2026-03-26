@@ -60,66 +60,11 @@ mod test {
 	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
 
-	/// A simple render tool for tests that spawns the scene content,
-	/// collects [`Value`] text from children, and returns it as a
-	/// plain-text response.
-	fn test_render_tool() -> impl Bundle {
-		(
-			Name::new("Test Render Tool"),
-			RenderToolMarker,
-			RouteHidden,
-			async_tool(
-				async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
-					let spawn_tool = cx.input.spawn_tool.clone();
-					let world = cx.caller.world();
-
-					let scene_entity =
-						cx.caller.call_detached(spawn_tool, ()).await?;
-
-					let text = world
-						.with_then(move |world: &mut World| -> String {
-							collect_scene_text(world, scene_entity)
-						})
-						.await;
-
-					Response::ok_body(text, MediaType::Text).xok()
-				},
-			),
-		)
-	}
-
-	/// Recursively collect text from [`Value::Str`] components in an
-	/// entity tree, then despawn the root.
-	fn collect_scene_text(world: &mut World, entity: Entity) -> String {
-		let mut parts = Vec::new();
-		collect_text_recursive(world, entity, &mut parts);
-		world.entity_mut(entity).despawn();
-		parts.join("")
-	}
-
-	fn collect_text_recursive(
-		world: &World,
-		entity: Entity,
-		parts: &mut Vec<String>,
-	) {
-		if let Some(value) = world.entity(entity).get::<Value>() {
-			if let Value::Str(text) = value {
-				parts.push(text.clone());
-			}
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				collect_text_recursive(world, child, parts);
-			}
-		}
-	}
-
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()
@@ -139,8 +84,7 @@ mod test {
 	async fn route_renders_root_scene_on_empty_path() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_route("", || {
 					(Element::new("p"), children![Value::Str(
 						"Root content".into()
@@ -159,8 +103,7 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = (AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_route("", || {
 					children![
 						(Element::new("h1"), children![Value::Str(

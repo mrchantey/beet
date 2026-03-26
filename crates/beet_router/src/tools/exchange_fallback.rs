@@ -2,7 +2,7 @@
 //!
 //! The fallback chain skips children whose tool signature doesn't
 //! match `Request → Response` (eg render tools that expect
-//! [`RenderRequest`]), so they can coexist on the same entity.
+//! different input types), so they can coexist on the same entity.
 //!
 //! This module provides [`default_router`], a request router that
 //! handles routing, scene navigation, tool invocation, and help
@@ -12,19 +12,18 @@
 //! ## Routing Behavior
 //!
 //! - **Scenes**: tool-based routes created via [`scene_route`] that delegate
-//!   rendering to the nearest [`RenderToolMarker`] entity.
+//!   rendering to the [`SceneToolRenderer`] on an ancestor.
 //! - **`--help`**: scoped to the requested path prefix, ie
 //!   `counter --help` only shows routes under `/counter`.
 //! - **Not found**: shows help scoped to the nearest ancestor scene,
 //!   ie `counter nonsense` shows help for `/counter`.
 //!
-//! ## Render Tools
+//! ## Scene Rendering
 //!
-//! The `default_router` does **not** include a render tool. Render
-//! tools are the responsibility of the server, since different
-//! servers need different rendering strategies:
-//! - CLI/REPL servers use a markdown render tool
-//! - TUI servers use a TUI render tool
+//! The `default_router` does **not** include a [`SceneToolRenderer`].
+//! The `SceneToolRenderer` is the responsibility of the server, since
+//! different servers need different rendering strategies.
+//! Use `SceneToolRenderer::default()` for content-negotiated rendering.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -36,9 +35,8 @@ use beet_tool::prelude::*;
 /// Errors are converted to a response.
 ///
 /// Children whose tool signature doesn't match `Request →
-/// Outcome<Response, Request>` (eg render tools expecting
-/// [`RenderRequest`]) are silently skipped so they can coexist on
-/// the same entity without causing fallback errors.
+/// Outcome<Response, Request>` are silently skipped so they can
+/// coexist on the same entity without causing fallback errors.
 pub fn exchange_fallback() -> impl Bundle {
 	let fallback = Fallback::<Request, Response>::default()
 		.with_exclude_errors(ChildError::NO_TOOL);
@@ -103,60 +101,6 @@ mod test {
 	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
 
-	/// A simple render tool for tests that spawns the scene content,
-	/// collects [`Value`] text from children, and returns it as a
-	/// plain-text response.
-	fn test_render_tool() -> impl Bundle {
-		(
-			Name::new("Test Render Tool"),
-			RenderToolMarker,
-			RouteHidden,
-			async_tool(
-				async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
-					let spawn_tool = cx.input.spawn_tool.clone();
-					let world = cx.caller.world();
-
-					let scene_entity =
-						cx.caller.call_detached(spawn_tool, ()).await?;
-
-					let text = world
-						.with_then(move |world: &mut World| -> String {
-							collect_scene_text(world, scene_entity)
-						})
-						.await;
-
-					Response::ok_body(text, MediaType::Text).xok()
-				},
-			),
-		)
-	}
-
-	/// Recursively collect text from [`Value::Str`] components in an
-	/// entity tree, then despawn the root.
-	fn collect_scene_text(world: &mut World, entity: Entity) -> String {
-		let mut parts = Vec::new();
-		collect_text_recursive(world, entity, &mut parts);
-		world.entity_mut(entity).despawn();
-		parts.join("")
-	}
-
-	fn collect_text_recursive(
-		world: &World,
-		entity: Entity,
-		parts: &mut Vec<String>,
-	) {
-		if let Some(value) = world.entity(entity).get::<Value>() {
-			if let Value::Str(text) = value {
-				parts.push(text.clone());
-			}
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				collect_text_recursive(world, child, parts);
-			}
-		}
-	}
-
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	fn my_interface() -> impl Bundle {
@@ -198,8 +142,7 @@ mod test {
 	#[cfg(feature = "json")]
 	async fn dispatches_tool_request() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				route_tool(
 					"add",
 					func_tool(|input: FuncToolIn<(i32, i32)>| Ok(
@@ -221,8 +164,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
@@ -239,8 +181,7 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_help_request() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
@@ -256,8 +197,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
 			]))
 			.call::<Request, Response>(
@@ -272,8 +212,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				scene_route("", || {
 					children![
 						(Element::new("h1"), children![Value::Str(
@@ -302,8 +241,7 @@ mod test {
 		let mut world = router_world();
 
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
 					scene_route("counter", || {
 						(Element::new("p"), children![Value::Str(

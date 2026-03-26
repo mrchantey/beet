@@ -2,16 +2,18 @@ use beet::prelude::*;
 
 /// Pete's Beets — a music record store stack driven by markdown files.
 ///
-/// Each scene loads its content from a `.md` file via [`file_route`],
+/// Each scene loads its content from a `.md` file via [`file_scene_tool`],
 /// which reads and parses markdown on each request.
 pub fn stack() -> impl Bundle {
 	(default_router(), children![root(), about(), counter()])
 }
 
-fn root() -> impl Bundle { file_route("", "examples/router/content/home.md") }
+fn root() -> impl Bundle {
+	file_scene_tool("", "examples/router/content/home.md")
+}
 
 fn about() -> impl Bundle {
-	file_route("about", "examples/router/content/about.md")
+	file_scene_tool("about", "examples/router/content/about.md")
 }
 
 /// Stock counter page using document fields and tools.

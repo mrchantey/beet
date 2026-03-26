@@ -183,60 +183,6 @@ mod test {
 		format_route_help(tree).xok()
 	}
 
-	/// A simple render tool for tests that spawns the scene content,
-	/// collects [`Value`] text from children, and returns it as a
-	/// plain-text response.
-	fn test_render_tool() -> impl Bundle {
-		(
-			Name::new("Test Render Tool"),
-			RenderToolMarker,
-			RouteHidden,
-			async_tool(
-				async |cx: AsyncToolIn<RenderRequest>| -> Result<Response> {
-					let spawn_tool = cx.input.spawn_tool.clone();
-					let world = cx.caller.world();
-
-					let scene_entity =
-						cx.caller.call_detached(spawn_tool, ()).await?;
-
-					let text = world
-						.with_then(move |world: &mut World| -> String {
-							collect_scene_text(world, scene_entity)
-						})
-						.await;
-
-					Response::ok_body(text, MediaType::Text).xok()
-				},
-			),
-		)
-	}
-
-	/// Recursively collect text from [`Value::Str`] components in an
-	/// entity tree, then despawn the root.
-	fn collect_scene_text(world: &mut World, entity: Entity) -> String {
-		let mut parts = Vec::new();
-		collect_text_recursive(world, entity, &mut parts);
-		world.entity_mut(entity).despawn();
-		parts.join("")
-	}
-
-	fn collect_text_recursive(
-		world: &World,
-		entity: Entity,
-		parts: &mut Vec<String>,
-	) {
-		if let Some(value) = world.entity(entity).get::<Value>() {
-			if let Value::Str(text) = value {
-				parts.push(text.clone());
-			}
-		}
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				collect_text_recursive(world, child, parts);
-			}
-		}
-	}
-
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	#[beet_core::test]
@@ -352,7 +298,7 @@ mod test {
 	async fn help_includes_scenes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((default_router(), children![
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				help(),
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
@@ -387,8 +333,7 @@ mod test {
 		let mut world = router_world();
 
 		let root = world
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
 				scene_route("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
@@ -411,8 +356,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_scoped_to_prefix() {
 		let body = router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
 					scene_route("counter", || {
 						(Element::new("p"), children![Value::Str(
@@ -441,8 +385,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
 			]))
 			.call::<Request, Response>(
@@ -460,8 +403,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		router_world()
-			.spawn((default_router(), children![
-				test_render_tool(),
+			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
 					scene_route("counter", || {
 						(Element::new("p"), children![Value::Str(

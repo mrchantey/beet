@@ -1,8 +1,8 @@
 //! A REPL server that reads lines from stdin in a loop, dispatching
 //! each as a [`Request`] and streaming the [`Response`] body to stdout.
 //!
-//! Typically paired with a [`media_render_tool`] so that scenes
-//! render their content to markdown for terminal output.
+//! Typically paired with a [`SceneToolRenderer`] so that scenes
+//! render their content for terminal output.
 //!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
@@ -22,8 +22,8 @@ use beet_tool::prelude::*;
 /// [`Request`], dispatched through the owning entity's tool pipeline,
 /// and the response body is streamed to stdout.
 ///
-/// Typically paired with a [`media_render_tool`] for rendering
-/// scene content to markdown in the terminal, and a [`History`] component for
+/// Typically paired with a [`SceneToolRenderer`] for rendering
+/// scene content in the terminal, and a [`History`] component for
 /// tracking the current path, enabling relative navigation via
 /// `--navigate=<direction>`.
 ///
@@ -41,6 +41,7 @@ use beet_tool::prelude::*;
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin));
 ///     app.world_mut().spawn((
+///         SceneToolRenderer::default(),
 ///         default_router(),
 ///         ReplServer,
 ///         children![

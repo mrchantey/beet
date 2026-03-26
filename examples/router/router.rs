@@ -44,7 +44,7 @@ fn setup(mut commands: Commands) -> Result {
 	commands.spawn((
 		server_from_cli()?,
 		content::stack(),
-		OnSpawn::insert_child(media_render_tool()),
+		SceneToolRenderer::default(),
 	));
 	Ok(())
 }
