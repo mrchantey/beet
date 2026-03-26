@@ -32,7 +32,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
 - Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster non-crypto etc, so only use others if theres a good reason for it.
-- Always use `bevyhow!{}`, `bevybail!{}` instead of `thiserror` unless a result consumer needs to access the error type
+- Always use `bevyhow!{}`, `bevybail!{}` unless a result consumer needs to access the error type, in which case use `thiserror` which is now no_std
 - Never use single letter variable names (except for `i` in loops) instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
