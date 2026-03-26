@@ -175,6 +175,11 @@ impl<'w> ThreadMut<'w> {
 		}
 		.xok()
 	}
+
+	pub fn despawn(&mut self) {
+		let entity = self.entity;
+		self.world_mut().despawn(entity);
+	}
 }
 
 /// Mutable view into an [`Actor`] entity within a [`ThreadMut`].
@@ -284,6 +289,8 @@ impl<'t, 'w> ActorViewMut<'t, 'w> {
 
 		Ok(new_posts)
 	}
+
+	pub fn despawn_thread(&mut self) { self.thread_view.despawn(); }
 }
 
 /// Mutable view into a [`Post`] entity within an [`ActorViewMut`].

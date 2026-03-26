@@ -50,7 +50,7 @@ where
 		}
 	}
 }
-impl Fallback {
+impl Fallback<(), ()> {
 	/// Create a default `Fallback<(), ()>`.
 	pub fn new() -> Self { Self::default() }
 }

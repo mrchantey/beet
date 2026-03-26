@@ -6,7 +6,7 @@ mod media;
 mod navigate;
 mod route_tree;
 mod router_plugin;
-mod server;
+mod scene_renderer;
 mod tools;
 
 
@@ -18,6 +18,6 @@ pub mod prelude {
 	pub use crate::route_tree::*;
 	pub use crate::router_plugin::*;
 
-	pub use crate::server::*;
+	pub use crate::scene_renderer::*;
 	pub use crate::tools::*;
 }
