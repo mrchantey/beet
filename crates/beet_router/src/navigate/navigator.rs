@@ -194,9 +194,22 @@ impl Navigator {
 			.with_header::<header::UserAgent>(user_agent)
 			.with_header::<header::Accept>(accepts)
 			.send()
-			.await?
-			.into_result()
-			.await?;
+			.await
+			.unwrap_or_else(|err| {
+				let mut err = err.to_string();
+				if err.is_empty() {
+					err = "unknown error".to_string();
+				}
+
+				Response::from_status_body(
+					StatusCode::BAD_REQUEST,
+					err,
+					MediaType::Text,
+				)
+			});
+		// do not bail on 404, render anyway
+		// .into_result()
+		// .await?;
 
 		let redirect = if response.status().is_redirect_location() {
 			response

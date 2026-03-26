@@ -287,9 +287,12 @@ impl Url {
 		}
 	}
 
-	/// Resolve `other` against `self`, treating `other` as relative if it has no authority.
+	/// Resolve `other` against `self`,
+	/// treating `other` as relative if the schemas match and it has no authority.
 	pub fn join(&self, other: Url) -> Url {
-		if other.authority().is_none() {
+		if other.scheme() != &Scheme::None && other.scheme() != &self.scheme {
+			other
+		} else if other.authority().is_none() {
 			let mut resolved = self.clone();
 			resolved.set_path(other.path);
 			resolved.params = other.params;

@@ -53,10 +53,33 @@ impl NodeParser for PlainTextParser {
 			tracker.into_full_span()
 		});
 
-		cx.entity.set_if_ne_or_insert(Value::new(text));
-		if let Some(span) = span {
-			cx.entity.set_if_ne_or_insert(span);
-		}
+
+		let parent = cx.entity.id();
+		// we diff against the first child,
+		// differs should not render to the root
+		let children = cx
+			.entity
+			.get::<Children>()
+			.map(|children| children.to_vec())
+			.unwrap_or_default();
+
+		// ensure only one child
+		cx.entity.world_scope(|world| {
+			for child in children.iter().skip(1) {
+				world.despawn(*child);
+			}
+
+			let first = children
+				.first()
+				.map(|child| *child)
+				.unwrap_or_else(|| world.spawn(ChildOf(parent)).id());
+
+			let mut first = world.entity_mut(first);
+			first.set_if_ne_or_insert(Value::new(text));
+			if let Some(span) = span {
+				first.set_if_ne_or_insert(span);
+			}
+		});
 
 		Ok(())
 	}
