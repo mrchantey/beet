@@ -89,6 +89,8 @@ mod test {
 				let cx = ParseContext::new(entity, &bytes);
 				PlainTextParser::default().parse(cx).unwrap();
 			})
+			.child(0)
+			.unwrap()
 			.get::<Value>()
 			.cloned()
 			.unwrap()
@@ -106,16 +108,27 @@ mod test {
 		parser
 			.parse(ParseContext::new(&mut entity_mut, &bytes))
 			.unwrap();
-		let v1 = entity_mut.get::<Value>().cloned().unwrap();
+		let child = entity_mut
+			.get::<Children>()
+			.and_then(|c| c.first().copied())
+			.unwrap();
+		drop(entity_mut);
+		let v1 = world.entity(child).get::<Value>().cloned().unwrap();
+		let mut entity_mut = world.entity_mut(entity);
 		parser
 			.parse(ParseContext::new(&mut entity_mut, &bytes))
 			.unwrap();
-		let v2 = entity_mut.get::<Value>().cloned().unwrap();
+		let child = entity_mut
+			.get::<Children>()
+			.and_then(|c| c.first().copied())
+			.unwrap();
+		drop(entity_mut);
+		let v2 = world.entity(child).get::<Value>().cloned().unwrap();
 		(v1, v2)
 			.xpect_eq((Value::Str("hello".into()), Value::Str("hello".into())));
 	}
 
-	/// Parsing with a path attaches a [`FileSpan`] component to the entity.
+	/// Parsing with a path attaches a [`FileSpan`] component to the child entity.
 	#[test]
 	fn parse_with_path_inserts_file_span() {
 		let bytes = MediaBytes::text("line1\nline2");
@@ -126,6 +139,8 @@ mod test {
 					.with_path(WsPathBuf::new("foo.txt"));
 				PlainTextParser::default().parse(cx).unwrap();
 			})
+			.child(0)
+			.unwrap()
 			.get::<FileSpan>()
 			.cloned()
 			.unwrap()

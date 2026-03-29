@@ -59,13 +59,8 @@ impl Document {
 					if current.is_null() {
 						*current = Value::List(Vec::new());
 					}
-					let current_snapshot = current.clone();
-					let array = current.as_list_mut().map_err(|_| {
-						DocumentError::ExpectedArray {
-							current: current_snapshot,
-							path: path.to_vec(),
-						}
-					})?;
+					let array =
+						current.as_list_mut().map_err(DocumentError::from)?;
 					// expand array if needed
 					while array.len() <= *idx {
 						array.push(Value::Null);
@@ -77,13 +72,8 @@ impl Document {
 					if current.is_null() {
 						*current = Value::Map(Default::default());
 					}
-					let current_snapshot = current.clone();
-					let object = current.as_map_mut().map_err(|_| {
-						DocumentError::ExpectedObject {
-							current: current_snapshot,
-							path: path.to_vec(),
-						}
-					})?;
+					let object =
+						current.as_map_mut().map_err(DocumentError::from)?;
 					if !object.contains_key(key) {
 						object.insert(key.clone(), init_value.clone());
 					}
@@ -128,10 +118,7 @@ impl Document {
 				FieldPath::ArrayIndex(idx) => {
 					current = current
 						.as_list()
-						.map_err(|_| DocumentError::ExpectedArray {
-							current: current.clone(),
-							path: path.to_vec(),
-						})?
+						.map_err(DocumentError::from)?
 						.get(*idx)
 						.ok_or_else(|| {
 							DocumentError::ArrayIndexOutOfBounds {
@@ -143,10 +130,7 @@ impl Document {
 				FieldPath::ObjectKey(key) => {
 					current = current
 						.as_map()
-						.map_err(|_| DocumentError::ExpectedObject {
-							current: current.clone(),
-							path: path.to_vec(),
-						})?
+						.map_err(DocumentError::from)?
 						.get(key)
 						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
@@ -173,13 +157,8 @@ impl Document {
 			match segment {
 				FieldPath::ArrayIndex(idx) => {
 					let idx_val = *idx;
-					let current_snapshot = current.clone();
-					let array = current.as_list_mut().map_err(|_| {
-						DocumentError::ExpectedArray {
-							current: current_snapshot,
-							path: path.to_vec(),
-						}
-					})?;
+					let array =
+						current.as_list_mut().map_err(DocumentError::from)?;
 					if idx_val >= array.len() {
 						return Err(DocumentError::ArrayIndexOutOfBounds {
 							index: idx_val,
@@ -189,13 +168,8 @@ impl Document {
 					current = &mut array[idx_val];
 				}
 				FieldPath::ObjectKey(key) => {
-					let current_snapshot = current.clone();
-					let object = current.as_map_mut().map_err(|_| {
-						DocumentError::ExpectedObject {
-							current: current_snapshot,
-							path: path.to_vec(),
-						}
-					})?;
+					let object =
+						current.as_map_mut().map_err(DocumentError::from)?;
 					if !object.contains_key(key) {
 						return Err(DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
@@ -214,27 +188,14 @@ impl Document {
 /// Errors that can occur when working with documents.
 #[derive(Debug, thiserror::Error)]
 pub enum DocumentError {
-	/// Expected an array but found a different type at the given path.
-	#[error("expected array, found {current:?}\nAt path {path:?}")]
-	ExpectedArray {
-		/// The actual value that was found.
-		current: Value,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
+	/// Value type mismatch from a [`Value`] accessor.
+	#[error(transparent)]
+	ValueError(#[from] ValueError),
 	/// Array index was out of bounds.
 	#[error("array index {index} out of bounds\nAt path {path:?}")]
 	ArrayIndexOutOfBounds {
 		/// The index that was out of bounds.
 		index: usize,
-		/// The path where the error occurred.
-		path: Vec<FieldPath>,
-	},
-	/// Expected an object but found a different type at the given path.
-	#[error("expected object, found {current:?}\nat path {path:?}")]
-	ExpectedObject {
-		/// The actual value that was found.
-		current: Value,
 		/// The path where the error occurred.
 		path: Vec<FieldPath>,
 	},

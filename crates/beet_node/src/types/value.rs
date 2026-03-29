@@ -74,6 +74,58 @@ pub enum Value {
 
 impl Eq for Value {}
 
+/// The kind/type of a [`Value`], used in error reporting.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ValueKind {
+	/// No value.
+	Null,
+	/// Boolean.
+	Bool,
+	/// Signed integer.
+	Int,
+	/// Unsigned integer.
+	Uint,
+	/// Floating point.
+	Float,
+	/// Byte slice.
+	Bytes,
+	/// String.
+	Str,
+	/// Key-value map.
+	Map,
+	/// Ordered list.
+	List,
+}
+
+impl core::fmt::Display for ValueKind {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::Null => write!(f, "null"),
+			Self::Bool => write!(f, "bool"),
+			Self::Int => write!(f, "int"),
+			Self::Uint => write!(f, "uint"),
+			Self::Float => write!(f, "float"),
+			Self::Bytes => write!(f, "bytes"),
+			Self::Str => write!(f, "str"),
+			Self::Map => write!(f, "map"),
+			Self::List => write!(f, "list"),
+		}
+	}
+}
+
+/// Error returned by [`Value`] accessor methods when the kind doesn't match.
+#[derive(Debug, thiserror::Error)]
+pub enum ValueError {
+	/// The value was a different kind than expected.
+	#[error("expected {expected}, got {actual}")]
+	KindMismatch {
+		/// The expected kind.
+		expected: ValueKind,
+		/// The actual kind.
+		actual: ValueKind,
+	},
+}
+
 impl core::hash::Hash for Value {
 	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		core::mem::discriminant(self).hash(state);
@@ -122,35 +174,64 @@ impl Value {
 	/// Returns `true` if this value is a list.
 	pub fn is_list(&self) -> bool { matches!(self, Self::List(_)) }
 
+	/// Returns the kind of this value.
+	pub fn kind(&self) -> ValueKind {
+		match self {
+			Self::Null => ValueKind::Null,
+			Self::Bool(_) => ValueKind::Bool,
+			Self::Int(_) => ValueKind::Int,
+			Self::Uint(_) => ValueKind::Uint,
+			Self::Float(_) => ValueKind::Float,
+			Self::Bytes(_) => ValueKind::Bytes,
+			Self::Str(_) => ValueKind::Str,
+			Self::Map(_) => ValueKind::Map,
+			Self::List(_) => ValueKind::List,
+		}
+	}
+
 	/// Returns this value as a map reference.
-	pub fn as_map(&self) -> Result<&HashMap<String, Value>> {
+	pub fn as_map(&self) -> Result<&HashMap<String, Value>, ValueError> {
 		match self {
 			Self::Map(map) => Ok(map),
-			other => bevybail!("expected map, got {:?}", other),
+			other => Err(ValueError::KindMismatch {
+				expected: ValueKind::Map,
+				actual: other.kind(),
+			}),
 		}
 	}
 
 	/// Returns this value as a mutable map reference.
-	pub fn as_map_mut(&mut self) -> Result<&mut HashMap<String, Value>> {
+	pub fn as_map_mut(
+		&mut self,
+	) -> Result<&mut HashMap<String, Value>, ValueError> {
 		match self {
 			Self::Map(map) => Ok(map),
-			other => bevybail!("expected map, got {:?}", other),
+			other => Err(ValueError::KindMismatch {
+				expected: ValueKind::Map,
+				actual: other.kind(),
+			}),
 		}
 	}
 
 	/// Returns this value as a list reference.
-	pub fn as_list(&self) -> Result<&Vec<Value>> {
+	pub fn as_list(&self) -> Result<&Vec<Value>, ValueError> {
 		match self {
 			Self::List(list) => Ok(list),
-			other => bevybail!("expected list, got {:?}", other),
+			other => Err(ValueError::KindMismatch {
+				expected: ValueKind::List,
+				actual: other.kind(),
+			}),
 		}
 	}
 
 	/// Returns this value as a mutable list reference.
-	pub fn as_list_mut(&mut self) -> Result<&mut Vec<Value>> {
+	pub fn as_list_mut(&mut self) -> Result<&mut Vec<Value>, ValueError> {
 		match self {
 			Self::List(list) => Ok(list),
-			other => bevybail!("expected list, got {:?}", other),
+			other => Err(ValueError::KindMismatch {
+				expected: ValueKind::List,
+				actual: other.kind(),
+			}),
 		}
 	}
 

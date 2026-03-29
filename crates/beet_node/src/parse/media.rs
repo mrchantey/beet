@@ -147,6 +147,8 @@ mod test {
 					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
+			.child(0)
+			.unwrap()
 			.get::<Value>()
 			.cloned()
 			.unwrap()
@@ -201,6 +203,8 @@ mod test {
 					.parse(ParseContext::new(entity, &bytes))
 					.unwrap();
 			})
+			.child(0)
+			.unwrap()
 			.get::<Value>()
 			.cloned()
 			.unwrap()
