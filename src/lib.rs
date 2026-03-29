@@ -14,6 +14,8 @@ pub use beet_core::test;
 pub use beet_core::test_runner;
 #[cfg(feature = "testing")]
 pub use beet_core::testing;
+#[cfg(feature = "infra")]
+pub use beet_infra as infra;
 #[cfg(feature = "net")]
 pub use beet_net as net;
 #[cfg(feature = "node")]
@@ -55,6 +57,8 @@ pub mod prelude {
 	pub use crate::node::prelude::*;
 	#[cfg(feature = "node")]
 	pub use crate::node::val;
+	#[cfg(feature = "infra")]
+	pub use crate::infra::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "tool")]

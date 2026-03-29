@@ -1051,6 +1051,7 @@ dependencies = [
  "async-executor",
  "beet",
  "beet_core",
+ "beet_infra",
  "beet_net",
  "beet_node",
  "beet_router",
@@ -1137,6 +1138,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "beet_infra"
+version = "0.0.9-dev.6"
+dependencies = [
+ "beet_core",
 ]
 
 [[package]]

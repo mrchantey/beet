@@ -47,11 +47,12 @@ members = [
 	"crates/beet_core",
 	"crates/beet_core/macros",
 	"crates/beet_core/shared",
+	"crates/beet_infra",
 	"crates/beet_net",
-	"crates/beet_tool",
 	"crates/beet_node",
 	"crates/beet_router",
 	"crates/beet_thread",
+	"crates/beet_tool",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -82,10 +83,11 @@ beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.6" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.6" }
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.6" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.6" }
+beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.6" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.6" }
-beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.6" }
 beet_node = { path = "crates/beet_node", version = "0.0.9-dev.6" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.6" }
+beet_tool = { path = "crates/beet_tool", version = "0.0.9-dev.6" }
 
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.6" }
@@ -230,6 +232,7 @@ default = ["node"]
 http_server = ["net", "tool","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["tui","router", "markdown"]
 ansi_paint = ["beet_core/ansi_paint","beet_node?/ansi_paint"]
+
 # 💡 Core
 
 serde = ["beet_core/serde", "beet_net?/serde"]
@@ -276,6 +279,8 @@ node = ["dep:beet_node"]
 tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
+infra = ["dep:beet_infra"]
+
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]
 # css = ["beet_parse?/css", "beet_rsx?/css"]
@@ -311,6 +316,7 @@ markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 bevy = { workspace = true }
 
 beet_core.workspace = true
+beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }

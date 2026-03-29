@@ -1,0 +1,14 @@
+[package]
+name = "beet_infra"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Terraform configuration represented as high level Bevy scenes"
+repository.workspace = true
+
+
+[dependencies]
+beet_core = {workspace=true}
