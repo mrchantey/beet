@@ -230,12 +230,6 @@ impl<'t, 'w> ActorViewMut<'t, 'w> {
 			.expect("actor entity should have Actor component")
 	}
 
-	/// Inserts a [`PostStreamer`] component on this actor entity.
-	/// Convenience wrapper around [`with_bundle`](Self::with_bundle).
-	pub fn with_streamer(&mut self, streamer: impl Bundle) -> &mut Self {
-		self.with_bundle(streamer)
-	}
-
 	pub fn with_tool(&mut self, tool: impl Into<ToolDefinition>) -> &mut Self {
 		let entity = self.entity;
 		self.thread_view.world.spawn((ChildOf(entity), tool.into()));

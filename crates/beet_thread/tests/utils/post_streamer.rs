@@ -12,7 +12,7 @@ pub async fn basic_text_response(
 		"Say hello in exactly 3 words. Do not include any punctuation.",
 	);
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	let posts = actor.send_and_collect().await.unwrap();
 
 	posts.is_empty().xpect_false();
@@ -31,7 +31,7 @@ pub async fn streaming_response(
 		.insert_actor(Actor::human())
 		.insert_post("Count from 1 to 5.");
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	let posts = actor.send_and_collect().await.unwrap();
 
 	posts.is_empty().xpect_false();
@@ -51,7 +51,7 @@ pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
 		.insert_actor(Actor::human())
 		.insert_post("Say hello in exactly 5 words.");
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	let posts = actor.send_and_collect().await.unwrap();
 
 	let text = posts
@@ -85,7 +85,7 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 		.insert_actor(Actor::human())
 		.insert_post("What's the weather like in San Francisco?");
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	actor.with_tool(tool);
 	let posts = actor.send_and_collect().await.unwrap();
 
@@ -133,7 +133,7 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 	human.insert_post(image_post);
 	let thread = human.thread_view();
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	let posts = actor.send_and_collect().await.unwrap();
 
 	let text = posts
@@ -164,7 +164,7 @@ pub async fn multi_turn_conversation(
 		.insert_post("What is my name?");
 	// The real agent that will generate a response
 	let mut actor = thread.insert_actor(Actor::agent());
-	actor.with_streamer(streamer);
+	actor.with_bundle(streamer);
 	let posts = actor.send_and_collect().await.unwrap();
 
 	let text = posts
@@ -193,7 +193,7 @@ pub async fn image_roundtrip(
 		.insert_actor(Actor::human())
 		.insert_post("Describe a solid blue square image in exactly 3 words.");
 	let mut actor1 = thread1.insert_actor(Actor::agent());
-	actor1.with_streamer(text_streamer);
+	actor1.with_bundle(text_streamer);
 	let description_posts = actor1.send_and_collect().await.unwrap();
 
 	let description = description_posts
@@ -223,7 +223,7 @@ pub async fn image_roundtrip(
 	human2.insert_post(image_post);
 	let thread2 = human2.thread_view();
 	let mut actor2 = thread2.insert_actor(Actor::agent());
-	actor2.with_streamer(vision_streamer);
+	actor2.with_bundle(vision_streamer);
 	let vision_posts = actor2.send_and_collect().await.unwrap();
 
 	let color = vision_posts

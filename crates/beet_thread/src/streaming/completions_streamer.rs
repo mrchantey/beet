@@ -234,7 +234,7 @@ impl PostStreamer for CompletionsStreamer {
 struct CompletionsSseStream<S> {
 	inner: S,
 	done: bool,
-	accumulator: completions_mapper::StreamAccumulator,
+	accumulator: StreamAccumulator,
 }
 
 impl<S> CompletionsSseStream<S> {
@@ -242,7 +242,7 @@ impl<S> CompletionsSseStream<S> {
 		Self {
 			inner,
 			done: false,
-			accumulator: completions_mapper::StreamAccumulator::new(),
+			accumulator: StreamAccumulator::new(),
 		}
 	}
 }
@@ -309,6 +309,51 @@ where
 			)))),
 			Poll::Ready(None) => Poll::Ready(None),
 			Poll::Pending => Poll::Pending,
+		}
+	}
+}
+
+
+
+/// Tracks accumulated tool call state across streaming chunks.
+/// Each tool call arrives incrementally: the first chunk carries `id`
+/// and `name`, subsequent chunks append to `arguments`.
+#[derive(Debug, Clone, Default)]
+pub struct StreamAccumulator {
+	/// In-flight tool calls keyed by chunk index.
+	pub tool_calls: Vec<AccumulatedToolCall>,
+}
+
+/// A single in-progress tool call being assembled from stream deltas.
+#[derive(Debug, Clone, Default)]
+pub struct AccumulatedToolCall {
+	/// The tool call index within the response.
+	pub index: u32,
+	/// Tool call ID, provided in the first chunk.
+	pub id: String,
+	/// Function name, provided in the first chunk.
+	pub name: String,
+	/// Arguments accumulated across deltas.
+	pub arguments: String,
+}
+
+impl StreamAccumulator {
+	pub fn new() -> Self { Self::default() }
+
+	/// Resets state for a new response stream.
+	pub fn reset(&mut self) { self.tool_calls.clear(); }
+
+	pub fn get_or_insert(&mut self, index: u32) -> &mut AccumulatedToolCall {
+		if let Some(pos) =
+			self.tool_calls.iter().position(|tc| tc.index == index)
+		{
+			&mut self.tool_calls[pos]
+		} else {
+			self.tool_calls.push(AccumulatedToolCall {
+				index,
+				..Default::default()
+			});
+			self.tool_calls.last_mut().unwrap()
 		}
 	}
 }
