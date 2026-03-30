@@ -58,6 +58,30 @@ pub fn post_to_o11s_input(
 				status: None,
 			})
 		}
+		AgentPost::Url(url_view) if post.post.media_type().is_image() => {
+			InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Parts(vec![ContentPart::InputImage(
+					o11s::InputImage::from_url(url_view.url()),
+				)]),
+				status: None,
+			})
+		}
+		AgentPost::Url(url_view) if post.post.media_type().is_video() => {
+			InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Parts(vec![ContentPart::InputFile(
+					o11s::InputFile {
+						filename: url_view.filename(),
+						file_data: None,
+						file_url: Some(url_view.url().to_string()),
+					},
+				)]),
+				status: None,
+			})
+		}
 		AgentPost::Url(url_view) => InputItem::Message(MessageParam {
 			id: None,
 			role,
@@ -70,6 +94,33 @@ pub fn post_to_o11s_input(
 			)]),
 			status: None,
 		}),
+		AgentPost::Bytes(bytes_view) if post.post.media_type().is_image() => {
+			InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Parts(vec![ContentPart::InputImage(
+					o11s::InputImage::from_base64(
+						post.post.media_type().as_str(),
+						&bytes_view.body_base64(),
+					),
+				)]),
+				status: None,
+			})
+		}
+		AgentPost::Bytes(bytes_view) if post.post.media_type().is_video() => {
+			InputItem::Message(MessageParam {
+				id: None,
+				role,
+				content: MessageContent::Parts(vec![ContentPart::InputFile(
+					o11s::InputFile {
+						filename: bytes_view.filename(),
+						file_data: Some(bytes_view.body_base64()),
+						file_url: None,
+					},
+				)]),
+				status: None,
+			})
+		}
 		AgentPost::Bytes(bytes_view) => InputItem::Message(MessageParam {
 			id: None,
 			role,
@@ -88,13 +139,7 @@ pub fn post_to_o11s_input(
 			// using xml on assistant messages is likely to confuse them,
 			// ie they start using them in their own responses
 			let text = if role != MessageRole::Assistant {
-				format!(
-					"<post author={} author_kind={} author_id={}>{}</post>",
-					post.actor.name(),
-					post.actor.kind().input_str(),
-					post.actor.id(),
-					value
-				)
+				post.wrap_user_text(value)
 			} else {
 				value.to_string()
 			};

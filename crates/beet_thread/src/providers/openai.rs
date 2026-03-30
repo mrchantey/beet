@@ -4,56 +4,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
 /// An OpenResponses-compatible provider for OpenAI API.
 ///
 /// OpenAI API key must be set via the `OPENAI_API_KEY` environment variable.
-/// By default, connects to `https://api.openai.com/v1`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OpenAiProvider {
-	inner: OpenResponsesProvider,
-}
+pub struct OpenAiProvider;
 
-impl Default for OpenAiProvider {
-	fn default() -> Self { Self::new().unwrap() }
-}
-
-impl OpenAiProvider {
-	/// Creates a new provider with the API key from the environment.
-	pub fn new() -> Result<Self> {
-		let api_key = env_ext::var("OPENAI_API_KEY")?;
-		Ok(Self {
-			inner: OpenResponsesProvider::new(Self::RESPONSES_URL)
-				.with_auth(api_key),
-		})
-	}
-}
-
-impl ModelProvider for OpenAiProvider {
-	fn box_clone(&self) -> Box<dyn ModelProvider> { Box::new(self.clone()) }
-
-	fn provider_slug(&self) -> &'static str { Self::PROVIDER_SLUG }
-
-	fn default_small_model(&self) -> &'static str { Self::GPT_5_NANO }
-	fn default_tool_model(&self) -> &'static str { Self::GPT_5_MINI }
-	fn default_large_model(&self) -> &'static str { Self::GPT_5_2 }
-
-	fn send(
-		&self,
-		request: o11s::RequestBody,
-	) -> BoxedFuture<'_, Result<o11s::ResponseBody>> {
-		let request = OpenResponsesProvider::inline_text_file_data(request);
-		Box::pin(self.inner.send(request))
-	}
-
-	fn stream(
-		&self,
-		request: o11s::RequestBody,
-	) -> BoxedFuture<'_, Result<StreamingEventStream>> {
-		let request = OpenResponsesProvider::inline_text_file_data(request);
-		Box::pin(self.inner.stream(request))
-	}
-}
 impl OpenAiProvider {
 	pub const AUTH_ENV: &str = "OPENAI_API_KEY";
 

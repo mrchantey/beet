@@ -81,12 +81,10 @@ pub fn post_to_completions_message(
 				},
 			)
 		}
-		AgentPost::Url(url_view) if is_image_media(post.post.media_type()) => {
+		AgentPost::Url(url_view) if post.post.media_type().is_image() => {
 			build_image_user_message(&post, url_view.url().to_string(), kind)
 		}
-		AgentPost::Bytes(bytes_view)
-			if is_image_media(post.post.media_type()) =>
-		{
+		AgentPost::Bytes(bytes_view) if post.post.media_type().is_image() => {
 			let data_url = format!(
 				"data:{};base64,{}",
 				post.post.media_type().as_str(),
@@ -94,26 +92,41 @@ pub fn post_to_completions_message(
 			);
 			build_image_user_message(&post, data_url, kind)
 		}
+		AgentPost::Url(url_view) if post.post.media_type().is_video() => {
+			// Video URLs: include as a reference since completions API
+			// doesn't natively support inline video
+			let wrapped =
+				post.wrap_user_text(&format!("[Video: {}]", url_view.url()));
+			ChatCompletionRequestMessage::User(
+				ChatCompletionRequestUserMessage {
+					content: ChatCompletionRequestUserMessageContent::Text(
+						wrapped,
+					),
+					name: Some(post.actor.name().to_string()),
+				},
+			)
+		}
+		AgentPost::Bytes(_bytes_view) if post.post.media_type().is_video() => {
+			// Video bytes: reference as placeholder since completions API
+			// doesn't natively support inline video data
+			let wrapped = post.wrap_user_text("[Video attachment]");
+			ChatCompletionRequestMessage::User(
+				ChatCompletionRequestUserMessage {
+					content: ChatCompletionRequestUserMessageContent::Text(
+						wrapped,
+					),
+					name: Some(post.actor.name().to_string()),
+				},
+			)
+		}
 		// Text-like posts: Text, Refusal, ReasoningContent, ReasoningSummary, Error
-		// Also non-image Url/Bytes fall through here.
+		// Also non-image/non-video Url/Bytes fall through here.
 		_ => {
 			let value = post.body_str()?;
 			build_text_message(&post, value, kind, is_self)
 		}
 	};
 	msg.xok()
-}
-
-/// Wraps text in XML metadata for non-assistant, non-system,
-/// non-developer roles so the model can distinguish speakers.
-fn wrap_user_text(post: &PostView, text: &str) -> String {
-	format!(
-		"<post author={} author_kind={} author_id={}>{}</post>",
-		post.actor.name(),
-		post.actor.kind().input_str(),
-		post.actor.id(),
-		text
-	)
 }
 
 /// Builds a text message, dispatching on role.
@@ -160,7 +173,7 @@ fn build_text_message(
 		}
 		// Agent (other) or Human -> user message with XML wrapping
 		_ => {
-			let wrapped = wrap_user_text(post, text);
+			let wrapped = post.wrap_user_text(text);
 			ChatCompletionRequestMessage::User(
 				ChatCompletionRequestUserMessage {
 					content: ChatCompletionRequestUserMessageContent::Text(
@@ -193,21 +206,6 @@ fn build_image_user_message(
 		name: Some(post.actor.name().to_string()),
 	})
 }
-
-/// Returns `true` when the media type represents an image format.
-fn is_image_media(media: &MediaType) -> bool {
-	matches!(
-		media,
-		MediaType::Png
-			| MediaType::Jpeg
-			| MediaType::Gif
-			| MediaType::Webp
-			| MediaType::Avif
-			| MediaType::Bmp
-			| MediaType::Tiff
-	)
-}
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // Response Mapping: CreateChatCompletionResponse -> ResponsePartial

@@ -520,6 +520,28 @@ impl MediaType {
 				| MediaType::AnsiTerm
 		)
 	}
+
+	/// Whether this is a raster image format suitable for vision model input.
+	pub fn is_image(&self) -> bool {
+		matches!(
+			self,
+			MediaType::Png
+				| MediaType::Jpeg
+				| MediaType::Gif
+				| MediaType::Webp
+				| MediaType::Avif
+				| MediaType::Bmp
+				| MediaType::Tiff
+		)
+	}
+
+	/// Whether this is a video format.
+	pub fn is_video(&self) -> bool {
+		matches!(
+			self,
+			MediaType::Mp4 | MediaType::VideoWebm | MediaType::VideoOgg
+		)
+	}
 }
 
 impl core::str::FromStr for MediaType {
@@ -795,5 +817,30 @@ mod test {
 		MediaType::Png.is_text().xpect_false();
 		MediaType::Bytes.is_text().xpect_false();
 		MediaType::Wasm.is_text().xpect_false();
+	}
+
+	#[test]
+	fn is_image_types() {
+		MediaType::Png.is_image().xpect_true();
+		MediaType::Jpeg.is_image().xpect_true();
+		MediaType::Gif.is_image().xpect_true();
+		MediaType::Webp.is_image().xpect_true();
+		MediaType::Avif.is_image().xpect_true();
+		MediaType::Bmp.is_image().xpect_true();
+		MediaType::Tiff.is_image().xpect_true();
+		MediaType::Svg.is_image().xpect_false();
+		MediaType::Ico.is_image().xpect_false();
+		MediaType::Text.is_image().xpect_false();
+		MediaType::Mp4.is_image().xpect_false();
+	}
+
+	#[test]
+	fn is_video_types() {
+		MediaType::Mp4.is_video().xpect_true();
+		MediaType::VideoWebm.is_video().xpect_true();
+		MediaType::VideoOgg.is_video().xpect_true();
+		MediaType::Png.is_video().xpect_false();
+		MediaType::Ogg.is_video().xpect_false();
+		MediaType::Text.is_video().xpect_false();
 	}
 }

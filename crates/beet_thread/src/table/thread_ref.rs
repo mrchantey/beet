@@ -116,4 +116,16 @@ impl std::ops::Deref for PostView<'_> {
 impl PostView<'_> {
 	pub fn entity(&self) -> Entity { self.entity }
 	pub fn actor_id(&self) -> ActorId { self.actor.id() }
+
+	/// Wraps text in XML metadata tags so models can distinguish speakers.
+	/// Used for non-assistant, non-system, non-developer messages.
+	pub fn wrap_user_text(&self, text: &str) -> String {
+		format!(
+			"<post author={} author_kind={} author_id={}>{}</post>",
+			self.actor.name(),
+			self.actor.kind().input_str(),
+			self.actor.id(),
+			text
+		)
+	}
 }
