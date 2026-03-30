@@ -1,5 +1,4 @@
 use crate::o11s::request::Input;
-use crate::o11s::request::InputItem;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -60,6 +59,76 @@ impl O11sStreamer {
 		self.use_previous_response_id = true;
 		self
 	}
+
+	async fn build_request(
+		&self,
+		caller: AsyncEntity,
+	) -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
+		// TODO perhaps with new bevy async we wont need 'static FnOnce,
+		// so wont need to clone
+		let this = self.clone();
+
+		caller
+			.with_state::<SocialQuery, _>(
+				move |actor_entity,
+				      query|
+				      -> Result<(o11s::RequestBody, ActorId, ThreadId)> {
+					let thread = query.thread(actor_entity)?;
+					let agent = thread.actor(actor_entity)?;
+
+					// get last received response meta
+					let last_received = if this.use_previous_response_id {
+						thread.stored_response(
+							actor_entity,
+							&this.model.provider_slug,
+							&this.model.model_slug,
+						)
+					} else {
+						None
+					};
+
+					// get input items (from last received if caching)
+					let items = thread
+						.posts_from(last_received.map(|(post, _)| post.id()))
+						.into_iter()
+						.xtry_map(|post| {
+							o11s_mapper::post_to_o11s_input(agent.id(), post)
+						})?;
+
+					let tools = query
+						.tools(agent.entity)
+						.into_iter()
+						.map(|(_entity, tool_def)| {
+							o11s_mapper::tool_to_function_param(tool_def)
+						})
+						.collect::<Vec<_>>();
+
+					// last_received.map(|(_, meta)| meta.clone())
+					// 4. build request body
+					let mut req_body =
+						o11s::RequestBody::new(&*this.model.model_slug)
+							.with_input(Input::Items(items))
+							.with_tools(tools)
+							.with_stream(this.stream);
+
+					if let Some(tool_choice) = &agent.tool_choice {
+						req_body = req_body.with_tool_choice(
+							o11s_mapper::tool_choice(tool_choice),
+						);
+					}
+
+					if let Some((_, last)) = last_received {
+						req_body = req_body
+							.with_previous_response_id(&last.response_id);
+					}
+					if let Some(instructions) = this.instructions {
+						req_body = req_body.with_instructions(instructions);
+					}
+					(req_body, agent.id(), thread.id()).xok()
+				},
+			)
+			.await
+	}
 }
 
 impl PostStreamer for O11sStreamer {
@@ -74,74 +143,7 @@ impl PostStreamer for O11sStreamer {
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		Box::pin(async move {
-			// 1. find last received from this provider match
-			// last_received may still be None if no match was found
-
-			let use_previous_response_id = self.use_previous_response_id;
-			let provider_slug = self.model.provider_slug.clone();
-			let model_slug = self.model.model_slug.clone();
-
-			let (thread, agent, last_received, input_items) = caller
-				.with_state::<SocialQuery, _>(
-					move |actor_entity,
-					      query|
-					      -> Result<(
-						ThreadId,
-						ActorId,
-						Option<ResponseMeta>,
-						Vec<InputItem>,
-					)> {
-						let thread = query.thread(actor_entity)?;
-						let agent = thread.actor(actor_entity)?;
-
-						// get last received response meta
-						let last_received = if use_previous_response_id {
-							thread.stored_response(
-								actor_entity,
-								&provider_slug,
-								&model_slug,
-							)
-						} else {
-							None
-						};
-
-						// get input items (from last received if caching)
-						let items = thread
-							.posts_from(
-								last_received.map(|(post, _)| post.id()),
-							)
-							.into_iter()
-							.xtry_map(|post| {
-								o11s_mapper::post_to_o11s_input(
-									agent.id(),
-									post,
-								)
-							})?;
-
-						Ok((
-							thread.id(),
-							agent.id(),
-							last_received.map(|(_, meta)| meta.clone()),
-							items,
-						))
-					},
-				)
-				.await?;
-
-			// 3. build tool items
-			let tools = vec![];
-
-			// 4. build request body
-			let mut req_body = o11s::RequestBody::new(&*self.model.model_slug)
-				.with_input(Input::Items(input_items))
-				.with_tools(tools)
-				.with_stream(self.stream);
-			if let Some(last) = last_received {
-				req_body = req_body.with_previous_response_id(last.response_id);
-			}
-			if let Some(instructions) = &self.instructions {
-				req_body = req_body.with_instructions(instructions);
-			}
+			let (req_body, agent, thread) = self.build_request(caller).await?;
 
 			// 5. build and send request
 			let mut request = Request::post(&self.model.url)

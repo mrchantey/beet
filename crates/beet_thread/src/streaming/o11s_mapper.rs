@@ -1,4 +1,5 @@
 use crate::o11s::ContentPart;
+use crate::o11s::FunctionToolParam;
 use crate::o11s::MessageRole;
 use crate::o11s::ResponseBody;
 use crate::o11s::StreamingEvent;
@@ -413,4 +414,68 @@ fn stream_to_partial_posts(event: StreamingEvent) -> Result<Vec<PostPartial>> {
 		}
 	}
 	.xok()
+}
+
+
+
+pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
+	match tool {
+		ToolDefinition::Function(func) => FunctionToolParam {
+			tool_type: "function".to_string(),
+			name: func.name().to_string(),
+			description: func.description().to_string().xsome(),
+			parameters: func.params_schema().clone().xsome(),
+			strict: Some(true),
+		},
+		ToolDefinition::Provider(provider) => FunctionToolParam {
+			// NOTE: FunctionToolParam restriction is incorrect,
+			// there is an open issue on openresponses to resolve this
+			tool_type: provider.name().to_string(),
+			name: "".to_string(),
+			description: None,
+			parameters: None,
+			strict: Some(true),
+		},
+	}
+}
+
+
+pub fn tool_choice(tool: &ToolChoice) -> o11s::ToolChoice {
+	use crate::o11s::AllowedToolsChoice;
+	use crate::o11s::SpecificFunctionChoice;
+	use crate::o11s::ToolChoiceValue;
+	// use crate::o11s::
+	match tool {
+		ToolChoice::Auto => o11s::ToolChoice::Value(ToolChoiceValue::Auto),
+		ToolChoice::AutoList(items) => {
+			o11s::ToolChoice::AllowedTools(AllowedToolsChoice {
+				choice_type: "allowed_tools".into(),
+				mode: ToolChoiceValue::Auto,
+				tools: items
+					.into_iter()
+					.map(|name| SpecificFunctionChoice {
+						name: name.to_string(),
+						choice_type: "function".into(),
+					})
+					.collect::<Vec<_>>(),
+			})
+		}
+		ToolChoice::RequiredAny => {
+			o11s::ToolChoice::Value(ToolChoiceValue::Required)
+		}
+		ToolChoice::RequiredList(items) => {
+			o11s::ToolChoice::AllowedTools(AllowedToolsChoice {
+				choice_type: "allowed_tools".into(),
+				mode: ToolChoiceValue::Auto,
+				tools: items
+					.into_iter()
+					.map(|name| SpecificFunctionChoice {
+						name: name.to_string(),
+						choice_type: "function".into(),
+					})
+					.collect::<Vec<_>>(),
+			})
+		}
+		ToolChoice::None => o11s::ToolChoice::Value(ToolChoiceValue::None),
+	}
 }

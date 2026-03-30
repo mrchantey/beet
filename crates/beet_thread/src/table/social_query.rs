@@ -7,7 +7,9 @@ pub struct SocialQuery<'w, 's> {
 	pub ancestors: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
 	pub threads: Query<'w, 's, (Entity, &'static Thread)>,
-	pub actors: Query<'w, 's, (Entity, &'static Actor)>,
+	pub actors:
+		Query<'w, 's, (Entity, &'static Actor, Option<&'static ToolChoice>)>,
+	pub tools: Query<'w, 's, (Entity, &'static ToolDefinition)>,
 	pub posts:
 		Query<'w, 's, (Entity, &'static Post, Option<&'static ResponseMeta>)>,
 }
@@ -29,7 +31,11 @@ impl<'w, 's> SocialQuery<'w, 's> {
 			.children
 			.iter_descendants_inclusive(thread_entity)
 			.filter_map(|entity| self.actors.get(entity).ok())
-			.map(|(entity, actor)| ActorView { entity, actor })
+			.map(|(entity, actor, tool_choice)| ActorView {
+				entity,
+				actor,
+				tool_choice,
+			})
 			.collect();
 
 		let mut posts: Vec<PostView<'_>> = self
@@ -57,6 +63,13 @@ impl<'w, 's> SocialQuery<'w, 's> {
 		}
 		.xok()
 	}
+	/// Recurse down (DFS) to find all [`ToolDefinition`] entities, returning their entities and definitions.
+	pub fn tools(&self, actor: Entity) -> Vec<(Entity, &ToolDefinition)> {
+		self.children
+			.iter_descendants_inclusive(actor)
+			.filter_map(|entity| self.tools.get(entity).ok())
+			.collect()
+	}
 
 	/// Find the [`ActorView`] that owns the given post entity.
 	pub fn actor_from_post_entity<'a>(
@@ -66,7 +79,11 @@ impl<'w, 's> SocialQuery<'w, 's> {
 		self.ancestors
 			.iter_ancestors_inclusive(post)
 			.find_map(|entity| self.actors.get(entity).ok())
-			.map(|(entity, actor)| ActorView { entity, actor })
+			.map(|(entity, actor, tool_choice)| ActorView {
+				entity,
+				actor,
+				tool_choice,
+			})
 			.ok_or_else(|| {
 				bevyhow!("No actor ancestor found for post {post:?}")
 			})
@@ -84,7 +101,7 @@ impl<'w, 's> SocialQuery<'w, 's> {
 			.ancestors
 			.iter_ancestors_inclusive(parent)
 			.find_map(|entity| {
-				self.actors.get(entity).map(|(_, actor)| actor.id()).ok()
+				self.actors.get(entity).map(|(_, actor, _)| actor.id()).ok()
 			})
 			.ok_or_else(|| {
 				bevyhow!("No actor ancestor found for {parent:?}")

@@ -90,6 +90,7 @@ impl<'a> ThreadRef<'a> {
 pub struct ActorView<'a> {
 	pub entity: Entity,
 	pub actor: &'a Actor,
+	pub tool_choice: Option<&'a ToolChoice>,
 }
 
 impl std::ops::Deref for ActorView<'_> {

@@ -13,18 +13,20 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["fs","tool","nightly"]
+default = ["fs","tool","agent", "nightly"]
 nightly = []
 rustls-tls = ["beet_net/rustls-tls"]
 native-tls = ["beet_net/native-tls"]
 fs = ["beet_core/fs"]
 tool = ["dep:beet_tool"]
+agent = ["dep:async-openai"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["ureq","json"] }
 beet_core = { workspace = true, features = ["serde"] }
 beet_tool = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["v7", "js"] }
+async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
 strum.workspace = true
