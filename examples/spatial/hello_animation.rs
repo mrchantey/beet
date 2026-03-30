@@ -50,7 +50,7 @@ fn setup(
 		children![(
 			Name::new("Behavior"),
 			TriggerOnAnimationReady::run(),
-			Sequence::default(),
+			Sequence::new(),
 			Retrigger::default(),
 			children![
 				(

@@ -11,6 +11,18 @@ pub enum EnvError {
 	NotFound(String),
 }
 
+/// Load environment variables from a `.env` file in the current directory.
+pub fn load_dotenv() {
+	#[cfg(not(target_arch = "wasm32"))]
+	{
+		dotenv::dotenv().ok();
+	}
+	#[cfg(target_arch = "wasm32")]
+	{
+		todo!("probs load from query params or something?")
+	}
+}
+
 /// Get the command line arguments, excluding the program name
 pub fn args() -> Vec<String> {
 	#[cfg(not(target_arch = "wasm32"))]

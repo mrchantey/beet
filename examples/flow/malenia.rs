@@ -46,7 +46,7 @@ fn run_app() {
 			Name::new("Malenia"),
 			Health::default(),
 			HealingPotions(2),
-			Fallback::default(),
+			Fallback::new(),
 			Retrigger::default(),
 		))
 		.with_children(|root| {
@@ -90,8 +90,10 @@ fn run_app() {
 }
 
 
-#[action(attack_player)]
+observer_adder!(on_add_attack_player, attack_player);
+
 #[derive(Component)]
+#[component(on_add = on_add_attack_player)]
 struct AttackPlayer {
 	max_damage: f32,
 	max_recoil: f32,
@@ -159,8 +161,10 @@ impl Default for Health {
 	fn default() -> Self { Self(100.0) }
 }
 
-#[action(provide_random_score)]
+observer_adder!(on_add_provide_random_score, provide_random_score);
+
 #[derive(Component, Reflect)]
+#[component(on_add = on_add_provide_random_score)]
 struct RandomScoreProvider {
 	pub scalar: f32,
 	pub offset: f32,
@@ -192,8 +196,10 @@ fn provide_random_score(
 }
 
 
-#[action(try_heal_self)]
+observer_adder!(on_add_try_heal_self, try_heal_self);
+
 #[derive(Component, Reflect)]
+#[component(on_add = on_add_try_heal_self)]
 struct TryHealSelf;
 
 fn try_heal_self(

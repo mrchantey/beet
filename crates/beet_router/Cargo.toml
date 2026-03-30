@@ -2,59 +2,58 @@
 name = "beet_router"
 version.workspace = true
 edition.workspace = true
-description = "Transport agnostic routing for bevy applications"
+description = "An opinionated semantic layer between applications and interfaces"
 documentation.workspace = true
 readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["bevy","server","router"]
+keywords.workspace = true
 categories.workspace = true
-publish = true
+
 
 [features]
-default = ["serde", "fs"]
-reflect_documentation = [
-	"bevy/reflect_documentation"
-]
-server = [
-	"beet_net/server",
-	# technically only required for internal tests
-	"beet_net/ureq"
-]
-tokens = ["beet_core/tokens"]
-# for conditional compilation in hooks
-client = ["beet_net/client"]
-fs = ["beet_net/fs"]
-serde = [
-	"dep:serde",
-	"dep:serde_json",
-	"beet_core/serde",
-]
+default = ["markdown"]
+interface = ["serde"]
+json = ["serde", "beet_core/json", "beet_net/json"]
+postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
+serde = ["dep:serde"]
+tui = ["dep:bevy_ratatui", "dep:ratatui"]
+markdown = ["dep:pulldown-cmark"]
+http = ["beet_net/server"]
+bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
-beet_core = {workspace = true, features=["ansi_paint"]}
-beet_net = {workspace = true, features=["flow"]}
-beet_dom.workspace = true
-beet_flow.workspace = true
-beet_rsx.workspace = true
-
+beet_core.workspace = true
+beet_node.workspace = true
+beet_tool.workspace = true
+beet_net.workspace = true
 bevy.workspace = true
-
-# utils
 extend.workspace = true
 thiserror.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-heck.workspace = true
+variadics_please.workspace = true
+bitflags = "2"
 
-# serde
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+serde = {workspace = true, optional=true}
 
-# async
-futures.workspace = true
-async-channel.workspace = true
+pulldown-cmark = { version = "0.13", optional = true }
+
+webbrowser.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy_ratatui = {workspace = true, optional=true,features=["crossterm"]}
+ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+
+
+
+
+# [[test]]
+# name = "interface"
+# path = "tests/interface.rs"
+# required-features = ["interface"]

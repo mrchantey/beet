@@ -1,11 +1,17 @@
-mod action;
+#![no_std]
+extern crate alloc;
+use macros::*;
+
+mod as_any;
 mod bundle_effect;
 mod entity_target_event;
 mod macros;
+mod mdx;
 mod sendit;
 mod to_tokens;
+mod tool;
 mod utils;
-use macros::*;
+
 
 
 
@@ -84,26 +90,10 @@ pub fn bundle_effect(
 	bundle_effect::impl_bundle_effect(input).into()
 }
 
-/// Convenience helper to directly add observers to this entity.
-/// This macro must be placed above `#[derive(Component)]` as it
-/// sets the `on_add` hook.
-/// ## Example
-/// ```rust ignore
-/// #[action(log_on_run)]
-/// #[derive(Component)]
-/// struct LogOnRun(pub String);
-///
-/// fn log_on_run(trigger: On<GetOutcome>, query: Populated<&LogOnRun>) {
-/// 	let name = query.get(trigger.target()).unwrap();
-/// 	println!("log_name_on_run: {}", name.0);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn action(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	action::impl_action(attr, item)
+/// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
+#[proc_macro_derive(Any, attributes(event))]
+pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	as_any::impl_as_any(input).into()
 }
 
 
@@ -178,4 +168,62 @@ pub fn beet_test(
 	parse_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+/// MDX-style markdown macro with `{}` interpolation.
+///
+/// Parses markdown text interspersed with `{}` bundle expressions.
+/// The crate path is resolved automatically via `internal_or_beet`.
+///
+/// # Input Format
+///
+/// ```text
+/// mdx!(# Heading text {bundle_expr} more text)
+/// mdx!("string with {interpolation}")
+/// ```
+#[proc_macro]
+pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	mdx::impl_mdx(input)
+}
+
+
+/// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
+///
+/// Works like `tokio::main` but uses `async-executor` for a lightweight, dependency-light runtime.
+///
+/// # Requirements
+///
+/// - Must be applied to an `async fn main()`
+/// - Not supported on `wasm32` targets
+///
+/// # Example
+///
+/// ```ignore
+/// #[beet::main]
+/// async fn main() {
+///     // async code here
+/// }
+///
+/// #[beet::main]
+/// async fn main() -> anyhow::Result<()> {
+///     // async code that returns a Result
+///     Ok(())
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn beet_main(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	parse_main_attr(attr, input)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
+}
+
+#[proc_macro_attribute]
+pub fn tool(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	tool::impl_tool(attr, item)
 }

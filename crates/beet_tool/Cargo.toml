@@ -1,0 +1,28 @@
+[package]
+name = "beet_tool"
+version.workspace = true
+edition.workspace = true
+description = "Entities as async functions."
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["reflect"]
+serde = ["dep:serde", "beet_core/serde"]
+json = ["serde","dep:serde_json","beet_core/json"]
+reflect = ["bevy/reflect_functions"]
+
+[dependencies]
+beet_core = { workspace = true }
+bevy.workspace = true
+bitflags.workspace = true
+extend.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }

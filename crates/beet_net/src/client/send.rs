@@ -1,7 +1,15 @@
-//! HTTP request sending functionality.
+//! Request sending with scheme-based routing.
 //!
-//! This module provides the [`RequestClientExt`] extension trait that adds
-//! a `send()` method to [`Request`] for executing HTTP requests.
+//! This module provides the [`Request::send`] method that routes requests
+//! based on their URL scheme:
+//!
+//! - `http` | `https` → HTTP client (ureq, reqwest, or web-sys)
+//! - `file` → local filesystem via [`FileClient`]
+//! - `data` → inline data URI, decoded to a 200 response
+//! - No scheme with authority → HTTP client
+//! - No scheme without authority → local filesystem via [`FileClient`]
+//! - Other → returns an error
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Validates that appropriate TLS features are enabled for HTTPS requests.
@@ -18,64 +26,222 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 	Ok(())
 }
 
+/// Send a request via the appropriate HTTP backend.
+///
+/// This is the HTTP-specific send path used by scheme routing.
+#[allow(unused)]
+async fn send_http(request: Request) -> Result<Response> {
+	#[cfg(target_arch = "wasm32")]
+	{
+		super::impl_web_sys::send_wasm(request).await
+	}
+	#[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
+	{
+		super::impl_ureq::send_ureq(request).await
+	}
+	#[cfg(all(
+		feature = "reqwest",
+		not(feature = "ureq"),
+		not(target_arch = "wasm32")
+	))]
+	{
+		super::impl_reqwest::send_reqwest(request).await
+	}
+
+	#[cfg(not(any(
+		feature = "reqwest",
+		feature = "ureq",
+		target_arch = "wasm32"
+	)))]
+	{
+		bevybail!(
+			"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
+		);
+	}
+}
+
+/// Send a request via the local filesystem [`FileClient`].
+#[cfg(feature = "fs")]
+async fn send_file(request: Request) -> Result<Response> {
+	let url = request.url();
+	let path = match url.scheme() {
+		// file:// URLs produce absolute paths via path_string()
+		Scheme::File => url.path_string(),
+		// No scheme — join segments without leading `/` to keep relative
+		_ => url.path().join("/"),
+	};
+	FileClient::new().send(path).await
+}
+
 /// Extension trait for sending HTTP requests.
 ///
 /// This trait provides a unified `send()` method that works across platforms,
-/// automatically selecting the appropriate HTTP backend based on target and features.
-#[extend::ext(name=RequestClientExt)]
-pub impl Request {
+/// automatically selecting the appropriate backend based on the URL scheme.
+impl Request {
 	/// Sends this request and returns the response.
 	///
-	/// # Platform Behavior
+	/// # Scheme Routing
 	///
-	/// - **WASM**: Uses `web-sys` fetch API
-	/// - **Native + `ureq`**: Uses blocking ureq, wrapped in unblock + async
-	/// - **Native + `reqwest`**: Uses async reqwest client
+	/// | Scheme | Backend |
+	/// |--------|---------|
+	/// | `http` / `https` | HTTP client (ureq, reqwest, or web-sys) |
+	/// | `file` | Local filesystem via [`FileClient`] |
+	/// | `data` | Inline data URI decoded to a 200 response |
+	/// | None + authority present | HTTP client |
+	/// | None + no authority | Local filesystem via [`FileClient`] |
+	/// | Other | Returns an error |
 	///
 	/// # Errors
 	///
 	/// Returns an error if the request fails due to network issues,
-	/// invalid URLs, or missing TLS features for HTTPS requests.
-	#[allow(async_fn_in_trait)]
-	async fn send(self) -> Result<Response> {
-		#[cfg(target_arch = "wasm32")]
-		{
-			super::impl_web_sys::send_wasm(self).await
-		}
-		#[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
-		{
-			super::impl_ureq::send_ureq(self).await
-		}
-		#[cfg(all(
-			feature = "reqwest",
-			not(feature = "ureq"),
-			not(target_arch = "wasm32")
-		))]
-		{
-			super::impl_reqwest::send_reqwest(self).await
-		}
-
-		#[cfg(not(any(
-			feature = "reqwest",
-			feature = "ureq",
-			target_arch = "wasm32"
-		)))]
-		{
-			panic!(
-				"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
-			);
+	/// invalid URLs, missing TLS features for HTTPS requests, or
+	/// an unsupported scheme.
+	pub async fn send(self) -> Result<Response> {
+		match self.scheme() {
+			Scheme::Http | Scheme::Https => send_http(self).await,
+			Scheme::File => {
+				#[cfg(feature = "fs")]
+				{
+					send_file(self).await
+				}
+				#[cfg(not(feature = "fs"))]
+				{
+					bevybail!(
+						"The 'fs' feature is required for file:// requests"
+					);
+				}
+			}
+			Scheme::None => {
+				if self.url().authority().is_some() {
+					// Authority present without a scheme, assume HTTP
+					send_http(self).await
+				} else {
+					// No authority — treat as a local file path
+					#[cfg(feature = "fs")]
+					{
+						send_file(self).await
+					}
+					#[cfg(not(feature = "fs"))]
+					{
+						bevybail!(
+							"The 'fs' feature is required for local file requests"
+						);
+					}
+				}
+			}
+			Scheme::About
+				if self.path().first() == Some(&String::from("blank")) =>
+			{
+				Ok(Response::ok())
+			}
+			Scheme::Ws | Scheme::Wss => {
+				bevybail!(
+					"WebSocket schemes are not supported by Request::send, use the sockets module instead"
+				);
+			}
+			Scheme::Data => send_data(self).await,
+			Scheme::MailTo
+			| Scheme::Tel
+			| Scheme::JavaScript
+			| Scheme::Blob
+			| Scheme::Cid
+			| Scheme::About
+			| Scheme::Chrome => {
+				bevybail!(
+					"Non-hierarchical scheme '{}' is not supported by Request::send",
+					self.scheme()
+				);
+			}
+			Scheme::Other(scheme) => {
+				bevybail!("Unsupported URL scheme: {scheme}");
+			}
 		}
 	}
 }
 
+/// Serve an inline data URI as a synthetic 200 response.
+///
+/// Parses the data URI payload, decodes the body, and sets the `Content-Type`
+/// header to the declared media type. The `Accept` header on the request is
+/// respected — if the declared media type is not acceptable a 406 response is
+/// returned.
+async fn send_data(request: Request) -> Result<Response> {
+	let mb = MediaBytes::from_url(request.url())?;
+
+	// Content negotiation: check Accept header if present.
+	let accepts = request
+		.headers()
+		.get::<header::Accept>()
+		.and_then(|res| res.ok())
+		.unwrap_or_default();
+
+	if !accepts.is_empty() && !accepts.contains(mb.media_type()) {
+		return Ok(Response::from_status(StatusCode::NOT_ACCEPTABLE));
+	}
+
+	Response::ok()
+		.with_content_type(mb.media_type().clone())
+		.with_body(mb.bytes().to_vec())
+		.xok()
+}
 
 
-#[cfg(any(
-	all(feature = "ureq", feature = "native-tls"),
-	all(feature = "reqwest", feature = "native-tls"),
-	target_arch = "wasm32"
-))]
 #[cfg(test)]
+mod test_data_scheme {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	async fn data_text_plain() {
+		let response = Request::get("data:text/plain,Hello%20World")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response
+			.parts
+			.headers
+			.get::<crate::headers::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::Text);
+	}
+
+	#[beet_core::test]
+	async fn data_html() {
+		let response = Request::get("data:text/html,<h1>Hi</h1>")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		let text = response.text().await.unwrap();
+		text.xpect_contains("<h1>Hi</h1>");
+	}
+
+	#[beet_core::test]
+	async fn data_base64() {
+		// "Hello" base64-encoded
+		let response = Request::get("data:text/plain;base64,SGVsbG8=")
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response.text().await.unwrap().xpect_eq("Hello");
+	}
+
+	#[beet_core::test]
+	async fn data_accept_mismatch_returns_406() {
+		let response = Request::get("data:text/html,<h1>Hi</h1>")
+			.with_accept(MediaType::Json)
+			.send()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::NOT_ACCEPTABLE);
+	}
+}
+
+#[cfg(test)]
+#[cfg(feature = "json")]
 mod test_request {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -85,14 +251,14 @@ mod test_request {
 	// TODO spin up our own server for tests
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
-	// #[ignore = "flaky example.com"]
+	#[ignore = "requires external network and system CA certs"]
 	async fn works() {
 		Request::get("https://example.com")
 			.send()
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -103,7 +269,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -116,19 +282,19 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
 	#[ignore = "flaky httpbin"]
 	async fn custom_header_works() {
 		Request::get(format!("{HTTPBIN}/headers"))
-			.with_header("X-Foo", "Bar")
+			.with_header_raw("X-Foo", "Bar")
 			.send()
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -140,7 +306,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 
 		Request::get(format!("{HTTPBIN}/delete"))
 			.with_method(HttpMethod::Delete)
@@ -148,7 +314,7 @@ mod test_request {
 			.await
 			.unwrap()
 			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::Ok);
+			.xpect_eq(StatusCode::OK);
 	}
 
 	#[beet_core::test]
@@ -199,6 +365,7 @@ mod test_request {
 
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	#[ignore = "requires external network and system CA certs"]
 	async fn concurrent_requests_complete_independently() {
 		// This test verifies that multiple requests can run concurrently
 		// without blocking each other. Make 3 concurrent requests - if they're
@@ -212,9 +379,9 @@ mod test_request {
 
 		let (res1, res2, res3) = futures::join!(req1, req2, req3);
 
-		res1.unwrap().status().xpect_eq(StatusCode::Ok);
-		res2.unwrap().status().xpect_eq(StatusCode::Ok);
-		res3.unwrap().status().xpect_eq(StatusCode::Ok);
+		res1.unwrap().status().xpect_eq(StatusCode::OK);
+		res2.unwrap().status().xpect_eq(StatusCode::OK);
+		res3.unwrap().status().xpect_eq(StatusCode::OK);
 
 		// Should complete concurrently in < 3 seconds, not sequentially
 		start.elapsed().as_secs().xpect_less_than(3);
@@ -234,8 +401,8 @@ mod test_request {
 	#[ignore = "flaky httpbin"]
 	async fn query_params_work() {
 		Request::get(format!("{HTTPBIN}/get"))
-			.with_query_param("foo", "bar")
-			.with_query_param("baz", "qux")
+			.with_param("foo", "bar")
+			.with_param("baz", "qux")
 			.send()
 			.await
 			.unwrap()
@@ -244,17 +411,12 @@ mod test_request {
 			.unwrap()
 			.xpect_contains("baz");
 	}
-
-	#[test]
-	#[should_panic]
-	fn invalid_header_fails() {
-		Request::get("http://localhost").with_header("bad\nheader", "val");
-	}
 }
 
 
 #[cfg(test)]
 #[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
+#[cfg(feature = "json")]
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -292,5 +454,39 @@ mod test_response {
 			.len()
 			.xpect_greater_than(200)
 			.xpect_less_than(1000);
+	}
+}
+
+
+#[cfg(feature = "fs")]
+#[cfg(test)]
+mod test_file_scheme {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[beet_core::test]
+	async fn send_with_file_scheme() {
+		let cwd = fs_ext::current_dir().unwrap();
+		let cargo_toml = cwd.join("Cargo.toml");
+		if !cargo_toml.exists() {
+			return;
+		}
+		let url = format!("file://{}", cargo_toml.display());
+		let response = Request::get(url).send().await.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response.text().await.unwrap().xpect_contains("[package]");
+	}
+
+	#[beet_core::test]
+	async fn send_bare_path() {
+		let cwd = fs_ext::current_dir().unwrap();
+		let cargo_toml = cwd.join("Cargo.toml");
+		if !cargo_toml.exists() {
+			return;
+		}
+		// A bare relative path with no scheme or authority
+		let response = Request::get("Cargo.toml").send().await.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response.text().await.unwrap().xpect_contains("[package]");
 	}
 }

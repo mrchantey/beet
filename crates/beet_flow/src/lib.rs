@@ -32,7 +32,7 @@
 //! - [`Fallback`]: Runs children in order until one succeeds
 //! - [`Parallel`]: Runs all children simultaneously
 //! - [`HighestScore`]: Runs the highest-scoring child (Utility AI)
-//! 
+//!
 //! # Concepts - Agent
 //!
 //! It is common for actions to have a single "target" entity they operate on.

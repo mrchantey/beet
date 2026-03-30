@@ -31,7 +31,8 @@ impl LocalStorageProvider {
 	}
 }
 
-impl<T: TableRow> TableProvider<T> for LocalStorageProvider {
+#[cfg(feature = "json")]
+impl<T: TableStoreRow> TableProvider<T> for LocalStorageProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}

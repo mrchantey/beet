@@ -13,7 +13,6 @@
 
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
-use bevy::ecs::error::ErrorContext;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -41,51 +40,38 @@ pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
-/// Trait for allowing bundles and results to be returned from methods.
-pub trait ApplyToEntity<M>: 'static + Send + Sync {
-	/// Applies this value to the entity.
-	fn apply(self, entity: &mut EntityWorldMut);
-}
-
-/// Marker type for bundle implementations of [`ApplyToEntity`].
-pub struct BundleApplyToEntityMarker;
-
-/// Marker type for result implementations of [`ApplyToEntity`].
-pub struct ResultApplyToEntityMarker;
-
-impl<T: Bundle> ApplyToEntity<BundleApplyToEntityMarker> for T {
-	fn apply(self, entity: &mut EntityWorldMut) { entity.insert(self); }
-}
-
-impl<T: Bundle> ApplyToEntity<ResultApplyToEntityMarker> for Result<T> {
-	fn apply(self, entity: &mut EntityWorldMut) {
-		match self {
-			Ok(bundle) => {
-				entity.insert(bundle);
-			}
-			Err(err) => entity.world_scope(|world| {
-				world.default_error_handler()(
-					err.into(),
-					ErrorContext::Command {
-						name: "ApplyToEntity".into(),
-					},
-				);
-			}),
-		}
-	}
-}
 impl OnSpawn {
 	/// Creates a new [`OnSpawn`] effect.
-	pub fn new(
-		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
-	) -> Self {
-		Self(Box::new(func))
+	#[track_caller]
+	pub fn new<F, O>(func: F) -> Self
+	where
+		F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> O,
+		O: IntoResult,
+	{
+		let location = std::panic::Location::caller();
+		Self(Box::new(move |entity| {
+			if let Err(err) = func(entity).into_result() {
+				entity.world_scope(move |world| {
+					world.handle_command_error::<F>(err, location);
+				});
+			}
+		}))
 	}
 
 	/// Inserts a bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {
 		Self::new(move |entity| {
 			entity.insert(bundle);
+		})
+	}
+	/// Inserts a bundle into the entities children on spawn,
+	/// avoiding bevy's duplicate component gotya with children!
+	pub fn insert_child(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world.spawn((bundle, ChildOf(id)));
+			});
 		})
 	}
 
@@ -99,19 +85,41 @@ impl OnSpawn {
 	}
 
 	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
 	pub fn run_insert<
-		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
+		System: 'static + Send + Sync + IntoSystem<In<Entity>, Out, M1>,
 		M1,
-		Out: ApplyToEntity<M2>,
-		M2,
+		Out: IntoResult<B>,
+		B: Bundle,
 	>(
 		system: System,
 	) -> Self {
-		Self::new(move |entity| {
+		Self::new(move |entity| -> Result {
+			let id = entity.id();
+			let bundle = entity
+				.world_scope(move |world| {
+					world.run_system_once_with(system, id)
+				})
+				.map_err(|err| bevyhow!("{}", err))?
+				.into_result()?;
+			entity.insert(bundle);
+			Ok(())
+		})
+	}
+	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
+	pub fn run<S, M>(system: S) -> Self
+	where
+		S: 'static + Send + Sync + IntoSystem<In<Entity>, Result, M>,
+	{
+		Self::new(move |entity| -> Result {
+			let id = entity.id();
 			entity
-				.world_scope(move |world| world.run_system_once(system))
-				.unwrap()
-				.apply(entity);
+				.world_scope(move |world| {
+					world.run_system_once_with::<_, _, Result, _>(system, id)
+				})
+				.map_err(|err| bevyhow!("{}", err))??;
+			Ok(())
 		})
 	}
 
@@ -153,12 +161,13 @@ impl OnSpawn {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function.
+	#[cfg(feature = "std")]
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
 	where
 		Fut: 'static + Send + Sync + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();
@@ -170,12 +179,13 @@ impl OnSpawn {
 	}
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function on the local thread.
+	#[cfg(feature = "std")]
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
 	where
 		Fut: 'static + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();
@@ -300,10 +310,10 @@ impl OnSpawnDeferred {
 	///
 	/// Panics if the method has already been taken.
 	pub fn take(&mut self) -> Self {
-		Self::new(std::mem::replace(
+		Self::new(core::mem::replace(
 			&mut self.0,
 			Box::new(|_| {
-				panic!("OnSpawwnDeferred: This method has already been taken")
+				panic!("OnSpawnDeferred: This method has already been taken")
 			}),
 		))
 	}
@@ -355,6 +365,7 @@ where
 
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod test {
 	use crate::prelude::*;
 

@@ -26,7 +26,7 @@ pub fn run_wasm() -> impl Bundle {
 		wasm_bindgen(),
 		init_deno(),
 		run_deno(),
-		(Name::new("Ok"), endpoint_action(StatusCode::Ok))
+		(Name::new("Ok"), endpoint_action(StatusCode::OK))
 	])
 }
 

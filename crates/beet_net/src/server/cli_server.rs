@@ -13,33 +13,42 @@ use beet_core::prelude::*;
 pub struct CliServer;
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let entity = cx.entity;
-	world.commands().queue(move |world: &mut World| -> Result {
-		world.entity_mut(entity).run_async_local(
-			async move |entity| -> Result {
-				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res = entity.exchange(req).await;
-				let (parts, mut body) = res.into_parts();
-
-				// stream body to stdout
-				while let Some(chunk) = body.next().await? {
-					let chunk_str = String::from_utf8_lossy(&chunk);
-					cross_log_noline!("{}", chunk_str);
-				}
-				let exit = match parts.status_to_exit_code() {
-					Ok(()) => AppExit::Success,
-					Err(code) => {
-						error!("Command failed\nStatus code: {code}");
-						AppExit::Error(code)
-					}
-				};
-				entity.world().write_message(exit);
-				Ok(())
-			},
-		);
-		Ok(())
-	});
+	world.commands().entity(cx.entity).queue_async(run_and_exit);
 }
+
+async fn run_and_exit(entity: AsyncEntity) -> Result {
+	let accept = vec![MediaType::AnsiTerm, MediaType::Markdown];
+
+	let req = Request::from_cli_args(CliArgs::parse_env())?
+		.with_header::<header::Accept>(accept);
+
+	let res = entity.exchange(req).await;
+	let (parts, body) = res.into_parts();
+
+	let exit = match parts.status_to_exit_code() {
+		Ok(()) => AppExit::Success,
+		Err(code) => {
+			error!("Command failed\nStatus code: {code}");
+			AppExit::Error(code)
+		}
+	};
+
+	stream_body_to_stdout(body).await?;
+
+	entity.world().write_message(exit);
+	Ok(())
+}
+
+/// Streams a [`Response`] body to stdout chunk-by-chunk, returning
+/// the response parts for exit-code inspection.
+pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
+	while let Some(chunk) = body.next().await? {
+		let chunk_str = String::from_utf8_lossy(&chunk);
+		cross_log_noline!("{}", chunk_str);
+	}
+	Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -52,7 +61,7 @@ mod tests {
 			.add_plugins((MinimalPlugins, ServerPlugin))
 			.spawn_then((
 				CliServer,
-				handler_exchange(|_, _| StatusCode::ImATeapot.into()),
+				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into()),
 			))
 			.run_async()
 			.await

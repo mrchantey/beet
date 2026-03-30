@@ -114,7 +114,7 @@ impl AnalyticsEvent {
 	}
 }
 
-impl TableRow for AnalyticsEvent {
+impl TableStoreRow for AnalyticsEvent {
 	fn id(&self) -> Uuid { self.id }
 }
 

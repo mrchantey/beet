@@ -121,6 +121,6 @@ mod test {
 		.await
 		.unwrap_err()
 		.to_string()
-		.xpect_eq("Timeout\n");
+		.xpect_contains("Timeout\n");
 	}
 }

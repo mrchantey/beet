@@ -43,7 +43,7 @@ fn setup(
 		GridDirection::sample(&mut rng.0),
 		children![(
 			RunOnAssetReady::new(qtable.clone()),
-			Sequence::default(),
+			Sequence::new(),
 			Retrigger::default(),
 			Name::new("Run Frozen Lake Agent"),
 			children![

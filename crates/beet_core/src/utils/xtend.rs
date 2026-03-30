@@ -69,7 +69,7 @@ pub trait Xtend: Sized {
 	/// Uses [`cross_log!`](crate::cross_log) for cross-platform output.
 	fn xprint(self, prefix: impl AsRef<str>) -> Self
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		crate::cross_log!("{}: {:#?}", prefix.as_ref(), self);
 		self
@@ -78,7 +78,7 @@ pub trait Xtend: Sized {
 	/// Prints the display-formatted value and returns `self`.
 	fn xprint_display(self) -> Self
 	where
-		Self: std::fmt::Display,
+		Self: core::fmt::Display,
 	{
 		crate::cross_log!("{}", self);
 		self
@@ -87,7 +87,7 @@ pub trait Xtend: Sized {
 	/// Prints the debug-formatted value and returns `self`.
 	fn xprint_debug(self) -> Self
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		crate::cross_log!("{:?}", self);
 		self
@@ -118,6 +118,19 @@ pub trait Xtend: Sized {
 	/// ```
 	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
 
+	/// Wraps `self` in [`Err`].
+	///
+	/// # Examples
+	///
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_core::prelude::*;
+	/// fn foo() -> Result<u32, &'static str> {
+	///     "error".xerr()
+	/// }
+	/// ```
+	fn xerr<T>(self) -> Result<T, Self> { Err(self) }
+
 	/// Wraps `self` in [`Some`].
 	///
 	/// # Examples
@@ -127,6 +140,12 @@ pub trait Xtend: Sized {
 	/// assert_eq!("foo".xsome(), Some("foo"));
 	/// ```
 	fn xsome(self) -> Option<Self> { Some(self) }
+	/// Wraps `self` in a `Vec`.
+	fn xvec(self) -> Vec<Self> {
+		let mut vec = Vec::with_capacity(1);
+		vec.push(self);
+		vec
+	}
 
 	/// Converts `self` using [`Into::into`].
 	///
@@ -141,7 +160,7 @@ pub trait Xtend: Sized {
 	/// Returns a pretty-printed `Debug` representation.
 	fn xfmt(&self) -> String
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		format!("{:#?}", self)
 	}
@@ -149,7 +168,7 @@ pub trait Xtend: Sized {
 	/// Returns a compact `Debug` representation.
 	fn xfmt_debug(&self) -> String
 	where
-		Self: std::fmt::Debug,
+		Self: core::fmt::Debug,
 	{
 		format!("{:?}", self)
 	}
@@ -157,7 +176,7 @@ pub trait Xtend: Sized {
 	/// Returns a `Display` representation.
 	fn xfmt_display(&self) -> String
 	where
-		Self: std::fmt::Display,
+		Self: core::fmt::Display,
 	{
 		format!("{}", self)
 	}
@@ -192,6 +211,40 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		}
 		Ok(out)
 	}
+
+	/// like map but async
+	fn xmap_async<O, E>(
+		self,
+		mut func: impl AsyncFnMut(T) -> Result<O, E>,
+	) -> impl Future<Output = Result<Vec<O>, E>> {
+		async move {
+			let mut out = Vec::new();
+			for item in self.into_iter() {
+				match (func)(item).await {
+					Ok(o) => out.push(o),
+					Err(e) => return Err(e),
+				}
+			}
+			Ok(out)
+		}
+	}
+
+	/// Filters each item with a fallible function, short-circuiting on error.
+	fn xtry_filter<E>(
+		self,
+		mut func: impl FnMut(&mut T) -> Result<bool, E>,
+	) -> Result<Vec<T>, E> {
+		let mut out = Vec::new();
+		for mut item in self.into_iter() {
+			match (func)(&mut item) {
+				Ok(true) => out.push(item),
+				Ok(false) => {}
+				Err(e) => return Err(e),
+			}
+		}
+		Ok(out)
+	}
+
 
 	/// Filter-maps each item with a fallible function, short-circuiting on error.
 	fn xtry_filter_map<O, E>(
@@ -289,4 +342,24 @@ impl XtendString for String {
 		self.push_str(item.as_ref());
 		self
 	}
+}
+
+
+/// Extension trait for types that can be converted into an iterator.
+pub trait XIntoIterator<M, T> {
+	/// Converts `self` into an iterator of items of type `T`.
+	fn xinto_iter(self) -> impl Iterator<Item = T>;
+}
+/// Marker type for the `IntoIterator` implementation of `XIntoIterator`.
+pub struct IteratorIntoIteratorMarker;
+
+impl<T, I> XIntoIterator<IteratorIntoIteratorMarker, T> for I
+where
+	I: IntoIterator<Item = T>,
+{
+	fn xinto_iter(self) -> impl Iterator<Item = T> { self.into_iter() }
+}
+
+impl<T> XIntoIterator<Self, T> for T {
+	fn xinto_iter(self) -> impl Iterator<Item = T> { [self].into_iter() }
 }

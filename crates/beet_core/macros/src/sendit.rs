@@ -1,3 +1,6 @@
+extern crate alloc;
+
+use alloc::vec::Vec;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -73,6 +76,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use alloc::string::ToString;
 	use quote::quote;
 
 	#[test]

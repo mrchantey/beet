@@ -354,6 +354,7 @@ impl DirEvent {
 
 
 #[cfg(test)]
+#[cfg(feature = "rand")]
 mod test {
 	use crate::prelude::*;
 
