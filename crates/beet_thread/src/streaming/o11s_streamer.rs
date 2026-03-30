@@ -156,7 +156,7 @@ impl PostStreamer for O11sStreamer {
 			// 6. unify streaming and non-streaming into a single typed stream
 			let typed_stream: ResPartialStream = if self.stream {
 				let raw_stream = response.event_source_raw().await?;
-				Box::pin(SseToTypedStream::new(raw_stream))
+				Box::pin(O11sSseStream::new(raw_stream))
 			} else {
 				let res_body = response.json::<o11s::ResponseBody>().await?;
 				trace!("Received full response body: {:#?}", res_body);
@@ -179,13 +179,13 @@ impl PostStreamer for O11sStreamer {
 /// Parses raw SSE events into typed [`StreamingEvent`](openresponses::StreamingEvent) values.
 ///
 /// Handles the `[DONE]` sentinel by cleanly terminating the stream.
-struct SseToTypedStream<S> {
+struct O11sSseStream<S> {
 	inner: S,
 	done: bool,
 	prev_state: Option<ResponsePartial>,
 }
 
-impl<S> SseToTypedStream<S> {
+impl<S> O11sSseStream<S> {
 	fn new(inner: S) -> Self {
 		Self {
 			inner,
@@ -195,7 +195,7 @@ impl<S> SseToTypedStream<S> {
 	}
 }
 
-impl<S, E> Stream for SseToTypedStream<S>
+impl<S, E> Stream for O11sSseStream<S>
 where
 	S: Stream<
 			Item = std::result::Result<

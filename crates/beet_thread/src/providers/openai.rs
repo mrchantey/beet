@@ -68,12 +68,29 @@ impl OpenAiProvider {
 
 	/// OpenAI Responses API URL.
 	pub const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
+	/// OpenAI Chat Completions API URL.
+	pub const COMPLETIONS_URL: &str =
+		"https://api.openai.com/v1/chat/completions";
 
+	/// Returns an [`O11sStreamer`] configured for GPT-5 Mini
+	/// via the OpenResponses endpoint.
 	pub fn gpt_5_mini() -> Result<O11sStreamer> {
 		O11sStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: Self::GPT_5_MINI.into(),
 			url: Self::RESPONSES_URL.into(),
+			auth: env_ext::var(Self::AUTH_ENV)?.xsome(),
+		})
+		.xok()
+	}
+
+	/// Returns a [`CompletionsStreamer`] configured for GPT-5 Mini
+	/// via the Chat Completions endpoint.
+	pub fn gpt_5_mini_completions() -> Result<CompletionsStreamer> {
+		CompletionsStreamer::new(ModelDef {
+			provider_slug: Self::PROVIDER_SLUG.into(),
+			model_slug: Self::GPT_5_MINI.into(),
+			url: Self::COMPLETIONS_URL.into(),
 			auth: env_ext::var(Self::AUTH_ENV)?.xsome(),
 		})
 		.xok()

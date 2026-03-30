@@ -7,7 +7,7 @@ async fn main() {
 		.insert_post("make like a duck and quack")
 		.thread_view()
 		.insert_actor(Actor::agent())
-		.with_streamer(
+		.with_bundle(
 			OllamaProvider::qwen_3_8b()
 				// disable streaming since we're aggregating
 				.without_streaming(),

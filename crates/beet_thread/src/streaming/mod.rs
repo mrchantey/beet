@@ -1,7 +1,13 @@
-mod post_streamer;
-mod post_tool;
+#[cfg(feature = "agent")]
+pub mod completions_mapper;
+#[cfg(feature = "agent")]
+mod completions_streamer;
 pub mod o11s_mapper;
 mod o11s_streamer;
+mod post_streamer;
+mod post_tool;
+#[cfg(feature = "agent")]
+pub use completions_streamer::*;
+pub use o11s_streamer::*;
 pub use post_streamer::*;
 pub use post_tool::*;
-pub use o11s_streamer::*;

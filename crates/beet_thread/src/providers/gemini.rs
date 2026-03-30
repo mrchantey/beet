@@ -1,7 +1,10 @@
-//! Gemini provider supporting the OpenResponses API.
+//! Gemini provider supporting both the native Gemini API and the
+//! OpenAI-compatible Chat Completions endpoint.
 //!
 //! Gemini provides cloud-based LLM inference. This provider translates
 //! OpenResponses requests/responses to and from Gemini's native format.
+//! For new code, prefer [`GeminiProvider::gemini_2_5_flash`] which uses
+//! the completions-based [`CompletionsStreamer`].
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -14,12 +17,34 @@ use std::task::Poll;
 
 impl GeminiProvider {
 	const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
+
+	/// Provider slug for Gemini.
+	pub const PROVIDER_SLUG: &str = "gemini";
+	/// Environment variable for the Gemini API key.
+	pub const AUTH_ENV: &str = "GEMINI_API_KEY";
+
 	/// Gemini 2.5 Flash - fast and efficient.
 	pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
 	/// Gemini 2.5 Flash with image generation support.
 	pub const GEMINI_2_5_FLASH_IMAGE: &str = "gemini-2.5-flash-preview-05-20";
 	/// Gemini 2.5 Pro - most capable.
 	pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
+
+	/// OpenAI-compatible completions endpoint for Gemini.
+	pub const COMPLETIONS_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+	/// Returns a [`CompletionsStreamer`] configured for Gemini 2.5 Flash
+	/// via the OpenAI-compatible completions endpoint.
+	pub fn gemini_2_5_flash() -> Result<CompletionsStreamer> {
+		let api_key = env_ext::var(Self::AUTH_ENV)?;
+		CompletionsStreamer::new(ModelDef {
+			provider_slug: Self::PROVIDER_SLUG.into(),
+			model_slug: Self::GEMINI_2_5_FLASH.into(),
+			url: Self::COMPLETIONS_URL.into(),
+			auth: Some(api_key),
+		})
+		.xok()
+	}
 }
 
 
@@ -151,7 +176,8 @@ impl GeminiProvider {
 								}
 							};
 
-							let parts = self.convert_message_content(&msg.content)?;
+							let parts =
+								self.convert_message_content(&msg.content)?;
 							if !parts.is_empty() {
 								contents.push(json!({
 									"role": role,
@@ -345,9 +371,7 @@ impl GeminiProvider {
 						call_id: format!("call_{idx}"),
 						name,
 						arguments: args,
-						status: Some(
-							o11s::FunctionCallStatus::Completed,
-						),
+						status: Some(o11s::FunctionCallStatus::Completed),
 					},
 				));
 			}
@@ -355,16 +379,14 @@ impl GeminiProvider {
 
 		// Add text message if we have any
 		if !text_content.is_empty() {
-			output.push(o11s::OutputItem::Message(
-				o11s::Message {
-					id: "msg_0".to_string(),
-					role: o11s::MessageRole::Assistant,
-					content: vec![o11s::OutputContent::OutputText(
-						o11s::OutputText::new(text_content),
-					)],
-					status: o11s::MessageStatus::Completed,
-				},
-			));
+			output.push(o11s::OutputItem::Message(o11s::Message {
+				id: "msg_0".to_string(),
+				role: o11s::MessageRole::Assistant,
+				content: vec![o11s::OutputContent::OutputText(
+					o11s::OutputText::new(text_content),
+				)],
+				status: o11s::MessageStatus::Completed,
+			}));
 		}
 
 		// Extract usage info
@@ -566,22 +588,19 @@ where
 						vec![],
 						None,
 					);
-					events.push(
-						o11s::StreamingEvent::ResponseCreated(
-							o11s::streaming::ResponseCreatedEvent {
-								sequence_number: seq,
-								response,
-							},
-						),
-					);
+					events.push(o11s::StreamingEvent::ResponseCreated(
+						o11s::streaming::ResponseCreatedEvent {
+							sequence_number: seq,
+							response,
+						},
+					));
 				}
 
 				// Send output_item.added on first content
 				if !self.item_added {
 					self.item_added = true;
 					let seq = self.next_sequence();
-					events
-						.push(o11s::StreamingEvent::OutputItemAdded(
+					events.push(o11s::StreamingEvent::OutputItemAdded(
 						o11s::streaming::OutputItemAddedEvent {
 							sequence_number: seq,
 							output_index: 0,
@@ -654,7 +673,11 @@ where
 									sequence_number: seq,
 									output_index: 0,
 									item: Some(o11s::OutputItem::Message(
-										GeminiProvider::create_message("msg_0", self.accumulated_text.clone(), o11s::MessageStatus::Completed),
+										GeminiProvider::create_message(
+											"msg_0",
+											self.accumulated_text.clone(),
+											o11s::MessageStatus::Completed,
+										),
 									)),
 								},
 							));
@@ -674,22 +697,20 @@ where
 
 							// Send response.completed
 							let seq = self.next_sequence();
-							let output =
-								vec![o11s::OutputItem::Message(
-									GeminiProvider::create_message(
-										"msg_0",
-										self.accumulated_text.clone(),
-										o11s::MessageStatus::Completed,
-									),
-								)];
+							let output = vec![o11s::OutputItem::Message(
+								GeminiProvider::create_message(
+									"msg_0",
+									self.accumulated_text.clone(),
+									o11s::MessageStatus::Completed,
+								),
+							)];
 							let mut response =
 								GeminiProvider::create_response_body(
 									&self.model,
 									output,
 									usage,
 								);
-							response.status =
-								o11s::response::Status::Completed;
+							response.status = o11s::response::Status::Completed;
 							events.push(
 								o11s::StreamingEvent::ResponseCompleted(
 									o11s::streaming::ResponseCompletedEvent {
@@ -735,8 +756,7 @@ where
 						output,
 						None,
 					);
-					response.status =
-						o11s::response::Status::Completed;
+					response.status = o11s::response::Status::Completed;
 					Poll::Ready(Some(Ok(
 						o11s::StreamingEvent::ResponseCompleted(
 							o11s::streaming::ResponseCompletedEvent {
