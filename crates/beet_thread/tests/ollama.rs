@@ -22,32 +22,32 @@ fn completions_streamer_non_streaming() -> CompletionsStreamer {
 // === PostStreamer (O11s) tests ===
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_basic_text_response() {
+async fn basic_text_response() {
 	post_streamer::basic_text_response(streamer_non_streaming()).await;
 }
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_streaming_response() {
+async fn streaming_response() {
 	post_streamer::streaming_response(streamer()).await;
 }
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_system_prompt() {
+async fn system_prompt() {
 	post_streamer::system_prompt(streamer_non_streaming()).await;
 }
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_tool_calling() {
+async fn tool_calling() {
 	post_streamer::tool_calling(streamer_non_streaming()).await;
 }
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_image_input() {
+async fn image_input() {
 	post_streamer::image_input(streamer_non_streaming()).await;
 }
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_multi_turn_conversation() {
+async fn multi_turn_conversation() {
 	post_streamer::multi_turn_conversation(streamer_non_streaming()).await;
 }
 
@@ -90,7 +90,7 @@ async fn cs_multi_turn_conversation() {
 // === Image Roundtrip tests ===
 
 #[beet_core::test(timeout_ms = 60_000)]
-async fn ps_image_roundtrip() {
+async fn image_roundtrip() {
 	post_streamer::image_roundtrip(streamer_non_streaming()).await;
 }
 
