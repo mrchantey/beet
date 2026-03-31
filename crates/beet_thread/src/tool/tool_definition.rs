@@ -1,27 +1,33 @@
 use beet_core::prelude::*;
+use beet_net::prelude::*;
+use beet_router::prelude::*;
 use beet_tool::prelude::*;
 use bevy::reflect::Typed;
 
-
+/// Create a routable function tool bundle for use with LLM tool calling.
+///
+/// Returns a bundle containing:
+/// - [`ToolDefinition`] metadata for the LLM provider
+/// - [`PathPartial`] for routing dispatch
+/// - A serde-wrapped [`Tool`] that accepts [`Request`]/[`Response`] pairs
+///
+/// The `path` is used both as the tool name sent to the LLM and as the
+/// route path for dispatching function call results.
 pub fn function_tool<T, M>(
 	path: &str,
 	description: &str,
 	tool: T,
-) -> (ToolDefinition, Tool<T::In, T::Out>)
+) -> impl Bundle
 where
-	T: IntoReflectTool<M>,
-	T::In: Typed,
-	T::Out: Typed,
+	T: 'static + IntoReflectTool<M>,
+	T::In: Typed + Send + Sync + serde::de::DeserializeOwned,
+	T::Out: Typed + Send + Sync + serde::Serialize,
 {
 	let meta = T::reflect_meta().input_json_schema();
-	// println!("Registering tool {path} with meta {meta}");
-	(
-		FunctionToolDefinition::new(path, description, meta).into(),
-		tool.into_tool(),
-	)
+	let definition: ToolDefinition =
+		FunctionToolDefinition::new(path, description, meta).into();
+	(definition, route_tool(path, tool))
 }
-
-
 
 #[derive(Debug, Clone, Component)]
 pub enum ToolDefinition {
@@ -57,7 +63,7 @@ impl Into<ToolDefinition> for ProviderToolDefinition {
 }
 
 /// Tool defined by the model provider,
-/// output is returned as regular context
+/// output is returned as regular context.
 #[derive(Debug, Clone, Deref)]
 pub struct ProviderToolDefinition {
 	name: String,
@@ -75,7 +81,7 @@ pub struct FunctionToolDefinition {
 	name: String,
 	/// A description of the function. Used by the model to decide when to call it.
 	description: String,
-	/// A json schema for the parameters
+	/// A json schema for the parameters.
 	params_schema: serde_json::Value,
 }
 impl FunctionToolDefinition {
@@ -100,15 +106,15 @@ impl FunctionToolDefinition {
 
 #[derive(Debug, Default, Clone, Component)]
 pub enum ToolChoice {
-	/// The agent may or may not select one of the available tools
+	/// The agent may or may not select one of the available tools.
 	#[default]
 	Auto,
-	/// The agent may or may not select one of the listed tools
+	/// The agent may or may not select one of the listed tools.
 	AutoList(Vec<String>),
-	/// The agent must select one of the available tools
+	/// The agent must select one of the available tools.
 	RequiredAny,
-	/// The agent must select one of the listed tools
+	/// The agent must select one of the listed tools.
 	RequiredList(Vec<String>),
-	/// The agent must not select any tool
+	/// The agent must not select any tool.
 	None,
 }

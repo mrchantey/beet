@@ -193,12 +193,11 @@ where
 }
 
 /// Spawns the async task, flushes all async tasks and returns the output.
-#[track_caller]
-fn spawn_async_task_then<Func, Fut, Out>(
+async fn spawn_async_task_then<Func, Fut, Out>(
 	world: AsyncWorld,
 	update: impl FnMut(),
 	func: Func,
-) -> impl Future<Output = Out>
+) -> Out
 where
 	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + MaybeSend + Future<Output = Out>,
@@ -211,15 +210,16 @@ where
 		send.try_send(out).ok();
 	});
 	AsyncRunner::poll_and_update(update, recv)
+		.await
+		.expect("spawn_async_task_then channel closed: task likely panicked")
 }
 
 /// Spawns the async local task, flushes all async tasks and returns the output.
-#[track_caller]
-fn spawn_async_task_local_then<Func, Fut, Out>(
+async fn spawn_async_task_local_then<Func, Fut, Out>(
 	world: AsyncWorld,
 	update: impl FnMut(),
 	func: Func,
-) -> impl Future<Output = Out>
+) -> Out
 where
 	Func: 'static + FnOnce(AsyncWorld) -> Fut,
 	Fut: 'static + Future<Output = Out>,
@@ -231,7 +231,9 @@ where
 		// allowed to drop recv
 		send.try_send(out).ok();
 	});
-	AsyncRunner::poll_and_update(update, recv)
+	AsyncRunner::poll_and_update(update, recv).await.expect(
+		"spawn_async_task_local_then channel closed: task likely panicked",
+	)
 }
 
 

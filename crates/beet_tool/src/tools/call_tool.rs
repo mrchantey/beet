@@ -62,9 +62,7 @@ where
 	match recv.try_recv() {
 		Ok(output) => output.xok(),
 		Err(TryRecvError::Empty) => {
-			AsyncRunner::poll_and_update(|| world.update_local(), recv)
-				.await
-				.xok()
+			AsyncRunner::poll_and_update(|| world.update_local(), recv).await
 		}
 		Err(TryRecvError::Closed) => {
 			bevybail!("Tool call response channel closed unexpectedly.")

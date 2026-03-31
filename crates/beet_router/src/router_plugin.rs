@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_tool::prelude::*;
 
+
 /// Plugin that registers route-building observers for tools.
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor

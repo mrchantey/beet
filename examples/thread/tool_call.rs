@@ -1,11 +1,11 @@
 //! Demonstrates tool calling with the [`ThreadMut`] fluent API.
 //!
-//! The agent is asked about the weather and calls the `get_weather`
+//! The agent is asked about flimflams and calls the `discover-things`
 //! tool to produce structured output.
 use beet::prelude::*;
 
 
-#[derive(Reflect)]
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
 pub struct DiscoverThingsInput {
 	question: String,
 }
@@ -25,9 +25,8 @@ async fn main() {
 				let question = cx.question.clone();
 
 				format!(
-					"you asked {}, great question!
-				flimflams are used by gzorps
-					",
+					"you asked {}, great question!\n\
+					flimflams are used by gzorps",
 					question
 				)
 				.xok()
