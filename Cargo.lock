@@ -1158,6 +1158,8 @@ name = "beet_infra"
 version = "0.0.9-dev.6"
 dependencies = [
  "beet_core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -123,6 +123,9 @@ impl Into<WsPathBuf> for &str {
 impl Into<WsPathBuf> for PathBuf {
 	fn into(self) -> WsPathBuf { WsPathBuf::new(self) }
 }
+impl Into<AbsPathBuf> for WsPathBuf {
+	fn into(self) -> AbsPathBuf { self.into_abs() }
+}
 
 
 #[cfg(test)]
