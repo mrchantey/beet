@@ -53,6 +53,7 @@ members = [
 	"crates/beet_router",
 	"crates/beet_thread",
 	"crates/beet_tool",
+	"examples/infra/extra-types",
 
 	## 💡 Flow
 	# "crates/beet_examples",
@@ -432,6 +433,15 @@ name = "tool_call"
 path = "examples/thread/tool_call.rs"
 required-features = ["thread"]
 
+
+
+
+# 💡 Examples - infra
+
+[[example]]
+name = "bucket"
+path = "examples/infra/bucket.rs"
+required-features = ["infra"]
 
 # 💡 Examples - flow
 
