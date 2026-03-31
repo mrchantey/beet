@@ -12,39 +12,40 @@ pub struct DiscoverThingsInput {
 
 #[beet::main]
 async fn main() {
-	let posts = ThreadMut::new()
-		.insert_actor(Actor::human())
-		.insert_post("Tell me about flimflams?")
-		.thread_view()
-		.insert_actor(Actor::agent())
-		.with_bundle(OllamaProvider::qwen().without_streaming())
+	let mut thread = ThreadMut::new();
+	let mut human = thread.insert_actor(Actor::human());
+	human.insert_post(
+		"Tell me about flim-flams, expand on the information given from tool calls, filling in the blanks.",
+	);
+	let mut agent = thread.insert_actor(Actor::agent());
+	agent
+		.with_bundle(OllamaProvider::qwen())
 		.with_child(function_tool(
-			"discover-things",
+			"all-about-flim-flams",
 			"learn all about things like flim-flams",
-			func_tool(|cx: FuncToolIn<DiscoverThingsInput>| {
-				let question = cx.question.clone();
-
-				format!(
-					"you asked {}, great question!\n\
-					flimflams are used by gzorps",
-					question
-				)
-				.xok()
+			func_tool(|_cx: FuncToolIn<DiscoverThingsInput>| {
+				"flimflams are used by gzorps on their way to work"
+					.to_string()
+					.xok()
 			}),
-		))
+		));
+
+
+	println!("1. Make tool call");
+	agent
 		.send_and_collect()
 		.await
-		.unwrap();
-
-	for post in &posts {
-		match post.as_agent_post() {
-			AgentPost::FunctionCall(fc) => {
-				println!("Tool call: {}({})", fc.name(), fc.arguments());
-			}
-			_ if post.intent().is_display() => {
-				println!("Response: {post}");
-			}
-			_ => {}
-		}
-	}
+		.unwrap()
+		.into_iter()
+		.for_each(print_post);
+	println!("2. read tool output");
+	agent
+		.send_and_collect()
+		.await
+		.unwrap()
+		.into_iter()
+		.for_each(print_post);
+}
+fn print_post(post: Post) {
+	println!("Post: {post}");
 }
