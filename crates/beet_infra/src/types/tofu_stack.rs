@@ -41,6 +41,9 @@ impl Default for LocalBackend {
 	}
 }
 
+
+/// https://opentofu.org/docs/language/settings/backends/s3/
+/// Use the s3 backend with a lockfile enabled via `use_lockfile`
 #[derive(Default, Serialize, Deserialize)]
 pub struct S3Backend {
 	/// Optionally specify the bucket name,

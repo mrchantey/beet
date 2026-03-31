@@ -4,15 +4,12 @@ extern crate alloc;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use proc_macro2::TokenStream;
-use syn::Expr;
 use syn::Ident;
 use syn::Member;
 use syn::Result;
 use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
-use syn::parse::Parser;
-use syn::punctuated::Punctuated;
 
 
 /// [`AttributeItem`] collection parsed from Syn attributes.
@@ -37,15 +34,6 @@ impl AttributeGroup {
 			.flatten()
 			.collect();
 		Ok(Self { attributes })
-	}
-
-	/// Parse 'foo,bar,bazz' into a vec of expressions
-	pub fn parse_punctated(tokens: TokenStream) -> Result<Vec<Expr>> {
-		let args = Punctuated::<Expr, Token![,]>::parse_terminated
-			.parse2(tokens)?
-			.into_iter()
-			.collect::<Vec<_>>();
-		Ok(args)
 	}
 
 	/// ## Errors
