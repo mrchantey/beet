@@ -26,7 +26,7 @@ async fn main() {
 		.insert_post("What's the weather like in San Francisco?")
 		.thread_view()
 		.insert_actor(Actor::agent())
-		.with_bundle(OllamaProvider::qwen_3_8b().without_streaming())
+		.with_bundle(OllamaProvider::qwen().without_streaming())
 		.with_tool(tool)
 		.send_and_collect()
 		.await

@@ -4,8 +4,8 @@ use beet::prelude::*;
 ///
 /// Each scene loads its content from a `.md` file via [`file_scene_tool`],
 /// which reads and parses markdown on each request.
-pub fn stack() -> impl Bundle {
-	(default_router(), children![root(), about(), counter()])
+pub fn routes() -> impl Bundle {
+	children![root(), about(), counter()]
 }
 
 fn root() -> impl Bundle {

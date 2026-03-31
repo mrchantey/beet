@@ -28,8 +28,11 @@ fn setup(mut commands: Commands) {
 				)]),
 				(
 					Actor::new("BeepBot", ActorKind::Agent),
-					// OllamaProvider::qwen_3_8b()
-					OpenAiProvider::gpt_5_mini().unwrap()
+					OllamaProvider::o11s(
+						OllamaProvider::QWEN_3_5_9B_ABLITERATED
+					)
+					.without_reasoning() // OpenAiProvider::gpt_5_mini().unwrap()
+					                     // OllamaProvider::qwen() // OpenAiProvider::gpt_5_mini().unwrap()
 				),
 				(
 					Actor::new("Billy", ActorKind::Human),

@@ -8,7 +8,7 @@ async fn main() {
 		.thread_view()
 		.insert_actor(Actor::agent())
 		.with_bundle(
-			OllamaProvider::qwen_3_8b()
+			OllamaProvider::qwen()
 				// disable streaming since we're aggregating
 				.without_streaming(),
 		)

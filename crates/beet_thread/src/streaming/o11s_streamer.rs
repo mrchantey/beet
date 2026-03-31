@@ -1,4 +1,6 @@
+use crate::o11s::ReasoningEffort;
 use crate::o11s::request::Input;
+use crate::o11s::request::ReasoningParam;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -21,6 +23,7 @@ pub struct O11sStreamer {
 	use_previous_response_id: bool,
 	/// System instructions to include with each request.
 	instructions: Option<String>,
+	reasoning: Option<ReasoningParam>,
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -37,6 +40,7 @@ impl O11sStreamer {
 			stream: true,
 			use_previous_response_id: false,
 			instructions: None,
+			reasoning: None,
 		}
 	}
 
@@ -52,6 +56,14 @@ impl O11sStreamer {
 		instructions: impl Into<String>,
 	) -> Self {
 		self.instructions = Some(instructions.into());
+		self
+	}
+
+	pub fn without_reasoning(mut self) -> Self {
+		self.reasoning = Some(ReasoningParam {
+			effort: Some(ReasoningEffort::None),
+			summary: None,
+		});
 		self
 	}
 
@@ -121,6 +133,10 @@ impl O11sStreamer {
 						req_body = req_body
 							.with_previous_response_id(&last.response_id);
 					}
+					if let Some(reasoning) = this.reasoning {
+						req_body = req_body.with_reasoning(reasoning);
+					}
+
 					if let Some(instructions) = this.instructions {
 						req_body = req_body.with_instructions(instructions);
 					}

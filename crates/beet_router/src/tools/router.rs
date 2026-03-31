@@ -35,8 +35,10 @@ async fn router_tool(
 	let node = world
 		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {
 			// no tree is a real error
-			let tree = root_route_tree(world, tool_entity)?;
-			tree.find(&path).cloned().xok()
+			root_route_tree(world, tool_entity)?
+				.find(&path)
+				.cloned()
+				.xok()
 		})
 		.await?;
 

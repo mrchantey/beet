@@ -5,18 +5,18 @@ use beet_thread::prelude::*;
 #[path = "utils/post_streamer.rs"]
 mod post_streamer;
 
-fn streamer() -> O11sStreamer { OllamaProvider::qwen_3_8b() }
+fn streamer() -> O11sStreamer { OllamaProvider::qwen() }
 
 fn streamer_non_streaming() -> O11sStreamer {
-	OllamaProvider::qwen_3_8b().without_streaming()
+	OllamaProvider::qwen().without_streaming()
 }
 
 fn completions_streamer() -> CompletionsStreamer {
-	OllamaProvider::qwen_3_8b_completions()
+	OllamaProvider::qwen_completions()
 }
 
 fn completions_streamer_non_streaming() -> CompletionsStreamer {
-	OllamaProvider::qwen_3_8b_completions().without_streaming()
+	OllamaProvider::qwen_completions().without_streaming()
 }
 
 // === PostStreamer (O11s) tests ===
