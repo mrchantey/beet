@@ -68,7 +68,7 @@ impl CompletionsStreamer {
 		let this = self.clone();
 
 		caller
-			.with_state::<SocialQuery, _>(
+			.with_state::<ThreadQuery, _>(
 				move |actor_entity,
 				      query|
 				      -> Result<(

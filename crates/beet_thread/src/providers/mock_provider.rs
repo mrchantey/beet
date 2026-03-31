@@ -99,7 +99,7 @@ impl PostStreamer for MockPostStreamer {
 
 		Box::pin(async move {
 			let (agent_id, thread_id, last_user_text, first_tool) = caller
-				.with_state::<SocialQuery, _>(
+				.with_state::<ThreadQuery, _>(
 					|actor_entity,
 					 query|
 					 -> Result<(

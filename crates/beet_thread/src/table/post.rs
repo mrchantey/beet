@@ -231,7 +231,7 @@ impl Post {
 	pub fn spawn(content: impl Into<IntoPost>) -> OnSpawn {
 		let content = content.into();
 		OnSpawn::new(move |entity| {
-			let post = entity.with_state::<SocialQuery, _>(
+			let post = entity.with_state::<ThreadQuery, _>(
 				move |post_entity, query| -> Result<Post> {
 					let thread = query.thread(post_entity)?;
 					let actor = query.actor_from_post_entity(post_entity)?;
@@ -258,7 +258,7 @@ impl Post {
 
 /// Content for constructing a new [`Post`].
 ///
-/// Used by spawners like [`Post::spawn`] and [`SocialQuery::spawn_post`].
+/// Used by spawners like [`Post::spawn`] and [`ThreadQuery::spawn_post`].
 /// Prefer [`AgentPost`] constructors for full control over intent and status.
 pub enum IntoPost {
 	Text(String),

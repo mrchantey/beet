@@ -231,8 +231,11 @@ impl<'t, 'w> ActorViewMut<'t, 'w> {
 	}
 
 	pub fn with_tool(&mut self, tool: impl Into<ToolDefinition>) -> &mut Self {
+		self.with_child(tool.into())
+	}
+	pub fn with_child(&mut self, child: impl Bundle) -> &mut Self {
 		let entity = self.entity;
-		self.thread_view.world.spawn((ChildOf(entity), tool.into()));
+		self.thread_view.world.spawn((ChildOf(entity), child));
 		self
 	}
 

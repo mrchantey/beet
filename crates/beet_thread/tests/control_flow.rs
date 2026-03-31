@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
 fn assert_and_exit(
 	input: In<SystemToolIn>,
 	mut commands: Commands,
-	query: SocialQuery,
+	query: ThreadQuery,
 ) -> Result<Outcome> {
 	let view = query.thread(input.caller)?;
 	view.posts

@@ -24,6 +24,7 @@ agent = ["dep:async-openai"]
 [dependencies]
 beet_net = { workspace = true, features = ["ureq","json"] }
 beet_core = { workspace = true, features = ["serde"] }
+beet_router = { workspace = true, features = ["json"] }
 beet_tool = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["v7", "js"] }
 async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }

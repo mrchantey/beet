@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(SystemParam)]
-pub struct SocialQuery<'w, 's> {
+pub struct ThreadQuery<'w, 's> {
 	pub commands: Commands<'w, 's>,
 	pub ancestors: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
@@ -14,7 +14,7 @@ pub struct SocialQuery<'w, 's> {
 		Query<'w, 's, (Entity, &'static Post, Option<&'static ResponseMeta>)>,
 }
 
-impl<'w, 's> SocialQuery<'w, 's> {
+impl<'w, 's> ThreadQuery<'w, 's> {
 	/// Recurse up ancestors to find the [`Thread`] entity,
 	/// then create a corresponding [`ThreadRef`].
 	/// Valid positions are:

@@ -17,7 +17,6 @@ pub mod prelude {
 	pub use crate::navigate::*;
 	pub use crate::route_tree::*;
 	pub use crate::router_plugin::*;
-
 	pub use crate::scene_renderer::*;
 	pub use crate::tools::*;
 }

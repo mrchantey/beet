@@ -28,11 +28,7 @@ fn setup(mut commands: Commands) {
 				)]),
 				(
 					Actor::new("BeepBot", ActorKind::Agent),
-					OllamaProvider::o11s(
-						OllamaProvider::QWEN_3_5_9B_ABLITERATED
-					)
-					.without_reasoning() // OpenAiProvider::gpt_5_mini().unwrap()
-					                     // OllamaProvider::qwen() // OpenAiProvider::gpt_5_mini().unwrap()
+					OpenAiProvider::gpt_5_mini().unwrap() 
 				),
 				(
 					Actor::new("Billy", ActorKind::Human),
@@ -46,7 +42,7 @@ fn setup(mut commands: Commands) {
 #[tool]
 fn stdin_post_tool(
 	cx: SystemToolIn,
-	mut query: SocialQuery,
+	mut query: ThreadQuery,
 	actors: Query<&Actor>,
 ) -> Result<Outcome> {
 	let actor = actors.get(cx.caller)?;
@@ -66,7 +62,7 @@ struct StdoutCursor(u32);
 fn on_create(
 	mut commands: Commands,
 	query: Populated<(Entity, &Post), Added<Post>>,
-	thread_query: SocialQuery,
+	thread_query: ThreadQuery,
 ) -> Result {
 	for (entity, post) in query.iter() {
 		commands.entity(entity).insert(StdoutCursor::default());
@@ -105,7 +101,7 @@ fn on_create(
 
 fn on_change(
 	mut query: Populated<(Entity, &Post, &mut StdoutCursor), Changed<Post>>,
-	thread_query: SocialQuery,
+	thread_query: ThreadQuery,
 ) -> Result {
 	for (entity, post, mut cursor) in query.iter_mut() {
 		let actor = thread_query.actor_from_post_entity(entity)?;

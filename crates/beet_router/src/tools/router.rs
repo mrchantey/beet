@@ -25,7 +25,7 @@ pub fn router() -> impl Bundle {
 /// request to the matching tool via `entity.call`. Scene routes are
 /// regular tools that delegate to the render tool internally, so
 /// no special handling is needed here.
-async fn router_tool(
+pub async fn router_tool(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();

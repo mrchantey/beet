@@ -86,6 +86,11 @@ pub enum AgentPost<'a> {
 	ReasoningSummary(ReasoningSummaryView<'a>),
 }
 
+impl std::ops::Deref for AgentPost<'_> {
+	type Target = Post;
+	fn deref(&self) -> &Self::Target { self.post() }
+}
+
 // ── Classification constructor ──────────────────────────────────────
 
 impl<'a> AgentPost<'a> {
@@ -497,6 +502,7 @@ impl AgentPost<'static> {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// A text content post (OK intent, text-like media type).
+#[derive(Deref)]
 pub struct TextView<'a> {
 	post: &'a Post,
 }
@@ -518,6 +524,7 @@ impl<'a> TextView<'a> {
 }
 
 /// A refusal post (REFUSAL intent).
+#[derive(Deref)]
 pub struct RefusalView<'a> {
 	post: &'a Post,
 }
@@ -535,6 +542,7 @@ impl<'a> RefusalView<'a> {
 }
 
 /// A URL post (URL media type).
+#[derive(Deref)]
 pub struct UrlView<'a> {
 	post: &'a Post,
 }
@@ -568,6 +576,7 @@ impl<'a> UrlView<'a> {
 }
 
 /// A binary/media post.
+#[derive(Deref)]
 pub struct BytesView<'a> {
 	post: &'a Post,
 }
@@ -605,6 +614,7 @@ impl<'a> BytesView<'a> {
 }
 
 /// An error post (5xx intent).
+#[derive(Deref)]
 pub struct ErrorView<'a> {
 	post: &'a Post,
 }
@@ -620,6 +630,7 @@ impl<'a> ErrorView<'a> {
 }
 
 /// A function call post. Validated by `post_kind: "function_call"` metadata.
+#[derive(Deref)]
 pub struct FunctionCallView<'a> {
 	post: &'a Post,
 }
@@ -657,9 +668,30 @@ impl<'a> FunctionCallView<'a> {
 			.expect("function call body should be valid utf-8")
 	}
 	pub fn post(&self) -> &'a Post { self.post }
+	pub fn into_owned(self) -> OwnedFunctionCall {
+		OwnedFunctionCall {
+			name: self.name().to_string(),
+			call_id: self.call_id().to_string(),
+			arguments: self.arguments().to_string(),
+		}
+	}
 }
 
+/// Used for executing function calls
+pub struct OwnedFunctionCall {
+	name: String,
+	call_id: String,
+	arguments: String,
+}
+impl OwnedFunctionCall {
+	pub fn name(&self) -> &str { &self.name }
+	pub fn call_id(&self) -> &str { &self.call_id }
+	pub fn arguments(&self) -> &str { &self.arguments }
+}
+
+
 /// A function call output post. Validated by `post_kind: "function_call_output"` metadata.
+#[derive(Deref)]
 pub struct FunctionCallOutputView<'a> {
 	post: &'a Post,
 }
@@ -699,6 +731,7 @@ impl<'a> FunctionCallOutputView<'a> {
 }
 
 /// A reasoning content post (REASONING_CONTENT intent).
+#[derive(Deref)]
 pub struct ReasoningContentView<'a> {
 	post: &'a Post,
 }

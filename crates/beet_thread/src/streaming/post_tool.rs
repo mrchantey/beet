@@ -12,6 +12,8 @@ where
 
 	let mut streamer = input.caller.get_cloned::<T>().await?;
 	let mut stream = streamer.stream_posts(input.caller.clone()).await?;
+	let mut function_calls = HashMap::new();
+
 	while let Some(changes) = stream.next().await {
 		let changes = changes?;
 		for post in changes
@@ -20,6 +22,13 @@ where
 		// .map(|post| post.as_agent_post())
 		{
 			info!("Received post changes: {:#?}", post);
+
+			match AgentPost::new(post) {
+				AgentPost::FunctionCall(view) => {
+					function_calls.insert(view.id(), view.into_owned());
+				}
+				_ => {}
+			}
 		}
 		// info!("Received post changes: {:#?}", changes);
 		let meta_builder = stream.meta_builder()?;
@@ -49,7 +58,7 @@ where
 					// 2. spawn created posts
 					for created_post in created {
 						let meta = meta_builder.build(created_post.id());
-						commands.entity(agent).with_child((created_post, meta));
+						commands.spawn((ChildOf(agent), created_post, meta));
 					}
 
 					Ok(())
@@ -57,6 +66,8 @@ where
 			)
 			.await?;
 	}
+
+	call_functions(input.caller, function_calls.into_values()).await?;
 
 	Ok(Pass(()))
 }
