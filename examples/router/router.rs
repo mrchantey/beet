@@ -51,11 +51,20 @@ fn setup(mut commands: Commands) -> Result {
 
 
 fn server_from_cli() -> Result<OnSpawn> {
+	cfg_if! {
+		if #[cfg(feature="http_server")]{
+			let default_server = "http";
+		}else{
+			let default_server = "cli";
+		}
+	};
+
+
 	match CliArgs::parse_env()
 		.params
 		.get("server")
 		.map(|val: &String| val.to_lowercase())
-		.unwrap_or_else(|| "cli".into())
+		.unwrap_or_else(|| default_server.into())
 		.as_str()
 	{
 		#[cfg(feature = "http_server")]

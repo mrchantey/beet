@@ -1,5 +1,16 @@
 //! Implementation of the [OpenResponses Specification](https://www.openresponses.org/specification).
 //!
+//! ## Comparison
+//!
+//!
+//! ### [`async-openai`]
+//! This crate provides clean type exports of the openai responses spec,
+//! but that contains a lot of openai opinions that supporting would cause vendor-lockin,
+//! for example the openai-specific provider tools.
+//!
+//! ### [`openresponses`]
+//! This crate is more of an auto-generated approach, we're tailoring with helper functions etc.
+//!
 //! OpenResponses is an open-source specification for building **multi-provider,
 //! interoperable LLM interfaces**. It defines a shared schema for calling language
 //! models, streaming results, and composing agentic workflows—independent of provider.

@@ -17,6 +17,7 @@ impl OllamaProvider {
 	pub const FUNCTION_GEMMA_270M_IT: &str = "functiongemma:270m-it-fp16";
 	/// Qwen 3 8B - balanced model.
 	pub const QWEN_3_8B: &str = "qwen3:8b";
+	pub const QWEN_3_5_8B: &str = "qwen3.5:9b";
 
 	/// Default OpenResponses URL for local Ollama.
 	pub const RESPONSES_URL: &str = "http://localhost:11434/v1/responses";

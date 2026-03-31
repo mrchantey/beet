@@ -3,11 +3,14 @@ use beet::prelude::*;
 fn main() {
 	env_ext::load_dotenv();
 	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin {
-			// level: Level::DEBUG,
-			filter: format!("bevy_time=off,ureq=off,ureq_proto=off"),
-			..default()
-		}))
+		.add_plugins((
+			MinimalPlugins,
+			// 	LogPlugin {
+			// 	level: Level::TRACE,
+			// 	filter: format!("bevy_time=off,ureq=off,ureq_proto=off"),
+			// 	..default()
+			// }
+		))
 		.init_plugin::<ActorPlugin>()
 		.add_systems(Startup, setup)
 		.add_systems(PostUpdate, (on_create, on_change).chain())

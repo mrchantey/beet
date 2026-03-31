@@ -26,7 +26,7 @@ fn counter() -> impl Bundle {
 				"Stock Counter".into()
 			)]),
 			(Element::new("p"), children![
-				Value::Str("Records in stock: ".into()),
+				Value::Str("Cookie Counter: ".into()),
 				field_ref.clone().as_text(),
 			]),
 			increment(field_ref),

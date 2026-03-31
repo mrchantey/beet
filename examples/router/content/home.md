@@ -1,18 +1,22 @@
-# Pete's Beets
+# Beets are great
 
-Welcome to **Pete's Beets** — your neighborhood record store since 1987.
+Welcome to a website all about beets and how good they are.
+They are **so good** that maybe when you eat them you wont want to eat anything else.
 
-## Now Spinning
 
-We carry *vinyl*, *cassette*, and *CD* across every genre from jazz to jungle.
+## Beets vs other stuff
 
-- New arrivals every Friday
-- Rare imports and limited pressings
-- Local artist spotlight wall
+Beets are *better* than other stuff so dont worry about comparing them.
+- they grow in the ground
+- you take them out of the ground
+- then cook them or something
 
-> "If it grooves, we got it." — Pete
+
+> *They are great* 
+> 
+> — Somebody who likes beets
 
 For more info check out our [github page](https://github.com/mrchantey/beet)
 
 
-- [About Us](/about)
+- [More about beets](/about)

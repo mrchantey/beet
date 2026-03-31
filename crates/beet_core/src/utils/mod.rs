@@ -18,6 +18,7 @@ mod as_any;
 #[cfg(feature = "std")]
 pub mod async_ext;
 mod backoff;
+mod cfg_if;
 #[cfg(feature = "std")]
 mod cli_args;
 mod clone_func;
