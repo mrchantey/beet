@@ -323,6 +323,21 @@ impl<Out> Default for OutHandler<Out> {
 }
 
 impl<Out> OutHandler<Out> {
+	/// Exit with [`AppExit::Success`] once the tool call is complete.
+	pub fn exit() -> Self {
+		OutHandler {
+			func: Box::new(|mut commands, _| {
+				commands.run(async |world| {
+					world.write_message(AppExit::Success);
+				});
+				Ok(())
+			}),
+		}
+	}
+}
+
+
+impl<Out> OutHandler<Out> {
 	/// Create an [`OutHandler`] from any compatible closure.
 	pub fn new<F>(func: F) -> Self
 	where

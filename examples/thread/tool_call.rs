@@ -3,8 +3,8 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() {
-	// let schema = reflect_ext::json_schema::<MakeChoice>();
-	// println!("schema: {:#?}", schema);
+	let schema = reflect_ext::json_schema::<MakeChoice>();
+	println!("schema: {:#?}", schema);
 	env_ext::load_dotenv();
 	App::new()
 		.add_plugins((
@@ -18,12 +18,19 @@ async fn main() {
 
 fn setup(mut commands: Commands) {
 	commands
-		.spawn((RepeatTimes::<()>::new(3), children![(
+		.spawn((RepeatTimes::<()>::new(2), children![(
 			Thread::default(),
 			Sequence::new().allow_no_tool(),
 			children![
 				(Actor::system(), children![Post::spawn(
-					"You enter the cave, and from the ceiling drops a glowing red beet.."
+					r#"Respond in the first person:
+> "I open the door.." - good, you are rolepaying
+> "The door opens, what do you want to do next" - bad, you are a participant, not dungeon master
+
+## Scenario
+
+You enter the cave, and from the ceiling drops a glowing red beet..
+"#
 				)]),
 				(
 					Actor::new("Fearless Warrior", ActorKind::Agent),
@@ -32,7 +39,7 @@ fn setup(mut commands: Commands) {
 				),
 			]
 		),]))
-		.call::<(), Outcome>((), default());
+		.call::<(), Outcome>((), OutHandler::exit());
 }
 
 fn agent_choice_tool() -> impl Bundle {

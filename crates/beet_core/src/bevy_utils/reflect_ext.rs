@@ -542,12 +542,17 @@ fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 		let mut schema =
 			resolve_type(field.type_info(), field.type_path(), ctx);
 
-		if let Some(obj) = schema.as_object_mut() {
-			if let Some(docs) = field.docs() {
-				obj.insert(
-					"description".to_string(),
-					Value::String(docs.to_string()),
-				);
+		if let Some(docs) = field.docs() {
+			let description = Value::String(docs.to_string());
+			// $ref cannot have sibling keywords, ie in OpenAI strict mode; wrap in anyOf
+			if schema.get("$ref").is_some() {
+				return json!({
+					"anyOf": [schema],
+					"description": description,
+				});
+			}
+			if let Some(obj) = schema.as_object_mut() {
+				obj.insert("description".to_string(), description);
 			}
 		}
 
