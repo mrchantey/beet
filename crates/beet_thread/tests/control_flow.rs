@@ -15,7 +15,7 @@ fn main() {
 			// 	..default()
 			// }
 		))
-		.init_plugin::<ActorPlugin>()
+		.init_plugin::<ThreadPlugin>()
 		.add_systems(Startup, setup)
 		.run();
 }

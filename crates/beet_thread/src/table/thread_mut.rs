@@ -82,7 +82,7 @@ impl ThreadMut<'static> {
 	pub fn new_with_plugins<M>(plugins: impl Plugins<M>) -> Self {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, plugins))
-			.init_plugin::<ActorPlugin>();
+			.init_plugin::<ThreadPlugin>();
 
 		Self::new_with_world(app)
 	}

@@ -23,16 +23,16 @@ agent = ["dep:async-openai"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["ureq","json"] }
-beet_core = { workspace = true, features = ["serde"] }
+beet_core = { workspace = true, features = ["serde","bevy_reflect_documentation"] }
 beet_router = { workspace = true, features = ["json"] }
 beet_tool = { workspace = true, optional = true, features=["json"] }
+bevy.workspace = true
 uuid = { workspace = true, features = ["v7", "js"] }
 async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
 strum.workspace = true
 thiserror.workspace = true
-bevy.workspace = true
 async-lock.workspace = true
 base64.workspace = true
 serde_json.workspace = true

@@ -1,51 +1,72 @@
-//! Demonstrates tool calling with the [`ThreadMut`] fluent API.
-//!
-//! The agent is asked about flimflams and calls the `discover-things`
-//! tool to produce structured output.
+//! Demonstrates tool calling
 use beet::prelude::*;
-
-
-#[derive(Reflect, serde::Deserialize, serde::Serialize)]
-pub struct DiscoverThingsInput {
-	question: String,
-}
 
 #[beet::main]
 async fn main() {
-	let mut thread = ThreadMut::new();
-	let mut human = thread.insert_actor(Actor::human());
-	human.insert_post(
-		"Tell me about flim-flams, expand on the information given from tool calls, filling in the blanks.",
-	);
-	let mut agent = thread.insert_actor(Actor::agent());
-	agent
-		.with_bundle(OllamaProvider::qwen())
-		.with_child(function_tool(
-			"all-about-flim-flams",
-			"learn all about things like flim-flams",
-			func_tool(|_cx: FuncToolIn<DiscoverThingsInput>| {
-				"flimflams are used by gzorps on their way to work"
-					.to_string()
-					.xok()
-			}),
-		));
-
-
-	println!("1. Make tool call");
-	agent
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.for_each(print_post);
-	println!("2. read tool output");
-	agent
-		.send_and_collect()
-		.await
-		.unwrap()
-		.into_iter()
-		.for_each(print_post);
+	// let schema = reflect_ext::json_schema::<MakeChoice>();
+	// println!("schema: {:#?}", schema);
+	env_ext::load_dotenv();
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			ThreadPlugin::default(),
+			ThreadStdoutPlugin::default(),
+		))
+		.add_systems(Startup, setup)
+		.run();
 }
-fn print_post(post: Post) {
-	println!("Post: {post}");
+
+fn setup(mut commands: Commands) {
+	commands
+		.spawn((RepeatTimes::<()>::new(3), children![(
+			Thread::default(),
+			Sequence::new().allow_no_tool(),
+			children![
+				(Actor::system(), children![Post::spawn(
+					"You enter the cave, and from the ceiling drops a glowing red beet.."
+				)]),
+				(
+					Actor::new("Fearless Warrior", ActorKind::Agent),
+					OpenAiProvider::gpt_5_mini().unwrap(),
+					children![agent_choice_tool()]
+				),
+			]
+		),]))
+		.call::<(), Outcome>((), default());
+}
+
+fn agent_choice_tool() -> impl Bundle {
+	function_tool(
+		"make-choice",
+		"make your choice",
+		func_tool(|cx: FuncToolIn<MakeChoice>| {
+			match cx.choice {
+				Choice::Attack => {
+					"the attack was successful, you must feel very smug.."
+				}
+				Choice::Defend => "you exhibited cowardice, the shame..",
+				Choice::GreetWarmly => {
+					"its almost as if the glowing beet winked in response.."
+				}
+			}
+			.to_string()
+			.xok()
+		}),
+	)
+}
+
+
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
+struct MakeChoice {
+	/// The choice you can make
+	choice: Choice,
+	/// A line of dialog to say as you make your choice
+	catchphrase: String,
+}
+#[derive(Reflect, serde::Deserialize, serde::Serialize)]
+enum Choice {
+	Attack,
+	/// Do Thing
+	Defend,
+	GreetWarmly,
 }
