@@ -32,28 +32,9 @@ pub fn insert_tool_path_and_params(
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
-	insert_path_and_params(
-		ev.entity,
-		&ancestors,
-		&paths,
-		&params,
-		&mut commands,
-	)
-}
-
-/// Shared logic for collecting ancestor path and param partials
-/// and inserting the resolved [`PathPattern`] and [`ParamsPattern`]
-/// on the given entity.
-fn insert_path_and_params(
-	entity: Entity,
-	ancestors: &Query<&ChildOf>,
-	paths: &Query<&PathPartial>,
-	params: &Query<&ParamsPartial>,
-	commands: &mut Commands,
-) -> Result {
-	let path = PathPattern::collect(entity, ancestors, paths)?;
-	let params = ParamsPattern::collect(entity, ancestors, params)?;
-	commands.entity(entity).insert((path, params));
+	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
+	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
+	commands.entity(ev.entity).insert((path, params));
 	Ok(())
 }
 
@@ -85,8 +66,17 @@ pub fn insert_route_tree(
 ) -> Result {
 	let root = ancestors.root_ancestor(ev.entity);
 	let mut nodes: Vec<ToolNode> = Vec::new();
+	// when added via ChildOf, it will not have been added to the Children,
+	// so we check this one manually
+	if let Ok(item) = tools.get(ev.entity) {
+		nodes.push(ToolNode::from_query(item));
+	}
 
-	for entity in children_query.iter_descendants_inclusive(root) {
+	for entity in children_query
+		.iter_descendants_inclusive(root)
+		// we've already checked this one
+		.filter(|entity| *entity != ev.entity)
+	{
 		if let Ok(item) = tools.get(entity) {
 			nodes.push(ToolNode::from_query(item));
 		}

@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use beet_router::prelude::*;
 use beet_tool::prelude::*;
 use bevy::reflect::Typed;

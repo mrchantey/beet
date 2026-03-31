@@ -190,6 +190,12 @@ impl<T: Sized> Xtend for T {}
 /// These methods combine iteration and collection into single operations
 /// for more concise code when you need a collected result anyway.
 pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
+	/// Adds the provided item to the end of the iterator,
+	/// using std::iter::once, returning another iterator
+	fn xpush(self, item: T) -> impl IntoIterator<Item = T> {
+		self.into_iter().chain(std::iter::once(item))
+	}
+
 	/// Maps each item and collects into a [`Vec`].
 	///
 	/// Equivalent to `.into_iter().map(func).collect()`.
