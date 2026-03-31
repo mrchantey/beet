@@ -223,7 +223,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn calls_first_tool_when_present() {
-		let tool = FunctionTool::new(
+		let tool = FunctionToolDefinition::new(
 			"greet",
 			"Greet someone",
 			serde_json::json!({

@@ -1,51 +1,76 @@
 use beet_core::prelude::*;
+use beet_tool::prelude::*;
+use bevy::reflect::Typed;
+
+
+pub fn function_tool<T, M>(
+	path: &str,
+	description: &str,
+	tool: T,
+) -> (ToolDefinition, Tool<T::In, T::Out>)
+where
+	T: IntoReflectTool<M>,
+	T::In: Typed,
+	T::Out: Typed,
+{
+	let meta = T::reflect_meta().input_json_schema();
+	// println!("Registering tool {path} with meta {meta}");
+	(
+		FunctionToolDefinition::new(path, description, meta).into(),
+		tool.into_tool(),
+	)
+}
 
 
 
 #[derive(Debug, Clone, Component)]
 pub enum ToolDefinition {
 	/// A tool defined in this application.
-	Function(FunctionTool),
+	Function(FunctionToolDefinition),
 	/// A tool defined by the model provider.
-	Provider(ProviderTool),
+	Provider(ProviderToolDefinition),
 }
 
 impl ToolDefinition {
 	pub fn provider(name: impl Into<String>) -> Self {
-		Self::Provider(ProviderTool { name: name.into() })
+		Self::Provider(ProviderToolDefinition { name: name.into() })
 	}
 	pub fn function(
 		name: impl Into<String>,
 		description: impl Into<String>,
 		params_schema: serde_json::Value,
 	) -> Self {
-		Self::Function(FunctionTool::new(name, description, params_schema))
+		Self::Function(FunctionToolDefinition::new(
+			name,
+			description,
+			params_schema,
+		))
 	}
 }
 
-impl Into<ToolDefinition> for FunctionTool {
+impl Into<ToolDefinition> for FunctionToolDefinition {
 	fn into(self) -> ToolDefinition { ToolDefinition::Function(self) }
 }
 
-impl Into<ToolDefinition> for ProviderTool {
+impl Into<ToolDefinition> for ProviderToolDefinition {
 	fn into(self) -> ToolDefinition { ToolDefinition::Provider(self) }
 }
 
 /// Tool defined by the model provider,
 /// output is returned as regular context
 #[derive(Debug, Clone, Deref)]
-pub struct ProviderTool {
+pub struct ProviderToolDefinition {
 	name: String,
 }
 
-impl ProviderTool {
+impl ProviderToolDefinition {
 	pub fn name(&self) -> &str { &self.name }
 }
 
 /// Tool defined in this application,
 /// output is the result of a function call.
 #[derive(Debug, Clone)]
-pub struct FunctionTool {
+pub struct FunctionToolDefinition {
 	/// The name of the tool. This must be unique per set of tools.
 	name: String,
 	/// A description of the function. Used by the model to decide when to call it.
@@ -53,7 +78,7 @@ pub struct FunctionTool {
 	/// A json schema for the parameters
 	params_schema: serde_json::Value,
 }
-impl FunctionTool {
+impl FunctionToolDefinition {
 	pub fn new(
 		name: impl Into<String>,
 		description: impl Into<String>,

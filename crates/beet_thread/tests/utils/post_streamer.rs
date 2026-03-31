@@ -70,7 +70,7 @@ pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
 
 /// Define a function tool and verify the model produces a function call.
 pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
-	let tool = FunctionTool::new(
+	let tool = FunctionToolDefinition::new(
 		"get_weather",
 		"Get the current weather for a location",
 		serde_json::json!({

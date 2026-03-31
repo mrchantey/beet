@@ -4,30 +4,35 @@
 //! tool to produce structured output.
 use beet::prelude::*;
 
+
+#[derive(Reflect)]
+pub struct DiscoverThingsInput {
+	question: String,
+}
+
 #[beet::main]
 async fn main() {
-	let tool = FunctionTool::new(
-		"get_weather",
-		"Get the current weather for a location",
-		serde_json::json!({
-			"type": "object",
-			"properties": {
-				"location": {
-					"type": "string",
-					"description": "The city and state, e.g. San Francisco, CA"
-				}
-			},
-			"required": ["location"]
-		}),
-	);
-
 	let posts = ThreadMut::new()
 		.insert_actor(Actor::human())
-		.insert_post("What's the weather like in San Francisco?")
+		.insert_post("Tell me about flimflams?")
 		.thread_view()
 		.insert_actor(Actor::agent())
 		.with_bundle(OllamaProvider::qwen().without_streaming())
-		.with_tool(tool)
+		.with_child(function_tool(
+			"discover-things",
+			"learn all about things like flim-flams",
+			func_tool(|cx: FuncToolIn<DiscoverThingsInput>| {
+				let question = cx.question.clone();
+
+				format!(
+					"you asked {}, great question!
+				flimflams are used by gzorps
+					",
+					question
+				)
+				.xok()
+			}),
+		))
 		.send_and_collect()
 		.await
 		.unwrap();

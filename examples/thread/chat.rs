@@ -28,7 +28,7 @@ fn setup(mut commands: Commands) {
 				)]),
 				(
 					Actor::new("BeepBot", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini().unwrap() 
+					OpenAiProvider::gpt_5_mini().unwrap()
 				),
 				(
 					Actor::new("Billy", ActorKind::Human),

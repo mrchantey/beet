@@ -1265,6 +1265,7 @@ dependencies = [
  "base64 0.22.1",
  "beet_core",
  "beet_net",
+ "beet_router",
  "beet_thread",
  "beet_tool",
  "bevy",
