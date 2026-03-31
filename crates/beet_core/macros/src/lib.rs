@@ -1,18 +1,14 @@
 #![no_std]
 extern crate alloc;
-use macros::*;
-
 mod as_any;
 mod bundle_effect;
 mod entity_target_event;
-mod macros;
+mod main_attr;
 mod mdx;
 mod sendit;
+mod test_attr;
 mod to_tokens;
 mod tool;
-mod utils;
-
-
 
 
 /// Implements `TokenizeSelf` for a struct or enum.
@@ -165,7 +161,7 @@ pub fn beet_test(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	parse_test_attr(attr, input)
+	test_attr::impl_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }
@@ -215,7 +211,7 @@ pub fn beet_main(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	parse_main_attr(attr, input)
+	main_attr::impl_main_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }

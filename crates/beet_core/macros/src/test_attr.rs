@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::ItemFn;
 
-pub fn parse_test_attr(
+pub fn impl_test_attr(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> syn::Result<TokenStream> {
