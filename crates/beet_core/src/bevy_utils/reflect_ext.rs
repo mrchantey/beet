@@ -557,7 +557,6 @@ fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 	#[cfg(not(feature = "bevy_reflect_documentation"))]
 	resolve_type(field.type_info(), field.type_path(), ctx)
 }
-
 /// Maps a Rust type path to a JSON Schema type.
 fn type_path_to_schema(type_path: &str) -> Value {
 	// Handle Option<T> specially - extract inner type

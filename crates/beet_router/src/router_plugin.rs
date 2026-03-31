@@ -25,6 +25,9 @@ impl Plugin for RouterPlugin {
 /// spawned at the same time as the tool, even if they come after it in the tuple.
 /// This is because, unlike OnAdd component hooks, observers run after the entire
 /// tree is spawned.
+///
+/// Control-flow tools (ie [`Sequence`], [`Repeat`]) that have no [`PathPartial`]
+/// anywhere in their hierarchy are skipped — they are not HTTP routes.
 pub fn insert_tool_path_and_params(
 	ev: On<Insert, ToolMeta>,
 	ancestors: Query<&ChildOf>,
@@ -32,6 +35,14 @@ pub fn insert_tool_path_and_params(
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
+	// skip tools with no explicit path — control-flow tools like Sequence and
+	// RepeatTimes require a Tool via #[require] but should not become routes
+	let has_path = ancestors
+		.iter_ancestors_inclusive(ev.entity)
+		.any(|entity| paths.contains(entity));
+	if !has_path {
+		return Ok(());
+	}
 	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
 	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
 	commands.entity(ev.entity).insert((path, params));
