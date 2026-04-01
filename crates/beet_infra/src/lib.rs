@@ -6,7 +6,7 @@
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`common_resources`] for pre-generated bindings of commonly used providers
 pub mod config_exporter;
-mod types;
+mod components;
 
 #[cfg(feature = "bindings_generator")]
 pub mod bindings_generator;
@@ -18,5 +18,5 @@ pub use config_exporter::types as terra;
 pub mod prelude {
 	pub use crate::config_exporter::config_exporter::*;
 	pub use crate::config_exporter::types::*;
-	pub use crate::types::*;
+	pub use crate::components::*;
 }

@@ -340,13 +340,17 @@ where
 /// Chainable operations for strings.
 pub trait XtendString {
 	/// Appends a string and returns `self`.
-	fn xtend(self, item: impl AsRef<str>) -> Self;
+	fn xtend(self, item: impl AsRef<str>) -> String;
 }
 
-impl XtendString for String {
-	fn xtend(mut self, item: impl AsRef<str>) -> Self {
-		self.push_str(item.as_ref());
-		self
+impl<T> XtendString for T
+where
+	T: Into<String>,
+{
+	fn xtend(self, item: impl AsRef<str>) -> String {
+		let mut this = self.into();
+		this.push_str(item.as_ref());
+		this
 	}
 }
 
