@@ -18,7 +18,7 @@ pub async fn call_functions(
 			.with_header::<header::ContentType>(MediaType::Json);
 
 		let output = match agent
-			.call_detached(async_tool(router_tool), request)
+			.call_detached(RouterTool.into_tool(), request)
 			.await?
 		{
 			Pass(res) => match res.into_result().await {

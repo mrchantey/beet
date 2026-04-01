@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
 use bevy::reflect::Typed;
 
 /// A tool that increments a numeric field in a document, returning the new value.
@@ -24,25 +23,26 @@ use bevy::reflect::Typed;
 /// let field = FieldRef::new("counter");
 /// let entity = world.spawn(increment(field)).id();
 /// ```
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn Increment(
+	cx: In<SystemToolIn>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<i64> {
+	let field = fields.get(cx.caller)?;
+	query.with_field(cx.caller, field, |value| {
+		let current = value.as_i64().unwrap_or(0);
+		let new_value = current + 1;
+		*value = Value::Int(new_value);
+		new_value
+	})
+}
+
+/// Convenience constructor for increment with a field reference and path.
 pub fn increment(field: FieldRef) -> impl Bundle {
-	(
-		field,
-		PathPartial::new("increment"),
-		system_tool(
-			|In(cx): In<SystemToolIn>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<i64> {
-				let field = fields.get(cx.caller)?;
-				query.with_field(cx.caller, field, |value| {
-					let current = value.as_i64().unwrap_or(0);
-					let new_value = current + 1;
-					*value = Value::Int(new_value);
-					new_value
-				})
-			},
-		),
-	)
+	(field, PathPartial::new("increment"), Increment)
 }
 
 /// A tool that decrements a numeric field in a document, returning the new value.
@@ -54,76 +54,98 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 /// 4. Returns the new value
 ///
 /// If the field doesn't exist or is not an i64, it will be initialized to -1.
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn Decrement(
+	cx: In<SystemToolIn>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<i64> {
+	let field = fields.get(cx.caller)?;
+	query.with_field(cx.caller, field, |value| {
+		let current = value.as_i64().unwrap_or(0);
+		let new_value = current - 1;
+		*value = Value::Int(new_value);
+		new_value
+	})
+}
+
+/// Convenience constructor for decrement with a field reference and path.
 pub fn decrement(field: FieldRef) -> impl Bundle {
-	(
-		field,
-		PathPartial::new("decrement"),
-		system_tool(
-			|In(cx): In<SystemToolIn>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<i64> {
-				let field = fields.get(cx.caller)?;
-				query.with_field(cx.caller, field, |value| {
-					let current = value.as_i64().unwrap_or(0);
-					let new_value = current - 1;
-					*value = Value::Int(new_value);
-					new_value
-				})
-			},
-		),
-	)
+	(field, PathPartial::new("decrement"), Decrement)
 }
 
 /// A tool that adds a value to a numeric field in a document.
 ///
 /// Takes the amount to add as input and returns the new value.
 /// If the field doesn't exist or is not an i64, it will be initialized to the provided value.
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn AddField(
+	cx: In<SystemToolIn<i64>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<i64> {
+	let field = fields.get(cx.caller)?;
+	query.with_field(cx.caller, field, |value| {
+		let current = value.as_i64().unwrap_or(0);
+		let new_value = current + cx.input;
+		*value = Value::Int(new_value);
+		new_value
+	})
+}
+
+/// Convenience constructor for add with a field reference and path.
 pub fn add(field: FieldRef) -> impl Bundle {
-	(
-		field,
-		PathPartial::new("add"),
-		system_tool(
-			|In(cx): In<SystemToolIn<i64>>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<i64> {
-				let field = fields.get(cx.caller)?;
-				query.with_field(cx.caller, field, |value| {
-					let current = value.as_i64().unwrap_or(0);
-					let new_value = current + cx.input;
-					*value = Value::Int(new_value);
-					new_value
-				})
-			},
-		),
-	)
+	(field, PathPartial::new("add"), AddField)
 }
 
 /// A tool that sets a field to a specific [`Value`].
 ///
 /// Takes a [`Value`] as input and stores it in the specified field.
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn SetField(
+	cx: In<SystemToolIn<Value>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<()> {
+	let field = fields.get(cx.caller)?;
+	query.with_field(cx.caller, field, move |value| {
+		*value = cx.input;
+	})
+}
+
+/// Convenience constructor for set_field with a field reference and path.
 pub fn set_field(field: FieldRef) -> impl Bundle {
-	(
-		field,
-		PathPartial::new("set-field"),
-		system_tool(
-			|In(cx): In<SystemToolIn<Value>>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<()> {
-				let field = fields.get(cx.caller)?;
-				query.with_field(cx.caller, field, move |value| {
-					*value = cx.input;
-				})
-			},
-		),
-	)
+	(field, PathPartial::new("set-field"), SetField)
 }
 
 /// A tool that sets a field to a specific typed value.
 ///
 /// Takes a generic type `T` that can be converted to/from reflection.
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn SetFieldTyped<T>(
+	cx: In<SystemToolIn<T>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<()>
+where
+	T: 'static + Send + Sync + FromReflect + Typed,
+{
+	let field = fields.get(cx.caller)?;
+	let new_value = Value::from_reflect(&cx.input)?;
+	query.with_field(cx.caller, field, move |value| {
+		*value = new_value;
+	})
+}
+
+/// Convenience constructor for set_field_typed with a field reference and path.
 pub fn set_field_typed<T>(field: FieldRef) -> impl Bundle
 where
 	T: 'static + Send + Sync + FromReflect + Typed,
@@ -131,46 +153,53 @@ where
 	(
 		field,
 		PathPartial::new("set-field-typed"),
-		system_tool(
-			move |In(cx): In<SystemToolIn<T>>,
-			      mut query: DocumentQuery,
-			      fields: Query<&FieldRef>|
-			      -> Result<()> {
-				let field = fields.get(cx.caller)?;
-				let new_value = Value::from_reflect(&cx.input)?;
-				query.with_field(cx.caller, field, move |value| {
-					*value = new_value;
-				})
-			},
-		),
+		SetFieldTyped::<T>(core::marker::PhantomData),
 	)
 }
 
 /// A tool that retrieves a field value from a document.
 ///
 /// Returns the [`Value`].
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn ReadField(
+	cx: In<SystemToolIn>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<Value> {
+	let field = fields.get(cx.caller)?;
+	let doc = query.get(cx.caller, &field.document)?;
+	doc.get_field_ref(&field.field_path)
+		.map(|val| val.clone())?
+		.xok()
+}
+
+/// Convenience constructor for get_field with a field reference and path.
 pub fn get_field(field: FieldRef) -> impl Bundle {
-	(
-		field,
-		PathPartial::new("get-field"),
-		system_tool(
-			|In(cx): In<SystemToolIn>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<Value> {
-				let field = fields.get(cx.caller)?;
-				let doc = query.get(cx.caller, &field.document)?;
-				doc.get_field_ref(&field.field_path)
-					.map(|val| val.clone())?
-					.xok()
-			},
-		),
-	)
+	(field, PathPartial::new("get-field"), ReadField)
 }
 
 /// A tool that retrieves a field value from a document with type conversion.
 ///
 /// Returns the value as a typed `T`.
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn ReadFieldTyped<T>(
+	cx: In<SystemToolIn>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<T>
+where
+	T: 'static + Send + Sync + FromReflect + Typed,
+{
+	let field = fields.get(cx.caller)?;
+	let doc = query.get(cx.caller, &field.document)?;
+	doc.get_field::<T>(&field.field_path)?.xok()
+}
+
+/// Convenience constructor for get_field_typed with a field reference and path.
 pub fn get_field_typed<T>(field: FieldRef) -> impl Bundle
 where
 	T: 'static + Send + Sync + FromReflect + Typed,
@@ -178,16 +207,7 @@ where
 	(
 		field,
 		PathPartial::new("get-field-typed"),
-		system_tool(
-			|In(cx): In<SystemToolIn>,
-			 mut query: DocumentQuery,
-			 fields: Query<&FieldRef>|
-			 -> Result<T> {
-				let field = fields.get(cx.caller)?;
-				let doc = query.get(cx.caller, &field.document)?;
-				doc.get_field::<T>(&field.field_path)?.xok()
-			},
-		),
+		ReadFieldTyped::<T>(core::marker::PhantomData),
 	)
 }
 
@@ -196,6 +216,8 @@ where
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_tool::prelude::*;
+	use bevy::ecs::entity::EntityHashMap;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
 
@@ -459,5 +481,40 @@ mod test {
 			.unwrap();
 
 		result.xpect_eq("Alice");
+	}
+
+	#[test]
+	fn roundtrip_increment_scene() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins);
+		app.init_plugin::<DocumentPlugin>();
+		app.init();
+		app.update();
+
+		let entity = app.world_mut().spawn(increment(count_field())).id();
+
+		// Serialize
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entity_tree(entity)
+			.save_ron()
+			.unwrap();
+		scene.xref().xpect_contains("Increment");
+
+		// Despawn original
+		app.world_mut().entity_mut(entity).despawn();
+
+		// Load
+		let mut entity_map = EntityHashMap::default();
+		SceneLoader::new(app.world_mut())
+			.with_entity_map(&mut entity_map)
+			.load_ron(&scene)
+			.unwrap();
+		app.update();
+
+		// The loaded entity should have Increment and ToolMeta
+		// (Tool itself isn't serializable, but #[require] re-creates it)
+		let loaded = *entity_map.values().next().unwrap();
+		app.world().entity(loaded).get::<Increment>().xpect_some();
+		app.world().entity(loaded).get::<ToolMeta>().xpect_some();
 	}
 }

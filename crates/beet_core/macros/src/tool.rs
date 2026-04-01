@@ -1,8 +1,10 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::FnArg;
@@ -132,25 +134,37 @@ fn parse_func_tool(
 	let body = &item.block;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
 
 	let destructure = make_destructure(params);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::func_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		fn #tool_fn #impl_generics (input: #beet_tool::prelude::FuncToolIn<#in_type>) -> Result<#out_type> #where_clause {
+			#destructure
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::func_tool(|input: #beet_tool::prelude::FuncToolIn<#in_type>| {
-					#destructure
-					#body_wrap
-				})
+				#beet_tool::prelude::func_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -178,23 +192,35 @@ fn parse_func_passthrough(
 	let param_name = &params[0].0;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let in_type = quote! { #inner_type };
 	let out_type = compute_out_type(item, result_out);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::func_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		fn #tool_fn #impl_generics (#param_name: #beet_tool::prelude::FuncToolIn<#in_type>) -> Result<#out_type> #where_clause {
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::func_tool(|#param_name: #beet_tool::prelude::FuncToolIn<#in_type>| {
-					#body_wrap
-				})
+				#beet_tool::prelude::func_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -216,25 +242,37 @@ fn parse_async_tool(
 	let body = &item.block;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let (in_type, out_type) = compute_in_out(params, item, result_out)?;
 
 	let destructure = make_destructure(params);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::async_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		async fn #tool_fn #impl_generics (input: #beet_tool::prelude::AsyncToolIn<#in_type>) -> Result<#out_type> #where_clause {
+			#destructure
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::async_tool(|input: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
-					#destructure
-					#body_wrap
-				})
+				#beet_tool::prelude::async_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -261,23 +299,35 @@ fn parse_async_passthrough(
 	let param_name = &params[0].0;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let in_type = quote! { #inner_type };
 	let out_type = compute_out_type(item, result_out);
 	let body_wrap = make_body_wrap(body, item, result_out);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::async_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		async fn #tool_fn #impl_generics (#param_name: #beet_tool::prelude::AsyncToolIn<#in_type>) -> Result<#out_type> #where_clause {
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::async_tool(|#param_name: #beet_tool::prelude::AsyncToolIn<#in_type>| async move {
-					#body_wrap
-				})
+				#beet_tool::prelude::async_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -301,7 +351,7 @@ fn parse_system_tool(
 	let body = &item.block;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let first_param_name = &params[0].0;
 	let in_type = quote! { #in_inner };
@@ -311,21 +361,33 @@ fn parse_system_tool(
 	// Collect remaining system params (everything after the first).
 	let system_params = collect_system_params(item, 1);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::system_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		fn #tool_fn #impl_generics (
+			In(__tool_in): In<#beet_tool::prelude::SystemToolIn<#in_type>>
+			#(, #system_params)*
+		) -> Result<#out_type> #where_clause {
+			let #first_param_name = In(__tool_in.input);
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::system_tool(|
-					In(__tool_in): In<#beet_tool::prelude::SystemToolIn<#in_type>>
-					#(, #system_params)*
-				| -> Result<#out_type> {
-					let #first_param_name = In(__tool_in.input);
-					#body_wrap
-				})
+				#beet_tool::prelude::system_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -344,7 +406,7 @@ fn parse_system_passthrough(
 	let body = &item.block;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-	let struct_def = make_struct_def(vis, fn_name, generics);
+	let fn_attrs = &item.attrs;
 
 	let first_param_name = &params[0].0;
 	let in_type = quote! { #inner_type };
@@ -353,20 +415,32 @@ fn parse_system_passthrough(
 
 	let system_params = collect_system_params(item, 1);
 
+	let tool_fn = tool_fn_name(fn_name);
+	let turbofish = make_turbofish(generics);
+
+	let require_tool = quote! {
+		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::system_tool(#tool_fn #turbofish)
+	};
+
+	let struct_def =
+		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+
 	Ok(quote! {
 		#struct_def
+
+		fn #tool_fn #impl_generics (
+			In(#first_param_name): In<#beet_tool::prelude::SystemToolIn<#in_type>>
+			#(, #system_params)*
+		) -> Result<#out_type> #where_clause {
+			#body_wrap
+		}
 
 		impl #impl_generics #beet_tool::prelude::IntoTool<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
 			type In = #in_type;
 			type Out = #out_type;
 
 			fn into_tool(self) -> #beet_tool::prelude::Tool<Self::In, Self::Out> {
-				#beet_tool::prelude::system_tool(|
-					In(#first_param_name): In<#beet_tool::prelude::SystemToolIn<#in_type>>
-					#(, #system_params)*
-				| -> Result<#out_type> {
-					#body_wrap
-				})
+				#beet_tool::prelude::system_tool(#tool_fn #turbofish)
 			}
 		}
 	})
@@ -481,17 +555,34 @@ fn collect_system_params(item: &ItemFn, skip: usize) -> Vec<&FnArg> {
 	item.sig.inputs.iter().skip(skip).collect()
 }
 
-/// Generate a struct definition, adding `PhantomData` for any type params.
+/// Generate a struct definition, forwarding function attributes to the
+/// struct and optionally adding a `#[require(Tool<...>)]` attribute
+/// when the derives include `Component`.
 fn make_struct_def(
 	vis: &syn::Visibility,
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
+	fn_attrs: &[syn::Attribute],
+	require_tool: Option<TokenStream>,
 ) -> TokenStream {
+	let has_component = has_component_derive(fn_attrs);
+	let require_attr = if has_component {
+		if let Some(expr) = require_tool {
+			quote! { #[require(#expr)] }
+		} else {
+			quote! {}
+		}
+	} else {
+		quote! {}
+	};
+
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
 
 	if type_params.is_empty() {
 		quote! {
+			#(#fn_attrs)*
+			#require_attr
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name;
 		}
@@ -504,6 +595,8 @@ fn make_struct_def(
 			quote! { ::core::marker::PhantomData<(#(#type_params),*)> }
 		};
 		quote! {
+			#(#fn_attrs)*
+			#require_attr
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name #impl_generics (#phantom) #where_clause;
 		}
@@ -572,6 +665,48 @@ fn is_result_type(ty: &Type) -> bool {
 /// Extract the inner `T` from `Result<T>` or `Result<T, E>`.
 fn extract_result_inner(ty: &Type) -> Option<&Type> {
 	extract_wrapper_type(ty, "Result")
+}
+
+
+// ---------------------------------------------------------------------------
+// Tool-specific helpers
+// ---------------------------------------------------------------------------
+
+/// Convert a function/struct name to a snake_case standalone function
+/// name with a `_tool` suffix.
+fn tool_fn_name(fn_name: &syn::Ident) -> syn::Ident {
+	let snake = fn_name.to_string().to_snake_case();
+	let name = alloc::format!("{}_tool", snake);
+	syn::Ident::new(&name, fn_name.span())
+}
+
+/// Check whether any `#[derive(...)]` attribute contains `Component`.
+fn has_component_derive(attrs: &[syn::Attribute]) -> bool {
+	attrs.iter().any(|attr| {
+		if attr.path().is_ident("derive") {
+			attr.parse_args_with(
+				syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
+			)
+			.map(|meta_list| {
+				meta_list.iter().any(|path| path.is_ident("Component"))
+			})
+			.unwrap_or(false)
+		} else {
+			false
+		}
+	})
+}
+
+/// Generate turbofish syntax for generic type parameters,
+/// or empty tokens when there are none.
+fn make_turbofish(generics: &syn::Generics) -> TokenStream {
+	let type_params: Vec<&syn::Ident> =
+		generics.type_params().map(|tp| &tp.ident).collect();
+	if type_params.is_empty() {
+		quote! {}
+	} else {
+		quote! { ::<#(#type_params),*> }
+	}
 }
 
 
@@ -647,6 +782,8 @@ mod test {
 		assert!(result.contains("type Out = ()"));
 		assert!(result.contains("let _ = input . input"));
 		assert!(result.contains("func_tool"));
+		// standalone function
+		assert!(result.contains("fn my_tool_tool"));
 	}
 
 	#[test]
@@ -661,6 +798,8 @@ mod test {
 		assert!(result.contains("let (a , b) = input . input"));
 		assert!(result.contains("func_tool"));
 		assert!(!result.contains("} ?"));
+		// standalone function
+		assert!(result.contains("fn add_tool"));
 	}
 
 	#[test]
@@ -672,6 +811,7 @@ mod test {
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("let val = input . input"));
 		assert!(result.contains("func_tool"));
+		assert!(result.contains("fn double_tool"));
 	}
 
 	#[test]
@@ -710,8 +850,8 @@ mod test {
 		});
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("func_tool"));
-		// The param name should be forwarded directly, no destructuring.
-		assert!(result.contains("| cx : "));
+		// standalone function has the param name
+		assert!(result.contains("fn my_tool_tool"));
 		assert!(!result.contains("let cx = input"));
 	}
 
@@ -722,7 +862,7 @@ mod test {
 		});
 		assert!(result.contains("type In = String"));
 		assert!(result.contains("func_tool"));
-		assert!(result.contains("| cx : "));
+		assert!(result.contains("fn my_tool_tool"));
 	}
 
 	#[test]
@@ -732,7 +872,7 @@ mod test {
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("func_tool"));
-		assert!(result.contains("| cx : "));
+		assert!(result.contains("fn my_tool_tool"));
 		assert!(!result.contains("let cx = input"));
 	}
 
@@ -743,7 +883,7 @@ mod test {
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("func_tool"));
-		assert!(result.contains("| cx : "));
+		assert!(result.contains("fn my_tool_tool"));
 		assert!(!result.contains("let cx = input"));
 	}
 
@@ -761,7 +901,8 @@ mod test {
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("type Out = i32"));
 		assert!(result.contains("async_tool"));
-		assert!(result.contains("async move"));
+		// standalone async function instead of inline closure
+		assert!(result.contains("async fn my_tool_tool"));
 	}
 
 	#[test]
@@ -814,8 +955,8 @@ mod test {
 		});
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("async_tool"));
-		// The param name should be forwarded directly.
-		assert!(result.contains("| cx : "));
+		// standalone async function
+		assert!(result.contains("async fn my_tool_tool"));
 		assert!(!result.contains("let cx = input"));
 	}
 
@@ -826,7 +967,7 @@ mod test {
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("async_tool"));
-		assert!(result.contains("| cx : "));
+		assert!(result.contains("async fn my_tool_tool"));
 		assert!(!result.contains("let cx = input"));
 	}
 
@@ -934,5 +1075,140 @@ mod test {
 		assert!(result.contains("system_tool"));
 		assert!(result.contains("In (cx)"));
 		assert!(!result.contains("__tool_in"));
+	}
+
+	// -----------------------------------------------------------------------
+	// has_component_derive helper
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn detect_component_derive() {
+		let item: syn::ItemFn = syn::parse_quote! {
+			#[derive(Debug, Clone, Component, Reflect)]
+			fn Add() {}
+		};
+		assert!(!item.attrs.is_empty());
+		assert!(has_component_derive(&item.attrs));
+	}
+
+	#[test]
+	fn detect_no_component_derive() {
+		let item: syn::ItemFn = syn::parse_quote! {
+			#[derive(Debug, Clone)]
+			fn Add() {}
+		};
+		assert!(!item.attrs.is_empty());
+		assert!(!has_component_derive(&item.attrs));
+	}
+
+	#[test]
+	fn detect_no_derives_at_all() {
+		let item: syn::ItemFn = syn::parse_quote! {
+			fn Add() {}
+		};
+		assert!(item.attrs.is_empty());
+		assert!(!has_component_derive(&item.attrs));
+	}
+
+	// -----------------------------------------------------------------------
+	// Component derive + #[require] generation
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn component_derive_adds_require() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Debug, Clone, Component, Reflect)]
+			fn Add(a: i32, b: i32) -> i32 { a + b }
+		});
+		assert!(
+			result.contains("derive (Debug , Clone , Component , Reflect)")
+		);
+		assert!(result.contains("# [require"));
+		assert!(result.contains("Tool <"));
+		assert!(result.contains("func_tool (add_tool"));
+		assert!(result.contains("struct Add"));
+		assert!(result.contains("fn add_tool"));
+	}
+
+	#[test]
+	fn no_component_derive_no_require() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Debug, Clone)]
+			fn my_tool(a: i32) -> i32 { a }
+		});
+		assert!(result.contains("derive (Debug , Clone)"));
+		assert!(!result.contains("# [require"));
+		assert!(result.contains("fn my_tool_tool"));
+	}
+
+	#[test]
+	fn no_derives_no_require() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(a: i32) -> i32 { a }
+		});
+		assert!(!result.contains("# [require"));
+		assert!(result.contains("fn my_tool_tool"));
+	}
+
+	#[test]
+	fn async_component_derive_adds_require() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Debug, Component, Reflect)]
+			async fn HelpHandler(cx: AsyncToolIn<Request>) -> Result<Outcome<Response, Request>> {
+				todo!()
+			}
+		});
+		assert!(result.contains("derive (Debug , Component , Reflect)"));
+		assert!(result.contains("# [require"));
+		assert!(result.contains("async_tool (help_handler_tool"));
+		assert!(result.contains("struct HelpHandler"));
+		assert!(result.contains("async fn help_handler_tool"));
+	}
+
+	#[test]
+	fn system_component_derive_adds_require() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Debug, Component, Reflect)]
+			fn Increment(val: In<()>, query: Query<&Name>) -> Result<i64> {
+				Ok(1)
+			}
+		});
+		assert!(result.contains("derive (Debug , Component , Reflect)"));
+		assert!(result.contains("# [require"));
+		assert!(result.contains("system_tool (increment_tool"));
+		assert!(result.contains("struct Increment"));
+		assert!(result.contains("fn increment_tool"));
+	}
+
+	#[test]
+	fn doc_attrs_forwarded() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			/// Does stuff.
+			fn my_tool(a: i32) -> i32 { a }
+		});
+		assert!(result.contains("doc"));
+		assert!(result.contains("struct my_tool"));
+	}
+
+	#[test]
+	fn into_tool_uses_standalone_fn() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn add(a: i32, b: i32) -> i32 { a + b }
+		});
+		// IntoTool impl should reference the standalone function, not an inline closure
+		assert!(result.contains("func_tool (add_tool)"));
+	}
+
+	#[test]
+	fn generic_component_with_turbofish() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Debug, Component)]
+			fn MyTool<T>(val: i32) -> i32
+			where T: Clone,
+			{ val }
+		});
+		assert!(result.contains("# [require"));
+		assert!(result.contains("func_tool (my_tool_tool :: < T >"));
+		assert!(result.contains("fn my_tool_tool < T >"));
 	}
 }

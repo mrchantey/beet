@@ -1138,6 +1138,7 @@ name = "beet_core_macros"
 version = "0.0.9-dev.6"
 dependencies = [
  "beet_core_shared",
+ "heck 0.4.1",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",

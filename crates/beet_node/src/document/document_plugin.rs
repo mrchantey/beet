@@ -1,3 +1,5 @@
+#[cfg(feature = "tool")]
+use super::common_tools;
 use crate::document::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -44,7 +46,17 @@ impl Plugin for DocumentPlugin {
 			.register_type::<FieldRef>()
 			.register_type::<FieldPath>()
 			.register_type::<Value>()
-			.register_type::<DocumentScope>()
+			.register_type::<DocumentScope>();
+
+		// Register tool types when the tool feature is enabled
+		#[cfg(feature = "tool")]
+		app.register_type::<common_tools::Increment>()
+			.register_type::<common_tools::Decrement>()
+			.register_type::<common_tools::AddField>()
+			.register_type::<common_tools::SetField>()
+			.register_type::<common_tools::ReadField>();
+
+		app
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)

@@ -9,7 +9,10 @@ use beet_net::prelude::*;
 use beet_tool::prelude::*;
 
 /// Checks for the `--help` param and renders scoped help text.
-pub(crate) async fn help_handler(
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub(crate) async fn HelpHandler(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
@@ -38,7 +41,10 @@ pub(crate) async fn help_handler(
 
 /// Fallback handler that shows help scoped to the nearest ancestor scene
 /// of an unmatched path.
-pub(crate) async fn contextual_not_found_handler(
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub(crate) async fn ContextualNotFoundHandler(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();

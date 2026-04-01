@@ -77,18 +77,18 @@ pub fn default_router() -> impl Bundle {
 		OnSpawn::insert_child((
 			Name::new("Help Tool"),
 			RouteHidden,
-			async_tool(help_handler),
+			HelpHandler,
 		)),
 		OnSpawn::insert_child((
 			Name::new("Navigate Tool"),
 			RouteHidden,
-			async_tool(navigate_handler),
+			NavigateHandler,
 		)),
 		OnSpawn::insert_child(try_router()),
 		OnSpawn::insert_child((
 			Name::new("Contextual Not Found"),
 			RouteHidden,
-			async_tool(contextual_not_found_handler),
+			ContextualNotFoundHandler,
 		)),
 	)
 }
@@ -101,6 +101,7 @@ mod test {
 	use beet_net::prelude::*;
 	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
+	use bevy::ecs::entity::EntityHashMap;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -268,5 +269,41 @@ mod test {
 		let body = res.unwrap_str().await;
 		body.contains("increment").xpect_true();
 		body.contains("about").xpect_false();
+	}
+
+	#[test]
+	fn roundtrip_router_tools_scene() {
+		let mut app = App::new();
+		app.add_plugins(MinimalPlugins);
+		app.init_plugin::<BeetRouterPlugin>();
+		app.init();
+		app.update();
+
+		let entity = app
+			.world_mut()
+			.spawn((Name::new("Helper"), HelpHandler))
+			.id();
+
+		// Serialize
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entity_tree(entity)
+			.save_ron()
+			.unwrap();
+		scene.xref().xpect_contains("HelpHandler");
+
+		// Despawn original
+		app.world_mut().entity_mut(entity).despawn();
+
+		// Load
+		let mut entity_map = EntityHashMap::default();
+		SceneLoader::new(app.world_mut())
+			.with_entity_map(&mut entity_map)
+			.load_ron(&scene)
+			.unwrap();
+		app.update();
+
+		// Verify the loaded entity has the component
+		let loaded = *entity_map.values().next().unwrap();
+		app.world().entity(loaded).get::<HelpHandler>().xpect_some();
 	}
 }

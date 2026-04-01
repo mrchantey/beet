@@ -6,7 +6,7 @@ use beet_tool::prelude::*;
 /// Fallback tool for mapping a request path to a corresponding tool in this
 /// tree's hierarchy, using the [`RouteTree`] in its ancestors.
 pub fn try_router() -> impl Bundle {
-	(Name::new("Router"), RouteHidden, async_tool(router_tool))
+	(Name::new("Router"), RouteHidden, RouterTool)
 }
 
 /// Fallback tool for mapping a request path to a corresponding tool in this
@@ -15,7 +15,7 @@ pub fn router() -> impl Bundle {
 	(
 		Name::new("Router"),
 		exchange_fallback(),
-		OnSpawn::insert_child((RouteHidden, async_tool(router_tool))),
+		OnSpawn::insert_child((RouteHidden, RouterTool)),
 	)
 }
 
@@ -25,7 +25,10 @@ pub fn router() -> impl Bundle {
 /// request to the matching tool via `entity.call`. Scene routes are
 /// regular tools that delegate to the render tool internally, so
 /// no special handling is needed here.
-pub async fn router_tool(
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub async fn RouterTool(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();

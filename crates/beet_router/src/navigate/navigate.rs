@@ -1,6 +1,6 @@
 //! Directional navigation within a [`RouteTree`].
 //!
-//! The [`navigate_handler`] checks for a `--navigate` param and
+//! The [`NavigateHandler`] checks for a `--navigate` param and
 //! resolves the target path relative to the current request path,
 //! then calls the target tool directly for rendering.
 
@@ -61,7 +61,10 @@ impl std::fmt::Display for NavigateTo {
 /// All routes are tools now, so navigation simply calls the target
 /// tool with the request. The current position is taken from the
 /// request path segments.
-pub(crate) async fn navigate_handler(
+#[tool]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub(crate) async fn NavigateHandler(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let Some(value) = cx.get_param("navigate") else {
