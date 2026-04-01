@@ -1,7 +1,9 @@
 //! Lambda + API Gateway + Cloudflare DNS example using the typed provider API.
 //!
 //! Run with:
-//!     cargo run --example lambda --features infra
+//! ```sh
+//!   cargo run --example lambda --features=fs,rand,infra_aws_lambda,infra_cloudflare_dns
+//! ```
 
 use beet::prelude::*;
 use beet_infra::common_resources::aws_lambda::*;

@@ -1,7 +1,9 @@
 //! Typed Lightsail infrastructure example.
 //!
 //! Run with:
-//!     cargo run --example lightsail --features infra
+//! ```sh
+//!   cargo run --example lightsail --features=fs,rand,infra_aws_lightsail
+//! ```
 
 use beet::prelude::*;
 use beet_infra::common_resources::aws_lightsail::*;

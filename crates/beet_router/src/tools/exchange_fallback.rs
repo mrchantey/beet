@@ -71,6 +71,7 @@ pub fn exchange_fallback() -> impl Bundle {
 /// 4. **Contextual Not Found** — show help for the nearest ancestor
 ///    scene of the unmatched path.
 pub fn default_router() -> impl Bundle {
+	// use on_spawn to avoid clobbering children!
 	(
 		exchange_fallback(),
 		OnSpawn::insert_child((

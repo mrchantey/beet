@@ -68,6 +68,7 @@ fn server_from_cli() -> Result<OnSpawn> {
 		.unwrap_or_else(|| default_server.into())
 		.as_str()
 	{
+		// use on_spawn to avoid clobbering children!
 		#[cfg(feature = "http_server")]
 		"http" => OnSpawn::insert(HttpServer::default()),
 		#[cfg(not(feature = "http_server"))]
