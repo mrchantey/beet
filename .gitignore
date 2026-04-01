@@ -1,5 +1,8 @@
 assets
 agent/reference*
+agent/plan.md
+agent/plan2.md
+
 
 !examples/assets
 Cargo.toml.full

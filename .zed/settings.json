@@ -85,6 +85,7 @@
 			},
 		},
 	},
+	"file_scan_inclusions": ["agent/plan.md", "agent/plan2.md"],
 	"file_scan_exclusions": [
 		"crates/beet-cli",
 		"crates/beet_build",
