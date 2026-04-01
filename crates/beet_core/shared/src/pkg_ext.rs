@@ -50,6 +50,7 @@ pub fn is_internal() -> bool {
 		"beet_router",
 		"beet_spatial",
 		"beet_tool",
+		"beet_infra",
 	];
 	INTERNAL_PKGS.contains(&crate_name().as_str())
 }

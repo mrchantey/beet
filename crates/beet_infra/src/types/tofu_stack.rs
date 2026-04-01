@@ -1,3 +1,4 @@
+#![allow(unused)]
 use beet_core::prelude::*;
 
 

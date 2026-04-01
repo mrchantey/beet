@@ -1157,9 +1157,16 @@ dependencies = [
 name = "beet_infra"
 version = "0.0.9-dev.6"
 dependencies = [
+ "async-process",
  "beet_core",
+ "beet_infra",
+ "heck 0.4.1",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
+ "syn",
 ]
 
 [[package]]

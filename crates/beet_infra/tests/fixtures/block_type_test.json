@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "test_data_source_a": [
+        {
+          "test": [
+            {
+              "datasource_a_type": 
+                [ {
+                  "filter_type": "REGEX",
+                  "filter_value": ".*",
+                  "name": "groups",
+                  "type": "GROUP"
+                } ],
+              "name": "test_datasource_a",
+              "type": "web",
+              "id": "abc123",
+              "description": "A test data source a",
+              "priority": 1,
+              "client_whitelist": [ "a", "b", "c"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

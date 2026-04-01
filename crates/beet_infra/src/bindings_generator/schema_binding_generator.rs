@@ -1,0 +1,330 @@
+//! Roundtrip schema + binding generator.
+//!
+//! [`SchemaBindingGenerator`] orchestrates the full workflow:
+//!
+//! 1. Write a `providers.tf.json` declaring the required providers.
+//! 2. Run `tofu init` to download provider plugins.
+//! 3. Run `tofu providers schema -json` to export the full schema.
+//! 4. Parse the schema with [`BindingGenerator`] (applying filters).
+//! 5. Write the generated Rust files to the specified output paths.
+
+use super::binding_generator::BindingGenerator;
+use crate::config_exporter::types::TerraProvider;
+use beet_core::prelude::*;
+use serde_json::json;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
+
+// ---------------------------------------------------------------------------
+// ProviderBindingTarget — per-provider output configuration
+// ---------------------------------------------------------------------------
+
+/// Pairs a [`TerraProvider`] with a list of resource type names to generate.
+///
+/// This is a configuration struct — it does not generate anything on its own.
+/// Pass it to [`BindingFile::with_resources`] to register which
+/// provider resources should be generated.
+pub struct ResourceList {
+	/// The provider to generate bindings for.
+	pub provider: TerraProvider,
+	pub resources: Vec<String>,
+}
+
+impl ResourceList {
+	pub fn new(provider: TerraProvider, resources: Vec<String>) -> Self {
+		Self {
+			provider,
+			resources,
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SchemaBindingGenerator
+// ---------------------------------------------------------------------------
+
+/// Orchestrates the full roundtrip: providers → tofu init → schema → codegen.
+///
+/// Holds a [`BindingGenerator`] that can be customised before generation.
+/// The binding generator's [`CodeGeneratorConfig`] controls all code-generation
+/// options (title case, builders, trait impls, preamble, etc.).
+///
+/// # Example
+///
+/// ```rust,ignore
+/// SchemaBindingGenerator::default()
+///     .with_file(
+///         BindingFile::new("src/providers/aws_lambda.rs")
+///             .with_resources(TerraProvider::AWS, ["aws_lambda_function", "aws_s3_bucket"]),
+///     )
+///     .with_file(
+///         BindingFile::new("src/providers/cloudflare_dns.rs")
+///             .with_resources(TerraProvider::CLOUDFLARE, ["cloudflare_dns_record"]),
+///     )
+///     .generate()
+///     .await?;
+/// ```
+pub struct SchemaBindingGenerator {
+	/// Each entry maps a provider binding target to its list of resource type names.
+	files: Vec<BindingFile>,
+	/// Working directory for tofu operations.  Defaults to
+	/// `target/terra-bindings-generator`.
+	work_dir: PathBuf,
+	/// The binding generator used for each target.  Users can pre-configure
+	/// this to control code-generation options; per-target filter and preamble
+	/// are applied automatically on top.
+	binding_generator: BindingGenerator,
+}
+
+/// A single output file with one or more provider resource lists.
+pub struct BindingFile {
+	/// Destination file path (relative to the crate root), e.g.
+	/// `"src/providers/aws_lambda.rs"`.
+	pub path: PathBuf,
+	resources: Vec<ResourceList>,
+}
+
+impl BindingFile {
+	pub fn new(path: impl AsRef<Path>) -> Self {
+		Self {
+			path: path.as_ref().to_path_buf(),
+			resources: Vec::new(),
+		}
+	}
+
+	pub fn with_resources(
+		mut self,
+		provider: TerraProvider,
+		resources: impl IntoIterator<Item = impl Into<String>>,
+	) -> Self {
+		self.resources.push(ResourceList::new(
+			provider,
+			resources.into_iter().map(Into::into).collect(),
+		));
+		self
+	}
+}
+
+impl Default for SchemaBindingGenerator {
+	fn default() -> Self {
+		Self {
+			files: Vec::new(),
+			work_dir: PathBuf::from("target/terra-bindings-generator"),
+			binding_generator: BindingGenerator::new()
+				.with_title_case(true)
+				.with_builders(true)
+				.with_trait_impls(true)
+				.with_custom_preamble(build_preamble()),
+		}
+	}
+}
+
+impl SchemaBindingGenerator {
+	/// Add a provider and its resource list.
+	pub fn with_file(mut self, file: BindingFile) -> Self {
+		self.files.push(file);
+		self
+	}
+
+	/// Override the working directory used for `tofu init` / schema export.
+	pub fn with_work_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+		self.work_dir = dir.into();
+		self
+	}
+
+	/// Replace the [`BindingGenerator`] used for code generation.
+	///
+	/// The filter and custom preamble are still set per-target automatically;
+	/// everything else (title case, builders, trait impls, etc.) comes from
+	/// the generator you supply here.
+	pub fn with_binding_generator(
+		mut self,
+		generator: BindingGenerator,
+	) -> Self {
+		self.binding_generator = generator;
+		self
+	}
+
+	/// Return a shared reference to the current [`BindingGenerator`].
+	pub fn binding_generator(&self) -> &BindingGenerator {
+		&self.binding_generator
+	}
+
+	/// Return a mutable reference to the current [`BindingGenerator`].
+	pub fn binding_generator_mut(&mut self) -> &mut BindingGenerator {
+		&mut self.binding_generator
+	}
+
+	/// Run the full generation pipeline.
+	pub async fn generate(&self) -> Result {
+		// 1. Prepare the working directory.
+		self.prepare_work_dir()?;
+
+		// 2. Write providers.tf.json
+		self.write_providers_tf()?;
+
+		// 3. tofu init
+		self.run_tofu_init().await?;
+
+		// 4. tofu providers schema -json > schema.json
+		let schema_path = self.run_tofu_schema().await?;
+
+		// 5. For each provider target, generate bindings with appropriate filter.
+		self.generate_bindings(&schema_path)?;
+
+		Ok(())
+	}
+
+	/// Like [`generate`](Self::generate) but skip steps 1–4 and use an
+	/// existing `schema.json` file directly.  Useful when the schema has
+	/// already been exported (saves the slow `tofu init` step).
+	pub fn generate_from_schema(
+		&self,
+		schema_path: impl AsRef<Path>,
+	) -> Result {
+		self.generate_bindings(schema_path.as_ref())
+	}
+
+	// ------------------------------------------------------------------
+	// Internal steps
+	// ------------------------------------------------------------------
+
+	fn prepare_work_dir(&self) -> Result {
+		if self.work_dir.exists() {
+			fs_ext::remove(&self.work_dir)?;
+		}
+		fs_ext::create_dir_all(&self.work_dir)?;
+		Ok(())
+	}
+
+	fn write_providers_tf(&self) -> Result {
+		let mut required_providers = serde_json::Map::new();
+
+		for file in &self.files {
+			for list in &file.resources {
+				// Deduplicate by local name.
+				let local = list.provider.local_name().to_string();
+				if required_providers.contains_key(&local) {
+					continue;
+				}
+				required_providers.insert(
+					local,
+					json!({
+						"source": list.provider.short_source(),
+						"version": list.provider.version.as_ref(),
+					}),
+				);
+			}
+		}
+
+		let tf_json = json!({
+			"terraform": {
+				"required_providers": required_providers,
+			}
+		});
+
+		let path = self.work_dir.join("providers.tf.json");
+		let mut buf = Vec::new();
+		serde_json::to_writer_pretty(&mut buf, &tf_json)?;
+		buf.write_all(b"\n")?;
+		fs_ext::write(&path, &buf)?;
+
+		cross_log!("[schema_binding_generator] wrote {}", path.display());
+		Ok(())
+	}
+
+	async fn run_tofu_init(&self) -> Result {
+		cross_log!(
+			"[schema_binding_generator] running tofu init in {}",
+			self.work_dir.display()
+		);
+		let output = async_process::Command::new("tofu")
+			.current_dir(&self.work_dir)
+			.args(["init"])
+			.output()
+			.await?;
+
+		if !output.status.success() {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			bevybail!("tofu init failed:\n{}", stderr);
+		}
+		cross_log!("[schema_binding_generator] tofu init: OK");
+		Ok(())
+	}
+
+	async fn run_tofu_schema(&self) -> Result<PathBuf> {
+		let schema_path = self.work_dir.join("schema.json");
+		cross_log!(
+			"[schema_binding_generator] running tofu providers schema → {}",
+			schema_path.display()
+		);
+
+		let output = async_process::Command::new("tofu")
+			.current_dir(&self.work_dir)
+			.args(["providers", "schema", "-json"])
+			.output()
+			.await?;
+
+		if !output.status.success() {
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			bevybail!("tofu providers schema failed:\n{}", stderr);
+		}
+
+		fs_ext::write(&schema_path, &output.stdout)?;
+		cross_log!(
+			"[schema_binding_generator] schema exported ({:.1} MB)",
+			output.stdout.len() as f64 / 1_048_576.0
+		);
+		Ok(schema_path)
+	}
+
+	fn generate_bindings(&self, schema_path: &Path) -> Result {
+		let schema = BindingGenerator::read_schema(schema_path)?;
+
+		for file in &self.files {
+			let mut filter =
+				crate::config_exporter::types::ResourceFilter::default();
+			for list in &file.resources {
+				filter = filter.with_resources(
+					list.provider.source.as_ref(),
+					&list.resources,
+				);
+			}
+
+			// Clone the base binding generator and apply the per-target filter.
+			let binding_gen =
+				self.binding_generator.clone().with_filter(filter);
+
+			// Ensure the parent directory exists.
+			if let Some(parent) = file.path.parent() {
+				fs_ext::create_dir_all(parent)?;
+			}
+
+			binding_gen.generate_to_file(&schema, &file.path)?;
+			cross_log!(
+				"[schema_binding_generator] wrote {}",
+				file.path.display()
+			);
+		}
+
+		Ok(())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Standard preamble for generated provider modules.
+fn build_preamble() -> String {
+	[
+		"//! Auto-generated Terraform provider bindings — do not edit by hand.",
+		"",
+		"#![allow(unused_imports, non_snake_case, non_camel_case_types, non_upper_case_globals)]",
+		"use std::collections::BTreeMap as Map;",
+		"use serde::{Serialize, Deserialize};",
+		"use serde_json;",
+	]
+	.join("\n")
+}

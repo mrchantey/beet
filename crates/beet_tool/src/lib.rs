@@ -7,6 +7,7 @@ mod tools;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	// Pass and Fail are top level variant exports, like `Ok`, `Err`
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
