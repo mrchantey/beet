@@ -16,38 +16,44 @@ async fn main() -> Result {
 	let generator = SchemaBindingGenerator::default()
 		// AWS resources used by examples/infra/lambda.rs
 		.with_file(
-			BindingFile::new("src/common_resources/aws_lambda.rs")
-				.with_resources(TerraProvider::AWS, [
-					"aws_api_gateway_rest_api",
-					"aws_apigatewayv2_api",
-					"aws_apigatewayv2_integration",
-					"aws_apigatewayv2_route",
-					"aws_apigatewayv2_stage",
-					"aws_iam_role",
-					"aws_iam_role_policy_attachment",
-					"aws_lambda_function",
-					"aws_lambda_function_url",
-					"aws_lambda_permission",
-					"aws_s3_bucket",
-				]),
+			BindingFile::new(
+				"crates/beet_infra/src/common_resources/aws_lambda.rs",
+			)
+			.with_resources(TerraProvider::AWS, [
+				"aws_api_gateway_rest_api",
+				"aws_apigatewayv2_api",
+				"aws_apigatewayv2_integration",
+				"aws_apigatewayv2_route",
+				"aws_apigatewayv2_stage",
+				"aws_iam_role",
+				"aws_iam_role_policy_attachment",
+				"aws_lambda_function",
+				"aws_lambda_function_url",
+				"aws_lambda_permission",
+				"aws_s3_bucket",
+			]),
 		)
 		// AWS resources used by examples/infra/lightsail.rs
 		.with_file(
-			BindingFile::new("src/common_resources/aws_lightsail.rs")
-				.with_resources(TerraProvider::AWS, [
-					"aws_lightsail_instance",
-					"aws_lightsail_instance_public_ports",
-					"aws_lightsail_key_pair",
-					"aws_lightsail_static_ip",
-					"aws_lightsail_static_ip_attachment",
-				]),
+			BindingFile::new(
+				"crates/beet_infra/src/common_resources/aws_lightsail.rs",
+			)
+			.with_resources(TerraProvider::AWS, [
+				"aws_lightsail_instance",
+				"aws_lightsail_instance_public_ports",
+				"aws_lightsail_key_pair",
+				"aws_lightsail_static_ip",
+				"aws_lightsail_static_ip_attachment",
+			]),
 		)
 		// Cloudflare resources used by examples/infra/lambda.rs
 		.with_file(
-			BindingFile::new("src/common_resources/cloudflare_dns.rs")
-				.with_resources(TerraProvider::CLOUDFLARE, [
-					"cloudflare_dns_record",
-				]),
+			BindingFile::new(
+				"crates/beet_infra/src/common_resources/cloudflare_dns.rs",
+			)
+			.with_resources(TerraProvider::CLOUDFLARE, [
+				"cloudflare_dns_record",
+			]),
 		);
 
 	// Use the existing schema.json instead of running the full tofu init cycle.

@@ -9,4 +9,4 @@ fn main() {
 }
 
 
-fn setup(mut commands: Commands) {}
+fn setup(mut _commands: Commands) {}

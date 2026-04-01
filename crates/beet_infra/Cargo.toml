@@ -9,6 +9,17 @@ readme.workspace = true
 description = "Terraform configuration represented as high level Bevy scenes"
 repository.workspace = true
 
+[features]
+default = []
+bindings_generator = ["heck", "proc-macro2", "quote", "syn", "prettyplease"]
+common_resources_aws_lambda = []
+common_resources_aws_lightsail = []
+common_resources_cloudflare_dns = []
+
+[[bin]]
+name = "generate_common"
+path = "src/bin/generate_common.rs"
+required-features = ["bindings_generator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
@@ -29,15 +40,3 @@ beet_infra = { path = ".", features = [
 	"common_resources_aws_lightsail",
 	"common_resources_cloudflare_dns",
 ] }
-
-[features]
-default = []
-bindings_generator = ["heck", "proc-macro2", "quote", "syn", "prettyplease"]
-common_resources_aws_lambda = []
-common_resources_aws_lightsail = []
-common_resources_cloudflare_dns = []
-
-[[bin]]
-name = "generate_common"
-path = "src/bin/generate_common.rs"
-required-features = ["bindings_generator"]
