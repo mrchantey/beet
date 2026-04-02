@@ -169,8 +169,9 @@ async fn main() -> Result {
 	// Export + validate
 	// -----------------------------------------------------------------
 
-	let dir = TempDir::new()?;
-	let out_path = dir.join("main.tf.json");
+	// let dir = TempDir::new()?;
+	// let out_path = dir.join("main.tf.json");
+	let out_path = WsPathBuf::new("target/examples/lambda/main.tf.json");
 
 	let result = exporter.export_and_validate(&out_path).await?;
 	beet::cross_log!("tofu validate: {result}");

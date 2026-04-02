@@ -101,6 +101,35 @@ pub trait TerraResource: TerraJson {
 	fn provider(&self) -> &'static TerraProvider;
 }
 
+/// A typed Terraform data source.
+///
+/// Mirror of [`TerraResource`] for `data` blocks. Referenced in expressions
+/// as `data.<type>.<name>.<attribute>`.
+pub trait TerraDataSource: TerraJson {
+	/// The Terraform data source type (e.g. `"aws_iam_policy_document"`).
+	fn data_type(&self) -> &'static str;
+
+	/// The provider this data source belongs to.
+	fn provider(&self) -> &'static TerraProvider;
+}
+
+/// A typed Terraform backend configuration.
+///
+/// Implement this trait and pass the backend to
+/// [`ConfigExporter::with_backend`] to configure remote state storage.
+///
+/// ```ignore
+/// let exporter = ConfigExporter::new()
+///     .with_backend(&S3Backend::default());
+/// ```
+pub trait TerraBackend {
+	/// The backend type identifier, ie `"s3"`, `"local"`, `"gcs"`.
+	fn backend_type(&self) -> &'static str;
+
+	/// Serialize the backend configuration body to JSON.
+	fn to_backend_json(&self) -> Value;
+}
+
 // ---------------------------------------------------------------------------
 // ResourceFilter
 // ---------------------------------------------------------------------------

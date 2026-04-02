@@ -2,7 +2,7 @@ use beet_core::prelude::*;
 
 use crate::prelude::ConfigExporter;
 
-#[derive(Debug, Clone, Get)]
+#[derive(Debug, Clone, Get, Resource)]
 pub struct StackContext {
 	/// The app name, defaults to `CARGO_PKG_NAME`
 	app_name: String,

@@ -11,7 +11,8 @@ repository.workspace = true
 
 [features]
 default = []
-bindings_generator = ["heck", "proc-macro2", "quote", "syn", "prettyplease","beet_core/tokens"]
+bindings_generator = ["heck", "tokens","prettyplease","beet_core/tokens"]
+tokens = ["proc-macro2", "quote", "syn"]
 stack_lambda = ["bindings_aws_common","bindings_aws_lambda","bindings_cloudflare_common"]
 stack_lightsail = ["bindings_aws_lightsail"]
 bindings_aws_common = []
@@ -41,6 +42,5 @@ beet_core = { workspace = true, features = ["testing"] }
 beet_infra = { path = ".", features = [
 	"bindings_generator",
 	"stack_lambda",
-	# "common_resources_aws_lightsail",
-	# "common_resources_cloudflare_dns",
+	"stack_lightsail",
 ] }

@@ -1,4 +1,7 @@
+use std::sync::LazyLock;
+
 use crate::prelude::*;
+use async_lock::RwLock;
 use aws_config::Region;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
@@ -29,14 +32,26 @@ impl S3Provider {
 		// let config = aws_config::load_from_env().await;
 		// Self(Client::new(&config))
 	}
-	/// Create a new S3 client with a specific region, ie `us-west-2`
+	/// Create a new S3 client with a specific region, ie `us-west-2`,
+	/// as creating a client is expensive, clients are reused according to region
 	pub async fn create_with_region(region: &str) -> Self {
+		static CLIENTS: LazyLock<RwLock<HashMap<String, Client>>> =
+			LazyLock::new(|| RwLock::new(HashMap::new()));
+		let region_str = region.to_string();
+
+		let clients = CLIENTS.read().await;
+		if let Some(client) = clients.get(&region_str) {
+			return Self(client.clone());
+		}
 		let region = Region::new(region.to_string());
 		let config = aws_config::from_env()
 			.region(RegionProviderChain::default_provider().or_else(region))
 			.load()
 			.await;
-		Self(Client::new(&config))
+		let client = Client::new(&config);
+		CLIENTS.write().await.insert(region_str, client.clone());
+
+		Self(client)
 	}
 	/// s3 buckets dont want a leading slash in the key
 	fn resolve_key(&self, path: &RoutePath) -> String {

@@ -1,4 +1,4 @@
-#![allow(unused)]
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -16,7 +16,6 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 
-
 // fn resource_name(label: &str) -> Vec<PathPatternSegment> {
 // 	vec![
 // 		PathPatternSegment::new_required("app_name"),
@@ -24,8 +23,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 // 	]
 // }
 
-pub fn lambda_stack(mut commands: EntityCommands, stack: LambdaStack) {
-	// commands.insert(TofuStack::new(S3Backend::new(AwsS3BucketDetails {
-	// 	..default()
-	// })));
+fn lambda_stack(mut commands: EntityCommands, _stack: LambdaStack) {
+	commands.insert_if_new(Stack::new(S3Backend::default()));
+}
+
+pub trait ResourceTool {
+	fn definition(&self) -> String;
+	#[cfg(feature = "tokens")]
+	fn rust_type() -> proc_macro2::TokenStream;
 }
