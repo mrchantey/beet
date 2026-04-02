@@ -88,7 +88,8 @@ impl PathPartial {
 pub struct PathPattern {
 	/// The complete sequence of segments
 	segments: Vec<PathPatternSegment>,
-	/// Is true if all segments are static
+	/// true if all segments are static,
+	/// calculated on creation.
 	is_static: bool,
 }
 
@@ -360,10 +361,17 @@ impl PathPatternSegment {
 	}
 
 	/// Creates a static segment
-	pub fn static_segment(name: impl Into<String>) -> Self {
+	pub fn new_static(name: impl Into<String>) -> Self {
 		Self {
 			name: name.into(),
 			modifier: PathPatternModifier::Static,
+		}
+	}
+	/// Creates a required segment
+	pub fn new_required(name: impl Into<String>) -> Self {
+		Self {
+			name: name.into(),
+			modifier: PathPatternModifier::Required,
 		}
 	}
 

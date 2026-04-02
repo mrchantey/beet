@@ -17,7 +17,7 @@ use super::binding::read_tf_schema_from_file;
 use super::config::CodeGeneratorConfig;
 use super::emit::CodeGenerator;
 use super::ir::Registry;
-use crate::config_exporter::types::ResourceFilter;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use std::io::Write;
 use std::path::Path;
@@ -235,11 +235,9 @@ impl BindingGenerator {
 
 #[cfg(test)]
 mod tests {
-	use super::super::ir::Container;
-	use super::super::ir::Field;
-	use super::super::ir::FieldType;
-	use super::*;
-	use crate::config_exporter::types::ResourceMeta;
+	use crate::bindings_generator::*;
+	use crate::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn default_generator() {
@@ -421,13 +419,14 @@ mod tests {
 		let output = String::from_utf8(buf).unwrap();
 
 		output
-			.contains("impl crate::terra::TerraJson for AwsS3BucketDetails")
-			.xpect_true();
-		output
-			.contains("impl crate::terra::TerraResource for AwsS3BucketDetails")
-			.xpect_true();
-		output.contains("\"aws_s3_bucket\"").xpect_true();
-		output.contains("TerraProvider::AWS").xpect_true();
+			.xpect_contains(
+				"impl crate::prelude::TerraJson for AwsS3BucketDetails",
+			)
+			.xpect_contains(
+				"impl crate::prelude::TerraResource for AwsS3BucketDetails",
+			)
+			.xpect_contains("\"aws_s3_bucket\"")
+			.xpect_contains("TerraProvider::AWS");
 	}
 
 	#[test]

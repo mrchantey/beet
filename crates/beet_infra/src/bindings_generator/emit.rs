@@ -492,16 +492,18 @@ impl<'a> CodeGenerator<'a> {
 		let provider_const = provider_source_to_const(&entry.provider_source);
 		let provider_ident = Ident::new(&provider_const, Span::call_site());
 
+		let pkg_name = pkg_ext::internal_or_beet("beet_infra");
+
 		quote! {
-			impl crate::terra::TerraJson for #struct_ident {
+			impl #pkg_name::prelude::TerraJson for #struct_ident {
 				fn to_json(&self) -> serde_json::Value {
 					serde_json::to_value(self).expect("serialization should not fail")
 				}
 			}
 
-			impl crate::terra::TerraResource for #struct_ident {
+			impl #pkg_name::prelude::TerraResource for #struct_ident {
 				fn resource_type(&self) -> &'static str { #resource_type_str }
-				fn provider(&self) -> &'static crate::terra::TerraProvider { &crate::terra::TerraProvider::#provider_ident }
+				fn provider(&self) -> &'static #pkg_name::prelude::TerraProvider { &#pkg_name::prelude::TerraProvider::#provider_ident }
 			}
 		}
 	}

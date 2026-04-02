@@ -7,9 +7,9 @@
 //!     cargo run -p beet_infra --bin generate_common --features bindings_generator
 
 use beet_core::prelude::*;
-use beet_infra::bindings_generator::schema_binding_generator::BindingFile;
-use beet_infra::bindings_generator::schema_binding_generator::SchemaBindingGenerator;
-use beet_infra::config_exporter::types::TerraProvider;
+use beet_infra::bindings_generator::BindingFile;
+use beet_infra::bindings_generator::SchemaBindingGenerator;
+use beet_infra::prelude::*;
 
 #[beet_core::main]
 async fn main() -> Result {

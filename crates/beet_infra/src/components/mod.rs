@@ -1,8 +1,10 @@
 mod infra_plugin;
+mod stack_context;
 mod tofu_stack;
 pub use infra_plugin::*;
+pub use stack_context::*;
 pub use tofu_stack::*;
-mod bucket;
-pub use bucket::*;
+mod expression;
+pub use expression::*;
 mod provider;
 pub use provider::*;

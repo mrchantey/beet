@@ -8,8 +8,8 @@
 use beet::prelude::*;
 use beet_infra::common_resources::aws_lambda::*;
 use beet_infra::common_resources::cloudflare_dns::*;
-use beet_infra::config_exporter::config_exporter::ConfigExporter;
-use beet_infra::config_exporter::config_exporter::Output;
+use beet_infra::types::config_exporter::ConfigExporter;
+use beet_infra::types::config_exporter::Output;
 use serde_json::json;
 
 #[beet::main]

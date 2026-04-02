@@ -1161,6 +1161,7 @@ dependencies = [
  "async-process",
  "beet_core",
  "beet_infra",
+ "beet_net",
  "heck 0.4.1",
  "prettyplease",
  "proc-macro2",

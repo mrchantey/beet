@@ -7,9 +7,9 @@
 
 use beet::prelude::*;
 use beet_infra::common_resources::aws_lightsail::*;
-use beet_infra::config_exporter::config_exporter::ConfigExporter;
-use beet_infra::config_exporter::config_exporter::Output;
-use beet_infra::config_exporter::config_exporter::Variable;
+use beet_infra::types::config_exporter::ConfigExporter;
+use beet_infra::types::config_exporter::Output;
+use beet_infra::types::config_exporter::Variable;
 use serde_json::json;
 
 #[beet::main]

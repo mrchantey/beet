@@ -22,8 +22,8 @@
 //! `serde_json::Value` or any `Serialize` type are still available for
 //! escape-hatch usage and backward compatibility.
 
-use super::types::TerraProvider;
-use super::types::TerraResource;
+use super::misc::TerraProvider;
+use super::misc::TerraResource;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde_json::Map;

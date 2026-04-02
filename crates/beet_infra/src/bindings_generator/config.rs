@@ -1,6 +1,5 @@
+use crate::prelude::*;
 use std::collections::BTreeMap;
-
-use crate::config_exporter::types::ResourceMeta;
 
 /// Code generation options meant to be supported by all languages.
 #[derive(Clone, Debug)]

@@ -8,7 +8,7 @@ pub struct CliArgs {
 	/// Positional arguments forming the path.
 	pub path: Vec<String>,
 	/// Named arguments as key-value pairs, supporting multiple values per key.
-	pub params: StringMultiMap,
+	pub params: MultiMap<String, String>,
 }
 
 
@@ -22,7 +22,7 @@ impl CliArgs {
 	pub fn parse(args: &str) -> Self {
 		let args = Self::group_quotations(args);
 		let mut path = Vec::new();
-		let mut params = StringMultiMap::new();
+		let mut params = MultiMap::new();
 		let mut collecting_nested = false;
 		let mut pending_key: Option<String> = None;
 

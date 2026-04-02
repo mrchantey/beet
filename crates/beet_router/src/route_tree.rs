@@ -293,8 +293,10 @@ impl RouteTree {
 	/// Find the subtree rooted at the given path prefix.
 	///
 	/// Walks the tree children matching each segment of `prefix` in
-	/// turn, returning the [`RouteTree`] node at that position. This
-	/// is useful for scoping help output to a specific path prefix.
+	/// turn, returning the [`RouteTree`] node at that position.
+	///
+	/// An example usecase for this
+	/// is scoping `--help` output to a specific path prefix.
 	///
 	/// Static segments are matched first. If no static match is found,
 	/// a dynamic segment at the same level is used as a fallback.
@@ -316,7 +318,7 @@ impl RouteTree {
 					.map(|last| last.is_static() && last.name() == seg)
 					.unwrap_or(false)
 			});
-			// fall back to dynamic match
+			// fall back to first dynamic match
 			let matched = matched.or_else(|| {
 				current.children.iter().find(|child| {
 					child

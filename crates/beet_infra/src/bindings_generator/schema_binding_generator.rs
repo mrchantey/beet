@@ -9,7 +9,7 @@
 //! 5. Write the generated Rust files to the specified output paths.
 
 use super::binding_generator::BindingGenerator;
-use crate::config_exporter::types::TerraProvider;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use serde_json::json;
 use std::io::Write;
@@ -283,8 +283,7 @@ impl SchemaBindingGenerator {
 		let schema = BindingGenerator::read_schema(schema_path)?;
 
 		for file in &self.files {
-			let mut filter =
-				crate::config_exporter::types::ResourceFilter::default();
+			let mut filter = ResourceFilter::default();
 			for list in &file.resources {
 				filter = filter.with_resources(
 					list.provider.source.as_ref(),

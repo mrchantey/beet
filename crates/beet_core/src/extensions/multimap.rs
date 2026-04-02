@@ -128,9 +128,6 @@ pub struct MultiMap<K, V, S = FixedHasher> {
 	inner: HashMap<K, Vec<V>, S>,
 }
 
-/// Type alias for the common case of string keys and values.
-pub type StringMultiMap = MultiMap<String, String>;
-
 impl<K, V, S: Default> Default for MultiMap<K, V, S> {
 	fn default() -> Self {
 		Self {

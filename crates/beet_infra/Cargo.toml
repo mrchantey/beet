@@ -11,7 +11,7 @@ repository.workspace = true
 
 [features]
 default = []
-bindings_generator = ["heck", "proc-macro2", "quote", "syn", "prettyplease"]
+bindings_generator = ["heck", "proc-macro2", "quote", "syn", "prettyplease","beet_core/tokens"]
 common_resources_aws_lambda = []
 common_resources_aws_lightsail = []
 common_resources_cloudflare_dns = []
@@ -23,6 +23,7 @@ required-features = ["bindings_generator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
+beet_net.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 heck = { workspace = true, optional = true }
