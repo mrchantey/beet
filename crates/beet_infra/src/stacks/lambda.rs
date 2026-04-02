@@ -40,7 +40,7 @@ impl LambdaStack {
 	#[cfg(feature = "stack_lambda_rt")]
 	async fn bucket(&self, slug: Slug) -> Bucket {
 		let provider = S3Provider::create_with_region(&self.region()).await;
-		let slug = slug.to_kebab_case();
+		let slug = slug.primary_identifier();
 		Bucket::new(provider, slug)
 	}
 
@@ -84,9 +84,9 @@ fn terra_config(
 			let html_bucket_slug = LambdaStack::html_bucket_name(cx);
 
 			config.add_resource(
-				html_bucket_slug.to_snake_case(),
+				html_bucket_slug.label(),
 				&AwsS3BucketDetails {
-					bucket: Some(html_bucket_slug.to_kebab_case().into()),
+					bucket: Some(html_bucket_slug.primary_identifier().into()),
 					force_destroy: Some(true),
 					region: Some(region.into()),
 					..default()
@@ -95,35 +95,39 @@ fn terra_config(
 
 			let assets_bucket_slug = LambdaStack::assets_bucket_name(cx);
 
-			config.add_resource(
-				assets_bucket_slug.to_snake_case(),
-				&AwsS3BucketDetails {
-					bucket: Some(assets_bucket_slug.to_kebab_case().into()),
+			config.add_named_resource(
+				&assets_bucket_slug,
+				AwsS3BucketDetails {
 					force_destroy: Some(true),
 					region: Some(region.into()),
 					..default()
 				},
 			);
 
-			let assume_role_policy = json!({
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Action": "sts:AssumeRole",
-					"Effect": "Allow",
-					"Principal": { "Service": "lambda.amazonaws.com" }
-				}]
-			});
 
 			let lambda_role_slug = cx.iam_role_slug("lambda");
-			let lambda_role_label = 
 
-			let mut lambda_role = AwsIamRoleDetails {
-				assume_role_policy: assume_role_policy.to_string().into(),
-				name: Some(lambda_role_label),
-				// name
-				// ..default()
-			};
-			// lambda_role.name = Some(format!("{prefix}--lambda-role"));
+			config.add_named_resource(&lambda_role_slug, AwsIamRoleDetails {
+				assume_role_policy: json!({
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Action": "sts:AssumeRole",
+						"Effect": "Allow",
+						"Principal": { "Service": "lambda.amazonaws.com" }
+					}]
+				})
+				.to_string()
+				.into(),
+				..default()
+			});
+
+			todo!("for each field in a struct, generate a function foo_attr()->&'static str");
+			// just returns the string, ie for foo: String returns "foo"
+
+			// aws_iam_role.lambda_role.name
+			// 1. resource-kind
+			// 2. resource-label
+			// 3. field-name
 		})?;
 
 	// config.add_resource(name, resource)

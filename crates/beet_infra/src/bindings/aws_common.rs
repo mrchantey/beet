@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 #[allow(unused)]
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsIamRoleDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arn: Option<SmolStr>,
@@ -91,7 +91,7 @@ impl TerraResource for AwsIamRoleDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsIamRolePolicyAttachmentDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
@@ -229,7 +229,7 @@ pub struct AwsIamRoleResourceBlockTypeInlinePolicy {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "cors_rule")]
 pub struct AwsS3BucketResourceBlockTypeCorsRule {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -254,7 +254,7 @@ impl AwsS3BucketResourceBlockTypeCorsRule {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "grant")]
 pub struct AwsS3BucketResourceBlockTypeGrant {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -276,7 +276,7 @@ impl AwsS3BucketResourceBlockTypeGrant {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "lifecycle_rule")]
 pub struct AwsS3BucketResourceBlockTypeLifecycleRule {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -316,7 +316,7 @@ impl AwsS3BucketResourceBlockTypeLifecycleRule {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "logging")]
 pub struct AwsS3BucketResourceBlockTypeLogging {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -338,7 +338,7 @@ pub struct AwsS3BucketResourceBlockTypeObjectLockConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_lock_enabled: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "replication_configuration")]
 pub struct AwsS3BucketResourceBlockTypeReplicationConfiguration {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -383,7 +383,7 @@ pub struct AwsS3BucketResourceBlockTypeWebsite {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing_rules: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "access_control_translation")]
 pub struct DestinationResourceBlockTypeAccessControlTranslation {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -426,7 +426,7 @@ pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionExpiration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "noncurrent_version_transition")]
 pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -439,7 +439,7 @@ impl LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
         Self { days: None, storage_class }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "transition")]
 pub struct LifecycleRuleResourceBlockTypeTransition {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -458,7 +458,7 @@ impl LifecycleRuleResourceBlockTypeTransition {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "rules")]
 pub struct ReplicationConfigurationResourceBlockTypeRules {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -489,7 +489,7 @@ impl ReplicationConfigurationResourceBlockTypeRules {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "destination")]
 pub struct RulesResourceBlockTypeDestination {
     #[serde(skip_serializing_if = "Option::is_none")]

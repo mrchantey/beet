@@ -65,14 +65,14 @@ impl Slug {
 	/// Converts the slug to alphanumeric and dashes
 	/// ie `my-app, prod, buckets, html` becomes:
 	/// `my-app--prod--buckets--html`
-	pub fn to_kebab_case(&self) -> String {
+	pub fn primary_identifier(&self) -> String {
 		use heck::ToKebabCase;
 		self.0.join("--").to_kebab_case()
 	}
 	/// Converts the slug to alphanumeric and underscores
 	/// ie `my-app, prod, buckets, html` becomes:
 	/// `my_app__prod__buckets__html`
-	pub fn to_snake_case(&self) -> String {
+	pub fn label(&self) -> String {
 		use heck::ToSnakeCase;
 		self.0.join("__").to_snake_case()
 	}

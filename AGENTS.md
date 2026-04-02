@@ -25,6 +25,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 ## Conventions
 
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
+- We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - we never mark #[deprecated] because we have no users, instead replace existing machinery

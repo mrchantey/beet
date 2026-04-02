@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 #[allow(unused)]
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsApiGatewayRestApiDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key_source: Option<SmolStr>,
@@ -106,7 +106,7 @@ impl TerraResource for AwsApiGatewayRestApiDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsApigatewayv2ApiDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_endpoint: Option<SmolStr>,
@@ -206,7 +206,7 @@ impl TerraResource for AwsApigatewayv2ApiDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsApigatewayv2IntegrationDetails {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub api_id: SmolStr,
@@ -306,7 +306,7 @@ impl TerraResource for AwsApigatewayv2IntegrationDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsApigatewayv2RouteDetails {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub api_id: SmolStr,
@@ -385,7 +385,7 @@ impl TerraResource for AwsApigatewayv2RouteDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsApigatewayv2StageDetails {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub api_id: SmolStr,
@@ -475,7 +475,7 @@ impl TerraResource for AwsApigatewayv2StageDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLambdaFunctionDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub architectures: Option<Vec<SmolStr>>,
@@ -672,7 +672,7 @@ impl TerraResource for AwsLambdaFunctionDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLambdaFunctionUrlDetails {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub authorization_type: SmolStr,
@@ -740,7 +740,7 @@ impl TerraResource for AwsLambdaFunctionUrlDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLambdaPermissionDetails {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub action: SmolStr,
@@ -817,7 +817,7 @@ impl TerraResource for AwsLambdaPermissionDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "endpoint_configuration")]
 pub struct AwsApiGatewayRestApiResourceBlockTypeEndpointConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -852,7 +852,7 @@ pub struct AwsApigatewayv2ApiResourceBlockTypeCorsConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_age: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "response_parameters")]
 pub struct AwsApigatewayv2IntegrationResourceBlockTypeResponseParameters {
     pub mappings: Map<SmolStr, SmolStr>,
@@ -870,7 +870,7 @@ pub struct AwsApigatewayv2IntegrationResourceBlockTypeTlsConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_name_to_verify: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "request_parameter")]
 pub struct AwsApigatewayv2RouteResourceBlockTypeRequestParameter {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -885,7 +885,7 @@ impl AwsApigatewayv2RouteResourceBlockTypeRequestParameter {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "access_log_settings")]
 pub struct AwsApigatewayv2StageResourceBlockTypeAccessLogSettings {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -912,7 +912,7 @@ pub struct AwsApigatewayv2StageResourceBlockTypeDefaultRouteSettings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub throttling_rate_limit: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "route_settings")]
 pub struct AwsApigatewayv2StageResourceBlockTypeRouteSettings {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -940,7 +940,7 @@ impl AwsApigatewayv2StageResourceBlockTypeRouteSettings {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "dead_letter_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeDeadLetterConfig {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -951,7 +951,7 @@ impl AwsLambdaFunctionResourceBlockTypeDeadLetterConfig {
         Self { target_arn }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "durable_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeDurableConfig {
     pub execution_timeout: i64,
@@ -978,7 +978,7 @@ pub struct AwsLambdaFunctionResourceBlockTypeEphemeralStorage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "file_system_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeFileSystemConfig {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -1001,7 +1001,7 @@ pub struct AwsLambdaFunctionResourceBlockTypeImageConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "logging_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeLoggingConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1023,7 +1023,7 @@ impl AwsLambdaFunctionResourceBlockTypeLoggingConfig {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "snap_start")]
 pub struct AwsLambdaFunctionResourceBlockTypeSnapStart {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -1039,7 +1039,7 @@ impl AwsLambdaFunctionResourceBlockTypeSnapStart {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "tenancy_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeTenancyConfig {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -1060,7 +1060,7 @@ pub struct AwsLambdaFunctionResourceBlockTypeTimeouts {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update: Option<SmolStr>,
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "tracing_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeTracingConfig {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
@@ -1071,7 +1071,7 @@ impl AwsLambdaFunctionResourceBlockTypeTracingConfig {
         Self { mode }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "vpc_config")]
 pub struct AwsLambdaFunctionResourceBlockTypeVpcConfig {
     #[serde(skip_serializing_if = "Option::is_none")]

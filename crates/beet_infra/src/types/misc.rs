@@ -101,6 +101,13 @@ pub trait TerraResource: TerraJson {
 	fn provider(&self) -> &'static TerraProvider;
 }
 
+/// Applied to resources that have an associated name, like a bucket
+/// or iam role.
+pub trait TerraNamed: TerraResource {
+	fn set_primary_identifier(&mut self, name: &str);
+}
+
+
 /// A typed Terraform data source.
 ///
 /// Mirror of [`TerraResource`] for `data` blocks. Referenced in expressions

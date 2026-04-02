@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 #[allow(unused)]
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLightsailInstanceDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arn: Option<SmolStr>,
@@ -112,7 +112,7 @@ impl TerraResource for AwsLightsailInstanceDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLightsailInstancePublicPortsDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
@@ -210,7 +210,7 @@ impl TerraResource for AwsLightsailKeyPairDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLightsailStaticIpAttachmentDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
@@ -260,7 +260,7 @@ impl TerraResource for AwsLightsailStaticIpAttachmentDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLightsailStaticIpDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arn: Option<SmolStr>,
@@ -313,7 +313,7 @@ impl TerraResource for AwsLightsailStaticIpDetails {
         &TerraProvider::AWS
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "port_info")]
 pub struct AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -339,7 +339,7 @@ impl AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "add_on")]
 pub struct AwsLightsailInstanceResourceBlockTypeAddOn {
     #[serde(skip_serializing_if = "SmolStr::is_empty")]

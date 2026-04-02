@@ -57,9 +57,7 @@ async fn main() -> Result {
 	// Use the existing schema.json instead of running the full tofu init cycle.
 	beet_core::cross_log!("Generating provider bindings from schema.json ...");
 	generator.generate().await?;
-	beet_core::cross_log!(
-		"Done! Provider modules written to src/common_resources/"
-	);
+	beet_core::cross_log!("Done!");
 
 	Ok(())
 }

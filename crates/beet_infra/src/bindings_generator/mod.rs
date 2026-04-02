@@ -1,4 +1,10 @@
 //! Typed Rust binding generation from OpenTofu provider schemas.
+//!
+//! These types serve for type safety when working on configurations,
+//! they serve as a first line of defence before running `opentofu`,
+//! which will also check the generated config for validity.
+//!
+//!
 mod binding;
 mod binding_generator;
 mod config;

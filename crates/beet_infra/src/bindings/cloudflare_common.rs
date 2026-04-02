@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 #[allow(unused)]
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct CloudflareDnsRecordDetails {
     /// Comments or notes about the DNS record. This field has no effect on DNS responses.
     #[serde(skip_serializing_if = "Option::is_none")]

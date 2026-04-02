@@ -41,6 +41,7 @@ use super::misc::TerraBackend;
 use super::misc::TerraDataSource;
 use super::misc::TerraProvider;
 use super::misc::TerraResource;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde_json::Map;
@@ -178,7 +179,7 @@ impl TerraConfig {
 	/// from the resource's [`TerraResource`] implementation.
 	pub fn add_resource(
 		&mut self,
-		name: impl Into<String>,
+		label: impl Into<String>,
 		resource: &dyn TerraResource,
 	) -> &mut Self {
 		self.ensure_provider(resource.provider());
@@ -187,9 +188,19 @@ impl TerraConfig {
 			.entry(resource.resource_type().to_string())
 			.or_insert_with(|| Value::Object(Map::new()));
 		if let Value::Object(map) = type_map {
-			map.insert(name.into(), resource.to_json());
+			map.insert(label.into(), resource.to_json());
 		}
 		self
+	}
+
+	/// a slug is able generate both the label and resource name,
+	/// creating a a shorthand for resources that are [`SetSlug`]
+	pub fn add_named_resource<T>(&mut self, slug: &Slug, mut resource: T)
+	where
+		T: TerraNamed + TerraResource,
+	{
+		resource.set_primary_identifier(&slug.primary_identifier());
+		self.add_resource(slug.label(), &resource);
 	}
 
 	/// Add a typed data source (chaining). The required provider is registered
