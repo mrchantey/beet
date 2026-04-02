@@ -2,14 +2,11 @@
 //!
 //! Run with:
 //! ```sh
-//!   cargo run --example lambda --features=fs,rand,infra_aws_lambda,infra_cloudflare_dns
+//!   cargo run --example lambda --features=fs,rand,stack_lambda
 //! ```
 
+use beet::infra::bindings::*;
 use beet::prelude::*;
-use beet_infra::common_resources::aws_lambda::*;
-use beet_infra::common_resources::cloudflare_dns::*;
-use beet_infra::types::config_exporter::ConfigExporter;
-use beet_infra::types::config_exporter::Output;
 use serde_json::json;
 
 #[beet::main]

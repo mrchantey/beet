@@ -96,16 +96,16 @@ impl CloudflareDnsRecordDetails {
         }
     }
 }
-impl crate::terra::TerraJson for CloudflareDnsRecordDetails {
+impl crate::prelude::TerraJson for CloudflareDnsRecordDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for CloudflareDnsRecordDetails {
+impl crate::prelude::TerraResource for CloudflareDnsRecordDetails {
     fn resource_type(&self) -> &'static str {
         "cloudflare_dns_record"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::CLOUDFLARE
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::CLOUDFLARE
     }
 }

@@ -2,14 +2,11 @@
 //!
 //! Run with:
 //! ```sh
-//!   cargo run --example lightsail --features=fs,rand,infra_aws_lightsail
+//!   cargo run --example lightsail --features=fs,rand,stack_lightsail
 //! ```
 
+use beet::infra::bindings::*;
 use beet::prelude::*;
-use beet_infra::common_resources::aws_lightsail::*;
-use beet_infra::types::config_exporter::ConfigExporter;
-use beet_infra::types::config_exporter::Output;
-use beet_infra::types::config_exporter::Variable;
 use serde_json::json;
 
 #[beet::main]

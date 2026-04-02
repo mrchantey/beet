@@ -7,15 +7,16 @@
 //! - [`config_exporter`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`common_resources`] for pre-generated bindings of commonly used providers
+pub mod bindings;
 mod components;
 mod stacks;
-pub mod types;
+mod types;
 
 #[cfg(feature = "bindings_generator")]
 pub mod bindings_generator;
-pub mod common_resources;
 
 pub mod prelude {
+	pub use crate::bindings;
 	pub use crate::components::*;
 	pub use crate::stacks::*;
 	pub use crate::types::*;

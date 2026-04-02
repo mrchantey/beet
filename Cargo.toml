@@ -281,9 +281,8 @@ tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
-infra_aws_lambda = ["infra", "beet_infra?/common_resources_aws_lambda"]
-infra_aws_lightsail = ["infra", "beet_infra?/common_resources_aws_lightsail"]
-infra_cloudflare_dns = ["infra", "beet_infra?/common_resources_cloudflare_dns"]
+stack_lambda = ["infra", "beet_infra?/stack_lambda"]
+stack_lightsail = ["infra", "beet_infra?/stack_lightsail"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]
@@ -449,12 +448,12 @@ required-features = ["infra"]
 [[example]]
 name = "lambda"
 path = "examples/infra/lambda.rs"
-required-features = ["infra_aws_lambda", "infra_cloudflare_dns", "fs", "rand"]
+required-features = ["stack_lambda", "fs", "rand"]
 
 [[example]]
 name = "lightsail"
 path = "examples/infra/lightsail.rs"
-required-features = ["infra_aws_lightsail", "fs", "rand"]
+required-features = ["stack_lightsail", "fs", "rand"]
 
 # 💡 Examples - flow
 

@@ -95,17 +95,17 @@ impl AwsLightsailInstanceDetails {
         }
     }
 }
-impl crate::terra::TerraJson for AwsLightsailInstanceDetails {
+impl crate::prelude::TerraJson for AwsLightsailInstanceDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for AwsLightsailInstanceDetails {
+impl crate::prelude::TerraResource for AwsLightsailInstanceDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_instance"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::AWS
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -142,17 +142,17 @@ impl AwsLightsailInstancePublicPortsDetails {
         }
     }
 }
-impl crate::terra::TerraJson for AwsLightsailInstancePublicPortsDetails {
+impl crate::prelude::TerraJson for AwsLightsailInstancePublicPortsDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for AwsLightsailInstancePublicPortsDetails {
+impl crate::prelude::TerraResource for AwsLightsailInstancePublicPortsDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_instance_public_ports"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::AWS
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -193,17 +193,17 @@ pub struct AwsLightsailKeyPairDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags_all: Option<Map<String, String>>,
 }
-impl crate::terra::TerraJson for AwsLightsailKeyPairDetails {
+impl crate::prelude::TerraJson for AwsLightsailKeyPairDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for AwsLightsailKeyPairDetails {
+impl crate::prelude::TerraResource for AwsLightsailKeyPairDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_key_pair"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::AWS
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -243,17 +243,17 @@ impl AwsLightsailStaticIpAttachmentDetails {
         }
     }
 }
-impl crate::terra::TerraJson for AwsLightsailStaticIpAttachmentDetails {
+impl crate::prelude::TerraJson for AwsLightsailStaticIpAttachmentDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for AwsLightsailStaticIpAttachmentDetails {
+impl crate::prelude::TerraResource for AwsLightsailStaticIpAttachmentDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_static_ip_attachment"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::AWS
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -296,17 +296,17 @@ impl AwsLightsailStaticIpDetails {
         }
     }
 }
-impl crate::terra::TerraJson for AwsLightsailStaticIpDetails {
+impl crate::prelude::TerraJson for AwsLightsailStaticIpDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl crate::terra::TerraResource for AwsLightsailStaticIpDetails {
+impl crate::prelude::TerraResource for AwsLightsailStaticIpDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_static_ip"
     }
-    fn provider(&self) -> &'static crate::terra::TerraProvider {
-        &crate::terra::TerraProvider::AWS
+    fn provider(&self) -> &'static crate::prelude::TerraProvider {
+        &crate::prelude::TerraProvider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
