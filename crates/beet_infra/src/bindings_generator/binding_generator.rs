@@ -342,9 +342,7 @@ mod tests {
 
 		output.contains("impl MyStruct {").xpect_true();
 		output
-			.contains(
-				"pub fn new(name: beet_core::prelude::SmolStr, count: i64) -> Self {",
-			)
+			.contains("pub fn new(name: SmolStr, count: i64) -> Self {")
 			.xpect_true();
 		output.contains("name").xpect_true();
 		output.contains("count").xpect_true();
@@ -421,12 +419,8 @@ mod tests {
 		let output = String::from_utf8(buf).unwrap();
 
 		output
-			.xpect_contains(
-				"impl crate::prelude::TerraJson for AwsS3BucketDetails",
-			)
-			.xpect_contains(
-				"impl crate::prelude::TerraResource for AwsS3BucketDetails",
-			)
+			.xpect_contains("impl TerraJson for AwsS3BucketDetails")
+			.xpect_contains("impl TerraResource for AwsS3BucketDetails")
 			.xpect_contains("\"aws_s3_bucket\"")
 			.xpect_contains("TerraProvider::AWS");
 	}

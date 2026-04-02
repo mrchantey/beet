@@ -637,7 +637,7 @@ mod test {
     [dependencies]
     serde = { version = "1.0", features = ["derive"] }
     serde_bytes = "0.11"
-    smol_str = "0.2"
+    smol_str = { version = "0.2", features = ["serde"] }
 
     [workspace]
     "#,
@@ -647,22 +647,24 @@ mod test {
 		let source_path = dir.as_ref().join("src/lib.rs");
 		let mut source_buf = Vec::new();
 		generate_serde("test", &mut source_buf, &registry.unwrap()).unwrap();
-		// Inject a `beet_core` stub so `beet_core::prelude::SmolStr` resolves
-		// in the temp crate (which doesn't depend on the full beet_core).
+		// Inject stubs so the generated preamble resolves in the temp crate:
+		// - `use beet_core::prelude::*` → provides `SmolStr`
+		// - `use crate::prelude::*`     → empty module, satisfies the import
 		let generated = String::from_utf8(source_buf).unwrap();
-		let beet_core_stub = concat!(
+		let preamble_stubs = concat!(
 			"pub mod beet_core {\n",
 			"    pub mod prelude {\n",
 			"        pub use smol_str::SmolStr;\n",
 			"    }\n",
 			"}\n",
+			"pub mod prelude {}\n",
 		);
 		// Insert after the first line (the `#![allow(…)]` inner attribute).
 		let source_with_stub = if let Some(nl) = generated.find('\n') {
 			let (first_line, rest) = generated.split_at(nl + 1);
-			format!("{}{}{}", first_line, beet_core_stub, rest)
+			format!("{}{}{}", first_line, preamble_stubs, rest)
 		} else {
-			format!("{}{}", beet_core_stub, generated)
+			format!("{}{}", preamble_stubs, generated)
 		};
 		fs_ext::write(&source_path, source_with_stub).unwrap();
 		// Use a stable `target` dir to avoid downloading and recompiling crates every time.

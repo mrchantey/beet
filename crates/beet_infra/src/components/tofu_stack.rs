@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-#[derive(Get, Component)]
+#[derive(Debug, Clone, Get, Component)]
 pub struct Stack {
 	/// The backend configuration for storing the state of this stack,
 	/// defaults to a local backend at `./infra-state`
@@ -26,6 +26,7 @@ impl Default for Stack {
 
 /// Strategy for maintaining the Terraform state for this stack.
 /// https://opentofu.org/docs/language/settings/backends/configuration/
+#[derive(Debug, Clone)]
 pub enum StackBackend {
 	Local(LocalBackend),
 	S3(S3Backend),
@@ -55,7 +56,7 @@ impl TerraBackend for StackBackend {
 
 /// Local filesystem backend.
 /// https://opentofu.org/docs/language/settings/backends/local/
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Get)]
 pub struct LocalBackend {
 	path: AbsPathBuf,
 }
@@ -79,14 +80,14 @@ const STATE_RESOURCE_NAME: &str = "tofu-state";
 
 /// S3 backend for remote state storage.
 /// https://opentofu.org/docs/language/settings/backends/s3/
-#[derive(SetWith, Serialize, Deserialize)]
+#[derive(Debug, Clone, SetWith)]
 pub struct S3Backend {
 	/// The S3 bucket containing the state file.
-	bucket: String,
+	bucket: SmolStr,
 	/// Path to the state file within the bucket (e.g. `"env/prod/terraform.tfstate"`).
-	key: String,
+	key: SmolStr,
 	/// AWS region where the bucket lives.
-	region: String,
+	region: SmolStr,
 	/// Enable OpenTofu's native S3 lockfile.
 	use_lockfile: bool,
 }
@@ -94,8 +95,8 @@ pub struct S3Backend {
 impl Default for S3Backend {
 	fn default() -> Self {
 		Self {
-			bucket: String::new(),
-			key: "terraform.tfstate".to_string(),
+			bucket: default(),
+			key: "terraform.tfstate".into(),
 			region: aws::region::DEFAULT.into(),
 			use_lockfile: true,
 		}

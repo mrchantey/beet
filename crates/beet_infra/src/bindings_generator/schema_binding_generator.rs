@@ -324,6 +324,10 @@ fn build_preamble() -> String {
 		"use std::collections::BTreeMap as Map;",
 		"use serde::{Serialize, Deserialize};",
 		"use serde_json;",
+		"#[allow(unused)]",
+		"use beet_core::prelude::*;",
+		"#[allow(unused)]",
+		"use crate::prelude::*;",
 	]
 	.join("\n")
 }

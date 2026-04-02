@@ -1,6 +1,7 @@
 //! Extension methods for Bevy's [`EntityWorldMut`].
 
 use bevy::ecs::component::Mutable;
+use bevy::ecs::query::QueryEntityError;
 
 use crate::prelude::*;
 
@@ -33,6 +34,20 @@ pub impl<'a> EntityWorldMut<'a> {
 			let mut state = world.state::<T>();
 			let item = state.get_mut(world);
 			let result = func(id, item);
+			state.apply(world);
+			result
+		})
+	}
+	/// Runs a function with access to a system parameter state.
+	fn with_query<T: 'static + QueryData, O>(
+		&mut self,
+		func: impl FnOnce(T::Item<'_, '_>) -> O,
+	) -> Result<O, QueryEntityError> {
+		let id = self.id();
+		self.world_scope(|world| {
+			let mut state = world.state::<Query<T>>();
+			let mut query = state.get_mut(world);
+			let result = query.get_mut(id).map(func);
 			state.apply(world);
 			result
 		})

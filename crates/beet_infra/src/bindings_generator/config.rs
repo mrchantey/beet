@@ -7,6 +7,13 @@ pub struct CodeGeneratorConfig {
 	pub(crate) module_name: Option<String>,
 	pub(crate) external_definitions: ExternalDefinitions,
 	pub(crate) comments: DocComments,
+	/// Use statements emitted in the file preamble, after the `#![allow(…)]`
+	/// line.  Defaults include `BTreeMap as Map`, `serde`, and `serde_bytes`.
+	/// The emitter always appends `beet_core::prelude::*` and
+	/// `beet_infra::prelude::*` (resolved via [`pkg_ext`]) after these.
+	/// Use [`with_use_items`](Self::with_use_items) to replace entirely, or
+	/// [`with_additional_use_items`](Self::with_additional_use_items) to extend.
+	pub(crate) use_items: Vec<String>,
 	/// When `true`, convert all generated type names from `snake_case` to
 	/// `UpperCamelCase` using the `heck` crate.
 	pub(crate) use_title_case: bool,
@@ -52,16 +59,28 @@ impl Default for CodeGeneratorConfig {
 }
 
 impl CodeGeneratorConfig {
+	/// Default use items included in the generated preamble.
+	///
+	/// Includes `BTreeMap as Map`, `serde`, and `serde_bytes`.
+	pub fn default_use_items() -> Vec<String> {
+		vec![
+			"use std::collections::BTreeMap as Map;".into(),
+			"use serde::{Serialize, Deserialize};".into(),
+			"use serde_bytes::ByteBuf as Bytes;".into(),
+		]
+	}
+
 	/// Default config.
 	pub fn new() -> Self {
 		Self {
 			module_name: None,
 			external_definitions: BTreeMap::new(),
 			comments: BTreeMap::new(),
+			use_items: Self::default_use_items(),
 			use_title_case: false,
 			generate_roots: true,
 			custom_preamble: None,
-			generate_default: false,
+			generate_default: true,
 			generate_builders: true,
 			generate_trait_impls: false,
 			resource_meta: Vec::new(),
@@ -115,6 +134,23 @@ impl CodeGeneratorConfig {
 	/// preamble.
 	pub fn with_custom_preamble(mut self, preamble: impl Into<String>) -> Self {
 		self.custom_preamble = Some(preamble.into());
+		self
+	}
+
+	/// Replace all use items in the generated preamble.
+	///
+	/// The emitter still appends the beet glob imports after these.
+	pub fn with_use_items(mut self, items: Vec<String>) -> Self {
+		self.use_items = items;
+		self
+	}
+
+	/// Append additional use items to the preamble.
+	pub fn with_additional_use_items(
+		mut self,
+		items: impl IntoIterator<Item = impl Into<String>>,
+	) -> Self {
+		self.use_items.extend(items.into_iter().map(Into::into));
 		self
 	}
 

@@ -11,7 +11,7 @@ pub struct StackContext {
 	stage: SmolStr,
 	/// Additional parameters, some of which
 	/// may be required by a config generator
-	params: MultiMap<String, String>,
+	params: MultiMap<SmolStr, SmolStr>,
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
 	prod_stage: SmolStr,
@@ -33,6 +33,10 @@ impl StackContext {
 	pub fn bucket_slug(&self, key: impl Into<SmolStr>) -> Slug {
 		self.resource_slug("buckets", key)
 	}
+	pub fn iam_role_slug(&self, key: impl Into<SmolStr>) -> Slug {
+		self.resource_slug("iam-roles", key)
+	}
+
 	pub fn resource_slug(
 		&self,
 		resource_kind: impl Into<SmolStr>,

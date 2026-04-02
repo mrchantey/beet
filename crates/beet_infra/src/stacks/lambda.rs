@@ -1,8 +1,10 @@
+use crate::bindings::AwsIamRoleDetails;
 use crate::bindings::AwsS3BucketDetails;
 use crate::bindings::aws;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use serde_json::json;
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize)]
 #[component(on_add=on_add)]
@@ -65,25 +67,75 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.get::<LambdaStack>()
 		.unwrap()
 		.clone();
-	// lambda_stack(world.commands(), cx.entity, stack);
 }
 
-// fn resource_name(label: &str) -> Vec<PathPatternSegment> {
-// 	vec![
-// 		PathPatternSegment::new_required("app_name"),
-// 		PathPatternSegment::new_static(label),
-// 	]
-// }
 
+fn terra_config(
+	cx: &StackContext,
+	entity: &mut EntityWorldMut,
+) -> Result<TerraConfig> {
+	let mut config = TerraConfig::default();
 
-pub trait ResourceTool {
-	fn definition(&self) -> String;
-	#[cfg(feature = "tokens")]
-	fn rust_type() -> proc_macro2::TokenStream;
+	let stack =
+		entity.with_query::<(&Stack, &LambdaStack), _>(|(stack, lambda)| {
+			config.set_backend(stack.backend());
+			let region = lambda.region();
+
+			let html_bucket_slug = LambdaStack::html_bucket_name(cx);
+
+			config.add_resource(
+				html_bucket_slug.to_snake_case(),
+				&AwsS3BucketDetails {
+					bucket: Some(html_bucket_slug.to_kebab_case().into()),
+					force_destroy: Some(true),
+					region: Some(region.into()),
+					..default()
+				},
+			);
+
+			let assets_bucket_slug = LambdaStack::assets_bucket_name(cx);
+
+			config.add_resource(
+				assets_bucket_slug.to_snake_case(),
+				&AwsS3BucketDetails {
+					bucket: Some(assets_bucket_slug.to_kebab_case().into()),
+					force_destroy: Some(true),
+					region: Some(region.into()),
+					..default()
+				},
+			);
+
+			let assume_role_policy = json!({
+				"Version": "2012-10-17",
+				"Statement": [{
+					"Action": "sts:AssumeRole",
+					"Effect": "Allow",
+					"Principal": { "Service": "lambda.amazonaws.com" }
+				}]
+			});
+
+			let lambda_role_slug = cx.iam_role_slug("lambda");
+			let lambda_role_label = 
+
+			let mut lambda_role = AwsIamRoleDetails {
+				assume_role_policy: assume_role_policy.to_string().into(),
+				name: Some(lambda_role_label),
+				// name
+				// ..default()
+			};
+			// lambda_role.name = Some(format!("{prefix}--lambda-role"));
+		})?;
+
+	// config.add_resource(name, resource)
+
+	config.xok()
 }
 
 
 #[derive(Component)]
 pub struct BucketDef {
 	label: SmolStr,
+	details: AwsS3BucketDetails,
 }
+
+impl BucketDef {}

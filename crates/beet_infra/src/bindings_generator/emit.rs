@@ -103,7 +103,7 @@ impl<'a> CodeGenerator<'a> {
 
 		// Preamble is emitted as raw text to preserve comments and inner
 		// attributes that don't survive token round-tripping.
-		let preamble = self.build_preamble_text(&external_names);
+		let preamble = self.build_preamble_text();
 
 		// Collect all tokens for the file body.
 		let mut file_tokens = TokenStream::new();
@@ -162,7 +162,7 @@ impl<'a> CodeGenerator<'a> {
 	// Preamble
 	// ------------------------------------------------------------------
 
-	fn build_preamble_text(&self, external_names: &HashSet<String>) -> String {
+	fn build_preamble_text(&self) -> String {
 		if let Some(preamble) = &self.config.custom_preamble {
 			return format!("{}\n\n", preamble);
 		}
@@ -172,12 +172,23 @@ impl<'a> CodeGenerator<'a> {
 			"#![allow(unused_imports, non_snake_case, non_camel_case_types, non_upper_case_globals)]"
 				.to_string(),
 		);
-		if !external_names.contains("Map") {
-			lines.push("use std::collections::BTreeMap as Map;".to_string());
+		for item in &self.config.use_items {
+			lines.push(item.clone());
 		}
-		lines.push("use serde::{Serialize, Deserialize};".to_string());
-		if !external_names.contains("Bytes") {
-			lines.push("use serde_bytes::ByteBuf as Bytes;".to_string());
+		// Beet glob imports — path resolved for internal vs published builds.
+		let beet_core = pkg_ext::internal_or_beet("beet_core");
+		let beet_infra = pkg_ext::internal_or_beet("beet_infra");
+		let beet_core_str = quote!(#beet_core).to_string();
+		let beet_infra_str = quote!(#beet_infra).to_string();
+		lines.push(format!(
+			"#[allow(unused)]\nuse {}::prelude::*;",
+			beet_core_str
+		));
+		if beet_infra_str != beet_core_str {
+			lines.push(format!(
+				"#[allow(unused)]\nuse {}::prelude::*;",
+				beet_infra_str
+			));
 		}
 		for (module, definitions) in &self.config.external_definitions {
 			if !module.is_empty() {
@@ -492,18 +503,16 @@ impl<'a> CodeGenerator<'a> {
 		let provider_const = provider_source_to_const(&entry.provider_source);
 		let provider_ident = Ident::new(&provider_const, Span::call_site());
 
-		let pkg_name = pkg_ext::internal_or_beet("beet_infra");
-
 		quote! {
-			impl #pkg_name::prelude::TerraJson for #struct_ident {
+			impl TerraJson for #struct_ident {
 				fn to_json(&self) -> serde_json::Value {
 					serde_json::to_value(self).expect("serialization should not fail")
 				}
 			}
 
-			impl #pkg_name::prelude::TerraResource for #struct_ident {
+			impl TerraResource for #struct_ident {
 				fn resource_type(&self) -> &'static str { #resource_type_str }
-				fn provider(&self) -> &'static #pkg_name::prelude::TerraProvider { &#pkg_name::prelude::TerraProvider::#provider_ident }
+				fn provider(&self) -> &'static TerraProvider { &TerraProvider::#provider_ident }
 			}
 		}
 	}
@@ -549,10 +558,7 @@ fn quote_field_type(
 		FieldType::F32 => quote! { f32 },
 		FieldType::F64 => quote! { f64 },
 		FieldType::Char => quote! { char },
-		FieldType::Str => {
-			let pkg_name = pkg_ext::internal_or_beet("beet_core");
-			quote! { #pkg_name::prelude::SmolStr }
-		}
+		FieldType::Str => quote! { SmolStr },
 		FieldType::Bytes => {
 			let ident = Ident::new("Bytes", Span::call_site());
 			quote! { #ident }
@@ -631,10 +637,7 @@ fn format_to_type_tokens(ft: &FieldType, title_case: bool) -> TokenStream {
 		FieldType::F32 => quote! { f32 },
 		FieldType::F64 => quote! { f64 },
 		FieldType::Char => quote! { char },
-		FieldType::Str => {
-			let pkg_name = pkg_ext::internal_or_beet("beet_core");
-			quote! { #pkg_name::prelude::SmolStr }
-		}
+		FieldType::Str => quote! { SmolStr },
 		FieldType::Bytes => {
 			let ident = Ident::new("Bytes", Span::call_site());
 			quote! { #ident }
@@ -674,10 +677,7 @@ fn default_value_tokens(ft: &FieldType) -> TokenStream {
 	match ft {
 		FieldType::Option(_) => quote! { None },
 		FieldType::Seq(_) => quote! { Vec::new() },
-		FieldType::Str => {
-			let pkg_name = pkg_ext::internal_or_beet("beet_core");
-			quote! { #pkg_name::prelude::SmolStr::default() }
-		}
+		FieldType::Str => quote! { SmolStr::default() },
 		FieldType::Bool => quote! { false },
 		FieldType::I8
 		| FieldType::I16
@@ -745,10 +745,7 @@ fn provider_source_to_const(source: &str) -> String {
 fn field_serde_annotation(ft: &FieldType) -> TokenStream {
 	match ft {
 		FieldType::Str => {
-			let pkg_name = pkg_ext::internal_or_beet("beet_core");
-			let skip_path =
-				format!("{}::prelude::SmolStr::is_empty", quote! { #pkg_name });
-			quote! { #[serde(skip_serializing_if = #skip_path)] }
+			quote! { #[serde(skip_serializing_if = "SmolStr::is_empty")] }
 		}
 		FieldType::Option(_) => {
 			quote! { #[serde(skip_serializing_if = "Option::is_none")] }
