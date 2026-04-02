@@ -4,7 +4,7 @@
 //!
 //! This crate provides typed Rust bindings for Terraform/OpenTofu
 //! configuration, including:
-//! - [`config_exporter`] for building and exporting JSON configurations
+//! - [`terra_config`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`common_resources`] for pre-generated bindings of commonly used providers
 pub mod bindings;
@@ -20,4 +20,5 @@ pub mod prelude {
 	pub use crate::components::*;
 	pub use crate::stacks::*;
 	pub use crate::types::*;
+	pub(crate) use smol_str::SmolStr;
 }

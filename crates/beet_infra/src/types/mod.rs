@@ -1,4 +1,4 @@
-mod config_exporter;
+mod terra_config;
 mod misc;
-pub use config_exporter::*;
+pub use terra_config::*;
 pub use misc::*;

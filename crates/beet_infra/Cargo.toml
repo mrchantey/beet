@@ -11,9 +11,10 @@ repository.workspace = true
 
 [features]
 default = []
-bindings_generator = ["heck", "tokens","prettyplease","beet_core/tokens"]
+bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
 stack_lambda = ["bindings_aws_common","bindings_aws_lambda","bindings_cloudflare_common"]
+stack_lambda_rt = ["beet_net/aws"]
 stack_lightsail = ["bindings_aws_lightsail"]
 bindings_aws_common = []
 bindings_aws_lightsail = []
@@ -29,8 +30,9 @@ required-features = ["bindings_generator"]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
 serde.workspace = true
+smol_str.workspace = true
 serde_json.workspace = true
-heck = { workspace = true, optional = true }
+heck.workspace = true
 async-process = { workspace = true }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }

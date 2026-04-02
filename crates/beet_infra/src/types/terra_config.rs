@@ -1,18 +1,18 @@
 //! Export Terraform/OpenTofu configurations as JSON.
 //!
-//! The [`ConfigExporter`] collects provider configurations, resources, data sources,
+//! The [`TerraConfig`] collects provider configurations, resources, data sources,
 //! variables, outputs, locals, and backend settings, then serialises them into
 //! valid Terraform JSON configuration.
 //!
 //! # Typed API
 //!
 //! When using generated provider bindings that implement [`TerraResource`] or
-//! [`TerraDataSource`], the exporter automatically tracks required providers
+//! [`TerraDataSource`], the config automatically tracks required providers
 //! and serialises bodies with full type safety:
 //!
 //! ```rust,ignore
 //! let bucket = AwsS3BucketDetails { bucket: Some("my-bucket".into()), ..Default::default() };
-//! let exporter = ConfigExporter::new()
+//! let config = TerraConfig::new()
 //!     .with_backend(&S3Backend::default())
 //!     .with_required_version("~> 1.8")
 //!     .with_resource("assets", &bucket)
@@ -21,7 +21,7 @@
 //!         description: Some("The bucket name".into()),
 //!         sensitive: None,
 //!     });
-//! exporter.export_to_file("main.tf.json").await?;
+//! config.export_to_file("main.tf.json").await?;
 //! ```
 //!
 //! # Untyped API
@@ -30,11 +30,11 @@
 //! `Serialize` type for escape-hatch usage:
 //!
 //! ```rust,ignore
-//! let mut exporter = ConfigExporter::new();
-//! exporter.add_required_provider("aws", "hashicorp/aws", "~> 6.0");
-//! exporter.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
-//! exporter.add_untyped_resource("aws_instance", "web", &my_instance)?;
-//! exporter.export_to_file("main.tf.json").await?;
+//! let mut config = TerraConfig::new();
+//! config.add_required_provider("aws", "hashicorp/aws", "~> 6.0");
+//! config.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
+//! config.add_untyped_resource("aws_instance", "web", &my_instance)?;
+//! config.export_to_file("main.tf.json").await?;
 //! ```
 
 use super::misc::TerraBackend;
@@ -70,7 +70,7 @@ pub struct Output {
 ///
 /// # Example
 /// ```rust,ignore
-/// let exporter = ConfigExporter::new()
+/// let config = TerraConfig::new()
 ///     .with_backend(&S3Backend::default())
 ///     .with_required_version("~> 1.8")
 ///     .with_resource("assets", &bucket)
@@ -79,9 +79,9 @@ pub struct Output {
 ///         description: Some("The bucket name".into()),
 ///         sensitive: None,
 ///     });
-/// exporter.export_and_validate("infra/main.tf.json").await?;
+/// config.export_and_validate("infra/main.tf.json").await?;
 /// ```
-pub struct ConfigExporter {
+pub struct TerraConfig {
 	/// Backend for remote state, serialised into `terraform.backend`.
 	backend: Option<(String, Value)>,
 	/// Optional `required_version` constraint in the `terraform` block.
@@ -97,8 +97,8 @@ pub struct ConfigExporter {
 	locals: Map<String, Value>,
 }
 
-impl ConfigExporter {
-	/// Create a new empty configuration exporter.
+impl TerraConfig {
+	/// Create a new empty configuration.
 	pub fn new() -> Self {
 		Self {
 			backend: None,
@@ -120,7 +120,7 @@ impl ConfigExporter {
 	/// Set the backend for remote state storage (chaining).
 	///
 	/// ```ignore
-	/// let exporter = ConfigExporter::new()
+	/// let config = TerraConfig::new()
 	///     .with_backend(&S3Backend::default());
 	/// ```
 	pub fn with_backend(mut self, backend: &dyn TerraBackend) -> Self {
@@ -140,7 +140,7 @@ impl ConfigExporter {
 	/// Set the required OpenTofu/Terraform version constraint (chaining).
 	///
 	/// ```ignore
-	/// let exporter = ConfigExporter::new().with_required_version("~> 1.8");
+	/// let config = TerraConfig::new().with_required_version("~> 1.8");
 	/// ```
 	pub fn with_required_version(
 		mut self,
@@ -260,7 +260,7 @@ impl ConfigExporter {
 	/// an array, which is the correct Terraform JSON format for aliases.
 	///
 	/// ```ignore
-	/// let exporter = ConfigExporter::new()
+	/// let config = TerraConfig::new()
 	///     .with_provider_config(&TerraProvider::AWS, &json!({"region": "us-east-1"}))?
 	///     .with_provider_alias(&TerraProvider::AWS, "eu_west_1", &json!({"region": "eu-west-1"}))?;
 	/// ```
@@ -668,6 +668,6 @@ impl ConfigExporter {
 	}
 }
 
-impl Default for ConfigExporter {
+impl Default for TerraConfig {
 	fn default() -> Self { Self::new() }
 }

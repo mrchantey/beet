@@ -91,7 +91,7 @@ systemctl enable {app_name}.service
 
 	// -- Assemble the config ------------------------------------------------
 
-	let exporter = ConfigExporter::new()
+	let exporter = TerraConfig::new()
 		// Typed resources — provider is registered automatically
 		.with_resource("keypair", &keypair)
 		.with_resource("ip", &static_ip)

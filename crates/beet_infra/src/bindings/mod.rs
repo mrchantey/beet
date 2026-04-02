@@ -1,3 +1,5 @@
+#[path = "./aws_constants.rs"]
+pub mod aws;
 #[cfg(feature = "bindings_aws_common")]
 mod aws_common;
 #[cfg(feature = "bindings_aws_common")]

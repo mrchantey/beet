@@ -190,6 +190,7 @@ base64 = "0.22"
 ron = "0.8"
 toml = "0.8"
 bytes = "1"
+smol_str = { version = "0.2", default-features = false }
 
 #💡 http
 http = "1"

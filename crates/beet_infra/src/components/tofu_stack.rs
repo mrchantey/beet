@@ -1,3 +1,4 @@
+use crate::bindings::aws;
 use crate::types::TerraBackend;
 use beet_core::prelude::*;
 use serde_json::Value;
@@ -85,7 +86,7 @@ pub struct S3Backend {
 	/// Path to the state file within the bucket (e.g. `"env/prod/terraform.tfstate"`).
 	key: String,
 	/// AWS region where the bucket lives.
-	region: AwsRegion,
+	region: String,
 	/// Enable OpenTofu's native S3 lockfile.
 	use_lockfile: bool,
 }
@@ -95,7 +96,7 @@ impl Default for S3Backend {
 		Self {
 			bucket: String::new(),
 			key: "terraform.tfstate".to_string(),
-			region: AwsRegion::default(),
+			region: aws::region::DEFAULT.into(),
 			use_lockfile: true,
 		}
 	}
@@ -110,24 +111,5 @@ impl TerraBackend for S3Backend {
 			"region": self.region.to_string(),
 			"use_lockfile": self.use_lockfile,
 		})
-	}
-}
-
-
-#[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
-pub enum AwsRegion {
-	#[default]
-	#[serde(rename = "us-east-1")]
-	UsEast1,
-	#[serde(rename = "us-west-2")]
-	UsWest2,
-}
-
-impl std::fmt::Display for AwsRegion {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			AwsRegion::UsEast1 => write!(f, "us-east-1"),
-			AwsRegion::UsWest2 => write!(f, "us-west-2"),
-		}
 	}
 }

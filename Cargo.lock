@@ -1168,6 +1168,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
+ "smol_str",
  "syn",
 ]
 

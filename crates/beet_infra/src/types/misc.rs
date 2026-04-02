@@ -116,10 +116,10 @@ pub trait TerraDataSource: TerraJson {
 /// A typed Terraform backend configuration.
 ///
 /// Implement this trait and pass the backend to
-/// [`ConfigExporter::with_backend`] to configure remote state storage.
+/// [`TerraConfig::with_backend`] to configure remote state storage.
 ///
 /// ```ignore
-/// let exporter = ConfigExporter::new()
+/// let config = TerraConfig::new()
 ///     .with_backend(&S3Backend::default());
 /// ```
 pub trait TerraBackend {

@@ -136,7 +136,7 @@ async fn main() -> Result {
 	// Assemble the config
 	// -----------------------------------------------------------------
 
-	let exporter = ConfigExporter::new()
+	let exporter = TerraConfig::new()
 		.with_resource("assets", &assets_bucket)
 		.with_resource("html", &html_bucket)
 		.with_resource("lambda_role", &lambda_role)
