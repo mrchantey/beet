@@ -9,42 +9,42 @@ use serde_json;
 pub struct CloudflareDnsRecordDetails {
     /// Comments or notes about the DNS record. This field has no effect on DNS responses.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
+    pub comment: Option<beet_core::prelude::SmolStr>,
     /// When the record comment was last modified. Omitted if there is no comment.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment_modified_on: Option<String>,
+    pub comment_modified_on: Option<beet_core::prelude::SmolStr>,
     /// A valid IPv4 address.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub content: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     /// When the record was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_on: Option<String>,
+    pub created_on: Option<beet_core::prelude::SmolStr>,
     /// Components of a CAA record.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<Map<String, String>>,
+    pub data: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     /// Identifier.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     /// Extra Cloudflare-specific information about the record.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<String>,
+    pub meta: Option<beet_core::prelude::SmolStr>,
     /// When the record was last modified.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub modified_on: Option<String>,
+    pub modified_on: Option<beet_core::prelude::SmolStr>,
     /// DNS record name (or @ for the zone apex) in Punycode.
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub name: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub name: beet_core::prelude::SmolStr,
     /// Required for MX, SRV and URI records; unused by other record types. Records with lower priorities are preferred.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     /// Whether the record can be proxied by Cloudflare or not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxiable: Option<bool>,
@@ -53,23 +53,28 @@ pub struct CloudflareDnsRecordDetails {
     pub proxied: Option<bool>,
     /// Settings for the DNS record.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub settings: Option<Map<String, String>>,
+    pub settings: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     /// Custom tags for the DNS record. This field has no effect on DNS responses.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<Vec<beet_core::prelude::SmolStr>>,
     /// When the record tags were last modified. Omitted if there are no tags.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_modified_on: Option<String>,
+    pub tags_modified_on: Option<beet_core::prelude::SmolStr>,
     /// Time To Live (TTL) of the DNS record in seconds. Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.
     pub ttl: i64,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub r#type: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub r#type: beet_core::prelude::SmolStr,
     /// Identifier.
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub zone_id: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub zone_id: beet_core::prelude::SmolStr,
 }
 impl CloudflareDnsRecordDetails {
-    pub fn new(name: String, ttl: i64, r#type: String, zone_id: String) -> Self {
+    pub fn new(
+        name: beet_core::prelude::SmolStr,
+        ttl: i64,
+        r#type: beet_core::prelude::SmolStr,
+        zone_id: beet_core::prelude::SmolStr,
+    ) -> Self {
         Self {
             comment: None,
             comment_modified_on: None,

@@ -8,63 +8,63 @@ use serde_json;
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AwsLightsailInstanceDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arn: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub availability_zone: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub blueprint_id: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub bundle_id: String,
+    pub arn: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub availability_zone: beet_core::prelude::SmolStr,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub blueprint_id: beet_core::prelude::SmolStr,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub bundle_id: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
+    pub created_at: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip_address_type: Option<String>,
+    pub ip_address_type: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv6_addresses: Option<Vec<String>>,
+    pub ipv6_addresses: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_static_ip: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub key_pair_name: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub name: String,
+    pub key_pair_name: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub name: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub private_ip_address: Option<String>,
+    pub private_ip_address: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_ip_address: Option<String>,
+    pub public_ip_address: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ram_size: Option<i64>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_all: Option<Map<String, String>>,
+    pub tags_all: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub user_data: Option<String>,
+    pub user_data: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub username: Option<String>,
+    pub username: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub add_on: Option<Vec<AwsLightsailInstanceResourceBlockTypeAddOn>>,
 }
 impl AwsLightsailInstanceDetails {
     pub fn new(
-        availability_zone: String,
-        blueprint_id: String,
-        bundle_id: String,
-        name: String,
+        availability_zone: beet_core::prelude::SmolStr,
+        blueprint_id: beet_core::prelude::SmolStr,
+        bundle_id: beet_core::prelude::SmolStr,
+        name: beet_core::prelude::SmolStr,
     ) -> Self {
         Self {
             arn: None,
@@ -113,23 +113,23 @@ pub struct AwsLightsailInstancePublicPortsDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub instance_name: String,
+    pub id: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub instance_name: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub port_info: Option<Vec<AwsLightsailInstancePublicPortsResourceBlockTypePortInfo>>,
 }
 impl AwsLightsailInstancePublicPortsDetails {
-    pub fn new(instance_name: String) -> Self {
+    pub fn new(instance_name: beet_core::prelude::SmolStr) -> Self {
         Self {
             count: None,
             depends_on: None,
@@ -158,40 +158,40 @@ impl crate::prelude::TerraResource for AwsLightsailInstancePublicPortsDetails {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsLightsailKeyPairDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arn: Option<String>,
+    pub arn: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub encrypted_fingerprint: Option<String>,
+    pub encrypted_fingerprint: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub encrypted_private_key: Option<String>,
+    pub encrypted_private_key: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fingerprint: Option<String>,
+    pub fingerprint: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name_prefix: Option<String>,
+    pub name_prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pgp_key: Option<String>,
+    pub pgp_key: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub private_key: Option<String>,
+    pub private_key: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key: Option<String>,
+    pub public_key: Option<beet_core::prelude::SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_all: Option<Map<String, String>>,
+    pub tags_all: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
 }
 impl crate::prelude::TerraJson for AwsLightsailKeyPairDetails {
     fn to_json(&self) -> serde_json::Value {
@@ -211,25 +211,28 @@ pub struct AwsLightsailStaticIpAttachmentDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub instance_name: String,
+    pub id: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub instance_name: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip_address: Option<String>,
+    pub ip_address: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub static_ip_name: String,
+    pub region: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub static_ip_name: beet_core::prelude::SmolStr,
 }
 impl AwsLightsailStaticIpAttachmentDetails {
-    pub fn new(instance_name: String, static_ip_name: String) -> Self {
+    pub fn new(
+        instance_name: beet_core::prelude::SmolStr,
+        static_ip_name: beet_core::prelude::SmolStr,
+    ) -> Self {
         Self {
             count: None,
             depends_on: None,
@@ -259,29 +262,29 @@ impl crate::prelude::TerraResource for AwsLightsailStaticIpAttachmentDetails {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AwsLightsailStaticIpDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arn: Option<String>,
+    pub arn: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ip_address: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub name: String,
+    pub ip_address: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub name: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub support_code: Option<String>,
+    pub support_code: Option<beet_core::prelude::SmolStr>,
 }
 impl AwsLightsailStaticIpDetails {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: beet_core::prelude::SmolStr) -> Self {
         Self {
             arn: None,
             count: None,
@@ -313,18 +316,22 @@ impl crate::prelude::TerraResource for AwsLightsailStaticIpDetails {
 #[serde(rename = "port_info")]
 pub struct AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cidr_list_aliases: Option<Vec<String>>,
+    pub cidr_list_aliases: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cidrs: Option<Vec<String>>,
+    pub cidrs: Option<Vec<beet_core::prelude::SmolStr>>,
     pub from_port: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ipv6_cidrs: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub protocol: String,
+    pub ipv6_cidrs: Option<Vec<beet_core::prelude::SmolStr>>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub protocol: beet_core::prelude::SmolStr,
     pub to_port: i64,
 }
 impl AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-    pub fn new(from_port: i64, protocol: String, to_port: i64) -> Self {
+    pub fn new(
+        from_port: i64,
+        protocol: beet_core::prelude::SmolStr,
+        to_port: i64,
+    ) -> Self {
         Self {
             cidr_list_aliases: None,
             cidrs: None,
@@ -338,15 +345,19 @@ impl AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename = "add_on")]
 pub struct AwsLightsailInstanceResourceBlockTypeAddOn {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub snapshot_time: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub status: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub r#type: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub snapshot_time: beet_core::prelude::SmolStr,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub status: beet_core::prelude::SmolStr,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub r#type: beet_core::prelude::SmolStr,
 }
 impl AwsLightsailInstanceResourceBlockTypeAddOn {
-    pub fn new(snapshot_time: String, status: String, r#type: String) -> Self {
+    pub fn new(
+        snapshot_time: beet_core::prelude::SmolStr,
+        status: beet_core::prelude::SmolStr,
+        r#type: beet_core::prelude::SmolStr,
+    ) -> Self {
         Self {
             snapshot_time,
             status,

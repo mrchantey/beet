@@ -342,7 +342,9 @@ mod tests {
 
 		output.contains("impl MyStruct {").xpect_true();
 		output
-			.contains("pub fn new(name: String, count: i64) -> Self {")
+			.contains(
+				"pub fn new(name: beet_core::prelude::SmolStr, count: i64) -> Self {",
+			)
 			.xpect_true();
 		output.contains("name").xpect_true();
 		output.contains("count").xpect_true();

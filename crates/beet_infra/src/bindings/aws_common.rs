@@ -8,48 +8,48 @@ use serde_json;
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AwsIamRoleDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arn: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub assume_role_policy: String,
+    pub arn: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub assume_role_policy: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub create_date: Option<String>,
+    pub create_date: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_detach_policies: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub managed_policy_arns: Option<Vec<String>>,
+    pub managed_policy_arns: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_session_duration: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name_prefix: Option<String>,
+    pub name_prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
+    pub path: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub permissions_boundary: Option<String>,
+    pub permissions_boundary: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_all: Option<Map<String, String>>,
+    pub tags_all: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub unique_id: Option<String>,
+    pub unique_id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inline_policy: Option<Vec<AwsIamRoleResourceBlockTypeInlinePolicy>>,
 }
 impl AwsIamRoleDetails {
-    pub fn new(assume_role_policy: String) -> Self {
+    pub fn new(assume_role_policy: beet_core::prelude::SmolStr) -> Self {
         Self {
             arn: None,
             assume_role_policy,
@@ -92,20 +92,23 @@ pub struct AwsIamRolePolicyAttachmentDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub policy_arn: String,
+    pub id: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub policy_arn: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub role: String,
+    pub provider: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub role: beet_core::prelude::SmolStr,
 }
 impl AwsIamRolePolicyAttachmentDetails {
-    pub fn new(policy_arn: String, role: String) -> Self {
+    pub fn new(
+        policy_arn: beet_core::prelude::SmolStr,
+        role: beet_core::prelude::SmolStr,
+    ) -> Self {
         Self {
             count: None,
             depends_on: None,
@@ -133,54 +136,54 @@ impl crate::prelude::TerraResource for AwsIamRolePolicyAttachmentDetails {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsS3BucketDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub acceleration_status: Option<String>,
+    pub acceleration_status: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub acl: Option<String>,
+    pub acl: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arn: Option<String>,
+    pub arn: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket: Option<String>,
+    pub bucket: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket_domain_name: Option<String>,
+    pub bucket_domain_name: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket_namespace: Option<String>,
+    pub bucket_namespace: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket_prefix: Option<String>,
+    pub bucket_prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket_region: Option<String>,
+    pub bucket_region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket_regional_domain_name: Option<String>,
+    pub bucket_regional_domain_name: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub for_each: Option<Vec<String>>,
+    pub for_each: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_destroy: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hosted_zone_id: Option<String>,
+    pub hosted_zone_id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_lock_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub policy: Option<String>,
+    pub policy: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
+    pub provider: Option<beet_core::prelude::SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub request_payer: Option<String>,
+    pub request_payer: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_all: Option<Map<String, String>>,
+    pub tags_all: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub website_domain: Option<String>,
+    pub website_domain: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub website_endpoint: Option<String>,
+    pub website_endpoint: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cors_rule: Option<Vec<AwsS3BucketResourceBlockTypeCorsRule>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -221,26 +224,29 @@ impl crate::prelude::TerraResource for AwsS3BucketDetails {
 #[serde(rename = "inline_policy")]
 pub struct AwsIamRoleResourceBlockTypeInlinePolicy {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub policy: Option<String>,
+    pub policy: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename = "cors_rule")]
 pub struct AwsS3BucketResourceBlockTypeCorsRule {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_headers: Option<Vec<String>>,
+    pub allowed_headers: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub allowed_methods: Vec<String>,
+    pub allowed_methods: Vec<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub allowed_origins: Vec<String>,
+    pub allowed_origins: Vec<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expose_headers: Option<Vec<String>>,
+    pub expose_headers: Option<Vec<beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_age_seconds: Option<i64>,
 }
 impl AwsS3BucketResourceBlockTypeCorsRule {
-    pub fn new(allowed_methods: Vec<String>, allowed_origins: Vec<String>) -> Self {
+    pub fn new(
+        allowed_methods: Vec<beet_core::prelude::SmolStr>,
+        allowed_origins: Vec<beet_core::prelude::SmolStr>,
+    ) -> Self {
         Self {
             allowed_headers: None,
             allowed_methods,
@@ -254,16 +260,19 @@ impl AwsS3BucketResourceBlockTypeCorsRule {
 #[serde(rename = "grant")]
 pub struct AwsS3BucketResourceBlockTypeGrant {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub permissions: Vec<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub r#type: String,
+    pub permissions: Vec<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub r#type: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub uri: Option<String>,
+    pub uri: Option<beet_core::prelude::SmolStr>,
 }
 impl AwsS3BucketResourceBlockTypeGrant {
-    pub fn new(permissions: Vec<String>, r#type: String) -> Self {
+    pub fn new(
+        permissions: Vec<beet_core::prelude::SmolStr>,
+        r#type: beet_core::prelude::SmolStr,
+    ) -> Self {
         Self {
             id: None,
             permissions,
@@ -279,11 +288,11 @@ pub struct AwsS3BucketResourceBlockTypeLifecycleRule {
     pub abort_incomplete_multipart_upload_days: Option<i64>,
     pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
+    pub prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiration: Option<Vec<LifecycleRuleResourceBlockTypeExpiration>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -315,13 +324,13 @@ impl AwsS3BucketResourceBlockTypeLifecycleRule {
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename = "logging")]
 pub struct AwsS3BucketResourceBlockTypeLogging {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub target_bucket: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub target_bucket: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub target_prefix: Option<String>,
+    pub target_prefix: Option<beet_core::prelude::SmolStr>,
 }
 impl AwsS3BucketResourceBlockTypeLogging {
-    pub fn new(target_bucket: String) -> Self {
+    pub fn new(target_bucket: beet_core::prelude::SmolStr) -> Self {
         Self {
             target_bucket,
             target_prefix: None,
@@ -332,18 +341,18 @@ impl AwsS3BucketResourceBlockTypeLogging {
 #[serde(rename = "object_lock_configuration")]
 pub struct AwsS3BucketResourceBlockTypeObjectLockConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub object_lock_enabled: Option<String>,
+    pub object_lock_enabled: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename = "replication_configuration")]
 pub struct AwsS3BucketResourceBlockTypeReplicationConfiguration {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub role: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub role: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Vec<ReplicationConfigurationResourceBlockTypeRules>>,
 }
 impl AwsS3BucketResourceBlockTypeReplicationConfiguration {
-    pub fn new(role: String) -> Self {
+    pub fn new(role: beet_core::prelude::SmolStr) -> Self {
         Self { role, rules: None }
     }
 }
@@ -351,13 +360,13 @@ impl AwsS3BucketResourceBlockTypeReplicationConfiguration {
 #[serde(rename = "timeouts")]
 pub struct AwsS3BucketResourceBlockTypeTimeouts {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub create: Option<String>,
+    pub create: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delete: Option<String>,
+    pub delete: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub read: Option<String>,
+    pub read: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub update: Option<String>,
+    pub update: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "versioning")]
@@ -371,22 +380,22 @@ pub struct AwsS3BucketResourceBlockTypeVersioning {
 #[serde(rename = "website")]
 pub struct AwsS3BucketResourceBlockTypeWebsite {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_document: Option<String>,
+    pub error_document: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub index_document: Option<String>,
+    pub index_document: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub redirect_all_requests_to: Option<String>,
+    pub redirect_all_requests_to: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub routing_rules: Option<String>,
+    pub routing_rules: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename = "access_control_translation")]
 pub struct DestinationResourceBlockTypeAccessControlTranslation {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub owner: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub owner: beet_core::prelude::SmolStr,
 }
 impl DestinationResourceBlockTypeAccessControlTranslation {
-    pub fn new(owner: String) -> Self {
+    pub fn new(owner: beet_core::prelude::SmolStr) -> Self {
         Self { owner }
     }
 }
@@ -396,7 +405,7 @@ pub struct DestinationResourceBlockTypeMetrics {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "replication_time")]
@@ -404,13 +413,13 @@ pub struct DestinationResourceBlockTypeReplicationTime {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<beet_core::prelude::SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "expiration")]
 pub struct LifecycleRuleResourceBlockTypeExpiration {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -427,11 +436,11 @@ pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionExpiration {
 pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub storage_class: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub storage_class: beet_core::prelude::SmolStr,
 }
 impl LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
-    pub fn new(storage_class: String) -> Self {
+    pub fn new(storage_class: beet_core::prelude::SmolStr) -> Self {
         Self { days: None, storage_class }
     }
 }
@@ -439,14 +448,14 @@ impl LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
 #[serde(rename = "transition")]
 pub struct LifecycleRuleResourceBlockTypeTransition {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub storage_class: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub storage_class: beet_core::prelude::SmolStr,
 }
 impl LifecycleRuleResourceBlockTypeTransition {
-    pub fn new(storage_class: String) -> Self {
+    pub fn new(storage_class: beet_core::prelude::SmolStr) -> Self {
         Self {
             date: None,
             days: None,
@@ -458,22 +467,22 @@ impl LifecycleRuleResourceBlockTypeTransition {
 #[serde(rename = "rules")]
 pub struct ReplicationConfigurationResourceBlockTypeRules {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delete_marker_replication_status: Option<String>,
+    pub delete_marker_replication_status: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    pub id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
+    pub prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i64>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub status: String,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub status: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination: Option<Vec<RulesResourceBlockTypeDestination>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Vec<RulesResourceBlockTypeFilter>>,
 }
 impl ReplicationConfigurationResourceBlockTypeRules {
-    pub fn new(status: String) -> Self {
+    pub fn new(status: beet_core::prelude::SmolStr) -> Self {
         Self {
             delete_marker_replication_status: None,
             id: None,
@@ -489,13 +498,13 @@ impl ReplicationConfigurationResourceBlockTypeRules {
 #[serde(rename = "destination")]
 pub struct RulesResourceBlockTypeDestination {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_id: Option<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub bucket: String,
+    pub account_id: Option<beet_core::prelude::SmolStr>,
+    #[serde(skip_serializing_if = "beet_core::prelude::SmolStr::is_empty")]
+    pub bucket: beet_core::prelude::SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub replica_kms_key_id: Option<String>,
+    pub replica_kms_key_id: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_class: Option<String>,
+    pub storage_class: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_control_translation: Option<
         Vec<DestinationResourceBlockTypeAccessControlTranslation>,
@@ -506,7 +515,7 @@ pub struct RulesResourceBlockTypeDestination {
     pub replication_time: Option<Vec<DestinationResourceBlockTypeReplicationTime>>,
 }
 impl RulesResourceBlockTypeDestination {
-    pub fn new(bucket: String) -> Self {
+    pub fn new(bucket: beet_core::prelude::SmolStr) -> Self {
         Self {
             account_id: None,
             bucket,
@@ -522,7 +531,7 @@ impl RulesResourceBlockTypeDestination {
 #[serde(rename = "filter")]
 pub struct RulesResourceBlockTypeFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<String>,
+    pub prefix: Option<beet_core::prelude::SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<String, String>>,
+    pub tags: Option<Map<beet_core::prelude::SmolStr, beet_core::prelude::SmolStr>>,
 }

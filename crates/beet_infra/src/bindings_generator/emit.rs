@@ -549,7 +549,10 @@ fn quote_field_type(
 		FieldType::F32 => quote! { f32 },
 		FieldType::F64 => quote! { f64 },
 		FieldType::Char => quote! { char },
-		FieldType::Str => quote! { String },
+		FieldType::Str => {
+			let pkg_name = pkg_ext::internal_or_beet("beet_core");
+			quote! { #pkg_name::prelude::SmolStr }
+		}
 		FieldType::Bytes => {
 			let ident = Ident::new("Bytes", Span::call_site());
 			quote! { #ident }
@@ -628,7 +631,10 @@ fn format_to_type_tokens(ft: &FieldType, title_case: bool) -> TokenStream {
 		FieldType::F32 => quote! { f32 },
 		FieldType::F64 => quote! { f64 },
 		FieldType::Char => quote! { char },
-		FieldType::Str => quote! { String },
+		FieldType::Str => {
+			let pkg_name = pkg_ext::internal_or_beet("beet_core");
+			quote! { #pkg_name::prelude::SmolStr }
+		}
 		FieldType::Bytes => {
 			let ident = Ident::new("Bytes", Span::call_site());
 			quote! { #ident }
@@ -668,7 +674,10 @@ fn default_value_tokens(ft: &FieldType) -> TokenStream {
 	match ft {
 		FieldType::Option(_) => quote! { None },
 		FieldType::Seq(_) => quote! { Vec::new() },
-		FieldType::Str => quote! { String::new() },
+		FieldType::Str => {
+			let pkg_name = pkg_ext::internal_or_beet("beet_core");
+			quote! { #pkg_name::prelude::SmolStr::default() }
+		}
 		FieldType::Bool => quote! { false },
 		FieldType::I8
 		| FieldType::I16
@@ -736,7 +745,10 @@ fn provider_source_to_const(source: &str) -> String {
 fn field_serde_annotation(ft: &FieldType) -> TokenStream {
 	match ft {
 		FieldType::Str => {
-			quote! { #[serde(skip_serializing_if = "String::is_empty")] }
+			let pkg_name = pkg_ext::internal_or_beet("beet_core");
+			let skip_path =
+				format!("{}::prelude::SmolStr::is_empty", quote! { #pkg_name });
+			quote! { #[serde(skip_serializing_if = #skip_path)] }
 		}
 		FieldType::Option(_) => {
 			quote! { #[serde(skip_serializing_if = "Option::is_none")] }

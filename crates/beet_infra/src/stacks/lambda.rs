@@ -19,6 +19,7 @@ pub struct LambdaStack {
 
 
 
+
 impl LambdaStack {
 	fn region(&self) -> &str {
 		self.region.as_deref().unwrap_or(aws::region::DEFAULT)
@@ -79,4 +80,10 @@ pub trait ResourceTool {
 	fn definition(&self) -> String;
 	#[cfg(feature = "tokens")]
 	fn rust_type() -> proc_macro2::TokenStream;
+}
+
+
+#[derive(Component)]
+pub struct BucketDef {
+	label: SmolStr,
 }

@@ -18,6 +18,7 @@ pub mod bindings_generator;
 pub mod prelude {
 	pub use crate::bindings;
 	pub use crate::components::*;
+	#[allow(unused)]
 	pub use crate::stacks::*;
 	pub use crate::types::*;
 }

@@ -22,8 +22,8 @@ bindings_aws_lambda = []
 bindings_cloudflare_common = []
 
 [[bin]]
-name = "generate_common"
-path = "src/bin/generate_common.rs"
+name = "bindings"
+path = "src/bin/bindings.rs"
 required-features = ["bindings_generator"]
 
 [dependencies]
