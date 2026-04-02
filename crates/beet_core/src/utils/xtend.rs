@@ -33,8 +33,8 @@ use bevy::prelude::*;
 /// Wrapping in Result:
 ///
 /// ```
-/// # use beet_core::prelude::*;
 /// # use bevy::prelude::*;
+/// # use beet_core::prelude::*;
 /// fn compute() -> Result<i32> {
 ///     42.xok()
 /// }
@@ -50,11 +50,17 @@ use bevy::prelude::*;
 ///     .sum::<i32>();
 /// assert_eq!(value, 6);
 /// ```
-pub trait Xtend: Sized {
+#[extend::ext(name = Xtend)]
+pub impl<T: Sized> T {
 	/// Applies a function to `self` and returns the result.
 	///
 	/// Similar to [`Iterator::map`] but works on any type, enabling method chaining.
-	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
+	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O
+	where
+		Self: Sized,
+	{
+		func(self)
+	}
 
 	/// Applies a function to `&mut self` for side effects, then returns `self`.
 	///
@@ -116,7 +122,12 @@ pub trait Xtend: Sized {
 	///     7.xok()
 	/// }
 	/// ```
-	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
+	fn xok<E>(self) -> Result<Self, E>
+	where
+		Self: Sized,
+	{
+		Ok(self)
+	}
 
 	/// Wraps `self` in [`Err`].
 	///
@@ -129,7 +140,12 @@ pub trait Xtend: Sized {
 	///     "error".xerr()
 	/// }
 	/// ```
-	fn xerr<T>(self) -> Result<T, Self> { Err(self) }
+	fn xerr<V>(self) -> Result<V, Self>
+	where
+		Self: Sized,
+	{
+		Err(self)
+	}
 
 	/// Wraps `self` in [`Some`].
 	///
@@ -139,9 +155,18 @@ pub trait Xtend: Sized {
 	/// # use beet_core::prelude::*;
 	/// assert_eq!("foo".xsome(), Some("foo"));
 	/// ```
-	fn xsome(self) -> Option<Self> { Some(self) }
+	fn xsome(self) -> Option<Self>
+	where
+		Self: Sized,
+	{
+		Some(self)
+	}
+
 	/// Wraps `self` in a `Vec`.
-	fn xvec(self) -> Vec<Self> {
+	fn xvec(self) -> Vec<Self>
+	where
+		Self: Sized,
+	{
 		let mut vec = Vec::with_capacity(1);
 		vec.push(self);
 		vec
@@ -155,7 +180,12 @@ pub trait Xtend: Sized {
 	/// # use beet_core::prelude::*;
 	/// assert_eq!(7_u32.xinto::<u64>(), 7);
 	/// ```
-	fn xinto<T: From<Self>>(self) -> T { T::from(self) }
+	fn xinto<U: From<Self>>(self) -> U
+	where
+		Self: Sized,
+	{
+		U::from(self)
+	}
 
 	/// Returns a pretty-printed `Debug` representation.
 	fn xfmt(&self) -> String
@@ -182,16 +212,14 @@ pub trait Xtend: Sized {
 	}
 }
 
-impl<T: Sized> Xtend for T {}
-
-
 /// Iterator-like operations that collect immediately into a [`Vec`].
 ///
 /// These methods combine iteration and collection into single operations
 /// for more concise code when you need a collected result anyway.
-pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
+#[extend::ext(name = XtendIter)]
+pub impl<T, I: IntoIterator<Item = T>> I {
 	/// Adds the provided item to the end of the iterator,
-	/// using std::iter::once, returning another iterator
+	/// using std::iter::once, returning another iterator.
 	fn xpush(self, item: T) -> impl IntoIterator<Item = T> {
 		self.into_iter().chain(std::iter::once(item))
 	}
@@ -218,7 +246,7 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		Ok(out)
 	}
 
-	/// like map but async
+	/// Like map but async.
 	fn xmap_async<O, E>(
 		self,
 		mut func: impl AsyncFnMut(T) -> Result<O, E>,
@@ -250,7 +278,6 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 		}
 		Ok(out)
 	}
-
 
 	/// Filter-maps each item with a fallible function, short-circuiting on error.
 	fn xtry_filter_map<O, E>(
@@ -297,7 +324,7 @@ pub trait XtendIter<T>: Sized + IntoIterator<Item = T> {
 }
 
 /// Extension methods for boolean values.
-#[extend::ext(name=XtendBool)]
+#[extend::ext(name = XtendBool)]
 pub impl bool {
 	/// Runs the function if `self` is true, returning `Some(result)`.
 	fn xmap_true<O>(&self, func: impl FnOnce() -> O) -> Option<O> {
@@ -310,27 +337,16 @@ pub impl bool {
 	}
 }
 
-impl<T: Sized, I: IntoIterator<Item = T>> XtendIter<T> for I {}
-
-
 /// Chainable operations for vectors.
-pub trait XtendVec<T> {
+#[extend::ext(name = XtendVec)]
+pub impl<T, T2: AsMut<Vec<T>>> T2 {
 	/// Extends `self` with items from an iterator and returns `self`.
-	fn xtend<I: IntoIterator<Item = T>>(self, iter: I) -> Self;
-
-	/// Pushes an item and returns `self`.
-	fn xpush(self, item: T) -> Self;
-}
-
-impl<T, T2> XtendVec<T> for T2
-where
-	T2: AsMut<Vec<T>>,
-{
 	fn xtend<I: IntoIterator<Item = T>>(mut self, iter: I) -> Self {
 		self.as_mut().extend(iter);
 		self
 	}
 
+	/// Pushes an item and returns `self`.
 	fn xpush(mut self, item: T) -> Self {
 		self.as_mut().push(item);
 		self
@@ -338,15 +354,9 @@ where
 }
 
 /// Chainable operations for strings.
-pub trait XtendString {
+#[extend::ext(name = XtendString)]
+pub impl<T: Into<String>> T {
 	/// Appends a string and returns `self`.
-	fn xtend(self, item: impl AsRef<str>) -> String;
-}
-
-impl<T> XtendString for T
-where
-	T: Into<String>,
-{
 	fn xtend(self, item: impl AsRef<str>) -> String {
 		let mut this = self.into();
 		this.push_str(item.as_ref());
@@ -354,13 +364,16 @@ where
 	}
 }
 
-
 /// Extension trait for types that can be converted into an iterator.
+///
+/// Uses a marker type `M` to allow two blanket impls to coexist: one for
+/// existing iterators and one for wrapping a single value.
 pub trait XIntoIterator<M, T> {
 	/// Converts `self` into an iterator of items of type `T`.
 	fn xinto_iter(self) -> impl Iterator<Item = T>;
 }
-/// Marker type for the `IntoIterator` implementation of `XIntoIterator`.
+
+/// Marker type for the [`IntoIterator`] implementation of [`XIntoIterator`].
 pub struct IteratorIntoIteratorMarker;
 
 impl<T, I> XIntoIterator<IteratorIntoIteratorMarker, T> for I

@@ -30,7 +30,6 @@ required-features = ["bindings_generator"]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
 serde.workspace = true
-smol_str.workspace = true
 serde_json.workspace = true
 heck.workspace = true
 async-process = { workspace = true }

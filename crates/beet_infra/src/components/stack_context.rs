@@ -12,20 +12,38 @@ pub struct StackContext {
 	/// Additional parameters, some of which
 	/// may be required by a config generator
 	params: MultiMap<String, String>,
+	/// Name of the production stage, which often receives
+	/// special treatment like bucket locking and no subdomain.
+	prod_stage: SmolStr,
 }
 
 impl Default for StackContext {
 	fn default() -> Self {
 		Self {
-			app_name: env!("CARGO_PKG_NAME").into(),
+			app_name: std::env::var("CARGO_PKG_NAME").unwrap().into(),
 			stage: "dev".into(),
+			prod_stage: "prod".into(),
 			params: default(),
 		}
 	}
 }
 impl StackContext {
-	pub fn is_production(&self) -> bool {
-		self.stage == "prod" || self.stage == "production"
+	pub fn is_production(&self) -> bool { self.stage == self.prod_stage }
+
+	pub fn bucket_slug(&self, key: impl Into<SmolStr>) -> Slug {
+		self.resource_slug("buckets", key)
+	}
+	pub fn resource_slug(
+		&self,
+		resource_kind: impl Into<SmolStr>,
+		key: impl Into<SmolStr>,
+	) -> Slug {
+		Slug::new(vec![
+			self.app_name.clone(),
+			self.stage.clone(),
+			resource_kind.into(),
+			key.into(),
+		])
 	}
 }
 

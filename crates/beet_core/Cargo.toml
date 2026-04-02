@@ -48,6 +48,7 @@ serde = [
 	"dep:serde",
 	"dep:ron",
 	"dep:serde_urlencoded",
+	"smol_str/serde"
 ]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 
@@ -81,6 +82,8 @@ send_wrapper.workspace = true
 web-time.workspace = true
 dotenv.workspace = true
 nu-ansi-term = { workspace = true, optional = true }
+smol_str = { workspace = true }
+heck.workspace = true
 
 #💡 http
 http = {workspace = true,optional=true}
@@ -98,7 +101,6 @@ serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 
-heck.workspace = true
 
 #💡 async
 futures-lite = { workspace = true, features = ["race"] }

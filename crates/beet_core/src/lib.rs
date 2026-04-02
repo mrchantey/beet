@@ -189,6 +189,7 @@ pub mod prelude {
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
 	pub use futures_lite::StreamExt;
+	pub use smol_str::SmolStr;
 	pub use web_time::Duration;
 	pub use web_time::Instant;
 	pub use web_time::SystemTime;

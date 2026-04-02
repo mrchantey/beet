@@ -20,5 +20,4 @@ pub mod prelude {
 	pub use crate::components::*;
 	pub use crate::stacks::*;
 	pub use crate::types::*;
-	pub(crate) use smol_str::SmolStr;
 }

@@ -1122,6 +1122,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "smol_str",
  "syn",
  "thiserror 2.0.18",
  "tracing",
@@ -1168,7 +1169,6 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "smol_str",
  "syn",
 ]
 
