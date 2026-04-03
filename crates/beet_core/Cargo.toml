@@ -39,11 +39,11 @@ testing = ["ansi_paint"]
 http = ["dep:http"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
-bevy_default = ["bevy_scene", "multi_threaded"]
+bevy_default = ["bevy_scene", "bevy_multithreaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_keyboard = ["bevy/keyboard", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
-multi_threaded = ["bevy/multi_threaded"]
+bevy_multithreaded = ["bevy/multi_threaded"]
 serde = [
 	"bevy/serialize",
 	"dep:serde",

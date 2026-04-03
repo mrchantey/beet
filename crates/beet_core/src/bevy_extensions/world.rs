@@ -8,7 +8,7 @@ use bevy::ecs::error::ErrorContext;
 use bevy::ecs::message::MessageCursor;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
-#[cfg(feature = "multi_threaded")]
+#[cfg(feature = "bevy_multithreaded")]
 use bevy::ecs::schedule::ExecutorKind;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::SystemState;
@@ -72,11 +72,11 @@ pub impl World {
 
 	/// The world equivalent of [`App::update`].
 	///
-	/// In multi_threaded mode, this temporarily sets all schedules to use
+	/// In bevy_multithreaded mode, this temporarily sets all schedules to use
 	/// single-threaded execution to avoid deadlocks when called from within
 	/// async tasks on IoTaskPool.
 	fn update_local(&mut self) {
-		#[cfg(feature = "multi_threaded")]
+		#[cfg(feature = "bevy_multithreaded")]
 		{
 			// Temporarily force single-threaded execution for all schedules
 			// to avoid deadlock when called from within a spawn_local task.
@@ -84,7 +84,7 @@ pub impl World {
 			self.run_schedule(Main);
 			self.clear_trackers();
 		}
-		#[cfg(not(feature = "multi_threaded"))]
+		#[cfg(not(feature = "bevy_multithreaded"))]
 		{
 			self.run_schedule(Main);
 			self.clear_trackers();
@@ -95,7 +95,7 @@ pub impl World {
 	///
 	/// This is necessary when running schedules from within async tasks
 	/// to avoid deadlocks with bevy's parallel schedule executor.
-	#[cfg(feature = "multi_threaded")]
+	#[cfg(feature = "bevy_multithreaded")]
 	fn force_single_threaded_schedules(&mut self) {
 		self.resource_scope(|_world, mut schedules: Mut<Schedules>| {
 			for (_label, schedule) in schedules.iter_mut() {

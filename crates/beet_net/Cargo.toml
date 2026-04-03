@@ -70,6 +70,7 @@ rustls-tls = [
 	"dep:futures-rustls",
 	"dep:webpki-roots",
 ]
+bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 
 [dependencies]

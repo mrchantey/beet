@@ -34,10 +34,10 @@ pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
 pub type LifetimeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
-/// A BoxedFuture which is `Send` on non-wasm32 targets with multi_threaded enabled
+/// A BoxedFuture which is `Send` on non-wasm32 targets with bevy_multithreaded enabled
 #[cfg(target_arch = "wasm32")]
 pub type MaybeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
-/// A BoxedFuture which is `Send` on non-wasm32 targets with multi_threaded enabled
+/// A BoxedFuture which is `Send` on non-wasm32 targets with bevy_multithreaded enabled
 #[cfg(not(target_arch = "wasm32"))]
 pub type MaybeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;

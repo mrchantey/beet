@@ -551,6 +551,7 @@ impl Config {
 	/// Write the config to a temporary directory and run `tofu validate`.
 	///
 	/// Returns the JSON output of `tofu validate -json` on success.
+	#[cfg(not(target_arch = "wasm32"))]
 	pub async fn validate(&self) -> Result<String> {
 		if !self.validation_errors.is_empty() {
 			let messages = self
@@ -598,6 +599,7 @@ impl Config {
 	///
 	/// Convenience wrapper combining [`export_to_file`] and [`validate`] that
 	/// operates on the given path rather than a temp directory.
+	#[cfg(not(target_arch = "wasm32"))]
 	pub async fn export_and_validate(
 		&self,
 		path: impl AsRef<Path>,

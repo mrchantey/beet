@@ -45,45 +45,48 @@ use std::panic::Location;
 
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 pub type MaybeSendWrapper<T> = send_wrapper::SendWrapper<T>;
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 pub type MaybeSendWrapper<T> = T;
 
 /// Wraps a value in [`MaybeSendWrapper`].
 pub fn maybe_send_wrapper<T>(value: T) -> MaybeSendWrapper<T> {
-	#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+	#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 	{
 		send_wrapper::SendWrapper::new(value)
 	}
-	#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+	#[cfg(not(all(
+		feature = "bevy_multithreaded",
+		not(target_arch = "wasm32")
+	)))]
 	{
 		value
 	}
 }
 
 /// Marker trait for types that are `Send` in multi-threaded environments.
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 pub trait MaybeSend: Send {}
 /// Marker trait for types that are `Send` in multi-threaded environments.
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 pub trait MaybeSend {}
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 impl<T> MaybeSend for T where T: Send {}
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 impl<T> MaybeSend for T {}
 
 /// Marker trait for types that are `Sync` in multi-threaded environments.
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 pub trait MaybeSync: Sync {}
 /// Marker trait for types that are `Sync` in multi-threaded environments.
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 pub trait MaybeSync {}
-#[cfg(all(feature = "multi_threaded", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
 impl<T> MaybeSync for T where T: Sync {}
-#[cfg(not(all(feature = "multi_threaded", not(target_arch = "wasm32"))))]
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 impl<T> MaybeSync for T {}
 
 

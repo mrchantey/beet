@@ -35,12 +35,15 @@ beet_router = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 heck.workspace = true
-async-process = { workspace = true }
+
 thiserror = { workspace = true }
 proc-macro2 = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 syn = { workspace = true, optional = true }
 prettyplease = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-process = { workspace = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
