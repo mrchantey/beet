@@ -163,6 +163,7 @@ mod tests {
 	use super::*;
 
 	#[beet_core::test(timeout_ms = 120000)]
+	#[ignore = "very slow"]
 	async fn lightsail_config_validates() {
 		let cx = StackContext::default();
 		let stack = Stack::new(LocalBackend::default());

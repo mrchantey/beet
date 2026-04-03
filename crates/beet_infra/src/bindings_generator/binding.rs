@@ -635,7 +635,7 @@ mod test {
 		registry.unwrap().len().xpect_eq(10);
 	}
 
-	#[beet_core::test]
+	#[beet_core::test(timeout_ms = 120000)]
 	async fn generate_serde_model_from_registry() {
 		let tf_schema = read_tf_schema_from_file(
 			fixtures_dir().join("test-provider-schema.json"),

@@ -1,6 +1,11 @@
+//!
+//!
+//! ```sh
+//! cargo run --example persistent_chat --features=thread,bevy_scene
+//! ```
 use beet::prelude::*;
 
-const ASSET_PATH: &str = "examples/assets/persistent_chat.json";
+const SCENE_PATH: &str = "examples/thread/persistent_chat.json";
 
 fn main() {
 	env_ext::load_dotenv();
@@ -16,7 +21,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-	let asset_path = WsPathBuf::new(ASSET_PATH);
+	let asset_path = WsPathBuf::new(SCENE_PATH);
 
 	if CliArgs::parse_env().params.contains_key("clear") {
 		fs_ext::remove(asset_path.into_abs()).ok();
@@ -48,7 +53,7 @@ fn setup(mut commands: Commands) {
 					)]),
 					(
 						Actor::new("Agent", ActorKind::Agent),
-						OpenAiProvider::gpt_5_mini().unwrap()
+						OllamaProvider::qwen()
 					),
 					// save after user post
 					SaveScene,
@@ -71,6 +76,6 @@ struct Root;
 #[derive(Component)]
 fn SaveScene(_: SystemToolIn, world: &mut World) -> Result<Outcome> {
 	let json = SceneSaver::new(world).save_json()?;
-	fs_ext::write(WsPathBuf::new(ASSET_PATH).into_abs(), json)?;
+	fs_ext::write(WsPathBuf::new(SCENE_PATH).into_abs(), json)?;
 	Ok(PASS)
 }

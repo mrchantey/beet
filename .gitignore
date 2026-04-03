@@ -3,6 +3,7 @@ agent/reference*
 agent/plan.md
 agent/plan2.md
 
+examples/thread/persistent_chat.json
 
 !examples/assets
 Cargo.toml.full
