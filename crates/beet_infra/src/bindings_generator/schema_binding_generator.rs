@@ -157,18 +157,38 @@ impl SchemaBindingGenerator {
 	}
 
 	/// Run the full generation pipeline.
+	///
+	/// Caches `providers.tf.json` and reuses `schema.json` when the provider
+	/// configuration has not changed, skipping the slow `tofu init` and
+	/// `tofu providers schema` steps.
 	pub async fn generate(&self) -> Result {
-		// 1. Prepare the working directory.
-		self.prepare_work_dir()?;
+		let new_content = self.build_providers_tf_content()?;
+		let providers_path = self.work_dir.join("providers.tf.json");
+		let schema_path = self.work_dir.join("schema.json");
 
-		// 2. Write providers.tf.json
-		self.write_providers_tf()?;
+		let can_reuse = providers_path.exists()
+			&& schema_path.exists()
+			&& fs_ext::read(&providers_path)
+				.map(|existing| existing == new_content)
+				.unwrap_or(false);
 
-		// 3. tofu init
-		self.run_tofu_init().await?;
+		if can_reuse {
+			cross_log!(
+				"[schema_binding_generator] providers unchanged, reusing existing schema"
+			);
+		} else {
+			// 1. Prepare the working directory.
+			self.prepare_work_dir()?;
 
-		// 4. tofu providers schema -json > schema.json
-		let schema_path = self.run_tofu_schema().await?;
+			// 2. Write providers.tf.json
+			self.write_providers_tf_bytes(&new_content)?;
+
+			// 3. tofu init
+			self.run_tofu_init().await?;
+
+			// 4. tofu providers schema -json > schema.json
+			self.run_tofu_schema().await?;
+		}
 
 		// 5. For each provider target, generate bindings with appropriate filter.
 		self.generate_bindings(&schema_path)?;
@@ -198,7 +218,8 @@ impl SchemaBindingGenerator {
 		Ok(())
 	}
 
-	fn write_providers_tf(&self) -> Result {
+	/// Build the serialized `providers.tf.json` content as bytes.
+	fn build_providers_tf_content(&self) -> Result<Vec<u8>> {
 		let mut required_providers = serde_json::Map::new();
 
 		for file in &self.files {
@@ -224,12 +245,16 @@ impl SchemaBindingGenerator {
 			}
 		});
 
-		let path = self.work_dir.join("providers.tf.json");
 		let mut buf = Vec::new();
 		serde_json::to_writer_pretty(&mut buf, &tf_json)?;
 		buf.write_all(b"\n")?;
-		fs_ext::write(&path, &buf)?;
+		Ok(buf)
+	}
 
+	/// Write pre-built providers content to `providers.tf.json`.
+	fn write_providers_tf_bytes(&self, content: &[u8]) -> Result {
+		let path = self.work_dir.join("providers.tf.json");
+		fs_ext::write(&path, content)?;
 		cross_log!("[schema_binding_generator] wrote {}", path.display());
 		Ok(())
 	}

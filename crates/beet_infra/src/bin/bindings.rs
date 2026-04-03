@@ -23,6 +23,10 @@ async fn main() -> Result {
 				]),
 		)
 		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_dns.rs")
+				.with_resources(terra::Provider::AWS, ["aws_route53_record"]),
+		)
+		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_lambda.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_api_gateway_rest_api",

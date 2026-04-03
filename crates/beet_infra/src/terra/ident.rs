@@ -35,6 +35,11 @@ where
 		let resource_type = self.resource.resource_type();
 		format!("{}.{}.{}", resource_type, label, field_name)
 	}
+
+	/// The terraform syntax for referencing a resource field in an interpolated string
+	pub fn field_ref(&self, field_name: &str) -> String {
+		format!("${{{}}}", self.field(field_name))
+	}
 }
 
 /// All the components used to construct various resource identifiers.

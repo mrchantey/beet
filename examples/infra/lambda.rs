@@ -20,13 +20,13 @@ async fn main() -> Result {
 	// -----------------------------------------------------------------
 
 	let assets_bucket = AwsS3BucketDetails {
-		bucket: Some(format!("{prefix}--assets")),
+		bucket: Some(format!("{prefix}--assets").into()),
 		force_destroy: Some(true),
 		..Default::default()
 	};
 
 	let html_bucket = AwsS3BucketDetails {
-		bucket: Some(format!("{prefix}--html")),
+		bucket: Some(format!("{prefix}--html").into()),
 		force_destroy: Some(true),
 		..Default::default()
 	};
@@ -45,8 +45,8 @@ async fn main() -> Result {
 	});
 
 	let mut lambda_role =
-		AwsIamRoleDetails::new(assume_role_policy.to_string());
-	lambda_role.name = Some(format!("{prefix}--lambda-role"));
+		AwsIamRoleDetails::new(assume_role_policy.to_string().into());
+	lambda_role.name = Some(format!("{prefix}--lambda-role").into());
 
 	let lambda_basic_policy = AwsIamRolePolicyAttachmentDetails::new(
 		"arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -59,7 +59,7 @@ async fn main() -> Result {
 	// -----------------------------------------------------------------
 
 	let mut router = AwsLambdaFunctionDetails::new(
-		format!("{prefix}--router"),
+		format!("{prefix}--router").into(),
 		"${aws_iam_role.lambda_role.arn}".into(),
 	);
 	router.runtime = Some("provided.al2023".into());
@@ -67,7 +67,7 @@ async fn main() -> Result {
 	router.filename = Some("lambda.zip".into());
 	router.timeout = Some(180);
 	router.memory_size = Some(1024);
-	router.source_code_hash = Some(String::new());
+	router.source_code_hash = Some(default());
 
 	let router_url = AwsLambdaFunctionUrlDetails::new(
 		"NONE".into(),
@@ -79,7 +79,7 @@ async fn main() -> Result {
 	// -----------------------------------------------------------------
 
 	let gateway = AwsApigatewayv2ApiDetails::new(
-		format!("{prefix}--gateway"),
+		format!("{prefix}--gateway").into(),
 		"HTTP".into(),
 	);
 
@@ -123,7 +123,7 @@ async fn main() -> Result {
 	// -----------------------------------------------------------------
 
 	let mut dns_record = CloudflareDnsRecordDetails::new(
-		format!("{stage}.beetstack.dev"),
+		format!("{stage}.beetstack.dev").into(),
 		1, // TTL=1 means "automatic" in Cloudflare
 		"CNAME".into(),
 		"CLOUDFLARE_ZONE_ID".into(), // replace at deploy time / use a variable
@@ -136,30 +136,30 @@ async fn main() -> Result {
 	// Assemble the config
 	// -----------------------------------------------------------------
 
-	let exporter = TerraConfig::new()
-		.with_resource("assets", &assets_bucket)
-		.with_resource("html", &html_bucket)
-		.with_resource("lambda_role", &lambda_role)
-		.with_resource("lambda_basic", &lambda_basic_policy)
-		.with_resource("router", &router)
-		.with_resource("router_url", &router_url)
-		.with_resource("gateway", &gateway)
-		.with_resource("lambda_integration", &lambda_integration)
-		.with_resource("default_route", &default_route)
-		.with_resource("default_stage", &default_stage)
-		.with_resource("apigw_lambda", &apigw_permission)
-		.with_resource("domain", &dns_record)
-		.with_output("api_endpoint", Output {
+	let exporter = terra::Config::new()
+		.with_labeled_resource("assets", &assets_bucket)
+		.with_labeled_resource("html", &html_bucket)
+		.with_labeled_resource("lambda_role", &lambda_role)
+		.with_labeled_resource("lambda_basic", &lambda_basic_policy)
+		.with_labeled_resource("router", &router)
+		.with_labeled_resource("router_url", &router_url)
+		.with_labeled_resource("gateway", &gateway)
+		.with_labeled_resource("lambda_integration", &lambda_integration)
+		.with_labeled_resource("default_route", &default_route)
+		.with_labeled_resource("default_stage", &default_stage)
+		.with_labeled_resource("apigw_lambda", &apigw_permission)
+		.with_labeled_resource("domain", &dns_record)
+		.with_output("api_endpoint", terra::Output {
 			value: json!("${aws_apigatewayv2_api.gateway.api_endpoint}"),
 			description: Some("The API Gateway endpoint URL".into()),
 			sensitive: None,
 		})
-		.with_output("function_url", Output {
+		.with_output("function_url", terra::Output {
 			value: json!("${aws_lambda_function_url.router_url.function_url}"),
 			description: Some("The Lambda function URL".into()),
 			sensitive: None,
 		})
-		.with_output("assets_bucket", Output {
+		.with_output("assets_bucket", terra::Output {
 			value: json!("${aws_s3_bucket.assets.bucket}"),
 			description: Some("The S3 assets bucket name".into()),
 			sensitive: None,

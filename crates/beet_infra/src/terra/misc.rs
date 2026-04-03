@@ -9,6 +9,12 @@ use beet_core::prelude::*;
 use serde_json::Value;
 use std::borrow::Cow;
 
+/// Wraps a terraform resource field path in interpolation syntax,
+/// ie `${aws_s3_bucket.my_bucket.arn}`
+pub fn tf_ref(field_path: &str) -> SmolStr {
+	format!("${{{field_path}}}").into()
+}
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------

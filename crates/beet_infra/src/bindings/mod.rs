@@ -11,6 +11,10 @@ pub use aws_lambda::*;
 mod aws_lightsail;
 #[cfg(feature = "bindings_aws_lightsail")]
 pub use aws_lightsail::*;
+#[cfg(feature = "bindings_aws_dns")]
+mod aws_dns;
+#[cfg(feature = "bindings_aws_dns")]
+pub use aws_dns::*;
 #[cfg(feature = "bindings_cloudflare_common")]
 mod cloudflare_common;
 #[cfg(feature = "bindings_cloudflare_common")]

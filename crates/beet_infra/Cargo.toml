@@ -13,10 +13,11 @@ repository.workspace = true
 default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-stack_lambda = ["bindings_aws_common","bindings_aws_lambda","bindings_cloudflare_common"]
+stack_lambda = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
 stack_lambda_rt = ["beet_net/aws"]
 stack_lightsail = ["bindings_aws_lightsail"]
 bindings_aws_common = []
+bindings_aws_dns = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_cloudflare_common = []
@@ -42,6 +43,7 @@ prettyplease = { workspace = true, optional = true }
 beet_core = { workspace = true, features = ["testing"] }
 beet_infra = { path = ".", features = [
 	"bindings_generator",
+	"bindings_aws_dns",
 	"stack_lambda",
 	"stack_lightsail",
 ] }
