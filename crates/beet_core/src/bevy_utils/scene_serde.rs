@@ -259,6 +259,7 @@ mod test {
 	fn scene_world() -> App {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
+		app.register_type::<Name>();
 		app.init();
 		app.update();
 		app

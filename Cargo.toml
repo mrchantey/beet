@@ -237,13 +237,13 @@ json = ["serde", "beet_core/json", "beet_net?/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 testing = ["beet_core/testing"]
 fs = ["beet_core/fs","beet_net?/fs"]
-bevy_scene = ["beet_core/bevy_scene"]
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default"
 ]
+bevy_scene = ["beet_core/bevy_scene"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
-
+bevy_keyboard = ["beet_core/bevy_keyboard"]
 
 # 💡 Net
 

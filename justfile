@@ -185,18 +185,22 @@ test-core *args:
 		-p beet_core_shared \
 		-p beet_core_macros \
 		-p beet_core 				\
+		-p beet_infra 			\
+		-p beet_net 				\
 		-p beet_node 				\
-		-p beet_tool 				\
 		-p beet_router 			\
-		--all-features {{ args }} -- {{ test-threads }}
-	cargo test	-p beet_net 				\
+		-p beet_thread 			\
+		-p beet_tool 				\
 		--all-features {{ args }} -- {{ test-threads }}
 	cargo test						\
 		-p beet_core  			\
 		-p beet_net  				\
+		-p beet_infra 			\
+		-p beet_net 				\
 		-p beet_node 				\
-		-p beet_tool 				\
 		-p beet_router 			\
+		-p beet_thread 			\
+		-p beet_tool 				\
 		--lib --target wasm32-unknown-unknown  \
 		--all-features  {{ args }} -- {{ test-threads }}
 # -p beet_tool 				\

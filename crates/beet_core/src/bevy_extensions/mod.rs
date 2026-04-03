@@ -28,6 +28,7 @@ mod app_exit;
 mod commands;
 mod entity;
 mod hierarchy;
+#[cfg(feature = "bevy_keyboard")]
 mod key;
 mod plugin;
 mod pose;
@@ -43,6 +44,7 @@ pub use app_exit::*;
 pub use commands::*;
 pub use entity::*;
 pub use hierarchy::*;
+#[cfg(feature = "bevy_keyboard")]
 pub use key::*;
 pub use plugin::*;
 pub use pose::*;

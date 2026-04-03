@@ -41,6 +41,7 @@ json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
 bevy_default = ["bevy_scene", "multi_threaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
+bevy_keyboard = ["bevy/keyboard", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 multi_threaded = ["bevy/multi_threaded"]
 serde = [
