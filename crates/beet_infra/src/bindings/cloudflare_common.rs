@@ -100,16 +100,16 @@ impl CloudflareDnsRecordDetails {
         }
     }
 }
-impl TerraJson for CloudflareDnsRecordDetails {
+impl terra::ToJson for CloudflareDnsRecordDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for CloudflareDnsRecordDetails {
+impl terra::Resource for CloudflareDnsRecordDetails {
     fn resource_type(&self) -> &'static str {
         "cloudflare_dns_record"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::CLOUDFLARE
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::CLOUDFLARE
     }
 }

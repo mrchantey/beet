@@ -99,17 +99,17 @@ impl AwsLightsailInstanceDetails {
         }
     }
 }
-impl TerraJson for AwsLightsailInstanceDetails {
+impl terra::ToJson for AwsLightsailInstanceDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLightsailInstanceDetails {
+impl terra::Resource for AwsLightsailInstanceDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_instance"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -146,17 +146,17 @@ impl AwsLightsailInstancePublicPortsDetails {
         }
     }
 }
-impl TerraJson for AwsLightsailInstancePublicPortsDetails {
+impl terra::ToJson for AwsLightsailInstancePublicPortsDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLightsailInstancePublicPortsDetails {
+impl terra::Resource for AwsLightsailInstancePublicPortsDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_instance_public_ports"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -197,17 +197,17 @@ pub struct AwsLightsailKeyPairDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags_all: Option<Map<SmolStr, SmolStr>>,
 }
-impl TerraJson for AwsLightsailKeyPairDetails {
+impl terra::ToJson for AwsLightsailKeyPairDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLightsailKeyPairDetails {
+impl terra::Resource for AwsLightsailKeyPairDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_key_pair"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -247,17 +247,17 @@ impl AwsLightsailStaticIpAttachmentDetails {
         }
     }
 }
-impl TerraJson for AwsLightsailStaticIpAttachmentDetails {
+impl terra::ToJson for AwsLightsailStaticIpAttachmentDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLightsailStaticIpAttachmentDetails {
+impl terra::Resource for AwsLightsailStaticIpAttachmentDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_static_ip_attachment"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -300,17 +300,17 @@ impl AwsLightsailStaticIpDetails {
         }
     }
 }
-impl TerraJson for AwsLightsailStaticIpDetails {
+impl terra::ToJson for AwsLightsailStaticIpDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLightsailStaticIpDetails {
+impl terra::Resource for AwsLightsailStaticIpDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lightsail_static_ip"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]

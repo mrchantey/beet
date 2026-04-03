@@ -33,13 +33,13 @@ pub struct CodeGeneratorConfig {
 	/// at least one required field.  Optional fields are initialised to their
 	/// natural defaults (`None`, `Vec::new()`, etc.).
 	pub(crate) generate_builders: bool,
-	/// When `true`, emit `TerraResource` and `TerraJson` trait
+	/// When `true`, emit `terra::Resource` and `terra::ToJson` trait
 	/// implementations for each resource struct listed in `resource_meta`.
 	pub(crate) generate_trait_impls: bool,
 	/// Metadata about generated resource types — used to emit trait impls
 	/// and builder constructors with the correct resource-type / provider
 	/// information.
-	pub(crate) resource_meta: Vec<ResourceMeta>,
+	pub(crate) resource_meta: Vec<terra::ResourceMeta>,
 }
 
 /// Track types definitions provided by external modules.
@@ -169,7 +169,7 @@ impl CodeGeneratorConfig {
 		self
 	}
 
-	/// Enable or disable `TerraResource` / `TerraJson` trait impl generation.
+	/// Enable or disable `terra::Resource` / `terra::ToJson` trait impl generation.
 	/// Requires [`resource_meta`](Self::with_resource_meta) to be populated.
 	pub fn with_generate_trait_impls(mut self, enabled: bool) -> Self {
 		self.generate_trait_impls = enabled;
@@ -178,7 +178,7 @@ impl CodeGeneratorConfig {
 
 	/// Provide metadata about generated resource types so the emitter can
 	/// produce trait implementations and correctly-typed constructors.
-	pub fn with_resource_meta(mut self, meta: Vec<ResourceMeta>) -> Self {
+	pub fn with_resource_meta(mut self, meta: Vec<terra::ResourceMeta>) -> Self {
 		self.resource_meta = meta;
 		self
 	}

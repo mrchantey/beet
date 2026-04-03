@@ -52,7 +52,7 @@ impl StackContext {
 }
 
 pub trait ToTerraConfig {
-	fn to_terra_config(&self, cx: &StackContext) -> Result<TerraConfig>;
+	fn to_terra_config(&self, cx: &StackContext) -> Result<terra::Config>;
 }
 
 /// Resource identifier, usually comprised of a tuple of strings,

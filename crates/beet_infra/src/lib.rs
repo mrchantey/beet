@@ -4,13 +4,13 @@
 //!
 //! This crate provides typed Rust bindings for Terraform/OpenTofu
 //! configuration, including:
-//! - [`terra_config`] for building and exporting JSON configurations
+//! - [`terra`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
-//! - [`common_resources`] for pre-generated bindings of commonly used providers
+//! - [`bindings`] for pre-generated bindings of commonly used providers
 pub mod bindings;
 mod components;
 mod stacks;
-mod types;
+pub mod terra;
 
 #[cfg(feature = "bindings_generator")]
 pub mod bindings_generator;
@@ -20,5 +20,5 @@ pub mod prelude {
 	pub use crate::components::*;
 	#[allow(unused)]
 	pub use crate::stacks::*;
-	pub use crate::types::*;
+	pub use crate::terra;
 }

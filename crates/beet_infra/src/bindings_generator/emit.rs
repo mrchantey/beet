@@ -504,15 +504,15 @@ impl<'a> CodeGenerator<'a> {
 		let provider_ident = Ident::new(&provider_const, Span::call_site());
 
 		quote! {
-			impl TerraJson for #struct_ident {
+			impl terra::ToJson for #struct_ident {
 				fn to_json(&self) -> serde_json::Value {
 					serde_json::to_value(self).expect("serialization should not fail")
 				}
 			}
 
-			impl TerraResource for #struct_ident {
+			impl terra::Resource for #struct_ident {
 				fn resource_type(&self) -> &'static str { #resource_type_str }
-				fn provider(&self) -> &'static TerraProvider { &TerraProvider::#provider_ident }
+				fn provider(&self) -> &'static terra::Provider { &terra::Provider::#provider_ident }
 			}
 		}
 	}
@@ -735,7 +735,7 @@ fn resolve_struct_name(
 	rename_type(state, &raw)
 }
 
-/// Map a provider source string to the `TerraProvider` constant name.
+/// Map a provider source string to the `terra::Provider` constant name.
 fn provider_source_to_const(source: &str) -> String {
 	let provider_name = source.split('/').last().unwrap_or("unknown");
 	provider_name.to_uppercase()

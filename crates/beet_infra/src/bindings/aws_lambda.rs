@@ -93,17 +93,17 @@ impl AwsApiGatewayRestApiDetails {
         }
     }
 }
-impl TerraJson for AwsApiGatewayRestApiDetails {
+impl terra::ToJson for AwsApiGatewayRestApiDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsApiGatewayRestApiDetails {
+impl terra::Resource for AwsApiGatewayRestApiDetails {
     fn resource_type(&self) -> &'static str {
         "aws_api_gateway_rest_api"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -193,17 +193,17 @@ impl AwsApigatewayv2ApiDetails {
         }
     }
 }
-impl TerraJson for AwsApigatewayv2ApiDetails {
+impl terra::ToJson for AwsApigatewayv2ApiDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsApigatewayv2ApiDetails {
+impl terra::Resource for AwsApigatewayv2ApiDetails {
     fn resource_type(&self) -> &'static str {
         "aws_apigatewayv2_api"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -293,17 +293,17 @@ impl AwsApigatewayv2IntegrationDetails {
         }
     }
 }
-impl TerraJson for AwsApigatewayv2IntegrationDetails {
+impl terra::ToJson for AwsApigatewayv2IntegrationDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsApigatewayv2IntegrationDetails {
+impl terra::Resource for AwsApigatewayv2IntegrationDetails {
     fn resource_type(&self) -> &'static str {
         "aws_apigatewayv2_integration"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -372,17 +372,17 @@ impl AwsApigatewayv2RouteDetails {
         }
     }
 }
-impl TerraJson for AwsApigatewayv2RouteDetails {
+impl terra::ToJson for AwsApigatewayv2RouteDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsApigatewayv2RouteDetails {
+impl terra::Resource for AwsApigatewayv2RouteDetails {
     fn resource_type(&self) -> &'static str {
         "aws_apigatewayv2_route"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -462,17 +462,17 @@ impl AwsApigatewayv2StageDetails {
         }
     }
 }
-impl TerraJson for AwsApigatewayv2StageDetails {
+impl terra::ToJson for AwsApigatewayv2StageDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsApigatewayv2StageDetails {
+impl terra::Resource for AwsApigatewayv2StageDetails {
     fn resource_type(&self) -> &'static str {
         "aws_apigatewayv2_stage"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -659,17 +659,17 @@ impl AwsLambdaFunctionDetails {
         }
     }
 }
-impl TerraJson for AwsLambdaFunctionDetails {
+impl terra::ToJson for AwsLambdaFunctionDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLambdaFunctionDetails {
+impl terra::Resource for AwsLambdaFunctionDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lambda_function"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -727,17 +727,17 @@ impl AwsLambdaFunctionUrlDetails {
         }
     }
 }
-impl TerraJson for AwsLambdaFunctionUrlDetails {
+impl terra::ToJson for AwsLambdaFunctionUrlDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLambdaFunctionUrlDetails {
+impl terra::Resource for AwsLambdaFunctionUrlDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lambda_function_url"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -804,17 +804,17 @@ impl AwsLambdaPermissionDetails {
         }
     }
 }
-impl TerraJson for AwsLambdaPermissionDetails {
+impl terra::ToJson for AwsLambdaPermissionDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsLambdaPermissionDetails {
+impl terra::Resource for AwsLambdaPermissionDetails {
     fn resource_type(&self) -> &'static str {
         "aws_lambda_permission"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]

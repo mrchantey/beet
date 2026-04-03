@@ -78,17 +78,17 @@ impl AwsIamRoleDetails {
         }
     }
 }
-impl TerraJson for AwsIamRoleDetails {
+impl terra::ToJson for AwsIamRoleDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsIamRoleDetails {
+impl terra::Resource for AwsIamRoleDetails {
     fn resource_type(&self) -> &'static str {
         "aws_iam_role"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -121,17 +121,17 @@ impl AwsIamRolePolicyAttachmentDetails {
         }
     }
 }
-impl TerraJson for AwsIamRolePolicyAttachmentDetails {
+impl terra::ToJson for AwsIamRolePolicyAttachmentDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsIamRolePolicyAttachmentDetails {
+impl terra::Resource for AwsIamRolePolicyAttachmentDetails {
     fn resource_type(&self) -> &'static str {
         "aws_iam_role_policy_attachment"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
@@ -208,17 +208,17 @@ pub struct AwsS3BucketDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub website: Option<Vec<AwsS3BucketResourceBlockTypeWebsite>>,
 }
-impl TerraJson for AwsS3BucketDetails {
+impl terra::ToJson for AwsS3BucketDetails {
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("serialization should not fail")
     }
 }
-impl TerraResource for AwsS3BucketDetails {
+impl terra::Resource for AwsS3BucketDetails {
     fn resource_type(&self) -> &'static str {
         "aws_s3_bucket"
     }
-    fn provider(&self) -> &'static TerraProvider {
-        &TerraProvider::AWS
+    fn provider(&self) -> &'static terra::Provider {
+        &terra::Provider::AWS
     }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]

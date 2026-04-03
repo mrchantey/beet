@@ -20,19 +20,19 @@ use std::path::PathBuf;
 // ProviderBindingTarget — per-provider output configuration
 // ---------------------------------------------------------------------------
 
-/// Pairs a [`TerraProvider`] with a list of resource type names to generate.
+/// Pairs a [`terra::Provider`] with a list of resource type names to generate.
 ///
 /// This is a configuration struct — it does not generate anything on its own.
 /// Pass it to [`BindingFile::with_resources`] to register which
 /// provider resources should be generated.
 pub struct ResourceList {
 	/// The provider to generate bindings for.
-	pub provider: TerraProvider,
+	pub provider: terra::Provider,
 	pub resources: Vec<String>,
 }
 
 impl ResourceList {
-	pub fn new(provider: TerraProvider, resources: Vec<String>) -> Self {
+	pub fn new(provider: terra::Provider, resources: Vec<String>) -> Self {
 		Self {
 			provider,
 			resources,
@@ -56,11 +56,11 @@ impl ResourceList {
 /// SchemaBindingGenerator::default()
 ///     .with_file(
 ///         BindingFile::new("src/providers/aws_lambda.rs")
-///             .with_resources(TerraProvider::AWS, ["aws_lambda_function", "aws_s3_bucket"]),
+///             .with_resources(terra::Provider::AWS, ["aws_lambda_function", "aws_s3_bucket"]),
 ///     )
 ///     .with_file(
 ///         BindingFile::new("src/providers/cloudflare_dns.rs")
-///             .with_resources(TerraProvider::CLOUDFLARE, ["cloudflare_dns_record"]),
+///             .with_resources(terra::Provider::CLOUDFLARE, ["cloudflare_dns_record"]),
 ///     )
 ///     .generate()
 ///     .await?;
@@ -95,7 +95,7 @@ impl BindingFile {
 
 	pub fn with_resources(
 		mut self,
-		provider: TerraProvider,
+		provider: terra::Provider,
 		resources: impl IntoIterator<Item = impl Into<String>>,
 	) -> Self {
 		self.resources.push(ResourceList::new(
@@ -283,7 +283,7 @@ impl SchemaBindingGenerator {
 		let schema = BindingGenerator::read_schema(schema_path)?;
 
 		for file in &self.files {
-			let mut filter = ResourceFilter::default();
+			let mut filter = terra::ResourceFilter::default();
 			for list in &file.resources {
 				filter = filter.with_resources(
 					list.provider.source.as_ref(),

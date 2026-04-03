@@ -1,24 +1,24 @@
 //! Core Terraform/OpenTofu types and traits.
 //!
 //! These form the typed foundation of beet_infra:
-//! - [`TerraProvider`] identifies a provider (AWS, Cloudflare, etc.)
-//! - [`TerraJson`] converts a value to Terraform-compatible JSON
-//! - [`TerraResource`] marks a struct as a typed Terraform resource
+//! - [`Provider`] identifies a provider (AWS, Cloudflare, etc.)
+//! - [`ToJson`] converts a value to Terraform-compatible JSON
+//! - [`Resource`] marks a struct as a typed Terraform resource
 
 use beet_core::prelude::*;
 use serde_json::Value;
 use std::borrow::Cow;
 
 // ---------------------------------------------------------------------------
-// TerraProvider
+// Provider
 // ---------------------------------------------------------------------------
 
 /// A Terraform/OpenTofu provider definition.
 ///
-/// Use the built-in constants ([`TerraProvider::AWS`], [`TerraProvider::CLOUDFLARE`])
-/// for well-known providers, or construct a custom one with [`TerraProvider::new`].
+/// Use the built-in constants ([`Provider::AWS`], [`Provider::CLOUDFLARE`])
+/// for well-known providers, or construct a custom one with [`Provider::new`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TerraProvider {
+pub struct Provider {
 	/// Human-readable display name (e.g. "Amazon Web Services").
 	pub name: Cow<'static, str>,
 	/// Full registry source path (e.g. "registry.opentofu.org/hashicorp/aws").
@@ -27,7 +27,7 @@ pub struct TerraProvider {
 	pub version: Cow<'static, str>,
 }
 
-impl TerraProvider {
+impl Provider {
 	/// Amazon Web Services provider.
 	pub const AWS: Self = Self {
 		name: Cow::Borrowed("Amazon Web Services"),
@@ -58,8 +58,8 @@ impl TerraProvider {
 	/// The local name used in `required_providers` blocks (last segment of source).
 	///
 	/// ```ignore
-	/// TerraProvider::AWS.local_name().xpect_eq("aws");
-	/// TerraProvider::CLOUDFLARE.local_name().xpect_eq("cloudflare");
+	/// terra::Provider::AWS.local_name().xpect_eq("aws");
+	/// terra::Provider::CLOUDFLARE.local_name().xpect_eq("cloudflare");
 	/// ```
 	pub fn local_name(&self) -> &str {
 		self.source.split('/').last().unwrap_or(&self.source)
@@ -68,7 +68,7 @@ impl TerraProvider {
 	/// The short source string for `required_providers` (strips the registry prefix).
 	///
 	/// ```ignore
-	/// TerraProvider::AWS.short_source().xpect_eq("hashicorp/aws");
+	/// terra::Provider::AWS.short_source().xpect_eq("hashicorp/aws");
 	/// ```
 	pub fn short_source(&self) -> &str {
 		self.source
@@ -82,7 +82,7 @@ impl TerraProvider {
 // ---------------------------------------------------------------------------
 
 /// Convert a value into Terraform-compatible JSON.
-pub trait TerraJson {
+pub trait ToJson {
 	fn to_json(&self) -> Value;
 }
 
@@ -93,43 +93,41 @@ pub trait TerraJson {
 /// - determine the Terraform resource type (e.g. `"aws_lambda_function"`)
 /// - determine which provider is required
 /// - serialize the resource body to JSON
-pub trait TerraResource: TerraJson {
+pub trait Resource: ToJson {
 	/// The Terraform resource type identifier (e.g. `"aws_lambda_function"`).
 	fn resource_type(&self) -> &'static str;
 
 	/// The provider this resource belongs to.
-	fn provider(&self) -> &'static TerraProvider;
+	fn provider(&self) -> &'static Provider;
 }
 
-/// Applied to resources that have an associated name, like a bucket
-/// or iam role.
-pub trait TerraNamed: TerraResource {
+/// Applied to resources that have an associated name, like a bucket or iam role.
+pub trait Named: Resource {
 	fn set_primary_identifier(&mut self, name: &str);
 }
 
-
 /// A typed Terraform data source.
 ///
-/// Mirror of [`TerraResource`] for `data` blocks. Referenced in expressions
+/// Mirror of [`Resource`] for `data` blocks. Referenced in expressions
 /// as `data.<type>.<name>.<attribute>`.
-pub trait TerraDataSource: TerraJson {
+pub trait DataSource: ToJson {
 	/// The Terraform data source type (e.g. `"aws_iam_policy_document"`).
 	fn data_type(&self) -> &'static str;
 
 	/// The provider this data source belongs to.
-	fn provider(&self) -> &'static TerraProvider;
+	fn provider(&self) -> &'static Provider;
 }
 
 /// A typed Terraform backend configuration.
 ///
 /// Implement this trait and pass the backend to
-/// [`TerraConfig::with_backend`] to configure remote state storage.
+/// [`Config::with_backend`] to configure remote state storage.
 ///
 /// ```ignore
-/// let config = TerraConfig::new()
+/// let config = terra::Config::new()
 ///     .with_backend(&S3Backend::default());
 /// ```
-pub trait TerraBackend {
+pub trait Backend {
 	/// The backend type identifier, ie `"s3"`, `"local"`, `"gcs"`.
 	fn backend_type(&self) -> &'static str;
 
@@ -242,23 +240,21 @@ mod tests {
 
 	#[test]
 	fn provider_local_name() {
-		TerraProvider::AWS.local_name().xpect_eq("aws");
-		TerraProvider::CLOUDFLARE
-			.local_name()
-			.xpect_eq("cloudflare");
+		Provider::AWS.local_name().xpect_eq("aws");
+		Provider::CLOUDFLARE.local_name().xpect_eq("cloudflare");
 	}
 
 	#[test]
 	fn provider_short_source() {
-		TerraProvider::AWS.short_source().xpect_eq("hashicorp/aws");
-		TerraProvider::CLOUDFLARE
+		Provider::AWS.short_source().xpect_eq("hashicorp/aws");
+		Provider::CLOUDFLARE
 			.short_source()
 			.xpect_eq("cloudflare/cloudflare");
 	}
 
 	#[test]
 	fn custom_provider() {
-		let provider = TerraProvider::new(
+		let provider = Provider::new(
 			"My Provider",
 			"registry.opentofu.org/acme/thing",
 			"~> 1.0",

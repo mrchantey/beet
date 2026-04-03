@@ -27,7 +27,7 @@ use std::path::Path;
 /// # Example — filtered, typed generation
 ///
 /// ```rust,ignore
-/// let filter = ResourceFilter::default()
+/// let filter = terra::ResourceFilter::default()
 ///     .with_resources("registry.opentofu.org/hashicorp/aws", [
 ///         "aws_lambda_function",
 ///         "aws_s3_bucket",
@@ -48,7 +48,7 @@ pub struct BindingGenerator {
 
 	/// Optional resource filter.  When set, only the specified resources are
 	/// parsed from the schema.
-	filter: Option<ResourceFilter>,
+	filter: Option<terra::ResourceFilter>,
 }
 
 impl Default for BindingGenerator {
@@ -105,12 +105,12 @@ impl BindingGenerator {
 	}
 
 	/// Set the resource filter.
-	pub fn with_filter(mut self, filter: ResourceFilter) -> Self {
+	pub fn with_filter(mut self, filter: terra::ResourceFilter) -> Self {
 		self.filter = Some(filter);
 		self
 	}
 
-	/// Enable generation of `TerraResource` / `TerraJson` trait impls.
+	/// Enable generation of `terra::Resource` / `terra::ToJson` trait impls.
 	pub fn with_trait_impls(mut self, enabled: bool) -> Self {
 		self.config = self.config.with_generate_trait_impls(enabled);
 		self
@@ -391,7 +391,7 @@ mod tests {
 
 	#[test]
 	fn generate_terra_impls() {
-		let meta = vec![ResourceMeta {
+		let meta = vec![terra::ResourceMeta {
 			resource_type: "aws_s3_bucket".to_string(),
 			provider_source: "registry.opentofu.org/hashicorp/aws".to_string(),
 			struct_name: "AwsS3BucketDetails".to_string(),
@@ -419,10 +419,10 @@ mod tests {
 		let output = String::from_utf8(buf).unwrap();
 
 		output
-			.xpect_contains("impl TerraJson for AwsS3BucketDetails")
-			.xpect_contains("impl TerraResource for AwsS3BucketDetails")
+			.xpect_contains("impl terra::ToJson for AwsS3BucketDetails")
+			.xpect_contains("impl terra::Resource for AwsS3BucketDetails")
 			.xpect_contains("\"aws_s3_bucket\"")
-			.xpect_contains("TerraProvider::AWS");
+			.xpect_contains("terra::Provider::AWS");
 	}
 
 	#[test]

@@ -1,5 +1,5 @@
 use crate::bindings::aws;
-use crate::types::TerraBackend;
+use crate::terra;
 use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
@@ -39,7 +39,7 @@ impl From<S3Backend> for StackBackend {
 	fn from(b: S3Backend) -> Self { StackBackend::S3(b) }
 }
 
-impl TerraBackend for StackBackend {
+impl terra::Backend for StackBackend {
 	fn backend_type(&self) -> &'static str {
 		match self {
 			StackBackend::Local(b) => b.backend_type(),
@@ -69,7 +69,7 @@ impl Default for LocalBackend {
 	}
 }
 
-impl TerraBackend for LocalBackend {
+impl terra::Backend for LocalBackend {
 	fn backend_type(&self) -> &'static str { "local" }
 	fn to_backend_json(&self) -> Value {
 		json!({ "path": self.path.to_string() })
@@ -103,7 +103,7 @@ impl Default for S3Backend {
 	}
 }
 
-impl TerraBackend for S3Backend {
+impl terra::Backend for S3Backend {
 	fn backend_type(&self) -> &'static str { "s3" }
 	fn to_backend_json(&self) -> Value {
 		json!({

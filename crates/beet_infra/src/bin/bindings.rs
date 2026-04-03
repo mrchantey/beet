@@ -16,7 +16,7 @@ async fn main() -> Result {
 	let generator = SchemaBindingGenerator::default()
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
-				.with_resources(TerraProvider::AWS, [
+				.with_resources(terra::Provider::AWS, [
 					"aws_iam_role",
 					"aws_iam_role_policy_attachment",
 					"aws_s3_bucket",
@@ -24,7 +24,7 @@ async fn main() -> Result {
 		)
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_lambda.rs")
-				.with_resources(TerraProvider::AWS, [
+				.with_resources(terra::Provider::AWS, [
 					"aws_api_gateway_rest_api",
 					"aws_apigatewayv2_api",
 					"aws_apigatewayv2_integration",
@@ -37,7 +37,7 @@ async fn main() -> Result {
 		)
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_lightsail.rs")
-				.with_resources(TerraProvider::AWS, [
+				.with_resources(terra::Provider::AWS, [
 					"aws_lightsail_instance",
 					"aws_lightsail_instance_public_ports",
 					"aws_lightsail_key_pair",
@@ -49,7 +49,7 @@ async fn main() -> Result {
 			BindingFile::new(
 				"crates/beet_infra/src/bindings/cloudflare_common.rs",
 			)
-			.with_resources(TerraProvider::CLOUDFLARE, [
+			.with_resources(terra::Provider::CLOUDFLARE, [
 				"cloudflare_dns_record",
 			]),
 		);

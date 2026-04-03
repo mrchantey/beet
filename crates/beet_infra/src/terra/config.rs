@@ -1,18 +1,18 @@
 //! Export Terraform/OpenTofu configurations as JSON.
 //!
-//! The [`TerraConfig`] collects provider configurations, resources, data sources,
+//! The [`Config`] collects provider configurations, resources, data sources,
 //! variables, outputs, locals, and backend settings, then serialises them into
 //! valid Terraform JSON configuration.
 //!
 //! # Typed API
 //!
-//! When using generated provider bindings that implement [`TerraResource`] or
-//! [`TerraDataSource`], the config automatically tracks required providers
+//! When using generated provider bindings that implement [`Resource`] or
+//! [`DataSource`], the config automatically tracks required providers
 //! and serialises bodies with full type safety:
 //!
 //! ```rust,ignore
 //! let bucket = AwsS3BucketDetails { bucket: Some("my-bucket".into()), ..Default::default() };
-//! let config = TerraConfig::new()
+//! let config = Config::new()
 //!     .with_backend(&S3Backend::default())
 //!     .with_required_version("~> 1.8")
 //!     .with_resource("assets", &bucket)
@@ -30,17 +30,18 @@
 //! `Serialize` type for escape-hatch usage:
 //!
 //! ```rust,ignore
-//! let mut config = TerraConfig::new();
+//! let mut config = Config::new();
 //! config.add_required_provider("aws", "hashicorp/aws", "~> 6.0");
 //! config.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
 //! config.add_untyped_resource("aws_instance", "web", &my_instance)?;
 //! config.export_to_file("main.tf.json").await?;
 //! ```
 
-use super::misc::TerraBackend;
-use super::misc::TerraDataSource;
-use super::misc::TerraProvider;
-use super::misc::TerraResource;
+use super::misc::Backend;
+use super::misc::DataSource;
+use super::misc::Named;
+use super::misc::Provider;
+use super::misc::Resource;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Serialize;
@@ -71,7 +72,7 @@ pub struct Output {
 ///
 /// # Example
 /// ```rust,ignore
-/// let config = TerraConfig::new()
+/// let config = Config::new()
 ///     .with_backend(&S3Backend::default())
 ///     .with_required_version("~> 1.8")
 ///     .with_resource("assets", &bucket)
@@ -82,7 +83,7 @@ pub struct Output {
 ///     });
 /// config.export_and_validate("infra/main.tf.json").await?;
 /// ```
-pub struct TerraConfig {
+pub struct Config {
 	/// Backend for remote state, serialised into `terraform.backend`.
 	backend: Option<(String, Value)>,
 	/// Optional `required_version` constraint in the `terraform` block.
@@ -98,7 +99,7 @@ pub struct TerraConfig {
 	locals: Map<String, Value>,
 }
 
-impl TerraConfig {
+impl Config {
 	/// Create a new empty configuration.
 	pub fn new() -> Self {
 		Self {
@@ -121,16 +122,16 @@ impl TerraConfig {
 	/// Set the backend for remote state storage (chaining).
 	///
 	/// ```ignore
-	/// let config = TerraConfig::new()
+	/// let config = Config::new()
 	///     .with_backend(&S3Backend::default());
 	/// ```
-	pub fn with_backend(mut self, backend: &dyn TerraBackend) -> Self {
+	pub fn with_backend(mut self, backend: &dyn Backend) -> Self {
 		self.set_backend(backend);
 		self
 	}
 
 	/// Set the backend for remote state storage.
-	pub fn set_backend(&mut self, backend: &dyn TerraBackend) -> &mut Self {
+	pub fn set_backend(&mut self, backend: &dyn Backend) -> &mut Self {
 		self.backend = Some((
 			backend.backend_type().to_string(),
 			backend.to_backend_json(),
@@ -141,7 +142,7 @@ impl TerraConfig {
 	/// Set the required OpenTofu/Terraform version constraint (chaining).
 	///
 	/// ```ignore
-	/// let config = TerraConfig::new().with_required_version("~> 1.8");
+	/// let config = Config::new().with_required_version("~> 1.8");
 	/// ```
 	pub fn with_required_version(
 		mut self,
@@ -165,22 +166,22 @@ impl TerraConfig {
 	// =====================================================================
 
 	/// Add a typed resource (chaining). The required provider is registered
-	/// automatically from the resource's [`TerraResource`] implementation.
+	/// automatically from the resource's [`Resource`] implementation.
 	pub fn with_resource(
 		mut self,
 		name: impl Into<String>,
-		resource: &dyn TerraResource,
+		resource: &dyn Resource,
 	) -> Self {
 		self.add_resource(name, resource);
 		self
 	}
 
 	/// Add a typed resource. The required provider is registered automatically
-	/// from the resource's [`TerraResource`] implementation.
+	/// from the resource's [`Resource`] implementation.
 	pub fn add_resource(
 		&mut self,
 		label: impl Into<String>,
-		resource: &dyn TerraResource,
+		resource: &dyn Resource,
 	) -> &mut Self {
 		self.ensure_provider(resource.provider());
 		let type_map = self
@@ -197,29 +198,29 @@ impl TerraConfig {
 	/// creating a a shorthand for resources that are [`SetSlug`]
 	pub fn add_named_resource<T>(&mut self, slug: &Slug, mut resource: T)
 	where
-		T: TerraNamed + TerraResource,
+		T: Named + Resource,
 	{
 		resource.set_primary_identifier(&slug.primary_identifier());
 		self.add_resource(slug.label(), &resource);
 	}
 
 	/// Add a typed data source (chaining). The required provider is registered
-	/// automatically from the data source's [`TerraDataSource`] implementation.
+	/// automatically from the data source's [`DataSource`] implementation.
 	pub fn with_data_source(
 		mut self,
 		name: impl Into<String>,
-		source: &dyn TerraDataSource,
+		source: &dyn DataSource,
 	) -> Self {
 		self.add_data_source_typed(name, source);
 		self
 	}
 
 	/// Add a typed data source. The required provider is registered automatically
-	/// from the data source's [`TerraDataSource`] implementation.
+	/// from the data source's [`DataSource`] implementation.
 	pub fn add_data_source_typed(
 		&mut self,
 		name: impl Into<String>,
-		source: &dyn TerraDataSource,
+		source: &dyn DataSource,
 	) -> &mut Self {
 		self.ensure_provider(source.provider());
 		let type_map = self
@@ -242,7 +243,7 @@ impl TerraConfig {
 	/// present. For multiple configs (aliases) use [`with_provider_alias`].
 	pub fn with_provider_config(
 		mut self,
-		provider: &TerraProvider,
+		provider: &Provider,
 		config: &impl Serialize,
 	) -> Result<Self> {
 		self.add_provider_config(provider, config)?;
@@ -254,7 +255,7 @@ impl TerraConfig {
 	/// The provider is auto-registered in `required_providers` if not already present.
 	pub fn add_provider_config(
 		&mut self,
-		provider: &TerraProvider,
+		provider: &Provider,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		self.ensure_provider(provider);
@@ -271,13 +272,13 @@ impl TerraConfig {
 	/// an array, which is the correct Terraform JSON format for aliases.
 	///
 	/// ```ignore
-	/// let config = TerraConfig::new()
-	///     .with_provider_config(&TerraProvider::AWS, &json!({"region": "us-east-1"}))?
-	///     .with_provider_alias(&TerraProvider::AWS, "eu_west_1", &json!({"region": "eu-west-1"}))?;
+	/// let config = Config::new()
+	///     .with_provider_config(&Provider::AWS, &json!({"region": "us-east-1"}))?
+	///     .with_provider_alias(&Provider::AWS, "eu_west_1", &json!({"region": "eu-west-1"}))?;
 	/// ```
 	pub fn with_provider_alias(
 		mut self,
-		provider: &TerraProvider,
+		provider: &Provider,
 		alias: impl Into<String>,
 		config: &impl Serialize,
 	) -> Result<Self> {
@@ -290,7 +291,7 @@ impl TerraConfig {
 	/// See [`with_provider_alias`] for details.
 	pub fn add_provider_alias(
 		&mut self,
-		provider: &TerraProvider,
+		provider: &Provider,
 		alias: impl Into<String>,
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
@@ -372,7 +373,7 @@ impl TerraConfig {
 	// Untyped / escape-hatch API
 	// =====================================================================
 
-	/// Add a required provider declaration without a typed [`TerraProvider`].
+	/// Add a required provider declaration without a typed [`Provider`].
 	pub fn add_required_provider(
 		&mut self,
 		name: &str,
@@ -620,7 +621,7 @@ impl TerraConfig {
 	// =====================================================================
 
 	/// Register a provider in `required_providers` if not already present.
-	fn ensure_provider(&mut self, provider: &TerraProvider) {
+	fn ensure_provider(&mut self, provider: &Provider) {
 		let local = provider.local_name().to_string();
 		if self.required_providers.contains_key(&local) {
 			return;
@@ -679,6 +680,6 @@ impl TerraConfig {
 	}
 }
 
-impl Default for TerraConfig {
+impl Default for Config {
 	fn default() -> Self { Self::new() }
 }

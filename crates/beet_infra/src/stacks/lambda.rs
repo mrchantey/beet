@@ -73,8 +73,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 fn terra_config(
 	cx: &StackContext,
 	entity: &mut EntityWorldMut,
-) -> Result<TerraConfig> {
-	let mut config = TerraConfig::default();
+) -> Result<terra::Config> {
+	let mut config = terra::Config::default();
 
 	let stack =
 		entity.with_query::<(&Stack, &LambdaStack), _>(|(stack, lambda)| {

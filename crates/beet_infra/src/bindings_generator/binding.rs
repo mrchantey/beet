@@ -192,9 +192,9 @@ pub fn export_schema_to_registry(
 /// collected doc comments extracted from schema `description` fields.
 pub fn export_filtered_resources(
 	schema: &TerraformSchemaExport,
-	filter: &ResourceFilter,
+	filter: &terra::ResourceFilter,
 	config: &CodeGeneratorConfig,
-) -> Result<(Registry, Vec<ResourceMeta>, DocComments)> {
+) -> Result<(Registry, Vec<terra::ResourceMeta>, DocComments)> {
 	let mut registry = Registry::new();
 	let mut meta = Vec::new();
 	let mut comments = DocComments::new();
@@ -236,7 +236,7 @@ pub fn export_filtered_resources(
 					container_name
 				};
 
-				meta.push(ResourceMeta {
+				meta.push(terra::ResourceMeta {
 					resource_type: resource_name.clone(),
 					provider_source: provider_source.clone(),
 					struct_name,
