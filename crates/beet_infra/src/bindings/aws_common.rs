@@ -11,72 +11,84 @@ use crate::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsIamRoleDetails {
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arn: Option<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub assume_role_policy: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create_date: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub for_each: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_detach_policies: Option<bool>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub managed_policy_arns: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_session_duration: Option<i64>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name_prefix: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permissions_boundary: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Map<SmolStr, SmolStr>>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags_all: Option<Map<SmolStr, SmolStr>>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unique_id: Option<SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inline_policy: Option<Vec<AwsIamRoleResourceBlockTypeInlinePolicy>>,
-}
-impl AwsIamRoleDetails {
-    pub fn new(assume_role_policy: SmolStr) -> Self {
-        Self {
-            arn: None,
-            assume_role_policy,
-            count: None,
-            create_date: None,
-            depends_on: None,
-            description: None,
-            for_each: None,
-            force_detach_policies: None,
-            id: None,
-            managed_policy_arns: None,
-            max_session_duration: None,
-            name: None,
-            name_prefix: None,
-            path: None,
-            permissions_boundary: None,
-            provider: None,
-            tags: None,
-            tags_all: None,
-            unique_id: None,
-            inline_policy: None,
-        }
-    }
 }
 impl terra::ToJson for AwsIamRoleDetails {
     fn to_json(&self) -> serde_json::Value {
@@ -90,36 +102,62 @@ impl terra::Resource for AwsIamRoleDetails {
     fn provider(&self) -> &'static terra::Provider {
         &terra::Provider::AWS
     }
+    fn validate_definition(&self) -> Result {
+        if self.arn.is_some() {
+            bevybail!(
+                "{}: computed-only field `arn` should not be set", self.resource_type()
+            );
+        }
+        if self.assume_role_policy.is_empty() {
+            bevybail!(
+                "{}: required field `assume_role_policy` is empty", self.resource_type()
+            );
+        }
+        if self.create_date.is_some() {
+            bevybail!(
+                "{}: computed-only field `create_date` should not be set", self
+                .resource_type()
+            );
+        }
+        if self.unique_id.is_some() {
+            bevybail!(
+                "{}: computed-only field `unique_id` should not be set", self
+                .resource_type()
+            );
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsIamRolePolicyAttachmentDetails {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub for_each: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub policy_arn: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub role: SmolStr,
-}
-impl AwsIamRolePolicyAttachmentDetails {
-    pub fn new(policy_arn: SmolStr, role: SmolStr) -> Self {
-        Self {
-            count: None,
-            depends_on: None,
-            for_each: None,
-            id: None,
-            policy_arn,
-            provider: None,
-            role,
-        }
-    }
 }
 impl terra::ToJson for AwsIamRolePolicyAttachmentDetails {
     fn to_json(&self) -> serde_json::Value {
@@ -133,56 +171,113 @@ impl terra::Resource for AwsIamRolePolicyAttachmentDetails {
     fn provider(&self) -> &'static terra::Provider {
         &terra::Provider::AWS
     }
+    fn validate_definition(&self) -> Result {
+        if self.policy_arn.is_empty() {
+            bevybail!("{}: required field `policy_arn` is empty", self.resource_type());
+        }
+        if self.role.is_empty() {
+            bevybail!("{}: required field `role` is empty", self.resource_type());
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsS3BucketDetails {
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acceleration_status: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acl: Option<SmolStr>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arn: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket: Option<SmolStr>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket_domain_name: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket_namespace: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket_prefix: Option<SmolStr>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket_region: Option<SmolStr>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket_regional_domain_name: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub for_each: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub force_destroy: Option<bool>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hosted_zone_id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_lock_enabled: Option<bool>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<SmolStr>,
     /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_payer: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Map<SmolStr, SmolStr>>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags_all: Option<Map<SmolStr, SmolStr>>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub website_domain: Option<SmolStr>,
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub website_endpoint: Option<SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -220,72 +315,125 @@ impl terra::Resource for AwsS3BucketDetails {
     fn provider(&self) -> &'static terra::Provider {
         &terra::Provider::AWS
     }
+    fn validate_definition(&self) -> Result {
+        if self.arn.is_some() {
+            bevybail!(
+                "{}: computed-only field `arn` should not be set", self.resource_type()
+            );
+        }
+        if self.bucket_domain_name.is_some() {
+            bevybail!(
+                "{}: computed-only field `bucket_domain_name` should not be set", self
+                .resource_type()
+            );
+        }
+        if self.bucket_region.is_some() {
+            bevybail!(
+                "{}: computed-only field `bucket_region` should not be set", self
+                .resource_type()
+            );
+        }
+        if self.bucket_regional_domain_name.is_some() {
+            bevybail!(
+                "{}: computed-only field `bucket_regional_domain_name` should not be set",
+                self.resource_type()
+            );
+        }
+        if self.hosted_zone_id.is_some() {
+            bevybail!(
+                "{}: computed-only field `hosted_zone_id` should not be set", self
+                .resource_type()
+            );
+        }
+        if self.website_domain.is_some() {
+            bevybail!(
+                "{}: computed-only field `website_domain` should not be set", self
+                .resource_type()
+            );
+        }
+        if self.website_endpoint.is_some() {
+            bevybail!(
+                "{}: computed-only field `website_endpoint` should not be set", self
+                .resource_type()
+            );
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "inline_policy")]
 pub struct AwsIamRoleResourceBlockTypeInlinePolicy {
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "cors_rule")]
 pub struct AwsS3BucketResourceBlockTypeCorsRule {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_headers: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub allowed_methods: Vec<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub allowed_origins: Vec<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expose_headers: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_age_seconds: Option<i64>,
-}
-impl AwsS3BucketResourceBlockTypeCorsRule {
-    pub fn new(allowed_methods: Vec<SmolStr>, allowed_origins: Vec<SmolStr>) -> Self {
-        Self {
-            allowed_headers: None,
-            allowed_methods,
-            allowed_origins,
-            expose_headers: None,
-            max_age_seconds: None,
-        }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "grant")]
 pub struct AwsS3BucketResourceBlockTypeGrant {
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub permissions: Vec<SmolStr>,
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub r#type: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uri: Option<SmolStr>,
-}
-impl AwsS3BucketResourceBlockTypeGrant {
-    pub fn new(permissions: Vec<SmolStr>, r#type: SmolStr) -> Self {
-        Self {
-            id: None,
-            permissions,
-            r#type,
-            uri: None,
-        }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "lifecycle_rule")]
 pub struct AwsS3BucketResourceBlockTypeLifecycleRule {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abort_incomplete_multipart_upload_days: Option<i64>,
+    /// ## Attribute
+    /// `required`
     pub enabled: bool,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Map<SmolStr, SmolStr>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -301,174 +449,193 @@ pub struct AwsS3BucketResourceBlockTypeLifecycleRule {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<Vec<LifecycleRuleResourceBlockTypeTransition>>,
 }
-impl AwsS3BucketResourceBlockTypeLifecycleRule {
-    pub fn new(enabled: bool) -> Self {
-        Self {
-            abort_incomplete_multipart_upload_days: None,
-            enabled,
-            id: None,
-            prefix: None,
-            tags: None,
-            expiration: None,
-            noncurrent_version_expiration: None,
-            noncurrent_version_transition: None,
-            transition: None,
-        }
-    }
-}
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "logging")]
 pub struct AwsS3BucketResourceBlockTypeLogging {
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub target_bucket: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_prefix: Option<SmolStr>,
-}
-impl AwsS3BucketResourceBlockTypeLogging {
-    pub fn new(target_bucket: SmolStr) -> Self {
-        Self {
-            target_bucket,
-            target_prefix: None,
-        }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "object_lock_configuration")]
 pub struct AwsS3BucketResourceBlockTypeObjectLockConfiguration {
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_lock_enabled: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "replication_configuration")]
 pub struct AwsS3BucketResourceBlockTypeReplicationConfiguration {
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub role: SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Vec<ReplicationConfigurationResourceBlockTypeRules>>,
 }
-impl AwsS3BucketResourceBlockTypeReplicationConfiguration {
-    pub fn new(role: SmolStr) -> Self {
-        Self { role, rules: None }
-    }
-}
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "timeouts")]
 pub struct AwsS3BucketResourceBlockTypeTimeouts {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "versioning")]
 pub struct AwsS3BucketResourceBlockTypeVersioning {
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mfa_delete: Option<bool>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "website")]
 pub struct AwsS3BucketResourceBlockTypeWebsite {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_document: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index_document: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub redirect_all_requests_to: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routing_rules: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "access_control_translation")]
 pub struct DestinationResourceBlockTypeAccessControlTranslation {
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub owner: SmolStr,
-}
-impl DestinationResourceBlockTypeAccessControlTranslation {
-    pub fn new(owner: SmolStr) -> Self {
-        Self { owner }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "metrics")]
 pub struct DestinationResourceBlockTypeMetrics {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<i64>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "replication_time")]
 pub struct DestinationResourceBlockTypeReplicationTime {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minutes: Option<i64>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<SmolStr>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "expiration")]
 pub struct LifecycleRuleResourceBlockTypeExpiration {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expired_object_delete_marker: Option<bool>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "noncurrent_version_expiration")]
 pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionExpiration {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "noncurrent_version_transition")]
 pub struct LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub storage_class: SmolStr,
-}
-impl LifecycleRuleResourceBlockTypeNoncurrentVersionTransition {
-    pub fn new(storage_class: SmolStr) -> Self {
-        Self { days: None, storage_class }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "transition")]
 pub struct LifecycleRuleResourceBlockTypeTransition {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub days: Option<i64>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub storage_class: SmolStr,
-}
-impl LifecycleRuleResourceBlockTypeTransition {
-    pub fn new(storage_class: SmolStr) -> Self {
-        Self {
-            date: None,
-            days: None,
-            storage_class,
-        }
-    }
 }
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "rules")]
 pub struct ReplicationConfigurationResourceBlockTypeRules {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete_marker_replication_status: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i64>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub status: SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -476,28 +643,23 @@ pub struct ReplicationConfigurationResourceBlockTypeRules {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Vec<RulesResourceBlockTypeFilter>>,
 }
-impl ReplicationConfigurationResourceBlockTypeRules {
-    pub fn new(status: SmolStr) -> Self {
-        Self {
-            delete_marker_replication_status: None,
-            id: None,
-            prefix: None,
-            priority: None,
-            status,
-            destination: None,
-            filter: None,
-        }
-    }
-}
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "destination")]
 pub struct RulesResourceBlockTypeDestination {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub bucket: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replica_kms_key_id: Option<SmolStr>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_class: Option<SmolStr>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -509,24 +671,15 @@ pub struct RulesResourceBlockTypeDestination {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replication_time: Option<Vec<DestinationResourceBlockTypeReplicationTime>>,
 }
-impl RulesResourceBlockTypeDestination {
-    pub fn new(bucket: SmolStr) -> Self {
-        Self {
-            account_id: None,
-            bucket,
-            replica_kms_key_id: None,
-            storage_class: None,
-            access_control_translation: None,
-            metrics: None,
-            replication_time: None,
-        }
-    }
-}
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "filter")]
 pub struct RulesResourceBlockTypeFilter {
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Map<SmolStr, SmolStr>>,
 }

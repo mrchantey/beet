@@ -90,7 +90,7 @@ impl LambdaStack {
 			cx.resource_ident("lambda_basic_policy"),
 			AwsIamRolePolicyAttachmentDetails {
 				policy_arn: "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole".into(),
-				role: terra::tf_ref(&lambda_role.field("name")),
+				role: lambda_role.field_ref("name").into(),
 				..default()
 			},
 		);
@@ -102,7 +102,7 @@ impl LambdaStack {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: Some("lambda.zip".into()),
-				role: terra::tf_ref(&lambda_role.field("arn")),
+				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
 				source_code_hash: Some(default()),
@@ -113,67 +113,76 @@ impl LambdaStack {
 		// Lambda Function URL
 		let lambda_url = ResourceDef::new_secondary(
 			cx.resource_ident("router_url"),
-			AwsLambdaFunctionUrlDetails::new(
-				"NONE".into(),
-				terra::tf_ref(&lambda_function.field("function_name")),
-			),
+			AwsLambdaFunctionUrlDetails {
+				authorization_type: "NONE".into(),
+				function_name: lambda_function
+					.field_ref("function_name")
+					.into(),
+				..default()
+			},
 		);
 
 		// API Gateway v2
 		let gateway_ident = cx.resource_ident("gateway");
 		let gateway = ResourceDef::new_secondary(
 			gateway_ident.clone(),
-			AwsApigatewayv2ApiDetails::new(
-				gateway_ident.primary_identifier().into(),
-				"HTTP".into(),
-			),
+			AwsApigatewayv2ApiDetails {
+				name: gateway_ident.primary_identifier().into(),
+				protocol_type: "HTTP".into(),
+				..default()
+			},
 		);
 
-		let mut lambda_integration_details =
-			AwsApigatewayv2IntegrationDetails::new(
-				terra::tf_ref(&gateway.field("id")),
-				"AWS_PROXY".into(),
-			);
-		lambda_integration_details.integration_uri =
-			Some(terra::tf_ref(&lambda_function.field("invoke_arn")));
-		lambda_integration_details.payload_format_version = Some("2.0".into());
+		let lambda_integration_details = AwsApigatewayv2IntegrationDetails {
+			api_id: gateway.field_ref("id").into(),
+			integration_type: "AWS_PROXY".into(),
+			integration_uri: Some(
+				lambda_function.field_ref("invoke_arn").into(),
+			),
+			payload_format_version: Some("2.0".into()),
+			..default()
+		};
 
 		let lambda_integration = ResourceDef::new_secondary(
 			cx.resource_ident("lambda_integration"),
 			lambda_integration_details,
 		);
 
-		let mut default_route_details = AwsApigatewayv2RouteDetails::new(
-			terra::tf_ref(&gateway.field("id")),
-			"$default".into(),
-		);
-		default_route_details.target = Some(
-			format!("integrations/${{{}}}", lambda_integration.field("id"))
-				.into(),
-		);
+		let default_route_details = AwsApigatewayv2RouteDetails {
+			api_id: gateway.field_ref("id").into(),
+			route_key: "$default".into(),
+			target: Some(
+				format!("integrations/{}", lambda_integration.field_ref("id"))
+					.into(),
+			),
+			..default()
+		};
 		let default_route = ResourceDef::new_secondary(
 			cx.resource_ident("default_route"),
 			default_route_details,
 		);
 
-		let mut default_stage_details = AwsApigatewayv2StageDetails::new(
-			terra::tf_ref(&gateway.field("id")),
-			"$default".into(),
-		);
-		default_stage_details.auto_deploy = Some(true);
+		let default_stage_details = AwsApigatewayv2StageDetails {
+			api_id: gateway.field_ref("id").into(),
+			name: "$default".into(),
+			auto_deploy: Some(true),
+			..default()
+		};
 		let default_stage = ResourceDef::new_secondary(
 			cx.resource_ident("default_stage"),
 			default_stage_details,
 		);
 
 		// Lambda Permission for API Gateway
-		let mut apigw_permission_details = AwsLambdaPermissionDetails::new(
-			"lambda:InvokeFunction".into(),
-			terra::tf_ref(&lambda_function.field("function_name")),
-			"apigateway.amazonaws.com".into(),
-		);
-		apigw_permission_details.source_arn =
-			Some(format!("${{{}}}/*/*", gateway.field("execution_arn")).into());
+		let apigw_permission_details = AwsLambdaPermissionDetails {
+			action: "lambda:InvokeFunction".into(),
+			function_name: lambda_function.field_ref("function_name").into(),
+			principal: "apigateway.amazonaws.com".into(),
+			source_arn: Some(
+				format!("{}/*/*", gateway.field_ref("execution_arn")).into(),
+			),
+			..default()
+		};
 		let apigw_permission = ResourceDef::new_secondary(
 			cx.resource_ident("apigw_lambda"),
 			apigw_permission_details,
@@ -198,15 +207,15 @@ impl LambdaStack {
 		if let Some(dns) = &self.dns {
 			match dns {
 				DnsProvider::Cloudflare { authority } => {
-					let mut dns_record = CloudflareDnsRecordDetails::new(
-						authority.clone(),
-						1,
-						"CNAME".into(),
-						"CLOUDFLARE_ZONE_ID".into(),
-					);
-					dns_record.content =
-						Some(terra::tf_ref(&gateway.field("api_endpoint")));
-					dns_record.proxied = Some(true);
+					let dns_record = CloudflareDnsRecordDetails {
+						name: authority.clone(),
+						ttl: 1,
+						r#type: "CNAME".into(),
+						zone_id: "CLOUDFLARE_ZONE_ID".into(),
+						content: Some(gateway.field_ref("api_endpoint").into()),
+						proxied: Some(true),
+						..default()
+					};
 					let dns_def = ResourceDef::new_secondary(
 						cx.resource_ident("dns"),
 						dns_record,
@@ -214,15 +223,16 @@ impl LambdaStack {
 					config = config.with_resource(&dns_def);
 				}
 				DnsProvider::Route53 { authority, zone_id } => {
-					let mut dns_record = AwsRoute53RecordDetails::new(
-						authority.clone(),
-						"CNAME".into(),
-						zone_id.clone(),
-					);
-					dns_record.ttl = Some(300);
-					dns_record.records = Some(vec![terra::tf_ref(
-						&gateway.field("api_endpoint"),
-					)]);
+					let dns_record = AwsRoute53RecordDetails {
+						name: authority.clone(),
+						r#type: "CNAME".into(),
+						zone_id: zone_id.clone(),
+						ttl: Some(300),
+						records: Some(vec![
+							gateway.field_ref("api_endpoint").into(),
+						]),
+						..default()
+					};
 					let dns_def = ResourceDef::new_secondary(
 						cx.resource_ident("dns"),
 						dns_record,
@@ -235,23 +245,17 @@ impl LambdaStack {
 		// Outputs
 		config
 			.with_output("api_endpoint", terra::Output {
-				value: json!(
-					terra::tf_ref(&gateway.field("api_endpoint")).as_str()
-				),
+				value: json!(gateway.field_ref("api_endpoint")),
 				description: Some("The API Gateway endpoint URL".into()),
 				sensitive: None,
 			})
 			.with_output("function_url", terra::Output {
-				value: json!(
-					terra::tf_ref(&lambda_url.field("function_url")).as_str()
-				),
+				value: json!(lambda_url.field_ref("function_url")),
 				description: Some("The Lambda function URL".into()),
 				sensitive: None,
 			})
 			.with_output("assets_bucket", terra::Output {
-				value: json!(
-					terra::tf_ref(&assets_bucket.field("bucket")).as_str()
-				),
+				value: json!(assets_bucket.field_ref("bucket")),
 				description: Some("The S3 assets bucket name".into()),
 				sensitive: None,
 			})

@@ -2,7 +2,6 @@ use crate::bindings::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde_json::json;
-use terra::tf_ref;
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
@@ -51,54 +50,60 @@ impl LightsailStack {
 		let ip_ident = cx.resource_ident("ip");
 		let static_ip = terra::ResourceDef::new_secondary(
 			ip_ident.clone(),
-			AwsLightsailStaticIpDetails::new(
-				ip_ident.primary_identifier().into(),
-			),
+			AwsLightsailStaticIpDetails {
+				name: ip_ident.primary_identifier().into(),
+				..default()
+			},
 		);
 
 		let instance_ident = cx.resource_ident("instance");
-		let mut instance_details = AwsLightsailInstanceDetails::new(
-			self.availability_zone.clone(),
-			self.blueprint_id.clone(),
-			self.bundle_id.clone(),
-			instance_ident.primary_identifier().into(),
-		);
-		instance_details.key_pair_name = Some(tf_ref(&keypair.field("name")));
-		instance_details.user_data = Some(self.build_user_data(cx));
-		instance_details.tags = Some(
-			[
-				(SmolStr::from("Project"), cx.app_name().clone()),
-				(SmolStr::from("Stage"), cx.stage().clone()),
-			]
-			.into_iter()
-			.collect(),
-		);
+		let instance_details = AwsLightsailInstanceDetails {
+			availability_zone: self.availability_zone.clone(),
+			blueprint_id: self.blueprint_id.clone(),
+			bundle_id: self.bundle_id.clone(),
+			name: instance_ident.primary_identifier().into(),
+			key_pair_name: Some(keypair.field_ref("name").into()),
+			user_data: Some(self.build_user_data(cx)),
+			tags: Some(
+				[
+					(SmolStr::from("Project"), cx.app_name().clone()),
+					(SmolStr::from("Stage"), cx.stage().clone()),
+				]
+				.into_iter()
+				.collect(),
+			),
+			..default()
+		};
 		let instance =
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
 		let ip_attach = terra::ResourceDef::new_secondary(
 			cx.resource_ident("ip_attach"),
-			AwsLightsailStaticIpAttachmentDetails::new(
-				tf_ref(&instance.field("name")),
-				tf_ref(&static_ip.field("name")),
-			),
+			AwsLightsailStaticIpAttachmentDetails {
+				instance_name: instance.field_ref("name").into(),
+				static_ip_name: static_ip.field_ref("name").into(),
+				..default()
+			},
 		);
 
-		let mut port_details = AwsLightsailInstancePublicPortsDetails::new(
-			tf_ref(&instance.field("name")),
-		);
-		port_details.port_info = Some(vec![
-			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo::new(
-				self.server_port as i64,
-				"tcp".into(),
-				self.server_port as i64,
-			),
-			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo::new(
-				22,
-				"tcp".into(),
-				22,
-			),
-		]);
+		let port_details = AwsLightsailInstancePublicPortsDetails {
+			instance_name: instance.field_ref("name").into(),
+			port_info: Some(vec![
+				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+					from_port: self.server_port as i64,
+					protocol: "tcp".into(),
+					to_port: self.server_port as i64,
+					..default()
+				},
+				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+					from_port: 22,
+					protocol: "tcp".into(),
+					to_port: 22,
+					..default()
+				},
+			]),
+			..default()
+		};
 		let ports = terra::ResourceDef::new_secondary(
 			cx.resource_ident("ports"),
 			port_details,
@@ -112,12 +117,12 @@ impl LightsailStack {
 			.with_resource(&ip_attach)
 			.with_resource(&ports)
 			.with_output("instance_name", terra::Output {
-				value: json!(tf_ref(&instance.field("name")).as_str()),
+				value: json!(instance.field_ref("name")),
 				description: Some("The Lightsail instance name".into()),
 				sensitive: None,
 			})
 			.with_output("static_ip_address", terra::Output {
-				value: json!(tf_ref(&static_ip.field("ip_address")).as_str()),
+				value: json!(static_ip.field_ref("ip_address")),
 				description: Some("The static IP address".into()),
 				sensitive: None,
 			})

@@ -114,16 +114,9 @@ impl<'a> CodeGenerator<'a> {
 			if let Container::Struct(fields) = format {
 				let struct_name = resolve_struct_name(&state, ns, name);
 
-				if self.config.generate_builders {
-					file_tokens.extend(self.emit_builder_impl(
-						&state,
-						&struct_name,
-						fields,
-					));
-				}
-
 				if self.config.generate_trait_impls {
-					file_tokens.extend(self.emit_trait_impls(&struct_name));
+					file_tokens
+						.extend(self.emit_trait_impls(&struct_name, fields));
 				}
 			}
 
@@ -265,11 +258,7 @@ impl<'a> CodeGenerator<'a> {
 				}
 			}
 			Container::Struct(fields) => {
-				let all_optional =
-					fields.iter().all(|field| field.value.is_optional());
-				if all_optional || self.config.generate_default {
-					derive_macros.push("Default".to_string());
-				}
+				derive_macros.push("Default".to_string());
 				let derives = derive_idents(&derive_macros);
 				let custom = self.custom_derive_tokens();
 
@@ -428,67 +417,14 @@ impl<'a> CodeGenerator<'a> {
 	}
 
 	// ------------------------------------------------------------------
-	// Builder (`new()`) generation
-	// ------------------------------------------------------------------
-
-	fn emit_builder_impl(
-		&self,
-		_state: &EmitterState,
-		struct_name: &str,
-		fields: &[Field],
-	) -> TokenStream {
-		let required: Vec<&Field> = fields
-			.iter()
-			.filter(|field| !field.value.is_optional())
-			.collect();
-
-		if required.is_empty() {
-			return quote! {};
-		}
-
-		let struct_ident = Ident::new(struct_name, Span::call_site());
-
-		let params: Vec<TokenStream> = required
-			.iter()
-			.map(|field| {
-				let fi = make_field_ident(&field.name);
-				let ty = format_to_type_tokens(
-					&field.value,
-					self.config.use_title_case,
-				);
-				quote! { #fi: #ty }
-			})
-			.collect();
-
-		let inits: Vec<TokenStream> = fields
-			.iter()
-			.map(|field| {
-				let fi = make_field_ident(&field.name);
-				if field.value.is_optional() {
-					let default = default_value_tokens(&field.value);
-					quote! { #fi: #default }
-				} else {
-					quote! { #fi }
-				}
-			})
-			.collect();
-
-		quote! {
-			impl #struct_ident {
-				pub fn new(#(#params),*) -> Self {
-					Self {
-						#(#inits,)*
-					}
-				}
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------
 	// Trait impl generation
 	// ------------------------------------------------------------------
 
-	fn emit_trait_impls(&self, struct_name: &str) -> TokenStream {
+	fn emit_trait_impls(
+		&self,
+		struct_name: &str,
+		fields: &[Field],
+	) -> TokenStream {
 		let meta = &self.config.resource_meta;
 		let matching =
 			meta.iter().find(|entry| entry.struct_name == struct_name);
@@ -502,6 +438,7 @@ impl<'a> CodeGenerator<'a> {
 		let resource_type_str = &entry.resource_type;
 		let provider_const = provider_source_to_const(&entry.provider_source);
 		let provider_ident = Ident::new(&provider_const, Span::call_site());
+		let validate_fn = emit_validate_definition(fields);
 
 		quote! {
 			impl terra::ToJson for #struct_ident {
@@ -513,6 +450,7 @@ impl<'a> CodeGenerator<'a> {
 			impl terra::Resource for #struct_ident {
 				fn resource_type(&self) -> &'static str { #resource_type_str }
 				fn provider(&self) -> &'static terra::Provider { &terra::Provider::#provider_ident }
+				#validate_fn
 			}
 		}
 	}
@@ -606,102 +544,6 @@ fn quote_field_type(
 	}
 }
 
-/// Map a `FieldType` to its token representation for builder parameters.
-///
-/// This is used by the builder generator and intentionally mirrors
-/// `quote_field_type` but operates independently of the `EmitterState`
-/// sizing checks.
-fn format_to_type_tokens(ft: &FieldType, title_case: bool) -> TokenStream {
-	match ft {
-		FieldType::TypeName(name) => {
-			let display = if title_case {
-				name.to_upper_camel_case()
-			} else {
-				name.clone()
-			};
-			let ident = Ident::new(&display, Span::call_site());
-			quote! { #ident }
-		}
-		FieldType::Unit => quote! { () },
-		FieldType::Bool => quote! { bool },
-		FieldType::I8 => quote! { i8 },
-		FieldType::I16 => quote! { i16 },
-		FieldType::I32 => quote! { i32 },
-		FieldType::I64 => quote! { i64 },
-		FieldType::I128 => quote! { i128 },
-		FieldType::U8 => quote! { u8 },
-		FieldType::U16 => quote! { u16 },
-		FieldType::U32 => quote! { u32 },
-		FieldType::U64 => quote! { u64 },
-		FieldType::U128 => quote! { u128 },
-		FieldType::F32 => quote! { f32 },
-		FieldType::F64 => quote! { f64 },
-		FieldType::Char => quote! { char },
-		FieldType::Str => quote! { SmolStr },
-		FieldType::Bytes => {
-			let ident = Ident::new("Bytes", Span::call_site());
-			quote! { #ident }
-		}
-		FieldType::Option(inner) => {
-			let inner_ty = format_to_type_tokens(inner, title_case);
-			quote! { Option<#inner_ty> }
-		}
-		FieldType::Seq(inner) => {
-			let inner_ty = format_to_type_tokens(inner, title_case);
-			quote! { Vec<#inner_ty> }
-		}
-		FieldType::Map { key, value } => {
-			let key_ty = format_to_type_tokens(key, title_case);
-			let val_ty = format_to_type_tokens(value, title_case);
-			let map_ident = Ident::new("Map", Span::call_site());
-			quote! { #map_ident<#key_ty, #val_ty> }
-		}
-		FieldType::Tuple(fmts) => {
-			let types: Vec<_> = fmts
-				.iter()
-				.map(|field_type| format_to_type_tokens(field_type, title_case))
-				.collect();
-			quote! { (#(#types),*) }
-		}
-		FieldType::TupleArray { content, size } => {
-			let inner = format_to_type_tokens(content, title_case);
-			let sz = *size;
-			quote! { [#inner; #sz] }
-		}
-	}
-}
-
-/// Return a token stream producing the natural default value for a given
-/// field type (used for optional fields in generated constructors).
-fn default_value_tokens(ft: &FieldType) -> TokenStream {
-	match ft {
-		FieldType::Option(_) => quote! { None },
-		FieldType::Seq(_) => quote! { Vec::new() },
-		FieldType::Str => quote! { SmolStr::default() },
-		FieldType::Bool => quote! { false },
-		FieldType::I8
-		| FieldType::I16
-		| FieldType::I32
-		| FieldType::I64
-		| FieldType::I128 => {
-			quote! { 0 }
-		}
-		FieldType::U8
-		| FieldType::U16
-		| FieldType::U32
-		| FieldType::U64
-		| FieldType::U128 => {
-			quote! { 0 }
-		}
-		FieldType::F32 | FieldType::F64 => quote! { 0.0 },
-		FieldType::Map { .. } => {
-			let map_ident = Ident::new("Map", Span::call_site());
-			quote! { #map_ident::new() }
-		}
-		_ => quote! { Default::default() },
-	}
-}
-
 /// Apply the title-case rename map to a type name string.
 fn rename_type(state: &EmitterState, name: &str) -> String {
 	if state.type_renames.is_empty() {
@@ -739,6 +581,62 @@ fn resolve_struct_name(
 fn provider_source_to_const(source: &str) -> String {
 	let provider_name = source.split('/').last().unwrap_or("unknown");
 	provider_name.to_uppercase()
+}
+
+/// Generate the body of `validate_definition` for a resource struct.
+///
+/// - Required fields: must not be empty (strings, sequences, maps).
+/// - Computed-only fields: must be `None`.
+fn emit_validate_definition(fields: &[Field]) -> TokenStream {
+	let mut checks = Vec::new();
+
+	for field in fields {
+		let fi = make_field_ident(&field.name);
+		let clean_name = if field.name.starts_with("r#") {
+			&field.name[2..]
+		} else {
+			&field.name
+		};
+
+		if field.metadata.required {
+			let msg = format!("{{}}: required field `{}` is empty", clean_name);
+			match &field.value {
+				FieldType::Str | FieldType::Seq(_) | FieldType::Map { .. } => {
+					checks.push(quote! {
+						if self.#fi.is_empty() {
+							bevybail!(#msg, self.resource_type());
+						}
+					});
+				}
+				_ => {}
+			}
+		}
+
+		if field.metadata.is_computed_only() {
+			if let FieldType::Option(_) = &field.value {
+				let msg = format!(
+					"{{}}: computed-only field `{}` should not be set",
+					clean_name,
+				);
+				checks.push(quote! {
+					if self.#fi.is_some() {
+						bevybail!(#msg, self.resource_type());
+					}
+				});
+			}
+		}
+	}
+
+	if checks.is_empty() {
+		return quote! {};
+	}
+
+	quote! {
+		fn validate_definition(&self) -> Result {
+			#(#checks)*
+			Ok(())
+		}
+	}
 }
 
 /// Produce `#[serde(skip_serializing_if = "…")]` annotations.

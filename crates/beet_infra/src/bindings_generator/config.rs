@@ -25,14 +25,6 @@ pub struct CodeGeneratorConfig {
 	/// Optional custom preamble to replace the default `#![allow(…)]` /
 	/// `use serde::…` block at the top of the generated file.
 	pub(crate) custom_preamble: Option<String>,
-	/// When `true`, always derive `Default` for structs — even those with
-	/// required (non-`Option`) fields.  This sacrifices compile-time safety
-	/// for ergonomics (`..Default::default()` patterns).
-	pub(crate) generate_default: bool,
-	/// When `true`, emit `pub fn new(…)` constructors for structs that have
-	/// at least one required field.  Optional fields are initialised to their
-	/// natural defaults (`None`, `Vec::new()`, etc.).
-	pub(crate) generate_builders: bool,
 	/// When `true`, emit `terra::Resource` and `terra::ToJson` trait
 	/// implementations for each resource struct listed in `resource_meta`.
 	pub(crate) generate_trait_impls: bool,
@@ -80,8 +72,6 @@ impl CodeGeneratorConfig {
 			use_title_case: false,
 			generate_roots: true,
 			custom_preamble: None,
-			generate_default: true,
-			generate_builders: true,
 			generate_trait_impls: false,
 			resource_meta: Vec::new(),
 		}
@@ -154,21 +144,6 @@ impl CodeGeneratorConfig {
 		self
 	}
 
-	/// When `true`, **always** derive `Default` for structs, even those with
-	/// required fields.  This lets callers use `..Default::default()` at the
-	/// cost of potentially constructing invalid resources.
-	pub fn with_generate_default(mut self, enabled: bool) -> Self {
-		self.generate_default = enabled;
-		self
-	}
-
-	/// Enable or disable `pub fn new(…)` constructor generation for structs
-	/// with required fields.
-	pub fn with_generate_builders(mut self, enabled: bool) -> Self {
-		self.generate_builders = enabled;
-		self
-	}
-
 	/// Enable or disable `terra::Resource` / `terra::ToJson` trait impl generation.
 	/// Requires [`resource_meta`](Self::with_resource_meta) to be populated.
 	pub fn with_generate_trait_impls(mut self, enabled: bool) -> Self {
@@ -178,7 +153,10 @@ impl CodeGeneratorConfig {
 
 	/// Provide metadata about generated resource types so the emitter can
 	/// produce trait implementations and correctly-typed constructors.
-	pub fn with_resource_meta(mut self, meta: Vec<terra::ResourceMeta>) -> Self {
+	pub fn with_resource_meta(
+		mut self,
+		meta: Vec<terra::ResourceMeta>,
+	) -> Self {
 		self.resource_meta = meta;
 		self
 	}

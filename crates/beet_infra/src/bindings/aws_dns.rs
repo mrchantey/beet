@@ -1,4 +1,4 @@
-//! Terraform provider bindings for AWS Route53 DNS.
+//! Auto-generated Terraform provider bindings — do not edit by hand.
 
 #![allow(unused_imports, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 use std::collections::BTreeMap as Map;
@@ -11,71 +11,92 @@ use crate::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 pub struct AwsRoute53RecordDetails {
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_overwrite: Option<bool>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depends_on: Option<Vec<SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub for_each: Option<Vec<SmolStr>>,
-    /// The FQDN built from the name and zone.
+    /// ## Attribute
+    /// `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fqdn: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub health_check_id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`, `computed`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multivalue_answer_routing_policy: Option<bool>,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub name: SmolStr,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub records: Option<Vec<SmolStr>>,
-    /// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub set_identifier: Option<SmolStr>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Map<SmolStr, SmolStr>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags_all: Option<Map<SmolStr, SmolStr>>,
+    /// ## Attribute
+    /// `optional`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ttl: Option<i64>,
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub r#type: SmolStr,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub zone_id: SmolStr,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<Vec<AwsRoute53RecordResourceBlockTypeAlias>>,
-}
-impl AwsRoute53RecordDetails {
-    pub fn new(name: SmolStr, r#type: SmolStr, zone_id: SmolStr) -> Self {
-        Self {
-            allow_overwrite: None,
-            count: None,
-            depends_on: None,
-            for_each: None,
-            fqdn: None,
-            health_check_id: None,
-            id: None,
-            multivalue_answer_routing_policy: None,
-            name,
-            provider: None,
-            records: None,
-            region: None,
-            set_identifier: None,
-            tags: None,
-            tags_all: None,
-            ttl: None,
-            r#type,
-            zone_id,
-            alias: None,
-        }
-    }
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cidr_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeCidrRoutingPolicy>,
+    >,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failover_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeFailoverRoutingPolicy>,
+    >,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geolocation_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeGeolocationRoutingPolicy>,
+    >,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geoproximity_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeGeoproximityRoutingPolicy>,
+    >,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeLatencyRoutingPolicy>,
+    >,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeouts: Option<Vec<AwsRoute53RecordResourceBlockTypeTimeouts>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weighted_routing_policy: Option<
+        Vec<AwsRoute53RecordResourceBlockTypeWeightedRoutingPolicy>,
+    >,
 }
 impl terra::ToJson for AwsRoute53RecordDetails {
     fn to_json(&self) -> serde_json::Value {
@@ -89,27 +110,131 @@ impl terra::Resource for AwsRoute53RecordDetails {
     fn provider(&self) -> &'static terra::Provider {
         &terra::Provider::AWS
     }
+    fn validate_definition(&self) -> Result {
+        if self.fqdn.is_some() {
+            bevybail!(
+                "{}: computed-only field `fqdn` should not be set", self.resource_type()
+            );
+        }
+        if self.name.is_empty() {
+            bevybail!("{}: required field `name` is empty", self.resource_type());
+        }
+        if self.r#type.is_empty() {
+            bevybail!("{}: required field `type` is empty", self.resource_type());
+        }
+        if self.zone_id.is_empty() {
+            bevybail!("{}: required field `zone_id` is empty", self.resource_type());
+        }
+        Ok(())
+    }
 }
-
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
 #[serde(rename = "alias")]
 pub struct AwsRoute53RecordResourceBlockTypeAlias {
+    /// ## Attribute
+    /// `required`
     pub evaluate_target_health: bool,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub name: SmolStr,
+    /// ## Attribute
+    /// `required`
     #[serde(skip_serializing_if = "SmolStr::is_empty")]
     pub zone_id: SmolStr,
 }
-impl AwsRoute53RecordResourceBlockTypeAlias {
-    pub fn new(
-        evaluate_target_health: bool,
-        name: SmolStr,
-        zone_id: SmolStr,
-    ) -> Self {
-        Self {
-            evaluate_target_health,
-            name,
-            zone_id,
-        }
-    }
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "cidr_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeCidrRoutingPolicy {
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub collection_id: SmolStr,
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub location_name: SmolStr,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "failover_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeFailoverRoutingPolicy {
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub r#type: SmolStr,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "geolocation_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeGeolocationRoutingPolicy {
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub continent: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subdivision: Option<SmolStr>,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "geoproximity_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeGeoproximityRoutingPolicy {
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aws_region: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bias: Option<i64>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_zone_group: Option<SmolStr>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coordinates: Option<Vec<GeoproximityRoutingPolicyResourceBlockTypeCoordinates>>,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "latency_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeLatencyRoutingPolicy {
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub region: SmolStr,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "timeouts")]
+pub struct AwsRoute53RecordResourceBlockTypeTimeouts {
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delete: Option<SmolStr>,
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update: Option<SmolStr>,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "weighted_routing_policy")]
+pub struct AwsRoute53RecordResourceBlockTypeWeightedRoutingPolicy {
+    /// ## Attribute
+    /// `required`
+    pub weight: i64,
+}
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default)]
+#[serde(rename = "coordinates")]
+pub struct GeoproximityRoutingPolicyResourceBlockTypeCoordinates {
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub latitude: SmolStr,
+    /// ## Attribute
+    /// `required`
+    #[serde(skip_serializing_if = "SmolStr::is_empty")]
+    pub longitude: SmolStr,
 }

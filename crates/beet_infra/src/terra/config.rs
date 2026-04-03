@@ -195,11 +195,15 @@ impl Config {
 
 	/// Add a typed resource. The required provider is registered automatically
 	/// from the resource's [`Resource`] implementation.
+	/// Panics if [`Resource::validate_definition`] fails.
 	pub fn add_labeled_resource(
 		&mut self,
 		label: impl Into<String>,
 		resource: &dyn Resource,
 	) -> &mut Self {
+		resource.validate_definition().unwrap_or_else(|err| {
+			panic!("resource validation failed: {err}");
+		});
 		self.ensure_provider(resource.provider());
 		let type_map = self
 			.resources

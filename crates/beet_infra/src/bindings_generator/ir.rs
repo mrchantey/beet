@@ -60,6 +60,58 @@ pub enum FieldType {
 }
 
 // ---------------------------------------------------------------------------
+// Field metadata from Terraform schema attributes
+// ---------------------------------------------------------------------------
+
+/// Terraform schema attribute flags propagated through code generation.
+///
+/// Used to enrich doc comments and generate runtime validation
+/// in [`validate_definition`](crate::terra::Resource::validate_definition).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct FieldMetadata {
+	/// The user must supply this field.
+	pub required: bool,
+	/// The user may supply this field.
+	pub optional: bool,
+	/// The provider computes this field (possibly in addition to user input).
+	pub computed: bool,
+	/// The field contains sensitive data (passwords, keys, etc.).
+	pub sensitive: bool,
+}
+
+impl FieldMetadata {
+	/// A field that is computed by the provider and should not be set by the
+	/// user (computed=true, not optional, not required).
+	pub fn is_computed_only(&self) -> bool {
+		self.computed && !self.optional && !self.required
+	}
+
+	/// Format the active flags as a comma-separated doc string,
+	/// e.g. `` `required`, `sensitive` ``.
+	/// Returns `None` when no flags are set.
+	pub fn flags_doc(&self) -> Option<String> {
+		let mut parts = Vec::new();
+		if self.required {
+			parts.push("`required`");
+		}
+		if self.optional {
+			parts.push("`optional`");
+		}
+		if self.computed {
+			parts.push("`computed`");
+		}
+		if self.sensitive {
+			parts.push("`sensitive`");
+		}
+		if parts.is_empty() {
+			None
+		} else {
+			Some(parts.join(", "))
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Fields & variants
 // ---------------------------------------------------------------------------
 
@@ -68,6 +120,10 @@ pub enum FieldType {
 pub struct Field {
 	pub name: String,
 	pub value: FieldType,
+	/// Terraform schema attribute flags. Defaults to all-false for fields
+	/// that don't originate from a Terraform attribute (e.g. block-type
+	/// children or manually-constructed IR).
+	pub metadata: FieldMetadata,
 }
 
 /// The payload shape of a single enum variant.
@@ -107,11 +163,25 @@ pub enum Container {
 // ---------------------------------------------------------------------------
 
 impl Field {
-	/// Shorthand for creating a [`Field`].
+	/// Shorthand for creating a [`Field`] with default (empty) metadata.
 	pub fn new(name: impl Into<String>, value: FieldType) -> Self {
 		Self {
 			name: name.into(),
 			value,
+			metadata: FieldMetadata::default(),
+		}
+	}
+
+	/// Create a [`Field`] with explicit metadata.
+	pub fn with_metadata(
+		name: impl Into<String>,
+		value: FieldType,
+		metadata: FieldMetadata,
+	) -> Self {
+		Self {
+			name: name.into(),
+			value,
+			metadata,
 		}
 	}
 }

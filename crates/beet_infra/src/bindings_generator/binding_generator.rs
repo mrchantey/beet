@@ -92,12 +92,6 @@ impl BindingGenerator {
 	// Configuration — convenience forwards
 	// ------------------------------------------------------------------
 
-	/// Enable or disable `new()` constructor generation.
-	pub fn with_builders(mut self, enabled: bool) -> Self {
-		self.config = self.config.with_generate_builders(enabled);
-		self
-	}
-
 	/// Enable or disable `UpperCamelCase` type-name conversion.
 	pub fn with_title_case(mut self, enabled: bool) -> Self {
 		self.config = self.config.with_title_case(enabled);
@@ -120,13 +114,6 @@ impl BindingGenerator {
 	/// with a custom one.
 	pub fn with_custom_preamble(mut self, preamble: impl Into<String>) -> Self {
 		self.config = self.config.with_custom_preamble(preamble);
-		self
-	}
-
-	/// When `true`, always derive `Default` for structs — even those with
-	/// required fields.
-	pub fn with_generate_default(mut self, enabled: bool) -> Self {
-		self.config = self.config.with_generate_default(enabled);
 		self
 	}
 
@@ -253,37 +240,27 @@ mod tests {
 			.config
 			.use_title_case
 			.xpect_eq(gen_b.config.use_title_case);
-		gen_a
-			.config
-			.generate_builders
-			.xpect_eq(gen_b.config.generate_builders);
 	}
 
 	#[test]
 	fn with_code_generator_config() {
 		let config = CodeGeneratorConfig::new()
 			.with_module_name("custom")
-			.with_title_case(true)
-			.with_generate_builders(false);
+			.with_title_case(true);
 
 		let generator =
 			BindingGenerator::new().with_code_generator_config(config);
 		generator.config.use_title_case.xpect_true();
-		generator.config.generate_builders.xpect_false();
 	}
 
 	#[test]
 	fn convenience_forwards() {
 		let generator = BindingGenerator::new()
 			.with_title_case(true)
-			.with_builders(false)
-			.with_trait_impls(true)
-			.with_generate_default(true);
+			.with_trait_impls(true);
 
 		generator.config.use_title_case.xpect_true();
-		generator.config.generate_builders.xpect_false();
 		generator.config.generate_trait_impls.xpect_true();
-		generator.config.generate_default.xpect_true();
 	}
 
 	#[test]
@@ -292,101 +269,6 @@ mod tests {
 		FieldType::Option(Box::new(FieldType::Str))
 			.is_optional()
 			.xpect_true();
-	}
-
-	#[test]
-	fn generate_builder_impls_skips_all_optional() {
-		let config = CodeGeneratorConfig::new().with_generate_builders(true);
-
-		let mut registry = Registry::new();
-		registry.insert(
-			(None, "AllOptional".to_string()),
-			Container::Struct(vec![
-				Field::new("a", FieldType::Option(Box::new(FieldType::Str))),
-				Field::new("b", FieldType::Option(Box::new(FieldType::Bool))),
-			]),
-		);
-
-		let mut buf = Vec::new();
-		CodeGenerator::new(&config)
-			.output(&mut buf, &registry)
-			.unwrap();
-		let output = String::from_utf8(buf).unwrap();
-
-		// All-optional struct should NOT have a builder impl.
-		output.contains("impl AllOptional {").xpect_false();
-	}
-
-	#[test]
-	fn generate_builder_impls_with_required() {
-		let config = CodeGeneratorConfig::new().with_generate_builders(true);
-
-		let mut registry = Registry::new();
-		registry.insert(
-			(None, "MyStruct".to_string()),
-			Container::Struct(vec![
-				Field::new("name", FieldType::Str),
-				Field::new("count", FieldType::I64),
-				Field::new(
-					"label",
-					FieldType::Option(Box::new(FieldType::Str)),
-				),
-			]),
-		);
-
-		let mut buf = Vec::new();
-		CodeGenerator::new(&config)
-			.output(&mut buf, &registry)
-			.unwrap();
-		let output = String::from_utf8(buf).unwrap();
-
-		output.contains("impl MyStruct {").xpect_true();
-		output
-			.contains("pub fn new(name: SmolStr, count: i64) -> Self {")
-			.xpect_true();
-		output.contains("name").xpect_true();
-		output.contains("count").xpect_true();
-		output.contains("label: None").xpect_true();
-	}
-
-	#[test]
-	fn generate_builder_impls_with_namespace() {
-		let config = CodeGeneratorConfig::new().with_generate_builders(true);
-
-		let mut registry = Registry::new();
-		registry.insert(
-			(Some("resource".to_string()), "my_thing".to_string()),
-			Container::Struct(vec![Field::new("id", FieldType::Str)]),
-		);
-
-		let mut buf = Vec::new();
-		CodeGenerator::new(&config)
-			.output(&mut buf, &registry)
-			.unwrap();
-		let output = String::from_utf8(buf).unwrap();
-
-		output.contains("impl resource_my_thing {").xpect_true();
-	}
-
-	#[test]
-	fn generate_builder_impls_title_case() {
-		let config = CodeGeneratorConfig::new()
-			.with_title_case(true)
-			.with_generate_builders(true);
-
-		let mut registry = Registry::new();
-		registry.insert(
-			(None, "my_struct".to_string()),
-			Container::Struct(vec![Field::new("id", FieldType::Str)]),
-		);
-
-		let mut buf = Vec::new();
-		CodeGenerator::new(&config)
-			.output(&mut buf, &registry)
-			.unwrap();
-		let output = String::from_utf8(buf).unwrap();
-
-		output.contains("impl MyStruct {").xpect_true();
 	}
 
 	#[test]
@@ -400,7 +282,6 @@ mod tests {
 		let config = CodeGeneratorConfig::new()
 			.with_title_case(true)
 			.with_generate_trait_impls(true)
-			.with_generate_builders(false)
 			.with_resource_meta(meta);
 
 		let mut registry = Registry::new();
@@ -428,8 +309,7 @@ mod tests {
 	#[test]
 	fn custom_preamble() {
 		let config = CodeGeneratorConfig::new()
-			.with_custom_preamble("// custom preamble\nuse custom::stuff;")
-			.with_generate_builders(false);
+			.with_custom_preamble("// custom preamble\nuse custom::stuff;");
 
 		let registry = Registry::new();
 
@@ -448,10 +328,8 @@ mod tests {
 	}
 
 	#[test]
-	fn generate_default_forces_default_derive() {
-		let config = CodeGeneratorConfig::new()
-			.with_generate_default(true)
-			.with_generate_builders(false);
+	fn default_always_derived() {
+		let config = CodeGeneratorConfig::new();
 
 		let mut registry = Registry::new();
 		registry.insert(

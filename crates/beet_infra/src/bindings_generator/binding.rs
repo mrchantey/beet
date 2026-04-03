@@ -310,22 +310,32 @@ fn collect_descriptions(
 ) {
 	if let Some(attrs) = &block.attributes {
 		for (attr_name, attr) in attrs {
-			if let Some(desc) = &attr.description {
-				if !desc.is_empty() {
-					let key = vec![
-						module_name.to_string(),
-						container_name.to_string(),
-						attr_name.clone(),
-					];
-					comments.insert(key, desc.clone());
+			let mut doc = attr.description.clone().unwrap_or_default();
+			let meta = super::ir::FieldMetadata {
+				required: attr.required.unwrap_or(false),
+				optional: attr.optional.unwrap_or(false),
+				computed: attr.computed.unwrap_or(false),
+				sensitive: attr.sensitive.unwrap_or(false),
+			};
+			if let Some(flags) = meta.flags_doc() {
+				if !doc.is_empty() {
+					doc.push('\n');
 				}
+				doc.push_str(&format!("## Attribute\n{}", flags));
+			}
+			if !doc.is_empty() {
+				let key = vec![
+					module_name.to_string(),
+					container_name.to_string(),
+					attr_name.clone(),
+				];
+				comments.insert(key, doc);
 			}
 		}
 	}
 
 	if let Some(block_types) = &block.block_types {
 		for (bt_name, nested) in block_types {
-			// Build the nested container name the same way export_block_type does.
 			let nested_container =
 				format!("{}_block_type_{}", container_name, bt_name);
 			collect_descriptions(
@@ -431,7 +441,13 @@ fn export_attributes(
 			_ => field_type.clone(),
 		};
 
-		target_attrs.push(Field::new(an, attr_fmt));
+		let metadata = super::ir::FieldMetadata {
+			required: at.required.unwrap_or(false),
+			optional: at.optional.unwrap_or(false),
+			computed: at.computed.unwrap_or(false),
+			sensitive: at.sensitive.unwrap_or(false),
+		};
+		target_attrs.push(Field::with_metadata(an, attr_fmt, metadata));
 	}
 	if !target_attrs.is_empty() {
 		Ok(Some(Container::Struct(target_attrs)))

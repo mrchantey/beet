@@ -9,12 +9,6 @@ use beet_core::prelude::*;
 use serde_json::Value;
 use std::borrow::Cow;
 
-/// Wraps a terraform resource field path in interpolation syntax,
-/// ie `${aws_s3_bucket.my_bucket.arn}`
-pub fn tf_ref(field_path: &str) -> SmolStr {
-	format!("${{{field_path}}}").into()
-}
-
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -99,12 +93,18 @@ pub trait ToJson {
 /// - determine the Terraform resource type (e.g. `"aws_lambda_function"`)
 /// - determine which provider is required
 /// - serialize the resource body to JSON
+/// - validate that required fields are set and computed-only fields are empty
 pub trait Resource: ToJson {
 	/// The Terraform resource type identifier (e.g. `"aws_lambda_function"`).
 	fn resource_type(&self) -> &'static str;
 
 	/// The provider this resource belongs to.
 	fn provider(&self) -> &'static Provider;
+
+	/// Validate that all required fields are set and all computed-only fields
+	/// are empty. Generated implementations check each field; the default
+	/// implementation accepts any state.
+	fn validate_definition(&self) -> Result { Ok(()) }
 }
 
 /// Applied to resources that have an associated name, like a bucket or iam role.

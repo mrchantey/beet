@@ -113,7 +113,6 @@ impl Default for SchemaBindingGenerator {
 			work_dir: PathBuf::from("target/terra-bindings-generator"),
 			binding_generator: BindingGenerator::new()
 				.with_title_case(true)
-				.with_builders(true)
 				.with_trait_impls(true)
 				.with_custom_preamble(build_preamble()),
 		}

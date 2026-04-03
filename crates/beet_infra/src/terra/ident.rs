@@ -28,7 +28,7 @@ where
 	}
 
 	/// The terraform syntax for referencing a resource field,
-	/// in the format `resorce_type.label_name.field_name`
+	/// in the format `resource_type.label_name.field_name`
 	/// ie `aws_iam_role.lambda_role.name`
 	pub fn field(&self, field_name: &str) -> String {
 		let label = &self.ident.label;
@@ -47,9 +47,8 @@ where
 pub struct Ident {
 	app_name: SmolStr,
 	stage: SmolStr,
-	// label: SmolStr,
 	/// kebab-case identifier for a resource,
-	/// preferred by proivders
+	/// preferred by providers
 	/// ie:
 	/// - bucket name
 	/// - lambda function name
