@@ -1,27 +1,30 @@
 //! # Router Example
 //!
+//! The beet router is general in nature
+//! 
+//! 
 //! Demonstrates beet's routing system with multiple server backends.
 //!
 //! ## Running the Example
 //!
 //! ```sh
 //! # CLI mode (default) — show root content and exit
-//! cargo run --example router --features stdio_server
+//! cargo run --example router
 //!
 //! # CLI mode — show help for all routes
-//! cargo run --example router --features stdio_server -- --help
+//! cargo run --example router -- --help
 //!
 //! # CLI mode — navigate to a scene
-//! cargo run --example router --features stdio_server -- about
+//! cargo run --example router -- about
 //!
 //! # CLI mode — show help scoped to a subcommand
-//! cargo run --example router --features stdio_server -- counter --help
+//! cargo run --example router -- counter --help
 //!
 //! # HTTP mode — start an HTTP server on port 3000
 //! cargo run --example router --features http_server -- --server=http
 //!
 //! # REPL mode — interactive read-eval-print loop
-//! cargo run --example router --features stdio_server -- --server=repl
+//! cargo run --example router -- --server=repl
 //! ```
 use beet::prelude::*;
 mod content;

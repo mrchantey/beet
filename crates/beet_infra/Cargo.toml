@@ -21,6 +21,7 @@ bindings_aws_dns = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_cloudflare_common = []
+cli = ["dep:beet_router"]
 
 [[bin]]
 name = "bindings"
@@ -30,6 +31,7 @@ required-features = ["bindings_generator"]
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
+beet_router = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 heck.workspace = true
