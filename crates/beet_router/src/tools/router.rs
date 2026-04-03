@@ -25,6 +25,7 @@ pub fn router() -> impl Bundle {
 /// request to the matching tool via `entity.call`. Scene routes are
 /// regular tools that delegate to the render tool internally, so
 /// no special handling is needed here.
+///
 #[tool]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -32,24 +33,24 @@ pub async fn RouterTool(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
-	let tool_entity = cx.caller.id();
+	let caller = cx.caller.id();
 	let world = cx.caller.world();
 
 	let node = world
-		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {
-			// no tree is a real error
-			root_route_tree(world, tool_entity)?.find(&path).cloned().xok()
+		.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
+			query.get(caller).map(|tree| tree.find(&path).cloned())
 		})
-		.await?;
+		.await;
+
 
 	match node {
-		Some(tool_node) => Pass(
+		Ok(Some(tool_node)) => Pass(
 			world
 				.entity(tool_node.entity)
 				.call::<Request, Response>(cx.input)
 				.await?,
 		),
-		None => Fail(cx.input),
+		_ => Fail(cx.input),
 	}
 	.xok()
 }

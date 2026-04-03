@@ -375,7 +375,7 @@ mod test {
 				}
 			});
 
-		// off-thread required for for multi_threaded, not sure why
+		// off-thread required for bevy_multithreaded, not sure why
 		std::thread::spawn(move || {
 			std::thread::sleep(Duration::from_millis(100));
 			fs_ext::write(path.join("foobar.txt"), "foobar").unwrap();

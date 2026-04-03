@@ -19,18 +19,24 @@ pub async fn call_functions(
 
 		let output = match agent
 			.call_detached(RouterTool.into_tool(), request)
-			.await?
+			.await
 		{
-			Pass(res) => match res.into_result().await {
+			Ok(Pass(res)) => match res.into_result().await {
 				Ok(res) => res.body.into_string().await.unwrap_or_else(|err| {
 					format!("Failed to read response body as string: {err}")
 				}),
 				Err(err) => {
-					format!("Function call failed: {err}")
+					format!(
+						"Function call returned error '{}': {err}",
+						call.name()
+					)
 				}
 			},
-			Fail(_req) => {
-				format!("Function not found")
+			Ok(Fail(_req)) => {
+				format!("Function '{}' not found", call.name())
+			}
+			Err(err) => {
+				format!("Function call failed '{}': {err}", call.name())
 			}
 		};
 

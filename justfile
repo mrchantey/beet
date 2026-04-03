@@ -181,7 +181,7 @@ snap:
 	cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
 test-core *args:
-	# beet_core runs separately to avoid multi_threaded feature unification
+	# beet_core runs separately to avoid bevy_multithreaded feature unification
 	# causing task pool threads to hang in subsequent test binaries
 	cargo test 						\
 		-p beet_core_shared \
