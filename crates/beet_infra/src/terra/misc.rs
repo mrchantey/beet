@@ -102,7 +102,7 @@ pub trait Resource: ToJson {
 }
 
 /// Applied to resources that have an associated name, like a bucket or iam role.
-pub trait Named: Resource {
+pub trait PrimaryResource: Resource {
 	fn set_primary_identifier(&mut self, name: &str);
 }
 

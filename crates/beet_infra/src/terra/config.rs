@@ -39,7 +39,6 @@
 
 use super::misc::Backend;
 use super::misc::DataSource;
-use super::misc::Named;
 use super::misc::Provider;
 use super::misc::Resource;
 use crate::prelude::*;
@@ -165,20 +164,38 @@ impl Config {
 	// Typed resource / data-source API
 	// =====================================================================
 
+	pub fn with_resource<T: Resource>(
+		mut self,
+		resource: &terra::ResourceDef<T>,
+	) -> Self {
+		self.add_resource(resource);
+		self
+	}
+
+	/// a slug is able generate both the label and resource name,
+	/// creating a a shorthand for resources that are [`SetSlug`]
+	pub fn add_resource<T: Resource>(
+		&mut self,
+		resource: &terra::ResourceDef<T>,
+	) -> &mut Self {
+		self.add_labeled_resource(resource.ident().label(), resource.resource())
+	}
+
+
 	/// Add a typed resource (chaining). The required provider is registered
 	/// automatically from the resource's [`Resource`] implementation.
-	pub fn with_resource(
+	pub fn with_labeled_resource(
 		mut self,
 		name: impl Into<String>,
 		resource: &dyn Resource,
 	) -> Self {
-		self.add_resource(name, resource);
+		self.add_labeled_resource(name, resource);
 		self
 	}
 
 	/// Add a typed resource. The required provider is registered automatically
 	/// from the resource's [`Resource`] implementation.
-	pub fn add_resource(
+	pub fn add_labeled_resource(
 		&mut self,
 		label: impl Into<String>,
 		resource: &dyn Resource,
@@ -194,15 +211,6 @@ impl Config {
 		self
 	}
 
-	/// a slug is able generate both the label and resource name,
-	/// creating a a shorthand for resources that are [`SetSlug`]
-	pub fn add_named_resource<T>(&mut self, slug: &Slug, mut resource: T)
-	where
-		T: Named + Resource,
-	{
-		resource.set_primary_identifier(&slug.primary_identifier());
-		self.add_resource(slug.label(), &resource);
-	}
 
 	/// Add a typed data source (chaining). The required provider is registered
 	/// automatically from the data source's [`DataSource`] implementation.

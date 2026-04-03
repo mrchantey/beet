@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -30,59 +28,14 @@ impl Default for StackContext {
 impl StackContext {
 	pub fn is_production(&self) -> bool { self.stage == self.prod_stage }
 
-	pub fn bucket_slug(&self, key: impl Into<SmolStr>) -> Slug {
-		self.resource_slug("buckets", key)
-	}
-	pub fn iam_role_slug(&self, key: impl Into<SmolStr>) -> Slug {
-		self.resource_slug("iam-roles", key)
-	}
+	// pub fn bucket_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
+	// 	self.resource_ident("buckets", label)
+	// }
+	// pub fn iam_role_slug(&self, label: impl Into<SmolStr>) -> terra::Ident {
+	// 	self.resource_ident("iam-roles", label)
+	// }
 
-	pub fn resource_slug(
-		&self,
-		resource_kind: impl Into<SmolStr>,
-		key: impl Into<SmolStr>,
-	) -> Slug {
-		Slug::new(vec![
-			self.app_name.clone(),
-			self.stage.clone(),
-			resource_kind.into(),
-			key.into(),
-		])
-	}
-}
-
-pub trait ToTerraConfig {
-	fn to_terra_config(&self, cx: &StackContext) -> Result<terra::Config>;
-}
-
-/// Resource identifier, usually comprised of a tuple of strings,
-/// ie app-name, stage, resource name
-pub struct Slug(Vec<SmolStr>);
-impl Slug {
-	pub fn new(parts: impl IntoIterator<Item = impl Into<SmolStr>>) -> Self {
-		Self(parts.into_iter().map(|s| s.into().into()).collect())
-	}
-	/// Converts the slug to alphanumeric and dashes
-	/// ie `my-app, prod, buckets, html` becomes:
-	/// `my-app--prod--buckets--html`
-	pub fn primary_identifier(&self) -> String {
-		use heck::ToKebabCase;
-		self.0.join("--").to_kebab_case()
-	}
-	/// Converts the slug to alphanumeric and underscores
-	/// ie `my-app, prod, buckets, html` becomes:
-	/// `my_app__prod__buckets__html`
-	pub fn label(&self) -> String {
-		use heck::ToSnakeCase;
-		self.0.join("__").to_snake_case()
-	}
-
-	/// Converts to kebab case path
-	pub fn to_path(&self) -> PathBuf {
-		use heck::ToKebabCase;
-		self.0.iter().fold(PathBuf::new(), |mut path, part| {
-			path.push(part.to_kebab_case());
-			path
-		})
+	pub fn resource_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
+		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
 	}
 }

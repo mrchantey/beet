@@ -18,6 +18,7 @@ mod exit_status;
 mod multimap;
 mod option;
 mod result_x;
+mod str;
 #[cfg(feature = "json")]
 mod value;
 mod vec;
@@ -28,6 +29,7 @@ pub use exit_status::*;
 pub use multimap::*;
 pub use option::*;
 pub use result_x::*;
+pub use str::*;
 #[cfg(feature = "json")]
 pub use value::*;
 pub use vec::*;

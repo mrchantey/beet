@@ -12,18 +12,18 @@ pub mod region {
 }
 
 
-impl terra::Named for AwsS3BucketDetails {
+impl terra::PrimaryResource for AwsS3BucketDetails {
 	fn set_primary_identifier(&mut self, name: &str) {
 		self.bucket = Some(name.into())
 	}
 }
 
-impl terra::Named for AwsIamRoleDetails {
+impl terra::PrimaryResource for AwsIamRoleDetails {
 	fn set_primary_identifier(&mut self, name: &str) {
 		self.name = Some(name.into())
 	}
 }
-impl terra::Named for AwsLambdaFunctionDetails {
+impl terra::PrimaryResource for AwsLambdaFunctionDetails {
 	fn set_primary_identifier(&mut self, name: &str) {
 		self.function_name = name.into()
 	}
