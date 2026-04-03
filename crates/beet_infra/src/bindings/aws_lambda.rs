@@ -1,4 +1,6 @@
-//! Auto-generated Terraform provider bindings — do not edit by hand.
+//! Auto-generated Terraform provider bindings — do not edit!
+//! Auto-generated Terraform provider bindings — do not edit!
+//! Auto-generated Terraform provider bindings — do not edit!
 
 #![allow(
 	unused_imports,
