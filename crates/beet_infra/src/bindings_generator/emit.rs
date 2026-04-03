@@ -599,12 +599,14 @@ fn emit_validate_definition(fields: &[Field]) -> TokenStream {
 		};
 
 		if field.metadata.required {
-			let msg = format!("{{}}: required field `{}` is empty", clean_name);
 			match &field.value {
 				FieldType::Str | FieldType::Seq(_) | FieldType::Map { .. } => {
 					checks.push(quote! {
 						if self.#fi.is_empty() {
-							bevybail!(#msg, self.resource_type());
+							return Err(terra::ResourceValidationError::MissingRequiredField {
+								resource_type: self.resource_type(),
+								field_name: #clean_name,
+							});
 						}
 					});
 				}
@@ -614,13 +616,12 @@ fn emit_validate_definition(fields: &[Field]) -> TokenStream {
 
 		if field.metadata.is_computed_only() {
 			if let FieldType::Option(_) = &field.value {
-				let msg = format!(
-					"{{}}: computed-only field `{}` should not be set",
-					clean_name,
-				);
 				checks.push(quote! {
 					if self.#fi.is_some() {
-						bevybail!(#msg, self.resource_type());
+						return Err(terra::ResourceValidationError::NonEmptyComputedField {
+							resource_type: self.resource_type(),
+							field_name: #clean_name,
+						});
 					}
 				});
 			}
@@ -632,7 +633,7 @@ fn emit_validate_definition(fields: &[Field]) -> TokenStream {
 	}
 
 	quote! {
-		fn validate_definition(&self) -> Result {
+		fn validate_definition(&self) -> Result<(), terra::ResourceValidationError> {
 			#(#checks)*
 			Ok(())
 		}

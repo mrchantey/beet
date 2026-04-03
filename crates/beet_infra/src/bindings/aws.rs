@@ -32,3 +32,7 @@ impl terra::PrimaryResource for AwsLambdaFunctionDetails {
 		self.function_name = name.into()
 	}
 }
+#[cfg(feature = "bindings_aws_lambda")]
+impl terra::PrimaryResource for AwsApigatewayv2ApiDetails {
+	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
+}

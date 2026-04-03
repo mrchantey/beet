@@ -342,7 +342,9 @@ impl SchemaBindingGenerator {
 /// Standard preamble for generated provider modules.
 fn build_preamble() -> String {
 	[
-		"//! Auto-generated Terraform provider bindings — do not edit by hand.",
+		"//! Auto-generated Terraform provider bindings — do not edit!",
+		"//! Auto-generated Terraform provider bindings — do not edit!",
+		"//! Auto-generated Terraform provider bindings — do not edit!",
 		"",
 		"#![allow(unused_imports, non_snake_case, non_camel_case_types, non_upper_case_globals)]",
 		"use std::collections::BTreeMap as Map;",

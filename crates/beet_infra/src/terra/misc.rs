@@ -8,6 +8,7 @@
 use beet_core::prelude::*;
 use serde_json::Value;
 use std::borrow::Cow;
+use thiserror::Error;
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -86,6 +87,25 @@ pub trait ToJson {
 	fn to_json(&self) -> Value;
 }
 
+/// Validation errors returned by [`Resource::validate_definition`].
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ResourceValidationError {
+	/// A computed-only field was set before deployment.
+	#[error(
+		"{resource_type}: computed-only field `{field_name}` should not be set"
+	)]
+	NonEmptyComputedField {
+		resource_type: &'static str,
+		field_name: &'static str,
+	},
+	/// A required field was left empty.
+	#[error("{resource_type}: required field `{field_name}` is empty")]
+	MissingRequiredField {
+		resource_type: &'static str,
+		field_name: &'static str,
+	},
+}
+
 /// A typed Terraform resource.
 ///
 /// Every generated resource struct implements this trait, giving the config
@@ -104,7 +124,9 @@ pub trait Resource: ToJson {
 	/// Validate that all required fields are set and all computed-only fields
 	/// are empty. Generated implementations check each field; the default
 	/// implementation accepts any state.
-	fn validate_definition(&self) -> Result { Ok(()) }
+	fn validate_definition(&self) -> Result<(), ResourceValidationError> {
+		Ok(())
+	}
 }
 
 /// Applied to resources that have an associated name, like a bucket or iam role.

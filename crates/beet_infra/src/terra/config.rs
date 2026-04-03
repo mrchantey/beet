@@ -41,6 +41,7 @@ use super::misc::Backend;
 use super::misc::DataSource;
 use super::misc::Provider;
 use super::misc::Resource;
+use super::misc::ResourceValidationError;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Serialize;
@@ -96,6 +97,8 @@ pub struct Config {
 	variables: Map<String, Value>,
 	outputs: Map<String, Value>,
 	locals: Map<String, Value>,
+	/// Validation errors collected when resources are added, checked in [`Config::validate`].
+	validation_errors: Vec<ResourceValidationError>,
 }
 
 impl Config {
@@ -111,6 +114,7 @@ impl Config {
 			variables: Map::new(),
 			outputs: Map::new(),
 			locals: Map::new(),
+			validation_errors: Vec::new(),
 		}
 	}
 
@@ -195,15 +199,15 @@ impl Config {
 
 	/// Add a typed resource. The required provider is registered automatically
 	/// from the resource's [`Resource`] implementation.
-	/// Panics if [`Resource::validate_definition`] fails.
+	/// Validation errors are collected and returned by [`Config::validate`].
 	pub fn add_labeled_resource(
 		&mut self,
 		label: impl Into<String>,
 		resource: &dyn Resource,
 	) -> &mut Self {
-		resource.validate_definition().unwrap_or_else(|err| {
-			panic!("resource validation failed: {err}");
-		});
+		if let Err(err) = resource.validate_definition() {
+			self.validation_errors.push(err);
+		}
 		self.ensure_provider(resource.provider());
 		let type_map = self
 			.resources
@@ -548,6 +552,15 @@ impl Config {
 	///
 	/// Returns the JSON output of `tofu validate -json` on success.
 	pub async fn validate(&self) -> Result<String> {
+		if !self.validation_errors.is_empty() {
+			let messages = self
+				.validation_errors
+				.iter()
+				.map(|e| e.to_string())
+				.collect::<Vec<_>>()
+				.join("\n");
+			bevybail!("resource validation failed:\n{messages}");
+		}
 		let dir = TempDir::new()?;
 		self.export_to_file(dir.as_ref().join("main.tf.json"))
 			.await?;
@@ -589,6 +602,15 @@ impl Config {
 		&self,
 		path: impl AsRef<Path>,
 	) -> Result<String> {
+		if !self.validation_errors.is_empty() {
+			let messages = self
+				.validation_errors
+				.iter()
+				.map(|e| e.to_string())
+				.collect::<Vec<_>>()
+				.join("\n");
+			bevybail!("resource validation failed:\n{messages}");
+		}
 		let path = path.as_ref();
 		let dir = path.parent().unwrap_or(Path::new("."));
 		fs_ext::create_dir_all(dir)?;

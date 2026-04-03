@@ -123,11 +123,9 @@ impl LambdaStack {
 		);
 
 		// API Gateway v2
-		let gateway_ident = cx.resource_ident("gateway");
-		let gateway = ResourceDef::new_secondary(
-			gateway_ident.clone(),
+		let gateway = ResourceDef::new_primary(
+			cx.resource_ident("gateway"),
 			AwsApigatewayv2ApiDetails {
-				name: gateway_ident.primary_identifier().into(),
 				protocol_type: "HTTP".into(),
 				..default()
 			},
