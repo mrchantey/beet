@@ -20,32 +20,38 @@ fn completions_streamer_non_streaming() -> CompletionsStreamer {
 
 // === PostStreamer (Completions) tests ===
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn basic_text_response() {
 	post_streamer::basic_text_response(completions_streamer_non_streaming())
 		.await;
 }
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn streaming_response() {
 	post_streamer::streaming_response(completions_streamer()).await;
 }
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn system_prompt() {
 	post_streamer::system_prompt(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn tool_calling() {
 	post_streamer::tool_calling(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn image_input() {
 	post_streamer::image_input(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 15_000)]
 async fn multi_turn_conversation() {
 	post_streamer::multi_turn_conversation(
@@ -56,6 +62,7 @@ async fn multi_turn_conversation() {
 
 // === Image Roundtrip tests ===
 
+#[ignore = "requires Gemini API key"]
 #[beet_core::test(timeout_ms = 30_000)]
 async fn image_roundtrip() {
 	post_streamer::image_roundtrip(completions_streamer_non_streaming()).await;

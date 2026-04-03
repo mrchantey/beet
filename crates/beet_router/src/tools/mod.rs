@@ -13,10 +13,10 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Gets the [`RouteTree`] from the root ancestor of the given entity.
-pub(crate) fn root_route_tree(
-	world: &World,
+pub(crate) fn root_route_tree<'w>(
+	world: &'w World,
 	entity: Entity,
-) -> Result<&RouteTree> {
+) -> Result<&'w RouteTree> {
 	/// Walks up [`ChildOf`] relations to find the root ancestor entity.
 	fn walk_to_root(world: &World, entity: Entity) -> Entity {
 		let mut current = entity;

@@ -39,7 +39,7 @@ pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> Tool<Input, Out>
 where
 	Func: 'static + Send + Sync + Clone + FnOnce(AsyncToolIn<Input>) -> Fut,
 	Input: 'static + Send + Sync,
-	Fut: 'static + Send + Future<Output = Result<Out>>,
+	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
 {
 	Tool::new(
@@ -73,7 +73,7 @@ impl<Func, Input, Out, Fut> IntoTool<(AsyncToolMarker, Input, Out)> for Func
 where
 	Func: 'static + Send + Sync + Clone + Fn(AsyncToolIn<Input>) -> Fut,
 	Input: 'static + Send + Sync,
-	Fut: 'static + Send + Future<Output = Result<Out>>,
+	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
 {
 	type In = Input;
@@ -91,7 +91,7 @@ impl<Func, Input, Out, Fut> IntoTool<(TypedAsyncToolMarker, Input, Out)>
 where
 	Func: 'static + Send + Sync + Clone + Fn(Input) -> Fut,
 	Input: 'static + Send + Sync + bevy::reflect::Typed,
-	Fut: 'static + Send + Future<Output = Out>,
+	Fut: 'static + MaybeSend + Future<Output = Out>,
 	Out: 'static + Send + Sync,
 {
 	type In = Input;

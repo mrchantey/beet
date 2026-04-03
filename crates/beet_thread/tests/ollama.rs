@@ -21,31 +21,37 @@ fn completions_streamer_non_streaming() -> CompletionsStreamer {
 
 // === PostStreamer (O11s) tests ===
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn basic_text_response() {
 	post_streamer::basic_text_response(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn streaming_response() {
 	post_streamer::streaming_response(streamer()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn system_prompt() {
 	post_streamer::system_prompt(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn tool_calling() {
 	post_streamer::tool_calling(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn image_input() {
 	post_streamer::image_input(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn multi_turn_conversation() {
 	post_streamer::multi_turn_conversation(streamer_non_streaming()).await;
@@ -53,32 +59,38 @@ async fn multi_turn_conversation() {
 
 // === PostStreamer (Completions) tests ===
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_basic_text_response() {
 	post_streamer::basic_text_response(completions_streamer_non_streaming())
 		.await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_streaming_response() {
 	post_streamer::streaming_response(completions_streamer()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_system_prompt() {
 	post_streamer::system_prompt(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_tool_calling() {
 	post_streamer::tool_calling(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_image_input() {
 	post_streamer::image_input(completions_streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_multi_turn_conversation() {
 	post_streamer::multi_turn_conversation(
@@ -89,11 +101,13 @@ async fn cs_multi_turn_conversation() {
 
 // === Image Roundtrip tests ===
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn image_roundtrip() {
 	post_streamer::image_roundtrip(streamer_non_streaming()).await;
 }
 
+#[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 60_000)]
 async fn cs_image_roundtrip() {
 	post_streamer::image_roundtrip(completions_streamer_non_streaming()).await;

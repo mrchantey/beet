@@ -283,7 +283,7 @@ impl<'w, 's> AsyncCommands<'w, 's> {
 	pub fn run<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		spawn_async_task(self.world(), func);

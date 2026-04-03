@@ -86,25 +86,23 @@
 //! ```no_run
 //! use beet_thread::prelude::*;
 //! use beet_core::prelude::*;
+//! use beet_net::prelude::*;
 //!
 //! # async fn example() -> Result<()> {
-//! let mut provider = OllamaProvider::default();
-//!
-//! let body = o11s::RequestBody::new(provider.default_small_model())
+//! let body = o11s::RequestBody::new(OllamaProvider::QWEN_3_5_9B)
 //!     .with_simple_input("Write a haiku.")
 //!     .with_stream(true);
 //!
-//! let stream = provider.stream(body).await?;
-//! beet_core::exports::futures_lite::pin!(stream);
+//! let mut stream = Request::post(OllamaProvider::RESPONSES_URL)
+//!     .with_json_body(&body)?
+//!     .send()
+//!     .await?
+//!     .event_source_raw()
+//!     .await?;
 //!
-//! while let Some(event) = stream.next().await {
-//!     match event? {
-//!         o11s::StreamingEvent::OutputTextDelta(ev) => {
-//!             print!("{}", ev.delta);
-//!         }
-//!         o11s::StreamingEvent::ResponseCompleted(_) => break,
-//!         _ => {}
-//!     }
+//! while let Some(Ok(event)) = stream.next().await {
+//!     if event.data == "[DONE]" { break; }
+//!     print!("{}", event.data);
 //! }
 //! # Ok(())
 //! # }

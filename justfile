@@ -181,10 +181,14 @@ snap:
 	cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
 test-core *args:
+	# beet_core runs separately to avoid multi_threaded feature unification
+	# causing task pool threads to hang in subsequent test binaries
 	cargo test 						\
 		-p beet_core_shared \
 		-p beet_core_macros \
 		-p beet_core 				\
+		--all-features {{ args }} -- {{ test-threads }}
+	cargo test 						\
 		-p beet_infra 			\
 		-p beet_net 				\
 		-p beet_node 				\
@@ -195,8 +199,6 @@ test-core *args:
 	cargo test						\
 		-p beet_core  			\
 		-p beet_net  				\
-		-p beet_infra 			\
-		-p beet_net 				\
 		-p beet_node 				\
 		-p beet_router 			\
 		-p beet_thread 			\
