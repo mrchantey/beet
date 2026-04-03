@@ -45,11 +45,17 @@ pub use beet_tool as tool;
 pub mod prelude {
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;
+	#[cfg(feature = "infra")]
+	pub use crate::infra::prelude::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
-	#[cfg(feature = "node")]
+	#[cfg(all(
+		feature = "node",
+		feature = "tui",
+		not(target_arch = "wasm32")
+	))]
 	pub use crate::node::prelude::Justify;
 	#[cfg(feature = "node")]
 	pub use crate::node::prelude::Pointer;
@@ -57,8 +63,6 @@ pub mod prelude {
 	pub use crate::node::prelude::*;
 	#[cfg(feature = "node")]
 	pub use crate::node::val;
-	#[cfg(feature = "infra")]
-	pub use crate::infra::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "tool")]

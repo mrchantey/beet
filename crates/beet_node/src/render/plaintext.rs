@@ -68,7 +68,7 @@ impl NodeRenderer for PlainTextRenderer {
 		if self.plaintext_only {
 			cx.check_accepts(&[MediaType::Text])?;
 		} else if !cx.accepts.is_empty()
-			&& !cx.accepts.iter().any(|mt| mt.is_text())
+			&& !cx.accepts.iter().any(|mt| mt.is_wildcard() || mt.is_text())
 		{
 			return Err(RenderError::AcceptMismatch {
 				requested: cx.accepts.clone(),

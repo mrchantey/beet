@@ -492,6 +492,14 @@ impl MediaType {
 		matches!(self, MediaType::Json | MediaType::Postcard)
 	}
 
+	/// Whether this is an HTTP wildcard media type (`*/*` or `text/*`).
+	///
+	/// Wildcards mean "any media type is acceptable" and should be treated
+	/// as a match by all renderers.
+	pub fn is_wildcard(&self) -> bool {
+		matches!(self, MediaType::Other(s) if s == "*/*" || s == "text/*")
+	}
+
 	/// Whether this is a text-based format that can be displayed as a string.
 	pub fn is_text(&self) -> bool {
 		matches!(

@@ -76,8 +76,9 @@ impl<'a> RenderContext<'a> {
 	/// Check whether the `accepts` list is compatible with the given
 	/// `available` media type.
 	///
-	/// Returns `Ok(())` if `accepts` is empty (meaning any type is fine)
-	/// or if at least one entry in `accepts` matches one of `available`.
+	/// Returns `Ok(())` if `accepts` is empty (meaning any type is fine),
+	/// if `accepts` contains the HTTP `*/*` wildcard, or if at least one
+	/// entry in `accepts` matches one of `available`.
 	/// Otherwise returns [`RenderError::AcceptMismatch`].
 	pub fn check_accepts(
 		&self,
@@ -86,7 +87,11 @@ impl<'a> RenderContext<'a> {
 		if self.accepts.is_empty() {
 			return Ok(());
 		}
-		if self.accepts.iter().any(|mt| available.contains(mt)) {
+		if self
+			.accepts
+			.iter()
+			.any(|mt| mt.is_wildcard() || available.contains(mt))
+		{
 			return Ok(());
 		}
 		Err(RenderError::AcceptMismatch {
