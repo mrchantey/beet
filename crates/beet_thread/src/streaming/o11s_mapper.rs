@@ -35,7 +35,7 @@ pub fn post_to_o11s_input(
 				MessageRole::User
 			}
 		}
-		ActorKind::Human => MessageRole::User,
+		ActorKind::User => MessageRole::User,
 	};
 
 	let agent_post = post.post.as_agent_post();

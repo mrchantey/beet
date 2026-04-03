@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_tool::prelude::*;
 
 #[derive(Default)]
 pub struct ThreadStdoutPlugin;
@@ -7,16 +8,17 @@ pub struct ThreadStdoutPlugin;
 impl Plugin for ThreadStdoutPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(PostUpdate, (post_added, post_changed).chain())
-			.init_resource::<ActorFilter>();
+			.init_resource::<StdoutActorFilter>();
 	}
 }
 
-
+/// Filter to determine which actor messages
+/// are printed to stdout, defaults to all except [`ActorKind::User`]
 #[derive(Deref, Resource)]
-pub struct ActorFilter(Vec<ActorKind>);
+pub struct StdoutActorFilter(Vec<ActorKind>);
 
 
-impl Default for ActorFilter {
+impl Default for StdoutActorFilter {
 	fn default() -> Self {
 		Self(vec![
 			ActorKind::System,
@@ -31,7 +33,7 @@ impl Default for ActorFilter {
 struct StdoutCursor(u32);
 
 fn post_added(
-	filter: Res<ActorFilter>,
+	filter: Res<StdoutActorFilter>,
 	mut commands: Commands,
 	query: Populated<(Entity, &Post), Added<Post>>,
 	thread_query: ThreadQuery,
@@ -72,7 +74,7 @@ fn post_added(
 }
 
 fn post_changed(
-	filter: Res<ActorFilter>,
+	filter: Res<StdoutActorFilter>,
 	mut query: Populated<(Entity, &Post, &mut StdoutCursor), Changed<Post>>,
 	thread_query: ThreadQuery,
 ) -> Result {
@@ -106,4 +108,22 @@ fn post_changed(
 	}
 
 	Ok(())
+}
+
+
+#[tool]
+#[derive(Component)]
+pub fn StdinPost(
+	cx: SystemToolIn,
+	mut query: ThreadQuery,
+	actors: Query<&Actor>,
+) -> Result<Outcome> {
+	let actor = actors.get(cx.caller)?;
+	let heading = paint_ext::cyan_bold(format!("\n\n{} > ", actor.name()));
+	print!("{heading}");
+	std::io::Write::flush(&mut std::io::stdout())?;
+	let mut input = String::new();
+	std::io::stdin().read_line(&mut input)?;
+	query.spawn_post(cx.caller, PostStatus::Completed, input)?;
+	Ok(Pass(()))
 }

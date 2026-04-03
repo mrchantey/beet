@@ -594,7 +594,7 @@ impl AsyncWorld {
 
 	/// Spawns an async task on the local thread.
 	pub fn run_async_local<Func, Fut, Out>(
-		&mut self,
+		&self,
 		func: Func,
 	) -> impl Future<Output = ()>
 	where

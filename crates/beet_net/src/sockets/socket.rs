@@ -37,7 +37,7 @@ impl Socket {
 				      -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
-					commands.run(async move |_| {
+					commands.run_local(async move |_| {
 						// socket send errors are non-fatal
 						send.send(message.take()).await.unwrap_or_else(|err| {
 							error!("{:?}", err);

@@ -116,7 +116,7 @@ impl PostStreamer for MockPostStreamer {
 							.posts
 							.iter()
 							.rev()
-							.find(|post| post.actor.kind() == ActorKind::Human)
+							.find(|post| post.actor.kind() == ActorKind::User)
 							.and_then(|post| post.body_str().ok())
 							.unwrap_or_default()
 							.to_string();
@@ -206,7 +206,7 @@ mod test {
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
 		ThreadMut::new()
-			.insert_actor(Actor::human())
+			.insert_actor(Actor::user())
 			.insert_post("Hello world!")
 			.thread_view()
 			.insert_actor(Actor::agent())
@@ -236,7 +236,7 @@ mod test {
 		);
 
 		let (name, args) = ThreadMut::new()
-			.insert_actor(Actor::human())
+			.insert_actor(Actor::user())
 			.insert_post("Greet someone")
 			.thread_view()
 			.insert_actor(Actor::agent())
@@ -264,7 +264,7 @@ mod test {
 	#[beet_core::test]
 	async fn custom_response_overrides_echo() {
 		ThreadMut::new()
-			.insert_actor(Actor::human())
+			.insert_actor(Actor::user())
 			.insert_post("Hello!")
 			.thread_view()
 			.insert_actor(Actor::agent())

@@ -48,7 +48,7 @@ pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 		let entity = entity.clone();
 		entity
 			.world()
-			.run_async(async move |world| {
+			.run_async_local(async move |world| {
 				let entity = world.entity(entity.id());
 				// pass an AsyncEntity to the service_fn
 				let service = service_fn(move |req| {

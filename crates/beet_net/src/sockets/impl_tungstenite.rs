@@ -215,9 +215,9 @@ pub(crate) fn start_tungstenite_server(
 
 			trace!("New WebSocket connection from: {}", addr);
 
-			// Spawn a new task for each connection
-			// future can be discarded
-			let _entity_fut = world.run_async(async move |world| {
+			// Spawn on local executor so Socket is created on the same thread
+			// as its receive loop (avoids SendWrapper thread-mismatch panics).
+			let _entity_fut = world.run_async_local(async move |world| {
 				handle_connection(world.entity(entity), stream).await
 			});
 		}

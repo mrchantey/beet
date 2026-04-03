@@ -100,7 +100,7 @@ mod tests {
 			.spawn_then(server)
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
 				let url = url.clone();
-				commands.run(async move |world| {
+				commands.run_local(async move |world| {
 					time_ext::sleep_millis(200).await;
 					let mut client = Socket::connect(&url).await.unwrap();
 					client.send(Message::text("hello server")).await.unwrap();
@@ -122,7 +122,7 @@ mod tests {
 			.spawn_then(server)
 			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
 				let url = url.clone();
-				commands.run(async move |world| {
+				commands.run_local(async move |world| {
 					time_ext::sleep_millis(200).await;
 					let mut client1 = Socket::connect(&url).await.unwrap();
 					client1.send(Message::text("client1")).await.unwrap();

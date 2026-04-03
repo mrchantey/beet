@@ -26,27 +26,8 @@ fn setup(mut commands: Commands) {
 					Actor::new("BeepBot", ActorKind::Agent),
 					OpenAiProvider::gpt_5_mini().unwrap()
 				),
-				(
-					Actor::new("Billy", ActorKind::Human),
-					stdin_post_tool.into_tool()
-				),
+				(Actor::new("Billy", ActorKind::User), StdinPost),
 			]
 		),]))
 		.call::<(), Outcome>((), default());
-}
-
-#[tool]
-fn stdin_post_tool(
-	cx: SystemToolIn,
-	mut query: ThreadQuery,
-	actors: Query<&Actor>,
-) -> Result<Outcome> {
-	let actor = actors.get(cx.caller)?;
-	let heading = paint_ext::cyan_bold(format!("\n\n{} > ", actor.name()));
-	print!("{heading}");
-	std::io::Write::flush(&mut std::io::stdout())?;
-	let mut input = String::new();
-	std::io::stdin().read_line(&mut input)?;
-	query.spawn_post(cx.caller, PostStatus::Completed, input)?;
-	Ok(Pass(()))
 }
