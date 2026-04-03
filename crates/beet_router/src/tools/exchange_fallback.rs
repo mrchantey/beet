@@ -37,9 +37,10 @@ use beet_tool::prelude::*;
 /// Children whose tool signature doesn't match `Request →
 /// Outcome<Response, Request>` are silently skipped so they can
 /// coexist on the same entity without causing fallback errors.
+/// This allows for the co-existence of the router children and the routes themselves.
 pub fn exchange_fallback() -> impl Bundle {
 	let fallback = Fallback::<Request, Response>::default()
-		.with_exclude_errors(ChildError::NO_TOOL);
+		.with_exclude_errors(ChildError::NO_TOOL | ChildError::TOOL_MISMATCH);
 	(
 		RouteHidden,
 		async_tool(async move |cx: AsyncToolIn<Request>| -> Result<Response> {

@@ -1,8 +1,8 @@
 //! # Router Example
 //!
 //! The beet router is general in nature
-//! 
-//! 
+//!
+//!
 //! Demonstrates beet's routing system with multiple server backends.
 //!
 //! ## Running the Example
@@ -46,9 +46,9 @@ fn main() -> AppExit {
 fn setup(mut commands: Commands) -> Result {
 	commands.spawn((
 		server_from_cli()?,
-		content::routes(),
 		default_router(),
 		SceneToolRenderer::default(),
+		content::routes(),
 	));
 	Ok(())
 }
