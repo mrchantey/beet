@@ -106,7 +106,7 @@ impl PostStreamer for MockPostStreamer {
 						ActorId,
 						ThreadId,
 						String,
-						Option<(String, JsonValue)>,
+						Option<(String, serde_json::Value)>,
 					)> {
 						let thread = query.thread(actor_entity)?;
 						let agent = thread.actor(actor_entity)?;
@@ -187,14 +187,8 @@ impl PostStreamer for MockPostStreamer {
 			let stream: ResPartialStream =
 				Box::pin(futures::stream::once(async move { Ok(partial) }));
 
-			PostStream::new(
-				"mock".into(),
-				"mock-model".into(),
-				agent_id,
-				thread_id,
-				stream,
-			)
-			.xok()
+			PostStream::new("mock", "mock-model", agent_id, thread_id, stream)
+				.xok()
 		})
 	}
 }

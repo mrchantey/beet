@@ -29,6 +29,7 @@ pub mod display_ext;
 mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
+mod lazy_pool;
 mod line_col;
 #[cfg(feature = "ansi_paint")]
 pub mod paint_ext;
@@ -49,6 +50,7 @@ pub mod terminal_ext;
 /// Time and duration utilities.
 #[cfg(feature = "std")]
 pub mod time_ext;
+pub use lazy_pool::*;
 mod tree;
 /// Timer utilities for WebAssembly environments.
 #[cfg(target_arch = "wasm32")]

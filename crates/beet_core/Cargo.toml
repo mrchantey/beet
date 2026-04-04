@@ -107,6 +107,7 @@ ron = { workspace = true, optional = true }
 #💡 async
 futures-lite = { workspace = true, features = ["race"] }
 async-channel = { workspace = true, optional = true }
+async-lock.workspace = true
 
 # tokens dependencies
 syn = { workspace = true, optional = true }
