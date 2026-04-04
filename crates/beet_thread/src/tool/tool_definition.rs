@@ -2,6 +2,8 @@ use beet_core::prelude::*;
 use beet_router::prelude::*;
 use beet_tool::prelude::*;
 use bevy::reflect::Typed;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Create a routable function tool bundle for use with LLM tool calling.
 ///
@@ -28,7 +30,8 @@ where
 	(definition, route_tool(path, tool))
 }
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize, Component)]
 pub enum ToolDefinition {
 	/// A tool defined in this application.
 	Function(FunctionToolDefinition),
@@ -63,7 +66,8 @@ impl Into<ToolDefinition> for ProviderToolDefinition {
 
 /// Tool defined by the model provider,
 /// output is returned as regular context.
-#[derive(Debug, Clone, Deref)]
+#[derive(Debug, Clone, Deref, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize)]
 pub struct ProviderToolDefinition {
 	name: String,
 }
@@ -74,7 +78,8 @@ impl ProviderToolDefinition {
 
 /// Tool defined in this application,
 /// output is the result of a function call.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize)]
 pub struct FunctionToolDefinition {
 	/// The name of the tool. This must be unique per set of tools.
 	name: String,
@@ -103,7 +108,8 @@ impl FunctionToolDefinition {
 
 
 
-#[derive(Debug, Default, Clone, Component)]
+#[derive(Debug, Default, Clone, Component, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize, Component, Default)]
 pub enum ToolChoice {
 	/// The agent may or may not select one of the available tools.
 	#[default]

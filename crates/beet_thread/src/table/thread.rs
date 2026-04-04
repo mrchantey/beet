@@ -15,8 +15,10 @@ pub type ThreadId = Uuid7<Thread>;
 	Hash,
 	Serialize,
 	Deserialize,
+	Reflect,
 	Component,
 )]
+#[reflect(Serialize, Deserialize, Component)]
 pub struct Thread {
 	id: ThreadId,
 	created: Timestamp,

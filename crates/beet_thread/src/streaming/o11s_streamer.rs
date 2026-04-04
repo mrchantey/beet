@@ -11,7 +11,8 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize, Component)]
 #[component(on_add=on_add)]
 pub struct O11sStreamer {
 	model: ModelDef,

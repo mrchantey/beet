@@ -7,12 +7,14 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy, Component, Reflect)]
 #[require(Tool<Input, Outcome> = async_tool(repeat_tool::<Input>))]
+#[reflect(Component, Default)]
 pub struct Repeat<Input = ()>
 where
 	Input: 'static + Send + Sync + Clone,
 {
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> Input>,
 }
 
@@ -82,14 +84,16 @@ where
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy, Component, Reflect)]
 #[require(Tool<Input, Outcome> = async_tool(repeat_times_tool::<Input>))]
+#[reflect(Component)]
 pub struct RepeatTimes<Input = ()>
 where
 	Input: 'static + Send + Sync + Clone,
 {
 	/// Maximum number of iterations.
 	total_times: u32,
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> Input>,
 }
 

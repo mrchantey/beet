@@ -48,10 +48,13 @@ impl<T1: TableId, T2: TableId> TableId for (T1, T2) {
 	}
 }
 
-#[derive(Serialize, Deserialize, Component)]
-pub struct Uuid7<M = ()> {
+#[derive(Serialize, Deserialize, Reflect, Component)]
+#[reflect(opaque)]
+#[reflect(Serialize, Deserialize)]
+pub struct Uuid7<M: 'static = ()> {
 	uuid_v7: Uuid,
 	#[serde(skip)]
+	#[reflect(ignore)]
 	phantom_data: PhantomData<M>,
 }
 

@@ -17,7 +17,9 @@ pub type PostId = Uuid7<Post>;
 	Hash,
 	Serialize,
 	Deserialize,
+	Reflect,
 )]
+#[reflect(Serialize, Deserialize)]
 pub struct PostIntent(u16);
 
 impl PostIntent {
@@ -83,7 +85,10 @@ impl std::fmt::Display for PostIntent {
 ///
 /// Note that `MessageRole` is not stored
 /// as this is relative to the Actor.
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Component)]
+#[derive(
+	Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, Component,
+)]
+#[reflect(Serialize, Deserialize, Component)]
 pub struct Post {
 	id: PostId,
 	created: Timestamp,
@@ -343,7 +348,9 @@ impl From<&str> for IntoPost {
 	Hash,
 	Serialize,
 	Deserialize,
+	Reflect,
 )]
+#[reflect(Serialize, Deserialize)]
 pub struct Timestamp(Duration);
 impl Timestamp {
 	pub fn now() -> Self {

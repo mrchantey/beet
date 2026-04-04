@@ -19,6 +19,7 @@
 //! - `incomplete`: Interrupted (e.g., max tokens reached)
 //! - `failed`: Error occurred (responses only)
 
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -77,7 +78,10 @@ pub enum ImageDetail {
 }
 
 /// Reasoning effort level for reasoning models.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReasoningEffort {
 	/// No reasoning before emitting a final answer.
@@ -93,7 +97,10 @@ pub enum ReasoningEffort {
 }
 
 /// Reasoning summary options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReasoningSummary {
 	/// Emit concise summaries.

@@ -7,7 +7,8 @@ pub struct ThreadStdoutPlugin;
 
 impl Plugin for ThreadStdoutPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(PostUpdate, (post_added, post_changed).chain())
+		app.register_type::<StdinPost>()
+			.add_systems(PostUpdate, (post_added, post_changed).chain())
 			.init_resource::<StdoutActorFilter>();
 	}
 }
@@ -112,7 +113,8 @@ fn post_changed(
 
 
 #[tool]
-#[derive(Component)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 pub fn StdinPost(
 	cx: SystemToolIn,
 	mut query: ThreadQuery,

@@ -16,6 +16,8 @@ fn main() {
 			// logs all agent messages to stdout
 			ThreadStdoutPlugin::default(),
 		))
+		.register_type::<Root>()
+		.register_type::<SaveScene>()
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -49,11 +51,13 @@ fn setup(mut commands: Commands) {
 				Sequence::new().allow_no_tool(),
 				children![
 					(Actor::system(), children![Post::spawn(
-						"Get to know the user as well as possible, who are they?"
+						"Get to know the user as well as possible, who are they?
+						your responses should be brief"
 					)]),
 					(
 						Actor::new("Agent", ActorKind::Agent),
-						OllamaProvider::qwen()
+						// OllamaProvider::qwen()
+						OpenAiProvider::gpt_5_mini().unwrap()
 					),
 					// save after user post
 					SaveScene,
@@ -67,15 +71,22 @@ fn setup(mut commands: Commands) {
 }
 
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 struct Root;
 
 
 /// On each loop, saves the scene to the asset path
 #[tool]
-#[derive(Component)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 fn SaveScene(_: SystemToolIn, world: &mut World) -> Result<Outcome> {
-	let json = SceneSaver::new(world).save_json()?;
+	let root = world
+		.query_filtered_once::<Entity, With<Root>>()
+		.into_iter()
+		.next()
+		.ok_or_else(|| bevyhow!("Root entity not found for SaveScene"))?;
+	let json = SceneSaver::new(world).with_entity_tree(root).save_json()?;
 	fs_ext::write(WsPathBuf::new(SCENE_PATH).into_abs(), json)?;
 	Ok(PASS)
 }

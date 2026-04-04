@@ -64,6 +64,7 @@
 //! ```
 
 use super::*;
+use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -544,7 +545,8 @@ pub struct StreamOptions {
 }
 
 /// Reasoning configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize)]
 pub struct ReasoningParam {
 	/// Controls the level of reasoning effort.
 	#[serde(skip_serializing_if = "Option::is_none")]
