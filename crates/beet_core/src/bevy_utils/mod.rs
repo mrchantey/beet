@@ -62,6 +62,10 @@ mod on_spawn;
 mod pretty_tracing;
 #[cfg(feature = "json")]
 pub mod reflect_ext;
+#[cfg(feature = "json")]
+mod reflect_json;
+#[cfg(feature = "json")]
+pub use reflect_json::*;
 #[cfg(feature = "bevy_scene")]
 pub mod scene_serde;
 mod when;

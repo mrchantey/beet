@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_tool::prelude::*;
 use futures::Stream;
-use std::borrow::Cow;
+
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -118,11 +118,12 @@ impl O11sStreamer {
 
 					// last_received.map(|(_, meta)| meta.clone())
 					// 4. build request body
-					let mut req_body =
-						o11s::RequestBody::new(&*this.model.model_slug)
-							.with_input(Input::Items(items))
-							.with_tools(tools)
-							.with_stream(this.stream);
+					let mut req_body = o11s::RequestBody::new(
+						this.model.model_slug.to_string(),
+					)
+					.with_input(Input::Items(items))
+					.with_tools(tools)
+					.with_stream(this.stream);
 
 					if let Some(tool_choice) = &agent.tool_choice {
 						req_body = req_body.with_tool_choice(
@@ -131,8 +132,9 @@ impl O11sStreamer {
 					}
 
 					if let Some((_, last)) = last_received {
-						req_body = req_body
-							.with_previous_response_id(&last.response_id);
+						req_body = req_body.with_previous_response_id(
+							last.response_id.to_string(),
+						);
 					}
 					if let Some(reasoning) = this.reasoning {
 						req_body = req_body.with_reasoning(reasoning);
@@ -149,10 +151,8 @@ impl O11sStreamer {
 }
 
 impl PostStreamer for O11sStreamer {
-	fn provider_slug(&self) -> Cow<'static, str> {
-		self.model.provider_slug.clone()
-	}
-	fn model_slug(&self) -> Cow<'static, str> { self.model.model_slug.clone() }
+	fn provider_slug(&self) -> &str { &self.model.provider_slug }
+	fn model_slug(&self) -> &str { &self.model.model_slug }
 
 
 	fn stream_posts(
@@ -163,7 +163,7 @@ impl PostStreamer for O11sStreamer {
 			let (req_body, agent, thread) = self.build_request(caller).await?;
 
 			// 5. build and send request
-			let mut request = Request::post(&self.model.url)
+			let mut request = Request::post(self.model.url.as_str())
 				.with_json_body::<o11s::RequestBody>(&req_body)?;
 			if let Some(auth) = &self.model.auth {
 				request = request.with_auth_bearer(auth);

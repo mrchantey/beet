@@ -28,3 +28,7 @@ Fix the error using a subagent, then run the crate again:
 `timeout 120 cargo test -p beet_core --all-features`
 When thats clear, run the full suite again:
 `timeout 120 just test-core`
+
+## Success
+
+Success means that `just test-core` works, the whole command. not just each crate working individually.

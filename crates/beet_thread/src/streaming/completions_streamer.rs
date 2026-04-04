@@ -11,7 +11,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_tool::prelude::*;
 use futures::Stream;
-use std::borrow::Cow;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -183,10 +182,8 @@ impl CompletionsStreamer {
 }
 
 impl PostStreamer for CompletionsStreamer {
-	fn provider_slug(&self) -> Cow<'static, str> {
-		self.model.provider_slug.clone()
-	}
-	fn model_slug(&self) -> Cow<'static, str> { self.model.model_slug.clone() }
+	fn provider_slug(&self) -> &str { &self.model.provider_slug }
+	fn model_slug(&self) -> &str { &self.model.model_slug }
 
 	fn stream_posts(
 		&mut self,
@@ -195,8 +192,8 @@ impl PostStreamer for CompletionsStreamer {
 		Box::pin(async move {
 			let (req_body, agent, thread) = self.build_request(caller).await?;
 
-			let mut request =
-				Request::post(&self.model.url).with_json_body(&req_body)?;
+			let mut request = Request::post(self.model.url.as_str())
+				.with_json_body(&req_body)?;
 			if let Some(auth) = &self.model.auth {
 				request = request.with_auth_bearer(auth);
 			}

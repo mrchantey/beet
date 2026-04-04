@@ -6,7 +6,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
-use std::borrow::Cow;
+
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
@@ -88,8 +88,8 @@ impl MockPostStreamer {
 }
 
 impl PostStreamer for MockPostStreamer {
-	fn provider_slug(&self) -> Cow<'static, str> { "mock".into() }
-	fn model_slug(&self) -> Cow<'static, str> { "mock-model".into() }
+	fn provider_slug(&self) -> &str { "mock" }
+	fn model_slug(&self) -> &str { "mock-model" }
 
 	fn stream_posts(
 		&mut self,
@@ -106,7 +106,7 @@ impl PostStreamer for MockPostStreamer {
 						ActorId,
 						ThreadId,
 						String,
-						Option<(String, serde_json::Value)>,
+						Option<(String, JsonValue)>,
 					)> {
 						let thread = query.thread(actor_entity)?;
 						let agent = thread.actor(actor_entity)?;

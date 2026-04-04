@@ -75,6 +75,7 @@ tokens = [
 beet_core_macros.workspace = true
 beet_core_shared = { workspace = true, optional = true }
 bevy.workspace = true
+bevy_reflect.workspace = true
 
 #💡 utils
 tracing.workspace = true

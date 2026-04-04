@@ -17,6 +17,28 @@ pub struct AsyncInit {
 
 
 impl AsyncInit {
+	/// Register an async init function when the entity is initialized.
+	pub fn register_on_add<Func, Fut>(
+		mut world: DeferredWorld,
+		cx: HookContext,
+		func: Func,
+	) where
+		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + ConditionalSendFuture<Output = Result>,
+	{
+		world.commands().entity(cx.entity).queue(
+			|mut entity: EntityWorldMut| {
+				if let Some(mut init) = entity.get_mut::<Self>() {
+					init.add(func);
+				} else {
+					let mut init = Self::new();
+					init.add(func);
+					entity.insert(init);
+				}
+			},
+		);
+	}
+
 	/// Create a new empty AsyncInit component.
 	pub fn new() -> Self { Self { items: Vec::new() } }
 	/// Add an async init function to this entity, which will be run when the entity is initialized.

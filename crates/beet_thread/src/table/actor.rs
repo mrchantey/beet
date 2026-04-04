@@ -62,6 +62,7 @@ impl Actor {
 	Hash,
 	Serialize,
 	Deserialize,
+	Reflect,
 )]
 #[reflect(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

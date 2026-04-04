@@ -100,7 +100,7 @@ pub struct Post {
 	/// The untyped body for this post.
 	body: Vec<u8>,
 	/// Extensible key-value metadata.
-	metadata: serde_json::Map<String, serde_json::Value>,
+	metadata: JsonMap,
 }
 impl std::fmt::Debug for Post {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -227,7 +227,7 @@ impl Post {
 			intent,
 			media_type,
 			body,
-			metadata,
+			metadata: JsonMap(metadata),
 		}
 	}
 

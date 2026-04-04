@@ -11,7 +11,11 @@ use bitflags::bitflags;
 bitflags! {
 	/// Child error types that can occur during control-flow execution.
 	/// Used with `exclude_errors` to selectively skip certain child issues.
-	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+	#[repr(transparent)]
+	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+	#[reflect(opaque)]
+	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
 	pub struct ChildError: u8 {
 		/// Child entity has no [`ToolMeta`] component.
 		const NO_TOOL = 0b01;

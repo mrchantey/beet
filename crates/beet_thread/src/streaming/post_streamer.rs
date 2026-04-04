@@ -1,24 +1,25 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use futures::Stream;
-use std::borrow::Cow;
+
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[reflect(Serialize, Deserialize)]
 pub struct ModelDef {
-	pub provider_slug: Cow<'static, str>,
-	pub model_slug: Cow<'static, str>,
-	pub url: Cow<'static, str>,
+	pub provider_slug: SmolStr,
+	pub model_slug: SmolStr,
+	pub url: SmolStr,
 	pub auth: Option<String>,
 }
 
 
 pub trait PostStreamer {
-	fn provider_slug(&self) -> Cow<'static, str>;
-	fn model_slug(&self) -> Cow<'static, str>;
+	fn provider_slug(&self) -> &str;
+	fn model_slug(&self) -> &str;
 
 	fn stream_posts(
 		&mut self,
@@ -40,8 +41,8 @@ pub struct PostStream {
 	// cloning and returning on each stream part
 	posts: TableMap<Post>,
 	post_partial_map: PostPartialMap,
-	provider_slug: Cow<'static, str>,
-	model_slug: Cow<'static, str>,
+	provider_slug: SmolStr,
+	model_slug: SmolStr,
 	/// store the response partial with all posts drained,
 	/// for using metadata.
 	response: Option<ResponsePartial>,
@@ -49,15 +50,15 @@ pub struct PostStream {
 
 impl PostStream {
 	pub fn new(
-		provider_slug: Cow<'static, str>,
-		model_slug: Cow<'static, str>,
+		provider_slug: impl Into<SmolStr>,
+		model_slug: impl Into<SmolStr>,
 		agent: ActorId,
 		thread: ThreadId,
 		inner: ResPartialStream,
 	) -> Self {
 		Self {
-			provider_slug,
-			model_slug,
+			provider_slug: provider_slug.into(),
+			model_slug: model_slug.into(),
 			agent,
 			thread,
 			inner,
@@ -80,12 +81,10 @@ impl PostStream {
 				)
 			})?
 			.clone();
-		let provider_slug = self.provider_slug.to_string();
-		let model_slug = self.model_slug.to_string();
 		MetaBuilder {
-			provider_slug,
-			model_slug,
-			response_id: response.response_id.clone(),
+			provider_slug: self.provider_slug.clone(),
+			model_slug: self.model_slug.clone(),
+			response_id: response.response_id.clone().into(),
 			response_stored: response.response_stored,
 		}
 		.xok()
@@ -93,9 +92,9 @@ impl PostStream {
 }
 
 pub struct MetaBuilder {
-	provider_slug: String,
-	model_slug: String,
-	response_id: String,
+	provider_slug: SmolStr,
+	model_slug: SmolStr,
+	response_id: SmolStr,
 	response_stored: bool,
 }
 impl MetaBuilder {

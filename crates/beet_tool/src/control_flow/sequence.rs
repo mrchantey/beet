@@ -6,16 +6,18 @@ use beet_core::prelude::*;
 /// Runs child tools in order, threading `Input` through each child.
 /// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
 /// with the final input if all compatible children pass.
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy, Component, Reflect)]
 #[require(Tool<Input, Outcome<Input, Output>> = async_tool(sequence_tool::<Input, Output>))]
+#[reflect(Component, Default)]
 pub struct Sequence<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Which child errors to skip instead of propagating.
-	/// Defaults to [`ChildError::empty`].
+	/// [`ChildError`] variants to skip instead of propagating.
+	/// Defaults to [`ChildError::empty`] (no errors excluded).
 	exclude_errors: ChildError,
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
@@ -43,6 +45,7 @@ where
 		self
 	}
 
+	/// Exclude [`ChildError::NO_TOOL`] so children without a tool are skipped.
 	pub fn allow_no_tool(mut self) -> Self {
 		self.exclude_errors |= ChildError::NO_TOOL;
 		self

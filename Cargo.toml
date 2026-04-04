@@ -120,6 +120,7 @@ bevy = { version = "0.18", default-features = false, features = [
 	# "track_location",
 	# "keyboard",
 ] }
+bevy_reflect = { version = "0.18", default-features = false, features = ["smol_str"] }
 
 #💡 utility
 bitflags = "2"

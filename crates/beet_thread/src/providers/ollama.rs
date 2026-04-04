@@ -1,9 +1,8 @@
 //! Ollama provider supporting the OpenResponses API.
 //!
 //! Ollama provides local LLM inference with OpenResponses-compatible streaming.
-use std::borrow::Cow;
-
 use crate::prelude::*;
+use beet_core::prelude::*;
 
 /// An OpenResponses-compatible provider for local Ollama inference.
 ///
@@ -27,7 +26,7 @@ impl OllamaProvider {
 	pub const COMPLETIONS_URL: &str =
 		"http://localhost:11434/v1/chat/completions";
 
-	pub fn o11s(model_slug: impl Into<Cow<'static, str>>) -> O11sStreamer {
+	pub fn o11s(model_slug: impl Into<SmolStr>) -> O11sStreamer {
 		O11sStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: model_slug.into(),
@@ -36,9 +35,7 @@ impl OllamaProvider {
 		})
 	}
 
-	pub fn completions(
-		model_slug: impl Into<Cow<'static, str>>,
-	) -> CompletionsStreamer {
+	pub fn completions(model_slug: impl Into<SmolStr>) -> CompletionsStreamer {
 		CompletionsStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: model_slug.into(),

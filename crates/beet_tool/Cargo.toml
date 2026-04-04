@@ -13,7 +13,7 @@ categories.workspace = true
 
 [features]
 default = ["reflect"]
-serde = ["dep:serde", "beet_core/serde"]
+serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde","dep:serde_json","beet_core/json"]
 reflect = ["bevy/reflect_functions"]
 

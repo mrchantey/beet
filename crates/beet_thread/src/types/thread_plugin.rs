@@ -28,6 +28,9 @@ impl Plugin for ThreadPlugin {
 			.register_type::<PostIntent>()
 			.register_type::<Timestamp>()
 			.register_type::<ResponseMeta>()
+			// ── JSON reflect wrappers ─────────────────────────────────────
+			.register_type::<JsonValue>()
+			.register_type::<JsonMap>()
 			// ── Streaming types ───────────────────────────────────────────
 			.register_type::<ModelDef>()
 			.register_type::<O11sStreamer>()
@@ -42,6 +45,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ProviderToolDefinition>()
 			.register_type::<ToolChoice>()
 			// ── Control-flow types (unit-input instantiations) ────────────
+			.register_type::<ChildError>()
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<Repeat<()>>()
 			.register_type::<RepeatTimes<()>>();

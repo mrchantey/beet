@@ -86,7 +86,7 @@ pub struct FunctionToolDefinition {
 	/// A description of the function. Used by the model to decide when to call it.
 	description: String,
 	/// A json schema for the parameters.
-	params_schema: serde_json::Value,
+	params_schema: JsonValue,
 }
 impl FunctionToolDefinition {
 	pub fn new(
@@ -97,7 +97,7 @@ impl FunctionToolDefinition {
 		Self {
 			name: name.into(),
 			description: description.into(),
-			params_schema,
+			params_schema: JsonValue(params_schema),
 		}
 	}
 	pub fn name(&self) -> &str { &self.name }
