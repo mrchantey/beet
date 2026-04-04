@@ -16,6 +16,7 @@ bitflags! {
 	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	#[reflect(opaque)]
 	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
+	#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 	pub struct ChildError: u8 {
 		/// Child entity has no [`ToolMeta`] component.
 		const NO_TOOL = 0b01;

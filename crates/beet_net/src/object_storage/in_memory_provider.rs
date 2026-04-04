@@ -6,25 +6,26 @@ use std::sync::Arc;
 
 
 impl Bucket {
-	/// create a new [`InMemoryProvider`]
-	pub async fn new_test() -> Self {
-		let provider = InMemoryProvider::new();
-		let bucket = Self::new(provider, "test-bucket");
-		bucket.bucket_try_create().await.unwrap();
-		bucket
-	}
+	/// Create a pre-created [`InMemoryProvider`] bucket for testing.
+	pub fn new_test() -> Self { Self::new(InMemoryProvider::created()) }
 }
 
 
-/// A bucket provider using a simple nested hashmap
-#[derive(Debug, Default, Clone, Deref, DerefMut)]
-pub struct InMemoryProvider(
-	pub Arc<RwLock<HashMap<String, HashMap<RoutePath, Bytes>>>>,
-);
+/// A bucket provider using an in-memory hashmap.
+///
+/// Inner state is `None` when the bucket has not been created,
+/// and `Some(map)` when it exists.
+#[derive(Debug, Default, Clone, Component)]
+pub struct InMemoryProvider(pub Arc<RwLock<Option<HashMap<RoutePath, Bytes>>>>);
 
 impl InMemoryProvider {
-	/// Creates a new empty in-memory provider.
+	/// Creates a new uncreated in-memory provider.
 	pub fn new() -> Self { Self::default() }
+
+	/// Creates a new already-created (empty) in-memory provider.
+	pub fn created() -> Self {
+		Self(Arc::new(RwLock::new(Some(HashMap::new()))))
+	}
 }
 
 #[cfg(feature = "json")]
@@ -39,140 +40,104 @@ impl BucketProvider for InMemoryProvider {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<bool>> {
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
-		Box::pin(
-			async move { this.read().await.contains_key(&bucket_name).xok() },
-		)
+		Box::pin(async move { this.0.read().await.is_some().xok() })
 	}
 
-	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
-			this.write()
-				.await
-				.entry(bucket_name)
-				.or_insert_with(HashMap::new);
+			let mut guard = this.0.write().await;
+			if guard.is_some() {
+				bevybail!("bucket already exists")
+			}
+			*guard = Some(HashMap::new());
 			Ok(())
 		})
 	}
 
-	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
-			this.write().await.remove(&bucket_name);
+			let mut guard = this.0.write().await;
+			if guard.is_none() {
+				bevybail!("bucket does not exist")
+			}
+			*guard = None;
 			Ok(())
 		})
 	}
 
-	fn insert(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-		body: Bytes,
-	) -> SendBoxedFuture<Result<()>> {
+	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
 		Box::pin(async move {
-			this.write()
-				.await
-				.entry(bucket_name)
-				.or_insert_with(HashMap::new)
-				.insert(path, body);
+			let mut guard = this.0.write().await;
+			let map = guard
+				.as_mut()
+				.ok_or_else(|| bevyhow!("bucket not created"))?;
+			map.insert(path, body);
 			Ok(())
 		})
 	}
 
-	fn exists(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
 		Box::pin(async move {
-			this.write()
-				.await
-				.get(&bucket_name)
-				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-				.map(|bucket| bucket.contains_key(&path))
+			let guard = this.0.read().await;
+			let map = guard
+				.as_ref()
+				.ok_or_else(|| bevyhow!("bucket not created"))?;
+			map.contains_key(&path).xok()
 		})
 	}
 
-	fn list(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		Box::pin(async move {
-			this.write()
-				.await
-				.get(&bucket_name)
-				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-				.map(|bucket| bucket.keys().cloned().collect())
+			let guard = this.0.read().await;
+			let map = guard
+				.as_ref()
+				.ok_or_else(|| bevyhow!("bucket not created"))?;
+			map.keys().cloned().collect::<Vec<_>>().xok()
 		})
 	}
 
-	fn get(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
 		Box::pin(async move {
-			this.write()
-				.await
-				.get(&bucket_name)
-				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-				.map(|bucket| {
-					bucket
-						.get(&path)
-						.cloned()
-						.ok_or_else(|| bevyhow!("Object not found: {path}"))
-				})
-				.flatten()
+			let guard = this.0.read().await;
+			let map = guard
+				.as_ref()
+				.ok_or_else(|| bevyhow!("bucket not created"))?;
+			map.get(&path)
+				.cloned()
+				.ok_or_else(|| bevyhow!("object not found: {path}"))
 		})
 	}
 
-	fn remove(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<()>> {
+	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
 		Box::pin(async move {
-			this.write()
-				.await
-				.get_mut(&bucket_name)
-				.ok_or_else(|| bevyhow!("bucket not found: {bucket_name}"))
-				.and_then(|bucket| {
-					bucket
-						.remove(&path)
-						.map(|_| ())
-						.ok_or_else(|| bevyhow!("Object not found: {path}"))
-				})
+			let mut guard = this.0.write().await;
+			let map = guard
+				.as_mut()
+				.ok_or_else(|| bevyhow!("bucket not created"))?;
+			map.remove(&path)
+				.map(|_| ())
+				.ok_or_else(|| bevyhow!("object not found: {path}"))
 		})
 	}
 
 	fn public_url(
 		&self,
-		_bucket_name: &str,
 		_path: &RoutePath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async move { Ok(None) })
+		Box::pin(async move { None.xok() })
 	}
 }
 

@@ -7,7 +7,10 @@
 //! - [`FsBucketProvider`]: Local filesystem storage (native only)
 //! - [`LocalStorageProvider`]: Browser localStorage (WASM only)
 //! - [`S3Provider`]: AWS S3 storage (requires `aws` feature)
-//! - [`DynamoProvider`]: AWS DynamoDB storage (requires `aws` feature)
+//! - [`DynamoDbProvider`]: AWS DynamoDB storage (requires `aws` feature)
+//!
+//! Use [`BucketPlugin`] to register observers that auto-insert a [`Bucket`]
+//! component whenever a provider component is added to an entity.
 //!
 //! # Example
 //!
@@ -53,3 +56,45 @@ mod s3_provider;
 pub use dynamo_provider::*;
 #[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 mod dynamo_provider;
+
+use beet_core::prelude::*;
+
+/// Observer that auto-inserts a [`Bucket`] component when a provider
+/// component `T` is added to an entity.
+fn add_bucket<T: Component + BucketProvider + Clone>(
+	ev: On<Insert, T>,
+	query: Query<&T>,
+	mut commands: Commands,
+) {
+	let entity = ev.entity;
+	if let Ok(provider) = query.get(entity) {
+		commands
+			.entity(entity)
+			.insert(Bucket::new(provider.clone()));
+	}
+}
+
+/// Plugin that registers bucket provider observers.
+///
+/// When added to an [`App`], this plugin ensures that any entity with a
+/// provider component (e.g. [`FsBucketProvider`], [`InMemoryProvider`])
+/// automatically receives a [`Bucket`] component wrapping that provider.
+pub struct BucketPlugin;
+
+impl Plugin for BucketPlugin {
+	fn build(&self, app: &mut App) {
+		app.register_type::<FsBucketProvider>()
+			.add_observer(add_bucket::<FsBucketProvider>)
+			.add_observer(add_bucket::<InMemoryProvider>);
+
+		#[cfg(target_arch = "wasm32")]
+		app.register_type::<LocalStorageProvider>()
+			.add_observer(add_bucket::<LocalStorageProvider>);
+
+		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+		app.register_type::<S3Provider>()
+			.register_type::<DynamoDbProvider>()
+			.add_observer(add_bucket::<S3Provider>)
+			.add_observer(add_bucket::<DynamoDbProvider>);
+	}
+}

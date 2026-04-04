@@ -5,7 +5,8 @@
 //! ```
 use beet::prelude::*;
 
-const SCENE_PATH: &str = "examples/thread/persistent_chat.json";
+const SCENE_DIR: &str = "examples/thread";
+const SCENE_FILE: &str = "persistent_chat.json";
 
 fn main() {
 	env_ext::load_dotenv();
@@ -15,6 +16,7 @@ fn main() {
 			ThreadPlugin::default(),
 			// logs all agent messages to stdout
 			ThreadStdoutPlugin::default(),
+			BucketPlugin,
 		))
 		.register_type::<Root>()
 		.register_type::<SaveScene>()
@@ -23,51 +25,74 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-	let asset_path = WsPathBuf::new(SCENE_PATH);
+	let bucket_path = WsPathBuf::new(SCENE_DIR).into_abs();
+	let fs_provider = FsBucketProvider::new(bucket_path);
+	let bucket = Bucket::new(fs_provider.clone());
+	let route = RoutePath::from(format!("/{SCENE_FILE}"));
+	let clear = CliArgs::parse_env().params.contains_key("clear");
 
-	if CliArgs::parse_env().params.contains_key("clear") {
-		fs_ext::remove(asset_path.into_abs()).ok();
-	}
+	commands.queue_async(async move |world: AsyncWorld| {
+		bucket.bucket_try_create().await?;
 
-	if let Ok(scene) = fs_ext::read(asset_path.into_abs()) {
-		// scene exists, clear
-		commands.queue(move |world: &mut World| -> Result {
-			SceneLoader::new(world).load_json(&scene)?;
-			let root = world
-				.query_filtered_once::<Entity, With<Root>>()
-				.into_iter()
-				.next()
-				.expect("root not found in loaded scene");
-			world
-				.commands()
-				.entity(root)
-				.call::<(), Outcome>((), default());
-			Ok(())
-		});
-	} else {
-		commands
-			.spawn((Root, Repeat::new(), children![(
-				Thread::default(),
-				Sequence::new().allow_no_tool(),
-				children![
-					(Actor::system(), children![Post::spawn(
-						"Get to know the user as well as possible, who are they?
-						your responses should be brief"
-					)]),
-					(
-						Actor::new("Agent", ActorKind::Agent),
-						// OllamaProvider::qwen()
-						OpenAiProvider::gpt_5_mini().unwrap()
-					),
-					// save after user post
-					SaveScene,
-					(Actor::new("User", ActorKind::User), StdinPost),
-					// save again after agent post
-					SaveScene
-				]
-			),]))
-			.call::<(), Outcome>((), default());
-	}
+		if clear {
+			bucket.remove(&route).await.ok();
+		}
+
+		match bucket.get(&route).await {
+			Ok(scene_bytes) => {
+				// Scene exists, load it
+				world
+					.with_then(move |world: &mut World| -> Result {
+						SceneLoader::new(world).load_json(&scene_bytes)?;
+						let root = world
+							.query_filtered_once::<Entity, With<Root>>()
+							.into_iter()
+							.next()
+							.ok_or_else(|| {
+								bevyhow!("root not found in loaded scene")
+							})?;
+						world
+							.commands()
+							.entity(root)
+							.call::<(), Outcome>((), default());
+						Ok(())
+					})
+					.await?;
+			}
+			Err(_) => {
+				// No existing scene, create fresh
+				world.with(move |world: &mut World| {
+					world
+						.commands()
+						.spawn((Root, fs_provider, Repeat::new(), children![(
+							Thread::default(),
+							Sequence::new().allow_no_tool(),
+							children![
+								(Actor::system(), children![Post::spawn(
+									"Ask a single, brief interesting question,
+									followup with more brief questions based on the users' aswers"
+								)]),
+								(
+									Actor::new("Agent", ActorKind::Agent),
+									// OllamaProvider::qwen()
+									OpenAiProvider::gpt_5_mini().unwrap()
+								),
+								// save after user post
+								SaveScene,
+								(
+									Actor::new("User", ActorKind::User),
+									StdinPost
+								),
+								// save again after agent post
+								SaveScene
+							]
+						)]))
+						.call::<(), Outcome>((), default());
+				});
+			}
+		}
+		Ok(())
+	});
 }
 
 
@@ -76,17 +101,33 @@ fn setup(mut commands: Commands) {
 struct Root;
 
 
-/// On each loop, saves the scene to the asset path
+/// On each loop, saves the scene to the bucket via [`FsBucketProvider`].
 #[tool]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-fn SaveScene(_: SystemToolIn, world: &mut World) -> Result<Outcome> {
-	let root = world
-		.query_filtered_once::<Entity, With<Root>>()
-		.into_iter()
-		.next()
-		.ok_or_else(|| bevyhow!("Root entity not found for SaveScene"))?;
-	let json = SceneSaver::new(world).with_entity_tree(root).save_json()?;
-	fs_ext::write(WsPathBuf::new(SCENE_PATH).into_abs(), json)?;
+async fn SaveScene(world: AsyncToolIn) -> Result<Outcome> {
+	let (bucket, json) = world
+		.caller
+		.world()
+		.with_then(|world| -> Result<_> {
+			let root = world
+				.query_filtered_once::<Entity, With<Root>>()
+				.into_iter()
+				.next()
+				.ok_or_else(|| {
+					bevyhow!("Root entity not found for SaveScene")
+				})?;
+			let bucket = world
+				.get::<Bucket>(root)
+				.ok_or_else(|| bevyhow!("Bucket not found on Root entity"))?
+				.clone();
+			let json =
+				SceneSaver::new(world).with_entity_tree(root).save_json()?;
+			(bucket, json).xok()
+		})
+		.await?;
+	let route = RoutePath::from(format!("/{SCENE_FILE}"));
+	bucket.bucket_try_create().await?;
+	bucket.insert(&route, json).await?;
 	Ok(PASS)
 }

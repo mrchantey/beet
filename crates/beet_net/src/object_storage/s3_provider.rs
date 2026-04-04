@@ -1,7 +1,4 @@
-use std::sync::LazyLock;
-
 use crate::prelude::*;
-use async_lock::RwLock;
 use aws_config::Region;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
@@ -11,12 +8,16 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// AWS S3 bucket provider using the official AWS SDK.
-///
-/// Wraps an [`aws_sdk_s3::Client`] and implements [`BucketProvider`] for
-/// storing and retrieving objects in S3 buckets.
-#[derive(Clone, Deref, DerefMut, Resource)]
-pub struct S3Provider(pub Client);
+/// AWS S3 bucket provider storing its configuration as serializable fields.
+/// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct S3Provider {
+	/// The S3 bucket name.
+	bucket_name: SmolStr,
+	/// The AWS region for this bucket.
+	region: SmolStr,
+}
 
 #[cfg(feature = "json")]
 impl<T: TableStoreRow> TableProvider<T> for S3Provider {
@@ -26,61 +27,62 @@ impl<T: TableStoreRow> TableProvider<T> for S3Provider {
 }
 
 impl S3Provider {
-	/// Create a new S3 client with the default region: `us-west-2`
-	pub async fn create() -> Self {
-		Self::create_with_region("us-west-2").await
-		// let config = aws_config::load_from_env().await;
-		// Self(Client::new(&config))
-	}
-	/// Create a new S3 client with a specific region, ie `us-west-2`,
-	/// as creating a client is expensive, clients are reused according to region
-	pub async fn create_with_region(region: &str) -> Self {
-		static CLIENTS: LazyLock<RwLock<HashMap<String, Client>>> =
-			LazyLock::new(|| RwLock::new(HashMap::new()));
-		let region_str = region.to_string();
-
-		let clients = CLIENTS.read().await;
-		if let Some(client) = clients.get(&region_str) {
-			return Self(client.clone());
+	/// Create a new S3 provider for the given bucket name and region.
+	pub fn new(
+		bucket_name: impl Into<SmolStr>,
+		region: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			bucket_name: bucket_name.into(),
+			region: region.into(),
 		}
-		let region = Region::new(region.to_string());
-		let config = aws_config::from_env()
-			.region(RegionProviderChain::default_provider().or_else(region))
-			.load()
-			.await;
-		let client = Client::new(&config);
-		CLIENTS.write().await.insert(region_str, client.clone());
-
-		Self(client)
 	}
-	/// s3 buckets dont want a leading slash in the key
+
+	/// Get or create an S3 client for this provider's region.
+	async fn client(&self) -> Client {
+		static POOL: LazyPool<SmolStr, Client, Client> =
+			LazyPool::new(|region| {
+				Box::pin(async move {
+					let region_obj = Region::new(region.to_string());
+					let config = aws_config::from_env()
+						.region(
+							RegionProviderChain::default_provider()
+								.or_else(region_obj),
+						)
+						.load()
+						.await;
+					Client::new(&config)
+				})
+			});
+		POOL.get(&self.region).await
+	}
+
+	/// S3 buckets don't want a leading slash in the key.
 	fn resolve_key(&self, path: &RoutePath) -> String {
 		path.to_string().trim_start_matches('/').to_string()
 	}
 }
 
 impl BucketProvider for S3Provider {
-	fn box_clone(&self) -> Box<dyn BucketProvider> {
-		Box::new(Self(self.0.clone()))
-	}
+	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
-	fn region(&self) -> Option<String> {
-		self.0.config().region().map(|r| r.to_string())
-	}
+	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
-	fn bucket_exists(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<bool>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let this = self.clone();
 		Box::pin(async move {
-			match client.head_bucket().bucket(&bucket_name).send().await {
-				Ok(_) => Ok(true),
+			let client = this.client().await;
+			match client
+				.head_bucket()
+				.bucket(this.bucket_name.as_str())
+				.send()
+				.await
+			{
+				Ok(_) => true.xok(),
 				Err(SdkError::ServiceError(service_err))
 					if let HeadBucketError::NotFound(_) = service_err.err() =>
 				{
-					Ok(false)
+					false.xok()
 				}
 				Err(other) => {
 					bevybail!("Failed to check bucket: {:?}", other)
@@ -89,37 +91,34 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+		let this = self.clone();
 		Box::pin(async move {
-			let mut create_bucket_req =
-				client.create_bucket().bucket(&bucket_name);
+			let client = this.client().await;
+			let mut req =
+				client.create_bucket().bucket(this.bucket_name.as_str());
 
 			use aws_sdk_s3::types::CreateBucketConfiguration;
 
-			let mut bucket_config = CreateBucketConfiguration::builder();
-			if let Some(region) = client.config().region() {
-				bucket_config = bucket_config
-					.location_constraint(region.to_string().as_str().into());
-			}
-
-			create_bucket_req = create_bucket_req
-				.create_bucket_configuration(bucket_config.build());
-			create_bucket_req.send().await?;
-			Ok(())
+			let bucket_config = CreateBucketConfiguration::builder()
+				.location_constraint(this.region.as_str().into())
+				.build();
+			req = req.create_bucket_configuration(bucket_config);
+			req.send().await?;
+			().xok()
 		})
 	}
 
-	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+		let this = self.clone();
 		Box::pin(async move {
-			// Only empty buckets can be deleted
-			// List all objects in the bucket and delete them
+			let client = this.client().await;
+			let bucket_name = this.bucket_name.as_str();
+
+			// Only empty buckets can be deleted, so remove all objects first
 			let mut continuation_token = None;
 			loop {
-				let mut req = client.list_objects_v2().bucket(&bucket_name);
+				let mut req = client.list_objects_v2().bucket(bucket_name);
 				if let Some(token) = &continuation_token {
 					req = req.continuation_token(token);
 				}
@@ -132,8 +131,10 @@ impl BucketProvider for S3Provider {
 							contents
 								.into_iter()
 								.filter_map(|obj| {
-									obj.key.map(|k| {
-										aws_sdk_s3::types::ObjectIdentifier::builder().key(k).build()
+									obj.key.map(|key| {
+										aws_sdk_s3::types::ObjectIdentifier::builder()
+												.key(key)
+												.build()
 									})
 								})
 								.collect::<Result<_, _>>()?,
@@ -142,7 +143,7 @@ impl BucketProvider for S3Provider {
 
 					client
 						.delete_objects()
-						.bucket(&bucket_name)
+						.bucket(bucket_name)
 						.delete(delete_objects)
 						.send()
 						.await?;
@@ -158,72 +159,37 @@ impl BucketProvider for S3Provider {
 				}
 			}
 
-			// Now delete the bucket itself
-			client.delete_bucket().bucket(&bucket_name).send().await?;
-			Ok(())
+			client.delete_bucket().bucket(bucket_name).send().await?;
+			().xok()
 		})
 	}
 
-	fn insert(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-		body: Bytes,
-	) -> SendBoxedFuture<Result<()>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
+	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
+			let client = this.client().await;
 			client
 				.put_object()
-				.bucket(&bucket_name)
+				.bucket(this.bucket_name.as_str())
 				.key(&key)
 				.body(body.to_vec().into())
 				.send()
 				.await?;
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn exists(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<bool>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
-		let key = self.resolve_key(path);
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+		let this = self.clone();
 		Box::pin(async move {
-			let head_result = client
-				.head_object()
-				.bucket(&bucket_name)
-				.key(&key)
-				.send()
-				.await;
-			match head_result {
-				Ok(_) => Ok(true),
-				Err(SdkError::ServiceError(service_err))
-					if let HeadObjectError::NotFound(_) = service_err.err() =>
-				{
-					Ok(false)
-				}
-				Err(err) => Err(err.into()),
-			}
-		})
-	}
-
-	fn list(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
-		Box::pin(async move {
+			let client = this.client().await;
+			let bucket_name = this.bucket_name.as_str();
 			let mut paths = Vec::new();
 			let mut continuation_token = None;
 
 			loop {
-				let mut req = client.list_objects_v2().bucket(&bucket_name);
+				let mut req = client.list_objects_v2().bucket(bucket_name);
 				if let Some(token) = &continuation_token {
 					req = req.continuation_token(token);
 				}
@@ -245,55 +211,66 @@ impl BucketProvider for S3Provider {
 				}
 			}
 
-			Ok(paths)
+			paths.xok()
 		})
 	}
 
-	fn get(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Bytes>> {
-		let client = self.0.clone();
-		let bucket_name = bucket_name.to_string();
+	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+		let this = self.clone();
 		let key = self.resolve_key(path);
-		// println!("Getting object from bucket: {}, key: {}", bucket_name, key);
 		Box::pin(async move {
+			let client = this.client().await;
 			let get_result = client
 				.get_object()
-				.bucket(&bucket_name)
+				.bucket(this.bucket_name.as_str())
 				.key(&key)
 				.send()
 				.await?;
-			// println!("Object retrieved successfully.");
-			let body_bytes = get_result.body.collect().await?.into_bytes();
-			Ok(body_bytes)
+			get_result.body.collect().await?.into_bytes().xok()
 		})
 	}
 
-	fn remove(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<()>> {
+	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
-		let path = path.clone();
-		let key = this.resolve_key(&path);
-
+		let key = self.resolve_key(path);
 		Box::pin(async move {
-			match this.exists(&bucket_name, &path).await? {
+			let client = this.client().await;
+			match client
+				.head_object()
+				.bucket(this.bucket_name.as_str())
+				.key(&key)
+				.send()
+				.await
+			{
+				Ok(_) => true.xok(),
+				Err(SdkError::ServiceError(service_err))
+					if let HeadObjectError::NotFound(_) = service_err.err() =>
+				{
+					false.xok()
+				}
+				Err(err) => Err(err.into()),
+			}
+		})
+	}
+
+	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		let path = path.clone();
+		Box::pin(async move {
+			match this.exists(&path).await? {
 				true => {
-					this.0
+					let client = this.client().await;
+					client
 						.delete_object()
-						.bucket(&bucket_name)
+						.bucket(this.bucket_name.as_str())
 						.key(&key)
 						.send()
 						.await?;
-					Ok(())
+					().xok()
 				}
 				false => {
-					bevybail!("Object not found: {}", key);
+					bevybail!("Object not found: {}", key)
 				}
 			}
 		})
@@ -301,15 +278,14 @@ impl BucketProvider for S3Provider {
 
 	fn public_url(
 		&self,
-		bucket_name: &str,
 		path: &RoutePath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
-		let region = self.region().unwrap_or_else(|| "us-west-2".to_string());
-		let bucket_name = bucket_name.to_string();
+		let region = &self.region;
+		let bucket_name = &self.bucket_name;
 		let key = self.resolve_key(path);
 		let public_url =
-			format!("https://{bucket_name}.s3.{region}.amazonaws.com/{key}",);
-		Box::pin(async move { Ok(Some(public_url)) })
+			format!("https://{bucket_name}.s3.{region}.amazonaws.com/{key}");
+		Box::pin(async move { Some(public_url).xok() })
 	}
 }
 
@@ -320,20 +296,18 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn works() {
-		let provider = S3Provider::create().await;
+		let provider = S3Provider::new("beet-test-bucket", "us-west-2");
 		bucket_test::run(provider).await;
 	}
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn infra_bucket() {
-		let client = S3Provider::create().await;
-
-		let bucket = Bucket::new(client, "beet-site-bucket-dev".to_string());
+		let provider = S3Provider::new("beet-site-bucket-dev", "us-west-2");
+		let bucket = Bucket::new(provider);
 		bucket.bucket_try_create().await.unwrap();
 		bucket.bucket_exists().await.xpect_ok();
 
-		// READ - Download and verify the file
 		bucket
 			.get(&RoutePath::new("index.html"))
 			.await
@@ -345,17 +319,15 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
-		let bucket_name: &str = "beet-test";
-
-		let client = S3Provider::create().await;
+		let provider = S3Provider::new("beet-test", "us-west-2");
 		let test_key = RoutePath::from("test-file.txt");
-		Bucket::new(client, bucket_name.to_string())
+		Bucket::new(provider)
 			.public_url(&test_key)
 			.await
 			.unwrap()
 			.unwrap()
 			.xpect_eq(format!(
-				"https://{bucket_name}.s3.us-west-2.amazonaws.com{test_key}"
+				"https://beet-test.s3.us-west-2.amazonaws.com{test_key}"
 			));
 	}
 }

@@ -5,20 +5,30 @@ use bytes::Bytes;
 use js_sys::wasm_bindgen::JsCast;
 
 /// A bucket provider backed by browser localStorage.
-#[derive(Debug, Clone)]
-pub struct LocalStorageProvider;
+///
+/// Uses `bucket:<bucket_name>:<path>` as the localStorage key prefix.
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct LocalStorageProvider {
+	/// The bucket name used as part of the localStorage key prefix.
+	bucket_name: SmolStr,
+}
 
 impl LocalStorageProvider {
-	/// Creates a new localStorage-backed bucket provider.
-	pub fn new() -> Self { Self }
-
-	fn bucket_prefix(bucket_name: &str) -> String {
-		format!("bucket:{}:", bucket_name)
+	/// Creates a new localStorage-backed bucket provider for the given bucket.
+	pub fn new(bucket_name: impl Into<SmolStr>) -> Self {
+		Self {
+			bucket_name: bucket_name.into(),
+		}
 	}
 
-	/// Compose the localStorage key for a given bucket and path.
-	fn storage_key(bucket_name: &str, path: &RoutePath) -> String {
-		Self::bucket_prefix(bucket_name).xtend(&path.to_string())
+	fn bucket_prefix(&self) -> String {
+		format!("bucket:{}:", self.bucket_name)
+	}
+
+	/// Compose the localStorage key for the bucket and path.
+	fn storage_key(&self, path: &RoutePath) -> String {
+		self.bucket_prefix().xtend(&path.to_string())
 	}
 
 	fn local_storage() -> web_sys::Storage {
@@ -43,119 +53,94 @@ impl BucketProvider for LocalStorageProvider {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<bool>> {
-		let prefix = Self::bucket_prefix(bucket_name);
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let prefix = self.bucket_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			for i in 0..storage.length().unwrap_or(0) {
 				if let Some(key) = storage.key(i).ok().flatten() {
 					if key.starts_with(&prefix) {
-						return Ok(true);
+						return true.xok();
 					}
 				}
 			}
-			Ok(false)
+			false.xok()
 		})
 	}
 
-	fn bucket_create(&self, _bucket_name: &str) -> SendBoxedFuture<Result<()>> {
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
 		// No-op for localStorage
-		Box::pin(async { Ok(()) })
+		Box::pin(async { ().xok() })
 	}
 
-	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		let prefix = Self::bucket_prefix(bucket_name);
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+		let prefix = self.bucket_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let keys: Vec<String> = (0..storage.length().unwrap_or(0))
 				.filter_map(|i| storage.key(i).ok().flatten())
-				.filter(|k| k.starts_with(&prefix))
+				.filter(|key| key.starts_with(&prefix))
 				.collect();
 			for key in keys {
 				storage.remove_item(&key).ok();
 			}
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn insert(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-		body: Bytes,
-	) -> SendBoxedFuture<Result<()>> {
-		let key = Self::storage_key(bucket_name, path);
+	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+		let key = self.storage_key(path);
 		let value = BASE64_STANDARD.encode(body);
 		Box::pin(async move {
 			Self::local_storage().set_item(&key, &value).map_jserr()?;
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn exists(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<bool>> {
-		let key = Self::storage_key(bucket_name, path);
+	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+		let key = self.storage_key(path);
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let value = storage.get_item(&key).map_jserr()?;
-			Ok(value.is_some())
+			value.is_some().xok()
 		})
 	}
 
-	fn list(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
-		let prefix = Self::bucket_prefix(bucket_name);
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+		let prefix = self.bucket_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let keys: Vec<RoutePath> = (0..storage.length().unwrap_or(0))
 				.filter_map(|i| storage.key(i).ok().flatten())
-				.filter_map(|k| k.strip_prefix(&prefix).map(RoutePath::new))
+				.filter_map(|key| key.strip_prefix(&prefix).map(RoutePath::new))
 				.collect();
-			Ok(keys)
+			keys.xok()
 		})
 	}
 
-	fn get(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Bytes>> {
-		let key = Self::storage_key(bucket_name, path);
+	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+		let key = self.storage_key(path);
 		Box::pin(async move {
 			let value = Self::local_storage().get_item(&key).map_jserr()?;
 			match value {
 				Some(val) => {
 					let bytes = BASE64_STANDARD.decode(val)?;
-					Ok(Bytes::from(bytes))
+					Bytes::from(bytes).xok()
 				}
 				None => bevybail!("Object not found: {}", key),
 			}
 		})
 	}
 
-	fn remove(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<()>> {
-		let key = Self::storage_key(bucket_name, path);
+	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+		let key = self.storage_key(path);
 		let this = self.clone();
-		let bucket_name = bucket_name.to_string();
 		let path = path.clone();
-
 		Box::pin(async move {
-			match this.exists(&bucket_name, &path).await? {
+			match this.exists(&path).await? {
 				true => {
 					Self::local_storage().remove_item(&key).map_jserr()?;
-					Ok(())
+					().xok()
 				}
 				false => {
 					bevybail!("Object not found: {}", key)
@@ -166,10 +151,9 @@ impl BucketProvider for LocalStorageProvider {
 
 	fn public_url(
 		&self,
-		_bucket_name: &str,
 		_path: &RoutePath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
-		Box::pin(async move { Ok(None) })
+		Box::pin(async move { None.xok() })
 	}
 }
 
@@ -179,7 +163,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = LocalStorageProvider::new();
+		let provider = LocalStorageProvider::new("test-bucket");
 		bucket_test::run(provider).await;
 	}
 }
