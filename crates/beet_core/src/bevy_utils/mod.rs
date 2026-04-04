@@ -40,6 +40,7 @@
 mod ancestor_query;
 #[cfg(feature = "std")]
 mod async_commands;
+mod async_init;
 #[cfg(feature = "std")]
 mod async_runner;
 mod bevyhow;
@@ -51,6 +52,7 @@ mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
 
+pub use async_init::*;
 pub use bevyhow::*;
 mod observer_adder;
 #[cfg(feature = "std")]

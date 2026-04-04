@@ -381,4 +381,21 @@ pub impl<'w> EntityWorldMut<'w> {
 		}
 		self
 	}
+
+	/// Removes the component of the given type from the entity and all its descendants
+	/// and returns their values.
+	fn take_recursive<C: Component>(&mut self) -> Vec<C> {
+		let mut taken = Vec::new();
+		if let Some(component) = self.take::<C>() {
+			taken.push(component);
+		}
+		if let Some(children) = self.get::<Children>() {
+			for child in children.to_vec() {
+				taken.extend(self.world_scope(|world| {
+					world.entity_mut(child).take_recursive::<C>()
+				}));
+			}
+		}
+		taken
+	}
 }
