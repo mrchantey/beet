@@ -39,7 +39,12 @@ fn post_added(
 	query: Populated<(Entity, &Post), Added<Post>>,
 	thread_query: ThreadQuery,
 ) -> Result {
-	for (entity, post) in query.iter() {
+	// handle multiple simultaneously created posts,
+	// ie scene load
+	let mut posts: Vec<_> = query.iter().collect();
+	posts.sort_by_key(|(_, post)| *post);
+
+	for (entity, post) in posts {
 		commands.entity(entity).insert(StdoutCursor::default());
 		let actor = thread_query.actor_from_post_entity(entity)?;
 
@@ -69,10 +74,16 @@ fn post_added(
 		let heading =
 			paint_ext::cyan_bold(format!("\n{} {}\n", actor.name(), suffix));
 		println!("{heading}");
+
+		let mut cursor = StdoutCursor::default();
+		print_post(post, &mut cursor);
+		commands.entity(entity).insert(cursor);
 	}
+	std::io::Write::flush(&mut std::io::stdout())?;
 
 	Ok(())
 }
+
 
 fn post_changed(
 	filter: Res<StdoutActorFilter>,
@@ -84,33 +95,36 @@ fn post_changed(
 		if !filter.contains(&actor.kind()) {
 			continue;
 		}
-
 		// hide reasoning and tool calls in release builds
 		#[cfg(not(debug_assertions))]
 		if !post.intent().is_display() {
 			continue;
 		}
-		let body = post.to_string();
-
-		let new_content = &body[**cursor as usize..];
-		let agent_post = post.as_agent_post();
-		let colored = if agent_post.is_refusal() {
-			paint_ext::red(new_content)
-		} else if agent_post.is_reasoning_summary()
-			|| agent_post.is_reasoning_content()
-		{
-			paint_ext::dimmed(new_content)
-		} else {
-			new_content.to_string()
-		};
-
-		print!("{}", colored);
-		**cursor = body.len() as u32;
+		print_post(post, &mut cursor);
 	}
+	std::io::Write::flush(&mut std::io::stdout())?;
 
 	Ok(())
 }
 
+fn print_post(post: &Post, cursor: &mut StdoutCursor) {
+	let body = post.to_string();
+
+	let new_content = &body[**cursor as usize..];
+	let agent_post = post.as_agent_post();
+	let colored = if agent_post.is_refusal() {
+		paint_ext::red(new_content)
+	} else if agent_post.is_reasoning_summary()
+		|| agent_post.is_reasoning_content()
+	{
+		paint_ext::dimmed(new_content)
+	} else {
+		new_content.to_string()
+	};
+
+	print!("{}", colored);
+	**cursor = body.len() as u32;
+}
 
 #[tool]
 #[derive(Component, Reflect)]

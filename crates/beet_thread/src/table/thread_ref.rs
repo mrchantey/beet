@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Get, Clone)]
 pub struct ThreadRef<'a> {
 	pub entity: Entity,
 	pub thread: &'a Thread,

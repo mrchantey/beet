@@ -85,6 +85,8 @@ impl std::fmt::Display for PostIntent {
 ///
 /// Note that `MessageRole` is not stored
 /// as this is relative to the Actor.
+///
+/// Posts implement [`Ord`], sorted by [`Self::created`]
 #[derive(
 	Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, Component,
 )]
@@ -120,6 +122,18 @@ impl std::fmt::Debug for Post {
 	}
 }
 
+
+impl PartialOrd for Post {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for Post {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.created.cmp(&other.created)
+	}
+}
 
 impl Table for Post {
 	type Id = PostId;

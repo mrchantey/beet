@@ -77,13 +77,13 @@ fn setup(mut commands: Commands) {
 									// OllamaProvider::qwen()
 									OpenAiProvider::gpt_5_mini().unwrap()
 								),
-								// save after user post
+								// save directly after agent post
 								SaveScene,
 								(
 									Actor::new("User", ActorKind::User),
 									StdinPost
 								),
-								// save again after agent post
+								// save directly after user post
 								SaveScene
 							]
 						)]))
