@@ -565,7 +565,7 @@ fn make_struct_def(
 	fn_attrs: &[syn::Attribute],
 	require_tool: Option<TokenStream>,
 ) -> TokenStream {
-	let has_component = has_component_derive(fn_attrs);
+	let has_component = has_derive(fn_attrs, "Component");
 	let require_attr = if has_component {
 		if let Some(expr) = require_tool {
 			quote! { #[require(#expr)] }
@@ -588,7 +588,7 @@ fn make_struct_def(
 		}
 	} else {
 		let (impl_generics, _, where_clause) = generics.split_for_impl();
-		let has_reflect = has_reflect_derive(fn_attrs);
+		let has_reflect = has_derive(fn_attrs, "Reflect");
 		let phantom = if type_params.len() == 1 {
 			let tp = type_params[0];
 			if has_reflect {
@@ -694,33 +694,14 @@ fn tool_fn_name(fn_name: &syn::Ident) -> syn::Ident {
 	syn::Ident::new(&name, fn_name.span())
 }
 
-/// Check whether any `#[derive(...)]` attribute contains `Component`.
-fn has_component_derive(attrs: &[syn::Attribute]) -> bool {
+/// Check whether any `#[derive(...)]` attribute contains `name`.
+fn has_derive(attrs: &[syn::Attribute], name: &str) -> bool {
 	attrs.iter().any(|attr| {
 		if attr.path().is_ident("derive") {
 			attr.parse_args_with(
 				syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
 			)
-			.map(|meta_list| {
-				meta_list.iter().any(|path| path.is_ident("Component"))
-			})
-			.unwrap_or(false)
-		} else {
-			false
-		}
-	})
-}
-
-/// Check whether any `#[derive(...)]` attribute contains `Reflect`.
-fn has_reflect_derive(attrs: &[syn::Attribute]) -> bool {
-	attrs.iter().any(|attr| {
-		if attr.path().is_ident("derive") {
-			attr.parse_args_with(
-				syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
-			)
-			.map(|meta_list| {
-				meta_list.iter().any(|path| path.is_ident("Reflect"))
-			})
+			.map(|meta_list| meta_list.iter().any(|path| path.is_ident(name)))
 			.unwrap_or(false)
 		} else {
 			false
@@ -1123,7 +1104,7 @@ mod test {
 	}
 
 	// -----------------------------------------------------------------------
-	// has_component_derive helper
+	// has_derive helper
 	// -----------------------------------------------------------------------
 
 	#[test]
@@ -1133,7 +1114,7 @@ mod test {
 			fn Add() {}
 		};
 		assert!(!item.attrs.is_empty());
-		assert!(has_component_derive(&item.attrs));
+		assert!(has_derive(&item.attrs, "Component"));
 	}
 
 	#[test]
@@ -1143,7 +1124,7 @@ mod test {
 			fn Add() {}
 		};
 		assert!(!item.attrs.is_empty());
-		assert!(!has_component_derive(&item.attrs));
+		assert!(!has_derive(&item.attrs, "Component"));
 	}
 
 	#[test]
@@ -1152,7 +1133,7 @@ mod test {
 			fn Add() {}
 		};
 		assert!(item.attrs.is_empty());
-		assert!(!has_component_derive(&item.attrs));
+		assert!(!has_derive(&item.attrs, "Component"));
 	}
 
 	// -----------------------------------------------------------------------

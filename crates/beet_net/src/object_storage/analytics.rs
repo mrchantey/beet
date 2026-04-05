@@ -8,6 +8,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+// TODO this should be from beet_infra
+const DEFAULT_REGION: &str = "us-west-2";
+
 /// Plugin that sets up analytics event handling and storage.
 pub fn analytics_plugin(app: &mut App) {
 	app.add_systems(PostStartup, spawn_analytics_event_store)
@@ -32,7 +35,9 @@ fn spawn_analytics_event_store(
 	let bucket_name = pkg_config.analytics_bucket_name();
 	let access = pkg_config.service_access;
 	commands.run(async move |queue| {
-		let store = dynamo_fs_selector(&fs_dir, &bucket_name, access).await;
+		let store =
+			dynamo_fs_selector(&fs_dir, &bucket_name, &DEFAULT_REGION, access)
+				.await;
 		queue.insert_resource(AnalyticsEventStore { store });
 	});
 }

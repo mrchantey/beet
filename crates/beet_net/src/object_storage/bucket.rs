@@ -46,76 +46,9 @@ impl Bucket {
 		BucketItem::new(self.clone(), path)
 	}
 
-
-	/// Create bucket (may take 10+ seconds for some services like DynamoDB).
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// bucket.bucket_create().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
-	/// # Errors
-	/// Fails if bucket already exists
-	pub async fn bucket_create(&self) -> Result {
-		self.provider.bucket_create().await
-	}
-
-	/// Ensure bucket exists, creating if needed.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// bucket.bucket_try_create().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn bucket_try_create(&self) -> Result {
-		self.provider.bucket_try_create().await
-	}
-
-	/// Check if bucket exists.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// let exists = bucket.bucket_exists().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn bucket_exists(&self) -> Result<bool> {
-		self.provider.bucket_exists().await
-	}
-	/// Remove bucket.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// bucket.bucket_remove().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	///
-	/// # Errors
-	/// Fails if bucket doesn't exist
-	pub async fn bucket_remove(&self) -> Result {
-		self.provider.bucket_remove().await
-	}
 	/// Insert object into bucket.
+	///
+	/// Ergonomic wrapper accepting any `impl Into<Bytes>` (eg. `&str`, `Vec<u8>`).
 	///
 	/// # Example
 	/// ```
@@ -159,52 +92,6 @@ impl Bucket {
 		}
 	}
 
-	/// Check if object exists.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// let exists = bucket.exists(&RoutePath::from("/file.txt")).await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn exists(&self, path: &RoutePath) -> Result<bool> {
-		self.provider.exists(path).await
-	}
-	/// List all objects in bucket.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// let paths = bucket.list().await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn list(&self) -> Result<Vec<RoutePath>> {
-		self.provider.list().await
-	}
-	/// Get object data.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// let data = bucket.get(&RoutePath::from("/file.txt")).await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn get(&self, path: &RoutePath) -> Result<Bytes> {
-		self.provider.get(path).await
-	}
-
 	/// Get all objects and their data.
 	///
 	/// # Example
@@ -219,7 +106,7 @@ impl Bucket {
 	/// ```
 	///
 	/// # Caution
-	/// Expensive operation - prefer [`Self::list`] + [`Self::get`]
+	/// Expensive operation - prefer [`BucketProvider::list`] + [`BucketProvider::get`]
 	pub async fn get_all(&self) -> Result<Vec<(RoutePath, Bytes)>> {
 		self.list()
 			.await?
@@ -231,40 +118,6 @@ impl Bucket {
 			.xmap(async_ext::try_join_all)
 			.await
 	}
-
-	/// Remove object from bucket.
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// bucket.remove(&RoutePath::from("/file.txt")).await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn remove(&self, path: &RoutePath) -> Result {
-		self.provider.remove(path).await
-	}
-
-	/// Get public URL for object (if supported by provider).
-	///
-	/// # Example
-	/// ```
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// # async fn run() -> Result<()> {
-	/// let bucket = temp_bucket();
-	/// let url = bucket.public_url(&RoutePath::from("/file.txt")).await?;
-	/// # Ok(())
-	/// # }
-	/// ```
-	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
-		self.provider.public_url(path).await
-	}
-	/// Get provider region.
-	pub fn region(&self) -> Option<String> { self.provider.region() }
 }
 
 impl BucketProvider for Bucket {
@@ -313,14 +166,67 @@ pub trait BucketProvider: 'static + Send + Sync {
 
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
+
 	/// Check if bucket exists.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let exists = bucket.bucket_exists().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>>;
-	/// Create bucket.
+
+	/// Create bucket (may take 10+ seconds for some services like DynamoDB).
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_create().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// # Errors
+	/// Fails if bucket already exists.
 	fn bucket_create(&self) -> SendBoxedFuture<Result>;
+
 	/// Remove bucket (destructive operation!).
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_remove().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
+	/// # Errors
+	/// Fails if bucket doesn't exist.
 	fn bucket_remove(&self) -> SendBoxedFuture<Result>;
 
 	/// Ensure bucket exists, creating if needed.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.bucket_try_create().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn bucket_try_create(&self) -> SendBoxedFuture<Result> {
 		let exists_fut = self.bucket_exists();
 		let create_fut = self.bucket_create();
@@ -332,19 +238,91 @@ pub trait BucketProvider: 'static + Send + Sync {
 			}
 		})
 	}
+
 	/// Insert object into bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result>;
+
 	/// List all objects in bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let paths = bucket.list().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>>;
+
 	/// Get object from bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let data = bucket.get(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>>;
+
 	/// Check if object exists in bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let exists = bucket.exists(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>>;
+
 	/// Remove object from bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// bucket.remove(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result>;
+
 	/// Get public URL of object.
 	/// - fs: `file:///data/buckets/my-bucket/key`
 	/// - s3: `https://my-bucket.s3.us-west-2.amazonaws.com/key`
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let bucket = temp_bucket();
+	/// let url = bucket.public_url(&RoutePath::from("/file.txt")).await?;
+	/// # Ok(())
+	/// # }
+	/// ```
 	fn public_url(
 		&self,
 		path: &RoutePath,
@@ -374,6 +352,7 @@ pub fn local_bucket(name: impl Into<String>) -> Bucket {
 pub async fn s3_fs_selector(
 	fs_path: AbsPathBuf,
 	bucket_name: impl AsRef<str>,
+	region: &str,
 	access: ServiceAccess,
 ) -> Bucket {
 	let bucket_name = bucket_name.as_ref();
@@ -390,13 +369,11 @@ pub async fn s3_fs_selector(
 		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Bucket Selector - S3: {bucket_name}");
-			let provider = S3Provider::new(bucket_name, "us-west-2");
+			let provider = S3Provider::new(bucket_name, region);
 			Bucket::new(provider)
 		}
 	}
 }
-
-
 
 /// Test utilities for bucket providers.
 #[cfg(test)]

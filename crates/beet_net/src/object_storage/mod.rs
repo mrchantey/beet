@@ -65,13 +65,13 @@ fn add_bucket<T: Component + BucketProvider + Clone>(
 	ev: On<Insert, T>,
 	query: Query<&T>,
 	mut commands: Commands,
-) {
+) -> Result {
 	let entity = ev.entity;
-	if let Ok(provider) = query.get(entity) {
-		commands
-			.entity(entity)
-			.insert(Bucket::new(provider.clone()));
-	}
+	let provider = query.get(entity)?;
+	commands
+		.entity(entity)
+		.insert(Bucket::new(provider.clone()));
+	Ok(())
 }
 
 /// Plugin that registers bucket provider observers.

@@ -371,6 +371,7 @@ pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
 pub async fn dynamo_fs_selector<T: TableStoreRow>(
 	fs_path: &AbsPathBuf,
 	table_name: &str,
+	region: &str,
 	access: ServiceAccess,
 ) -> TableStore<T> {
 	match access {
@@ -386,7 +387,7 @@ pub async fn dynamo_fs_selector<T: TableStoreRow>(
 		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - Dynamo: {table_name}");
-			TableStore::new(DynamoDbProvider::new(table_name, "us-west-2"))
+			TableStore::new(DynamoDbProvider::new(table_name, region))
 		}
 	}
 }
