@@ -7,11 +7,24 @@ pub async fn post_streamer_tool<T>(input: AsyncToolIn<()>) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {
+	let streamer = input.caller.get_cloned::<T>().await?;
+	post_streamer_tool_stateful(AsyncToolIn {
+		caller: input.caller,
+		input: streamer,
+	})
+	.await
+}
+pub async fn post_streamer_tool_stateful<T>(
+	cx: AsyncToolIn<T>,
+) -> Result<Outcome>
+where
+	T: Clone + Component + PostStreamer,
+{
 	// TODO somehow expose settings.. PostTool component?
 	let allow_multiple_modified = false;
 
-	let mut streamer = input.caller.get_cloned::<T>().await?;
-	let mut stream = streamer.stream_posts(input.caller.clone()).await?;
+	let streamer = cx.input;
+	let mut stream = streamer.stream_posts(cx.caller.clone()).await?;
 	let mut function_calls = HashMap::new();
 
 	while let Some(changes) = stream.next().await {
@@ -33,8 +46,7 @@ where
 		// info!("Received post changes: {:#?}", changes);
 		let meta_builder = stream.meta_builder()?;
 		let PostChanges { created, modified } = changes;
-		input
-			.caller
+		cx.caller
 			.with_state::<(Commands, Query<&mut Post>), _>(
 				move |agent, (mut commands, mut query)| -> Result {
 					// let view = query.view(entity)?;
@@ -67,7 +79,7 @@ where
 			.await?;
 	}
 
-	call_functions(input.caller, function_calls.into_values()).await?;
+	call_functions(cx.caller, function_calls.into_values()).await?;
 
 	Ok(Pass(()))
 }

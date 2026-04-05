@@ -14,7 +14,7 @@ impl Plugin for ThreadStdoutPlugin {
 }
 
 /// Filter to determine which actor messages
-/// are printed to stdout, defaults to all except [`ActorKind::User`]
+/// are printed to stdout, defaults to all
 #[derive(Deref, Resource)]
 pub struct StdoutActorFilter(Vec<ActorKind>);
 
@@ -25,6 +25,7 @@ impl Default for StdoutActorFilter {
 			ActorKind::System,
 			ActorKind::Developer,
 			ActorKind::Agent,
+			ActorKind::User,
 		])
 	}
 }
@@ -60,7 +61,7 @@ fn post_added(
 
 		let agent_post = post.as_agent_post();
 		let suffix = if agent_post.is_refusal() {
-			"refusal >"
+			"refusal > "
 		} else if agent_post.is_reasoning_summary()
 			|| agent_post.is_reasoning_content()
 		{
@@ -68,15 +69,15 @@ fn post_added(
 		} else if agent_post.is_url() || agent_post.is_bytes() {
 			"media "
 		} else {
-			">"
+			"> "
 		};
 
 		let heading =
-			paint_ext::cyan_bold(format!("\n{} {}\n", actor.name(), suffix));
-		println!("{heading}");
+			paint_ext::cyan_bold(format!("\n\n{} {}", actor.name(), suffix));
+		print!("{heading}");
 
 		let mut cursor = StdoutCursor::default();
-		print_post(post, &mut cursor);
+		print_delta(post, &mut cursor);
 		commands.entity(entity).insert(cursor);
 	}
 	std::io::Write::flush(&mut std::io::stdout())?;
@@ -100,14 +101,14 @@ fn post_changed(
 		if !post.intent().is_display() {
 			continue;
 		}
-		print_post(post, &mut cursor);
+		print_delta(post, &mut cursor);
 	}
 	std::io::Write::flush(&mut std::io::stdout())?;
 
 	Ok(())
 }
 
-fn print_post(post: &Post, cursor: &mut StdoutCursor) {
+fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 	let body = post.to_string();
 
 	let new_content = &body[**cursor as usize..];
@@ -127,7 +128,7 @@ fn print_post(post: &Post, cursor: &mut StdoutCursor) {
 }
 
 #[tool]
-#[derive(Component, Reflect)]
+#[derive(Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn StdinPost(
 	cx: SystemToolIn,
@@ -135,11 +136,20 @@ pub fn StdinPost(
 	actors: Query<&Actor>,
 ) -> Result<Outcome> {
 	let actor = actors.get(cx.caller)?;
-	let heading = paint_ext::cyan_bold(format!("\n\n{} > ", actor.name()));
-	print!("{heading}");
+	let heading = paint_ext::cyan_bold(format!("{} > ", actor.name()));
+	// reserve extra line to prevent jump
+	print!("\n\n\n\x1B[1A{heading}");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	let mut input = String::new();
 	std::io::stdin().read_line(&mut input)?;
+	let input = input.trim();
+
+	// Clear the terminal line
+	// (up 1 line, erase, up 2 lines)
+	// it will be printed again by the printer.
+	print!("\x1B[1A\x1B[2K\x1B[1A\x1B[1A");
+	std::io::Write::flush(&mut std::io::stdout())?;
+
 	query.spawn_post(cx.caller, PostStatus::Completed, input)?;
 	Ok(Pass(()))
 }

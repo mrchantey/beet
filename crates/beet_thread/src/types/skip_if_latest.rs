@@ -2,32 +2,60 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_tool::prelude::*;
 
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
 #[require(Tool<(), Outcome> = Self::default_tool())]
-pub struct SkipIfLatest<T> {
+pub struct SkipIfLatest<T, M = T>
+where
+	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	M: 'static + Send + Sync,
+{
+	inner: T,
 	#[reflect(ignore)]
-	_phantom: PhantomData<T>,
+	_phantom: PhantomData<M>,
 }
 
-impl<T> DefaultTool<(), Outcome> for SkipIfLatest<T> {
+impl<T, M> Clone for SkipIfLatest<T, M>
+where
+	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	M: 'static + Send + Sync,
+{
+	fn clone(&self) -> Self {
+		Self {
+			inner: self.inner.clone(),
+			_phantom: default(),
+		}
+	}
+}
+
+impl<T, M> SkipIfLatest<T, M>
+where
+	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	M: 'static + Send + Sync,
+{
+	/// Create a new `SkipIfLatest` wrapper.
+	pub fn new(inner: T) -> Self {
+		Self {
+			inner,
+			_phantom: default(),
+		}
+	}
+}
+
+
+impl<T, M> DefaultTool<(), Outcome> for SkipIfLatest<T, M>
+where
+	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	M: 'static + Send + Sync,
+{
 	fn default_tool() -> Tool<(), Outcome> {
 		async_tool(move |cx: AsyncToolIn| async move {
 			let should_skip = cx
 				.caller
 				.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {
 					let thread = query.thread(entity)?;
-					println!("entity: {}", entity);
-					for post in thread.posts() {
-						println!(
-							"post: {:?} , entity: {}",
-							post.actor.kind(),
-							post.actor_entity
-						);
-					}
 
-					if let Some(last) =
-						query.thread(entity)?.posts().into_iter().last()
+					if let Some(last) = thread.posts().into_iter().last()
 						&& last.actor_entity == entity
 					{
 						true
@@ -41,19 +69,9 @@ impl<T> DefaultTool<(), Outcome> for SkipIfLatest<T> {
 			if should_skip {
 				Ok(PASS)
 			} else {
-				todo!("how to get inner state?");
-				// let inner = cx.caller.get_cloned::<Self>().await?.inner;
-				// cx.caller.call_detached(inner, ()).await
+				let inner = cx.caller.get_cloned::<Self>().await?.inner;
+				cx.caller.call_detached(inner, ()).await
 			}
 		})
-	}
-}
-
-impl<T> SkipIfLatest<T> {
-	/// Create a new `SkipIfLatest` wrapper.
-	pub fn new() -> Self {
-		Self {
-			_phantom: default(),
-		}
 	}
 }

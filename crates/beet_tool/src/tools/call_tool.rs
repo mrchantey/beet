@@ -184,13 +184,15 @@ pub impl AsyncEntity {
 	fn call_detached<
 		Input: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
+		M,
 	>(
 		&self,
-		tool: Tool<Input, Out>,
+		tool: impl IntoTool<M, In = Input, Out = Out>,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
 		let entity_id = self.id();
 		let world = self.world().clone();
+		let tool = tool.into_tool();
 		async move {
 			let recv = world
 				.with_then(move |world: &mut World| {

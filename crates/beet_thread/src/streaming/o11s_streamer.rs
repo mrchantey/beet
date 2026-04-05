@@ -34,6 +34,16 @@ impl DefaultTool<(), Outcome> for O11sStreamer {
 	}
 }
 
+impl IntoTool<Self> for O11sStreamer {
+	type In = ();
+	type Out = Outcome;
+	fn into_tool(self) -> Tool<(), Outcome> {
+		async_tool(async move |cx: AsyncToolIn| {
+			post_streamer_tool_stateful(cx.map_input(self)).await
+		})
+	}
+}
+
 impl O11sStreamer {
 	pub fn new(model: ModelDef) -> Self {
 		Self {
@@ -156,7 +166,7 @@ impl PostStreamer for O11sStreamer {
 
 
 	fn stream_posts(
-		&mut self,
+		&self,
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		Box::pin(async move {

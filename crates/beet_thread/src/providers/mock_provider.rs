@@ -92,7 +92,7 @@ impl PostStreamer for MockPostStreamer {
 	fn model_slug(&self) -> &str { "mock-model" }
 
 	fn stream_posts(
-		&mut self,
+		&self,
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		let custom_response = self.custom_response.clone();

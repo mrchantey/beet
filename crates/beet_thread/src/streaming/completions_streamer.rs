@@ -35,6 +35,16 @@ impl DefaultTool<(), Outcome> for CompletionsStreamer {
 	}
 }
 
+impl IntoTool<Self> for CompletionsStreamer {
+	type In = ();
+	type Out = Outcome;
+	fn into_tool(self) -> Tool<(), Outcome> {
+		async_tool(async move |cx: AsyncToolIn| {
+			post_streamer_tool_stateful(cx.map_input(self)).await
+		})
+	}
+}
+
 impl CompletionsStreamer {
 	pub fn new(model: ModelDef) -> Self {
 		Self {
@@ -185,7 +195,7 @@ impl PostStreamer for CompletionsStreamer {
 	fn model_slug(&self) -> &str { &self.model.model_slug }
 
 	fn stream_posts(
-		&mut self,
+		&self,
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>> {
 		Box::pin(async move {

@@ -73,15 +73,14 @@ fn setup(mut commands: Commands) {
 								)]),
 								(
 									Actor::new("Agent", ActorKind::Agent),
-									SkipIfLatest::<O11sStreamer>::new(),
+									SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
 									// OllamaProvider::qwen()
-									OpenAiProvider::gpt_5_mini().unwrap()
 								),
 								// save directly after agent post
 								SaveScene,
 								(
 									Actor::new("User", ActorKind::User),
-									SkipIfLatest::<StdinPost>::new()
+									SkipIfLatest::new(StdinPost)
 								),
 								// save directly after user post
 								SaveScene

@@ -19,6 +19,16 @@ impl<In> std::ops::DerefMut for AsyncToolIn<In> {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
 }
 
+impl<In> AsyncToolIn<In> {
+	/// Map the input of this `AsyncToolIn` to a different type, keeping the same caller.
+	pub fn map_input<NewIn>(self, input: NewIn) -> AsyncToolIn<NewIn> {
+		AsyncToolIn {
+			caller: self.caller,
+			input,
+		}
+	}
+}
+
 /// Create a [`Tool`] from an async closure that receives
 /// [`AsyncToolIn`] and returns [`Result<Out>`].
 ///

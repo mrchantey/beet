@@ -22,7 +22,7 @@ pub trait PostStreamer {
 	fn model_slug(&self) -> &str;
 
 	fn stream_posts(
-		&mut self,
+		&self,
 		caller: AsyncEntity,
 	) -> BoxedFuture<'_, Result<PostStream>>;
 }
