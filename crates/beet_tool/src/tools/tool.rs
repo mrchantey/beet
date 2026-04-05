@@ -432,7 +432,9 @@ where
 	}
 }
 
-
+pub trait DefaultTool<Input, Output> {
+	fn default_tool() -> Tool<Input, Output>;
+}
 
 #[derive(
 	Debug,

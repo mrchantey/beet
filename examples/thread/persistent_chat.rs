@@ -69,8 +69,7 @@ fn setup(mut commands: Commands) {
 							Sequence::new().allow_no_tool(),
 							children![
 								(Actor::system(), children![Post::spawn(
-									"Ask a single, brief interesting question,
-									followup with more brief questions based on the users' answers"
+									r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
 								)]),
 								(
 									Actor::new("Agent", ActorKind::Agent),

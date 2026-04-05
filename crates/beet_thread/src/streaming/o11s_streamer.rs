@@ -13,7 +13,7 @@ use std::task::Poll;
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
-#[component(on_add = on_add)]
+#[require(Tool<(),Outcome> = Self::default_tool())]
 pub struct O11sStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
@@ -27,15 +27,11 @@ pub struct O11sStreamer {
 	reasoning: Option<ReasoningParam>,
 }
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	// Skip if a wrapper (eg SkipIfLatest) already provided a Tool
-	if world.entity(cx.entity).contains::<Tool<(), Outcome>>() {
-		return;
+
+impl DefaultTool<(), Outcome> for O11sStreamer {
+	fn default_tool() -> Tool<(), Outcome> {
+		async_tool(post_streamer_tool::<O11sStreamer>)
 	}
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(async_tool(post_streamer_tool::<O11sStreamer>));
 }
 
 impl O11sStreamer {

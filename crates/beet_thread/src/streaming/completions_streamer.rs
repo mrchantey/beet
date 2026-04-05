@@ -20,7 +20,7 @@ use std::task::Poll;
 /// [`completions_mapper`](super::completions_mapper).
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
-#[component(on_add = on_add)]
+#[require(Tool<(),Outcome> = Self::default_tool())]
 pub struct CompletionsStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
@@ -29,15 +29,10 @@ pub struct CompletionsStreamer {
 	instructions: Option<String>,
 }
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	// Skip if a wrapper already provided a Tool
-	if world.entity(cx.entity).contains::<Tool<(), Outcome>>() {
-		return;
+impl DefaultTool<(), Outcome> for CompletionsStreamer {
+	fn default_tool() -> Tool<(), Outcome> {
+		async_tool(post_streamer_tool::<CompletionsStreamer>)
 	}
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(async_tool(post_streamer_tool::<CompletionsStreamer>));
 }
 
 impl CompletionsStreamer {
