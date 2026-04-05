@@ -1303,6 +1303,7 @@ name = "beet_tool"
 version = "0.0.9-dev.6"
 dependencies = [
  "beet_core",
+ "beet_tool",
  "bevy",
  "bitflags 2.10.0",
  "extend",

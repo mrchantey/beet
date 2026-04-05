@@ -588,17 +588,31 @@ fn make_struct_def(
 		}
 	} else {
 		let (impl_generics, _, where_clause) = generics.split_for_impl();
+		let has_reflect = has_reflect_derive(fn_attrs);
 		let phantom = if type_params.len() == 1 {
 			let tp = type_params[0];
-			quote! { ::core::marker::PhantomData<#tp> }
+			if has_reflect {
+				quote! { fn() -> #tp }
+			} else {
+				quote! { #tp }
+			}
 		} else {
-			quote! { ::core::marker::PhantomData<(#(#type_params),*)> }
+			if has_reflect {
+				quote! { fn() -> (#(#type_params),*) }
+			} else {
+				quote! { (#(#type_params),*) }
+			}
+		};
+		let reflect_ignore = if has_reflect {
+			quote! { #[reflect(ignore)] }
+		} else {
+			quote! {}
 		};
 		quote! {
 			#(#fn_attrs)*
 			#require_attr
 			#[allow(non_camel_case_types)]
-			#vis struct #fn_name #impl_generics (#phantom) #where_clause;
+			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
 		}
 	}
 }
@@ -697,6 +711,23 @@ fn has_component_derive(attrs: &[syn::Attribute]) -> bool {
 	})
 }
 
+/// Check whether any `#[derive(...)]` attribute contains `Reflect`.
+fn has_reflect_derive(attrs: &[syn::Attribute]) -> bool {
+	attrs.iter().any(|attr| {
+		if attr.path().is_ident("derive") {
+			attr.parse_args_with(
+				syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
+			)
+			.map(|meta_list| {
+				meta_list.iter().any(|path| path.is_ident("Reflect"))
+			})
+			.unwrap_or(false)
+		} else {
+			false
+		}
+	})
+}
+
 /// Generate turbofish syntax for generic type parameters,
 /// or empty tokens when there are none.
 fn make_turbofish(generics: &syn::Generics) -> TokenStream {
@@ -764,6 +795,20 @@ mod test {
 			{}
 		});
 		assert!(result.contains("PhantomData < (A , B) >"));
+	}
+
+	#[test]
+	fn generic_with_reflect_uses_fn_phantom() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			#[reflect(Component)]
+			async fn my_tool<T>(input: AsyncToolIn<()>) -> ()
+			where
+				T: Send + Sync,
+			{}
+		});
+		assert!(result.contains("reflect (ignore)"));
+		assert!(result.contains("fn () ->"));
 	}
 
 	fn parse_str(attr: TokenStream, item: syn::ItemFn) -> String {

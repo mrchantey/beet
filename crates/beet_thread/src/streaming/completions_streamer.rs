@@ -30,6 +30,10 @@ pub struct CompletionsStreamer {
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	// Skip if a wrapper already provided a Tool
+	if world.entity(cx.entity).contains::<Tool<(), Outcome>>() {
+		return;
+	}
 	world
 		.commands()
 		.entity(cx.entity)

@@ -48,6 +48,9 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ChildError>()
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<Repeat<()>>()
-			.register_type::<RepeatTimes<()>>();
+			.register_type::<RepeatTimes<()>>()
+			// ── SkipIfLatest wrapper instantiations ───────────────────────
+			.register_type::<SkipIfLatest<StdinPost>>()
+			.register_type::<SkipIfLatest<O11sStreamer>>();
 	}
 }

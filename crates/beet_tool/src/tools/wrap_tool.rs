@@ -7,9 +7,13 @@ use beet_core::prelude::*;
 /// handler at the point of their choosing, enabling middleware
 /// patterns like input transformation, output transformation,
 /// or short-circuiting.
+#[derive(Get)]
 pub struct Next<In: 'static, Out: 'static> {
+	#[get(skip)]
 	handler: Tool<In, Out>,
+	/// The entity that initiated this tool call.
 	caller: Entity,
+	/// The [`AsyncWorld`] handle for this tool call.
 	world: AsyncWorld,
 }
 
@@ -188,10 +192,12 @@ where
 
 #[cfg(test)]
 mod test {
+	use std::marker::PhantomData;
 	use std::str::FromStr;
 
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use bevy::ecs::entity::EntityHashMap;
 
 	#[tool]
 	fn add(a: i32, b: i32) -> i32 { a + b }
@@ -199,6 +205,58 @@ mod test {
 	fn double(val: i32) -> i32 { val * 2 }
 	#[tool]
 	fn negate(val: i32) -> i32 { -val }
+
+	// -- serde roundtrip helpers ------------------------------------------
+
+	/// Trait for types whose tool handler can be constructed statically,
+	/// allowing a wrapper to build the inner tool at `#[require]` time.
+	trait InnerTestTool: 'static + Send + Sync {
+		fn inner_tool() -> Tool<i32, i32>;
+	}
+
+	/// Inner tool defined with `#[tool]`, used as the wrapped target.
+	#[tool]
+	#[derive(Debug, Default, Component, Reflect)]
+	#[reflect(Component, Default)]
+	fn Doubler(val: i32) -> i32 { val * 2 }
+
+	impl InnerTestTool for Doubler {
+		fn inner_tool() -> Tool<i32, i32> { Doubler.into_tool() }
+	}
+
+	/// Wrapper function defined with `#[tool]`, provides the wrapping logic.
+	#[tool]
+	async fn AddOneWrap(cx: AsyncToolIn<(i32, Next<i32, i32>)>) -> Result<i32> {
+		let inner_out = cx.1.call(cx.0).await?;
+		Ok(inner_out + 1)
+	}
+
+	/// Serializable wrapper component, generic over the inner tool `T`.
+	/// Uses `#[require]` to provide the wrapped tool at bundle-resolution
+	/// time, avoiding timing issues during scene deserialization.
+	#[derive(Debug, Clone, Component, Reflect)]
+	#[reflect(Component, Default)]
+	#[require(Tool<i32, i32> = AddOneWrapper::<T>::make_tool())]
+	struct AddOneWrapper<T: InnerTestTool = Doubler>(
+		#[reflect(ignore)] PhantomData<fn() -> T>,
+	);
+
+	impl<T: InnerTestTool> Default for AddOneWrapper<T> {
+		fn default() -> Self { Self(PhantomData) }
+	}
+
+	impl<T: InnerTestTool> AddOneWrapper<T> {
+		fn make_tool() -> Tool<i32, i32> {
+			let inner = T::inner_tool();
+			async_tool(move |cx: AsyncToolIn<i32>| {
+				let inner = inner.clone();
+				async move {
+					let inner_out = cx.caller.call_detached(inner, *cx).await?;
+					Ok(inner_out + 1)
+				}
+			})
+		}
+	}
 
 	/// Example middleware accepting and returning an opaque type
 	async fn my_middleware<In, Out>(
@@ -315,5 +373,119 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(-29);
+	}
+
+	// -- serde roundtrip tests --------------------------------------------
+
+	fn scene_app() -> App {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin));
+		app.register_type::<AddOneWrapper<Doubler>>();
+		app.register_type::<i32>();
+		app.init();
+		app.update();
+		app
+	}
+
+	#[beet_core::test]
+	async fn wrapper_works_directly() {
+		let mut app = scene_app();
+		// Only AddOneWrapper is needed — its #[require] provides the
+		// wrapped tool, constructing the inner Doubler tool statically.
+		let entity = app
+			.world_mut()
+			.spawn(AddOneWrapper::<Doubler>::default())
+			.id();
+		app.update();
+
+		// double(5) + 1 = 11
+		app.world_mut()
+			.entity_mut(entity)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(11);
+	}
+
+	#[test]
+	fn wrapper_scene_roundtrip() {
+		let mut app = scene_app();
+
+		let entity = app
+			.world_mut()
+			.spawn(AddOneWrapper::<Doubler>::default())
+			.id();
+		app.update();
+
+		// The entity should have the wrapper component and a ToolMeta.
+		app.world()
+			.entity(entity)
+			.get::<AddOneWrapper<Doubler>>()
+			.xpect_some();
+		app.world().entity(entity).get::<ToolMeta>().xpect_some();
+
+		// Serialize
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entities([entity])
+			.save_ron()
+			.unwrap();
+		scene.xref().xpect_contains("AddOneWrapper");
+
+		// Despawn original
+		app.world_mut().entity_mut(entity).despawn();
+		app.update();
+
+		// Deserialize
+		let mut entity_map = EntityHashMap::default();
+		SceneLoader::new(app.world_mut())
+			.with_entity_map(&mut entity_map)
+			.load_ron(&scene)
+			.unwrap();
+		app.update();
+
+		// The loaded entity should have the wrapper and a ToolMeta
+		// (Tool itself isn't serializable, but #[require] re-creates it)
+		let loaded = *entity_map.values().next().unwrap();
+		app.world()
+			.entity(loaded)
+			.get::<AddOneWrapper<Doubler>>()
+			.xpect_some();
+		app.world().entity(loaded).get::<ToolMeta>().xpect_some();
+	}
+
+	#[beet_core::test]
+	async fn wrapper_works_after_roundtrip() {
+		let mut app = scene_app();
+
+		let entity = app
+			.world_mut()
+			.spawn(AddOneWrapper::<Doubler>::default())
+			.id();
+		app.update();
+
+		// Serialize then despawn
+		let scene = SceneSaver::new(app.world_mut())
+			.with_entities([entity])
+			.save_ron()
+			.unwrap();
+		app.world_mut().entity_mut(entity).despawn();
+		app.update();
+
+		// Deserialize
+		let mut entity_map = EntityHashMap::default();
+		SceneLoader::new(app.world_mut())
+			.with_entity_map(&mut entity_map)
+			.load_ron(&scene)
+			.unwrap();
+		app.update();
+
+		// Call the wrapped tool on the loaded entity: double(5) + 1 = 11
+		let loaded = *entity_map.values().next().unwrap();
+		app.world_mut()
+			.entity_mut(loaded)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(11);
 	}
 }

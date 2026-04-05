@@ -26,4 +26,5 @@ extend.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 [dev-dependencies]
+beet_tool = { path = ".", features= ["bevy_scene"] }
 beet_core = { workspace = true, features = ["testing"] }

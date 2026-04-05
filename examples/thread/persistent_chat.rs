@@ -70,10 +70,11 @@ fn setup(mut commands: Commands) {
 							children![
 								(Actor::system(), children![Post::spawn(
 									"Ask a single, brief interesting question,
-									followup with more brief questions based on the users' aswers"
+									followup with more brief questions based on the users' answers"
 								)]),
 								(
 									Actor::new("Agent", ActorKind::Agent),
+									SkipIfLatest::<O11sStreamer>::new(),
 									// OllamaProvider::qwen()
 									OpenAiProvider::gpt_5_mini().unwrap()
 								),
@@ -81,7 +82,7 @@ fn setup(mut commands: Commands) {
 								SaveScene,
 								(
 									Actor::new("User", ActorKind::User),
-									StdinPost
+									SkipIfLatest::<StdinPost>::new()
 								),
 								// save directly after user post
 								SaveScene
