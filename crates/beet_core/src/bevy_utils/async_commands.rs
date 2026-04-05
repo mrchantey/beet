@@ -690,6 +690,36 @@ impl AsyncEntity {
 			.await
 	}
 
+	/// Spawns an async task.
+	pub fn run_async<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = ()>
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out> + Send,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with_then(move |mut entity| {
+			entity.run_async(func);
+		})
+	}
+
+	/// Spawns an async task on the local thread.
+	pub fn run_async_local<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = ()>
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with_then(move |mut entity| {
+			entity.run_async_local(func);
+		})
+	}
+
 	/// Gets a component and runs a function with it.
 	pub async fn get<T: Component, O>(
 		&self,
@@ -922,6 +952,7 @@ pub impl World {
 #[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
 pub impl EntityWorldMut<'_> {
 	/// Spawns an async task for this entity.
+	// Only mutable to allow for ergonomic chaining.
 	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
@@ -938,6 +969,7 @@ pub impl EntityWorldMut<'_> {
 	}
 
 	/// Spawns an async task on the local thread for this entity.
+	// Only mutable to allow for ergonomic chaining.
 	#[track_caller]
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where

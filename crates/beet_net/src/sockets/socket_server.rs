@@ -44,7 +44,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	world
 		.commands()
-		.run_system_cached_with(super::start_tungstenite_server, cx.entity);
+		.entity(cx.entity)
+		.queue_async(super::start_tungstenite_server);
 	#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
 	panic!(
 		"WebSocket server requires the 'tungstenite' feature on non-wasm32 targets"

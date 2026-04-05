@@ -185,45 +185,39 @@ pub(crate) async fn rustls_connect(
 ///
 /// This bevy system binds a TCP listener and spawns tasks to handle WebSocket connections.
 /// Similar to [`start_hyper_server`] but for WebSockets.
-pub(crate) fn start_tungstenite_server(
-	In(entity): In<Entity>,
-	query: Query<&SocketServer>,
-	mut async_commands: AsyncCommands,
-) -> Result {
-	let server = query.get(entity)?;
-	let addr = server.local_address();
+///
+/// Must be run on the main thread
+pub(crate) async fn start_tungstenite_server(entity: AsyncEntity) -> Result {
+	let addr = entity
+		.get::<SocketServer, _>(|server| server.local_address())
+		.await?;
+	let socket_addr: std::net::SocketAddr = addr
+		.parse()
+		.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
+	let listener = Async::<TcpListener>::bind(socket_addr)
+		.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
 
-	async_commands.run(async move |world| -> Result {
-		let socket_addr: std::net::SocketAddr = addr
-			.parse()
-			.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
-		let listener = Async::<TcpListener>::bind(socket_addr)
-			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
+	let local_addr = listener
+		.get_ref()
+		.local_addr()
+		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-		let local_addr = listener
-			.get_ref()
-			.local_addr()
-			.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
+	info!("WebSocket server listening on ws://{}", local_addr);
 
-		info!("WebSocket server listening on ws://{}", local_addr);
+	loop {
+		let (stream, addr) = listener
+			.accept()
+			.await
+			.map_err(|e| bevyhow!("Failed to accept connection: {}", e))?;
 
-		loop {
-			let (stream, addr) = listener
-				.accept()
-				.await
-				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))?;
+		trace!("New WebSocket connection from: {}", addr);
 
-			trace!("New WebSocket connection from: {}", addr);
-
-			// Spawn on local executor so Socket is created on the same thread
-			// as its receive loop (avoids SendWrapper thread-mismatch panics).
-			let _entity_fut = world.run_async_local(async move |world| {
-				handle_connection(world.entity(entity), stream).await
-			});
-		}
-	});
-
-	Ok(())
+		// Spawn on local executor so Socket is created on the same thread
+		// as its receive loop (avoids SendWrapper thread-mismatch panics).
+		let _fut = entity.run_async_local(async move |entity| {
+			handle_connection(entity, stream).await
+		});
+	}
 }
 async fn handle_connection(
 	server: AsyncEntity,

@@ -25,7 +25,7 @@ use std::task::Poll;
 /// hyper requests.
 /// See [`HttpServer`] for customizing handlers.
 pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
-	let addr: SocketAddr = entity
+	let addr = entity
 		.get::<HttpServer, SocketAddr>(|server| {
 			(server.host, server.port).into()
 		})
