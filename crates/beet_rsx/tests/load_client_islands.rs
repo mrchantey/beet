@@ -11,8 +11,8 @@ fn works() {
 	app.add_plugins(ApplyDirectivesPlugin)
 		.register_type::<ClientIslandRoot<Counter>>();
 
-	app.load_scene(SCENE).unwrap();
-	app.query_once::<&NodeTag>().len().xpect_eq(2);
+	SceneLoader::new(app.world_mut()).load_ron(SCENE).unwrap();
+	app.world_mut().query_once::<&NodeTag>().len().xpect_eq(2);
 }
 
 

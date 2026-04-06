@@ -1,0 +1,20 @@
+{
+  "resource": [
+    {
+      "test_resource_a": [
+        {
+          "test": [
+            {
+              "name": "test_resource_a",
+              "type": "web",
+              "id": "abc123",
+              "description": "A test resource a",
+              "priority": 1,
+              "client_whitelist": [ "a", "b", "c"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

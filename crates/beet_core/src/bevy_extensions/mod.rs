@@ -9,8 +9,8 @@
 //!
 //! # World Extensions
 //!
-//! - [`WorldExt`] - Local execution, serialization, entity inspection
-//! - [`IntoWorldMutExt`] - Query utilities, component inspection, scene building
+//! - [`WorldExt`] - Local execution, entity inspection
+//! - [`WorldMutExt`] - Query utilities, component inspection, scene building
 //! - [`CoreWorldExt`] - Observer helpers
 //!
 //! # Entity Extensions
@@ -28,9 +28,12 @@ mod app_exit;
 mod commands;
 mod entity;
 mod hierarchy;
+#[cfg(feature = "bevy_keyboard")]
+mod key;
 mod plugin;
 mod pose;
 mod quat;
+mod relationship;
 mod schedule;
 mod system;
 mod transform_x;
@@ -42,9 +45,12 @@ pub use app_exit::*;
 pub use commands::*;
 pub use entity::*;
 pub use hierarchy::*;
+#[cfg(feature = "bevy_keyboard")]
+pub use key::*;
 pub use plugin::*;
 pub use pose::*;
 pub use quat::*;
+pub use relationship::*;
 pub use schedule::*;
 pub use vec3::*;
 pub use world::*;

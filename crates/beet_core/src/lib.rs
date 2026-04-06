@@ -5,7 +5,7 @@
 //!
 //! # Modules
 //!
-//! - [`arena`] - Global arenas for storing objects with copyable handles
+//! - [`arena`] - Global arenas for storing objects with copyable handles (requires `std`)
 //! - [`extensions`] - Extension traits for standard library types
 //! - [`utils`] - General utilities including async helpers and method chaining
 //! - [`testing`] - Custom test runner and matchers (requires `testing` feature)
@@ -13,14 +13,15 @@
 //!
 //! # Feature Flags
 //!
-//! - `serde` - Serialization support (enabled by default)
+//! - `std` - Standard library support (enabled by default)
+//! - `serde` - Serialization support
 //! - `testing` - Test runner and matcher utilities
-//! - `exchange` - HTTP request/response types
 //! - `fs` - File system watching and utilities (native only)
 //! - `tokens` - Proc-macro token utilities
 //! - `rand` - Random number generation
 //! - `nightly` - Nightly Rust features like `Fn` trait implementations
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(crate::test_runner))]
@@ -48,35 +49,59 @@
 // allow name collision until exit_ok stablized
 #![allow(unstable_name_collisions)]
 
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
+
+/// Re-export of [`alloc`] for use in macros across std/no_std boundaries.
+#[doc(hidden)]
+pub extern crate alloc as _alloc;
+
 #[cfg(feature = "testing")]
 extern crate test;
 
+#[cfg(feature = "std")]
 pub use utils::async_ext;
+#[cfg(feature = "std")]
 pub use utils::time_ext;
 
+// Re-export cross_log helpers at crate root so `$crate::` in macros resolves them.
+// The std feature check lives inside these functions (in beet_core where std is a
+// declared feature), avoiding unexpected_cfgs warnings in downstream crates.
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_error_native;
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_native;
+#[cfg(not(target_arch = "wasm32"))]
+pub use utils::cross_log::_cross_log_native_noline;
+
+#[cfg(feature = "std")]
 pub mod arena;
 mod bevy_extensions;
-mod bevy_utils;
-#[cfg(feature = "exchange")]
-mod exchange;
+pub mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
+#[cfg(feature = "std")]
 mod path_utils;
 #[cfg(feature = "testing")]
 pub mod testing;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
+pub mod types;
 pub mod utils;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
-// Re-export for ergonomic `#[beet_core::test]` usage
+// Re-export for ergonomic `#[beet_core::test]` and `#[beet_core::main]` usage
+pub use beet_core_macros::beet_main as main;
 pub use beet_core_macros::beet_test as test;
 pub use beet_core_macros::*;
 #[cfg(target_arch = "wasm32")]
 pub use web_utils::js_runtime;
 
+#[cfg(feature = "std")]
 mod workspace_config;
 #[cfg(feature = "testing")]
 pub use crate::testing::test_runner;
@@ -89,24 +114,43 @@ pub use crate::testing::test_runner;
 /// use beet_core::prelude::*;
 /// ```
 pub mod prelude {
+	// Re-export alloc types so modules using `crate::prelude::*` get them
+	// regardless of std/no_std. This avoids scattering `use alloc::*`
+	// throughout this crate and downstream no_std crates.
+	pub use alloc::boxed::Box;
+	pub use alloc::format;
+	pub use alloc::string::String;
+	pub use alloc::string::ToString;
+	pub use alloc::vec;
+	pub use alloc::vec::Vec;
+	pub use core::hash::BuildHasher;
+	pub use core::marker::PhantomData;
+
+	#[cfg(feature = "std")]
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
-	#[cfg(feature = "exchange")]
-	pub use crate::exchange::*;
+	pub use crate::cfg_if;
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
+	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
 	#[cfg(feature = "testing")]
 	pub use crate::testing::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
+	pub use crate::types::*;
 	pub use crate::utils::*;
 	pub use either::Either;
-	pub use std::marker::PhantomData;
+	#[cfg(feature = "serde")]
+	pub use serde::Deserialize;
+	#[cfg(feature = "serde")]
+	pub use serde::Serialize;
+	#[cfg(feature = "serde")]
+	pub use serde::de::DeserializeOwned;
 	// as a metaframework we're a superset of bevy,
 	// and more opinionated about kitchen sink prelude inclusions
 	/// hack to fix bevy macros
@@ -127,7 +171,6 @@ pub mod prelude {
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;
 	pub use bevy_ecs::entity_disabling::Disabled;
-	pub use std::hash::BuildHasher;
 	pub use tracing::Level;
 
 	#[cfg(target_arch = "wasm32")]
@@ -138,19 +181,25 @@ pub mod prelude {
 	pub use bevy::reflect as bevy_reflect;
 	pub use bevy::time::Stopwatch;
 
+	#[cfg(feature = "std")]
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::web_utils::*;
+	#[cfg(feature = "std")]
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
 	pub use futures_lite::StreamExt;
+	pub use smol_str::SmolStr;
 	pub use web_time::Duration;
 	pub use web_time::Instant;
+	pub use web_time::SystemTime;
 
+	#[cfg(feature = "std")]
 	pub use crate::abs_file;
 	pub use crate::cross_log;
 	pub use crate::cross_log_error;
 	pub use crate::cross_log_noline;
+	#[cfg(feature = "std")]
 	pub use crate::dir;
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;
@@ -163,6 +212,7 @@ pub mod prelude {
 pub mod exports {
 	pub use itertools::Itertools;
 	// original exports
+	#[cfg(feature = "std")]
 	pub use async_channel;
 	pub use futures_lite;
 	#[cfg(feature = "tokens")]
@@ -174,11 +224,10 @@ pub mod exports {
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;
-	#[cfg(feature = "serde")]
-	pub use toml;
 	pub use web_time;
 
 	// merged-in exports
+	#[cfg(feature = "std")]
 	pub use glob;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use notify;

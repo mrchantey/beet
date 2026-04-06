@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::ExecutorKind;
 use bevy::time::TimePlugin;
 
 /// Entry point for the custom test runner, invoked by the test harness.
@@ -9,7 +10,7 @@ pub fn test_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
 		.spawn_then((
-			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
+			TestRunnerConfig::from_env(),
 			tests_bundle_borrowed(tests),
 		))
 		.run();
@@ -28,6 +29,18 @@ impl Plugin for TestPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<TimePlugin>()
 			.insert_schedule_before(Update, RunTests)
+			// Force single-threaded execution so `spawn_local` in `run_tests_series`
+			// always lands on the main thread's local executor.
+			// With `bevy_multithreaded`, the default is `MultiThreaded`, which
+			// can dispatch systems to worker threads whose thread-local executors
+			// are not ticked by `tick_global_task_pools_on_main_thread`, causing
+			// async test tasks to never complete.
+			//
+			// We could alternatively just mark run_tests_series with NonSendMarker,
+			// but thats more error-prone
+			.edit_schedule(RunTests, |schedule| {
+				schedule.set_executor_kind(ExecutorKind::SingleThreaded);
+			})
 			.add_systems(
 				RunTests,
 				(

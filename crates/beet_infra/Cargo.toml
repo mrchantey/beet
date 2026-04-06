@@ -1,0 +1,55 @@
+[package]
+name = "beet_infra"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Terraform configuration represented as high level Bevy scenes"
+repository.workspace = true
+
+[features]
+default = []
+bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
+tokens = ["proc-macro2", "quote", "syn"]
+stack_lambda = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
+stack_lambda_rt = ["beet_net/aws"]
+stack_lightsail = ["bindings_aws_lightsail"]
+bindings_aws_common = []
+bindings_aws_dns = []
+bindings_aws_lightsail = []
+bindings_aws_lambda = []
+bindings_cloudflare_common = []
+cli = ["dep:beet_router"]
+
+[[bin]]
+name = "bindings"
+path = "src/bin/bindings.rs"
+required-features = ["bindings_generator"]
+
+[dependencies]
+beet_core = { workspace = true, features = ["json", "rand", "fs"] }
+beet_net.workspace = true
+beet_router = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+heck.workspace = true
+
+thiserror = { workspace = true }
+proc-macro2 = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
+syn = { workspace = true, optional = true }
+prettyplease = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-process = { workspace = true }
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
+beet_infra = { path = ".", features = [
+	"bindings_generator",
+	"bindings_aws_dns",
+	"stack_lambda",
+	"stack_lightsail",
+] }

@@ -5,11 +5,12 @@
 [target.wasm32-unknown-unknown]
 # wasm runner for cargo run and cargo test
 # uncomment during development
-runner = 'cargo run -p beet-cli -- run-wasm'
-# runner = 'beet run-wasm'
+# runner = 'cargo run -p beet-cli -- run-wasm'
+runner = 'beet run-wasm'
 
 rustflags = [
-	# remove in getrandom 0.3.4
+	# TODO remove in getrandom 0.3.4
+	# i think we can remove this now..
 	"--cfg",
 	"getrandom_backend=\"wasm_js\"",
 	# get span.file()

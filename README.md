@@ -108,7 +108,7 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                              | Status | Description                                      |
 | -------------------------------------------------- | ------ | ------------------------------------------------ |
-| [`beet_clanker`](crates/beet_clanker/Cargo.toml)       | 🐉      | Structured context and tool calling for llms  |
+| [`beet_actor`](crates/beet_actor/Cargo.toml)       | 🐉      | Actor types and systems  |
 | [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
 | [`emby`](crates/emby/Cargo.toml)                   | 🐉      | the beetmash ambassador                          |
 

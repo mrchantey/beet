@@ -6,9 +6,10 @@ use bevy::app::Plugins;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
+#[cfg(feature = "std")]
 use bevy::tasks::IoTaskPool;
+#[cfg(feature = "std")]
 use bevy::tasks::Task;
-use std::time::Duration;
 
 /// Extension trait adding utility methods to [`App`].
 #[extend::ext(name=BeetCoreAppExt)]
@@ -98,11 +99,13 @@ pub impl App {
 	}
 
 	/// Runs the app asynchronously, useful for wasm where `App::run` returns immediately.
+	#[cfg(feature = "std")]
 	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
-		AsyncRunner::run(std::mem::take(self))
+		AsyncRunner::run(core::mem::take(self))
 	}
 
 	/// Runs an IO task to completion, polling at 10 millisecond intervals.
+	#[cfg(feature = "std")]
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static + Send,
@@ -111,6 +114,7 @@ pub impl App {
 		self.await_io_task(IoTaskPool::get().spawn(fut)).await
 	}
 	/// Runs a local IO task to completion, polling at 10 millisecond intervals.
+	#[cfg(feature = "std")]
 	async fn run_io_task_local<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static,
@@ -119,6 +123,7 @@ pub impl App {
 		self.await_io_task(IoTaskPool::get().spawn_local(fut)).await
 	}
 	/// Awaits an IO task, updating the app while waiting.
+	#[cfg(feature = "std")]
 	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
 		self.init_plugin::<TaskPoolPlugin>();
 		// spin up async task pool

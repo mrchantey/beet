@@ -22,7 +22,7 @@ qrcode = ["dep:qrcode","dep:image"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # TODO only launch, others should be seperate apps
-beet = { workspace = true, features = ["launch", "webdriver", "clanker"] }
+beet = { workspace = true, features = ["launch", "webdriver", "social"] }
 ron.workspace = true
 bevy.workspace = true
 heck.workspace = true

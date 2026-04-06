@@ -1,13 +1,10 @@
 //! Plugin and utilities for running Bevy-based HTTP servers.
 // use crate::prelude::*;
 use beet_core::prelude::*;
-#[cfg(feature = "flow")]
-use beet_flow::prelude::ControlFlowPlugin;
 
 /// Plugin for running Bevy HTTP servers.
 ///
-/// Sets up the async runtime and optionally integrates with `beet_flow`
-/// for behavior tree-based request handling.
+/// Sets up the async runtime needed for tool-based exchange handling.
 #[derive(Default)]
 pub struct ServerPlugin;
 
@@ -40,8 +37,6 @@ impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>();
 		// .add_observer(exchange_stats);
-		#[cfg(feature = "flow")]
-		app.init_plugin::<ControlFlowPlugin>();
 	}
 }
 
@@ -59,14 +54,14 @@ mod test {
 	#[beet_core::test]
 	// #[ignore = "flaky with all features?"]
 	async fn http_server() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_mini_http_server);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
 				.spawn_then((
 					server,
-					handler_exchange(|_, _| Response::ok().with_body("hello")),
+					exchange_handler(|_| Response::ok().with_body("hello")),
 				))
 				.run();
 		});

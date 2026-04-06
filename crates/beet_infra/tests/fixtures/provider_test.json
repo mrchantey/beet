@@ -1,0 +1,13 @@
+{
+  "provider": [
+    {
+      "test_provider": [
+        {
+          "api_token": "ABC12345",
+          "base_url": "foo.com",
+          "org_name": "something"
+        }
+      ]
+    }
+  ]
+}

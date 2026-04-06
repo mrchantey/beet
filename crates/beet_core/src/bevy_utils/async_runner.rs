@@ -79,14 +79,14 @@ impl AsyncRunner {
 	pub async fn poll_and_update<T>(
 		mut update: impl FnMut(),
 		recv: Receiver<T>,
-	) -> T {
+	) -> Result<T> {
 		loop {
 			match recv.try_recv() {
 				Ok(out) => {
 					// Run one final update to process any commands the async task
 					// sent before completing (e.g. resource modifications)
 					update();
-					return out;
+					return Ok(out);
 				}
 				Err(TryRecvError::Empty) => {
 					// Update to process command queues
@@ -106,7 +106,10 @@ impl AsyncRunner {
 					tick_task_pools();
 				}
 				Err(TryRecvError::Closed) => {
-					unreachable!("we control the send");
+					bevybail!(
+						"Channel closed: async task likely failed. \
+						 Enable logging to see the underlying error."
+					);
 				}
 			}
 		}

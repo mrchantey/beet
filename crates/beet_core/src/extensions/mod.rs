@@ -13,19 +13,23 @@
 //! - [`Multimap`] - Multi-value map operations
 
 mod duration;
+#[cfg(feature = "std")]
 mod exit_status;
 mod multimap;
 mod option;
 mod result_x;
-#[cfg(feature = "serde")]
+mod str;
+#[cfg(feature = "json")]
 mod value;
 mod vec;
 
 pub use duration::*;
+#[cfg(feature = "std")]
 pub use exit_status::*;
 pub use multimap::*;
 pub use option::*;
 pub use result_x::*;
-#[cfg(feature = "serde")]
+pub use str::*;
+#[cfg(feature = "json")]
 pub use value::*;
 pub use vec::*;

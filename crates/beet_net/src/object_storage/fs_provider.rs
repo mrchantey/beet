@@ -5,31 +5,28 @@ use bytes::Bytes;
 
 /// Filesystem-backed bucket provider for local storage.
 ///
-/// Stores objects as files on the local filesystem, with each bucket
-/// represented as a subdirectory under the configured root path.
-#[derive(Debug, Clone)]
+/// Stores objects as files on the local filesystem, with the configured
+/// path representing the full bucket directory.
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub struct FsBucketProvider {
-	/// The root path for the filesystem bucket provider,
-	/// all created buckets will be under this path.
-	/// For example, if the root is `/data/buckets` and the bucket name is
-	/// `my-bucket`, the bucket will be at `/data/buckets/my-bucket`.
-	root: AbsPathBuf,
+	/// The full path to the bucket directory.
+	path: AbsPathBuf,
 }
 
 impl FsBucketProvider {
-	/// Create a new filesystem bucket provider with the given root path
-	pub fn new(root: impl Into<AbsPathBuf>) -> Self {
-		Self { root: root.into() }
+	/// Create a new filesystem bucket provider with the given bucket path.
+	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
+		Self { path: path.into() }
 	}
-	/// Resolve the path for a bucket and key, handling leading slashes.
-	fn resolve_path(&self, bucket_name: &str, path: &RoutePath) -> AbsPathBuf {
-		self.root
-			.join(bucket_name)
-			.join(path.to_string().trim_start_matches('/'))
+	/// Resolve the full path for an object key, handling leading slashes.
+	fn resolve_path(&self, route: &RoutePath) -> AbsPathBuf {
+		self.path.join(route.to_string().trim_start_matches('/'))
 	}
 }
 
-impl<T: TableRow> TableProvider<T> for FsBucketProvider {
+#[cfg(feature = "json")]
+impl<T: TableStoreRow> TableProvider<T> for FsBucketProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
@@ -41,48 +38,37 @@ impl BucketProvider for FsBucketProvider {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<bool>> {
-		let path = self.root.join(bucket_name);
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let path = self.path.clone();
 		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
-	fn bucket_create(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		let path = self.root.join(bucket_name);
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+		let path = self.path.clone();
 		Box::pin(async move {
 			fs_ext::create_dir_all_async(path).await?;
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn bucket_remove(&self, bucket_name: &str) -> SendBoxedFuture<Result<()>> {
-		let path = self.root.join(bucket_name);
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+		let path = self.path.clone();
 		Box::pin(async move {
 			fs_ext::remove_async(path).await?;
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn insert(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-		body: Bytes,
-	) -> SendBoxedFuture<Result<()>> {
-		let path = self.resolve_path(bucket_name, path);
+	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::write_async(path, body).await?;
-			Ok(())
+			().xok()
 		})
 	}
 
-	fn list(
-		&self,
-		bucket_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
-		let bucket_path = self.root.join(bucket_name);
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+		let bucket_path = self.path.clone();
 		Box::pin(async move {
 			ReadDir::files_recursive_async(&bucket_path)
 				.await?
@@ -97,21 +83,9 @@ impl BucketProvider for FsBucketProvider {
 				.xok()
 		})
 	}
-	fn exists(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<bool>> {
-		let path = self.resolve_path(bucket_name, path);
-		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
-	}
 
-	fn get(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Bytes>> {
-		let path = self.resolve_path(bucket_name, path);
+	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::read_async(&path)
 				.await
@@ -120,18 +94,19 @@ impl BucketProvider for FsBucketProvider {
 				.xok()
 		})
 	}
-	fn remove(
-		&self,
-		bucket_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<()>> {
-		let path = self.resolve_path(bucket_name, path);
+
+	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+		let path = self.resolve_path(path);
+		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
+	}
+
+	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(
 		&self,
-		_bucket_name: &str,
 		_path: &RoutePath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })

@@ -83,12 +83,12 @@ use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use core::any::TypeId;
+use core::borrow::Borrow;
+use core::hash::BuildHasher;
+use core::hash::Hash;
+use core::str::FromStr;
 use heck::ToSnakeCase;
-use std::any::TypeId;
-use std::borrow::Borrow;
-use std::hash::BuildHasher;
-use std::hash::Hash;
-use std::str::FromStr;
 
 /// Marker attribute indicating a field is required during MultiMap parsing.
 ///
@@ -116,12 +116,17 @@ pub struct RequiredField;
 /// Unlike a standard `HashMap`, this allows multiple values to be associated
 /// with the same key. Values are stored in insertion order per key.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "serde",
+	serde(bound(
+		serialize = "K: serde::Serialize + Eq + Hash, V: serde::Serialize, S: BuildHasher",
+		deserialize = "K: serde::Deserialize<'de> + Eq + Hash, V: serde::Deserialize<'de>, S: BuildHasher + Default"
+	))
+)]
 pub struct MultiMap<K, V, S = FixedHasher> {
 	inner: HashMap<K, Vec<V>, S>,
 }
-
-/// Type alias for the common case of string keys and values.
-pub type StringMultiMap = MultiMap<String, String>;
 
 impl<K, V, S: Default> Default for MultiMap<K, V, S> {
 	fn default() -> Self {
@@ -139,14 +144,67 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
 
+impl<K, V, S> std::hash::Hash for MultiMap<K, V, S>
+where
+	K: Eq + Ord + Hash,
+	V: Eq + Hash,
+	S: BuildHasher,
+{
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		// order of keys doesn't matter, but order of values per key does
+		let mut entries: Vec<_> = self.inner.iter().collect();
+		entries.sort_by(|a, b| a.0.cmp(b.0)); // sort by key for consistent hashing
+		for (key, values) in entries {
+			key.hash(state);
+			values.hash(state);
+		}
+	}
+}
+
+impl<K, V, S> Ord for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		let mut a: Vec<_> = self.inner.iter().collect();
+		let mut b: Vec<_> = other.inner.iter().collect();
+
+		a.sort_by(|x, y| x.0.cmp(y.0));
+		b.sort_by(|x, y| x.0.cmp(y.0));
+
+		a.cmp(&b)
+	}
+}
+impl<K, V, S> PartialOrd for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<K, V> MultiMap<K, V>
+where
+	K: Eq + Hash,
+{
+	/// Create a new empty multimap.
+	pub const fn new() -> Self {
+		Self {
+			inner: HashMap::new(),
+		}
+	}
+}
+
 impl<K, V, S> MultiMap<K, V, S>
 where
 	K: Eq + Hash,
 	S: BuildHasher + Default,
 {
-	/// Create a new empty multimap.
-	pub fn new() -> Self { Self::default() }
-
 	/// Insert a key with no values.
 	/// If the key already exists, this is a no-op.
 	pub fn insert_key(&mut self, key: K) { self.inner.entry(key).or_default(); }
@@ -169,6 +227,23 @@ where
 		Q: Hash + Eq + ?Sized,
 	{
 		self.inner.get(key).and_then(|values| values.first())
+	}
+
+	/// Get the first value matching any of the provided keys.
+	pub fn get_multikey<'a, Q>(
+		&self,
+		keys: impl IntoIterator<Item = &'a Q>,
+	) -> Option<&V>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized + 'a,
+	{
+		for key in keys.into_iter() {
+			if let Some(value) = self.get(key) {
+				return Some(value);
+			}
+		}
+		None
 	}
 
 	/// Get all values for a key.
@@ -207,6 +282,11 @@ where
 	/// Iterate over all key-values pairs.
 	pub fn iter_all(&self) -> impl Iterator<Item = (&K, &Vec<V>)> {
 		self.inner.iter()
+	}
+
+	/// Consume the multimap and iterate over all key-values pairs.
+	pub fn into_iter_all(self) -> impl Iterator<Item = (K, Vec<V>)> {
+		self.inner.into_iter()
 	}
 
 	/// Iterate over all keys.
@@ -532,64 +612,62 @@ fn build_field_value(
 
 	// Handle primitive/leaf types
 	match field_type_id {
-		id if id == TypeId::of::<String>() => {
-			return parse_string_field(map_item);
-		}
+		id if id == TypeId::of::<String>() => parse_string_field(map_item),
 		id if id == TypeId::of::<Option<String>>() => {
-			return Ok(Some(Box::new(parse_option_string_field(map_item))));
+			Ok(Some(Box::new(parse_option_string_field(map_item))))
 		}
 		id if id == TypeId::of::<Vec<String>>() => {
-			return Ok(Some(Box::new(parse_vec_string_field(map_item))));
+			Ok(Some(Box::new(parse_vec_string_field(map_item))))
 		}
 		id if id == TypeId::of::<i8>() => {
-			return parse_number_field::<i8>(map_item, field_name);
+			parse_number_field::<i8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i16>() => {
-			return parse_number_field::<i16>(map_item, field_name);
+			parse_number_field::<i16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i32>() => {
-			return parse_number_field::<i32>(map_item, field_name);
+			parse_number_field::<i32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i64>() => {
-			return parse_number_field::<i64>(map_item, field_name);
+			parse_number_field::<i64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i128>() => {
-			return parse_number_field::<i128>(map_item, field_name);
+			parse_number_field::<i128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<isize>() => {
-			return parse_number_field::<isize>(map_item, field_name);
+			parse_number_field::<isize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u8>() => {
-			return parse_number_field::<u8>(map_item, field_name);
+			parse_number_field::<u8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u16>() => {
-			return parse_number_field::<u16>(map_item, field_name);
+			parse_number_field::<u16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u32>() => {
-			return parse_number_field::<u32>(map_item, field_name);
+			parse_number_field::<u32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u64>() => {
-			return parse_number_field::<u64>(map_item, field_name);
+			parse_number_field::<u64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u128>() => {
-			return parse_number_field::<u128>(map_item, field_name);
+			parse_number_field::<u128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<usize>() => {
-			return parse_number_field::<usize>(map_item, field_name);
+			parse_number_field::<usize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f32>() => {
-			return parse_number_field::<f32>(map_item, field_name);
+			parse_number_field::<f32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f64>() => {
-			return parse_number_field::<f64>(map_item, field_name);
+			parse_number_field::<f64>(map_item, field_name)
 		}
-		_ => {}
+		_ => {
+			bevybail!(
+				"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
+				field_name
+			)
+		}
 	}
-
-	bevybail!(
-		"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
-		field_name
-	)
 }
 
 /// Parse a number field from the multimap.
@@ -601,7 +679,7 @@ fn parse_number_field<T: FromStr + PartialReflect>(
 	field_name: &str,
 ) -> Result<Option<Box<dyn PartialReflect>>>
 where
-	T::Err: std::fmt::Display,
+	T::Err: core::fmt::Display,
 {
 	let value_str = values.first();
 

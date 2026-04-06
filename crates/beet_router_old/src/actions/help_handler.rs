@@ -1,0 +1,889 @@
+//! Help handler for displaying endpoint documentation.
+//!
+//! # Kebab-case Parameter Convention
+//!
+//! This module demonstrates the kebab-case parameter system used throughout beet,
+//! the conversion happens automatically:
+//! - `ParamMeta::from_field()` converts snake_case field names to kebab-case for display
+//! - `MultiMap::parse_reflect()` normalizes kebab-case keys to snake_case before reflection lookup
+use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_flow::prelude::*;
+use bevy::reflect::TypeInfo;
+
+
+/// Parameters for configuring the help handler behavior
+#[derive(Debug, Clone)]
+pub struct HelpHandlerConfig {
+	/// Text inserted at the beginning of the formatted output
+	pub introduction: String,
+	/// The default format to use when rendering help
+	pub default_format: HelpFormat,
+	/// If true, handler runs when path segments are empty OR --help param is present
+	/// If false, handler only runs when --help param is present
+	pub match_root: bool,
+	/// If true, disable colored output
+	pub no_color: bool,
+}
+
+impl Default for HelpHandlerConfig {
+	fn default() -> Self {
+		Self {
+			introduction: String::from("Cli Help"),
+			default_format: default(),
+			match_root: false,
+			no_color: false,
+		}
+	}
+}
+
+/// Query parameters for requesting help documentation.
+///
+/// When `help` is true, the help handler will render documentation
+/// instead of executing the normal endpoint logic.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+	Default,
+)]
+#[reflect(Default)]
+pub struct HelpParams {
+	#[deref]
+	#[reflect(@ParamOptions::desc("Get help"))]
+	help: bool,
+	#[reflect(@ParamOptions::desc("Help format: cli, http"))]
+	help_format: Option<String>,
+}
+
+
+/// Creates a help handler middleware that responds to help parameters.
+///
+/// This handler checks for `HelpParams` (--help, --help-format) and when found,
+/// renders documentation for all endpoints that partially match the current path.
+///
+/// The handler should be added early in the request flow, typically in a Fallback
+/// so it can exit early when help is requested.
+///
+/// # Arguments
+/// * `params` - Configuration parameters for the help handler
+///
+/// # Example
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_flow::prelude::*;
+/// # use beet_net::prelude::*;
+/// # async {
+/// // Use router_exchange to ensure EndpointTree is available for help_handler
+/// RouterPlugin::world()
+///     .spawn(router_exchange(|| {
+///         (Fallback, children![
+///             help_handler(HelpHandlerConfig {
+///                 introduction: String::from("Welcome to my CLI"),
+///                 default_format: HelpFormat::Cli,
+///                 match_root: false,
+///                 no_color: false,
+///             }),
+///             EndpointBuilder::get()
+///                 .with_path("foo")
+///                 .with_action(|| "foo"),
+///         ])
+///     }))
+///     .exchange_str(Request::get("/?help=true"))
+///     .await;
+/// # };
+/// ```
+pub fn help_handler(handler_config: HelpHandlerConfig) -> impl Bundle {
+	(
+		Name::new("Help Handler"),
+		OnSpawn::observe(
+			move |ev: On<GetOutcome>,
+			      route_query: RouteQuery,
+			      mut commands: Commands|
+			      -> Result {
+				let action = ev.target();
+
+				// parse help params
+				let req_params = route_query
+					.request_meta(action)?
+					.params()
+					.parse_reflect::<HelpParams>()?;
+
+				// get current path for checking
+				let current_path = route_query.path(action)?.clone();
+				let is_root = current_path.is_empty();
+
+				// check if help should run:
+				// - if match_root is true: run if help param OR path is empty
+				// - if match_root is false: run only if help param is present
+				let should_run = if handler_config.match_root {
+					req_params.help || is_root
+				} else {
+					req_params.help
+				};
+
+				if !should_run {
+					// no help requested, pass through
+					commands.entity(action).trigger_target(Outcome::Fail);
+					return Ok(());
+				}
+
+
+
+				// get endpoint tree and filter by partial path match
+				let tree = route_query.endpoint_tree(action)?;
+
+				// collect all endpoints that match
+				let mut matching_endpoints = Vec::new();
+				collect_matching_endpoints(
+					&tree,
+					&current_path,
+					&mut matching_endpoints,
+				);
+
+				// determine format
+				let format = match req_params.help_format.as_deref() {
+					Some("http") => HelpFormat::Http,
+					Some("cli") => HelpFormat::Cli,
+					Some(other) => {
+						bevybail!("Unrecognized help-format '{}'", other);
+					}
+					_ => handler_config.default_format,
+				};
+				let formatter: Box<dyn EndpointHelpFormatter> = match format {
+					HelpFormat::Cli => Box::new(CliFormatter),
+					HelpFormat::Http => Box::new(HttpFormatter),
+				};
+
+
+				// render help for all matching endpoints
+				let help_text = formatter.format(
+					&handler_config,
+					&matching_endpoints,
+					&current_path,
+				);
+
+				let agent = route_query.agents.entity(action);
+				commands.entity(agent).insert(
+					Response::new(default(), help_text.into())
+						.with_content_type(MimeType::Text),
+				);
+
+				// pass to exit fallback early
+				commands.entity(action).trigger_target(Outcome::Pass);
+
+				Ok(())
+			},
+		),
+	)
+}
+
+
+// recursively collect all endpoints from the tree that match
+// the path at this point.
+fn collect_matching_endpoints(
+	node: &EndpointTree,
+	current_path: &Vec<String>,
+	endpoints: &mut Vec<Endpoint>,
+) {
+	let node_depth = node.pattern.iter().count();
+	let current_depth = current_path.len();
+
+	// determine if we should include this node and/or recurse
+	if current_path.is_empty() {
+		// show all endpoints when no filter specified
+		if let Some(endpoint) = &node.endpoint {
+			endpoints.push(endpoint.clone());
+		}
+		// always recurse when no filter
+		for child in &node.children {
+			collect_matching_endpoints(child, current_path, endpoints);
+		}
+	} else if node_depth <= current_depth {
+		// node is at or above current depth - check if it's on the path
+		match node.pattern.parse_path(current_path) {
+			Ok(path_match) => {
+				// pattern matches current path
+				if path_match.exact_match() {
+					// exact match - show this endpoint and all children
+					if let Some(endpoint) = &node.endpoint {
+						endpoints.push(endpoint.clone());
+					}
+				}
+				// recurse to children since we're on the right path
+				for child in &node.children {
+					collect_matching_endpoints(child, current_path, endpoints);
+				}
+			}
+			Err(_) => {
+				// pattern doesn't match - don't include or recurse
+			}
+		}
+	}
+	// if node_depth > current_depth, we've gone too deep, don't include
+}
+
+/// Trait for formatting endpoint help documentation
+pub trait EndpointHelpFormatter {
+	/// Format the complete help output for multiple endpoints
+	fn format(
+		&self,
+		params: &HelpHandlerConfig,
+		endpoints: &[Endpoint],
+		path: &Vec<String>,
+	) -> String {
+		let _enabled = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+
+		if endpoints.is_empty() {
+			return self.format_none_found(path);
+		}
+
+		let mut output = String::new();
+		output.push_str("\n");
+		output.push_str(&params.introduction);
+		output.push_str("\n\n");
+		output.push_str(&self.format_header());
+		output.push_str("\n\n");
+
+		for endpoint in endpoints {
+			output.push_str(&self.format_endpoint(endpoint));
+			output.push_str("\n");
+		}
+
+		output
+	}
+
+	/// Formats output when no endpoints match the path.
+	fn format_none_found(&self, path: &Vec<String>) -> String;
+
+	/// Format the header section
+	fn format_header(&self) -> String;
+
+	/// Format a single endpoint
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String;
+
+	/// Format the path
+	fn format_path(&self, path: &PathPattern) -> String;
+
+	/// Format the parameters/flags
+	fn format_params(&self, endpoint: &Endpoint) -> String;
+
+	/// Format the request body metadata
+	fn format_request_body(&self, body: &BodyType) -> String;
+
+	/// Format the response body metadata
+	fn format_response_body(&self, body: &BodyType) -> String;
+
+	/// Format cache strategy (if applicable)
+	fn format_cache_strategy(&self, cache: &CacheStrategy) -> String {
+		format!("Cache: {:?}", cache)
+	}
+}
+
+/// CLI-style formatter with colored output
+struct CliFormatter;
+
+impl EndpointHelpFormatter for CliFormatter {
+	fn format_header(&self) -> String {
+		format!("\n{}", paint_ext::bold("Available commands:"))
+	}
+
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String {
+		let mut output = String::new();
+
+		// command path (CLI-style: space-separated, no slashes)
+		let path_str = self.format_path(endpoint.path());
+		output.push_str(&format!("  {}", paint_ext::green(&path_str)));
+
+		// description
+		if let Some(desc) = endpoint.description() {
+			output.push_str(&format!("\n    {}", desc));
+		}
+
+		// params
+		output.push_str(&self.format_params(endpoint));
+
+		// request body
+		let request_body_str =
+			self.format_request_body(endpoint.request_body());
+		if !request_body_str.is_empty() {
+			output.push_str(&request_body_str);
+		}
+
+		// response body
+		let response_body_str =
+			self.format_response_body(endpoint.response_body());
+		if !response_body_str.is_empty() {
+			output.push_str(&response_body_str);
+		}
+
+		output
+	}
+
+	fn format_path(&self, path: &PathPattern) -> String {
+		path.iter()
+			.map(|seg| {
+				if seg.is_static() {
+					seg.to_string()
+				} else if seg.is_greedy() {
+					format!("[*{}]", seg.name())
+				} else {
+					format!("[{}]", seg.name())
+				}
+			})
+			.collect::<Vec<_>>()
+			.join(" ")
+	}
+
+
+
+	fn format_params(&self, endpoint: &Endpoint) -> String {
+		if endpoint.params().is_empty() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!("\n    {}", paint_ext::dimmed("Flags:")));
+
+		for param in endpoint.params().iter() {
+			output.push_str("\n      ");
+
+			// name with short flag if present
+			let mut param_display = format!("--{}", param.name());
+			if let Some(short) = param.short() {
+				param_display.push_str(&format!(", -{}", short));
+			}
+			output.push_str(&paint_ext::yellow(format!("{}\t", param_display)));
+
+			// value type
+			match param.value() {
+				ParamValue::Flag => {
+					output.push_str(&paint_ext::dimmed("(flag)     "))
+				}
+				ParamValue::Single => {
+					output.push_str(&paint_ext::dimmed("(value)    "))
+				}
+				ParamValue::Multiple => {
+					output.push_str(&paint_ext::dimmed("(multiple) "))
+				}
+			}
+
+			// required/optional
+			if param.is_required() {
+				output.push_str(&paint_ext::red("required"));
+			} else {
+				output.push_str(&paint_ext::green("optional"));
+			}
+
+			// description
+			if let Some(desc) = param.description() {
+				output.push_str(&format!(" - {}", desc));
+			}
+		}
+
+		output
+	}
+
+	fn format_request_body(&self, body: &BodyType) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output
+			.push_str(&format!("\n    {}", paint_ext::dimmed("Request Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
+		}
+
+		output
+	}
+
+	fn format_response_body(&self, body: &BodyType) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!(
+			"\n    {}",
+			paint_ext::dimmed("Response Body:")
+		));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
+		}
+
+		output
+	}
+
+	fn format_none_found(&self, path: &Vec<String>) -> String {
+		let path_str = if path.is_empty() {
+			"<empty>".to_string()
+		} else {
+			path.join(" ")
+		};
+		paint_ext::red_bold(format!(
+			"No matching endpoints found for path: {}",
+			path_str
+		))
+		.to_string()
+	}
+}
+
+/// Formats struct fields from TypeInfo for display in help output.
+fn format_type_info_fields(output: &mut String, type_info: &TypeInfo) {
+	if let TypeInfo::Struct(struct_info) = type_info {
+		for field in struct_info.iter() {
+			let field_name = field.name();
+			let type_path = field.type_path();
+			let is_required = !type_path.starts_with("core::option::Option<");
+
+			output.push_str(&format!(
+				"\n        {}",
+				paint_ext::yellow(field_name)
+			));
+			if is_required {
+				output.push_str(&paint_ext::red(" (required)"));
+			} else {
+				output.push_str(&paint_ext::green(" (optional)"));
+			}
+		}
+	}
+}
+
+/// HTTP-style formatter with colored output
+struct HttpFormatter;
+
+impl EndpointHelpFormatter for HttpFormatter {
+	fn format_header(&self) -> String {
+		paint_ext::bold("Available endpoints:").to_string()
+	}
+
+	#[allow(deprecated)]
+	fn format_endpoint(&self, endpoint: &Endpoint) -> String {
+		let mut output = String::new();
+
+		// method and path
+		let method = endpoint
+			.method()
+			.map(|m| format!("{:?}", m).to_uppercase())
+			.unwrap_or_else(|| "ANY".to_string());
+		let path = endpoint.path().annotated_route_path();
+
+		output.push_str(&format!(
+			"  {} {}",
+			paint_ext::cyan(&method),
+			paint_ext::green(&path.to_string())
+		));
+
+		// description
+		if let Some(desc) = endpoint.description() {
+			output.push_str(&format!("\n    {}", desc));
+		}
+
+		// query params
+		output.push_str(&self.format_params(endpoint));
+
+		// request body
+		let request_body_str =
+			self.format_request_body(endpoint.request_body());
+		if !request_body_str.is_empty() {
+			output.push_str(&request_body_str);
+		}
+
+		// response body
+		let response_body_str =
+			self.format_response_body(endpoint.response_body());
+		if !response_body_str.is_empty() {
+			output.push_str(&response_body_str);
+		}
+
+
+
+		// cache strategy
+		if let Some(cache) = endpoint.cache_strategy() {
+			output.push_str(&format!(
+				"\n    {}",
+				paint_ext::dimmed(&self.format_cache_strategy(&cache))
+			));
+		}
+
+		output
+	}
+
+	fn format_path(&self, path: &PathPattern) -> String {
+		path.annotated_route_path().to_string()
+	}
+
+
+
+	fn format_params(&self, endpoint: &Endpoint) -> String {
+		if endpoint.params().is_empty() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!(
+			"\n    {}",
+			paint_ext::bold("Query Parameters:")
+		));
+
+		for param in endpoint.params().iter() {
+			output.push_str(&format!(
+				"\n      {}",
+				paint_ext::yellow(param.name())
+			));
+			if param.is_required() {
+				output.push_str(&paint_ext::red(" (required)"));
+			} else {
+				output.push_str(&paint_ext::green(" (optional)"));
+			}
+			output.push_str(&format!(
+				" - {}",
+				paint_ext::dimmed(&param.value().to_string())
+			));
+			if let Some(desc) = param.description() {
+				output.push_str(&format!(": {}", desc));
+			}
+		}
+
+		output
+	}
+
+	fn format_request_body(&self, body: &BodyType) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output.push_str(&format!("\n    {}", paint_ext::bold("Request Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
+		}
+
+		output
+	}
+
+	fn format_response_body(&self, body: &BodyType) -> String {
+		if body.is_none() {
+			return String::new();
+		}
+
+		let mut output = String::new();
+		output
+			.push_str(&format!("\n    {}", paint_ext::bold("Response Body:")));
+		output.push_str(&format!(
+			"\n      {} {}",
+			paint_ext::cyan(&body.type_display()),
+			paint_ext::dimmed(&format!("({})", body.encoding()))
+		));
+
+		// show fields if available from type info
+		if let Some(type_info) = body.type_info() {
+			format_type_info_fields(&mut output, type_info);
+		}
+
+		output
+	}
+
+	fn format_none_found(&self, path: &Vec<String>) -> String {
+		let path_str = if path.is_empty() {
+			default()
+		} else {
+			path.join("/")
+		};
+		paint_ext::red_bold(format!(
+			"No matching endpoints found for path: /{}",
+			path_str
+		))
+		.to_string()
+	}
+}
+
+/// Format for rendering endpoint help
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum HelpFormat {
+	#[default]
+	/// CLI format with commands and flags
+	Cli,
+	/// HTTP format with methods and query params
+	Http,
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use beet_net::prelude::*;
+
+	#[beet_core::test]
+	async fn help_shows_matching_endpoints() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_description("The foo command")
+					.with_action(|| "foo"),
+				EndpointBuilder::get()
+					.with_path("bar")
+					.with_description("The bar command")
+					.with_action(|| "bar"),
+			])
+		}));
+
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
+
+		response.clone().xpect_contains("foo");
+		response.clone().xpect_contains("The foo command");
+		response.clone().xpect_contains("bar");
+		response.xpect_contains("The bar command");
+	}
+
+	#[beet_core::test]
+	async fn help_format_http() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::post()
+					.with_path("api/users")
+					.with_description("Create user")
+					.with_action(|| "create"),
+			])
+		}));
+
+		let response = entity
+			.exchange_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		response.clone().xpect_contains("POST");
+		response.clone().xpect_contains("api/users");
+		response.xpect_contains("Create user");
+	}
+
+	#[beet_core::test]
+	async fn help_with_params() {
+		#[derive(Reflect)]
+		struct TestParams {
+			#[reflect(@ParamOptions::desc("Enable verbose output"))]
+			verbose: bool,
+			#[reflect(@ParamOptions::desc_and_short("Output format", 'f'))]
+			format: Option<String>,
+		}
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("test")
+					.with_params::<TestParams>()
+					.with_description("Test command")
+					.with_action(|| "test"),
+			])
+		}));
+
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
+
+		response.clone().xpect_contains("verbose");
+		response.clone().xpect_contains("Enable verbose output");
+		response.clone().xpect_contains("format");
+		response.xpect_contains(", -f");
+	}
+
+	#[beet_core::test]
+	async fn no_help_passes_through() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("foo")
+					.with_action(|| "foo response"),
+			])
+		}));
+
+		let response = entity.exchange_str(Request::get("/foo")).await;
+
+		response.xpect_eq("foo response");
+	}
+
+	#[beet_core::test]
+	async fn kebab_case_params_work() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("test")
+					.with_action(|| "test"),
+			])
+		}));
+
+		// test both kebab-case and underscore variants
+		let response1 = entity
+			.exchange_str(Request::get("/?help=true&help-format=http"))
+			.await;
+		response1.clone().xpect_contains("GET");
+
+		let response2 = entity
+			.exchange_str(Request::get("/?help=true&help_format=http"))
+			.await;
+		response2.xpect_contains("GET");
+	}
+
+	#[beet_core::test]
+	async fn full_kebab_case_flow_integration() {
+		// demonstrates the complete kebab-case parameter system:
+		// 1. struct fields use snake_case
+		// 2. ParamMeta displays them as kebab-case
+		// 3. query params accept both formats
+		// 4. MultiMap normalizes to snake_case for reflection
+
+		#[derive(Reflect)]
+		struct TestParams {
+			#[reflect(@ParamOptions::desc("Maximum retry attempts"))]
+			max_retry_count: u32,
+			#[reflect(@ParamOptions::desc("Enable verbose logging"))]
+			enable_verbose_mode: bool,
+		}
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("deploy")
+					.with_params::<TestParams>()
+					.with_description("Deploy application")
+					.with_action(|| "deployed"),
+			])
+		}));
+
+		// CLI help shows kebab-case params
+		let help_response =
+			entity.exchange_str(Request::get("/?help=true")).await;
+
+		help_response.clone().xpect_contains("--max-retry-count");
+		help_response
+			.clone()
+			.xpect_contains("--enable-verbose-mode");
+		help_response
+			.clone()
+			.xpect_contains("Maximum retry attempts");
+		help_response.xpect_contains("Enable verbose logging");
+
+		// HTTP help also shows kebab-case
+		let http_help = entity
+			.exchange_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		http_help.clone().xpect_contains("max-retry-count");
+		http_help.xpect_contains("enable-verbose-mode");
+	}
+
+	#[beet_core::test]
+	async fn help_with_body_metadata() {
+		#[derive(Reflect)]
+		struct CreateUserRequest {
+			username: String,
+			email: String,
+			age: Option<u32>,
+		}
+
+		#[derive(Reflect)]
+		struct CreateUserResponse {
+			id: u64,
+			created_at: String,
+		}
+
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::post()
+					.with_path("api/users")
+					.with_description("Create a new user")
+					.with_request_body(BodyType::json::<CreateUserRequest>())
+					.with_response_body(BodyType::json::<CreateUserResponse>())
+					.with_action(|| "created"),
+			])
+		}));
+
+		// test CLI format
+		let cli_response =
+			entity.exchange_str(Request::get("/?help=true")).await;
+
+		cli_response.clone().xpect_contains("Request Body:");
+		cli_response.clone().xpect_contains("CreateUserRequest");
+		cli_response.clone().xpect_contains("username");
+		cli_response.clone().xpect_contains("email");
+		cli_response.clone().xpect_contains("Response Body:");
+		cli_response.clone().xpect_contains("CreateUserResponse");
+		cli_response.clone().xpect_contains("id");
+		cli_response.xpect_contains("created_at");
+
+		// test HTTP format
+		let http_response = entity
+			.exchange_str(Request::get("/?help=true&help-format=http"))
+			.await;
+
+		http_response.clone().xpect_contains("Request Body:");
+		http_response.clone().xpect_contains("CreateUserRequest");
+		http_response.clone().xpect_contains("Response Body:");
+		http_response.xpect_contains("CreateUserResponse");
+	}
+
+	#[beet_core::test]
+	async fn help_no_body_metadata_when_none() {
+		let mut world = RouterPlugin::world();
+		let mut entity = world.spawn(router_exchange(|| {
+			(Fallback, children![
+				help_handler(HelpHandlerConfig::default()),
+				EndpointBuilder::get()
+					.with_path("status")
+					.with_description("Get status")
+					.with_action(|| "ok"),
+			])
+		}));
+
+		let response = entity.exchange_str(Request::get("/?help=true")).await;
+
+		// should not contain body sections when BodyType::none()
+		response.clone().xpect_contains("status");
+		response.clone().xpect_contains("Get status");
+		// BodyType::none() should not produce output
+		(!response.contains("Request Body:")).xpect_true();
+		(!response.contains("Response Body:")).xpect_true();
+	}
+}

@@ -21,11 +21,9 @@ struct Options {
 }
 impl Options {
 	fn new(attr: TokenStream) -> Result<Self> {
-		let attrs = AttributeGroup::parse_punctated(attr)?;
+		let map = AttributeMap::parse(attr)?;
 		Ok(Self {
-			take: attrs
-				.iter()
-				.any(|attr| attr.into_token_stream().to_string() == "take"),
+			take: map.contains_key("take"),
 		})
 	}
 }

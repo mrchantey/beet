@@ -7,9 +7,10 @@ The `Request` / `Response` pattern is generalized and not tied to any transport,
 ## Features
 
 - **Transport agnostic servers**: server implementations for cli arguments or http requests
-- **Cross-plaform clients**: HTTP clients for sending requests (ureq, reqwest and WASM backends)
-- **Object_storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
+- **Cross-platform clients**: HTTP clients for sending requests (ureq, reqwest and WASM backends)
+- **Object storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
 - **Sockets**: WebSocket client and server
+- **Tool-based exchanges**: Request/response handling via `Tool<Request, Response>` from `beet_tool`
 
 ## Example
 
@@ -22,25 +23,25 @@ App::new()
   .add_plugins((MinimalPlugins, ServerPlugin))
   .add_systems(Startup, |mut commands: Commands| {
     commands.spawn((
-			// swap out the server to handle http requests!
-			CliServer::default(),
+      // swap out the server to handle http requests!
+      CliServer::default(),
       // HttpServer::default(),
-      handler_exchange(|_, _| {
-        Response::ok_body("hello world", "text/plain")
+      exchange_handler(|_| {
+        Response::ok_body("hello world", MediaType::Text)
       }),
     ));
   })
   .run();
 ```
 
-## Features
+## Feature Flags
 
 | Feature | Description |
 |---------|-------------|
-| `server` | HTTP server functionality |
+| `server` | Lightweight mini HTTP server using `async-io` TCP |
+| `hyper` | Full-featured Hyper HTTP server (implies `server`) |
 | `lambda` | AWS Lambda server support |
 | `aws` | AWS S3 and DynamoDB providers |
-| `flow` | `beet_flow` integration for exchange patterns |
 | `reqwest` | Use reqwest as the HTTP client backend |
 | `ureq` | Use ureq as the HTTP client backend |
 | `tungstenite` | Native WebSocket support |

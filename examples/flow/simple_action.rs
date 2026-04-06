@@ -1,26 +1,28 @@
 //! # Simple Action - Custom Behavior Implementation
 //!
-//! This example shows how to create a custom action using the `#[action]` macro.
+//! This example shows how to create a custom action using `observer_adder!`.
 //!
 //! ## Key Concepts
 //!
-//! - **#[action]**: Macro that sets up an observer to handle `GetOutcome` events
+//! - **observer_adder!**: Macro that generates an `on_add` hook registering observers
 //! - **On<GetOutcome>**: The trigger event passed to action handlers
 //! - **ev.target()**: Returns the entity that received the event
 //! - **expect_action**: Helper for error messages when queries fail
 //!
 //! ## How Actions Work
 //!
-//! 1. The `#[action(log_on_run)]` attribute registers the `log_on_run` function
-//!    as an observer for `GetOutcome` events
-//! 2. When `GetOutcome` is triggered on an entity with `LogOnRun`, the observer fires
-//! 3. The handler queries for its component data and performs its logic
+//! 1. `observer_adder!` generates an `on_add` hook that registers the observer
+//! 2. `#[component(on_add = ...)]` wires the hook to the component
+//! 3. When `GetOutcome` is triggered on an entity with `LogOnRun`, the observer fires
+//! 4. The handler queries for its component data and performs its logic
 //!
 //! ## Creating Your Own Actions
 //!
 //! ```ignore
-//! #[action(my_handler)]
+//! observer_adder!(on_add_my_handler, my_handler);
+//!
 //! #[derive(Component)]
+//! #[component(on_add = on_add_my_handler)]
 //! struct MyAction { /* fields */ }
 //!
 //! fn my_handler(
@@ -35,8 +37,10 @@
 //! ```
 use beet::prelude::*;
 
-#[action(log_on_run)]
+observer_adder!(on_add_log_on_run, log_on_run);
+
 #[derive(Component)]
+#[component(on_add = on_add_log_on_run)]
 struct LogOnRun(pub String);
 
 fn log_on_run(ev: On<GetOutcome>, query: Query<&LogOnRun>) {

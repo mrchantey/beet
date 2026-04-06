@@ -9,40 +9,64 @@ use aws_sdk_dynamodb::types::TableStatus;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// AWS DynamoDB provider implementing the bucket storage interface.
-///
-/// Wraps an [`aws_sdk_dynamodb::Client`] and implements [`BucketProvider`] for
-/// storing and retrieving objects in DynamoDB tables. Each "bucket" maps to a
-/// DynamoDB table with a simple `id` (string) primary key.
-#[derive(Clone, Deref, DerefMut, Resource)]
-pub struct DynamoDbProvider(pub Client);
+/// AWS DynamoDB provider storing its configuration as serializable fields.
+/// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct DynamoDbProvider {
+	/// The DynamoDB table name (maps to "bucket name" in the storage abstraction).
+	table_name: SmolStr,
+	/// The AWS region for this table.
+	region: SmolStr,
+}
 
 impl DynamoDbProvider {
-	/// Creates a new DynamoDB client with the default region: `us-west-2`.
-	pub async fn create() -> Self {
-		Self::create_with_region("us-west-2").await
+	/// Creates a new provider for the given table name and region.
+	pub fn new(
+		table_name: impl Into<SmolStr>,
+		region: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			table_name: table_name.into(),
+			region: region.into(),
+		}
 	}
-	/// Creates a new DynamoDB client with a specific region, e.g. `us-west-2`.
-	pub async fn create_with_region(region: &str) -> Self {
-		let region = Region::new(region.to_string());
-		let config = aws_config::from_env()
-			.region(RegionProviderChain::default_provider().or_else(region))
-			.load()
-			.await;
-		Self(Client::new(&config))
+
+	/// Get or create a DynamoDB client for this provider's region.
+	async fn client(&self) -> Client {
+		static POOL: LazyPool<SmolStr, Client, Client> =
+			LazyPool::new(|region| {
+				let region_str = region.to_string();
+				Box::pin(async move {
+					let region_obj = Region::new(region_str);
+					let config = aws_config::from_env()
+						.region(
+							RegionProviderChain::default_provider()
+								.or_else(region_obj),
+						)
+						.load()
+						.await;
+					Client::new(&config)
+				})
+			});
+		POOL.get(&self.region).await
 	}
-	/// remove leading slash for dynamo friendly path
+
+	/// Remove leading slash for DynamoDB-friendly path.
 	fn resolve_key(&self, path: &RoutePath) -> AttributeValue {
 		let str = path.to_string().trim_start_matches('/').to_string();
 		AttributeValue::S(str)
 	}
 
-	/// Get the table status, returning None if the table does not exist.
-	async fn table_status(
-		&self,
-		table_name: &str,
-	) -> Result<Option<TableStatus>> {
-		match self.describe_table().table_name(table_name).send().await {
+	/// Get the table status, returning `None` if the table does not exist.
+	async fn table_status(&self) -> Result<Option<TableStatus>> {
+		let client = self.client().await;
+		match client
+			.describe_table()
+			.table_name(self.table_name.as_str())
+			.send()
+			.await
+		{
 			Ok(out) => {
 				let Some(desc) = out.table() else {
 					bevybail!("Failed to get table description: {out:?}")
@@ -66,10 +90,11 @@ impl DynamoDbProvider {
 		}
 	}
 
-	async fn await_table_create(&self, table_name: &str) -> Result<()> {
+	/// Poll until the table becomes active after creation.
+	async fn await_table_create(&self) -> Result<()> {
 		let mut stream = Backoff::default().with_max_attempts(20).stream();
 		while let Some(_) = stream.next().await {
-			match self.table_status(table_name).await? {
+			match self.table_status().await? {
 				Some(TableStatus::Creating) => {}
 				Some(TableStatus::Active) => return Ok(()),
 				status => {
@@ -79,10 +104,12 @@ impl DynamoDbProvider {
 		}
 		bevybail!("Table did not become active in time");
 	}
-	async fn await_table_remove(&self, table_name: &str) -> Result<()> {
+
+	/// Poll until the table is fully deleted.
+	async fn await_table_remove(&self) -> Result<()> {
 		let mut stream = Backoff::default().with_max_attempts(20).stream();
 		while let Some(_) = stream.next().await {
-			match self.table_status(table_name).await? {
+			match self.table_status().await? {
 				Some(TableStatus::Deleting) => {}
 				None => return Ok(()),
 				status => {
@@ -95,34 +122,28 @@ impl DynamoDbProvider {
 }
 
 impl BucketProvider for DynamoDbProvider {
-	fn box_clone(&self) -> Box<dyn BucketProvider> {
-		Box::new(Self(self.0.clone()))
-	}
+	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
-	fn region(&self) -> Option<String> {
-		self.0.config().region().map(|r| r.to_string())
-	}
+	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
-	fn bucket_exists(&self, table_name: &str) -> SendBoxedFuture<Result<bool>> {
-		let table_name = table_name.to_string();
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		Box::pin(async move {
-			match this.table_status(&table_name).await {
+			match this.table_status().await {
 				Ok(Some(TableStatus::Active)) => Ok(true),
-				Ok(Some(_)) => Ok(false),
-				Ok(None) => Ok(false),
+				Ok(Some(_)) | Ok(None) => Ok(false),
 				Err(err) => Err(err),
 			}
 		})
 	}
 
-	fn bucket_create(&self, table_name: &str) -> SendBoxedFuture<Result<()>> {
-		let builder = self.create_table().table_name(table_name);
-		let table_name = table_name.to_string();
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
-			// Simple table with string PK "id"
-			let result = builder
+			let client = this.client().await;
+			let result = client
+				.create_table()
+				.table_name(this.table_name.as_str())
 				.attribute_definitions(
 					aws_sdk_dynamodb::types::AttributeDefinition::builder()
 						.attribute_name("id")
@@ -148,70 +169,107 @@ impl BucketProvider for DynamoDbProvider {
 
 			match result {
 				Ok(_) => {
-					this.await_table_create(&table_name).await?;
+					this.await_table_create().await?;
 					Ok(())
 				}
-				// Err(SdkError::ServiceError(service_err))
-				// 	if let CreateTableError::ResourceInUseException(_) =
-				// 		service_err.err() =>
-				// {
-				// 	// already exists
-				// 	Ok(())
-				// }
 				Err(err) => bevybail!("Failed to create table: {:?}", err),
 			}
 		})
 	}
 
-	fn bucket_remove(&self, table_name: &str) -> SendBoxedFuture<Result<()>> {
-		let delete_fut = self.delete_table().table_name(table_name).send();
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let table_name = table_name.to_string();
 		Box::pin(async move {
-			delete_fut.await?;
-			this.await_table_remove(&table_name).await?;
+			let client = this.client().await;
+			client
+				.delete_table()
+				.table_name(this.table_name.as_str())
+				.send()
+				.await?;
+			this.await_table_remove().await?;
 			Ok(())
 		})
 	}
 
-	fn insert(
-		&self,
-		table_name: &str,
-		path: &RoutePath,
-		body: Bytes,
-	) -> SendBoxedFuture<Result<()>> {
-		let fut = self
-			.put_item()
-			.table_name(table_name)
-			.item("id", self.resolve_key(path))
-			.item("data", AttributeValue::B(body.to_vec().into()))
-			.send();
+	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
 		Box::pin(async move {
-			fut.await?;
+			let client = this.client().await;
+			client
+				.put_item()
+				.table_name(this.table_name.as_str())
+				.item("id", key)
+				.item("data", AttributeValue::B(body.to_vec().into()))
+				.send()
+				.await?;
 			Ok(())
 		})
 	}
 
-	fn exists(
-		&self,
-		table_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<bool>> {
-		let fut = self
-			.get_item()
-			.table_name(table_name)
-			.key("id", self.resolve_key(path))
-			.send();
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+		let this = self.clone();
 		Box::pin(async move {
-			use aws_sdk_dynamodb::error::SdkError;
-			use aws_sdk_dynamodb::operation::get_item::GetItemError;
+			let client = this.client().await;
+			let out = client
+				.scan()
+				.table_name(this.table_name.as_str())
+				.send()
+				.await?;
+			let mut paths = Vec::new();
+			if let Some(items) = out.items {
+				for item in items {
+					if let Some(AttributeValue::S(id)) = item.get("id") {
+						paths.push(RoutePath::new(id));
+					}
+				}
+			}
+			paths.xok()
+		})
+	}
 
-			match fut.await {
+	/// Retrieve an object by path.
+	///
+	/// Assumes a two-field schema: `id` (path) and `data` (binary).
+	/// For typed tables, see [`TableProvider`].
+	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		Box::pin(async move {
+			let client = this.client().await;
+			let out = client
+				.get_item()
+				.table_name(this.table_name.as_str())
+				.key("id", key)
+				.send()
+				.await?;
+			let Some(item) = out.item else {
+				bevybail!("Item not found");
+			};
+			let Some(AttributeValue::B(data)) = item.get("data") else {
+				bevybail!("No data field found");
+			};
+			Bytes::from(data.clone().into_inner()).xok()
+		})
+	}
+
+	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		Box::pin(async move {
+			let client = this.client().await;
+			match client
+				.get_item()
+				.table_name(this.table_name.as_str())
+				.key("id", key)
+				.send()
+				.await
+			{
 				Ok(out) => Ok(out.item.is_some()),
 				Err(SdkError::ServiceError(service_err))
 					if matches!(
 						service_err.err(),
-						GetItemError::ResourceNotFoundException(_)
+						aws_sdk_dynamodb::operation::get_item::GetItemError::ResourceNotFoundException(_)
 					) =>
 				{
 					Ok(false)
@@ -221,64 +279,18 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn list(
-		&self,
-		table_name: &str,
-	) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
-		let fut = self.scan().table_name(table_name).send();
+	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
 		Box::pin(async move {
-			let out = fut.await?;
-			let mut paths = Vec::new();
-			if let Some(items) = out.items {
-				for item in items {
-					if let Some(AttributeValue::S(id)) = item.get("id") {
-						paths.push(RoutePath::new(id));
-					}
-				}
-			}
-			Ok(paths)
-		})
-	}
-
-	/// using the default bucket get, we assume two fields:
-	/// - id: the path to the item
-	/// - data: the binary data of the item
-	/// For typed tables, see [`TableProvider`]
-	fn get(
-		&self,
-		table_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<Bytes>> {
-		let fut = self
-			.get_item()
-			.table_name(table_name)
-			.key("id", self.resolve_key(path))
-			.send();
-		Box::pin(async move {
-			let out = fut.await?;
-			let Some(item) = out.item else {
-				bevybail!("Item not found");
-			};
-			let Some(AttributeValue::B(data)) = item.get("data") else {
-				bevybail!("No data field found");
-			};
-			Ok(Bytes::from(data.clone().into_inner()))
-		})
-	}
-
-	fn remove(
-		&self,
-		table_name: &str,
-		path: &RoutePath,
-	) -> SendBoxedFuture<Result<()>> {
-		let fut = self
-			.delete_item()
-			.table_name(table_name)
-			.key("id", self.resolve_key(path))
-			.return_values(aws_sdk_dynamodb::types::ReturnValue::AllOld)
-			.send();
-		Box::pin(async move {
-			let result = fut.await?;
+			let client = this.client().await;
+			let result = client
+				.delete_item()
+				.table_name(this.table_name.as_str())
+				.key("id", key)
+				.return_values(aws_sdk_dynamodb::types::ReturnValue::AllOld)
+				.send()
+				.await?;
 			if result.attributes.is_none() {
 				bevybail!("Item not found");
 			}
@@ -288,7 +300,6 @@ impl BucketProvider for DynamoDbProvider {
 
 	fn public_url(
 		&self,
-		_table_name: &str,
 		_path: &RoutePath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
@@ -296,45 +307,46 @@ impl BucketProvider for DynamoDbProvider {
 }
 
 
-impl<T: TableRow> TableProvider<T> for DynamoDbProvider {
+#[cfg(feature = "json")]
+impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(&self, table_name: &str, body: T) -> SendBoxedFuture<Result> {
+	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
+		let this = self.clone();
 		let Ok(item) = serde_dynamo::to_item(body) else {
 			return Box::pin(async move {
 				bevybail!("Failed to serialize item for dynamo");
 			});
 		};
-		let fut = self
-			.put_item()
-			.table_name(table_name)
-			.set_item(Some(item))
-			.send();
 		Box::pin(async move {
-			fut.await?;
+			let client = this.client().await;
+			client
+				.put_item()
+				.table_name(this.table_name.as_str())
+				.set_item(Some(item))
+				.send()
+				.await?;
 			Ok(())
 		})
 	}
 
-	fn get_row(
-		&self,
-		table_name: &str,
-		id: Uuid,
-	) -> SendBoxedFuture<Result<T>> {
-		let fut = self
-			.get_item()
-			.table_name(table_name)
-			.key("id", AttributeValue::S(id.to_string()))
-			.send();
+	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
+		let this = self.clone();
 		Box::pin(async move {
-			let out = fut.await?;
+			let client = this.client().await;
+			let out = client
+				.get_item()
+				.table_name(this.table_name.as_str())
+				.key("id", AttributeValue::S(id.to_string()))
+				.send()
+				.await?;
 			let Some(item) = out.item else {
 				bevybail!("Item not found");
 			};
-			let item = serde_dynamo::from_item(item)?;
-			Ok(item)
+			let item: T = serde_dynamo::from_item(item)?;
+			item.xok()
 		})
 	}
 }
@@ -346,13 +358,14 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn bucket() {
-		let provider = DynamoDbProvider::create().await;
+		let provider = DynamoDbProvider::new("beet-test-table", "us-west-2");
 		bucket_test::run(provider).await;
 	}
+	#[cfg(feature = "json")]
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {
-		let provider = DynamoDbProvider::create().await;
+		let provider = DynamoDbProvider::new("beet-test-table", "us-west-2");
 		table_test::run(provider).await;
 	}
 }

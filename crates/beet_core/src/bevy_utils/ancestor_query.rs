@@ -10,7 +10,7 @@ use bevy::prelude::*;
 pub struct AncestorQuery<
 	'w,
 	's,
-	D: 'static + QueryData,
+	D: 'static + QueryData = (),
 	F: 'static + QueryFilter = (),
 > {
 	commands: Commands<'w, 's>,
@@ -21,6 +21,11 @@ pub struct AncestorQuery<
 impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 	AncestorQuery<'w, 's, D, F>
 {
+	/// Get the root ancestor of the given entity.
+	pub fn root_ancestor(&self, entity: Entity) -> Entity {
+		self.ancestors.root_ancestor(entity)
+	}
+
 	/// Get the first ancestor of the given entity that matches the query,
 	/// inclusive of the given entity.
 	pub fn get(

@@ -339,7 +339,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let filter = GlobFilter::default()
 			.with_include("**/*.rs")
@@ -356,7 +356,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	fn glob_pattern_serde() {
 		let pattern = GlobPattern::new("*foo*");
 		let json = serde_json::to_string(&pattern).unwrap();

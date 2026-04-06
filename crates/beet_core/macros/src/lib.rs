@@ -1,12 +1,15 @@
-mod action;
+#![no_std]
+extern crate alloc;
+mod as_any;
 mod bundle_effect;
 mod entity_target_event;
-mod macros;
+mod getset;
+mod main_attr;
+mod mdx;
 mod sendit;
+mod test_attr;
 mod to_tokens;
-mod utils;
-use macros::*;
-
+mod tool;
 
 
 /// Implements `TokenizeSelf` for a struct or enum.
@@ -84,26 +87,10 @@ pub fn bundle_effect(
 	bundle_effect::impl_bundle_effect(input).into()
 }
 
-/// Convenience helper to directly add observers to this entity.
-/// This macro must be placed above `#[derive(Component)]` as it
-/// sets the `on_add` hook.
-/// ## Example
-/// ```rust ignore
-/// #[action(log_on_run)]
-/// #[derive(Component)]
-/// struct LogOnRun(pub String);
-///
-/// fn log_on_run(trigger: On<GetOutcome>, query: Populated<&LogOnRun>) {
-/// 	let name = query.get(trigger.target()).unwrap();
-/// 	println!("log_name_on_run: {}", name.0);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn action(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	action::impl_action(attr, item)
+/// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
+#[proc_macro_derive(Any, attributes(event))]
+pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	as_any::impl_as_any(input).into()
 }
 
 
@@ -175,7 +162,169 @@ pub fn beet_test(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	parse_test_attr(attr, input)
+	test_attr::impl_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+/// MDX-style markdown macro with `{}` interpolation.
+///
+/// Parses markdown text interspersed with `{}` bundle expressions.
+/// The crate path is resolved automatically via `internal_or_beet`.
+///
+/// # Input Format
+///
+/// ```text
+/// mdx!(# Heading text {bundle_expr} more text)
+/// mdx!("string with {interpolation}")
+/// ```
+#[proc_macro]
+pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	mdx::impl_mdx(input)
+}
+
+
+/// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
+///
+/// Works like `tokio::main` but uses `async-executor` for a lightweight, dependency-light runtime.
+///
+/// # Requirements
+///
+/// - Must be applied to an `async fn main()`
+/// - Not supported on `wasm32` targets
+///
+/// # Example
+///
+/// ```ignore
+/// #[beet::main]
+/// async fn main() {
+///     // async code here
+/// }
+///
+/// #[beet::main]
+/// async fn main() -> anyhow::Result<()> {
+///     // async code that returns a Result
+///     Ok(())
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn beet_main(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	main_attr::impl_main_attr(attr, input)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
+}
+
+#[proc_macro_attribute]
+pub fn tool(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	tool::impl_tool(attr, item)
+}
+
+/// Generate getter methods for struct fields.
+///
+/// All methods are `pub` by default and return `&T`.
+///
+/// ## Struct-level attributes
+///
+/// - `#[get(clone)]` - return `T` via `.clone()` by default
+/// - `#[get(copy)]` - return `T` by copy by default
+/// - `#[get(vis = private)]` - set default visibility
+/// - `#[get(unwrap_trait)]` - unwrap `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ## Field-level attributes
+///
+/// - `#[get(skip)]` - skip this field
+/// - `#[get(clone)]`, `#[get(copy)]`, `#[get(vis = pub_crate)]` - override per field
+/// - `#[get(unwrap_trait)]` - unwrap trait wrapper for this field
+///
+/// ```ignore
+/// #[derive(Get)]
+/// #[get(copy)]
+/// pub struct Point {
+///     x: f32,
+///     #[get(clone, vis = private)]
+///     name: String,
+/// }
+/// ```
+#[proc_macro_derive(Get, attributes(get))]
+pub fn derive_get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	getset::get::impl_get(input)
+}
+
+/// Generate mutable getter methods for struct fields.
+///
+/// All methods are `pub` by default and return `&mut T`.
+/// Method names follow the `field_mut` convention.
+///
+/// ```ignore
+/// #[derive(GetMut)]
+/// pub struct Foo {
+///     #[get_mut(vis = pub_crate)]
+///     name: String,
+///     #[get_mut(skip)]
+///     secret: String,
+/// }
+/// ```
+#[proc_macro_derive(GetMut, attributes(get_mut))]
+pub fn derive_get_mut(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	getset::get_mut::impl_get_mut(input)
+}
+
+/// Generate setter methods for struct fields.
+///
+/// All methods are `pub` by default, take `&mut self`, and return `&mut Self`.
+/// Method names follow the `set_field` convention.
+///
+/// ## Options
+///
+/// - `unwrap_option` - accept `T` instead of `Option<T>`, wrapping with `Some`
+/// - `unwrap_trait` - accept `impl Trait` for `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ```ignore
+/// #[derive(Set)]
+/// pub struct Config {
+///     name: String,
+///     #[set(unwrap_option)]
+///     label: Option<String>,
+///     #[set(unwrap_trait)]
+///     handler: Box<dyn Handler>,
+/// }
+/// ```
+#[proc_macro_derive(Set, attributes(set))]
+pub fn derive_set(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	getset::set::impl_set(input)
+}
+
+/// Generate builder-style setter methods for struct fields.
+///
+/// All methods are `pub` by default, take `mut self`, and return `Self`.
+/// Method names follow the `with_field` convention.
+///
+/// ## Options
+///
+/// - `unwrap_option` - accept `T` instead of `Option<T>`, wrapping with `Some`
+/// - `unwrap_trait` - accept `impl Trait` for `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ```ignore
+/// #[derive(SetWith)]
+/// pub struct Config {
+///     name: String,
+///     #[set_with(unwrap_option)]
+///     label: Option<String>,
+/// }
+///
+/// let config = Config::default().with_name("hello".into()).with_label("world".into());
+/// ```
+#[proc_macro_derive(SetWith, attributes(set_with))]
+pub fn derive_set_with(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	getset::set_with::impl_set_with(input)
 }

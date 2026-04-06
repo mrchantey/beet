@@ -29,7 +29,7 @@ pub fn beet_cli() -> impl Bundle {
 					EndpointBuilder::new()
 						.with_path("teapot")
 						.with_description("I'm a teapot")
-						.with_action(|| { StatusCode::ImATeapot }),
+						.with_action(|| { StatusCode::IM_A_TEAPOT }),
 					EndpointBuilder::default()
 						.with_path("run-wasm/*binary-path")
 						.with_description("Run a wasm binary")

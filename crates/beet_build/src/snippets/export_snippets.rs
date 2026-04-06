@@ -23,7 +23,7 @@ pub(crate) fn export_snippets(world: &mut World) -> Result {
 #[allow(unused)]
 fn export_all_snippets(world: &mut World) -> Result {
 	// temp hack: just put them all in one big file
-	let scene = world.build_scene();
+	let scene = SceneSaver::new_default(world).save_ron()?;
 	let path = world
 		.resource::<WorkspaceConfig>()
 		.snippets_dir()
@@ -48,15 +48,14 @@ fn export_snippets_incrementally(world: &mut World) -> Result {
 		// temporarily remove parent to avoid 'entity not found'
 		let parent = world.entity_mut(file_snippets.root).take::<ChildOf>();
 
-		let scene = DynamicSceneBuilder::from_world(world)
+		let scene = SceneSaver::new_default(world)
+			.with_entities(file_snippets.entities)
 			// .deny_component::<CodegenFile>()
 			// .deny_component::<MetaType>()
 			// .deny_component::<RouteFileCollection>()
 			// .deny_component::<ModifyRoutePath>()
-			.extract_entities(file_snippets.entities.clone().into_iter())
-			.build();
+			.save_ron()?;
 
-		let scene = world.build_scene_with(scene);
 		tracing::trace!(
 			"Writing rsx snippet to {}",
 			file_snippets.path.display()

@@ -1,3 +1,4 @@
+use beet_core::bevy_utils::scene_serde::SceneLoader;
 use beet_core::prelude::*;
 use beet_dom::prelude::*;
 
@@ -8,7 +9,7 @@ pub fn load_client_islands(world: &mut World) -> Result {
 	let tag_name =
 		&world.resource::<HtmlConstants>().client_islands_script_type;
 	if let Some(scene) = beet_script_text(&tag_name)? {
-		world.load_scene(scene)?;
+		SceneLoader::new(world).load_ron(scene)?;
 	}
 
 	Ok(())

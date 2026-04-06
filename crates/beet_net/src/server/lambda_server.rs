@@ -5,23 +5,13 @@ use lambda_http::tower::service_fn;
 use lambda_http::tracing;
 
 
-/// Starts the Lambda runtime for the HttpServer
-pub(super) fn start_lambda_server(
-	In(entity): In<Entity>,
-	mut async_commands: AsyncCommands,
-) -> Result {
-	async_commands.run_local(async move |world| -> Result {
-		run_lambda(world.entity(entity)).await
-	});
-
-	Ok(())
-}
-
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
-async fn run_lambda(entity: AsyncEntity) -> Result {
+pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
 	// This variable only applies to API Gateway stages,
 	// you can remove it if you don't use them.
-	// i.e with: `GET /test-stage/todo/id/123` without: `GET /todo/id/123`
+	// i.e
+	// - default: `GET /test-stage/todo/id/123`
+	// - ignored: `GET /todo/id/123`
 	unsafe {
 		std::env::set_var("AWS_LAMBDA_HTTP_IGNORE_STAGE_IN_PATH", "true");
 	};
@@ -46,10 +36,8 @@ async fn run_lambda(entity: AsyncEntity) -> Result {
 async fn handle_request(
 	entity: AsyncEntity,
 	lambda_req: lambda_http::Request,
-) -> std::result::Result<
-	lambda_http::Response<lambda_http::Body>,
-	std::convert::Infallible,
-> {
+) -> Result<lambda_http::Response<lambda_http::Body>, std::convert::Infallible>
+{
 	let result: Result<lambda_http::Response<lambda_http::Body>> = async {
 		let req = lambda_to_request(lambda_req)?;
 		let res = entity.exchange(req).await;
@@ -63,7 +51,7 @@ async fn handle_request(
 			error!("Failed to process lambda request: {}", e);
 			Ok(lambda_http::Response::builder()
 				.status(500)
-				// dont leak internal error context to client
+				// don't leak internal error context to client
 				.body(lambda_http::Body::Text(
 					"Internal Server Error".to_string(),
 				))

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// Result type alias using [`FsError`].
-pub type FsResult<T = ()> = std::result::Result<T, FsError>;
+pub type FsResult<T = ()> = Result<T, FsError>;
 
 
 /// An file system error that includes the path that caused the error.

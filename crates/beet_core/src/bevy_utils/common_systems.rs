@@ -19,6 +19,7 @@ pub fn exit_in_frames(
 }
 
 /// Closes the application when the Escape key is pressed.
+#[cfg(feature = "bevy_keyboard")]
 pub fn close_on_esc(
 	input: When<Res<ButtonInput<KeyCode>>>,
 	mut exit: MessageWriter<AppExit>,

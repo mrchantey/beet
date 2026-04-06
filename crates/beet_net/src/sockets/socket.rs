@@ -37,7 +37,7 @@ impl Socket {
 				      -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
-					commands.run(async move |_| {
+					commands.run_local(async move |_| {
 						// socket send errors are non-fatal
 						send.send(message.take()).await.unwrap_or_else(|err| {
 							error!("{:?}", err);
@@ -203,7 +203,7 @@ impl SocketWrite {
 	}
 
 	/// Gracefully close the connection with an optional close frame.
-	pub async fn close(mut self, close: Option<CloseFrame>) -> Result<()> {
+	pub async fn close(&mut self, close: Option<CloseFrame>) -> Result<()> {
 		self.writer.close_boxed(close).await
 	}
 }
@@ -424,7 +424,7 @@ mod tests {
 		let writer = DummyWriter::default();
 		let socket = Socket::new(reader, writer);
 
-		let (send, _recv) = socket.split();
+		let (mut send, _recv) = socket.split();
 
 		let frame = CloseFrame {
 			code: 1000,
@@ -435,26 +435,24 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	// #[ignore="hits public api"]
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	async fn echo_endpoint() {
-		let url = "wss://echo.websocket.org";
-		let mut socket = match Socket::connect(url).await {
-			Ok(s) => s,
-			Err(e) => panic!("failed to connect to {}: {:?}", url, e),
-		};
+		use crate::sockets::echo_socket_server::EchoSocketServer;
+
+		let server = EchoSocketServer::new().await;
+		let mut socket = Socket::connect(&server.url).await.unwrap();
 
 		let payload = "beet-ws-integration-test";
 		socket.send(Message::text(payload)).await.unwrap();
 
-		// only way out is success, error or close
 		while let Some(item) = socket.next().await {
 			match item {
-				Ok(Message::Text(t)) if t == payload => {
+				Ok(Message::Text(text)) if text == payload => {
 					break;
 				}
 				Ok(_) => continue,
-				Err(e) => {
-					panic!("error from socket stream: {:?}", e);
+				Err(err) => {
+					panic!("error from socket stream: {:?}", err);
 				}
 			}
 		}
