@@ -4,7 +4,6 @@ created="2026-04-06"
 +++
 
 # Application Level Homoiconicity
-
 *Pete Hayman — 6th April, 2026*
 
 As much as I'd like to be I'm not a lisp guy, when somebody tells me `(+ 1 2)` is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful.
@@ -25,7 +24,7 @@ fn enemy_ai() -> impl Bundle {
 }
 ```
 
-In bevy this translates to **Behavior Expressed as Entity Trees**, a backronym I thought of soon after releasing beet. Technically they aren't limited to just trees, although they are strongly preferred over looser patterns like state machines for the same reasons that GOTO is considered an antipattern.
+In bevy this translates to **Behavior Expressed as Entity Trees**, a backronym I thought of soon after releasing beet. Technically the control flow patterns aren't limited to just trees, although they are strongly preferred over looser patterns like state machines for the same reasons that GOTO is considered an antipattern.
 
 Its a simple idea, the hard part is doing it well. Upon release, beet was actually the third iteration of this idea, and while the public api for this pattern has remained the same in the two years since its release, the implementation has evolved dramatically. But with every rewrite it gets closer, feels more native and with the grain of the existing bevy ecosystem.
 
@@ -115,4 +114,14 @@ The gains in simplicity are self-evident but i think thats just the beginning:
 - How can infra deployments be simplified when the router logic itself is just a json file?
 - What capabilities does an agent get when it can confidently modify its own behavior without source code changes?
 
-ECS is a weird architecture in that its so agnostic to the application, and the scope of beet has evolved beyound a simple behavior library into a full stack framework to explore this. It feels like we're on the ground floor of discovering the implications of this architecture, and I can't wait to see how the landscape unfolds.
+## I accidentally built a web (1.0) browser
+
+ECS is a weird architecture in that its so agnostic to the application, and the scope of beet has evolved beyond a simple behavior library into a full stack framework to explore this.
+
+As a concrete example, I am currently rewriting the web ui layer of beet to be target agnostic. I just finished building the parsers and renderers for various formats: html, markdown, ratatui etc, and realized I could view `example.com` in ratatui by combining the html parser and tui renderer. A few hours twiddling with the `Naivgator`, `Scrollbar` and `UrlBar` components, and there you have it! A [crude sans-js/css web browser](https://github.com/mrchantey/beet/blob/1dcd4d8574b8ec254623a0c99bc3dc586c65a65b/examples/router/mini_browser.rs#L1).
+
+I wasn't intending to build that, it just came out of the general nature of the architecture. No need to create some intricate binding layer between the html AST and application framework, its already represented as Bevy ECS! Likewise for the tui renderer. Translating between technologies is not required when everything speaks the same language.
+
+## Its gonna be awesome
+
+It feels like we're on the ground floor of discovering the implications of this architecture, and I can't wait to see how the landscape unfolds.
