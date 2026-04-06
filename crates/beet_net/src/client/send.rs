@@ -242,13 +242,11 @@ mod test_data_scheme {
 
 #[cfg(test)]
 #[cfg(feature = "json")]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod test_request {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	const HTTPBIN: &str = "https://postman-echo.com";
-	// const HTTPBIN: &str = "https://httpbin.org";
-	// TODO spin up our own server for tests
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
 	#[ignore = "requires external network and system CA certs"]
@@ -262,9 +260,9 @@ mod test_request {
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn get_works() {
-		Request::get(format!("{HTTPBIN}/get"))
+		let server = EchoHttpServer::new().await;
+		Request::get(format!("{}/get", server.url))
 			.send()
 			.await
 			.unwrap()
@@ -273,9 +271,9 @@ mod test_request {
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn post_json_works() {
-		Request::post(format!("{HTTPBIN}/post"))
+		let server = EchoHttpServer::new().await;
+		Request::post(format!("{}/post", server.url))
 			.with_json_body(&serde_json::json!({"foo": "bar"}))
 			.unwrap()
 			.send()
@@ -286,21 +284,29 @@ mod test_request {
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn custom_header_works() {
-		Request::get(format!("{HTTPBIN}/headers"))
+		let server = EchoHttpServer::new().await;
+		let response = Request::get(format!("{}/headers", server.url))
 			.with_header_raw("X-Foo", "Bar")
 			.send()
 			.await
 			.unwrap()
-			.xmap(|res| res.status())
-			.xpect_eq(StatusCode::OK);
+			.into_result()
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		let json: serde_json::Value =
+			serde_json::from_str(&response.text().await.unwrap()).unwrap();
+		json["headers"]["x-foo"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("Bar");
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn put_and_delete_work() {
-		Request::get(format!("{HTTPBIN}/put"))
+		let server = EchoHttpServer::new().await;
+		Request::get(format!("{}/put", server.url))
 			.with_method(HttpMethod::Put)
 			.send()
 			.await
@@ -308,7 +314,7 @@ mod test_request {
 			.xmap(|res| res.status())
 			.xpect_eq(StatusCode::OK);
 
-		Request::get(format!("{HTTPBIN}/delete"))
+		Request::get(format!("{}/delete", server.url))
 			.with_method(HttpMethod::Delete)
 			.send()
 			.await
@@ -318,59 +324,59 @@ mod test_request {
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn body_raw_works() {
-		Request::get(format!("{HTTPBIN}/post"))
+		let server = EchoHttpServer::new().await;
+		let json: serde_json::Value = Request::get(format!("{}/post", server.url))
 			.with_method(HttpMethod::Post)
 			.with_body(b"rawbytes".to_vec())
-			.send()
-			.await
-			.unwrap()
-			.text()
-			.await
-			.unwrap()
-			.xpect_contains("rawbytes");
-	}
-
-	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
-	async fn body_stream() {
-		use bytes::Bytes;
-
-		Request::post(format!("{HTTPBIN}/post"))
-			.with_body_stream(bevy::tasks::futures_lite::stream::iter(vec![
-				Ok(Bytes::from("chunk1")),
-				Ok(Bytes::from("chunk2")),
-				Ok(Bytes::from("chunk3")),
-			]))
 			.send()
 			.await
 			.unwrap()
 			.into_result()
 			.await
 			.unwrap()
-			.text()
+			.json()
 			.await
+			.unwrap();
+		json["body"]
+			.as_str()
 			.unwrap()
-			.xmap(|text| {
-				// cross_log!("Response text: {}", text);
-				// The response should contain all our chunks
-				text.contains("chunk1")
-					&& text.contains("chunk2")
-					&& text.contains("chunk3")
-			})
-			.xpect_true();
+			.xpect_contains("rawbytes");
 	}
 
+	#[beet_core::test]
+	async fn body_stream() {
+		use bytes::Bytes;
+
+		let server = EchoHttpServer::new().await;
+		let json: serde_json::Value =
+			Request::post(format!("{}/post", server.url))
+				.with_body_stream(
+					bevy::tasks::futures_lite::stream::iter(vec![
+						Ok(Bytes::from("chunk1")),
+						Ok(Bytes::from("chunk2")),
+						Ok(Bytes::from("chunk3")),
+					]),
+				)
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.json()
+				.await
+				.unwrap();
+		let body = json["body"].as_str().unwrap();
+		body.contains("chunk1").xpect_true();
+		body.contains("chunk2").xpect_true();
+		body.contains("chunk3").xpect_true();
+	}
 
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
 	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
 	#[ignore = "requires external network and system CA certs"]
 	async fn concurrent_requests_complete_independently() {
-		// This test verifies that multiple requests can run concurrently
-		// without blocking each other. Make 3 concurrent requests - if they're
-		// properly async, they'll complete concurrently (fast). If blocking,
-		// they'd complete sequentially (slow).
 		let start = Instant::now();
 
 		let req1 = Request::get("https://example.com").send();
@@ -388,28 +394,30 @@ mod test_request {
 	}
 
 	#[test]
-	#[ignore = "flaky httpbin"]
 	fn query_params() {
-		// #[derive(Serialize)]
-		// struct Foo{
-		Request::get(format!("{HTTPBIN}/get"))
+		Request::get("http://localhost/get")
 			.parse_query_param("foo", &(1, 2))
 			.xpect_err();
 	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
 	async fn query_params_work() {
-		Request::get(format!("{HTTPBIN}/get"))
-			.with_param("foo", "bar")
-			.with_param("baz", "qux")
-			.send()
-			.await
-			.unwrap()
-			.text()
-			.await
-			.unwrap()
-			.xpect_contains("baz");
+		let server = EchoHttpServer::new().await;
+		let json: serde_json::Value =
+			Request::get(format!("{}/get", server.url))
+				.with_param("foo", "bar")
+				.with_param("baz", "qux")
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.json()
+				.await
+				.unwrap();
+		json["query"]["foo"].as_str().unwrap().xpect_eq("bar");
+		json["query"]["baz"].as_str().unwrap().xpect_eq("qux");
 	}
 }
 
@@ -417,31 +425,38 @@ mod test_request {
 #[cfg(test)]
 #[cfg(any(feature = "reqwest", feature = "ureq", target_arch = "wasm32"))]
 #[cfg(feature = "json")]
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod test_response {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	// const HTTPBIN: &str = "https://httpbin.org";
-	const HTTPBIN: &str = "https://httpbin.dev";
+	#[beet_core::test]
+	async fn post() {
+		let server = EchoHttpServer::new().await;
+		let original = serde_json::json!({"foo": "bar"});
+		let json: serde_json::Value =
+			Request::post(format!("{}/post", server.url))
+				.with_body(&original.to_string())
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.json()
+				.await
+				.unwrap();
+		// The echo server returns the raw body string; verify it contains our JSON
+		json["body"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("\"foo\":\"bar\"");
+	}
 
 	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
-	async fn post() {
-		Request::post(format!("{HTTPBIN}/post"))
-			.with_body(&serde_json::json!({"foo": "bar"}).to_string())
-			.send()
-			.await
-			.unwrap()
-			.json::<serde_json::Value>()
-			.await
-			.unwrap()
-			.xmap(|value| value["json"]["foo"].as_str().unwrap().to_string())
-			.xpect_eq("bar");
-	}
-	#[beet_core::test]
-	#[ignore = "flaky httpbin"]
+	#[ignore = "requires external streaming server"]
 	async fn stream() {
-		let res = Request::get(format!("{HTTPBIN}/stream/3"))
+		let res = Request::get("https://httpbin.dev/stream/3")
 			.send()
 			.await
 			.unwrap();

@@ -26,6 +26,8 @@ mod hyper_server;
 mod lambda_server;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod mini_http_server;
+#[cfg(all(feature = "server", feature = "json", not(target_arch = "wasm32")))]
+mod echo_http_server;
 mod server_plugin;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub use http_server::*;
@@ -39,4 +41,6 @@ pub use hyper_server::*;
 pub use lambda_server::*;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub use mini_http_server::*;
+#[cfg(all(feature = "server", feature = "json", not(target_arch = "wasm32")))]
+pub use echo_http_server::*;
 pub use server_plugin::*;

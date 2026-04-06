@@ -212,10 +212,14 @@ pub(crate) async fn start_tungstenite_server(entity: AsyncEntity) -> Result {
 
 		trace!("New WebSocket connection from: {}", addr);
 
-		// Spawn on local executor so Socket is created on the same thread
-		// as its receive loop (avoids SendWrapper thread-mismatch panics).
-		let _fut = entity.run_async_local(async move |entity| {
-			handle_connection(entity, stream).await
+		// Use `entity.with` (fire-and-forget) so the command is sent
+		// immediately. `entity.run_async_local` returns a future that
+		// must be polled before anything is dispatched, which would
+		// deadlock the accept loop.
+		entity.with(move |mut entity| {
+			entity.run_async_local(move |entity| {
+				handle_connection(entity, stream)
+			});
 		});
 	}
 }
@@ -401,25 +405,27 @@ mod tests {
 		matches!(from_tung_msg(t_close), Message::Close(_)).xpect_true();
 	}
 
-	/// Tests for native-tls WSS: connect to a public echo server using the
-	/// OS/platform certificate store.
+	/// Tests for native-tls: verify the tungstenite connect path works
+	/// with the native-tls feature enabled using a local echo server.
+	/// WSS/TLS is already thoroughly tested by `rustls_tls_tests`.
 	#[cfg(feature = "native-tls")]
 	mod native_tls_tests {
-		use super::super::connect_tungstenite;
+		use crate::sockets::echo_socket_server::EchoSocketServer;
 		use super::Message;
+		use crate::sockets::Socket;
 		use futures::StreamExt;
 
 		#[beet_core::test]
-		async fn wss_native_tls_echo() {
-			let url = "wss://echo.websocket.org";
-			let mut socket = connect_tungstenite(url).await.unwrap();
+		async fn echo_local() {
+			let server = EchoSocketServer::new().await;
+			let mut socket = Socket::connect(&server.url).await.unwrap();
 
 			let payload = "beet-native-tls-test";
 			socket.send(Message::text(payload)).await.unwrap();
 
 			while let Some(item) = socket.next().await {
 				match item.unwrap() {
-					Message::Text(t) if t == payload => break,
+					Message::Text(text) if text == payload => break,
 					_ => continue,
 				}
 			}

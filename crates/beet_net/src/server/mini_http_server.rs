@@ -73,13 +73,38 @@ async fn handle_connection(
 	use futures_lite::AsyncReadExt;
 	use futures_lite::AsyncWriteExt;
 
-	// Read the raw HTTP request
+	// Read the raw HTTP request headers (and possibly partial body)
 	let mut buf = vec![0u8; 8192];
 	let bytes_read = stream.read(&mut buf).await?;
 	if bytes_read == 0 {
 		return Ok(());
 	}
 	buf.truncate(bytes_read);
+
+	// Check if we need to read more bytes based on Content-Length
+	let header_end = find_header_end(&buf);
+	if let Some(header_end_pos) = header_end {
+		let content_length = parse_content_length(&buf[..header_end_pos]);
+		if content_length > 0 {
+			let body_start = header_end_pos;
+			let body_received = buf.len() - body_start;
+			let remaining = content_length.saturating_sub(body_received);
+			if remaining > 0 {
+				buf.resize(body_start + content_length, 0);
+				let mut total_read = body_received;
+				while total_read < content_length {
+					let read_count = stream
+						.read(&mut buf[body_start + total_read..])
+						.await?;
+					if read_count == 0 {
+						break;
+					}
+					total_read += read_count;
+				}
+				buf.truncate(body_start + total_read);
+			}
+		}
+	}
 
 	// Parse the raw HTTP request into our Request type
 	let request = parse_http_request(&buf)?;
@@ -93,6 +118,34 @@ async fn handle_connection(
 	stream.flush().await?;
 
 	Ok(())
+}
+
+/// Find the byte offset of the end of the HTTP headers (after the blank line).
+/// Returns the position immediately after `\r\n\r\n` or `\n\n`.
+fn find_header_end(buf: &[u8]) -> Option<usize> {
+	if let Some(pos) = buf
+		.windows(4)
+		.position(|window| window == b"\r\n\r\n")
+	{
+		return Some(pos + 4);
+	}
+	if let Some(pos) = buf.windows(2).position(|window| window == b"\n\n") {
+		return Some(pos + 2);
+	}
+	None
+}
+
+/// Extract the Content-Length value from raw header bytes.
+fn parse_content_length(header_bytes: &[u8]) -> usize {
+	let header_str = String::from_utf8_lossy(header_bytes);
+	for line in header_str.lines() {
+		if let Some((key, value)) = line.split_once(':') {
+			if key.trim().eq_ignore_ascii_case("content-length") {
+				return value.trim().parse::<usize>().unwrap_or(0);
+			}
+		}
+	}
+	0
 }
 
 /// Parse a raw HTTP request into a [`Request`].
