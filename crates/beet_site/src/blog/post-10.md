@@ -5,6 +5,8 @@ created="2026-04-06"
 
 # Application Level Homoiconicity
 
+*Pete Hayman — 6th April, 2026*
+
 As much as I'd like to be I'm not a lisp guy, when somebody tells me `(+ 1 2)` is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful.
 
 I'm a games guy, I've seen how messy hard-coded control flow gets in patterns like enemy AI. I've also seen how brittle it is to shoehorn in (and often back out) some highly opinionated DSL to address this.

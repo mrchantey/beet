@@ -5,6 +5,8 @@ created="2026-02-01"
 
 # The Harvest #8 - It's all been done before
 
+*Pete Hayman — 1st February, 2026*
+
 <iframe src="https://www.youtube.com/embed/8nokKDoz2_4" title="The Harvest #8 | It's all been done before" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 <br/>

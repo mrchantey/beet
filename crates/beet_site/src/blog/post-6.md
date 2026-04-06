@@ -5,6 +5,8 @@ created="2025-12-04"
 
 # The Full Moon Harvest #6 - Folk Technology
 
+*Pete Hayman — 4th December, 2025*
+
 <iframe src="https://www.youtube.com/embed/NFjdN8KGkg8" title="Full Moon Harvest #6 | Folk Technology" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 <br/>
