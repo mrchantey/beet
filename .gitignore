@@ -9,6 +9,7 @@ rustc-ice*
 .vscode/settings.json
 dump.*
 plan.md
+plan2.md
 file.pdf
 launch.ron
 
