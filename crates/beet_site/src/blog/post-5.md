@@ -4,6 +4,7 @@ created="2025-11-05"
 +++
 
 # The Full Moon Harvest #5 - Declarative State
+
 *Pete Hayman — 5th November, 2025*
 
 <iframe src="https://www.youtube.com/embed/BhLvfvw1rgw" title="Full Moon Harvest #5 | Declarative State" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>

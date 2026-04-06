@@ -4,7 +4,13 @@ created="2026-04-06"
 +++
 
 # Application Level Homoiconicity
+
 *Pete Hayman — 6th April, 2026*
+
+<iframe src="https://www.youtube.com/embed/D-d_mJ9N5mA" title="The Harvest #10 - Application Level Homoiconicity" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+<br/>
+<br/>
 
 As much as I'd like to be I'm not a lisp guy, when somebody tells me `(+ 1 2)` is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful.
 
