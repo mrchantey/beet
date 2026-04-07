@@ -15,7 +15,7 @@
 //! let config = Config::new()
 //!     .with_backend(&S3Backend::default())
 //!     .with_required_version("~> 1.8")
-//!     .with_resource("assets", &bucket)
+//!     .with_resource("assets", &bucket)?
 //!     .with_output("bucket_name", Output {
 //!         value: json!("${aws_s3_bucket.assets.bucket}"),
 //!         description: Some("The bucket name".into()),
@@ -75,7 +75,7 @@ pub struct Output {
 /// let config = Config::new()
 ///     .with_backend(&S3Backend::default())
 ///     .with_required_version("~> 1.8")
-///     .with_resource("assets", &bucket)
+///     .with_resource("assets", &bucket)?
 ///     .with_output("bucket_name", Output {
 ///         value: json!("${aws_s3_bucket.assets.bucket}"),
 ///         description: Some("The bucket name".into()),
@@ -171,9 +171,9 @@ impl Config {
 	pub fn with_resource<T: Resource>(
 		mut self,
 		resource: &terra::ResourceDef<T>,
-	) -> Self {
-		self.add_resource(resource);
-		self
+	) -> Result<Self> {
+		self.add_resource(resource)?;
+		Ok(self)
 	}
 
 	/// a slug is able generate both the label and resource name,
@@ -181,7 +181,7 @@ impl Config {
 	pub fn add_resource<T: Resource>(
 		&mut self,
 		resource: &terra::ResourceDef<T>,
-	) -> &mut Self {
+	) -> Result<&mut Self> {
 		self.add_labeled_resource(resource.ident().label(), resource.resource())
 	}
 
@@ -192,9 +192,9 @@ impl Config {
 		mut self,
 		name: impl Into<String>,
 		resource: &dyn Resource,
-	) -> Self {
-		self.add_labeled_resource(name, resource);
-		self
+	) -> Result<Self> {
+		self.add_labeled_resource(name, resource)?;
+		Ok(self)
 	}
 
 	/// Add a typed resource. The required provider is registered automatically
@@ -204,7 +204,8 @@ impl Config {
 		&mut self,
 		label: impl Into<String>,
 		resource: &dyn Resource,
-	) -> &mut Self {
+	) -> Result<&mut Self> {
+		let label = label.into();
 		if let Err(err) = resource.validate_definition() {
 			self.validation_errors.push(err);
 		}
@@ -214,9 +215,15 @@ impl Config {
 			.entry(resource.resource_type().to_string())
 			.or_insert_with(|| Value::Object(Map::new()));
 		if let Value::Object(map) = type_map {
-			map.insert(label.into(), resource.to_json());
+			if map.insert(label.clone(), resource.to_json()).is_some() {
+				bevybail!(
+					"duplicate resource: type `{}` label `{}` already exists",
+					resource.resource_type(),
+					label
+				);
+			}
 		}
-		self
+		Ok(self)
 	}
 
 

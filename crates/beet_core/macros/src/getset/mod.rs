@@ -73,7 +73,12 @@ pub struct FieldConfig {
 	pub unwrap_trait: bool,
 	/// Skip generation for this field.
 	pub skip: bool,
+	/// Accept `impl Into<T>` in the setter. Auto-enabled for String / Cow types.
+	pub use_into: bool,
+	/// Suppress the auto-into behaviour for String / Cow fields.
+	pub not_into: bool,
 }
+
 
 /// Defaults parsed from struct-level attributes.
 pub struct StructConfig {
@@ -146,6 +151,8 @@ const FIELD_ALLOWED_KEYS: &[&str] = &[
 	"option",
 	"unwrap_option",
 	"unwrap_trait",
+	"into",
+	"not_into",
 ];
 
 /// Extract the token content from an attribute, returning `None` for bare paths.
@@ -163,13 +170,15 @@ fn attr_tokens(
 }
 
 /// Apply common config keys from an [`AttributeMap`] to vis, return_type,
-/// unwrap_option, and unwrap_trait.
+/// unwrap_option, unwrap_trait, use_into, and not_into.
 fn apply_common_keys(
 	map: &AttributeMap,
 	vis: &mut Vis,
 	return_type: &mut GetReturnType,
 	unwrap_option: &mut bool,
 	unwrap_trait: &mut bool,
+	use_into: &mut bool,
+	not_into: &mut bool,
 ) -> syn::Result<()> {
 	if let Some(Some(expr)) = map.get("vis") {
 		*vis = parse_vis(expr)?;
@@ -185,6 +194,12 @@ fn apply_common_keys(
 	}
 	if map.contains_key("unwrap_trait") {
 		*unwrap_trait = true;
+	}
+	if map.contains_key("into") {
+		*use_into = true;
+	}
+	if map.contains_key("not_into") {
+		*not_into = true;
 	}
 	Ok(())
 }
@@ -213,12 +228,16 @@ pub fn parse_struct_config(
 		return Ok(config);
 	}
 
+	let mut _use_into = false;
+	let mut _not_into = false;
 	apply_common_keys(
 		&map,
 		&mut config.vis,
 		&mut config.return_type,
 		&mut config.unwrap_option,
 		&mut config.unwrap_trait,
+		&mut _use_into,
+		&mut _not_into,
 	)?;
 
 	Ok(config)
@@ -237,6 +256,8 @@ pub fn parse_field_config(
 		unwrap_option: defaults.unwrap_option,
 		unwrap_trait: defaults.unwrap_trait,
 		skip: false,
+		use_into: false,
+		not_into: false,
 	};
 
 	let Some(attr) = attrs.iter().find(|attr| attr.path().is_ident(attr_name))
@@ -262,6 +283,8 @@ pub fn parse_field_config(
 		&mut config.return_type,
 		&mut config.unwrap_option,
 		&mut config.unwrap_trait,
+		&mut config.use_into,
+		&mut config.not_into,
 	)?;
 
 	Ok(config)
@@ -314,6 +337,27 @@ pub fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
 	} else {
 		None
 	}
+}
+
+/// Returns true if the type should automatically use `impl Into<T>`.
+/// Covers `String` and `Cow<'_, …>` types.
+pub fn is_auto_into_type(ty: &syn::Type) -> bool {
+	let syn::Type::Path(path) = ty else {
+		return false;
+	};
+	let Some(seg) = path.path.segments.last() else {
+		return false;
+	};
+	matches!(seg.ident.to_string().as_str(), "String" | "Cow")
+}
+
+/// Resolve whether `impl Into<T>` should be used for a field, accounting for
+/// auto-detection and explicit flags.
+pub fn effective_use_into(ty: &syn::Type, config: &FieldConfig) -> bool {
+	if config.not_into {
+		return false;
+	}
+	config.use_into || is_auto_into_type(ty)
 }
 
 /// Generate the impl block for a getset derive. Called by each derive macro.

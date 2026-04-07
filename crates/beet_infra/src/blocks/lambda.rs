@@ -42,7 +42,7 @@ impl LambdaBlock {
 	}
 
 	/// Build a complete [`terra::Config`] for this stack.
-	pub fn build_config(&self, stack: &Stack) -> terra::Config {
+	pub fn build_config(&self, stack: &Stack) -> Result<terra::Config> {
 		let region = self.region();
 
 		// S3 Buckets
@@ -185,17 +185,17 @@ impl LambdaBlock {
 		// Assemble core resources
 		let mut config = terra::Config::default()
 			.with_backend(stack.backend())
-			.with_resource(&html_bucket)
-			.with_resource(&assets_bucket)
-			.with_resource(&lambda_role)
-			.with_resource(&lambda_policy)
-			.with_resource(&lambda_function)
-			.with_resource(&lambda_url)
-			.with_resource(&gateway)
-			.with_resource(&lambda_integration)
-			.with_resource(&default_route)
-			.with_resource(&default_stage)
-			.with_resource(&apigw_permission);
+			.with_resource(&html_bucket)?
+			.with_resource(&assets_bucket)?
+			.with_resource(&lambda_role)?
+			.with_resource(&lambda_policy)?
+			.with_resource(&lambda_function)?
+			.with_resource(&lambda_url)?
+			.with_resource(&gateway)?
+			.with_resource(&lambda_integration)?
+			.with_resource(&default_route)?
+			.with_resource(&default_stage)?
+			.with_resource(&apigw_permission)?;
 
 		// DNS (conditional)
 		if let Some(dns) = &self.dns {
@@ -214,7 +214,7 @@ impl LambdaBlock {
 						stack.resource_ident("dns"),
 						dns_record,
 					);
-					config = config.with_resource(&dns_def);
+					config = config.with_resource(&dns_def)?;
 				}
 				DnsProvider::Route53 { authority, zone_id } => {
 					let dns_record = AwsRoute53RecordDetails {
@@ -231,13 +231,13 @@ impl LambdaBlock {
 						stack.resource_ident("dns"),
 						dns_record,
 					);
-					config = config.with_resource(&dns_def);
+					config = config.with_resource(&dns_def)?;
 				}
 			}
 		}
 
 		// Outputs
-		config
+		Ok(config
 			.with_output("api_endpoint", terra::Output {
 				value: json!(gateway.field_ref("api_endpoint")),
 				description: Some("The API Gateway endpoint URL".into()),
@@ -252,7 +252,7 @@ impl LambdaBlock {
 				value: json!(assets_bucket.field_ref("bucket")),
 				description: Some("The S3 assets bucket name".into()),
 				sensitive: None,
-			})
+			}))
 	}
 }
 
@@ -265,7 +265,7 @@ mod tests {
 	async fn lambda_config_validates() {
 		let stack = Stack::default_local();
 		let lambda = LambdaBlock::default();
-		let config = lambda.build_config(&stack);
+		let config = lambda.build_config(&stack).unwrap();
 		config.validate().await.unwrap();
 	}
 }

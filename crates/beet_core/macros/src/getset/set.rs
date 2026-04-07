@@ -57,11 +57,17 @@ fn generate_field(field: &syn::Field, config: &FieldConfig) -> TokenStream {
 					}
 				}
 			}
+			let use_into = effective_use_into(inner_ty, config);
+			let (param, assign) = if use_into {
+				(quote! { impl Into<#inner_ty> }, quote! { Some(val.into()) })
+			} else {
+				(quote! { #inner_ty }, quote! { Some(val) })
+			};
 			return quote! {
 				#(#doc)*
 				#[inline(always)]
-				#vis fn #fn_name(&mut self, val: #inner_ty) -> &mut Self {
-					self.#field_name = Some(val);
+				#vis fn #fn_name(&mut self, val: #param) -> &mut Self {
+					self.#field_name = #assign;
 					self
 				}
 			};
@@ -91,12 +97,23 @@ fn generate_field(field: &syn::Field, config: &FieldConfig) -> TokenStream {
 	}
 
 	// Normal setter
-	quote! {
-		#(#doc)*
-		#[inline(always)]
-		#vis fn #fn_name(&mut self, val: #ty) -> &mut Self {
-			self.#field_name = val;
-			self
+	if effective_use_into(ty, config) {
+		quote! {
+			#(#doc)*
+			#[inline(always)]
+			#vis fn #fn_name(&mut self, val: impl Into<#ty>) -> &mut Self {
+				self.#field_name = val.into();
+				self
+			}
+		}
+	} else {
+		quote! {
+			#(#doc)*
+			#[inline(always)]
+			#vis fn #fn_name(&mut self, val: #ty) -> &mut Self {
+				self.#field_name = val;
+				self
+			}
 		}
 	}
 }
@@ -117,7 +134,9 @@ mod test {
 		assert!(result.contains("fn set_name"));
 		assert!(result.contains("& mut self"));
 		assert!(result.contains("& mut Self"));
-		assert!(result.contains("self . name = val"));
+		// String auto-enables impl Into
+		assert!(result.contains("impl Into < String >"));
+		assert!(result.contains("self . name = val . into ()"));
 	}
 
 	#[test]
@@ -157,8 +176,9 @@ mod test {
 		};
 		let result = parse(input).unwrap().to_string();
 		assert!(result.contains("fn set_label"));
-		assert!(result.contains("val : String"));
-		assert!(result.contains("Some (val)"));
+		// String auto-enables impl Into
+		assert!(result.contains("impl Into < String >"));
+		assert!(result.contains("Some (val . into ())"));
 	}
 
 	#[test]
@@ -201,6 +221,56 @@ mod test {
 		assert!(result.contains("fn set_handler"));
 		assert!(result.contains("impl Handler"));
 		assert!(result.contains("Some (Box :: new (val))"));
+	}
+
+	#[test]
+	fn into_explicit() {
+		let input: DeriveInput = syn::parse_quote! {
+			pub struct Foo {
+				#[set(into)]
+				name: String,
+			}
+		};
+		let result = parse(input).unwrap().to_string();
+		assert!(result.contains("impl Into"));
+		assert!(result.contains("val . into ()"));
+	}
+
+	#[test]
+	fn into_auto_string() {
+		let input: DeriveInput = syn::parse_quote! {
+			pub struct Foo {
+				name: String,
+			}
+		};
+		let result = parse(input).unwrap().to_string();
+		assert!(result.contains("impl Into"));
+		assert!(result.contains("val . into ()"));
+	}
+
+	#[test]
+	fn into_auto_cow() {
+		let input: DeriveInput = syn::parse_quote! {
+			pub struct Foo<'a> {
+				label: Cow<'a, str>,
+			}
+		};
+		let result = parse(input).unwrap().to_string();
+		assert!(result.contains("impl Into"));
+		assert!(result.contains("val . into ()"));
+	}
+
+	#[test]
+	fn not_into_suppresses_auto() {
+		let input: DeriveInput = syn::parse_quote! {
+			pub struct Foo {
+				#[set(not_into)]
+				name: String,
+			}
+		};
+		let result = parse(input).unwrap().to_string();
+		assert!(result.contains("val : String"));
+		assert!(!result.contains("val . into ()"));
 	}
 
 	#[test]
