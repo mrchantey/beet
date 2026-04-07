@@ -26,9 +26,10 @@ If you encounter an error, isolate it and run again, ie if the error is in beet_
 `timeout 120  cargo test -p beet_core --all-features --lib -- test_name`
 Fix the error using a subagent, then run the crate again:
 `timeout 120 cargo test -p beet_core --all-features`
-When thats clear, run the full suite again:
-`timeout 120 just test-core`
+When thats clear, run the full suite again
+`timeout 300 just test-core | tail`
+After the first complete pass, run fully again, checking for warnings. Fix any warnings encountered
 
 ## Success
 
-Success means that `just test-core` works, the whole command. not just each crate working individually.
+Success means that `just test-core` passes without warnings, the whole command. not just each crate working individually.
