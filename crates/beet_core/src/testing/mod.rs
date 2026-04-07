@@ -15,7 +15,7 @@
 //! ## Basic Tests
 //!
 //! ```rust
-//! #![cfg_attr(test, feature(test, custom_test_frameworks))]
+//! #![cfg_attr(test, feature(custom_test_frameworks))]
 //! #![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! use beet_core::prelude::*;
 //!
@@ -62,7 +62,7 @@
 //!
 //! 2. Add the following attributes to your test files:
 //!    ```rust
-//!    #![cfg_attr(test, feature(test, custom_test_frameworks))]
+//!    #![cfg_attr(test, feature(custom_test_frameworks))]
 //!    #![cfg_attr(test, test_runner(beet_core::test_runner))]
 //!    ```
 //!

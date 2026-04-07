@@ -35,9 +35,6 @@
 		closure_track_caller
 	)
 )]
-// The test crate is needed for the test runner infrastructure
-// Note: `test` feature is already enabled by cfg(test) above, so only add if_let_guard here
-#![cfg_attr(feature = "testing", feature(if_let_guard))]
 // never_type is needed for IntoFut impl for Future<Output = !>
 // Only enable if nightly feature is not already enabling it
 #![cfg_attr(

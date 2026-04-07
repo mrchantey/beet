@@ -21,6 +21,8 @@ this can usually be fixed by running again
 
 ## Instructions
 
+The timeout provided is negotiable, adjust as needed.
+
 Run `timeout 300 just test-core`
 If you encounter an error, isolate it and run again, ie if the error is in beet_core lib:
 `timeout 120  cargo test -p beet_core --all-features --lib -- test_name`
@@ -33,3 +35,5 @@ After the first complete pass, run fully again, checking for warnings. Fix any w
 ## Success
 
 Success means that `just test-core` passes without warnings, the whole command. not just each crate working individually.
+
+Upon completion provide a comprehensive summary of what was changed.
