@@ -58,6 +58,7 @@ fs = [
 	"dep:notify-debouncer-full",
 	"dep:ctrlc",
 	"dep:async-fs",
+	"dep:async-process",
 ]
 tokens = [
 	"serde",
@@ -134,6 +135,7 @@ futures = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }
+async-process = { workspace = true, optional = true }
 
 ## fs
 async-fs = { workspace = true, optional = true }

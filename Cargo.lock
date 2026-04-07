@@ -1088,6 +1088,7 @@ dependencies = [
  "async-fs",
  "async-io",
  "async-lock",
+ "async-process",
  "async-task",
  "beet_core",
  "beet_core_macros",

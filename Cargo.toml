@@ -281,8 +281,8 @@ tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
-stack_lambda = ["infra", "beet_infra?/stack_lambda"]
-stack_lightsail = ["infra", "beet_infra?/stack_lightsail"]
+stack_lambda = ["infra", "beet_infra?/stack_lambda", "fs", "rand"]
+stack_lightsail = ["infra", "beet_infra?/stack_lightsail", "fs", "rand"]
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]

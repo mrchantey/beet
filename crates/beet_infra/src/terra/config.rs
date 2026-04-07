@@ -566,33 +566,8 @@ impl Config {
 		self.export_to_file(dir.as_ref().join("main.tf.json"))
 			.await?;
 
-		let init = async_process::Command::new("tofu")
-			.current_dir(dir.as_ref())
-			.args(["init"])
-			.output()
-			.await?;
-		if !init.status.success() {
-			bevybail!(
-				"tofu init failed:\n{}",
-				String::from_utf8_lossy(&init.stderr)
-			);
-		}
-
-		let validate = async_process::Command::new("tofu")
-			.current_dir(dir.as_ref())
-			.args(["validate", "-json"])
-			.output()
-			.await?;
-
-		let stdout = String::from_utf8_lossy(&validate.stdout).to_string();
-		if !validate.status.success() {
-			bevybail!(
-				"tofu validate failed:\nstdout: {}\nstderr: {}",
-				stdout,
-				String::from_utf8_lossy(&validate.stderr),
-			);
-		}
-		Ok(stdout)
+		tofu::init(dir.path()).await?;
+		tofu::validate(dir.path()).await
 	}
 
 	/// Export to `path`, then run `tofu init` + `tofu validate` in-place.
@@ -602,7 +577,7 @@ impl Config {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub async fn export_and_validate(
 		&self,
-		path: impl AsRef<Path>,
+		path: &AbsPathBuf,
 	) -> Result<String> {
 		if !self.validation_errors.is_empty() {
 			let messages = self
@@ -613,41 +588,16 @@ impl Config {
 				.join("\n");
 			bevybail!("resource validation failed:\n{messages}");
 		}
-		let path = path.as_ref();
-		let dir = path.parent().unwrap_or(Path::new("."));
-		fs_ext::create_dir_all(dir)?;
+		let dir = path.parent().unwrap_or_default();
+		fs_ext::create_dir_all(&dir)?;
 		self.export_to_file(path).await?;
 		cross_log!("Generated: {}", path.display());
-
 		cross_log!("Running tofu init …");
-		let init = async_process::Command::new("tofu")
-			.current_dir(dir)
-			.args(["init"])
-			.output()
-			.await?;
-		if !init.status.success() {
-			bevybail!(
-				"tofu init failed:\n{}",
-				String::from_utf8_lossy(&init.stderr)
-			);
-		}
+		tofu::init(&dir).await?;
 		cross_log!("tofu init: OK");
-
 		cross_log!("Running tofu validate …");
-		let validate = async_process::Command::new("tofu")
-			.current_dir(dir)
-			.args(["validate", "-json"])
-			.output()
-			.await?;
+		let stdout = tofu::validate(&dir).await?;
 
-		let stdout = String::from_utf8_lossy(&validate.stdout).to_string();
-		if !validate.status.success() {
-			bevybail!(
-				"tofu validate failed:\nstdout: {}\nstderr: {}",
-				stdout,
-				String::from_utf8_lossy(&validate.stderr),
-			);
-		}
 		cross_log!("tofu validate: PASSED");
 		Ok(stdout)
 	}

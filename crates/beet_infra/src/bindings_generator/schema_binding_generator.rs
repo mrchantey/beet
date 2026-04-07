@@ -70,7 +70,7 @@ pub struct SchemaBindingGenerator {
 	files: Vec<BindingFile>,
 	/// Working directory for tofu operations.  Defaults to
 	/// `target/terra-bindings-generator`.
-	work_dir: PathBuf,
+	work_dir: AbsPathBuf,
 	/// The binding generator used for each target.  Users can pre-configure
 	/// this to control code-generation options; per-target filter and preamble
 	/// are applied automatically on top.
@@ -110,7 +110,8 @@ impl Default for SchemaBindingGenerator {
 	fn default() -> Self {
 		Self {
 			files: Vec::new(),
-			work_dir: PathBuf::from("target/terra-bindings-generator"),
+			work_dir: WsPathBuf::new("target/terra-bindings-generator")
+				.into_abs(),
 			binding_generator: BindingGenerator::new()
 				.with_title_case(true)
 				.with_trait_impls(true)
@@ -127,8 +128,8 @@ impl SchemaBindingGenerator {
 	}
 
 	/// Override the working directory used for `tofu init` / schema export.
-	pub fn with_work_dir(mut self, dir: impl Into<PathBuf>) -> Self {
-		self.work_dir = dir.into();
+	pub fn with_work_dir(mut self, dir: AbsPathBuf) -> Self {
+		self.work_dir = dir;
 		self
 	}
 
@@ -263,42 +264,25 @@ impl SchemaBindingGenerator {
 			"[schema_binding_generator] running tofu init in {}",
 			self.work_dir.display()
 		);
-		let output = async_process::Command::new("tofu")
-			.current_dir(&self.work_dir)
-			.args(["init"])
-			.output()
-			.await?;
+		tofu::init(&self.work_dir).await?;
 
-		if !output.status.success() {
-			let stderr = String::from_utf8_lossy(&output.stderr);
-			bevybail!("tofu init failed:\n{}", stderr);
-		}
 		cross_log!("[schema_binding_generator] tofu init: OK");
 		Ok(())
 	}
 
-	async fn run_tofu_schema(&self) -> Result<PathBuf> {
+	async fn run_tofu_schema(&self) -> Result<AbsPathBuf> {
 		let schema_path = self.work_dir.join("schema.json");
 		cross_log!(
 			"[schema_binding_generator] running tofu providers schema → {}",
-			schema_path.display()
+			schema_path
 		);
+		let schema = tofu::export_schema(&self.work_dir).await?;
 
-		let output = async_process::Command::new("tofu")
-			.current_dir(&self.work_dir)
-			.args(["providers", "schema", "-json"])
-			.output()
-			.await?;
+		fs_ext::write_async(&schema_path, &schema).await?;
 
-		if !output.status.success() {
-			let stderr = String::from_utf8_lossy(&output.stderr);
-			bevybail!("tofu providers schema failed:\n{}", stderr);
-		}
-
-		fs_ext::write(&schema_path, &output.stdout)?;
 		cross_log!(
 			"[schema_binding_generator] schema exported ({:.1} MB)",
-			output.stdout.len() as f64 / 1_048_576.0
+			schema.len() as f64 / 1_048_576.0
 		);
 		Ok(schema_path)
 	}

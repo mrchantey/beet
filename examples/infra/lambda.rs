@@ -2,7 +2,7 @@
 //!
 //! Run with:
 //! ```sh
-//!   cargo run --example lambda --features=fs,rand,stack_lambda
+//!   cargo run --example lambda --features=stack_lambda
 //! ```
 use beet::prelude::*;
 
@@ -14,7 +14,8 @@ async fn main() -> Result {
 	let lambda = LambdaStack::default();
 	let config = lambda.build_config(&cx, &stack);
 
-	let out_path = WsPathBuf::new("target/examples/lambda/main.tf.json");
+	let out_path =
+		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
 	config.export_and_validate(&out_path).await?;
 	Ok(())
 }

@@ -2,7 +2,7 @@
 //!
 //! Run with:
 //! ```sh
-//!   cargo run --example lightsail --features=fs,rand,stack_lightsail
+//!   cargo run --example lightsail --features=stack_lightsail
 //! ```
 use beet::prelude::*;
 

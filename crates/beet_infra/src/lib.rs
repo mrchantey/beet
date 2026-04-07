@@ -21,4 +21,5 @@ pub mod prelude {
 	#[allow(unused)]
 	pub use crate::stacks::*;
 	pub use crate::terra;
+	pub use crate::terra::tofu;
 }

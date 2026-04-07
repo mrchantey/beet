@@ -1,7 +1,7 @@
-use extend::ext;
-
+use crate::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use crate::web_utils::js_runtime;
+use extend::ext;
 
 /// Extension trait for [`Result`] providing additional conversion methods.
 #[ext]
