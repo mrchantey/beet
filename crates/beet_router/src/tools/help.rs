@@ -17,19 +17,19 @@ pub(crate) async fn HelpHandler(
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
 		let path = cx.input.path().clone();
-		let tool_entity = cx.caller.id();
 		let help_text = cx
 			.caller
-			.world()
-			.with_then(move |world: &mut World| -> Result<String> {
-				let tree = root_route_tree(world, tool_entity)?;
-				// Scope help to the requested path prefix
-				if let Some(subtree) = tree.find_subtree(&path) {
-					format_route_help(subtree).xok()
-				} else {
-					nearest_ancestor_help(tree, &path).xok()
-				}
-			})
+			.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+				move |entity, query| {
+					let tree = query.get(entity)?;
+					if let Some(subtree) = tree.find_subtree(&path) {
+						// Scope help to the requested path prefix
+						format_route_help(subtree).xok()
+					} else {
+						nearest_ancestor_help(tree, &path).xok()
+					}
+				},
+			)
 			.await?;
 
 		Pass(Response::ok_body(help_text, MediaType::Text))
@@ -48,14 +48,14 @@ pub(crate) async fn ContextualNotFoundHandler(
 	cx: AsyncToolIn<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
-	let tool_entity = cx.caller.id();
 	let help_text = cx
 		.caller
-		.world()
-		.with_then(move |world: &mut World| -> Result<String> {
-			let tree = root_route_tree(world, tool_entity)?;
-			nearest_ancestor_help(tree, &path).xok()
-		})
+		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+			move |entity, query| {
+				let tree = query.get(entity)?;
+				nearest_ancestor_help(tree, &path).xok()
+			},
+		)
 		.await?;
 
 	Pass(Response::from_status_body(

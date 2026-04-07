@@ -77,9 +77,8 @@ pub(crate) async fn NavigateHandler(
 	let world = cx.caller.world();
 
 	let resolved = world
-		.with_then(move |world: &mut World| -> Result<Option<ToolNode>> {
-			let tree =
-				root_route_tree(world, tool_entity)?;
+		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {
+			let tree = query.get(tool_entity)?;
 			let target_path =
 				resolve_navigation(tree, &current_path, direction)?;
 			tree.find(&target_path).cloned().xok()
