@@ -14,7 +14,8 @@ async fn main() -> Result {
 	let lightsail = LightsailStack::default();
 	let config = lightsail.build_config(&cx, &stack);
 
-	let out_path = WsPathBuf::new("target/examples/lambda/main.tf.json");
+	let out_path =
+		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
 	config.export_and_validate(&out_path).await?;
 	Ok(())
 }

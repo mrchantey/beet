@@ -25,6 +25,8 @@ impl Default for Stack {
 }
 
 /// Strategy for maintaining the Terraform state for this stack.
+/// By default, the state for each stack is
+/// stored in an individual directory in a shared state bucket.
 /// https://opentofu.org/docs/language/settings/backends/configuration/
 #[derive(Debug, Clone)]
 pub enum StackBackend {
@@ -64,7 +66,7 @@ pub struct LocalBackend {
 impl Default for LocalBackend {
 	fn default() -> Self {
 		Self {
-			path: WsPathBuf::new(STATE_RESOURCE_NAME).into(),
+			path: WsPathBuf::new(DEFAULT_STATE_NAME).into(),
 		}
 	}
 }
@@ -76,13 +78,13 @@ impl terra::Backend for LocalBackend {
 	}
 }
 
-const STATE_RESOURCE_NAME: &str = "tofu-state";
+const DEFAULT_STATE_NAME: &str = "beet-state";
 
 /// S3 backend for remote state storage.
 /// https://opentofu.org/docs/language/settings/backends/s3/
-#[derive(Debug, Clone, SetWith)]
+#[derive(Debug, Clone, Get, SetWith)]
 pub struct S3Backend {
-	/// The S3 bucket containing the state file.
+	/// The S3 bucket containing the state file, defaults to `beet-state`
 	bucket: SmolStr,
 	/// Path to the state file within the bucket (e.g. `"env/prod/terraform.tfstate"`).
 	key: SmolStr,
@@ -92,10 +94,20 @@ pub struct S3Backend {
 	use_lockfile: bool,
 }
 
+impl S3Backend {
+	#[cfg(feature = "aws")]
+	pub fn provider(&self) -> beet_net::prelude::S3Provider {
+		beet_net::prelude::S3Provider::new(
+			self.bucket.clone(),
+			self.region.clone(),
+		)
+	}
+}
+
 impl Default for S3Backend {
 	fn default() -> Self {
 		Self {
-			bucket: default(),
+			bucket: DEFAULT_STATE_NAME.into(),
 			key: "terraform.tfstate".into(),
 			region: aws::region::DEFAULT.into(),
 			use_lockfile: true,
