@@ -1,23 +1,54 @@
 //! Local echo HTTP server for testing.
-use beet_tool::prelude::*;
 use crate::prelude::*;
+use beet_tool::prelude::*;
+use bytes::Bytes;
+
+/// Structured response from the echo server.
+///
+/// Contains the request details echoed back:
+/// method, path segments, headers, query parameters, and body text.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EchoResponse {
+	/// The HTTP method used, ie `GET`, `POST`.
+	pub method: HttpMethod,
+	/// Path segments from the request URL.
+	pub path: Vec<String>,
+	/// Request headers as a multimap.
+	pub headers: MultiMap<String, String>,
+	/// Query parameters as a multimap.
+	pub query: MultiMap<String, String>,
+	/// The request body as text.
+	pub body: String,
+}
+
+/// Test event payload for SSE endpoint.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SseTestEvent {
+	/// The event index.
+	pub index: u32,
+	/// The event message.
+	pub msg: String,
+}
 
 /// A local echo HTTP server for integration tests.
 ///
-/// Mimics the behavior of httpbin/postman-echo by returning request details
-/// as a JSON response body, including method, path, headers, body, and query params.
+/// Returns request details as a JSON response body, including method, path,
+/// headers, body, and query params. Also supports SSE and streaming JSON endpoints.
 pub struct EchoHttpServer {
-	/// The base URL of the running server, ie `http://127.0.0.1:8401`.
-	pub url: String,
+	/// The base URL of the running server, ie `http://127.0.0.1:38401`.
+	url: Url,
 }
 
 impl EchoHttpServer {
+	/// The base [`Url`] of the running server.
+	pub fn url(&self) -> &Url { &self.url }
+
 	/// Starts a new echo HTTP server on a background thread.
 	///
-	/// Use the `url` field to make requests against the running server.
+	/// Use [`url()`](Self::url) to make requests against the running server.
 	pub async fn new() -> Self {
-		let server = HttpServer::new_test(start_mini_http_server);
-		let url = server.0.local_url();
+		let server = HttpServer::new_test(start_mini_http_server).await;
+		let url = Url::parse(&server.0.local_url());
 		std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
@@ -29,49 +60,95 @@ impl EchoHttpServer {
 	}
 }
 
-/// Builds a JSON response echoing the request's method, path, headers, body, and query params.
+/// Routes requests based on the first path segment.
 fn echo_request(req: FuncToolIn<Request>) -> Response {
 	let req = req.take();
+	match req.path().first().map(|seg| seg.as_str()) {
+		Some("sse") => sse_response(&req),
+		Some("stream") => stream_response(&req),
+		_ => standard_echo_response(req),
+	}
+}
 
-	let method = req.method().to_string().to_uppercase();
-	let path = req.path_string();
+/// Builds a JSON response echoing the request's method, path, headers, body, and query params.
+fn standard_echo_response(req: Request) -> Response {
+	let method = *req.method();
+	let path = req.path().to_vec();
 
-	let mut headers_map = serde_json::Map::new();
+	let mut headers = MultiMap::new();
 	for (key, values) in req.headers.iter_all() {
-		if let Some(first) = values.first() {
-			headers_map.insert(
-				key.clone(),
-				serde_json::Value::String(first.clone()),
-			);
+		for value in values {
+			headers.insert(key.clone(), value.clone());
 		}
 	}
 
-	let mut query_map = serde_json::Map::new();
+	let mut query = MultiMap::new();
 	for (key, values) in req.params().iter_all() {
-		if let Some(first) = values.first() {
-			query_map.insert(
-				key.clone(),
-				serde_json::Value::String(first.clone()),
-			);
+		for value in values {
+			query.insert(key.clone(), value.clone());
 		}
 	}
 
 	// Extract body last since `try_into_bytes` consumes it
-	let body_text = req
+	let body = req
 		.body
 		.try_into_bytes()
 		.map(|bytes| String::from_utf8_lossy(bytes.as_ref()).into_owned())
 		.unwrap_or_default();
 
-	let json = serde_json::json!({
-		"method": method,
-		"path": path,
-		"headers": serde_json::Value::Object(headers_map),
-		"body": body_text,
-		"query": serde_json::Value::Object(query_map),
-	});
+	let echo = EchoResponse {
+		method,
+		path,
+		headers,
+		query,
+		body,
+	};
 
-	Response::ok_body(json.to_string(), MediaType::Json)
+	let json = serde_json::to_string(&echo).unwrap();
+	Response::ok_body(json, MediaType::Json)
+}
+
+/// Returns a Server-Sent Events stream.
+/// Accepts an optional `count` query param (defaults to 3).
+fn sse_response(req: &Request) -> Response {
+	let count: u32 = req
+		.get_param("count")
+		.and_then(|val| val.parse().ok())
+		.unwrap_or(3);
+
+	let stream = futures::stream::iter((0..count).map(|idx| {
+		let event = SseTestEvent {
+			index: idx,
+			msg: "hello".into(),
+		};
+		let data = serde_json::to_string(&event).unwrap();
+		let formatted = format!("event: message\ndata: {}\n\n", data);
+		Ok(Bytes::from(formatted))
+	}));
+
+	Response::ok()
+		.with_content_type(MediaType::EventStream)
+		.with_body(Body::stream(stream))
+}
+
+/// Returns newline-delimited JSON objects as a stream.
+/// Path format: `/stream/{count}` where count defaults to 3.
+fn stream_response(req: &Request) -> Response {
+	let count: u32 = req
+		.path()
+		.get(1)
+		.and_then(|val| val.parse().ok())
+		.unwrap_or(3);
+
+	let stream = futures::stream::iter((0..count).map(|idx| {
+		let json = serde_json::json!({"index": idx, "data": "stream-chunk"});
+		let line = format!("{}\n", json);
+		Ok(Bytes::from(line))
+	}));
+
+	Response::ok()
+		.with_content_type(MediaType::Json)
+		.with_body(Body::stream(stream))
 }
 
 
@@ -86,73 +163,78 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[beet_core::test]
-	async fn echo_get() {
-		let server = super::EchoHttpServer::new().await;
-		let response = Request::get(format!("{}/get", server.url))
+	/// Helper to send a request and deserialize the echo response.
+	async fn echo(request: Request) -> EchoResponse {
+		request
 			.send()
 			.await
 			.unwrap()
 			.into_result()
 			.await
-			.unwrap();
-		let body = response.text().await.unwrap();
-		let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-		json["method"].as_str().unwrap().xpect_eq("GET");
-		json["path"].as_str().unwrap().xpect_eq("/get");
+			.unwrap()
+			.json::<EchoResponse>()
+			.await
+			.unwrap()
+	}
+
+	#[beet_core::test]
+	async fn echo_get() {
+		let server = EchoHttpServer::new().await;
+		let resp = echo(Request::get(server.url().clone().push("get"))).await;
+		resp.method.xpect_eq(HttpMethod::Get);
+		resp.path.xpect_eq(vec!["get".to_string()]);
 	}
 
 	#[beet_core::test]
 	async fn echo_post_with_body() {
-		let server = super::EchoHttpServer::new().await;
-		let response = Request::post(format!("{}/post", server.url))
-			.with_body("hello world")
-			.send()
-			.await
-			.unwrap()
-			.into_result()
-			.await
-			.unwrap();
-		let body = response.text().await.unwrap();
-		let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-		json["method"].as_str().unwrap().xpect_eq("POST");
-		json["body"].as_str().unwrap().xpect_eq("hello world");
+		let server = EchoHttpServer::new().await;
+		let resp = echo(
+			Request::post(server.url().clone().push("post"))
+				.with_body("hello world"),
+		)
+		.await;
+		resp.method.xpect_eq(HttpMethod::Post);
+		resp.body.xpect_eq("hello world");
 	}
 
 	#[beet_core::test]
 	async fn echo_custom_header() {
-		let server = super::EchoHttpServer::new().await;
-		let response = Request::get(format!("{}/headers", server.url))
-			.with_header_raw("x-foo", "Bar")
-			.send()
-			.await
-			.unwrap()
-			.into_result()
-			.await
-			.unwrap();
-		let body = response.text().await.unwrap();
-		let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-		json["headers"]["x-foo"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("Bar");
+		let server = EchoHttpServer::new().await;
+		let resp = echo(
+			Request::get(server.url().clone().push("headers"))
+				.with_header_raw("x-foo", "Bar"),
+		)
+		.await;
+		resp.headers.get("x-foo").unwrap().xpect_eq("Bar");
 	}
 
 	#[beet_core::test]
 	async fn echo_query_params() {
-		let server = super::EchoHttpServer::new().await;
-		let response = Request::get(format!("{}/search", server.url))
-			.with_param("foo", "bar")
-			.with_param("baz", "42")
+		let server = EchoHttpServer::new().await;
+		let resp = echo(
+			Request::get(server.url().clone().push("search"))
+				.with_param("foo", "bar")
+				.with_param("baz", "42"),
+		)
+		.await;
+		resp.query.get("foo").unwrap().xpect_eq("bar");
+		resp.query.get("baz").unwrap().xpect_eq("42");
+	}
+
+	#[beet_core::test]
+	async fn echo_sse() {
+		let server = EchoHttpServer::new().await;
+		let resp = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "2")
 			.send()
 			.await
 			.unwrap()
 			.into_result()
 			.await
 			.unwrap();
-		let body = response.text().await.unwrap();
-		let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-		json["query"]["foo"].as_str().unwrap().xpect_eq("bar");
-		json["query"]["baz"].as_str().unwrap().xpect_eq("42");
+		let text = resp.text().await.unwrap();
+		text.xref().xpect_contains("event: message");
+		text.xref().xpect_contains("\"index\":0");
+		text.xref().xpect_contains("\"index\":1");
 	}
 }

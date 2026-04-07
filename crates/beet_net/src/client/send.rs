@@ -262,7 +262,7 @@ mod test_request {
 	#[beet_core::test]
 	async fn get_works() {
 		let server = EchoHttpServer::new().await;
-		Request::get(format!("{}/get", server.url))
+		Request::get(server.url().clone().push("get"))
 			.send()
 			.await
 			.unwrap()
@@ -273,7 +273,7 @@ mod test_request {
 	#[beet_core::test]
 	async fn post_json_works() {
 		let server = EchoHttpServer::new().await;
-		Request::post(format!("{}/post", server.url))
+		Request::post(server.url().clone().push("post"))
 			.with_json_body(&serde_json::json!({"foo": "bar"}))
 			.unwrap()
 			.send()
@@ -286,27 +286,25 @@ mod test_request {
 	#[beet_core::test]
 	async fn custom_header_works() {
 		let server = EchoHttpServer::new().await;
-		let response = Request::get(format!("{}/headers", server.url))
-			.with_header_raw("X-Foo", "Bar")
-			.send()
-			.await
-			.unwrap()
-			.into_result()
-			.await
-			.unwrap();
-		response.status().xpect_eq(StatusCode::OK);
-		let json: serde_json::Value =
-			serde_json::from_str(&response.text().await.unwrap()).unwrap();
-		json["headers"]["x-foo"]
-			.as_str()
-			.unwrap()
-			.xpect_contains("Bar");
+		let resp: EchoResponse =
+			Request::get(server.url().clone().push("headers"))
+				.with_header_raw("X-Foo", "Bar")
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.json()
+				.await
+				.unwrap();
+		resp.headers.get("x-foo").unwrap().xpect_contains("Bar");
 	}
 
 	#[beet_core::test]
 	async fn put_and_delete_work() {
 		let server = EchoHttpServer::new().await;
-		Request::get(format!("{}/put", server.url))
+		Request::get(server.url().clone().push("put"))
 			.with_method(HttpMethod::Put)
 			.send()
 			.await
@@ -314,7 +312,7 @@ mod test_request {
 			.xmap(|res| res.status())
 			.xpect_eq(StatusCode::OK);
 
-		Request::get(format!("{}/delete", server.url))
+		Request::get(server.url().clone().push("delete"))
 			.with_method(HttpMethod::Delete)
 			.send()
 			.await
@@ -326,38 +324,10 @@ mod test_request {
 	#[beet_core::test]
 	async fn body_raw_works() {
 		let server = EchoHttpServer::new().await;
-		let json: serde_json::Value = Request::get(format!("{}/post", server.url))
-			.with_method(HttpMethod::Post)
-			.with_body(b"rawbytes".to_vec())
-			.send()
-			.await
-			.unwrap()
-			.into_result()
-			.await
-			.unwrap()
-			.json()
-			.await
-			.unwrap();
-		json["body"]
-			.as_str()
-			.unwrap()
-			.xpect_contains("rawbytes");
-	}
-
-	#[beet_core::test]
-	async fn body_stream() {
-		use bytes::Bytes;
-
-		let server = EchoHttpServer::new().await;
-		let json: serde_json::Value =
-			Request::post(format!("{}/post", server.url))
-				.with_body_stream(
-					bevy::tasks::futures_lite::stream::iter(vec![
-						Ok(Bytes::from("chunk1")),
-						Ok(Bytes::from("chunk2")),
-						Ok(Bytes::from("chunk3")),
-					]),
-				)
+		let resp: EchoResponse =
+			Request::get(server.url().clone().push("post"))
+				.with_method(HttpMethod::Post)
+				.with_body(b"rawbytes".to_vec())
 				.send()
 				.await
 				.unwrap()
@@ -367,10 +337,35 @@ mod test_request {
 				.json()
 				.await
 				.unwrap();
-		let body = json["body"].as_str().unwrap();
-		body.contains("chunk1").xpect_true();
-		body.contains("chunk2").xpect_true();
-		body.contains("chunk3").xpect_true();
+		resp.body.xpect_contains("rawbytes");
+	}
+
+	#[beet_core::test]
+	async fn body_stream() {
+		use bytes::Bytes;
+
+		let server = EchoHttpServer::new().await;
+		let resp: EchoResponse =
+			Request::post(server.url().clone().push("post"))
+				.with_body_stream(bevy::tasks::futures_lite::stream::iter(
+					vec![
+						Ok(Bytes::from("chunk1")),
+						Ok(Bytes::from("chunk2")),
+						Ok(Bytes::from("chunk3")),
+					],
+				))
+				.send()
+				.await
+				.unwrap()
+				.into_result()
+				.await
+				.unwrap()
+				.json()
+				.await
+				.unwrap();
+		resp.body.contains("chunk1").xpect_true();
+		resp.body.contains("chunk2").xpect_true();
+		resp.body.contains("chunk3").xpect_true();
 	}
 
 	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
@@ -403,21 +398,20 @@ mod test_request {
 	#[beet_core::test]
 	async fn query_params_work() {
 		let server = EchoHttpServer::new().await;
-		let json: serde_json::Value =
-			Request::get(format!("{}/get", server.url))
-				.with_param("foo", "bar")
-				.with_param("baz", "qux")
-				.send()
-				.await
-				.unwrap()
-				.into_result()
-				.await
-				.unwrap()
-				.json()
-				.await
-				.unwrap();
-		json["query"]["foo"].as_str().unwrap().xpect_eq("bar");
-		json["query"]["baz"].as_str().unwrap().xpect_eq("qux");
+		let resp: EchoResponse = Request::get(server.url().clone().push("get"))
+			.with_param("foo", "bar")
+			.with_param("baz", "qux")
+			.send()
+			.await
+			.unwrap()
+			.into_result()
+			.await
+			.unwrap()
+			.json()
+			.await
+			.unwrap();
+		resp.query.get("foo").unwrap().xpect_eq("bar");
+		resp.query.get("baz").unwrap().xpect_eq("qux");
 	}
 }
 
@@ -434,8 +428,8 @@ mod test_response {
 	async fn post() {
 		let server = EchoHttpServer::new().await;
 		let original = serde_json::json!({"foo": "bar"});
-		let json: serde_json::Value =
-			Request::post(format!("{}/post", server.url))
+		let resp: EchoResponse =
+			Request::post(server.url().clone().push("post"))
 				.with_body(&original.to_string())
 				.send()
 				.await
@@ -447,28 +441,23 @@ mod test_response {
 				.await
 				.unwrap();
 		// The echo server returns the raw body string; verify it contains our JSON
-		json["body"]
-			.as_str()
-			.unwrap()
-			.xpect_contains("\"foo\":\"bar\"");
+		resp.body.xpect_contains("\"foo\":\"bar\"");
 	}
 
 	#[beet_core::test]
-	#[ignore = "requires external streaming server"]
 	async fn stream() {
-		let res = Request::get("https://httpbin.dev/stream/3")
+		let server = EchoHttpServer::new().await;
+		let res = Request::get(server.url().clone().push("stream").push("3"))
 			.send()
+			.await
+			.unwrap()
+			.into_result()
 			.await
 			.unwrap();
 
 		matches!(res.body, Body::Stream(_)).xpect_true();
 
-		res.text()
-			.await
-			.unwrap()
-			.len()
-			.xpect_greater_than(200)
-			.xpect_less_than(1000);
+		res.text().await.unwrap().len().xpect_greater_than(10);
 	}
 }
 

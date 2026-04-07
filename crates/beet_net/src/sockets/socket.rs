@@ -440,7 +440,8 @@ mod tests {
 		use crate::sockets::echo_socket_server::EchoSocketServer;
 
 		let server = EchoSocketServer::new().await;
-		let mut socket = Socket::connect(&server.url).await.unwrap();
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		let payload = "beet-ws-integration-test";
 		socket.send(Message::text(payload)).await.unwrap();

@@ -410,15 +410,16 @@ mod tests {
 	/// WSS/TLS is already thoroughly tested by `rustls_tls_tests`.
 	#[cfg(feature = "native-tls")]
 	mod native_tls_tests {
-		use crate::sockets::echo_socket_server::EchoSocketServer;
 		use super::Message;
 		use crate::sockets::Socket;
+		use crate::sockets::echo_socket_server::EchoSocketServer;
 		use futures::StreamExt;
 
 		#[beet_core::test]
 		async fn echo_local() {
 			let server = EchoSocketServer::new().await;
-			let mut socket = Socket::connect(&server.url).await.unwrap();
+			let mut socket =
+				Socket::connect(&server.url().to_string()).await.unwrap();
 
 			let payload = "beet-native-tls-test";
 			socket.send(Message::text(payload)).await.unwrap();

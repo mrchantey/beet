@@ -177,34 +177,21 @@ pub impl Response {
 }
 
 
+#[cfg(test)]
 #[cfg(all(
-	test,
-	any(
-		target_arch = "wasm32",
-		all(
-			feature = "native-tls",
-			any(feature = "reqwest", feature = "ureq")
-		)
-	)
+	feature = "server",
+	feature = "ureq",
+	feature = "json",
+	not(target_arch = "wasm32")
 ))]
 mod test {
 	use super::*;
 
-	#[derive(serde::Deserialize, Debug)]
-	struct TestEvent {
-		testing: bool,
-		sse_dev: String,
-		msg: String,
-		now: u64,
-	}
-
-	#[cfg_attr(
-		feature = "reqwest",
-		beet_core::test(tokio, timeout_ms = 30_000)
-	)]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
+	#[beet_core::test]
 	async fn raw_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
@@ -214,54 +201,48 @@ mod test {
 
 		let mut count = 0;
 		while let Some(Ok(event)) = ev.next().await {
-			event.data.xref().xpect_contains("It works!");
-			if count == 2 {
+			event.data.xref().xpect_contains("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 
-	#[cfg(feature = "json")]
-	#[cfg_attr(
-		feature = "reqwest",
-		beet_core::test(tokio, timeout_ms = 30_000)
-	)]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
+	#[beet_core::test]
 	async fn typed_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
-			.event_source_typed::<TestEvent>()
+			.event_source_typed::<SseTestEvent>()
 			.await
 			.unwrap();
 
 		let mut count = 0;
 		while let Some(Ok(sse)) = ev.next().await {
-			sse.data.testing.xpect_true();
-			sse.data.sse_dev.xpect_eq("is great");
-			sse.data.msg.xpect_eq("It works!");
-			sse.data.now.xpect_greater_than(0);
-			if count == 2 {
+			sse.data.index.xpect_eq(count as u32);
+			sse.data.msg.xpect_eq("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 
-	#[cfg(feature = "json")]
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
+	#[beet_core::test]
 	async fn mapped_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
 			.event_source_mapped(|event| {
-				// Custom parsing: just extract the msg field
 				let data: serde_json::Value =
 					serde_json::from_str(&event.data)?;
 				let msg = data["msg"].as_str().unwrap_or_default().to_string();
@@ -272,12 +253,12 @@ mod test {
 
 		let mut count = 0;
 		while let Some(Ok(sse)) = ev.next().await {
-			sse.data.xpect_eq("It works!");
-			if count == 2 {
+			sse.data.xpect_eq("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 }

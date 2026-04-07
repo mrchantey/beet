@@ -21,7 +21,7 @@ use std::net::SocketAddr;
 pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
 	let addr: SocketAddr = entity
 		.get::<HttpServer, SocketAddr>(|server| {
-			(server.host, server.port).into()
+			(server.host, server.port.unwrap_or(0)).into()
 		})
 		.await?;
 
@@ -111,11 +111,53 @@ async fn handle_connection(
 
 	// Dispatch through the entity's exchange
 	let response: Response = entity.exchange(request).await;
+	let (parts, body) = response.into_parts();
 
-	// Serialize the response and write it back
-	let raw_response = serialize_http_response(response).await?;
-	stream.write_all(&raw_response).await?;
-	stream.flush().await?;
+	match body {
+		Body::Bytes(bytes) => {
+			// Use standard serialization for non-streaming responses
+			let response = Response {
+				parts,
+				body: Body::Bytes(bytes),
+			};
+			let raw_response = serialize_http_response(response).await?;
+			stream.write_all(&raw_response).await?;
+			stream.flush().await?;
+		}
+		Body::Stream(body_stream) => {
+			// Write status line and headers with chunked transfer encoding
+			let status_code = parts.status();
+			let mut header_buf = Vec::new();
+			write!(
+				header_buf,
+				"HTTP/1.1 {} {}\r\n",
+				status_code.as_u16(),
+				status_code.message()
+			)?;
+			for (key, values) in parts.headers().iter_all() {
+				for value in values {
+					write!(header_buf, "{}: {}\r\n", key, value)?;
+				}
+			}
+			write!(header_buf, "transfer-encoding: chunked\r\n")?;
+			write!(header_buf, "connection: close\r\n")?;
+			write!(header_buf, "\r\n")?;
+			stream.write_all(&header_buf).await?;
+
+			// Write each chunk in HTTP chunked transfer encoding
+			let mut body = Body::Stream(body_stream);
+			while let Some(chunk) = body.next().await? {
+				let chunk_header = format!("{:x}\r\n", chunk.len());
+				stream.write_all(chunk_header.as_bytes()).await?;
+				stream.write_all(&chunk).await?;
+				stream.write_all(b"\r\n").await?;
+				stream.flush().await?;
+			}
+			// Terminating zero-length chunk
+			stream.write_all(b"0\r\n\r\n").await?;
+			stream.flush().await?;
+		}
+	}
 
 	Ok(())
 }
@@ -123,10 +165,7 @@ async fn handle_connection(
 /// Find the byte offset of the end of the HTTP headers (after the blank line).
 /// Returns the position immediately after `\r\n\r\n` or `\n\n`.
 fn find_header_end(buf: &[u8]) -> Option<usize> {
-	if let Some(pos) = buf
-		.windows(4)
-		.position(|window| window == b"\r\n\r\n")
-	{
+	if let Some(pos) = buf.windows(4).position(|window| window == b"\r\n\r\n") {
 		return Some(pos + 4);
 	}
 	if let Some(pos) = buf.windows(2).position(|window| window == b"\n\n") {

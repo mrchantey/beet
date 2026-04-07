@@ -27,7 +27,7 @@ use std::task::Poll;
 pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 	let addr = entity
 		.get::<HttpServer, SocketAddr>(|server| {
-			(server.host, server.port).into()
+			(server.host, server.port.unwrap_or(0)).into()
 		})
 		.await?;
 
@@ -273,7 +273,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let server = HttpServer::new_test(start_hyper_server);
+		let server = HttpServer::new_test(start_hyper_server).await;
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -299,7 +299,7 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test(start_hyper_server);
+		let server = HttpServer::new_test(start_hyper_server).await;
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -329,7 +329,7 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test(start_hyper_server);
+		let server = HttpServer::new_test(start_hyper_server).await;
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()

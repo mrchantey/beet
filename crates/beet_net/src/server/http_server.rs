@@ -26,11 +26,10 @@ use std::future::Future;
 #[component(on_add=on_add)]
 #[require(ExchangeStats)]
 pub struct HttpServer {
-	/// The port the server listens on. This may be updated at runtime,
-	/// for instance if the provided port is `0` it may be updated to
-	/// some random available port by the os like `98304`.
-	/// This is ignored by lambda_server
-	pub port: u16,
+	/// The port the server listens on. `None` means the OS will assign
+	/// an available port (equivalent to binding to port `0`).
+	/// This is ignored by lambda_server.
+	pub port: Option<u16>,
 	/// The host address to bind to. Defaults to `[127, 0, 0, 1]` (localhost).
 	/// Use `[0, 0, 0, 0]` to listen on all interfaces (required for deployed servers).
 	pub host: [u8; 4],
@@ -39,7 +38,7 @@ pub struct HttpServer {
 impl Default for HttpServer {
 	fn default() -> Self {
 		Self {
-			port: DEFAULT_SERVER_PORT,
+			port: Some(DEFAULT_SERVER_PORT),
 			host: [127, 0, 0, 1],
 		}
 	}
@@ -49,7 +48,7 @@ impl HttpServer {
 	/// Creates a new server configured to listen on the specified port.
 	pub fn new(port: u16) -> Self {
 		Self {
-			port,
+			port: Some(port),
 			..Default::default()
 		}
 	}
@@ -57,7 +56,7 @@ impl HttpServer {
 	/// (i.e., host address `[0, 0, 0, 0]`) on the specified port.
 	pub fn new_all_interfaces(port: u16) -> Self {
 		Self {
-			port,
+			port: Some(port),
 			host: [0, 0, 0, 0],
 		}
 	}
@@ -95,23 +94,27 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 
 impl HttpServer {
-	/// Creates a new server with an auto-incrementing port for testing.
+	/// Creates a test server bound to an OS-assigned port.
 	///
-	/// Each call returns a server on a different port, starting from
-	/// [`DEFAULT_SERVER_TEST_PORT`], to avoid collisions in parallel tests.
+	/// Binds to port `0` so the OS picks a free port, avoiding
+	/// collisions in parallel tests.
 	///
-	/// We don't automatically assign server in tests so it must be provided.
-	pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
+	/// The `on_add` hook is disabled in tests, so the returned
+	/// [`OnSpawn`] must be included in the spawn bundle to start
+	/// the listener.
+	pub async fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 	where
 		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
-		use std::sync::atomic::AtomicU16;
-		use std::sync::atomic::Ordering;
-		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SERVER_TEST_PORT);
+		// Bind to port 0 to get an OS-assigned port
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.expect("failed to bind test server");
+		let port = listener.local_addr().unwrap().port();
+		drop(listener);
 		(
 			Self {
-				port: PORT.fetch_add(1, Ordering::SeqCst),
+				port: Some(port),
 				..default()
 			},
 			OnSpawn::new_async(run_server),
@@ -120,7 +123,8 @@ impl HttpServer {
 
 	/// Returns the local URL for connecting to this server.
 	pub fn local_url(&self) -> String {
-		format!("http://127.0.0.1:{}", self.port)
+		let port = self.port.unwrap_or(0);
+		format!("http://127.0.0.1:{}", port)
 	}
 }
 
@@ -135,13 +139,12 @@ pub(crate) mod test {
 	///
 	/// Spawns a server with a mirror exchange handler, sends requests,
 	/// and verifies responses round-trip correctly.
-	// #[track_caller]
 	pub async fn test_server<Func, Fut>(run_server: Func)
 	where
 		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
-		let server = HttpServer::new_test(run_server);
+		let server = HttpServer::new_test(run_server).await;
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()

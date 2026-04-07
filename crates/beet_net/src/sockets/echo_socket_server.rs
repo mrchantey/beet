@@ -1,26 +1,29 @@
 //! Local echo WebSocket server for testing.
 
+use crate::prelude::*;
 use crate::sockets::common_handlers::echo_close;
 use crate::sockets::common_handlers::echo_message;
 use crate::sockets::*;
-use beet_core::prelude::*;
 
 /// A local echo WebSocket server for integration tests.
 ///
 /// Echoes back any Text or Binary message, and acknowledges Close frames.
 /// Uses the existing [`echo_message`] and [`echo_close`] handlers.
 pub struct EchoSocketServer {
-	/// The WebSocket URL of the running server, e.g. `ws://127.0.0.1:8501`.
-	pub url: String,
+	/// The WebSocket URL of the running server, ie `ws://127.0.0.1:38501`.
+	url: Url,
 }
 
 impl EchoSocketServer {
+	/// The base [`Url`] of the running server.
+	pub fn url(&self) -> &Url { &self.url }
+
 	/// Starts a new echo WebSocket server on a background thread.
 	///
 	/// Returns immediately after the server is ready to accept connections.
 	pub async fn new() -> Self {
-		let server = SocketServer::new_test();
-		let url = server.0.local_url();
+		let server = SocketServer::new_test().await;
+		let url = Url::parse(&server.0.local_url());
 
 		std::thread::spawn(move || {
 			let mut app = App::new();
@@ -39,14 +42,15 @@ impl EchoSocketServer {
 
 #[cfg(test)]
 mod tests {
-	use crate::sockets::Message;
 	use super::*;
+	use crate::sockets::Message;
 	use futures::StreamExt;
 
 	#[beet_core::test]
 	async fn echo_text() {
 		let server = EchoSocketServer::new().await;
-		let mut socket = Socket::connect(&server.url).await.unwrap();
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		socket.send(Message::text("hello")).await.unwrap();
 
@@ -66,13 +70,11 @@ mod tests {
 	#[beet_core::test]
 	async fn echo_binary() {
 		let server = EchoSocketServer::new().await;
-		let mut socket = Socket::connect(&server.url).await.unwrap();
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		let payload: Vec<u8> = vec![0xDE, 0xAD, 0xBE, 0xEF];
-		socket
-			.send(Message::binary(payload.clone()))
-			.await
-			.unwrap();
+		socket.send(Message::binary(payload.clone())).await.unwrap();
 
 		while let Some(item) = socket.next().await {
 			match item.unwrap() {
@@ -90,7 +92,8 @@ mod tests {
 	#[beet_core::test]
 	async fn echo_close_frame() {
 		let server = EchoSocketServer::new().await;
-		let mut socket = Socket::connect(&server.url).await.unwrap();
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		let frame = CloseFrame {
 			code: 1000,
@@ -115,7 +118,8 @@ mod tests {
 	#[beet_core::test]
 	async fn multiple_messages() {
 		let server = EchoSocketServer::new().await;
-		let mut socket = Socket::connect(&server.url).await.unwrap();
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		let messages: Vec<Message> = vec![
 			Message::text("first"),

@@ -302,6 +302,12 @@ impl Url {
 			other
 		}
 	}
+
+	/// Push a path segment to the end of the path.
+	pub fn push(mut self, segment: impl Into<String>) -> Self {
+		self.path.push(segment.into());
+		self
+	}
 }
 
 impl std::fmt::Display for Url {
