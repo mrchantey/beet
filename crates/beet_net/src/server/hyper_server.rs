@@ -34,6 +34,19 @@ pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
 	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
 		.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
 
+	start_hyper_server_with_tcp(entity, listener).await
+}
+
+/// Like [`start_hyper_server`] but accepts a pre-bound TCP listener,
+/// eliminating port race conditions in tests.
+pub async fn start_hyper_server_with_tcp(
+	entity: AsyncEntity,
+	listener: async_io::Async<std::net::TcpListener>,
+) -> Result {
+	let addr = listener
+		.get_ref()
+		.local_addr()
+		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
 	info!("Server listening on http://{}", addr);
 
 	loop {
@@ -131,7 +144,7 @@ async fn response_to_hyper(
 		}
 		Body::Stream(stream) => {
 			// Convert our stream to a stream of Frames
-			let frame_stream = stream.take().map(|result| {
+			let frame_stream = stream.map(|result| {
 				result.map(Frame::data).map_err(|e| {
 					std::io::Error::new(
 						std::io::ErrorKind::Other,
@@ -268,12 +281,15 @@ mod test {
 
 	#[beet_core::test]
 	async fn roundtrip() {
-		super::super::http_server::test::test_server(start_hyper_server).await;
+		super::super::http_server::test::test_server(
+			start_hyper_server_with_tcp,
+		)
+		.await;
 	}
 
 	#[beet_core::test]
 	async fn works() {
-		let server = HttpServer::new_test(start_hyper_server).await;
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -299,7 +315,7 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test(start_hyper_server).await;
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
@@ -329,7 +345,7 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test(start_hyper_server).await;
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()

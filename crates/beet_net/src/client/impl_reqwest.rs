@@ -31,9 +31,8 @@ fn into_request(request: Request) -> Result<reqwest::Request> {
 			use futures::TryStreamExt;
 			use reqwest::Body as ReqwestBody;
 
-			let stream_inner = stream.take();
 			let reqwest_body =
-				ReqwestBody::wrap_stream(stream_inner.map_err(|err| {
+				ReqwestBody::wrap_stream(stream.map_err(|err| {
 					std::io::Error::new(
 						std::io::ErrorKind::Other,
 						format!("{}", err),

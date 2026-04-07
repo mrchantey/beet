@@ -22,7 +22,7 @@ impl EchoSocketServer {
 	///
 	/// Returns immediately after the server is ready to accept connections.
 	pub async fn new() -> Self {
-		let server = SocketServer::new_test().await;
+		let server = SocketServer::new_test();
 		let url = Url::parse(&server.0.local_url());
 
 		std::thread::spawn(move || {

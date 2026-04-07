@@ -97,27 +97,31 @@ impl HttpServer {
 	/// Creates a test server bound to an OS-assigned port.
 	///
 	/// Binds to port `0` so the OS picks a free port, avoiding
-	/// collisions in parallel tests.
+	/// collisions in parallel tests. The listener is kept alive and
+	/// passed directly to the server function, eliminating port race conditions.
 	///
 	/// The `on_add` hook is disabled in tests, so the returned
 	/// [`OnSpawn`] must be included in the spawn bundle to start
 	/// the listener.
-	pub async fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
+	pub fn new_test<Func, Fut>(run_server: Func) -> (HttpServer, OnSpawn)
 	where
-		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+		Func: 'static
+			+ Send
+			+ Sync
+			+ FnOnce(AsyncEntity, async_io::Async<std::net::TcpListener>) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
-		// Bind to port 0 to get an OS-assigned port
 		let listener = std::net::TcpListener::bind("127.0.0.1:0")
 			.expect("failed to bind test server");
 		let port = listener.local_addr().unwrap().port();
-		drop(listener);
+		let listener = async_io::Async::new(listener)
+			.expect("failed to create async listener");
 		(
 			Self {
 				port: Some(port),
 				..default()
 			},
-			OnSpawn::new_async(run_server),
+			OnSpawn::new_async(move |entity| run_server(entity, listener)),
 		)
 	}
 
@@ -141,10 +145,13 @@ pub(crate) mod test {
 	/// and verifies responses round-trip correctly.
 	pub async fn test_server<Func, Fut>(run_server: Func)
 	where
-		Func: 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
+		Func: 'static
+			+ Send
+			+ Sync
+			+ FnOnce(AsyncEntity, async_io::Async<std::net::TcpListener>) -> Fut,
 		Fut: 'static + Send + Sync + Future<Output = Result>,
 	{
-		let server = HttpServer::new_test(run_server).await;
+		let server = HttpServer::new_test(run_server);
 		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()

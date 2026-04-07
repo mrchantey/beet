@@ -59,20 +59,23 @@ impl SocketServer {
 	/// Creates a new server with an OS-assigned port for testing.
 	///
 	/// Binds to port 0 so the OS picks an available port,
-	/// avoiding collisions in parallel tests.
+	/// avoiding collisions in parallel tests. The listener is kept
+	/// alive and passed directly to the server, eliminating port race conditions.
 	///
 	/// The `on_add` hook is disabled in tests, so the returned [`OnSpawn`]
 	/// must be included in the spawn bundle to start the listener.
 	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-	pub async fn new_test() -> (SocketServer, OnSpawn) {
-		// Bind to port 0 to get an OS-assigned port
+	pub fn new_test() -> (SocketServer, OnSpawn) {
 		let listener = std::net::TcpListener::bind("127.0.0.1:0")
 			.expect("failed to bind test socket server");
 		let port = listener.local_addr().unwrap().port();
-		drop(listener);
+		let listener = async_io::Async::new(listener)
+			.expect("failed to create async listener");
 		(
 			Self { port: Some(port) },
-			OnSpawn::new_async(super::start_tungstenite_server),
+			OnSpawn::new_async(move |entity| {
+				super::start_tungstenite_server_with_tcp(entity, listener)
+			}),
 		)
 	}
 
@@ -102,7 +105,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn server_binds_and_accepts() {
-		let server = SocketServer::new_test().await;
+		let server = SocketServer::new_test();
 		let url = server.0.local_url();
 
 		std::thread::spawn(move || {
@@ -120,7 +123,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn handles_multiple_concurrent_connections() {
-		let server = SocketServer::new_test().await;
+		let server = SocketServer::new_test();
 		let url = server.0.local_url();
 
 		std::thread::spawn(move || {
@@ -149,7 +152,7 @@ mod tests {
 	/// 4. server sends close back
 	#[beet_core::test]
 	async fn ecs_sockets() {
-		let server = SocketServer::new_test().await;
+		let server = SocketServer::new_test();
 		let url = server.0.local_url();
 		let store = Store::<bool>::default();
 

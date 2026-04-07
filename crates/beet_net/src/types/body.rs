@@ -20,6 +20,7 @@ use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
 use futures::Stream;
+#[cfg(target_arch = "wasm32")]
 use send_wrapper::SendWrapper;
 use std::pin::Pin;
 
@@ -41,6 +42,16 @@ impl<T> MaybeSendStream for T where
 {
 }
 
+/// Streaming body inner type. On wasm, wrapped in [`SendWrapper`] since
+/// streams may not be `Send + Sync`. On native, streams satisfy
+/// `Send + Sync` directly via [`MaybeSendStream`].
+#[cfg(target_arch = "wasm32")]
+type BodyStream = SendWrapper<Pin<Box<dyn MaybeSendStream>>>;
+/// Streaming body inner type. On native platforms, streams are already
+/// `Send + Sync` via [`MaybeSendStream`].
+#[cfg(not(target_arch = "wasm32"))]
+type BodyStream = Pin<Box<dyn MaybeSendStream>>;
+
 /// The body of an HTTP request or response.
 ///
 /// Bodies can be either in-memory [`Bytes`] or a streaming source.
@@ -48,14 +59,21 @@ impl<T> MaybeSendStream for T where
 pub enum Body {
 	/// In-memory bytes content.
 	Bytes(Bytes),
-	/// A streaming body wrapped in [`SendWrapper`] for use in Bevy components.
-	Stream(SendWrapper<Pin<Box<dyn MaybeSendStream>>>),
+	/// A streaming body source.
+	Stream(BodyStream),
 }
 
 impl Body {
 	/// Creates a streaming body from the given stream.
 	pub fn stream(stream: impl 'static + MaybeSendStream) -> Self {
-		Body::Stream(SendWrapper::new(Box::pin(stream)))
+		#[cfg(target_arch = "wasm32")]
+		{
+			Body::Stream(SendWrapper::new(Box::pin(stream)))
+		}
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			Body::Stream(Box::pin(stream))
+		}
 	}
 
 	/// Converts this body into a [`TextStream`] of UTF-8 string chunks.

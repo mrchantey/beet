@@ -30,6 +30,22 @@ pub async fn start_mini_http_server(entity: AsyncEntity) -> Result {
 			bevyhow!("Failed to bind mini HTTP server to {addr}: {err}")
 		})?;
 
+	start_mini_http_server_with_tcp(entity, listener).await
+}
+
+/// Start a mini HTTP server using a pre-bound TCP listener.
+///
+/// This variant accepts an already-bound listener, which eliminates
+/// port race conditions in tests. See [`start_mini_http_server`] for
+/// the convenience wrapper that binds its own listener.
+pub async fn start_mini_http_server_with_tcp(
+	entity: AsyncEntity,
+	listener: async_io::Async<std::net::TcpListener>,
+) -> Result {
+	let addr = listener
+		.get_ref()
+		.local_addr()
+		.map_err(|err| bevyhow!("Failed to get local address: {err}"))?;
 	cross_log!("Mini HTTP server listening on http://{addr}");
 
 	loop {
@@ -370,7 +386,9 @@ mod test {
 	#[cfg(feature = "ureq")]
 	#[beet_core::test]
 	async fn roundtrip() {
-		super::super::http_server::test::test_server(start_mini_http_server)
-			.await;
+		super::super::http_server::test::test_server(
+			start_mini_http_server_with_tcp,
+		)
+		.await;
 	}
 }

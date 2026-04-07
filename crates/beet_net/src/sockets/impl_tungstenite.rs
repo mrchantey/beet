@@ -196,7 +196,14 @@ pub(crate) async fn start_tungstenite_server(entity: AsyncEntity) -> Result {
 		.map_err(|e| bevyhow!("Invalid address {}: {}", addr, e))?;
 	let listener = Async::<TcpListener>::bind(socket_addr)
 		.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
+	start_tungstenite_server_with_tcp(entity, listener).await
+}
 
+/// Accept WebSocket connections on a pre-bound listener.
+pub(crate) async fn start_tungstenite_server_with_tcp(
+	entity: AsyncEntity,
+	listener: Async<TcpListener>,
+) -> Result {
 	let local_addr = listener
 		.get_ref()
 		.local_addr()
