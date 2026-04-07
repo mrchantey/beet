@@ -10,7 +10,7 @@ use beet::prelude::*;
 async fn main() -> Result {
 	let stack = Stack::default_local();
 	let lightsail = LightsailBlock::default();
-	let config = lightsail.build_config(&stack);
+	let config = lightsail.build_config(&stack)?;
 
 	let out_path =
 		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();

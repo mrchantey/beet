@@ -8,9 +8,12 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() -> Result {
-	let stack = Stack::default_local();
-	let lambda = LambdaBlock::default();
-	let config = lambda.build_config(&stack);
+	App::new()
+		.spawn((Stack::default_local(), children![LambdaBlock::default()]));
+
+	// let stack = ;
+	// let lambda = ;
+	// let config = lambda.build_config(&stack)?;
 
 	let out_path =
 		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();

@@ -4,7 +4,7 @@ use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use serde_json::json;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DnsProvider {
 	Cloudflare {
 		authority: SmolStr,
@@ -19,7 +19,7 @@ pub enum DnsProvider {
 /// - Serverless lambda function with API Gateway v2
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
 pub struct LambdaBlock {
 	/// Optional DNS provider configuration.
 	pub dns: Option<DnsProvider>,
@@ -35,6 +35,17 @@ impl Default for LambdaBlock {
 		}
 	}
 }
+
+impl Block for LambdaBlock {
+	fn apply_to_config(
+		&self,
+		stack: &Stack,
+		config: &mut terra::Config,
+	) -> Result {
+		Ok(())
+	}
+}
+
 
 impl LambdaBlock {
 	fn region(&self) -> &str {

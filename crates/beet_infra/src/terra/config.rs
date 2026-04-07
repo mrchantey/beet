@@ -41,7 +41,6 @@ use super::misc::Backend;
 use super::misc::DataSource;
 use super::misc::Provider;
 use super::misc::Resource;
-use super::misc::ResourceValidationError;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Serialize;
@@ -83,6 +82,7 @@ pub struct Output {
 ///     });
 /// config.export_and_validate("infra/main.tf.json").await?;
 /// ```
+#[derive(Debug, Default, Clone)]
 pub struct Config {
 	/// Backend for remote state, serialised into `terraform.backend`.
 	backend: Option<(String, Value)>,
@@ -97,26 +97,11 @@ pub struct Config {
 	variables: Map<String, Value>,
 	outputs: Map<String, Value>,
 	locals: Map<String, Value>,
-	/// Validation errors collected when resources are added, checked in [`Config::validate`].
-	validation_errors: Vec<ResourceValidationError>,
 }
 
 impl Config {
 	/// Create a new empty configuration.
-	pub fn new() -> Self {
-		Self {
-			backend: None,
-			required_version: None,
-			required_providers: Map::new(),
-			providers: Map::new(),
-			resources: Map::new(),
-			data_sources: Map::new(),
-			variables: Map::new(),
-			outputs: Map::new(),
-			locals: Map::new(),
-			validation_errors: Vec::new(),
-		}
-	}
+	pub fn new() -> Self { Self::default() }
 
 	// =====================================================================
 	// Terraform block settings
@@ -199,29 +184,29 @@ impl Config {
 
 	/// Add a typed resource. The required provider is registered automatically
 	/// from the resource's [`Resource`] implementation.
-	/// Validation errors are collected and returned by [`Config::validate`].
+	/// ## Errors
+	///
+	/// - If the resource is invalid, ie [`Resource::validate_definition`]
+	/// - If an existing resource with the provided label
 	pub fn add_labeled_resource(
 		&mut self,
 		label: impl Into<String>,
 		resource: &dyn Resource,
 	) -> Result<&mut Self> {
 		let label = label.into();
-		if let Err(err) = resource.validate_definition() {
-			self.validation_errors.push(err);
-		}
+		resource.validate_definition()?;
 		self.ensure_provider(resource.provider());
-		let type_map = self
+		let map = self
 			.resources
 			.entry(resource.resource_type().to_string())
-			.or_insert_with(|| Value::Object(Map::new()));
-		if let Value::Object(map) = type_map {
-			if map.insert(label.clone(), resource.to_json()).is_some() {
-				bevybail!(
-					"duplicate resource: type `{}` label `{}` already exists",
-					resource.resource_type(),
-					label
-				);
-			}
+			.or_insert_with(|| Value::Object(Map::new()))
+			.to_object_mut()?;
+		if map.insert(label.clone(), resource.to_json()).is_some() {
+			bevybail!(
+				"duplicate resource: type `{}` label `{}` already exists",
+				resource.resource_type(),
+				label
+			);
 		}
 		Ok(self)
 	}
@@ -233,27 +218,33 @@ impl Config {
 		mut self,
 		name: impl Into<String>,
 		source: &dyn DataSource,
-	) -> Self {
-		self.add_data_source_typed(name, source);
-		self
+	) -> Result<Self> {
+		self.add_data_source_typed(name, source)?;
+		self.xok()
 	}
 
 	/// Add a typed data source. The required provider is registered automatically
 	/// from the data source's [`DataSource`] implementation.
 	pub fn add_data_source_typed(
 		&mut self,
-		name: impl Into<String>,
+		label: impl Into<String>,
 		source: &dyn DataSource,
-	) -> &mut Self {
+	) -> Result<&mut Self> {
+		let label = label.into();
 		self.ensure_provider(source.provider());
-		let type_map = self
+		let map = self
 			.data_sources
 			.entry(source.data_type().to_string())
-			.or_insert_with(|| Value::Object(Map::new()));
-		if let Value::Object(map) = type_map {
-			map.insert(name.into(), source.to_json());
+			.or_insert_with(|| Value::Object(Map::new()))
+			.to_object_mut()?;
+		if map.insert(label.clone(), source.to_json()).is_some() {
+			bevybail!(
+				"duplicate data source: type `{}` label `{}` already exists",
+				source.data_type(),
+				label
+			);
 		}
-		self
+		self.xok()
 	}
 
 	// =====================================================================
@@ -560,15 +551,6 @@ impl Config {
 	/// Returns the JSON output of `tofu validate -json` on success.
 	#[cfg(not(target_arch = "wasm32"))]
 	pub async fn validate(&self) -> Result<String> {
-		if !self.validation_errors.is_empty() {
-			let messages = self
-				.validation_errors
-				.iter()
-				.map(|e| e.to_string())
-				.collect::<Vec<_>>()
-				.join("\n");
-			bevybail!("resource validation failed:\n{messages}");
-		}
 		let dir = TempDir::new()?;
 		self.export_to_file(dir.as_ref().join("main.tf.json"))
 			.await?;
@@ -586,15 +568,6 @@ impl Config {
 		&self,
 		path: &AbsPathBuf,
 	) -> Result<String> {
-		if !self.validation_errors.is_empty() {
-			let messages = self
-				.validation_errors
-				.iter()
-				.map(|e| e.to_string())
-				.collect::<Vec<_>>()
-				.join("\n");
-			bevybail!("resource validation failed:\n{messages}");
-		}
 		let dir = path.parent().unwrap_or_default();
 		fs_ext::create_dir_all(&dir)?;
 		self.export_to_file(path).await?;
@@ -671,8 +644,4 @@ impl Config {
 		}
 		self.outputs.insert(name.into(), Value::Object(obj));
 	}
-}
-
-impl Default for Config {
-	fn default() -> Self { Self::new() }
 }

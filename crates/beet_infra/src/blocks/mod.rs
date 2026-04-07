@@ -7,3 +7,5 @@ pub use lambda::*;
 mod lightsail;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail::*;
+mod block;
+pub use block::*;
