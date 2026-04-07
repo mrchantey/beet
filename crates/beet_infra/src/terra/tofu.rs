@@ -51,21 +51,31 @@ pub async fn dangerously_destroy_backend(backend: &StackBackend) -> Result {
 	Ok(())
 }
 
+const NOT_FOUND: &str = r#"
+It looks like opentofu is not installed, this is required for deploying infrastructure.
+Please install and try again
+https://opentofu.org/docs/intro/install
+"#;
+
+fn tofu_process<'a>() -> Process<'a> {
+	Process::new("tofu").with_not_found(NOT_FOUND)
+}
+
 
 /// Export the provider schema based on `./providers.tf.json`
 pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["providers", "schema", "-json"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["providers", "schema", "-json"])
 		.run_async_stdout()
 		.await
 }
 
 /// Initialize an opentofu directory, using the `./providers.tf.json`
 pub async fn init(dir: &AbsPathBuf) -> Result {
-	Process::new("tofu")
-		.with_args(&["init"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["init"])
 		.run_async()
 		.await?;
 	Ok(())
@@ -73,63 +83,63 @@ pub async fn init(dir: &AbsPathBuf) -> Result {
 
 /// Validates the opentofu file, ie the `main.tf.json`
 pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["validate", "-json"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["validate", "-json"])
 		.run_async_stdout()
 		.await
 }
 
 /// Show execution plan
 pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["plan"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["plan"])
 		.run_async_stdout()
 		.await
 }
 
 /// Apply the execution plan
 pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["apply"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["apply"])
 		.run_async_stdout()
 		.await
 }
 
 /// Show the current state
 pub async fn show(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["show"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["show"])
 		.run_async_stdout()
 		.await
 }
 
 /// List all resources in the state
 pub async fn list(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["state", "list"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["state", "list"])
 		.run_async_stdout()
 		.await
 }
 
 /// Remove a resource from the state
 pub async fn remove(dir: &AbsPathBuf, resource: &str) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["state", "rm", resource])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["state", "rm", resource])
 		.run_async_stdout()
 		.await
 }
 
 /// Destroy infrastructure
 pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
-	Process::new("tofu")
-		.with_args(&["destroy"])
+	tofu_process()
 		.with_cwd(dir)
+		.with_args(&["destroy"])
 		.run_async_stdout()
 		.await
 }
