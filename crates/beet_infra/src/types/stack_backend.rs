@@ -4,26 +4,6 @@ use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-#[derive(Debug, Clone, Get, Component)]
-pub struct Stack {
-	/// The backend configuration for storing the state of this stack,
-	/// defaults to a local backend at `./infra-state`
-	backend: StackBackend,
-}
-
-
-impl Stack {
-	pub fn new(backend: impl Into<StackBackend>) -> Self {
-		Self {
-			backend: backend.into(),
-		}
-	}
-}
-
-impl Default for Stack {
-	fn default() -> Self { Self::new(S3Backend::default()) }
-}
-
 /// Strategy for maintaining the Terraform state for this stack.
 /// By default, the state for each stack is
 /// stored in an individual directory in a shared state bucket.

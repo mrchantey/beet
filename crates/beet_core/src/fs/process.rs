@@ -40,6 +40,7 @@ impl<'a> Process<'a> {
 	}
 
 	/// Run the command, collecting stdout
+	#[track_caller]
 	pub fn run(self) -> Result<Output> {
 		let mut cmd = std::process::Command::new(self.command);
 		if let Some(dir) = self.cwd {
@@ -52,11 +53,13 @@ impl<'a> Process<'a> {
 	}
 
 	/// Run the command, collecting stdout
+	#[track_caller]
 	pub fn run_stdout(self) -> Result<String> {
 		self.run()
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
 	/// Run the command, collecting stdout
+	// #[track_caller]
 	pub async fn run_async(self) -> Result<Output> {
 		let mut cmd = async_process::Command::new(self.command);
 		if let Some(dir) = self.cwd {
@@ -90,7 +93,7 @@ impl<'a> Process<'a> {
 			}
 		})
 	}
-
+	#[track_caller]
 	fn map_output(&self, output: Output) -> Result<Output> {
 		if output.status.success() {
 			output.xok()

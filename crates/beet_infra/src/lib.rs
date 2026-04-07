@@ -8,8 +8,8 @@
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`bindings`] for pre-generated bindings of commonly used providers
 pub mod bindings;
-mod components;
-mod stacks;
+mod types;
+mod blocks;
 pub mod terra;
 
 #[cfg(feature = "bindings_generator")]
@@ -17,9 +17,9 @@ pub mod bindings_generator;
 
 pub mod prelude {
 	pub use crate::bindings;
-	pub use crate::components::*;
+	pub use crate::types::*;
 	#[allow(unused)]
-	pub use crate::stacks::*;
+	pub use crate::blocks::*;
 	pub use crate::terra;
 	pub use crate::terra::tofu;
 }

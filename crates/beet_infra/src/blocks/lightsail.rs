@@ -8,8 +8,8 @@ use serde_json::json;
 /// - Static IP with attachment
 /// - Configurable ports
 /// - Systemd service user data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LightsailStack {
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+pub struct LightsailBlock {
 	/// The port the application server listens on.
 	pub server_port: u16,
 	/// AWS availability zone, defaults to `us-east-1a`.
@@ -20,7 +20,7 @@ pub struct LightsailStack {
 	pub bundle_id: SmolStr,
 }
 
-impl Default for LightsailStack {
+impl Default for LightsailBlock {
 	fn default() -> Self {
 		Self {
 			server_port: 8080,
@@ -31,14 +31,10 @@ impl Default for LightsailStack {
 	}
 }
 
-impl LightsailStack {
+impl LightsailBlock {
 	/// Build a complete [`terra::Config`] for this Lightsail stack.
-	pub fn build_config(
-		&self,
-		cx: &StackContext,
-		stack: &Stack,
-	) -> terra::Config {
-		let keypair_ident = cx.resource_ident("keypair");
+	pub fn build_config(&self, stack: &Stack) -> terra::Config {
+		let keypair_ident = stack.resource_ident("keypair");
 		let keypair = terra::ResourceDef::new_secondary(
 			keypair_ident.clone(),
 			AwsLightsailKeyPairDetails {
@@ -47,7 +43,7 @@ impl LightsailStack {
 			},
 		);
 
-		let ip_ident = cx.resource_ident("ip");
+		let ip_ident = stack.resource_ident("ip");
 		let static_ip = terra::ResourceDef::new_secondary(
 			ip_ident.clone(),
 			AwsLightsailStaticIpDetails {
@@ -56,18 +52,18 @@ impl LightsailStack {
 			},
 		);
 
-		let instance_ident = cx.resource_ident("instance");
+		let instance_ident = stack.resource_ident("instance");
 		let instance_details = AwsLightsailInstanceDetails {
 			availability_zone: self.availability_zone.clone(),
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
 			name: instance_ident.primary_identifier().into(),
 			key_pair_name: Some(keypair.field_ref("name").into()),
-			user_data: Some(self.build_user_data(cx)),
+			user_data: Some(self.build_user_data(stack)),
 			tags: Some(
 				[
-					(SmolStr::from("Project"), cx.app_name().clone()),
-					(SmolStr::from("Stage"), cx.stage().clone()),
+					(SmolStr::from("Project"), stack.app_name().clone()),
+					(SmolStr::from("Stage"), stack.stage().clone()),
 				]
 				.into_iter()
 				.collect(),
@@ -78,7 +74,7 @@ impl LightsailStack {
 			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
 		let ip_attach = terra::ResourceDef::new_secondary(
-			cx.resource_ident("ip_attach"),
+			stack.resource_ident("ip_attach"),
 			AwsLightsailStaticIpAttachmentDetails {
 				instance_name: instance.field_ref("name").into(),
 				static_ip_name: static_ip.field_ref("name").into(),
@@ -105,7 +101,7 @@ impl LightsailStack {
 			..default()
 		};
 		let ports = terra::ResourceDef::new_secondary(
-			cx.resource_ident("ports"),
+			stack.resource_ident("ports"),
 			port_details,
 		);
 
@@ -129,8 +125,8 @@ impl LightsailStack {
 	}
 
 	/// Generate a systemd-based user data script for the application.
-	fn build_user_data(&self, cx: &StackContext) -> SmolStr {
-		let app_name = cx.app_name();
+	fn build_user_data(&self, stack: &Stack) -> SmolStr {
+		let app_name = stack.app_name();
 		format!(
 			r#"#!/bin/bash
 set -euo pipefail
@@ -165,10 +161,9 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn lightsail_config_validates() {
-		let cx = StackContext::default();
-		let stack = Stack::new(LocalBackend::default());
-		let lightsail = LightsailStack::default();
-		let config = lightsail.build_config(&cx, &stack);
+		let stack = Stack::default_local();
+		let lightsail = LightsailBlock::default();
+		let config = lightsail.build_config(&stack);
 		config.validate().await.unwrap();
 	}
 }

@@ -9,6 +9,7 @@
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "aws")]
 use beet_net::prelude::*;
 
 /// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
@@ -17,6 +18,7 @@ pub async fn ensure_backend_exists(backend: &StackBackend) -> Result {
 		StackBackend::Local(local) => {
 			fs_ext::create_dir_all_async(local.path()).await?;
 		}
+		#[allow(unused)]
 		StackBackend::S3(s3) => {
 			cfg_if! {
 				if #[cfg(feature = "aws")] {
@@ -37,6 +39,7 @@ pub async fn dangerously_destroy_backend(backend: &StackBackend) -> Result {
 		StackBackend::Local(local) => {
 			fs_ext::remove_async(local.path()).await?;
 		}
+		#[allow(unused)]
 		StackBackend::S3(s3) => {
 			cfg_if! {
 				if #[cfg(feature = "aws")] {

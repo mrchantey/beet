@@ -4,7 +4,7 @@ use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 use serde_json::json;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
 pub enum DnsProvider {
 	Cloudflare {
 		authority: SmolStr,
@@ -20,14 +20,14 @@ pub enum DnsProvider {
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LambdaStack {
+pub struct LambdaBlock {
 	/// Optional DNS provider configuration.
 	pub dns: Option<DnsProvider>,
 	/// AWS region for the buckets and lambda function.
 	pub region: Option<SmolStr>,
 }
 
-impl Default for LambdaStack {
+impl Default for LambdaBlock {
 	fn default() -> Self {
 		Self {
 			dns: None,
@@ -36,22 +36,18 @@ impl Default for LambdaStack {
 	}
 }
 
-impl LambdaStack {
+impl LambdaBlock {
 	fn region(&self) -> &str {
 		self.region.as_deref().unwrap_or(aws::region::DEFAULT)
 	}
 
 	/// Build a complete [`terra::Config`] for this stack.
-	pub fn build_config(
-		&self,
-		cx: &StackContext,
-		stack: &Stack,
-	) -> terra::Config {
+	pub fn build_config(&self, stack: &Stack) -> terra::Config {
 		let region = self.region();
 
 		// S3 Buckets
 		let html_bucket = ResourceDef::new_primary(
-			cx.resource_ident("html"),
+			stack.resource_ident("html"),
 			AwsS3BucketDetails {
 				force_destroy: Some(true),
 				region: Some(region.into()),
@@ -59,7 +55,7 @@ impl LambdaStack {
 			},
 		);
 		let assets_bucket = ResourceDef::new_primary(
-			cx.resource_ident("assets"),
+			stack.resource_ident("assets"),
 			AwsS3BucketDetails {
 				force_destroy: Some(true),
 				region: Some(region.into()),
@@ -69,7 +65,7 @@ impl LambdaStack {
 
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
-			cx.resource_ident("lambda_role"),
+			stack.resource_ident("lambda_role"),
 			AwsIamRoleDetails {
 				assume_role_policy: json!({
 					"Version": "2012-10-17",
@@ -87,7 +83,7 @@ impl LambdaStack {
 
 		// IAM Role Policy Attachment
 		let lambda_policy = ResourceDef::new_secondary(
-			cx.resource_ident("lambda_basic_policy"),
+			stack.resource_ident("lambda_basic_policy"),
 			AwsIamRolePolicyAttachmentDetails {
 				policy_arn: "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole".into(),
 				role: lambda_role.field_ref("name").into(),
@@ -97,7 +93,7 @@ impl LambdaStack {
 
 		// Lambda Function
 		let lambda_function = ResourceDef::new_primary(
-			cx.resource_ident("router"),
+			stack.resource_ident("router"),
 			AwsLambdaFunctionDetails {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
@@ -112,7 +108,7 @@ impl LambdaStack {
 
 		// Lambda Function URL
 		let lambda_url = ResourceDef::new_secondary(
-			cx.resource_ident("router_url"),
+			stack.resource_ident("router_url"),
 			AwsLambdaFunctionUrlDetails {
 				authorization_type: "NONE".into(),
 				function_name: lambda_function
@@ -124,7 +120,7 @@ impl LambdaStack {
 
 		// API Gateway v2
 		let gateway = ResourceDef::new_primary(
-			cx.resource_ident("gateway"),
+			stack.resource_ident("gateway"),
 			AwsApigatewayv2ApiDetails {
 				protocol_type: "HTTP".into(),
 				..default()
@@ -142,7 +138,7 @@ impl LambdaStack {
 		};
 
 		let lambda_integration = ResourceDef::new_secondary(
-			cx.resource_ident("lambda_integration"),
+			stack.resource_ident("lambda_integration"),
 			lambda_integration_details,
 		);
 
@@ -156,7 +152,7 @@ impl LambdaStack {
 			..default()
 		};
 		let default_route = ResourceDef::new_secondary(
-			cx.resource_ident("default_route"),
+			stack.resource_ident("default_route"),
 			default_route_details,
 		);
 
@@ -167,7 +163,7 @@ impl LambdaStack {
 			..default()
 		};
 		let default_stage = ResourceDef::new_secondary(
-			cx.resource_ident("default_stage"),
+			stack.resource_ident("default_stage"),
 			default_stage_details,
 		);
 
@@ -182,7 +178,7 @@ impl LambdaStack {
 			..default()
 		};
 		let apigw_permission = ResourceDef::new_secondary(
-			cx.resource_ident("apigw_lambda"),
+			stack.resource_ident("apigw_lambda"),
 			apigw_permission_details,
 		);
 
@@ -215,7 +211,7 @@ impl LambdaStack {
 						..default()
 					};
 					let dns_def = ResourceDef::new_secondary(
-						cx.resource_ident("dns"),
+						stack.resource_ident("dns"),
 						dns_record,
 					);
 					config = config.with_resource(&dns_def);
@@ -232,7 +228,7 @@ impl LambdaStack {
 						..default()
 					};
 					let dns_def = ResourceDef::new_secondary(
-						cx.resource_ident("dns"),
+						stack.resource_ident("dns"),
 						dns_record,
 					);
 					config = config.with_resource(&dns_def);
@@ -265,12 +261,11 @@ mod tests {
 	use super::*;
 
 	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore="very slow"]
+	#[ignore = "very slow"]
 	async fn lambda_config_validates() {
-		let cx = StackContext::default();
-		let stack = Stack::new(LocalBackend::default());
-		let lambda = LambdaStack::default();
-		let config = lambda.build_config(&cx, &stack);
+		let stack = Stack::default_local();
+		let lambda = LambdaBlock::default();
+		let config = lambda.build_config(&stack);
 		config.validate().await.unwrap();
 	}
 }
