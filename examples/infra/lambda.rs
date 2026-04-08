@@ -9,14 +9,10 @@ use beet::prelude::*;
 #[beet::main]
 async fn main() -> Result {
 	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			BeetRouterPlugin,
-			// LogPlugin {
-			// 	level: Level::TRACE,
-			// 	..default()
-			// },
-		))
+		.add_plugins((MinimalPlugins, BeetRouterPlugin, LogPlugin {
+			// level: Level::TRACE,
+			..default()
+		}))
 		.add_systems(Startup, setup)
 		.run();
 	Ok(())

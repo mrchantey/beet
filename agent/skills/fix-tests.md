@@ -3,6 +3,8 @@
 ## Context
 
 Always use `tail` when running tests to preserve context.
+Run all tests piping the entire output to `agent/scratch.txt`, use this for all commands, so that multiple greps can be applied.
+
 
 ## Hanging Tests
 
