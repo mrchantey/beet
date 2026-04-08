@@ -23,7 +23,7 @@ fn should_panic() {
 fn returns_ok_async() {
 	register_test(TestCaseParams::new(), async {
 		time_ext::sleep_millis(10).await;
-		Ok(())
+		Ok::<(), String>(())
 	});
 }
 #[test]

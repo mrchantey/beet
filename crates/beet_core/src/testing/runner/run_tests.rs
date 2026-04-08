@@ -157,7 +157,7 @@ mod tests {
 		run_test(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
-				Ok(())
+				Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -167,7 +167,7 @@ mod tests {
 		run_test(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
-				Err("pizza".into())
+				Err::<(), String>("pizza".into())
 			});
 			Ok(())
 		}))
@@ -196,7 +196,7 @@ mod tests {
 			test_ext::new_auto(|| {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
-					Ok(())
+					Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -222,7 +222,7 @@ mod tests {
 			test_ext::new_auto(|| {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
-					Ok(())
+					Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -262,7 +262,7 @@ mod tests {
 		run_test(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(5000), async {
 				async_ext::yield_now().await;
-				Ok(())
+				Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -273,7 +273,7 @@ mod tests {
 		run_test(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
-				Err("unified error".into())
+				Err::<(), String>("unified error".into())
 			});
 			Ok(())
 		}))

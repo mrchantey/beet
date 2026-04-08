@@ -129,7 +129,7 @@ mod tests {
 
 	use super::*;
 
-	
+
 	async fn did_timeout(test: TestDescAndFn) -> bool {
 		test_runner_ext::run(Some("--timeout-ms=10"), test)
 			.await
@@ -183,7 +183,7 @@ mod tests {
 		let test = test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(1000), async {
 				time_ext::sleep_millis(50).await;
-				Ok(())
+				Ok::<(), String>(())
 			});
 			Ok(())
 		});
@@ -237,7 +237,7 @@ mod tests {
 		let test = test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(5000), async {
 				time_ext::sleep_millis(10).await;
-				Ok(())
+				Ok::<(), String>(())
 			});
 			Ok(())
 		});
@@ -253,7 +253,7 @@ mod tests {
 		let test = test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(5000), async {
 				time_ext::sleep_millis(10).await;
-				Ok(())
+				Ok::<(), String>(())
 			});
 			Ok(())
 		});
