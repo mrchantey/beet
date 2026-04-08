@@ -14,14 +14,14 @@ default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
 aws = ["beet_net/aws"]
-lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
-lightsail_block = ["bindings_aws_lightsail"]
+lambda_block = ["cli", "bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
+lightsail_block = ["cli", "bindings_aws_lightsail"]
 bindings_aws_common = []
 bindings_aws_dns = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_cloudflare_common = []
-cli = ["dep:beet_router"]
+cli = ["dep:beet_tool", "dep:beet_router"]
 
 [[bin]]
 name = "bindings"
@@ -31,6 +31,7 @@ required-features = ["bindings_generator"]
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
+beet_tool = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true

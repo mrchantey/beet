@@ -1,3 +1,4 @@
+//! Terraform config types and utilities.
 mod config;
 mod ident;
 mod misc;

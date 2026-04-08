@@ -14,6 +14,30 @@
 use crate::prelude::*;
 
 impl MediaType {
+	/// Serialize `value` into bytes using the first media type in `accept` that
+	/// matches, falling back to plaintext if empty.
+	pub fn serialize_accepts<T: serde::Serialize>(
+		accept: &[MediaType],
+		value: &T,
+	) -> Result<(MediaType, Vec<u8>)> {
+		for media_type in accept {
+			if let Ok(bytes) = media_type.serialize(value) {
+				return Ok((media_type.clone(), bytes));
+			}
+		}
+		// last resort, see if it accepts text
+		if accept.is_empty() {
+			let value = serde_plain::to_string(value)?;
+			Ok((MediaType::Text, value.into_bytes()))
+		} else {
+			bevybail!(
+				"None of the accept media types could serialize the value\ntypes: {:?}",
+				accept
+			)
+		}
+	}
+
+
 	/// Serialize `value` into bytes using this media type's format.
 	///
 	/// ## Errors
@@ -31,6 +55,10 @@ impl MediaType {
 	#[cfg(feature = "serde")]
 	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
 		match self {
+			MediaType::Text => {
+				let value = serde_plain::to_string(value)?;
+				Ok(value.into_bytes())
+			}
 			MediaType::Json => {
 				#[cfg(feature = "json")]
 				{

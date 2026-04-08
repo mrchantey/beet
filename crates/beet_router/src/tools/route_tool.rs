@@ -57,19 +57,26 @@ where
 	Input: 'static + Send + Sync + serde::de::DeserializeOwned,
 	Output: 'static + Send + Sync + serde::Serialize,
 {
-	let media_type = request
+	let request_type = request
 		.headers
 		.get::<header::ContentType>()
 		.and_then(|res| res.ok())
 		.unwrap_or(MediaType::Json);
+	let accepts = request
+		.headers
+		.get::<header::Accept>()
+		.and_then(|res| res.ok())
+		.unwrap_or_default();
 	let body_bytes = request.body.into_bytes().await?;
-	let input: Input = media_type.deserialize(&body_bytes)?;
+	let input: Input = request_type.deserialize(&body_bytes)?;
 	let output: Output = next.call(input).await?;
-	// Use the same format as the request payload
-	let body_bytes = media_type.serialize(&output)?;
+
+	let (response_type, response_body) =
+		MediaType::serialize_accepts(&accepts, &output)?;
+
 	Response::ok()
-		.with_content_type(media_type)
-		.with_body(body_bytes)
+		.with_content_type(response_type)
+		.with_body(response_body)
 		.xok()
 }
 

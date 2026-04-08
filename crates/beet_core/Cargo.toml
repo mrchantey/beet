@@ -37,8 +37,6 @@ nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["ansi_paint"]
 http = ["dep:http"]
-json = ["serde", "dep:serde_json"]
-postcard = ["serde", "dep:postcard"]
 bevy_default = ["bevy_scene", "bevy_multithreaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_keyboard = ["bevy/keyboard", "serde"]
@@ -47,10 +45,13 @@ bevy_multithreaded = ["bevy/multi_threaded"]
 serde = [
 	"bevy/serialize",
 	"dep:serde",
+	"dep:serde_plain",
 	"dep:ron",
 	"dep:serde_urlencoded",
 	"smol_str/serde"
 ]
+json = ["serde", "dep:serde_json"]
+postcard = ["serde", "dep:postcard"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 
 fs = [
@@ -100,6 +101,7 @@ either = "1"
 
 #💡 serde
 serde = { workspace = true, optional = true, features=["rc"] }
+serde_plain = {workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }

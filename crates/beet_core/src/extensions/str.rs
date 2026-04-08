@@ -5,9 +5,8 @@ use extend::ext;
 
 // #[ext]
 // pub impl SmolStr {
-
-// 	pub fn
-
+// 	/// Appends a string slice to the end of this `SmolStr`, returning a new `SmolStr`.
+// 	// fn push(self, s: &str) -> Self { SmolStr::new(format!("{}{}", self, s)) }
 // }
 /// Extension methods for [`Vec<SmolStr>`] providing additional string manipulation utilities.
 #[ext]

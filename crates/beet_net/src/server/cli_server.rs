@@ -17,7 +17,14 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
-	let accept = vec![MediaType::AnsiTerm, MediaType::Markdown];
+	let accept = vec![
+		MediaType::AnsiTerm,
+		MediaType::Text,
+		MediaType::Markdown,
+		MediaType::Json,
+	];
+
+	// todo read format cli arg and use as accept
 
 	let req = Request::from_cli_args(CliArgs::parse_env())?
 		.with_header::<header::Accept>(accept);

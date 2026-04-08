@@ -9,14 +9,29 @@ use beet::prelude::*;
 #[beet::main]
 async fn main() -> Result {
 	App::new()
-		.spawn((Stack::default_local(), children![LambdaBlock::default()]));
+		.add_plugins((
+			MinimalPlugins,
+			BeetRouterPlugin,
+			// LogPlugin {
+			// 	level: Level::TRACE,
+			// 	..default()
+			// },
+		))
+		.add_systems(Startup, setup)
+		.run();
 
-	// let stack = ;
-	// let lambda = ;
-	// let config = lambda.build_config(&stack)?;
-
-	let out_path =
-		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
-	config.export_and_validate(&out_path).await?;
+	// let out_path =
+	// 	WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
+	// config.export_and_validate(&out_path).await?;
 	Ok(())
+}
+
+
+fn setup(mut commands: Commands) {
+	commands.spawn((
+		Stack::new("lambda-example"),
+		CliServer::default(),
+		stack_router(),
+		LambdaBlock::default(),
+	));
 }
