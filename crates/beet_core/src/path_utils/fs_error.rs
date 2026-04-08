@@ -36,6 +36,12 @@ pub enum FsError {
 		/// The path that already exists.
 		path: PathBuf,
 	},
+	/// The path was expected to be relative to the workspace root, but was not.
+	#[error("Fs Error - Expected Workspace Relative Path\nPath: {path}")]
+	ExpectedWorkspaceRelative {
+		/// The path that was expected to be a workspace path.
+		path: PathBuf,
+	},
 	/// Catch-all error for IO errors that are not [`io::ErrorKind::NotFound`].
 	#[error("Fs Error - IO\nPath: {path}\nError: {err}")]
 	Io {

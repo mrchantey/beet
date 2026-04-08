@@ -47,8 +47,6 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
-use std::io::Write;
-use std::path::Path;
 
 /// A Terraform variable definition.
 pub struct Variable {
@@ -462,7 +460,7 @@ impl Config {
 	// =====================================================================
 
 	/// Build the complete Terraform JSON configuration as a [`Value`].
-	pub fn to_value(&self) -> Value {
+	pub fn to_json(&self) -> Value {
 		let mut root = Map::new();
 
 		// terraform block: optional required_version, backend, required_providers
@@ -527,68 +525,6 @@ impl Config {
 		}
 
 		Value::Object(root)
-	}
-
-	/// Serialize to a pretty-printed JSON string.
-	pub fn to_json_pretty(&self) -> Result<String, serde_json::Error> {
-		serde_json::to_string_pretty(&self.to_value())
-	}
-
-	/// Write the configuration to a writer.
-	pub fn export_to_writer(&self, writer: &mut dyn Write) -> Result {
-		let json = self.to_json_pretty()?;
-		writer.write_all(json.as_bytes())?;
-		writer.write_all(b"\n")?;
-		Ok(())
-	}
-
-	/// Write the configuration to a file.
-	pub async fn export_to_file(&self, path: impl AsRef<Path>) -> Result {
-		let json = self.to_json_pretty()?;
-		let mut content = json.into_bytes();
-		content.push(b'\n');
-		fs_ext::write_async(path, &content).await?;
-		Ok(())
-	}
-
-	// =====================================================================
-	// Validation
-	// =====================================================================
-
-	/// Write the config to a temporary directory and run `tofu validate`.
-	///
-	/// Returns the JSON output of `tofu validate -json` on success.
-	#[cfg(not(target_arch = "wasm32"))]
-	pub async fn validate(&self) -> Result<String> {
-		let dir = TempDir::new()?;
-		self.export_to_file(dir.as_ref().join("main.tf.json"))
-			.await?;
-
-		tofu::init(dir.path()).await?;
-		tofu::validate(dir.path()).await
-	}
-
-	/// Export to `path`, then run `tofu init` + `tofu validate` in-place.
-	///
-	/// Convenience wrapper combining [`export_to_file`] and [`validate`] that
-	/// operates on the given path rather than a temp directory.
-	#[cfg(not(target_arch = "wasm32"))]
-	pub async fn export_and_validate(
-		&self,
-		path: &AbsPathBuf,
-	) -> Result<String> {
-		let dir = path.parent().unwrap_or_default();
-		fs_ext::create_dir_all(&dir)?;
-		self.export_to_file(path).await?;
-		cross_log!("Generated: {}", path.display());
-		cross_log!("Running tofu init …");
-		tofu::init(&dir).await?;
-		cross_log!("tofu init: OK");
-		cross_log!("Running tofu validate …");
-		let stdout = tofu::validate(&dir).await?;
-
-		cross_log!("tofu validate: PASSED");
-		Ok(stdout)
 	}
 
 	// =====================================================================

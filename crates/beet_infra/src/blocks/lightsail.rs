@@ -169,9 +169,11 @@ mod tests {
 	#[ignore = "very slow"]
 	async fn lightsail_config_validates() {
 		let stack = Stack::default_local();
-		let lightsail = LightsailBlock::default();
+		let block = LightsailBlock::default();
 		let mut config = stack.create_config();
-		lightsail.apply_to_config(&stack, &mut config).unwrap();
-		config.validate().await.unwrap();
+		block.apply_to_config(&stack, &mut config).unwrap();
+		let dir = TempDir::new().unwrap();
+		let project = terra::Project::new(dir.path().clone(), config);
+		project.validate().await.unwrap();
 	}
 }

@@ -13,17 +13,27 @@ pub trait IntoFut<M> {
 	fn into_fut(self) -> impl AsyncTest;
 }
 /// Marker for futures that return `Result<(), String>`.
-pub struct ReturnsResult;
+pub struct ReturnsStringResult;
+/// Marker for futures that return `Result<(), BevyError>`.
+pub struct ReturnsBevyResult;
 /// Marker for futures that return `()`.
 pub struct ReturnsUnit;
 /// Marker for futures that return `!` (never type).
 pub struct ReturnsNever;
 
-impl<T> IntoFut<ReturnsResult> for T
+impl<T> IntoFut<ReturnsStringResult> for T
 where
 	T: AsyncTest,
 {
 	fn into_fut(self) -> impl AsyncTest { self }
+}
+impl<T> IntoFut<ReturnsBevyResult> for T
+where
+	T: 'static + Future<Output = bevy::prelude::Result>,
+{
+	fn into_fut(self) -> impl AsyncTest {
+		async move { self.await.map_err(|e| e.to_string()) }
+	}
 }
 impl<T> IntoFut<ReturnsUnit> for T
 where

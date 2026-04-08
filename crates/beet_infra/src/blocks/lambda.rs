@@ -270,12 +270,16 @@ mod tests {
 	use super::*;
 
 	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
+	// #[ignore = "very slow"]
 	async fn lambda_config_validates() {
 		let stack = Stack::default_local();
-		let lambda = LambdaBlock::default();
+		let block = LambdaBlock::default();
 		let mut config = stack.create_config();
-		lambda.apply_to_config(&stack, &mut config).unwrap();
-		config.validate().await.unwrap();
+		block.apply_to_config(&stack, &mut config).unwrap();
+		let dir = TempDir::new().unwrap();
+		// let path = dir.path().clone();
+		let path = WsPathBuf::new("target/infra/test").into_abs();
+		let project = terra::Project::new(path, config);
+		project.validate().await.unwrap();
 	}
 }

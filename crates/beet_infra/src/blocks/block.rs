@@ -36,7 +36,7 @@ impl ErasedBlock {
 		}))
 	}
 
-	fn call(
+	pub fn apply_to_config(
 		&self,
 		entity: &EntityRef,
 		stack: &Stack,

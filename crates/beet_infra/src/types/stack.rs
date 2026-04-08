@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::terra::Project;
 use beet_core::prelude::*;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]
@@ -40,6 +41,7 @@ impl Stack {
 		}
 	}
 
+	#[cfg(test)]
 	pub fn default_local() -> Self {
 		Self {
 			backend: LocalBackend::default().into(),
@@ -62,5 +64,31 @@ impl Stack {
 	/// Initialize a config with the corresponding backend
 	pub fn create_config(&self) -> terra::Config {
 		terra::Config::default().with_backend(self.backend())
+	}
+}
+
+
+#[derive(SystemParam)]
+pub struct StackQuery<'w, 's> {
+	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
+	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
+	children: Query<'w, 's, &'static Children>,
+	// ancestors: Query<'w, 's, &'static ChildOf>,
+}
+
+impl<'w, 's> StackQuery<'w, 's> {
+	/// Finds the stack in ancestors and
+	/// builds a config of all block descendents
+	pub fn build_config(&self, entity: Entity) -> Result<terra::Project> {
+		let (root, stack) = self.stacks.get(entity)?;
+		let mut config = stack.create_config();
+		for (child, block) in self
+			.children
+			.iter_descendants_inclusive(root)
+			.filter_map(|child| self.blocks.get(child).ok())
+		{
+			block.apply_to_config(&child, stack, &mut config)?;
+		}
+		Ok(Project::new(stack.work_directory().into_abs(), config))
 	}
 }

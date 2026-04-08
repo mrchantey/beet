@@ -20,7 +20,10 @@ pub fn stack_router() -> impl Bundle {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 async fn Validate(cx: AsyncToolIn) -> Result {
-	let _stack = cx.caller.get_cloned::<Stack>().await?;
+	let _config = cx
+		.caller
+		.with_state::<StackQuery, _>(|entity, query| query.build_config(entity))
+		.await?;
 	Ok(())
 
 	// "VALIDATED".into().xok()

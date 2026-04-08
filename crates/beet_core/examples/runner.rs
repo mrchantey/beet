@@ -23,7 +23,7 @@ fn panics() -> Result<(), String> {
 
 
 fn returns_ok_async() -> Result<(), String> {
-	register_test(TestCaseParams::new(), async { Ok(()) });
+	register_test(TestCaseParams::new(), async { Ok::<(), String>(()) });
 	Ok(())
 }
 fn returns_err_async() -> Result<(), String> {

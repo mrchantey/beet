@@ -65,15 +65,29 @@ pub fn impl_test_attr(
 		(true, false) => {
 			let ident = &func.sig.ident;
 			let vis = &func.vis;
-			let block = &func.block;
+			let func_block = &func.block;
 			let attrs = &func.attrs;
+			let block = match &func.sig.output {
+				syn::ReturnType::Default => {
+					quote! { async #func_block }
+				}
+				syn::ReturnType::Type(_, ty) => {
+					quote! {
+						async {
+							let out: #ty = async #func_block.await;
+							out
+						}
+					}
+				}
+			};
+
 			quote! {
 				#[test]
 				#(#attrs)*
 				#vis fn #ident() {
 					#beet_core::testing::register_test(
 						#params_expr,
-						async #block
+						#block
 					);
 				}
 			}

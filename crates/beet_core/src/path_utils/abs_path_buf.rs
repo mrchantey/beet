@@ -141,7 +141,10 @@ impl AbsPathBuf {
 	/// Converts this absolute path to a workspace-relative path.
 	pub fn into_ws_path(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
-		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())?;
+		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())
+			.map_err(|_| FsError::ExpectedWorkspaceRelative {
+			path: self.into(),
+		})?;
 		Ok(WsPathBuf::new(path))
 	}
 }
