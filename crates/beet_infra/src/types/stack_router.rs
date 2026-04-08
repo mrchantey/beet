@@ -12,6 +12,10 @@ pub fn stack_router() -> impl Bundle {
 			route_tool("validate", Validate),
 			ToolDescription::of::<Validate>(),
 		)),
+		OnSpawn::insert_child((
+			route_tool("plan", Plan),
+			ToolDescription::of::<Plan>(),
+		)),
 	)
 }
 
@@ -19,14 +23,27 @@ pub fn stack_router() -> impl Bundle {
 #[tool]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn Validate(cx: AsyncToolIn) -> Result {
-	let _config = cx
-		.caller
-		.with_state::<StackQuery, _>(|entity, query| query.build_config(entity))
-		.await?;
-	Ok(())
-
-	// "VALIDATED".into().xok()
+async fn Validate(cx: AsyncToolIn) -> Result<String> {
+	cx.caller
+		.with_state::<StackQuery, _>(|entity, query| {
+			query.build_project(entity)
+		})
+		.await?
+		.validate()
+		.await
+}
+/// Plan the stack
+#[tool]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+async fn Plan(cx: AsyncToolIn) -> Result<String> {
+	cx.caller
+		.with_state::<StackQuery, _>(|entity, query| {
+			query.build_project(entity)
+		})
+		.await?
+		.plan()
+		.await
 }
 
 

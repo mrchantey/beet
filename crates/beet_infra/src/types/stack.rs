@@ -79,7 +79,7 @@ pub struct StackQuery<'w, 's> {
 impl<'w, 's> StackQuery<'w, 's> {
 	/// Finds the stack in ancestors and
 	/// builds a config of all block descendents
-	pub fn build_config(&self, entity: Entity) -> Result<terra::Project> {
+	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
 		let (root, stack) = self.stacks.get(entity)?;
 		let mut config = stack.create_config();
 		for (child, block) in self
