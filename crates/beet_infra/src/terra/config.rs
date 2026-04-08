@@ -20,7 +20,7 @@
 //!         value: json!("${aws_s3_bucket.assets.bucket}"),
 //!         description: Some("The bucket name".into()),
 //!         sensitive: None,
-//!     });
+//!     })?;
 //! config.export_to_file("main.tf.json").await?;
 //! ```
 //!
@@ -31,7 +31,7 @@
 //!
 //! ```rust,ignore
 //! let mut config = Config::new();
-//! config.add_required_provider("aws", "hashicorp/aws", "~> 6.0");
+//! config.add_required_provider("aws", "hashicorp/aws", "~> 6.0")?;
 //! config.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
 //! config.add_untyped_resource("aws_instance", "web", &my_instance)?;
 //! config.export_to_file("main.tf.json").await?;
@@ -79,7 +79,7 @@ pub struct Output {
 ///         value: json!("${aws_s3_bucket.assets.bucket}"),
 ///         description: Some("The bucket name".into()),
 ///         sensitive: None,
-///     });
+///     })?;
 /// config.export_and_validate("infra/main.tf.json").await?;
 /// ```
 #[derive(Debug, Default, Clone)]
@@ -274,7 +274,7 @@ impl Config {
 	) -> Result<&mut Self> {
 		self.ensure_provider(provider);
 		let value = serde_json::to_value(config)?;
-		self.insert_provider_entry(provider.local_name(), value);
+		self.insert_provider_entry(provider.local_name(), value)?;
 		Ok(self)
 	}
 
@@ -314,7 +314,7 @@ impl Config {
 		if let Value::Object(ref mut map) = value {
 			map.insert("alias".to_string(), Value::String(alias.into()));
 		}
-		self.insert_provider_entry(provider.local_name(), value);
+		self.insert_provider_entry(provider.local_name(), value)?;
 		Ok(self)
 	}
 
@@ -323,43 +323,51 @@ impl Config {
 	// =====================================================================
 
 	/// Add a variable definition (chaining).
+	/// ## Errors
+	/// - If a variable with the same name already exists
 	pub fn with_variable(
 		mut self,
 		name: impl Into<String>,
 		variable: Variable,
-	) -> Self {
-		self.insert_variable(name, variable);
-		self
+	) -> Result<Self> {
+		self.insert_variable(name, variable)?;
+		Ok(self)
 	}
 
 	/// Add a variable definition.
+	/// ## Errors
+	/// - If a variable with the same name already exists
 	pub fn add_variable(
 		&mut self,
 		name: impl Into<String>,
 		variable: Variable,
-	) -> &mut Self {
-		self.insert_variable(name, variable);
-		self
+	) -> Result<&mut Self> {
+		self.insert_variable(name, variable)?;
+		Ok(self)
 	}
 
 	/// Add an output definition (chaining).
+	/// ## Errors
+	/// - If an output with the same name already exists
 	pub fn with_output(
 		mut self,
 		name: impl Into<String>,
 		output: Output,
-	) -> Self {
-		self.insert_output(name, output);
-		self
+	) -> Result<Self> {
+		self.insert_output(name, output)?;
+		Ok(self)
 	}
 
 	/// Add an output definition.
+	/// ## Errors
+	/// - If an output with the same name already exists
 	pub fn add_output(
 		&mut self,
 		name: impl Into<String>,
 		output: Output,
-	) -> &mut Self {
-		self.insert_output(name, output);
-		self
+	) -> Result<&mut Self> {
+		self.insert_output(name, output)?;
+		Ok(self)
 	}
 
 	/// Add a local value (chaining).
@@ -388,17 +396,22 @@ impl Config {
 	// =====================================================================
 
 	/// Add a required provider declaration without a typed [`Provider`].
+	/// ## Errors
+	/// - If a provider with the same name already exists
 	pub fn add_required_provider(
 		&mut self,
 		name: &str,
 		source: &str,
 		version: &str,
-	) -> &mut Self {
+	) -> Result<&mut Self> {
+		if self.required_providers.contains_key(name) {
+			bevybail!("duplicate required provider: `{}` already exists", name);
+		}
 		self.required_providers.insert(
 			name.to_string(),
 			json!({ "source": source, "version": version }),
 		);
-		self
+		Ok(self)
 	}
 
 	/// Add a raw provider configuration block by name.
@@ -408,7 +421,7 @@ impl Config {
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		let value = serde_json::to_value(config)?;
-		self.insert_provider_entry(name, value);
+		self.insert_provider_entry(name, value)?;
 		Ok(self)
 	}
 
@@ -420,13 +433,11 @@ impl Config {
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		let value = serde_json::to_value(config)?;
-		let type_map = self
-			.resources
+		self.resources
 			.entry(resource_type.to_string())
-			.or_insert_with(|| Value::Object(Map::new()));
-		if let Value::Object(map) = type_map {
-			map.insert(name.to_string(), value);
-		}
+			.or_insert_with(|| Value::Object(Map::new()))
+			.to_object_mut()?
+			.insert(name.to_string(), value);
 		Ok(self)
 	}
 
@@ -438,13 +449,11 @@ impl Config {
 		config: &impl Serialize,
 	) -> Result<&mut Self> {
 		let value = serde_json::to_value(config)?;
-		let type_map = self
-			.data_sources
+		self.data_sources
 			.entry(data_type.to_string())
-			.or_insert_with(|| Value::Object(Map::new()));
-		if let Value::Object(map) = type_map {
-			map.insert(name.to_string(), value);
-		}
+			.or_insert_with(|| Value::Object(Map::new()))
+			.to_object_mut()?
+			.insert(name.to_string(), value);
 		Ok(self)
 	}
 
@@ -603,7 +612,11 @@ impl Config {
 
 	/// Insert a provider config, upgrading to an array on the second call
 	/// for the same provider (required by Terraform for aliased providers).
-	fn insert_provider_entry(&mut self, local_name: &str, config: Value) {
+	fn insert_provider_entry(
+		&mut self,
+		local_name: &str,
+		config: Value,
+	) -> Result<()> {
 		match self.providers.get_mut(local_name) {
 			None => {
 				self.providers.insert(local_name.to_string(), config);
@@ -615,11 +628,22 @@ impl Config {
 			Some(Value::Array(arr)) => {
 				arr.push(config);
 			}
-			_ => {}
+			Some(other) => {
+				other.to_object_mut()?;
+			}
 		}
+		Ok(())
 	}
 
-	fn insert_variable(&mut self, name: impl Into<String>, variable: Variable) {
+	fn insert_variable(
+		&mut self,
+		name: impl Into<String>,
+		variable: Variable,
+	) -> Result<()> {
+		let name = name.into();
+		if self.variables.contains_key(&name) {
+			bevybail!("duplicate variable: `{}` already exists", name);
+		}
 		let mut obj = Map::new();
 		if let Some(var_type) = variable.r#type {
 			obj.insert("type".to_string(), Value::String(var_type));
@@ -630,10 +654,19 @@ impl Config {
 		if let Some(desc) = variable.description {
 			obj.insert("description".to_string(), Value::String(desc));
 		}
-		self.variables.insert(name.into(), Value::Object(obj));
+		self.variables.insert(name, Value::Object(obj));
+		Ok(())
 	}
 
-	fn insert_output(&mut self, name: impl Into<String>, output: Output) {
+	fn insert_output(
+		&mut self,
+		name: impl Into<String>,
+		output: Output,
+	) -> Result<()> {
+		let name = name.into();
+		if self.outputs.contains_key(&name) {
+			bevybail!("duplicate output: `{}` already exists", name);
+		}
 		let mut obj = Map::new();
 		obj.insert("value".to_string(), output.value);
 		if let Some(desc) = output.description {
@@ -642,6 +675,7 @@ impl Config {
 		if let Some(sensitive) = output.sensitive {
 			obj.insert("sensitive".to_string(), Value::Bool(sensitive));
 		}
-		self.outputs.insert(name.into(), Value::Object(obj));
+		self.outputs.insert(name, Value::Object(obj));
+		Ok(())
 	}
 }

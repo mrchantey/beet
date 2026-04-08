@@ -38,14 +38,6 @@ impl Block for LightsailBlock {
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
-		Ok(())
-	}
-}
-
-
-impl LightsailBlock {
-	/// Build a complete [`terra::Config`] for this Lightsail stack.
-	pub fn build_config(&self, stack: &Stack) -> Result<terra::Config> {
 		let keypair_ident = stack.resource_ident("keypair");
 		let keypair = terra::ResourceDef::new_secondary(
 			keypair_ident.clone(),
@@ -117,25 +109,28 @@ impl LightsailBlock {
 			port_details,
 		);
 
-		Ok(terra::Config::default()
-			.with_backend(stack.backend())
-			.with_resource(&keypair)?
-			.with_resource(&static_ip)?
-			.with_resource(&instance)?
-			.with_resource(&ip_attach)?
-			.with_resource(&ports)?
-			.with_output("instance_name", terra::Output {
+		config
+			.add_resource(&keypair)?
+			.add_resource(&static_ip)?
+			.add_resource(&instance)?
+			.add_resource(&ip_attach)?
+			.add_resource(&ports)?
+			.add_output("instance_name", terra::Output {
 				value: json!(instance.field_ref("name")),
 				description: Some("The Lightsail instance name".into()),
 				sensitive: None,
-			})
-			.with_output("static_ip_address", terra::Output {
+			})?
+			.add_output("static_ip_address", terra::Output {
 				value: json!(static_ip.field_ref("ip_address")),
 				description: Some("The static IP address".into()),
 				sensitive: None,
-			}))
-	}
+			})?;
 
+		Ok(())
+	}
+}
+
+impl LightsailBlock {
 	/// Generate a systemd-based user data script for the application.
 	fn build_user_data(&self, stack: &Stack) -> SmolStr {
 		let app_name = stack.app_name();
@@ -175,7 +170,8 @@ mod tests {
 	async fn lightsail_config_validates() {
 		let stack = Stack::default_local();
 		let lightsail = LightsailBlock::default();
-		let config = lightsail.build_config(&stack).unwrap();
+		let mut config = stack.create_config();
+		lightsail.apply_to_config(&stack, &mut config).unwrap();
 		config.validate().await.unwrap();
 	}
 }

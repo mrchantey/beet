@@ -4,16 +4,29 @@
 //! ```sh
 //!   cargo run --example lightsail --features=lightsail_block
 //! ```
-use beet::prelude::*;
 
+use beet::prelude::*;
 #[beet::main]
 async fn main() -> Result {
-	let stack = Stack::default_local();
-	let lightsail = LightsailBlock::default();
-	let config = lightsail.build_config(&stack)?;
-
-	let out_path =
-		WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
-	config.export_and_validate(&out_path).await?;
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			BeetRouterPlugin,
+			// LogPlugin {
+			// 	level: Level::TRACE,
+			// 	..default()
+			// },
+		))
+		.add_systems(Startup, setup)
+		.run();
 	Ok(())
+}
+
+fn setup(mut commands: Commands) {
+	commands.spawn((
+		Stack::new("lambda-example"),
+		CliServer::default(),
+		stack_router(),
+		LightsailBlock::default(),
+	));
 }

@@ -19,10 +19,6 @@ async fn main() -> Result {
 		))
 		.add_systems(Startup, setup)
 		.run();
-
-	// let out_path =
-	// 	WsPathBuf::new("target/examples/lambda/main.tf.json").into_abs();
-	// config.export_and_validate(&out_path).await?;
 	Ok(())
 }
 

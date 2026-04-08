@@ -31,8 +31,8 @@ required-features = ["bindings_generator"]
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
-beet_tool = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
+beet_tool = { workspace = true, optional = true, features= ["json"] }
+beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true
 heck.workspace = true
