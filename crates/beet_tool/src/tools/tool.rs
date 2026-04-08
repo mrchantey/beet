@@ -269,9 +269,15 @@ impl ToolDescription {
 	}
 	pub fn of<T: Typed>() -> Self {
 		let type_info = T::type_info();
-		let docs = type_info
-			.docs()
-			.unwrap_or("No Description Available".into());
+		cfg_if! {
+			if #[cfg(feature="reflect")]{
+			let docs = type_info
+				.docs()
+				.unwrap_or("No Description Available".into());
+			} else {
+				let docs = "No Description Available";
+			}
+		};
 		Self::new(docs)
 	}
 }

@@ -150,8 +150,9 @@ mod test {
 	#[beet_core::test]
 	#[cfg(feature = "postcard")]
 	async fn postcard_request_response() {
-		let request =
-			Request::with_postcard("/add", &AddInput { a: 5, b: 7 }).unwrap();
+		let request = Request::with_postcard("/add", &AddInput { a: 5, b: 7 })
+			.unwrap()
+			.with_header::<header::Accept>(MediaType::Postcard);
 
 		let response = AsyncPlugin::world()
 			.spawn(add_route_tool())

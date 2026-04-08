@@ -16,7 +16,7 @@ default = ["reflect"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde","dep:serde_json","beet_core/json"]
 bevy_scene = ["beet_core/bevy_scene"]
-reflect = ["bevy/reflect_functions"]
+reflect = ["beet_core/bevy_reflect_documentation"]
 
 [dependencies]
 beet_core = { workspace = true }

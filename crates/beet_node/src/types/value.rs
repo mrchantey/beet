@@ -791,6 +791,8 @@ fn value_from_reflect(reflect: &dyn PartialReflect) -> Result<Value> {
 				reflect.reflect_kind()
 			)
 		}
+		// functions with function feature
+		#[allow(unreachable_patterns)]
 		other => {
 			bevybail!("unsupported reflect kind: {:?}", other.kind())
 		}

@@ -15,7 +15,7 @@ use crate::prelude::*;
 
 impl MediaType {
 	/// Serialize `value` into bytes using the first media type in `accept` that
-	/// matches, falling back to plaintext if empty.
+	/// matches, falling back to json if empty.
 	pub fn serialize_accepts<T: serde::Serialize>(
 		accept: &[MediaType],
 		value: &T,
@@ -27,8 +27,15 @@ impl MediaType {
 		}
 		// last resort, see if it accepts text
 		if accept.is_empty() {
-			let value = serde_plain::to_string(value)?;
-			Ok((MediaType::Text, value.into_bytes()))
+			cfg_if! {
+				if #[cfg(feature = "json")]{
+					let value = serde_json::to_string(value)?;
+					Ok((MediaType::Json, value.into_bytes()))
+				}else {
+					let value = serde_plain::to_string(value)?;
+					Ok((MediaType::Text, value.into_bytes()))
+				}
+			}
 		} else {
 			bevybail!(
 				"None of the accept media types could serialize the value\ntypes: {:?}",
