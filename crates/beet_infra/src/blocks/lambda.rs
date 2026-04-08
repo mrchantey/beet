@@ -20,6 +20,7 @@ pub enum DnsProvider {
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
 #[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LambdaBlock {
 	/// Optional DNS provider configuration.
 	pub dns: Option<DnsProvider>,

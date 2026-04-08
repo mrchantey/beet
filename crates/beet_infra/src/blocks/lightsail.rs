@@ -9,6 +9,7 @@ use serde_json::json;
 /// - Configurable ports
 /// - Systemd service user data
 #[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LightsailBlock {
 	/// The port the application server listens on.
 	pub server_port: u16,
@@ -30,6 +31,17 @@ impl Default for LightsailBlock {
 		}
 	}
 }
+
+impl Block for LightsailBlock {
+	fn apply_to_config(
+		&self,
+		stack: &Stack,
+		config: &mut terra::Config,
+	) -> Result {
+		Ok(())
+	}
+}
+
 
 impl LightsailBlock {
 	/// Build a complete [`terra::Config`] for this Lightsail stack.
