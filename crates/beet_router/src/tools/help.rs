@@ -147,6 +147,10 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 		}
 		output.push('\n');
 
+		if let Some(description) = &node.description {
+			output.push_str(&format!("    {}\n", description.as_str()));
+		}
+
 		// input/output types, skip trivial `()` types
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();

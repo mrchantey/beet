@@ -116,6 +116,12 @@ impl MediaType {
 		bytes: &[u8],
 	) -> Result<T> {
 		match self {
+			MediaType::Text => {
+				let string = std::str::from_utf8(bytes)?;
+				serde_plain::from_str(string).map_err(|err| {
+					bevyhow!("Failed to deserialize plaintext body: {err}")
+				})
+			}
 			MediaType::Json => {
 				#[cfg(feature = "json")]
 				{
@@ -164,6 +170,14 @@ mod test {
 		b: i32,
 	}
 
+
+	#[test]
+	fn roundtrip_plaintext() {
+		let input: u32 = 20;
+		let bytes = MediaType::Text.serialize(&input).unwrap();
+		let output: u32 = MediaType::Text.deserialize(&bytes).unwrap();
+		output.xpect_eq(input);
+	}
 	#[cfg(feature = "json")]
 	#[test]
 	fn roundtrip_json() {
@@ -202,6 +216,5 @@ mod test {
 	#[test]
 	fn unsupported_media_type_errors() {
 		MediaType::Html.serialize(&42u32).xpect_err();
-		MediaType::Text.serialize(&42u32).xpect_err();
 	}
 }

@@ -566,7 +566,9 @@ fn make_struct_def(
 	require_tool: Option<TokenStream>,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
-	let require_attr = if has_component {
+	let has_reflect = has_derive(fn_attrs, "Reflect");
+
+	let require_tool = if has_component {
 		if let Some(expr) = require_tool {
 			quote! { #[require(#expr)] }
 		} else {
@@ -579,16 +581,26 @@ fn make_struct_def(
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
 
+	// let require_description = if has_reflect {
+	// 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+
+	// 	quote! {
+	// 		#[require(#beet_tool::prelude::ToolDescription = #beet_tool::prelude::ToolDescription::of<Self>())]
+	// 	}
+	// } else {
+	// 	quote! {}
+	// };
+
 	if type_params.is_empty() {
 		quote! {
 			#(#fn_attrs)*
-			#require_attr
+			#require_tool
+			// #require_description
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name;
 		}
 	} else {
 		let (impl_generics, _, where_clause) = generics.split_for_impl();
-		let has_reflect = has_derive(fn_attrs, "Reflect");
 		let phantom = if type_params.len() == 1 {
 			let tp = type_params[0];
 			if has_reflect {
@@ -610,7 +622,8 @@ fn make_struct_def(
 		};
 		quote! {
 			#(#fn_attrs)*
-			#require_attr
+			#require_tool
+			// #require_description
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
 		}

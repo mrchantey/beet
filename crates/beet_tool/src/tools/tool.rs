@@ -140,7 +140,8 @@ where
 #[derive(Copy, Clone, Debug, Component)]
 #[component(on_add=try_add_reflect_tool_meta)]
 pub struct ToolMeta {
-	/// Type metadata for the tool handler.
+	/// Type metadata for the tool handler,
+	/// this is the type of the actual function.
 	handler: TypeMeta,
 	/// Type metadata for the tool input.
 	input: TypeMeta,
@@ -255,6 +256,26 @@ impl ReflectToolMeta {
 		reflect_ext::type_info_to_json_schema(self.output_info)
 	}
 }
+
+#[derive(Debug, Clone, Get, Deref, Component)]
+pub struct ToolDescription {
+	description: String,
+}
+impl ToolDescription {
+	pub fn new(description: impl Into<String>) -> Self {
+		Self {
+			description: description.into(),
+		}
+	}
+	pub fn of<T: Typed>() -> Self {
+		let type_info = T::type_info();
+		let docs = type_info
+			.docs()
+			.unwrap_or("No Description Available".into());
+		Self::new(docs)
+	}
+}
+
 
 /// Lightweight type metadata using [`TypeId`](std::any::TypeId) for
 /// comparison and [`type_name`](std::any::type_name) for display.

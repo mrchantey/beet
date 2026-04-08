@@ -51,24 +51,28 @@ pub struct ToolNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
+	/// A description of the tool.
+	pub description: Option<ToolDescription>,
 	/// Whether this tool is a scene route (has a [`SceneRoute`] component).
 	pub is_scene: bool,
 }
 
 /// The query tuple type used to collect tool components for [`ToolNode::from_query`].
+// TODO this is a code smell, means we need
 pub type ToolQueryItem<'a> = (
 	Entity,
 	&'a ToolMeta,
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
+	Option<&'a ToolDescription>,
 	Option<&'a SceneRoute>,
 );
 
 impl ToolNode {
 	/// Create a [`ToolNode`] from the full query result tuple.
 	pub fn from_query(
-		(entity, meta, path, params, method, scene_route): ToolQueryItem,
+		(entity, meta, path, params, method, description, scene_route): ToolQueryItem,
 	) -> Self {
 		Self {
 			entity,
@@ -76,6 +80,7 @@ impl ToolNode {
 			params: params.clone(),
 			path: path.clone(),
 			method: method.cloned(),
+			description: description.cloned(),
 			is_scene: scene_route.is_some(),
 		}
 	}
@@ -472,6 +477,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 			ToolNode {
@@ -480,6 +486,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 		];
@@ -499,6 +506,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 			ToolNode {
@@ -507,6 +515,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 		];
@@ -526,6 +535,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 			ToolNode {
@@ -534,6 +544,7 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
+				description: None,
 				is_scene: false,
 			},
 		];

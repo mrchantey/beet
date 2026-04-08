@@ -67,17 +67,7 @@ pub fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,
-	tools: Query<
-		(
-			Entity,
-			&ToolMeta,
-			&PathPattern,
-			&ParamsPattern,
-			Option<&HttpMethod>,
-			Option<&SceneRoute>,
-		),
-		Without<RouteHidden>,
-	>,
+	tools: Query<ToolQueryItem, Without<RouteHidden>>,
 	mut commands: Commands,
 ) -> Result {
 	let root = ancestors.root_ancestor(ev.entity);
