@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::terra::Project;
 use beet_core::prelude::*;
+use beet_net::prelude::S3Provider;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]
 pub struct Stack {
@@ -84,17 +85,21 @@ impl Stack {
 
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
-	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
+	stacks: AncestorQuery<
+		'w,
+		's,
+		(Entity, &'static Stack, Option<&'static AwsStack>),
+	>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
+	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
 	children: Query<'w, 's, &'static Children>,
-	// ancestors: Query<'w, 's, &'static ChildOf>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
 	/// Finds the stack in ancestors and
 	/// builds a config of all block descendents
 	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
-		let (root, stack) = self.stacks.get(entity)?;
+		let (root, stack, _) = self.stacks.get(entity)?;
 		let mut config = stack.create_config();
 		for (child, block) in self
 			.children
@@ -104,5 +109,33 @@ impl<'w, 's> StackQuery<'w, 's> {
 			block.apply_to_config(&child, stack, &mut config)?;
 		}
 		Ok(Project::new(&stack, config))
+	}
+
+	#[cfg(feature = "aws")]
+	pub fn s3_provider(&self, entity: Entity) -> Result<S3Provider> {
+		let (_, stack, aws_stack) = self.stacks.get(entity)?;
+		let bucket = self.s3_buckets.get(entity)?;
+		bucket.provider(stack, aws_stack).xok()
+	}
+}
+
+/// Define the default region for all descendants of
+/// this entity.
+#[derive(Debug, Clone, Component, Get)]
+pub struct AwsStack {
+	default_region: SmolStr,
+}
+
+impl Default for AwsStack {
+	fn default() -> Self { Self::new(Self::DEFAULT_REGION) }
+}
+
+impl AwsStack {
+	/// The default region used when no ancestor [`AwsStack`] is present.
+	pub const DEFAULT_REGION: &'static str = "us-east-1";
+	pub fn new(region: impl Into<SmolStr>) -> Self {
+		Self {
+			default_region: region.into(),
+		}
 	}
 }
