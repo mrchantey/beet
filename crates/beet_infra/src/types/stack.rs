@@ -14,6 +14,9 @@ pub struct Stack {
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
 	prod_stage: SmolStr,
+	/// A suffix to append to the state backend, defaults to `tofu.tfstate`,
+	/// making the final state key `app-name--stage--state-suffix`
+	state_suffix: SmolStr,
 	/// The opentofu directory for creating
 	/// and deploying infrastructure config.
 	work_directory: WsPathBuf,
@@ -34,6 +37,7 @@ impl Stack {
 		Self {
 			app_name,
 			work_directory,
+			state_suffix: "tofu.tfstate".into(),
 			stage: "dev".into(),
 			prod_stage: "prod".into(),
 			params: default(),
@@ -71,7 +75,9 @@ impl Stack {
 	}
 	/// Initialize a config with the corresponding backend
 	pub fn create_config(&self) -> terra::Config {
-		terra::Config::default().with_backend(self.backend().to_json(&self))
+		// ie my-app--prod--tofu.tfstate
+		let ident = self.resource_ident(self.state_suffix.clone());
+		terra::Config::default().with_backend(self.backend().to_json(&ident))
 	}
 }
 

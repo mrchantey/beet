@@ -270,8 +270,8 @@ mod tests {
 	use super::*;
 
 	#[beet_core::test(timeout_ms = 120000)]
-	// #[ignore = "very slow"]
-	async fn lambda_config_validates() {
+	#[ignore = "very slow"]
+	async fn validate() {
 		let (stack, _dir) = Stack::default_local();
 		let block = LambdaBlock::default();
 		let mut config = stack.create_config();

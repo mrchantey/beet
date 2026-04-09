@@ -1,5 +1,6 @@
 //! Local echo HTTP server for testing.
 use crate::prelude::*;
+use beet_core::prelude::*;
 use beet_tool::prelude::*;
 use bytes::Bytes;
 

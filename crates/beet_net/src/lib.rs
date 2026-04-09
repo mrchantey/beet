@@ -38,7 +38,8 @@ pub mod prelude {
 	pub use crate::sockets;
 	pub use crate::tools::*;
 	pub use crate::types::*;
-	pub use beet_core::prelude::*;
+	#[cfg(test)]
+	pub(crate) use beet_core::prelude::*;
 
 	// Re-export common types from dependencies
 	pub use bevy::tasks::futures_lite::StreamExt;

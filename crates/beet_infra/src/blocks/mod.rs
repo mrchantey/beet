@@ -9,3 +9,7 @@ mod lightsail;
 pub use lightsail::*;
 mod block;
 pub use block::*;
+#[cfg(feature = "bindings_aws_common")]
+mod bucket;
+#[cfg(feature = "bindings_aws_common")]
+pub use bucket::*;

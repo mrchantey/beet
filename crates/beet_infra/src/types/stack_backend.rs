@@ -1,6 +1,5 @@
 use crate::bindings::aws;
 use crate::terra;
-use crate::types::Stack;
 use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
@@ -23,9 +22,7 @@ impl From<S3Backend> for StackBackend {
 }
 impl StackBackend {
 	/// Create the body of the opentofu "backend" field
-	pub fn to_json(&self, stack: &Stack) -> Value {
-		// ie my-app--prod--tofu.tfstate
-		let ident = stack.resource_ident("tofu.tfstate");
+	pub fn to_json(&self, ident: &terra::Ident) -> Value {
 		match self {
 			StackBackend::Local(b) => b.to_json(&ident),
 			StackBackend::S3(b) => b.to_json(&ident),
