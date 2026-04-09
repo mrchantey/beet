@@ -106,7 +106,7 @@ pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
 pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir)
-		.with_args(&["apply"])
+		.with_args(&["apply", "-auto-approve"])
 		.run_async_stdout()
 		.await
 }
@@ -142,7 +142,7 @@ pub async fn remove(dir: &AbsPathBuf, resource: &str) -> Result<String> {
 pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir)
-		.with_args(&["destroy"])
+		.with_args(&["destroy", "-auto-approve"])
 		.run_async_stdout()
 		.await
 }

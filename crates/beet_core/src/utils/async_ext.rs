@@ -123,6 +123,18 @@ where
 		.map_err(|err| bevyhow!("tokio task panicked: {err}"))?
 }
 
+/// Convenience wrapper that pins an [`on_tokio`] future into a [`SendBoxedFuture`].
+///
+/// Replaces the common pattern `Box::pin(async_ext::on_tokio(async move { ... }))`.
+#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+pub fn pin_tokio<F, T>(future: F) -> SendBoxedFuture<Result<T, BevyError>>
+where
+	F: 'static + Send + Future<Output = Result<T, BevyError>>,
+	T: 'static + Send,
+{
+	Box::pin(on_tokio(future))
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

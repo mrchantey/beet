@@ -58,12 +58,18 @@ impl<'a> Process<'a> {
 		self.run()
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
-	/// Run the command asynchronously, collecting stdout.
-	///
-	/// Uses the synchronous [`Process::run`] internally because
-	/// `async_process::Command::output()` can hang due to reactor
-	/// compatibility issues with bevy's task pools.
-	pub async fn run_async(self) -> Result<Output> { self.run() }
+	/// Run the command asynchronously using `async_process`, collecting stdout.
+	pub async fn run_async(self) -> Result<Output> {
+		let mut cmd = async_process::Command::new(self.command);
+		if let Some(dir) = self.cwd {
+			cmd.current_dir(dir);
+		}
+		cmd.args(self.args)
+			.output()
+			.await
+			.xmap(|result| self.map_result(result))?
+			.xmap(|output| self.map_output(output))
+	}
 
 	/// Run the command, collecting stdout
 	pub async fn run_async_stdout(self) -> Result<String> {

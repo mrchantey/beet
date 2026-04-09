@@ -2,7 +2,7 @@
 //!
 //! Run with:
 //! ```sh
-//!   cargo run --example lightsail --features=lightsail_block
+//!   cargo run --example lightsail --features=lightsail_block,bindings_aws_common,aws
 //! ```
 
 use beet::prelude::*;
@@ -20,7 +20,7 @@ async fn main() -> Result {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		Stack::new("lambda-example"),
+		Stack::new("lightsail-example"),
 		stack_cli(),
 		LightsailBlock::default(),
 	));

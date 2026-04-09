@@ -22,7 +22,10 @@ impl S3BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			details: default(),
+			details: AwsS3BucketDetails {
+				force_destroy: Some(true),
+				..default()
+			},
 			output: true,
 		}
 	}
