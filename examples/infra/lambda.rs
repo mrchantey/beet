@@ -9,7 +9,7 @@ use beet::prelude::*;
 #[beet::main]
 async fn main() -> Result {
 	App::new()
-		.add_plugins((MinimalPlugins, BeetRouterPlugin, LogPlugin {
+		.add_plugins((MinimalPlugins, InfraPlugin, LogPlugin {
 			// level: Level::TRACE,
 			..default()
 		}))
@@ -22,8 +22,7 @@ async fn main() -> Result {
 fn setup(mut commands: Commands) {
 	commands.spawn((
 		Stack::new("lambda-example").with_backend(LocalBackend::default()),
-		CliServer::default(),
-		stack_router(),
 		LambdaBlock::default(),
+		stack_cli(),
 	));
 }

@@ -17,9 +17,12 @@ pub struct BucketBlock {
 }
 
 impl BucketBlock {
-	pub fn new(label: SmolStr, details: impl Into<BucketDetails>) -> Self {
+	pub fn new(
+		label: impl Into<SmolStr>,
+		details: impl Into<BucketDetails>,
+	) -> Self {
 		Self {
-			label,
+			label: label.into(),
 			details: details.into(),
 			output: true,
 		}

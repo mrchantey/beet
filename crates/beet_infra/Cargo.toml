@@ -20,6 +20,12 @@ bindings_aws_common = []
 bindings_aws_dns = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
+bindings_aws_all = [
+	"bindings_aws_common",
+	"bindings_aws_dns",
+	"bindings_aws_lightsail",
+	"bindings_aws_lambda",
+]
 bindings_cloudflare_common = []
 cli = ["dep:beet_tool", "dep:beet_router"]
 

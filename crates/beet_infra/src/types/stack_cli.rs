@@ -1,12 +1,14 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_router::prelude::*;
 use beet_tool::prelude::*;
 
 
 
-pub fn stack_router() -> impl Bundle {
+pub fn stack_cli() -> impl Bundle {
 	(
+		CliServer::default(),
 		default_router(),
 		OnSpawn::insert_child((
 			route_tool("validate", Validate),
@@ -45,12 +47,3 @@ async fn Plan(cx: AsyncToolIn) -> Result<String> {
 		.plan()
 		.await
 }
-
-
-
-// fn build_config(mut commands: Commands) {
-// 	let mut foo = 32;
-// 	commands
-// 		.entity(Entity::PLACEHOLDER)
-// 		.call::<_, ()>(&mut foo, default());
-// }

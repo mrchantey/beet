@@ -2,10 +2,12 @@
 mod infra_plugin;
 mod stack;
 mod stack_backend;
-mod stack_router;
+#[cfg(feature = "cli")]
+mod stack_cli;
 pub use infra_plugin::*;
 pub use stack::*;
 pub use stack_backend::*;
-pub use stack_router::*;
+#[cfg(feature = "cli")]
+pub use stack_cli::*;
 // mod expression;
 // pub use expression::*;

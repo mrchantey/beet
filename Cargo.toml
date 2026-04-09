@@ -284,6 +284,10 @@ markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 infra = ["dep:beet_infra"]
 lambda_block = ["infra", "beet_infra?/lambda_block", "fs", "rand"]
 lightsail_block = ["infra", "beet_infra?/lightsail_block", "fs", "rand"]
+bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
+bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
+bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
+
 
 # examples = ["bevy_default", "spatial", "dep:beet_examples"]
 # flow = ["dep:beet_flow"]
@@ -448,7 +452,7 @@ required-features = ["thread","bevy_scene"]
 [[example]]
 name = "bucket"
 path = "examples/infra/bucket.rs"
-required-features = ["infra"]
+required-features = ["bindings_aws_common"]
 
 [[example]]
 name = "lambda"
