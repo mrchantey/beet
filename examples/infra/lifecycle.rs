@@ -36,39 +36,39 @@ fn setup(mut commands: Commands) {
 				})
 				.await?;
 
-			println!("Validating..");
+			println!("🔨 Validating..");
 			project.validate().await?;
 
-			println!("Planning..");
+			println!("🔨 Planning..");
 			let plan = project.plan().await?;
-			println!("Plan generated: \n{plan}");
+			println!("🧭 Plan generated: \n{plan}");
 
 			let provider = entity
 				.with_state::<StackQuery, _>(|entity, query| {
 					query.s3_provider(entity)
 				})
 				.await?;
-			println!("Bucket Exists: {}", provider.bucket_exists().await?);
+			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
 
-			println!("Applying..");
+			println!("🔨 Applying..");
 			project.apply().await?;
 
-			println!("Bucket Exists: {}", provider.bucket_exists().await?);
+			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
 
 			let path = RoutePath::new("foo.md");
 			let content = "bar";
 
-			println!("File Exists: {}", provider.get(&path).await.is_ok());
+			println!("📄 File Exists: {}", provider.get(&path).await.is_ok());
 
-			println!("Inserting File..");
+			println!("🔨 Inserting File..");
 			provider.insert(&path, content.into()).await?;
 			let bytes = provider.get(&path).await?;
-			println!("Remote Bytes match: {}", bytes == content.as_bytes());
+			println!("📄 File Matches: {}", bytes == content.as_bytes());
 
-			println!("Destroying..");
+			println!("🔨 Destroying..");
 			project.destroy().await?;
 
-			println!("Bucket Exists: {}", provider.bucket_exists().await?);
+			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
 
 			entity.world().write_message(AppExit::Success);
 			Ok(())
