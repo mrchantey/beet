@@ -16,6 +16,8 @@ pub struct Stack {
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
 	prod_stage: SmolStr,
+	/// Allow reconfiguring the backend without migrating state
+	reconfigure: bool,
 	/// A suffix to append to the state backend, defaults to `tofu.tfstate`,
 	/// making the final state key `app-name--stage--state-suffix`
 	state_suffix: SmolStr,
@@ -43,6 +45,7 @@ impl Stack {
 			stage: "dev".into(),
 			prod_stage: "prod".into(),
 			params: default(),
+			reconfigure: false,
 			backend: S3Backend::default().into(),
 		}
 	}
@@ -99,10 +102,18 @@ pub struct StackQuery<'w, 's> {
 
 impl<'w, 's> StackQuery<'w, 's> {
 	/// Finds the stack in ancestors and
-	/// builds a config of all block descendents
+	/// builds a config of all block descendents.
+	/// Sets the AWS provider region from the nearest [`AwsStack`] ancestor,
+	/// ensuring the tofu config and Rust SDK use the same region.
 	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
-		let (root, stack, _) = self.stacks.get(entity)?;
+		let (root, stack, aws_stack) = self.stacks.get(entity)?;
 		let mut config = stack.create_config();
+		let region =
+			aws_stack.map_or(AwsStack::DEFAULT_REGION, |s| s.default_region());
+		config.add_provider_config(
+			&terra::Provider::AWS,
+			&serde_json::json!({ "region": region }),
+		)?;
 		for (child, block) in self
 			.children
 			.iter_descendants_inclusive(root)
@@ -134,7 +145,8 @@ impl Default for AwsStack {
 
 impl AwsStack {
 	/// The default region used when no ancestor [`AwsStack`] is present.
-	pub const DEFAULT_REGION: &'static str = "us-east-1";
+	pub const DEFAULT_REGION: &'static str =
+		crate::bindings::aws::region::DEFAULT;
 	pub fn new(region: impl Into<SmolStr>) -> Self {
 		Self {
 			default_region: region.into(),

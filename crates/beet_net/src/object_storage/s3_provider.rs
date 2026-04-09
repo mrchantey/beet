@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use aws_config::Region;
-use aws_config::meta::region::RegionProviderChain;
+
 use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;
@@ -44,13 +44,8 @@ impl S3Provider {
 			LazyPool::new(|region| {
 				Box::pin(async move {
 					let region_obj = Region::new(region.to_string());
-					let config = aws_config::from_env()
-						.region(
-							RegionProviderChain::default_provider()
-								.or_else(region_obj),
-						)
-						.load()
-						.await;
+					let config =
+						aws_config::from_env().region(region_obj).load().await;
 					Client::new(&config)
 				})
 			});
@@ -98,12 +93,15 @@ impl BucketProvider for S3Provider {
 			let mut req =
 				client.create_bucket().bucket(this.bucket_name.as_str());
 
-			use aws_sdk_s3::types::CreateBucketConfiguration;
-
-			let bucket_config = CreateBucketConfiguration::builder()
-				.location_constraint(this.region.as_str().into())
-				.build();
-			req = req.create_bucket_configuration(bucket_config);
+			// us-east-1 is S3's default region and rejects an explicit
+			// LocationConstraint; all other regions require it.
+			if this.region.as_str() != "us-east-1" {
+				use aws_sdk_s3::types::CreateBucketConfiguration;
+				let bucket_config = CreateBucketConfiguration::builder()
+					.location_constraint(this.region.as_str().into())
+					.build();
+				req = req.create_bucket_configuration(bucket_config);
+			}
 			req.send().await?;
 			().xok()
 		})

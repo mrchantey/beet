@@ -92,7 +92,9 @@ impl Default for S3Backend {
 	fn default() -> Self {
 		Self {
 			bucket: DEFAULT_STATE_NAME.into(),
-			region: aws::region::DEFAULT.into(),
+			// State bucket lives in us-east-1 as a stable singleton,
+			// independent of the managed-resource region.
+			region: aws::region::US_EAST_1.into(),
 			use_lockfile: true,
 		}
 	}

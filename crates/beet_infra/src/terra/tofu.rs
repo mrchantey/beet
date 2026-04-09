@@ -74,11 +74,18 @@ pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 		.await
 }
 
-/// Initialize an opentofu directory, using the `./providers.tf.json`
-pub async fn init(dir: &AbsPathBuf) -> Result {
+/// Initialize an opentofu directory, using the `./providers.tf.json`.
+/// Uses `-reconfigure` to allow backend type changes without migrating state.
+pub async fn init(dir: &AbsPathBuf, force: bool) -> Result {
+	let args = if force {
+		vec!["init", "-reconfigure"]
+	} else {
+		vec!["init"]
+	};
+
 	tofu_process()
 		.with_cwd(dir)
-		.with_args(&["init"])
+		.with_args(&args)
 		.run_async()
 		.await?;
 	Ok(())

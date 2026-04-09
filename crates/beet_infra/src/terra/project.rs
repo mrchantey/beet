@@ -8,6 +8,7 @@ use beet_core::prelude::*;
 pub struct Project {
 	config: Config,
 	dir: AbsPathBuf,
+	reconfigure: bool,
 	backend: StackBackend,
 }
 impl Project {
@@ -15,12 +16,14 @@ impl Project {
 		Self {
 			dir: stack.work_directory().into_abs(),
 			config,
+			reconfigure: *stack.reconfigure(),
 			backend: stack.backend().clone(),
 		}
 	}
 
 	/// Initialize the tofu project if required,
-	/// checking if the config has changes and a lockfile exists
+	/// checking if the config has changes, a lockfile exists,
+	/// and the backend type matches the current config.
 	async fn init(&self) -> Result {
 		/// The lock file created by `tofu init` on successful completion.
 		const LOCK_FILE: &str = ".terraform.lock.hcl";
@@ -41,7 +44,7 @@ impl Project {
 		debug!("initializing tofu backend");
 		tofu::ensure_backend_exists(&self.backend).await?;
 		debug!("initializing tofu project");
-		tofu::init(&self.dir).await?;
+		tofu::init(&self.dir, self.reconfigure).await?;
 		Ok(())
 	}
 
