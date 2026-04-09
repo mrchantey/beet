@@ -451,8 +451,8 @@ required-features = ["thread","bevy_scene"]
 # 💡 Examples - infra
 
 [[example]]
-name = "bucket"
-path = "examples/infra/bucket.rs"
+name = "lifecycle"
+path = "examples/infra/lifecycle.rs"
 required-features = ["bindings_aws_common"]
 
 [[example]]
