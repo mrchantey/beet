@@ -79,11 +79,17 @@ impl Stack {
 		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
 	}
 
+	// ie my-app--prod--tofu.tfstate
+	pub fn backend_path(&self) -> String {
+		self.resource_ident(self.state_suffix.clone())
+			.primary_identifier()
+			.clone()
+	}
+
 	/// Initialize a config with the corresponding backend
 	pub fn create_config(&self) -> terra::Config {
-		// ie my-app--prod--tofu.tfstate
-		let ident = self.resource_ident(self.state_suffix.clone());
-		terra::Config::default().with_backend(self.backend().to_json(&ident))
+		let key = self.backend_path();
+		terra::Config::default().with_backend(self.backend().to_json(&key))
 	}
 }
 

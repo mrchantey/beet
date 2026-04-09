@@ -239,6 +239,12 @@ pub trait BucketProvider: 'static + Send + Sync {
 		})
 	}
 
+	/// Check if bucket is empty (contains no objects).
+	fn bucket_is_empty(&self) -> SendBoxedFuture<Result<bool>> {
+		let this = self.box_clone();
+		Box::pin(async move { this.list().await?.is_empty().xok() })
+	}
+
 	/// Insert object into bucket.
 	///
 	/// # Example

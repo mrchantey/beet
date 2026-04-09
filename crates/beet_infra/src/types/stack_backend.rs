@@ -1,5 +1,4 @@
 use crate::bindings::aws;
-use crate::terra;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
@@ -9,7 +8,7 @@ use serde_json::json;
 /// By default, the state for each stack is
 /// stored in an individual directory in a shared state bucket.
 /// https://opentofu.org/docs/language/settings/backends/configuration/
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StackBackend {
 	Local(LocalBackend),
 	S3(S3Backend),
@@ -23,10 +22,10 @@ impl From<S3Backend> for StackBackend {
 }
 impl StackBackend {
 	/// Create the body of the opentofu "backend" field
-	pub fn to_json(&self, ident: &terra::Ident) -> Value {
+	pub fn to_json(&self, key: &str) -> Value {
 		match self {
-			Self::Local(b) => b.to_json(&ident),
-			Self::S3(b) => b.to_json(&ident),
+			Self::Local(b) => b.to_json(&key),
+			Self::S3(b) => b.to_json(&key),
 		}
 	}
 
@@ -37,11 +36,25 @@ impl StackBackend {
 			Self::Local(local) => local.provider().box_clone(),
 		}
 	}
+
+	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
+	pub async fn ensure_exists(&self) -> Result {
+		self.provider().bucket_try_create().await
+	}
+
+	/// Remove this backend bucket if its empty
+	pub async fn remove_if_empty(&self) -> Result {
+		let provider = self.provider();
+		if provider.bucket_is_empty().await? {
+			provider.bucket_remove().await?;
+		}
+		Ok(())
+	}
 }
 
 /// Local filesystem backend, defaults to `.beet/infra`
 /// https://opentofu.org/docs/language/settings/backends/local/
-#[derive(Debug, Clone, Get)]
+#[derive(Debug, Clone, PartialEq, Eq, Get)]
 pub struct LocalBackend {
 	/// The path on the local filesystem where the state file will be stored, defaults to `.beet/infra`.
 	path: AbsPathBuf,
@@ -55,9 +68,8 @@ impl Default for LocalBackend {
 	}
 }
 impl LocalBackend {
-	fn to_json(&self, ident: &terra::Ident) -> Value {
-		let ident = ident.primary_identifier();
-		json!({"local":{ "path": self.path.join(ident) }})
+	fn to_json(&self, key: &str) -> Value {
+		json!({"local":{ "path": self.path.join(key) }})
 	}
 	pub fn provider(&self) -> FsBucketProvider {
 		FsBucketProvider::new(self.path.clone())
@@ -68,7 +80,7 @@ const DEFAULT_STATE_NAME: &str = "beet-state";
 
 /// S3 backend for remote state storage.
 /// https://opentofu.org/docs/language/settings/backends/s3/
-#[derive(Debug, Clone, Get, SetWith)]
+#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
 pub struct S3Backend {
 	/// The S3 bucket containing the state file, defaults to `beet-state`
 	bucket: SmolStr,
@@ -101,11 +113,11 @@ impl Default for S3Backend {
 }
 
 impl S3Backend {
-	fn to_json(&self, ident: &terra::Ident) -> Value {
+	fn to_json(&self, key: &str) -> Value {
 		json!({
 			"s3": {
 				"bucket": self.bucket,
-				"key": ident.primary_identifier(),
+				"key": key,
 				"region": self.region.to_string(),
 				"use_lockfile": self.use_lockfile,
 			}
