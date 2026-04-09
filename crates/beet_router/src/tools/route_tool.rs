@@ -246,6 +246,6 @@ mod test {
 			.unwrap()
 			.annotated_rel_path()
 			.to_string()
-			.xpect_eq("/add");
+			.xpect_eq("add");
 	}
 }

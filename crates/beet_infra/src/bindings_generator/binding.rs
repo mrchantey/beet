@@ -405,7 +405,7 @@ fn export_attributes(
 			{
 				FieldType::Seq(Box::new(FieldType::Str))
 			}
-			/* TODO: It will assume a map of strings even if the specified type is of a different kind (e.g. map of object) */
+			// Assumes a map of strings even for other map value types, ie map of object
 			Some(AttributeType(Value::Array(type_arr)))
 				if type_arr.first().unwrap() == "map" =>
 			{

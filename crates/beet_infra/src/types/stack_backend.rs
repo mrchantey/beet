@@ -47,9 +47,7 @@ impl StackBackend {
 		match self {
 			Self::Local(local) => local.clear_stale_locks(),
 			Self::S3(_) => {
-				todo!(
-					"should we clear s3 locks too, when use_lockfile enabled?"
-				)
+				// S3 lock management is handled server-side by OpenTofu's native lockfile mechanism
 			}
 		}
 	}

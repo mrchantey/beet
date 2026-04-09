@@ -4,6 +4,7 @@ use crate::prelude::*;
 use crate::sockets::common_handlers::echo_close;
 use crate::sockets::common_handlers::echo_message;
 use crate::sockets::*;
+use beet_core::prelude::*;
 
 /// A local echo WebSocket server for integration tests.
 ///
