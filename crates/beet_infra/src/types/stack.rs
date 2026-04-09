@@ -75,6 +75,7 @@ impl Stack {
 	pub fn resource_ident(&self, label: impl Into<SmolStr>) -> terra::Ident {
 		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
 	}
+
 	/// Initialize a config with the corresponding backend
 	pub fn create_config(&self) -> terra::Config {
 		// ie my-app--prod--tofu.tfstate

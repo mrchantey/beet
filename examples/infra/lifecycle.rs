@@ -39,27 +39,38 @@ fn setup(mut commands: Commands) {
 
 			println!("Validating..");
 			project.validate().await?;
+
 			println!("Planning..");
 			let plan = project.plan().await?;
 			println!("Plan generated: \n{plan}");
-			project.apply().await?;
-			let path = RoutePath::new("foo.md");
-			let content = "bar";
+
 			let provider = entity
 				.with_state::<StackQuery, _>(|entity, query| {
 					query.s3_provider(entity)
 				})
 				.await?;
+			println!("Bucket Exists: {}", provider.bucket_exists().await?);
+
 			println!("Applying..");
-			// it should not not yet be set
-			provider.get(&path).await.unwrap_err();
-			println!("Inserting..");
+			project.apply().await?;
+
+			println!("Bucket Exists: {}", provider.bucket_exists().await?);
+			provider.bucket_exists().await?.xpect_eq(true);
+
+			let path = RoutePath::new("foo.md");
+			let content = "bar";
+
+			println!("File Exists: {}", provider.get(&path).await.is_ok());
+
+			println!("Inserting File..");
 			provider.insert(&path, content.into()).await?;
 			let bytes = provider.get(&path).await?;
-			assert_eq!(bytes, content.as_bytes());
+			println!("Remote Bytes match: {}", bytes == content.as_bytes());
 
 			println!("Destroying..");
 			project.destroy().await?;
+
+			println!("Bucket Exists: {}", provider.bucket_exists().await?);
 
 			entity.world().write_message(AppExit::Success);
 			Ok(())

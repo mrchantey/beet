@@ -1,6 +1,7 @@
 use crate::bindings::aws;
 use crate::terra;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
@@ -24,8 +25,16 @@ impl StackBackend {
 	/// Create the body of the opentofu "backend" field
 	pub fn to_json(&self, ident: &terra::Ident) -> Value {
 		match self {
-			StackBackend::Local(b) => b.to_json(&ident),
-			StackBackend::S3(b) => b.to_json(&ident),
+			Self::Local(b) => b.to_json(&ident),
+			Self::S3(b) => b.to_json(&ident),
+		}
+	}
+
+	#[cfg(feature = "aws")]
+	pub fn provider(&self) -> Box<dyn Provider> {
+		match self {
+			Self::S3(s3) => s3.provider().box_clone(),
+			Self::Local(local) => local.provider.box_clone(),
 		}
 	}
 }
@@ -49,6 +58,9 @@ impl LocalBackend {
 	fn to_json(&self, ident: &terra::Ident) -> Value {
 		let ident = ident.primary_identifier();
 		json!({"local":{ "path": self.path.join(ident) }})
+	}
+	pub fn provider(&self) -> LocalProvider {
+		LocalProvider::new(self.path.clone())
 	}
 }
 
