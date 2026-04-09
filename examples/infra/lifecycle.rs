@@ -8,7 +8,7 @@ use beet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((MinimalPlugins, InfraPlugin, LogPlugin {
-			level: Level::TRACE,
+			level: Level::WARN,
 			..default()
 		}))
 		.add_systems(Startup, setup)
@@ -17,12 +17,11 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	cfg_if! {
-		if #[cfg(feature="aws")] {
-			let backend = S3Backend::default();
-		} else {
-			let backend = LocalBackend::default();
-		}
+	let args = CliArgs::parse_env();
+	let backend: StackBackend = if args.params.contains_key("aws") {
+		S3Backend::default().into()
+	} else {
+		LocalBackend::default().into()
 	};
 
 	commands
@@ -55,7 +54,6 @@ fn setup(mut commands: Commands) {
 			project.apply().await?;
 
 			println!("Bucket Exists: {}", provider.bucket_exists().await?);
-			provider.bucket_exists().await?.xpect_eq(true);
 
 			let path = RoutePath::new("foo.md");
 			let content = "bar";

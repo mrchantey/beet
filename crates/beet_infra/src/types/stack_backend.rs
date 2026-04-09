@@ -31,10 +31,10 @@ impl StackBackend {
 	}
 
 	#[cfg(feature = "aws")]
-	pub fn provider(&self) -> Box<dyn Provider> {
+	pub fn provider(&self) -> Box<dyn BucketProvider> {
 		match self {
 			Self::S3(s3) => s3.provider().box_clone(),
-			Self::Local(local) => local.provider.box_clone(),
+			Self::Local(local) => local.provider().box_clone(),
 		}
 	}
 }
@@ -59,8 +59,8 @@ impl LocalBackend {
 		let ident = ident.primary_identifier();
 		json!({"local":{ "path": self.path.join(ident) }})
 	}
-	pub fn provider(&self) -> LocalProvider {
-		LocalProvider::new(self.path.clone())
+	pub fn provider(&self) -> FsBucketProvider {
+		FsBucketProvider::new(self.path.clone())
 	}
 }
 

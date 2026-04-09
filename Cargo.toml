@@ -262,7 +262,7 @@ rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
 lambda = ["rustls-tls", "beet_net?/lambda"]
-aws = ["net", "beet_net?/aws"]
+aws = ["net", "beet_net?/aws","beet_infra?/aws"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
@@ -453,7 +453,7 @@ required-features = ["thread","bevy_scene"]
 [[example]]
 name = "lifecycle"
 path = "examples/infra/lifecycle.rs"
-required-features = ["bindings_aws_common"]
+required-features = ["bindings_aws_common", "aws"]
 
 [[example]]
 name = "lambda"
