@@ -49,7 +49,7 @@ where
 /// via [`Next`], serializes the output, and returns a [`Response`].
 ///
 /// Errors propagate as tool errors through the handler chain.
-async fn serde_exchange<Input, Output>(
+pub async fn serde_exchange<Input, Output>(
 	request: Request,
 	next: Next<Input, Output>,
 ) -> Result<Response>

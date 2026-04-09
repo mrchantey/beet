@@ -59,8 +59,16 @@ fn collect_params(item: &ItemFn) -> syn::Result<Vec<(syn::Ident, Box<Type>)>> {
 
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out"])?;
+	attrs.assert_types(&[], &["result_out", "route"])?;
 	let result_out = attrs.contains_key("result_out");
+	let has_route = attrs.contains_key("route");
+	let route_path: Option<alloc::string::String> =
+		if let Some(Some(expr)) = attrs.get("route") {
+			Some(extract_string_literal(expr)?)
+		} else {
+			None
+		};
+	let route_path = route_path.as_deref();
 
 	let is_async = item.sig.asyncness.is_some();
 
@@ -76,11 +84,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 				extract_wrapper_type_or_unit(first_ty, "AsyncToolIn")
 			{
 				return parse_async_passthrough(
-					&item, result_out, &inner, &params,
+					&item, result_out, &inner, &params, has_route, route_path,
 				);
 			}
 		}
-		parse_async_tool(&item, result_out, &params)
+		parse_async_tool(&item, result_out, &params, has_route, route_path)
 	} else if let Some(first_ty) = first_param_type {
 		if let Some(in_inner) = extract_wrapper_type(first_ty, "In") {
 			// First param is In<T>, determine which sub-case.
@@ -88,33 +96,43 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 				extract_wrapper_type_or_unit(in_inner, "SystemToolIn")
 			{
 				// In<SystemToolIn<T>> or In<SystemToolIn> → system passthrough
-				parse_system_passthrough(&item, result_out, &inner, &params)
+				parse_system_passthrough(
+					&item, result_out, &inner, &params, has_route, route_path,
+				)
 			} else if let Some(inner) =
 				extract_wrapper_type_or_unit(in_inner, "FuncToolIn")
 			{
 				// In<FuncToolIn<T>> or In<FuncToolIn> → func passthrough
-				parse_func_passthrough(&item, result_out, &inner, &params)
+				parse_func_passthrough(
+					&item, result_out, &inner, &params, has_route, route_path,
+				)
 			} else {
 				// In<T> → system tool
-				parse_system_tool(&item, result_out, in_inner, &params)
+				parse_system_tool(
+					&item, result_out, in_inner, &params, has_route, route_path,
+				)
 			}
 		} else if let Some(inner) =
 			extract_wrapper_type_or_unit(first_ty, "SystemToolIn")
 		{
 			// SystemToolIn<T> or SystemToolIn (no In<>) → system passthrough
-			parse_system_passthrough(&item, result_out, &inner, &params)
+			parse_system_passthrough(
+				&item, result_out, &inner, &params, has_route, route_path,
+			)
 		} else if let Some(inner) =
 			extract_wrapper_type_or_unit(first_ty, "FuncToolIn")
 		{
 			// FuncToolIn<T> or FuncToolIn (no In<>) → func passthrough
-			parse_func_passthrough(&item, result_out, &inner, &params)
+			parse_func_passthrough(
+				&item, result_out, &inner, &params, has_route, route_path,
+			)
 		} else {
 			// No special first param → func tool (current behavior)
-			parse_func_tool(&item, result_out, &params)
+			parse_func_tool(&item, result_out, &params, has_route, route_path)
 		}
 	} else {
 		// No params → func tool
-		parse_func_tool(&item, result_out, &params)
+		parse_func_tool(&item, result_out, &params, has_route, route_path)
 	}
 }
 
@@ -127,6 +145,8 @@ fn parse_func_tool(
 	item: &ItemFn,
 	result_out: bool,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 	let vis = &item.vis;
@@ -144,12 +164,20 @@ fn parse_func_tool(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::func_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::func_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -177,6 +205,8 @@ fn parse_func_passthrough(
 	result_out: bool,
 	inner_type: &Type,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	if params.len() != 1 {
 		synbail!(
@@ -201,12 +231,20 @@ fn parse_func_passthrough(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::func_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::func_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -235,6 +273,8 @@ fn parse_async_tool(
 	item: &ItemFn,
 	result_out: bool,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 	let vis = &item.vis;
@@ -252,12 +292,20 @@ fn parse_async_tool(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::async_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::async_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -284,6 +332,8 @@ fn parse_async_passthrough(
 	result_out: bool,
 	inner_type: &Type,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	if params.len() != 1 {
 		synbail!(
@@ -308,12 +358,20 @@ fn parse_async_passthrough(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::async_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::async_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -344,6 +402,8 @@ fn parse_system_tool(
 	result_out: bool,
 	in_inner: &Type,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 	let vis = &item.vis;
@@ -364,12 +424,20 @@ fn parse_system_tool(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::system_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::system_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -399,6 +467,8 @@ fn parse_system_passthrough(
 	result_out: bool,
 	inner_type: &Type,
 	params: &[(syn::Ident, Box<Type>)],
+	has_route: bool,
+	route_path: Option<&str>,
 ) -> syn::Result<TokenStream> {
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 	let vis = &item.vis;
@@ -418,12 +488,20 @@ fn parse_system_passthrough(
 	let tool_fn = tool_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
-	let require_tool = quote! {
-		#beet_tool::prelude::Tool<#in_type, #out_type> = #beet_tool::prelude::system_tool(#tool_fn #turbofish)
-	};
+	let tool_expr =
+		quote! { #beet_tool::prelude::system_tool(#tool_fn #turbofish) };
+	let require_tool = make_require_tool(
+		tool_expr, &in_type, &out_type, has_route, &beet_tool,
+	);
 
-	let struct_def =
-		make_struct_def(vis, fn_name, generics, fn_attrs, Some(require_tool));
+	let struct_def = make_struct_def(
+		vis,
+		fn_name,
+		generics,
+		fn_attrs,
+		Some(require_tool),
+		route_path,
+	);
 
 	Ok(quote! {
 		#struct_def
@@ -555,15 +633,59 @@ fn collect_system_params(item: &ItemFn, skip: usize) -> Vec<&FnArg> {
 	item.sig.inputs.iter().skip(skip).collect()
 }
 
+/// Build the `#[require(...)]` expression for the `Tool` component.
+///
+/// When `has_route` is true, wraps the tool with `serde_exchange` middleware
+/// so it accepts [`Request`] and returns [`Response`].
+fn make_require_tool(
+	tool_expr: TokenStream,
+	in_type: &TokenStream,
+	out_type: &TokenStream,
+	has_route: bool,
+	beet_tool: &syn::Path,
+) -> TokenStream {
+	if has_route {
+		let beet_net = pkg_ext::internal_or_beet("beet_net");
+		let beet_router = pkg_ext::internal_or_beet("beet_router");
+		quote! {
+			#beet_tool::prelude::Tool<
+				#beet_net::prelude::Request,
+				#beet_net::prelude::Response
+			> = #beet_router::prelude::serde_exchange::<#in_type, #out_type>.wrap(#tool_expr)
+		}
+	} else {
+		quote! {
+			#beet_tool::prelude::Tool<#in_type, #out_type> = #tool_expr
+		}
+	}
+}
+
+/// Extract a string value from a literal expression, ie `"home"`.
+fn extract_string_literal(
+	expr: &syn::Expr,
+) -> syn::Result<alloc::string::String> {
+	match expr {
+		syn::Expr::Lit(syn::ExprLit {
+			lit: syn::Lit::Str(s),
+			..
+		}) => Ok(s.value()),
+		other => Err(syn::Error::new_spanned(
+			other,
+			"expected a string literal, ie `route = \"home\"`",
+		)),
+	}
+}
+
 /// Generate a struct definition, forwarding function attributes to the
-/// struct and optionally adding a `#[require(Tool<...>)]` attribute
-/// when the derives include `Component`.
+/// struct and optionally adding `#[require(...)]` attributes when the
+/// derives include `Component`.
 fn make_struct_def(
 	vis: &syn::Visibility,
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
 	fn_attrs: &[syn::Attribute],
 	require_tool: Option<TokenStream>,
+	route_path: Option<&str>,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
 	let has_reflect = has_derive(fn_attrs, "Reflect");
@@ -578,24 +700,37 @@ fn make_struct_def(
 		quote! {}
 	};
 
+	let require_description = if has_component && has_reflect {
+		let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+		quote! {
+			#[require(#beet_tool::prelude::ToolDescription = #beet_tool::prelude::ToolDescription::of::<Self>())]
+		}
+	} else {
+		quote! {}
+	};
+
+	let require_path = if has_component {
+		if let Some(path) = route_path {
+			let beet_net = pkg_ext::internal_or_beet("beet_net");
+			quote! {
+				#[require(#beet_net::prelude::PathPartial = #beet_net::prelude::PathPartial::new(#path))]
+			}
+		} else {
+			quote! {}
+		}
+	} else {
+		quote! {}
+	};
+
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
-
-	// let require_description = if has_reflect {
-	// 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
-
-	// 	quote! {
-	// 		#[require(#beet_tool::prelude::ToolDescription = #beet_tool::prelude::ToolDescription::of<Self>())]
-	// 	}
-	// } else {
-	// 	quote! {}
-	// };
 
 	if type_params.is_empty() {
 		quote! {
 			#(#fn_attrs)*
 			#require_tool
-			// #require_description
+			#require_description
+			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name;
 		}
@@ -623,7 +758,8 @@ fn make_struct_def(
 		quote! {
 			#(#fn_attrs)*
 			#require_tool
-			// #require_description
+			#require_description
+			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
 		}
@@ -1217,6 +1353,88 @@ mod test {
 		assert!(result.contains("system_tool (increment_tool"));
 		assert!(result.contains("struct Increment"));
 		assert!(result.contains("fn increment_tool"));
+	}
+
+	// -----------------------------------------------------------------------
+	// ToolDescription require
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn component_reflect_adds_tool_description() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			fn Add(a: i32, b: i32) -> i32 { a + b }
+		});
+		assert!(result.contains("ToolDescription"));
+		assert!(result.contains("ToolDescription :: of :: < Self > ()"));
+	}
+
+	#[test]
+	fn component_without_reflect_no_tool_description() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component)]
+			fn Add(a: i32, b: i32) -> i32 { a + b }
+		});
+		assert!(!result.contains("ToolDescription"));
+	}
+
+	#[test]
+	fn no_component_no_tool_description() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn my_tool(a: i32) -> i32 { a }
+		});
+		assert!(!result.contains("ToolDescription"));
+	}
+
+	// -----------------------------------------------------------------------
+	// route attribute
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn route_bare_wraps_with_serde_exchange() {
+		let result = parse_str(quote!(route), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn MyTool(val: i32) -> String { val.to_string() }
+		});
+		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("Request"));
+		assert!(result.contains("Response"));
+		// inner types still used as serde_exchange type params
+		assert!(result.contains("serde_exchange :: < i32 , String >"));
+		// no PathPartial since no path given
+		assert!(!result.contains("PathPartial"));
+	}
+
+	#[test]
+	fn route_with_path_adds_path_partial() {
+		let result = parse_str(quote!(route = "home"), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn MyTool(val: i32) -> String { val.to_string() }
+		});
+		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("PathPartial"));
+		assert!(result.contains("PathPartial :: new (\"home\")"));
+	}
+
+	#[test]
+	fn route_without_component_no_path_partial() {
+		let result = parse_str(quote!(route = "home"), syn::parse_quote! {
+			async fn my_tool(val: i32) -> String { val.to_string() }
+		});
+		// no Component derive, so no #[require] at all
+		assert!(!result.contains("PathPartial"));
+		assert!(!result.contains("# [require"));
+	}
+
+	#[test]
+	fn route_with_path_and_tool_description() {
+		let result = parse_str(quote!(route = "validate"), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Validate(input: String) -> String { input }
+		});
+		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("PathPartial :: new (\"validate\")"));
+		assert!(result.contains("ToolDescription"));
 	}
 
 	#[test]
