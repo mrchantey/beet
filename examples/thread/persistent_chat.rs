@@ -28,7 +28,7 @@ fn setup(mut commands: Commands) {
 	let bucket_path = WsPathBuf::new(SCENE_DIR).into_abs();
 	let fs_provider = FsBucketProvider::new(bucket_path);
 	let bucket = Bucket::new(fs_provider.clone());
-	let route = RoutePath::from(format!("/{SCENE_FILE}"));
+	let route = RelPath::new(SCENE_FILE);
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
 	commands.queue_async(async move |world: AsyncWorld| {
@@ -125,7 +125,7 @@ async fn SaveScene(world: AsyncToolIn) -> Result<Outcome> {
 			(bucket, json).xok()
 		})
 		.await?;
-	let route = RoutePath::from(format!("/{SCENE_FILE}"));
+	let route = RelPath::new(SCENE_FILE);
 	bucket.bucket_try_create().await?;
 	bucket.insert(&route, json).await?;
 	Ok(PASS)

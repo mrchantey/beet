@@ -378,9 +378,9 @@ impl Request {
 		self
 	}
 
-	/// Returns the path as a RoutePath
-	pub fn route_path(&self) -> RoutePath {
-		RoutePath::new(self.parts.path_string())
+	/// Returns the path as a [`RelPath`].
+	pub fn route_path(&self) -> RelPath {
+		RelPath::new(self.parts.path_string())
 	}
 
 	/// Returns a reference to the request parts
@@ -615,7 +615,7 @@ mod test {
 	#[test]
 	fn request_route_path() {
 		let request = Request::get("/api/users/123");
-		request.route_path().to_string().xpect_eq("/api/users/123");
+		request.route_path().to_string().xpect_eq("api/users/123");
 	}
 
 	#[test]

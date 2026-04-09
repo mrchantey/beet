@@ -113,11 +113,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 	let filtered: Vec<&ToolNode> = nodes
 		.into_iter()
 		.filter(|node| {
-			!node
-				.path
-				.annotated_route_path()
-				.to_string()
-				.ends_with("/help")
+			node.path.annotated_rel_path().last_segment() != Some("help")
 		})
 		.collect();
 
@@ -136,7 +132,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 /// Format a [`ToolNode`] into the output string, displaying `[scene]`
 /// for scene routes and input/output types for regular tools.
 fn format_tool_node(output: &mut String, node: &ToolNode) {
-	let path = node.path.annotated_route_path();
+	let path = node.path.annotated_rel_path();
 
 	if node.is_scene {
 		output.push_str(&format!("  {} [scene]\n", path));

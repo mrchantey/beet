@@ -1,7 +1,6 @@
 use crate::prelude::terra::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 
 
 
@@ -11,7 +10,7 @@ pub struct Project {
 	dir: AbsPathBuf,
 	reconfigure: bool,
 	backend: StackBackend,
-	state_path: RoutePath,
+	state_path: RelPath,
 }
 impl Project {
 	pub fn new(stack: &Stack, config: Config) -> Self {
@@ -20,7 +19,7 @@ impl Project {
 			config,
 			reconfigure: *stack.reconfigure(),
 			backend: stack.backend().clone(),
-			state_path: RoutePath::new(stack.backend_path()),
+			state_path: RelPath::new(stack.backend_path()),
 		}
 	}
 
@@ -99,5 +98,21 @@ impl Project {
 		// self.backend.remove_if_empty().await?;
 		fs_ext::remove_async(&self.dir).await?;
 		Ok(())
+	}
+	/// Destroys infrastructure without initializing, moving forward
+	/// with each step, even if other parts fail ie dir exists but no backend state.
+	/// - clears stale state locks from interrupted runs
+	/// - runs tofu destroy (lock-free), tearing down all infrastructure
+	/// - removes the state file from the state bucket
+	/// - removes the working directory
+	pub async fn force_destroy(&self) {
+		self.backend.clear_stale_locks();
+		tofu::destroy_force(&self.dir).await.ok();
+		self.backend()
+			.provider()
+			.remove(&self.state_path)
+			.await
+			.ok();
+		fs_ext::remove_async(&self.dir).await.ok();
 	}
 }

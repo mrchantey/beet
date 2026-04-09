@@ -1,5 +1,4 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
-use super::*;
 use beet_core::prelude::*;
 use std::collections::VecDeque;
 use std::path::Path;
@@ -179,15 +178,15 @@ impl PathPattern {
 	/// Returns true if all segments are static
 	pub fn is_static(&self) -> bool { self.is_static }
 
-	/// Convert the segments to a [`RoutePath`] using annotations for dynamic segments,
-	/// ie `/foo/:bar/*bazz`
-	pub fn annotated_route_path(&self) -> RoutePath {
+	/// Convert the segments to a [`RelPath`] using annotations for dynamic segments,
+	/// ie `foo/:bar/*bazz`
+	pub fn annotated_rel_path(&self) -> RelPath {
 		self.segments
 			.iter()
 			.map(|segment| segment.to_string_annotated())
 			.collect::<Vec<_>>()
 			.join("/")
-			.xmap(RoutePath::new)
+			.xmap(RelPath::new)
 	}
 	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
@@ -214,7 +213,7 @@ impl PathPattern {
 
 impl std::fmt::Display for PathPattern {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.annotated_route_path())
+		write!(f, "{}", self.annotated_rel_path())
 	}
 }
 
@@ -265,7 +264,7 @@ pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 /// Errors that can occur when matching a route pattern against a path.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
-	/// A static segment did not match its corresponding [`RoutePath`] part.
+	/// A static segment did not match its corresponding [`RelPath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]
@@ -553,6 +552,7 @@ impl std::fmt::Display for PathPatternSegment {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::prelude::*;
 
 	/// match segments against a route path
 	fn parse(

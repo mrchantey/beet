@@ -19,8 +19,8 @@
 //! # use beet_core::prelude::*;
 //! # async fn run() -> Result<()> {
 //! let bucket = temp_bucket();
-//! bucket.insert(&RoutePath::from("/hello.txt"), "world").await?;
-//! let data = bucket.get(&RoutePath::from("/hello.txt")).await?;
+//! bucket.insert(&RelPath::from("hello.txt"), "world").await?;
+//! let data = bucket.get(&RelPath::from("hello.txt")).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -28,6 +28,7 @@
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
+mod blob;
 mod bucket;
 #[cfg(feature = "json")]
 mod table;
@@ -39,6 +40,7 @@ pub use aws_cli::*;
 pub use table::*;
 mod bucket_item;
 mod in_memory_provider;
+pub use blob::*;
 pub use bucket::*;
 pub use bucket_item::*;
 pub use in_memory_provider::*;

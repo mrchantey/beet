@@ -136,9 +136,9 @@ mod test {
 			.find(&["add"])
 			.unwrap()
 			.path
-			.annotated_route_path()
+			.annotated_rel_path()
 			.to_string()
-			.xpect_eq("/add");
+			.xpect_eq("add");
 	}
 
 	#[beet_core::test]

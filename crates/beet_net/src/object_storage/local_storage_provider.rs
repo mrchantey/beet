@@ -27,7 +27,7 @@ impl LocalStorageProvider {
 	}
 
 	/// Compose the localStorage key for the bucket and path.
-	fn storage_key(&self, path: &RoutePath) -> String {
+	fn storage_key(&self, path: &RelPath) -> String {
 		self.bucket_prefix().xtend(&path.to_string())
 	}
 
@@ -88,7 +88,7 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
 		let value = BASE64_STANDARD.encode(body);
 		Box::pin(async move {
@@ -97,7 +97,7 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let key = self.storage_key(path);
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -106,19 +106,19 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let prefix = self.bucket_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
-			let keys: Vec<RoutePath> = (0..storage.length().unwrap_or(0))
+			let keys: Vec<RelPath> = (0..storage.length().unwrap_or(0))
 				.filter_map(|i| storage.key(i).ok().flatten())
-				.filter_map(|key| key.strip_prefix(&prefix).map(RoutePath::new))
+				.filter_map(|key| key.strip_prefix(&prefix).map(RelPath::new))
 				.collect();
 			keys.xok()
 		})
 	}
 
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let key = self.storage_key(path);
 		Box::pin(async move {
 			let value = Self::local_storage().get_item(&key).map_jserr()?;
@@ -132,7 +132,7 @@ impl BucketProvider for LocalStorageProvider {
 		})
 	}
 
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let key = self.storage_key(path);
 		let this = self.clone();
 		let path = path.clone();
@@ -151,7 +151,7 @@ impl BucketProvider for LocalStorageProvider {
 
 	fn public_url(
 		&self,
-		_path: &RoutePath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}

@@ -52,9 +52,10 @@ impl S3Provider {
 		POOL.get(&self.region).await
 	}
 
-	/// S3 buckets don't want a leading slash in the key.
-	fn resolve_key(&self, path: &RoutePath) -> String {
-		path.to_string().trim_start_matches('/').to_string()
+	/// Resolve the S3 object key from a [`RelPath`].
+	fn resolve_key(&self, path: &RelPath) -> String {
+		// this is stupid, just inline
+		path.to_string()
 	}
 }
 
@@ -162,7 +163,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -178,7 +179,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -196,7 +197,7 @@ impl BucketProvider for S3Provider {
 				paths.extend(
 					contents
 						.into_iter()
-						.filter_map(|obj| obj.key.map(RoutePath::new)),
+						.filter_map(|obj| obj.key.map(RelPath::new)),
 				);
 
 				if list_result.is_truncated == Some(true) {
@@ -213,7 +214,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -228,7 +229,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -251,7 +252,7 @@ impl BucketProvider for S3Provider {
 		})
 	}
 
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -276,7 +277,7 @@ impl BucketProvider for S3Provider {
 
 	fn public_url(
 		&self,
-		path: &RoutePath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let region = &self.region;
 		let bucket_name = &self.bucket_name;
@@ -307,7 +308,7 @@ mod test {
 		bucket.bucket_exists().await.xpect_ok();
 
 		bucket
-			.get(&RoutePath::new("index.html"))
+			.get(&RelPath::new("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -318,14 +319,14 @@ mod test {
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
 		let provider = S3Provider::new("beet-test", "us-west-2");
-		let test_key = RoutePath::from("test-file.txt");
+		let test_key = RelPath::from("test-file.txt");
 		Bucket::new(provider)
 			.public_url(&test_key)
 			.await
 			.unwrap()
 			.unwrap()
 			.xpect_eq(format!(
-				"https://beet-test.s3.us-west-2.amazonaws.com{test_key}"
+				"https://beet-test.s3.us-west-2.amazonaws.com/{test_key}"
 			));
 	}
 }

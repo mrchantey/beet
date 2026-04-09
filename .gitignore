@@ -1,7 +1,7 @@
 assets
 agent/*
+.beet/infra
 !agent/skills
-
 
 examples/thread/persistent_chat.json
 

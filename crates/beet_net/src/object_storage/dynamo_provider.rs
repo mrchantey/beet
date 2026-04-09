@@ -52,10 +52,9 @@ impl DynamoDbProvider {
 		POOL.get(&self.region).await
 	}
 
-	/// Remove leading slash for DynamoDB-friendly path.
-	fn resolve_key(&self, path: &RoutePath) -> AttributeValue {
-		let str = path.to_string().trim_start_matches('/').to_string();
-		AttributeValue::S(str)
+	/// Resolve a [`RelPath`] to a DynamoDB-friendly attribute value.
+	fn resolve_key(&self, path: &RelPath) -> AttributeValue {
+		AttributeValue::S(path.to_string())
 	}
 
 	/// Get the table status, returning `None` if the table does not exist.
@@ -191,7 +190,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -207,7 +206,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -220,7 +219,7 @@ impl BucketProvider for DynamoDbProvider {
 			if let Some(items) = out.items {
 				for item in items {
 					if let Some(AttributeValue::S(id)) = item.get("id") {
-						paths.push(RoutePath::new(id));
+						paths.push(RelPath::new(id));
 					}
 				}
 			}
@@ -232,7 +231,7 @@ impl BucketProvider for DynamoDbProvider {
 	///
 	/// Assumes a two-field schema: `id` (path) and `data` (binary).
 	/// For typed tables, see [`TableProvider`].
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -253,7 +252,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -279,7 +278,7 @@ impl BucketProvider for DynamoDbProvider {
 		})
 	}
 
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -300,7 +299,7 @@ impl BucketProvider for DynamoDbProvider {
 
 	fn public_url(
 		&self,
-		_path: &RoutePath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}

@@ -16,7 +16,7 @@ impl Bucket {
 /// Inner state is `None` when the bucket has not been created,
 /// and `Some(map)` when it exists.
 #[derive(Debug, Default, Clone, Component)]
-pub struct InMemoryProvider(pub Arc<RwLock<Option<HashMap<RoutePath, Bytes>>>>);
+pub struct InMemoryProvider(pub Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>);
 
 impl InMemoryProvider {
 	/// Creates a new uncreated in-memory provider.
@@ -69,7 +69,7 @@ impl BucketProvider for InMemoryProvider {
 		})
 	}
 
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -82,7 +82,7 @@ impl BucketProvider for InMemoryProvider {
 		})
 	}
 
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -94,7 +94,7 @@ impl BucketProvider for InMemoryProvider {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
 			let guard = this.0.read().await;
@@ -105,7 +105,7 @@ impl BucketProvider for InMemoryProvider {
 		})
 	}
 
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -119,7 +119,7 @@ impl BucketProvider for InMemoryProvider {
 		})
 	}
 
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let path = path.clone();
 		Box::pin(async move {
@@ -135,7 +135,7 @@ impl BucketProvider for InMemoryProvider {
 
 	fn public_url(
 		&self,
-		_path: &RoutePath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}

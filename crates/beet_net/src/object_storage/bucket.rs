@@ -40,10 +40,23 @@ impl Bucket {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let bucket = temp_bucket();
-	/// let item = bucket.item(RoutePath::from("/my-file.txt"));
+	/// let item = bucket.item(RelPath::from("my-file.txt"));
 	/// ```
-	pub fn item(&self, path: RoutePath) -> BucketItem {
+	pub fn item(&self, path: RelPath) -> BucketItem {
 		BucketItem::new(self.clone(), path)
+	}
+
+	/// Create a [`Blob`] handle for a single object in this bucket.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// let bucket = temp_bucket();
+	/// let blob = bucket.blob(RelPath::new("my-file.txt"));
+	/// ```
+	pub fn blob(&self, path: RelPath) -> Blob {
+		Blob::new(self.provider.box_clone(), path)
 	}
 
 	/// Insert object into bucket.
@@ -56,13 +69,13 @@ impl Bucket {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// bucket.insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// bucket.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(
 		&self,
-		path: &RoutePath,
+		path: &RelPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		self.provider.insert(path, body.into()).await
@@ -76,13 +89,13 @@ impl Bucket {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// bucket.try_insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// bucket.try_insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn try_insert(
 		&self,
-		path: &RoutePath,
+		path: &RelPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		if self.exists(path).await? {
@@ -107,7 +120,7 @@ impl Bucket {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`BucketProvider::list`] + [`BucketProvider::get`]
-	pub async fn get_all(&self) -> Result<Vec<(RoutePath, Bytes)>> {
+	pub async fn get_all(&self) -> Result<Vec<(RelPath, Bytes)>> {
 		self.list()
 			.await?
 			.into_iter()
@@ -132,24 +145,24 @@ impl BucketProvider for Bucket {
 	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
 		self.provider.bucket_remove()
 	}
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.provider.insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.provider.list()
 	}
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
 	}
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		self.provider.exists(path)
 	}
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &RoutePath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.provider.public_url(path)
 	}
@@ -163,6 +176,9 @@ impl BucketProvider for Bucket {
 pub trait BucketProvider: 'static + Send + Sync {
 	/// Returns a boxed clone of this provider.
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
+
+	/// Create a [`Blob`] handle for a single object managed by this provider.
+	fn blob(&self, path: RelPath) -> Blob { Blob::new(self.box_clone(), path) }
 
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
@@ -253,11 +269,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// bucket.insert(&RoutePath::from("/file.txt"), "content").await?;
+	/// bucket.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result>;
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result>;
 
 	/// List all objects in bucket.
 	///
@@ -271,7 +287,7 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>>;
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>>;
 
 	/// Get object from bucket.
 	///
@@ -281,11 +297,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// let data = bucket.get(&RoutePath::from("/file.txt")).await?;
+	/// let data = bucket.get(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>>;
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>>;
 
 	/// Check if object exists in bucket.
 	///
@@ -295,11 +311,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// let exists = bucket.exists(&RoutePath::from("/file.txt")).await?;
+	/// let exists = bucket.exists(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>>;
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>>;
 
 	/// Remove object from bucket.
 	///
@@ -309,11 +325,11 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// bucket.remove(&RoutePath::from("/file.txt")).await?;
+	/// bucket.remove(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result>;
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
 
 	/// Get public URL of object.
 	/// - fs: `file:///data/buckets/my-bucket/key`
@@ -325,13 +341,13 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let bucket = temp_bucket();
-	/// let url = bucket.public_url(&RoutePath::from("/file.txt")).await?;
+	/// let url = bucket.public_url(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	fn public_url(
 		&self,
-		path: &RoutePath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
@@ -390,7 +406,7 @@ pub mod bucket_test {
 	/// Runs the standard bucket provider test suite.
 	pub async fn run(provider: impl BucketProvider) {
 		let bucket = Bucket::new(provider);
-		let path = RoutePath::from("/test_path");
+		let path = RelPath::from("test_path");
 		let body = bytes::Bytes::from("test_body");
 		bucket.bucket_remove().await.ok();
 		bucket.bucket_exists().await.unwrap().xpect_false();

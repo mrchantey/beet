@@ -140,7 +140,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # }
 	/// ```
 	pub async fn exists(&self, id: Uuid) -> Result<bool> {
-		let path = RoutePath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		BucketProvider::exists(self.provider.as_ref(), &path).await
 	}
 
@@ -156,7 +156,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn list(&self) -> Result<Vec<RoutePath>> {
+	pub async fn list(&self) -> Result<Vec<RelPath>> {
 		BucketProvider::list(self.provider.as_ref()).await
 	}
 
@@ -199,18 +199,14 @@ impl<T: TableStoreRow> TableStore<T> {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`Self::list`] + [`Self::get`] for large tables.
-	pub async fn get_all(&self) -> Result<Vec<(RoutePath, T)>> {
+	pub async fn get_all(&self) -> Result<Vec<(RelPath, T)>> {
 		self.list()
 			.await?
 			.into_iter()
 			.map(async |path| {
-				let id = path
-					.to_string()
-					.trim_start_matches('/')
-					.parse::<Uuid>()
-					.map_err(|e| {
-						bevyhow!("Invalid UUID in path {}: {}", path, e)
-					})?;
+				let id = path.to_string().parse::<Uuid>().map_err(|e| {
+					bevyhow!("Invalid UUID in path {}: {}", path, e)
+				})?;
 				let data = self.get(id).await?;
 				Ok::<_, BevyError>((path, data))
 			})
@@ -236,7 +232,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # Errors
 	/// Returns error if object doesn't exist.
 	pub async fn remove(&self, id: Uuid) -> Result {
-		let path = RoutePath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		BucketProvider::remove(self.provider.as_ref(), &path).await
 	}
 
@@ -248,7 +244,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
-	/// let path = RoutePath::from("/some-uuid");
+	/// let path = RelPath::from("some-uuid");
 	/// if let Some(url) = table.public_url(&path).await? {
 	///     println!("Public URL: {}", url);
 	/// }
@@ -257,7 +253,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// ```
 	///
 	/// Returns `None` if provider doesn't support public URLs.
-	pub async fn public_url(&self, path: &RoutePath) -> Result<Option<String>> {
+	pub async fn public_url(&self, path: &RelPath) -> Result<Option<String>> {
 		BucketProvider::public_url(self.provider.as_ref(), path).await
 	}
 
@@ -339,7 +335,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
 	/// Inserts a row into the table, serializing it as JSON.
 	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
-		let path = RoutePath::new(body.id().to_string());
+		let path = RelPath::new(body.id().to_string());
 		match serde_json::to_vec(&body) {
 			Ok(vec) => BucketProvider::insert(self, &path, vec.into()),
 			Err(e) => {
@@ -349,7 +345,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	}
 	/// Retrieves a row by its UUID, deserializing from JSON.
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
-		let path = RoutePath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		let fut = BucketProvider::get(self, &path);
 		Box::pin(async move {
 			let bytes = fut.await?;
@@ -418,7 +414,7 @@ pub mod table_test {
 			}],
 		});
 		let id = body.id();
-		let path = RoutePath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		table.bucket_remove().await.ok();
 		table.bucket_exists().await.unwrap().xpect_false();
 		table.bucket_try_create().await.unwrap();

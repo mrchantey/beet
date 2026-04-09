@@ -1,7 +1,7 @@
-//! Demonstrates the full lifecycle of an infra project
+//! Demonstrates the full lifecycle of an infra project.
 //!
-//!
-//!
+//! Handles cleanup of stale AWS resources from previously interrupted runs
+//! before applying infrastructure changes.
 use beet::prelude::*;
 
 
@@ -36,6 +36,22 @@ fn setup(mut commands: Commands) {
 				})
 				.await?;
 
+			let provider = entity
+				.with_state::<StackQuery, _>(|entity, query| {
+					query.s3_provider(entity)
+				})
+				.await?;
+
+			// Reset state in case of a previously interrupted run.
+			// force_destroy only cleans terraform state; it cannot remove
+			// AWS resources whose state was already lost. Explicitly
+			// remove the managed bucket if it still exists.
+			project.force_destroy().await;
+			if provider.bucket_exists().await.unwrap_or(false) {
+				println!("🧹 Cleaning up stale bucket..");
+				provider.bucket_remove().await.ok();
+			}
+
 			println!("🔨 Validating..");
 			project.validate().await?;
 
@@ -43,11 +59,6 @@ fn setup(mut commands: Commands) {
 			let plan = project.plan().await?;
 			println!("🧭 Plan generated: \n{plan}");
 
-			let provider = entity
-				.with_state::<StackQuery, _>(|entity, query| {
-					query.s3_provider(entity)
-				})
-				.await?;
 			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
 
 			println!("🔨 Applying..");
@@ -55,7 +66,7 @@ fn setup(mut commands: Commands) {
 
 			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
 
-			let path = RoutePath::new("foo.md");
+			let path = RelPath::new("foo.md");
 			let content = "bar";
 
 			println!("📄 File Exists: {}", provider.get(&path).await.is_ok());

@@ -15,7 +15,7 @@ pub struct BucketItem {
 	/// The bucket containing this item.
 	pub bucket: Bucket,
 	/// The path to this item within the bucket.
-	pub path: RoutePath,
+	pub path: RelPath,
 	/// Getter for the item's data content.
 	pub get_data: Getter<Option<String>>,
 	/// Setter for the item's data content.
@@ -28,7 +28,7 @@ pub struct BucketItem {
 
 impl BucketItem {
 	/// Creates a new bucket item and initializes reactive effects.
-	pub fn new(bucket: Bucket, path: RoutePath) -> Self {
+	pub fn new(bucket: Bucket, path: RelPath) -> Self {
 		let (get_data, set_data) = signal::<Option<String>>(None);
 		let (get_err, set_err) = signal::<Option<String>>(None);
 		let this = Self {

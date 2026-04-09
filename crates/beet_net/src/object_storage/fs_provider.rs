@@ -19,9 +19,9 @@ impl FsBucketProvider {
 	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
 		Self { path: path.into() }
 	}
-	/// Resolve the full path for an object key, handling leading slashes.
-	fn resolve_path(&self, route: &RoutePath) -> AbsPathBuf {
-		self.path.join(route.to_string().trim_start_matches('/'))
+	/// Resolve the full path for an object key.
+	fn resolve_path(&self, route: &RelPath) -> AbsPathBuf {
+		self.path.join(route.to_string())
 	}
 }
 
@@ -59,7 +59,7 @@ impl BucketProvider for FsBucketProvider {
 		})
 	}
 
-	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::write_async(path, body).await?;
@@ -67,7 +67,7 @@ impl BucketProvider for FsBucketProvider {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let bucket_path = self.path.clone();
 		Box::pin(async move {
 			ReadDir::files_recursive_async(&bucket_path)
@@ -77,14 +77,14 @@ impl BucketProvider for FsBucketProvider {
 					let path = path
 						.strip_prefix(&bucket_path)
 						.unwrap_or_else(|_| path.as_path());
-					RoutePath::new(path)
+					RelPath::new(path)
 				})
 				.collect::<Vec<_>>()
 				.xok()
 		})
 	}
 
-	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::read_async(&path)
@@ -95,19 +95,19 @@ impl BucketProvider for FsBucketProvider {
 		})
 	}
 
-	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
-	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(
 		&self,
-		_path: &RoutePath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}

@@ -244,7 +244,7 @@ mod test {
 			.spawn(add_route_tool())
 			.get::<PathPattern>()
 			.unwrap()
-			.annotated_route_path()
+			.annotated_rel_path()
 			.to_string()
 			.xpect_eq("/add");
 	}

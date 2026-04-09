@@ -42,6 +42,18 @@ impl StackBackend {
 		self.provider().bucket_try_create().await
 	}
 
+	/// Clear stale lock files if the backend supports it.
+	pub fn clear_stale_locks(&self) {
+		match self {
+			Self::Local(local) => local.clear_stale_locks(),
+			Self::S3(_) => {
+				todo!(
+					"should we clear s3 locks too, when use_lockfile enabled?"
+				)
+			}
+		}
+	}
+
 	/// Remove this backend bucket if its empty
 	pub async fn remove_if_empty(&self) -> Result {
 		let provider = self.provider();
@@ -69,10 +81,29 @@ impl Default for LocalBackend {
 }
 impl LocalBackend {
 	fn to_json(&self, key: &str) -> Value {
-		json!({"local":{ "path": self.path.join(key) }})
+		// Use the absolute path string directly. AbsPathBuf's Serialize impl
+		// converts to a workspace-relative path, but terraform's local backend
+		// resolves relative paths from the tofu working directory, not the
+		// workspace root.
+		let state_path = self.path.join(key).to_string();
+		json!({"local":{ "path": state_path }})
 	}
 	pub fn provider(&self) -> FsBucketProvider {
 		FsBucketProvider::new(self.path.clone())
+	}
+	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
+	pub fn clear_stale_locks(&self) {
+		if let Ok(entries) =
+			std::fs::read_dir(self.path.as_ref() as &std::path::Path)
+		{
+			for entry in entries.flatten() {
+				let name = entry.file_name();
+				let name = name.to_string_lossy();
+				if name.starts_with('.') && name.ends_with(".lock.info") {
+					std::fs::remove_file(entry.path()).ok();
+				}
+			}
+		}
 	}
 }
 

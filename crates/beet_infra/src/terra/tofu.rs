@@ -132,3 +132,14 @@ pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
 		.run_async_stdout()
 		.await
 }
+
+/// Destroy infrastructure, bypassing any stale state locks.
+/// Used only by `force_destroy` recovery paths where we know
+/// no concurrent operation is active.
+pub async fn destroy_force(dir: &AbsPathBuf) -> Result<String> {
+	tofu_process()
+		.with_cwd(dir)
+		.with_args(&["destroy", "-auto-approve", "-lock=false"])
+		.run_async_stdout()
+		.await
+}
