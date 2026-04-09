@@ -70,8 +70,19 @@ where
 			      }| {
 				let func = self.clone();
 				commands.run_local(async move |world: AsyncWorld| -> Result {
-					let output = func(wrap_in, next).await?;
-					out_handler.call_async(world, output).await
+					match func(wrap_in, next).await {
+						Ok(output) => {
+							out_handler.call_async(world, output).await
+						}
+						Err(err) => {
+							if !out_handler.send_err(err) {
+								bevybail!(
+									"wrap tool failed without an error handler"
+								);
+							}
+							Ok(())
+						}
+					}
 				});
 				Ok(())
 			},
@@ -115,8 +126,9 @@ where
 			      }| {
 				let func = self.clone();
 				commands.run_local(async move |world: AsyncWorld| -> Result {
-					let output = func(wrap_in, next).await;
-					out_handler.call_async(world, output).await
+					out_handler
+						.call_async(world, func(wrap_in, next).await)
+						.await
 				});
 				Ok(())
 			},

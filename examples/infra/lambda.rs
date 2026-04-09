@@ -21,7 +21,7 @@ async fn main() -> Result {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		Stack::new("lambda-example"),
+		Stack::new("lambda-example").with_backend(LocalBackend::default()),
 		CliServer::default(),
 		stack_router(),
 		LambdaBlock::default(),

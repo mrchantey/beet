@@ -97,7 +97,9 @@ pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir)
-		.with_args(&["plan"])
+		.with_args(&[
+			"plan", "-out", // save the plan for deterministic apply
+		])
 		.run_async_stdout()
 		.await
 }

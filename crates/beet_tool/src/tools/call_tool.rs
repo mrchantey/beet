@@ -26,24 +26,43 @@ where
 /// Wires a channel-based [`OutHandler`] and calls [`call_world`].
 ///
 /// Returns the receiving end of the channel so the caller can await the result.
+/// The channel carries `Result<Out>` so that async tool errors propagate
+/// back to the caller instead of silently closing the channel.
 #[track_caller]
 fn call_with_channel<Input, Out>(
 	entity: Entity,
 	world: &mut World,
 	input: Input,
-) -> Result<Receiver<Out>>
+) -> Result<Receiver<Result<Out>>>
 where
 	Input: 'static,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = async_channel::bounded(1);
+	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
+	let err_send = send.clone();
 	let out_handler = OutHandler::new(move |_commands, output: Out| {
-		send.try_send(output).map_err(|err| {
+		send.try_send(Ok(output)).map_err(|err| {
 			bevyhow!("Failed to send tool output through channel: {err:?}")
 		})
+	})
+	.with_on_err(move |err| {
+		err_send.try_send(Err(err)).ok();
 	});
 	call_world(entity, world, input, out_handler)?;
 	Ok(recv)
+}
+
+/// Unwraps a `Result<Out>` received from a tool-call channel,
+/// providing a clear error when the channel closes unexpectedly.
+fn unwrap_channel_result<Out>(
+	result: std::result::Result<Result<Out>, async_channel::RecvError>,
+) -> Result<Out> {
+	match result {
+		Ok(inner) => inner,
+		Err(_) => {
+			bevybail!("Tool call response channel closed unexpectedly.")
+		}
+	}
 }
 
 /// Drives a tool call to completion from an [`EntityWorldMut`] context,
@@ -60,9 +79,9 @@ where
 	let world = entity.into_world_mut();
 	let recv = call_with_channel::<Input, Out>(id, world, input)?;
 	match recv.try_recv() {
-		Ok(output) => output.xok(),
+		Ok(result) => result,
 		Err(TryRecvError::Empty) => {
-			AsyncRunner::poll_and_update(|| world.update_local(), recv).await
+			AsyncRunner::poll_and_update(|| world.update_local(), recv).await?
 		}
 		Err(TryRecvError::Closed) => {
 			bevybail!("Tool call response channel closed unexpectedly.")
@@ -126,16 +145,20 @@ fn call_with_channel_for_value<Input, Out>(
 	entity: EntityWorldMut,
 	tool: Tool<Input, Out>,
 	input: Input,
-) -> Result<Receiver<Out>>
+) -> Result<Receiver<Result<Out>>>
 where
 	Input: 'static,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = async_channel::bounded(1);
+	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
+	let err_send = send.clone();
 	let out_handler = OutHandler::new(move |_, output: Out| {
-		send.try_send(output).map_err(|err| {
+		send.try_send(Ok(output)).map_err(|err| {
 			bevyhow!("Failed to send tool output through channel: {err:?}")
 		})
+	})
+	.with_on_err(move |err| {
+		err_send.try_send(Err(err)).ok();
 	});
 	tool.call_world(entity, input, out_handler)?;
 	Ok(recv)
@@ -168,9 +191,7 @@ pub impl AsyncEntity {
 					},
 				)
 				.await?;
-			recv.recv().await.map_err(|_| {
-				bevyhow!("Tool call response channel closed unexpectedly.")
-			})
+			unwrap_channel_result(recv.recv().await)
 		}
 	}
 
@@ -203,9 +224,7 @@ pub impl AsyncEntity {
 					)
 				})
 				.await?;
-			recv.recv().await.map_err(|_| {
-				bevyhow!("Tool call response channel closed unexpectedly.")
-			})
+			unwrap_channel_result(recv.recv().await)
 		}
 	}
 }

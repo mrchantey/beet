@@ -146,23 +146,6 @@ pub trait DataSource: ToJson {
 	fn provider(&self) -> &'static Provider;
 }
 
-/// A typed Terraform backend configuration.
-///
-/// Implement this trait and pass the backend to
-/// [`Config::with_backend`] to configure remote state storage.
-///
-/// ```ignore
-/// let config = terra::Config::new()
-///     .with_backend(&S3Backend::default());
-/// ```
-pub trait Backend {
-	/// The backend type identifier, ie `"s3"`, `"local"`, `"gcs"`.
-	fn backend_type(&self) -> &'static str;
-
-	/// Serialize the backend configuration body to JSON.
-	fn to_backend_json(&self) -> Value;
-}
-
 // ---------------------------------------------------------------------------
 // ResourceFilter
 // ---------------------------------------------------------------------------

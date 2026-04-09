@@ -57,8 +57,18 @@ impl TempDir {
 	/// ```
 	pub fn new() -> FsResult<Self> {
 		let temp_dir = std::env::temp_dir();
-		let dir_name = format!("beet_tmp_{}", Uuid::new_v4().to_string());
+		let dir_name = format!("beet_tmp_{}", Uuid::now_v7().to_string());
 		let dir_path = temp_dir.join(dir_name);
+		Self::new_with_path(dir_path)
+	}
+
+	/// Create a new temporary directory in `target/tmp`, relative to the workspace root.
+	/// The `CARGO_TARGET_DIR` env var is not used.
+	pub fn new_ws() -> FsResult<Self> {
+		let workspace_root = fs_ext::workspace_root();
+		let dir_name =
+			format!("target/tmp/beet_tmp_{}", Uuid::now_v7().to_string());
+		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
 
@@ -78,7 +88,7 @@ impl TempDir {
 	pub fn new_workspace() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
 		let dir_name =
-			format!("target/tmp/beet_tmp_{}", Uuid::new_v4().to_string());
+			format!("target/tmp/beet_tmp_{}", Uuid::now_v7().to_string());
 		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}

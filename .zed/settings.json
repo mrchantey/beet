@@ -111,7 +111,7 @@
 		// "tests",
 		// "target",
 		// ".env.example",
-		".beet",
+		// ".beet",
 		".github",
 		// ".cargo",
 		"launch.ron",

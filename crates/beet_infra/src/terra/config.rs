@@ -37,11 +37,9 @@
 //! config.export_to_file("main.tf.json").await?;
 //! ```
 
-use super::misc::Backend;
-use super::misc::DataSource;
-use super::misc::Provider;
-use super::misc::Resource;
 use crate::prelude::*;
+use crate::terra::Resource;
+use crate::terra::*;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde_json::Map;
@@ -83,7 +81,7 @@ pub struct Output {
 #[derive(Debug, Default, Clone)]
 pub struct Config {
 	/// Backend for remote state, serialised into `terraform.backend`.
-	backend: Option<(String, Value)>,
+	backend: Option<Value>,
 	/// Optional `required_version` constraint in the `terraform` block.
 	required_version: Option<String>,
 	required_providers: Map<String, Value>,
@@ -111,17 +109,14 @@ impl Config {
 	/// let config = Config::new()
 	///     .with_backend(&S3Backend::default());
 	/// ```
-	pub fn with_backend(mut self, backend: &dyn Backend) -> Self {
+	pub fn with_backend(mut self, backend: Value) -> Self {
 		self.set_backend(backend);
 		self
 	}
 
 	/// Set the backend for remote state storage.
-	pub fn set_backend(&mut self, backend: &dyn Backend) -> &mut Self {
-		self.backend = Some((
-			backend.backend_type().to_string(),
-			backend.to_backend_json(),
-		));
+	pub fn set_backend(&mut self, backend: Value) -> &mut Self {
+		self.backend = Some(backend);
 		self
 	}
 
@@ -471,11 +466,8 @@ impl Config {
 				Value::String(v.clone()),
 			);
 		}
-		if let Some((ref backend_type, ref backend_cfg)) = self.backend {
-			tf_block.insert(
-				"backend".to_string(),
-				json!({ backend_type: backend_cfg }),
-			);
+		if let Some(backend) = &self.backend {
+			tf_block.insert("backend".to_string(), backend.clone());
 		}
 		if !self.required_providers.is_empty() {
 			tf_block.insert(

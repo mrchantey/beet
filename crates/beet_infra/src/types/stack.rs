@@ -40,13 +40,21 @@ impl Stack {
 			backend: S3Backend::default().into(),
 		}
 	}
-
+	/// Create a stack with a local backend and a temporary directory for testing.
+	/// The directory will be removed on drop.
 	#[cfg(test)]
-	pub fn default_local() -> Self {
-		Self {
-			backend: LocalBackend::default().into(),
-			..default()
-		}
+	pub fn default_local() -> (Self, TempDir) {
+		let dir = TempDir::new_ws().unwrap();
+		let path = dir.path().into_ws_path().unwrap();
+
+		(
+			Self {
+				backend: LocalBackend::default().into(),
+				work_directory: path,
+				..default()
+			},
+			dir,
+		)
 	}
 
 	pub fn is_production(&self) -> bool { self.stage == self.prod_stage }
@@ -63,7 +71,7 @@ impl Stack {
 	}
 	/// Initialize a config with the corresponding backend
 	pub fn create_config(&self) -> terra::Config {
-		terra::Config::default().with_backend(self.backend())
+		terra::Config::default().with_backend(self.backend().to_json(&self))
 	}
 }
 
@@ -89,6 +97,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 		{
 			block.apply_to_config(&child, stack, &mut config)?;
 		}
-		Ok(Project::new(stack.work_directory().into_abs(), config))
+		Ok(Project::new(&stack, config))
 	}
 }

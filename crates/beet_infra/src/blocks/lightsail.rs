@@ -168,12 +168,11 @@ mod tests {
 	#[beet_core::test(timeout_ms = 120000)]
 	#[ignore = "very slow"]
 	async fn lightsail_config_validates() {
-		let stack = Stack::default_local();
+		let (stack, _dir) = Stack::default_local();
 		let block = LightsailBlock::default();
 		let mut config = stack.create_config();
 		block.apply_to_config(&stack, &mut config).unwrap();
-		let dir = TempDir::new().unwrap();
-		let project = terra::Project::new(dir.path().clone(), config);
+		let project = terra::Project::new(&stack, config);
 		project.validate().await.unwrap();
 	}
 }

@@ -337,14 +337,20 @@ impl<'w, 's, In, Out> ToolCall<'w, 's, In, Out> {}
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
 /// pipe chains, etc.) share a uniform interface.
+///
+/// An optional error callback can be set via [`OutHandler::with_on_err`]
+/// so that async tools can propagate errors back through the same
+/// channel instead of silently dropping the sender.
 pub struct OutHandler<Out = ()> {
 	func: Box<dyn 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result>,
+	on_err: Option<Box<dyn 'static + Send + Sync + FnOnce(BevyError)>>,
 }
 
 impl<Out> Default for OutHandler<Out> {
 	fn default() -> Self {
 		Self {
 			func: Box::new(|_, _| Ok(())),
+			on_err: None,
 		}
 	}
 }
@@ -359,6 +365,7 @@ impl<Out> OutHandler<Out> {
 				});
 				Ok(())
 			}),
+			on_err: None,
 		}
 	}
 }
@@ -372,6 +379,29 @@ impl<Out> OutHandler<Out> {
 	{
 		Self {
 			func: Box::new(func),
+			on_err: None,
+		}
+	}
+
+	/// Attach an error callback invoked when the tool fails before
+	/// producing an output. This allows the error to be sent back
+	/// through the same channel the caller is awaiting.
+	pub fn with_on_err(
+		mut self,
+		func: impl 'static + Send + Sync + FnOnce(BevyError),
+	) -> Self {
+		self.on_err = Some(Box::new(func));
+		self
+	}
+
+	/// Send an error through the error callback, if one was set.
+	/// Returns `true` if the error was handled.
+	pub fn send_err(self, err: BevyError) -> bool {
+		if let Some(on_err) = self.on_err {
+			on_err(err);
+			true
+		} else {
+			false
 		}
 	}
 

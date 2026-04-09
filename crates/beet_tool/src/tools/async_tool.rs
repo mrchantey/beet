@@ -67,8 +67,19 @@ where
 			};
 			let func = func.clone();
 			commands.run(async move |world: AsyncWorld| -> Result {
-				let output = func(arg).await?;
-				out_handler.call_async(world, output).await
+				match func(arg).await {
+					Ok(output) => out_handler.call_async(world, output).await,
+					Err(err) => {
+						if !out_handler.send_err(err) {
+							// no error handler set, re-raise so
+							// run_async_task can log it
+							bevybail!(
+								"async tool failed without an error handler"
+							);
+						}
+						Ok(())
+					}
+				}
 			});
 			Ok(())
 		},
