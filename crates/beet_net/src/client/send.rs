@@ -247,8 +247,7 @@ mod test_request {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	#[beet_core::test]
 	#[ignore = "requires external network and system CA certs"]
 	async fn works() {
 		Request::get("https://example.com")
@@ -368,8 +367,7 @@ mod test_request {
 		resp.body.contains("chunk3").xpect_true();
 	}
 
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test)]
+	#[beet_core::test]
 	#[ignore = "requires external network and system CA certs"]
 	async fn concurrent_requests_complete_independently() {
 		let start = Instant::now();

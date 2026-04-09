@@ -70,7 +70,7 @@ impl BucketProvider for S3Provider {
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			match client
 				.head_bucket()
@@ -88,12 +88,12 @@ impl BucketProvider for S3Provider {
 					bevybail!("Failed to check bucket: {:?}", other)
 				}
 			}
-		})
+		}))
 	}
 
 	fn bucket_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let mut req =
 				client.create_bucket().bucket(this.bucket_name.as_str());
@@ -106,12 +106,12 @@ impl BucketProvider for S3Provider {
 			req = req.create_bucket_configuration(bucket_config);
 			req.send().await?;
 			().xok()
-		})
+		}))
 	}
 
 	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let bucket_name = this.bucket_name.as_str();
 
@@ -161,13 +161,13 @@ impl BucketProvider for S3Provider {
 
 			client.delete_bucket().bucket(bucket_name).send().await?;
 			().xok()
-		})
+		}))
 	}
 
 	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			client
 				.put_object()
@@ -177,12 +177,12 @@ impl BucketProvider for S3Provider {
 				.send()
 				.await?;
 			().xok()
-		})
+		}))
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let bucket_name = this.bucket_name.as_str();
 			let mut paths = Vec::new();
@@ -212,13 +212,13 @@ impl BucketProvider for S3Provider {
 			}
 
 			paths.xok()
-		})
+		}))
 	}
 
 	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let get_result = client
 				.get_object()
@@ -227,13 +227,13 @@ impl BucketProvider for S3Provider {
 				.send()
 				.await?;
 			get_result.body.collect().await?.into_bytes().xok()
-		})
+		}))
 	}
 
 	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			match client
 				.head_object()
@@ -250,14 +250,14 @@ impl BucketProvider for S3Provider {
 				}
 				Err(err) => Err(err.into()),
 			}
-		})
+		}))
 	}
 
 	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			match this.exists(&path).await? {
 				true => {
 					let client = this.client().await;
@@ -273,7 +273,7 @@ impl BucketProvider for S3Provider {
 					bevybail!("Object not found: {}", key)
 				}
 			}
-		})
+		}))
 	}
 
 	fn public_url(

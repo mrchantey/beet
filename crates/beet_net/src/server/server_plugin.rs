@@ -9,30 +9,6 @@ use beet_core::prelude::*;
 pub struct ServerPlugin;
 
 
-impl ServerPlugin {
-	/// Runs the app with the appropriate async runtime.
-	///
-	/// - With `lambda` feature: Uses a multi-threaded Tokio runtime
-	/// - Otherwise: Uses Bevy's default schedule runner
-	pub fn maybe_tokio_runner(mut app: App) -> AppExit {
-		#[cfg(all(feature = "lambda", not(target_arch = "wasm32")))]
-		{
-			tokio::runtime::Builder::new_multi_thread()
-				.enable_all()
-				.build()
-				.unwrap()
-				.block_on(app.run_async())
-		}
-		#[cfg(not(all(feature = "lambda", not(target_arch = "wasm32"))))]
-		{
-			// just use default runner
-			use bevy::app::ScheduleRunnerPlugin;
-			ScheduleRunnerPlugin::default().build(&mut app);
-			app.run()
-		}
-	}
-}
-
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>();

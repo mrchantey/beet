@@ -48,9 +48,6 @@ impl Plugin for BeetRunner {
 		// #[cfg(feature = "launch")]
 		// app.set_runner(LaunchConfig::runner);
 
-		// #[cfg(feature = "server_app")]
-		// app.set_runner(ServerPlugin::maybe_tokio_runner);
-
 		// app.add_systems(Startup, print_config);
 		// #[cfg(not(any(
 		// 	feature = "launch",

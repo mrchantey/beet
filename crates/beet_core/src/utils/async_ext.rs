@@ -28,9 +28,9 @@ pub fn block_on_local_executor<F: Future>(fut: F) -> F::Output {
 /// Yields execution back to the async runtime.
 pub fn yield_now() -> YieldNow { futures_lite::future::yield_now() }
 
-/// A 'static + Send, making it suitable for use-cases like tokio::spawn
+/// A 'static + Send, making it suitable for spawning on async runtimes
 pub type SendBoxedFuture<T> = Pin<Box<dyn 'static + Send + Future<Output = T>>>;
-/// A 'static + Send, making it suitable for use-cases like tokio::spawn
+/// A 'static + Send, making it suitable for spawning on async runtimes
 pub type LifetimeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
@@ -88,6 +88,39 @@ pub async fn timeout<F: Future>(
 		async move { Ok(fut.await) },
 	)
 	.await
+}
+
+/// Shared multi-threaded tokio runtime, lazily initialized.
+///
+/// Several dependencies like `reqwest` and AWS SDKs require a tokio
+/// runtime. This provides a single cached runtime so we can bridge
+/// their futures into beet's async-executor based runtime.
+#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+pub fn tokio() -> &'static tokio::runtime::Runtime {
+	static TOKIO: std::sync::LazyLock<tokio::runtime::Runtime> =
+		std::sync::LazyLock::new(|| {
+			tokio::runtime::Builder::new_multi_thread()
+				.enable_all()
+				.build()
+				.expect("failed to build tokio runtime")
+		});
+	&TOKIO
+}
+
+/// Spawn a future on the shared tokio runtime and await its completion.
+///
+/// Use this to bridge tokio-dependent code (reqwest, AWS SDK, etc.)
+/// into non-tokio async contexts.
+#[cfg(all(feature = "tokio", not(target_arch = "wasm32")))]
+pub async fn on_tokio<F, T>(future: F) -> Result<T, BevyError>
+where
+	F: 'static + Send + Future<Output = Result<T, BevyError>>,
+	T: 'static + Send,
+{
+	tokio()
+		.spawn(future)
+		.await
+		.map_err(|err| bevyhow!("tokio task panicked: {err}"))?
 }
 
 #[cfg(test)]

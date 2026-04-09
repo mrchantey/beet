@@ -30,7 +30,7 @@ hyper = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
+lambda = ["rustls-tls", "dep:lambda_http", "beet_core/tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
 aws = [
@@ -40,6 +40,7 @@ aws = [
 	"dep:serde_dynamo",
 	"dep:aws-sdk-dynamodb",
 	"dep:aws-config",
+	"beet_core/tokio",
 ]
 serde = [
 	"dep:serde",
@@ -52,7 +53,7 @@ http = [
 	"dep:http",
 	"dep:eventsource-stream",
 ]
-reqwest = ["dep:reqwest","dep:tokio"]
+reqwest = ["dep:reqwest", "beet_core/tokio"]
 ureq = ["dep:ureq", "dep:blocking"]
 tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
 native-tls = [
@@ -157,15 +158,7 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"rt-tokio",
 	"behavior-version-latest",
 ] }
-# actually a dev-dep but we need optional
-# strictly for testing only
-tokio = { version = "1", features = [
-	"macros",
-	# "sync",
-	# "rt",
-	# "rt-multi-thread",
-	# "time",
-], optional=true }
+
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

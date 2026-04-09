@@ -39,14 +39,10 @@ where
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
-	let err_send = send.clone();
-	let out_handler = OutHandler::new(move |_commands, output: Out| {
-		send.try_send(Ok(output)).map_err(|err| {
+	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
+		send.try_send(result).map_err(|err| {
 			bevyhow!("Failed to send tool output through channel: {err:?}")
 		})
-	})
-	.with_on_err(move |err| {
-		err_send.try_send(Err(err)).ok();
 	});
 	call_world(entity, world, input, out_handler)?;
 	Ok(recv)
@@ -151,14 +147,10 @@ where
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
-	let err_send = send.clone();
-	let out_handler = OutHandler::new(move |_, output: Out| {
-		send.try_send(Ok(output)).map_err(|err| {
+	let out_handler = OutHandler::new(move |_, result: Result<Out>| {
+		send.try_send(result).map_err(|err| {
 			bevyhow!("Failed to send tool output through channel: {err:?}")
 		})
-	})
-	.with_on_err(move |err| {
-		err_send.try_send(Err(err)).ok();
 	});
 	tool.call_world(entity, input, out_handler)?;
 	Ok(recv)

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 
 /// Allows chaining two [`Tool`] implementations, feeding the
 /// output of the first into the input of the second.
@@ -34,13 +35,16 @@ where
 					caller,
 					input: in_a,
 					out_handler: OutHandler::new(
-						move |commands, out_a: Out| {
-							handler2.call(ToolCall::<T2::In, T2::Out> {
-								commands,
-								caller,
-								input: out_a.into(),
-								out_handler,
-							})
+						move |commands, result: Result<Out>| match result {
+							Ok(out_a) => {
+								handler2.call(ToolCall::<T2::In, T2::Out> {
+									commands,
+									caller,
+									input: out_a.into(),
+									out_handler,
+								})
+							}
+							Err(err) => out_handler.call(commands, Err(err)),
 						},
 					),
 				})

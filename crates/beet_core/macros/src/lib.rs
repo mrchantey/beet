@@ -186,7 +186,7 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 /// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
 ///
-/// Works like `tokio::main` but uses `async-executor` for a lightweight, dependency-light runtime.
+/// Works like a standard async main entry point but uses `async-executor` for a lightweight, dependency-light runtime.
 ///
 /// # Requirements
 ///

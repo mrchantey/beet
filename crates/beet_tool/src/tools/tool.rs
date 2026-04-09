@@ -333,39 +333,40 @@ pub struct ToolCall<'w, 's, In, Out> {
 
 impl<'w, 's, In, Out> ToolCall<'w, 's, In, Out> {}
 
-/// Delivers a tool's output back to the caller.
+/// Delivers a tool's output or error back to the caller.
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
 /// pipe chains, etc.) share a uniform interface.
-///
-/// An optional error callback can be set via [`OutHandler::with_on_err`]
-/// so that async tools can propagate errors back through the same
-/// channel instead of silently dropping the sender.
 pub struct OutHandler<Out = ()> {
-	func: Box<dyn 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result>,
-	on_err: Option<Box<dyn 'static + Send + Sync + FnOnce(BevyError)>>,
+	func: Box<
+		dyn 'static
+			+ Send
+			+ Sync
+			+ FnOnce(AsyncCommands, Result<Out>) -> Result,
+	>,
 }
 
 impl<Out> Default for OutHandler<Out> {
 	fn default() -> Self {
 		Self {
-			func: Box::new(|_, _| Ok(())),
-			on_err: None,
+			// by default discard the out value, propagating the error
+			func: Box::new(|_, result| result.map(|_| ())),
 		}
 	}
 }
 
 impl<Out> OutHandler<Out> {
-	/// Exit with [`AppExit::Success`] once the tool call is complete.
+	/// Exit with [`AppExit::Success`] once the tool call is complete,
+	/// discarding the [`Out`] value.
 	pub fn exit() -> Self {
 		OutHandler {
-			func: Box::new(|mut commands, _| {
+			func: Box::new(|mut commands, result| {
+				result?;
 				commands.run(async |world| {
 					world.write_message(AppExit::Success);
 				});
 				Ok(())
 			}),
-			on_err: None,
 		}
 	}
 }
@@ -375,59 +376,40 @@ impl<Out> OutHandler<Out> {
 	/// Create an [`OutHandler`] from any compatible closure.
 	pub fn new<F>(func: F) -> Self
 	where
-		F: 'static + Send + Sync + FnOnce(AsyncCommands, Out) -> Result,
+		F: 'static + Send + Sync + FnOnce(AsyncCommands, Result<Out>) -> Result,
 	{
 		Self {
 			func: Box::new(func),
-			on_err: None,
 		}
 	}
 
-	/// Attach an error callback invoked when the tool fails before
-	/// producing an output. This allows the error to be sent back
-	/// through the same channel the caller is awaiting.
-	pub fn with_on_err(
-		mut self,
-		func: impl 'static + Send + Sync + FnOnce(BevyError),
-	) -> Self {
-		self.on_err = Some(Box::new(func));
-		self
-	}
-
-	/// Send an error through the error callback, if one was set.
-	/// Returns `true` if the error was handled.
-	pub fn send_err(self, err: BevyError) -> bool {
-		if let Some(on_err) = self.on_err {
-			on_err(err);
-			true
-		} else {
-			false
-		}
-	}
-
-	/// Deliver the output, consuming this handler.
+	/// Deliver the result, consuming this handler.
 	///
 	/// # Errors
 	/// Returns whatever error the inner callback produces.
-	pub fn call(self, commands: AsyncCommands, output: Out) -> Result {
-		(self.func)(commands, output)
+	pub fn call(self, commands: AsyncCommands, result: Result<Out>) -> Result {
+		(self.func)(commands, result)
 	}
 
-	pub fn call_world(self, world: &mut World, output: Out) -> Result {
+	pub fn call_world(self, world: &mut World, result: Result<Out>) -> Result {
 		let mut state = SystemState::<AsyncCommands>::new(world);
 		let commands = state.get_mut(world);
-		let result = (self.func)(commands, output);
+		let result = (self.func)(commands, result);
 		state.apply(world);
 		world.flush();
 		result
 	}
 
-	pub async fn call_async(self, world: AsyncWorld, output: Out) -> Result
+	pub async fn call_async(
+		self,
+		world: AsyncWorld,
+		result: Result<Out>,
+	) -> Result
 	where
 		Out: 'static + Send,
 	{
 		world
-			.with_then(move |world| self.call_world(world, output))
+			.with_then(move |world| self.call_world(world, result))
 			.await
 	}
 }

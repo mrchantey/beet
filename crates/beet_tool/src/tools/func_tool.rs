@@ -16,8 +16,8 @@ where
 		          out_handler,
 		      }| {
 			let cx = FuncToolIn { caller, input };
-			let out = func.clone()(cx)?;
-			out_handler.call(commands, out)
+			let result = func.clone()(cx);
+			out_handler.call(commands, result)
 		},
 	)
 }

@@ -128,18 +128,18 @@ impl BucketProvider for DynamoDbProvider {
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			match this.table_status().await {
 				Ok(Some(TableStatus::Active)) => Ok(true),
 				Ok(Some(_)) | Ok(None) => Ok(false),
 				Err(err) => Err(err),
 			}
-		})
+		}))
 	}
 
 	fn bucket_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let result = client
 				.create_table()
@@ -174,12 +174,12 @@ impl BucketProvider for DynamoDbProvider {
 				}
 				Err(err) => bevybail!("Failed to create table: {:?}", err),
 			}
-		})
+		}))
 	}
 
 	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			client
 				.delete_table()
@@ -188,13 +188,13 @@ impl BucketProvider for DynamoDbProvider {
 				.await?;
 			this.await_table_remove().await?;
 			Ok(())
-		})
+		}))
 	}
 
 	fn insert(&self, path: &RoutePath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			client
 				.put_item()
@@ -204,12 +204,12 @@ impl BucketProvider for DynamoDbProvider {
 				.send()
 				.await?;
 			Ok(())
-		})
+		}))
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RoutePath>>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let out = client
 				.scan()
@@ -225,7 +225,7 @@ impl BucketProvider for DynamoDbProvider {
 				}
 			}
 			paths.xok()
-		})
+		}))
 	}
 
 	/// Retrieve an object by path.
@@ -235,7 +235,7 @@ impl BucketProvider for DynamoDbProvider {
 	fn get(&self, path: &RoutePath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let out = client
 				.get_item()
@@ -250,13 +250,13 @@ impl BucketProvider for DynamoDbProvider {
 				bevybail!("No data field found");
 			};
 			Bytes::from(data.clone().into_inner()).xok()
-		})
+		}))
 	}
 
 	fn exists(&self, path: &RoutePath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			match client
 				.get_item()
@@ -276,13 +276,13 @@ impl BucketProvider for DynamoDbProvider {
 				}
 				Err(other) => Err(other.into()),
 			}
-		})
+		}))
 	}
 
 	fn remove(&self, path: &RoutePath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let result = client
 				.delete_item()
@@ -295,7 +295,7 @@ impl BucketProvider for DynamoDbProvider {
 				bevybail!("Item not found");
 			}
 			Ok(())
-		})
+		}))
 	}
 
 	fn public_url(
@@ -320,7 +320,7 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 				bevybail!("Failed to serialize item for dynamo");
 			});
 		};
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			client
 				.put_item()
@@ -329,12 +329,12 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 				.send()
 				.await?;
 			Ok(())
-		})
+		}))
 	}
 
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Box::pin(async_ext::on_tokio(async move {
 			let client = this.client().await;
 			let out = client
 				.get_item()
@@ -347,7 +347,7 @@ impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
 			};
 			let item: T = serde_dynamo::from_item(item)?;
 			item.xok()
-		})
+		}))
 	}
 }
 

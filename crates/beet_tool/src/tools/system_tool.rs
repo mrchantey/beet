@@ -69,10 +69,9 @@ where
 			let func = func.clone();
 			let sys_input = SystemToolIn { caller, input };
 			commands.commands.queue(move |world: &mut World| -> Result {
-				let output: Result<Out> =
+				let result: Result<Out> =
 					world.run_system_cached_with(func, sys_input)?;
-				let output = output?;
-				out_handler.call_world(world, output)
+				out_handler.call_world(world, result)
 			});
 			Ok(())
 		},

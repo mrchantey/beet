@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::terra::Project;
 use beet_core::prelude::*;
+#[cfg(feature = "aws")]
 use beet_net::prelude::S3Provider;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]

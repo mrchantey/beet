@@ -159,6 +159,7 @@ async-io = "2"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
 
 #💡 macros
 

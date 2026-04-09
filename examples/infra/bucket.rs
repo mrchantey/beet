@@ -28,27 +28,11 @@ fn setup(mut commands: Commands) {
 			println!("Validating..");
 			project.validate().await?;
 			println!("Planning..");
-			project.plan().await?;
+			let plan = project.plan().await?;
+			println!("{plan}");
 			// hey agent leave this for now do not attempt to implement
-			// let provider = entity
-			// 	.with_state::<StackQuery, _>(|entity, query| {
-			// 		query.s3_provider(entity)
-			// 	})
-			// 	.await?;
-			// println!("Applying..");
-			// project.apply().await?;
-			// let path = RoutePath::new("foo.md");
-			// let content = "bar";
-			// // not yet set
-			// provider.get(&path).await.unwrap_err();
-			// println!("Inserting..");
-			// provider.insert(&path, content.into()).await?;
-			// let bytes = provider.get(&path).await?;
-			// assert_eq!(bytes, content.as_bytes());
-
-			// println!("Destroying..");
-			// project.destroy().await?;
-
+			// ...
+			process_ext::exit(0);
 			Ok(())
 		});
 }

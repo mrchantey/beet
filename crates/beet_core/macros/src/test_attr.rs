@@ -1,6 +1,5 @@
 extern crate alloc;
 
-use alloc::string::ToString;
 use alloc::vec;
 use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
@@ -26,10 +25,9 @@ pub fn impl_test_attr(
 		AttributeGroup::parse(&[synthetic_attr], "beet")?
 	};
 
-	attrs.validate_allowed_keys(&["timeout_ms", "tokio"])?;
+	attrs.validate_allowed_keys(&["timeout_ms"])?;
 
 	let timeout_ms = attrs.get_value_parsed::<syn::LitInt>("timeout_ms")?;
-	let is_tokio = attrs.contains("tokio");
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 
 	// Build test params
@@ -45,68 +43,50 @@ pub fn impl_test_attr(
 
 	let is_async = func.sig.asyncness.is_some();
 
-
-	Ok(match (is_async, is_tokio) {
-		(true, true) => {
-			let non_tokio_attrs = attrs.attributes.iter().filter(|attr| {
-				// filter out existing tokio attributes
-				attr.name()
-					.map(|name| name.to_string() != "tokio")
-					.unwrap_or(true)
-			});
-
-			// a bit weird, wasm impl is recursive but without tokio marker
-			quote! {
-				#[cfg_attr(not(target_arch = "wasm32"), tokio::test)]
-				#[cfg_attr(target_arch = "wasm32", #beet_core::test(#(#non_tokio_attrs),*))]
-				#func
+	let tokens = if is_async {
+		let ident = &func.sig.ident;
+		let vis = &func.vis;
+		let func_block = &func.block;
+		let attrs = &func.attrs;
+		let block = match &func.sig.output {
+			syn::ReturnType::Default => {
+				quote! { async #func_block }
 			}
-		}
-		(true, false) => {
-			let ident = &func.sig.ident;
-			let vis = &func.vis;
-			let func_block = &func.block;
-			let attrs = &func.attrs;
-			let block = match &func.sig.output {
-				syn::ReturnType::Default => {
-					quote! { async #func_block }
-				}
-				syn::ReturnType::Type(_, ty) => {
-					quote! {
-						async {
-							let out: #ty = async #func_block.await;
-							out
-						}
+			syn::ReturnType::Type(_, ty) => {
+				quote! {
+					async {
+						let out: #ty = async #func_block.await;
+						out
 					}
 				}
-			};
-
-			quote! {
-				#[test]
-				#(#attrs)*
-				#vis fn #ident() {
-					#beet_core::testing::register_test(
-						#params_expr,
-						#block
-					);
-				}
 			}
-		}
-		(false, _) => {
-			let ident = &func.sig.ident;
-			let vis = &func.vis;
-			let block = &func.block;
-			let attrs = &func.attrs;
-			let sig_inputs = &func.sig.inputs;
-			let sig_output = &func.sig.output;
+		};
 
-			quote! {
-				#[test]
-				#(#attrs)*
-				#vis fn #ident(#sig_inputs) #sig_output {
+		quote! {
+			#[test]
+			#(#attrs)*
+			#vis fn #ident() {
+				#beet_core::testing::register_test(
+					#params_expr,
 					#block
-				}
+				);
 			}
 		}
-	})
+	} else {
+		let ident = &func.sig.ident;
+		let vis = &func.vis;
+		let block = &func.block;
+		let attrs = &func.attrs;
+		let sig_inputs = &func.sig.inputs;
+		let sig_output = &func.sig.output;
+
+		quote! {
+			#[test]
+			#(#attrs)*
+			#vis fn #ident(#sig_inputs) #sig_output {
+				#block
+			}
+		}
+	};
+	Ok(tokens)
 }

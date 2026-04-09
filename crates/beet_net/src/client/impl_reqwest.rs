@@ -4,18 +4,19 @@ use reqwest::Client;
 use reqwest::RequestBuilder;
 use std::sync::LazyLock;
 
-#[allow(unused)]
-pub(super) async fn send_reqwest(req: Request) -> Result<Response> {
-	static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(|| Client::new());
-
+/// Send a request using the reqwest client.
+pub async fn send_reqwest(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
-
 	let req: reqwest::Request = into_request(req)?;
-	let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
-		.send()
-		.await?;
-	let res: Response = into_response(res).await?;
-	Ok(res)
+	async_ext::on_tokio(async move {
+		static REQWEST_CLIENT: LazyLock<Client> =
+			LazyLock::new(|| Client::new());
+		let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
+			.send()
+			.await?;
+		into_response(res).await
+	})
+	.await
 }
 
 fn into_request(request: Request) -> Result<reqwest::Request> {

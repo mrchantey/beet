@@ -40,6 +40,9 @@ pub mod prelude {
 	pub use crate::types::*;
 	#[cfg(test)]
 	pub(crate) use beet_core::prelude::*;
+	// Re-export core types used in beet_net's public API
+	pub use beet_core::prelude::MediaBytes;
+	pub use beet_core::prelude::MediaType;
 
 	// Re-export common types from dependencies
 	pub use bevy::tasks::futures_lite::StreamExt;

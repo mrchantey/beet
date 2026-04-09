@@ -36,3 +36,5 @@ mod send;
 pub use event_source::*;
 #[cfg(feature = "fs")]
 pub use impl_file::*;
+#[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
+pub use impl_reqwest::*;

@@ -33,6 +33,7 @@ std = [
 	"dep:async-io",
 	"dep:async-task",
 ]
+tokio = ["dep:tokio"]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
 testing = ["ansi_paint"]
@@ -138,6 +139,7 @@ async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }
 async-process = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 
 ## fs
 async-fs = { workspace = true, optional = true }
