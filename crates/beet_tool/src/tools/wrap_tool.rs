@@ -12,9 +12,7 @@ pub struct Next<In: 'static, Out: 'static> {
 	#[get(skip)]
 	handler: Tool<In, Out>,
 	/// The entity that initiated this tool call.
-	caller: Entity,
-	/// The [`AsyncWorld`] handle for this tool call.
-	world: AsyncWorld,
+	caller: AsyncEntity,
 }
 
 impl<In, Out> Next<In, Out>
@@ -22,16 +20,19 @@ where
 	In: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
+	pub(super) fn new(handler: Tool<In, Out>, caller: AsyncEntity) -> Self {
+		Self { handler, caller }
+	}
+
+	pub fn id(&self) -> Entity { self.caller.id() }
+	pub fn world(&self) -> &AsyncWorld { self.caller.world() }
+
 	/// Call the inner handler asynchronously.
 	///
 	/// Schedules the inner handler via [`AsyncWorld`] and awaits
 	/// the result through a channel.
 	pub async fn call(&self, input: In) -> Result<Out> {
-		let caller = self.caller;
-		self.world
-			.entity(caller)
-			.call_detached(self.handler.clone(), input)
-			.await
+		self.caller.call_detached(self.handler.clone(), input).await
 	}
 }
 
@@ -176,8 +177,7 @@ where
 			      }| {
 				let next = Next {
 					handler: inner_handler.clone(),
-					caller,
-					world: commands.world(),
+					caller: commands.world().entity(caller),
 				};
 
 				outer_handler.call(ToolCall {

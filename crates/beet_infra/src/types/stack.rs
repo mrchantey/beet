@@ -137,6 +137,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok(Project::new(&stack, config))
 	}
 
+	/// Get the provider from an [`S3Bucket`] on this entity
 	#[cfg(feature = "aws")]
 	pub fn s3_provider(&self, entity: Entity) -> Result<S3Provider> {
 		let (_, stack, aws_stack) = self.stacks.get(entity)?;

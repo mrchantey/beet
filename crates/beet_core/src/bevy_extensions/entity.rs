@@ -91,4 +91,15 @@ pub impl<'a> EntityWorldMut<'a> {
 			}
 		}
 	}
+
+	/// Gets a mutable reference to a component, inserting the default value if not present.
+	fn get_mut_or_default<T: Component<Mutability = Mutable> + Default>(
+		&mut self,
+	) -> Mut<'_, T> {
+		if !self.contains::<T>() {
+			self.insert(T::default());
+		}
+		self.get_mut::<T>()
+			.expect("Component was just inserted or already existed")
+	}
 }

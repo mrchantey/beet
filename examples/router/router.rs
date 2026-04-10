@@ -21,7 +21,7 @@
 //! cargo run --example router -- counter --help
 //!
 //! # HTTP mode — start an HTTP server on port 3000
-//! cargo run --example router --features http_server -- --server=http
+//! cargo run --example router --features http_server
 //!
 //! # REPL mode — interactive read-eval-print loop
 //! cargo run --example router -- --server=repl
