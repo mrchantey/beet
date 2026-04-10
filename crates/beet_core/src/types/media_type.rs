@@ -196,6 +196,15 @@ impl MediaType {
 	const ANSI_TERM: &'static str = "text/ansi-term";
 	const RATATUI: &'static str = "state/ratatui";
 
+	/// Parse a list of media types from an `Accept` header string, which may
+	/// contain multiple comma-separated media types with optional parameters.
+	pub fn from_accepts(accepts: &str) -> Vec<Self> {
+		accepts
+			.split(',')
+			.map(|s| Self::from_content_type(s.trim()))
+			.collect()
+	}
+
 	/// Parse a media type from a content-type string.
 	///
 	/// Strips parameters like `; charset=utf-8` before matching.

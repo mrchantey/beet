@@ -3,11 +3,23 @@
 //! This module provides [`CliServer`], which accepts command-line arguments
 //! as a request and logs the response to stdout. Useful for CLI tools and
 //! scripting.
+//!
+//! ## Accept Header
+//!
+//! Use `--accept` to specify preferred response media types:
+//! ```sh
+//! cargo run --example router -- --accept=text/html
+//! cargo run --example router -- --accept=text/html,text/plain
+//! ```
+//! When omitted the default preference is `ansi-term, text, markdown, json`.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A 'server' that accepts the cli arguments and environment variables as a request,
+/// A server that accepts CLI arguments and environment variables as a request,
 /// logging the response body to stdout.
+///
+/// Supports `--accept=<media types>` to override the default content negotiation,
+/// for example `--accept=text/html,text/plain`.
 #[derive(Default, Component)]
 #[component(on_add=on_add)]
 pub struct CliServer;
@@ -17,17 +29,23 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
-	let accept = vec![
-		MediaType::AnsiTerm,
-		MediaType::Text,
-		MediaType::Markdown,
-		MediaType::Json,
-	];
+	let args = CliArgs::parse_env();
 
-	// todo read format cli arg and use as accept
+	let accept = args
+		.params
+		.get("accept")
+		.map(|item| MediaType::from_accepts(item))
+		.unwrap_or_else(|| {
+			vec![
+				MediaType::AnsiTerm,
+				MediaType::Text,
+				MediaType::Markdown,
+				MediaType::Json,
+			]
+		});
 
-	let req = Request::from_cli_args(CliArgs::parse_env())?
-		.with_header::<header::Accept>(accept);
+	let req =
+		Request::from_cli_args(args)?.with_header::<header::Accept>(accept);
 
 	let res = entity.exchange(req).await;
 	let (parts, body) = res.into_parts();

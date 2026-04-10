@@ -4,10 +4,9 @@ use beet_core::prelude::*;
 
 /// Declare a tool to be registered as a descendant wrapper,
 /// while still being serializable via reflect.
-#[derive(Debug, Default, Clone, Component)]
-#[require(T = T::default())]
+#[derive(Debug, Clone, Component)]
 #[component(on_add=on_add::<T, In, Out>)]
-pub struct WrapDescendants<T, In, Out>(PhantomData<(T, In, Out)>)
+pub struct WrapDescendants<T, In, Out>(T)
 where
 	In: 'static,
 	Out: 'static,
@@ -15,6 +14,18 @@ where
 		+ Clone
 		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
 		+ Default;
+
+impl<T, In, Out> Default for WrapDescendants<T, In, Out>
+where
+	In: 'static,
+	Out: 'static,
+	T: Component
+		+ Clone
+		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
+		+ Default,
+{
+	fn default() -> Self { Self(default()) }
+}
 
 fn on_add<T, In, Out>(mut world: DeferredWorld, cx: HookContext)
 where
@@ -27,18 +38,20 @@ where
 {
 	let tool = world
 		.entity(cx.entity)
-		.get::<T>()
-		.expect("Component missing")
-		.clone()
-		.into_tool();
-	world.commands().entity(cx.entity).queue(
-		move |mut entity: EntityWorldMut| {
+		.get::<WrapDescendants<T, In, Out>>()
+		.unwrap()
+		.0
+		.clone();
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(tool.clone())
+		.queue(move |mut entity: EntityWorldMut| {
 			entity
 				.get_mut_or_default::<WrapDescendentsList<In, Out>>()
 				.0
-				.push(tool);
-		},
-	);
+				.push(tool.into_tool());
+		});
 }
 
 

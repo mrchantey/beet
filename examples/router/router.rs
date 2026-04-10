@@ -1,9 +1,8 @@
 //! # Router Example
 //!
-//! The beet router is general in nature
-//!
-//!
 //! Demonstrates beet's routing system with multiple server backends.
+//! Routes are wrapped in a layout template via [`WrapDescendentsList`],
+//! so HTML responses automatically include navigation and styling.
 //!
 //! ## Running the Example
 //!
@@ -20,7 +19,11 @@
 //! # CLI mode — show help scoped to a subcommand
 //! cargo run --example router -- counter --help
 //!
-//! # HTTP mode — start an HTTP server on port 3000
+//! # CLI mode — request HTML output wrapped in the layout template
+//! cargo run --example router -- --accept=text/html
+//! cargo run --example router -- about --accept=text/html
+//!
+//! # HTTP mode — start an HTTP server on port 8337
 //! cargo run --example router --features http_server
 //!
 //! # REPL mode — interactive read-eval-print loop
