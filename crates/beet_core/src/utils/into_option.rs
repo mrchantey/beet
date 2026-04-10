@@ -1,3 +1,5 @@
+use futures::future::Either;
+
 /// A trait for converting a type into an `Option<T>`,
 /// including the unit type, with a marker to specify the conversion strategy.
 pub trait IntoOption<T, M> {

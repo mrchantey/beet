@@ -7,7 +7,7 @@ mod navigate;
 mod route_tree;
 mod router_plugin;
 mod scene_renderer;
-mod tools;
+mod router;
 
 
 /// Exports the most commonly used items.
@@ -18,5 +18,5 @@ pub mod prelude {
 	pub use crate::route_tree::*;
 	pub use crate::router_plugin::*;
 	pub use crate::scene_renderer::*;
-	pub use crate::tools::*;
+	pub use crate::router::*;
 }
