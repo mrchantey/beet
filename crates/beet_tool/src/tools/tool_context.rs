@@ -1,10 +1,7 @@
 use beet_core::prelude::*;
 
-/// Unified context passed to all tool handlers, providing access to the
-/// caller entity and the input payload.
-///
-/// Replaces the former `FuncToolIn`, `AsyncToolIn`, and `SystemToolIn`
-/// types with a single generic context. The `caller` field is always an
+/// Unified context for all tool handlers, providing access to the
+/// caller entity and the input payload. The `caller` field is always an
 /// [`AsyncEntity`], giving tools consistent access to the entity that
 /// initiated the call regardless of whether the tool is sync or async.
 #[derive(Debug, Clone, Deref, DerefMut, Get)]

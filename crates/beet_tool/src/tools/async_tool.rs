@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Backward-compatible alias for [`ToolContext`].
-pub type AsyncToolIn<In = ()> = ToolContext<In>;
-
 /// Create a [`Tool`] from an async closure that receives
 /// [`ToolContext`] and returns [`Result<Out>`].
 ///

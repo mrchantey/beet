@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Backward-compatible alias for [`ToolContext`].
-pub type FuncToolIn<In = ()> = ToolContext<In>;
-
 pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
 where
 	F: 'static

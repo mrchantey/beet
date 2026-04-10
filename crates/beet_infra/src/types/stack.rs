@@ -79,24 +79,24 @@ impl Stack {
 		terra::Ident::new(self.app_name.clone(), self.stage.clone(), label)
 	}
 
-	// ie my-app--prod--tofu.tfstate
-	pub fn backend_path(&self) -> String {
-		self.resource_ident(self.state_suffix.clone())
-			.primary_identifier()
-			.clone()
+	/// The state backend path, ie `my-app--prod--tofu.tfstate`.
+	pub fn backend_path(&self) -> RelPath {
+		RelPath::new(
+			self.resource_ident(self.state_suffix.clone())
+				.primary_identifier()
+				.clone(),
+		)
 	}
 
-	/// Initialize a config with the corresponding backend
+	/// Initialize a config with the corresponding backend.
 	pub fn create_config(&self) -> terra::Config {
-		let key = self.backend_path();
+		let key = self.backend_path().to_string();
 		terra::Config::default().with_backend(self.backend().to_json(&key))
 	}
 
 	#[cfg(feature = "aws")]
 	pub fn state_file(&self) -> Blob {
-		self.backend
-			.provider()
-			.blob(RelPath::new(self.backend_path()))
+		self.backend.provider().blob(self.backend_path())
 	}
 }
 

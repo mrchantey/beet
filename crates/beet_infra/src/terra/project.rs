@@ -4,24 +4,22 @@ use beet_core::prelude::*;
 
 
 
-#[derive(Debug, Clone, Get)]
+#[derive(Debug, Clone, Deref, Get)]
 pub struct Project {
 	config: Config,
-	dir: AbsPathBuf,
-	reconfigure: bool,
-	backend: StackBackend,
-	state_path: RelPath,
+	#[deref]
+	stack: Stack,
 }
 impl Project {
 	pub fn new(stack: &Stack, config: Config) -> Self {
 		Self {
-			dir: stack.work_directory().into_abs(),
 			config,
-			reconfigure: *stack.reconfigure(),
-			backend: stack.backend().clone(),
-			state_path: RelPath::new(stack.backend_path()),
+			stack: stack.clone(),
 		}
 	}
+
+	/// The absolute working directory for the tofu project.
+	fn dir(&self) -> AbsPathBuf { self.work_directory().into_abs() }
 
 	/// Initialize the tofu project if required,
 	/// checking if the config has changes, a lockfile exists,
@@ -30,9 +28,10 @@ impl Project {
 		/// The lock file created by `tofu init` on successful completion.
 		const LOCK_FILE: &str = ".terraform.lock.hcl";
 
+		let dir = self.dir();
 		let bytes = serde_json::to_vec_pretty(&self.config.to_json())?;
-		let config_path = self.dir.join("main.tf.json");
-		let lock_path = self.dir.join(LOCK_FILE);
+		let config_path = dir.join("main.tf.json");
+		let lock_path = dir.join(LOCK_FILE);
 		let config_unchanged = fs_ext::read_async(config_path.clone())
 			.await
 			.is_ok_and(|current| current == bytes);
@@ -44,9 +43,9 @@ impl Project {
 		}
 		fs_ext::write_async(config_path, &bytes).await?;
 		debug!("initializing tofu backend");
-		self.backend.ensure_exists().await?;
+		self.backend().ensure_exists().await?;
 		debug!("initializing tofu project");
-		tofu::init(&self.dir, self.reconfigure).await?;
+		tofu::init(&dir, *self.reconfigure()).await?;
 		Ok(())
 	}
 
@@ -54,37 +53,37 @@ impl Project {
 	/// Only downloads providers, no backend needed.
 	pub async fn validate(&self) -> Result<String> {
 		self.init().await?;
-		tofu::validate(&self.dir).await
+		tofu::validate(&self.dir()).await
 	}
 
 	/// Show execution plan
 	pub async fn plan(&self) -> Result<String> {
 		self.init().await?;
-		tofu::plan(&self.dir).await
+		tofu::plan(&self.dir()).await
 	}
 
 	/// Apply the execution plan.
 	pub async fn apply(&self) -> Result<String> {
 		self.init().await?;
-		tofu::apply(&self.dir).await
+		tofu::apply(&self.dir()).await
 	}
 
 	/// Show the current state.
 	pub async fn show(&self) -> Result<String> {
 		self.init().await?;
-		tofu::show(&self.dir).await
+		tofu::show(&self.dir()).await
 	}
 
 	/// List all resources in the state.
 	pub async fn list(&self) -> Result<String> {
 		self.init().await?;
-		tofu::list(&self.dir).await
+		tofu::list(&self.dir()).await
 	}
 
 	/// Remove a resource from the state.
 	pub async fn remove(&self, resource: &str) -> Result<String> {
 		self.init().await?;
-		tofu::remove(&self.dir, resource).await
+		tofu::remove(&self.dir(), resource).await
 	}
 
 	/// Destroy infrastructure.
@@ -93,10 +92,12 @@ impl Project {
 	/// - removes the working directory
 	pub async fn destroy(&self) -> Result {
 		self.init().await?;
-		tofu::destroy(&self.dir).await?;
-		self.backend().provider().remove(&self.state_path).await?;
-		// self.backend.remove_if_empty().await?;
-		fs_ext::remove_async(&self.dir).await?;
+		tofu::destroy(&self.dir()).await?;
+		self.backend()
+			.provider()
+			.remove(&self.backend_path())
+			.await?;
+		fs_ext::remove_async(&self.dir()).await?;
 		Ok(())
 	}
 	/// Destroys infrastructure without initializing, moving forward
@@ -106,13 +107,13 @@ impl Project {
 	/// - removes the state file from the state bucket
 	/// - removes the working directory
 	pub async fn force_destroy(&self) {
-		self.backend.clear_stale_locks();
-		tofu::destroy_force(&self.dir).await.ok();
+		self.backend().clear_stale_locks();
+		tofu::destroy_force(&self.dir()).await.ok();
 		self.backend()
 			.provider()
-			.remove(&self.state_path)
+			.remove(&self.backend_path())
 			.await
 			.ok();
-		fs_ext::remove_async(&self.dir).await.ok();
+		fs_ext::remove_async(&self.dir()).await.ok();
 	}
 }

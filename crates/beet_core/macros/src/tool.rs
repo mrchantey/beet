@@ -11,10 +11,6 @@ use syn::ReturnType;
 use syn::Type;
 use syn::parse_macro_input;
 
-/// Type names recognized as [`ToolContext`] aliases for passthrough detection.
-const TOOL_CONTEXT_NAMES: &[&str] =
-	&["ToolContext", "AsyncToolIn", "FuncToolIn", "SystemToolIn"];
-
 pub fn impl_tool(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
@@ -31,13 +27,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
 	let has_route = attrs.contains_key("route");
-	let route_path: Option<alloc::string::String> =
-		if let Some(expr) = attrs.get("route") {
-			Some(extract_string_literal(expr)?)
-		} else {
-			None
-		};
-	let route_path = route_path.as_deref();
+	let route_expr: Option<&syn::Expr> = attrs.get("route");
 
 	// ── 2. Extract function data ──
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
@@ -87,7 +77,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		generics,
 		fn_attrs,
 		Some(require_tool),
-		route_path,
+		route_expr,
 	);
 
 	// ── 6. Build handler function at module level ──
@@ -293,17 +283,9 @@ fn make_system_fn_parts(
 // Type extraction helpers
 // ---------------------------------------------------------------------------
 
-/// Extract inner type from any ToolContext-like wrapper.
-///
-/// Recognizes `ToolContext<T>`, `AsyncToolIn<T>`, `FuncToolIn<T>`,
-/// `SystemToolIn<T>`, and their default-unit forms (no generic args → `()`).
+/// Extract inner type, recognizing `ToolContext<T>` and its default-unit form (no generic args → `()`).
 fn extract_tool_context_type(ty: &Type) -> Option<Type> {
-	for name in TOOL_CONTEXT_NAMES {
-		if let Some(inner) = extract_wrapper_type_or_unit(ty, name) {
-			return Some(inner);
-		}
-	}
-	None
+	extract_wrapper_type_or_unit(ty, "ToolContext")
 }
 
 /// Extract an identifier from a pattern.
@@ -473,22 +455,6 @@ fn make_require_tool(
 	}
 }
 
-/// Extract a string value from a literal expression, ie `"home"`.
-fn extract_string_literal(
-	expr: &syn::Expr,
-) -> syn::Result<alloc::string::String> {
-	match expr {
-		syn::Expr::Lit(syn::ExprLit {
-			lit: syn::Lit::Str(s),
-			..
-		}) => Ok(s.value()),
-		other => Err(syn::Error::new_spanned(
-			other,
-			"expected a string literal, ie `route = \"home\"`",
-		)),
-	}
-}
-
 /// Generate a struct definition, forwarding function attributes to the
 /// struct and optionally adding `#[require(...)]` attributes when the
 /// derives include `Component`.
@@ -498,7 +464,7 @@ fn make_struct_def(
 	generics: &syn::Generics,
 	fn_attrs: &[syn::Attribute],
 	require_tool: Option<TokenStream>,
-	route_path: Option<&str>,
+	route_expr: Option<&syn::Expr>,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
 	let has_reflect = has_derive(fn_attrs, "Reflect");
@@ -523,10 +489,10 @@ fn make_struct_def(
 	};
 
 	let require_path = if has_component {
-		if let Some(path) = route_path {
+		if let Some(expr) = route_expr {
 			let beet_net = pkg_ext::internal_or_beet("beet_net");
 			quote! {
-				#[require(#beet_net::prelude::PathPartial = #beet_net::prelude::PathPartial::new(#path))]
+				#[require(#beet_net::prelude::PathPartial = #beet_net::prelude::PathPartial::new(#expr))]
 			}
 		} else {
 			quote! {}
@@ -769,16 +735,6 @@ mod test {
 	}
 
 	#[test]
-	fn pure_passthrough_func_tool_in_alias() {
-		let result = parse_str(quote!(pure), syn::parse_quote! {
-			fn my_tool(cx: FuncToolIn<i32>) -> i32 { *cx }
-		});
-		assert!(result.contains("type In = i32"));
-		assert!(result.contains("func_tool"));
-		assert!(!result.contains("__tool_cx"));
-	}
-
-	#[test]
 	fn pure_passthrough_default_unit() {
 		let result = parse_str(quote!(pure), syn::parse_quote! {
 			fn my_tool(cx: ToolContext) -> i32 { 1 }
@@ -858,19 +814,9 @@ mod test {
 	}
 
 	#[test]
-	fn async_passthrough_async_tool_in_alias() {
-		let result = parse_str(quote!(), syn::parse_quote! {
-			async fn my_tool(cx: AsyncToolIn<i32>) -> i32 { *cx }
-		});
-		assert!(result.contains("type In = i32"));
-		assert!(result.contains("async_tool"));
-		assert!(!result.contains("__tool_cx"));
-	}
-
-	#[test]
 	fn async_passthrough_default_unit() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			async fn my_tool(cx: AsyncToolIn) -> i32 { 42 }
+			async fn my_tool(cx: ToolContext) -> i32 { 42 }
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("async_tool"));
@@ -951,17 +897,6 @@ mod test {
 	}
 
 	#[test]
-	fn system_passthrough_in_system_tool_in_alias() {
-		let result = parse_str(quote!(), syn::parse_quote! {
-			fn my_tool(cx: In<SystemToolIn<i32>>) -> Entity { cx.id() }
-		});
-		assert!(result.contains("type In = i32"));
-		assert!(result.contains("system_tool"));
-		assert!(result.contains("In (cx)"));
-		assert!(!result.contains("__tool_cx"));
-	}
-
-	#[test]
 	fn system_passthrough_with_params() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn my_tool(cx: In<ToolContext<i32>>, time: Res<Time>) -> f32 { 0.0 }
@@ -975,7 +910,7 @@ mod test {
 	#[test]
 	fn system_passthrough_default_unit() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			fn my_tool(cx: In<SystemToolIn>) -> Entity { cx.id() }
+			fn my_tool(cx: In<ToolContext>) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("system_tool"));
@@ -995,20 +930,9 @@ mod test {
 	}
 
 	#[test]
-	fn system_passthrough_direct_alias() {
-		let result = parse_str(quote!(), syn::parse_quote! {
-			fn my_tool(cx: SystemToolIn<i32>) -> Entity { cx.id() }
-		});
-		assert!(result.contains("type In = i32"));
-		assert!(result.contains("system_tool"));
-		assert!(result.contains("In (cx)"));
-		assert!(!result.contains("__tool_cx"));
-	}
-
-	#[test]
 	fn system_passthrough_direct_default_unit() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			fn my_tool(cx: SystemToolIn) -> Entity { cx.id() }
+			fn my_tool(cx: ToolContext) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("system_tool"));
@@ -1240,6 +1164,18 @@ mod test {
 		assert!(result.contains("serde_exchange"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
+	}
+
+	#[test]
+	fn route_with_expression_adds_path_partial() {
+		let result =
+			parse_str(quote!(route = get_route_path()), syn::parse_quote! {
+				#[derive(Component, Reflect)]
+				async fn MyTool(val: i32) -> String { val.to_string() }
+			});
+		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("PathPartial"));
+		assert!(result.contains("PathPartial :: new (get_route_path ())"));
 	}
 
 	#[test]

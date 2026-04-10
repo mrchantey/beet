@@ -3,9 +3,6 @@ use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
 
-/// Backward-compatible alias for [`ToolContext`].
-pub type SystemToolIn<In = ()> = ToolContext<In>;
-
 /// Create a [`Tool`] from a Bevy system that returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), system tools have access to

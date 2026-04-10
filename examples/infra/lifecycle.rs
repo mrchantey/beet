@@ -52,8 +52,18 @@ fn setup(mut commands: Commands) {
 				provider.bucket_remove().await.ok();
 			}
 
+			println!(
+				"📦 State file exists: {}",
+				project.state_file().exists().await?
+			);
+
 			println!("🔨 Validating..");
 			project.validate().await?;
+
+			println!(
+				"📦 State file exists: {}",
+				project.state_file().exists().await?
+			);
 
 			println!("🔨 Planning..");
 			let plan = project.plan().await?;
@@ -80,6 +90,11 @@ fn setup(mut commands: Commands) {
 			project.destroy().await?;
 
 			println!("🪣 Bucket Exists: {}", provider.bucket_exists().await?);
+			
+			println!(
+				"📦 State file exists: {}",
+				project.state_file().exists().await?
+			);
 
 			entity.world().write_message(AppExit::Success);
 			Ok(())
