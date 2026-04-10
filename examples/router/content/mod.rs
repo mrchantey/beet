@@ -62,8 +62,9 @@ fn counter() -> impl Bundle {
 #[tool]
 #[derive(Default, Clone, Component)]
 async fn LayoutTemplate(
-	(request, next): (Request, Next<Request, Response>),
+	cx: ToolContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
+	let (request, next) = cx.take();
 	let response = next.call(request).await?;
 
 	let content_type = response

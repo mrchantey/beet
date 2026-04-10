@@ -92,8 +92,8 @@ where
 			}
 		};
 
+	let world = cx.world().clone();
 	let mut input = cx.input;
-	let world = cx.caller.world();
 
 	for child in children {
 		let tool_meta_result =

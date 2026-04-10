@@ -61,7 +61,7 @@ where
 			let parts = cx.input.parts().clone();
 
 			// 2. spawn the entity to be rendered to
-			let entity = cx.caller.world().spawn_then(()).await;
+			let entity = cx.world().spawn_then(()).await;
 
 			// 3. call the inner tool and insert its bundle
 			let bundle = cx.caller.call_detached(tool, cx.input).await?;
@@ -139,7 +139,7 @@ pub fn file_scene_tool(
 			let bytes = MediaBytes::new(media_type, bytes);
 
 			// spawn entity and parse content onto it
-			let entity = cx.caller.world().spawn_then(()).await;
+			let entity = cx.world().spawn_then(()).await;
 			entity
 				.with_then(move |mut entity_mut| {
 					let mut parser = MediaParser::new();

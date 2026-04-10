@@ -74,7 +74,7 @@ pub(crate) async fn NavigateHandler(
 	let direction = NavigateTo::from_str_param(value)?;
 	let current_path = cx.input.path().clone();
 	let tool_entity = cx.caller.id();
-	let world = cx.caller.world();
+	let world = cx.world();
 
 	let resolved = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {

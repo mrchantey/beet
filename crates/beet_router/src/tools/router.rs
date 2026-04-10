@@ -34,7 +34,7 @@ pub async fn RouterTool(
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let caller = cx.caller.id();
-	let world = cx.caller.world();
+	let world = cx.world();
 
 	let node = world
 		.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {

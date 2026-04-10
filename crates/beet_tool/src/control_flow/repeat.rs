@@ -53,7 +53,7 @@ where
 		_ => return Outcome::PASS.xok(),
 	};
 
-	let world = cx.caller.world();
+	let world = cx.world();
 
 	let tool_meta = world
 		.entity(child)
@@ -144,7 +144,7 @@ where
 		_ => return Outcome::PASS.xok(),
 	};
 
-	let world = cx.caller.world();
+	let world = cx.world();
 
 	let tool_meta = world
 		.entity(child)
