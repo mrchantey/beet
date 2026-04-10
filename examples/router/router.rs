@@ -40,7 +40,7 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			BeetRouterPlugin,
+			RouterAppPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run()

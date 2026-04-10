@@ -39,7 +39,7 @@ use beet_tool::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();
-///     app.add_plugins((MinimalPlugins, LogPlugin::default(), BeetRouterPlugin));
+///     app.add_plugins((MinimalPlugins, LogPlugin::default(), RouterAppPlugin));
 ///     app.world_mut().spawn((
 ///         SceneToolRenderer::default(),
 ///         default_router(),

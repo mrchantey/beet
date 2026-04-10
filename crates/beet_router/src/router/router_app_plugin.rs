@@ -11,9 +11,9 @@ use beet_node::prelude::*;
 /// - [`InterfacePlugin`] — single-active-scene enforcement
 /// - [`InputPlugin`] — link click navigation wiring
 #[derive(Default)]
-pub struct BeetRouterPlugin;
+pub struct RouterAppPlugin;
 
-impl Plugin for BeetRouterPlugin {
+impl Plugin for RouterAppPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<DocumentPlugin>()

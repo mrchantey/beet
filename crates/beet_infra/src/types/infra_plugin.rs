@@ -11,6 +11,6 @@ impl Plugin for InfraPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>();
 		#[cfg(feature = "cli")]
-		app.init_plugin::<beet_router::prelude::BeetRouterPlugin>();
+		app.init_plugin::<beet_router::prelude::RouterAppPlugin>();
 	}
 }

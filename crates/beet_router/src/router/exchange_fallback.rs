@@ -276,7 +276,7 @@ mod test {
 	fn roundtrip_router_tools_scene() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
-		app.init_plugin::<BeetRouterPlugin>();
+		app.init_plugin::<RouterAppPlugin>();
 		app.init();
 		app.update();
 
