@@ -31,7 +31,7 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").init_with(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		scene_route("counter", move || {
+		scene_func("counter", move || {
 			let field_ref = field_ref.clone();
 			(Element::new("div"), children![
 				(Element::new("h1"), children![Value::Str(

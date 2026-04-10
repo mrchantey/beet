@@ -306,7 +306,7 @@ mod test {
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				help(),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 				increment(FieldRef::new("count")),
@@ -341,7 +341,7 @@ mod test {
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))
@@ -364,14 +364,14 @@ mod test {
 		let body = router_world()
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
-					scene_route("counter", || {
+					scene_func("counter", || {
 						(Element::new("p"), children![Value::Str(
 							"counter".into()
 						)])
 					}),
 					children![increment(FieldRef::new("count")),],
 				),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))
@@ -411,14 +411,14 @@ mod test {
 		router_world()
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
-					scene_route("counter", || {
+					scene_func("counter", || {
 						(Element::new("p"), children![Value::Str(
 							"counter".into()
 						)])
 					}),
 					children![increment(FieldRef::new("count")),],
 				),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))

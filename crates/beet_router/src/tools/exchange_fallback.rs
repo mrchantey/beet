@@ -11,7 +11,7 @@
 //!
 //! ## Routing Behavior
 //!
-//! - **Scenes**: tool-based routes created via [`scene_route`] that delegate
+//! - **Scenes**: tool-based routes created via [`scene_func`] that delegate
 //!   rendering to the [`SceneToolRenderer`] on an ancestor.
 //! - **`--help`**: scoped to the requested path prefix, ie
 //!   `counter --help` only shows routes under `/counter`.
@@ -169,7 +169,7 @@ mod test {
 		router_world()
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))
@@ -186,7 +186,7 @@ mod test {
 		router_world()
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				increment(FieldRef::new("count")),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))
@@ -216,7 +216,7 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("", || {
+				scene_func("", || {
 					children![
 						(Element::new("h1"), children![Value::Str(
 							"My Server".into()
@@ -226,7 +226,7 @@ mod test {
 						)]),
 					]
 				}),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))
@@ -246,14 +246,14 @@ mod test {
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				(
-					scene_route("counter", || {
+					scene_func("counter", || {
 						(Element::new("p"), children![Value::Str(
 							"counter".into()
 						)])
 					}),
 					children![increment(FieldRef::new("count")),],
 				),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))

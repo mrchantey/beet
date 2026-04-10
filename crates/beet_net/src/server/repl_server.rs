@@ -45,8 +45,8 @@ use beet_tool::prelude::*;
 ///         default_router(),
 ///         ReplServer,
 ///         children![
-///             scene_route("", || Name::new("welcome!")),
-///             scene_route("about", || Name::new("about")),
+///             scene_func("", || Name::new("welcome!")),
+///             scene_func("about", || Name::new("about")),
 ///         ],
 ///     ));
 ///     async_ext::block_on(app.run_async());

@@ -68,7 +68,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()
 					)])
@@ -88,7 +88,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
-				scene_route("", || {
+				scene_func("", || {
 					(Element::new("p"), children![Value::Str(
 						"Root content".into()
 					)])
@@ -107,7 +107,7 @@ mod test {
 		let body = (AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
-				scene_route("", || {
+				scene_func("", || {
 					children![
 						(Element::new("h1"), children![Value::Str(
 							"My Server".into()
@@ -117,7 +117,7 @@ mod test {
 						)]),
 					]
 				}),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
 				}),
 			]))

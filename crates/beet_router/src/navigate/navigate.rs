@@ -284,10 +284,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("", || {
+				scene_func("", || {
 					(Element::new("h1"), children![Value::Str("Root".into())])
 				}),
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()
 					)])
@@ -313,12 +313,12 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("alpha", || {
+				scene_func("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
 					)])
 				}),
-				scene_route("beta", || {
+				scene_func("beta", || {
 					(Element::new("p"), children![Value::Str(
 						"Beta page".into()
 					)])
@@ -344,12 +344,12 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("alpha", || {
+				scene_func("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
 					)])
 				}),
-				scene_route("beta", || {
+				scene_func("beta", || {
 					(Element::new("p"), children![Value::Str(
 						"Beta page".into()
 					)])
@@ -387,12 +387,12 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("alpha", || {
+				scene_func("alpha", || {
 					(Element::new("p"), children![Value::Str(
 						"Alpha page".into()
 					)])
 				}),
-				scene_route("beta", || {
+				scene_func("beta", || {
 					(Element::new("p"), children![Value::Str(
 						"Beta page".into()
 					)])
@@ -418,7 +418,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_route("about", || {
+				scene_func("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()
 					)])

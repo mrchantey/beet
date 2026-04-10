@@ -8,7 +8,7 @@ use beet_tool::prelude::*;
 /// in HyperCard. Each scene route is a route, with the exact rendering
 /// behavior determined by the [`SceneToolRenderer`] on the server.
 ///
-/// Use [`scene_route`] or [`scene_tool`] to create a routable scene.
+/// Use [`scene_func`] or [`scene_tool`] to create a routable scene.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(DocumentScope)]
@@ -95,11 +95,11 @@ where
 /// use beet_core::prelude::*;
 /// use beet_node::prelude::*;
 ///
-/// let bundle = scene_route("about", || {
+/// let bundle = scene_func("about", || {
 ///     (Element::new("p"), children![Value::Str("About page".into())])
 /// });
 /// ```
-pub fn scene_route<F, B>(path: &str, func: F) -> impl Bundle
+pub fn scene_func<F, B>(path: &str, func: F) -> impl Bundle
 where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
