@@ -62,7 +62,7 @@ impl EchoHttpServer {
 }
 
 /// Routes requests based on the first path segment.
-fn echo_request(req: FuncToolIn<Request>) -> Response {
+fn echo_request(req: ToolContext<Request>) -> Response {
 	let req = req.take();
 	match req.path().first().map(|seg| seg.as_str()) {
 		Some("sse") => sse_response(&req),

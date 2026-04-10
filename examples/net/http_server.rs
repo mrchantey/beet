@@ -46,11 +46,11 @@ struct Count(u32);
 
 /// Handler function that processes all incoming requests.
 fn handler(
-	input: In<SystemToolIn<Request>>,
+	cx: In<ToolContext<Request>>,
 	mut query: Query<&mut Count>,
 ) -> Result<Response> {
-	let caller = input.0.caller;
-	let request = input.0.input;
+	let caller = cx.id();
+	let request = cx.0.input;
 	// only accept `/` routes
 	if !request.path().is_empty() {
 		let message = format!("Not Found: {}", request.path_string());

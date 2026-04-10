@@ -40,7 +40,7 @@ impl Repeat {
 ///
 /// Returns an error when the child has no [`ToolMeta`] or an
 /// incompatible tool signature.
-async fn repeat_tool<Input>(cx: AsyncToolIn<Input>) -> Result<Outcome>
+async fn repeat_tool<Input>(cx: ToolContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -125,7 +125,7 @@ where
 ///
 /// Returns an error when the child has no [`ToolMeta`] or an
 /// incompatible tool signature.
-async fn repeat_times_tool<Input>(cx: AsyncToolIn<Input>) -> Result<Outcome>
+async fn repeat_times_tool<Input>(cx: ToolContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -177,14 +177,14 @@ mod tests {
 	use std::sync::atomic::Ordering;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
-		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())
+		func_tool(|_: ToolContext<()>| Outcome::FAIL.xok())
 	}
 
 	/// A child tool that passes `n` times, then fails.
 	fn pass_n_then_fail(n: u32) -> (Arc<AtomicU32>, Tool<(), Outcome>) {
 		let count = Arc::new(AtomicU32::new(0));
 		let count_inner = count.clone();
-		let tool = func_tool(move |_: FuncToolIn<()>| {
+		let tool = func_tool(move |_: ToolContext<()>| {
 			let calls = count_inner.fetch_add(1, Ordering::SeqCst);
 			if calls < n {
 				Outcome::PASS.xok()

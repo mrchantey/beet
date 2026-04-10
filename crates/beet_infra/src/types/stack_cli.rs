@@ -25,7 +25,7 @@ pub fn stack_cli() -> impl Bundle {
 #[tool]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn Validate(cx: AsyncToolIn) -> Result<String> {
+async fn Validate(cx: ToolContext) -> Result<String> {
 	cx.caller
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)
@@ -38,7 +38,7 @@ async fn Validate(cx: AsyncToolIn) -> Result<String> {
 #[tool]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn Plan(cx: AsyncToolIn) -> Result<String> {
+async fn Plan(cx: ToolContext) -> Result<String> {
 	cx.caller
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)

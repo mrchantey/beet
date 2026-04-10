@@ -200,11 +200,11 @@ mod test {
 	use beet_core::prelude::*;
 	use bevy::ecs::entity::EntityHashMap;
 
-	#[tool]
-	fn add(a: i32, b: i32) -> i32 { a + b }
-	#[tool]
+	#[tool(pure)]
+	fn add((a, b): (i32, i32)) -> i32 { a + b }
+	#[tool(pure)]
 	fn double(val: i32) -> i32 { val * 2 }
-	#[tool]
+	#[tool(pure)]
 	fn negate(val: i32) -> i32 { -val }
 
 	// -- serde roundtrip helpers ------------------------------------------
@@ -216,9 +216,8 @@ mod test {
 	}
 
 	/// Inner tool defined with `#[tool]`, used as the wrapped target.
-	#[tool]
-	#[derive(Debug, Default, Component, Reflect)]
-	#[reflect(Component, Default)]
+	#[tool(pure)]
+	#[derive(Debug, Default, Reflect)]
 	fn Doubler(val: i32) -> i32 { val * 2 }
 
 	impl InnerTestTool for Doubler {
@@ -227,7 +226,7 @@ mod test {
 
 	/// Wrapper function defined with `#[tool]`, provides the wrapping logic.
 	#[tool]
-	async fn AddOneWrap(cx: AsyncToolIn<(i32, Next<i32, i32>)>) -> Result<i32> {
+	async fn AddOneWrap(cx: ToolContext<(i32, Next<i32, i32>)>) -> Result<i32> {
 		let inner_out = cx.1.call(cx.0).await?;
 		Ok(inner_out + 1)
 	}
@@ -249,7 +248,7 @@ mod test {
 	impl<T: InnerTestTool> AddOneWrapper<T> {
 		fn make_tool() -> Tool<i32, i32> {
 			let inner = T::inner_tool();
-			async_tool(move |cx: AsyncToolIn<i32>| {
+			async_tool(move |cx: ToolContext<i32>| {
 				let inner = inner.clone();
 				async move {
 					let inner_out = cx.caller.call_detached(inner, *cx).await?;

@@ -43,7 +43,7 @@ pub fn exchange_fallback() -> impl Bundle {
 		.with_exclude_errors(ChildError::NO_TOOL | ChildError::TOOL_MISMATCH);
 	(
 		RouteHidden,
-		async_tool(async move |cx: AsyncToolIn<Request>| -> Result<Response> {
+		async_tool(async move |cx: ToolContext<Request>| -> Result<Response> {
 			match fallback.run(cx).await? {
 				Pass(res) => Ok(res),
 				// no child matched — return a simple plaintext not-found
@@ -109,18 +109,18 @@ mod test {
 	fn my_interface() -> impl Bundle {
 		(
 			system_tool(
-				|In(req): In<SystemToolIn<Request>>,
+				|In(req): In<ToolContext<Request>>,
 				 trees: Query<&RouteTree>|
 				 -> Result<RouteTree> {
-					let tree = trees.get(req.caller)?;
+					let tree = trees.get(req.id())?;
 					Ok(tree.clone())
 				},
 			),
 			children![(
 				PathPartial::new("add"),
-				func_tool(
-					|input: FuncToolIn<(u32, u32)>| Ok(input.0 + input.1)
-				),
+				func_tool(|input: ToolContext<(u32, u32)>| Ok(
+					input.0 + input.1
+				)),
 			)],
 		)
 	}
@@ -148,7 +148,7 @@ mod test {
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				route_tool(
 					"add",
-					func_tool(|input: FuncToolIn<(i32, i32)>| Ok(
+					func_tool(|input: ToolContext<(i32, i32)>| Ok(
 						input.0 + input.1
 					))
 				),

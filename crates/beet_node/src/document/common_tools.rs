@@ -27,12 +27,12 @@ use bevy::reflect::Typed;
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn Increment(
-	cx: In<SystemToolIn>,
+	cx: In<ToolContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
-	let field = fields.get(cx.caller)?;
-	query.with_field(cx.caller, field, |value| {
+	let field = fields.get(cx.id())?;
+	query.with_field(cx.id(), field, |value| {
 		let current = value.as_i64().unwrap_or(0);
 		let new_value = current + 1;
 		*value = Value::Int(new_value);
@@ -58,12 +58,12 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn Decrement(
-	cx: In<SystemToolIn>,
+	cx: In<ToolContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
-	let field = fields.get(cx.caller)?;
-	query.with_field(cx.caller, field, |value| {
+	let field = fields.get(cx.id())?;
+	query.with_field(cx.id(), field, |value| {
 		let current = value.as_i64().unwrap_or(0);
 		let new_value = current - 1;
 		*value = Value::Int(new_value);
@@ -84,12 +84,12 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn AddField(
-	cx: In<SystemToolIn<i64>>,
+	cx: In<ToolContext<i64>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
-	let field = fields.get(cx.caller)?;
-	query.with_field(cx.caller, field, |value| {
+	let field = fields.get(cx.id())?;
+	query.with_field(cx.id(), field, |value| {
 		let current = value.as_i64().unwrap_or(0);
 		let new_value = current + cx.input;
 		*value = Value::Int(new_value);
@@ -109,12 +109,12 @@ pub fn add(field: FieldRef) -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn SetField(
-	cx: In<SystemToolIn<Value>>,
+	cx: In<ToolContext<Value>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<()> {
-	let field = fields.get(cx.caller)?;
-	query.with_field(cx.caller, field, move |value| {
+	let field = fields.get(cx.id())?;
+	query.with_field(cx.id(), field, move |value| {
 		*value = cx.input;
 	})
 }
@@ -131,16 +131,16 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn SetFieldTyped<T>(
-	cx: In<SystemToolIn<T>>,
+	cx: In<ToolContext<T>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<()>
 where
 	T: 'static + Send + Sync + FromReflect + Typed,
 {
-	let field = fields.get(cx.caller)?;
+	let field = fields.get(cx.id())?;
 	let new_value = Value::from_reflect(&cx.input)?;
-	query.with_field(cx.caller, field, move |value| {
+	query.with_field(cx.id(), field, move |value| {
 		*value = new_value;
 	})
 }
@@ -164,12 +164,12 @@ where
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn ReadField(
-	cx: In<SystemToolIn>,
+	cx: In<ToolContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<Value> {
-	let field = fields.get(cx.caller)?;
-	let doc = query.get(cx.caller, &field.document)?;
+	let field = fields.get(cx.id())?;
+	let doc = query.get(cx.id(), &field.document)?;
 	doc.get_field_ref(&field.field_path)
 		.map(|val| val.clone())?
 		.xok()
@@ -187,15 +187,15 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn ReadFieldTyped<T>(
-	cx: In<SystemToolIn>,
+	cx: In<ToolContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<T>
 where
 	T: 'static + Send + Sync + FromReflect + Typed,
 {
-	let field = fields.get(cx.caller)?;
-	let doc = query.get(cx.caller, &field.document)?;
+	let field = fields.get(cx.id())?;
+	let doc = query.get(cx.id(), &field.document)?;
 	doc.get_field::<T>(&field.field_path)?.xok()
 }
 

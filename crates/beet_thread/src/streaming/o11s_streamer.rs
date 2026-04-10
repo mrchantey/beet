@@ -38,7 +38,7 @@ impl IntoTool<Self> for O11sStreamer {
 	type In = ();
 	type Out = Outcome;
 	fn into_tool(self) -> Tool<(), Outcome> {
-		async_tool(async move |cx: AsyncToolIn| {
+		async_tool(async move |cx: ToolContext| {
 			post_streamer_tool_stateful(cx.map_input(self)).await
 		})
 	}

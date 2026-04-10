@@ -104,8 +104,8 @@ struct Root;
 #[tool]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn SaveScene(world: AsyncToolIn) -> Result<Outcome> {
-	let (bucket, json) = world
+async fn SaveScene(cx: ToolContext) -> Result<Outcome> {
+	let (bucket, json) = cx
 		.caller
 		.world()
 		.with_then(|world| -> Result<_> {

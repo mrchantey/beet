@@ -386,7 +386,7 @@ mod test {
 	fn tool_at(path: &str) -> impl Bundle {
 		(
 			PathPartial::new(path),
-			func_tool(|_: FuncToolIn<()>| Ok(())),
+			func_tool(|_: ToolContext<()>| Ok(())),
 		)
 	}
 
@@ -457,7 +457,7 @@ mod test {
 				(
 					PathPartial::new("about"),
 					SceneRoute,
-					func_tool(|_: FuncToolIn<()>| Ok(()))
+					func_tool(|_: ToolContext<()>| Ok(()))
 				),
 				tool_at("action"),
 			])
@@ -602,7 +602,7 @@ mod test {
 				(
 					PathPartial::new("counter"),
 					SceneRoute,
-					func_tool(|_: FuncToolIn<()>| Ok(())),
+					func_tool(|_: ToolContext<()>| Ok(())),
 					children![tool_at("increment"), tool_at("decrement"),],
 				),
 				tool_at("other"),

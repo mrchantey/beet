@@ -79,7 +79,7 @@ where
 	/// - incompatible [`ToolMeta`] signature
 	pub async fn run(
 		&self,
-		cx: AsyncToolIn<Input>,
+		cx: ToolContext<Input>,
 	) -> Result<Outcome<Output, Input>>
 	where
 		Input: 'static + Send + Sync,
@@ -144,7 +144,7 @@ where
 }
 
 async fn fallback_tool<Input, Output>(
-	cx: AsyncToolIn<Input>,
+	cx: ToolContext<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
 	Input: 'static + Send + Sync,
@@ -163,13 +163,13 @@ mod tests {
 	use super::*;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
-		func_tool(|_: FuncToolIn<()>| Outcome::FAIL.xok())
+		func_tool(|_: ToolContext<()>| Outcome::FAIL.xok())
 	}
 	fn outcome_pass() -> Tool<(), Outcome> {
-		func_tool(|_: FuncToolIn<()>| Outcome::PASS.xok())
+		func_tool(|_: ToolContext<()>| Outcome::PASS.xok())
 	}
 	fn wrong_signature_tool() -> Tool<(), i32> {
-		func_tool(|_: FuncToolIn<()>| 7.xok())
+		func_tool(|_: ToolContext<()>| 7.xok())
 	}
 
 	#[beet_core::test]

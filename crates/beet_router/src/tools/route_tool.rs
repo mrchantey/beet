@@ -26,7 +26,7 @@ use beet_tool::prelude::*;
 /// // Create a route tool from a typed handler
 /// let bundle = route_tool(
 ///     "add",
-///     func_tool(|input: FuncToolIn<(i32, i32)>| Ok(input.0 + input.1)),
+///     func_tool(|input: ToolContext<(i32, i32)>| Ok(input.0 + input.1)),
 /// );
 /// ```
 pub fn route_tool<T: 'static, M>(
@@ -99,7 +99,7 @@ mod test {
 	fn add_route_tool() -> impl Bundle {
 		route_tool(
 			"add",
-			func_tool(|input: FuncToolIn<AddInput>| Ok(input.a + input.b)),
+			func_tool(|input: ToolContext<AddInput>| Ok(input.a + input.b)),
 		)
 	}
 
@@ -176,7 +176,10 @@ mod test {
 	#[beet_core::test]
 	async fn unit_input_empty_body() {
 		let response = AsyncPlugin::world()
-			.spawn(route_tool("unit", func_tool(|_: FuncToolIn<()>| Ok(42i32))))
+			.spawn(route_tool(
+				"unit",
+				func_tool(|_: ToolContext<()>| Ok(42i32)),
+			))
 			.call::<Request, Response>(Request::get("/"))
 			.await
 			.unwrap();

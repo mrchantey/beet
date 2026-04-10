@@ -39,11 +39,11 @@ fn setup(mut commands: Commands) {
 
 
 fn assert_and_exit(
-	input: In<SystemToolIn>,
+	input: In<ToolContext>,
 	mut commands: Commands,
 	query: ThreadQuery,
 ) -> Result<Outcome> {
-	let view = query.thread(input.caller)?;
+	let view = query.thread(input.id())?;
 	view.posts
 		.iter()
 		.find(|post| {

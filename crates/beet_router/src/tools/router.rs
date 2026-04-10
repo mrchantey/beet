@@ -30,7 +30,7 @@ pub fn router() -> impl Bundle {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub async fn RouterTool(
-	cx: AsyncToolIn<Request>,
+	cx: ToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let caller = cx.caller.id();
@@ -137,9 +137,7 @@ mod test {
 			.into_world()
 			.spawn((router(), children![route_tool(
 				"add",
-				func_tool(
-					|input: FuncToolIn<(i32, i32)>| Ok(input.0 + input.1)
-				),
+				func_tool(|cx: ToolContext<(i32, i32)>| Ok(cx.0 + cx.1)),
 			),]))
 			.call::<Request, Response>(
 				Request::with_json("/add", &(10i32, 20i32)).unwrap(),

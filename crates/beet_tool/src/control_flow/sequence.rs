@@ -71,7 +71,7 @@ impl Sequence {
 /// - no [`ToolMeta`]
 /// - incompatible [`ToolMeta`] signature
 async fn sequence_tool<Input, Output>(
-	cx: AsyncToolIn<Input>,
+	cx: ToolContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
 	Input: 'static + Send + Sync,
@@ -142,13 +142,13 @@ mod tests {
 	use super::*;
 
 	fn outcome_fail() -> Tool<(), Outcome<(), ()>> {
-		func_tool(|_: FuncToolIn<()>| Outcome::Fail(()).xok())
+		func_tool(|_: ToolContext<()>| Outcome::Fail(()).xok())
 	}
 	fn outcome_pass() -> Tool<(), Outcome<(), ()>> {
-		func_tool(|_: FuncToolIn<()>| Outcome::Pass(()).xok())
+		func_tool(|_: ToolContext<()>| Outcome::Pass(()).xok())
 	}
 	fn wrong_signature_tool() -> Tool<(), i32> {
-		func_tool(|_: FuncToolIn<()>| 7.xok())
+		func_tool(|_: ToolContext<()>| 7.xok())
 	}
 
 	#[beet_core::test]

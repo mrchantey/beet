@@ -530,8 +530,8 @@ mod test {
 			.unwrap();
 	}
 
-	#[tool]
-	fn add(a: u32, b: u32) -> u32 { a + b }
+	#[tool(pure)]
+	fn add((a, b): (u32, u32)) -> u32 { a + b }
 	#[test]
 	fn missing_reflect_tool() {
 		// not registered

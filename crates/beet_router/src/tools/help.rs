@@ -13,7 +13,7 @@ use beet_tool::prelude::*;
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub(crate) async fn HelpHandler(
-	cx: AsyncToolIn<Request>,
+	cx: ToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	if cx.has_param("help") {
 		let path = cx.input.path().clone();
@@ -45,7 +45,7 @@ pub(crate) async fn HelpHandler(
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub(crate) async fn ContextualNotFoundHandler(
-	cx: AsyncToolIn<Request>,
+	cx: ToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let path = cx.input.path().clone();
 	let help_text = cx
@@ -178,11 +178,11 @@ mod test {
 		(PathPartial::new("help"), system_tool(help_system))
 	}
 	fn help_system(
-		In(cx): In<SystemToolIn>,
+		In(cx): In<ToolContext>,
 		ancestors: Query<&ChildOf>,
 		trees: Query<&RouteTree>,
 	) -> Result<String> {
-		let root = ancestors.root_ancestor(cx.caller);
+		let root = ancestors.root_ancestor(cx.id());
 		let tree = trees.get(root).map_err(|_| {
 			bevyhow!("No RouteTree found on root ancestor, cannot render help")
 		})?;

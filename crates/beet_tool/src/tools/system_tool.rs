@@ -3,41 +3,15 @@ use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
 
-/// Context passed to system tool handlers containing the caller entity
-/// and input payload.
-///
-/// This mirrors [`FuncToolIn`] and [`AsyncToolIn`], giving
-/// system-based tools access to the entity that owns the
-/// [`Tool`] component.
-pub struct SystemToolIn<In = ()> {
-	/// The entity that owns the [`Tool`] being called.
-	pub caller: Entity,
-	/// The input payload for this tool call.
-	pub input: In,
-}
-
-impl<In> std::ops::Deref for SystemToolIn<In> {
-	type Target = In;
-	fn deref(&self) -> &Self::Target { &self.input }
-}
-
-impl<In> std::ops::DerefMut for SystemToolIn<In> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
-}
-
-impl<In> SystemToolIn<In> {
-	/// Consume the context and return the inner input payload.
-	pub fn take(self) -> In { self.input }
-
-	pub fn caller(&self) -> Entity { self.caller }
-}
+/// Backward-compatible alias for [`ToolContext`].
+pub type SystemToolIn<In = ()> = ToolContext<In>;
 
 /// Create a [`Tool`] from a Bevy system that returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), system tools have access to
 /// ECS queries, resources, and other system parameters.
 ///
-/// The system's first argument must be `In<SystemToolIn<Input>>` (the
+/// The system's first argument must be `In<ToolContext<Input>>` (the
 /// tool's input payload plus entity context), followed by any number
 /// of regular system parameters.
 ///
@@ -46,7 +20,7 @@ impl<In> SystemToolIn<In> {
 /// ```rust
 /// # use beet_tool::prelude::*;
 /// # use beet_core::prelude::*;
-/// let handler = system_tool(|In(input): In<SystemToolIn<()>>, time: Res<Time>| -> Result<f32> {
+/// let handler = system_tool(|In(input): In<ToolContext<()>>, time: Res<Time>| -> Result<f32> {
 ///     Ok(time.elapsed_secs())
 /// });
 /// ```
@@ -54,7 +28,7 @@ pub fn system_tool<Func, Input, Out, FnMarker>(func: Func) -> Tool<Input, Out>
 where
 	Func: 'static + Send + Sync + Clone,
 	FnMarker: 'static,
-	Func: IntoSystem<In<SystemToolIn<Input>>, Result<Out>, FnMarker>,
+	Func: IntoSystem<In<ToolContext<Input>>, Result<Out>, FnMarker>,
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
@@ -67,7 +41,11 @@ where
 		          out_handler,
 		      }| {
 			let func = func.clone();
-			let sys_input = SystemToolIn { caller, input };
+			let async_entity = commands.world().entity(caller);
+			let sys_input = ToolContext {
+				caller: async_entity,
+				input,
+			};
 			commands.commands.queue(move |world: &mut World| -> Result {
 				let result: Result<Out> =
 					world.run_system_cached_with(func, sys_input)?;
@@ -88,7 +66,7 @@ where
 	FnMarker: 'static,
 	Func: SystemParamFunction<FnMarker, Out = Result<Out>>,
 	Func: IntoSystem<
-			In<SystemToolIn<Input>>,
+			In<ToolContext<Input>>,
 			Result<Out>,
 			(IsFunctionSystem, FnMarker),
 		>,
@@ -113,7 +91,7 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(system_tool(
-				|In(input): In<SystemToolIn<()>>,
+				|In(input): In<ToolContext<()>>,
 				 time: Res<Time>|
 				 -> Result<f32> {
 					let _ = input.caller;
@@ -135,7 +113,7 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(system_tool(
-				|In(input): In<SystemToolIn<i32>>,
+				|In(input): In<ToolContext<i32>>,
 				 _time: Res<Time>|
 				 -> Result<i32> { Ok(*input * 2) },
 			))
@@ -152,7 +130,7 @@ mod test {
 	async fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(system_tool(|_: In<SystemToolIn<()>>| -> Result { Ok(()) }))
+			.spawn(system_tool(|_: In<ToolContext<()>>| -> Result { Ok(()) }))
 			.id();
 		world.entity_mut(entity).call::<(), ()>(()).await.unwrap();
 	}
@@ -162,8 +140,8 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn(system_tool(
-				|In(input): In<SystemToolIn<()>>| -> Result<Entity> {
-					Ok(input.caller)
+				|In(input): In<ToolContext<()>>| -> Result<Entity> {
+					Ok(input.caller.id())
 				},
 			))
 			.id();
@@ -177,7 +155,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn pipe_with_system() {
-		#[tool]
+		#[tool(pure)]
 		fn negate(val: i32) -> i32 { -val }
 
 		let mut world = AsyncPlugin::world();
@@ -185,7 +163,7 @@ mod test {
 		let entity = world
 			.spawn(
 				system_tool(
-					|In(input): In<SystemToolIn<i32>>,
+					|In(input): In<ToolContext<i32>>,
 					 _time: Res<Time>|
 					 -> Result<i32> { Ok(*input * 2) },
 				)
@@ -288,7 +266,7 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[tool]
-	fn sys_passthrough(cx: In<SystemToolIn<()>>) -> Entity { cx.caller }
+	fn sys_passthrough(cx: In<ToolContext<()>>) -> Entity { cx.id() }
 
 	#[beet_core::test]
 	async fn tool_macro_system_passthrough_entity() {
@@ -304,7 +282,7 @@ mod test {
 
 	#[tool]
 	fn sys_passthrough_with_res(
-		cx: In<SystemToolIn<i32>>,
+		cx: In<ToolContext<i32>>,
 		time: Res<Time>,
 	) -> f32 {
 		*cx as f32 + time.elapsed_secs()

@@ -1,11 +1,16 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-
+/// Backward-compatible alias for [`ToolContext`].
+pub type FuncToolIn<In = ()> = ToolContext<In>;
 
 pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
 where
-	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<Input>) -> Result<Out>,
+	F: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ FnOnce(ToolContext<Input>) -> Result<Out>,
 {
 	Tool::<Input, Out>::new(
 		TypeMeta::of::<F>(),
@@ -15,39 +20,22 @@ where
 		          input,
 		          out_handler,
 		      }| {
-			let cx = FuncToolIn { caller, input };
+			let async_entity = commands.world().entity(caller);
+			let cx = ToolContext {
+				caller: async_entity,
+				input,
+			};
 			let result = func.clone()(cx);
 			out_handler.call(commands, result)
 		},
 	)
 }
 
-/// Context passed to tool handlers containing the caller entity and input payload.
-pub struct FuncToolIn<In = ()> {
-	/// The entity that initiated this tool call.
-	pub caller: Entity,
-	/// The input payload for this tool call.
-	pub input: In,
-}
-
-impl<In> std::ops::Deref for FuncToolIn<In> {
-	type Target = In;
-
-	fn deref(&self) -> &Self::Target { &self.input }
-}
-impl<In> std::ops::DerefMut for FuncToolIn<In> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
-}
-
-impl<In> FuncToolIn<In> {
-	pub fn take(self) -> In { self.input }
-}
-
 pub struct FuncToolMarker;
 
 impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<I>) -> Result<O>,
+	F: 'static + Send + Sync + Clone + FnOnce(ToolContext<I>) -> Result<O>,
 {
 	type In = I;
 	type Out = O;
@@ -79,7 +67,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(func_tool(|input: FuncToolIn<(i32, i32)>| {
+			.spawn(func_tool(|input: ToolContext<(i32, i32)>| {
 				Ok(input.0 + input.1)
 			}))
 			.call::<(i32, i32), i32>((5, 3))
@@ -88,7 +76,7 @@ mod test {
 			.xpect_eq(8);
 	}
 
-	#[tool]
+	#[tool(pure)]
 	fn no_args_tool() {}
 
 	#[beet_core::test]
@@ -100,8 +88,8 @@ mod test {
 			.unwrap();
 	}
 
-	#[tool]
-	fn add_tool(a: i32, b: i32) -> i32 { a + b }
+	#[tool(pure)]
+	fn add_tool((a, b): (i32, i32)) -> i32 { a + b }
 
 	#[beet_core::test]
 	async fn tool_macro_with_args() {
@@ -113,7 +101,7 @@ mod test {
 			.xpect_eq(8);
 	}
 
-	#[tool]
+	#[tool(pure)]
 	fn single_arg_tool(val: i32) -> i32 { val * 3 }
 
 	#[beet_core::test]
@@ -126,8 +114,8 @@ mod test {
 			.xpect_eq(21);
 	}
 
-	#[tool]
-	fn fallible_tool(a: i32, b: i32) -> Result<i32> {
+	#[tool(pure)]
+	fn fallible_tool((a, b): (i32, i32)) -> Result<i32> {
 		if b == 0 {
 			bevybail!("cannot be zero");
 		}
@@ -155,7 +143,7 @@ mod test {
 			.xpect_contains("cannot be zero");
 	}
 
-	#[tool(result_out)]
+	#[tool(pure, result_out)]
 	fn result_out_tool(val: i32) -> Result<i32> { Ok(val * 2) }
 
 	#[beet_core::test]
@@ -173,8 +161,8 @@ mod test {
 	// #[tool] macro — func passthrough
 	// -----------------------------------------------------------------------
 
-	#[tool]
-	fn func_passthrough_tool(cx: FuncToolIn<i32>) -> i32 { *cx * 3 }
+	#[tool(pure)]
+	fn func_passthrough_tool(cx: ToolContext<i32>) -> i32 { *cx * 3 }
 
 	#[beet_core::test]
 	async fn tool_macro_func_passthrough() {
@@ -186,8 +174,8 @@ mod test {
 			.xpect_eq(15);
 	}
 
-	#[tool]
-	fn func_passthrough_entity(cx: FuncToolIn<()>) -> Entity { cx.caller }
+	#[tool(pure)]
+	fn func_passthrough_entity(cx: ToolContext<()>) -> Entity { cx.id() }
 
 	#[beet_core::test]
 	async fn tool_macro_func_passthrough_entity() {

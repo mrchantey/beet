@@ -65,7 +65,7 @@ impl std::fmt::Display for NavigateTo {
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub(crate) async fn NavigateHandler(
-	cx: AsyncToolIn<Request>,
+	cx: ToolContext<Request>,
 ) -> Result<Outcome<Response, Request>> {
 	let Some(value) = cx.get_param("navigate") else {
 		return Fail(cx.input).xok();

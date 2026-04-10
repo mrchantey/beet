@@ -3,19 +3,19 @@ use beet_core::prelude::*;
 use beet_tool::prelude::*;
 
 /// often added alongside streamers, ie `O11sStreamer`
-pub async fn post_streamer_tool<T>(input: AsyncToolIn<()>) -> Result<Outcome>
+pub async fn post_streamer_tool<T>(cx: ToolContext<()>) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {
-	let streamer = input.caller.get_cloned::<T>().await?;
-	post_streamer_tool_stateful(AsyncToolIn {
-		caller: input.caller,
+	let streamer = cx.caller.get_cloned::<T>().await?;
+	post_streamer_tool_stateful(ToolContext {
+		caller: cx.caller,
 		input: streamer,
 	})
 	.await
 }
 pub async fn post_streamer_tool_stateful<T>(
-	cx: AsyncToolIn<T>,
+	cx: ToolContext<T>,
 ) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,

@@ -42,11 +42,11 @@ struct Count(u32);
 
 /// A simple router implementation that matches the request path
 fn router(
-	In(input): In<SystemToolIn<Request>>,
+	In(cx): In<ToolContext<Request>>,
 	world: &mut World,
 ) -> Result<Response> {
-	let entity = world.entity_mut(input.caller);
-	let request = input.take();
+	let entity = world.entity_mut(cx.id());
+	let request = cx.take();
 	println!("{}: {}", request.method(), request.path_string());
 
 	let route = match request.path_string().as_str() {

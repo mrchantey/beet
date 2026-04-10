@@ -56,7 +56,7 @@ where
 	(
 		PathPartial::new(path),
 		SceneRoute,
-		async_tool(async move |cx: AsyncToolIn<Request>| -> Result<Response> {
+		async_tool(async move |cx: ToolContext<Request>| -> Result<Response> {
 			// 1. clone the parts for the renderer
 			let parts = cx.input.parts().clone();
 
@@ -104,7 +104,7 @@ where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
-	scene_tool(path, func_tool(move |_: FuncToolIn<Request>| Ok(func())))
+	scene_tool(path, func_tool(move |_: ToolContext<Request>| Ok(func())))
 }
 
 /// Creates a routable scene that loads and parses a file.
@@ -129,7 +129,7 @@ pub fn file_scene_tool(
 	(
 		PathPartial::new(path),
 		SceneRoute,
-		async_tool(async move |cx: AsyncToolIn<Request>| -> Result<Response> {
+		async_tool(async move |cx: ToolContext<Request>| -> Result<Response> {
 			let parts = cx.input.parts().clone();
 
 			// read file

@@ -55,8 +55,11 @@ impl AttributeMap {
 		Ok(Self(map))
 	}
 
-	pub fn get(&self, key: &str) -> Option<&Option<Expr>> {
-		self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+	pub fn get(&self, key: &str) -> Option<&Expr> {
+		self.0
+			.iter()
+			.find(|(k, _)| k == key)
+			.and_then(|(_, v)| v.as_ref())
 	}
 
 	pub fn contains_key(&self, key: &str) -> bool {

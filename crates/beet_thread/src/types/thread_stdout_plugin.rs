@@ -131,11 +131,11 @@ fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn StdinPost(
-	cx: SystemToolIn,
+	cx: ToolContext,
 	mut query: ThreadQuery,
 	actors: Query<&Actor>,
 ) -> Result<Outcome> {
-	let actor = actors.get(cx.caller)?;
+	let actor = actors.get(cx.id())?;
 	let heading = paint_ext::cyan_bold(format!("{} > ", actor.name()));
 	// reserve extra line to prevent jump
 	print!("\n\n\n\x1B[1A{heading}");
@@ -150,6 +150,6 @@ pub fn StdinPost(
 	print!("\x1B[1A\x1B[2K\x1B[1A\x1B[1A");
 	std::io::Write::flush(&mut std::io::stdout())?;
 
-	query.spawn_post(cx.caller, PostStatus::Completed, input)?;
+	query.spawn_post(cx.id(), PostStatus::Completed, input)?;
 	Ok(Pass(()))
 }

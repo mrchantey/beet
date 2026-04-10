@@ -69,13 +69,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[tool]
-	fn add(a: i32, b: i32) -> i32 { a + b }
-	#[tool]
+	#[tool(pure)]
+	fn add((a, b): (i32, i32)) -> i32 { a + b }
+	#[tool(pure)]
 	fn negate(val: i32) -> i32 { -val }
-	#[tool]
+	#[tool(pure)]
 	fn multiply(val: i32) -> i32 { val * val }
-	#[tool]
+	#[tool(pure)]
 	fn to_string(val: i32) -> String { val.to_string() }
 
 	#[beet_core::test]

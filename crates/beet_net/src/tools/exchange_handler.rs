@@ -20,9 +20,9 @@ use beet_tool::prelude::*;
 /// ```
 pub fn exchange_handler<F>(func: F) -> Tool<Request, Response>
 where
-	F: 'static + Send + Sync + Clone + FnOnce(FuncToolIn<Request>) -> Response,
+	F: 'static + Send + Sync + Clone + FnOnce(ToolContext<Request>) -> Response,
 {
-	func_tool(move |input: FuncToolIn<Request>| Ok(func(input)))
+	func_tool(move |cx: ToolContext<Request>| Ok(func(cx)))
 }
 
 /// Creates an async [`Tool<Request, Response>`] from a closure.
@@ -42,8 +42,8 @@ where
 	F: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
 	Fut: 'static + Send + Future<Output = Response>,
 {
-	async_tool(move |input: AsyncToolIn<Request>| {
-		let fut = func(input.input);
+	async_tool(move |cx: ToolContext<Request>| {
+		let fut = func(cx.input);
 		async move { Ok(fut.await) }
 	})
 }

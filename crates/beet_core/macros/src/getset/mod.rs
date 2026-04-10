@@ -180,7 +180,7 @@ fn apply_common_keys(
 	use_into: &mut bool,
 	not_into: &mut bool,
 ) -> syn::Result<()> {
-	if let Some(Some(expr)) = map.get("vis") {
+	if let Some(expr) = map.get("vis") {
 		*vis = parse_vis(expr)?;
 	}
 	if map.contains_key("clone") {

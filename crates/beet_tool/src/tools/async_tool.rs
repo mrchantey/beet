@@ -1,36 +1,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Context passed to async tool handlers containing an [`AsyncEntity`]
-/// handle and the input payload.
-pub struct AsyncToolIn<In = ()> {
-	/// The entity that initiated this tool call.
-	pub caller: AsyncEntity,
-	/// The input payload for this tool call.
-	pub input: In,
-}
-
-impl<In> std::ops::Deref for AsyncToolIn<In> {
-	type Target = In;
-	fn deref(&self) -> &Self::Target { &self.input }
-}
-
-impl<In> std::ops::DerefMut for AsyncToolIn<In> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.input }
-}
-
-impl<In> AsyncToolIn<In> {
-	/// Map the input of this `AsyncToolIn` to a different type, keeping the same caller.
-	pub fn map_input<NewIn>(self, input: NewIn) -> AsyncToolIn<NewIn> {
-		AsyncToolIn {
-			caller: self.caller,
-			input,
-		}
-	}
-}
+/// Backward-compatible alias for [`ToolContext`].
+pub type AsyncToolIn<In = ()> = ToolContext<In>;
 
 /// Create a [`Tool`] from an async closure that receives
-/// [`AsyncToolIn`] and returns [`Result<Out>`].
+/// [`ToolContext`] and returns [`Result<Out>`].
 ///
 /// Unlike [`func_tool`](crate::func_tool), async tools can perform
 /// non-blocking work such as network requests or streaming without
@@ -41,13 +16,13 @@ impl<In> AsyncToolIn<In> {
 /// ```rust,no_run
 /// # use beet_tool::prelude::*;
 /// # use beet_core::prelude::*;
-/// let handler = async_tool(|input: AsyncToolIn<u32>| async move {
+/// let handler = async_tool(|input: ToolContext<u32>| async move {
 ///     Ok(*input * 2)
 /// });
 /// ```
 pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> Tool<Input, Out>
 where
-	Func: 'static + Send + Sync + Clone + FnOnce(AsyncToolIn<Input>) -> Fut,
+	Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<Input>) -> Fut,
 	Input: 'static + Send + Sync,
 	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
@@ -61,7 +36,7 @@ where
 		          out_handler,
 		      }| {
 			let async_entity = commands.world().entity(caller);
-			let arg = AsyncToolIn {
+			let arg = ToolContext {
 				caller: async_entity,
 				input,
 			};
@@ -76,12 +51,12 @@ where
 }
 
 /// Marker for the async tool [`IntoTool`] impl accepting
-/// `Fn(AsyncToolIn<I>) -> Future<Output = Result<O>>`.
+/// `Fn(ToolContext<I>) -> Future<Output = Result<O>>`.
 pub struct AsyncToolMarker;
 
 impl<Func, Input, Out, Fut> IntoTool<(AsyncToolMarker, Input, Out)> for Func
 where
-	Func: 'static + Send + Sync + Clone + Fn(AsyncToolIn<Input>) -> Fut,
+	Func: 'static + Send + Sync + Clone + Fn(ToolContext<Input>) -> Fut,
 	Input: 'static + Send + Sync,
 	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
@@ -108,7 +83,7 @@ where
 	type Out = Out;
 
 	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		async_tool(move |input: AsyncToolIn<Input>| {
+		async_tool(move |input: ToolContext<Input>| {
 			let fut = self(input.input);
 			async move { fut.await.xok() }
 		})
@@ -124,7 +99,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: AsyncToolIn<(i32, i32)>| {
+			.spawn(async_tool(async |input: ToolContext<(i32, i32)>| {
 				Ok(input.0 + input.1)
 			}))
 			.call::<(i32, i32), i32>((3, 4))
@@ -136,7 +111,7 @@ mod test {
 	#[beet_core::test]
 	async fn negate() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: AsyncToolIn<i32>| Ok(-*input)))
+			.spawn(async_tool(async |input: ToolContext<i32>| Ok(-*input)))
 			.call::<i32, i32>(42)
 			.await
 			.unwrap()
@@ -147,7 +122,7 @@ mod test {
 	async fn returns_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(async_tool(async |cx: AsyncToolIn<()>| Ok(cx.caller.id())))
+			.spawn(async_tool(async |cx: ToolContext<()>| Ok(cx.caller.id())))
 			.id();
 		world
 			.entity_mut(entity)
@@ -160,7 +135,7 @@ mod test {
 	#[beet_core::test]
 	async fn string_processing() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: AsyncToolIn<String>| {
+			.spawn(async_tool(async |input: ToolContext<String>| {
 				Ok(format!("hello {}", *input))
 			}))
 			.call::<String, String>("world".to_string())
@@ -207,7 +182,7 @@ mod test {
 	}
 
 	#[tool]
-	async fn async_add(a: i32, b: i32) -> i32 { a + b }
+	async fn async_add((a, b): (i32, i32)) -> i32 { a + b }
 
 	#[beet_core::test]
 	async fn tool_macro_async_multi_arg() {
@@ -255,7 +230,7 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[tool]
-	async fn async_passthrough_tool(cx: AsyncToolIn<i32>) -> i32 { *cx * 3 }
+	async fn async_passthrough_tool(cx: ToolContext<i32>) -> i32 { *cx * 3 }
 
 	#[beet_core::test]
 	async fn tool_macro_async_passthrough() {
@@ -268,7 +243,7 @@ mod test {
 	}
 
 	#[tool]
-	async fn async_passthrough_entity(cx: AsyncToolIn<()>) -> Entity {
+	async fn async_passthrough_entity(cx: ToolContext<()>) -> Entity {
 		cx.caller.id()
 	}
 
