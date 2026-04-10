@@ -1,4 +1,9 @@
-# Beets are great
+---
+title: Home
+created: 2026-03-20
+edited: 2026-04-10
+---
+
 
 Welcome to a website all about beets and how good they are.
 They are **so good** that maybe when you eat them you wont want to eat anything else.

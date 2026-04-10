@@ -43,6 +43,8 @@ mod random_source;
 /// Stream conversion utilities for byte-to-text streaming.
 #[cfg(feature = "std")]
 pub mod stream_ext;
+mod into_option;
+pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
 #[cfg(feature = "std")]
