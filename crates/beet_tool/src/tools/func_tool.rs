@@ -175,7 +175,7 @@ mod test {
 	}
 
 	#[tool(pure)]
-	fn func_passthrough_entity(cx: ToolContext<()>) -> Entity { cx.id() }
+	fn func_passthrough_entity(cx: ToolContext) -> Entity { cx.id() }
 
 	#[beet_core::test]
 	async fn tool_macro_func_passthrough_entity() {

@@ -384,10 +384,7 @@ mod test {
 	use beet_tool::prelude::*;
 
 	fn tool_at(path: &str) -> impl Bundle {
-		(
-			PathPartial::new(path),
-			func_tool(|_: ToolContext<()>| Ok(())),
-		)
+		(PathPartial::new(path), func_tool(|_: ToolContext| Ok(())))
 	}
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
@@ -457,7 +454,7 @@ mod test {
 				(
 					PathPartial::new("about"),
 					SceneRoute,
-					func_tool(|_: ToolContext<()>| Ok(()))
+					func_tool(|_: ToolContext| Ok(()))
 				),
 				tool_at("action"),
 			])
@@ -602,7 +599,7 @@ mod test {
 				(
 					PathPartial::new("counter"),
 					SceneRoute,
-					func_tool(|_: ToolContext<()>| Ok(())),
+					func_tool(|_: ToolContext| Ok(())),
 					children![tool_at("increment"), tool_at("decrement"),],
 				),
 				tool_at("other"),

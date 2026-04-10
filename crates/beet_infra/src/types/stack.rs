@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::terra::Project;
 use beet_core::prelude::*;
 #[cfg(feature = "aws")]
-use beet_net::prelude::S3Provider;
+use beet_net::prelude::*;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]
 pub struct Stack {
@@ -90,6 +90,13 @@ impl Stack {
 	pub fn create_config(&self) -> terra::Config {
 		let key = self.backend_path();
 		terra::Config::default().with_backend(self.backend().to_json(&key))
+	}
+
+	#[cfg(feature = "aws")]
+	pub fn state_file(&self) -> Blob {
+		self.backend
+			.provider()
+			.blob(RelPath::new(self.backend_path()))
 	}
 }
 

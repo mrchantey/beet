@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use beet_tool::prelude::*;
 
 /// often added alongside streamers, ie `O11sStreamer`
-pub async fn post_streamer_tool<T>(cx: ToolContext<()>) -> Result<Outcome>
+pub async fn post_streamer_tool<T>(cx: ToolContext) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {

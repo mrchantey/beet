@@ -122,7 +122,7 @@ mod test {
 	async fn returns_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(async_tool(async |cx: ToolContext<()>| Ok(cx.caller.id())))
+			.spawn(async_tool(async |cx: ToolContext| Ok(cx.caller.id())))
 			.id();
 		world
 			.entity_mut(entity)
@@ -243,7 +243,7 @@ mod test {
 	}
 
 	#[tool]
-	async fn async_passthrough_entity(cx: ToolContext<()>) -> Entity {
+	async fn async_passthrough_entity(cx: ToolContext) -> Entity {
 		cx.caller.id()
 	}
 

@@ -176,10 +176,7 @@ mod test {
 	#[beet_core::test]
 	async fn unit_input_empty_body() {
 		let response = AsyncPlugin::world()
-			.spawn(route_tool(
-				"unit",
-				func_tool(|_: ToolContext<()>| Ok(42i32)),
-			))
+			.spawn(route_tool("unit", func_tool(|_: ToolContext| Ok(42i32))))
 			.call::<Request, Response>(Request::get("/"))
 			.await
 			.unwrap();

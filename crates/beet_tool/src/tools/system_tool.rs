@@ -20,7 +20,7 @@ pub type SystemToolIn<In = ()> = ToolContext<In>;
 /// ```rust
 /// # use beet_tool::prelude::*;
 /// # use beet_core::prelude::*;
-/// let handler = system_tool(|In(input): In<ToolContext<()>>, time: Res<Time>| -> Result<f32> {
+/// let handler = system_tool(|In(input): In<ToolContext>, time: Res<Time>| -> Result<f32> {
 ///     Ok(time.elapsed_secs())
 /// });
 /// ```
@@ -91,9 +91,7 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(system_tool(
-				|In(input): In<ToolContext<()>>,
-				 time: Res<Time>|
-				 -> Result<f32> {
+				|In(input): In<ToolContext>, time: Res<Time>| -> Result<f32> {
 					let _ = input.caller;
 					Ok(time.elapsed_secs())
 				},
@@ -130,7 +128,7 @@ mod test {
 	async fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(system_tool(|_: In<ToolContext<()>>| -> Result { Ok(()) }))
+			.spawn(system_tool(|_: In<ToolContext>| -> Result { Ok(()) }))
 			.id();
 		world.entity_mut(entity).call::<(), ()>(()).await.unwrap();
 	}
@@ -140,7 +138,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let entity = world
 			.spawn(system_tool(
-				|In(input): In<ToolContext<()>>| -> Result<Entity> {
+				|In(input): In<ToolContext>| -> Result<Entity> {
 					Ok(input.caller.id())
 				},
 			))
@@ -266,7 +264,7 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[tool]
-	fn sys_passthrough(cx: In<ToolContext<()>>) -> Entity { cx.id() }
+	fn sys_passthrough(cx: In<ToolContext>) -> Entity { cx.id() }
 
 	#[beet_core::test]
 	async fn tool_macro_system_passthrough_entity() {

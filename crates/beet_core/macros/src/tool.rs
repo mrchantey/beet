@@ -162,7 +162,7 @@ fn make_simple_fn_parts(
 			// No params → input is ()
 			let in_type = quote! { () };
 			let fn_params =
-				quote! { __tool_cx: #beet_tool::prelude::ToolContext<()> };
+				quote! { __tool_cx: #beet_tool::prelude::ToolContext };
 			let preamble = quote! { let _ = __tool_cx.input; };
 			Ok((in_type, fn_params, preamble))
 		}
@@ -228,7 +228,7 @@ fn make_system_fn_parts(
 			// No params at all
 			let in_type = quote! { () };
 			let first = quote! {
-				In(__tool_cx): In<#beet_tool::prelude::ToolContext<()>>
+				In(__tool_cx): In<#beet_tool::prelude::ToolContext>
 			};
 			let preamble = quote! { let _ = __tool_cx.input; };
 			(in_type, first, preamble, Vec::new())
@@ -271,7 +271,7 @@ fn make_system_fn_parts(
 				// No input marker → all params are system params
 				let in_type = quote! { () };
 				let first = quote! {
-					In(__tool_cx): In<#beet_tool::prelude::ToolContext<()>>
+					In(__tool_cx): In<#beet_tool::prelude::ToolContext>
 				};
 				let preamble = quote! { let _ = __tool_cx.input; };
 				(in_type, first, preamble, system_params_from(0))
@@ -1023,7 +1023,7 @@ mod test {
 	#[test]
 	fn async_passthrough_with_generics() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			async fn my_tool<T>(input: ToolContext<()>) -> ()
+			async fn my_tool<T>(input: ToolContext) -> ()
 			where
 				T: Send + Sync,
 			{}
@@ -1057,7 +1057,7 @@ mod test {
 	#[test]
 	fn multi_generic_struct() {
 		let result = parse_str(quote!(), syn::parse_quote! {
-			async fn my_tool<A, B>(input: ToolContext<()>) -> ()
+			async fn my_tool<A, B>(input: ToolContext) -> ()
 			where
 				A: Send,
 				B: Sync,
@@ -1071,7 +1071,7 @@ mod test {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			#[reflect(Component)]
-			async fn my_tool<T>(input: ToolContext<()>) -> ()
+			async fn my_tool<T>(input: ToolContext) -> ()
 			where
 				T: Send + Sync,
 			{}

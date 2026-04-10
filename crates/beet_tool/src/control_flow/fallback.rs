@@ -163,13 +163,13 @@ mod tests {
 	use super::*;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
-		func_tool(|_: ToolContext<()>| Outcome::FAIL.xok())
+		func_tool(|_: ToolContext| Outcome::FAIL.xok())
 	}
 	fn outcome_pass() -> Tool<(), Outcome> {
-		func_tool(|_: ToolContext<()>| Outcome::PASS.xok())
+		func_tool(|_: ToolContext| Outcome::PASS.xok())
 	}
 	fn wrong_signature_tool() -> Tool<(), i32> {
-		func_tool(|_: ToolContext<()>| 7.xok())
+		func_tool(|_: ToolContext| 7.xok())
 	}
 
 	#[beet_core::test]
