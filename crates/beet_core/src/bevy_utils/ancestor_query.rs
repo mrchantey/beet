@@ -26,6 +26,21 @@ impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 		self.ancestors.root_ancestor(entity)
 	}
 
+	/// Gets all matching ancestors inclusive of the given entity,
+	/// in order from root to entity.
+	pub fn get_ancestors(
+		&self,
+		entity: Entity,
+	) -> Vec<<<D as QueryData>::ReadOnly as QueryData>::Item<'_, '_>> {
+		let mut items: Vec<_> = self
+			.ancestors
+			.iter_ancestors_inclusive(entity)
+			.filter_map(|entity| self.query.get(entity).ok())
+			.collect();
+		items.reverse();
+		items
+	}
+
 	/// Get the first ancestor of the given entity that matches the query,
 	/// inclusive of the given entity.
 	pub fn get(

@@ -20,7 +20,7 @@ where
 	In: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	pub(super) fn new(handler: Tool<In, Out>, caller: AsyncEntity) -> Self {
+	pub fn new(handler: Tool<In, Out>, caller: AsyncEntity) -> Self {
 		Self { handler, caller }
 	}
 

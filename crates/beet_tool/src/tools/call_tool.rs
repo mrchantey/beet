@@ -12,7 +12,7 @@ fn call_world<Input, Out>(
 	out_handler: OutHandler<Out>,
 ) -> Result
 where
-	Input: 'static,
+	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
 	world.run_system_cached_with::<_, Result, _, _>(
@@ -20,6 +20,36 @@ where
 		(entity, input, out_handler),
 	)??;
 	world.flush();
+	Ok(())
+}
+
+fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
+	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
+	commands: AsyncCommands,
+	// use an option in case mismatch, we can still do an assert_match
+	tools: Query<(&ToolMeta, Option<&Tool<Input, Out>>)>,
+	descendent_wrappers: AncestorQuery<&WrapDescendentsList<Input, Out>>,
+) -> Result {
+	let (meta, tool) = tools
+		.get(caller)
+		.map_err(|err| bevyhow!("Entity has no tool {caller:?}: {err:?}"))?;
+	meta.assert_match::<Input, Out>()?;
+
+	let tool = tool.ok_or_else(|| {
+		bevyhow!("meta matches but tool missing.. this shouldnt happen.")
+	})?;
+
+	let mut tool = tool.clone();
+	for wrapper in descendent_wrappers.get_ancestors(caller) {
+		tool = wrapper.wrap(&tool);
+	}
+
+	tool.call(ToolCall {
+		commands,
+		caller,
+		input,
+		out_handler,
+	})?;
 	Ok(())
 }
 
@@ -35,7 +65,7 @@ fn call_with_channel<Input, Out>(
 	input: Input,
 ) -> Result<Receiver<Result<Out>>>
 where
-	Input: 'static,
+	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
@@ -68,7 +98,7 @@ async fn call_inner<Input, Out>(
 	input: Input,
 ) -> Result<Out>
 where
-	Input: 'static,
+	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
 	let id = entity.id();
@@ -85,28 +115,6 @@ where
 	}
 }
 
-fn call_tool_system<Input, Out>(
-	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
-	commands: AsyncCommands,
-	// use an option in case mismatch, we can still do an assert_match
-	tools: Query<(&ToolMeta, Option<&Tool<Input, Out>>)>,
-) -> Result {
-	let (meta, tool) = tools
-		.get(caller)
-		.map_err(|err| bevyhow!("Entity has no tool {caller:?}: {err:?}"))?;
-	meta.assert_match::<Input, Out>()?;
-
-	tool.ok_or_else(|| {
-		bevyhow!("meta matches but tool missing.. this shouldnt happen.")
-	})?
-	.call(ToolCall {
-		commands,
-		caller,
-		input,
-		out_handler,
-	})?;
-	Ok(())
-}
 
 /// Extension trait for calling [`Tool`] components on
 /// [`EntityWorldMut`].
@@ -117,7 +125,10 @@ pub impl EntityWorldMut<'_> {
 	/// # Errors
 	/// Errors if the entity has no matching [`Tool`] component
 	/// or the tool call fails.
-	fn call_blocking<Input: 'static, Out: 'static + Send + Sync>(
+	fn call_blocking<
+		Input: 'static + Send + Sync,
+		Out: 'static + Send + Sync,
+	>(
 		self,
 		input: Input,
 	) -> Result<Out> {
@@ -129,7 +140,7 @@ pub impl EntityWorldMut<'_> {
 	/// # Errors
 	/// Errors if the entity has no matching [`Tool`] component
 	/// or the tool call fails.
-	fn call<Input: 'static, Out: 'static + Send + Sync>(
+	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
@@ -143,7 +154,7 @@ fn call_with_channel_for_value<Input, Out>(
 	input: Input,
 ) -> Result<Receiver<Result<Out>>>
 where
-	Input: 'static,
+	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
@@ -191,6 +202,8 @@ pub impl AsyncEntity {
 	///
 	/// Uses `self` as the entity context passed to the tool handler. The
 	/// handler may use or ignore this entity depending on its implementation.
+	///
+	/// WrapDescendents ancestors are not used.
 	///
 	/// # Errors
 	/// Errors if the tool handler fails or the response channel closes.
