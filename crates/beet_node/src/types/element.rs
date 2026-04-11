@@ -15,6 +15,11 @@ impl Element {
 	pub fn new(name: impl Into<String>) -> Self { Self(name.into()) }
 	/// The tag name of this element, ie `div`, `span`, `p`.
 	pub fn tag(&self) -> &str { &self.0 }
+	/// Bundle this element with inner text, using [`OnSpawn`] to avoid
+	/// clobbering other children.
+	pub fn with_inner_text(self, text: &str) -> impl Bundle {
+		(self, OnSpawn::insert_child(Value::Str(text.into())))
+	}
 }
 
 #[derive(SystemParam)]

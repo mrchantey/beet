@@ -16,9 +16,7 @@ pub struct RouterPlugin;
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<HelpHandler>()
-			.register_type::<ContextualNotFoundHandler>()
 			.register_type::<NavigateHandler>()
-			.register_type::<RouterTool>()
 			.register_type::<PathPartial>()
 			.add_observer(insert_tool_path_and_params)
 			.add_observer(insert_route_tree);

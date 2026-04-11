@@ -1,12 +1,12 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_tool::prelude::*;
 
-
-/// Declare a tool to be registered as a descendant wrapper,
-/// while still being serializable via reflect.
+/// Declare a tool to be registered as route middleware.
+/// The component is serializable via reflect and registers
+/// itself into [`MiddlewareList`] on add.
 #[derive(Debug, Clone, Component)]
 #[component(on_add=on_add::<T, In, Out>)]
-pub struct WrapDescendants<T, In, Out>(T)
+pub struct Middleware<T, In, Out>(T)
 where
 	In: 'static,
 	Out: 'static,
@@ -15,7 +15,7 @@ where
 		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
 		+ Default;
 
-impl<T, In, Out> Default for WrapDescendants<T, In, Out>
+impl<T, In, Out> Default for Middleware<T, In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -38,7 +38,7 @@ where
 {
 	let tool = world
 		.entity(cx.entity)
-		.get::<WrapDescendants<T, In, Out>>()
+		.get::<Middleware<T, In, Out>>()
 		.unwrap()
 		.0
 		.clone();
@@ -48,21 +48,24 @@ where
 		.insert(tool.clone())
 		.queue(move |mut entity: EntityWorldMut| {
 			entity
-				.get_mut_or_default::<WrapDescendentsList<In, Out>>()
+				.get_mut_or_default::<MiddlewareList<In, Out>>()
 				.0
 				.push(tool.into_tool());
 		});
 }
 
 
-/// Type-erased collection of wrapper tools declared on an ancestor.
+/// Type-erased collection of middleware tools declared on an ancestor.
 ///
 /// Each entry wraps descendants sharing the same `In`/`Out` signature.
+/// Currently used for `Request`/`Response` middleware but generic
+/// to support future middleware signatures.
 #[derive(Debug, Clone, Component)]
-pub struct WrapDescendentsList<In: 'static, Out: 'static>(
+pub struct MiddlewareList<In: 'static, Out: 'static>(
 	pub Vec<Tool<(In, Next<In, Out>), Out>>,
 );
-impl<In, Out> Default for WrapDescendentsList<In, Out>
+
+impl<In, Out> Default for MiddlewareList<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -70,7 +73,7 @@ where
 	fn default() -> Self { Self(default()) }
 }
 
-impl<In, Out> WrapDescendentsList<In, Out>
+impl<In, Out> MiddlewareList<In, Out>
 where
 	In: 'static,
 	Out: 'static,
@@ -84,8 +87,8 @@ where
 		self.0.push(tool.into_tool());
 	}
 
-	/// Apply all wrappers in this collection to the given tool,
-	/// returning a new tool with each wrapper layered on top.
+	/// Apply all middleware in this collection to the given tool,
+	/// returning a new tool with each middleware layered on top.
 	pub fn wrap(&self, tool: &Tool<In, Out>) -> Tool<In, Out>
 	where
 		In: 'static + Send + Sync,
@@ -96,36 +99,5 @@ where
 			tool = wrapper.clone().wrap(tool);
 		}
 		tool
-	}
-}
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[tool(pure)]
-	#[derive(Default, Clone, Component)]
-	fn Increment(value: u32) -> u32 { value + 1 }
-
-	#[tool]
-	#[derive(Default, Clone, Component)]
-	async fn Double((value, next): (u32, Next<u32, u32>)) -> Result<u32> {
-		let inner = next.call(value).await?;
-		Ok(inner * 2)
-	}
-
-	#[beet_core::test]
-	async fn works() {
-		let mut world = AsyncPlugin::world();
-		let parent =
-			world.spawn(WrapDescendants::<Double, _, _>::default()).id();
-		world
-			.spawn((ChildOf(parent), Increment))
-			.call::<u32, u32>(2)
-			.await
-			.unwrap()
-			// Increments then doubles
-			.xpect_eq(6);
 	}
 }

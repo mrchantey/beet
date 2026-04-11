@@ -1,13 +1,11 @@
 use beet::prelude::*;
 
 pub fn routes() -> impl Bundle {
-	// let mut wrappers = WrapDescendentsList::<Request, Response>::new();
-	// wrappers.add();
-	// Nest under a child entity so the WrapDescendentsList only applies
+	// Nest under a child entity so the MiddlewareList only applies
 	// to route descendants, not the server entity's own exchange fallback.
 	children![(
 		Name::new("Routes"),
-		WrapDescendants::<LayoutTemplate, _, _>::default(),
+		Middleware::<LayoutTemplate, _, _>::default(),
 		children![root(), about(), counter()]
 	)]
 }

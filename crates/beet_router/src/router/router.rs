@@ -1,59 +1,25 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
 
-/// Fallback tool for mapping a request path to a corresponding tool in this
-/// tree's hierarchy, using the [`RouteTree`] in its ancestors.
-pub fn try_router() -> impl Bundle {
-	(Name::new("Router"), RouteHidden, RouterTool)
-}
-
-/// Fallback tool for mapping a request path to a corresponding tool in this
-/// tree's hierarchy, using the [`RouteTree`] in its ancestors.
+/// Creates a router bundle with help and navigate middleware.
+///
+/// This is the standard way to set up routing. It includes:
+/// - [`Router2`] for route lookup and dispatch
+/// - [`HelpHandler`] middleware for `--help` support
+/// - [`NavigateHandler`] middleware for `--navigate` support
+///
+/// Does **not** include a [`SceneToolRenderer`] — that belongs
+/// on the server entity since different servers need different
+/// rendering strategies.
 pub fn router() -> impl Bundle {
 	(
-		Name::new("Router"),
-		exchange_fallback(),
-		OnSpawn::insert_child((RouteHidden, RouterTool)),
+		Router2,
+		Middleware::<HelpHandler, Request, Response>::default(),
+		Middleware::<NavigateHandler, Request, Response>::default(),
 	)
 }
 
-/// Routes a request to the matching tool in the [`RouteTree`].
-///
-/// Looks up the request path in the [`RouteTree`], then forwards the
-/// request to the matching tool via `entity.call`. Scene routes are
-/// regular tools that delegate to the render tool internally, so
-/// no special handling is needed here.
-///
-#[tool]
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub async fn RouterTool(
-	cx: ToolContext<Request>,
-) -> Result<Outcome<Response, Request>> {
-	let path = cx.input.path().clone();
-	let caller = cx.caller.id();
-	let world = cx.world();
-
-	let node = world
-		.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
-			query.get(caller).map(|tree| tree.find(&path).cloned())
-		})
-		.await;
-
-
-	match node {
-		Ok(Some(tool_node)) => Pass(
-			world
-				.entity(tool_node.entity)
-				.call::<Request, Response>(cx.input)
-				.await?,
-		),
-		_ => Fail(cx.input),
-	}
-	.xok()
-}
 
 #[cfg(test)]
 mod test {
@@ -63,10 +29,11 @@ mod test {
 	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
 
+	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
+
 	#[beet_core::test]
 	async fn route_renders_scene() {
-		(AsyncPlugin, RouterPlugin)
-			.into_world()
+		router_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_func("about", || {
 					(Element::new("p"), children![Value::Str(
@@ -85,8 +52,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
-		(AsyncPlugin, RouterPlugin)
-			.into_world()
+		router_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_func("", || {
 					(Element::new("p"), children![Value::Str(
@@ -104,8 +70,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn route_renders_root_scene_child() {
-		let body = (AsyncPlugin, RouterPlugin)
-			.into_world()
+		let body = router_world()
 			.spawn((SceneToolRenderer::default(), router(), children![
 				scene_func("", || {
 					children![
@@ -131,25 +96,158 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(feature = "json")]
-	async fn route_calls_route_tool() {
-		(AsyncPlugin, RouterPlugin)
-			.into_world()
-			.spawn((router(), children![route_tool(
-				"add",
-				Tool::<(i32, i32), i32>::new_pure(
-					|cx: ToolContext<(i32, i32)>| Ok(cx.0 + cx.1)
-				),
-			),]))
+	async fn help_flag_returns_route_list() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				increment(FieldRef::new("count")),
+				scene_func("about", || {
+					(Element::new("p"), children![Value::Str("about".into())])
+				}),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("Available routes");
+	}
+
+	#[beet_core::test]
+	async fn dispatches_help_request() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				increment(FieldRef::new("count")),
+				scene_func("about", || {
+					(Element::new("p"), children![Value::Str("about".into())])
+				}),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.await
+			.unwrap()
+			.status()
+			.xpect_eq(StatusCode::OK);
+	}
+
+	#[beet_core::test]
+	async fn not_found() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				increment(FieldRef::new("count")),
+			]))
 			.call::<Request, Response>(
-				Request::with_json("/add", &(10i32, 20i32)).unwrap(),
+				Request::from_cli_str("nonexistent").unwrap(),
 			)
 			.await
 			.unwrap()
-			.body
-			.into_json::<i32>()
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
+	}
+
+	#[beet_core::test]
+	async fn renders_root_scene_on_empty_args() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				scene_func("", || {
+					children![
+						(Element::new("h1"), children![Value::Str(
+							"My Server".into()
+						)]),
+						(Element::new("p"), children![Value::Str(
+							"welcome!".into()
+						)]),
+					]
+				}),
+				scene_func("about", || {
+					(Element::new("p"), children![Value::Str("about".into())])
+				}),
+			]))
+			.call::<Request, Response>(Request::from_cli_str("").unwrap())
 			.await
 			.unwrap()
-			.xpect_eq(30);
+			.unwrap_str()
+			.await
+			.xpect_contains("My Server")
+			.xpect_contains("welcome!");
+	}
+
+	#[beet_core::test]
+	async fn scoped_help_for_subcommand() {
+		let mut world = router_world();
+
+		let root = world
+			.spawn((SceneToolRenderer::default(), router(), children![
+				(
+					scene_func("counter", || {
+						(Element::new("p"), children![Value::Str(
+							"counter".into()
+						)])
+					}),
+					children![increment(FieldRef::new("count")),],
+				),
+				scene_func("about", || {
+					(Element::new("p"), children![Value::Str("about".into())])
+				}),
+			]))
+			.flush();
+
+		let res = world
+			.entity_mut(root)
+			.call::<Request, Response>(
+				Request::from_cli_str("counter --help").unwrap(),
+			)
+			.await
+			.unwrap();
+
+		let body = res.unwrap_str().await;
+		body.contains("increment").xpect_true();
+		body.contains("about").xpect_false();
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_ancestor_help() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				increment(FieldRef::new("count")),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("nonexistent").unwrap(),
+			)
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("not found")
+			.xpect_contains("Available routes");
+	}
+
+	#[beet_core::test]
+	async fn not_found_shows_scoped_ancestor_help() {
+		router_world()
+			.spawn((SceneToolRenderer::default(), router(), children![
+				(
+					scene_func("counter", || {
+						(Element::new("p"), children![Value::Str(
+							"counter".into()
+						)])
+					}),
+					children![increment(FieldRef::new("count")),],
+				),
+				scene_func("about", || {
+					(Element::new("p"), children![Value::Str("about".into())])
+				}),
+			]))
+			.call::<Request, Response>(
+				Request::from_cli_str("counter nonsense").unwrap(),
+			)
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("not found")
+			.xpect_contains("increment")
+			.xnot()
+			.xpect_contains("about");
 	}
 }

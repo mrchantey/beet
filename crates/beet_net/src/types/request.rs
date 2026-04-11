@@ -482,7 +482,8 @@ pub trait FromRequest<M>: Sized {
 	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>>;
 }
 
-struct SerdeFromRequestMarker;
+/// Marker type for [`FromRequest`] implementations via [`serde::de::DeserializeOwned`].
+pub struct SerdeFromRequestMarker;
 impl<T> FromRequest<SerdeFromRequestMarker> for T
 where
 	T: DeserializeOwned + Send + 'static,

@@ -30,7 +30,7 @@ use beet_tool::prelude::*;
 /// Typing `exit` or `quit` terminates the loop and writes
 /// [`AppExit::Success`]. An EOF on stdin also exits cleanly.
 ///
-/// Typically combined with a [`default_router`] and child tools
+/// Typically combined with a [`router`] and child tools
 /// to build an interactive CLI application:
 ///
 /// ```ignore
@@ -42,7 +42,7 @@ use beet_tool::prelude::*;
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), RouterAppPlugin));
 ///     app.world_mut().spawn((
 ///         SceneToolRenderer::default(),
-///         default_router(),
+///         router(),
 ///         ReplServer,
 ///         children![
 ///             scene_func("", || Name::new("welcome!")),

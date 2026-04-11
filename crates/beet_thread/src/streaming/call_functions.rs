@@ -15,13 +15,14 @@ pub async fn call_functions(
 	for call in function_calls.into_iter() {
 		let request = Request::get(call.name())
 			.with_body(call.arguments())
-			.with_header::<header::ContentType>(MediaType::Json);
+			.with_header::<header::ContentType>(MediaType::Json)
+			.with_header::<header::Accept>(MediaType::Json);
 
 		let output = match agent
-			.call_detached(RouterTool.into_tool(), request)
+			.call_detached(Router2.into_tool(), request)
 			.await
 		{
-			Ok(Pass(res)) => match res.into_result().await {
+			Ok(res) => match res.into_result().await {
 				Ok(res) => res.body.into_string().await.unwrap_or_else(|err| {
 					format!("Failed to read response body as string: {err}")
 				}),
@@ -32,9 +33,6 @@ pub async fn call_functions(
 					)
 				}
 			},
-			Ok(Fail(_req)) => {
-				format!("Function '{}' not found", call.name())
-			}
 			Err(err) => {
 				format!("Function call failed '{}': {err}", call.name())
 			}

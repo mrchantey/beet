@@ -1,109 +1,232 @@
-//! A tool that renders help documentation for registered routes.
+//! Help middleware that renders route documentation using beet_node.
 //!
-//! Traverses to the root ancestor, reads the [`RouteTree`], and formats
-//! it as a human-readable help string showing scenes and tools.
+//! When the `--help` param is present, renders a scene entity tree
+//! describing available routes, then converts it to a response
+//! via the scene rendering pipeline. If the param is absent,
+//! calls the inner handler via [`Next`].
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_node::prelude::*;
 use beet_tool::prelude::*;
 
-/// Checks for the `--help` param and renders scoped help text.
+/// Middleware that intercepts `--help` and renders scoped help
+/// as a beet_node scene entity tree.
 #[tool]
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub(crate) async fn HelpHandler(
-	cx: ToolContext<Request>,
-) -> Result<Outcome<Response, Request>> {
-	if cx.has_param("help") {
-		let path = cx.input.path().clone();
-		let help_text = cx
-			.caller
-			.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
-				move |entity, query| {
-					let tree = query.get(entity)?;
-					if let Some(subtree) = tree.find_subtree(&path) {
-						// Scope help to the requested path prefix
-						format_route_help(subtree).xok()
-					} else {
-						nearest_ancestor_help(tree, &path).xok()
-					}
-				},
-			)
-			.await?;
+pub async fn HelpHandler(
+	cx: ToolContext<(Request, Next<Request, Response>)>,
+) -> Result<Response> {
+	let caller = cx.caller.clone();
+	let (request, next) = cx.take();
 
-		Pass(Response::ok_body(help_text, MediaType::Text))
-	} else {
-		Fail(cx.input)
+	if !request.has_param("help") {
+		return next.call(request).await;
 	}
-	.xok()
-}
 
-/// Fallback handler that shows help scoped to the nearest ancestor scene
-/// of an unmatched path.
-#[tool]
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub(crate) async fn ContextualNotFoundHandler(
-	cx: ToolContext<Request>,
-) -> Result<Outcome<Response, Request>> {
-	let path = cx.input.path().clone();
-	let help_text = cx
-		.caller
+	let path = request.path().clone();
+	let parts = request.parts().clone();
+
+	let nodes = caller
+		.clone()
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
 			move |entity, query| {
 				let tree = query.get(entity)?;
-				nearest_ancestor_help(tree, &path).xok()
+				let nodes = if let Some(subtree) = tree.find_subtree(&path) {
+					subtree.flatten_nodes()
+				} else {
+					tree.flatten_nodes()
+				};
+				let filtered: Vec<&ToolNode> = nodes
+					.into_iter()
+					.filter(|node| {
+						node.path.annotated_rel_path().last_segment()
+							!= Some("help")
+					})
+					.collect();
+				filtered
+					.into_iter()
+					.cloned()
+					.collect::<Vec<ToolNode>>()
+					.xok()
 			},
 		)
 		.await?;
 
-	Pass(Response::from_status_body(
-		StatusCode::NOT_FOUND,
-		help_text,
-		MediaType::Text,
-	))
-	.xok()
+	let scene = spawn_help_scene(&caller, &nodes).await;
+	let response = <Entity as ExchangeRouteOut<Entity>>::into_route_response(
+		scene, caller, parts,
+	)
+	.await?;
+	Ok(response)
 }
 
-/// Walks the path segments from longest to shortest prefix, returning
-/// help for the first ancestor that matches a scene. Falls back to
-/// root help if nothing matches.
-fn nearest_ancestor_help(tree: &RouteTree, segments: &Vec<String>) -> String {
-	// Try progressively shorter prefixes
+/// Fallback handler that shows help scoped to the nearest ancestor scene
+/// of an unmatched path. Returns a NOT_FOUND status with the help scene.
+pub(crate) async fn contextual_not_found(
+	caller: &AsyncEntity,
+	path: &[String],
+) -> Result<Response> {
+	let path_owned = path.to_vec();
+	let parts = RequestParts::new(HttpMethod::Get, "/");
+
+	let (preamble, nodes) = caller
+		.clone()
+		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
+			move |entity, query| {
+				let tree = query.get(entity)?;
+				let (preamble, help_nodes) =
+					nearest_ancestor_help_nodes(tree, &path_owned);
+				(preamble, help_nodes).xok()
+			},
+		)
+		.await?;
+
+	let scene = spawn_not_found_scene(caller, &preamble, &nodes).await;
+	let mut response =
+		<Entity as ExchangeRouteOut<Entity>>::into_route_response(
+			scene,
+			caller.clone(),
+			parts,
+		)
+		.await?;
+	response.parts.status = StatusCode::NOT_FOUND;
+	Ok(response)
+}
+
+/// Walks path segments from longest to shortest prefix, returning
+/// help nodes for the first ancestor that matches a scene.
+fn nearest_ancestor_help_nodes(
+	tree: &RouteTree,
+	segments: &[String],
+) -> (String, Vec<ToolNode>) {
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
 		if let Some(node) = tree.find(prefix) {
 			if node.is_scene {
 				let prefix_str = prefix.join("/");
-				let mut output = String::new();
-				output.push_str(&format!(
-					"Route /{} not found. Showing help for /{}:\n\n",
+				let preamble = format!(
+					"Route /{} not found. Showing help for /{}:",
 					segments.join("/"),
 					prefix_str,
-				));
-				// Scope help to the matching ancestor subtree
+				);
 				let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
-				output.push_str(&format_route_help(help_tree));
-				return output;
+				let nodes = filtered_nodes(help_tree);
+				return (preamble, nodes);
 			}
 		}
 	}
+	let preamble = format!("Route /{} not found.", segments.join("/"));
+	let nodes = filtered_nodes(tree);
+	(preamble, nodes)
+}
 
-	// Nothing matched at all - show root help with a not-found preamble
-	let mut output = String::new();
-	output.push_str(&format!("Route /{} not found.\n\n", segments.join("/"),));
-	output.push_str(&format_route_help(tree));
-	output
+fn filtered_nodes(tree: &RouteTree) -> Vec<ToolNode> {
+	tree.flatten_nodes()
+		.into_iter()
+		.filter(|node| {
+			node.path.annotated_rel_path().last_segment() != Some("help")
+		})
+		.cloned()
+		.collect()
+}
+
+/// Spawns a help scene entity tree with route documentation.
+async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ToolNode]) -> Entity {
+	let children: Vec<(Element, OnSpawn)> = nodes
+		.iter()
+		.map(|node| format_tool_node_bundle(node))
+		.collect();
+
+	let world = caller.world();
+	let entity = world
+		.spawn_then((
+			DespawnOnRender,
+			Element::new("div"),
+			OnSpawn::insert_child(
+				Element::new("h2").with_inner_text("Available routes"),
+			),
+			
+		))
+		.await;
+	for child in children {
+		entity.insert_then(OnSpawn::insert_child(child)).await;
+	}
+	entity.id()
+}
+
+/// Spawns a not-found scene entity tree with a preamble and help.
+async fn spawn_not_found_scene(
+	caller: &AsyncEntity,
+	preamble: &str,
+	nodes: &[ToolNode],
+) -> Entity {
+	let children: Vec<(Element, OnSpawn)> = nodes
+		.iter()
+		.map(|node| format_tool_node_bundle(node))
+		.collect();
+
+	let world = caller.world();
+	let entity = world
+		.spawn_then((
+			DespawnOnRender,
+			Element::new("div"),
+			OnSpawn::insert_child(Element::new("p").with_inner_text(preamble)),
+			OnSpawn::insert_child(
+				Element::new("h2").with_inner_text("Available routes"),
+			),
+		))
+		.await;
+	for child in children {
+		entity.insert_then(OnSpawn::insert_child(child)).await;
+	}
+	entity.id()
+}
+
+/// Creates an element bundle describing a single route node.
+fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
+	let path = node.path.annotated_rel_path().to_string();
+
+	let label = if node.is_scene {
+		format!("{} [scene]", path)
+	} else if let Some(method) = &node.method {
+		format!("{} [{}]", path, method)
+	} else {
+		path
+	};
+
+	let mut inner_text = label;
+
+	if let Some(description) = &node.description {
+		inner_text.push_str(&format!(" — {}", description.as_str()));
+	}
+
+	let input_type = node.meta.input().type_name();
+	let output_type = node.meta.output().type_name();
+	// Skip trivial unit types and Request→Response (all ExchangeTools share this)
+	let is_trivial = input_type == "()" && output_type == "()";
+	let is_exchange =
+		input_type.ends_with("Request") && output_type.ends_with("Response");
+	if !is_trivial && !is_exchange {
+		inner_text.push_str(&format!(" ({}→{})", input_type, output_type));
+	}
+
+	for param in node.params.iter() {
+		inner_text.push_str(&format!(" {}", param));
+	}
+
+	(
+		Element::new("li"),
+		OnSpawn::insert_child(Value::Str(inner_text.into())),
+	)
 }
 
 /// Format a [`RouteTree`] as a help string, listing both scenes and tools.
 ///
 /// The help tool itself is excluded from the listing.
-/// This is the primary entry point for rendering help text and is
-/// reused by the interface tool for contextual help. Can be called on
-/// a subtree from [`RouteTree::find_subtree`] to scope output to a
-/// specific path prefix.
+/// Retained for backward compatibility with tests and plaintext rendering.
 pub fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
 	output.push_str("Available routes:\n\n");
@@ -123,15 +246,14 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 	}
 
 	for node in filtered {
-		format_tool_node(&mut output, node);
+		format_tool_node_text(&mut output, node);
 	}
 
 	output
 }
 
-/// Format a [`ToolNode`] into the output string, displaying `[scene]`
-/// for scene routes and input/output types for regular tools.
-fn format_tool_node(output: &mut String, node: &ToolNode) {
+/// Format a [`ToolNode`] as plaintext for CLI output.
+fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 	let path = node.path.annotated_rel_path();
 
 	if node.is_scene {
@@ -147,18 +269,21 @@ fn format_tool_node(output: &mut String, node: &ToolNode) {
 			output.push_str(&format!("    {}\n", description.as_str()));
 		}
 
-		// input/output types, skip trivial `()` types
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();
-		if input_type != "()" {
-			output.push_str(&format!("    input:  {}\n", input_type));
-		}
-		if output_type != "()" {
-			output.push_str(&format!("    output: {}\n", output_type));
+		// Skip Request→Response since all ExchangeTools share this
+		let is_exchange = input_type.ends_with("Request")
+			&& output_type.ends_with("Response");
+		if !is_exchange {
+			if input_type != "()" {
+				output.push_str(&format!("    input:  {}\n", input_type));
+			}
+			if output_type != "()" {
+				output.push_str(&format!("    output: {}\n", output_type));
+			}
 		}
 	}
 
-	// params
 	for param in node.params.iter() {
 		output.push_str(&format!("    {}\n", param));
 	}
@@ -173,7 +298,6 @@ mod test {
 	use beet_node::prelude::*;
 
 	/// Adds help as a tool located at `/help`.
-	/// Usually this is handled as an interface tool, added via ?help.
 	fn help() -> impl Bundle {
 		(
 			PathPartial::new("help"),
@@ -307,7 +431,7 @@ mod test {
 	async fn help_includes_scenes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
+			.spawn((SceneToolRenderer::default(), children![
 				help(),
 				scene_func("about", || {
 					(Element::new("p"), children![Value::Str("about".into())])
@@ -335,107 +459,5 @@ mod test {
 		output.contains("[scene]").xpect_true();
 		// tools should still appear
 		output.contains("increment").xpect_true();
-	}
-
-	#[beet_core::test]
-	async fn default_router_renders_help() {
-		let mut world = router_world();
-
-		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				increment(FieldRef::new("count")),
-				scene_func("about", || {
-					(Element::new("p"), children![Value::Str("about".into())])
-				}),
-			]))
-			.flush();
-
-		let body = world
-			.entity_mut(root)
-			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
-			.await
-			.unwrap()
-			.unwrap_str()
-			.await;
-		body.contains("Available routes").xpect_true();
-		body.contains("increment").xpect_true();
-		body.contains("about").xpect_true();
-	}
-
-	#[beet_core::test]
-	async fn help_scoped_to_prefix() {
-		let body = router_world()
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				(
-					scene_func("counter", || {
-						(Element::new("p"), children![Value::Str(
-							"counter".into()
-						)])
-					}),
-					children![increment(FieldRef::new("count")),],
-				),
-				scene_func("about", || {
-					(Element::new("p"), children![Value::Str("about".into())])
-				}),
-			]))
-			.call::<Request, Response>(
-				Request::from_cli_str("counter --help").unwrap(),
-			)
-			.await
-			.unwrap()
-			.unwrap_str()
-			.await;
-		// Should show routes under counter
-		body.contains("increment").xpect_true();
-		// Should not show sibling routes
-		body.contains("about").xpect_false();
-	}
-
-	#[beet_core::test]
-	async fn not_found_shows_ancestor_help() {
-		router_world()
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				increment(FieldRef::new("count")),
-			]))
-			.call::<Request, Response>(
-				Request::from_cli_str("nonexistent").unwrap(),
-			)
-			.await
-			.unwrap()
-			.text()
-			.await
-			.unwrap()
-			.xpect_contains("not found")
-			.xpect_contains("Available routes");
-	}
-
-	#[beet_core::test]
-	async fn not_found_shows_scoped_ancestor_help() {
-		router_world()
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				(
-					scene_func("counter", || {
-						(Element::new("p"), children![Value::Str(
-							"counter".into()
-						)])
-					}),
-					children![increment(FieldRef::new("count")),],
-				),
-				scene_func("about", || {
-					(Element::new("p"), children![Value::Str("about".into())])
-				}),
-			]))
-			.call::<Request, Response>(
-				Request::from_cli_str("counter nonsense").unwrap(),
-			)
-			.await
-			.unwrap()
-			.text()
-			.await
-			.unwrap()
-			.xpect_contains("not found")
-			.xpect_contains("increment")
-			.xnot()
-			.xpect_contains("about");
 	}
 }

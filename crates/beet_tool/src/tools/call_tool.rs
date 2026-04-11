@@ -28,7 +28,6 @@ fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
 	commands: AsyncCommands,
 	// use an option in case mismatch, we can still do an assert_match
 	tools: Query<(&ToolMeta, Option<&Tool<Input, Out>>)>,
-	descendent_wrappers: AncestorQuery<&WrapDescendentsList<Input, Out>>,
 ) -> Result {
 	let (meta, tool) = tools
 		.get(caller)
@@ -38,11 +37,6 @@ fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
 	let tool = tool.ok_or_else(|| {
 		bevyhow!("meta matches but tool missing.. this shouldnt happen.")
 	})?;
-
-	let mut tool = tool.clone();
-	for wrapper in descendent_wrappers.get_ancestors(caller) {
-		tool = wrapper.wrap(&tool);
-	}
 
 	tool.call(ToolCall {
 		commands,
@@ -202,8 +196,6 @@ pub impl AsyncEntity {
 	///
 	/// Uses `self` as the entity context passed to the tool handler. The
 	/// handler may use or ignore this entity depending on its implementation.
-	///
-	/// WrapDescendents ancestors are not used.
 	///
 	/// # Errors
 	/// Errors if the tool handler fails or the response channel closes.

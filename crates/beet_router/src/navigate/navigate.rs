@@ -1,8 +1,9 @@
 //! Directional navigation within a [`RouteTree`].
 //!
-//! The [`NavigateHandler`] checks for a `--navigate` param and
-//! resolves the target path relative to the current request path,
-//! then calls the target tool directly for rendering.
+//! The [`NavigateHandler`] middleware checks for a `--navigate` param
+//! and resolves the target path relative to the current request path,
+//! then calls the target tool directly for rendering. If the param
+//! is absent, calls the inner handler via [`Next`].
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -55,26 +56,27 @@ impl std::fmt::Display for NavigateTo {
 }
 
 
-/// Checks for the `--navigate` param and resolves the target route
-/// directly from the [`RouteTree`].
-///
-/// All routes are tools now, so navigation simply calls the target
-/// tool with the request. The current position is taken from the
-/// request path segments.
+/// Middleware that intercepts `--navigate` and resolves the target
+/// route from the [`RouteTree`]. If the param is absent, calls the
+/// inner handler via [`Next`].
 #[tool]
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub(crate) async fn NavigateHandler(
-	cx: ToolContext<Request>,
-) -> Result<Outcome<Response, Request>> {
-	let Some(value) = cx.get_param("navigate") else {
-		return Fail(cx.input).xok();
+pub async fn NavigateHandler(
+	cx: ToolContext<(Request, Next<Request, Response>)>,
+) -> Result<Response> {
+	let caller = cx.caller.clone();
+	let (request, next) = cx.take();
+
+	let Some(value) = request.get_param("navigate").map(|val| val.to_string())
+	else {
+		return next.call(request).await;
 	};
 
-	let direction = NavigateTo::from_str_param(value)?;
-	let current_path = cx.input.path().clone();
-	let tool_entity = cx.caller.id();
-	let world = cx.world();
+	let direction = NavigateTo::from_str_param(&value)?;
+	let current_path = request.path().clone();
+	let tool_entity = caller.id();
+	let world = caller.world();
 
 	let resolved = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {
@@ -86,20 +88,19 @@ pub(crate) async fn NavigateHandler(
 		.await?;
 
 	let Some(node) = resolved else {
-		return Pass(Response::ok_body(
+		return Response::ok_body(
 			"Navigation target not found",
 			MediaType::Text,
-		))
+		)
 		.xok();
 	};
 
-	// All routes are tools, call them directly
-	let response = world
-		.entity(node.entity)
-		.call::<Request, Response>(cx.input)
-		.await?;
+	// Dispatch through the route's ExchangeTool
+	let entity = world.entity(node.entity);
+	let exchange = entity.clone().get_cloned::<ExchangeTool>().await?;
+	let response = exchange.call(entity, request).await?;
 
-	Pass(response).xok()
+	response.xok()
 }
 
 /// Resolve a navigation direction against a [`RouteTree`] from the
@@ -144,7 +145,6 @@ fn resolve_first_child(
 		})?
 	};
 
-	// Find the first child that has a node
 	let first = find_first_node_child(subtree).ok_or_else(|| {
 		bevyhow!("No child routes under /{}", current_path.join("/"))
 	})?;
@@ -158,7 +158,6 @@ fn find_first_node_child(tree: &RouteTree) -> Option<&RouteTree> {
 		if child.node().is_some() {
 			return Some(child);
 		}
-		// intermediate nodes without a route may have children
 		if let Some(found) = find_first_node_child(child) {
 			return Some(found);
 		}
@@ -192,7 +191,6 @@ fn resolve_sibling(
 		})?
 	};
 
-	// Collect children that have nodes (visible routes)
 	let siblings: Vec<&RouteTree> = parent_subtree
 		.children
 		.iter()
@@ -203,7 +201,6 @@ fn resolve_sibling(
 		bevybail!("No sibling routes at this level");
 	}
 
-	// Find current index by matching the last segment name
 	let current_idx = siblings
 		.iter()
 		.position(|child| {
@@ -283,16 +280,24 @@ mod test {
 	async fn navigate_parent_from_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_func("", || {
-					(Element::new("h1"), children![Value::Str("Root".into())])
-				}),
-				scene_func("about", || {
-					(Element::new("p"), children![Value::Str(
-						"About page".into()
-					)])
-				}),
-			]))
+			.spawn((
+				SceneToolRenderer::default(),
+				Router2,
+				Middleware::<HelpHandler, Request, Response>::default(),
+				Middleware::<NavigateHandler, Request, Response>::default(),
+				children![
+					scene_func("", || {
+						(Element::new("h1"), children![Value::Str(
+							"Root".into()
+						)])
+					}),
+					scene_func("about", || {
+						(Element::new("p"), children![Value::Str(
+							"About page".into()
+						)])
+					}),
+				],
+			))
 			.flush();
 
 		let body = world
@@ -304,7 +309,6 @@ mod test {
 			.unwrap()
 			.unwrap_str()
 			.await;
-		// Navigating parent from /about should render root scene
 		body.contains("Root").xpect_true();
 	}
 
@@ -312,18 +316,24 @@ mod test {
 	async fn navigate_first_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_func("alpha", || {
-					(Element::new("p"), children![Value::Str(
-						"Alpha page".into()
-					)])
-				}),
-				scene_func("beta", || {
-					(Element::new("p"), children![Value::Str(
-						"Beta page".into()
-					)])
-				}),
-			]))
+			.spawn((
+				SceneToolRenderer::default(),
+				Router2,
+				Middleware::<HelpHandler, Request, Response>::default(),
+				Middleware::<NavigateHandler, Request, Response>::default(),
+				children![
+					scene_func("alpha", || {
+						(Element::new("p"), children![Value::Str(
+							"Alpha page".into()
+						)])
+					}),
+					scene_func("beta", || {
+						(Element::new("p"), children![Value::Str(
+							"Beta page".into()
+						)])
+					}),
+				],
+			))
 			.flush();
 
 		let body = world
@@ -335,7 +345,6 @@ mod test {
 			.unwrap()
 			.unwrap_str()
 			.await;
-		// First child should be alpha (sorted alphabetically)
 		body.contains("Alpha page").xpect_true();
 	}
 
@@ -343,18 +352,24 @@ mod test {
 	async fn navigate_next_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_func("alpha", || {
-					(Element::new("p"), children![Value::Str(
-						"Alpha page".into()
-					)])
-				}),
-				scene_func("beta", || {
-					(Element::new("p"), children![Value::Str(
-						"Beta page".into()
-					)])
-				}),
-			]))
+			.spawn((
+				SceneToolRenderer::default(),
+				Router2,
+				Middleware::<HelpHandler, Request, Response>::default(),
+				Middleware::<NavigateHandler, Request, Response>::default(),
+				children![
+					scene_func("alpha", || {
+						(Element::new("p"), children![Value::Str(
+							"Alpha page".into()
+						)])
+					}),
+					scene_func("beta", || {
+						(Element::new("p"), children![Value::Str(
+							"Beta page".into()
+						)])
+					}),
+				],
+			))
 			.flush();
 
 		// alpha -> next -> beta
@@ -386,18 +401,24 @@ mod test {
 	async fn navigate_prev_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_func("alpha", || {
-					(Element::new("p"), children![Value::Str(
-						"Alpha page".into()
-					)])
-				}),
-				scene_func("beta", || {
-					(Element::new("p"), children![Value::Str(
-						"Beta page".into()
-					)])
-				}),
-			]))
+			.spawn((
+				SceneToolRenderer::default(),
+				Router2,
+				Middleware::<HelpHandler, Request, Response>::default(),
+				Middleware::<NavigateHandler, Request, Response>::default(),
+				children![
+					scene_func("alpha", || {
+						(Element::new("p"), children![Value::Str(
+							"Alpha page".into()
+						)])
+					}),
+					scene_func("beta", || {
+						(Element::new("p"), children![Value::Str(
+							"Beta page".into()
+						)])
+					}),
+				],
+			))
 			.flush();
 
 		// alpha -> prev -> wraps to beta
@@ -417,13 +438,17 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), default_router(), children![
-				scene_func("about", || {
+			.spawn((
+				SceneToolRenderer::default(),
+				Router2,
+				Middleware::<HelpHandler, Request, Response>::default(),
+				Middleware::<NavigateHandler, Request, Response>::default(),
+				children![scene_func("about", || {
 					(Element::new("p"), children![Value::Str(
 						"About page".into()
 					)])
-				}),
-			]))
+				}),],
+			))
 			.flush();
 
 		// No --navigate param, should route normally

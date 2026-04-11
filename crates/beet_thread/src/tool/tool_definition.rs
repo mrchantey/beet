@@ -20,14 +20,14 @@ pub fn function_tool<T, M>(
 	tool: T,
 ) -> impl Bundle
 where
-	T: 'static + IntoReflectTool<M>,
+	T: 'static + Send + Sync + IntoReflectTool<M>,
 	T::In: Typed + Send + Sync + serde::de::DeserializeOwned,
 	T::Out: Typed + Send + Sync + serde::Serialize,
 {
 	let meta = T::reflect_meta().input_json_schema();
 	let definition: ToolDefinition =
 		FunctionToolDefinition::new(path, description, meta).into();
-	(definition, route_tool(path, tool))
+	(definition, route(path, ExchangeTool::new_detached(tool)))
 }
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]

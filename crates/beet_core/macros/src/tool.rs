@@ -404,8 +404,8 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 
 /// Build the `#[require(...)]` expression for the `Tool` component.
 ///
-/// When `has_route` is true, wraps the tool with `serde_exchange` middleware
-/// so it accepts [`Request`] and returns [`Response`].
+/// When `has_route` is true, wraps the tool with [`ExchangeTool`] so it
+/// accepts [`Request`] and returns [`Response`].
 fn make_require_tool(
 	tool_expr: TokenStream,
 	in_type: &TokenStream,
@@ -414,13 +414,9 @@ fn make_require_tool(
 	beet_tool: &syn::Path,
 ) -> TokenStream {
 	if has_route {
-		let beet_net = pkg_ext::internal_or_beet("beet_net");
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
-			#beet_tool::prelude::Tool<
-				#beet_net::prelude::Request,
-				#beet_net::prelude::Response
-			> = #beet_router::prelude::serde_exchange::<#in_type, #out_type>.wrap(#tool_expr)
+			#beet_router::prelude::ExchangeTool = #beet_router::prelude::ExchangeTool::new_detached::<#in_type, #out_type, _, _, _, _>(#tool_expr)
 		}
 	} else {
 		quote! {
@@ -1117,15 +1113,13 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[test]
-	fn route_bare_wraps_with_serde_exchange() {
+	fn route_bare_wraps_with_exchange_tool() {
 		let result = parse_str(quote!(route), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			async fn MyTool(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("serde_exchange"));
-		assert!(result.contains("Request"));
-		assert!(result.contains("Response"));
-		assert!(result.contains("serde_exchange :: < i32 , String >"));
+		assert!(result.contains("ExchangeTool"));
+		assert!(result.contains("new_detached"));
 		assert!(!result.contains("PathPartial"));
 	}
 
@@ -1135,7 +1129,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn MyTool(val: i32) -> String { val.to_string() }
 		});
-		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
 	}
@@ -1147,7 +1141,7 @@ mod test {
 				#[derive(Component, Reflect)]
 				async fn MyTool(val: i32) -> String { val.to_string() }
 			});
-		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (get_route_path ())"));
 	}
@@ -1167,7 +1161,7 @@ mod test {
 			#[derive(Component, Reflect)]
 			async fn Validate(input: String) -> String { input }
 		});
-		assert!(result.contains("serde_exchange"));
+		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
 		assert!(result.contains("ToolDescription"));
 	}

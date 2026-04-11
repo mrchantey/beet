@@ -1,7 +1,7 @@
 //! # Router Example
 //!
 //! Demonstrates beet's routing system with multiple server backends.
-//! Routes are wrapped in a layout template via [`WrapDescendentsList`],
+//! Routes are wrapped in a layout template via [`MiddlewareList`],
 //! so HTML responses automatically include navigation and styling.
 //!
 //! ## Running the Example
@@ -49,7 +49,7 @@ fn main() -> AppExit {
 fn setup(mut commands: Commands) -> Result {
 	commands.spawn((
 		server_from_cli()?,
-		default_router(),
+		router(),
 		SceneToolRenderer::default(),
 		content::routes(),
 	));

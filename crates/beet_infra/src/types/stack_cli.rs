@@ -9,13 +9,13 @@ use beet_tool::prelude::*;
 pub fn stack_cli() -> impl Bundle {
 	(
 		CliServer::default(),
-		default_router(),
+		router(),
 		OnSpawn::insert_child((
-			route_tool("validate", Validate),
+			route("validate", ExchangeTool::new_detached(Validate)),
 			ToolDescription::of::<Validate>(),
 		)),
 		OnSpawn::insert_child((
-			route_tool("plan", Plan),
+			route("plan", ExchangeTool::new_detached(Plan)),
 			ToolDescription::of::<Plan>(),
 		)),
 	)
