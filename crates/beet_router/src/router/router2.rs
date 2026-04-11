@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::IntoResponse;
@@ -22,13 +20,19 @@ pub async fn Router2(cx: ToolContext<Request>) -> Response {
 
 
 	match node {
-		Ok(Some(tool_node)) => {
-			let entity = world.entity(tool_node.entity);
-			let tool = match entity.clone().get_cloned::<ExchangeTool>().await {
-				Ok(tool) => tool,
-				Err(err) => return err.into_response(),
-			};
-			tool.call(entity, request)
+		Ok(Some(node)) => {
+			let entity = world.entity(node.entity);
+			let tool =
+				match entity.clone().get_cloned::<ExchangeTool>().await {
+					Ok(tool) => tool,
+					Err(err) => return err.into_response(),
+				}
+				.inner;
+
+			// TODO apply middleware here
+
+			entity
+				.call_detached(tool, request)
 				.await
 				.unwrap_or_else(|err| err.into_response())
 		}
@@ -40,15 +44,7 @@ pub async fn Router2(cx: ToolContext<Request>) -> Response {
 
 #[derive(Clone, Component)]
 pub struct ExchangeTool {
-	handler: Arc<
-		dyn 'static
-			+ Send
-			+ Sync
-			+ Fn(
-				AsyncEntity,
-				Request,
-			) -> MaybeSendBoxedFuture<'static, Result<Response>>,
-	>,
+	inner: Tool<Request, Response>,
 }
 
 impl ExchangeTool {
@@ -58,26 +54,52 @@ impl ExchangeTool {
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 	{
 		Self {
-			handler: Arc::new(|entity, request| {
-				Box::pin(async move {
-					let parts = request.parts().clone();
-					let input = In::from_request(request).await?;
-					let output: Out = entity.call(input).await?;
-					output.into_route_response(entity, parts).await
-				})
-			}),
+			inner: Tool::<Request, Response>::new_async(
+				async |cx| -> Result<Response> {
+					let parts = cx.input.parts().clone();
+					let input = In::from_request(cx.input).await?;
+					let output: Out = cx.caller.call(input).await?;
+					output.into_route_response(cx.caller, parts).await
+				},
+			),
+		}
+	}
+	/// Calls the inner tool instead of the entity
+	pub fn new_detached<In, Out, Inner, M1, M2, M3>(inner: Inner) -> Self
+	where
+		In: 'static + Send + Sync + FromRequest<M1>,
+		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
+		Inner: 'static + Send + Sync + IntoTool<M3, In = In, Out = Out>,
+	{
+		let inner = inner.into_tool();
+		Self {
+			inner: Tool::<Request, Response>::new_async(
+				async move |cx| -> Result<Response> {
+					let parts = cx.input.parts().clone();
+					let input = In::from_request(cx.input).await?;
+					let output: Out =
+						cx.caller.call_detached(inner, input).await?;
+					output.into_route_response(cx.caller, parts).await
+				},
+			),
 		}
 	}
 
-	pub fn call(
+
+	pub async fn call(
 		&self,
 		entity: AsyncEntity,
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
-		(self.handler)(entity, request)
+	) -> Result<Response> {
+		entity.call_detached(self.inner.clone(), request).await
 	}
 }
 
+impl IntoTool<Self> for ExchangeTool {
+	type In = Request;
+	type Out = Response;
+	fn into_tool(self) -> Tool<Request, Response> { self.inner }
+}
 
 pub trait ExchangeRouteOut<M>
 where
@@ -168,7 +190,9 @@ impl ExchangeRouteOut<Self> for Entity {
 			let scene_entity = caller.world().entity(self);
 			let result = scene_entity.call_detached(render_tool, parts).await;
 
-			// if scene_entity.get
+			if scene_entity.contains::<DespawnOnRender>().await {
+				scene_entity.despawn().await;
+			}
 
 			result
 		})

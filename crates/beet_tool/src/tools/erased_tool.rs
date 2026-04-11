@@ -1,19 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::Arc;
 
 #[derive(Component)]
 pub struct ErasedTool {
-	handler: Arc<
-		dyn 'static
-			+ Send
-			+ Sync
-			+ Fn(
-				AsyncEntity,
-				MediaBytes<'static>,
-				Vec<MediaType>,
-			) -> SendBoxedFuture<Result<MediaBytes<'static>>>,
-	>,
+	inner: Tool<(MediaBytes<'static>, Vec<MediaType>), MediaBytes<'static>>,
 }
 
 impl ErasedTool {
@@ -23,23 +13,26 @@ impl ErasedTool {
 		Out: 'static + Send + Sync + Serialize,
 	{
 		Self {
-			handler: Arc::new(|entity, input, accepts| {
-				Box::pin(async move {
-					let input: In = input.deserialize()?;
-					let output: Out = entity.call(input).await?;
-					let output =
-						MediaType::serialize_accepts(&accepts, &output)?;
-					Ok(output)
-				})
+			inner: Tool::<
+				(MediaBytes<'static>, Vec<MediaType>),
+				MediaBytes<'static>,
+			>::new_async(async |cx| -> Result<MediaBytes<'static>> {
+				let (input, accepts) = cx.input;
+				let input: In = input.deserialize()?;
+				let output: Out = cx.caller.call(input).await?;
+				let output = MediaType::serialize_accepts(&accepts, &output)?;
+				Ok(output)
 			}),
 		}
 	}
-	pub fn call(
+	pub async fn call(
 		&self,
 		entity: AsyncEntity,
 		input: MediaBytes<'static>,
 		accepts: Vec<MediaType>,
-	) -> SendBoxedFuture<Result<MediaBytes<'static>>> {
-		(self.handler)(entity, input, accepts)
+	) -> Result<MediaBytes<'static>> {
+		entity
+			.call_detached(self.inner.clone(), (input, accepts))
+			.await
 	}
 }

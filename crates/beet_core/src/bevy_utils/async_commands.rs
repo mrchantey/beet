@@ -737,6 +737,10 @@ impl AsyncEntity {
 		})
 		.await
 	}
+	/// Checks if the entity contains the component
+	pub async fn contains<T: Component>(&self) -> bool {
+		self.with_then(|entity| entity.contains::<T>()).await
+	}
 
 	/// Runs a function with access to the entity id and system parameter state.
 	pub fn with_state<T: 'static + SystemParam, O>(
