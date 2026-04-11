@@ -482,6 +482,28 @@ pub trait FromRequest<M>: Sized {
 	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>>;
 }
 
+struct SerdeFromRequestMarker;
+impl<T> FromRequest<SerdeFromRequestMarker> for T
+where
+	T: DeserializeOwned + Send + 'static,
+{
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+		Box::pin(async move {
+			request
+				.into_media_bytes()
+				.await
+				.map_err(|err| err.into_response())
+				.and_then(|bytes| {
+					bytes.deserialize().map_err(|err| err.into_response())
+				})
+		})
+	}
+}
+
+
+
 /// Marker type for [`FromRequest`] implementations via [`TryFrom`].
 pub struct TryFromRequestMarker;
 

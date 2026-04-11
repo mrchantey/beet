@@ -36,6 +36,13 @@ impl SceneToolRenderer {
 	pub fn new(tool: Tool<RequestParts, Response>) -> Self { Self { tool } }
 }
 
+impl IntoTool<Self> for SceneToolRenderer {
+	type In = RequestParts;
+	type Out = Response;
+	fn into_tool(self) -> Tool<RequestParts, Response> { self.tool }
+}
+
+
 /// Creates a routable scene tool from a path and a tool that returns
 /// a [`Bundle`].
 ///
