@@ -28,6 +28,8 @@ where
 	)
 }
 
+
+
 pub struct FuncToolMarker;
 
 impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
@@ -54,6 +56,7 @@ where
 		func_tool(move |input| self(input.input).xok())
 	}
 }
+
 
 
 #[cfg(test)]

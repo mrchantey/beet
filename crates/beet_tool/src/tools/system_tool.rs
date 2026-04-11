@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
-use bevy::ecs::system::SystemParamFunction;
 
 /// Create a [`Tool`] from a Bevy system that returns [`Result<Out>`].
 ///
@@ -52,6 +51,8 @@ where
 		},
 	)
 }
+
+
 
 /// Marker for the system tool [`IntoTool`] impl.
 pub struct SystemToolMarker;

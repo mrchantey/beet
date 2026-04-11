@@ -44,7 +44,10 @@ pub struct ExchangeTool {
 		dyn 'static
 			+ Send
 			+ Sync
-			+ Fn(AsyncEntity, Request) -> SendBoxedFuture<Result<Response>>,
+			+ Fn(
+				AsyncEntity,
+				Request,
+			) -> MaybeSendBoxedFuture<'static, Result<Response>>,
 	>,
 }
 
@@ -70,7 +73,7 @@ impl ExchangeTool {
 		&self,
 		entity: AsyncEntity,
 		request: Request,
-	) -> SendBoxedFuture<Result<Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		(self.handler)(entity, request)
 	}
 }
@@ -84,7 +87,7 @@ where
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
-	) -> SendBoxedFuture<Result<Response>>;
+	) -> MaybeSendBoxedFuture<'static, Result<Response>>;
 }
 
 
@@ -98,7 +101,7 @@ where
 		self,
 		_caller: AsyncEntity,
 		_parts: RequestParts,
-	) -> SendBoxedFuture<Result<Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		let response = self.into_response();
 		Box::pin(async move { response.xok() })
 	}
@@ -113,7 +116,7 @@ where
 		self,
 		_caller: AsyncEntity,
 		parts: RequestParts,
-	) -> SendBoxedFuture<Result<Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
 			let accept = match parts.headers.get_or_default::<header::Accept>()
 			{
@@ -144,7 +147,7 @@ impl ExchangeRouteOut<Self> for Entity {
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
-	) -> SendBoxedFuture<Result<Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
 			let render_tool = caller
 				.with_state::<AncestorQuery<&SceneToolRenderer>, _>(
