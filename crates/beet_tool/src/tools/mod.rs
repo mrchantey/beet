@@ -1,7 +1,7 @@
 mod async_tool;
 mod call_tool;
 mod chain_tool;
-mod func_tool;
+mod pure_tool;
 mod into_tool;
 mod system_tool;
 mod tool;
@@ -14,7 +14,7 @@ mod erased_tool;
 pub use call_tool::*;
 pub use chain_tool::*;
 pub use erased_tool::*;
-pub use func_tool::*;
+pub use pure_tool::*;
 pub use into_tool::*;
 pub use system_tool::*;
 pub use tool::*;

@@ -12,7 +12,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 ## Context
 
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
-- This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility, instead prioritizing refactors and cleaning up dead or experimental code.
+- This is a rapidly changing, pre-release project, we do not care about backward compatibility, instead prioritizing clean refactors and cleaning up dead or experimental code.
 - Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
 - when told to run a command, run that command before doing anything else, including searching the codebase
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
@@ -25,6 +25,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 
 ## Conventions
 
+- Never consider backward-compatibility. when asked to change something, remove the old implementation
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
 - We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible

@@ -2,14 +2,104 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::IsFunctionSystem;
 
-/// Create a [`Tool`] from a Bevy system that returns [`Result<Out>`].
-///
-/// Unlike [`func_tool`](crate::func_tool), system tools have access to
-/// ECS queries, resources, and other system parameters.
-///
-/// The system's first argument must be `In<ToolContext<Input>>` (the
-/// tool's input payload plus entity context), followed by any number
-/// of regular system parameters.
+impl<In, Out> Tool<In, Out>
+where
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync,
+{
+	/// Create a [`Tool`] from a Bevy system returning a value convertible
+	/// to `Result<Out>` via [`IntoResult`].
+	///
+	/// The system's first argument must be `In<ToolContext<Input>>` (the
+	/// tool's input payload plus entity context), followed by any number
+	/// of regular system parameters.
+	///
+	/// Accepts systems returning either `Out` or `Result<Out>`.
+	///
+	/// Note: this method requires [`SystemParamFunction`] to pin the
+	/// raw output type and avoid trait-resolution ambiguity. For
+	/// exclusive systems (those taking `&mut World`) or systems that
+	/// always return `Result<Out>`, use [`new_system`](Self::new_system)
+	/// instead.
+	pub fn new_system_result<Func, FnMarker, RawOut>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone,
+		FnMarker: 'static,
+		Func: SystemParamFunction<FnMarker, Out = RawOut>,
+		Func: IntoSystem<
+				bevy::ecs::system::In<ToolContext<In>>,
+				RawOut,
+				(IsFunctionSystem, FnMarker),
+			>,
+		RawOut: 'static + Send + Sync + IntoResult<Out>,
+	{
+		Tool::new(
+			TypeMeta::of::<Func>(),
+			move |ToolCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let func = func.clone();
+				let async_entity = commands.world().entity(caller);
+				let sys_input = ToolContext {
+					caller: async_entity,
+					input,
+				};
+				commands.commands.queue(move |world: &mut World| -> Result {
+					let raw: RawOut =
+						world.run_system_cached_with(func, sys_input)?;
+					let result: Result<Out> = raw.into_result();
+					out_handler.call_world(world, result)
+				});
+				Ok(())
+			},
+		)
+	}
+
+	/// Create a [`Tool`] from a Bevy system returning `Result<Out>`.
+	///
+	/// Works with both regular and exclusive systems (those taking
+	/// `&mut World`). For systems returning plain `Out`, use
+	/// [`new_system_result`](Self::new_system_result) which also
+	/// accepts non-Result returns.
+	pub fn new_system<Func, FnMarker>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone,
+		FnMarker: 'static,
+		Func: IntoSystem<
+				bevy::ecs::system::In<ToolContext<In>>,
+				Result<Out>,
+				FnMarker,
+			>,
+	{
+		Tool::new(
+			TypeMeta::of::<Func>(),
+			move |ToolCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let func = func.clone();
+				let async_entity = commands.world().entity(caller);
+				let sys_input = ToolContext {
+					caller: async_entity,
+					input,
+				};
+				commands.commands.queue(move |world: &mut World| -> Result {
+					let result: Result<Out> =
+						world.run_system_cached_with(func, sys_input)?;
+					out_handler.call_world(world, result)
+				});
+				Ok(())
+			},
+		)
+	}
+}
+
+/// Convenience alias for [`Tool::new_system`].
 ///
 /// ## Examples
 ///
@@ -28,28 +118,7 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	Tool::new(
-		TypeMeta::of::<Func>(),
-		move |ToolCall {
-		          mut commands,
-		          caller,
-		          input,
-		          out_handler,
-		      }| {
-			let func = func.clone();
-			let async_entity = commands.world().entity(caller);
-			let sys_input = ToolContext {
-				caller: async_entity,
-				input,
-			};
-			commands.commands.queue(move |world: &mut World| -> Result {
-				let result: Result<Out> =
-					world.run_system_cached_with(func, sys_input)?;
-				out_handler.call_world(world, result)
-			});
-			Ok(())
-		},
-	)
+	Tool::new_system(func)
 }
 
 
@@ -74,7 +143,7 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> { system_tool(self) }
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { Tool::new_system(self) }
 }
 
 
@@ -88,7 +157,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world
-			.spawn(system_tool(
+			.spawn(Tool::new_system(
 				|In(input): In<ToolContext>, time: Res<Time>| -> Result<f32> {
 					let _ = input.caller;
 					Ok(time.elapsed_secs())
@@ -108,7 +177,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		world.init_resource::<Time>();
 		let entity = world
-			.spawn(system_tool(
+			.spawn(Tool::new_system(
 				|In(input): In<ToolContext<i32>>,
 				 _time: Res<Time>|
 				 -> Result<i32> { Ok(*input * 2) },
@@ -126,7 +195,7 @@ mod test {
 	async fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(system_tool(|_: In<ToolContext>| -> Result { Ok(()) }))
+			.spawn(Tool::new_system(|_: In<ToolContext>| -> Result { Ok(()) }))
 			.id();
 		world.entity_mut(entity).call::<(), ()>(()).await.unwrap();
 	}
@@ -135,7 +204,7 @@ mod test {
 	async fn access_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(system_tool(
+			.spawn(Tool::new_system(
 				|In(input): In<ToolContext>| -> Result<Entity> {
 					Ok(input.caller.id())
 				},
@@ -158,7 +227,7 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(
-				system_tool(
+				Tool::new_system(
 					|In(input): In<ToolContext<i32>>,
 					 _time: Res<Time>|
 					 -> Result<i32> { Ok(*input * 2) },

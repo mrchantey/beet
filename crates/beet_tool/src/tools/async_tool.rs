@@ -1,12 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Create a [`Tool`] from an async closure that receives
-/// [`ToolContext`] and returns [`Result<Out>`].
-///
-/// Unlike [`func_tool`](crate::func_tool), async tools can perform
-/// non-blocking work such as network requests or streaming without
-/// stalling the ECS.
+/// Convenience alias for [`Tool::new_async_result`].
 ///
 /// ## Examples
 ///
@@ -24,30 +19,79 @@ where
 	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
 	Out: 'static + Send + Sync,
 {
-	Tool::new(
-		TypeMeta::of::<Func>(),
-		move |ToolCall {
-		          mut commands,
-		          caller,
-		          input,
-		          out_handler,
-		      }| {
-			let async_entity = commands.world().entity(caller);
-			let arg = ToolContext {
-				caller: async_entity,
-				input,
-			};
-			let func = func.clone();
-			commands.run(async move |world: AsyncWorld| -> Result {
-				let result = func(arg).await;
-				out_handler.call_async(world, result).await
-			});
-			Ok(())
-		},
-	)
+	Tool::new_async_result(func)
 }
 
+impl<In, Out> Tool<In, Out>
+where
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync,
+{
+	/// Create a [`Tool`] from an async closure that receives [`ToolContext`]
+	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
+	///
+	/// Accepts closures returning either `Out` or `Result<Out>`.
+	pub fn new_async_result<Func, Fut, RawOut>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = RawOut>,
+		RawOut: IntoResult<Out>,
+	{
+		Tool::new(
+			TypeMeta::of::<Func>(),
+			move |ToolCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let async_entity = commands.world().entity(caller);
+				let arg = ToolContext {
+					caller: async_entity,
+					input,
+				};
+				let func = func.clone();
+				commands.run(async move |world: AsyncWorld| -> Result {
+					let result: Result<Out> = func(arg).await.into_result();
+					out_handler.call_async(world, result).await
+				});
+				Ok(())
+			},
+		)
+	}
 
+	/// Create a [`Tool`] from an async closure returning `Result<Out>`.
+	///
+	/// For closures that may return either `Out` or `Result<Out>`,
+	/// use [`new_async_result`](Self::new_async_result).
+	pub fn new_async<Func, Fut>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
+	{
+		Tool::new(
+			TypeMeta::of::<Func>(),
+			move |ToolCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let async_entity = commands.world().entity(caller);
+				let arg = ToolContext {
+					caller: async_entity,
+					input,
+				};
+				let func = func.clone();
+				commands.run(async move |world: AsyncWorld| -> Result {
+					let result: Result<Out> = func(arg).await;
+					out_handler.call_async(world, result).await
+				});
+				Ok(())
+			},
+		)
+	}
+}
 
 
 /// Marker for the async tool [`IntoTool`] impl accepting
@@ -64,7 +108,7 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> { async_tool(self) }
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { Tool::new_async(self) }
 }
 
 /// Marker for the typed async tool [`IntoTool`] impl accepting
@@ -83,9 +127,9 @@ where
 	type Out = Out;
 
 	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		async_tool(move |input: ToolContext<Input>| {
+		Tool::new_async(move |input: ToolContext<Input>| {
 			let fut = self(input.input);
-			async move { fut.await.xok() }
+			async move { fut.await.xok::<BevyError>() }
 		})
 	}
 }
@@ -99,9 +143,11 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: ToolContext<(i32, i32)>| {
-				Ok(input.0 + input.1)
-			}))
+			.spawn(async_tool(
+				async |input: ToolContext<(i32, i32)>| -> Result<i32> {
+					Ok(input.0 + input.1)
+				},
+			))
 			.call::<(i32, i32), i32>((3, 4))
 			.await
 			.unwrap()
@@ -111,7 +157,9 @@ mod test {
 	#[beet_core::test]
 	async fn negate() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: ToolContext<i32>| Ok(-*input)))
+			.spawn(async_tool(async |input: ToolContext<i32>| -> Result<i32> {
+				Ok(-*input)
+			}))
 			.call::<i32, i32>(42)
 			.await
 			.unwrap()
@@ -122,7 +170,9 @@ mod test {
 	async fn returns_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(async_tool(async |cx: ToolContext| Ok(cx.caller.id())))
+			.spawn(async_tool(async |cx: ToolContext| -> Result<Entity> {
+				Ok(cx.caller.id())
+			}))
 			.id();
 		world
 			.entity_mut(entity)
@@ -135,9 +185,11 @@ mod test {
 	#[beet_core::test]
 	async fn string_processing() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: ToolContext<String>| {
-				Ok(format!("hello {}", *input))
-			}))
+			.spawn(async_tool(
+				async |input: ToolContext<String>| -> Result<String> {
+					Ok(format!("hello {}", *input))
+				},
+			))
 			.call::<String, String>("world".to_string())
 			.await
 			.unwrap()

@@ -1,6 +1,51 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+impl<In, Out> Tool<In, Out>
+where
+	In: 'static,
+	Out: 'static,
+{
+	/// Create a [`Tool`] from a pure closure that receives [`ToolContext`]
+	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
+	///
+	/// Accepts closures returning either `Out` or `Result<Out>`.
+	pub fn new_pure_result<Func, RawOut>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> RawOut,
+		RawOut: IntoResult<Out>,
+	{
+		Tool::new(
+			TypeMeta::of::<Func>(),
+			move |ToolCall {
+			          commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let async_entity = commands.world().entity(caller);
+				let cx = ToolContext {
+					caller: async_entity,
+					input,
+				};
+				let result: Result<Out> = func.clone()(cx).into_result();
+				out_handler.call(commands, result)
+			},
+		)
+	}
+
+	/// Create a [`Tool`] from a pure closure returning `Out` directly.
+	///
+	/// For closures that may fail, use [`new_pure_result`](Self::new_pure_result).
+	pub fn new_pure<Func>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Out,
+	{
+		Self::new_pure_result(func)
+	}
+}
+
+/// Convenience alias for [`Tool::new_pure_result`].
 pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
 where
 	F: 'static
@@ -9,23 +54,7 @@ where
 		+ Clone
 		+ FnOnce(ToolContext<Input>) -> Result<Out>,
 {
-	Tool::<Input, Out>::new(
-		TypeMeta::of::<F>(),
-		move |ToolCall {
-		          commands,
-		          caller,
-		          input,
-		          out_handler,
-		      }| {
-			let async_entity = commands.world().entity(caller);
-			let cx = ToolContext {
-				caller: async_entity,
-				input,
-			};
-			let result = func.clone()(cx);
-			out_handler.call(commands, result)
-		},
-	)
+	Tool::new_pure_result(func)
 }
 
 
@@ -39,7 +68,9 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> { func_tool(self) }
+	fn into_tool(self) -> Tool<Self::In, Self::Out> {
+		Tool::new_pure_result(self)
+	}
 }
 
 pub struct TypedFuncToolMarker;
@@ -53,7 +84,9 @@ where
 	type Out = O;
 
 	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		func_tool(move |input| self(input.input).xok())
+		Tool::new_pure_result(move |input: ToolContext<I>| {
+			self(input.input).xok::<BevyError>()
+		})
 	}
 }
 
@@ -67,7 +100,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(func_tool(|input: ToolContext<(i32, i32)>| {
+			.spawn(func_tool(|input: ToolContext<(i32, i32)>| -> Result<i32> {
 				Ok(input.0 + input.1)
 			}))
 			.call::<(i32, i32), i32>((5, 3))
