@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome> = async_tool(repeat_tool::<Input>))]
+#[require(Tool<Input, Outcome> = Tool::new_async(repeat_tool::<Input>))]
 #[reflect(Component, Default)]
 pub struct Repeat<Input = ()>
 where
@@ -85,7 +85,7 @@ where
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome> = async_tool(repeat_times_tool::<Input>))]
+#[require(Tool<Input, Outcome> = Tool::new_async(repeat_times_tool::<Input>))]
 #[reflect(Component)]
 pub struct RepeatTimes<Input = ()>
 where
@@ -177,14 +177,14 @@ mod tests {
 	use std::sync::atomic::Ordering;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
-		func_tool(|_: ToolContext| Outcome::FAIL.xok())
+		Tool::new_pure(|_: ToolContext| Outcome::FAIL.xok())
 	}
 
 	/// A child tool that passes `n` times, then fails.
 	fn pass_n_then_fail(n: u32) -> (Arc<AtomicU32>, Tool<(), Outcome>) {
 		let count = Arc::new(AtomicU32::new(0));
 		let count_inner = count.clone();
-		let tool = func_tool(move |_: ToolContext| {
+		let tool = Tool::new_pure(move |_: ToolContext| {
 			let calls = count_inner.fetch_add(1, Ordering::SeqCst);
 			if calls < n {
 				Outcome::PASS.xok()

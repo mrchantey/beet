@@ -31,7 +31,7 @@ fn setup(mut commands: Commands) {
 					"you are robot, make beep boop noises"
 				)]),
 				(Actor::agent(), OllamaProvider::qwen()),
-				(system_tool(assert_and_exit))
+				(Tool::<(), Outcome>::new_system(assert_and_exit))
 			],
 		))
 		.call::<(), Outcome>((), default());

@@ -10,7 +10,7 @@ where
 	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
 	///
 	/// Accepts closures returning either `Out` or `Result<Out>`.
-	pub fn new_pure_result<Func, RawOut>(func: Func) -> Self
+	pub fn new_pure<Func, RawOut>(func: Func) -> Self
 	where
 		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> RawOut,
 		RawOut: IntoResult<Out>,
@@ -33,28 +33,6 @@ where
 			},
 		)
 	}
-
-	/// Create a [`Tool`] from a pure closure returning `Out` directly.
-	///
-	/// For closures that may fail, use [`new_pure_result`](Self::new_pure_result).
-	pub fn new_pure<Func>(func: Func) -> Self
-	where
-		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Out,
-	{
-		Self::new_pure_result(func)
-	}
-}
-
-/// Convenience alias for [`Tool::new_pure_result`].
-pub fn func_tool<F, Input, Out>(func: F) -> Tool<Input, Out>
-where
-	F: 'static
-		+ Send
-		+ Sync
-		+ Clone
-		+ FnOnce(ToolContext<Input>) -> Result<Out>,
-{
-	Tool::new_pure_result(func)
 }
 
 
@@ -68,9 +46,7 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		Tool::new_pure_result(self)
-	}
+	fn into_tool(self) -> Tool<Self::In, Self::Out> { Tool::new_pure(self) }
 }
 
 pub struct TypedFuncToolMarker;
@@ -84,7 +60,7 @@ where
 	type Out = O;
 
 	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		Tool::new_pure_result(move |input: ToolContext<I>| {
+		Tool::new_pure(move |input: ToolContext<I>| {
 			self(input.input).xok::<BevyError>()
 		})
 	}
@@ -100,9 +76,11 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(func_tool(|input: ToolContext<(i32, i32)>| -> Result<i32> {
-				Ok(input.0 + input.1)
-			}))
+			.spawn(Tool::<(i32, i32), i32>::new_pure(
+				|input: ToolContext<(i32, i32)>| -> Result<i32> {
+					Ok(input.0 + input.1)
+				},
+			))
 			.call::<(i32, i32), i32>((5, 3))
 			.await
 			.unwrap()

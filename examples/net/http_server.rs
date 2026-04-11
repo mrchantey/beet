@@ -1,7 +1,7 @@
 //! # Basic Server
 //!
 //! This example demonstrates creating a basic server in Beet
-//! using [`func_tool`], the simplest synchronous exchange pattern.
+//! using [`Tool::new_pure`], the simplest synchronous exchange pattern.
 //! For concurrent request handling see [`spawn_exchange`].
 //!
 //!
@@ -35,7 +35,7 @@ fn main() {
 				// CliServer::default(),
 				HttpServer::default(),
 				Count::default(),
-				system_tool(handler),
+				Tool::<Request, Response>::new_system(handler),
 			));
 		})
 		.run();

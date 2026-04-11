@@ -45,11 +45,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 3. Determine tool kind ──
 	// async → async tool, pure → func tool, otherwise system tool
 	let tool_factory = if is_async {
-		quote! { #beet_tool::prelude::Tool::new_async_result }
+		quote! { #beet_tool::prelude::Tool::new_async }
 	} else if is_pure {
-		quote! { #beet_tool::prelude::Tool::new_pure_result }
+		quote! { #beet_tool::prelude::Tool::new_pure }
 	} else {
-		quote! { #beet_tool::prelude::Tool::new_system_result }
+		quote! { #beet_tool::prelude::Tool::new_system }
 	};
 	let async_kw = if is_async {
 		quote! { async }
@@ -584,35 +584,35 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[test]
-	fn async_fn_uses_new_async_result() {
+	fn async_fn_uses_new_async() {
 		let result = parse_str(
 			quote!(),
 			syn::parse_quote! { async fn my_tool() -> i32 { 42 } },
 		);
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 		assert!(result.contains("async fn my_tool_tool"));
 	}
 
 	#[test]
-	fn pure_fn_uses_new_pure_result() {
+	fn pure_fn_uses_new_pure() {
 		let result = parse_str(
 			quote!(pure),
 			syn::parse_quote! { fn my_tool() -> i32 { 42 } },
 		);
-		assert!(result.contains("Tool :: new_pure_result"));
-		assert!(!result.contains("Tool :: new_system_result"));
-		assert!(!result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_pure"));
+		assert!(!result.contains("Tool :: new_system"));
+		assert!(!result.contains("Tool :: new_async"));
 	}
 
 	#[test]
-	fn plain_fn_uses_new_system_result() {
+	fn plain_fn_uses_new_system() {
 		let result = parse_str(
 			quote!(),
 			syn::parse_quote! { fn my_tool(val: In<i32>) -> i32 { val.0 } },
 		);
-		assert!(result.contains("Tool :: new_system_result"));
-		assert!(!result.contains("Tool :: new_pure_result"));
-		assert!(!result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_system"));
+		assert!(!result.contains("Tool :: new_pure"));
+		assert!(!result.contains("Tool :: new_async"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -649,7 +649,7 @@ mod test {
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("type Out = ()"));
 		assert!(result.contains("let _ = __tool_cx . input"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 		assert!(result.contains("fn my_tool_tool"));
 	}
 
@@ -662,7 +662,7 @@ mod test {
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("type Out = i32"));
 		assert!(result.contains("let val = __tool_cx . input"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 		assert!(result.contains("fn double_tool"));
 	}
 
@@ -675,7 +675,7 @@ mod test {
 		assert!(result.contains("type In = (i32 , i32)"));
 		assert!(result.contains("type Out = i32"));
 		assert!(result.contains("let (a , b) = __tool_cx . input"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 	}
 
 	#[test]
@@ -684,7 +684,7 @@ mod test {
 			fn fallible(val: i32) -> Result<i32> { Ok(val) }
 		});
 		assert!(result.contains("type Out = i32"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 	}
 
 	#[test]
@@ -693,7 +693,7 @@ mod test {
 			fn fallible(val: i32) -> Result<i32> { Ok(val) }
 		});
 		assert!(result.contains("type Out = Result < i32 >"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 	}
 
 	#[test]
@@ -702,7 +702,7 @@ mod test {
 			fn my_tool(cx: ToolContext<i32>) -> i32 { *cx }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 		assert!(result.contains("fn my_tool_tool"));
 		assert!(result.contains("cx : "));
 		assert!(!result.contains("__tool_cx"));
@@ -714,7 +714,7 @@ mod test {
 			fn my_tool(cx: ToolContext) -> i32 { 1 }
 		});
 		assert!(result.contains("type In = ()"));
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 		assert!(!result.contains("__tool_cx"));
 	}
 
@@ -740,7 +740,7 @@ mod test {
 		assert!(result.contains("struct my_tool"));
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("type Out = i32"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 		assert!(result.contains("async fn my_tool_tool"));
 	}
 
@@ -750,7 +750,7 @@ mod test {
 			async fn negate(val: i32) -> i32 { -val }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 		assert!(result.contains("let val = __tool_cx . input"));
 	}
 
@@ -760,7 +760,7 @@ mod test {
 			async fn fallible(val: i32) -> Result<i32> { Ok(val) }
 		});
 		assert!(result.contains("type Out = i32"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 	}
 
 	#[test]
@@ -769,7 +769,7 @@ mod test {
 			async fn fallible(val: i32) -> Result<i32> { Ok(val) }
 		});
 		assert!(result.contains("type Out = Result < i32 >"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -782,7 +782,7 @@ mod test {
 			async fn my_tool(cx: ToolContext<i32>) -> i32 { *cx }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 		assert!(result.contains("async fn my_tool_tool"));
 		assert!(!result.contains("__tool_cx"));
 	}
@@ -793,7 +793,7 @@ mod test {
 			async fn my_tool(cx: ToolContext) -> i32 { 42 }
 		});
 		assert!(result.contains("type In = ()"));
-		assert!(result.contains("Tool :: new_async_result"));
+		assert!(result.contains("Tool :: new_async"));
 		assert!(!result.contains("__tool_cx"));
 	}
 
@@ -808,7 +808,7 @@ mod test {
 		});
 		assert!(result.contains("type In = i32"));
 		assert!(result.contains("type Out = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("ToolContext"));
 		assert!(result.contains("let val = In (__tool_cx . input)"));
 	}
@@ -819,7 +819,7 @@ mod test {
 			fn my_tool(val: In<i32>, time: Res<Time>) -> f32 { val.0 as f32 }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("time : Res < Time >"));
 		assert!(result.contains("let val = In (__tool_cx . input)"));
 	}
@@ -830,7 +830,7 @@ mod test {
 			fn my_tool(val: In<i32>) -> Result<i32> { Ok(val.0) }
 		});
 		assert!(result.contains("type Out = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 	}
 
 	#[test]
@@ -840,7 +840,7 @@ mod test {
 		});
 		assert!(result.contains("type In = ()"));
 		assert!(result.contains("type Out = ()"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 	}
 
 	#[test]
@@ -849,7 +849,7 @@ mod test {
 			fn my_tool(commands: Commands) {}
 		});
 		assert!(result.contains("type In = ()"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		// commands is a system param, not consumed as input
 		assert!(result.contains("commands : Commands"));
 		assert!(result.contains("let _ = __tool_cx . input"));
@@ -865,7 +865,7 @@ mod test {
 			fn my_tool(cx: In<ToolContext<i32>>) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("In (cx)"));
 		assert!(!result.contains("__tool_cx"));
 	}
@@ -876,7 +876,7 @@ mod test {
 			fn my_tool(cx: In<ToolContext<i32>>, time: Res<Time>) -> f32 { 0.0 }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("time : Res < Time >"));
 		assert!(result.contains("In (cx)"));
 	}
@@ -887,7 +887,7 @@ mod test {
 			fn my_tool(cx: In<ToolContext>) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = ()"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("In (cx)"));
 		assert!(!result.contains("__tool_cx"));
 	}
@@ -898,7 +898,7 @@ mod test {
 			fn my_tool(cx: ToolContext<i32>) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = i32"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("In (cx)"));
 		assert!(!result.contains("__tool_cx"));
 	}
@@ -909,7 +909,7 @@ mod test {
 			fn my_tool(cx: ToolContext) -> Entity { cx.id() }
 		});
 		assert!(result.contains("type In = ()"));
-		assert!(result.contains("Tool :: new_system_result"));
+		assert!(result.contains("Tool :: new_system"));
 		assert!(result.contains("In (cx)"));
 		assert!(!result.contains("__tool_cx"));
 	}
@@ -949,7 +949,7 @@ mod test {
 		assert!(
 			result.contains("IntoTool < my_tool < T > > for my_tool < T >")
 		);
-		assert!(result.contains("Tool :: new_pure_result"));
+		assert!(result.contains("Tool :: new_pure"));
 	}
 
 	#[test]
@@ -1026,7 +1026,7 @@ mod test {
 		);
 		assert!(result.contains("# [require"));
 		assert!(result.contains("Tool <"));
-		assert!(result.contains("Tool :: new_pure_result (add_tool"));
+		assert!(result.contains("Tool :: new_pure (add_tool"));
 		assert!(result.contains("struct Add"));
 		assert!(result.contains("fn add_tool"));
 	}
@@ -1061,7 +1061,7 @@ mod test {
 		});
 		assert!(result.contains("derive (Debug , Component , Reflect)"));
 		assert!(result.contains("# [require"));
-		assert!(result.contains("Tool :: new_async_result (help_handler_tool"));
+		assert!(result.contains("Tool :: new_async (help_handler_tool"));
 		assert!(result.contains("struct HelpHandler"));
 		assert!(result.contains("async fn help_handler_tool"));
 	}
@@ -1076,7 +1076,7 @@ mod test {
 		});
 		assert!(result.contains("derive (Debug , Component , Reflect)"));
 		assert!(result.contains("# [require"));
-		assert!(result.contains("Tool :: new_system_result (increment_tool"));
+		assert!(result.contains("Tool :: new_system (increment_tool"));
 		assert!(result.contains("struct Increment"));
 		assert!(result.contains("fn increment_tool"));
 	}
@@ -1193,7 +1193,7 @@ mod test {
 		});
 		// The handler function should be at module level so #[require] can reference it
 		assert!(result.contains("fn into_tool"));
-		assert!(result.contains("Tool :: new_pure_result (add_tool)"));
+		assert!(result.contains("Tool :: new_pure (add_tool)"));
 		assert!(result.contains("fn add_tool"));
 	}
 
@@ -1206,9 +1206,7 @@ mod test {
 			{ val }
 		});
 		assert!(result.contains("# [require"));
-		assert!(
-			result.contains("Tool :: new_pure_result (my_tool_tool :: < T >")
-		);
+		assert!(result.contains("Tool :: new_pure (my_tool_tool :: < T >"));
 		assert!(result.contains("fn my_tool_tool < T >"));
 	}
 }

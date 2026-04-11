@@ -43,17 +43,19 @@ pub fn exchange_fallback() -> impl Bundle {
 		.with_exclude_errors(ChildError::NO_TOOL | ChildError::TOOL_MISMATCH);
 	(
 		RouteHidden,
-		async_tool(async move |cx: ToolContext<Request>| -> Result<Response> {
-			match fallback.run(cx).await? {
-				Pass(res) => Ok(res),
-				// no child matched — return a simple plaintext not-found
-				Fail(req) => Ok(Response::from_status_body(
-					StatusCode::NOT_FOUND,
-					format!("Resource not found: {}", req.path_string()),
-					MediaType::Text,
-				)),
-			}
-		}),
+		Tool::<Request, Response>::new_async(
+			async move |cx: ToolContext<Request>| -> Result<Response> {
+				match fallback.run(cx).await? {
+					Pass(res) => Ok(res),
+					// no child matched — return a simple plaintext not-found
+					Fail(req) => Ok(Response::from_status_body(
+						StatusCode::NOT_FOUND,
+						format!("Resource not found: {}", req.path_string()),
+						MediaType::Text,
+					)),
+				}
+			},
+		),
 	)
 }
 
@@ -108,7 +110,7 @@ mod test {
 
 	fn my_interface() -> impl Bundle {
 		(
-			system_tool(
+			Tool::<Request, RouteTree>::new_system(
 				|In(req): In<ToolContext<Request>>,
 				 trees: Query<&RouteTree>|
 				 -> Result<RouteTree> {
@@ -118,9 +120,9 @@ mod test {
 			),
 			children![(
 				PathPartial::new("add"),
-				func_tool(|input: ToolContext<(u32, u32)>| Ok(
-					input.0 + input.1
-				)),
+				Tool::<(u32, u32), u32>::new_pure(
+					|input: ToolContext<(u32, u32)>| Ok(input.0 + input.1)
+				),
 			)],
 		)
 	}
@@ -148,9 +150,9 @@ mod test {
 			.spawn((SceneToolRenderer::default(), default_router(), children![
 				route_tool(
 					"add",
-					func_tool(|input: ToolContext<(i32, i32)>| Ok(
-						input.0 + input.1
-					))
+					Tool::<(i32, i32), i32>::new_pure(
+						|input: ToolContext<(i32, i32)>| Ok(input.0 + input.1)
+					)
 				),
 			]))
 			.call::<Request, Response>(

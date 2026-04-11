@@ -1,27 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Convenience alias for [`Tool::new_async_result`].
-///
-/// ## Examples
-///
-/// ```rust,no_run
-/// # use beet_tool::prelude::*;
-/// # use beet_core::prelude::*;
-/// let handler = async_tool(|input: ToolContext<u32>| async move {
-///     Ok(*input * 2)
-/// });
-/// ```
-pub fn async_tool<Func, Input, Out, Fut>(func: Func) -> Tool<Input, Out>
-where
-	Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<Input>) -> Fut,
-	Input: 'static + Send + Sync,
-	Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
-	Out: 'static + Send + Sync,
-{
-	Tool::new_async_result(func)
-}
-
 impl<In, Out> Tool<In, Out>
 where
 	In: 'static + Send + Sync,
@@ -31,7 +10,7 @@ where
 	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
 	///
 	/// Accepts closures returning either `Out` or `Result<Out>`.
-	pub fn new_async_result<Func, Fut, RawOut>(func: Func) -> Self
+	pub fn new_async<Func, Fut, RawOut>(func: Func) -> Self
 	where
 		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Fut,
 		Fut: 'static + MaybeSend + Future<Output = RawOut>,
@@ -53,38 +32,6 @@ where
 				let func = func.clone();
 				commands.run(async move |world: AsyncWorld| -> Result {
 					let result: Result<Out> = func(arg).await.into_result();
-					out_handler.call_async(world, result).await
-				});
-				Ok(())
-			},
-		)
-	}
-
-	/// Create a [`Tool`] from an async closure returning `Result<Out>`.
-	///
-	/// For closures that may return either `Out` or `Result<Out>`,
-	/// use [`new_async_result`](Self::new_async_result).
-	pub fn new_async<Func, Fut>(func: Func) -> Self
-	where
-		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> Fut,
-		Fut: 'static + MaybeSend + Future<Output = Result<Out>>,
-	{
-		Tool::new(
-			TypeMeta::of::<Func>(),
-			move |ToolCall {
-			          mut commands,
-			          caller,
-			          input,
-			          out_handler,
-			      }| {
-				let async_entity = commands.world().entity(caller);
-				let arg = ToolContext {
-					caller: async_entity,
-					input,
-				};
-				let func = func.clone();
-				commands.run(async move |world: AsyncWorld| -> Result {
-					let result: Result<Out> = func(arg).await;
 					out_handler.call_async(world, result).await
 				});
 				Ok(())
@@ -143,7 +90,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(async_tool(
+			.spawn(Tool::<(i32, i32), i32>::new_async(
 				async |input: ToolContext<(i32, i32)>| -> Result<i32> {
 					Ok(input.0 + input.1)
 				},
@@ -157,9 +104,9 @@ mod test {
 	#[beet_core::test]
 	async fn negate() {
 		AsyncPlugin::world()
-			.spawn(async_tool(async |input: ToolContext<i32>| -> Result<i32> {
-				Ok(-*input)
-			}))
+			.spawn(Tool::<i32, i32>::new_async(
+				async |input: ToolContext<i32>| -> Result<i32> { Ok(-*input) },
+			))
 			.call::<i32, i32>(42)
 			.await
 			.unwrap()
@@ -170,9 +117,11 @@ mod test {
 	async fn returns_tool_entity() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(async_tool(async |cx: ToolContext| -> Result<Entity> {
-				Ok(cx.caller.id())
-			}))
+			.spawn(Tool::<(), Entity>::new_async(
+				async |cx: ToolContext| -> Result<Entity> {
+					Ok(cx.caller.id())
+				},
+			))
 			.id();
 		world
 			.entity_mut(entity)
@@ -185,7 +134,7 @@ mod test {
 	#[beet_core::test]
 	async fn string_processing() {
 		AsyncPlugin::world()
-			.spawn(async_tool(
+			.spawn(Tool::<String, String>::new_async(
 				async |input: ToolContext<String>| -> Result<String> {
 					Ok(format!("hello {}", *input))
 				},

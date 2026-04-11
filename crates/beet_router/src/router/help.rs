@@ -175,7 +175,10 @@ mod test {
 	/// Adds help as a tool located at `/help`.
 	/// Usually this is handled as an interface tool, added via ?help.
 	fn help() -> impl Bundle {
-		(PathPartial::new("help"), system_tool(help_system))
+		(
+			PathPartial::new("help"),
+			Tool::<(), String>::new_system(help_system),
+		)
 	}
 	fn help_system(
 		In(cx): In<ToolContext>,

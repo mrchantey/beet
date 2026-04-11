@@ -8,9 +8,9 @@ use bevy::reflect::Typed;
 /// Conversion trait for creating a [`Tool`] from a value.
 ///
 /// Implementations exist for plain closures
-/// ([`Tool::new_pure_result`]), Bevy systems
-/// ([`Tool::new_system_result`]), and async closures
-/// ([`Tool::new_async_result`]).
+/// ([`Tool::new_pure`]), Bevy systems
+/// ([`Tool::new_system`]), and async closures
+/// ([`Tool::new_async`]).
 pub trait IntoTool<M>: Sized {
 	/// Input type for the resulting handler.
 	type In;

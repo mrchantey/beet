@@ -30,7 +30,7 @@ pub struct O11sStreamer {
 
 impl DefaultTool<(), Outcome> for O11sStreamer {
 	fn default_tool() -> Tool<(), Outcome> {
-		async_tool(post_streamer_tool::<O11sStreamer>)
+		Tool::new_async(post_streamer_tool::<O11sStreamer>)
 	}
 }
 
@@ -38,7 +38,7 @@ impl IntoTool<Self> for O11sStreamer {
 	type In = ();
 	type Out = Outcome;
 	fn into_tool(self) -> Tool<(), Outcome> {
-		async_tool(async move |cx: ToolContext| {
+		Tool::new_async(async move |cx: ToolContext| {
 			post_streamer_tool_stateful(cx.map_input(self)).await
 		})
 	}

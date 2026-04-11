@@ -135,6 +135,10 @@ where
 		})
 	}
 }
+/// Marker component for scene entities that should be despawned
+/// after they render.
+#[derive(Component)]
+pub struct DespawnOnRender;
 
 /// A route that return an entity is a Scene Route.
 /// This indicates the returned entity should be rendered
@@ -159,12 +163,14 @@ impl ExchangeRouteOut<Self> for Entity {
 					},
 				)
 				.await
-				.unwrap_or_else(|_| async_tool(default_scene_renderer));
-			caller
-				.world()
-				.entity(self)
-				.call_detached(render_tool, parts)
-				.await
+				.unwrap_or_else(|_| Tool::new_async(default_scene_renderer));
+
+			let scene_entity = caller.world().entity(self);
+			let result = scene_entity.call_detached(render_tool, parts).await;
+
+			// if scene_entity.get
+
+			result
 		})
 	}
 }

@@ -35,7 +35,9 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(async_tool(post_streamer_tool::<MockPostStreamer>));
+		.insert(Tool::<(), Outcome>::new_async(
+			post_streamer_tool::<MockPostStreamer>,
+		));
 }
 
 impl MockPostStreamer {

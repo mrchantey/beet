@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
 /// with the final input if all compatible children pass.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome<Input, Output>> = async_tool(sequence_tool::<Input, Output>))]
+#[require(Tool<Input, Outcome<Input, Output>> = Tool::new_async(sequence_tool::<Input, Output>))]
 #[reflect(Component, Default)]
 pub struct Sequence<Input = (), Output = ()>
 where
@@ -142,13 +142,13 @@ mod tests {
 	use super::*;
 
 	fn outcome_fail() -> Tool<(), Outcome<(), ()>> {
-		func_tool(|_: ToolContext| Outcome::Fail(()).xok())
+		Tool::new_pure(|_: ToolContext| Outcome::Fail(()).xok())
 	}
 	fn outcome_pass() -> Tool<(), Outcome<(), ()>> {
-		func_tool(|_: ToolContext| Outcome::Pass(()).xok())
+		Tool::new_pure(|_: ToolContext| Outcome::Pass(()).xok())
 	}
 	fn wrong_signature_tool() -> Tool<(), i32> {
-		func_tool(|_: ToolContext| 7.xok())
+		Tool::new_pure(|_: ToolContext| 7.xok())
 	}
 
 	#[beet_core::test]

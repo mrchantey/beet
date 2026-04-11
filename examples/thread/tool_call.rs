@@ -46,7 +46,7 @@ fn agent_choice_tool() -> impl Bundle {
 	function_tool(
 		"make-choice",
 		"make your choice",
-		func_tool(|cx: ToolContext<MakeChoice>| {
+		Tool::<MakeChoice, String>::new_pure(|cx: ToolContext<MakeChoice>| {
 			match cx.choice {
 				Choice::Attack => {
 					"the attack was successful, you must feel very smug.."

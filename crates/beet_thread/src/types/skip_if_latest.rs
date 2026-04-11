@@ -49,7 +49,7 @@ where
 	M: 'static + Send + Sync,
 {
 	fn default_tool() -> Tool<(), Outcome> {
-		async_tool(move |cx: ToolContext| async move {
+		Tool::new_async(move |cx: ToolContext| async move {
 			let should_skip = cx
 				.caller
 				.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {

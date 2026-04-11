@@ -137,7 +137,9 @@ mod test {
 			.into_world()
 			.spawn((router(), children![route_tool(
 				"add",
-				func_tool(|cx: ToolContext<(i32, i32)>| Ok(cx.0 + cx.1)),
+				Tool::<(i32, i32), i32>::new_pure(
+					|cx: ToolContext<(i32, i32)>| Ok(cx.0 + cx.1)
+				),
 			),]))
 			.call::<Request, Response>(
 				Request::with_json("/add", &(10i32, 20i32)).unwrap(),

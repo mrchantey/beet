@@ -248,7 +248,7 @@ mod test {
 	impl<T: InnerTestTool> AddOneWrapper<T> {
 		fn make_tool() -> Tool<i32, i32> {
 			let inner = T::inner_tool();
-			async_tool(move |cx: ToolContext<i32>| {
+			Tool::new_async(move |cx: ToolContext<i32>| {
 				let inner = inner.clone();
 				async move {
 					let inner_out = cx.caller.call_detached(inner, *cx).await?;

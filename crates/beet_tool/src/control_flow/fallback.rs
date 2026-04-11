@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
 #[derive(Debug, Component)]
-#[require(Tool<Input, Outcome<Output, Input>> = async_tool(fallback_tool::<Input, Output>))]
+#[require(Tool<Input, Outcome<Output, Input>> = Tool::new_async(fallback_tool::<Input, Output>))]
 pub struct Fallback<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
@@ -163,13 +163,13 @@ mod tests {
 	use super::*;
 
 	fn outcome_fail() -> Tool<(), Outcome> {
-		func_tool(|_: ToolContext| Outcome::FAIL.xok())
+		Tool::new_pure(|_: ToolContext| Outcome::FAIL.xok())
 	}
 	fn outcome_pass() -> Tool<(), Outcome> {
-		func_tool(|_: ToolContext| Outcome::PASS.xok())
+		Tool::new_pure(|_: ToolContext| Outcome::PASS.xok())
 	}
 	fn wrong_signature_tool() -> Tool<(), i32> {
-		func_tool(|_: ToolContext| 7.xok())
+		Tool::new_pure(|_: ToolContext| 7.xok())
 	}
 
 	#[beet_core::test]
