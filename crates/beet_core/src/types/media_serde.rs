@@ -19,10 +19,10 @@ impl MediaType {
 	pub fn serialize_accepts<T: serde::Serialize>(
 		accept: &[MediaType],
 		value: &T,
-	) -> Result<(MediaType, Vec<u8>)> {
+	) -> Result<MediaBytes<'static>> {
 		for media_type in accept {
 			if let Ok(bytes) = media_type.serialize(value) {
-				return Ok((media_type.clone(), bytes));
+				return Ok(MediaBytes::new(media_type.clone(), bytes));
 			}
 		}
 		// last resort, see if it accepts text
@@ -30,10 +30,10 @@ impl MediaType {
 			cfg_if! {
 				if #[cfg(feature = "json")]{
 					let value = serde_json::to_string(value)?;
-					Ok((MediaType::Json, value.into_bytes()))
+					Ok(MediaBytes::new(MediaType::Json, value.into_bytes()))
 				}else {
 					let value = serde_plain::to_string(value)?;
-					Ok((MediaType::Text, value.into_bytes()))
+					Ok(MediaBytes::new(MediaType::Text, value.into_bytes()))
 				}
 			}
 		} else {

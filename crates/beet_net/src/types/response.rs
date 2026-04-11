@@ -306,7 +306,7 @@ impl Response {
 	/// Consumes the response body and returns it as [`MediaBytes`],
 	/// using the [`header::ContentType`], or defaulting to [`MediaType::Bytes`].
 	/// Note, the bytes may be empty.
-	pub async fn media_bytes(self) -> Result<MediaBytes<'static>> {
+	pub async fn into_media_bytes(self) -> Result<MediaBytes<'static>> {
 		let media_type = self
 			.parts
 			.headers
@@ -376,6 +376,13 @@ impl Response {
 		self.parts.headers.set_content_type(content_type);
 		self
 	}
+
+	/// Sets the body and content type based on the given media bytes.
+	pub fn with_media(self, bytes: MediaBytes<'static>) -> Self {
+		let (media_type, bytes) = bytes.take();
+		self.with_content_type(media_type).with_body(bytes)
+	}
+
 	/// Unwrap the ok status code and get the body as text
 	pub async fn unwrap_str(self) -> String {
 		self.into_result().await.unwrap().text().await.unwrap()
@@ -411,9 +418,10 @@ impl From<http::StatusCode> for Response {
 	}
 }
 
-impl From<StatusCode> for Response {
-	fn from(status: StatusCode) -> Self { Response::from_status(status) }
+impl IntoResponse<Self> for StatusCode {
+	fn into_response(self) -> Response { Response::from_status(self) }
 }
+
 
 /// Converts a type into a [`Response`].
 ///
@@ -463,6 +471,10 @@ impl IntoResponse<Self> for Infallible {
 impl IntoResponse<Self> for () {
 	fn into_response(self) -> Response { Response::ok() }
 }
+// impl<T: Into<Response>> IntoResponse<Self> for T {
+// 	fn into_response(self) -> Response { self.into() }
+// }
+
 
 impl<T: TryInto<Response>, M1> IntoResponse<(Self, M1)> for T
 where

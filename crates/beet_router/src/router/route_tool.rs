@@ -71,13 +71,9 @@ where
 	let input: Input = request_type.deserialize(&body_bytes)?;
 	let output: Output = next.call(input).await?;
 
-	let (response_type, response_body) =
-		MediaType::serialize_accepts(&accepts, &output)?;
+	let media_bytes = MediaType::serialize_accepts(&accepts, &output)?;
 
-	Response::ok()
-		.with_content_type(response_type)
-		.with_body(response_body)
-		.xok()
+	Response::ok().with_media(media_bytes).xok()
 }
 
 

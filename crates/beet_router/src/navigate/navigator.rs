@@ -225,7 +225,7 @@ impl Navigator {
 			None
 		};
 
-		let media_bytes = response.media_bytes().await?;
+		let media_bytes = response.into_media_bytes().await?;
 
 		let render_targets = entity.get_cloned::<RenderTargets>().await?;
 		entity

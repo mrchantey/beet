@@ -14,6 +14,13 @@ pub struct MediaBytes<'a> {
 	bytes: Cow<'a, [u8]>,
 }
 
+impl MediaBytes<'static> {
+	/// Create a new owned [`MediaBytes`] with the given media type and bytes.
+	pub fn take(self) -> (MediaType, Vec<u8>) {
+		(self.media_type, self.bytes.into_owned())
+	}
+}
+
 impl<'a> MediaBytes<'a> {
 	/// Create a new [`MediaBytes`] with the given media type and bytes.
 	pub fn new(media_type: MediaType, bytes: impl Into<Cow<'a, [u8]>>) -> Self {
@@ -155,8 +162,10 @@ mod test {
 
 	#[test]
 	fn from_string_ctor() {
-		let mb =
-			MediaBytes::new_owned_str(MediaType::Html, "<b>bold</b>".to_string());
+		let mb = MediaBytes::new_owned_str(
+			MediaType::Html,
+			"<b>bold</b>".to_string(),
+		);
 		mb.as_utf8().unwrap().xpect_eq("<b>bold</b>");
 	}
 

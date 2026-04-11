@@ -444,6 +444,17 @@ impl Request {
 		res_parts.headers = self.parts.headers().clone();
 		Response::new(res_parts, default())
 	}
+
+	/// Converts the request body into bytes, consuming the request.
+	pub async fn into_media_bytes(self) -> Result<MediaBytes<'static>> {
+		let content_type = self
+			.headers
+			.get::<header::ContentType>()
+			.and_then(|res| res.ok())
+			.unwrap_or(MediaType::Json);
+		let bytes = self.body.into_bytes().await?;
+		Ok(MediaBytes::new(content_type, bytes.to_vec()))
+	}
 }
 
 impl From<&str> for Request {

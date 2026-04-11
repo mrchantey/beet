@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
 use bevy::reflect::TypeInfo;
@@ -475,45 +476,47 @@ pub trait DefaultTool<Input, Output> {
 	fn default_tool() -> Tool<Input, Output>;
 }
 
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[relationship(relationship_target = Tools)]
-pub struct ToolOf(Entity);
-
-impl ToolOf {
-	pub fn new(value: Entity) -> Self { Self(value) }
+#[derive(Component)]
+pub struct ErasedTool {
+	handler: Arc<
+		dyn 'static
+			+ Send
+			+ Sync
+			+ Fn(
+				AsyncEntity,
+				MediaBytes<'static>,
+				Vec<MediaType>,
+			) -> SendBoxedFuture<Result<MediaBytes<'static>>>,
+	>,
 }
 
-/// Component for storing the tools associated with an entity,
-/// useful for defining available behaviors on a page, or a social tool set.
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[relationship_target(relationship = ToolOf,linked_spawn)]
-pub struct Tools(Vec<Entity>);
-
-
+impl ErasedTool {
+	pub fn new<In, Out>() -> Self
+	where
+		In: 'static + Send + Sync + DeserializeOwned,
+		Out: 'static + Send + Sync + Serialize,
+	{
+		Self {
+			handler: Arc::new(|entity, input, accepts| {
+				Box::pin(async move {
+					let input: In = input.deserialize()?;
+					let output: Out = entity.call(input).await?;
+					let output =
+						MediaType::serialize_accepts(&accepts, &output)?;
+					Ok(output)
+				})
+			}),
+		}
+	}
+	pub fn call(
+		&self,
+		entity: AsyncEntity,
+		input: MediaBytes<'static>,
+		accepts: Vec<MediaType>,
+	) -> SendBoxedFuture<Result<MediaBytes<'static>>> {
+		(self.handler)(entity, input, accepts)
+	}
+}
 
 #[cfg(test)]
 mod test {

@@ -20,7 +20,7 @@ impl<In> ToolContext<In> {
 	/// Consume the context and return the inner input payload.
 	pub fn take(self) -> In { self.input }
 
-	pub fn world(&self) -> &AsyncWorld { self.caller.world() }
+	pub fn world(&self) -> AsyncWorld { self.caller.world().clone() }
 
 	/// Map the input to a different type, keeping the same caller.
 	pub fn map_input<NewIn>(self, input: NewIn) -> ToolContext<NewIn> {

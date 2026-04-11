@@ -53,7 +53,7 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.await
 			.unwrap()
 			// get body typed by the content-type header
-			.media_bytes()
+			.into_media_bytes()
 			.await
 			.unwrap();
 

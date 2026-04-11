@@ -82,6 +82,17 @@ impl HeaderMap {
 	pub fn get<H: Header>(&self) -> Option<Result<H::Value>> {
 		self.get_raw(H::KEY).map(|vals| H::parse(vals))
 	}
+	/// Get a typed header value. Returns `None` if the header is absent,
+	/// or `Some(Err(..))` if parsing fails.
+	pub fn get_or_default<H: Header>(&self) -> Result<H::Value>
+	where
+		H::Value: Default,
+	{
+		match self.get_raw(H::KEY) {
+			Some(vals) => H::parse(vals),
+			None => H::Value::default().xok(),
+		}
+	}
 
 	/// Set a typed header, replacing any existing values for that key.
 	pub fn set<H: Header>(&mut self, value: impl Into<H::Value>) {
