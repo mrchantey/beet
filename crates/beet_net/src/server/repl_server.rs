@@ -41,7 +41,6 @@ use beet_tool::prelude::*;
 ///     let mut app = App::new();
 ///     app.add_plugins((MinimalPlugins, LogPlugin::default(), RouterAppPlugin));
 ///     app.world_mut().spawn((
-///         SceneToolRenderer::default(),
 ///         router(),
 ///         ReplServer,
 ///         children![

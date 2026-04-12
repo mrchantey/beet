@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_tool::prelude::*;
 
 /// Declare a tool to be registered as route middleware.
@@ -99,5 +100,27 @@ where
 			tool = wrapper.clone().wrap(tool);
 		}
 		tool
+	}
+}
+
+/// System parameter for resolving ancestor middleware on an entity.
+#[derive(SystemParam)]
+pub struct MiddlewareQuery<'w, 's> {
+	middleware:
+		AncestorQuery<'w, 's, &'static MiddlewareList<Request, Response>>,
+}
+
+impl MiddlewareQuery<'_, '_> {
+	/// Wraps a tool with all ancestor middleware for the given entity.
+	pub fn resolve_tool(
+		&self,
+		entity: Entity,
+		tool: Tool<Request, Response>,
+	) -> Tool<Request, Response> {
+		let mut wrapped = tool;
+		for list in self.middleware.get_ancestors(entity) {
+			wrapped = list.wrap(&wrapped);
+		}
+		wrapped
 	}
 }

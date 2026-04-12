@@ -404,8 +404,9 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 
 /// Build the `#[require(...)]` expression for the `Tool` component.
 ///
-/// When `has_route` is true, wraps the tool with [`ExchangeTool`] so it
-/// accepts [`Request`] and returns [`Response`].
+/// When `has_route` is true, requires both `Tool<In, Out>` (which inserts
+/// [`ToolMeta`] via its own on-add hook) and [`ExchangeTool`] for
+/// type-erased request/response dispatch.
 fn make_require_tool(
 	tool_expr: TokenStream,
 	in_type: &TokenStream,
@@ -416,6 +417,7 @@ fn make_require_tool(
 	if has_route {
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
+			#beet_tool::prelude::Tool<#in_type, #out_type> = #tool_expr,
 			#beet_router::prelude::ExchangeTool = #beet_router::prelude::ExchangeTool::new_detached::<#in_type, #out_type, _, _, _, _>(#tool_expr)
 		}
 	} else {
@@ -1120,6 +1122,7 @@ mod test {
 		});
 		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("new_detached"));
+		assert!(result.contains("Tool <"));
 		assert!(!result.contains("PathPartial"));
 	}
 
@@ -1130,6 +1133,7 @@ mod test {
 			async fn MyTool(val: i32) -> String { val.to_string() }
 		});
 		assert!(result.contains("ExchangeTool"));
+		assert!(result.contains("Tool <"));
 		assert!(result.contains("PathPartial"));
 		assert!(result.contains("PathPartial :: new (\"home\")"));
 	}

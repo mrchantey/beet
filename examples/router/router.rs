@@ -47,12 +47,7 @@ fn main() -> AppExit {
 }
 
 fn setup(mut commands: Commands) -> Result {
-	commands.spawn((
-		server_from_cli()?,
-		router(),
-		SceneToolRenderer::default(),
-		content::routes(),
-	));
+	commands.spawn((server_from_cli()?, router(), content::routes()));
 	Ok(())
 }
 

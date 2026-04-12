@@ -32,9 +32,7 @@ fn counter() -> impl Bundle {
 		scene_func("counter", move || {
 			let field_ref = field_ref.clone();
 			(Element::new("div"), children![
-				(Element::new("h1"), children![Value::Str(
-					"Cookie Counter".into()
-				)]),
+				Element::new("h1").with_inner_text("Cookie Counter"),
 				(Element::new("p"), children![
 					Value::Str("Cookie Counter: ".into()),
 					field_ref.clone().as_text(),

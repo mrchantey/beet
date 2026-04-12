@@ -88,7 +88,8 @@ pub async fn NavigateHandler(
 		.await?;
 
 	let Some(node) = resolved else {
-		return Response::ok_body(
+		return Response::from_status_body(
+			StatusCode::NOT_FOUND,
 			"Navigation target not found",
 			MediaType::Text,
 		)
@@ -280,24 +281,11 @@ mod test {
 	async fn navigate_parent_from_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				SceneToolRenderer::default(),
-				Router2,
-				Middleware::<HelpHandler, Request, Response>::default(),
-				Middleware::<NavigateHandler, Request, Response>::default(),
-				children![
-					scene_func("", || {
-						(Element::new("h1"), children![Value::Str(
-							"Root".into()
-						)])
-					}),
-					scene_func("about", || {
-						(Element::new("p"), children![Value::Str(
-							"About page".into()
-						)])
-					}),
-				],
-			))
+			.spawn((router(), children![
+				scene_func("", || Element::new("h1").with_inner_text("Root")),
+				scene_func("about", || Element::new("p")
+					.with_inner_text("About page")),
+			]))
 			.flush();
 
 		let body = world
@@ -316,24 +304,12 @@ mod test {
 	async fn navigate_first_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				SceneToolRenderer::default(),
-				Router2,
-				Middleware::<HelpHandler, Request, Response>::default(),
-				Middleware::<NavigateHandler, Request, Response>::default(),
-				children![
-					scene_func("alpha", || {
-						(Element::new("p"), children![Value::Str(
-							"Alpha page".into()
-						)])
-					}),
-					scene_func("beta", || {
-						(Element::new("p"), children![Value::Str(
-							"Beta page".into()
-						)])
-					}),
-				],
-			))
+			.spawn((router(), children![
+				scene_func("alpha", || Element::new("p")
+					.with_inner_text("Alpha page")),
+				scene_func("beta", || Element::new("p")
+					.with_inner_text("Beta page")),
+			]))
 			.flush();
 
 		let body = world
@@ -352,24 +328,12 @@ mod test {
 	async fn navigate_next_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				SceneToolRenderer::default(),
-				Router2,
-				Middleware::<HelpHandler, Request, Response>::default(),
-				Middleware::<NavigateHandler, Request, Response>::default(),
-				children![
-					scene_func("alpha", || {
-						(Element::new("p"), children![Value::Str(
-							"Alpha page".into()
-						)])
-					}),
-					scene_func("beta", || {
-						(Element::new("p"), children![Value::Str(
-							"Beta page".into()
-						)])
-					}),
-				],
-			))
+			.spawn((router(), children![
+				scene_func("alpha", || Element::new("p")
+					.with_inner_text("Alpha page")),
+				scene_func("beta", || Element::new("p")
+					.with_inner_text("Beta page")),
+			]))
 			.flush();
 
 		// alpha -> next -> beta
@@ -401,24 +365,12 @@ mod test {
 	async fn navigate_prev_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				SceneToolRenderer::default(),
-				Router2,
-				Middleware::<HelpHandler, Request, Response>::default(),
-				Middleware::<NavigateHandler, Request, Response>::default(),
-				children![
-					scene_func("alpha", || {
-						(Element::new("p"), children![Value::Str(
-							"Alpha page".into()
-						)])
-					}),
-					scene_func("beta", || {
-						(Element::new("p"), children![Value::Str(
-							"Beta page".into()
-						)])
-					}),
-				],
-			))
+			.spawn((router(), children![
+				scene_func("alpha", || Element::new("p")
+					.with_inner_text("Alpha page")),
+				scene_func("beta", || Element::new("p")
+					.with_inner_text("Beta page")),
+			]))
 			.flush();
 
 		// alpha -> prev -> wraps to beta
@@ -438,17 +390,10 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				SceneToolRenderer::default(),
-				Router2,
-				Middleware::<HelpHandler, Request, Response>::default(),
-				Middleware::<NavigateHandler, Request, Response>::default(),
-				children![scene_func("about", || {
-					(Element::new("p"), children![Value::Str(
-						"About page".into()
-					)])
-				}),],
-			))
+			.spawn((router(), children![scene_func("about", || Element::new(
+				"p"
+			)
+			.with_inner_text("About page")),]))
 			.flush();
 
 		// No --navigate param, should route normally

@@ -56,10 +56,8 @@ pub async fn HelpHandler(
 		.await?;
 
 	let scene = spawn_help_scene(&caller, &nodes).await;
-	let response = <Entity as ExchangeRouteOut<Entity>>::into_route_response(
-		scene, caller, parts,
-	)
-	.await?;
+	let response =
+		SceneToolRenderer::render_entity(&caller, scene, parts).await?;
 	Ok(response)
 }
 
@@ -84,13 +82,12 @@ pub(crate) async fn ContextualNotFound(
 		.await?;
 
 	let scene = spawn_not_found_scene(&cx.caller, &preamble, &nodes).await;
-	let mut response =
-		<Entity as ExchangeRouteOut<Entity>>::into_route_response(
-			scene,
-			cx.caller.clone(),
-			cx.input.parts().clone(),
-		)
-		.await?;
+	let mut response = SceneToolRenderer::render_entity(
+		&cx.caller,
+		scene,
+		cx.input.parts().clone(),
+	)
+	.await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
@@ -184,40 +181,46 @@ async fn spawn_not_found_scene(
 }
 
 /// Creates an element bundle describing a single route node.
+///
+/// Each route renders as a `<li>` with clearly separated sections:
+/// path, kind tag, description, type signature, and parameters.
 fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	let path = node.path.annotated_rel_path().to_string();
 
-	let label = if node.is_scene {
-		format!("{} [scene]", path)
+	// path with leading slash and kind tag
+	let heading = if node.is_scene {
+		format!("/{path} [scene]")
 	} else if let Some(method) = &node.method {
-		format!("{} [{}]", path, method)
+		format!("/{path} [{method}]")
 	} else {
-		path
+		format!("/{path}")
 	};
 
-	let mut inner_text = label;
+	let mut text = heading;
 
+	// description on same line after em dash
 	if let Some(description) = &node.description {
-		inner_text.push_str(&format!(" — {}", description.as_str()));
+		text.push_str(&format!(" — {}", description.as_str()));
 	}
 
+	// input/output types — skip trivial, exchange, and scene signatures
 	let input_type = node.meta.input().type_name();
 	let output_type = node.meta.output().type_name();
-	// Skip trivial unit types and Request→Response (all ExchangeTools share this)
 	let is_trivial = input_type == "()" && output_type == "()";
 	let is_exchange =
 		input_type.ends_with("Request") && output_type.ends_with("Response");
-	if !is_trivial && !is_exchange {
-		inner_text.push_str(&format!(" ({}→{})", input_type, output_type));
+	if !is_trivial && !is_exchange && !node.is_scene {
+		text.push_str(&format!(" ({input_type} → {output_type})"));
 	}
 
+	// parameters
 	for param in node.params.iter() {
-		inner_text.push_str(&format!(" {}", param));
+		text.push_str(&format!(" {param}"));
 	}
 
 	(
 		Element::new("li"),
-		OnSpawn::insert_child(Value::Str(inner_text.into())),
+		OnSpawn::insert_child(Value::Str(text.into())),
 	)
 }
 
@@ -255,9 +258,9 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 	let path = node.path.annotated_rel_path();
 
 	if node.is_scene {
-		output.push_str(&format!("  {} [scene]\n", path));
+		output.push_str(&format!("  /{} [scene]\n", path));
 	} else {
-		output.push_str(&format!("  {}", path));
+		output.push_str(&format!("  /{}", path));
 		if let Some(method) = &node.method {
 			output.push_str(&format!(" [{}]", method));
 		}
@@ -269,10 +272,10 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();
-		// Skip Request→Response since all ExchangeTools share this
+		// Skip Request→Response and scene tool signatures
 		let is_exchange = input_type.ends_with("Request")
 			&& output_type.ends_with("Response");
-		if !is_exchange {
+		if !is_exchange && !node.is_scene {
 			if input_type != "()" {
 				output.push_str(&format!("    input:  {}\n", input_type));
 			}
@@ -428,13 +431,12 @@ mod test {
 	async fn help_includes_scenes() {
 		let mut world = router_world();
 		let root = world
-			.spawn((SceneToolRenderer::default(), children![
+			.spawn(children![
 				help(),
-				scene_func("about", || {
-					(Element::new("p"), children![Value::Str("about".into())])
-				}),
+				scene_func("about", || Element::new("p")
+					.with_inner_text("about")),
 				increment(FieldRef::new("count")),
-			]))
+			])
 			.flush();
 
 		let help_entity = world
