@@ -65,31 +65,30 @@ pub async fn HelpHandler(
 
 /// Fallback handler that shows help scoped to the nearest ancestor scene
 /// of an unmatched path. Returns a NOT_FOUND status with the help scene.
-pub(crate) async fn contextual_not_found(
-	caller: &AsyncEntity,
-	path: &[String],
+#[tool]
+pub(crate) async fn ContextualNotFound(
+	cx: ToolContext<Request>,
 ) -> Result<Response> {
-	let path_owned = path.to_vec();
-	let parts = RequestParts::new(HttpMethod::Get, "/");
+	let path = cx.input.path().clone();
 
-	let (preamble, nodes) = caller
-		.clone()
+	let (preamble, nodes) = cx
+		.caller
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
 			move |entity, query| {
 				let tree = query.get(entity)?;
 				let (preamble, help_nodes) =
-					nearest_ancestor_help_nodes(tree, &path_owned);
+					nearest_ancestor_help_nodes(tree, &path);
 				(preamble, help_nodes).xok()
 			},
 		)
 		.await?;
 
-	let scene = spawn_not_found_scene(caller, &preamble, &nodes).await;
+	let scene = spawn_not_found_scene(&cx.caller, &preamble, &nodes).await;
 	let mut response =
 		<Entity as ExchangeRouteOut<Entity>>::into_route_response(
 			scene,
-			caller.clone(),
-			parts,
+			cx.caller.clone(),
+			cx.input.parts().clone(),
 		)
 		.await?;
 	response.parts.status = StatusCode::NOT_FOUND;

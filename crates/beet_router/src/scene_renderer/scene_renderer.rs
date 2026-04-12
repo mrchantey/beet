@@ -34,6 +34,35 @@ impl Default for SceneToolRenderer {
 impl SceneToolRenderer {
 	/// Creates a renderer with a custom tool.
 	pub fn new(tool: Tool<RequestParts, Response>) -> Self { Self { tool } }
+
+
+
+	pub async fn render_entity(
+		caller: &AsyncEntity,
+		scene_entity: Entity,
+		parts: RequestParts,
+	) -> Result<Response> {
+		let render_tool = caller
+			.with_state::<AncestorQuery<&SceneToolRenderer>, _>(
+				|entity, state| {
+					state
+						.get(entity)
+						.cloned()
+						.map(|renderer| renderer.into_tool())
+				},
+			)
+			.await
+			.unwrap_or_else(|_| Tool::new_async(default_scene_renderer));
+
+		let scene_entity = caller.world().entity(scene_entity);
+		let result = scene_entity.call_detached(render_tool, parts).await;
+
+		if scene_entity.contains::<DespawnOnRender>().await {
+			scene_entity.despawn().await;
+		}
+
+		result
+	}
 }
 
 impl IntoTool<Self> for SceneToolRenderer {

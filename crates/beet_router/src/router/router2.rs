@@ -35,13 +35,7 @@ pub async fn Router2(cx: ToolContext<Request>) -> Response {
 		Ok(None) => {
 			// No matching route — build a not-found response through
 			// the contextual help system so middleware still applies.
-			let caller_clone = cx.caller.clone();
-			let path_clone = request.path().clone();
-			Tool::new_async(
-				async move |_inner_cx: ToolContext<Request>| -> Result<Response> {
-					contextual_not_found(&caller_clone, &path_clone).await
-				},
-			)
+			ContextualNotFound.into_tool()
 		}
 		Err(err) => return bevyhow!("{err}").into_response(),
 	};
@@ -240,26 +234,7 @@ impl ExchangeRouteOut<Self> for Entity {
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
-			let render_tool = caller
-				.with_state::<AncestorQuery<&SceneToolRenderer>, _>(
-					|entity, state| {
-						state
-							.get(entity)
-							.cloned()
-							.map(|renderer| renderer.into_tool())
-					},
-				)
-				.await
-				.unwrap_or_else(|_| Tool::new_async(default_scene_renderer));
-
-			let scene_entity = caller.world().entity(self);
-			let result = scene_entity.call_detached(render_tool, parts).await;
-
-			if scene_entity.contains::<DespawnOnRender>().await {
-				scene_entity.despawn().await;
-			}
-
-			result
+			SceneToolRenderer::render_entity(&caller, self, parts).await
 		})
 	}
 }
