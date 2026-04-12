@@ -43,32 +43,35 @@ pub async fn Router(cx: ToolContext<Request>) -> Response {
 		})
 		.await;
 
-	// resolve the inner tool from the matched route
-	let inner_tool = match &node {
+	// resolve the inner tool and dispatch entity from the matched route
+	let (inner_tool, dispatch_entity) = match &node {
 		Ok(Some(node)) => {
 			let entity = world.entity(node.entity);
 			match entity.clone().get_cloned::<ExchangeTool>().await {
-				Ok(tool) => tool.into_tool(),
+				Ok(tool) => (tool.into_tool(), entity),
 				Err(err) => return err.into_response(),
 			}
 		}
 		Ok(None) => {
 			// no matching route — build a not-found response through
 			// the contextual help system so middleware still applies
-			ContextualNotFound.into_tool()
+			(ContextualNotFound.into_tool(), cx.caller.clone())
 		}
 		Err(err) => return bevyhow!("{err}").into_response(),
 	};
 
-	// wrap the inner tool with ancestor middleware
-	let caller_id = cx.caller.id();
+	// wrap the inner tool with ancestor middleware resolved from the
+	// dispatch entity so route-scoped middleware is correctly applied
+	let dispatch_id = dispatch_entity.id();
 	let tool = world
 		.with_state::<MiddlewareQuery, _>(move |query| {
-			query.resolve_tool(caller_id, inner_tool)
+			query.resolve_tool(dispatch_id, inner_tool)
 		})
 		.await;
 
-	cx.caller
+	// dispatch on the route entity so cx.caller in the exchange tool
+	// (and inner tools) is the route entity, not the server entity
+	dispatch_entity
 		.call_detached(tool, request)
 		.await
 		.unwrap_or_else(|err| err.into_response())

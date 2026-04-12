@@ -121,8 +121,6 @@ where
 	);
 
 	// Capture the spawner so the exchange tool can call it via call_detached.
-	// cx.caller is the root entity (from Router2 dispatch), not the route
-	// entity, so we must use call_detached with the captured tool.
 	let spawner_for_exchange = scene_spawner.clone();
 	let exchange = ExchangeTool::from_tool(Tool::new_async(
 		async move |cx: ToolContext<Request>| -> Result<Response> {
@@ -170,8 +168,6 @@ where
 	);
 
 	// Capture the spawner so the exchange tool can call it via call_detached.
-	// cx.caller is the root entity (from Router2 dispatch), not the route
-	// entity, so we must use call_detached with the captured tool.
 	let spawner_for_exchange = scene_spawner.clone();
 	let exchange = ExchangeTool::from_tool(Tool::new_async(
 		async move |cx: ToolContext<Request>| -> Result<Response> {
@@ -188,7 +184,7 @@ where
 }
 
 #[derive(Component, Reflect)]
-#[require(FileSceneTool)]
+#[require(SceneRoute, FileSceneTool)]
 pub struct FileScene {
 	path: WsPathBuf,
 }
@@ -216,70 +212,6 @@ async fn FileSceneTool(cx: ToolContext<Request>) -> Result<SceneEntity> {
 		})
 		.await?;
 	SceneEntity(cx.id()).xok()
-}
-
-
-
-/// Creates a routable scene that loads and parses a file.
-///
-/// A file scene tool is a regular tool (`Tool<(), Entity>`) that reads
-/// the file, parses its content via [`MediaParser`] onto the caller
-/// entity, and returns the caller's id. The [`ExchangeTool`] handles
-/// `Request` → `Response` conversion via [`SceneToolRenderer`].
-///
-/// # Example
-///
-/// ```no_run
-/// use beet_router::prelude::*;
-/// use beet_core::prelude::*;
-///
-/// let bundle = file_scene_tool("readme", "docs/readme.md");
-/// ```
-pub fn file_scene_tool(
-	path: &str,
-	file_path: impl Into<WsPathBuf>,
-) -> impl Bundle {
-	let ws_path: WsPathBuf = file_path.into();
-
-	// The entity's own tool: reads file, parses onto a fresh entity,
-	// returns its id
-	let ws_path_inner = ws_path.clone();
-	let scene_spawner = Tool::<(), Entity>::new_async(
-		async move |cx: ToolContext<()>| -> Result<Entity> {
-			// read the file
-			let abs_path = ws_path_inner.clone().into_abs();
-			let media_type = MediaType::from_path(&ws_path_inner);
-			let bytes = fs_ext::read_async(&abs_path).await?;
-			let bytes = MediaBytes::new(media_type, bytes);
-
-			// spawn entity and parse content onto it
-			let entity = cx.world().spawn_then(DespawnOnRender).await;
-			entity
-				.with_then(move |mut entity_mut| {
-					MediaParser::new()
-						.parse(ParseContext::new(&mut entity_mut, &bytes))
-				})
-				.await?;
-			entity.id().xok()
-		},
-	);
-
-	// Capture the spawner so the exchange tool can call it via call_detached.
-	// cx.caller is the root entity (from Router2 dispatch), not the route
-	// entity, so we must use call_detached with the captured tool.
-	let spawner_for_exchange = scene_spawner.clone();
-	let exchange = ExchangeTool::from_tool(Tool::new_async(
-		async move |cx: ToolContext<Request>| -> Result<Response> {
-			let parts = cx.input.parts().clone();
-			let entity: Entity = cx
-				.caller
-				.call_detached(spawner_for_exchange.clone(), ())
-				.await?;
-			SceneToolRenderer::render_entity(&cx.caller, entity, parts).await
-		},
-	));
-
-	(PathPartial::new(path), SceneRoute, scene_spawner, exchange)
 }
 
 /// Convenience function to create a simple route from a path and bundle.

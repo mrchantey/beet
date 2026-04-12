@@ -6,17 +6,12 @@ pub fn routes() -> impl Bundle {
 	children![(
 		Name::new("Routes"),
 		Middleware::<LayoutTemplate, _, _>::default(),
-		children![root(), about(), counter()]
+		children![
+			route("", FileScene::new("examples/router/content/home.md")),
+			route("about", FileScene::new("examples/router/content/about.md")),
+			counter()
+		]
 	)]
-}
-
-fn root() -> impl Bundle {
-	route("", FileScene::new("examples/router/content/home.md"))
-	// file_scene_tool("", "examples/router/content/home.md")
-}
-
-fn about() -> impl Bundle {
-	file_scene_tool("about", "examples/router/content/about.md")
 }
 
 #[derive(Reflect)]
