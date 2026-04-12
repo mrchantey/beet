@@ -488,27 +488,6 @@ where
 	}
 }
 
-/// None = not found, matching http principles ie crud operations
-impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
-	fn into_response(self) -> Response {
-		match self {
-			Some(val) => val.into_response(),
-			None => Response::not_found(),
-		}
-	}
-}
-
-impl<'a> From<&'a str> for Response {
-	fn from(value: &'a str) -> Response {
-		Response::ok_body(value, MediaType::Text)
-	}
-}
-
-impl From<String> for Response {
-	fn from(value: String) -> Response {
-		Response::ok_body(value, MediaType::Text)
-	}
-}
 
 #[cfg(test)]
 mod test {
@@ -562,17 +541,6 @@ mod test {
 		response.status().xpect_eq(StatusCode::OK);
 	}
 
-	#[test]
-	fn response_from_str() {
-		let response: Response = "hello".into();
-		response.status().xpect_eq(StatusCode::OK);
-		response
-			.headers
-			.get::<headers::ContentType>()
-			.unwrap()
-			.unwrap()
-			.xpect_eq(MediaType::Text);
-	}
 
 	#[test]
 	fn response_temporary_redirect() {
@@ -774,17 +742,5 @@ mod test {
 	fn into_response_status_code() {
 		let response = StatusCode::CREATED.into_response();
 		response.status().xpect_eq(StatusCode::CREATED);
-	}
-
-	#[test]
-	fn into_response_option_some() {
-		let response = Some(StatusCode::CREATED).into_response();
-		response.status().xpect_eq(StatusCode::CREATED);
-	}
-
-	#[test]
-	fn into_response_option_none() {
-		let response: Response = None::<StatusCode>.into_response();
-		response.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 }

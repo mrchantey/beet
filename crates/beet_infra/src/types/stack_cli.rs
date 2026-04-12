@@ -2,27 +2,18 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
-use beet_tool::prelude::*;
-
-
 
 pub fn stack_cli() -> impl Bundle {
 	(
 		CliServer::default(),
 		router(),
-		OnSpawn::insert_child((
-			route("validate", ExchangeTool::new_detached(Validate)),
-			ToolDescription::of::<Validate>(),
-		)),
-		OnSpawn::insert_child((
-			route("plan", ExchangeTool::new_detached(Plan)),
-			ToolDescription::of::<Plan>(),
-		)),
+		OnSpawn::insert_child(Validate),
+		OnSpawn::insert_child(Plan),
 	)
 }
 
 /// Validate the stack
-#[tool]
+#[tool(route = "validate")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 async fn Validate(cx: ToolContext) -> Result<String> {
@@ -35,7 +26,7 @@ async fn Validate(cx: ToolContext) -> Result<String> {
 		.await
 }
 /// Plan the stack
-#[tool]
+#[tool(route = "plan")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 async fn Plan(cx: ToolContext) -> Result<String> {

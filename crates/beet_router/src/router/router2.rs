@@ -212,6 +212,18 @@ where
 	}
 }
 
+// ///None = not found?
+// impl<T: IntoResponse<M>, M> IntoResponse<(Self, M)> for Option<T> {
+// 	fn into_response(self) -> Response {
+// 		match self {
+// 			Some(val) => val.into_response(),
+// 			None => Response::not_found(),
+// 		}
+// 	}
+// }
+
+
+
 /// Marker component for scene entities that should be despawned
 /// after they render.
 #[derive(Component)]

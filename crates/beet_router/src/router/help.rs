@@ -148,7 +148,6 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ToolNode]) -> Entity {
 			OnSpawn::insert_child(
 				Element::new("h2").with_inner_text("Available routes"),
 			),
-			
 		))
 		.await;
 	for child in children {
@@ -295,7 +294,6 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_node::prelude::*;
 
 	/// Adds help as a tool located at `/help`.
 	fn help() -> impl Bundle {
