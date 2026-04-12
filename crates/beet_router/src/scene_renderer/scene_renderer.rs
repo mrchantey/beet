@@ -187,6 +187,39 @@ where
 	(PathPartial::new(path), SceneRoute, scene_spawner, exchange)
 }
 
+#[derive(Component, Reflect)]
+#[require(FileSceneTool)]
+pub struct FileScene {
+	path: WsPathBuf,
+}
+impl FileScene {
+	pub fn new(path: impl Into<WsPathBuf>) -> Self {
+		Self { path: path.into() }
+	}
+}
+
+
+#[tool(route)]
+#[derive(Default, Component)]
+async fn FileSceneTool(cx: ToolContext<Request>) -> Result<SceneEntity> {
+	let abs_path = cx
+		.caller
+		.get::<FileScene, _>(|fs| fs.path.into_abs())
+		.await?;
+
+	let media_type = MediaType::from_path(&abs_path);
+	let bytes = fs_ext::read_async(&abs_path).await?;
+	let bytes = MediaBytes::new(media_type, bytes);
+	cx.caller
+		.with_then(move |mut entity_mut| {
+			MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))
+		})
+		.await?;
+	SceneEntity(cx.id()).xok()
+}
+
+
+
 /// Creates a routable scene that loads and parses a file.
 ///
 /// A file scene tool is a regular tool (`Tool<(), Entity>`) that reads

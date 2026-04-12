@@ -19,7 +19,7 @@ pub async fn call_functions(
 			.with_header::<header::Accept>(MediaType::Json);
 
 		let output =
-			match agent.call_detached(Router2.into_tool(), request).await {
+			match agent.call_detached(Router.into_tool(), request).await {
 				Ok(res) => match res.into_result().await {
 					Ok(res) => {
 						let is_json = res

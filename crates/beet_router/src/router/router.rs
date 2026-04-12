@@ -16,7 +16,7 @@ use beet_tool::prelude::*;
 /// found on an ancestor.
 pub fn router() -> impl Bundle {
 	(
-		Router2,
+		Router,
 		Middleware::<HelpHandler, Request, Response>::default(),
 		Middleware::<NavigateHandler, Request, Response>::default(),
 	)
@@ -30,7 +30,7 @@ pub fn router() -> impl Bundle {
 /// the inner tool so they can intercept before dispatch.
 #[tool]
 #[derive(Debug, Clone, Component)]
-pub async fn Router2(cx: ToolContext<Request>) -> Response {
+pub async fn Router(cx: ToolContext<Request>) -> Response {
 	let caller = cx.caller.clone();
 	let world = cx.world();
 	let request = cx.input;
@@ -214,16 +214,22 @@ where
 /// The entity is rendered via the ancestor [`SceneToolRenderer`]
 /// and then converted to a response. Entities marked with
 /// [`DespawnOnRender`] are cleaned up after rendering.
-impl ExchangeRouteOut<Self> for Entity {
+impl ExchangeRouteOut<Self> for SceneEntity {
 	fn into_route_response(
 		self,
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
-			SceneToolRenderer::render_entity(&caller, self, parts).await
+			SceneToolRenderer::render_entity(&caller, self.0, parts).await
 		})
 	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deref)]
+pub struct SceneEntity(pub Entity);
+impl From<Entity> for SceneEntity {
+	fn from(entity: Entity) -> Self { Self(entity) }
 }
 
 

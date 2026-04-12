@@ -11,7 +11,8 @@ pub fn routes() -> impl Bundle {
 }
 
 fn root() -> impl Bundle {
-	file_scene_tool("", "examples/router/content/home.md")
+	route("", FileScene::new("examples/router/content/home.md"))
+	// file_scene_tool("", "examples/router/content/home.md")
 }
 
 fn about() -> impl Bundle {
