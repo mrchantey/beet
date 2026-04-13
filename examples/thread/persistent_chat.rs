@@ -74,7 +74,7 @@ fn setup(mut commands: Commands) {
 								(
 									Actor::new("Agent", ActorKind::Agent),
 									SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
-									// OllamaProvider::default_12gb_gpu()
+									// OllamaProvider::default_12gb()
 								),
 								// save directly after agent post
 								SaveScene,

@@ -451,10 +451,15 @@ fn make_struct_def(
 		quote! {}
 	};
 
-	let require_description = if has_component && has_reflect {
+	let require_meta = if has_component && has_reflect {
 		let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 		quote! {
-			#[require(#beet_tool::prelude::ToolDescription = #beet_tool::prelude::ToolDescription::of::<Self>())]
+			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_handler::<Self, Self>())]
+		}
+	} else if has_component {
+		let beet_tool = pkg_ext::internal_or_beet("beet_tool");
+		quote! {
+			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_tool::<Self, Self>())]
 		}
 	} else {
 		quote! {}
@@ -480,7 +485,7 @@ fn make_struct_def(
 		quote! {
 			#(#fn_attrs)*
 			#require_tool
-			#require_description
+			#require_meta
 			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name;
@@ -509,7 +514,7 @@ fn make_struct_def(
 		quote! {
 			#(#fn_attrs)*
 			#require_tool
-			#require_description
+			#require_meta
 			#require_path
 			#[allow(non_camel_case_types)]
 			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
@@ -1080,34 +1085,36 @@ mod test {
 	}
 
 	// -----------------------------------------------------------------------
-	// ToolDescription require
+	// ToolMeta require
 	// -----------------------------------------------------------------------
 
 	#[test]
-	fn component_reflect_adds_tool_description() {
+	fn component_reflect_adds_handler_meta() {
 		let result = parse_str(quote!(pure), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			fn Add(val: i32) -> i32 { val }
 		});
-		assert!(result.contains("ToolDescription"));
-		assert!(result.contains("ToolDescription :: of :: < Self > ()"));
+		assert!(result.contains("ToolMeta"));
+		assert!(result.contains("of_handler :: < Self , Self > ()"));
 	}
 
 	#[test]
-	fn component_without_reflect_no_tool_description() {
+	fn component_without_reflect_adds_tool_meta() {
 		let result = parse_str(quote!(pure), syn::parse_quote! {
 			#[derive(Component)]
 			fn Add(val: i32) -> i32 { val }
 		});
-		assert!(!result.contains("ToolDescription"));
+		assert!(result.contains("ToolMeta"));
+		assert!(result.contains("of_tool :: < Self , Self > ()"));
 	}
 
 	#[test]
-	fn no_component_no_tool_description() {
+	fn no_component_no_tool_meta() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn my_tool(val: In<i32>) -> i32 { val.0 }
 		});
-		assert!(!result.contains("ToolDescription"));
+		assert!(!result.contains("of_tool"));
+		assert!(!result.contains("of_reflect"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -1160,14 +1167,14 @@ mod test {
 	}
 
 	#[test]
-	fn route_with_path_and_tool_description() {
+	fn route_with_path_and_tool_meta() {
 		let result = parse_str(quote!(route = "validate"), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			async fn Validate(input: String) -> String { input }
 		});
 		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
-		assert!(result.contains("ToolDescription"));
+		assert!(result.contains("of_handler :: < Self , Self > ()"));
 	}
 
 	// -----------------------------------------------------------------------

@@ -215,10 +215,10 @@ where
 	}
 }
 
-/// A route that returns an [`Entity`] is a scene route.
+/// A route that returns a [`SceneEntity`] is a scene route.
 /// The entity is rendered via the ancestor [`SceneToolRenderer`]
-/// and then converted to a response. Entities marked with
-/// [`DespawnOnRender`] are cleaned up after rendering.
+/// and then converted to a response. Ephemeral scene entities
+/// are cleaned up after rendering.
 impl ExchangeRouteOut<Self> for SceneEntity {
 	fn into_route_response(
 		self,
@@ -226,20 +226,38 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
-			SceneToolRenderer::render_entity(&caller, self.0, parts).await
+			SceneToolRenderer::render_entity(&caller, self, parts).await
 		})
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deref)]
-pub struct SceneEntity(Entity);
+/// A route output representing a scene entity to be rendered.
+/// The `despawn_on_render` flag controls whether the entity is
+/// cleaned up after rendering (ie help pages, not-found pages).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SceneEntity {
+	/// The entity to render.
+	pub entity: Entity,
+	/// Whether to despawn this entity after rendering.
+	pub despawn_on_render: bool,
+}
 impl SceneEntity {
-	/// A scene entity that should not be despawned after render
-	pub fn new_fixed(entity: Entity) -> Self { Self(entity) }
+	/// A scene entity that should not be despawned after render.
+	pub fn new_fixed(entity: Entity) -> Self {
+		Self {
+			entity,
+			despawn_on_render: false,
+		}
+	}
 
 	/// A scene entity that should be despawned after render,
-	/// ie a help page or not found route
-	pub fn new_ephemeral(_entity: Entity) -> Self { todo!() }
+	/// ie a help page or not found route.
+	pub fn new_ephemeral(entity: Entity) -> Self {
+		Self {
+			entity,
+			despawn_on_render: true,
+		}
+	}
 }
 
 
@@ -257,9 +275,10 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((router(), children![fixed_scene("about", || {
+			.spawn((router(), children![fixed_scene(
+				"about",
 				Element::new("p").with_inner_text("About page")
-			}),]))
+			),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -272,9 +291,10 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((router(), children![fixed_scene("", || {
+			.spawn((router(), children![fixed_scene(
+				"",
 				Element::new("p").with_inner_text("Root content")
-			}),]))
+			),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap()
@@ -287,15 +307,14 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
 			.spawn((router(), children![
-				fixed_scene("", || {
-					children![
-						Element::new("h1").with_inner_text("My Server"),
-						Element::new("p").with_inner_text("welcome!"),
-					]
-				}),
-				fixed_scene("about", || {
+				fixed_scene("", children![
+					Element::new("h1").with_inner_text("My Server"),
+					Element::new("p").with_inner_text("welcome!"),
+				]),
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -311,9 +330,10 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene("about", || {
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -328,9 +348,10 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene("about", || {
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -356,15 +377,14 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((router(), children![
-				fixed_scene("", || {
-					children![
-						Element::new("h1").with_inner_text("My Server"),
-						Element::new("p").with_inner_text("welcome!"),
-					]
-				}),
-				fixed_scene("about", || {
+				fixed_scene("", children![
+					Element::new("h1").with_inner_text("My Server"),
+					Element::new("p").with_inner_text("welcome!"),
+				]),
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("").unwrap())
 			.await
@@ -382,14 +402,16 @@ mod test {
 		let root = world
 			.spawn((router(), children![
 				(
-					fixed_scene("counter", || {
+					fixed_scene(
+						"counter",
 						Element::new("p").with_inner_text("counter")
-					}),
+					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene("about", || {
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.flush();
 
@@ -427,14 +449,16 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				(
-					fixed_scene("counter", || {
+					fixed_scene(
+						"counter",
 						Element::new("p").with_inner_text("counter")
-					}),
+					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene("about", || {
+				fixed_scene(
+					"about",
 					Element::new("p").with_inner_text("about")
-				}),
+				),
 			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("counter nonsense").unwrap(),

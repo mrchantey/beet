@@ -4,16 +4,6 @@ use beet_net::prelude::*;
 use beet_node::prelude::*;
 use beet_tool::prelude::*;
 
-/// A single content container, similar to pages in a website or cards
-/// in HyperCard. Each scene route is a route, with the exact rendering
-/// behavior determined by the [`SceneToolRenderer`] on the server.
-///
-/// Use [`fixed_scene`] or [`scene_tool`] to create a routable scene.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-#[require(DocumentScope)]
-pub struct SceneRoute;
-
 /// Component on a server entity that controls how scenes are rendered.
 /// When absent, the default content-negotiated renderer via
 /// [`MediaRenderer`] is used as a fallback.
@@ -36,11 +26,11 @@ impl SceneToolRenderer {
 
 	/// Renders the given scene entity using the ancestor
 	/// [`SceneToolRenderer`], falling back to the default renderer
-	/// when none is found. Entities marked with [`DespawnOnRender`]
+	/// when none is found. Entities with `despawn_on_render` set
 	/// are cleaned up after rendering.
 	pub async fn render_entity(
 		caller: &AsyncEntity,
-		scene_entity: Entity,
+		scene: SceneEntity,
 		parts: RequestParts,
 	) -> Result<Response> {
 		let render_tool = caller
@@ -55,10 +45,10 @@ impl SceneToolRenderer {
 			.await
 			.unwrap_or_else(|_| Tool::new_async(default_scene_renderer));
 
-		let scene_entity = caller.world().entity(scene_entity);
+		let scene_entity = caller.world().entity(scene.entity);
 		let result = scene_entity.call_detached(render_tool, parts).await;
 
-		if scene_entity.contains::<DespawnOnRender>().await {
+		if scene.despawn_on_render {
 			scene_entity.despawn().await;
 		}
 
@@ -73,20 +63,11 @@ impl IntoTool<Self> for SceneToolRenderer {
 }
 
 
-/// Marker component for scene entities that should be despawned
-/// after they render.
-#[derive(Component)]
-pub struct DespawnOnRender;
-
-
-/// Creates a fixed routable scene from a path and content closure.
+/// Creates a fixed routable scene from a path and content bundle.
 ///
-/// This approach is convenient
-///
-/// A scene func is a regular tool (`Tool<(), Entity>`) that calls the
-/// closure, spawns an entity with the resulting bundle, and returns
-/// the entity id. The [`ExchangeTool`] handles the
-/// `Request` → `Response` conversion via [`SceneToolRenderer`].
+/// The entity itself becomes both the route and the scene content.
+/// The [`ExchangeTool`] handles the `Request` → `Response`
+/// conversion via [`SceneToolRenderer`].
 ///
 /// # Example
 ///
@@ -95,28 +76,24 @@ pub struct DespawnOnRender;
 /// use beet_core::prelude::*;
 /// use beet_node::prelude::*;
 ///
-/// let bundle = fixed_scene("about", || {
+/// let bundle = fixed_scene("about",
 ///     Element::new("p").with_inner_text("About page")
-/// });
+/// );
 /// ```
-pub fn fixed_scene<F, B>(path: &str, func: F) -> impl Bundle
-where
-	F: 'static + Send + Sync + Clone + Fn() -> B,
-	B: 'static + Send + Sync + Bundle,
-{
-	route(path, (CallerScene, func()))
+pub fn fixed_scene<B: Bundle>(path: &str, bundle: B) -> impl Bundle {
+	route(path, (CallerScene, bundle))
 }
-/// Simply returns the caller as the scene to be rendered
+/// Simply returns the caller as the scene to be rendered.
 #[tool(route)]
 #[derive(Default, Component)]
-#[require(SceneRoute)]
+#[require(DocumentScope)]
 async fn CallerScene(cx: ToolContext<Request>) -> Result<SceneEntity> {
 	SceneEntity::new_fixed(cx.id()).xok()
 }
 
 
 #[derive(Component, Reflect)]
-#[require(SceneRoute, FileSceneTool)]
+#[require(DocumentScope, FileSceneTool)]
 pub struct FileScene {
 	path: WsPathBuf,
 }

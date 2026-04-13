@@ -8,7 +8,7 @@ use beet_tool::prelude::*;
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
 /// whenever tools are spawned in an entity hierarchy. Scene routes
-/// register as tools (via [`SceneRoute`] + [`ToolMeta`]), so there
+/// register as tools (via [`DocumentScope`] + [`ToolMeta`]), so there
 /// is no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -57,8 +57,8 @@ pub fn insert_tool_path_and_params(
 ///
 /// Collects all entities with tool components ([`ToolMeta`], [`PathPattern`],
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
-/// tree. Scene routes are distinguished from regular tools by the presence of
-/// a [`SceneRoute`] component, which sets `is_scene: true` on the [`ToolNode`].
+/// tree. Scene routes are distinguished from regular tools by their output
+/// type being [`SceneEntity`], detected via [`ToolMeta::output_is`].
 // TODO this is a bit wasteful, if we used change detection could deduplicate added,
 // and only generate once, but we'd still want a guanratee the system runs immediately
 pub fn insert_route_tree(

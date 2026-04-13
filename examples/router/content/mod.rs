@@ -25,8 +25,8 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").init_with(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		fixed_scene("counter", move || {
-			let field_ref = field_ref.clone();
+		fixed_scene(
+			"counter",
 			(Element::new("div"), children![
 				Element::new("h1").with_inner_text("Cookie Counter"),
 				(Element::new("p"), children![
@@ -34,8 +34,8 @@ fn counter() -> impl Bundle {
 					field_ref.clone().as_text(),
 				]),
 				increment(field_ref),
-			])
-		}),
+			]),
+		),
 	)
 }
 

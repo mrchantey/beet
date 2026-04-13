@@ -68,7 +68,7 @@
 //! use beet_net::prelude::*;
 //!
 //! # async fn example() -> Result<()> {
-//! let body = o11s::RequestBody::new(OllamaProvider::DEFAULT_12GB_GPU)
+//! let body = o11s::RequestBody::new(OllamaProvider::DEFAULT_12GB)
 //!     .with_simple_input("Write a haiku about streaming.")
 //!     .with_stream(true);
 //!

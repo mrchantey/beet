@@ -28,23 +28,22 @@ impl<In: 'static, Out: 'static> Clone for Tool<In, Out> {
 	}
 }
 
+/// Fallback hook that inserts a basic [`ToolMeta`] when a `Tool` is
+/// spawned without one. Tools created via the `#[tool]` macro provide
+/// a richer [`ToolMeta`] through `#[require]`, which is already present
+/// by the time this hook runs, so the check short-circuits.
+// couldnt this just also be a require or would that clobber?
 fn on_add<In: 'static, Out: 'static>(
 	mut world: DeferredWorld,
 	cx: HookContext,
 ) {
-	let handler = world
+	if world.entity(cx.entity).contains::<ToolMeta>() {
+		return;
+	}
+	world
+		.commands()
 		.entity(cx.entity)
-		.get::<Tool<In, Out>>()
-		.unwrap()
-		.handler_meta
-		.clone();
-	let meta = ToolMeta {
-		handler,
-		input: TypeMeta::of::<In>(),
-		output: TypeMeta::of::<Out>(),
-	};
-
-	world.commands().entity(cx.entity).insert(meta);
+		.insert(ToolMeta::of::<(), In, Out>());
 }
 
 impl<In, Out> Tool<In, Out>
@@ -249,28 +248,32 @@ mod test {
 	}
 
 	#[tool(pure)]
+	#[derive(Reflect)]
 	fn add((a, b): (u32, u32)) -> u32 { a + b }
+
 	#[test]
-	fn missing_reflect_tool() {
-		// not registered
+	fn bare_tool_auto_inserts_basic_meta() {
 		let mut world = World::new();
 		let entity = world.spawn(add.into_tool());
-		entity.get::<ToolMeta>().xpect_some();
-		entity.get::<ReflectToolMeta>().xpect_none();
+		let meta = entity.get::<ToolMeta>().unwrap();
+		// basic fallback meta has no type_info
+		meta.type_info().xpect_none();
 	}
+
 	#[test]
-	fn register_reflect_tool() {
-		let mut app = App::new();
-		app.register_type::<u32>();
-		app.register_type::<(u32, u32)>();
-		let world = app.world_mut();
-		let entity = world.spawn(add.into_tool());
-		entity.get::<ReflectToolMeta>().xpect_some();
-	}
-	#[test]
-	fn into_reflect_tool() {
+	fn macro_meta_takes_priority() {
 		let mut world = World::new();
-		let entity = world.spawn(add.into_reflect_tool());
-		entity.get::<ReflectToolMeta>().xpect_some();
+		let meta = ToolMeta::of_handler::<add, add>();
+		let entity = world.spawn((add.into_tool(), meta));
+		// the richer meta from of_handler is preserved
+		entity.get::<ToolMeta>().unwrap().type_info().xpect_some();
+	}
+
+	#[test]
+	fn reflect_meta_has_type_info() {
+		let meta = ToolMeta::of_reflect::<add, add>();
+		meta.type_info().xpect_some();
+		meta.input_info().xpect_some();
+		meta.output_info().xpect_some();
 	}
 }

@@ -101,7 +101,7 @@ fn nearest_ancestor_help_nodes(
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
 		if let Some(node) = tree.find(prefix) {
-			if node.is_scene {
+			if node.is_scene() {
 				let prefix_str = prefix.join("/");
 				let preamble = format!(
 					"Route /{} not found. Showing help for /{}:",
@@ -130,7 +130,10 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ToolNode> {
 }
 
 /// Spawns a help scene entity tree with route documentation.
-async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ToolNode]) -> Entity {
+async fn spawn_help_scene(
+	caller: &AsyncEntity,
+	nodes: &[ToolNode],
+) -> SceneEntity {
 	let children: Vec<(Element, OnSpawn)> = nodes
 		.iter()
 		.map(|node| format_tool_node_bundle(node))
@@ -139,7 +142,6 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ToolNode]) -> Entity {
 	let world = caller.world();
 	let entity = world
 		.spawn_then((
-			DespawnOnRender,
 			Element::new("div"),
 			OnSpawn::insert_child(
 				Element::new("h2").with_inner_text("Available routes"),
@@ -149,7 +151,7 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ToolNode]) -> Entity {
 	for child in children {
 		entity.insert_then(OnSpawn::insert_child(child)).await;
 	}
-	entity.id()
+	SceneEntity::new_ephemeral(entity.id())
 }
 
 /// Spawns a not-found scene entity tree with a preamble and help.
@@ -157,7 +159,7 @@ async fn spawn_not_found_scene(
 	caller: &AsyncEntity,
 	preamble: &str,
 	nodes: &[ToolNode],
-) -> Entity {
+) -> SceneEntity {
 	let children: Vec<(Element, OnSpawn)> = nodes
 		.iter()
 		.map(|node| format_tool_node_bundle(node))
@@ -166,7 +168,6 @@ async fn spawn_not_found_scene(
 	let world = caller.world();
 	let entity = world
 		.spawn_then((
-			DespawnOnRender,
 			Element::new("div"),
 			OnSpawn::insert_child(Element::new("p").with_inner_text(preamble)),
 			OnSpawn::insert_child(
@@ -177,7 +178,7 @@ async fn spawn_not_found_scene(
 	for child in children {
 		entity.insert_then(OnSpawn::insert_child(child)).await;
 	}
-	entity.id()
+	SceneEntity::new_ephemeral(entity.id())
 }
 
 /// Creates an element bundle describing a single route node.
@@ -188,7 +189,7 @@ fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	let path = node.path.annotated_rel_path().to_string();
 
 	// path with leading slash and kind tag
-	let heading = if node.is_scene {
+	let heading = if node.is_scene() {
 		format!("/{path} [scene]")
 	} else if let Some(method) = &node.method {
 		format!("/{path} [{method}]")
@@ -199,8 +200,8 @@ fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	let mut text = heading;
 
 	// description on same line after em dash
-	if let Some(description) = &node.description {
-		text.push_str(&format!(" — {}", description.as_str()));
+	if let Some(description) = node.description() {
+		text.push_str(&format!(" — {}", description));
 	}
 
 	// input/output types — skip trivial, exchange, and scene signatures
@@ -209,7 +210,7 @@ fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	let is_trivial = input_type == "()" && output_type == "()";
 	let is_exchange =
 		input_type.ends_with("Request") && output_type.ends_with("Response");
-	if !is_trivial && !is_exchange && !node.is_scene {
+	if !is_trivial && !is_exchange && !node.is_scene() {
 		text.push_str(&format!(" ({input_type} → {output_type})"));
 	}
 
@@ -257,7 +258,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 	let path = node.path.annotated_rel_path();
 
-	if node.is_scene {
+	if node.is_scene() {
 		output.push_str(&format!("  /{} [scene]\n", path));
 	} else {
 		output.push_str(&format!("  /{}", path));
@@ -266,8 +267,8 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 		}
 		output.push('\n');
 
-		if let Some(description) = &node.description {
-			output.push_str(&format!("    {}\n", description.as_str()));
+		if let Some(description) = node.description() {
+			output.push_str(&format!("    {}\n", description));
 		}
 
 		let input_type = node.meta.input().type_name();
@@ -275,7 +276,7 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 		// Skip Request→Response and scene tool signatures
 		let is_exchange = input_type.ends_with("Request")
 			&& output_type.ends_with("Response");
-		if !is_exchange && !node.is_scene {
+		if !is_exchange && !node.is_scene() {
 			if input_type != "()" {
 				output.push_str(&format!("    input:  {}\n", input_type));
 			}
@@ -302,6 +303,7 @@ mod test {
 		(
 			PathPartial::new("help"),
 			Tool::<(), String>::new_system(help_system),
+			ToolMeta::of::<(), (), String>(),
 		)
 	}
 	fn help_system(
@@ -433,8 +435,10 @@ mod test {
 		let root = world
 			.spawn(children![
 				help(),
-				fixed_scene("about", || Element::new("p")
-					.with_inner_text("about")),
+				fixed_scene(
+					"about",
+					Element::new("p").with_inner_text("about")
+				),
 				increment(FieldRef::new("count")),
 			])
 			.flush();

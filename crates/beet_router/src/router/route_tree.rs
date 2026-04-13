@@ -201,7 +201,7 @@ impl RouteTree {
 	pub fn flatten_tool_nodes(&self) -> Vec<&ToolNode> {
 		self.flatten_nodes()
 			.into_iter()
-			.filter(|node| !node.is_scene)
+			.filter(|node| !node.is_scene())
 			.collect()
 	}
 
@@ -209,7 +209,7 @@ impl RouteTree {
 	pub fn flatten_scene_nodes(&self) -> Vec<&ToolNode> {
 		self.flatten_nodes()
 			.into_iter()
-			.filter(|node| node.is_scene)
+			.filter(|node| node.is_scene())
 			.collect()
 	}
 
@@ -299,7 +299,7 @@ impl std::fmt::Display for RouteTree {
 		) -> std::fmt::Result {
 			if let Some(tool) = &node.node {
 				let path = node.path.annotated_rel_path();
-				if tool.is_scene {
+				if tool.is_scene() {
 					writeln!(f, "  {} [scene]", path)?;
 				} else {
 					let input = tool.meta.input().type_name();
@@ -327,7 +327,7 @@ impl std::fmt::Display for RouteTree {
 }
 
 /// A tool route node, representing a callable action at a specific path.
-/// Scene routes are also represented as tool nodes with `is_scene` set to true.
+/// Scene routes are identified by their output type being [`SceneEntity`].
 #[derive(Debug, Clone)]
 pub struct ToolNode {
 	/// The entity containing this tool.
@@ -340,28 +340,29 @@ pub struct ToolNode {
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
-	/// A description of the tool.
-	pub description: Option<ToolDescription>,
-	/// Whether this tool is a scene route (has a [`SceneRoute`] component).
-	pub is_scene: bool,
+}
+
+impl ToolNode {
+	/// Whether this tool is a scene route (output type is [`SceneEntity`]).
+	pub fn is_scene(&self) -> bool { self.meta.output_is::<SceneEntity>() }
+
+	/// The tool's description from doc comments, if available.
+	pub fn description(&self) -> Option<&str> { self.meta.description() }
 }
 
 /// The query tuple type used to collect tool components for [`ToolNode::from_query`].
-// TODO this is a code smell, means we need
 pub type ToolQueryItem<'a> = (
 	Entity,
 	&'a ToolMeta,
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
-	Option<&'a ToolDescription>,
-	Option<&'a SceneRoute>,
 );
 
 impl ToolNode {
 	/// Create a [`ToolNode`] from the full query result tuple.
 	pub fn from_query(
-		(entity, meta, path, params, method, description, scene_route): ToolQueryItem,
+		(entity, meta, path, params, method): ToolQueryItem,
 	) -> Self {
 		Self {
 			entity,
@@ -369,8 +370,6 @@ impl ToolNode {
 			params: params.clone(),
 			path: path.clone(),
 			method: method.cloned(),
-			description: description.cloned(),
-			is_scene: scene_route.is_some(),
 		}
 	}
 }
@@ -381,12 +380,14 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_node::prelude::*;
 	use beet_tool::prelude::*;
 
 	fn tool_at(path: &str) -> impl Bundle {
 		(
 			PathPartial::new(path),
 			Tool::<(), ()>::new_pure(|_: ToolContext| Ok(())),
+			ToolMeta::of::<(), (), ()>(),
 		)
 	}
 
@@ -454,16 +455,14 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(
-					PathPartial::new("about"),
-					SceneRoute,
-					Tool::<(), ()>::new_pure(|_: ToolContext| Ok(()))
+				fixed_scene(
+					"about",
+					Element::new("p").with_inner_text("about")
 				),
 				tool_at("action"),
 			])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
-		// 1 scene route + 1 tool = 2 visible routes
 		tree.flatten_scene_nodes().len().xpect_eq(1);
 		tree.flatten_tool_nodes().len().xpect_eq(1);
 	}
@@ -477,8 +476,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 			ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -486,8 +483,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -506,8 +501,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 			ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -515,8 +508,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -535,8 +526,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 			ToolNode {
 				entity: Entity::PLACEHOLDER,
@@ -544,8 +533,6 @@ mod test {
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
-				description: None,
-				is_scene: false,
 			},
 		];
 		let tree = RouteTree::from_nodes(nodes).unwrap();
@@ -600,9 +587,10 @@ mod test {
 		let root = world
 			.spawn(children![
 				(
-					PathPartial::new("counter"),
-					SceneRoute,
-					Tool::<(), ()>::new_pure(|_: ToolContext| Ok(())),
+					fixed_scene(
+						"counter",
+						Element::new("p").with_inner_text("counter")
+					),
 					children![tool_at("increment"), tool_at("decrement"),],
 				),
 				tool_at("other"),

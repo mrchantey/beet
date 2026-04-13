@@ -2,36 +2,136 @@ use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
+/// Unified metadata for a tool, combining handler/input/output type
+/// information with optional reflection data and description.
+///
+/// Created via [`ToolMeta::of`], [`ToolMeta::of_tool`],
+/// [`ToolMeta::of_handler`], or [`ToolMeta::of_reflect`].
 #[derive(Copy, Clone, Debug, Component)]
-#[component(on_add=try_add_reflect_tool_meta)]
 pub struct ToolMeta {
-	/// Type metadata for the tool handler,
-	/// this is the type of the actual function.
-	pub(super) handler: TypeMeta,
+	/// Type metadata for the tool handler.
+	handler: TypeMeta,
 	/// Type metadata for the tool input.
-	pub(super) input: TypeMeta,
+	input: TypeMeta,
 	/// Type metadata for the tool output.
-	pub(super) output: TypeMeta,
+	output: TypeMeta,
+	/// Reflection data, present when the handler type implements [`Typed`].
+	/// Input/output [`TypeInfo`] is optionally available when those types
+	/// also implement [`Typed`].
+	type_info: Option<ToolTypeInfo>,
 }
 
 impl ToolMeta {
-	/// Create a [`ToolMeta`] from handler, input and output type parameters.
+	/// Create a [`ToolMeta`] from explicit handler, input and output type parameters.
 	pub fn of<H: 'static, In: 'static, Out: 'static>() -> Self {
 		Self {
 			handler: TypeMeta::of::<H>(),
 			input: TypeMeta::of::<In>(),
 			output: TypeMeta::of::<Out>(),
+			type_info: None,
 		}
 	}
 
-	/// Get the handler type metadata for this tool.
+	/// Create a [`ToolMeta`] from a type implementing [`IntoTool`](crate::prelude::IntoTool).
+	pub fn of_tool<T, M>() -> Self
+	where
+		T: 'static + crate::prelude::IntoTool<M>,
+		T::In: 'static,
+		T::Out: 'static,
+	{
+		Self {
+			handler: TypeMeta::of::<T>(),
+			input: TypeMeta::of::<T::In>(),
+			output: TypeMeta::of::<T::Out>(),
+			type_info: None,
+		}
+	}
+
+	/// Create a [`ToolMeta`] with handler reflection data. Provides
+	/// description from doc comments but no JSON schemas for input/output.
+	/// Requires only the handler to implement [`Typed`].
+	pub fn of_handler<T, M>() -> Self
+	where
+		T: 'static + Typed + crate::prelude::IntoTool<M>,
+		T::In: 'static,
+		T::Out: 'static,
+	{
+		Self {
+			handler: TypeMeta::of::<T>(),
+			input: TypeMeta::of::<T::In>(),
+			output: TypeMeta::of::<T::Out>(),
+			type_info: Some(ToolTypeInfo::of_handler::<T>()),
+		}
+	}
+
+	/// Create a [`ToolMeta`] with full reflection data from a type
+	/// implementing both [`Typed`] and [`IntoTool`](crate::prelude::IntoTool).
+	/// Provides description and JSON schemas for input/output.
+	pub fn of_reflect<T, M>() -> Self
+	where
+		T: 'static + Typed + crate::prelude::IntoTool<M>,
+		T::In: 'static + Typed,
+		T::Out: 'static + Typed,
+	{
+		Self {
+			handler: TypeMeta::of::<T>(),
+			input: TypeMeta::of::<T::In>(),
+			output: TypeMeta::of::<T::Out>(),
+			type_info: Some(ToolTypeInfo::of_full::<T, M>()),
+		}
+	}
+
+	/// The handler type metadata.
 	pub fn handler(&self) -> TypeMeta { self.handler }
 	/// The full type name of the handler function or type.
-	pub fn name(&self) -> &'static str { self.handler.type_name }
-	/// Get the input type metadata for this tool.
+	pub fn name(&self) -> &'static str { self.handler.type_name() }
+	/// The input type metadata.
 	pub fn input(&self) -> TypeMeta { self.input }
-	/// Get the output type metadata for this tool.
+	/// The output type metadata.
 	pub fn output(&self) -> TypeMeta { self.output }
+	/// The reflection data, if available.
+	pub fn type_info(&self) -> Option<&ToolTypeInfo> { self.type_info.as_ref() }
+
+	/// Returns true if the output type matches `T`.
+	pub fn output_is<T: 'static>(&self) -> bool {
+		self.output.type_id() == std::any::TypeId::of::<T>()
+	}
+
+	/// The handler [`TypeInfo`], if reflection data is available.
+	pub fn handler_info(&self) -> Option<&'static TypeInfo> {
+		self.type_info.map(|info| info.handler_info)
+	}
+
+	/// The input [`TypeInfo`], if full reflection data is available.
+	pub fn input_info(&self) -> Option<&'static TypeInfo> {
+		self.type_info.and_then(|info| info.input_info)
+	}
+
+	/// The output [`TypeInfo`], if full reflection data is available.
+	pub fn output_info(&self) -> Option<&'static TypeInfo> {
+		self.type_info.and_then(|info| info.output_info)
+	}
+
+	/// A description from doc comments, if reflection data is available.
+	pub fn description(&self) -> Option<&str> {
+		self.type_info.as_ref().and_then(|info| info.description())
+	}
+
+	/// JSON schema for the input type, if full reflection data is available.
+	#[cfg(feature = "json")]
+	pub fn input_json_schema(&self) -> Option<serde_json::Value> {
+		self.type_info
+			.and_then(|info| info.input_info)
+			.map(|info| reflect_ext::type_info_to_json_schema(info))
+	}
+
+	/// JSON schema for the output type, if full reflection data is available.
+	#[cfg(feature = "json")]
+	pub fn output_json_schema(&self) -> Option<serde_json::Value> {
+		self.type_info
+			.and_then(|info| info.output_info)
+			.map(|info| reflect_ext::type_info_to_json_schema(info))
+	}
 
 	/// Assert that the provided types match this tool's input/output types.
 	///
@@ -60,90 +160,62 @@ impl ToolMeta {
 	}
 }
 
-fn try_add_reflect_tool_meta(mut world: DeferredWorld, cx: HookContext) {
-	let entity = world.entity(cx.entity);
-	if entity.contains::<ReflectToolMeta>() {
-		// already added, ususally by `into_reflect_tool`
-		return;
-	}
-	let Some(registry) = world.get_resource::<AppTypeRegistry>() else {
-		// no registry, can't add ReflectToolMeta
-		return;
-	};
-	let tool_meta = entity.get::<ToolMeta>().unwrap().clone();
-	let registry = registry.read();
 
-	let input = registry
-		.get(tool_meta.input().type_id())
-		.map(|info| info.type_info());
-	let output = registry
-		.get(tool_meta.output().type_id())
-		.map(|info| info.type_info());
-
-	drop(registry);
-
-	if let (Some(input), Some(output)) = (input, output) {
-		// both input and output types are registered in the AppTypeRegistry
-		// so we can add ReflectToolMeta
-		world.commands().entity(cx.entity).insert(ReflectToolMeta {
-			tool_meta,
-			input_info: input,
-			output_info: output,
-		});
-	}
+/// Reflection metadata for a tool. Always includes the handler
+/// [`TypeInfo`]; input and output [`TypeInfo`] are optional and
+/// present only when created via [`ToolTypeInfo::of_full`].
+#[derive(Debug, Copy, Clone)]
+pub struct ToolTypeInfo {
+	/// The handler [`TypeInfo`].
+	handler_info: &'static TypeInfo,
+	/// The input [`TypeInfo`], if available.
+	input_info: Option<&'static TypeInfo>,
+	/// The output [`TypeInfo`], if available.
+	output_info: Option<&'static TypeInfo>,
 }
 
-/// Superset of ToolMeta, added in one of two ways:
-/// 1. When a tool is added via `world.spawn(my_tool.into_reflect_tool())`
-/// 2. Alternatively by a `ToolMeta` on_add hook
-/// if both the input and output are registered in the [`AppTypeRegistry`]
-#[derive(Debug, Clone, Copy, Component)]
-pub struct ReflectToolMeta {
-	pub(super) tool_meta: ToolMeta,
-	pub(super) input_info: &'static TypeInfo,
-	pub(super) output_info: &'static TypeInfo,
-}
-impl std::ops::Deref for ReflectToolMeta {
-	type Target = ToolMeta;
-	fn deref(&self) -> &Self::Target { &self.tool_meta }
-}
-
-impl ReflectToolMeta {
-	pub fn input_info(&self) -> &'static TypeInfo { self.input_info }
-	pub fn output_info(&self) -> &'static TypeInfo { self.output_info }
-
-	#[cfg(feature = "json")]
-	pub fn input_json_schema(&self) -> serde_json::Value {
-		reflect_ext::type_info_to_json_schema(self.input_info)
-	}
-	#[cfg(feature = "json")]
-	pub fn output_json_schema(&self) -> serde_json::Value {
-		reflect_ext::type_info_to_json_schema(self.output_info)
-	}
-}
-
-#[derive(Debug, Clone, Get, Deref, Component)]
-pub struct ToolDescription {
-	description: String,
-}
-impl ToolDescription {
-	pub fn new(description: impl Into<String>) -> Self {
+impl ToolTypeInfo {
+	/// Create [`ToolTypeInfo`] with only handler reflection data.
+	/// Provides description but no JSON schemas.
+	pub fn of_handler<T: Typed>() -> Self {
 		Self {
-			description: description.into(),
+			handler_info: T::type_info(),
+			input_info: None,
+			output_info: None,
 		}
 	}
-	pub fn of<T: Typed>() -> Self {
-		let type_info = T::type_info();
+
+	/// Create [`ToolTypeInfo`] with full reflection data including
+	/// input and output types.
+	pub fn of_full<T, M>() -> Self
+	where
+		T: Typed + crate::prelude::IntoTool<M>,
+		T::In: Typed,
+		T::Out: Typed,
+	{
+		Self {
+			handler_info: T::type_info(),
+			input_info: Some(T::In::type_info()),
+			output_info: Some(T::Out::type_info()),
+		}
+	}
+
+	/// The handler [`TypeInfo`].
+	pub fn handler_info(&self) -> &'static TypeInfo { self.handler_info }
+	/// The input [`TypeInfo`], if available.
+	pub fn input_info(&self) -> Option<&'static TypeInfo> { self.input_info }
+	/// The output [`TypeInfo`], if available.
+	pub fn output_info(&self) -> Option<&'static TypeInfo> { self.output_info }
+
+	/// A description from the handler's doc comments, if available.
+	pub fn description(&self) -> Option<&str> {
 		cfg_if! {
-			if #[cfg(feature="reflect")]{
-			let docs = type_info
-				.docs()
-				.unwrap_or("No Description Available".into());
+			if #[cfg(feature = "reflect")] {
+				self.handler_info.docs()
 			} else {
-				let docs = "No Description Available";
+				None
 			}
-		};
-		Self::new(docs)
+		}
 	}
 }
 

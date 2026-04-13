@@ -8,7 +8,7 @@ async fn main() {
 		.thread_view()
 		.insert_actor(Actor::agent())
 		.with_bundle(
-			OllamaProvider::default_12gb_gpu()
+			OllamaProvider::default_12gb()
 				// disable streaming since we're aggregating
 				.without_streaming(),
 		)

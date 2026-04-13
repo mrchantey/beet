@@ -26,17 +26,23 @@ where
 fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
 	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
-	// use an option in case mismatch, we can still do an assert_match
-	tools: Query<(&ToolMeta, Option<&Tool<Input, Out>>)>,
+	tools: Query<&Tool<Input, Out>>,
+	metas: Query<&ToolMeta>,
 ) -> Result {
-	let (meta, tool) = tools
-		.get(caller)
-		.map_err(|err| bevyhow!("Entity has no tool {caller:?}: {err:?}"))?;
-	meta.assert_match::<Input, Out>()?;
-
-	let tool = tool.ok_or_else(|| {
-		bevyhow!("meta matches but tool missing.. this shouldnt happen.")
-	})?;
+	let tool = match tools.get(caller) {
+		Ok(tool) => tool,
+		Err(_) => {
+			// provide a detailed mismatch diagnostic when ToolMeta is present
+			if let Ok(meta) = metas.get(caller) {
+				meta.assert_match::<Input, Out>()?;
+			}
+			bevybail!(
+				"No Tool<{}, {}> on entity {caller:?}",
+				std::any::type_name::<Input>(),
+				std::any::type_name::<Out>()
+			);
+		}
+	};
 
 	tool.call(ToolCall {
 		commands,

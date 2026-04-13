@@ -38,32 +38,33 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 				)]),
 				(
 					Actor::new("Fearless Warrior", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini().unwrap(),
-					children![agent_choice_tool()]
+					OllamaProvider::default_12gb(),
+					// OpenAiProvider::gpt_5_mini().unwrap(),
+					children![function_tool(
+						"make-choice",
+						"make your choice",
+						AgentChoiceTool,
+					)]
 				),
 			]
 		),]))
 		.call::<(), Outcome>((), OutHandler::exit());
 }
 
-fn agent_choice_tool() -> impl Bundle {
-	function_tool(
-		"make-choice",
-		"make your choice",
-		Tool::<MakeChoice, String>::new_pure(|cx: ToolContext<MakeChoice>| {
-			match cx.choice {
-				Choice::Attack => {
-					"the attack was successful, you must feel very smug.."
-				}
-				Choice::Defend => "you exhibited cowardice, the shame..",
-				Choice::GreetWarmly => {
-					"its almost as if the glowing beet winked in response.."
-				}
-			}
-			.to_string()
-			.xok()
-		}),
-	)
+/// Processes an agent's choice and returns a narrative response.
+#[tool(route, pure)]
+#[derive(Component, Reflect)]
+fn AgentChoiceTool(cx: ToolContext<MakeChoice>) -> String {
+	match cx.choice {
+		Choice::Attack => {
+			"the attack was successful, you must feel very smug.."
+		}
+		Choice::Defend => "you exhibited cowardice, the shame..",
+		Choice::GreetWarmly => {
+			"its almost as if the glowing beet winked in response.."
+		}
+	}
+	.to_string()
 }
 
 
