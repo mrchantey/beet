@@ -20,7 +20,7 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((RepeatTimes::<()>::new(2), children![(
 			Thread::default(),
-			Sequence::new().allow_no_tool(),
+			Sequence::new().allow_no_action(),
 			children![
 				(Actor::system(), children![Post::spawn(
 					r#"
@@ -44,7 +44,7 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 					Actor::new("Fearless Warrior", ActorKind::Agent),
 					// OllamaProvider::default_12gb(),
 					OpenAiProvider::gpt_5_mini().unwrap(),
-					children![AgentChoiceTool]
+					children![AgentChoiceAction]
 				),
 			]
 		),]))
@@ -52,9 +52,9 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 }
 
 /// Make a choice for what to do, following the schema
-#[tool(pure, route = "make-choice")]
+#[action(pure, route = "make-choice")]
 #[derive(Component, Reflect)]
-fn AgentChoiceTool(cx: ToolContext<MakeChoice>) -> String {
+fn AgentChoiceAction(cx: ActionContext<MakeChoice>) -> String {
 	match cx.choice {
 		Choice::Attack => {
 			"the attack was successful, you must feel very smug.."

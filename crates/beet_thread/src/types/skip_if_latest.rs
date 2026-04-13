@@ -1,13 +1,13 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
 
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-#[require(Tool<(), Outcome> = Self::default_tool())]
+#[require(Action<(), Outcome> = Self::default_action())]
 pub struct SkipIfLatest<T, M = T>
 where
-	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	T: 'static + Send + Sync + Clone + IntoAction<M, In = (), Out = Outcome>,
 	M: 'static + Send + Sync,
 {
 	inner: T,
@@ -17,7 +17,7 @@ where
 
 impl<T, M> Clone for SkipIfLatest<T, M>
 where
-	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	T: 'static + Send + Sync + Clone + IntoAction<M, In = (), Out = Outcome>,
 	M: 'static + Send + Sync,
 {
 	fn clone(&self) -> Self {
@@ -30,7 +30,7 @@ where
 
 impl<T, M> SkipIfLatest<T, M>
 where
-	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	T: 'static + Send + Sync + Clone + IntoAction<M, In = (), Out = Outcome>,
 	M: 'static + Send + Sync,
 {
 	/// Create a new `SkipIfLatest` wrapper.
@@ -43,13 +43,13 @@ where
 }
 
 
-impl<T, M> DefaultTool<(), Outcome> for SkipIfLatest<T, M>
+impl<T, M> DefaultAction<(), Outcome> for SkipIfLatest<T, M>
 where
-	T: 'static + Send + Sync + Clone + IntoTool<M, In = (), Out = Outcome>,
+	T: 'static + Send + Sync + Clone + IntoAction<M, In = (), Out = Outcome>,
 	M: 'static + Send + Sync,
 {
-	fn default_tool() -> Tool<(), Outcome> {
-		Tool::new_async(move |cx: ToolContext| async move {
+	fn default_action() -> Action<(), Outcome> {
+		Action::new_async(move |cx: ActionContext| async move {
 			let should_skip = cx
 				.caller
 				.with_state::<ThreadQuery, _>(|entity, query| -> Result<bool> {

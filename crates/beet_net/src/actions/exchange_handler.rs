@@ -1,12 +1,12 @@
-//! Exchange handlers that produce [`Tool<Request, Response>`] components.
+//! Exchange handlers that produce [`Action<Request, Response>`] components.
 //!
-//! These convenience functions create tools for common request/response
-//! patterns, wrapping the `beet_tool` primitives with HTTP-friendly APIs.
+//! These convenience functions create actions for common request/response
+//! patterns, wrapping the `beet_action` primitives with HTTP-friendly APIs.
 
 use crate::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
-/// Creates a synchronous [`Tool<Request, Response>`] from a closure.
+/// Creates a synchronous [`Action<Request, Response>`] from a closure.
 ///
 /// ## Example
 ///
@@ -18,14 +18,14 @@ use beet_tool::prelude::*;
 ///     request.take().mirror()
 /// }));
 /// ```
-pub fn exchange_handler<F>(func: F) -> Tool<Request, Response>
+pub fn exchange_handler<F>(func: F) -> Action<Request, Response>
 where
-	F: 'static + Send + Sync + Clone + FnOnce(ToolContext<Request>) -> Response,
+	F: 'static + Send + Sync + Clone + FnOnce(ActionContext<Request>) -> Response,
 {
-	Tool::new_pure(move |cx: ToolContext<Request>| Ok(func(cx)))
+	Action::new_pure(move |cx: ActionContext<Request>| Ok(func(cx)))
 }
 
-/// Creates an async [`Tool<Request, Response>`] from a closure.
+/// Creates an async [`Action<Request, Response>`] from a closure.
 ///
 /// ## Example
 ///
@@ -37,21 +37,21 @@ where
 ///     request.mirror_parts()
 /// }));
 /// ```
-pub fn exchange_handler_async<F, Fut>(func: F) -> Tool<Request, Response>
+pub fn exchange_handler_async<F, Fut>(func: F) -> Action<Request, Response>
 where
 	F: 'static + Send + Sync + Clone + FnOnce(Request) -> Fut,
 	Fut: 'static + Send + Future<Output = Response>,
 {
-	Tool::new_async(move |cx: ToolContext<Request>| {
+	Action::new_async(move |cx: ActionContext<Request>| {
 		let fut = func(cx.input);
 		async move { Ok(fut.await) }
 	})
 }
 
-/// Creates a mirror exchange tool that echoes requests back as responses.
+/// Creates a mirror exchange action that echoes requests back as responses.
 ///
 /// Useful for testing and debugging exchange infrastructure.
-pub fn mirror_exchange() -> Tool<Request, Response> {
+pub fn mirror_exchange() -> Action<Request, Response> {
 	exchange_handler(|req| req.take().mirror())
 }
 

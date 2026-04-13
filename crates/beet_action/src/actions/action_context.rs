@@ -1,19 +1,19 @@
 use beet_core::prelude::*;
 
-/// Unified context for all tool handlers, providing access to the
+/// Unified context for all action handlers, providing access to the
 /// caller entity and the input payload. The `caller` field is always an
-/// [`AsyncEntity`], giving tools consistent access to the entity that
-/// initiated the call regardless of whether the tool is sync or async.
+/// [`AsyncEntity`], giving actions consistent access to the entity that
+/// initiated the call regardless of whether the action is sync or async.
 #[derive(Debug, Clone, Deref, DerefMut, Get)]
-pub struct ToolContext<In = ()> {
-	/// The entity that initiated this tool call.
+pub struct ActionContext<In = ()> {
+	/// The entity that initiated this action call.
 	pub caller: AsyncEntity,
-	/// The input payload for this tool call.
+	/// The input payload for this action call.
 	#[deref]
 	pub input: In,
 }
 
-impl<In> ToolContext<In> {
+impl<In> ActionContext<In> {
 	/// Returns the [`Entity`] id of the caller.
 	pub fn id(&self) -> Entity { self.caller.id() }
 
@@ -23,8 +23,8 @@ impl<In> ToolContext<In> {
 	pub fn world(&self) -> AsyncWorld { self.caller.world().clone() }
 
 	/// Map the input to a different type, keeping the same caller.
-	pub fn map_input<NewIn>(self, input: NewIn) -> ToolContext<NewIn> {
-		ToolContext {
+	pub fn map_input<NewIn>(self, input: NewIn) -> ActionContext<NewIn> {
+		ActionContext {
 			caller: self.caller,
 			input,
 		}

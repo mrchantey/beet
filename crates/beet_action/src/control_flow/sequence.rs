@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 /// Sequence control-flow component.
 ///
-/// Runs child tools in order, threading `Input` through each child.
+/// Runs child actions in order, threading `Input` through each child.
 /// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
 /// with the final input if all compatible children pass.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome<Input, Output>> = Tool::new_async(sequence_tool::<Input, Output>))]
+#[require(Action<Input, Outcome<Input, Output>> = Action::new_async(sequence_action::<Input, Output>))]
 #[reflect(Component, Default)]
 pub struct Sequence<Input = (), Output = ()>
 where
@@ -45,9 +45,9 @@ where
 		self
 	}
 
-	/// Exclude [`ChildError::NO_TOOL`] so children without a tool are skipped.
-	pub fn allow_no_tool(mut self) -> Self {
-		self.exclude_errors |= ChildError::NO_TOOL;
+	/// Exclude [`ChildError::NO_ACTION`] so children without an action are skipped.
+	pub fn allow_no_action(mut self) -> Self {
+		self.exclude_errors |= ChildError::NO_ACTION;
 		self
 	}
 
@@ -68,10 +68,10 @@ impl Sequence {
 /// ## Errors
 ///
 /// Errors depending on [`ChildError`] flags when a child has:
-/// - no [`ToolMeta`]
-/// - incompatible [`ToolMeta`] signature
-async fn sequence_tool<Input, Output>(
-	cx: ToolContext<Input>,
+/// - no [`ActionMeta`]
+/// - incompatible [`ActionMeta`] signature
+async fn sequence_action<Input, Output>(
+	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
 	Input: 'static + Send + Sync,
@@ -96,29 +96,29 @@ where
 	let mut input = cx.input;
 
 	for child in children {
-		let tool_meta_result =
-			world.entity(child).get(|meta: &ToolMeta| *meta).await;
+		let action_meta_result =
+			world.entity(child).get(|meta: &ActionMeta| *meta).await;
 
-		let tool_meta = match tool_meta_result {
-			Ok(tool_meta) => tool_meta,
+		let action_meta = match action_meta_result {
+			Ok(action_meta) => action_meta,
 			Err(child_error) => {
-				if exclude_errors.contains(ChildError::NO_TOOL) {
+				if exclude_errors.contains(ChildError::NO_ACTION) {
 					continue;
 				}
 				bevybail!(
-					"sequence child has no tool: {child:?}, error: {child_error}"
+					"sequence child has no action: {child:?}, error: {child_error}"
 				);
 			}
 		};
 
 		if let Err(mismatch_error) =
-			tool_meta.assert_match::<Input, Outcome<Input, Output>>()
+			action_meta.assert_match::<Input, Outcome<Input, Output>>()
 		{
-			if exclude_errors.contains(ChildError::TOOL_MISMATCH) {
+			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
 				continue;
 			}
 			bevybail!(
-				"sequence child wrong tool signature: {child:?}, error: {mismatch_error}"
+				"sequence child wrong action signature: {child:?}, error: {mismatch_error}"
 			);
 		}
 
@@ -141,14 +141,14 @@ where
 mod tests {
 	use super::*;
 
-	fn outcome_fail() -> Tool<(), Outcome<(), ()>> {
-		Tool::new_pure(|_: ToolContext| Outcome::Fail(()).xok())
+	fn outcome_fail() -> Action<(), Outcome<(), ()>> {
+		Action::new_pure(|_: ActionContext| Outcome::Fail(()).xok())
 	}
-	fn outcome_pass() -> Tool<(), Outcome<(), ()>> {
-		Tool::new_pure(|_: ToolContext| Outcome::Pass(()).xok())
+	fn outcome_pass() -> Action<(), Outcome<(), ()>> {
+		Action::new_pure(|_: ActionContext| Outcome::Pass(()).xok())
 	}
-	fn wrong_signature_tool() -> Tool<(), i32> {
-		Tool::new_pure(|_: ToolContext| 7.xok())
+	fn wrong_signature_action() -> Action<(), i32> {
+		Action::new_pure(|_: ActionContext| 7.xok())
 	}
 
 	#[beet_core::test]
@@ -221,11 +221,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_tool_mismatch_ignores_wrong_signature() {
+	async fn exclude_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new().with_exclude_errors(ChildError::TOOL_MISMATCH),
-				children![wrong_signature_tool(), outcome_pass()],
+				Sequence::new().with_exclude_errors(ChildError::ACTION_MISMATCH),
+				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
 			.await
@@ -234,10 +234,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_no_tool_ignores_missing() {
+	async fn exclude_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new().with_exclude_errors(ChildError::NO_TOOL),
+				Sequence::new().with_exclude_errors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())

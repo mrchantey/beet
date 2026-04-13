@@ -1,23 +1,23 @@
-//! Core exchange types for request/response handling via the tool pattern.
+//! Core exchange types for request/response handling via the action pattern.
 //!
 //! This module provides [`ExchangeExt`] for ergonomic request/response
-//! exchanges on entities that have a [`Tool<Request, Response>`] component,
+//! exchanges on entities that have an [`Action<Request, Response>`] component,
 //! and [`ExchangeEnd`] for observability.
 use super::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// Extension trait for performing request/response exchanges on entities
-/// with a [`Tool<Request, Response>`] component.
+/// with an [`Action<Request, Response>`] component.
 ///
-/// This is a thin convenience wrapper around the tool call pattern,
+/// This is a thin convenience wrapper around the action call pattern,
 /// converting the `Result<Response>` into a `Response` by logging
 /// errors and returning an internal error response on failure.
 #[extend::ext(name=ExchangeExt)]
 pub impl EntityWorldMut<'_> {
 	/// Send a request and await the response.
 	///
-	/// If the tool call fails, logs the error and returns
+	/// If the action call fails, logs the error and returns
 	/// [`Response::internal_error`].
 	fn exchange(
 		mut self,
@@ -72,7 +72,7 @@ pub impl EntityWorldMut<'_> {
 pub impl AsyncEntity {
 	/// Send a request and await the response.
 	///
-	/// If the tool call fails, logs the error and returns
+	/// If the action call fails, logs the error and returns
 	/// [`Response::internal_error`].
 	fn exchange(
 		&self,
@@ -122,7 +122,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	async fn missing_tool_returns_error() {
+	async fn missing_action_returns_error() {
 		AsyncPlugin::world()
 			.spawn_empty()
 			.exchange(Request::get("foo"))

@@ -27,7 +27,7 @@ bindings_aws_all = [
 	"bindings_aws_lambda",
 ]
 bindings_cloudflare_common = []
-cli = ["dep:beet_tool", "dep:beet_router"]
+cli = ["dep:beet_action", "dep:beet_router"]
 
 [[bin]]
 name = "bindings"
@@ -37,7 +37,7 @@ required-features = ["bindings_generator"]
 [dependencies]
 beet_core = { workspace = true, features = ["json", "rand", "fs"] }
 beet_net.workspace = true
-beet_tool = { workspace = true, optional = true, features= ["json"] }
+beet_action = { workspace = true, optional = true, features= ["json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true

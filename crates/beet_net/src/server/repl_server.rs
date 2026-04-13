@@ -1,7 +1,7 @@
 //! A REPL server that reads lines from stdin in a loop, dispatching
 //! each as a [`Request`] and streaming the [`Response`] body to stdout.
 //!
-//! Typically paired with a [`SceneToolRenderer`] so that scenes
+//! Typically paired with a [`SceneActionRenderer`] so that scenes
 //! render their content for terminal output.
 //!
 //! Uses a background thread for stdin reading so the async executor
@@ -10,7 +10,7 @@ use super::cli_server::stream_body_to_stdout;
 use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// A REPL (read-eval-print loop) server [`Bundle`].
 ///
@@ -19,10 +19,10 @@ use beet_tool::prelude::*;
 /// renders the root content. After the initial display, starts a
 /// background thread that reads lines from stdin.
 /// Each non-empty line is parsed as CLI-style arguments into a
-/// [`Request`], dispatched through the owning entity's tool pipeline,
+/// [`Request`], dispatched through the owning entity's action pipeline,
 /// and the response body is streamed to stdout.
 ///
-/// Typically paired with a [`SceneToolRenderer`] for rendering
+/// Typically paired with a [`SceneActionRenderer`] for rendering
 /// scene content in the terminal, and a [`History`] component for
 /// tracking the current path, enabling relative navigation via
 /// `--navigate=<direction>`.
@@ -30,7 +30,7 @@ use beet_tool::prelude::*;
 /// Typing `exit` or `quit` terminates the loop and writes
 /// [`AppExit::Success`]. An EOF on stdin also exits cleanly.
 ///
-/// Typically combined with a [`router`] and child tools
+/// Typically combined with a [`router`] and child actions
 /// to build an interactive CLI application:
 ///
 /// ```ignore

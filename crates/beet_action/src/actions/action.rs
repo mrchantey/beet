@@ -5,21 +5,21 @@ use std::sync::Arc;
 
 #[derive(Component)]
 #[component(on_add=on_add::<In, Out>)]
-pub struct Tool<In: 'static, Out: 'static> {
+pub struct Action<In: 'static, Out: 'static> {
 	/// The full type name of the handler, for display and debugging.
 	handler_meta: TypeMeta,
-	handler: Arc<dyn 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result>,
+	handler: Arc<dyn 'static + Send + Sync + Fn(ActionCall<In, Out>) -> Result>,
 }
 
-impl<In: 'static, Out: 'static> std::fmt::Debug for Tool<In, Out> {
+impl<In: 'static, Out: 'static> std::fmt::Debug for Action<In, Out> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Tool")
+		f.debug_struct("Action")
 			.field("handler_meta", &self.handler_meta)
 			.finish()
 	}
 }
 
-impl<In: 'static, Out: 'static> Clone for Tool<In, Out> {
+impl<In: 'static, Out: 'static> Clone for Action<In, Out> {
 	fn clone(&self) -> Self {
 		Self {
 			handler_meta: self.handler_meta,
@@ -28,32 +28,32 @@ impl<In: 'static, Out: 'static> Clone for Tool<In, Out> {
 	}
 }
 
-/// Fallback hook that inserts a basic [`ToolMeta`] when a `Tool` is
-/// spawned without one. Tools created via the `#[tool]` macro provide
-/// a richer [`ToolMeta`] through `#[require]`, which is already present
+/// Fallback hook that inserts a basic [`ActionMeta`] when a `Action` is
+/// spawned without one. Actions created via the `#[action]` macro provide
+/// a richer [`ActionMeta`] through `#[require]`, which is already present
 /// by the time this hook runs, so the check short-circuits.
 // couldnt this just also be a require or would that clobber?
 fn on_add<In: 'static, Out: 'static>(
 	mut world: DeferredWorld,
 	cx: HookContext,
 ) {
-	if world.entity(cx.entity).contains::<ToolMeta>() {
+	if world.entity(cx.entity).contains::<ActionMeta>() {
 		return;
 	}
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(ToolMeta::of::<(), In, Out>());
+		.insert(ActionMeta::of::<(), In, Out>());
 }
 
-impl<In, Out> Tool<In, Out>
+impl<In, Out> Action<In, Out>
 where
 	In: 'static,
 	Out: 'static,
 {
 	pub fn new(
 		handler_meta: TypeMeta,
-		handler: impl 'static + Send + Sync + Fn(ToolCall<In, Out>) -> Result,
+		handler: impl 'static + Send + Sync + Fn(ActionCall<In, Out>) -> Result,
 	) -> Self {
 		Self {
 			handler_meta,
@@ -64,15 +64,15 @@ where
 	pub fn handler_meta(&self) -> TypeMeta { self.handler_meta }
 
 
-	/// Invoke this tool handler with the given [`ToolCall`].
+	/// Invoke this action handler with the given [`ActionCall`].
 	///
 	/// # Errors
 	/// Propagates any error from the handler or [`OutHandler`].
-	pub fn call(&self, call: ToolCall<In, Out>) -> Result {
+	pub fn call(&self, call: ActionCall<In, Out>) -> Result {
 		(self.handler)(call)
 	}
 
-	/// Invoke this tool handler, constructing the [`ToolCall`] internally.
+	/// Invoke this action handler, constructing the [`ActionCall`] internally.
 	///
 	/// # Errors
 	/// Propagates any error from the handler or [`OutHandler`].
@@ -83,7 +83,7 @@ where
 		commands: AsyncCommands,
 		out_handler: OutHandler<Out>,
 	) -> Result {
-		let call = ToolCall {
+		let call = ActionCall {
 			commands,
 			caller: entity,
 			input,
@@ -92,7 +92,7 @@ where
 		self.call(call)
 	}
 
-	/// Invoke this tool handler from a [`World`], constructing the [`ToolCall`] internally.
+	/// Invoke this action handler from a [`World`], constructing the [`ActionCall`] internally.
 	///
 	/// # Errors
 	/// Propagates any error from the handler or [`OutHandler`].
@@ -112,7 +112,7 @@ where
 		result
 	}
 
-	/// Invoke this tool handler asynchronously, constructing the [`ToolCall`] internally.
+	/// Invoke this action handler asynchronously, constructing the [`ActionCall`] internally.
 	///
 	/// # Errors
 	/// Propagates any error from the handler or [`OutHandler`].
@@ -135,23 +135,23 @@ where
 	}
 }
 
-/// Payload for a single tool invocation, containing the caller entity,
+/// Payload for a single action invocation, containing the caller entity,
 /// input value, [`AsyncCommands`] for queuing work, and a callback
 /// for delivering the output.
-pub struct ToolCall<'w, 's, In, Out> {
+pub struct ActionCall<'w, 's, In, Out> {
 	/// Commands for queuing ECS work or spawning async tasks.
 	pub commands: AsyncCommands<'w, 's>,
-	/// The entity that initiated or owns this tool call.
+	/// The entity that initiated or owns this action call.
 	pub caller: Entity,
 	/// The input payload for this invocation.
 	pub input: In,
-	/// Callback invoked with the output when the tool completes.
+	/// Callback invoked with the output when the action completes.
 	pub out_handler: OutHandler<Out>,
 }
 
-impl<'w, 's, In, Out> ToolCall<'w, 's, In, Out> {}
+impl<'w, 's, In, Out> ActionCall<'w, 's, In, Out> {}
 
-/// Delivers a tool's output or error back to the caller.
+/// Delivers an action's output or error back to the caller.
 ///
 /// Wraps a closure so that different delivery mechanisms (channels,
 /// pipe chains, etc.) share a uniform interface.
@@ -174,7 +174,7 @@ impl<Out> Default for OutHandler<Out> {
 }
 
 impl<Out> OutHandler<Out> {
-	/// Exit with [`AppExit::Success`] once the tool call is complete,
+	/// Exit with [`AppExit::Success`] once the action call is complete,
 	/// discarding the [`Out`] value.
 	pub fn exit() -> Self {
 		OutHandler {
@@ -238,8 +238,8 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	#[should_panic = "No Tool"]
-	async fn missing_tool_component() {
+	#[should_panic = "No Action"]
+	async fn missing_action_component() {
 		AsyncPlugin::world()
 			.spawn_empty()
 			.call::<(), ()>(())
@@ -247,15 +247,15 @@ mod test {
 			.unwrap();
 	}
 
-	#[tool(pure)]
+	#[action(pure)]
 	#[derive(Reflect)]
 	fn add((a, b): (u32, u32)) -> u32 { a + b }
 
 	#[test]
-	fn bare_tool_auto_inserts_basic_meta() {
+	fn bare_action_auto_inserts_basic_meta() {
 		let mut world = World::new();
-		let entity = world.spawn(add.into_tool());
-		let meta = entity.get::<ToolMeta>().unwrap();
+		let entity = world.spawn(add.into_action());
+		let meta = entity.get::<ActionMeta>().unwrap();
 		// basic fallback meta has no type_info
 		meta.type_info().xpect_none();
 	}
@@ -263,15 +263,15 @@ mod test {
 	#[test]
 	fn macro_meta_takes_priority() {
 		let mut world = World::new();
-		let meta = ToolMeta::of_handler::<add, add>();
-		let entity = world.spawn((add.into_tool(), meta));
+		let meta = ActionMeta::of_handler::<add, add>();
+		let entity = world.spawn((add.into_action(), meta));
 		// the richer meta from of_handler is preserved
-		entity.get::<ToolMeta>().unwrap().type_info().xpect_some();
+		entity.get::<ActionMeta>().unwrap().type_info().xpect_some();
 	}
 
 	#[test]
 	fn reflect_meta_has_type_info() {
-		let meta = ToolMeta::of_reflect::<add, add>();
+		let meta = ActionMeta::of_reflect::<add, add>();
 		meta.type_info().xpect_some();
 		meta.input_info().xpect_some();
 		meta.output_info().xpect_some();

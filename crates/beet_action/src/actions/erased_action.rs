@@ -2,18 +2,18 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 #[derive(Component)]
-pub struct ErasedTool {
-	inner: Tool<(MediaBytes<'static>, Vec<MediaType>), MediaBytes<'static>>,
+pub struct ErasedAction {
+	inner: Action<(MediaBytes<'static>, Vec<MediaType>), MediaBytes<'static>>,
 }
 
-impl ErasedTool {
+impl ErasedAction {
 	pub fn new<In, Out>() -> Self
 	where
 		In: 'static + Send + Sync + DeserializeOwned,
 		Out: 'static + Send + Sync + Serialize,
 	{
 		Self {
-			inner: Tool::<
+			inner: Action::<
 				(MediaBytes<'static>, Vec<MediaType>),
 				MediaBytes<'static>,
 			>::new_async(async |cx| -> Result<MediaBytes<'static>> {

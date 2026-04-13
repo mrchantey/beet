@@ -1,7 +1,7 @@
 //! Local echo HTTP server for testing.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 use bytes::Bytes;
 
 /// Structured response from the echo server.
@@ -62,7 +62,7 @@ impl EchoHttpServer {
 }
 
 /// Routes requests based on the first path segment.
-fn echo_request(req: ToolContext<Request>) -> Response {
+fn echo_request(req: ActionContext<Request>) -> Response {
 	let req = req.take();
 	match req.path().first().map(|seg| seg.as_str()) {
 		Some("sse") => sse_response(&req),

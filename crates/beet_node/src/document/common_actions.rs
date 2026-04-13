@@ -3,9 +3,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::reflect::Typed;
 
-/// A tool that increments a numeric field in a document, returning the new value.
+/// An action that increments a numeric field in a document, returning the new value.
 ///
-/// When triggered, this tool:
+/// When triggered, this action:
 /// 1. Reads the current value from the specified field
 /// 2. Increments it by 1
 /// 3. Writes the new value back
@@ -23,11 +23,11 @@ use bevy::reflect::Typed;
 /// let field = FieldRef::new("counter");
 /// let entity = world.spawn(increment(field)).id();
 /// ```
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn Increment(
-	cx: In<ToolContext>,
+	cx: In<ActionContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
@@ -45,20 +45,20 @@ pub fn increment(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("increment"), Increment)
 }
 
-/// A tool that decrements a numeric field in a document, returning the new value.
+/// An action that decrements a numeric field in a document, returning the new value.
 ///
-/// When triggered, this tool:
+/// When triggered, this action:
 /// 1. Reads the current value from the specified field
 /// 2. Decrements it by 1
 /// 3. Writes the new value back
 /// 4. Returns the new value
 ///
 /// If the field doesn't exist or is not an i64, it will be initialized to -1.
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn Decrement(
-	cx: In<ToolContext>,
+	cx: In<ActionContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
@@ -76,15 +76,15 @@ pub fn decrement(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("decrement"), Decrement)
 }
 
-/// A tool that adds a value to a numeric field in a document.
+/// An action that adds a value to a numeric field in a document.
 ///
 /// Takes the amount to add as input and returns the new value.
 /// If the field doesn't exist or is not an i64, it will be initialized to the provided value.
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn AddField(
-	cx: In<ToolContext<i64>>,
+	cx: In<ActionContext<i64>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<i64> {
@@ -102,14 +102,14 @@ pub fn add(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("add"), AddField)
 }
 
-/// A tool that sets a field to a specific [`Value`].
+/// An action that sets a field to a specific [`Value`].
 ///
 /// Takes a [`Value`] as input and stores it in the specified field.
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn SetField(
-	cx: In<ToolContext<Value>>,
+	cx: In<ActionContext<Value>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<()> {
@@ -124,14 +124,14 @@ pub fn set_field(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("set-field"), SetField)
 }
 
-/// A tool that sets a field to a specific typed value.
+/// An action that sets a field to a specific typed value.
 ///
 /// Takes a generic type `T` that can be converted to/from reflection.
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn SetFieldTyped<T>(
-	cx: In<ToolContext<T>>,
+	cx: In<ActionContext<T>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<()>
@@ -157,14 +157,14 @@ where
 	)
 }
 
-/// A tool that retrieves a field value from a document.
+/// An action that retrieves a field value from a document.
 ///
 /// Returns the [`Value`].
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn ReadField(
-	cx: In<ToolContext>,
+	cx: In<ActionContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<Value> {
@@ -180,14 +180,14 @@ pub fn get_field(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("get-field"), ReadField)
 }
 
-/// A tool that retrieves a field value from a document with type conversion.
+/// An action that retrieves a field value from a document with type conversion.
 ///
 /// Returns the value as a typed `T`.
-#[tool]
+#[action]
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn ReadFieldTyped<T>(
-	cx: In<ToolContext>,
+	cx: In<ActionContext>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<T>
@@ -216,7 +216,7 @@ where
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_tool::prelude::*;
+	use beet_action::prelude::*;
 	use bevy::ecs::entity::EntityHashMap;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
@@ -511,10 +511,10 @@ mod test {
 			.unwrap();
 		app.update();
 
-		// The loaded entity should have Increment and ToolMeta
-		// (Tool itself isn't serializable, but #[require] re-creates it)
+		// The loaded entity should have Increment and ActionMeta
+		// (Action itself isn't serializable, but #[require] re-creates it)
 		let loaded = *entity_map.values().next().unwrap();
 		app.world().entity(loaded).get::<Increment>().xpect_some();
-		app.world().entity(loaded).get::<ToolMeta>().xpect_some();
+		app.world().entity(loaded).get::<ActionMeta>().xpect_some();
 	}
 }

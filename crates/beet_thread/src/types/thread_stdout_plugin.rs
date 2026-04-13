@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
 
 #[derive(Default)]
 pub struct ThreadStdoutPlugin;
@@ -127,11 +127,11 @@ fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 	**cursor = body.len() as u32;
 }
 
-#[tool]
+#[action]
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component)]
 pub fn StdinPost(
-	cx: ToolContext,
+	cx: ActionContext,
 	mut query: ThreadQuery,
 	actors: Query<&Actor>,
 ) -> Result<Outcome> {

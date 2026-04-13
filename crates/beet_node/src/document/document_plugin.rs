@@ -1,5 +1,5 @@
-#[cfg(feature = "tool")]
-use super::common_tools;
+#[cfg(feature = "action")]
+use super::common_actions;
 use crate::document::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -48,13 +48,13 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Value>()
 			.register_type::<DocumentScope>();
 
-		// Register tool types when the tool feature is enabled
-		#[cfg(feature = "tool")]
-		app.register_type::<common_tools::Increment>()
-			.register_type::<common_tools::Decrement>()
-			.register_type::<common_tools::AddField>()
-			.register_type::<common_tools::SetField>()
-			.register_type::<common_tools::ReadField>();
+		// Register action types when the action feature is enabled
+		#[cfg(feature = "action")]
+		app.register_type::<common_actions::Increment>()
+			.register_type::<common_actions::Decrement>()
+			.register_type::<common_actions::AddField>()
+			.register_type::<common_actions::SetField>()
+			.register_type::<common_actions::ReadField>();
 
 		app
 			// Add observers and systems

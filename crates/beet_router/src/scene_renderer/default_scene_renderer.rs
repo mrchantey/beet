@@ -1,12 +1,12 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_node::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
-/// Creates a render tool that negotiates content type via the
+/// Creates a render action that negotiates content type via the
 /// `Accept` header and delegates to [`MediaRenderer`].
 pub async fn default_scene_renderer(
-	cx: ToolContext<RequestParts>,
+	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	let accepts: Vec<MediaType> = cx
 		.input

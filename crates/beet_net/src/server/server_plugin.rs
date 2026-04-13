@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 
 /// Plugin for running Bevy HTTP servers.
 ///
-/// Sets up the async runtime needed for tool-based exchange handling.
+/// Sets up the async runtime needed for action-based exchange handling.
 #[derive(Default)]
 pub struct ServerPlugin;
 

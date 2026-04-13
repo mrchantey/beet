@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 /// Fallback control-flow component.
 ///
-/// Runs child tools in order until one passes.
+/// Runs child actions in order until one passes.
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
 #[derive(Debug, Component)]
-#[require(Tool<Input, Outcome<Output, Input>> = Tool::new_async(fallback_tool::<Input, Output>))]
+#[require(Action<Input, Outcome<Output, Input>> = Action::new_async(fallback_action::<Input, Output>))]
 pub struct Fallback<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
@@ -75,11 +75,11 @@ where
 	/// ## Errors
 	///
 	/// Errors depending on [`ChildError`] exclusions when a child has:
-	/// - no [`ToolMeta`]
-	/// - incompatible [`ToolMeta`] signature
+	/// - no [`ActionMeta`]
+	/// - incompatible [`ActionMeta`] signature
 	pub async fn run(
 		&self,
-		cx: ToolContext<Input>,
+		cx: ActionContext<Input>,
 	) -> Result<Outcome<Output, Input>>
 	where
 		Input: 'static + Send + Sync,
@@ -101,29 +101,29 @@ where
 		let mut input = cx.input;
 
 		for child in children {
-			let tool_meta_result =
-				world.entity(child).get(|meta: &ToolMeta| *meta).await;
+			let action_meta_result =
+				world.entity(child).get(|meta: &ActionMeta| *meta).await;
 
-			let tool_meta = match tool_meta_result {
-				Ok(tool_meta) => tool_meta,
+			let action_meta = match action_meta_result {
+				Ok(action_meta) => action_meta,
 				Err(child_error) => {
-					if self.exclude_errors.contains(ChildError::NO_TOOL) {
+					if self.exclude_errors.contains(ChildError::NO_ACTION) {
 						continue;
 					}
 					bevybail!(
-						"fallback child has no tool: {child:?}, error: {child_error}"
+						"fallback child has no action: {child:?}, error: {child_error}"
 					);
 				}
 			};
 
 			if let Err(mismatch_error) =
-				tool_meta.assert_match::<Input, Outcome<Output, Input>>()
+				action_meta.assert_match::<Input, Outcome<Output, Input>>()
 			{
-				if self.exclude_errors.contains(ChildError::TOOL_MISMATCH) {
+				if self.exclude_errors.contains(ChildError::ACTION_MISMATCH) {
 					continue;
 				}
 				bevybail!(
-					"fallback child has incorrect tool signature: {child:?}, error: {mismatch_error}"
+					"fallback child has incorrect action signature: {child:?}, error: {mismatch_error}"
 				);
 			}
 
@@ -143,8 +143,8 @@ where
 	}
 }
 
-async fn fallback_tool<Input, Output>(
-	cx: ToolContext<Input>,
+async fn fallback_action<Input, Output>(
+	cx: ActionContext<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
 	Input: 'static + Send + Sync,
@@ -162,14 +162,14 @@ where
 mod tests {
 	use super::*;
 
-	fn outcome_fail() -> Tool<(), Outcome> {
-		Tool::new_pure(|_: ToolContext| Outcome::FAIL.xok())
+	fn outcome_fail() -> Action<(), Outcome> {
+		Action::new_pure(|_: ActionContext| Outcome::FAIL.xok())
 	}
-	fn outcome_pass() -> Tool<(), Outcome> {
-		Tool::new_pure(|_: ToolContext| Outcome::PASS.xok())
+	fn outcome_pass() -> Action<(), Outcome> {
+		Action::new_pure(|_: ActionContext| Outcome::PASS.xok())
 	}
-	fn wrong_signature_tool() -> Tool<(), i32> {
-		Tool::new_pure(|_: ToolContext| 7.xok())
+	fn wrong_signature_action() -> Action<(), i32> {
+		Action::new_pure(|_: ActionContext| 7.xok())
 	}
 
 	#[beet_core::test]
@@ -231,10 +231,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_no_tool_ignores_missing() {
+	async fn exclude_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::new().with_exclude_errors(ChildError::NO_TOOL),
+				Fallback::new().with_exclude_errors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
@@ -244,11 +244,11 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn exclude_tool_mismatch_ignores_wrong_signature() {
+	async fn exclude_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::new().with_exclude_errors(ChildError::TOOL_MISMATCH),
-				children![wrong_signature_tool(), outcome_pass()],
+				Fallback::new().with_exclude_errors(ChildError::ACTION_MISMATCH),
+				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
 			.await

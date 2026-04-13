@@ -1,5 +1,6 @@
 #![no_std]
 extern crate alloc;
+mod action;
 mod as_any;
 mod bundle_effect;
 mod entity_target_event;
@@ -9,7 +10,6 @@ mod mdx;
 mod sendit;
 mod test_attr;
 mod to_tokens;
-mod tool;
 
 
 /// Implements `TokenizeSelf` for a struct or enum.
@@ -218,11 +218,11 @@ pub fn beet_main(
 }
 
 #[proc_macro_attribute]
-pub fn tool(
+pub fn action(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	tool::impl_tool(attr, item)
+	action::impl_action(attr, item)
 }
 
 /// Generate getter methods for struct fields.

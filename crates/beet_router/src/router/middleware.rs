@@ -1,8 +1,8 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
-/// Declare a tool to be registered as route middleware.
+/// Declare an action to be registered as route middleware.
 /// The component is serializable via reflect and registers
 /// itself into [`MiddlewareList`] on add.
 #[derive(Debug, Clone, Component)]
@@ -13,7 +13,7 @@ where
 	Out: 'static,
 	T: Component
 		+ Clone
-		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
+		+ IntoAction<T, In = (In, Next<In, Out>), Out = Out>
 		+ Default;
 
 impl<T, In, Out> Default for Middleware<T, In, Out>
@@ -22,7 +22,7 @@ where
 	Out: 'static,
 	T: Component
 		+ Clone
-		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
+		+ IntoAction<T, In = (In, Next<In, Out>), Out = Out>
 		+ Default,
 {
 	fn default() -> Self { Self(default()) }
@@ -34,10 +34,10 @@ where
 	Out: 'static,
 	T: Component
 		+ Clone
-		+ IntoTool<T, In = (In, Next<In, Out>), Out = Out>
+		+ IntoAction<T, In = (In, Next<In, Out>), Out = Out>
 		+ Default,
 {
-	let tool = world
+	let action = world
 		.entity(cx.entity)
 		.get::<Middleware<T, In, Out>>()
 		.unwrap()
@@ -46,24 +46,24 @@ where
 	world
 		.commands()
 		.entity(cx.entity)
-		.insert(tool.clone())
+		.insert(action.clone())
 		.queue(move |mut entity: EntityWorldMut| {
 			entity
 				.get_mut_or_default::<MiddlewareList<In, Out>>()
 				.0
-				.push(tool.into_tool());
+				.push(action.into_action());
 		});
 }
 
 
-/// Type-erased collection of middleware tools declared on an ancestor.
+/// Type-erased collection of middleware actions declared on an ancestor.
 ///
 /// Each entry wraps descendants sharing the same `In`/`Out` signature.
 /// Currently used for `Request`/`Response` middleware but generic
 /// to support future middleware signatures.
 #[derive(Debug, Clone, Component)]
 pub struct MiddlewareList<In: 'static, Out: 'static>(
-	pub Vec<Tool<(In, Next<In, Out>), Out>>,
+	pub Vec<Action<(In, Next<In, Out>), Out>>,
 );
 
 impl<In, Out> Default for MiddlewareList<In, Out>
@@ -81,25 +81,25 @@ where
 {
 	pub fn new() -> Self { Self(vec![]) }
 
-	pub fn add<T, M>(&mut self, tool: T)
+	pub fn add<T, M>(&mut self, action: T)
 	where
-		T: IntoTool<M, In = (In, Next<In, Out>), Out = Out>,
+		T: IntoAction<M, In = (In, Next<In, Out>), Out = Out>,
 	{
-		self.0.push(tool.into_tool());
+		self.0.push(action.into_action());
 	}
 
-	/// Apply all middleware in this collection to the given tool,
-	/// returning a new tool with each middleware layered on top.
-	pub fn wrap(&self, tool: &Tool<In, Out>) -> Tool<In, Out>
+	/// Apply all middleware in this collection to the given action,
+	/// returning a new action with each middleware layered on top.
+	pub fn wrap(&self, action: &Action<In, Out>) -> Action<In, Out>
 	where
 		In: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
 	{
-		let mut tool = tool.clone();
+		let mut action = action.clone();
 		for wrapper in &self.0 {
-			tool = wrapper.clone().wrap(tool);
+			action = wrapper.clone().wrap(action);
 		}
-		tool
+		action
 	}
 }
 
@@ -111,13 +111,13 @@ pub struct MiddlewareQuery<'w, 's> {
 }
 
 impl MiddlewareQuery<'_, '_> {
-	/// Wraps a tool with all ancestor middleware for the given entity.
-	pub fn resolve_tool(
+	/// Wraps an action with all ancestor middleware for the given entity.
+	pub fn resolve_action(
 		&self,
 		entity: Entity,
-		tool: Tool<Request, Response>,
-	) -> Tool<Request, Response> {
-		let mut wrapped = tool;
+		action: Action<Request, Response>,
+	) -> Action<Request, Response> {
+		let mut wrapped = action;
 		for list in self.middleware.get_ancestors(entity) {
 			wrapped = list.wrap(&wrapped);
 		}

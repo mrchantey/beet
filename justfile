@@ -190,7 +190,7 @@ test-core *args:
 		-p beet_node 				\
 		-p beet_router 			\
 		-p beet_thread 			\
-		-p beet_tool 				\
+		-p beet_action 			\
 		--all-features {{ args }} -- {{ test-threads }}
 	cargo test						\
 		-p beet_core  			\
@@ -198,13 +198,13 @@ test-core *args:
 		-p beet_node 				\
 		-p beet_router 			\
 		-p beet_thread 			\
-		-p beet_tool 				\
+		-p beet_action 			\
 		--lib --target wasm32-unknown-unknown  \
 		--all-features  {{ args }} -- {{ test-threads }}
-# -p beet_tool 				\
+# -p beet_action 			\
 # -p beet_router 			\
-# cargo test -p beet_tool	 --all-features																					{{ args }} -- {{ test-threads }}
-# cargo test -p beet_tool  --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
+# cargo test -p beet_action	 --all-features																					{{ args }} -- {{ test-threads }}
+# cargo test -p beet_action  --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
 # cargo test -p beet_router --all-features																					{{ args }} -- {{ test-threads }}
 # cargo test -p beet_router --lib --target wasm32-unknown-unknown	 --all-features {{ args }} -- {{ test-threads }}
 

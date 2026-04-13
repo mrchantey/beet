@@ -13,10 +13,10 @@ pub fn stack_cli() -> impl Bundle {
 }
 
 /// Validate the stack
-#[tool(route = "validate")]
+#[action(route = "validate")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn Validate(cx: ToolContext) -> Result<String> {
+async fn Validate(cx: ActionContext) -> Result<String> {
 	cx.caller
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)
@@ -26,10 +26,10 @@ async fn Validate(cx: ToolContext) -> Result<String> {
 		.await
 }
 /// Plan the stack
-#[tool(route = "plan")]
+#[action(route = "plan")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn Plan(cx: ToolContext) -> Result<String> {
+async fn Plan(cx: ActionContext) -> Result<String> {
 	cx.caller
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)

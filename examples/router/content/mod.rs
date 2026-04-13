@@ -51,10 +51,10 @@ fn counter() -> impl Bundle {
 ///
 /// Loads assets from disk on each request so templates can be edited without
 /// restarting the server.
-#[tool]
+#[action]
 #[derive(Default, Clone, Component)]
 async fn LayoutTemplate(
-	cx: ToolContext<(Request, Next<Request, Response>)>,
+	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let (request, next) = cx.take();
 	let response = next.call(request).await?;

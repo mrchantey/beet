@@ -66,7 +66,7 @@ fn setup(mut commands: Commands) {
 						.commands()
 						.spawn((Root, fs_provider, Repeat::new(), children![(
 							Thread::default(),
-							Sequence::new().allow_no_tool(),
+							Sequence::new().allow_no_action(),
 							children![
 								(Actor::system(), children![Post::spawn(
 									r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
@@ -101,10 +101,10 @@ struct Root;
 
 
 /// On each loop, saves the scene to the bucket via [`FsBucketProvider`].
-#[tool]
+#[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-async fn SaveScene(cx: ToolContext) -> Result<Outcome> {
+async fn SaveScene(cx: ActionContext) -> Result<Outcome> {
 	let (bucket, json) = cx
 		.world()
 		.with_then(|world| -> Result<_> {

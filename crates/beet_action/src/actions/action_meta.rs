@@ -2,27 +2,27 @@ use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 
-/// Unified metadata for a tool, combining handler/input/output type
+/// Unified metadata for an action, combining handler/input/output type
 /// information with optional reflection data and description.
 ///
-/// Created via [`ToolMeta::of`], [`ToolMeta::of_tool`],
-/// [`ToolMeta::of_handler`], or [`ToolMeta::of_reflect`].
+/// Created vian [`ActionMeta::of`], [`ActionMeta::of_action`],
+/// [`ActionMeta::of_handler`], or [`ActionMeta::of_reflect`].
 #[derive(Copy, Clone, Debug, Component, Get)]
-pub struct ToolMeta {
-	/// Type metadata for the tool handler.
+pub struct ActionMeta {
+	/// Type metadata for the action handler.
 	handler: TypeMeta,
-	/// Type metadata for the tool input.
+	/// Type metadata for the action input.
 	input: TypeMeta,
-	/// Type metadata for the tool output.
+	/// Type metadata for the action output.
 	output: TypeMeta,
 	/// Reflection data, present when the handler type implements [`Typed`].
 	/// Input/output [`TypeInfo`] is optionally available when those types
 	/// also implement [`Typed`].
-	type_info: Option<ToolTypeInfo>,
+	type_info: Option<ActionTypeInfo>,
 }
 
-impl ToolMeta {
-	/// Create a [`ToolMeta`] from explicit handler, input and output type parameters.
+impl ActionMeta {
+	/// Create an [`ActionMeta`] from explicit handler, input and output type parameters.
 	pub fn of<H: 'static, In: 'static, Out: 'static>() -> Self {
 		Self {
 			handler: TypeMeta::of::<H>(),
@@ -32,10 +32,10 @@ impl ToolMeta {
 		}
 	}
 
-	/// Create a [`ToolMeta`] from a type implementing [`IntoTool`](crate::prelude::IntoTool).
-	pub fn of_tool<T, M>() -> Self
+	/// Create an [`ActionMeta`] from a type implementing [`IntoAction`](crate::prelude::IntoAction).
+	pub fn of_action<T, M>() -> Self
 	where
-		T: 'static + crate::prelude::IntoTool<M>,
+		T: 'static + crate::prelude::IntoAction<M>,
 		T::In: 'static,
 		T::Out: 'static,
 	{
@@ -47,12 +47,12 @@ impl ToolMeta {
 		}
 	}
 
-	/// Create a [`ToolMeta`] with handler reflection data. Provides
+	/// Create an [`ActionMeta`] with handler reflection data. Provides
 	/// description from doc comments but no JSON schemas for input/output.
 	/// Requires only the handler to implement [`Typed`].
 	pub fn of_handler<T, M>() -> Self
 	where
-		T: 'static + Typed + crate::prelude::IntoTool<M>,
+		T: 'static + Typed + crate::prelude::IntoAction<M>,
 		T::In: 'static,
 		T::Out: 'static,
 	{
@@ -60,16 +60,16 @@ impl ToolMeta {
 			handler: TypeMeta::of::<T>(),
 			input: TypeMeta::of::<T::In>(),
 			output: TypeMeta::of::<T::Out>(),
-			type_info: Some(ToolTypeInfo::of_handler::<T>()),
+			type_info: Some(ActionTypeInfo::of_handler::<T>()),
 		}
 	}
 
-	/// Create a [`ToolMeta`] with full reflection data from a type
-	/// implementing both [`Typed`] and [`IntoTool`](crate::prelude::IntoTool).
+	/// Create an [`ActionMeta`] with full reflection data from a type
+	/// implementing both [`Typed`] and [`IntoAction`](crate::prelude::IntoAction).
 	/// Provides description and JSON schemas for input/output.
 	pub fn of_reflect<T, M>() -> Self
 	where
-		T: 'static + Typed + crate::prelude::IntoTool<M>,
+		T: 'static + Typed + crate::prelude::IntoAction<M>,
 		T::In: 'static + Typed,
 		T::Out: 'static + Typed,
 	{
@@ -77,7 +77,7 @@ impl ToolMeta {
 			handler: TypeMeta::of::<T>(),
 			input: TypeMeta::of::<T::In>(),
 			output: TypeMeta::of::<T::Out>(),
-			type_info: Some(ToolTypeInfo::of_full::<T, M>()),
+			type_info: Some(ActionTypeInfo::of_full::<T, M>()),
 		}
 	}
 
@@ -125,7 +125,7 @@ impl ToolMeta {
 			.map(|info| reflect_ext::type_info_to_json_schema(info))
 	}
 
-	/// Assert that the provided types match this tool's input/output types.
+	/// Assert that the provided types match this action's input/output types.
 	///
 	/// # Errors
 	/// Returns an error if types don't match.
@@ -136,13 +136,13 @@ impl ToolMeta {
 		let received_output = TypeMeta::of::<Out>();
 		if *expected_input != received_input {
 			bevybail!(
-				"Tool Call Input mismatch.\nExpected: {}\nReceived: {}.",
+				"Action Call Input mismatch.\nExpected: {}\nReceived: {}.",
 				expected_input,
 				received_input,
 			);
 		} else if *expected_output != received_output {
 			bevybail!(
-				"Tool Call Output mismatch.\nExpected: {}\nReceived: {}.",
+				"Action Call Output mismatch.\nExpected: {}\nReceived: {}.",
 				expected_output,
 				received_output,
 			);
@@ -153,11 +153,11 @@ impl ToolMeta {
 }
 
 
-/// Reflection metadata for a tool. Always includes the handler
+/// Reflection metadata for an action. Always includes the handler
 /// [`TypeInfo`]; input and output [`TypeInfo`] are optional and
-/// present only when created via [`ToolTypeInfo::of_full`].
+/// present only when created vian [`ActionTypeInfo::of_full`].
 #[derive(Debug, Copy, Clone)]
-pub struct ToolTypeInfo {
+pub struct ActionTypeInfo {
 	/// The handler [`TypeInfo`].
 	handler_info: &'static TypeInfo,
 	/// The input [`TypeInfo`], if available.
@@ -166,8 +166,8 @@ pub struct ToolTypeInfo {
 	output_info: Option<&'static TypeInfo>,
 }
 
-impl ToolTypeInfo {
-	/// Create [`ToolTypeInfo`] with only handler reflection data.
+impl ActionTypeInfo {
+	/// Create [`ActionTypeInfo`] with only handler reflection data.
 	/// Provides description but no JSON schemas.
 	pub fn of_handler<T: Typed>() -> Self {
 		Self {
@@ -177,11 +177,11 @@ impl ToolTypeInfo {
 		}
 	}
 
-	/// Create [`ToolTypeInfo`] with full reflection data including
+	/// Create [`ActionTypeInfo`] with full reflection data including
 	/// input and output types.
 	pub fn of_full<T, M>() -> Self
 	where
-		T: Typed + crate::prelude::IntoTool<M>,
+		T: Typed + crate::prelude::IntoAction<M>,
 		T::In: Typed,
 		T::Out: Typed,
 	{

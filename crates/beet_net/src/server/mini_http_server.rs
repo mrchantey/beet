@@ -3,7 +3,7 @@
 //! This is a lightweight alternative to the hyper-based server that
 //! requires no additional dependencies beyond `async-io` and
 //! `futures-lite`. It parses raw HTTP/1.1 requests, dispatches them
-//! through the entity's tool pipeline, and writes raw HTTP responses
+//! through the entity's action pipeline, and writes raw HTTP responses
 //! back to the connection.
 //!
 //! Selected automatically when the `server` feature is enabled but

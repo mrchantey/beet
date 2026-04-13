@@ -1,26 +1,26 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
 
 /// often added alongside streamers, ie `O11sStreamer`
-pub async fn post_streamer_tool<T>(cx: ToolContext) -> Result<Outcome>
+pub async fn post_streamer_action<T>(cx: ActionContext) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {
 	let streamer = cx.caller.get_cloned::<T>().await?;
-	post_streamer_tool_stateful(ToolContext {
+	post_streamer_action_stateful(ActionContext {
 		caller: cx.caller,
 		input: streamer,
 	})
 	.await
 }
-pub async fn post_streamer_tool_stateful<T>(
-	cx: ToolContext<T>,
+pub async fn post_streamer_action_stateful<T>(
+	cx: ActionContext<T>,
 ) -> Result<Outcome>
 where
 	T: Clone + Component + PostStreamer,
 {
-	// TODO somehow expose settings.. PostTool component?
+	// TODO somehow expose settings.. PostAction component?
 	let allow_multiple_modified = false;
 
 	let streamer = cx.input;

@@ -1059,17 +1059,17 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "beet"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "async-executor",
  "beet",
+ "beet_action",
  "beet_core",
  "beet_infra",
  "beet_net",
  "beet_node",
  "beet_router",
  "beet_thread",
- "beet_tool",
  "bevy",
  "console_error_panic_hook",
  "futures",
@@ -1080,8 +1080,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_action"
+version = "0.0.9-dev.8"
+dependencies = [
+ "beet_action",
+ "beet_core",
+ "bevy",
+ "bitflags 2.11.0",
+ "extend",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "beet_core"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1141,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "beet_core_shared",
  "heck 0.4.1",
@@ -1153,7 +1166,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_shared"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1162,14 +1175,14 @@ dependencies = [
 
 [[package]]
 name = "beet_infra"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "async-process",
+ "beet_action",
  "beet_core",
  "beet_infra",
  "beet_net",
  "beet_router",
- "beet_tool",
  "heck 0.4.1",
  "prettyplease",
  "proc-macro2",
@@ -1182,7 +1195,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1195,8 +1208,8 @@ dependencies = [
  "aws-sdk-dynamodb",
  "aws-sdk-s3",
  "base64 0.22.1",
+ "beet_action",
  "beet_core",
- "beet_tool",
  "bevy",
  "blocking",
  "bytes",
@@ -1235,11 +1248,11 @@ dependencies = [
 
 [[package]]
 name = "beet_node"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
+ "beet_action",
  "beet_core",
  "beet_net",
- "beet_tool",
  "bevy",
  "bevy_ratatui",
  "bytes",
@@ -1257,12 +1270,12 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
+ "beet_action",
  "beet_core",
  "beet_net",
  "beet_node",
- "beet_tool",
  "bevy",
  "bevy_ratatui",
  "bitflags 2.11.0",
@@ -1277,16 +1290,16 @@ dependencies = [
 
 [[package]]
 name = "beet_thread"
-version = "0.0.9-dev.6"
+version = "0.0.9-dev.8"
 dependencies = [
  "async-lock",
  "async-openai",
  "base64 0.22.1",
+ "beet_action",
  "beet_core",
  "beet_net",
  "beet_router",
  "beet_thread",
- "beet_tool",
  "bevy",
  "futures",
  "js-sys",
@@ -1299,19 +1312,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "beet_tool"
-version = "0.0.9-dev.6"
-dependencies = [
- "beet_core",
- "beet_tool",
- "bevy",
- "bitflags 2.11.0",
- "extend",
- "serde",
- "serde_json",
 ]
 
 [[package]]

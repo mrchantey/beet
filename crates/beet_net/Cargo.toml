@@ -8,7 +8,7 @@ readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["router", "request", "buckets", "key-value-store", "tool"]
+keywords = ["router", "request", "buckets", "key-value-store", "action"]
 categories.workspace = true
 publish = true
 
@@ -76,7 +76,7 @@ bevy_reflect_documentation = ["bevy/reflect_documentation"]
 
 [dependencies]
 beet_core = {workspace = true,features=["http"]}
-beet_tool = {workspace = true}
+beet_action = {workspace = true}
 
 bevy.workspace = true
 

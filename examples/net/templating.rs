@@ -31,7 +31,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				Count::default(),
-				Tool::<Request, Response>::new_system(router),
+				Action::<Request, Response>::new_system(router),
 			));
 		})
 		.run();
@@ -42,7 +42,7 @@ struct Count(u32);
 
 /// A simple router implementation that matches the request path
 fn router(
-	In(cx): In<ToolContext<Request>>,
+	In(cx): In<ActionContext<Request>>,
 	mut counts: Query<&mut Count>,
 ) -> Result<Response> {
 	let entity = cx.caller.id();

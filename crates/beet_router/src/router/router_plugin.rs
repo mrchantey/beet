@@ -1,14 +1,14 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 
-/// Plugin that registers route-building observers for tools.
+/// Plugin that registers route-building observers for actions.
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
-/// whenever tools are spawned in an entity hierarchy. Scene routes
-/// register as tools (via [`DocumentScope`] + [`ToolMeta`]), so there
+/// whenever actions are spawned in an entity hierarchy. Scene routes
+/// register as actions (via [`DocumentScope`] + [`ActionMeta`]), so there
 /// is no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -18,28 +18,28 @@ impl Plugin for RouterPlugin {
 		app.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
 			.register_type::<PathPartial>()
-			.add_observer(insert_tool_path_and_params)
+			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_route_tree);
 	}
 }
 
-/// Observer that listens for new tools and inserts their path and params patterns.
+/// Observer that listens for new actions and inserts their path and params patterns.
 /// Any [`PathPartial`] or [`ParamsPartial`] will be collected so long as they are
-/// spawned at the same time as the tool, even if they come after it in the tuple.
+/// spawned at the same time as the action, even if they come after it in the tuple.
 /// This is because, unlike OnAdd component hooks, observers run after the entire
 /// tree is spawned.
 ///
-/// Control-flow tools (ie [`Sequence`], [`Repeat`]) that have no [`PathPartial`]
+/// Control-flow actions (ie [`Sequence`], [`Repeat`]) that have no [`PathPartial`]
 /// anywhere in their hierarchy are skipped — they are not HTTP routes.
-pub fn insert_tool_path_and_params(
-	ev: On<Insert, ToolMeta>,
+pub fn insert_action_path_and_params(
+	ev: On<Insert, ActionMeta>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
-	// skip tools with no explicit path — control-flow tools like Sequence and
-	// RepeatTimes require a Tool via #[require] but should not become routes
+	// skip actions with no explicit path — control-flow actions like Sequence and
+	// RepeatTimes require a Action via #[require] but should not become routes
 	let has_path = ancestors
 		.iter_ancestors_inclusive(ev.entity)
 		.any(|entity| paths.contains(entity));
@@ -55,25 +55,25 @@ pub fn insert_tool_path_and_params(
 /// Observer that rebuilds the [`RouteTree`] on the root ancestor
 /// whenever a [`PathPattern`] is inserted on any entity in the hierarchy.
 ///
-/// Collects all entities with tool components ([`ToolMeta`], [`PathPattern`],
+/// Collects all entities with action components ([`ActionMeta`], [`PathPattern`],
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
-/// tree. Scene routes are distinguished from regular tools by their output
-/// type being [`SceneEntity`], detected via [`ToolMeta::output_is`].
+/// tree. Scene routes are distinguished from regular actions by their output
+/// type being [`SceneEntity`], detected vian [`ActionMeta::output_is`].
 // TODO this is a bit wasteful, if we used change detection could deduplicate added,
 // and only generate once, but we'd still want a guanratee the system runs immediately
 pub fn insert_route_tree(
 	ev: On<Insert, PathPattern>,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,
-	tools: Query<ToolQueryItem, Without<RouteHidden>>,
+	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 	mut commands: Commands,
 ) -> Result {
 	let root = ancestors.root_ancestor(ev.entity);
-	let mut nodes: Vec<ToolNode> = Vec::new();
+	let mut nodes: Vec<ActionNode> = Vec::new();
 	// when added via ChildOf, it will not have been added to the Children,
 	// so we check this one manually
-	if let Ok(item) = tools.get(ev.entity) {
-		nodes.push(ToolNode::from_query(item));
+	if let Ok(item) = actions.get(ev.entity) {
+		nodes.push(ActionNode::from_query(item));
 	}
 
 	for entity in children_query
@@ -81,8 +81,8 @@ pub fn insert_route_tree(
 		// we've already checked this one
 		.filter(|entity| *entity != ev.entity)
 	{
-		if let Ok(item) = tools.get(entity) {
-			nodes.push(ToolNode::from_query(item));
+		if let Ok(item) = actions.get(entity) {
+			nodes.push(ActionNode::from_query(item));
 		}
 	}
 

@@ -1,7 +1,7 @@
 //! CLI-based server for running beet applications from the command line.
 //!
 //! This module provides [`CliServer`], which accepts command-line arguments
-//! as a request and logs the response to stdout. Useful for CLI tools and
+//! as a request and logs the response to stdout. Useful for CLI actions and
 //! scripting.
 //!
 //! ## Accept Header

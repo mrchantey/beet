@@ -3,7 +3,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::future::Future;
 
-/// HTTP server that listens for incoming requests, triggering a [`Tool::<Request,Response>`] call.
+/// HTTP server that listens for incoming requests, triggering an [`Action::<Request,Response>`] call.
 ///
 /// When spawned, this component automatically starts a server on the specified port.
 /// The underlying implementation depends on compile-time feature flags:

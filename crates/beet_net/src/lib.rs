@@ -4,7 +4,7 @@
 #![deny(missing_docs)]
 
 mod client;
-mod tools;
+mod actions;
 mod types;
 /// Re-export the typed header module at crate level.
 pub use types::header;
@@ -36,7 +36,7 @@ pub mod prelude {
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
-	pub use crate::tools::*;
+	pub use crate::actions::*;
 	pub use crate::types::*;
 	// Re-export core types used in beet_net's public API
 	pub use beet_core::prelude::MediaBytes;

@@ -17,7 +17,7 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((Repeat::new(), children![(
 			Thread::default(),
-			Sequence::new().allow_no_tool(),
+			Sequence::new().allow_no_action(),
 			children![
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"

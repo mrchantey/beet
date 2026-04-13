@@ -1,7 +1,7 @@
 //! # Basic Server
 //!
 //! This example demonstrates creating a basic server in Beet
-//! using [`Tool::new_pure`], the simplest synchronous exchange pattern.
+//! using [`Action::new_pure`], the simplest synchronous exchange pattern.
 //! For concurrent request handling see [`spawn_exchange`].
 //!
 //!
@@ -35,7 +35,7 @@ fn main() {
 				// CliServer::default(),
 				HttpServer::default(),
 				Count::default(),
-				Tool::<Request, Response>::new_system(handler),
+				Action::<Request, Response>::new_system(handler),
 			));
 		})
 		.run();
@@ -46,7 +46,7 @@ struct Count(u32);
 
 /// Handler function that processes all incoming requests.
 fn handler(
-	cx: In<ToolContext<Request>>,
+	cx: In<ActionContext<Request>>,
 	mut query: Query<&mut Count>,
 ) -> Result<Response> {
 	let caller = cx.id();

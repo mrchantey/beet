@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 /// A reference to a specific field in a document.
 ///
-/// Used by content and tools to interact with document fields. By default,
+/// Used by content and actions to interact with document fields. By default,
 /// fields are initialized with `null` if missing, unless configured otherwise
 /// via [`on_missing`](FieldRef::on_missing).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]

@@ -1,14 +1,14 @@
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
 pub(crate) fn insert_tool_definition(
-	// path pattern is inserted by ToolMeta
+	// path pattern is inserted by ActionMeta
 	ev: On<Insert, PathPattern>,
 	mut commands: Commands,
-	query: Query<(&ToolMeta, &PathPattern)>,
+	query: Query<(&ActionMeta, &PathPattern)>,
 ) -> Result {
 	let tool = query.get(ev.entity)?;
 	let def: ToolDefinition = FunctionToolDefinition::from_meta(tool)?.into();
@@ -91,7 +91,9 @@ impl FunctionToolDefinition {
 	pub fn description(&self) -> &str { &self.description }
 	pub fn params_schema(&self) -> &serde_json::Value { &self.params_schema }
 
-	pub fn from_meta((meta, path): (&ToolMeta, &PathPattern)) -> Result<Self> {
+	pub fn from_meta(
+		(meta, path): (&ActionMeta, &PathPattern),
+	) -> Result<Self> {
 		if !path.is_static() {
 			bevybail!(
 				"Tool path must be static (no parameters or wildcards) to create a FunctionToolDefinition.\nPath provided: {path}"
@@ -101,10 +103,10 @@ impl FunctionToolDefinition {
 		let description = meta
 			.description()
 			.ok_or_else(||{
-				bevyhow!("ToolMeta lacks description, which is required to create a FunctionToolDefinition.\n{meta:?}")
+				bevyhow!("ActionMeta lacks description, which is required to create a FunctionToolDefinition.\n{meta:?}")
 			})?;
 		let params_schema = meta.input_json_schema().ok_or_else(||{
-			bevyhow!("ToolMeta lacks input json schema, which is required to create a FunctionToolDefinition.\n{meta:?}")
+			bevyhow!("ActionMeta lacks input json schema, which is required to create a FunctionToolDefinition.\n{meta:?}")
 		})?;
 		Ok(Self::new(path, description, params_schema))
 	}

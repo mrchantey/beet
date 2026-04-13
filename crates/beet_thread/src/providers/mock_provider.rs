@@ -4,8 +4,8 @@
 //! - With tools, it calls the first tool with default argument values
 //! - Without tools, it echoes the input prefixed with "you said:"
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -32,12 +32,11 @@ pub struct MockPostStreamer {
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(Tool::<(), Outcome>::new_async(
-			post_streamer_tool::<MockPostStreamer>,
-		));
+	world.commands().entity(cx.entity).insert(
+		Action::<(), Outcome>::new_async(
+			post_streamer_action::<MockPostStreamer>,
+		),
+	);
 }
 
 impl MockPostStreamer {

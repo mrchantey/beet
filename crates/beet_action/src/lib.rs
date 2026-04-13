@@ -3,7 +3,7 @@
 // #![deny(missing_docs)]
 
 mod control_flow;
-mod tools;
+mod actions;
 
 /// Exports the most commonly used items.
 pub mod prelude {
@@ -13,5 +13,5 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
-	pub use crate::tools::*;
+	pub use crate::actions::*;
 }

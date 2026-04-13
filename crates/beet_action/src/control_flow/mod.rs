@@ -18,10 +18,10 @@ bitflags! {
 	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
 	#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 	pub struct ChildError: u8 {
-		/// Child entity has no [`ToolMeta`] component.
-		const NO_TOOL = 0b01;
-		/// Child entity has a tool with an incompatible signature.
-		const TOOL_MISMATCH = 0b10;
+		/// Child entity has no [`ActionMeta`] component.
+		const NO_ACTION = 0b01;
+		/// Child entity has an action with an incompatible signature.
+		const ACTION_MISMATCH = 0b10;
 	}
 }
 
@@ -31,7 +31,7 @@ bitflags! {
 ///
 /// Outcome payloads default to `()` and variants are exposed at the crate level:
 /// ```rust
-/// # use beet_tool::prelude::*;
+/// # use beet_action::prelude::*;
 ///
 /// fn short() -> Outcome {
 /// 	Pass(())

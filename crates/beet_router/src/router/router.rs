@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::IntoResponse;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// Creates a router bundle with help and navigate middleware.
 ///
@@ -11,8 +11,8 @@ use beet_tool::prelude::*;
 /// - [`HelpHandler`] middleware for `--help` support
 /// - [`NavigateHandler`] middleware for `--navigate` support
 ///
-/// Does **not** include a [`SceneToolRenderer`] — rendering falls
-/// back to the default renderer when no [`SceneToolRenderer`] is
+/// Does **not** include a [`SceneActionRenderer`] — rendering falls
+/// back to the default renderer when no [`SceneActionRenderer`] is
 /// found on an ancestor.
 pub fn router() -> impl Bundle {
 	(
@@ -22,15 +22,15 @@ pub fn router() -> impl Bundle {
 	)
 }
 
-/// Routes a request to the matching tool in the [`RouteTree`],
-/// applying ancestor [`MiddlewareList`] around the matched tool.
+/// Routes a request to the matching action in the [`RouteTree`],
+/// applying ancestor [`MiddlewareList`] around the matched action.
 ///
 /// When no route matches, renders contextual not-found help.
 /// Middleware such as [`HelpHandler`] and [`NavigateHandler`] wrap
-/// the inner tool so they can intercept before dispatch.
-#[tool]
+/// the inner action so they can intercept before dispatch.
+#[action]
 #[derive(Debug, Clone, Component)]
-pub async fn Router(cx: ToolContext<Request>) -> Response {
+pub async fn Router(cx: ActionContext<Request>) -> Response {
 	let caller = cx.caller.clone();
 	let world = cx.world();
 	let request = cx.input;
@@ -40,56 +40,56 @@ pub async fn Router(cx: ToolContext<Request>) -> Response {
 	let node = world
 		.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
 			query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
-				bevyhow!("Route tree not found. Was the `ToolMeta` added? was the `RouterPlugin` added?")
+				bevyhow!("Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?")
 			})
 		})
 		.await;
 
-	// resolve the inner tool and dispatch entity from the matched route
-	let (inner_tool, dispatch_entity) = match &node {
+	// resolve the inner action and dispatch entity from the matched route
+	let (inner_action, dispatch_entity) = match &node {
 		Ok(Some(node)) => {
 			let entity = world.entity(node.entity);
-			match entity.clone().get_cloned::<ExchangeTool>().await {
-				Ok(tool) => (tool.into_tool(), entity),
+			match entity.clone().get_cloned::<ExchangeAction>().await {
+				Ok(action) => (action.into_action(), entity),
 				Err(err) => return err.into_response(),
 			}
 		}
 		Ok(None) => {
 			// no matching route — build a not-found response through
 			// the contextual help system so middleware still applies
-			(ContextualNotFound.into_tool(), cx.caller.clone())
+			(ContextualNotFound.into_action(), cx.caller.clone())
 		}
 		Err(err) => return bevyhow!("{err}").into_response(),
 	};
 
-	// wrap the inner tool with ancestor middleware resolved from the
+	// wrap the inner action with ancestor middleware resolved from the
 	// dispatch entity so route-scoped middleware is correctly applied
 	let dispatch_id = dispatch_entity.id();
-	let tool = world
+	let action = world
 		.with_state::<MiddlewareQuery, _>(move |query| {
-			query.resolve_tool(dispatch_id, inner_tool)
+			query.resolve_action(dispatch_id, inner_action)
 		})
 		.await;
 
-	// dispatch on the route entity so cx.caller in the exchange tool
-	// (and inner tools) is the route entity, not the server entity
+	// dispatch on the route entity so cx.caller in the exchange action
+	// (and inner actions) is the route entity, not the server entity
 	dispatch_entity
-		.call_detached(tool, request)
+		.call_detached(action, request)
 		.await
 		.unwrap_or_else(|err| err.into_response())
 }
 
 
-/// Type-erased `Tool<Request, Response>` stored on each route entity.
+/// Type-erased `Action<Request, Response>` stored on each route entity.
 /// Handles request extraction and response conversion so the router
 /// can dispatch uniformly.
 #[derive(Clone, Component)]
-pub struct ExchangeTool {
-	inner: Tool<Request, Response>,
+pub struct ExchangeAction {
+	inner: Action<Request, Response>,
 }
 
-impl ExchangeTool {
-	/// Creates an exchange tool that calls the entity's own typed tool,
+impl ExchangeAction {
+	/// Creates an exchange action that calls the entity's own typed action,
 	/// extracting input from the request and converting output to a response.
 	pub fn new<In, Out, M1, M2>() -> Self
 	where
@@ -97,8 +97,8 @@ impl ExchangeTool {
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
 	{
 		Self {
-			inner: Tool::new_async(
-				async |cx: ToolContext<Request>| -> Result<Response> {
+			inner: Action::new_async(
+				async |cx: ActionContext<Request>| -> Result<Response> {
 					let parts = cx.input.parts().clone();
 					let input = In::from_request(cx.input).await?;
 					let output: Out = cx.caller.call(input).await?;
@@ -108,25 +108,25 @@ impl ExchangeTool {
 		}
 	}
 
-	/// Wraps an existing `Tool<Request, Response>` directly.
-	/// Use this when you already have a fully constructed tool
+	/// Wraps an existing `Action<Request, Response>` directly.
+	/// Use this when you already have a fully constructed action
 	/// that handles its own request/response lifecycle.
-	pub fn from_tool(tool: Tool<Request, Response>) -> Self {
-		Self { inner: tool }
+	pub fn from_action(action: Action<Request, Response>) -> Self {
+		Self { inner: action }
 	}
 
-	/// Creates an exchange tool that calls a detached inner tool
-	/// instead of the entity's own tool.
+	/// Creates an exchange action that calls a detached inner action
+	/// instead of the entity's own action.
 	pub fn new_detached<In, Out, Inner, M1, M2, M3>(inner: Inner) -> Self
 	where
 		In: 'static + Send + Sync + FromRequest<M1>,
 		Out: 'static + Send + Sync + ExchangeRouteOut<M2>,
-		Inner: 'static + Send + Sync + IntoTool<M3, In = In, Out = Out>,
+		Inner: 'static + Send + Sync + IntoAction<M3, In = In, Out = Out>,
 	{
-		let inner = inner.into_tool();
+		let inner = inner.into_action();
 		Self {
-			inner: Tool::new_async(
-				async move |cx: ToolContext<Request>| -> Result<Response> {
+			inner: Action::new_async(
+				async move |cx: ActionContext<Request>| -> Result<Response> {
 					let parts = cx.input.parts().clone();
 					let input = In::from_request(cx.input).await?;
 					let output: Out =
@@ -137,7 +137,7 @@ impl ExchangeTool {
 		}
 	}
 
-	/// Dispatches a request through this exchange tool on the given entity.
+	/// Dispatches a request through this exchange action on the given entity.
 	pub async fn call(
 		&self,
 		entity: AsyncEntity,
@@ -147,18 +147,18 @@ impl ExchangeTool {
 	}
 }
 
-impl IntoTool<Self> for ExchangeTool {
+impl IntoAction<Self> for ExchangeAction {
 	type In = Request;
 	type Out = Response;
-	fn into_tool(self) -> Tool<Request, Response> { self.inner }
+	fn into_action(self) -> Action<Request, Response> { self.inner }
 }
 
-/// Trait for converting a tool's output into a [`Response`].
+/// Trait for converting an action's output into a [`Response`].
 ///
 /// Three blanket impls cover the main cases:
 /// - Types implementing [`IntoResponse`] (direct conversion)
 /// - Types implementing [`Serialize`] (serde content negotiation)
-/// - [`Entity`] (scene rendering via [`SceneToolRenderer`])
+/// - [`Entity`] (scene rendering via [`SceneActionRenderer`])
 pub trait ExchangeRouteOut<M>
 where
 	Self: Sized,
@@ -216,7 +216,7 @@ where
 }
 
 /// A route that returns a [`SceneEntity`] is a scene route.
-/// The entity is rendered via the ancestor [`SceneToolRenderer`]
+/// The entity is rendered via the ancestor [`SceneActionRenderer`]
 /// and then converted to a response. Ephemeral scene entities
 /// are cleaned up after rendering.
 impl ExchangeRouteOut<Self> for SceneEntity {
@@ -226,7 +226,7 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
-			SceneToolRenderer::render_entity(&caller, self, parts).await
+			SceneActionRenderer::render_entity(&caller, self, parts).await
 		})
 	}
 }
@@ -273,7 +273,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_node::prelude::*;
-	use beet_tool::prelude::*;
+	use beet_action::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 

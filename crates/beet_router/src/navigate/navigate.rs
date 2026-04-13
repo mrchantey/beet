@@ -2,13 +2,13 @@
 //!
 //! The [`NavigateHandler`] middleware checks for a `--navigate` param
 //! and resolves the target path relative to the current request path,
-//! then calls the target tool directly for rendering. If the param
+//! then calls the target action directly for rendering. If the param
 //! is absent, calls the inner handler via [`Next`].
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// The direction to navigate relative to the current path.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
@@ -59,11 +59,11 @@ impl std::fmt::Display for NavigateTo {
 /// Middleware that intercepts `--navigate` and resolves the target
 /// route from the [`RouteTree`]. If the param is absent, calls the
 /// inner handler via [`Next`].
-#[tool]
+#[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub async fn NavigateHandler(
-	cx: ToolContext<(Request, Next<Request, Response>)>,
+	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
@@ -75,12 +75,12 @@ pub async fn NavigateHandler(
 
 	let direction = NavigateTo::from_str_param(&value)?;
 	let current_path = request.path().clone();
-	let tool_entity = caller.id();
+	let action_entity = caller.id();
 	let world = caller.world();
 
 	let resolved = world
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(move |query| {
-			let tree = query.get(tool_entity)?;
+			let tree = query.get(action_entity)?;
 			let target_path =
 				resolve_navigation(tree, &current_path, direction)?;
 			tree.find(&target_path).cloned().xok()
@@ -96,9 +96,9 @@ pub async fn NavigateHandler(
 		.xok();
 	};
 
-	// Dispatch through the route's ExchangeTool
+	// Dispatch through the route's ExchangeAction
 	let entity = world.entity(node.entity);
-	let exchange = entity.clone().get_cloned::<ExchangeTool>().await?;
+	let exchange = entity.clone().get_cloned::<ExchangeAction>().await?;
 	let response = exchange.call(entity, request).await?;
 
 	response.xok()
@@ -248,7 +248,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_node::prelude::*;
-	use beet_tool::prelude::*;
+	use beet_action::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_tool::prelude::*;
 use bevy::app::Plugins;
 
 #[derive(Debug)]

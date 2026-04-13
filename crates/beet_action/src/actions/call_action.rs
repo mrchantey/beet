@@ -4,7 +4,7 @@ use beet_core::exports::async_channel::Receiver;
 use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
 
-/// Dispatches a tool call through a cached system, then flushes the world.
+/// Dispatches an action call through a cached system, then flushes the world.
 fn call_world<Input, Out>(
 	entity: Entity,
 	world: &mut World,
@@ -16,35 +16,35 @@ where
 	Out: 'static + Send + Sync,
 {
 	world.run_system_cached_with::<_, Result, _, _>(
-		call_tool_system::<Input, Out>,
+		call_action_system::<Input, Out>,
 		(entity, input, out_handler),
 	)??;
 	world.flush();
 	Ok(())
 }
 
-fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
+fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
 	In((caller, input, out_handler)): In<(Entity, Input, OutHandler<Out>)>,
 	commands: AsyncCommands,
-	tools: Query<&Tool<Input, Out>>,
-	metas: Query<&ToolMeta>,
+	actions: Query<&Action<Input, Out>>,
+	metas: Query<&ActionMeta>,
 ) -> Result {
-	let tool = match tools.get(caller) {
-		Ok(tool) => tool,
+	let action = match actions.get(caller) {
+		Ok(action) => action,
 		Err(_) => {
-			// provide a detailed mismatch diagnostic when ToolMeta is present
+			// provide a detailed mismatch diagnostic when ActionMeta is present
 			if let Ok(meta) = metas.get(caller) {
 				meta.assert_match::<Input, Out>()?;
 			}
 			bevybail!(
-				"No Tool<{}, {}> on entity {caller:?}",
+				"No Action<{}, {}> on entity {caller:?}",
 				std::any::type_name::<Input>(),
 				std::any::type_name::<Out>()
 			);
 		}
 	};
 
-	tool.call(ToolCall {
+	action.call(ActionCall {
 		commands,
 		caller,
 		input,
@@ -56,7 +56,7 @@ fn call_tool_system<Input: Send + Sync, Out: Send + Sync>(
 /// Wires a channel-based [`OutHandler`] and calls [`call_world`].
 ///
 /// Returns the receiving end of the channel so the caller can await the result.
-/// The channel carries `Result<Out>` so that async tool errors propagate
+/// The channel carries `Result<Out>` so that async action errors propagate
 /// back to the caller instead of silently closing the channel.
 #[track_caller]
 fn call_with_channel<Input, Out>(
@@ -71,14 +71,14 @@ where
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
 		send.try_send(result).map_err(|err| {
-			bevyhow!("Failed to send tool output through channel: {err:?}")
+			bevyhow!("Failed to send action output through channel: {err:?}")
 		})
 	});
 	call_world(entity, world, input, out_handler)?;
 	Ok(recv)
 }
 
-/// Unwraps a `Result<Out>` received from a tool-call channel,
+/// Unwraps a `Result<Out>` received from an action-call channel,
 /// providing a clear error when the channel closes unexpectedly.
 fn unwrap_channel_result<Out>(
 	result: std::result::Result<Result<Out>, async_channel::RecvError>,
@@ -86,12 +86,12 @@ fn unwrap_channel_result<Out>(
 	match result {
 		Ok(inner) => inner,
 		Err(_) => {
-			bevybail!("Tool call response channel closed unexpectedly.")
+			bevybail!("Action call response channel closed unexpectedly.")
 		}
 	}
 }
 
-/// Drives a tool call to completion from an [`EntityWorldMut`] context,
+/// Drives an action call to completion from an [`EntityWorldMut`] context,
 /// polling the world as needed while waiting for the result.
 async fn call_inner<Input, Out>(
 	entity: EntityWorldMut<'_>,
@@ -110,21 +110,21 @@ where
 			AsyncRunner::poll_and_update(|| world.update_local(), recv).await?
 		}
 		Err(TryRecvError::Closed) => {
-			bevybail!("Tool call response channel closed unexpectedly.")
+			bevybail!("Action call response channel closed unexpectedly.")
 		}
 	}
 }
 
 
-/// Extension trait for calling [`Tool`] components on
+/// Extension trait for calling [`Action`] components on
 /// [`EntityWorldMut`].
-#[extend::ext(name=EntityWorldMutToolExt)]
+#[extend::ext(name=EntityWorldMutActionExt)]
 pub impl EntityWorldMut<'_> {
-	/// Call a tool and block until the result is ready.
+	/// Call an action and block until the result is ready.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Tool`] component
-	/// or the tool call fails.
+	/// Errors if the entity has no matching [`Action`] component
+	/// or the action call fails.
 	fn call_blocking<
 		Input: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
@@ -135,11 +135,11 @@ pub impl EntityWorldMut<'_> {
 		async_ext::block_on(call_inner(self, input))
 	}
 
-	/// Call a tool asynchronously, polling the world until completion.
+	/// Call an action asynchronously, polling the world until completion.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Tool`] component
-	/// or the tool call fails.
+	/// Errors if the entity has no matching [`Action`] component
+	/// or the action call fails.
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: Input,
@@ -150,7 +150,7 @@ pub impl EntityWorldMut<'_> {
 
 fn call_with_channel_for_value<Input, Out>(
 	entity: EntityWorldMut,
-	tool: Tool<Input, Out>,
+	action: Action<Input, Out>,
 	input: Input,
 ) -> Result<Receiver<Result<Out>>>
 where
@@ -160,24 +160,24 @@ where
 	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
 	let out_handler = OutHandler::new(move |_, result: Result<Out>| {
 		send.try_send(result).map_err(|err| {
-			bevyhow!("Failed to send tool output through channel: {err:?}")
+			bevyhow!("Failed to send action output through channel: {err:?}")
 		})
 	});
-	tool.call_world(entity, input, out_handler)?;
+	action.call_world(entity, input, out_handler)?;
 	Ok(recv)
 }
 
-/// Extension trait for calling tools on [`AsyncEntity`] handles.
-#[extend::ext(name=AsyncEntityToolExt)]
+/// Extension trait for calling actions on [`AsyncEntity`] handles.
+#[extend::ext(name=AsyncEntityActionExt)]
 pub impl AsyncEntity {
-	/// Make a tool call asynchronously.
+	/// Make an action call asynchronously.
 	///
-	/// The world's normal update loop drives any async work inside the tool;
+	/// The world's normal update loop drives any async work inside the action;
 	/// this side just awaits the channel result.
 	///
 	/// # Errors
-	/// Errors if the entity has no matching [`Tool`] or the
-	/// tool call fails.
+	/// Errors if the entity has no matching [`Action`] or the
+	/// action call fails.
 	#[track_caller]
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		&self,
@@ -198,31 +198,31 @@ pub impl AsyncEntity {
 		}
 	}
 
-	/// Call a [`Tool`] value directly, without it being attached to an entity.
+	/// Call an [`Action`] value directly, without it being attached to an entity.
 	///
-	/// Uses `self` as the entity context passed to the tool handler. The
+	/// Uses `self` as the entity context passed to the action handler. The
 	/// handler may use or ignore this entity depending on its implementation.
 	///
 	/// # Errors
-	/// Errors if the tool handler fails or the response channel closes.
+	/// Errors if the action handler fails or the response channel closes.
 	fn call_detached<
 		Input: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
 		M,
 	>(
 		&self,
-		tool: impl IntoTool<M, In = Input, Out = Out>,
+		action: impl IntoAction<M, In = Input, Out = Out>,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
 		let entity_id = self.id();
 		let world = self.world().clone();
-		let tool = tool.into_tool();
+		let action = action.into_action();
 		async move {
 			let recv = world
 				.with_then(move |world: &mut World| {
 					call_with_channel_for_value(
 						world.entity_mut(entity_id),
-						tool,
+						action,
 						input,
 					)
 				})
@@ -232,10 +232,10 @@ pub impl AsyncEntity {
 	}
 }
 
-/// Extension trait for queuing tool calls via [`EntityCommands`].
-#[extend::ext(name=EntityCommandsToolExt)]
+/// Extension trait for queuing action calls via [`EntityCommands`].
+#[extend::ext(name=EntityCommandsActionExt)]
 pub impl EntityCommands<'_> {
-	/// Queue a tool call with the provided input and output handler.
+	/// Queue an action call with the provided input and output handler.
 	///
 	/// The call will be executed when commands are applied.
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(

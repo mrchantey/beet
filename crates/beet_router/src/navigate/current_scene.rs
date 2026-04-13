@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 /// like TUI.
 ///
 /// Used by the TUI draw system to know which scene to render. The
-/// render tool despawns the previous scene before inserting this on
+/// render action despawns the previous scene before inserting this on
 /// the new one. The [`single_current_scene`] observer acts as a
 /// safety net, removing stale markers if anything else inserts this
 /// component.

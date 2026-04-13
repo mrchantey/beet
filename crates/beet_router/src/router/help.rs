@@ -9,15 +9,15 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_node::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// Middleware that intercepts `--help` and renders scoped help
 /// as a beet_node scene entity tree.
-#[tool]
+#[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub async fn HelpHandler(
-	cx: ToolContext<(Request, Next<Request, Response>)>,
+	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
@@ -39,7 +39,7 @@ pub async fn HelpHandler(
 				} else {
 					tree.flatten_nodes()
 				};
-				let filtered: Vec<&ToolNode> = nodes
+				let filtered: Vec<&ActionNode> = nodes
 					.into_iter()
 					.filter(|node| {
 						node.path.annotated_rel_path().last_segment()
@@ -49,7 +49,7 @@ pub async fn HelpHandler(
 				filtered
 					.into_iter()
 					.cloned()
-					.collect::<Vec<ToolNode>>()
+					.collect::<Vec<ActionNode>>()
 					.xok()
 			},
 		)
@@ -57,15 +57,15 @@ pub async fn HelpHandler(
 
 	let scene = spawn_help_scene(&caller, &nodes).await;
 	let response =
-		SceneToolRenderer::render_entity(&caller, scene, parts).await?;
+		SceneActionRenderer::render_entity(&caller, scene, parts).await?;
 	Ok(response)
 }
 
 /// Fallback handler that shows help scoped to the nearest ancestor scene
 /// of an unmatched path. Returns a NOT_FOUND status with the help scene.
-#[tool]
+#[action]
 pub(crate) async fn ContextualNotFound(
-	cx: ToolContext<Request>,
+	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let path = cx.input.path().clone();
 
@@ -82,7 +82,7 @@ pub(crate) async fn ContextualNotFound(
 		.await?;
 
 	let scene = spawn_not_found_scene(&cx.caller, &preamble, &nodes).await;
-	let mut response = SceneToolRenderer::render_entity(
+	let mut response = SceneActionRenderer::render_entity(
 		&cx.caller,
 		scene,
 		cx.input.parts().clone(),
@@ -97,7 +97,7 @@ pub(crate) async fn ContextualNotFound(
 fn nearest_ancestor_help_nodes(
 	tree: &RouteTree,
 	segments: &[String],
-) -> (String, Vec<ToolNode>) {
+) -> (String, Vec<ActionNode>) {
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
 		if let Some(node) = tree.find(prefix) {
@@ -119,7 +119,7 @@ fn nearest_ancestor_help_nodes(
 	(preamble, nodes)
 }
 
-fn filtered_nodes(tree: &RouteTree) -> Vec<ToolNode> {
+fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
 	tree.flatten_nodes()
 		.into_iter()
 		.filter(|node| {
@@ -132,11 +132,11 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ToolNode> {
 /// Spawns a help scene entity tree with route documentation.
 async fn spawn_help_scene(
 	caller: &AsyncEntity,
-	nodes: &[ToolNode],
+	nodes: &[ActionNode],
 ) -> SceneEntity {
 	let children: Vec<(Element, OnSpawn)> = nodes
 		.iter()
-		.map(|node| format_tool_node_bundle(node))
+		.map(|node| format_action_node_bundle(node))
 		.collect();
 
 	let world = caller.world();
@@ -158,11 +158,11 @@ async fn spawn_help_scene(
 async fn spawn_not_found_scene(
 	caller: &AsyncEntity,
 	preamble: &str,
-	nodes: &[ToolNode],
+	nodes: &[ActionNode],
 ) -> SceneEntity {
 	let children: Vec<(Element, OnSpawn)> = nodes
 		.iter()
-		.map(|node| format_tool_node_bundle(node))
+		.map(|node| format_action_node_bundle(node))
 		.collect();
 
 	let world = caller.world();
@@ -185,7 +185,7 @@ async fn spawn_not_found_scene(
 ///
 /// Each route renders as a `<li>` containing the path heading
 /// and a nested `<ul>` with description, type info, and parameters.
-fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
+fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 	let path = node.path.annotated_rel_path().to_string();
 
 	// path with leading slash and kind tag
@@ -249,9 +249,9 @@ fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	)
 }
 
-/// Format a [`RouteTree`] as a help string, listing both scenes and tools.
+/// Format a [`RouteTree`] as a help string, listing both scenes and actions.
 ///
-/// The help tool itself is excluded from the listing.
+/// The help action itself is excluded from the listing.
 /// Retained for backward compatibility with tests and plaintext rendering.
 pub fn format_route_help(tree: &RouteTree) -> String {
 	let mut output = String::new();
@@ -259,7 +259,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 
 	let nodes = tree.flatten_nodes();
 
-	let filtered: Vec<&ToolNode> = nodes
+	let filtered: Vec<&ActionNode> = nodes
 		.into_iter()
 		.filter(|node| {
 			node.path.annotated_rel_path().last_segment() != Some("help")
@@ -272,14 +272,14 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 	}
 
 	for node in filtered {
-		format_tool_node_text(&mut output, node);
+		format_action_node_text(&mut output, node);
 	}
 
 	output
 }
 
-/// Format a [`ToolNode`] as plaintext for CLI output.
-fn format_tool_node_text(output: &mut String, node: &ToolNode) {
+/// Format an [`ActionNode`] as plaintext for CLI output.
+fn format_action_node_text(output: &mut String, node: &ActionNode) {
 	let path = node.path.annotated_rel_path();
 
 	if node.is_scene() {
@@ -297,7 +297,7 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();
-		// Skip Request→Response and scene tool signatures
+		// Skip Request→Response and scene action signatures
 		let is_exchange = input_type.ends_with("Request")
 			&& output_type.ends_with("Response");
 		if !is_exchange && !node.is_scene() {
@@ -322,16 +322,16 @@ fn format_tool_node_text(output: &mut String, node: &ToolNode) {
 mod test {
 	use super::*;
 
-	/// Adds help as a tool located at `/help`.
+	/// Adds help as an action located at `/help`.
 	fn help() -> impl Bundle {
 		(
 			PathPartial::new("help"),
-			Tool::<(), String>::new_system(help_system),
-			ToolMeta::of::<(), (), String>(),
+			Action::<(), String>::new_system(help_system),
+			ActionMeta::of::<(), (), String>(),
 		)
 	}
 	fn help_system(
-		In(cx): In<ToolContext>,
+		In(cx): In<ActionContext>,
 		ancestors: Query<&ChildOf>,
 		trees: Query<&RouteTree>,
 	) -> Result<String> {
@@ -345,7 +345,7 @@ mod test {
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	#[beet_core::test]
-	async fn help_lists_tools() {
+	async fn help_lists_actions() {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
@@ -377,7 +377,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn help_shows_nested_tools() {
+	async fn help_shows_nested_actions() {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
@@ -431,7 +431,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn help_with_no_other_tools() {
+	async fn help_with_no_other_actions() {
 		let mut world = router_world();
 		let root = world.spawn(children![help()]).flush();
 
@@ -484,7 +484,7 @@ mod test {
 		// scenes should appear with a [scene] marker
 		output.contains("about").xpect_true();
 		output.contains("[scene]").xpect_true();
-		// tools should still appear
+		// actions should still appear
 		output.contains("increment").xpect_true();
 	}
 }

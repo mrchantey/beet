@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome> = Tool::new_async(repeat_tool::<Input>))]
+#[require(Action<Input, Outcome> = Action::new_async(repeat_action::<Input>))]
 #[reflect(Component, Default)]
 pub struct Repeat<Input = ()>
 where
@@ -38,9 +38,9 @@ impl Repeat {
 ///
 /// ## Errors
 ///
-/// Returns an error when the child has no [`ToolMeta`] or an
-/// incompatible tool signature.
-async fn repeat_tool<Input>(cx: ToolContext<Input>) -> Result<Outcome>
+/// Returns an error when the child has no [`ActionMeta`] or an
+/// incompatible action signature.
+async fn repeat_action<Input>(cx: ActionContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -55,14 +55,14 @@ where
 
 	let world = cx.world();
 
-	let tool_meta = world
+	let action_meta = world
 		.entity(child)
-		.get(|meta: &ToolMeta| *meta)
+		.get(|meta: &ActionMeta| *meta)
 		.await
 		.map_err(|err| {
-			bevyhow!("repeat child has no tool: {child:?}, error: {err}")
+			bevyhow!("repeat child has no action: {child:?}, error: {err}")
 		})?;
-	tool_meta.assert_match::<Input, Outcome>()?;
+	action_meta.assert_match::<Input, Outcome>()?;
 
 	loop {
 		match world
@@ -85,7 +85,7 @@ where
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Tool<Input, Outcome> = Tool::new_async(repeat_times_tool::<Input>))]
+#[require(Action<Input, Outcome> = Action::new_async(repeat_times_action::<Input>))]
 #[reflect(Component)]
 pub struct RepeatTimes<Input = ()>
 where
@@ -123,9 +123,9 @@ where
 ///
 /// ## Errors
 ///
-/// Returns an error when the child has no [`ToolMeta`] or an
-/// incompatible tool signature.
-async fn repeat_times_tool<Input>(cx: ToolContext<Input>) -> Result<Outcome>
+/// Returns an error when the child has no [`ActionMeta`] or an
+/// incompatible action signature.
+async fn repeat_times_action<Input>(cx: ActionContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -146,14 +146,14 @@ where
 
 	let world = cx.world();
 
-	let tool_meta = world
+	let action_meta = world
 		.entity(child)
-		.get(|meta: &ToolMeta| *meta)
+		.get(|meta: &ActionMeta| *meta)
 		.await
 		.map_err(|err| {
-			bevyhow!("repeat_times child has no tool: {child:?}, error: {err}")
+			bevyhow!("repeat_times child has no action: {child:?}, error: {err}")
 		})?;
-	tool_meta.assert_match::<Input, Outcome>()?;
+	action_meta.assert_match::<Input, Outcome>()?;
 
 	for _ in 0..total_times {
 		match world
@@ -176,15 +176,15 @@ mod tests {
 	use std::sync::atomic::AtomicU32;
 	use std::sync::atomic::Ordering;
 
-	fn outcome_fail() -> Tool<(), Outcome> {
-		Tool::new_pure(|_: ToolContext| Outcome::FAIL.xok())
+	fn outcome_fail() -> Action<(), Outcome> {
+		Action::new_pure(|_: ActionContext| Outcome::FAIL.xok())
 	}
 
-	/// A child tool that passes `n` times, then fails.
-	fn pass_n_then_fail(n: u32) -> (Arc<AtomicU32>, Tool<(), Outcome>) {
+	/// A child action that passes `n` times, then fails.
+	fn pass_n_then_fail(n: u32) -> (Arc<AtomicU32>, Action<(), Outcome>) {
 		let count = Arc::new(AtomicU32::new(0));
 		let count_inner = count.clone();
-		let tool = Tool::new_pure(move |_: ToolContext| {
+		let action = Action::new_pure(move |_: ActionContext| {
 			let calls = count_inner.fetch_add(1, Ordering::SeqCst);
 			if calls < n {
 				Outcome::PASS.xok()
@@ -192,7 +192,7 @@ mod tests {
 				Outcome::FAIL.xok()
 			}
 		});
-		(count, tool)
+		(count, action)
 	}
 
 	// ── Repeat ──────────────────────────────────────────────────

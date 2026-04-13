@@ -2,7 +2,7 @@
 //!
 //! This module provides the core HTTP-like types ([`Request`], [`Response`],
 //! [`RequestParts`], [`ResponseParts`], etc.) as well as higher-level exchange
-//! patterns built on the tool system.
+//! patterns built on the action system.
 //!
 //! ## Core Types
 //!
@@ -17,10 +17,10 @@
 //! ## Exchange Patterns
 //!
 //! - [`ExchangeExt`] / [`AsyncExchangeExt`]: Convenience traits for calling
-//!   `Tool<Request, Response>` on entities
+//!   `Action<Request, Response>` on entities
 //! - [`ExchangeEnd`]: Event triggered when an exchange completes
-//! - [`exchange_handler`]: Creates a sync `Tool<Request, Response>` from a closure
-//! - [`exchange_handler_async`]: Creates an async `Tool<Request, Response>` from a closure
+//! - [`exchange_handler`]: Creates a sync `Action<Request, Response>` from a closure
+//! - [`exchange_handler_async`]: Creates an async `Action<Request, Response>` from a closure
 //! - [`mirror_exchange`]: Echoes requests back as responses
 
 // core types (moved from beet_core)

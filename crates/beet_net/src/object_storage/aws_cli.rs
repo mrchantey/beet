@@ -2,7 +2,7 @@
 //!
 //! This module provides a small, well-documented surface for invoking the AWS
 //! CLI (specifically aws s3 sync) from async Rust code without pulling in the
-//! full AWS SDK. It is intended for CI, build, and tooling flows where the AWS
+//! full AWS SDK. It is intended for CI, build, and automation flows where the AWS
 //! CLI is already installed and configured (credentials, profiles, etc).
 //!
 //! Key points

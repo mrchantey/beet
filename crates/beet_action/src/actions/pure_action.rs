@@ -1,30 +1,30 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-impl<In, Out> Tool<In, Out>
+impl<In, Out> Action<In, Out>
 where
 	In: 'static,
 	Out: 'static,
 {
-	/// Create a [`Tool`] from a pure closure that receives [`ToolContext`]
+	/// Create an [`Action`] from a pure closure that receives [`ActionContext`]
 	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
 	///
 	/// Accepts closures returning either `Out` or `Result<Out>`.
 	pub fn new_pure<Func, RawOut>(func: Func) -> Self
 	where
-		Func: 'static + Send + Sync + Clone + FnOnce(ToolContext<In>) -> RawOut,
+		Func: 'static + Send + Sync + Clone + FnOnce(ActionContext<In>) -> RawOut,
 		RawOut: IntoResult<Out>,
 	{
-		Tool::new(
+		Action::new(
 			TypeMeta::of::<Func>(),
-			move |ToolCall {
+			move |ActionCall {
 			          commands,
 			          caller,
 			          input,
 			          out_handler,
 			      }| {
 				let async_entity = commands.world().entity(caller);
-				let cx = ToolContext {
+				let cx = ActionContext {
 					caller: async_entity,
 					input,
 				};
@@ -37,21 +37,21 @@ where
 
 
 
-pub struct FuncToolMarker;
+pub struct FuncActionMarker;
 
-impl<F, I, O> IntoTool<(FuncToolMarker, I, O)> for F
+impl<F, I, O> IntoAction<(FuncActionMarker, I, O)> for F
 where
-	F: 'static + Send + Sync + Clone + FnOnce(ToolContext<I>) -> Result<O>,
+	F: 'static + Send + Sync + Clone + FnOnce(ActionContext<I>) -> Result<O>,
 {
 	type In = I;
 	type Out = O;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> { Tool::new_pure(self) }
+	fn into_action(self) -> Action<Self::In, Self::Out> { Action::new_pure(self) }
 }
 
-pub struct TypedFuncToolMarker;
+pub struct TypedFuncActionMarker;
 
-impl<F, I, O> IntoTool<(TypedFuncToolMarker, I, O)> for F
+impl<F, I, O> IntoAction<(TypedFuncActionMarker, I, O)> for F
 where
 	F: 'static + Send + Sync + Clone + FnOnce(I) -> O,
 	O: bevy::reflect::Typed,
@@ -59,8 +59,8 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_tool(self) -> Tool<Self::In, Self::Out> {
-		Tool::new_pure(move |input: ToolContext<I>| {
+	fn into_action(self) -> Action<Self::In, Self::Out> {
+		Action::new_pure(move |input: ActionContext<I>| {
 			self(input.input).xok::<BevyError>()
 		})
 	}
@@ -76,8 +76,8 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		AsyncPlugin::world()
-			.spawn(Tool::<(i32, i32), i32>::new_pure(
-				|input: ToolContext<(i32, i32)>| -> Result<i32> {
+			.spawn(Action::<(i32, i32), i32>::new_pure(
+				|input: ActionContext<(i32, i32)>| -> Result<i32> {
 					Ok(input.0 + input.1)
 				},
 			))
@@ -87,46 +87,46 @@ mod test {
 			.xpect_eq(8);
 	}
 
-	#[tool(pure)]
-	fn no_args_tool() {}
+	#[action(pure)]
+	fn no_args_action() {}
 
 	#[beet_core::test]
-	async fn tool_macro_no_args() {
+	async fn action_macro_no_args() {
 		AsyncPlugin::world()
-			.spawn(no_args_tool.into_tool())
+			.spawn(no_args_action.into_action())
 			.call::<(), ()>(())
 			.await
 			.unwrap();
 	}
 
-	#[tool(pure)]
-	fn add_tool((a, b): (i32, i32)) -> i32 { a + b }
+	#[action(pure)]
+	fn add_action((a, b): (i32, i32)) -> i32 { a + b }
 
 	#[beet_core::test]
-	async fn tool_macro_with_args() {
+	async fn action_macro_with_args() {
 		AsyncPlugin::world()
-			.spawn(add_tool.into_tool())
+			.spawn(add_action.into_action())
 			.call::<(i32, i32), i32>((5, 3))
 			.await
 			.unwrap()
 			.xpect_eq(8);
 	}
 
-	#[tool(pure)]
-	fn single_arg_tool(val: i32) -> i32 { val * 3 }
+	#[action(pure)]
+	fn single_arg_action(val: i32) -> i32 { val * 3 }
 
 	#[beet_core::test]
-	async fn tool_macro_single_arg() {
+	async fn action_macro_single_arg() {
 		AsyncPlugin::world()
-			.spawn(single_arg_tool.into_tool())
+			.spawn(single_arg_action.into_action())
 			.call::<i32, i32>(7)
 			.await
 			.unwrap()
 			.xpect_eq(21);
 	}
 
-	#[tool(pure)]
-	fn fallible_tool((a, b): (i32, i32)) -> Result<i32> {
+	#[action(pure)]
+	fn fallible_action((a, b): (i32, i32)) -> Result<i32> {
 		if b == 0 {
 			bevybail!("cannot be zero");
 		}
@@ -134,9 +134,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn tool_macro_result_ok() {
+	async fn action_macro_result_ok() {
 		AsyncPlugin::world()
-			.spawn(fallible_tool.into_tool())
+			.spawn(fallible_action.into_action())
 			.call::<(i32, i32), i32>((5, 3))
 			.await
 			.unwrap()
@@ -144,9 +144,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn tool_macro_result_err() {
+	async fn action_macro_result_err() {
 		AsyncPlugin::world()
-			.spawn(fallible_tool.into_tool())
+			.spawn(fallible_action.into_action())
 			.call::<(i32, i32), i32>((5, 0))
 			.await
 			.unwrap_err()
@@ -154,13 +154,13 @@ mod test {
 			.xpect_contains("cannot be zero");
 	}
 
-	#[tool(pure, result_out)]
-	fn result_out_tool(val: i32) -> Result<i32> { Ok(val * 2) }
+	#[action(pure, result_out)]
+	fn result_out_action(val: i32) -> Result<i32> { Ok(val * 2) }
 
 	#[beet_core::test]
-	async fn tool_macro_result_out() {
+	async fn action_macro_result_out() {
 		AsyncPlugin::world()
-			.spawn(result_out_tool.into_tool())
+			.spawn(result_out_action.into_action())
 			.call::<i32, Result<i32>>(4)
 			.await
 			.unwrap()
@@ -169,29 +169,29 @@ mod test {
 	}
 
 	// -----------------------------------------------------------------------
-	// #[tool] macro — func passthrough
+	// #[action] macro — func passthrough
 	// -----------------------------------------------------------------------
 
-	#[tool(pure)]
-	fn func_passthrough_tool(cx: ToolContext<i32>) -> i32 { *cx * 3 }
+	#[action(pure)]
+	fn func_passthrough_action(cx: ActionContext<i32>) -> i32 { *cx * 3 }
 
 	#[beet_core::test]
-	async fn tool_macro_func_passthrough() {
+	async fn action_macro_func_passthrough() {
 		AsyncPlugin::world()
-			.spawn(func_passthrough_tool.into_tool())
+			.spawn(func_passthrough_action.into_action())
 			.call::<i32, i32>(5)
 			.await
 			.unwrap()
 			.xpect_eq(15);
 	}
 
-	#[tool(pure)]
-	fn func_passthrough_entity(cx: ToolContext) -> Entity { cx.id() }
+	#[action(pure)]
+	fn func_passthrough_entity(cx: ActionContext) -> Entity { cx.id() }
 
 	#[beet_core::test]
-	async fn tool_macro_func_passthrough_entity() {
+	async fn action_macro_func_passthrough_entity() {
 		let mut world = AsyncPlugin::world();
-		let entity = world.spawn(func_passthrough_entity.into_tool()).id();
+		let entity = world.spawn(func_passthrough_entity.into_action()).id();
 		world
 			.entity_mut(entity)
 			.call::<(), Entity>(())

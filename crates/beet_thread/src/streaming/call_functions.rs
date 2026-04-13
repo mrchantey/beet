@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
-use beet_tool::prelude::*;
 
 
 
@@ -19,7 +19,7 @@ pub async fn call_functions(
 			.with_header::<header::Accept>(MediaType::Json);
 
 		let output =
-			match agent.call_detached(Router.into_tool(), request).await {
+			match agent.call_detached(Router.into_action(), request).await {
 				Ok(res) => match res.into_result().await {
 					Ok(res) => {
 						let is_json = res

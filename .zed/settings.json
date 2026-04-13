@@ -104,7 +104,7 @@
 		"crates/beet_rsx_combinator",
 		"crates/beet_site",
 		"crates/beet_spatial",
-		// "crates/beet_tool",
+		// "crates/beet_action",
 		"crates/emby",
 		"scripts",
 		// "tests",

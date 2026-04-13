@@ -7,9 +7,9 @@ use crate::streaming::completions_mapper;
 use async_openai::types::chat::CreateChatCompletionRequest;
 use async_openai::types::chat::CreateChatCompletionResponse;
 use async_openai::types::chat::CreateChatCompletionStreamResponse;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
 use futures::Stream;
 use std::pin::Pin;
 use std::task::Context;
@@ -20,7 +20,7 @@ use std::task::Poll;
 /// [`completions_mapper`](super::completions_mapper).
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
-#[require(Tool<(),Outcome> = Self::default_tool())]
+#[require(Action<(),Outcome> = Self::default_action())]
 pub struct CompletionsStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
@@ -29,18 +29,18 @@ pub struct CompletionsStreamer {
 	instructions: Option<String>,
 }
 
-impl DefaultTool<(), Outcome> for CompletionsStreamer {
-	fn default_tool() -> Tool<(), Outcome> {
-		Tool::new_async(post_streamer_tool::<CompletionsStreamer>)
+impl DefaultAction<(), Outcome> for CompletionsStreamer {
+	fn default_action() -> Action<(), Outcome> {
+		Action::new_async(post_streamer_action::<CompletionsStreamer>)
 	}
 }
 
-impl IntoTool<Self> for CompletionsStreamer {
+impl IntoAction<Self> for CompletionsStreamer {
 	type In = ();
 	type Out = Outcome;
-	fn into_tool(self) -> Tool<(), Outcome> {
-		Tool::new_async(async move |cx: ToolContext| {
-			post_streamer_tool_stateful(cx.map_input(self)).await
+	fn into_action(self) -> Action<(), Outcome> {
+		Action::new_async(async move |cx: ActionContext| {
+			post_streamer_action_stateful(cx.map_input(self)).await
 		})
 	}
 }

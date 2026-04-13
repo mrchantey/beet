@@ -49,7 +49,7 @@ pub fn is_internal() -> bool {
 		"beet_rsx_combinator",
 		"beet_router",
 		"beet_spatial",
-		"beet_tool",
+		"beet_action",
 		"beet_infra",
 	];
 	INTERNAL_PKGS.contains(&crate_name().as_str())

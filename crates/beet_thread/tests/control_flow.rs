@@ -1,8 +1,8 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
-use beet_tool::prelude::*;
 
 #[ignore = "requires Ollama running locally"]
 #[beet_core::test(timeout_ms = 15_000)]
@@ -25,13 +25,13 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((
 			Thread::default(),
-			Sequence::new().allow_no_tool(),
+			Sequence::new().allow_no_action(),
 			children![
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"
 				)]),
 				(Actor::agent(), OllamaProvider::default_12gb()),
-				(Tool::<(), Outcome>::new_system(assert_and_exit))
+				(Action::<(), Outcome>::new_system(assert_and_exit))
 			],
 		))
 		.call::<(), Outcome>((), default());
@@ -39,7 +39,7 @@ fn setup(mut commands: Commands) {
 
 
 fn assert_and_exit(
-	input: In<ToolContext>,
+	input: In<ActionContext>,
 	mut commands: Commands,
 	query: ThreadQuery,
 ) -> Result<Outcome> {

@@ -3,6 +3,8 @@ mod beet_plugins;
 
 // #[cfg(feature = "build")]
 // pub use beet_build as build;
+#[cfg(feature = "action")]
+pub use beet_action as action;
 pub use beet_core as core;
 pub use beet_core::cross_log;
 pub use beet_core::cross_log_error;
@@ -23,8 +25,6 @@ pub use beet_node as node;
 pub use beet_router as router;
 #[cfg(feature = "thread")]
 pub use beet_thread as thread;
-#[cfg(feature = "tool")]
-pub use beet_tool as tool;
 // #[cfg(feature = "design")]
 // pub use beet_design as design;
 // #[cfg(feature = "dom")]
@@ -42,6 +42,8 @@ pub use beet_tool as tool;
 // #[cfg(feature = "spatial")]
 // pub use beet_spatial as spatial;
 pub mod prelude {
+	#[cfg(feature = "action")]
+	pub use crate::action::prelude::*;
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
@@ -64,8 +66,6 @@ pub mod prelude {
 	pub use crate::node::val;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
-	#[cfg(feature = "tool")]
-	pub use crate::tool::prelude::*;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
 	#[cfg(feature = "thread")]

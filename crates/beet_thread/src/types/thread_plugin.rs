@@ -2,9 +2,9 @@ use crate::o11s::ReasoningEffort;
 use crate::o11s::ReasoningSummary;
 use crate::o11s::request::ReasoningParam;
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_router::prelude::*;
-use beet_tool::prelude::*;
 
 #[derive(Default)]
 pub struct ThreadPlugin {}

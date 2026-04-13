@@ -2,9 +2,9 @@ use crate::o11s::ReasoningEffort;
 use crate::o11s::request::Input;
 use crate::o11s::request::ReasoningParam;
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
 use futures::Stream;
 
 use std::pin::Pin;
@@ -13,7 +13,7 @@ use std::task::Poll;
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize, Component)]
-#[require(Tool<(),Outcome> = Self::default_tool())]
+#[require(Action<(),Outcome> = Self::default_action())]
 pub struct O11sStreamer {
 	model: ModelDef,
 	/// Whether to use streaming mode.
@@ -28,18 +28,18 @@ pub struct O11sStreamer {
 }
 
 
-impl DefaultTool<(), Outcome> for O11sStreamer {
-	fn default_tool() -> Tool<(), Outcome> {
-		Tool::new_async(post_streamer_tool::<O11sStreamer>)
+impl DefaultAction<(), Outcome> for O11sStreamer {
+	fn default_action() -> Action<(), Outcome> {
+		Action::new_async(post_streamer_action::<O11sStreamer>)
 	}
 }
 
-impl IntoTool<Self> for O11sStreamer {
+impl IntoAction<Self> for O11sStreamer {
 	type In = ();
 	type Out = Outcome;
-	fn into_tool(self) -> Tool<(), Outcome> {
-		Tool::new_async(async move |cx: ToolContext| {
-			post_streamer_tool_stateful(cx.map_input(self)).await
+	fn into_action(self) -> Action<(), Outcome> {
+		Action::new_async(async move |cx: ActionContext| {
+			post_streamer_action_stateful(cx.map_input(self)).await
 		})
 	}
 }

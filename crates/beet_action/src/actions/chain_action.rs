@@ -1,43 +1,43 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Allows chaining two [`Tool`] implementations, feeding the
+/// Allows chaining two [`Action`] implementations, feeding the
 /// output of the first into the input of the second.
 ///
-/// Both handlers are fused into a single [`Tool`] whose input
+/// Both handlers are fused into a single [`Action`] whose input
 /// type matches the first handler and whose output type matches the
 /// second. The intermediate value is converted via [`From`].
-pub trait IntoChainTool<In, Out, M>
+pub trait IntoChainAction<In, Out, M>
 where
-	Self: 'static + Sized + IntoTool<M, In = In, Out = Out>,
+	Self: 'static + Sized + IntoAction<M, In = In, Out = Out>,
 	Out: 'static,
 {
 	/// Chain `self` to `other`, producing a combined handler.
-	fn chain<T2, M2>(self, other: T2) -> Tool<In, T2::Out>
+	fn chain<T2, M2>(self, other: T2) -> Action<In, T2::Out>
 	where
-		T2: 'static + IntoTool<M2>,
+		T2: 'static + IntoAction<M2>,
 		T2::In: 'static + From<Out>,
 	{
-		let handler1 = self.into_tool();
-		let handler2 = other.into_tool();
+		let handler1 = self.into_action();
+		let handler2 = other.into_action();
 
-		Tool::new(
+		Action::new(
 			TypeMeta::of::<(Self, T2)>(),
-			move |ToolCall {
+			move |ActionCall {
 			          commands,
 			          caller,
 			          input: in_a,
 			          out_handler,
-			      }: ToolCall<In, T2::Out>| {
+			      }: ActionCall<In, T2::Out>| {
 				let handler2 = handler2.clone();
-				handler1.call(ToolCall {
+				handler1.call(ActionCall {
 					commands,
 					caller,
 					input: in_a,
 					out_handler: OutHandler::new(
 						move |commands, result: Result<Out>| match result {
 							Ok(out_a) => {
-								handler2.call(ToolCall::<T2::In, T2::Out> {
+								handler2.call(ActionCall::<T2::In, T2::Out> {
 									commands,
 									caller,
 									input: out_a.into(),
@@ -54,9 +54,9 @@ where
 }
 
 
-impl<In, Out, M, T> IntoChainTool<In, Out, M> for T
+impl<In, Out, M, T> IntoChainAction<In, Out, M> for T
 where
-	T: 'static + IntoTool<M, In = In, Out = Out>,
+	T: 'static + IntoAction<M, In = In, Out = Out>,
 	Out: 'static,
 {
 }
@@ -69,13 +69,13 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[tool(pure)]
+	#[action(pure)]
 	fn add((a, b): (i32, i32)) -> i32 { a + b }
-	#[tool(pure)]
+	#[action(pure)]
 	fn negate(val: i32) -> i32 { -val }
-	#[tool(pure)]
+	#[action(pure)]
 	fn multiply(val: i32) -> i32 { val * val }
-	#[tool(pure)]
+	#[action(pure)]
 	fn to_string(val: i32) -> String { val.to_string() }
 
 	#[beet_core::test]

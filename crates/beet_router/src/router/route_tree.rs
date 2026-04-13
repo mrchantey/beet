@@ -1,18 +1,18 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_tool::prelude::*;
+use beet_action::prelude::*;
 
 /// Marker component that excludes an entity from the [`RouteTree`].
 ///
-/// Internal tools like fallback chain handlers should not appear
+/// Internal actions like fallback chain handlers should not appear
 /// as routable endpoints. Adding this component prevents them from
 /// being collected during route tree construction.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct RouteHidden;
 
-/// Collects all routes (tools and scene routes) in an entity hierarchy and
+/// Collects all routes (actions and scene routes) in an entity hierarchy and
 /// arranges them into a validated tree.
 ///
 /// Inserted on the root ancestor whenever a [`PathPattern`] is set.
@@ -32,33 +32,33 @@ pub struct RouteTree {
 	/// The params pattern for this tree node.
 	pub params: ParamsPattern,
 	/// The route at this exact path, if any.
-	node: Option<ToolNode>,
+	node: Option<ActionNode>,
 	/// Child nodes in the tree.
 	pub children: Vec<RouteTree>,
 }
 
 impl RouteTree {
-	/// Returns the [`ToolNode`] at this level of the tree, if any.
-	pub fn node(&self) -> Option<&ToolNode> { self.node.as_ref() }
+	/// Returns the [`ActionNode`] at this level of the tree, if any.
+	pub fn node(&self) -> Option<&ActionNode> { self.node.as_ref() }
 
-	/// Builds a [`RouteTree`] from a list of [`ToolNode`].
+	/// Builds a [`RouteTree`] from a list of [`ActionNode`].
 	///
 	/// ## Errors
 	///
 	/// Returns an error if there are conflicting or duplicate paths.
-	pub fn from_nodes(nodes: Vec<ToolNode>) -> Result<Self> {
+	pub fn from_nodes(nodes: Vec<ActionNode>) -> Result<Self> {
 		#[derive(Default)]
 		struct Node {
 			children: HashMap<String, Node>,
-			route: Option<ToolNode>,
+			route: Option<ActionNode>,
 			params: Option<ParamsPattern>,
 			is_static: Option<bool>,
 		}
 
 		let mut root = Node::default();
 
-		for tool_node in &nodes {
-			let path = &tool_node.path;
+		for action_node in &nodes {
+			let path = &action_node.path;
 			let segments = path.iter().cloned().collect::<Vec<_>>();
 			let mut node = &mut root;
 
@@ -109,8 +109,8 @@ impl RouteTree {
 							path.annotated_rel_path()
 						);
 					}
-					node.route = Some(tool_node.clone());
-					node.params = Some(tool_node.params.clone());
+					node.route = Some(action_node.clone());
+					node.params = Some(action_node.params.clone());
 				}
 			}
 
@@ -121,8 +121,8 @@ impl RouteTree {
 						"Duplicate route: multiple routes defined for path '/'"
 					);
 				}
-				node.route = Some(tool_node.clone());
-				node.params = Some(tool_node.params.clone());
+				node.route = Some(action_node.clone());
+				node.params = Some(action_node.params.clone());
 			}
 		}
 
@@ -183,9 +183,9 @@ impl RouteTree {
 	}
 
 	/// Returns all route nodes in the tree as a flat list.
-	pub fn flatten_nodes(&self) -> Vec<&ToolNode> {
+	pub fn flatten_nodes(&self) -> Vec<&ActionNode> {
 		let mut nodes = Vec::new();
-		fn inner<'a>(nodes: &mut Vec<&'a ToolNode>, tree: &'a RouteTree) {
+		fn inner<'a>(nodes: &mut Vec<&'a ActionNode>, tree: &'a RouteTree) {
 			if let Some(route) = &tree.node {
 				nodes.push(route);
 			}
@@ -197,16 +197,16 @@ impl RouteTree {
 		nodes
 	}
 
-	/// Returns all tool nodes in the tree as a flat list, skipping scene route nodes.
-	pub fn flatten_tool_nodes(&self) -> Vec<&ToolNode> {
+	/// Returns all action nodes in the tree as a flat list, skipping scene route nodes.
+	pub fn flatten_action_nodes(&self) -> Vec<&ActionNode> {
 		self.flatten_nodes()
 			.into_iter()
 			.filter(|node| !node.is_scene())
 			.collect()
 	}
 
-	/// Returns all scene route nodes in the tree as a flat list, skipping non-scene tools.
-	pub fn flatten_scene_nodes(&self) -> Vec<&ToolNode> {
+	/// Returns all scene route nodes in the tree as a flat list, skipping non-scene actions.
+	pub fn flatten_scene_nodes(&self) -> Vec<&ActionNode> {
 		self.flatten_nodes()
 			.into_iter()
 			.filter(|node| node.is_scene())
@@ -218,14 +218,14 @@ impl RouteTree {
 	/// Walks the tree looking for an exact match against
 	/// the provided path. There should never be more than one match
 	/// as [`RouteTree::from_nodes`] rejects conflicts.
-	pub fn find(&self, path: &[impl AsRef<str>]) -> Option<&ToolNode> {
+	pub fn find(&self, path: &[impl AsRef<str>]) -> Option<&ActionNode> {
 		let path_vec: Vec<String> =
 			path.iter().map(|s| s.as_ref().to_string()).collect();
 
 		fn inner<'a>(
 			node: &'a RouteTree,
 			path: &Vec<String>,
-		) -> Option<&'a ToolNode> {
+		) -> Option<&'a ActionNode> {
 			if let Some(route) = &node.node {
 				if route
 					.path
@@ -297,15 +297,15 @@ impl std::fmt::Display for RouteTree {
 			node: &RouteTree,
 			f: &mut std::fmt::Formatter<'_>,
 		) -> std::fmt::Result {
-			if let Some(tool) = &node.node {
+			if let Some(action) = &node.node {
 				let path = node.path.annotated_rel_path();
-				if tool.is_scene() {
+				if action.is_scene() {
 					writeln!(f, "  {} [scene]", path)?;
 				} else {
-					let input = tool.meta.input().type_name();
-					let output = tool.meta.output().type_name();
+					let input = action.meta.input().type_name();
+					let output = action.meta.output().type_name();
 					write!(f, "  {}", path)?;
-					if let Some(method) = &tool.method {
+					if let Some(method) = &action.method {
 						write!(f, " [{}]", method)?;
 					}
 					writeln!(f)?;
@@ -326,43 +326,43 @@ impl std::fmt::Display for RouteTree {
 	}
 }
 
-/// A tool route node, representing a callable action at a specific path.
+/// An action route node, representing a callable action at a specific path.
 /// Scene routes are identified by their output type being [`SceneEntity`].
 #[derive(Debug, Clone)]
-pub struct ToolNode {
-	/// The entity containing this tool.
+pub struct ActionNode {
+	/// The entity containing this action.
 	pub entity: Entity,
-	/// Metadata about the tool's input/output types.
-	pub meta: ToolMeta,
-	/// The parameter pattern for this tool.
+	/// Metadata about the action's input/output types.
+	pub meta: ActionMeta,
+	/// The parameter pattern for this action.
 	pub params: ParamsPattern,
-	/// The full path pattern for this tool.
+	/// The full path pattern for this action.
 	pub path: PathPattern,
 	/// Optional HTTP method restriction.
 	pub method: Option<HttpMethod>,
 }
 
-impl ToolNode {
-	/// Whether this tool is a scene route (output type is [`SceneEntity`]).
+impl ActionNode {
+	/// Whether this action is a scene route (output type is [`SceneEntity`]).
 	pub fn is_scene(&self) -> bool { self.meta.output_is::<SceneEntity>() }
 
-	/// The tool's description from doc comments, if available.
+	/// The action's description from doc comments, if available.
 	pub fn description(&self) -> Option<&str> { self.meta.description() }
 }
 
-/// The query tuple type used to collect tool components for [`ToolNode::from_query`].
-pub type ToolQueryItem<'a> = (
+/// The query tuple type used to collect action components for [`ActionNode::from_query`].
+pub type ActionQueryItem<'a> = (
 	Entity,
-	&'a ToolMeta,
+	&'a ActionMeta,
 	&'a PathPattern,
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
 );
 
-impl ToolNode {
-	/// Create a [`ToolNode`] from the full query result tuple.
+impl ActionNode {
+	/// Create an [`ActionNode`] from the full query result tuple.
 	pub fn from_query(
-		(entity, meta, path, params, method): ToolQueryItem,
+		(entity, meta, path, params, method): ActionQueryItem,
 	) -> Self {
 		Self {
 			entity,
@@ -381,13 +381,13 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_node::prelude::*;
-	use beet_tool::prelude::*;
+	use beet_action::prelude::*;
 
-	fn tool_at(path: &str) -> impl Bundle {
+	fn action_at(path: &str) -> impl Bundle {
 		(
 			PathPartial::new(path),
-			Tool::<(), ()>::new_pure(|_: ToolContext| Ok(())),
-			ToolMeta::of::<(), (), ()>(),
+			Action::<(), ()>::new_pure(|_: ActionContext| Ok(())),
+			ActionMeta::of::<(), (), ()>(),
 		)
 	}
 
@@ -397,11 +397,11 @@ mod test {
 	fn builds_tree_on_spawn() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![tool_at("foo"), tool_at("bar")])
+			.spawn(children![action_at("foo"), action_at("bar")])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.flatten().len().xpect_eq(2);
-		tree.flatten_tool_nodes().len().xpect_eq(2);
+		tree.flatten_action_nodes().len().xpect_eq(2);
 	}
 
 	#[test]
@@ -409,8 +409,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((PathPartial::new("api"), children![
-				tool_at("users"),
-				tool_at("posts")
+				action_at("users"),
+				action_at("posts")
 			]))
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
@@ -427,7 +427,7 @@ mod test {
 	fn find_by_path() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![tool_at("foo"), tool_at("bar")])
+			.spawn(children![action_at("foo"), action_at("bar")])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.find(&["foo"]).xpect_some();
@@ -440,8 +440,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("counter"), children![
-				tool_at("increment"),
-				tool_at("decrement")
+				action_at("increment"),
+				action_at("decrement")
 			])])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
@@ -459,27 +459,27 @@ mod test {
 					"about",
 					Element::new("p").with_inner_text("about")
 				),
-				tool_at("action"),
+				action_at("action"),
 			])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.flatten_scene_nodes().len().xpect_eq(1);
-		tree.flatten_tool_nodes().len().xpect_eq(1);
+		tree.flatten_action_nodes().len().xpect_eq(1);
 	}
 
 	#[test]
 	fn detects_duplicate_paths() {
 		let nodes = vec![
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 			},
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
@@ -495,16 +495,16 @@ mod test {
 	#[test]
 	fn detects_dynamic_conflicts() {
 		let nodes = vec![
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
 			},
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
@@ -520,16 +520,16 @@ mod test {
 	#[test]
 	fn allows_different_static_paths() {
 		let nodes = vec![
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 			},
-			ToolNode {
+			ActionNode {
 				entity: Entity::PLACEHOLDER,
-				meta: ToolMeta::of::<(), (), ()>(),
+				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
@@ -543,7 +543,7 @@ mod test {
 	fn display_format() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![tool_at("foo"), tool_at("bar"),])
+			.spawn(children![action_at("foo"), action_at("bar"),])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		let output = tree.to_string();
@@ -557,27 +557,27 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				tool_at("alpha"),
-				tool_at("beta"),
-				(PathPartial::new("nested"), children![tool_at("gamma")])
+				action_at("alpha"),
+				action_at("beta"),
+				(PathPartial::new("nested"), children![action_at("gamma")])
 			])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
-		// 3 tools
+		// 3 actions
 		tree.flatten_nodes().len().xpect_eq(3);
-		tree.flatten_tool_nodes().len().xpect_eq(3);
+		tree.flatten_action_nodes().len().xpect_eq(3);
 	}
 
 	#[test]
-	fn tracks_tool_entities() {
+	fn tracks_action_entities() {
 		let mut world = router_world();
-		let root = world.spawn(children![tool_at("tracked")]).flush();
+		let root = world.spawn(children![action_at("tracked")]).flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		let node = tree.find(&["tracked"]).unwrap();
 		// the entity should be valid and queryable
 		world
 			.entity(node.entity)
-			.contains::<ToolMeta>()
+			.contains::<ActionMeta>()
 			.xpect_true();
 	}
 
@@ -591,17 +591,17 @@ mod test {
 						"counter",
 						Element::new("p").with_inner_text("counter")
 					),
-					children![tool_at("increment"), tool_at("decrement"),],
+					children![action_at("increment"), action_at("decrement"),],
 				),
-				tool_at("other"),
+				action_at("other"),
 			])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		let subtree = tree.find_subtree(&["counter"]).unwrap();
-		// subtree contains the counter scene route + 2 tools
+		// subtree contains the counter scene route + 2 actions
 		subtree.flatten_nodes().len().xpect_eq(3);
-		subtree.flatten_tool_nodes().len().xpect_eq(2);
-		// sibling tool should not appear in subtree
+		subtree.flatten_action_nodes().len().xpect_eq(2);
+		// sibling action should not appear in subtree
 		subtree
 			.flatten_nodes()
 			.iter()
@@ -614,7 +614,7 @@ mod test {
 	#[test]
 	fn find_subtree_returns_none_for_missing_prefix() {
 		let mut world = router_world();
-		let root = world.spawn(children![tool_at("foo")]).flush();
+		let root = world.spawn(children![action_at("foo")]).flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.find_subtree(&["nonexistent"]).xpect_none();
 	}
@@ -623,16 +623,16 @@ mod test {
 	fn find_subtree_falls_back_to_dynamic_segment() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![(PathPartial::new(":id"), children![tool_at(
+			.spawn(children![(PathPartial::new(":id"), children![action_at(
 				"details"
 			),])])
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		// no static "42" child exists, should fall back to :id
 		let subtree = tree.find_subtree(&["42"]).unwrap();
-		subtree.flatten_tool_nodes().len().xpect_eq(1);
+		subtree.flatten_action_nodes().len().xpect_eq(1);
 		subtree
-			.flatten_tool_nodes()
+			.flatten_action_nodes()
 			.first()
 			.unwrap()
 			.path
