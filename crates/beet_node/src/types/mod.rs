@@ -8,3 +8,5 @@ mod value;
 pub use value::*;
 mod into_bundle;
 pub use into_bundle::*;
+mod slot;
+pub use slot::*;

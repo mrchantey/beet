@@ -8,6 +8,7 @@ pub type NodeView<'a> = (
 	Option<&'a Children>,
 	Option<&'a Value>,
 	Option<&'a Expression>,
+	Option<&'a SlotContainer>,
 );
 
 
@@ -46,7 +47,21 @@ impl NodeWalker<'_, '_> {
 			return;
 		}
 
-		let (doctype, comment, element, children, value, expression) = node;
+		let (doctype, comment, element, children, value, expression, slot) =
+			node;
+
+		// If a SlotContainer is present, the slot element is transparent:
+		// recurse directly into the content entity, skipping this
+		// entity's own components entirely.
+		if let Some(slot) = slot {
+			let child_cx = VisitContext {
+				start: cx.start,
+				entity: **slot,
+				depth: cx.depth,
+			};
+			self.walk_entity(visitor, child_cx);
+			return;
+		}
 
 		// 1. Doctype
 		if let Some(doctype) = doctype {
@@ -68,7 +83,8 @@ impl NodeWalker<'_, '_> {
 		if let Some(expression) = expression {
 			visitor.visit_expression(&cx, expression);
 		}
-		// 6. Children
+		// 6. Children (also serves as default content for <slot> elements
+		// when no SlotContainer is present)
 		if let Some(children) = children {
 			for child in children {
 				let child_cx = VisitContext {

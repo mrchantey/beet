@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::IntoResponse;
 use beet_net::prelude::*;
-use beet_action::prelude::*;
 
 /// Creates a router bundle with help and navigate middleware.
 ///
@@ -258,10 +258,15 @@ impl SceneEntity {
 			despawn: vec![entity],
 		}
 	}
+	pub fn push_despawn(mut self, entity: Entity) -> Self {
+		self.despawn.push(entity);
+		self
+	}
 
 	/// Merge another scene's despawn list into this one.
-	pub fn join(&mut self, child: SceneEntity) {
+	pub fn with_join(mut self, child: SceneEntity) -> Self {
 		self.despawn.extend(child.despawn);
+		self
 	}
 }
 
@@ -270,10 +275,10 @@ impl SceneEntity {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 	use beet_node::prelude::*;
-	use beet_action::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 

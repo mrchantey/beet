@@ -26,13 +26,13 @@
 				padding: 2rem 1rem;
 			}
 		</style>
-		{{ head }}
+		<slot name="head" />
 	</head>
 	<body>
 		<header class="container">
 			<nav>
 				<ul>
-					{{ nav }}
+					<slot name="nav" />
 					<li>
 						<details class="dropdown">
 							<summary role="button" class="secondary">Theme</summary>
@@ -46,6 +46,6 @@
 				</ul>
 			</nav>
 		</header>
-		<main class="container">{{ main }}</main>
+		<main class="container"><slot name="main" /></main>
 	</body>
 </html>
