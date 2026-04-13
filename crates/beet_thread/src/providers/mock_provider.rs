@@ -129,7 +129,7 @@ impl PostStreamer for MockPostStreamer {
 							.into_iter()
 							.find_map(|(_, tool_def)| match tool_def {
 								ToolDefinition::Function(func) => Some((
-									func.name().to_string(),
+									func.path().to_string(),
 									func.params_schema().clone(),
 								)),
 								_ => None,

@@ -13,6 +13,7 @@ impl Plugin for ThreadPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<RouterPlugin>()
+			.add_observer(insert_tool_definition)
 			// ── Hierarchy types (needed for scene serialization) ──────────
 			.register_type::<ChildOf>()
 			.register_type::<Children>()

@@ -467,7 +467,7 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 	match tool {
 		ToolDefinition::Function(func) => FunctionToolParam {
 			tool_type: "function".to_string(),
-			name: func.name().to_string(),
+			name: func.path().to_string(),
 			description: func.description().to_string().xsome(),
 			parameters: func.params_schema().clone().xsome(),
 			strict: Some(true),

@@ -436,7 +436,7 @@ pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
 		ToolDefinition::Function(func) => {
 			ChatCompletionTools::Function(ChatCompletionTool {
 				function: FunctionObject {
-					name: func.name().to_string(),
+					name: func.path().to_string(),
 					description: Some(func.description().to_string()),
 					parameters: Some(func.params_schema().clone()),
 					strict: Some(true),

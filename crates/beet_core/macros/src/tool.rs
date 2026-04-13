@@ -54,7 +54,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let async_kw = if is_async {
 		quote! { async }
 	} else {
-		quote! {}
+		TokenStream::default()
 	};
 
 	// ── 4. Analyze parameters and build function parts ──
@@ -169,7 +169,7 @@ fn make_simple_fn_parts(
 				let fn_params = quote! {
 					#param_name: #beet_tool::prelude::ToolContext<#inner>
 				};
-				let preamble = quote! {};
+				let preamble = TokenStream::default();
 				Ok((in_type, fn_params, preamble))
 			} else {
 				// Bare input: destructure from context
@@ -239,7 +239,7 @@ fn make_system_fn_parts(
 					let first = quote! {
 						In(#param_name): In<#beet_tool::prelude::ToolContext<#inner>>
 					};
-					let preamble = quote! {};
+					let preamble = TokenStream::default();
 					(in_type, first, preamble, system_params_from(1))
 				} else {
 					// In<T> → system tool with input T
@@ -259,7 +259,7 @@ fn make_system_fn_parts(
 				let first = quote! {
 					In(#param_name): In<#beet_tool::prelude::ToolContext<#inner>>
 				};
-				let preamble = quote! {};
+				let preamble = TokenStream::default();
 				(in_type, first, preamble, system_params_from(1))
 			} else {
 				// No input marker → all params are system params
@@ -445,37 +445,32 @@ fn make_struct_def(
 		if let Some(expr) = require_tool {
 			quote! { #[require(#expr)] }
 		} else {
-			quote! {}
+			TokenStream::default()
 		}
 	} else {
-		quote! {}
+		TokenStream::default()
 	};
 
+	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 	let require_meta = if has_component && has_reflect {
-		let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 		quote! {
-			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_handler::<Self, Self>())]
+			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_handler::<Self, _>())]
 		}
 	} else if has_component {
-		let beet_tool = pkg_ext::internal_or_beet("beet_tool");
 		quote! {
-			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_tool::<Self, Self>())]
+			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_tool::<Self, _>())]
 		}
 	} else {
-		quote! {}
+		TokenStream::default()
 	};
 
-	let require_path = if has_component {
-		if let Some(expr) = route_expr {
-			let beet_net = pkg_ext::internal_or_beet("beet_net");
-			quote! {
-				#[require(#beet_net::prelude::PathPartial = #beet_net::prelude::PathPartial::new(#expr))]
-			}
-		} else {
-			quote! {}
+	let require_path = if has_component && let Some(expr) = route_expr {
+		let beet_net = pkg_ext::internal_or_beet("beet_net");
+		quote! {
+			#[require(#beet_net::prelude::PathPartial = #beet_net::prelude::PathPartial::new(#expr))]
 		}
 	} else {
-		quote! {}
+		TokenStream::default()
 	};
 
 	let type_params: Vec<&syn::Ident> =
@@ -509,7 +504,7 @@ fn make_struct_def(
 		let reflect_ignore = if has_reflect {
 			quote! { #[reflect(ignore)] }
 		} else {
-			quote! {}
+			TokenStream::default()
 		};
 		quote! {
 			#(#fn_attrs)*
@@ -556,7 +551,7 @@ fn make_turbofish(generics: &syn::Generics) -> TokenStream {
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
 	if type_params.is_empty() {
-		quote! {}
+		TokenStream::default()
 	} else {
 		quote! { ::<#(#type_params),*> }
 	}

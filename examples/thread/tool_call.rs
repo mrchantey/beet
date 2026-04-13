@@ -38,21 +38,17 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 				)]),
 				(
 					Actor::new("Fearless Warrior", ActorKind::Agent),
-					OllamaProvider::default_12gb(),
-					// OpenAiProvider::gpt_5_mini().unwrap(),
-					children![function_tool(
-						"make-choice",
-						"make your choice",
-						AgentChoiceTool,
-					)]
+					// OllamaProvider::default_12gb(),
+					OpenAiProvider::gpt_5_mini().unwrap(),
+					children![AgentChoiceTool]
 				),
 			]
 		),]))
 		.call::<(), Outcome>((), OutHandler::exit());
 }
 
-/// Processes an agent's choice and returns a narrative response.
-#[tool(route, pure)]
+/// Make a choice for what to do, following the schema
+#[tool(pure, route = "make-choice")]
 #[derive(Component, Reflect)]
 fn AgentChoiceTool(cx: ToolContext<MakeChoice>) -> String {
 	match cx.choice {
@@ -70,7 +66,7 @@ fn AgentChoiceTool(cx: ToolContext<MakeChoice>) -> String {
 
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
 struct MakeChoice {
-	/// The choice you can make
+	/// The choice you can make, follow the schema and pick one.
 	choice: Choice,
 	/// A line of dialog to say as you make your choice
 	catchphrase: String,

@@ -4,7 +4,6 @@
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
 	// "show_completions_on_input": false,
-
 	// "completions": {
 	// 	"words": "disabled"
 	// },

@@ -1,35 +1,20 @@
 use beet_core::prelude::*;
-use beet_router::prelude::*;
+use beet_net::prelude::*;
 use beet_tool::prelude::*;
-use bevy::reflect::Typed;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Create a routable function tool bundle for use with LLM tool calling.
-///
-/// Returns a bundle containing:
-/// - [`ToolDefinition`] metadata for the LLM provider
-/// - [`PathPartial`] for routing dispatch
-/// - A serde-wrapped [`Tool`] that accepts [`Request`]/[`Response`] pairs
-///
-/// The `path` is used both as the tool name sent to the LLM and as the
-/// route path for dispatching function call results.
-pub fn function_tool<T, M>(
-	path: &str,
-	description: &str,
-	tool: T,
-) -> impl Bundle
-where
-	T: 'static + Send + Sync + Typed + IntoTool<M>,
-	T::In: Typed + Send + Sync + serde::de::DeserializeOwned,
-	T::Out: Typed + Send + Sync + serde::Serialize,
-{
-	let meta = ToolMeta::of_reflect::<T, M>()
-		.input_json_schema()
-		.expect("of_reflect guarantees reflection data");
-	let definition: ToolDefinition =
-		FunctionToolDefinition::new(path, description, meta).into();
-	(definition, route(path, ExchangeTool::new_detached(tool)))
+pub(crate) fn insert_tool_definition(
+	// path pattern is inserted by ToolMeta
+	ev: On<Insert, PathPattern>,
+	mut commands: Commands,
+	query: Query<(&ToolMeta, &PathPattern)>,
+) -> Result {
+	let tool = query.get(ev.entity)?;
+	let def: ToolDefinition = FunctionToolDefinition::from_meta(tool)?.into();
+	commands.entity(ev.entity).insert(def);
+
+	Ok(())
 }
 
 #[derive(Debug, Clone, Component, Serialize, Deserialize, Reflect)]
@@ -83,8 +68,8 @@ impl ProviderToolDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 #[reflect(Serialize, Deserialize)]
 pub struct FunctionToolDefinition {
-	/// The name of the tool. This must be unique per set of tools.
-	name: String,
+	/// The path to the tool. This must be unique per set of tools.
+	path: String,
 	/// A description of the function. Used by the model to decide when to call it.
 	description: String,
 	/// A json schema for the parameters.
@@ -92,19 +77,37 @@ pub struct FunctionToolDefinition {
 }
 impl FunctionToolDefinition {
 	pub fn new(
-		name: impl Into<String>,
+		path: impl Into<String>,
 		description: impl Into<String>,
 		params_schema: serde_json::Value,
 	) -> Self {
 		Self {
-			name: name.into(),
+			path: path.into(),
 			description: description.into(),
 			params_schema: JsonValue(params_schema),
 		}
 	}
-	pub fn name(&self) -> &str { &self.name }
+	pub fn path(&self) -> &str { &self.path }
 	pub fn description(&self) -> &str { &self.description }
 	pub fn params_schema(&self) -> &serde_json::Value { &self.params_schema }
+
+	pub fn from_meta((meta, path): (&ToolMeta, &PathPattern)) -> Result<Self> {
+		if !path.is_static() {
+			bevybail!(
+				"Tool path must be static (no parameters or wildcards) to create a FunctionToolDefinition.\nPath provided: {path}"
+			);
+		}
+		let path = path.annotated_rel_path().to_string();
+		let description = meta
+			.description()
+			.ok_or_else(||{
+				bevyhow!("ToolMeta lacks description, which is required to create a FunctionToolDefinition.\n{meta:?}")
+			})?;
+		let params_schema = meta.input_json_schema().ok_or_else(||{
+			bevyhow!("ToolMeta lacks input json schema, which is required to create a FunctionToolDefinition.\n{meta:?}")
+		})?;
+		Ok(Self::new(path, description, params_schema))
+	}
 }
 
 
