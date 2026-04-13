@@ -71,9 +71,9 @@ async fn LayoutTemplate(
 	let world = caller.world();
 
 	// parse layout, head, and nav into entities, then wire up slots
-	let (layout_id, head_id, nav_id) = world
+	let (layout_id, head_id, nav_id, article_header_id) = world
 		.with_then(
-			move |world: &mut World| -> Result<(Entity, Entity, Entity)> {
+			move |world: &mut World| -> Result<(Entity, Entity, Entity, Option<Entity>)> {
 				let layout_id = parse_html_entity(world, &layout_html, true)?;
 				let head_id = parse_html_entity(world, &head_html, false)?;
 				let nav_id = parse_html_entity(world, &nav_html, false)?;
@@ -97,23 +97,43 @@ async fn LayoutTemplate(
 					)?;
 					world.entity_mut(slot).insert(bundle);
 				}
+				// build article header from frontmatter if present
+				let article_header_id = world
+					.entity(content_id)
+					.get::<Frontmatter>()
+					.map(|fm| article_header_html(fm))
+					.filter(|html| !html.is_empty())
+					.map(|html| parse_html_entity(world, &html, false))
+					.transpose()?;
+
+				if let Some(slot) =
+					find_named_slot(world, layout_id, "article-header")
+				{
+					if let Some(header_id) = article_header_id {
+						world
+							.entity_mut(slot)
+							.insert(SlotContainer::new(header_id));
+					}
+				}
 				if let Some(slot) = find_named_slot(world, layout_id, "main") {
 					world
 						.entity_mut(slot)
 						.insert(SlotContainer::new(content_id));
 				}
 
-				Ok((layout_id, head_id, nav_id))
+				Ok((layout_id, head_id, nav_id, article_header_id))
 			},
 		)
 		.await?;
 
 	// build scene entity with all ephemeral entities for cleanup
-	SceneEntity::new_ephemeral(layout_id)
+	let mut scene = SceneEntity::new_ephemeral(layout_id)
 		.push_despawn(head_id)
-		.push_despawn(nav_id)
-		.with_join(content)
-		.xok()
+		.push_despawn(nav_id);
+	if let Some(header_id) = article_header_id {
+		scene = scene.push_despawn(header_id);
+	}
+	scene.with_join(content).xok()
 }
 
 /// Parses an HTML string into a new entity. If `scope` is true, the
@@ -139,6 +159,40 @@ fn head_content() -> Result<String> {
 	let theme_switcher =
 		fs_ext::read_to_string("examples/assets/js/minimal-theme-switcher.js")?;
 	Ok(format!(r#"<script>{theme_switcher}</script>"#))
+}
+
+/// Builds an article header HTML string from [`Frontmatter`] fields.
+///
+/// Renders the `title`, `created`, and `edited` fields if present.
+/// Returns an empty string when no relevant fields exist.
+fn article_header_html(fm: &Frontmatter) -> String {
+	let title = fm.get_str("title").unwrap_or_default();
+	let created = fm.get_str("created").unwrap_or_default();
+	let edited = fm.get_str("edited").unwrap_or_default();
+
+	if title.is_empty() && created.is_empty() && edited.is_empty() {
+		return String::new();
+	}
+
+	let mut html = String::from("<header>");
+	if !title.is_empty() {
+		html.push_str(&format!("<h1>{title}</h1>"));
+	}
+	if !created.is_empty() || !edited.is_empty() {
+		html.push_str("<p><small>");
+		if !created.is_empty() {
+			html.push_str(&format!("Created: {created}"));
+		}
+		if !created.is_empty() && !edited.is_empty() {
+			html.push_str(" · ");
+		}
+		if !edited.is_empty() {
+			html.push_str(&format!("Edited: {edited}"));
+		}
+		html.push_str("</small></p>");
+	}
+	html.push_str("</header>");
+	html
 }
 
 /// Generates navigation `<li>` items from the known routes.

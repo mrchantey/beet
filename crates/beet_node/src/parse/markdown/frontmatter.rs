@@ -52,6 +52,16 @@ impl Frontmatter {
 		let value = build_dynamic_struct(pairs)?;
 		Ok(Self { value, kind })
 	}
+
+	/// Get a string field from the frontmatter by name.
+	///
+	/// Returns `None` if the field does not exist or is not a string.
+	pub fn get_str(&self, key: &str) -> Option<&str> {
+		self.value
+			.field(key)
+			.and_then(|field| field.try_downcast_ref::<String>())
+			.map(|s| s.as_str())
+	}
 }
 
 /// Build a [`DynamicStruct`] from a list of key-value pairs.
@@ -388,6 +398,18 @@ mod test {
 	fn frontmatter_empty() {
 		let fm = Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
 		fm.value.field_len().xpect_eq(0);
+	}
+
+	#[test]
+	fn get_str_field() {
+		let fm = Frontmatter::parse(
+			"title: Hello\ncount: 42",
+			FrontmatterKind::Yaml,
+		)
+		.unwrap();
+		fm.get_str("title").unwrap().xpect_eq("Hello");
+		fm.get_str("count").is_none().xpect_true();
+		fm.get_str("missing").is_none().xpect_true();
 	}
 
 	#[test]
