@@ -24,12 +24,16 @@ fn setup(mut commands: Commands) {
 			children![
 				(Actor::system(), children![Post::spawn(
 					r#"
-Respond in the first person:
+This is a tool call test. You will get two responses.
+
+For the first, respond in the first person:
 > "I open the door.." - good, you are rolepaying
 > "The door opens, what do you want to do next" - bad, remember you are a participant, not dungeon master
 
-If you do not receive the tool call output for your second response,
-break character, describe the error to the user, and offer a suggestion to fix it.
+For the second, if you receive a tool output, produce a final text response.
+If you instead receive an error break character,
+describe the error to the user, and offer a suggestion to fix it.
+This will be your final response so do not attempt to continue the conversation.
 
 ## Scenario
 

@@ -74,6 +74,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let require_tool = make_require_tool(
 		tool_expr, &in_type, &out_type, has_route, &beet_tool,
 	);
+	let is_middleware = has_next_type(&in_type);
 	let struct_def = make_struct_def(
 		vis,
 		fn_name,
@@ -81,6 +82,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		fn_attrs,
 		Some(require_tool),
 		route_expr,
+		is_middleware,
 	);
 
 	// ── 6. Build handler function at module level ──
@@ -361,6 +363,24 @@ fn is_result_type(ty: &Type) -> bool {
 	false
 }
 
+/// Whether the input type contains a `Next` type, indicating middleware.
+fn has_next_type(tokens: &TokenStream) -> bool {
+	for tt in tokens.clone().into_iter() {
+		match tt {
+			proc_macro2::TokenTree::Ident(ident) if ident == "Next" => {
+				return true;
+			}
+			proc_macro2::TokenTree::Group(group) => {
+				if has_next_type(&group.stream()) {
+					return true;
+				}
+			}
+			_ => {}
+		}
+	}
+	false
+}
+
 /// Extract the inner `T` from `Result<T>` or `Result<T, E>`.
 fn extract_result_inner(ty: &Type) -> Option<&Type> {
 	extract_wrapper_type(ty, "Result")
@@ -437,6 +457,7 @@ fn make_struct_def(
 	fn_attrs: &[syn::Attribute],
 	require_tool: Option<TokenStream>,
 	route_expr: Option<&syn::Expr>,
+	is_middleware: bool,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
 	let has_reflect = has_derive(fn_attrs, "Reflect");
@@ -452,9 +473,13 @@ fn make_struct_def(
 	};
 
 	let beet_tool = pkg_ext::internal_or_beet("beet_tool");
-	let require_meta = if has_component && has_reflect {
+	let require_meta = if has_component && has_reflect && is_middleware {
 		quote! {
 			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_handler::<Self, _>())]
+		}
+	} else if has_component && has_reflect {
+		quote! {
+			#[require(#beet_tool::prelude::ToolMeta = #beet_tool::prelude::ToolMeta::of_reflect::<Self, _>())]
 		}
 	} else if has_component {
 		quote! {
@@ -1084,13 +1109,13 @@ mod test {
 	// -----------------------------------------------------------------------
 
 	#[test]
-	fn component_reflect_adds_handler_meta() {
+	fn component_reflect_adds_reflect_meta() {
 		let result = parse_str(quote!(pure), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			fn Add(val: i32) -> i32 { val }
 		});
 		assert!(result.contains("ToolMeta"));
-		assert!(result.contains("of_handler :: < Self , Self > ()"));
+		assert!(result.contains("of_reflect :: < Self , _ > ()"));
 	}
 
 	#[test]
@@ -1100,7 +1125,7 @@ mod test {
 			fn Add(val: i32) -> i32 { val }
 		});
 		assert!(result.contains("ToolMeta"));
-		assert!(result.contains("of_tool :: < Self , Self > ()"));
+		assert!(result.contains("of_tool :: < Self , _ > ()"));
 	}
 
 	#[test]
@@ -1110,6 +1135,18 @@ mod test {
 		});
 		assert!(!result.contains("of_tool"));
 		assert!(!result.contains("of_reflect"));
+	}
+
+	#[test]
+	fn middleware_reflect_uses_handler_meta() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Default, Clone, Component, Reflect)]
+			async fn HelpHandler(cx: ToolContext<(Request, Next<Request, Response>)>) -> Result<Response> {
+				todo!()
+			}
+		});
+		assert!(result.contains("ToolMeta"));
+		assert!(result.contains("of_handler :: < Self , _ > ()"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -1169,7 +1206,7 @@ mod test {
 		});
 		assert!(result.contains("ExchangeTool"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
-		assert!(result.contains("of_handler :: < Self , Self > ()"));
+		assert!(result.contains("of_reflect :: < Self , _ > ()"));
 	}
 
 	// -----------------------------------------------------------------------

@@ -183,8 +183,8 @@ async fn spawn_not_found_scene(
 
 /// Creates an element bundle describing a single route node.
 ///
-/// Each route renders as a `<li>` with clearly separated sections:
-/// path, kind tag, description, type signature, and parameters.
+/// Each route renders as a `<li>` containing the path heading
+/// and a nested `<ul>` with description, type info, and parameters.
 fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 	let path = node.path.annotated_rel_path().to_string();
 
@@ -197,31 +197,55 @@ fn format_tool_node_bundle(node: &ToolNode) -> (Element, OnSpawn) {
 		format!("/{path}")
 	};
 
-	let mut text = heading;
+	// collect detail items as (label, value) pairs
+	let mut details: Vec<(String, String)> = Vec::new();
 
-	// description on same line after em dash
 	if let Some(description) = node.description() {
-		text.push_str(&format!(" — {}", description));
+		details.push(("description".into(), description.to_string()));
 	}
 
-	// input/output types — skip trivial, exchange, and scene signatures
 	let input_type = node.meta.input().type_name();
 	let output_type = node.meta.output().type_name();
 	let is_trivial = input_type == "()" && output_type == "()";
 	let is_exchange =
 		input_type.ends_with("Request") && output_type.ends_with("Response");
 	if !is_trivial && !is_exchange && !node.is_scene() {
-		text.push_str(&format!(" ({input_type} → {output_type})"));
+		details.push(("input".into(), input_type.to_string()));
+		details.push(("output".into(), output_type.to_string()));
 	}
 
-	// parameters
 	for param in node.params.iter() {
-		text.push_str(&format!(" {param}"));
+		details.push(("param".into(), param.to_string()));
 	}
 
 	(
 		Element::new("li"),
-		OnSpawn::insert_child(Value::Str(text.into())),
+		OnSpawn::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				// heading text
+				world.spawn((Value::Str(heading.into()), ChildOf(id)));
+				// nested detail list
+				if !details.is_empty() {
+					let ul_id =
+						world.spawn((Element::new("ul"), ChildOf(id))).id();
+					for (label, value) in details {
+						let li_id = world
+							.spawn((Element::new("li"), ChildOf(ul_id)))
+							.id();
+						world.spawn((
+							Element::new("strong")
+								.with_inner_text(&format!("{label}:")),
+							ChildOf(li_id),
+						));
+						world.spawn((
+							Value::Str(format!(" {value}").into()),
+							ChildOf(li_id),
+						));
+					}
+				}
+			});
+		}),
 	)
 }
 

@@ -7,7 +7,7 @@ use bevy::reflect::Typed;
 ///
 /// Created via [`ToolMeta::of`], [`ToolMeta::of_tool`],
 /// [`ToolMeta::of_handler`], or [`ToolMeta::of_reflect`].
-#[derive(Copy, Clone, Debug, Component)]
+#[derive(Copy, Clone, Debug, Component, Get)]
 pub struct ToolMeta {
 	/// Type metadata for the tool handler.
 	handler: TypeMeta,
@@ -81,16 +81,8 @@ impl ToolMeta {
 		}
 	}
 
-	/// The handler type metadata.
-	pub fn handler(&self) -> TypeMeta { self.handler }
 	/// The full type name of the handler function or type.
 	pub fn name(&self) -> &'static str { self.handler.type_name() }
-	/// The input type metadata.
-	pub fn input(&self) -> TypeMeta { self.input }
-	/// The output type metadata.
-	pub fn output(&self) -> TypeMeta { self.output }
-	/// The reflection data, if available.
-	pub fn type_info(&self) -> Option<&ToolTypeInfo> { self.type_info.as_ref() }
 
 	/// Returns true if the output type matches `T`.
 	pub fn output_is<T: 'static>(&self) -> bool {
@@ -142,13 +134,13 @@ impl ToolMeta {
 		let expected_output = self.output();
 		let received_input = TypeMeta::of::<In>();
 		let received_output = TypeMeta::of::<Out>();
-		if expected_input != received_input {
+		if *expected_input != received_input {
 			bevybail!(
 				"Tool Call Input mismatch.\nExpected: {}\nReceived: {}.",
 				expected_input,
 				received_input,
 			);
-		} else if expected_output != received_output {
+		} else if *expected_output != received_output {
 			bevybail!(
 				"Tool Call Output mismatch.\nExpected: {}\nReceived: {}.",
 				expected_output,

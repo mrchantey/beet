@@ -232,21 +232,21 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 }
 
 /// A route output representing a scene entity to be rendered.
-/// The `despawn_on_render` flag controls whether the entity is
-/// cleaned up after rendering (ie help pages, not-found pages).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Entities in `despawn` are cleaned up after rendering,
+/// ie help pages, not-found pages.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SceneEntity {
 	/// The entity to render.
 	pub entity: Entity,
-	/// Whether to despawn this entity after rendering.
-	pub despawn_on_render: bool,
+	/// Entities to despawn after rendering.
+	pub despawn: Vec<Entity>,
 }
 impl SceneEntity {
 	/// A scene entity that should not be despawned after render.
 	pub fn new_fixed(entity: Entity) -> Self {
 		Self {
 			entity,
-			despawn_on_render: false,
+			despawn: default(),
 		}
 	}
 
@@ -255,8 +255,13 @@ impl SceneEntity {
 	pub fn new_ephemeral(entity: Entity) -> Self {
 		Self {
 			entity,
-			despawn_on_render: true,
+			despawn: vec![entity],
 		}
+	}
+
+	/// Merge another scene's despawn list into this one.
+	pub fn join(&mut self, child: SceneEntity) {
+		self.despawn.extend(child.despawn);
 	}
 }
 

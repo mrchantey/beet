@@ -26,8 +26,8 @@ impl SceneToolRenderer {
 
 	/// Renders the given scene entity using the ancestor
 	/// [`SceneToolRenderer`], falling back to the default renderer
-	/// when none is found. Entities with `despawn_on_render` set
-	/// are cleaned up after rendering.
+	/// when none is found. Entities in `despawn` are cleaned up
+	/// after rendering.
 	pub async fn render_entity(
 		caller: &AsyncEntity,
 		scene: SceneEntity,
@@ -48,8 +48,10 @@ impl SceneToolRenderer {
 		let scene_entity = caller.world().entity(scene.entity);
 		let result = scene_entity.call_detached(render_tool, parts).await;
 
-		if scene.despawn_on_render {
-			scene_entity.despawn().await;
+		// despawn all ephemeral entities
+		let world = caller.world();
+		for entity in scene.despawn {
+			world.entity(entity).despawn().await;
 		}
 
 		result
