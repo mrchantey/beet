@@ -66,7 +66,7 @@ pub async fn Router(cx: ActionContext<Request>) -> Response {
 	// dispatch entity so route-scoped middleware is correctly applied
 	let dispatch_id = dispatch_entity.id();
 	let action = world
-		.with_state::<MiddlewareQuery, _>(move |query| {
+		.with_state::<MiddlewareQuery<Request, Response>, _>(move |query| {
 			query.resolve_action(dispatch_id, inner_action)
 		})
 		.await;

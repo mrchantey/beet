@@ -67,7 +67,7 @@ impl SceneActionRenderer {
 		result
 	}
 
-	/// Applies ancestor [`SceneMiddlewareQuery`] middleware to the scene.
+	/// Applies ancestor [`MiddlewareQuery`] middleware to the scene.
 	///
 	/// Creates an inner action that returns the original scene, wraps
 	/// it with any ancestor `RequestParts/SceneEntity` middleware,
@@ -80,9 +80,9 @@ impl SceneActionRenderer {
 	) -> Result<SceneEntity> {
 		// check for ancestor scene middleware first
 		let has_middleware = caller
-			.with_state::<SceneMiddlewareQuery, _>(|entity, query| {
-				query.has_middleware(entity)
-			})
+			.with_state::<MiddlewareQuery<RequestParts, SceneEntity>, _>(
+				|entity, query| query.has_middleware(entity),
+			)
 			.await;
 		if !has_middleware {
 			return Ok(scene);
@@ -98,7 +98,7 @@ impl SceneActionRenderer {
 
 		// wrap with ancestor scene middleware and execute
 		let wrapped = caller
-			.with_state::<SceneMiddlewareQuery, _>({
+			.with_state::<MiddlewareQuery<RequestParts, SceneEntity>, _>({
 				move |entity, query| query.resolve_action(entity, inner)
 			})
 			.await;

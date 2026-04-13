@@ -1,6 +1,5 @@
-use beet_core::prelude::*;
-use beet_net::prelude::*;
 use beet_action::prelude::*;
+use beet_core::prelude::*;
 
 /// Declare an action to be registered as route middleware.
 /// The component is serializable via reflect and registers
@@ -105,22 +104,45 @@ where
 
 /// System parameter for resolving ancestor middleware on an entity.
 #[derive(SystemParam)]
-pub struct MiddlewareQuery<'w, 's> {
-	middleware:
-		AncestorQuery<'w, 's, &'static MiddlewareList<Request, Response>>,
+pub struct MiddlewareQuery<'w, 's, In, Out>
+where
+	In: 'static,
+	Out: 'static,
+{
+	middleware: AncestorQuery<'w, 's, &'static MiddlewareList<In, Out>>,
 }
 
-impl MiddlewareQuery<'_, '_> {
+impl<In, Out> MiddlewareQuery<'_, '_, In, Out>
+where
+	In: 'static,
+	Out: 'static,
+{
 	/// Wraps an action with all ancestor middleware for the given entity.
 	pub fn resolve_action(
 		&self,
 		entity: Entity,
-		action: Action<Request, Response>,
-	) -> Action<Request, Response> {
+		action: Action<In, Out>,
+	) -> Action<In, Out>
+	where
+		In: 'static + Send + Sync,
+		Out: 'static + Send + Sync,
+	{
 		let mut wrapped = action;
 		for list in self.middleware.get_ancestors(entity) {
 			wrapped = list.wrap(&wrapped);
 		}
 		wrapped
+	}
+
+	/// Returns `true` if any middleware exists on ancestors
+	/// of the given entity.
+	pub fn has_middleware(&self, entity: Entity) -> bool {
+		let ancestors = self.middleware.get_ancestors(entity);
+		for list in ancestors {
+			if !list.0.is_empty() {
+				return true;
+			}
+		}
+		false
 	}
 }
