@@ -140,6 +140,9 @@ impl From<String> for RelPath {
 impl From<&str> for RelPath {
 	fn from(value: &str) -> Self { Self::new(value) }
 }
+impl From<&Vec<String>> for RelPath {
+	fn from(parts: &Vec<String>) -> Self { Self::new(parts.join("/")) }
+}
 
 impl From<PathBuf> for RelPath {
 	fn from(value: PathBuf) -> Self { Self::new(value) }

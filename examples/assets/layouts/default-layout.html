@@ -46,6 +46,9 @@
 				</ul>
 			</nav>
 		</header>
-		<main class="container"><slot name="main" /></main>
+		<main class="container">
+			<slot name="sidebar" />
+			<slot name="main" />
+		</main>
 	</body>
 </html>

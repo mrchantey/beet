@@ -1,9 +1,11 @@
 mod help;
 mod middleware;
 mod router;
+mod sidebar;
 pub use help::*;
 pub use middleware::*;
 pub use router::*;
+pub use sidebar::*;
 mod route_tree;
 mod router_app_plugin;
 mod router_plugin;

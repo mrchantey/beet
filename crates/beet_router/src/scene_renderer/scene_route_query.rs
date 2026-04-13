@@ -1,12 +1,12 @@
 //! Scoped entity traversal within scene route boundaries.
 //!
-//! This module provides [`SceneRouteQuery`], a system parameter for iterating
+//! This module provides [`RouteQuery`], a system parameter for iterating
 //! entities within the scope of a [`DocumentScope`]. Many systems, ie markdown
 //! rendering, must only operate on entities belonging to a specific scene.
 //!
 //! # Traversal Rules
 //!
-//! Given an entity, SceneRouteQuery:
+//! Given an entity, RouteQuery:
 //! 1. Traverses up to find the containing [`DocumentScope`], or root if no scene exists
 //! 2. Iterates descendants within that scene, stopping at and excluding
 //! [`DocumentScope`] boundaries (unless it's the scene root itself)
@@ -21,14 +21,14 @@ use std::collections::VecDeque;
 /// Provides DFS and BFS iterators that respect scene route boundaries,
 /// ensuring systems only process entities belonging to a specific scene.
 #[derive(SystemParam)]
-pub struct SceneRouteQuery<'w, 's> {
+pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
 	scenes: Query<'w, 's, (), With<DocumentScope>>,
 }
 
-impl<'w, 's> SceneRouteQuery<'w, 's> {
+impl<'w, 's> RouteQuery<'w, 's> {
 	/// Finds the route tree for the given entity, if it exists.
 	/// This is done by first traversing to the root ancestor,
 	/// which is where route trees should exist.
@@ -76,7 +76,7 @@ impl<'w, 's> SceneRouteQuery<'w, 's> {
 	) -> Vec<Entity> {
 		world
 			.run_system_once_with(
-				|entity: In<Entity>, query: SceneRouteQuery| {
+				|entity: In<Entity>, query: RouteQuery| {
 					query.iter_dfs(*entity).collect::<Vec<_>>()
 				},
 				entity,
@@ -124,7 +124,7 @@ impl<'w, 's> SceneRouteQuery<'w, 's> {
 
 /// Depth-first iterator over entities within a scene route boundary.
 pub struct SceneRouteDfsIter<'a, 'w, 's> {
-	query: &'a SceneRouteQuery<'w, 's>,
+	query: &'a RouteQuery<'w, 's>,
 	stack: Vec<Entity>,
 	root: Entity,
 }
@@ -152,7 +152,7 @@ impl Iterator for SceneRouteDfsIter<'_, '_, '_> {
 
 /// Breadth-first iterator over entities within a scene route boundary.
 pub struct SceneRouteBfsIter<'a, 'w, 's> {
-	query: &'a SceneRouteQuery<'w, 's>,
+	query: &'a RouteQuery<'w, 's>,
 	queue: VecDeque<Entity>,
 	root: Entity,
 }
@@ -193,7 +193,7 @@ mod test {
 
 		world
 			.run_system_cached_with(
-				|In(entity): In<Entity>, query: SceneRouteQuery| {
+				|In(entity): In<Entity>, query: RouteQuery| {
 					query.scene_root(entity).xpect_eq(entity);
 				},
 				scene,
@@ -203,7 +203,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					query.scene_root(entity).xpect_eq(expected);
 				},
 				(child, scene),
@@ -213,7 +213,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					query.scene_root(entity).xpect_eq(expected);
 				},
 				(grandchild, scene),
@@ -231,7 +231,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					query.scene_root(entity).xpect_eq(expected);
 				},
 				(child, root),
@@ -255,7 +255,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
 					// DFS order: root, a, b, c, d
 					entities.xpect_eq(expected);
@@ -281,7 +281,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_bfs(entity).collect();
 					// BFS order: root, a, b, c, d
 					entities.xpect_eq(expected);
@@ -305,7 +305,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
 					// Should not include nested_scene or its children
 					entities.xpect_eq(expected);
@@ -329,7 +329,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
 					// Should not include boundary or its children
 					entities.xpect_eq(expected);
@@ -352,7 +352,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
 					// Starting from grandchild should still traverse from scene root
 					entities.xpect_eq(expected);
@@ -377,7 +377,7 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
-				 query: SceneRouteQuery| {
+				 query: RouteQuery| {
 					let entities: Vec<_> =
 						query.iter_dfs_from(entity).collect();
 					// Should start from child, not scene root
