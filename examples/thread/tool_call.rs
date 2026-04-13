@@ -23,9 +23,13 @@ fn setup(mut commands: Commands) {
 			Sequence::new().allow_no_tool(),
 			children![
 				(Actor::system(), children![Post::spawn(
-					r#"Respond in the first person:
+					r#"
+Respond in the first person:
 > "I open the door.." - good, you are rolepaying
-> "The door opens, what do you want to do next" - bad, you are a participant, not dungeon master
+> "The door opens, what do you want to do next" - bad, remember you are a participant, not dungeon master
+
+If you do not receive the tool call output for your second response,
+break character, describe the error to the user, and offer a suggestion to fix it.
 
 ## Scenario
 

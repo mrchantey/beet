@@ -39,7 +39,9 @@ pub async fn Router(cx: ToolContext<Request>) -> Response {
 	// find the matching route in the tree
 	let node = world
 		.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
-			query.get(caller.id()).map(|tree| tree.find(&path).cloned())
+			query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
+				bevyhow!("Route tree not found. Was the `ToolMeta` added? was the `RouterPlugin` added?")
+			})
 		})
 		.await;
 
