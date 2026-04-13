@@ -30,7 +30,7 @@ fn setup(mut commands: Commands) {
 				(Actor::system(), children![Post::spawn(
 					"you are robot, make beep boop noises"
 				)]),
-				(Actor::agent(), OllamaProvider::qwen()),
+				(Actor::agent(), OllamaProvider::default_12gb_gpu()),
 				(Tool::<(), Outcome>::new_system(assert_and_exit))
 			],
 		))

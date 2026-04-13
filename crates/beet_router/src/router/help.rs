@@ -433,7 +433,7 @@ mod test {
 		let root = world
 			.spawn(children![
 				help(),
-				scene_func("about", || Element::new("p")
+				fixed_scene("about", || Element::new("p")
 					.with_inner_text("about")),
 				increment(FieldRef::new("count")),
 			])

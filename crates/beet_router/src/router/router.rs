@@ -230,10 +230,16 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deref)]
-pub struct SceneEntity(pub Entity);
-impl From<Entity> for SceneEntity {
-	fn from(entity: Entity) -> Self { Self(entity) }
+pub struct SceneEntity(Entity);
+impl SceneEntity {
+	/// A scene entity that should not be despawned after render
+	pub fn new_fixed(entity: Entity) -> Self { Self(entity) }
+
+	/// A scene entity that should be despawned after render,
+	/// ie a help page or not found route
+	pub fn new_ephemeral(_entity: Entity) -> Self { todo!() }
 }
+
 
 
 #[cfg(test)]
@@ -249,7 +255,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((router(), children![scene_func("about", || {
+			.spawn((router(), children![fixed_scene("about", || {
 				Element::new("p").with_inner_text("About page")
 			}),]))
 			.call::<Request, Response>(Request::get("about"))
@@ -264,7 +270,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((router(), children![scene_func("", || {
+			.spawn((router(), children![fixed_scene("", || {
 				Element::new("p").with_inner_text("Root content")
 			}),]))
 			.call::<Request, Response>(Request::get(""))
@@ -279,13 +285,13 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
 			.spawn((router(), children![
-				scene_func("", || {
+				fixed_scene("", || {
 					children![
 						Element::new("h1").with_inner_text("My Server"),
 						Element::new("p").with_inner_text("welcome!"),
 					]
 				}),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))
@@ -303,7 +309,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))
@@ -320,7 +326,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))
@@ -348,13 +354,13 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((router(), children![
-				scene_func("", || {
+				fixed_scene("", || {
 					children![
 						Element::new("h1").with_inner_text("My Server"),
 						Element::new("p").with_inner_text("welcome!"),
 					]
 				}),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))
@@ -374,12 +380,12 @@ mod test {
 		let root = world
 			.spawn((router(), children![
 				(
-					scene_func("counter", || {
+					fixed_scene("counter", || {
 						Element::new("p").with_inner_text("counter")
 					}),
 					children![increment(FieldRef::new("count")),],
 				),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))
@@ -419,12 +425,12 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				(
-					scene_func("counter", || {
+					fixed_scene("counter", || {
 						Element::new("p").with_inner_text("counter")
 					}),
 					children![increment(FieldRef::new("count")),],
 				),
-				scene_func("about", || {
+				fixed_scene("about", || {
 					Element::new("p").with_inner_text("about")
 				}),
 			]))

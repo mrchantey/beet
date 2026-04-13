@@ -5,18 +5,18 @@ use beet_thread::prelude::*;
 #[path = "utils/post_streamer.rs"]
 mod post_streamer;
 
-fn streamer() -> O11sStreamer { OllamaProvider::qwen() }
+fn streamer() -> O11sStreamer { OllamaProvider::default_12gb_gpu() }
 
 fn streamer_non_streaming() -> O11sStreamer {
-	OllamaProvider::qwen().without_streaming()
+	OllamaProvider::default_12gb_gpu().without_streaming()
 }
 
 fn completions_streamer() -> CompletionsStreamer {
-	OllamaProvider::qwen_completions()
+	OllamaProvider::default_12gb_gpu_completions()
 }
 
 fn completions_streamer_non_streaming() -> CompletionsStreamer {
-	OllamaProvider::qwen_completions().without_streaming()
+	OllamaProvider::default_12gb_gpu_completions().without_streaming()
 }
 
 // === PostStreamer (O11s) tests ===

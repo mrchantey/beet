@@ -8,7 +8,7 @@ use beet_tool::prelude::*;
 /// in HyperCard. Each scene route is a route, with the exact rendering
 /// behavior determined by the [`SceneToolRenderer`] on the server.
 ///
-/// Use [`scene_func`] or [`scene_tool`] to create a routable scene.
+/// Use [`fixed_scene`] or [`scene_tool`] to create a routable scene.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(DocumentScope)]
@@ -79,64 +79,9 @@ impl IntoTool<Self> for SceneToolRenderer {
 pub struct DespawnOnRender;
 
 
-/// Creates a routable scene tool from a path and a tool that returns
-/// a [`Bundle`].
+/// Creates a fixed routable scene from a path and content closure.
 ///
-/// A scene tool is a regular tool (`Tool<(), Entity>`) that spawns an
-/// entity with the provided bundle and returns its id. The
-/// [`ExchangeTool`] handles request extraction and renders the
-/// entity via [`SceneToolRenderer`].
-///
-/// # Example
-///
-/// ```no_run
-/// use beet_router::prelude::*;
-/// use beet_core::prelude::*;
-/// use beet_net::prelude::*;
-/// use beet_node::prelude::*;
-/// use beet_tool::prelude::*;
-///
-/// let bundle = scene_tool("about", Tool::<Request, (Element,)>::new_pure(
-///     |_cx| Ok((Element::new("p"),))
-/// ));
-/// ```
-pub fn scene_tool<M, B>(
-	path: &str,
-	tool: impl IntoTool<M, In = Request, Out = B>,
-) -> impl Bundle
-where
-	B: 'static + Send + Sync + Bundle,
-{
-	let inner = tool.into_tool();
-
-	// The entity's own tool: spawns a scene entity, inserts the bundle,
-	// and returns the entity id.
-	let scene_spawner = Tool::<(), Entity>::new_async(
-		async move |cx: ToolContext<()>| -> Result<Entity> {
-			let bundle =
-				cx.caller.call_detached(inner, Request::get("")).await?;
-			let entity = cx.world().spawn_then((DespawnOnRender, bundle)).await;
-			entity.id().xok()
-		},
-	);
-
-	// Capture the spawner so the exchange tool can call it via call_detached.
-	let spawner_for_exchange = scene_spawner.clone();
-	let exchange = ExchangeTool::from_tool(Tool::new_async(
-		async move |cx: ToolContext<Request>| -> Result<Response> {
-			let parts = cx.input.parts().clone();
-			let entity: Entity = cx
-				.caller
-				.call_detached(spawner_for_exchange.clone(), ())
-				.await?;
-			SceneToolRenderer::render_entity(&cx.caller, entity, parts).await
-		},
-	));
-
-	(PathPartial::new(path), SceneRoute, scene_spawner, exchange)
-}
-
-/// Creates a routable scene from a path and content closure.
+/// This approach is convenient
 ///
 /// A scene func is a regular tool (`Tool<(), Entity>`) that calls the
 /// closure, spawns an entity with the resulting bundle, and returns
@@ -150,38 +95,25 @@ where
 /// use beet_core::prelude::*;
 /// use beet_node::prelude::*;
 ///
-/// let bundle = scene_func("about", || {
+/// let bundle = fixed_scene("about", || {
 ///     Element::new("p").with_inner_text("About page")
 /// });
 /// ```
-pub fn scene_func<F, B>(path: &str, func: F) -> impl Bundle
+pub fn fixed_scene<F, B>(path: &str, func: F) -> impl Bundle
 where
 	F: 'static + Send + Sync + Clone + Fn() -> B,
 	B: 'static + Send + Sync + Bundle,
 {
-	// The entity's own tool: calls the closure and spawns the result
-	let scene_spawner = Tool::<(), Entity>::new_async(
-		async move |cx: ToolContext<()>| -> Result<Entity> {
-			let entity = cx.world().spawn_then((DespawnOnRender, func())).await;
-			entity.id().xok()
-		},
-	);
-
-	// Capture the spawner so the exchange tool can call it via call_detached.
-	let spawner_for_exchange = scene_spawner.clone();
-	let exchange = ExchangeTool::from_tool(Tool::new_async(
-		async move |cx: ToolContext<Request>| -> Result<Response> {
-			let parts = cx.input.parts().clone();
-			let entity: Entity = cx
-				.caller
-				.call_detached(spawner_for_exchange.clone(), ())
-				.await?;
-			SceneToolRenderer::render_entity(&cx.caller, entity, parts).await
-		},
-	));
-
-	(PathPartial::new(path), SceneRoute, scene_spawner, exchange)
+	route(path, (CallerScene, func()))
 }
+/// Simply returns the caller as the scene to be rendered
+#[tool(route)]
+#[derive(Default, Component)]
+#[require(SceneRoute)]
+async fn CallerScene(cx: ToolContext<Request>) -> Result<SceneEntity> {
+	SceneEntity::new_fixed(cx.id()).xok()
+}
+
 
 #[derive(Component, Reflect)]
 #[require(SceneRoute, FileSceneTool)]
@@ -211,7 +143,7 @@ async fn FileSceneTool(cx: ToolContext<Request>) -> Result<SceneEntity> {
 			MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))
 		})
 		.await?;
-	SceneEntity(cx.id()).xok()
+	SceneEntity::new_fixed(cx.id()).xok()
 }
 
 /// Convenience function to create a simple route from a path and bundle.

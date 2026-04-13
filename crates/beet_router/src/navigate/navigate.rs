@@ -282,8 +282,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				scene_func("", || Element::new("h1").with_inner_text("Root")),
-				scene_func("about", || Element::new("p")
+				fixed_scene("", || Element::new("h1").with_inner_text("Root")),
+				fixed_scene("about", || Element::new("p")
 					.with_inner_text("About page")),
 			]))
 			.flush();
@@ -305,9 +305,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				scene_func("alpha", || Element::new("p")
+				fixed_scene("alpha", || Element::new("p")
 					.with_inner_text("Alpha page")),
-				scene_func("beta", || Element::new("p")
+				fixed_scene("beta", || Element::new("p")
 					.with_inner_text("Beta page")),
 			]))
 			.flush();
@@ -329,9 +329,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				scene_func("alpha", || Element::new("p")
+				fixed_scene("alpha", || Element::new("p")
 					.with_inner_text("Alpha page")),
-				scene_func("beta", || Element::new("p")
+				fixed_scene("beta", || Element::new("p")
 					.with_inner_text("Beta page")),
 			]))
 			.flush();
@@ -366,9 +366,9 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				scene_func("alpha", || Element::new("p")
+				fixed_scene("alpha", || Element::new("p")
 					.with_inner_text("Alpha page")),
-				scene_func("beta", || Element::new("p")
+				fixed_scene("beta", || Element::new("p")
 					.with_inner_text("Beta page")),
 			]))
 			.flush();
@@ -390,7 +390,7 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![scene_func("about", || Element::new(
+			.spawn((router(), children![fixed_scene("about", || Element::new(
 				"p"
 			)
 			.with_inner_text("About page")),]))
