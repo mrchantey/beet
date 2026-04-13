@@ -280,7 +280,9 @@ impl SidebarState {
 				.and_then(|node| node.order)
 				.unwrap_or(u32::MAX);
 			match order_a.cmp(&order_b) {
-				std::cmp::Ordering::Equal => path_a.cmp(&path_b),
+				std::cmp::Ordering::Equal => {
+					natural_cmp(path_a.as_ref(), path_b.as_ref())
+				}
 				other => other,
 			}
 		});
@@ -303,13 +305,69 @@ impl SidebarState {
 	}
 }
 
+use std::cmp::Ordering;
+
+
+/// Compare with [natural sort order](https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/)
+fn natural_cmp(a: &str, b: &str) -> Ordering {
+	let mut a = a.chars().peekable();
+	let mut b = b.chars().peekable();
+
+	loop {
+		match (a.peek(), b.peek()) {
+			(None, None) => return Ordering::Equal,
+			(None, _) => return Ordering::Less,
+			(_, None) => return Ordering::Greater,
+
+			(Some(c1), Some(c2))
+				if c1.is_ascii_digit() && c2.is_ascii_digit() =>
+			{
+				// collect full number chunks
+				let mut n1 = String::new();
+				let mut n2 = String::new();
+
+				while let Some(c) = a.peek() {
+					if c.is_ascii_digit() {
+						n1.push(*c);
+						a.next();
+					} else {
+						break;
+					}
+				}
+
+				while let Some(c) = b.peek() {
+					if c.is_ascii_digit() {
+						n2.push(*c);
+						b.next();
+					} else {
+						break;
+					}
+				}
+
+				// compare as numbers (fallback to length if large)
+				let ord = n1.len().cmp(&n2.len()).then(n1.cmp(&n2));
+				if ord != Ordering::Equal {
+					return ord;
+				}
+			}
+
+			_ => {
+				let c1 = a.next().unwrap();
+				let c2 = b.next().unwrap();
+				let ord = c1.cmp(&c2);
+				if ord != Ordering::Equal {
+					return ord;
+				}
+			}
+		}
+	}
+}
+
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 	use beet_net::prelude::*;
-	use beet_node::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -320,7 +378,12 @@ mod test {
 			.unwrap()
 			.to_string()
 	}
-
+	#[test]
+	fn natural_compare() {
+		let mut v = vec!["page10", "page1", "page2"];
+		v.sort_by(|a, b| natural_cmp(a, b));
+		assert_eq!(v, vec!["page1", "page2", "page10"]);
+	}
 	#[test]
 	fn builds_basic_sidebar() {
 		let mut world = router_world();

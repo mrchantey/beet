@@ -6,10 +6,10 @@
 //! calls the inner handler via [`Next`].
 
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_node::prelude::*;
-use beet_action::prelude::*;
 
 /// Middleware that intercepts `--help` and renders scoped help
 /// as a beet_node scene entity tree.
@@ -69,19 +69,19 @@ pub(crate) async fn ContextualNotFound(
 ) -> Result<Response> {
 	let path = cx.input.path().clone();
 
-	let (preamble, nodes) = cx
+	let (info, nodes) = cx
 		.caller
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
 			move |entity, query| {
 				let tree = query.get(entity)?;
-				let (preamble, help_nodes) =
+				let (info, help_nodes) =
 					nearest_ancestor_help_nodes(tree, &path);
-				(preamble, help_nodes).xok()
+				(info, help_nodes).xok()
 			},
 		)
 		.await?;
 
-	let scene = spawn_not_found_scene(&cx.caller, &preamble, &nodes).await;
+	let scene = spawn_not_found_scene(&cx.caller, info, &nodes).await;
 	let mut response = SceneActionRenderer::render_entity(
 		&cx.caller,
 		scene,
@@ -92,31 +92,47 @@ pub(crate) async fn ContextualNotFound(
 	Ok(response)
 }
 
+/// Data describing a not-found route for rendering the preamble.
+struct NotFoundInfo {
+	/// The path that was not found.
+	not_found_path: String,
+	/// The nearest ancestor scene path, if any.
+	ancestor_path: Option<String>,
+}
+
 /// Walks path segments from longest to shortest prefix, returning
 /// help nodes for the first ancestor that matches a scene.
 fn nearest_ancestor_help_nodes(
 	tree: &RouteTree,
 	segments: &[String],
-) -> (String, Vec<ActionNode>) {
+) -> (NotFoundInfo, Vec<ActionNode>) {
+	let not_found_path = segments.join("/");
+
 	for length in (1..segments.len()).rev() {
 		let prefix = &segments[..length];
 		if let Some(node) = tree.find(prefix) {
 			if node.is_scene() {
 				let prefix_str = prefix.join("/");
-				let preamble = format!(
-					"Route /{} not found. Showing help for /{}:",
-					segments.join("/"),
-					prefix_str,
-				);
 				let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
 				let nodes = filtered_nodes(help_tree);
-				return (preamble, nodes);
+				return (
+					NotFoundInfo {
+						not_found_path,
+						ancestor_path: Some(prefix_str),
+					},
+					nodes,
+				);
 			}
 		}
 	}
-	let preamble = format!("Route /{} not found.", segments.join("/"));
 	let nodes = filtered_nodes(tree);
-	(preamble, nodes)
+	(
+		NotFoundInfo {
+			not_found_path,
+			ancestor_path: None,
+		},
+		nodes,
+	)
 }
 
 fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
@@ -154,10 +170,80 @@ async fn spawn_help_scene(
 	SceneEntity::new_ephemeral(entity.id())
 }
 
-/// Spawns a not-found scene entity tree with a preamble and help.
+/// Builds the not-found preamble with anchor tags for the missing route
+/// and optional ancestor route.
+fn not_found_preamble(info: NotFoundInfo) -> (Element, OnSpawn) {
+	let not_found_path = info.not_found_path;
+	let ancestor_path = info.ancestor_path;
+	(
+		Element::new("div"),
+		OnSpawn::new(move |entity| {
+			let div_id = entity.id();
+			entity.world_scope(move |world| {
+				// <p> with inline anchors for the route names
+				let p_id =
+					world.spawn((Element::new("p"), ChildOf(div_id))).id();
+
+				world.spawn((Value::Str("Route ".into()), ChildOf(p_id)));
+
+				// <a href="/not/found/path">/not/found/path</a>
+				let not_found_href = format!("/{not_found_path}");
+				let anchor_id =
+					world.spawn((Element::new("a"), ChildOf(p_id))).id();
+				world.spawn((
+					Attribute::new("href"),
+					Value::Str(not_found_href.clone().into()),
+					AttributeOf::new(anchor_id),
+				));
+				world.spawn((
+					Value::Str(not_found_href.into()),
+					ChildOf(anchor_id),
+				));
+
+				if let Some(ancestor) = ancestor_path {
+					world.spawn((
+						Value::Str(" not found. Showing help for ".into()),
+						ChildOf(p_id),
+					));
+
+					// <a href="/ancestor">/ancestor</a>
+					let ancestor_href = format!("/{ancestor}");
+					let a2_id =
+						world.spawn((Element::new("a"), ChildOf(p_id))).id();
+					world.spawn((
+						Attribute::new("href"),
+						Value::Str(ancestor_href.clone().into()),
+						AttributeOf::new(a2_id),
+					));
+					world.spawn((
+						Value::Str(ancestor_href.into()),
+						ChildOf(a2_id),
+					));
+
+					world.spawn((Value::Str(":".into()), ChildOf(p_id)));
+				} else {
+					world.spawn((
+						Value::Str(" not found.".into()),
+						ChildOf(p_id),
+					));
+				}
+
+				// <h2>Available routes</h2>
+				let h2_id =
+					world.spawn((Element::new("h2"), ChildOf(div_id))).id();
+				world.spawn((
+					Value::Str("Available routes".into()),
+					ChildOf(h2_id),
+				));
+			});
+		}),
+	)
+}
+
+/// Spawns a not-found scene entity tree with anchor-tagged preamble and help.
 async fn spawn_not_found_scene(
 	caller: &AsyncEntity,
-	preamble: &str,
+	info: NotFoundInfo,
 	nodes: &[ActionNode],
 ) -> SceneEntity {
 	let children: Vec<(Element, OnSpawn)> = nodes
@@ -166,15 +252,7 @@ async fn spawn_not_found_scene(
 		.collect();
 
 	let world = caller.world();
-	let entity = world
-		.spawn_then((
-			Element::new("div"),
-			OnSpawn::insert_child(Element::new("p").with_inner_text(preamble)),
-			OnSpawn::insert_child(
-				Element::new("h2").with_inner_text("Available routes"),
-			),
-		))
-		.await;
+	let entity = world.spawn_then(not_found_preamble(info)).await;
 	for child in children {
 		entity.insert_then(OnSpawn::insert_child(child)).await;
 	}

@@ -10,4 +10,4 @@ Unfortunately everything I know about them is on the other page.
 ---
 
 - [Ok ill go there then](/)
-- [A page that doesnt exist](/beets-are-bad)
+- [Find out about bad beets](/about/bad-beets) lol jks
