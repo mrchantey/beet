@@ -3,15 +3,11 @@ use beet::prelude::*;
 pub fn routes() -> impl Bundle {
 	// Nest under a child entity so the MiddlewareList only applies
 	// to route descendants, not the server entity's own exchange fallback.
-	children![(
-		Name::new("Routes"),
-		Middleware::<LayoutTemplate, _, _>::default(),
-		children![
-			route("", FileScene::new("examples/router/content/home.md")),
-			route("about", FileScene::new("examples/router/content/about.md")),
-			counter()
-		]
-	)]
+	(Middleware::<LayoutTemplate, _, _>::default(), children![
+		route("", FileScene::new("examples/router/content/home.md")),
+		route("about", FileScene::new("examples/router/content/about.md")),
+		counter()
+	])
 }
 
 #[derive(Reflect)]

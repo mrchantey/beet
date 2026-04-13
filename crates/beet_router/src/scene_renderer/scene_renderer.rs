@@ -26,6 +26,20 @@ impl SceneActionRenderer {
 		Self { action }
 	}
 
+	async fn resolve(entity: &AsyncEntity) -> Action<RequestParts, Response> {
+		entity
+			.with_state::<AncestorQuery<&SceneActionRenderer>, _>(
+				|entity, state| {
+					state
+						.get(entity)
+						.cloned()
+						.map(|renderer| renderer.into_action())
+				},
+			)
+			.await
+			.unwrap_or_else(|_| Action::new_async(default_scene_renderer))
+	}
+
 	/// Renders the given scene entity using the ancestor
 	/// [`SceneActionRenderer`], falling back to the default renderer
 	/// when none is found.
@@ -43,17 +57,7 @@ impl SceneActionRenderer {
 		let scene = Self::apply_scene_middleware(caller, scene, &parts).await?;
 
 		// find the nearest ancestor SceneActionRenderer or fall back
-		let render_action = caller
-			.with_state::<AncestorQuery<&SceneActionRenderer>, _>(
-				|entity, state| {
-					state
-						.get(entity)
-						.cloned()
-						.map(|renderer| renderer.into_action())
-				},
-			)
-			.await
-			.unwrap_or_else(|_| Action::new_async(default_scene_renderer));
+		let render_action = Self::resolve(caller).await;
 
 		let scene_entity = caller.world().entity(scene.entity);
 		let result = scene_entity.call_detached(render_action, parts).await;
