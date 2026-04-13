@@ -55,6 +55,7 @@ async fn LayoutTemplate(
 ) -> Result<SceneEntity> {
 	let caller = cx.caller.clone();
 	let (parts, next) = cx.take();
+	let path: RelPath = parts.path().into();
 
 	// get the content scene from the inner handler
 	let content = next.call(parts).await?;
@@ -66,6 +67,7 @@ async fn LayoutTemplate(
 	let head_html = head_content()?;
 	let nav_html = nav_content();
 
+	let caller_entity = caller.id();
 	let world = caller.world();
 
 	// parse layout, head, and nav into entities, then wire up slots
@@ -82,6 +84,18 @@ async fn LayoutTemplate(
 				}
 				if let Some(slot) = find_named_slot(world, layout_id, "nav") {
 					world.entity_mut(slot).insert(SlotContainer::new(nav_id));
+				}
+				if let Some(slot) = find_named_slot(world, layout_id, "sidebar")
+				{
+					let sidebar_state = SidebarState::new(path);
+					let bundle = world.with_state::<RouteQuery, Result<_>>(
+						move |query| {
+							let tree = query.route_tree(caller_entity)?;
+							let bundle = sidebar_state.build(&tree);
+							bundle.xok()
+						},
+					)?;
+					world.entity_mut(slot).insert(bundle);
 				}
 				if let Some(slot) = find_named_slot(world, layout_id, "main") {
 					world
