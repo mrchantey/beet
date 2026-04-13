@@ -57,6 +57,15 @@ members = [
 	"crates/beet_action",
 	"examples/infra/extra-types",
 
+	## TODO
+	# "crates/beet_dom",
+	# "crates/beet_parse",
+	# "crates/beet_rsx_combinator",
+	# "crates/beet_rsx/macros",
+	# "crates/beet_rsx",
+
+
+
 	## 💡 Flow
 	# "crates/beet_examples",
 	# "crates/beet_flow",
@@ -66,12 +75,7 @@ members = [
 	## 💡 RSX
 	# "crates/beet_build",
 	# "crates/beet_design",
-	# "crates/beet_dom",
-	# "crates/beet_parse",
 	# "crates/beet_router",
-	# "crates/beet_rsx_combinator",
-	# "crates/beet_rsx/macros",
-	# "crates/beet_rsx",
 
 	## 💡 Beet
 	# "crates/beet_site",
@@ -92,20 +96,23 @@ beet_node = { path = "crates/beet_node", version = "0.0.9-dev.8" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.8" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.8" }
 
+## TODO
+# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.8" }
+# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.8" }
+# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.8" }
+# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.8" }
+# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.8" }
+
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.8" }
 # beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.8" }
 # beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.8" }
 # beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.8" }
 
-# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.8" }
-# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.8" }
-# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.8" }
-# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.8" }
+
 # beet_build = { path = "crates/beet_build", version = "0.0.9-dev.8" }
 # beet_design = { path = "crates/beet_design", version = "0.0.9-dev.8" }
 # beet_router = { path = "crates/beet_router", version = "0.0.9-dev.8" }
-# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.8" }
 
 #💡 local
 # bevy_ecs = {version = "0.18", default-features = false, features = ["backtrace"]}

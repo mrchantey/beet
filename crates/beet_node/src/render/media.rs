@@ -173,6 +173,7 @@ impl NodeRenderer for MediaRenderer {
 		// 1. first try each media type and see if we can do an exact match
 		for media_type in &candidates {
 			if let Some(output) = self.try_render_media_type(cx, media_type)? {
+				trace!("Rendered media type {media_type} for entity {}", cx.entity);
 				return Ok(output);
 			}
 		}

@@ -28,6 +28,26 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
 
+
+/// Entry point for the `mdx` proc macro.
+///
+/// Content tokens are parsed directly — no crate path prefix needed.
+pub fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	let input2: TokenStream = input.into();
+	let content_tokens: Vec<TokenTree> = input2.into_iter().collect();
+
+	let segments = match try_extract_string_literal(&content_tokens) {
+		Some((string_content, span)) => {
+			parse_string_content(&string_content, span)
+		}
+		None => parse_raw_tokens(content_tokens),
+	};
+
+	let output = generate_output(segments);
+	output.into()
+}
+
+
 /// A segment of parsed MDX content.
 enum Segment {
 	/// Markdown text to be passed to `markdown()`.
@@ -338,22 +358,4 @@ fn remap_spans(ts: TokenStream, span: proc_macro2::Span) -> TokenStream {
 			}
 		})
 		.collect()
-}
-
-/// Entry point for the `mdx` proc macro.
-///
-/// Content tokens are parsed directly — no crate path prefix needed.
-pub fn impl_mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	let input2: TokenStream = input.into();
-	let content_tokens: Vec<TokenTree> = input2.into_iter().collect();
-
-	let segments = match try_extract_string_literal(&content_tokens) {
-		Some((string_content, span)) => {
-			parse_string_content(&string_content, span)
-		}
-		None => parse_raw_tokens(content_tokens),
-	};
-
-	let output = generate_output(segments);
-	output.into()
 }
