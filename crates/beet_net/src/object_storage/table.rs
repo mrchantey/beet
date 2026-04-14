@@ -358,7 +358,7 @@ pub trait TableProvider<T: TableStoreRow>:
 /// Create temporary in-memory table for testing.
 /// The returned table is pre-created and ready for immediate use.
 pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
-	TableStore::new(InMemoryProvider::created())
+	TableStore::new(InMemoryBucket::created())
 }
 
 /// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]
@@ -373,17 +373,17 @@ pub async fn dynamo_fs_selector<T: TableStoreRow>(
 	match access {
 		ServiceAccess::Local => {
 			debug!("Table Selector - FS: {fs_path}");
-			TableStore::new(FsBucketProvider::new(fs_path.clone()))
+			TableStore::new(FsBucket::new(fs_path.clone()))
 		}
 		#[cfg(not(all(feature = "aws", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - FS (no aws feature): {fs_path}");
-			TableStore::new(FsBucketProvider::new(fs_path.clone()))
+			TableStore::new(FsBucket::new(fs_path.clone()))
 		}
 		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - Dynamo: {table_name}");
-			TableStore::new(DynamoDbProvider::new(table_name, region))
+			TableStore::new(DynamoBucket::new(table_name, region))
 		}
 	}
 }

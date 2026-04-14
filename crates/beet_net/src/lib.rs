@@ -3,14 +3,15 @@
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![deny(missing_docs)]
 
-mod client;
 mod actions;
+mod client;
 mod types;
 /// Re-export the typed header module at crate level.
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
 /// Re-export media-type-driven serialization at crate level.
+mod net_plugin;
 mod object_storage;
 mod server;
 /// WebSocket client and server implementations.
@@ -32,11 +33,12 @@ pub mod prelude {
 	/// Default port for WebSocket connections in webdriver sessions.
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
+	pub use crate::actions::*;
 	pub use crate::client::*;
+	pub use crate::net_plugin::*;
 	pub use crate::object_storage::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
-	pub use crate::actions::*;
 	pub use crate::types::*;
 	// Re-export core types used in beet_net's public API
 	pub use beet_core::prelude::MediaBytes;

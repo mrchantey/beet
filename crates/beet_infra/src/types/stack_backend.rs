@@ -86,9 +86,7 @@ impl LocalBackend {
 		let state_path = self.path.join(key).to_string();
 		json!({"local":{ "path": state_path }})
 	}
-	pub fn provider(&self) -> FsBucketProvider {
-		FsBucketProvider::new(self.path.clone())
-	}
+	pub fn provider(&self) -> FsBucket { FsBucket::new(self.path.clone()) }
 	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
 	pub fn clear_stale_locks(&self) {
 		if let Ok(entries) =
@@ -121,8 +119,8 @@ pub struct S3Backend {
 
 impl S3Backend {
 	#[cfg(feature = "aws")]
-	pub fn provider(&self) -> beet_net::prelude::S3Provider {
-		beet_net::prelude::S3Provider::new(
+	pub fn provider(&self) -> beet_net::prelude::S3Bucket {
+		beet_net::prelude::S3Bucket::new(
 			self.bucket.clone(),
 			self.region.clone(),
 		)

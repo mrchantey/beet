@@ -100,6 +100,7 @@ impl<'de> serde::Deserialize<'de> for EnvVar {
 mod test {
 	use super::*;
 
+	#[cfg(not(target_arch = "wasm32"))]
 	#[test]
 	fn roundtrip_serde() {
 		// SAFETY: single-threaded test
@@ -144,6 +145,7 @@ mod reflect_test {
 	/// concrete [`EnvVar`] directly rather than reconstructing it from
 	/// struct fields (which would leave `value = ""`).
 	#[test]
+	#[cfg(not(target_arch = "wasm32"))]
 	fn roundtrip_reflect_serde() {
 		// SAFETY: single-threaded test
 		unsafe { env_ext::set_var("BEET_TEST_REFLECT_VAR", "reflect_value") };

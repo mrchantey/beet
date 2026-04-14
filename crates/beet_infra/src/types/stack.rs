@@ -95,7 +95,7 @@ impl Stack {
 
 	#[cfg(feature = "aws")]
 	pub fn state_file(&self) -> Blob {
-		self.backend.provider().blob(self.backend_path())
+		self.backend.provider().erased_blob(self.backend_path())
 	}
 }
 
@@ -138,7 +138,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 
 	/// Get the provider from an [`S3Bucket`] on this entity
 	#[cfg(feature = "aws")]
-	pub fn s3_provider(&self, entity: Entity) -> Result<S3Provider> {
+	pub fn s3_provider(&self, entity: Entity) -> Result<S3Bucket> {
 		let (_, stack, aws_stack) = self.stacks.get(entity)?;
 		let bucket = self.s3_buckets.get(entity)?;
 		bucket.provider(stack, aws_stack).xok()

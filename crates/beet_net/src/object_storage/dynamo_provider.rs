@@ -11,16 +11,15 @@ use bytes::Bytes;
 
 /// AWS DynamoDB provider storing its configuration as serializable fields.
 /// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct DynamoDbProvider {
+#[derive(Debug, Clone, Reflect)]
+pub struct DynamoBucket {
 	/// The DynamoDB table name (maps to "bucket name" in the storage abstraction).
 	table_name: SmolStr,
 	/// The AWS region for this table.
 	region: SmolStr,
 }
 
-impl DynamoDbProvider {
+impl DynamoBucket {
 	/// Creates a new provider for the given table name and region.
 	pub fn new(
 		table_name: impl Into<SmolStr>,
@@ -118,9 +117,14 @@ impl DynamoDbProvider {
 		}
 		bevybail!("Table did not delete in time");
 	}
+
+	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+		TypedBlob::new(TypedBucket(self.clone()), path)
+	}
 }
 
-impl BucketProvider for DynamoDbProvider {
+impl BucketProvider for DynamoBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
@@ -307,7 +311,7 @@ impl BucketProvider for DynamoDbProvider {
 
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for DynamoDbProvider {
+impl<T: TableStoreRow> TableProvider<T> for DynamoBucket {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
@@ -357,14 +361,14 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn bucket() {
-		let provider = DynamoDbProvider::new("beet-test-table", "us-west-2");
+		let provider = DynamoBucket::new("beet-test-table", "us-west-2");
 		bucket_test::run(provider).await;
 	}
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {
-		let provider = DynamoDbProvider::new("beet-test-table", "us-west-2");
+		let provider = DynamoBucket::new("beet-test-table", "us-west-2");
 		table_test::run(provider).await;
 	}
 }

@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 
 impl Bucket {
-	/// Create a pre-created [`InMemoryProvider`] bucket for testing.
-	pub fn new_test() -> Self { Self::new(InMemoryProvider::created()) }
+	/// Create a pre-created [`InMemoryBucket`] bucket for testing.
+	pub fn new_test() -> Self { Self::new(InMemoryBucket::created()) }
 }
 
 
@@ -15,10 +15,10 @@ impl Bucket {
 ///
 /// Inner state is `None` when the bucket has not been created,
 /// and `Some(map)` when it exists.
-#[derive(Debug, Default, Clone, Component)]
-pub struct InMemoryProvider(pub Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>);
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryBucket(pub Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>);
 
-impl InMemoryProvider {
+impl InMemoryBucket {
 	/// Creates a new uncreated in-memory provider.
 	pub fn new() -> Self { Self::default() }
 
@@ -29,13 +29,13 @@ impl InMemoryProvider {
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for InMemoryProvider {
+impl<T: TableStoreRow> TableProvider<T> for InMemoryBucket {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl BucketProvider for InMemoryProvider {
+impl BucketProvider for InMemoryBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { None }
@@ -147,7 +147,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = InMemoryProvider::new();
+		let provider = InMemoryBucket::new();
 		bucket_test::run(provider).await;
 	}
 }

@@ -3,14 +3,15 @@
 //! This module provides a unified API for storing and retrieving binary data
 //! across different storage backends:
 //!
-//! - [`InMemoryProvider`]: Ephemeral storage for testing
-//! - [`FsBucketProvider`]: Local filesystem storage (native only)
-//! - [`LocalStorageProvider`]: Browser localStorage (WASM only)
-//! - [`S3Provider`]: AWS S3 storage (requires `aws` feature)
-//! - [`DynamoDbProvider`]: AWS DynamoDB storage (requires `aws` feature)
+//! - [`InMemoryBucket`]: Ephemeral storage for testing
+//! - [`FsBucket`]: Local filesystem storage (native only)
+//! - [`LocalStorageBucket`]: Browser localStorage (WASM only)
+//! - [`S3Bucket`]: AWS S3 storage (requires `aws` feature)
+//! - [`DynamoBucket`]: AWS DynamoDB storage (requires `aws` feature)
 //!
-//! Use [`BucketPlugin`] to register observers that auto-insert a [`Bucket`]
-//! component whenever a provider component is added to an entity.
+//! Use [`BucketPlugin`] to register bucket types for scene serialization.
+//! [`TypedBucket`] and [`TypedBlob`] are the serializable wrappers that
+//! auto-insert their erased counterparts ([`Bucket`] and [`Blob`]) on add.
 //!
 //! # Example
 //!
@@ -61,42 +62,31 @@ mod dynamo_provider;
 
 use beet_core::prelude::*;
 
-/// Observer that auto-inserts a [`Bucket`] component when a provider
-/// component `T` is added to an entity.
-fn add_bucket<T: Component + BucketProvider + Clone>(
-	ev: On<Insert, T>,
-	query: Query<&T>,
-	mut commands: Commands,
-) -> Result {
-	let entity = ev.entity;
-	let provider = query.get(entity)?;
-	commands
-		.entity(entity)
-		.insert(Bucket::new(provider.clone()));
-	Ok(())
-}
-
-/// Plugin that registers bucket provider observers.
+/// Plugin that registers bucket types for scene serialization.
 ///
-/// When added to an [`App`], this plugin ensures that any entity with a
-/// provider component (e.g. [`FsBucketProvider`], [`InMemoryProvider`])
-/// automatically receives a [`Bucket`] component wrapping that provider.
+/// Registers [`TypedBucket`] and [`TypedBlob`] instantiations for each
+/// provider so that scenes containing bucket references can be serialized
+/// and deserialized.
+#[derive(Default)]
 pub struct BucketPlugin;
 
 impl Plugin for BucketPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<FsBucketProvider>()
-			.add_observer(add_bucket::<FsBucketProvider>)
-			.add_observer(add_bucket::<InMemoryProvider>);
+		app.register_type::<FsBucket>()
+			.register_type::<TypedBucket<FsBucket>>()
+			.register_type::<TypedBlob<FsBucket>>();
 
 		#[cfg(target_arch = "wasm32")]
-		app.register_type::<LocalStorageProvider>()
-			.add_observer(add_bucket::<LocalStorageProvider>);
+		app.register_type::<LocalStorageBucket>()
+			.register_type::<TypedBucket<LocalStorageBucket>>()
+			.register_type::<TypedBlob<LocalStorageBucket>>();
 
 		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
-		app.register_type::<S3Provider>()
-			.register_type::<DynamoDbProvider>()
-			.add_observer(add_bucket::<S3Provider>)
-			.add_observer(add_bucket::<DynamoDbProvider>);
+		app.register_type::<S3Bucket>()
+			.register_type::<DynamoBucket>()
+			.register_type::<TypedBucket<S3Bucket>>()
+			.register_type::<TypedBlob<S3Bucket>>()
+			.register_type::<TypedBucket<DynamoBucket>>()
+			.register_type::<TypedBlob<DynamoBucket>>();
 	}
 }

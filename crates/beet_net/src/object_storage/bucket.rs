@@ -210,8 +210,10 @@ pub trait BucketProvider: 'static + Send + Sync {
 	/// Returns a boxed clone of this provider.
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
 
-	/// Create a [`Blob`] handle for a single object managed by this provider.
-	fn blob(&self, path: RelPath) -> Blob {
+	/// Create a type-erased [`Blob`] handle for a single object managed by
+	/// this provider. Prefer the typed [`FsBucket::blob`], [`S3Bucket::blob`]
+	/// etc. when you need scene serialization.
+	fn erased_blob(&self, path: RelPath) -> Blob {
 		Blob::new(Bucket::new(self.box_clone()), path)
 	}
 
@@ -388,17 +390,17 @@ pub trait BucketProvider: 'static + Send + Sync {
 
 /// Create temporary in-memory bucket for testing.
 /// The returned bucket is pre-created and ready for immediate use.
-pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryProvider::created()) }
+pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryBucket::created()) }
 
 /// Create local bucket with platform-specific provider.
-/// - wasm: [`LocalStorageProvider`]
-/// - native: [`FsBucketProvider`] at `.cache/buckets/<name>`
+/// - wasm: [`LocalStorageBucket`]
+/// - native: [`FsBucket`] at `.cache/buckets/<name>`
 pub fn local_bucket(name: impl Into<String>) -> Bucket {
 	let name = name.into();
 	#[cfg(target_arch = "wasm32")]
-	return Bucket::new(LocalStorageProvider::new(name));
+	return Bucket::new(LocalStorageBucket::new(name));
 	#[cfg(not(target_arch = "wasm32"))]
-	return Bucket::new(FsBucketProvider::new(
+	return Bucket::new(FsBucket::new(
 		AbsPathBuf::new_workspace_rel(format!(".cache/buckets/{name}"))
 			.unwrap(),
 	));
@@ -416,21 +418,84 @@ pub async fn s3_fs_selector(
 	match access {
 		ServiceAccess::Local => {
 			debug!("Bucket Selector - FS: {fs_path}");
-			Bucket::new(FsBucketProvider::new(fs_path))
+			Bucket::new(FsBucket::new(fs_path))
 		}
 		#[cfg(not(all(feature = "aws", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
 			debug!("Bucket Selector - FS (no aws or wasm): {fs_path}");
-			Bucket::new(FsBucketProvider::new(fs_path))
+			Bucket::new(FsBucket::new(fs_path))
 		}
 		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Bucket Selector - S3: {bucket_name}");
-			let provider = S3Provider::new(bucket_name, region);
+			let provider = S3Bucket::new(bucket_name, region);
 			Bucket::new(provider)
 		}
 	}
 }
+
+
+/// Convenience type for scene serialization, inserts a [`Bucket`] on add.
+///
+/// Wraps a concrete [`BucketProvider`] implementation and automatically
+/// inserts a type-erased [`Bucket`] component when added to an entity.
+///
+/// # Example
+/// ```no_run
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # fn run(mut commands: Commands) {
+/// let typed = TypedBucket(FsBucket::new(
+///     AbsPathBuf::new_workspace_rel("my-bucket").unwrap(),
+/// ));
+/// commands.spawn(typed);
+/// // entity now also has a `Bucket` component
+/// # }
+/// ```
+#[derive(Deref, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = on_add_typed_bucket::<B>)]
+pub struct TypedBucket<
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+>(pub B);
+
+impl<
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider + std::fmt::Debug,
+> std::fmt::Debug for TypedBucket<B>
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("TypedBucket").field(&self.0).finish()
+	}
+}
+
+impl<B: BucketProvider + Clone + Reflect> TypedBucket<B> {
+	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	pub fn blob(&self, path: RelPath) -> TypedBlob<B> {
+		TypedBlob::new(self.clone(), path)
+	}
+
+	/// Convert to a type-erased [`Bucket`].
+	pub fn to_bucket(&self) -> Bucket { Bucket::new(self.0.clone()) }
+}
+
+fn on_add_typed_bucket<
+	B: 'static + Send + Sync + BucketProvider + Reflect + Clone,
+>(
+	mut world: DeferredWorld,
+	cx: HookContext,
+) {
+	let inner = world
+		.entity(cx.entity)
+		.get::<TypedBucket<B>>()
+		.unwrap()
+		.0
+		.clone();
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(Bucket::new(inner));
+}
+
 
 /// Test utilities for bucket providers.
 #[cfg(test)]

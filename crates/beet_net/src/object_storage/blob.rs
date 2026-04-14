@@ -134,6 +134,188 @@ impl Blob {
 }
 
 
+/// Serializable blob handle that inserts an erased [`Blob`] on add.
+///
+/// Unlike [`Blob`], this type is fully reflectable and can be used in
+/// Bevy scenes. When added to an entity the `on_add` hook automatically
+/// inserts a [`Blob`] component so that systems reading [`Blob`] continue
+/// to work unchanged.
+///
+/// # Example
+///
+/// ```no_run
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// let typed = FsBucket::new(
+///     AbsPathBuf::new_workspace_rel("my_dir").unwrap()
+/// ).blob(RelPath::new("file.txt"));
+/// // `typed` is a `TypedBlob<FsBucket>` — reflectable and serializable.
+/// ```
+#[derive(Clone, Component, Reflect, Get)]
+#[reflect(Component)]
+#[component(on_add = on_add_typed_blob::<B>)]
+pub struct TypedBlob<B>
+where
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+{
+	/// Path to the blob within the bucket.
+	path: RelPath,
+	/// Typed bucket that owns this blob.
+	#[get(skip)]
+	bucket: TypedBucket<B>,
+}
+
+fn on_add_typed_blob<B>(mut world: DeferredWorld, cx: HookContext)
+where
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+{
+	let typed = world
+		.entity(cx.entity)
+		.get::<TypedBlob<B>>()
+		.unwrap()
+		.clone();
+	let blob = Blob::new(Bucket::new(typed.bucket.0.clone()), typed.path);
+	world.commands().entity(cx.entity).insert(blob);
+}
+
+impl<B> TypedBlob<B>
+where
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+{
+	/// Create a new [`TypedBlob`] from a [`TypedBucket`] and path.
+	pub fn new(bucket: TypedBucket<B>, path: RelPath) -> Self {
+		Self { path, bucket }
+	}
+
+	/// Convert to an erased [`Blob`].
+	pub fn to_blob(&self) -> Blob {
+		Blob::new(Bucket::new(self.bucket.0.clone()), self.path.clone())
+	}
+
+	/// Get the underlying [`TypedBucket`].
+	pub fn bucket(&self) -> &TypedBucket<B> { &self.bucket }
+
+	/// Get the underlying [`Bucket`] (type-erased).
+	pub fn erased_bucket(&self) -> Bucket { Bucket::new(self.bucket.0.clone()) }
+
+	/// Insert (or overwrite) the blob's content.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// blob.insert("content").await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn insert(&self, body: impl Into<Bytes>) -> Result {
+		self.bucket.insert(&self.path, body.into()).await
+	}
+
+	/// Insert the blob's content, failing if it already exists.
+	pub async fn try_insert(&self, body: impl Into<Bytes>) -> Result {
+		if self.exists().await? {
+			bevybail!("Object already exists: {}", self.path)
+		} else {
+			self.insert(body).await
+		}
+	}
+
+	/// Retrieve the blob's content.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// blob.insert("hello").await?;
+	/// let data = blob.get().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn get(&self) -> Result<Bytes> {
+		self.bucket.get(&self.path).await
+	}
+
+	/// Check whether the blob exists in the bucket.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let exists = blob.exists().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn exists(&self) -> Result<bool> {
+		self.bucket.exists(&self.path).await
+	}
+
+	/// Remove the blob from the bucket.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// blob.insert("temp").await?;
+	/// blob.remove().await?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn remove(&self) -> Result {
+		self.bucket.remove(&self.path).await
+	}
+
+	/// Get the public URL of the blob, if the provider supports it.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// if let Some(url) = blob.public_url().await? {
+	///     println!("Public URL: {url}");
+	/// }
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub async fn public_url(&self) -> Result<Option<String>> {
+		self.bucket.public_url(&self.path).await
+	}
+}
+
+impl<B> std::fmt::Debug for TypedBlob<B>
+where
+	B: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ Reflect
+		+ BucketProvider
+		+ std::fmt::Debug,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("TypedBlob")
+			.field("path", &self.path)
+			.field("bucket", &self.bucket)
+			.finish()
+	}
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -155,9 +337,20 @@ mod test {
 
 	#[test]
 	fn blob_from_provider_trait() {
-		let provider = InMemoryProvider::created();
-		let blob = provider.blob(RelPath::new("key.dat"));
+		let provider = InMemoryBucket::created();
+		let blob = provider.erased_blob(RelPath::new("key.dat"));
 		blob.path().to_string().xpect_eq("key.dat");
+	}
+
+	#[test]
+	fn typed_blob_to_blob() {
+		let bucket = FsBucket::new(
+			AbsPathBuf::new_workspace_rel("target/tests/typed_blob").unwrap(),
+		);
+		let typed = bucket.blob(RelPath::new("test.txt"));
+		typed.path().to_string().xpect_eq("test.txt");
+		let erased = typed.to_blob();
+		erased.path().to_string().xpect_eq("test.txt");
 	}
 
 	#[test]

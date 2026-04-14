@@ -7,14 +7,13 @@ use js_sys::wasm_bindgen::JsCast;
 /// A bucket provider backed by browser localStorage.
 ///
 /// Uses `bucket:<bucket_name>:<path>` as the localStorage key prefix.
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct LocalStorageProvider {
+#[derive(Debug, Clone, Reflect)]
+pub struct LocalStorageBucket {
 	/// The bucket name used as part of the localStorage key prefix.
 	bucket_name: SmolStr,
 }
 
-impl LocalStorageProvider {
+impl LocalStorageBucket {
 	/// Creates a new localStorage-backed bucket provider for the given bucket.
 	pub fn new(bucket_name: impl Into<SmolStr>) -> Self {
 		Self {
@@ -39,16 +38,21 @@ impl LocalStorageProvider {
 			.expect("LocalStorage is not available")
 			.expect("Failed to access localStorage")
 	}
+
+	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+		TypedBlob::new(TypedBucket(self.clone()), path)
+	}
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for LocalStorageProvider {
+impl<T: TableStoreRow> TableProvider<T> for LocalStorageBucket {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl BucketProvider for LocalStorageProvider {
+impl BucketProvider for LocalStorageBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { None }
@@ -163,7 +167,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = LocalStorageProvider::new("test-bucket");
+		let provider = LocalStorageBucket::new("test-bucket");
 		bucket_test::run(provider).await;
 	}
 }

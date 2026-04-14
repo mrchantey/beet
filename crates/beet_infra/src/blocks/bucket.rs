@@ -41,14 +41,14 @@ impl S3BucketBlock {
 		&self,
 		stack: &Stack,
 		aws_stack: Option<&AwsStack>,
-	) -> beet_net::prelude::S3Provider {
+	) -> beet_net::prelude::S3Bucket {
 		let default_region = aws_stack
 			.map_or(AwsStack::DEFAULT_REGION, |stack| stack.default_region());
 		let region =
 			self.region.as_ref().map_or(default_region, |region| region);
 		let bucket_name = stack.resource_ident(self.label.clone());
 
-		beet_net::prelude::S3Provider::new(
+		beet_net::prelude::S3Bucket::new(
 			bucket_name.primary_identifier(),
 			region,
 		)

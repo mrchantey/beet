@@ -3,19 +3,18 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 
 
-/// Filesystem-backed bucket provider for local storage.
+/// Filesystem-backed bucket for local storage.
 ///
 /// Stores objects as files on the local filesystem, with the configured
 /// path representing the full bucket directory.
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct FsBucketProvider {
+#[derive(Debug, Clone, Reflect)]
+pub struct FsBucket {
 	/// The full path to the bucket directory.
 	path: AbsPathBuf,
 }
 
-impl FsBucketProvider {
-	/// Create a new filesystem bucket provider with the given bucket path.
+impl FsBucket {
+	/// Create a new filesystem bucket with the given bucket path.
 	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
 		Self { path: path.into() }
 	}
@@ -23,17 +22,21 @@ impl FsBucketProvider {
 	fn resolve_path(&self, route: &RelPath) -> AbsPathBuf {
 		self.path.join(route.to_string())
 	}
+	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+		TypedBlob::new(TypedBucket(self.clone()), path)
+	}
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for FsBucketProvider {
+impl<T: TableStoreRow> TableProvider<T> for FsBucket {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
 
-impl BucketProvider for FsBucketProvider {
+impl BucketProvider for FsBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { None }
@@ -125,7 +128,7 @@ mod test {
 	async fn works() {
 		let dir = "target/tests/beet_net/test-bucket-001";
 		let provider =
-			FsBucketProvider::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
+			FsBucket::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
 		bucket_test::run(provider).await;
 	}
 }

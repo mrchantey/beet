@@ -19,7 +19,6 @@ fn main() {
 			},
 			ThreadPlugin::default(),
 			ThreadStdoutPlugin::default(),
-			BucketPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run();
@@ -28,16 +27,15 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	let bucket_path = WsPathBuf::new(SCENE_DIR).into_abs();
-	let blob =
-		FsBucketProvider::new(bucket_path).blob(RelPath::new(SCENE_FILE));
+	let blob = FsBucket::new(bucket_path).blob(RelPath::new(SCENE_FILE));
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
 	commands.queue_async(async move |world: AsyncWorld| {
-		blob.bucket().bucket_try_create().await?;
+		blob.erased_bucket().bucket_try_create().await?;
 		if clear {
 			blob.remove().await.ok();
 		}
-		thread_store::load_or_spawn(world, blob.clone(), move |world| {
+		thread_store::load_or_spawn(world, blob.to_blob(), move |world| {
 			world.commands().spawn(default_scene(blob));
 		})
 		.await?;
@@ -46,7 +44,7 @@ fn setup(mut commands: Commands) {
 	});
 }
 
-fn default_scene(blob: Blob) -> impl Bundle {
+fn default_scene(blob: TypedBlob<FsBucket>) -> impl Bundle {
 	(
 		Repeat::new(),
 		CallOnSpawn::<(), Outcome>::default(),

@@ -37,6 +37,7 @@ pub fn args() -> Vec<String> {
 /// # Safety
 /// Modifies global process state. Calling concurrently from multiple
 /// threads or while other threads read environment variables is undefined behavior.
+#[allow(unused)]
 pub unsafe fn set_var(key: &str, value: &str) {
 	#[cfg(not(target_arch = "wasm32"))]
 	unsafe {

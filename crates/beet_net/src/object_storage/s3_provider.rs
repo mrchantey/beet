@@ -10,9 +10,8 @@ use bytes::Bytes;
 
 /// AWS S3 bucket provider storing its configuration as serializable fields.
 /// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub struct S3Provider {
+#[derive(Debug, Clone, Reflect)]
+pub struct S3Bucket {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,
 	/// The AWS region for this bucket.
@@ -20,14 +19,14 @@ pub struct S3Provider {
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for S3Provider {
+impl<T: TableStoreRow> TableProvider<T> for S3Bucket {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl S3Provider {
-	/// Create a new S3 provider for the given bucket name and region.
+impl S3Bucket {
+	/// Create a new S3 bucket for the given bucket name and region.
 	pub fn new(
 		bucket_name: impl Into<SmolStr>,
 		region: impl Into<SmolStr>,
@@ -38,7 +37,7 @@ impl S3Provider {
 		}
 	}
 
-	/// Get or create an S3 client for this provider's region.
+	/// Get or create an S3 client for this bucket's region.
 	async fn client(&self) -> Client {
 		static POOL: LazyPool<SmolStr, Client, Client> =
 			LazyPool::new(|region| {
@@ -57,9 +56,14 @@ impl S3Provider {
 		// this is stupid, just inline
 		path.to_string()
 	}
+
+	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+		TypedBlob::new(TypedBucket(self.clone()), path)
+	}
 }
 
-impl BucketProvider for S3Provider {
+impl BucketProvider for S3Bucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
@@ -295,14 +299,14 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn works() {
-		let provider = S3Provider::new("beet-test-bucket", "us-west-2");
+		let provider = S3Bucket::new("beet-test-bucket", "us-west-2");
 		bucket_test::run(provider).await;
 	}
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn infra_bucket() {
-		let provider = S3Provider::new("beet-site-bucket-dev", "us-west-2");
+		let provider = S3Bucket::new("beet-site-bucket-dev", "us-west-2");
 		let bucket = Bucket::new(provider);
 		bucket.bucket_try_create().await.unwrap();
 		bucket.bucket_exists().await.xpect_ok();
@@ -318,7 +322,7 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
-		let provider = S3Provider::new("beet-test", "us-west-2");
+		let provider = S3Bucket::new("beet-test", "us-west-2");
 		let test_key = RelPath::from("test-file.txt");
 		Bucket::new(provider)
 			.public_url(&test_key)
