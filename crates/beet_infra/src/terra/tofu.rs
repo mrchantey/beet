@@ -39,8 +39,8 @@ Please install and try again
 https://opentofu.org/docs/intro/install
 "#;
 
-fn tofu_process<'a>() -> Process<'a> {
-	Process::new("tofu").with_not_found(NOT_FOUND)
+fn tofu_process<'a>() -> ChildProcess<'a> {
+	ChildProcess::new("tofu").with_not_found(NOT_FOUND)
 }
 
 

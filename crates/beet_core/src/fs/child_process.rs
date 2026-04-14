@@ -5,7 +5,7 @@ use std::process::Output;
 /// Helper for spawning processes with
 /// easy stdout collection
 #[derive(Debug, SetWith)]
-pub struct Process<'a> {
+pub struct ChildProcess<'a> {
 	/// The command to run (e.g. "ls", "cargo")
 	command: &'a str,
 	/// Arguments to pass to the command
@@ -18,7 +18,7 @@ pub struct Process<'a> {
 	not_found: Option<&'a str>,
 }
 
-impl std::fmt::Display for Process<'_> {
+impl std::fmt::Display for ChildProcess<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.command)?;
 		for arg in self.args {
@@ -28,7 +28,7 @@ impl std::fmt::Display for Process<'_> {
 	}
 }
 
-impl<'a> Process<'a> {
+impl<'a> ChildProcess<'a> {
 	/// Creates a new process with the given command and optional arguments.
 	pub fn new(command: &'a str) -> Self {
 		Self {

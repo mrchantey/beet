@@ -16,12 +16,12 @@
 
 mod cargo_build_cmd;
 mod fs_watcher;
-mod process;
+mod child_process;
 #[cfg(feature = "rand")]
 mod tempdir;
 
 pub use cargo_build_cmd::*;
 pub use fs_watcher::*;
-pub use process::*;
+pub use child_process::*;
 #[cfg(feature = "rand")]
 pub use tempdir::*;
