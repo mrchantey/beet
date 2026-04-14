@@ -1,4 +1,6 @@
+mod call_on_spawn;
 mod fallback;
+pub use call_on_spawn::*;
 pub use fallback::*;
 mod repeat;
 pub use repeat::*;

@@ -48,6 +48,8 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ToolChoice>()
 			// ── Control-flow types (unit-input instantiations) ────────────
 			.register_type::<ChildError>()
+			.register_type::<CallOnSpawn<(), Outcome>>()
+			.add_systems(Update, call_on_spawn::<(), Outcome>)
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<Repeat<()>>()
 			.register_type::<RepeatTimes<()>>()

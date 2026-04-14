@@ -14,20 +14,32 @@ fn main() {
 		.add_plugins((
 			MinimalPlugins,
 			ThreadPlugin::default(),
-			// logs all agent messages to stdout
 			ThreadStdoutPlugin::default(),
 			BucketPlugin,
 		))
-		.register_type::<Root>()
 		.register_type::<SaveScene>()
 		.add_systems(Startup, setup)
 		.run();
 }
 
+#[derive(Clone)]
+struct PersistentThread {
+	blob: Blob,
+	spawn: OnSpawnClone,
+}
+
+impl PersistentThread {
+	pub fn new(blob: Blob, func: impl CloneEntityFunc) -> Self {
+		Self {
+			blob,
+			spawn: OnSpawnClone::new(func),
+		}
+	}
+}
+
 fn setup(mut commands: Commands) {
 	let bucket_path = WsPathBuf::new(SCENE_DIR).into_abs();
-	let bucket_provider = FsBucketProvider::new(bucket_path);
-	let bucket = Bucket::new(bucket_provider.clone());
+	let bucket = FsBucketProvider::new(bucket_path);
 	let route = RelPath::new(SCENE_FILE);
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
@@ -43,19 +55,7 @@ fn setup(mut commands: Commands) {
 				// Scene exists, load it and call the root
 				world
 					.with_then(move |world: &mut World| -> Result {
-						SceneLoader::new(world).load_json(&scene_bytes)?;
-						let root = world
-							.query_filtered_once::<Entity, With<Root>>()
-							.into_iter()
-							.next()
-							.ok_or_else(|| {
-								bevyhow!("root not found in loaded scene")
-							})?;
-						world
-							.commands()
-							.entity(root)
-							.call::<(), Outcome>((), default());
-						Ok(())
+						SceneLoader::new(world).load_json(&scene_bytes)
 					})
 					.await?;
 			}
@@ -64,7 +64,7 @@ fn setup(mut commands: Commands) {
 				world.with(move |world: &mut World| {
 					world
 						.commands()
-						.spawn(default_scene(bucket_provider))
+						.spawn(default_scene(bucket))
 						.call::<(), Outcome>((), default());
 				});
 			}
@@ -74,35 +74,34 @@ fn setup(mut commands: Commands) {
 }
 
 fn default_scene(bucket_provider: impl Component) -> impl Bundle {
-	(Root, bucket_provider, Repeat::new(), children![(
-		Thread::default(),
-		Sequence::new().allow_no_action(),
-		children![
-			(Actor::system(), children![Post::spawn(
-				r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
-			)]),
-			(
-				Actor::new("Agent", ActorKind::Agent),
-				SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
-				// OllamaProvider::default_12gb()
-			),
-			// save directly after agent post
-			SaveScene,
-			(
-				Actor::new("User", ActorKind::User),
-				SkipIfLatest::new(StdinPost)
-			),
-			// save directly after user post
-			SaveScene
-		]
-	)])
+	(
+		bucket_provider,
+		Repeat::new(),
+		CallOnSpawn::<(), Outcome>::default(),
+		children![(
+			Thread::default(),
+			Sequence::new().allow_no_action(),
+			children![
+				(Actor::system(), children![Post::spawn(
+					r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
+				)]),
+				(
+					Actor::new("Agent", ActorKind::Agent),
+					SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
+					// OllamaProvider::default_12gb()
+				),
+				// save directly after agent post
+				SaveScene,
+				(
+					Actor::new("User", ActorKind::User),
+					SkipIfLatest::new(StdinPost)
+				),
+				// save directly after user post
+				SaveScene
+			]
+		)],
+	)
 }
-
-
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-struct Root;
-
 
 /// On each loop, saves the scene to the bucket via [`FsBucketProvider`].
 #[action]
@@ -110,26 +109,20 @@ struct Root;
 #[reflect(Component)]
 async fn SaveScene(cx: ActionContext) -> Result<Outcome> {
 	let (bucket, json) = cx
-		.world()
-		.with_then(|world| -> Result<_> {
-			let root = world
-				.query_filtered_once::<Entity, With<Root>>()
-				.into_iter()
-				.next()
-				.ok_or_else(|| {
-					bevyhow!("Root entity not found for SaveScene")
-				})?;
-			let bucket = world
-				.get::<Bucket>(root)
-				.ok_or_else(|| bevyhow!("Bucket not found on Root entity"))?
-				.clone();
+		.caller
+		.with_then(|mut entity| -> Result<_> {
+			let root =
+				entity.with_state::<AncestorQuery, _>(|entity, query| {
+					query.root_ancestor(entity)
+				});
+			let world = entity.into_world_mut();
+			let bucket = world.entity(root).get_or_else::<Bucket>()?.clone();
 			let json =
 				SceneSaver::new(world).with_entity_tree(root).save_json()?;
 			(bucket, json).xok()
 		})
 		.await?;
 	let route = RelPath::new(SCENE_FILE);
-	bucket.bucket_try_create().await?;
 	bucket.insert(&route, json).await?;
 	Ok(PASS)
 }

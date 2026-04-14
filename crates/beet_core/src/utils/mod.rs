@@ -29,6 +29,7 @@ pub mod display_ext;
 mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
+mod into_option;
 mod lazy_pool;
 mod line_col;
 #[cfg(feature = "ansi_paint")]
@@ -40,10 +41,11 @@ mod panic_context;
 pub mod process_ext;
 #[cfg(feature = "rand")]
 mod random_source;
+#[cfg(feature = "serde")]
+pub mod serde_ext;
 /// Stream conversion utilities for byte-to-text streaming.
 #[cfg(feature = "std")]
 pub mod stream_ext;
-mod into_option;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;

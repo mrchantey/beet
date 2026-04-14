@@ -100,6 +100,13 @@ pub struct Post {
 	intent: PostIntent,
 	media_type: MediaType,
 	/// The untyped body for this post.
+	///
+	/// This field is serialized as a string when valid utf-8
+	/// for byte efficiency and human readability in text formats.
+	#[serde(
+		serialize_with = "serde_ext::serialize_bytes_or_string",
+		deserialize_with = "serde_ext::deserialize_bytes_or_string"
+	)]
 	body: Vec<u8>,
 	/// Extensible key-value metadata.
 	metadata: JsonMap,

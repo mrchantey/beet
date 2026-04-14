@@ -5,6 +5,17 @@ use bevy::ecs::query::QueryEntityError;
 
 use crate::prelude::*;
 
+
+/// Extension trait adding utility methods to [`EntityRef`].
+#[extend::ext(name=EntityRefExt)]
+pub impl<'a> EntityRef<'a> {
+	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
+	fn get_or_else<T: Component>(&self) -> Result<&T> {
+		self.get::<T>().ok_or_else(|| {
+			bevyhow!("Component not found: {}", std::any::type_name::<T>())
+		})
+	}
+}
 /// Extension trait adding utility methods to [`EntityWorldMut`].
 #[extend::ext(name=EntityWorldMutExt)]
 pub impl<'a> EntityWorldMut<'a> {
@@ -38,6 +49,16 @@ pub impl<'a> EntityWorldMut<'a> {
 			result
 		})
 	}
+
+	/// Gets a mutable reference to the component of type `T`, or returns an error if it doesn't exist.
+	fn get_or_else<T: Component<Mutability = Mutable>>(
+		&mut self,
+	) -> Result<Mut<'_, T>> {
+		self.get_mut::<T>().ok_or_else(|| {
+			bevyhow!("Component not found: {}", std::any::type_name::<T>())
+		})
+	}
+
 	/// Runs a function with access to a system parameter state.
 	fn with_query<T: 'static + QueryData, O>(
 		&mut self,
