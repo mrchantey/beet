@@ -122,7 +122,6 @@ impl MediaRenderer {
 		// Build a context with empty accepts so sub-renderers don't
 		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
-		trace!("Trying to render {media_type} for entity {}", cx.entity);
 		match media_type {
 			MediaType::Html => {
 				self.html_renderer.render(&mut inner_cx).map(Some)
