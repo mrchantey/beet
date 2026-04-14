@@ -3,7 +3,7 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() {
-	let schema = reflect_ext::json_schema::<MakeChoice>();
+	let schema = reflect_ext::json_schema::<ChoiceInput>();
 	println!("schema: {:#?}", schema);
 	env_ext::load_dotenv();
 	App::new()
@@ -54,7 +54,7 @@ You enter the cave, and from the ceiling drops a glowing red beet..
 /// Make a choice for what to do, following the schema
 #[action(pure, route = "make-choice")]
 #[derive(Component, Reflect)]
-fn AgentChoiceAction(cx: ActionContext<MakeChoice>) -> String {
+fn AgentChoiceAction(cx: ActionContext<ChoiceInput>) -> String {
 	match cx.choice {
 		Choice::Attack => {
 			"the attack was successful, you must feel very smug.."
@@ -69,7 +69,7 @@ fn AgentChoiceAction(cx: ActionContext<MakeChoice>) -> String {
 
 
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
-struct MakeChoice {
+struct ChoiceInput {
 	/// The choice you can make, follow the schema and pick one.
 	choice: Choice,
 	/// A line of dialog to say as you make your choice

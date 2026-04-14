@@ -351,6 +351,61 @@ pub fn is_auto_into_type(ty: &syn::Type) -> bool {
 	matches!(seg.ident.to_string().as_str(), "String" | "Cow")
 }
 
+/// Returns `true` for primitive types that implement `Copy`:
+/// `bool`, `char`, all integer and float primitives.
+/// Used to automatically return by value instead of by reference in the `Get` derive.
+pub fn is_primitive_copy_type(ty: &syn::Type) -> bool {
+	let syn::Type::Path(path) = ty else {
+		return false;
+	};
+	if path.qself.is_some() {
+		return false;
+	}
+	let Some(seg) = path.path.segments.last() else {
+		return false;
+	};
+	// only bare primitive names, no generics
+	if !matches!(seg.arguments, syn::PathArguments::None) {
+		return false;
+	}
+	matches!(
+		seg.ident.to_string().as_str(),
+		"bool"
+			| "char" | "f32"
+			| "f64" | "i8"
+			| "i16" | "i32"
+			| "i64" | "i128"
+			| "isize" | "u8"
+			| "u16" | "u32"
+			| "u64" | "u128"
+			| "usize"
+			// other known copy types
+			| "Entity"
+	)
+}
+
+/// For owned types that have a natural borrowed form, returns
+/// `(return_type_tokens, accessor_tokens)`, ie:
+/// - `String`  → `(&str,              as_str())`
+/// - `PathBuf` → `(&::std::path::Path, as_path())`
+/// - `OsString`→ `(&::std::ffi::OsStr, as_os_str())`
+pub fn str_like_return(ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
+	let syn::Type::Path(path) = ty else {
+		return None;
+	};
+	let seg = path.path.segments.last()?;
+	match seg.ident.to_string().as_str() {
+		"String" => Some((quote! { &str }, quote! { as_str() })),
+		"PathBuf" => {
+			Some((quote! { &::std::path::Path }, quote! { as_path() }))
+		}
+		"OsString" => {
+			Some((quote! { &::std::ffi::OsStr }, quote! { as_os_str() }))
+		}
+		_ => None,
+	}
+}
+
 /// Resolve whether `impl Into<T>` should be used for a field, accounting for
 /// auto-detection and explicit flags.
 pub fn effective_use_into(ty: &syn::Type, config: &FieldConfig) -> bool {
@@ -730,6 +785,79 @@ mod test {
 	fn trait_bounds_returns_none_for_non_trait() {
 		let ty: Type = syn::parse_quote!(String);
 		assert!(trait_bounds_tokens(&ty).is_none());
+	}
+
+	// -- is_primitive_copy_type --
+
+	#[test]
+	fn primitive_copy_detects_bool() {
+		let ty: Type = syn::parse_quote!(bool);
+		assert!(is_primitive_copy_type(&ty));
+	}
+
+	#[test]
+	fn primitive_copy_detects_numerics() {
+		for src in &[
+			"i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32",
+			"u64", "u128", "usize", "f32", "f64", "char",
+		] {
+			let ty: Type = syn::parse_str(src).unwrap();
+			assert!(is_primitive_copy_type(&ty), "{src} should be copy");
+		}
+	}
+
+	#[test]
+	fn primitive_copy_rejects_string() {
+		let ty: Type = syn::parse_quote!(String);
+		assert!(!is_primitive_copy_type(&ty));
+	}
+
+	#[test]
+	fn primitive_copy_rejects_generic() {
+		// Vec<u8> has generics, so not a bare primitive
+		let ty: Type = syn::parse_quote!(Vec<u8>);
+		assert!(!is_primitive_copy_type(&ty));
+	}
+
+	#[test]
+	fn primitive_copy_rejects_qualified() {
+		let ty: Type = syn::parse_quote!(<Foo as Bar>::i32);
+		assert!(!is_primitive_copy_type(&ty));
+	}
+
+	// -- str_like_return --
+
+	#[test]
+	fn str_like_string_returns_str() {
+		let ty: Type = syn::parse_quote!(String);
+		let (ret_ty, accessor) = str_like_return(&ty).unwrap();
+		assert_eq!(ret_ty.to_string(), "& str");
+		assert_eq!(accessor.to_string(), "as_str ()");
+	}
+
+	#[test]
+	fn str_like_pathbuf_returns_path() {
+		let ty: Type = syn::parse_quote!(PathBuf);
+		let (ret_ty, accessor) = str_like_return(&ty).unwrap();
+		assert!(ret_ty.to_string().contains("Path"));
+		assert_eq!(accessor.to_string(), "as_path ()");
+	}
+
+	#[test]
+	fn str_like_osstring_returns_osstr() {
+		let ty: Type = syn::parse_quote!(OsString);
+		let (ret_ty, accessor) = str_like_return(&ty).unwrap();
+		assert!(ret_ty.to_string().contains("OsStr"));
+		assert_eq!(accessor.to_string(), "as_os_str ()");
+	}
+
+	#[test]
+	fn str_like_returns_none_for_unknown() {
+		let ty: Type = syn::parse_quote!(Vec<u8>);
+		assert!(str_like_return(&ty).is_none());
+
+		let ty: Type = syn::parse_quote!(bool);
+		assert!(str_like_return(&ty).is_none());
 	}
 
 	// -- produce --

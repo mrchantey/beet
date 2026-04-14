@@ -45,7 +45,7 @@ impl Project {
 		debug!("initializing tofu backend");
 		self.backend().ensure_exists().await?;
 		debug!("initializing tofu project");
-		tofu::init(&dir, *self.reconfigure()).await?;
+		tofu::init(&dir, self.reconfigure()).await?;
 		Ok(())
 	}
 

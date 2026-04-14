@@ -83,8 +83,7 @@ impl Stack {
 	pub fn backend_path(&self) -> RelPath {
 		RelPath::new(
 			self.resource_ident(self.state_suffix.clone())
-				.primary_identifier()
-				.clone(),
+				.primary_identifier(),
 		)
 	}
 

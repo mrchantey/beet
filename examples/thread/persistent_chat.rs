@@ -26,8 +26,8 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	let bucket_path = WsPathBuf::new(SCENE_DIR).into_abs();
-	let fs_provider = FsBucketProvider::new(bucket_path);
-	let bucket = Bucket::new(fs_provider.clone());
+	let bucket_provider = FsBucketProvider::new(bucket_path);
+	let bucket = Bucket::new(bucket_provider.clone());
 	let route = RelPath::new(SCENE_FILE);
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
 
 		match bucket.get(&route).await {
 			Ok(scene_bytes) => {
-				// Scene exists, load it
+				// Scene exists, load it and call the root
 				world
 					.with_then(move |world: &mut World| -> Result {
 						SceneLoader::new(world).load_json(&scene_bytes)?;
@@ -64,34 +64,38 @@ fn setup(mut commands: Commands) {
 				world.with(move |world: &mut World| {
 					world
 						.commands()
-						.spawn((Root, fs_provider, Repeat::new(), children![(
-							Thread::default(),
-							Sequence::new().allow_no_action(),
-							children![
-								(Actor::system(), children![Post::spawn(
-									r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
-								)]),
-								(
-									Actor::new("Agent", ActorKind::Agent),
-									SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
-									// OllamaProvider::default_12gb()
-								),
-								// save directly after agent post
-								SaveScene,
-								(
-									Actor::new("User", ActorKind::User),
-									SkipIfLatest::new(StdinPost)
-								),
-								// save directly after user post
-								SaveScene
-							]
-						)]))
+						.spawn(default_scene(bucket_provider))
 						.call::<(), Outcome>((), default());
 				});
 			}
 		}
 		Ok(())
 	});
+}
+
+fn default_scene(bucket_provider: impl Component) -> impl Bundle {
+	(Root, bucket_provider, Repeat::new(), children![(
+		Thread::default(),
+		Sequence::new().allow_no_action(),
+		children![
+			(Actor::system(), children![Post::spawn(
+				r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
+			)]),
+			(
+				Actor::new("Agent", ActorKind::Agent),
+				SkipIfLatest::new(OpenAiProvider::gpt_5_mini().unwrap()),
+				// OllamaProvider::default_12gb()
+			),
+			// save directly after agent post
+			SaveScene,
+			(
+				Actor::new("User", ActorKind::User),
+				SkipIfLatest::new(StdinPost)
+			),
+			// save directly after user post
+			SaveScene
+		]
+	)])
 }
 
 
