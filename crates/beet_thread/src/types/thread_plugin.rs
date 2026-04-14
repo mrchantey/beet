@@ -33,6 +33,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<JsonValue>()
 			.register_type::<JsonMap>()
 			// ── Streaming types ───────────────────────────────────────────
+			.register_type::<EnvVar>()
 			.register_type::<ModelDef>()
 			.register_type::<O11sStreamer>()
 			.register_type::<CompletionsStreamer>()

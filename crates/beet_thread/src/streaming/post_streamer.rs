@@ -13,7 +13,7 @@ pub struct ModelDef {
 	pub provider_slug: SmolStr,
 	pub model_slug: SmolStr,
 	pub url: SmolStr,
-	pub auth: Option<String>,
+	pub auth: Option<EnvVar>,
 }
 
 

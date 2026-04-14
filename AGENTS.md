@@ -46,6 +46,8 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - avoid nested functions and always use method chainining where possible:
 	- Bad: `foo(bar(bazz))`
 	- Good: `bar(bazz).xmap(foo)`
+- Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
+
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
 - comments must be concise

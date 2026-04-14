@@ -20,6 +20,7 @@
 mod abs_path_buf;
 /// Cross-platform environment variable access.
 pub mod env_ext;
+mod env_var;
 mod fs_error;
 pub mod fs_ext;
 pub mod path_ext;
@@ -29,6 +30,7 @@ mod workspace_root;
 mod ws_path_buf;
 
 pub use abs_path_buf::*;
+pub use env_var::*;
 pub use fs_error::*;
 pub use read_dir::*;
 pub use rel_path::*;

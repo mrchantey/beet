@@ -29,12 +29,11 @@ impl GeminiProvider {
 	/// Returns a [`CompletionsStreamer`] configured for Gemini 2.5 Flash
 	/// via the OpenAI-compatible completions endpoint.
 	pub fn gemini_2_5_flash() -> Result<CompletionsStreamer> {
-		let api_key = env_ext::var(Self::AUTH_ENV)?;
 		CompletionsStreamer::new(ModelDef {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: Self::GEMINI_2_5_FLASH.into(),
 			url: Self::COMPLETIONS_URL.into(),
-			auth: Some(api_key),
+			auth: EnvVar::new(Self::AUTH_ENV)?.xsome(),
 		})
 		.xok()
 	}

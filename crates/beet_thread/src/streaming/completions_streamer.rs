@@ -204,7 +204,7 @@ impl PostStreamer for CompletionsStreamer {
 			let mut request = Request::post(self.model.url.as_str())
 				.with_json_body(&req_body)?;
 			if let Some(auth) = &self.model.auth {
-				request = request.with_auth_bearer(auth);
+				request = request.with_auth_bearer(auth.value());
 			}
 			let response = request.send().await?.into_result().await?;
 

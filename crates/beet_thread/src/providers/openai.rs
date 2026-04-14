@@ -34,7 +34,7 @@ impl OpenAiProvider {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: Self::GPT_5_MINI.into(),
 			url: Self::RESPONSES_URL.into(),
-			auth: env_ext::var(Self::AUTH_ENV)?.xsome(),
+			auth: EnvVar::new(Self::AUTH_ENV)?.xsome(),
 		})
 		.xok()
 	}
@@ -46,7 +46,7 @@ impl OpenAiProvider {
 			provider_slug: Self::PROVIDER_SLUG.into(),
 			model_slug: Self::GPT_5_MINI.into(),
 			url: Self::COMPLETIONS_URL.into(),
-			auth: env_ext::var(Self::AUTH_ENV)?.xsome(),
+			auth: EnvVar::new(Self::AUTH_ENV)?.xsome(),
 		})
 		.xok()
 	}
