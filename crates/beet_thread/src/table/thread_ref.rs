@@ -1,11 +1,13 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::Blob;
 
 
 #[derive(Debug, Get, Clone)]
 pub struct ThreadRef<'a> {
 	pub entity: Entity,
 	pub thread: &'a Thread,
+	pub blob: Option<&'a Blob>,
 	/// The list of actors in bfs order of [`Children`]
 	pub actors: Vec<ActorView<'a>>,
 	/// The list of posts in this thread, sorted chronologically by [`PostId`]

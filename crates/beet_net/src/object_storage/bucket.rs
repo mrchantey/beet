@@ -55,9 +55,7 @@ impl Bucket {
 	/// let bucket = temp_bucket();
 	/// let blob = bucket.blob(RelPath::new("my-file.txt"));
 	/// ```
-	pub fn blob(&self, path: RelPath) -> Blob {
-		Blob::new(self.provider.box_clone(), path)
-	}
+	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
 
 	/// Insert object into bucket.
 	///
@@ -168,6 +166,41 @@ impl BucketProvider for Bucket {
 	}
 }
 
+impl BucketProvider for Box<dyn BucketProvider> {
+	fn box_clone(&self) -> Box<dyn BucketProvider> { self.as_ref().box_clone() }
+	fn region(&self) -> Option<String> { self.as_ref().region() }
+	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		self.as_ref().bucket_exists()
+	}
+	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+		self.as_ref().bucket_create()
+	}
+	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+		self.as_ref().bucket_remove()
+	}
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+		self.as_ref().insert(path, body)
+	}
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+		self.as_ref().list()
+	}
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+		self.as_ref().get(path)
+	}
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+		self.as_ref().exists(path)
+	}
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+		self.as_ref().remove(path)
+	}
+	fn public_url(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<String>>> {
+		self.as_ref().public_url(path)
+	}
+}
+
 /// Trait for bucket storage backends (S3, filesystem, memory, etc.).
 ///
 /// Implementations provide the actual storage operations for [`Bucket`].
@@ -178,7 +211,9 @@ pub trait BucketProvider: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn BucketProvider>;
 
 	/// Create a [`Blob`] handle for a single object managed by this provider.
-	fn blob(&self, path: RelPath) -> Blob { Blob::new(self.box_clone(), path) }
+	fn blob(&self, path: RelPath) -> Blob {
+		Blob::new(Bucket::new(self.box_clone()), path)
+	}
 
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;

@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 pub type ThreadId = Uuid7<Thread>;
 

@@ -776,6 +776,11 @@ impl Post {
 	/// Reads [`PostStatus`] from metadata.
 	pub fn status(&self) -> PostStatus { post_status(self) }
 
+	/// Returns `true` if the post is in-progress (not completed or interrupted).
+	pub fn in_progress(&self) -> bool {
+		self.status() == PostStatus::InProgress
+	}
+
 	/// Writes [`PostStatus`] into metadata.
 	pub fn set_status(&mut self, status: PostStatus) {
 		set_post_status(self, status)

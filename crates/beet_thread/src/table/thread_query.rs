@@ -1,12 +1,14 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 #[derive(SystemParam)]
 pub struct ThreadQuery<'w, 's> {
 	pub commands: Commands<'w, 's>,
 	pub ancestors: Query<'w, 's, &'static ChildOf>,
 	pub children: Query<'w, 's, &'static Children>,
-	pub threads: Query<'w, 's, (Entity, &'static Thread)>,
+	pub threads:
+		Query<'w, 's, (Entity, &'static Thread, Option<&'static Blob>)>,
 	pub actors:
 		Query<'w, 's, (Entity, &'static Actor, Option<&'static ToolChoice>)>,
 	pub tools: Query<'w, 's, (Entity, &'static ToolDefinition)>,
@@ -18,10 +20,10 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 	/// Recurse up ancestors to find the [`Thread`] entity,
 	/// then create a corresponding [`ThreadRef`].
 	/// Valid positions are:
-	/// - any descendant of a thread, ie an Actor
+	/// - any descendant of a thread, ie an Actor or Post
 	/// - any `PostOf`
 	pub fn thread(&self, entity: Entity) -> Result<ThreadRef<'_>> {
-		let (thread_entity, thread) = self
+		let (thread_entity, thread, blob) = self
 			.ancestors
 			.iter_ancestors_inclusive(entity)
 			.find_map(|ancestor| self.threads.get(ancestor).ok())
@@ -58,6 +60,7 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 		ThreadRef {
 			entity: thread_entity,
 			thread,
+			blob,
 			actors,
 			posts,
 		}
@@ -110,7 +113,10 @@ impl<'w, 's> ThreadQuery<'w, 's> {
 			.ancestors
 			.iter_ancestors_inclusive(parent)
 			.find_map(|entity| {
-				self.threads.get(entity).map(|(_, thread)| thread.id()).ok()
+				self.threads
+					.get(entity)
+					.map(|(_, thread, _)| thread.id())
+					.ok()
 			})
 			.ok_or_else(|| {
 				bevyhow!("No thread ancestor found for {parent:?}")

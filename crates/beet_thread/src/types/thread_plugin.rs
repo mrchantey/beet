@@ -55,6 +55,9 @@ impl Plugin for ThreadPlugin {
 			.register_type::<RepeatTimes<()>>()
 			// ── SkipIfLatest wrapper instantiations ───────────────────────
 			.register_type::<SkipIfLatest<StdinPost>>()
-			.register_type::<SkipIfLatest<O11sStreamer>>();
+			.register_type::<SkipIfLatest<O11sStreamer>>()
+			.add_systems(PostUpdate, thread_store::store_thread_on_post)
+			// _
+			;
 	}
 }

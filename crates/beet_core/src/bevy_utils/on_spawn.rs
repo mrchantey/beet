@@ -325,6 +325,12 @@ impl OnSpawnDeferred {
 #[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
+impl std::fmt::Debug for OnSpawnClone {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("OnSpawnClone").finish()
+	}
+}
+
 impl OnSpawnClone {
 	/// Creates a new [`OnSpawnClone`] effect.
 	pub fn new(func: impl CloneEntityFunc) -> Self { Self(Box::new(func)) }

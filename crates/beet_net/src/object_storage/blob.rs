@@ -22,36 +22,17 @@ use bytes::Bytes;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Get)]
+#[derive(Debug, Clone, Component, Get)]
 pub struct Blob {
 	/// Path to the blob within the bucket.
 	path: RelPath,
 	/// Provider that handles storage operations.
-	provider: Box<dyn BucketProvider>,
-}
-
-impl std::fmt::Debug for Blob {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Blob")
-			.field("path", &self.path)
-			.finish_non_exhaustive()
-	}
-}
-
-impl Clone for Blob {
-	fn clone(&self) -> Self {
-		Self {
-			path: self.path.clone(),
-			provider: self.provider.box_clone(),
-		}
-	}
+	bucket: Bucket,
 }
 
 impl Blob {
 	/// Create a new [`Blob`] from a provider and path.
-	pub fn new(provider: Box<dyn BucketProvider>, path: RelPath) -> Self {
-		Self { path, provider }
-	}
+	pub fn new(bucket: Bucket, path: RelPath) -> Self { Self { path, bucket } }
 
 	/// Insert (or overwrite) the blob's content.
 	///
@@ -67,7 +48,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn insert(&self, body: impl Into<Bytes>) -> Result {
-		self.provider.insert(&self.path, body.into()).await
+		self.bucket.insert(&self.path, body.into()).await
 	}
 
 	/// Insert the blob's content, failing if it already exists.
@@ -94,7 +75,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn get(&self) -> Result<Bytes> {
-		self.provider.get(&self.path).await
+		self.bucket.get(&self.path).await
 	}
 
 	/// Check whether the blob exists in the bucket.
@@ -111,7 +92,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn exists(&self) -> Result<bool> {
-		self.provider.exists(&self.path).await
+		self.bucket.exists(&self.path).await
 	}
 
 	/// Remove the blob from the bucket.
@@ -129,7 +110,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn remove(&self) -> Result {
-		self.provider.remove(&self.path).await
+		self.bucket.remove(&self.path).await
 	}
 
 	/// Get the public URL of the blob, if the provider supports it.
@@ -148,7 +129,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn public_url(&self) -> Result<Option<String>> {
-		self.provider.public_url(&self.path).await
+		self.bucket.public_url(&self.path).await
 	}
 }
 
