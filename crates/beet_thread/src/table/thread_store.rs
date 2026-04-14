@@ -40,13 +40,21 @@ where
 pub async fn write(entity: AsyncEntity) -> Result {
 	let (blob, json) = entity
 		.with_then(|mut entity| -> Result<_> {
-			let root = entity.with_state::<ThreadQuery, Result<Entity>>(
-				|entity, query| query.thread(entity)?.entity.xok(),
-			)?;
+			let thread_root = entity
+				.with_state::<ThreadQuery, Result<Entity>>(
+					|entity, query| query.thread(entity)?.entity.xok(),
+				)?;
+
+			let root_ancestor =
+				entity.with_state::<AncestorQuery, _>(|entity, query| {
+					query.root_ancestor(entity)
+				});
+
 			let world = entity.into_world_mut();
-			let blob = world.entity(root).get_or_else::<Blob>()?.clone();
-			let json =
-				SceneSaver::new(world).with_entity_tree(root).save_json()?;
+			let blob = world.entity(thread_root).get_or_else::<Blob>()?.clone();
+			let json = SceneSaver::new(world)
+				.with_entity_tree(root_ancestor)
+				.save_json()?;
 			(blob, json).xok()
 		})
 		.await?;

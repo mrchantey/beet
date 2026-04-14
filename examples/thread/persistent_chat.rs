@@ -13,10 +13,10 @@ fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
-			LogPlugin {
-				// level: Level::TRACE,
-				..default()
-			},
+			// LogPlugin {
+			// 	// level: Level::TRACE,
+			// 	..default()
+			// },
 			ThreadPlugin::default(),
 			ThreadStdoutPlugin::default(),
 		))

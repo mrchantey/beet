@@ -31,8 +31,12 @@ impl Default for StdoutActorFilter {
 }
 
 // cursor to track which part of post deltas have already been printed
-#[derive(Default, Deref, DerefMut, Component)]
-struct StdoutCursor(u32);
+#[derive(Default, Component)]
+struct StdoutCursor {
+	pos: u32,
+	/// the post is complete and a newline has been printed
+	complete: bool,
+}
 
 fn post_added(
 	filter: Res<StdoutActorFilter>,
@@ -73,7 +77,7 @@ fn post_added(
 		};
 
 		let heading =
-			paint_ext::cyan_bold(format!("\n\n{} {}", actor.name(), suffix));
+			paint_ext::cyan_bold(format!("{} {}", actor.name(), suffix));
 		print!("{heading}");
 
 		let mut cursor = StdoutCursor::default();
@@ -111,7 +115,7 @@ fn post_changed(
 fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 	let body = post.to_string();
 
-	let new_content = &body[**cursor as usize..];
+	let new_content = &body[cursor.pos as usize..];
 	let agent_post = post.as_agent_post();
 	let colored = if agent_post.is_refusal() {
 		paint_ext::red(new_content)
@@ -124,7 +128,11 @@ fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 	};
 
 	print!("{}", colored);
-	**cursor = body.len() as u32;
+	cursor.pos = body.len() as u32;
+	if !cursor.complete && !post.in_progress() {
+		print!("\n\n");
+		cursor.complete = true;
+	}
 }
 
 #[action]
@@ -137,17 +145,16 @@ pub fn StdinPost(
 ) -> Result<Outcome> {
 	let actor = actors.get(cx.id())?;
 	let heading = paint_ext::cyan_bold(format!("{} > ", actor.name()));
-	// reserve extra line to prevent jump
-	print!("\n\n\n\x1B[1A{heading}");
+	print!("{heading}");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	let mut input = String::new();
 	std::io::stdin().read_line(&mut input)?;
 	let input = input.trim();
 
-	// Clear the terminal line
-	// (up 1 line, erase, up 2 lines)
-	// it will be printed again by the printer.
-	print!("\x1B[1A\x1B[2K\x1B[1A\x1B[1A");
+	// Clear the stdin line
+	// it will be printed again by the post printer.
+	// (up 1 line, erase)
+	print!("\x1B[1A\x1B[2K");
 	std::io::Write::flush(&mut std::io::stdout())?;
 
 	query.spawn_post(cx.id(), PostStatus::Completed, input)?;
