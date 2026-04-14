@@ -32,6 +32,20 @@ pub fn args() -> Vec<String> {
 	return array_ext::into_vec_str(js_runtime::env_args());
 }
 
+/// Set an environment variable.
+///
+/// # Safety
+/// Modifies global process state. Calling concurrently from multiple
+/// threads or while other threads read environment variables is undefined behavior.
+pub unsafe fn set_var(key: &str, value: &str) {
+	#[cfg(not(target_arch = "wasm32"))]
+	unsafe {
+		std::env::set_var(key, value);
+	}
+	#[cfg(target_arch = "wasm32")]
+	unimplemented!("set_var is not supported on wasm");
+}
+
 /// Try get the environment variable with the given key, returning
 /// an error containing the key name if not found.
 pub fn var(key: &str) -> Result<String, EnvError> {
@@ -48,8 +62,8 @@ pub fn var(key: &str) -> Result<String, EnvError> {
 	}
 }
 
-
-/// Get all environment variables
+/// Get all environment variables.
+///
 /// ## Panics
 /// In wasm this will panic if `js_runtime::env_all` returns a malformed array
 pub fn vars() -> Vec<(String, String)> {
