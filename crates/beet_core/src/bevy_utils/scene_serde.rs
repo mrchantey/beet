@@ -358,6 +358,8 @@ mod test {
 			.xpect_eq("SceneChild");
 	}
 
+
+	// TODO new behavior is SpawnedBy attribute, children are not replaced
 	#[test]
 	fn loads_into_entity_replaces_existing_children() {
 		let mut app = scene_world();

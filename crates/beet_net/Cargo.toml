@@ -71,6 +71,7 @@ rustls-tls = [
 	"dep:futures-rustls",
 	"dep:webpki-roots",
 ]
+bevy_scene = ["beet_core/bevy_scene"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 
@@ -188,6 +189,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+beet_net = {path = ".", features = ["bevy_scene"] }
 # beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

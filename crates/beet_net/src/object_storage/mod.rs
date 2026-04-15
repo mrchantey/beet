@@ -31,6 +31,8 @@ mod analytics;
 mod aws_cli;
 mod blob;
 mod bucket;
+#[cfg(feature = "bevy_scene")]
+mod scene_store;
 #[cfg(feature = "json")]
 mod table;
 #[cfg(feature = "json")]
@@ -45,6 +47,8 @@ pub use blob::*;
 pub use bucket::*;
 pub use bucket_item::*;
 pub use in_memory_provider::*;
+#[cfg(feature = "bevy_scene")]
+pub use scene_store::*;
 mod fs_provider;
 #[cfg(target_arch = "wasm32")]
 mod local_storage_provider;

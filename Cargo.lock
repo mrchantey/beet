@@ -1210,6 +1210,7 @@ dependencies = [
  "base64 0.22.1",
  "beet_action",
  "beet_core",
+ "beet_net",
  "bevy",
  "blocking",
  "bytes",
