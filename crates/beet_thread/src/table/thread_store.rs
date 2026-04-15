@@ -6,7 +6,7 @@ use beet_net::prelude::*;
 pub fn store_thread_on_post(
 	mut commands: Commands,
 	changed: Query<(Entity, &Post), Changed<Post>>,
-	stores: AncestorQuery<&SpawnedBy>,
+	stores: AncestorQuery<&SceneOf>,
 ) -> Result {
 	for (entity, post) in changed.iter() {
 		if post.in_progress() {

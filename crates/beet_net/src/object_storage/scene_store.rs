@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 pub struct SceneStore {
 	#[reflect(ignore)]
 	trigger: CoalescingTrigger,
-	/// Load the scene on spawn, defaults to true
+	/// Load the scene on spawn, defaults to false
 	load_on_spawn: bool,
 	/// Error when saving an emtpy scene, defaults to true
 	error_on_empty: bool,
@@ -19,13 +19,13 @@ impl Default for SceneStore {
 		Self {
 			trigger: default(),
 			error_on_empty: true,
-			load_on_spawn: true,
+			load_on_spawn: false,
 		}
 	}
 }
 
 impl SceneStore {
-	/// Loads the associated [`Blob`], adding to this entities [`SpawnedEntities`].
+	/// Loads the associated [`Blob`], adding to this entities [`SceneEntities`].
 	/// ## Errors
 	/// - Errors if this entity has no [`Blob`] or [`SceneStore`]
 	pub async fn load(entity: AsyncEntity) -> Result {
@@ -40,7 +40,7 @@ impl SceneStore {
 			.await?;
 		Ok(())
 	}
-	/// Writes all [`SpawnedEntities`] to the associated [`Blob`]
+	/// Writes all [`SceneEntities`] and their created descendents to the associated [`Blob`]
 	///
 	/// ## Errors
 	/// - Errors if this entity has no [`Blob`] or [`SceneStore`]
@@ -55,7 +55,7 @@ impl SceneStore {
 
 						// errors if empty, nothing to save.
 						let spawned_entities = entity
-							.get_or_else::<SpawnedEntities>()?
+							.get_or_else::<SceneEntities>()?
 							// TODO error_on_empty weird lifetime issue
 							.to_vec();
 
@@ -63,7 +63,7 @@ impl SceneStore {
 						let mut saver = SceneSaver::new(world);
 
 						for entity in spawned_entities {
-							// add all to save
+							// add all and their descendents to save
 							saver = saver.with_entity_tree(entity);
 						}
 						let scene_media = saver.save(

@@ -44,34 +44,36 @@ fn setup(mut commands: Commands) {
 	println!("");
 
 	commands.queue_async(async move |world: AsyncWorld| {
-		if !blob.exists().await? || clear {
-			write_scene(world, blob.to_blob()).await?;
+		let store = world
+			.spawn_then((blob.clone(), SceneStore::default()))
+			.await;
+		if clear || !blob.exists().await? {
+			write_scene(store.clone()).await?;
 		}
-		world.spawn((blob, SceneStore::default()));
+		SceneStore::load(store).await?;
 		Ok(())
 	});
 }
 
 
 /// Temporarily spawn the hardcoded scene to serialize it.
-/// as bsn and editor tooling matures this step will be done
+/// Note that as bsn and editor tooling matures this step will be done
 /// outside of the binary
 ///
-// Note the CallOnSpawn will not be made, as the entity is removed
-// before any systems run.
-async fn write_scene(world: AsyncWorld, blob: Blob) -> Result {
-	let media_type = blob.media_type().unwrap_or(MediaType::Json);
-	let bytes = world
-		.with_then(move |world| -> Result<_> {
-			let scene_entity = world.spawn(default_scene()).id();
-			let bytes = SceneSaver::new(world)
-				.with_entity_tree(scene_entity)
-				.save(media_type)?;
-			world.entity_mut(scene_entity).despawn();
-			bytes.xok()
-		})
-		.await?;
-	blob.insert(bytes).await?;
+async fn write_scene(store: AsyncEntity) -> Result {
+	let store_id = store.id();
+	let entity = store
+		.world()
+		.spawn_then((
+			default_scene(),
+			SceneOf(store_id),
+			// stop CallOnSpawn with Disabled,
+			// this will not be serialized
+			Disabled,
+		))
+		.await;
+	SceneStore::save(store).await?;
+	entity.despawn().await;
 	Ok(())
 }
 

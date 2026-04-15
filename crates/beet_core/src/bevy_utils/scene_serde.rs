@@ -6,7 +6,6 @@
 use crate::prelude::*;
 use bevy::ecs::entity::EntityHashMap;
 use bevy::prelude::*;
-use bevy::reflect::TypeRegistryArc;
 use bevy::scene::serde::SceneSerializer;
 
 /// Serializes world state or a subtree to various formats.
@@ -14,7 +13,6 @@ use bevy::scene::serde::SceneSerializer;
 /// Use [`SceneSaver::new`] for the full world, or [`SceneSaver::new`] followed
 /// by [`SceneSaver::with_entity_tree`] to serialize only an entity and its descendants.
 pub struct SceneSaver<'a> {
-	registry: TypeRegistryArc,
 	world: &'a World,
 	builder: DynamicSceneBuilder<'a>,
 }
@@ -23,12 +21,7 @@ impl<'a> SceneSaver<'a> {
 	/// Creates a saver for the entire world.
 	pub fn new(world: &'a mut World) -> Self {
 		let builder = DynamicSceneBuilder::from_world(world);
-		let registry = world.resource::<AppTypeRegistry>().0.clone();
-		Self {
-			registry,
-			world,
-			builder,
-		}
+		Self { world, builder }
 	}
 
 	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
@@ -92,7 +85,8 @@ impl<'a> SceneSaver<'a> {
 		media_type: MediaType,
 		options: SerializeOptions,
 	) -> Result<MediaBytes> {
-		let registry = self.registry.read();
+		let registry = self.world.resource::<AppTypeRegistry>();
+		let registry = registry.read();
 		let dyn_scene = self.builder.build();
 		let serializer = SceneSerializer::new(&dyn_scene, &registry);
 		MediaBytes::serialize_with_options(media_type, &serializer, options)
@@ -242,7 +236,7 @@ impl<'a> SceneLoader<'a> {
 		let spawned: Vec<Entity> = entity_map.values().copied().collect();
 		if let Some(parent) = entity {
 			for entity in spawned.iter() {
-				self.world.entity_mut(*entity).insert(SpawnedBy(parent));
+				self.world.entity_mut(*entity).insert(SceneOf(parent));
 			}
 		}
 
@@ -264,8 +258,8 @@ impl<'a> SceneLoader<'a> {
 	Component,
 )]
 #[reflect(Component)]
-#[relationship(relationship_target = SpawnedEntities)]
-pub struct SpawnedBy(pub Entity);
+#[relationship(relationship_target = SceneEntities)]
+pub struct SceneOf(pub Entity);
 
 /// Added to the [`SceneLoader::Entity`]
 #[derive(
@@ -281,8 +275,8 @@ pub struct SpawnedBy(pub Entity);
 	Component,
 )]
 #[reflect(Component)]
-#[relationship_target(relationship = SpawnedBy)]
-pub struct SpawnedEntities(Vec<Entity>);
+#[relationship_target(relationship = SceneOf,linked_spawn)]
+pub struct SceneEntities(Vec<Entity>);
 
 
 
@@ -358,11 +352,11 @@ mod test {
 			.load(&scene_bytes)
 			.unwrap();
 
-		// Spawned entities should have SpawnedBy pointing to target
+		// Spawned entities should have SceneOf pointing to target
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<SpawnedBy>()
+			.get::<SceneOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);
@@ -416,11 +410,11 @@ mod test {
 			.as_str()
 			.xpect_eq("OldChild");
 
-		// Spawned entities have SpawnedBy, not ChildOf
+		// Spawned entities have SceneOf, not ChildOf
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<SpawnedBy>()
+			.get::<SceneOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);
