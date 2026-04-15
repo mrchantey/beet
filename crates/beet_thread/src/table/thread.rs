@@ -8,8 +8,6 @@ pub type ThreadId = Uuid7<Thread>;
 	Clone,
 	PartialEq,
 	Eq,
-	PartialOrd,
-	Ord,
 	Hash,
 	Serialize,
 	Deserialize,
@@ -21,6 +19,8 @@ pub struct Thread {
 	id: ThreadId,
 	created: Timestamp,
 	name: String,
+	/// Extensible key-value metadata.
+	metadata: JsonMap,
 }
 
 impl Default for Thread {
@@ -38,9 +38,19 @@ impl Thread {
 			id: Uuid7::new_now(),
 			created: Timestamp::now(),
 			name: name.into(),
+			metadata: default(),
 		}
 	}
 
 	pub fn created(&self) -> Timestamp { self.created }
 	pub fn name(&self) -> &str { &self.name }
+
+	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
+		&self.metadata
+	}
+	pub fn metadata_mut(
+		&mut self,
+	) -> &mut serde_json::Map<String, serde_json::Value> {
+		&mut self.metadata
+	}
 }

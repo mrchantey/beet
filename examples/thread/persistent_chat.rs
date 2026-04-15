@@ -36,6 +36,9 @@ fn setup(mut commands: Commands) {
 		}
 	}
 
+	// create some space for the output
+	println!("");
+
 	let blob = bucket.blob(RelPath::new(SCENE_FILE));
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
@@ -68,7 +71,10 @@ fn default_scene(blob: impl Component) -> impl Bundle {
 				.allow_no_action(),
 			children![
 				(Actor::system(), children![Post::spawn(
-					r#"Ask a single, brief interesting question, followup with more brief questions based on the users' answers"#
+					r#"Ask a single brief, highly relevent and deeply contraversial question
+related to the users personal life, not the mundane.
+followup with more brief questions based on the users' answers
+"#
 				)]),
 				(
 					Actor::new("Agent", ActorKind::Agent),

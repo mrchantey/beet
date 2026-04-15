@@ -174,7 +174,7 @@ impl<'a> SceneLoader<'a> {
 	}
 
 	/// Deserializes a RON scene string into the world.
-	pub fn load_ron(self, scene: impl AsRef<str>) -> Result {
+	pub fn load_ron(self, scene: impl AsRef<str>) -> Result<Vec<Entity>> {
 		use serde::de::DeserializeSeed;
 		let mut de = ron::de::Deserializer::from_str(scene.as_ref())?;
 		let dynamic_scene = {
@@ -189,7 +189,7 @@ impl<'a> SceneLoader<'a> {
 
 	/// Deserializes a JSON scene string into the world.
 	#[cfg(feature = "json")]
-	pub fn load_json(self, bytes: &[u8]) -> Result {
+	pub fn load_json(self, bytes: &[u8]) -> Result<Vec<Entity>> {
 		use serde::de::DeserializeSeed;
 		let mut de = serde_json::Deserializer::from_slice(bytes);
 		let dynamic_scene = {
@@ -204,7 +204,7 @@ impl<'a> SceneLoader<'a> {
 
 	/// Deserializes postcard bytes into the world.
 	#[cfg(feature = "postcard")]
-	pub fn load_postcard(self, bytes: &[u8]) -> Result {
+	pub fn load_postcard(self, bytes: &[u8]) -> Result<Vec<Entity>> {
 		use serde::de::DeserializeSeed;
 		let mut de = postcard::Deserializer::from_bytes(bytes);
 		let dynamic_scene = {
@@ -218,39 +218,61 @@ impl<'a> SceneLoader<'a> {
 		self.write(dynamic_scene)
 	}
 
-	fn write(self, dynamic_scene: bevy::scene::DynamicScene) -> Result {
+	fn write(
+		self,
+		dynamic_scene: bevy::scene::DynamicScene,
+	) -> Result<Vec<Entity>> {
 		let entity = self.entity;
 		let mut default_map = EntityHashMap::default();
 		let entity_map = self.entity_map.unwrap_or(&mut default_map);
 		dynamic_scene.write_to_world(self.world, entity_map)?;
 
-		// after writing, handle entity spawn situation
-		// this will likely need a rewrite after new scene system (bevy 0.19)
+		let spawned: Vec<Entity> = entity_map.values().copied().collect();
 		if let Some(parent) = entity {
-			// Remove existing children from the target entity
-			if let Some(children) = self.world.entity(parent).get::<Children>()
-			{
-				let to_despawn: Vec<Entity> = children.iter().collect();
-				for child in to_despawn {
-					self.world.entity_mut(child).despawn();
-				}
-			}
-			// Reparent all spawned root entities (those without ChildOf)
-			let spawned_roots: Vec<Entity> = entity_map
-				.values()
-				.copied()
-				.filter(|spawned| {
-					!self.world.entity(*spawned).contains::<ChildOf>()
-				})
-				.collect();
-			for root in spawned_roots {
-				self.world.entity_mut(root).insert(ChildOf(parent));
+			for entity in spawned.iter() {
+				self.world.entity_mut(*entity).insert(SpawnedBy(parent));
 			}
 		}
 
-		Ok(())
+		Ok(spawned)
 	}
 }
+
+/// Added to entities spawned by the scene loader to track their source entity in the scene file.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[relationship(relationship_target = SpawnedEntities)]
+pub struct SpawnedBy(pub Entity);
+
+/// Added to the [`SceneLoader::Entity`]
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[relationship_target(relationship = SpawnedBy)]
+pub struct SpawnedEntities(Vec<Entity>);
+
+
 
 #[cfg(test)]
 mod test {

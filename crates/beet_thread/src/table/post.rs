@@ -161,6 +161,12 @@ impl Post {
 	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
 		&self.metadata
 	}
+	/// Returns a mutable reference to the metadata.
+	pub fn metadata_mut(
+		&mut self,
+	) -> &mut serde_json::Map<String, serde_json::Value> {
+		&mut self.metadata
+	}
 
 	pub fn set_intent(&mut self, intent: PostIntent) { self.intent = intent; }
 
@@ -177,12 +183,6 @@ impl Post {
 	/// Returns a mutable reference to the raw body bytes.
 	pub fn body_bytes_mut(&mut self) -> &mut Vec<u8> { &mut self.body }
 
-	/// Returns a mutable reference to the metadata.
-	pub fn metadata_mut(
-		&mut self,
-	) -> &mut serde_json::Map<String, serde_json::Value> {
-		&mut self.metadata
-	}
 
 	/// Returns the `file_stem` from metadata, if present.
 	pub fn file_stem(&self) -> Option<&str> {

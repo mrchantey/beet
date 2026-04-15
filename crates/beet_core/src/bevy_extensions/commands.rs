@@ -18,7 +18,8 @@ pub impl Commands<'_, '_> {
 	fn load_scene_ron(&mut self, scene: impl Into<String>) {
 		let scene = scene.into();
 		self.queue(move |world: &mut World| -> Result {
-			SceneLoader::new(world).load_ron(&scene)
+			SceneLoader::new(world).load_ron(&scene)?;
+			Ok(())
 		});
 	}
 

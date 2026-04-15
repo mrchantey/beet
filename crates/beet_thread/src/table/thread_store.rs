@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+
 pub async fn load_or_spawn<Out>(
 	world: AsyncWorld,
 	blob: Blob,
@@ -15,7 +16,8 @@ where
 			// Scene exists, load it and call the root
 			world
 				.with_then(move |world| -> Result {
-					SceneLoader::new(world).load_json(&scene_bytes)
+					SceneLoader::new(world).load_json(&scene_bytes)?;
+					Ok(())
 				})
 				.await?;
 		}
