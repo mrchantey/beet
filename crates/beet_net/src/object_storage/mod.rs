@@ -78,8 +78,10 @@ impl Plugin for BucketPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<FsBucket>()
 			.register_type::<TypedBucket<FsBucket>>()
-			.register_type::<TypedBlob<FsBucket>>()
-			.add_systems(PostUpdate, load_scenes_on_insert);
+			.register_type::<TypedBlob<FsBucket>>();
+
+		#[cfg(feature = "bevy_scene")]
+		app.add_systems(PostUpdate, load_scenes_on_insert);
 
 		#[cfg(target_arch = "wasm32")]
 		app.register_type::<LocalStorageBucket>()

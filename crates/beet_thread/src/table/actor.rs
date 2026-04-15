@@ -8,8 +8,6 @@ pub type ActorId = Uuid7<Actor>;
 	Clone,
 	PartialEq,
 	Eq,
-	PartialOrd,
-	Ord,
 	Hash,
 	Serialize,
 	Deserialize,
@@ -22,6 +20,8 @@ pub struct Actor {
 	/// The name of the actor used when building context
 	name: String,
 	kind: ActorKind,
+	/// Extensible key-value metadata.
+	metadata: JsonMap,
 }
 
 impl Table for Actor {
@@ -35,6 +35,7 @@ impl Actor {
 			id: default(),
 			name: name.into(),
 			kind,
+			metadata: default(),
 		}
 	}
 	pub fn system() -> Self { Self::new("System", ActorKind::System) }
@@ -44,6 +45,14 @@ impl Actor {
 
 	pub fn name(&self) -> &str { &self.name }
 	pub fn kind(&self) -> ActorKind { self.kind }
+	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
+		&self.metadata
+	}
+	pub fn metadata_mut(
+		&mut self,
+	) -> &mut serde_json::Map<String, serde_json::Value> {
+		&mut self.metadata
+	}
 }
 
 /// The kind of actor this entity is.

@@ -11,7 +11,7 @@ pub struct SceneStore {
 	trigger: CoalescingTrigger,
 	/// Load the scene on spawn, defaults to false
 	load_on_spawn: bool,
-	/// Error when saving an emtpy scene, defaults to true
+	/// Error when saving an empty scene, defaults to true
 	error_on_empty: bool,
 }
 impl Default for SceneStore {
@@ -50,14 +50,15 @@ impl SceneStore {
 		this.trigger
 			.run_flush(async move || {
 				let (blob, bytes) = entity
-					.with_then(|mut entity| -> Result<_> {
+					.with_then(move |mut entity| -> Result<_> {
 						let blob = entity.get_or_else::<Blob>()?.clone();
 
-						// errors if empty, nothing to save.
-						let spawned_entities = entity
-							.get_or_else::<SceneEntities>()?
-							// TODO error_on_empty weird lifetime issue
-							.to_vec();
+						let spawned_entities =
+							entity.try_get::<SceneEntities>()?.to_vec();
+
+						if error_on_empty && spawned_entities.is_empty() {
+							bevybail!("cannot save empty scene");
+						}
 
 						let world = entity.into_world_mut();
 						let mut saver = SceneSaver::new(world);

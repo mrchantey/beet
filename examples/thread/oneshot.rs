@@ -2,7 +2,7 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() {
-	let posts = ThreadMut::new()
+	let posts = ThreadMut::spawn()
 		.insert_actor(Actor::system())
 		.insert_post("make like a duck and quack")
 		.thread_view()

@@ -1,17 +1,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Query parameter for accessing [`Thread`] entity trees.
+/// All queries use [`Allow<Disabled>`] to support querying disabled trees,
+/// ie when using Post::spawn on a tree disabled for serialization.
 #[derive(SystemParam)]
 pub struct ThreadQuery<'w, 's> {
 	pub commands: Commands<'w, 's>,
-	pub ancestors: Query<'w, 's, &'static ChildOf>,
-	pub children: Query<'w, 's, &'static Children>,
-	pub threads: Query<'w, 's, (Entity, &'static Thread)>,
-	pub actors:
-		Query<'w, 's, (Entity, &'static Actor, Option<&'static ToolChoice>)>,
-	pub tools: Query<'w, 's, (Entity, &'static ToolDefinition)>,
-	pub posts:
-		Query<'w, 's, (Entity, &'static Post, Option<&'static ResponseMeta>)>,
+	pub ancestors: Query<'w, 's, &'static ChildOf, Allow<Disabled>>,
+	pub children: Query<'w, 's, &'static Children, Allow<Disabled>>,
+	pub threads: Query<'w, 's, (Entity, &'static Thread), Allow<Disabled>>,
+	pub actors: Query<
+		'w,
+		's,
+		(Entity, &'static Actor, Option<&'static ToolChoice>),
+		Allow<Disabled>,
+	>,
+	pub tools:
+		Query<'w, 's, (Entity, &'static ToolDefinition), Allow<Disabled>>,
+	pub posts: Query<
+		'w,
+		's,
+		(Entity, &'static Post, Option<&'static ResponseMeta>),
+		Allow<Disabled>,
+	>,
 }
 
 impl<'w, 's> ThreadQuery<'w, 's> {

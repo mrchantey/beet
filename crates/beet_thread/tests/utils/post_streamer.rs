@@ -7,7 +7,7 @@ use beet_thread::prelude::*;
 pub async fn basic_text_response(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	ThreadMut::new()
+	ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post("complete the sequence: one, two, three, ____")
 		.thread_view()
@@ -27,7 +27,7 @@ pub async fn basic_text_response(
 pub async fn streaming_response(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	ThreadMut::new()
+	ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post("Count from 1 to 5.")
 		.thread_view()
@@ -46,7 +46,7 @@ pub async fn streaming_response(
 
 /// Use a system prompt and verify the response follows it.
 pub async fn system_prompt(streamer: impl Component + PostStreamer + Clone) {
-	ThreadMut::new()
+	ThreadMut::spawn()
 		.insert_actor(Actor::system())
 		.insert_post(
 			"You are a pirate. Always respond in pirate speak, beginning with 'ahoy'.",
@@ -85,7 +85,7 @@ pub async fn tool_calling(streamer: impl Component + PostStreamer + Clone) {
 		}),
 	);
 
-	let (name, args) = ThreadMut::new()
+	let (name, args) = ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post("What's the weather like in San Francisco?")
 		.thread_view()
@@ -122,7 +122,7 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 	)
 	.unwrap();
 
-	ThreadMut::new()
+	ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post(
 			"What color is this image? Answer in one word, either 'red' 'green' or 'blue'.",
@@ -151,7 +151,7 @@ pub async fn image_input(streamer: impl Component + PostStreamer + Clone) {
 pub async fn multi_turn_conversation(
 	streamer: impl Component + PostStreamer + Clone,
 ) {
-	let mut thread = ThreadMut::new();
+	let mut thread = ThreadMut::spawn();
 	thread
 		.insert_actor(Actor::user())
 		.insert_post("My name is Alice.");
@@ -184,7 +184,7 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 	}
 
 	// Step 1: ask the agent to generate a blue image
-	let posts = ThreadMut::new()
+	let posts = ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post(
 			"Create a solid blue 1x1 pixel image. Return only the image.",
@@ -217,7 +217,7 @@ pub async fn image_roundtrip(streamer: impl Component + PostStreamer + Clone) {
 		});
 
 	// Step 3: ask the agent to interpret the image
-	ThreadMut::new()
+	ThreadMut::spawn()
 		.insert_actor(Actor::user())
 		.insert_post(
 			"What color is this image? Answer in one word, either 'red' 'green' or 'blue'.",

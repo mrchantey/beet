@@ -54,9 +54,11 @@ impl Plugin for ThreadPlugin {
 			// ── SkipIfLatest wrapper instantiations ───────────────────────
 			.register_type::<SkipIfLatest<StdinPost>>()
 			.register_type::<SkipIfLatest<O11sStreamer>>()
-			.add_systems(PostUpdate, thread_store::store_thread_on_post)
 			.add_observer(insert_tool_definition)
 			// _
 			;
+
+		#[cfg(feature = "bevy_scene")]
+		app.add_systems(PostUpdate, thread_store::store_thread_on_post);
 	}
 }

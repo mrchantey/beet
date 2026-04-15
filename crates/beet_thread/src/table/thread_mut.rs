@@ -67,29 +67,29 @@ pub struct ThreadMut<'w> {
 }
 
 impl Default for ThreadMut<'static> {
-	fn default() -> Self { Self::new() }
+	fn default() -> Self { Self::spawn() }
 }
 
 impl ThreadMut<'static> {
-	pub fn new() -> Self { Self::new_with_plugins(()) }
-	pub fn new_logging<M>(level: Level) -> Self {
-		Self::new_with_plugins(LogPlugin {
+	pub fn spawn() -> Self { Self::spawn_with_plugins(()) }
+	pub fn spawn_logging<M>(level: Level) -> Self {
+		Self::spawn_with_plugins(LogPlugin {
 			level,
 			filter: format!("ureq=off,ureq_proto=off"),
 			..default()
 		})
 	}
-	pub fn new_with_plugins<M>(plugins: impl Plugins<M>) -> Self {
+	pub fn spawn_with_plugins<M>(plugins: impl Plugins<M>) -> Self {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, plugins))
 			.init_plugin::<ThreadPlugin>();
 
-		Self::new_with_world(app)
+		Self::spawn_with_world(app)
 	}
 }
 
 impl<'w> ThreadMut<'w> {
-	pub fn new_with_world(world: impl Into<AsWorldMut<'w>>) -> Self {
+	pub fn spawn_with_world(world: impl Into<AsWorldMut<'w>>) -> Self {
 		let mut world = world.into();
 		let thread = Thread::new("Oneshot Thread");
 		let id = thread.id();
@@ -362,7 +362,7 @@ mod tests {
 		world.spawn_empty();
 		world.spawn_empty();
 
-		let mut thread = ThreadMut::new();
+		let mut thread = ThreadMut::spawn();
 		thread.insert_actor(Actor::system());
 		thread.insert_actor(Actor::agent());
 	}

@@ -200,7 +200,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn echoes_input_without_tools() {
-		ThreadMut::new()
+		ThreadMut::spawn()
 			.insert_actor(Actor::user())
 			.insert_post("Hello world!")
 			.thread_view()
@@ -230,7 +230,7 @@ mod test {
 			}),
 		);
 
-		let (name, args) = ThreadMut::new()
+		let (name, args) = ThreadMut::spawn()
 			.insert_actor(Actor::user())
 			.insert_post("Greet someone")
 			.thread_view()
@@ -258,7 +258,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn custom_response_overrides_echo() {
-		ThreadMut::new()
+		ThreadMut::spawn()
 			.insert_actor(Actor::user())
 			.insert_post("Hello!")
 			.thread_view()
