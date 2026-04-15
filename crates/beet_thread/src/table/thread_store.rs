@@ -1,16 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
-
-#[derive(Debug, Default, Clone)]
-struct CoalescingTrigger(Arc<Mutex<CoalescingTriggerInner>>);
-#[derive(Debug, Default, Clone)]
-struct CoalescingTriggerInner {
-	dirty: bool,
-	in_progress: bool,
-}
 
 pub async fn load_or_spawn<Out>(
 	world: AsyncWorld,
@@ -37,7 +27,27 @@ where
 	Ok(())
 }
 
-pub async fn write(entity: AsyncEntity) -> Result {
+/// Write the thread scene to its blob, coalescing concurrent requests.
+///
+/// Only one write runs in-flight at a time. If called while a write is already
+/// in-flight, the dirty flag is set and the in-flight write will re-run once
+/// after it finishes — regardless of how many extra calls arrive.
+pub async fn write(entity: AsyncEntity, trigger: CoalescingTrigger) -> Result {
+	// If a write is already in-flight, the dirty flag is set for a retry
+	if !trigger.start() {
+		return Ok(());
+	}
+	// Drive until no pending dirty requests remain
+	loop {
+		write_inner(entity).await?;
+		if !trigger.finish() {
+			break;
+		}
+	}
+	Ok(())
+}
+
+async fn write_inner(entity: AsyncEntity) -> Result {
 	let (blob, json) = entity
 		.with_then(|mut entity| -> Result<_> {
 			let thread_root = entity
@@ -62,12 +72,11 @@ pub async fn write(entity: AsyncEntity) -> Result {
 	Ok(())
 }
 
-
-
 pub fn store_thread_on_post(
 	mut commands: Commands,
 	threads: ThreadQuery,
 	changed: Query<(Entity, &Post), Changed<Post>>,
+	mut triggers: Local<HashMap<Entity, CoalescingTrigger>>,
 ) -> Result {
 	for (entity, post) in changed.iter() {
 		if post.in_progress() {
@@ -79,9 +88,13 @@ pub fn store_thread_on_post(
 			// no blob, nothing to save to
 			continue;
 		}
+		// get or create a per-entity coalescing trigger
+		let trigger = triggers.entry(thread.entity).or_default().clone();
 		commands
 			.entity(thread.entity)
-			.queue_async(async |entity| thread_store::write(entity).await);
+			.queue_async(move |entity| async move {
+				thread_store::write(entity, trigger).await
+			});
 	}
 
 	Ok(())
