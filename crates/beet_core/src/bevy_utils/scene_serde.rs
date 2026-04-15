@@ -133,6 +133,15 @@ impl<'a> SceneLoader<'a> {
 			entity: None,
 		}
 	}
+	/// Creates a loader for the world containing the given entity.
+	pub fn new_entity(entity: EntityWorldMut<'a>) -> Self {
+		let id = entity.id();
+		Self {
+			world: entity.into_world_mut(),
+			entity_map: None,
+			entity: Some(id),
+		}
+	}
 
 	/// Provides a custom entity map to use during loading.
 	pub fn with_entity_map(

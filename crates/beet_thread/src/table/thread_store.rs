@@ -3,100 +3,24 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 
-pub async fn load_or_spawn<Out>(
-	world: AsyncWorld,
-	blob: Blob,
-	scene: impl 'static + Send + Sync + FnOnce(&mut World) -> Out,
-) -> Result
-where
-	Out: IntoResult,
-{
-	match blob.get_media().await {
-		Ok(bytes) => {
-			// Scene exists, load it and call the root
-			world
-				.with_then(move |world| -> Result {
-					SceneLoader::new(world).load(&bytes)?;
-					Ok(())
-				})
-				.await?;
-		}
-		Err(_) => {
-			// No existing scene, create fresh
-			world.with_then(|world| scene(world).into_result()).await?;
-		}
-	}
-	Ok(())
-}
-
-/// Write the thread scene to its blob, coalescing concurrent requests.
-///
-/// Only one write runs in-flight at a time. If called while a write is already
-/// in-flight, the dirty flag is set and the in-flight write will re-run once
-/// after it finishes — regardless of how many extra calls arrive.
-pub async fn write(entity: AsyncEntity, trigger: CoalescingTrigger) -> Result {
-	// If a write is already in-flight, the dirty flag is set for a retry
-	if !trigger.start() {
-		return Ok(());
-	}
-	// Drive until no pending dirty requests remain
-	loop {
-		write_inner(entity).await?;
-		if !trigger.finish() {
-			break;
-		}
-	}
-	Ok(())
-}
-
-async fn write_inner(entity: AsyncEntity) -> Result {
-	let (blob, scene_media) = entity
-		.with_then(|mut entity| -> Result<_> {
-			let thread_root = entity
-				.with_state::<ThreadQuery, Result<Entity>>(
-					|entity, query| query.thread(entity)?.entity.xok(),
-				)?;
-
-			let root_ancestor =
-				entity.with_state::<AncestorQuery, _>(|entity, query| {
-					query.root_ancestor(entity)
-				});
-
-			let world = entity.into_world_mut();
-			let blob = world.entity(thread_root).get_or_else::<Blob>()?.clone();
-			let media_type = blob.media_type().unwrap_or(MediaType::Json);
-			let scene_media = SceneSaver::new(world)
-				.with_entity_tree(root_ancestor)
-				.save(media_type)?;
-			(blob, scene_media).xok()
-		})
-		.await?;
-	blob.insert(scene_media.bytes().to_vec()).await?;
-	Ok(())
-}
-
 pub fn store_thread_on_post(
 	mut commands: Commands,
-	threads: ThreadQuery,
 	changed: Query<(Entity, &Post), Changed<Post>>,
-	mut triggers: Local<HashMap<Entity, CoalescingTrigger>>,
+	stores: AncestorQuery<&SpawnedBy>,
 ) -> Result {
 	for (entity, post) in changed.iter() {
 		if post.in_progress() {
 			// do not react to in-progress posts, ie streaming text.
 			continue;
 		}
-		let thread = threads.thread(entity)?;
-		if thread.blob.is_none() {
-			// no blob, nothing to save to
+		let Ok(store) = stores.get(entity) else {
+			// this post is not in a scene spawned hierarchy
 			continue;
-		}
-		// get or create a per-entity coalescing trigger
-		let trigger = triggers.entry(thread.entity).or_default().clone();
+		};
 		commands
-			.entity(thread.entity)
+			.entity(**store)
 			.queue_async(move |entity| async move {
-				thread_store::write(entity, trigger).await
+				SceneStore::save(entity).await
 			});
 	}
 

@@ -1,12 +1,13 @@
 use crate::prelude::*;
 
 /// Owned bytes paired with a [`MediaType`].
-#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, Reflect)]
 #[reflect(Default)]
 pub struct MediaBytes {
 	/// The media type of these bytes.
 	media_type: MediaType,
 	/// The raw bytes of the media content.
+	#[deref]
 	bytes: Vec<u8>,
 }
 
@@ -125,6 +126,10 @@ impl core::fmt::Display for MediaBytes {
 			}
 		}
 	}
+}
+
+impl Into<bytes::Bytes> for MediaBytes {
+	fn into(self) -> bytes::Bytes { self.bytes.into() }
 }
 
 #[cfg(test)]

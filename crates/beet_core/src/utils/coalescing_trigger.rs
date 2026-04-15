@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -73,6 +74,44 @@ impl CoalescingTrigger {
 			inner.in_progress = false;
 			false
 		}
+	}
+
+	/// Runs the provided function, coalescing concurrent calls into retries as needed.
+	///
+	/// Only one call runs in-flight at a time. If called while a call is already
+	/// in-flight, the dirty flag is set and the in-flight call will re-run once
+	/// after it finishes — regardless of how many extra calls arrive.
+	///
+	/// If the function returns an error, the trigger will be left in a consistent state
+	/// and subsequent calls will still trigger retries as expected.
+	pub async fn run_flush(&self, func: impl AsyncFn() -> Result) -> Result {
+		// If a write is already in-flight, the dirty flag is set for a retry
+		if !self.start() {
+			return Ok(());
+		}
+		// Drive until no pending dirty requests remain
+		loop {
+			func().await?;
+			if !self.finish() {
+				break;
+			}
+		}
+		Ok(())
+	}
+	/// Blocking version of [`run_flush`].
+	pub fn run_flush_blocking(&self, func: impl Fn() -> Result) -> Result {
+		// If a write is already in-flight, the dirty flag is set for a retry
+		if !self.start() {
+			return Ok(());
+		}
+		// Drive until no pending dirty requests remain
+		loop {
+			func()?;
+			if !self.finish() {
+				break;
+			}
+		}
+		Ok(())
 	}
 }
 

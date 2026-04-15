@@ -1108,6 +1108,7 @@ dependencies = [
  "beet_core_shared",
  "bevy",
  "bevy_reflect",
+ "bytes",
  "console_error_panic_hook",
  "ctrlc",
  "dotenv",

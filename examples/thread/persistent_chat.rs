@@ -36,45 +36,62 @@ fn setup(mut commands: Commands) {
 		}
 	}
 
-	// create some space for the output
-	println!("");
 
 	let blob = bucket.blob(RelPath::new(SCENE_FILE));
 	let clear = CliArgs::parse_env().params.contains_key("clear");
 
-	commands.queue_async(async move |world: AsyncWorld| {
-		if clear {
-			blob.remove().await.ok();
-		}
-		thread_store::load_or_spawn(world, blob.to_blob(), move |world| {
-			world.commands().spawn(default_scene(blob));
-		})
-		.await?;
+	// create some space for the output
+	println!("");
 
+	commands.queue_async(async move |world: AsyncWorld| {
+		if !blob.exists().await? || clear {
+			write_scene(world, blob.to_blob()).await?;
+		}
+		world.spawn((blob, SceneStore::default()));
 		Ok(())
 	});
 }
 
-fn default_scene(blob: impl Component) -> impl Bundle {
+
+/// Temporarily spawn the hardcoded scene to serialize it.
+/// as bsn and editor tooling matures this step will be done
+/// outside of the binary
+///
+// Note the CallOnSpawn will not be made, as the entity is removed
+// before any systems run.
+async fn write_scene(world: AsyncWorld, blob: Blob) -> Result {
+	let media_type = blob.media_type().unwrap_or(MediaType::Json);
+	let bytes = world
+		.with_then(move |world| -> Result<_> {
+			let scene_entity = world.spawn(default_scene()).id();
+			let bytes = SceneSaver::new(world)
+				.with_entity_tree(scene_entity)
+				.save(media_type)?;
+			world.entity_mut(scene_entity).despawn();
+			bytes.xok()
+		})
+		.await?;
+	blob.insert(bytes).await?;
+	Ok(())
+}
+
+
+fn default_scene() -> impl Bundle {
 	(
+		Thread::default(),
+		// adding a blob to a thread indicates it should be persisted
 		Repeat::new(),
 		// this control flow will be triggered on spawn,
 		// including after scene reload
 		CallOnSpawn::<(), Outcome>::default(),
 		children![(
-			Thread::default(),
-			// adding a blob to a thread indicates it should be persisted
-			blob,
 			Sequence::new()
 				// the system actor is static and has no action,
 				// so the sequence will skip over it
 				.allow_no_action(),
 			children![
 				(Actor::system(), children![Post::spawn(
-					r#"Ask a single brief, highly relevent and deeply contraversial question
-related to the users personal life, not the mundane.
-followup with more brief questions based on the users' answers
-"#
+					r#"Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"#
 				)]),
 				(
 					Actor::new("Agent", ActorKind::Agent),
