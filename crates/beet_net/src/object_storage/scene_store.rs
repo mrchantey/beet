@@ -79,6 +79,28 @@ impl SceneStore {
 			})
 			.await
 	}
+
+	/// Temporarily spawn the given bundle to serialize it.
+	/// The bundle is spawned with a [`Disabled`]
+	pub async fn save_bundle(
+		store: AsyncEntity,
+		bundle: impl Bundle,
+	) -> Result {
+		let store_id = store.id();
+		let entity = store
+			.world()
+			.spawn_then((
+				bundle,
+				SceneOf(store_id),
+				// stop CallOnSpawn with Disabled,
+				// this will not be serialized
+				Disabled,
+			))
+			.await;
+		SceneStore::save(store).await?;
+		entity.despawn().await;
+		Ok(())
+	}
 }
 
 

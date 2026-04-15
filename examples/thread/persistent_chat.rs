@@ -48,35 +48,12 @@ fn setup(mut commands: Commands) {
 			.spawn_then((blob.clone(), SceneStore::default()))
 			.await;
 		if clear || !blob.exists().await? {
-			write_scene(store.clone()).await?;
+			SceneStore::save_bundle(store.clone(), default_scene()).await?;
 		}
 		SceneStore::load(store).await?;
 		Ok(())
 	});
 }
-
-
-/// Temporarily spawn the hardcoded scene to serialize it.
-/// Note that as bsn and editor tooling matures this step will be done
-/// outside of the binary
-///
-async fn write_scene(store: AsyncEntity) -> Result {
-	let store_id = store.id();
-	let entity = store
-		.world()
-		.spawn_then((
-			default_scene(),
-			SceneOf(store_id),
-			// stop CallOnSpawn with Disabled,
-			// this will not be serialized
-			Disabled,
-		))
-		.await;
-	SceneStore::save(store).await?;
-	entity.despawn().await;
-	Ok(())
-}
-
 
 fn default_scene() -> impl Bundle {
 	(

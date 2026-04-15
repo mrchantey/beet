@@ -253,7 +253,7 @@ bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default"
 ]
-bevy_scene = ["beet_core/bevy_scene", "beet_net?/bevy_scene"]
+bevy_scene = ["beet_core/bevy_scene", "beet_net?/bevy_scene","beet_thread?/bevy_scene"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithreaded"]
