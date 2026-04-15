@@ -217,20 +217,6 @@ impl Request {
 		request.xok()
 	}
 
-	/// Creates a POST request with a postcard-serialized body and `content-type` header.
-	/// Sets the `content-type` header to `application/x-postcard`.
-	#[cfg(feature = "postcard")]
-	pub fn with_postcard<T: serde::Serialize>(
-		url: impl Into<Url>,
-		value: &T,
-	) -> Result<Self> {
-		let body = Body::from_postcard(value)?;
-		let mut request =
-			Self::from_parts(RequestParts::new(HttpMethod::Post, url), body);
-		request.headers.set_content_type(MediaType::Postcard);
-		request.xok()
-	}
-
 	/// Creates a POST request with a raw JSON string body and `content-type` header.
 	///
 	/// ```
@@ -247,14 +233,12 @@ impl Request {
 		request
 	}
 
-	/// Creates a POST request with raw postcard bytes and `content-type` header.
-	#[cfg(feature = "postcard")]
-	pub fn with_postcard_bytes(
-		url: impl Into<Url>,
-		bytes: impl AsRef<[u8]>,
-	) -> Self {
-		let mut request = Self::post(url).with_body(bytes);
-		request.headers.set_content_type(MediaType::Postcard);
+	/// Creates a POST request with a [`MediaBytes`] body and appropriate `content-type` header.
+	#[cfg(feature = "serde")]
+	pub fn with_media(url: impl Into<Url>, bytes: MediaBytes) -> Self {
+		let (media_type, raw) = bytes.take();
+		let mut request = Self::post(url).with_body(raw);
+		request.headers.set_content_type(media_type);
 		request
 	}
 
@@ -446,7 +430,7 @@ impl Request {
 	}
 
 	/// Converts the request body into bytes, consuming the request.
-	pub async fn into_media_bytes(self) -> Result<MediaBytes<'static>> {
+	pub async fn into_media_bytes(self) -> Result<MediaBytes> {
 		let content_type = self
 			.headers
 			.get::<header::ContentType>()
@@ -711,46 +695,17 @@ mod test {
 			.xpect_eq(r#"{"name":"Ada"}"#);
 	}
 
-	#[cfg(feature = "postcard")]
+	#[cfg(feature = "json")]
 	#[test]
-	fn request_with_postcard() {
-		use serde::Deserialize;
-		use serde::Serialize;
-
-		#[derive(Debug, PartialEq, Serialize, Deserialize)]
-		struct Payload {
-			val: u32,
-		}
-
-		let payload = Payload { val: 42 };
-		let request = Request::with_postcard("/api/data", &payload).unwrap();
-
+	fn request_with_media() {
+		let mb = MediaBytes::serialize(MediaType::Json, &42u32).unwrap();
+		let request = Request::with_media("/api/data", mb);
 		(*request.method()).xpect_eq(HttpMethod::Post);
 		request
 			.headers
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MediaType::Postcard);
-
-		let body_bytes = request.body.try_into_bytes().unwrap();
-		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
-		roundtrip.xpect_eq(payload);
-	}
-
-	#[cfg(feature = "postcard")]
-	#[test]
-	fn request_with_postcard_bytes() {
-		let raw = vec![0x01, 0x02, 0x03];
-		let request = Request::with_postcard_bytes("/api/data", &raw);
-		request
-			.headers
-			.get::<header::ContentType>()
-			.unwrap()
-			.unwrap()
-			.xpect_eq(MediaType::Postcard);
-
-		let body_bytes = request.body.try_into_bytes().unwrap();
-		body_bytes.to_vec().xpect_eq(raw);
+			.xpect_eq(MediaType::Json);
 	}
 }

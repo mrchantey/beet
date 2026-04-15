@@ -494,11 +494,15 @@ mod test {
 		let entity = app.world_mut().spawn(increment(count_field())).id();
 
 		// Serialize
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entity_tree(entity)
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
-		scene.xref().xpect_contains("Increment");
+		scene_bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("Increment");
 
 		// Despawn original
 		app.world_mut().entity_mut(entity).despawn();
@@ -507,7 +511,7 @@ mod test {
 		let mut entity_map = EntityHashMap::default();
 		SceneLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 		app.update();
 

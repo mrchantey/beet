@@ -287,7 +287,7 @@ mod test {
 	fn roundtrip(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html(html);
+		let bytes = MediaBytes::new_html(html);
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -302,7 +302,7 @@ mod test {
 	fn roundtrip_expressions(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html(html);
+		let bytes = MediaBytes::new_html(html);
 		HtmlParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -374,7 +374,7 @@ mod test {
 	fn roundtrip_escaped(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html(html);
+		let bytes = MediaBytes::new_html(html);
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

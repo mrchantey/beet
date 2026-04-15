@@ -14,7 +14,7 @@ use beet::prelude::*;
 fn main() {
 	let mut world = World::new();
 	let mut entity = world.spawn_empty();
-	let md_bytes = MediaBytes::markdown(MARKDOWN);
+	let md_bytes = MediaBytes::new_markdown(MARKDOWN);
 
 	// 1. Load the markdown into ecs
 	MarkdownParser::new()

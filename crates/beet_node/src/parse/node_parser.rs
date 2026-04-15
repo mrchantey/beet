@@ -27,7 +27,7 @@ pub struct ParseContext<'a, 'w> {
 	/// The entity to parse into.
 	pub entity: &'a mut EntityWorldMut<'w>,
 	/// The typed bytes to parse.
-	pub bytes: &'a MediaBytes<'a>,
+	pub bytes: &'a MediaBytes,
 	/// Optional source path for [`FileSpan`] tracking.
 	pub path: Option<WsPathBuf>,
 }
@@ -36,7 +36,7 @@ impl<'a, 'w> ParseContext<'a, 'w> {
 	/// Create a new [`ParseContext`].
 	pub fn new(
 		entity: &'a mut EntityWorldMut<'w>,
-		bytes: &'a MediaBytes<'a>,
+		bytes: &'a MediaBytes,
 	) -> Self {
 		Self {
 			entity,
@@ -82,7 +82,7 @@ mod test {
 	#[test]
 	fn read_plain_text() {
 		let mut world = World::new();
-		let bytes = MediaBytes::text("hello world");
+		let bytes = MediaBytes::new_text("hello world");
 		world
 			.spawn_empty()
 			.xtap(|entity| {
@@ -103,7 +103,7 @@ mod test {
 		let mut world = World::new();
 		let mut parser = PlainTextParser::default();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::text("hello");
+		let bytes = MediaBytes::new_text("hello");
 		let mut entity_mut = world.entity_mut(entity);
 		parser
 			.parse(ParseContext::new(&mut entity_mut, &bytes))
@@ -131,7 +131,7 @@ mod test {
 	/// Parsing with a path attaches a [`FileSpan`] component to the child entity.
 	#[test]
 	fn parse_with_path_inserts_file_span() {
-		let bytes = MediaBytes::text("line1\nline2");
+		let bytes = MediaBytes::new_text("line1\nline2");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {

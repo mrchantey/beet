@@ -11,12 +11,12 @@ pub async fn load_or_spawn<Out>(
 where
 	Out: IntoResult,
 {
-	match blob.get().await {
-		Ok(scene_bytes) => {
+	match blob.get_media().await {
+		Ok(bytes) => {
 			// Scene exists, load it and call the root
 			world
 				.with_then(move |world| -> Result {
-					SceneLoader::new(world).load_json(&scene_bytes)?;
+					SceneLoader::new(world).load(&bytes)?;
 					Ok(())
 				})
 				.await?;
@@ -50,7 +50,7 @@ pub async fn write(entity: AsyncEntity, trigger: CoalescingTrigger) -> Result {
 }
 
 async fn write_inner(entity: AsyncEntity) -> Result {
-	let (blob, json) = entity
+	let (blob, scene_media) = entity
 		.with_then(|mut entity| -> Result<_> {
 			let thread_root = entity
 				.with_state::<ThreadQuery, Result<Entity>>(
@@ -64,13 +64,14 @@ async fn write_inner(entity: AsyncEntity) -> Result {
 
 			let world = entity.into_world_mut();
 			let blob = world.entity(thread_root).get_or_else::<Blob>()?.clone();
-			let json = SceneSaver::new(world)
+			let media_type = blob.media_type().unwrap_or(MediaType::Json);
+			let scene_media = SceneSaver::new(world)
 				.with_entity_tree(root_ancestor)
-				.save_json()?;
-			(blob, json).xok()
+				.save(media_type)?;
+			(blob, scene_media).xok()
 		})
 		.await?;
-	blob.insert(json).await?;
+	blob.insert(scene_media.bytes().to_vec()).await?;
 	Ok(())
 }
 

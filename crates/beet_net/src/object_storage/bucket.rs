@@ -46,6 +46,13 @@ impl Bucket {
 		BucketItem::new(self.clone(), path)
 	}
 
+	/// Get an object and infer the [`MediaType`] from its path extension.
+	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
+		let media_type = MediaType::from_path(path.as_path());
+		let bytes = self.get(path).await?;
+		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+	}
+
 	/// Create a [`Blob`] handle for a single object in this bucket.
 	///
 	/// # Example

@@ -384,7 +384,7 @@ mod test {
 	fn roundtrip(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -399,7 +399,7 @@ mod test {
 	fn roundtrip_expressions(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -505,7 +505,7 @@ mod test {
 	fn render_unescaped(html: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html(html);
+		let bytes = MediaBytes::new_html(html);
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

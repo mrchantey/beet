@@ -22,9 +22,10 @@ use bytes::Bytes;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Component, Get)]
+#[derive(Debug, Clone, Component, Get, Deref)]
 pub struct Blob {
 	/// Path to the blob within the bucket.
+	#[deref]
 	path: RelPath,
 	/// Provider that handles storage operations.
 	bucket: Bucket,
@@ -76,6 +77,14 @@ impl Blob {
 	/// ```
 	pub async fn get(&self) -> Result<Bytes> {
 		self.bucket.get(&self.path).await
+	}
+
+	/// Retrieve the blob's content as [`MediaBytes`], inferring the
+	/// [`MediaType`] from the path extension.
+	pub async fn get_media(&self) -> Result<MediaBytes> {
+		let media_type = MediaType::from_path(self.path.as_path());
+		let bytes = self.get().await?;
+		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
 
 	/// Check whether the blob exists in the bucket.
@@ -242,6 +251,14 @@ where
 		self.bucket.get(&self.path).await
 	}
 
+	/// Retrieve the blob's content as [`MediaBytes`], inferring the
+	/// [`MediaType`] from the path extension.
+	pub async fn get_media(&self) -> Result<MediaBytes> {
+		let media_type = MediaType::from_path(self.path.as_path());
+		let bytes = self.get().await?;
+		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+	}
+
 	/// Check whether the blob exists in the bucket.
 	///
 	/// # Example
@@ -366,6 +383,17 @@ mod test {
 				.xpect_eq(bytes::Bytes::from("world"));
 			blob.remove().await.unwrap();
 			blob.exists().await.unwrap().xpect_false();
+		});
+	}
+
+	#[test]
+	fn get_media_infers_type() {
+		async_ext::block_on(async {
+			let blob = temp_bucket().blob(RelPath::new("data.json"));
+			blob.insert(r#"{"key":"value"}"#).await.unwrap();
+			let media = blob.get_media().await.unwrap();
+			media.media_type().xpect_eq(MediaType::Json);
+			media.as_utf8().unwrap().xpect_contains("key");
 		});
 	}
 

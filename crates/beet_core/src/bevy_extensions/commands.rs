@@ -13,12 +13,12 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
-	/// Loads a scene from a serialized string.
+	/// Loads a scene from [`MediaBytes`].
 	#[cfg(feature = "bevy_scene")]
-	fn load_scene_ron(&mut self, scene: impl Into<String>) {
-		let scene = scene.into();
+	fn load_scene(&mut self, bytes: impl Into<MediaBytes>) {
+		let bytes = bytes.into();
 		self.queue(move |world: &mut World| -> Result {
-			SceneLoader::new(world).load_ron(&scene)?;
+			SceneLoader::new(world).load(&bytes)?;
 			Ok(())
 		});
 	}

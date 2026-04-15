@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 /// Extends [`MediaBytes`] with `data:` URI construction and parsing.
 #[extend::ext(name = MediaBytesUrlExt)]
-pub impl<'a> MediaBytes<'a> {
+pub impl MediaBytes {
 	/// Parse a `data:` [`Url`] directly into [`MediaBytes`], decoding the
 	/// payload in a single step.
 	///
@@ -28,7 +28,7 @@ pub impl<'a> MediaBytes<'a> {
 	/// assert_eq!(mb.media_type(), &MediaType::Text);
 	/// assert_eq!(mb.as_utf8().unwrap(), "Hello");
 	/// ```
-	fn from_url(url: &Url) -> Result<MediaBytes<'static>> {
+	fn from_url(url: &Url) -> Result<MediaBytes> {
 		if url.scheme() != &Scheme::Data {
 			bevybail!("expected a data: URL, got scheme '{}'", url.scheme());
 		}
@@ -87,7 +87,7 @@ pub impl<'a> MediaBytes<'a> {
 	/// ```
 	/// # use beet_net::prelude::*;
 	/// # use beet_core::prelude::*;
-	/// let mb = MediaBytes::text("Hello");
+	/// let mb = MediaBytes::new_text("Hello");
 	/// let url = mb.into_url();
 	/// assert_eq!(url.scheme(), &Scheme::Data);
 	/// // Round-trip
@@ -194,7 +194,7 @@ mod test {
 	#[cfg(feature = "serde")]
 	#[test]
 	fn into_url_base64() {
-		let mb = MediaBytes::text("Hello");
+		let mb = MediaBytes::new_text("Hello");
 		let url = mb.into_url();
 		url.scheme().xpect_eq(Scheme::Data);
 		// The payload segment should contain the base64 token.
@@ -205,7 +205,7 @@ mod test {
 	#[cfg(feature = "serde")]
 	#[test]
 	fn round_trip() {
-		let original = MediaBytes::html("<p>hi</p>");
+		let original = MediaBytes::new_html("<p>hi</p>");
 		let url = original.into_url();
 		let back = MediaBytes::from_url(&url).unwrap();
 		back.media_type().xpect_eq(MediaType::Html);
@@ -215,7 +215,7 @@ mod test {
 	#[cfg(feature = "serde")]
 	#[test]
 	fn round_trip_display_reparse() {
-		let mb = MediaBytes::text("Hello");
+		let mb = MediaBytes::new_text("Hello");
 		let url = mb.into_url();
 		// Display then re-parse should produce identical bytes.
 		let reparsed = Url::parse(url.to_string());

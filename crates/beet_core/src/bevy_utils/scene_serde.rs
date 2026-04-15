@@ -12,7 +12,7 @@ use bevy::scene::serde::SceneSerializer;
 /// Serializes world state or a subtree to various formats.
 ///
 /// Use [`SceneSaver::new`] for the full world, or [`SceneSaver::new`] followed
-/// by [`SceneSaver::for_entity`] to serialize only an entity and its descendants.
+/// by [`SceneSaver::with_entity_tree`] to serialize only an entity and its descendants.
 pub struct SceneSaver<'a> {
 	registry: TypeRegistryArc,
 	world: &'a World,
@@ -81,42 +81,21 @@ impl<'a> SceneSaver<'a> {
 		self
 	}
 
-	/// Serializes to a RON string.
-	pub fn save_ron(self) -> Result<String> {
-		let registry = self.registry.read();
-		let dyn_scene = self.builder.build();
-		let serializer = SceneSerializer::new(&dyn_scene, &registry);
-		let pretty_config = ron::ser::PrettyConfig::default()
-			.indentor("  ".to_string())
-			.new_line("\n".to_string());
-		ron::ser::to_string_pretty(&serializer, pretty_config)?.xok()
+	/// Serializes to [`MediaBytes`] using the given format with default options.
+	pub fn save(self, media_type: MediaType) -> Result<MediaBytes> {
+		self.save_with_options(media_type, default())
 	}
 
-	/// Serializes to a JSON string.
-	#[cfg(feature = "json")]
-	pub fn save_json_string_pretty(self) -> Result<String> {
+	/// Serializes to [`MediaBytes`] using the given format and [`SerializeOptions`].
+	pub fn save_with_options(
+		self,
+		media_type: MediaType,
+		options: SerializeOptions,
+	) -> Result<MediaBytes> {
 		let registry = self.registry.read();
 		let dyn_scene = self.builder.build();
 		let serializer = SceneSerializer::new(&dyn_scene, &registry);
-		serde_json::to_string_pretty(&serializer)?.xok()
-	}
-
-	/// Serializes to JSON bytes.
-	#[cfg(feature = "json")]
-	pub fn save_json(self) -> Result<Vec<u8>> {
-		let registry = self.registry.read();
-		let dyn_scene = self.builder.build();
-		let serializer = SceneSerializer::new(&dyn_scene, &registry);
-		serde_json::to_vec(&serializer)?.xok()
-	}
-
-	/// Serializes to postcard bytes.
-	#[cfg(feature = "postcard")]
-	pub fn save_postcard(self) -> Result<Vec<u8>> {
-		let registry = self.registry.read();
-		let dyn_scene = self.builder.build();
-		let serializer = SceneSerializer::new(&dyn_scene, &registry);
-		postcard::to_allocvec(&serializer)?.xok()
+		MediaBytes::serialize_with_options(media_type, &serializer, options)
 	}
 
 	/// Collects an entity and all its descendants into a flat list.
@@ -173,49 +152,73 @@ impl<'a> SceneLoader<'a> {
 		self
 	}
 
-	/// Deserializes a RON scene string into the world.
-	pub fn load_ron(self, scene: impl AsRef<str>) -> Result<Vec<Entity>> {
-		use serde::de::DeserializeSeed;
-		let mut de = ron::de::Deserializer::from_str(scene.as_ref())?;
-		let dynamic_scene = {
-			let type_registry = self.world.resource::<AppTypeRegistry>();
-			let scene_de = bevy::scene::serde::SceneDeserializer {
-				type_registry: &type_registry.read(),
-			};
-			scene_de.deserialize(&mut de)?
-		};
-		self.write(dynamic_scene)
-	}
-
-	/// Deserializes a JSON scene string into the world.
-	#[cfg(feature = "json")]
-	pub fn load_json(self, bytes: &[u8]) -> Result<Vec<Entity>> {
-		use serde::de::DeserializeSeed;
-		let mut de = serde_json::Deserializer::from_slice(bytes);
-		let dynamic_scene = {
-			let type_registry = self.world.resource::<AppTypeRegistry>();
-			let scene_de = bevy::scene::serde::SceneDeserializer {
-				type_registry: &type_registry.read(),
-			};
-			scene_de.deserialize(&mut de)?
-		};
-		self.write(dynamic_scene)
-	}
-
-	/// Deserializes postcard bytes into the world.
-	#[cfg(feature = "postcard")]
-	pub fn load_postcard(self, bytes: &[u8]) -> Result<Vec<Entity>> {
-		use serde::de::DeserializeSeed;
-		let mut de = postcard::Deserializer::from_bytes(bytes);
-		let dynamic_scene = {
-			let type_registry = self.world.resource::<AppTypeRegistry>();
-			let registry_read = type_registry.read();
-			let scene_de = bevy::scene::serde::SceneDeserializer {
-				type_registry: &registry_read,
-			};
-			scene_de.deserialize(&mut de)?
-		};
-		self.write(dynamic_scene)
+	/// Deserializes a scene from [`MediaBytes`] into the world,
+	/// dispatching by media type.
+	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
+		match bytes.media_type() {
+			MediaType::Ron => {
+				use serde::de::DeserializeSeed;
+				let text = bytes.as_utf8()?;
+				let mut de = ron::de::Deserializer::from_str(text)?;
+				let dynamic_scene = {
+					let type_registry =
+						self.world.resource::<AppTypeRegistry>();
+					let scene_de = bevy::scene::serde::SceneDeserializer {
+						type_registry: &type_registry.read(),
+					};
+					scene_de.deserialize(&mut de)?
+				};
+				self.write(dynamic_scene)
+			}
+			MediaType::Json => {
+				cfg_if! {
+					if #[cfg(feature = "json")] {
+						use serde::de::DeserializeSeed;
+						let mut de =
+							serde_json::Deserializer::from_slice(bytes.bytes());
+						let dynamic_scene = {
+							let type_registry =
+								self.world.resource::<AppTypeRegistry>();
+							let scene_de = bevy::scene::serde::SceneDeserializer {
+								type_registry: &type_registry.read(),
+							};
+							scene_de.deserialize(&mut de)?
+						};
+						self.write(dynamic_scene)
+					} else {
+						bevybail!(
+							"The `json` feature is required for JSON scene loading"
+						)
+					}
+				}
+			}
+			MediaType::Postcard | MediaType::Bytes => {
+				cfg_if! {
+					if #[cfg(feature = "postcard")] {
+						use serde::de::DeserializeSeed;
+						let mut de =
+							postcard::Deserializer::from_bytes(bytes.bytes());
+						let dynamic_scene = {
+							let type_registry =
+								self.world.resource::<AppTypeRegistry>();
+							let registry_read = type_registry.read();
+							let scene_de = bevy::scene::serde::SceneDeserializer {
+								type_registry: &registry_read,
+							};
+							scene_de.deserialize(&mut de)?
+						};
+						self.write(dynamic_scene)
+					} else {
+						bevybail!(
+							"The `postcard` feature is required for postcard scene loading"
+						)
+					}
+				}
+			}
+			other => {
+				bevybail!("Unsupported media type for scene loading: {other}")
+			}
+		}
 	}
 
 	fn write(
@@ -290,10 +293,13 @@ mod test {
 	#[test]
 	fn round_trip_ron() {
 		let mut app = scene_world();
-		let scene =
-			SceneSaver::new_default(app.world_mut()).save_ron().unwrap();
-		scene.xref().xpect_contains("Time");
-		SceneLoader::new(app.world_mut()).load_ron(&scene).unwrap();
+		let scene_bytes = SceneSaver::new_default(app.world_mut())
+			.save(MediaType::Ron)
+			.unwrap();
+		scene_bytes.as_utf8().unwrap().xref().xpect_contains("Time");
+		SceneLoader::new(app.world_mut())
+			.load(&scene_bytes)
+			.unwrap();
 	}
 
 	#[test]
@@ -304,69 +310,68 @@ mod test {
 			.entity_mut(entity)
 			.with_child(Name::new("Child"));
 
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entity_tree(entity)
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
-		scene.xref().xpect_contains("Root");
-		scene.xref().xpect_contains("Child");
+		let text = scene_bytes.as_utf8().unwrap();
+		text.xref().xpect_contains("Root");
+		text.xref().xpect_contains("Child");
 	}
 
 	#[test]
 	fn custom_entity_map() {
 		let mut app = scene_world();
-		let scene =
-			SceneSaver::new_default(app.world_mut()).save_ron().unwrap();
+		let scene_bytes = SceneSaver::new_default(app.world_mut())
+			.save(MediaType::Ron)
+			.unwrap();
 		let mut entity_map = Default::default();
 		SceneLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 	}
 
 	#[test]
-	fn loads_into_entity() {
+	fn loads_into_entity_adds_spawned_by() {
 		let mut app = scene_world();
-		// Spawn a named entity with a child to form a scene
+		// Spawn a named entity to form a scene
 		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entities([child])
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
 
 		// Load the scene into a target entity
 		let target = app.world_mut().spawn(Name::new("Target")).id();
-		SceneLoader::new(app.world_mut())
+		let spawned = SceneLoader::new(app.world_mut())
 			.with_entity(target)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 
-		// The target should now have children
-		let children: Vec<Entity> = app
-			.world()
-			.entity(target)
-			.get::<Children>()
-			.unwrap()
-			.iter()
-			.collect();
-		children.len().xpect_eq(1);
+		// Spawned entities should have SpawnedBy pointing to target
+		spawned.len().xpect_eq(1);
 		app.world()
-			.entity(children[0])
+			.entity(spawned[0])
+			.get::<SpawnedBy>()
+			.unwrap()
+			.0
+			.xpect_eq(target);
+		app.world()
+			.entity(spawned[0])
 			.get::<Name>()
 			.unwrap()
 			.as_str()
 			.xpect_eq("SceneChild");
 	}
 
-
-	// TODO new behavior is SpawnedBy attribute, children are not replaced
 	#[test]
-	fn loads_into_entity_replaces_existing_children() {
+	fn loads_into_entity_preserves_existing_children() {
 		let mut app = scene_world();
 		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entities([child])
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
 
 		// Spawn a target with an existing child
@@ -381,12 +386,12 @@ mod test {
 			.len()
 			.xpect_eq(1);
 
-		SceneLoader::new(app.world_mut())
+		let spawned = SceneLoader::new(app.world_mut())
 			.with_entity(target)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 
-		// Old child should be replaced
+		// Existing children should be preserved
 		let children: Vec<Entity> = app
 			.world()
 			.entity(target)
@@ -400,6 +405,15 @@ mod test {
 			.get::<Name>()
 			.unwrap()
 			.as_str()
-			.xpect_eq("SceneChild");
+			.xpect_eq("OldChild");
+
+		// Spawned entities have SpawnedBy, not ChildOf
+		spawned.len().xpect_eq(1);
+		app.world()
+			.entity(spawned[0])
+			.get::<SpawnedBy>()
+			.unwrap()
+			.0
+			.xpect_eq(target);
 	}
 }

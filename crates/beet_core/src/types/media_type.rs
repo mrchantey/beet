@@ -30,6 +30,8 @@ pub enum MediaType {
 	Json,
 	/// `application/x-postcard`
 	Postcard,
+	/// `application/x-ron`
+	Ron,
 	/// `text/markdown`
 	Markdown,
 	/// `text/event-stream` — Server-Sent Events.
@@ -141,6 +143,7 @@ impl MediaType {
 	// ── Canonical strings ──────────────────────────────────────────
 	const JSON: &'static str = "application/json";
 	const POSTCARD: &'static str = "application/x-postcard";
+	const RON: &'static str = "application/x-ron";
 	const TEXT: &'static str = "text/plain";
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
@@ -217,6 +220,7 @@ impl MediaType {
 		match raw {
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
+			val if val.contains(Self::RON) => MediaType::Ron,
 			val if val.contains(Self::HTML) => MediaType::Html,
 			val if val.contains(Self::MARKDOWN) => MediaType::Markdown,
 			val if val.contains(Self::EVENT_STREAM) => MediaType::EventStream,
@@ -311,6 +315,7 @@ impl MediaType {
 			"yaml" | "yml" => MediaType::Yaml,
 			"csv" => MediaType::Csv,
 			"toml" => MediaType::Toml,
+			"ron" => MediaType::Ron,
 			"sql" => MediaType::Sql,
 			"graphql" | "gql" => MediaType::GraphQl,
 			// images
@@ -405,6 +410,7 @@ impl MediaType {
 			MediaType::Pdf => Some("pdf"),
 			MediaType::Wasm => Some("wasm"),
 			MediaType::Postcard => Some("postcard"),
+			MediaType::Ron => Some("ron"),
 			MediaType::Protobuf => Some("proto"),
 			MediaType::MessagePack => Some("msgpack"),
 			MediaType::Shell => Some("sh"),
@@ -446,6 +452,7 @@ impl MediaType {
 			MediaType::Xml => Self::XML,
 			MediaType::Json => Self::JSON,
 			MediaType::Postcard => Self::POSTCARD,
+			MediaType::Ron => Self::RON,
 			MediaType::Markdown => Self::MARKDOWN,
 			MediaType::EventStream => Self::EVENT_STREAM,
 			MediaType::Css => Self::CSS,
@@ -502,7 +509,7 @@ impl MediaType {
 
 	/// Whether this is a serializable format (JSON or Postcard).
 	pub fn is_serializable(&self) -> bool {
-		matches!(self, MediaType::Json | MediaType::Postcard)
+		matches!(self, MediaType::Json | MediaType::Postcard | MediaType::Ron)
 	}
 
 	/// Whether this is an HTTP wildcard media type (`*/*` or `text/*`).

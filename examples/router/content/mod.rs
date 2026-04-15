@@ -148,7 +148,7 @@ fn parse_html_entity(
 	} else {
 		world.spawn_empty().id()
 	};
-	let bytes = MediaBytes::html(html);
+	let bytes = MediaBytes::new_html(html);
 	let mut entity_mut = world.entity_mut(entity);
 	MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))?;
 	Ok(entity)

@@ -162,7 +162,7 @@ mod test {
 
 	/// Parse markdown bytes into an entity.
 	fn parse_md(entity: &mut EntityWorldMut, md: &str) {
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(entity, &bytes))
 			.unwrap();
@@ -170,7 +170,7 @@ mod test {
 
 	/// Parse markdown with a path for span tracking.
 	fn parse_md_with_path(entity: &mut EntityWorldMut, md: &str, path: &str) {
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(
 				ParseContext::new(entity, &bytes)
@@ -350,7 +350,7 @@ mod test {
 
 	#[test]
 	fn reparse_unchanged_no_change() {
-		let bytes = MediaBytes::markdown("# Title\n\nParagraph");
+		let bytes = MediaBytes::new_markdown("# Title\n\nParagraph");
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| {

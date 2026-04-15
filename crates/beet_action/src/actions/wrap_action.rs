@@ -89,7 +89,8 @@ where
 pub struct TypedWrapActionMarker;
 
 impl<WrapFn, WrapIn, WrapOut, Fut, InnerIn, InnerOut>
-	IntoAction<(TypedWrapActionMarker, WrapIn, WrapOut, InnerIn, InnerOut)> for WrapFn
+	IntoAction<(TypedWrapActionMarker, WrapIn, WrapOut, InnerIn, InnerOut)>
+	for WrapFn
 where
 	WrapFn: 'static
 		+ Send
@@ -226,7 +227,9 @@ mod test {
 
 	/// Wrapper function defined with `#[action]`, provides the wrapping logic.
 	#[action]
-	async fn AddOneWrap(cx: ActionContext<(i32, Next<i32, i32>)>) -> Result<i32> {
+	async fn AddOneWrap(
+		cx: ActionContext<(i32, Next<i32, i32>)>,
+	) -> Result<i32> {
 		let inner_out = cx.1.call(cx.0).await?;
 		Ok(inner_out + 1)
 	}
@@ -425,11 +428,15 @@ mod test {
 		app.world().entity(entity).get::<ActionMeta>().xpect_some();
 
 		// Serialize
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entities([entity])
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
-		scene.xref().xpect_contains("AddOneWrapper");
+		scene_bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("AddOneWrapper");
 
 		// Despawn original
 		app.world_mut().entity_mut(entity).despawn();
@@ -439,7 +446,7 @@ mod test {
 		let mut entity_map = EntityHashMap::default();
 		SceneLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 		app.update();
 
@@ -464,9 +471,9 @@ mod test {
 		app.update();
 
 		// Serialize then despawn
-		let scene = SceneSaver::new(app.world_mut())
+		let scene_bytes = SceneSaver::new(app.world_mut())
 			.with_entities([entity])
-			.save_ron()
+			.save(MediaType::Ron)
 			.unwrap();
 		app.world_mut().entity_mut(entity).despawn();
 		app.update();
@@ -475,7 +482,7 @@ mod test {
 		let mut entity_map = EntityHashMap::default();
 		SceneLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load_ron(&scene)
+			.load(&scene_bytes)
 			.unwrap();
 		app.update();
 

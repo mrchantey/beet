@@ -351,7 +351,7 @@ mod test {
 	fn render(md: &str) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -521,7 +521,7 @@ mod test {
 	fn unescape_html_entities() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<p>a &amp; b</p>");
+		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -538,7 +538,7 @@ mod test {
 	fn custom_style_map() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown("# Hello");
+		let bytes = MediaBytes::new_markdown("# Hello");
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

@@ -209,6 +209,22 @@ pub async fn read_to_string_async(path: impl AsRef<Path>) -> FsResult<String> {
 	}
 }
 
+/// Read a file and infer the [`MediaType`] from the file extension.
+pub fn read_media(path: impl AsRef<Path>) -> FsResult<MediaBytes> {
+	let path = path.as_ref();
+	let media_type = MediaType::from_path(path);
+	let bytes = fs_ext::read(path)?;
+	Ok(MediaBytes::new(media_type, bytes))
+}
+
+/// Async version of [`read_media`].
+pub async fn read_media_async(path: impl AsRef<Path>) -> FsResult<MediaBytes> {
+	let path = path.as_ref();
+	let media_type = MediaType::from_path(path);
+	let bytes = fs_ext::read_async(path).await?;
+	Ok(MediaBytes::new(media_type, bytes))
+}
+
 /// Stream a file as byte chunks.
 ///
 /// On native with the `fs` feature, reads asynchronously in 64 KiB
@@ -483,5 +499,12 @@ mod test {
 		fs_ext::read_stream_string("nonexistent_file.txt")
 			.is_err()
 			.xpect_true();
+	}
+
+	#[test]
+	fn read_media() {
+		let mb = fs_ext::read_media(fs_ext::test_dir().join("mod.rs")).unwrap();
+		mb.media_type().xpect_eq(MediaType::Rust);
+		mb.bytes().len().xpect_greater_than(10);
 	}
 }

@@ -17,6 +17,7 @@ mod duration;
 mod exit_status;
 mod multimap;
 mod option;
+mod path;
 mod result_x;
 mod str;
 #[cfg(feature = "json")]
@@ -28,6 +29,7 @@ pub use duration::*;
 pub use exit_status::*;
 pub use multimap::*;
 pub use option::*;
+pub use path::*;
 pub use result_x::*;
 pub use str::*;
 #[cfg(feature = "json")]

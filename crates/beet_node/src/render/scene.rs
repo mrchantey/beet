@@ -16,25 +16,17 @@ impl NodeRenderer for SceneRenderer {
 			match accepts {
 				#[cfg(feature = "json")]
 				MediaType::Json => {
-					let bytes = SceneSaver::new(cx.world)
+					let media_bytes = SceneSaver::new(cx.world)
 						.with_entity_tree(cx.entity)
-						.save_json()?;
-					return RenderOutput::Media(MediaBytes::new(
-						MediaType::Json,
-						bytes,
-					))
-					.xok();
+						.save(MediaType::Json)?;
+					return RenderOutput::Media(media_bytes).xok();
 				}
 				#[cfg(feature = "postcard")]
 				MediaType::Postcard => {
-					let bytes = SceneSaver::new(cx.world)
+					let media_bytes = SceneSaver::new(cx.world)
 						.with_entity_tree(cx.entity)
-						.save_postcard()?;
-					return RenderOutput::Media(MediaBytes::new(
-						MediaType::Postcard,
-						bytes,
-					))
-					.xok();
+						.save(MediaType::Postcard)?;
+					return RenderOutput::Media(media_bytes).xok();
 				}
 				_ => {}
 			}

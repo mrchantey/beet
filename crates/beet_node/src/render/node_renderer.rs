@@ -127,7 +127,7 @@ impl From<BevyError> for RenderError {
 #[derive(Debug)]
 pub enum RenderOutput {
 	/// The render produced typed bytes, ie html, markdown, json.
-	Media(MediaBytes<'static>),
+	Media(MediaBytes),
 	/// The renderer is stateful (ie a persistent UI) and completed
 	/// its render pass, which may or may not have changed the display.
 	Stateful,
@@ -137,11 +137,11 @@ impl RenderOutput {
 	/// Convenience constructor for a [`RenderOutput::Media`] with the given
 	/// media type and UTF-8 string content.
 	pub fn media_string(media_type: MediaType, content: String) -> Self {
-		Self::Media(MediaBytes::new_owned_str(media_type, content))
+		Self::Media(MediaBytes::new_string(media_type, content))
 	}
 
 	/// Returns the inner [`MediaBytes`] if this is a [`RenderOutput::Media`].
-	pub fn media_bytes(&self) -> Option<&MediaBytes<'static>> {
+	pub fn media_bytes(&self) -> Option<&MediaBytes> {
 		match self {
 			Self::Media(mb) => Some(mb),
 			Self::Stateful => None,

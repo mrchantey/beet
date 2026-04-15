@@ -9,12 +9,12 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, EntityEvent)]
 pub struct RenderMedia {
 	entity: Entity,
-	media_bytes: MediaBytes<'static>,
+	media_bytes: MediaBytes,
 }
 
 impl RenderMedia {
 	/// Create a new render media event for the given entity and media bytes.
-	pub fn new(entity: Entity, media_bytes: MediaBytes<'static>) -> Self {
+	pub fn new(entity: Entity, media_bytes: MediaBytes) -> Self {
 		Self {
 			entity,
 			media_bytes,
@@ -23,7 +23,7 @@ impl RenderMedia {
 }
 
 impl core::ops::Deref for RenderMedia {
-	type Target = MediaBytes<'static>;
+	type Target = MediaBytes;
 	fn deref(&self) -> &Self::Target { &self.media_bytes }
 }
 

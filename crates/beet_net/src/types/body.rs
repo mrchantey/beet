@@ -170,15 +170,6 @@ impl Body {
 		MediaType::Json.deserialize(&bytes)
 	}
 
-	/// Consumes the body and deserializes the content as postcard.
-	#[cfg(feature = "postcard")]
-	pub async fn into_postcard<T: serde::de::DeserializeOwned>(
-		self,
-	) -> Result<T> {
-		let bytes = self.into_bytes().await?;
-		MediaType::Postcard.deserialize(&bytes)
-	}
-
 	/// Creates a body by serializing `value` as JSON.
 	#[cfg(feature = "json")]
 	pub fn from_json<T: serde::Serialize>(value: &T) -> Result<Self> {
@@ -187,12 +178,10 @@ impl Body {
 			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
 	}
 
-	/// Creates a body by serializing `value` as postcard.
-	#[cfg(feature = "postcard")]
-	pub fn from_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
-		MediaType::Postcard
-			.serialize(value)
-			.map(|bytes| Body::Bytes(Bytes::from(bytes)))
+	/// Creates a body from [`MediaBytes`], using the raw bytes.
+	pub fn from_media(bytes: MediaBytes) -> Self {
+		let (_media_type, bytes) = bytes.take();
+		Body::Bytes(Bytes::from(bytes))
 	}
 
 	/// Consumes the body and deserializes using the given [`MediaType`].

@@ -1148,7 +1148,7 @@ mod test {
 	fn render_markdown(md: &str, width: u16, height: u16) -> String {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown(md);
+		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -1178,7 +1178,7 @@ mod test {
 	fn markdown_bold_is_styled() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown("**bold**");
+		let bytes = MediaBytes::new_markdown("**bold**");
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

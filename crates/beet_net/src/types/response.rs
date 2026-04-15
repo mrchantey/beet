@@ -159,16 +159,6 @@ impl Response {
 			.xok()
 	}
 
-	/// Creates an OK response with a postcard-serialized body and `content-type` header.
-	#[cfg(feature = "postcard")]
-	pub fn with_postcard<T: serde::Serialize>(value: &T) -> Result<Self> {
-		let body = Body::from_postcard(value)?;
-		Self::ok()
-			.with_body(body)
-			.with_content_type(MediaType::Postcard)
-			.xok()
-	}
-
 	/// Creates an OK response with a raw JSON string body and `content-type` header.
 	///
 	/// ```
@@ -183,14 +173,6 @@ impl Response {
 		Self::ok()
 			.with_body(json.as_ref())
 			.with_content_type(MediaType::Json)
-	}
-
-	/// Creates an OK response with raw postcard bytes and `content-type` header.
-	#[cfg(feature = "postcard")]
-	pub fn with_postcard_bytes(bytes: impl AsRef<[u8]>) -> Self {
-		Self::ok()
-			.with_body(Bytes::copy_from_slice(bytes.as_ref()))
-			.with_content_type(MediaType::Postcard)
 	}
 
 	/// Deserializes the response body using the format indicated by
@@ -306,7 +288,7 @@ impl Response {
 	/// Consumes the response body and returns it as [`MediaBytes`],
 	/// using the [`header::ContentType`], or defaulting to [`MediaType::Bytes`].
 	/// Note, the bytes may be empty.
-	pub async fn into_media_bytes(self) -> Result<MediaBytes<'static>> {
+	pub async fn into_media_bytes(self) -> Result<MediaBytes> {
 		let media_type = self
 			.parts
 			.headers
@@ -378,7 +360,7 @@ impl Response {
 	}
 
 	/// Sets the body and content type based on the given media bytes.
-	pub fn with_media(self, bytes: MediaBytes<'static>) -> Self {
+	pub fn with_media(self, bytes: MediaBytes) -> Self {
 		let (media_type, bytes) = bytes.take();
 		self.with_content_type(media_type).with_body(bytes)
 	}
@@ -626,19 +608,11 @@ mod test {
 			.xpect_eq(r#"{"foo":42}"#);
 	}
 
-	#[cfg(feature = "postcard")]
+	#[cfg(feature = "json")]
 	#[test]
-	fn response_with_postcard() {
-		use serde::Deserialize;
-		use serde::Serialize;
-
-		#[derive(Debug, PartialEq, Serialize, Deserialize)]
-		struct Payload {
-			val: u32,
-		}
-
-		let payload = Payload { val: 99 };
-		let response = Response::with_postcard(&payload).unwrap();
+	fn response_with_media() {
+		let mb = MediaBytes::serialize(MediaType::Json, &42u32).unwrap();
+		let response = Response::ok().with_media(mb);
 		response.status().xpect_eq(StatusCode::OK);
 		response
 			.parts
@@ -646,28 +620,7 @@ mod test {
 			.get::<header::ContentType>()
 			.unwrap()
 			.unwrap()
-			.xpect_eq(MediaType::Postcard);
-
-		let body_bytes = response.body.try_into_bytes().unwrap();
-		let roundtrip: Payload = postcard::from_bytes(&body_bytes).unwrap();
-		roundtrip.xpect_eq(payload);
-	}
-
-	#[cfg(feature = "postcard")]
-	#[test]
-	fn response_with_postcard_bytes() {
-		let raw = vec![0x01, 0x02, 0x03];
-		let response = Response::with_postcard_bytes(&raw);
-		response
-			.parts
-			.headers
-			.get::<header::ContentType>()
-			.unwrap()
-			.unwrap()
-			.xpect_eq(MediaType::Postcard);
-
-		let body_bytes = response.body.try_into_bytes().unwrap();
-		body_bytes.to_vec().xpect_eq(raw);
+			.xpect_eq(MediaType::Json);
 	}
 
 	#[cfg(feature = "json")]
@@ -683,23 +636,6 @@ mod test {
 
 		let payload = Payload { foo: 30 };
 		let response = Response::with_json(&payload).unwrap();
-		let roundtrip: Payload = response.deserialize().await.unwrap();
-		roundtrip.xpect_eq(payload);
-	}
-
-	#[cfg(feature = "postcard")]
-	#[beet_core::test]
-	async fn response_deserialize_postcard() {
-		use serde::Deserialize;
-		use serde::Serialize;
-
-		#[derive(Debug, PartialEq, Serialize, Deserialize)]
-		struct Payload {
-			val: u32,
-		}
-
-		let payload = Payload { val: 77 };
-		let response = Response::with_postcard(&payload).unwrap();
 		let roundtrip: Payload = response.deserialize().await.unwrap();
 		roundtrip.xpect_eq(payload);
 	}

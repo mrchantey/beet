@@ -167,9 +167,7 @@ async fn FileSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
 		.get::<FileScene, _>(|fs| fs.path.into_abs())
 		.await?;
 
-	let media_type = MediaType::from_path(&abs_path);
-	let bytes = fs_ext::read_async(&abs_path).await?;
-	let bytes = MediaBytes::new(media_type, bytes);
+	let bytes = fs_ext::read_media_async(&abs_path).await?;
 	cx.caller
 		.with_then(move |mut entity_mut| {
 			MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))

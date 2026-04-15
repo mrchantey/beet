@@ -1,76 +1,67 @@
 use crate::prelude::*;
-use alloc::borrow::Cow;
 
-
-/// A chunk of bytes with an associated media type.
-///
-/// The inner bytes are stored as a [`Cow`], allowing zero-copy use of borrowed
-/// slices alongside owned allocations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MediaBytes<'a> {
+/// Owned bytes paired with a [`MediaType`].
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub struct MediaBytes {
 	/// The media type of these bytes.
 	media_type: MediaType,
 	/// The raw bytes of the media content.
-	bytes: Cow<'a, [u8]>,
+	bytes: Vec<u8>,
 }
 
-impl MediaBytes<'static> {
-	/// Create a new owned [`MediaBytes`] with the given media type and bytes.
-	pub fn take(self) -> (MediaType, Vec<u8>) {
-		(self.media_type, self.bytes.into_owned())
-	}
-}
-
-impl<'a> MediaBytes<'a> {
+impl MediaBytes {
 	/// Create a new [`MediaBytes`] with the given media type and bytes.
-	pub fn new(media_type: MediaType, bytes: impl Into<Cow<'a, [u8]>>) -> Self {
+	pub fn new(media_type: MediaType, bytes: impl Into<Vec<u8>>) -> Self {
 		Self {
 			media_type,
 			bytes: bytes.into(),
 		}
 	}
 
-	/// Create a [`MediaBytes`] from a UTF-8 string.
-	pub fn new_str(media_type: MediaType, content: &'a str) -> Self {
-		Self::new(media_type, content.as_bytes())
+	/// Create a [`MediaBytes`] from a UTF-8 string slice.
+	pub fn new_str(media_type: MediaType, content: &str) -> Self {
+		Self::new(media_type, content.as_bytes().to_vec())
 	}
 
-	/// Create an owned [`MediaBytes<'static>`] from a [`String`].
-	pub fn new_owned_str(
-		media_type: MediaType,
-		content: String,
-	) -> MediaBytes<'static> {
-		MediaBytes {
-			media_type,
-			bytes: Cow::Owned(content.into_bytes()),
-		}
+	/// Create a [`MediaBytes`] from an owned [`String`].
+	pub fn new_string(media_type: MediaType, content: String) -> Self {
+		Self::new(media_type, content.into_bytes())
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Html`].
-	pub fn html(html: &'a str) -> Self { Self::new_str(MediaType::Html, html) }
+	pub fn new_html(html: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Html, html.as_ref())
+	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Text`].
-	pub fn text(text: &'a str) -> Self { Self::new_str(MediaType::Text, text) }
+	pub fn new_text(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Text, text.as_ref())
+	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Bytes`].
-	pub fn octet(bytes: impl Into<Cow<'a, [u8]>>) -> Self {
+	pub fn new_octet(bytes: impl Into<Vec<u8>>) -> Self {
 		Self::new(MediaType::Bytes, bytes)
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Markdown`].
-	pub fn markdown(text: &'a str) -> Self {
-		Self::new_str(MediaType::Markdown, text)
+	pub fn new_markdown(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Markdown, text.as_ref())
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Json`].
-	pub fn json(text: &'a str) -> Self { Self::new_str(MediaType::Json, text) }
+	pub fn new_json(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Json, text.as_ref())
+	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Css`].
-	pub fn css(text: &'a str) -> Self { Self::new_str(MediaType::Css, text) }
+	pub fn new_css(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Css, text.as_ref())
+	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Javascript`].
-	pub fn javascript(text: &'a str) -> Self {
-		Self::new_str(MediaType::Javascript, text)
+	pub fn new_javascript(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Javascript, text.as_ref())
 	}
 
 	/// The media type of these bytes.
@@ -84,15 +75,10 @@ impl<'a> MediaBytes<'a> {
 		core::str::from_utf8(&self.bytes)?.xok()
 	}
 
-	/// Convert into an owned `MediaBytes<'static>`, cloning the bytes if needed.
-	pub fn into_owned(self) -> MediaBytes<'static> {
-		MediaBytes {
-			media_type: self.media_type,
-			bytes: Cow::Owned(self.bytes.into_owned()),
-		}
-	}
+	/// Consume and return the media type and bytes.
+	pub fn take(self) -> (MediaType, Vec<u8>) { (self.media_type, self.bytes) }
 
-	/// Serialize `value` using this media type's format, returning owned [`MediaBytes`].
+	/// Serialize `value` using the given media type's format, returning [`MediaBytes`].
 	///
 	/// ## Errors
 	///
@@ -102,12 +88,20 @@ impl<'a> MediaBytes<'a> {
 	pub fn serialize<T: serde::Serialize>(
 		media_type: MediaType,
 		value: &T,
-	) -> Result<MediaBytes<'static>> {
+	) -> Result<MediaBytes> {
 		let bytes = media_type.serialize(value)?;
-		Ok(MediaBytes {
-			media_type,
-			bytes: Cow::Owned(bytes),
-		})
+		MediaBytes::new(media_type, bytes).xok()
+	}
+
+	/// Serialize `value` with the given [`SerializeOptions`].
+	#[cfg(feature = "serde")]
+	pub fn serialize_with_options<T: serde::Serialize>(
+		media_type: MediaType,
+		value: &T,
+		options: SerializeOptions,
+	) -> Result<MediaBytes> {
+		let bytes = media_type.serialize_with_options(value, options)?;
+		MediaBytes::new(media_type, bytes).xok()
 	}
 
 	/// Deserialize bytes into `T` using this media type's format.
@@ -122,7 +116,7 @@ impl<'a> MediaBytes<'a> {
 	}
 }
 
-impl<'a> core::fmt::Display for MediaBytes<'a> {
+impl core::fmt::Display for MediaBytes {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match core::str::from_utf8(&self.bytes) {
 			Ok(text) => write!(f, "{text}"),
@@ -138,61 +132,55 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn new_borrowed() {
-		let data = b"hello";
-		let mb = MediaBytes::new(MediaType::Text, data.as_slice());
+	fn new_from_vec() {
+		let mb = MediaBytes::new(MediaType::Html, b"<p>hi</p>".to_vec());
+		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
+	}
+
+	#[test]
+	fn new_from_slice() {
+		let mb = MediaBytes::new(MediaType::Text, b"hello".as_slice());
 		mb.bytes().xpect_eq(b"hello".as_slice());
 		mb.media_type().xpect_eq(MediaType::Text);
 	}
 
 	#[test]
-	fn new_owned() {
-		let mb = MediaBytes::new(
-			MediaType::Html,
-			Vec::from(b"<p>hi</p>".as_slice()),
-		);
-		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
-	}
-
-	#[test]
-	fn from_str_ctor() {
+	fn new_str_ctor() {
 		let mb = MediaBytes::new_str(MediaType::Text, "hello");
 		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
 	#[test]
-	fn from_string_ctor() {
-		let mb = MediaBytes::new_owned_str(
-			MediaType::Html,
-			"<b>bold</b>".to_string(),
-		);
+	fn new_string_ctor() {
+		let mb =
+			MediaBytes::new_string(MediaType::Html, "<b>bold</b>".to_string());
 		mb.as_utf8().unwrap().xpect_eq("<b>bold</b>");
 	}
 
 	#[test]
-	fn html_helper() {
-		let mb = MediaBytes::html("<p>hi</p>");
+	fn new_html_helper() {
+		let mb = MediaBytes::new_html("<p>hi</p>");
 		mb.media_type().xpect_eq(MediaType::Html);
 		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
 	}
 
 	#[test]
-	fn text_helper() {
-		let mb = MediaBytes::text("hello");
+	fn new_text_helper() {
+		let mb = MediaBytes::new_text("hello");
 		mb.media_type().xpect_eq(MediaType::Text);
 		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
 	#[test]
-	fn octet_helper() {
-		let mb = MediaBytes::octet(vec![0xFF, 0xFE]);
+	fn new_octet_helper() {
+		let mb = MediaBytes::new_octet(vec![0xFF, 0xFE]);
 		mb.media_type().xpect_eq(MediaType::Bytes);
 		mb.bytes().xpect_eq(&[0xFF, 0xFE]);
 	}
 
 	#[test]
-	fn markdown_helper() {
-		let mb = MediaBytes::markdown("# Title");
+	fn new_markdown_helper() {
+		let mb = MediaBytes::new_markdown("# Title");
 		mb.media_type().xpect_eq(MediaType::Markdown);
 		mb.as_utf8().unwrap().xpect_eq("# Title");
 	}
@@ -204,11 +192,11 @@ mod test {
 	}
 
 	#[test]
-	fn into_owned() {
-		let data = b"data";
-		let borrowed = MediaBytes::new(MediaType::Bytes, data.as_slice());
-		let owned: MediaBytes<'static> = borrowed.into_owned();
-		owned.bytes().xpect_eq(b"data".as_slice());
+	fn take_returns_parts() {
+		let mb = MediaBytes::new_text("data");
+		let (media_type, bytes) = mb.take();
+		media_type.xpect_eq(MediaType::Text);
+		bytes.xpect_eq(b"data".to_vec());
 	}
 
 	#[test]
@@ -238,5 +226,12 @@ mod test {
 		let mb = MediaBytes::serialize(MediaType::Json, &input).unwrap();
 		let output: Point = mb.deserialize().unwrap();
 		output.xpect_eq(input);
+	}
+
+	#[test]
+	fn default_is_empty() {
+		let mb = MediaBytes::default();
+		mb.media_type().xpect_eq(MediaType::Bytes);
+		mb.bytes().xpect_eq(&[] as &[u8]);
 	}
 }

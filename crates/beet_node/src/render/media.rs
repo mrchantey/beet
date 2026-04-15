@@ -172,7 +172,10 @@ impl NodeRenderer for MediaRenderer {
 		// 1. first try each media type and see if we can do an exact match
 		for media_type in &candidates {
 			if let Some(output) = self.try_render_media_type(cx, media_type)? {
-				trace!("Rendered media type {media_type} for entity {}", cx.entity);
+				trace!(
+					"Rendered media type {media_type} for entity {}",
+					cx.entity
+				);
 				return Ok(output);
 			}
 		}
@@ -212,7 +215,7 @@ mod test {
 	fn render_html() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<div>hello</div>");
+		let bytes = MediaBytes::new_html("<div>hello</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -226,7 +229,7 @@ mod test {
 	fn render_plain_text() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<p>hello</p>");
+		let bytes = MediaBytes::new_html("<p>hello</p>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -240,7 +243,7 @@ mod test {
 	fn render_markdown() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::markdown("# Title");
+		let bytes = MediaBytes::new_markdown("# Title");
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -256,7 +259,7 @@ mod test {
 	fn fallback_text_type() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<p>hello</p>");
+		let bytes = MediaBytes::new_html("<p>hello</p>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -270,7 +273,7 @@ mod test {
 	fn accepts_priority() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<div>hi</div>");
+		let bytes = MediaBytes::new_html("<div>hi</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
@@ -289,7 +292,7 @@ mod test {
 	fn no_match_errors() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::html("<div>hi</div>");
+		let bytes = MediaBytes::new_html("<div>hi</div>");
 		HtmlParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();

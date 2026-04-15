@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 #[derive(Component)]
 pub struct ErasedAction {
-	inner: Action<(MediaBytes<'static>, Vec<MediaType>), MediaBytes<'static>>,
+	inner: Action<(MediaBytes, Vec<MediaType>), MediaBytes>,
 }
 
 impl ErasedAction {
@@ -13,24 +13,25 @@ impl ErasedAction {
 		Out: 'static + Send + Sync + Serialize,
 	{
 		Self {
-			inner: Action::<
-				(MediaBytes<'static>, Vec<MediaType>),
-				MediaBytes<'static>,
-			>::new_async(async |cx| -> Result<MediaBytes<'static>> {
-				let (input, accepts) = cx.input;
-				let input: In = input.deserialize()?;
-				let output: Out = cx.caller.call(input).await?;
-				let output = MediaType::serialize_accepts(&accepts, &output)?;
-				Ok(output)
-			}),
+			inner:
+				Action::<(MediaBytes, Vec<MediaType>), MediaBytes>::new_async(
+					async |cx| -> Result<MediaBytes> {
+						let (input, accepts) = cx.input;
+						let input: In = input.deserialize()?;
+						let output: Out = cx.caller.call(input).await?;
+						let output =
+							MediaType::serialize_accepts(&accepts, &output)?;
+						Ok(output)
+					},
+				),
 		}
 	}
 	pub async fn call(
 		&self,
 		entity: AsyncEntity,
-		input: MediaBytes<'static>,
+		input: MediaBytes,
 		accepts: Vec<MediaType>,
-	) -> Result<MediaBytes<'static>> {
+	) -> Result<MediaBytes> {
 		entity
 			.call_detached(self.inner.clone(), (input, accepts))
 			.await
