@@ -8,9 +8,16 @@ pub struct ThreadStdoutPlugin;
 impl Plugin for ThreadStdoutPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<StdinPost>()
+			.add_systems(PreStartup, clear_on_run)
 			.add_systems(PostUpdate, (post_added, post_changed).chain())
 			.init_resource::<StdoutActorFilter>();
 	}
+}
+
+fn clear_on_run() -> Result {
+	terminal_ext::clear()?;
+	println!("");
+	Ok(())
 }
 
 /// Filter to determine which actor messages

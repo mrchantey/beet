@@ -2,7 +2,7 @@
 //!
 //! ```sh
 //! cargo run --example persistent_chat --features=thread,bevy_scene
-//! cargo run --example persistent_chat --features=thread,bevy_scene -- --clear
+//! cargo run --example persistent_chat --features=thread,bevy_scene -- --new
 //! ```
 use beet::prelude::*;
 
@@ -38,16 +38,13 @@ fn setup(mut commands: Commands) {
 
 
 	let blob = bucket.blob(RelPath::new(SCENE_FILE));
-	let clear = CliArgs::parse_env().params.contains_key("clear");
-
-	// create some space for the output
-	println!("");
+	let new = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {
 		let store = world
 			.spawn_then((blob.clone(), SceneStore::default()))
 			.await;
-		if clear || !blob.exists().await? {
+		if new || !blob.exists().await? {
 			SceneStore::save_bundle(store.clone(), default_scene()).await?;
 		}
 		SceneStore::load(store).await?;

@@ -80,25 +80,30 @@ impl SceneStore {
 			.await
 	}
 
-	/// Temporarily spawn the given bundle to serialize it.
-	/// The bundle is spawned with a [`Disabled`]
+	/// Temporarily spawn the given bundle to serialize it
+	/// to the blob associated with this entity.
+	/// The spawn/despawn step is exclusive and synchronous,
+	/// ensuring no systems run.
+	/// ## Errors
+	/// Errors if the entity has no blob
 	pub async fn save_bundle(
 		store: AsyncEntity,
 		bundle: impl Bundle,
 	) -> Result {
-		let store_id = store.id();
-		let entity = store
+		let blob = store.get_cloned::<Blob>().await?;
+		let media_type = blob.media_type().unwrap_or(MediaType::Json);
+		let bytes = store
 			.world()
-			.spawn_then((
-				bundle,
-				SceneOf(store_id),
-				// stop CallOnSpawn with Disabled,
-				// this will not be serialized
-				Disabled,
-			))
-			.await;
-		SceneStore::save(store).await?;
-		entity.despawn().await;
+			.with_then(move |world| {
+				let entity = world.spawn(bundle).id();
+				let bytes = SceneSaver::new(world)
+					.with_entity_tree(entity)
+					.save(media_type);
+				world.entity_mut(entity).despawn();
+				bytes
+			})
+			.await?;
+		blob.insert(bytes).await?;
 		Ok(())
 	}
 }
