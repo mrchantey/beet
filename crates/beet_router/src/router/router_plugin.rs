@@ -29,8 +29,8 @@ impl Plugin for RouterPlugin {
 /// This is because, unlike OnAdd component hooks, observers run after the entire
 /// tree is spawned.
 ///
-/// Control-flow actions (ie [`Sequence`], [`Repeat`]) that have no [`PathPartial`]
-/// anywhere in their hierarchy are skipped — they are not HTTP routes.
+/// Only actions whose entity directly carries a [`PathPartial`] become routes.
+/// Descendants of a route entity (eg sequence steps) are skipped.
 pub fn insert_action_path_and_params(
 	ev: On<Insert, ActionMeta>,
 	ancestors: Query<&ChildOf>,
@@ -38,12 +38,9 @@ pub fn insert_action_path_and_params(
 	params: Query<&ParamsPartial>,
 	mut commands: Commands,
 ) -> Result {
-	// skip actions with no explicit path — control-flow actions like Sequence and
-	// RepeatTimes require a Action via #[require] but should not become routes
-	let has_path = ancestors
-		.iter_ancestors_inclusive(ev.entity)
-		.any(|entity| paths.contains(entity));
-	if !has_path {
+	// only entities that have their own PathPartial become routes;
+	// children of a route (eg sequence steps) have no PathPartial themselves
+	if !paths.contains(ev.entity) {
 		return Ok(());
 	}
 	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;

@@ -7,11 +7,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 
 
-// pub fn exchange_sequence(){
-
-// }
-
-
 /// Creates a synchronous [`Action<Request, Response>`] from a closure.
 ///
 /// ## Example
