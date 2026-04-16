@@ -6,6 +6,12 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 
+
+// pub fn exchange_sequence(){
+
+// }
+
+
 /// Creates a synchronous [`Action<Request, Response>`] from a closure.
 ///
 /// ## Example
@@ -20,7 +26,11 @@ use beet_action::prelude::*;
 /// ```
 pub fn exchange_handler<F>(func: F) -> Action<Request, Response>
 where
-	F: 'static + Send + Sync + Clone + FnOnce(ActionContext<Request>) -> Response,
+	F: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ FnOnce(ActionContext<Request>) -> Response,
 {
 	Action::new_pure(move |cx: ActionContext<Request>| Ok(func(cx)))
 }

@@ -51,6 +51,9 @@ unsafe extern "C" {
 	/// Get single environment variable by key, ie `Deno.env.get(key)`
 	#[wasm_bindgen]
 	pub fn env_var(key: &str) -> Option<String>;
+	/// Set an environment variable, ie `Deno.env.set(key, value)`
+	#[wasm_bindgen]
+	pub fn set_env(key: &str, value: &str);
 	/// Get all environment variables as entries 2D array, ie `Object.entries(Deno.env.toObject())`
 	#[wasm_bindgen]
 	pub fn env_all() -> js_sys::Array;
@@ -89,6 +92,9 @@ unsafe extern "C" {
 	/// Get a single environment variable (test variant).
 	#[wasm_bindgen(js_name = "test_env_var")]
 	pub fn env_var(key: &str) -> Option<String>;
+	/// Set an environment variable (test variant).
+	#[wasm_bindgen(js_name = "test_set_env")]
+	pub fn set_env(key: &str, value: &str);
 	/// Get all environment variables (test variant).
 	#[wasm_bindgen(js_name = "test_env_all")]
 	pub fn env_all() -> js_sys::Array;

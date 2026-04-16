@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_action::prelude::ActionContext;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
@@ -12,29 +13,25 @@ pub fn stack_cli() -> impl Bundle {
 	)
 }
 
+async fn project(cx: ActionContext) -> Result<terra::Project> {
+	cx.caller
+		.with_state::<StackQuery, _>(|entity, query| {
+			query.build_project(entity)
+		})
+		.await
+}
+
 /// Validate the stack
 #[action(route = "validate")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 async fn Validate(cx: ActionContext) -> Result<String> {
-	cx.caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.build_project(entity)
-		})
-		.await?
-		.validate()
-		.await
+	project(cx).await?.validate().await
 }
 /// Plan the stack
 #[action(route = "plan")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 async fn Plan(cx: ActionContext) -> Result<String> {
-	cx.caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.build_project(entity)
-		})
-		.await?
-		.plan()
-		.await
+	project(cx).await?.plan().await
 }

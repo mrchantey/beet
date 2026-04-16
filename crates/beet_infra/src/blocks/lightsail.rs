@@ -8,7 +8,7 @@ use serde_json::json;
 /// - Static IP with attachment
 /// - Configurable ports
 /// - Systemd service user data
-#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, SetWith, Serialize, Deserialize, Component)]
 #[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LightsailBlock {
 	/// The port the application server listens on.

@@ -348,7 +348,7 @@ pub fn is_auto_into_type(ty: &syn::Type) -> bool {
 	let Some(seg) = path.path.segments.last() else {
 		return false;
 	};
-	matches!(seg.ident.to_string().as_str(), "String" | "Cow")
+	matches!(seg.ident.to_string().as_str(), "String" | "Cow" | "SmolStr")
 }
 
 /// Returns `true` for primitive types that implement `Copy`:

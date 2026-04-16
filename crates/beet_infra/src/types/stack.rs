@@ -46,7 +46,7 @@ impl Stack {
 			prod_stage: "prod".into(),
 			params: default(),
 			reconfigure: false,
-			backend: S3Backend::default().into(),
+			backend: default(),
 		}
 	}
 	/// Create a stack with a local backend and a temporary directory for testing.

@@ -14,6 +14,18 @@ pub enum StackBackend {
 	S3(S3Backend),
 }
 
+impl Default for StackBackend {
+	fn default() -> Self {
+		cfg_if! {
+			if #[cfg(feature = "aws")] {
+				StackBackend::S3(S3Backend::default())
+			} else {
+				StackBackend::Local(LocalBackend::default())
+			}
+		}
+	}
+}
+
 impl From<LocalBackend> for StackBackend {
 	fn from(b: LocalBackend) -> Self { StackBackend::Local(b) }
 }

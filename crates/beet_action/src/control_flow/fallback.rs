@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
 #[derive(Debug, Component)]
-#[require(Action<Input, Outcome<Output, Input>> = Action::new_async(fallback_action::<Input, Output>))]
+#[require(FallbackAction<Input,Output>)]
 pub struct Fallback<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
@@ -60,36 +60,32 @@ where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// Set the excluded child errors.
-	pub fn with_exclude_errors(mut self, exclude_errors: ChildError) -> Self {
-		self.exclude_errors = exclude_errors;
-		self
-	}
-
-	/// Get the current excluded child errors.
-	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
-	/// Try children in order, returning the first pass or final fail.
-	///
-	/// Child error handling is controlled by [`Fallback::exclude_errors`].
-	///
-	/// ## Errors
-	///
-	/// Errors depending on [`ChildError`] exclusions when a child has:
-	/// - no [`ActionMeta`]
-	/// - incompatible [`ActionMeta`] signature
-	pub async fn run(
-		&self,
-		cx: ActionContext<Input>,
-	) -> Result<Outcome<Output, Input>>
-	where
-		Input: 'static + Send + Sync,
-		Output: 'static + Send + Sync,
-	{
-		let children = match cx
-			.caller
-			.get(|children: &Children| children.to_vec())
-			.await
-		{
+}
+/// Try children in order, returning the first pass or final fail.
+///
+/// Child error handling is controlled by [`Fallback::exclude_errors`].
+///
+/// ## Errors
+///
+/// Errors depending on [`ChildError`] exclusions when a child has:
+/// - no [`ActionMeta`]
+/// - incompatible [`ActionMeta`] signature
+#[action(default)]
+#[derive(Component)]
+pub async fn FallbackAction<Input, Output>(
+	cx: ActionContext<Input>,
+) -> Result<Outcome<Output, Input>>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	let exclude_errors = cx
+		.caller
+		.get_cloned::<ExcludeErrors>()
+		.await
+		.unwrap_or_default();
+	let children =
+		match cx.caller.get(|children: &Children| children.to_vec()).await {
 			Ok(children) => children,
 			Err(_) => {
 				// entity has no children, fail returning the input
@@ -97,65 +93,49 @@ where
 			}
 		};
 
-		let world = cx.world().clone();
-		let mut input = cx.input;
+	let world = cx.world().clone();
+	let mut input = cx.input;
 
-		for child in children {
-			let action_meta_result =
-				world.entity(child).get(|meta: &ActionMeta| *meta).await;
+	for child in children {
+		let action_meta_result =
+			world.entity(child).get(|meta: &ActionMeta| *meta).await;
 
-			let action_meta = match action_meta_result {
-				Ok(action_meta) => action_meta,
-				Err(child_error) => {
-					if self.exclude_errors.contains(ChildError::NO_ACTION) {
-						continue;
-					}
-					bevybail!(
-						"fallback child has no action: {child:?}, error: {child_error}"
-					);
-				}
-			};
-
-			if let Err(mismatch_error) =
-				action_meta.assert_match::<Input, Outcome<Output, Input>>()
-			{
-				if self.exclude_errors.contains(ChildError::ACTION_MISMATCH) {
+		let action_meta = match action_meta_result {
+			Ok(action_meta) => action_meta,
+			Err(child_error) => {
+				if exclude_errors.contains(ChildError::NO_ACTION) {
 					continue;
 				}
 				bevybail!(
-					"fallback child has incorrect action signature: {child:?}, error: {mismatch_error}"
+					"fallback child has no action: {child:?}, error: {child_error}"
 				);
 			}
+		};
 
-			match world
-				.entity(child)
-				.call::<Input, Outcome<Output, Input>>(input)
-				.await?
-			{
-				Outcome::Pass(output) => return Ok(Outcome::Pass(output)),
-				Outcome::Fail(next_input) => {
-					input = next_input;
-				}
+		if let Err(mismatch_error) =
+			action_meta.assert_match::<Input, Outcome<Output, Input>>()
+		{
+			if exclude_errors.contains(ChildError::ACTION_MISMATCH) {
+				continue;
 			}
+			bevybail!(
+				"fallback child has incorrect action signature: {child:?}, error: {mismatch_error}"
+			);
 		}
 
-		Ok(Outcome::Fail(input))
+		match world
+			.entity(child)
+			.call::<Input, Outcome<Output, Input>>(input)
+			.await?
+		{
+			Outcome::Pass(output) => return Ok(Outcome::Pass(output)),
+			Outcome::Fail(next_input) => {
+				input = next_input;
+			}
+		}
 	}
-}
 
-async fn fallback_action<Input, Output>(
-	cx: ActionContext<Input>,
-) -> Result<Outcome<Output, Input>>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	cx.caller
-		.get_cloned::<Fallback<Input, Output>>()
-		.await
-		.unwrap_or_default()
-		.run(cx)
-		.await
+	Ok(Outcome::Fail(input))
 }
 
 #[cfg(test)]
@@ -234,7 +214,8 @@ mod tests {
 	async fn exclude_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::new().with_exclude_errors(ChildError::NO_ACTION),
+				Fallback::new(),
+				ExcludeErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())
@@ -247,7 +228,8 @@ mod tests {
 	async fn exclude_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Fallback::new().with_exclude_errors(ChildError::ACTION_MISMATCH),
+				Fallback::new(),
+				ExcludeErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome>(())

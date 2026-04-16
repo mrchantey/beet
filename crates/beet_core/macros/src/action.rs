@@ -23,10 +23,11 @@ pub fn impl_action(
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 1. Parse attributes ──
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out", "route", "pure"])?;
+	attrs.assert_types(&[], &["result_out", "route", "pure", "default"])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
 	let has_route = attrs.contains_key("route");
+	let derive_default = attrs.contains_key("default");
 	let route_expr: Option<&syn::Expr> = attrs.get("route");
 
 	// ── 2. Extract function data ──
@@ -72,7 +73,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 5. Build struct definition ──
 	let action_expr = quote! { #action_factory(#action_fn_name #turbofish) };
 	let require_action = make_require_action(
-		action_expr, &in_type, &out_type, has_route, &beet_action,
+		action_expr,
+		&in_type,
+		&out_type,
+		has_route,
+		&beet_action,
 	);
 	let is_middleware = has_next_type(&in_type);
 	let struct_def = make_struct_def(
@@ -84,6 +89,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		route_expr,
 		is_middleware,
 	);
+	let default_impl = if derive_default {
+		make_default(fn_name, generics)
+	} else {
+		TokenStream::default()
+	};
 
 	// ── 6. Build handler function at module level ──
 	// The handler must live at module scope so that both `IntoAction`
@@ -114,6 +124,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	Ok(quote! {
 		#handler_fn
 		#struct_def
+		#default_impl
 		#into_action
 	})
 }
@@ -542,6 +553,31 @@ fn make_struct_def(
 	}
 }
 
+fn make_default(fn_name: &syn::Ident, generics: &syn::Generics) -> TokenStream {
+	let type_params: Vec<&syn::Ident> =
+		generics.type_params().map(|tp| &tp.ident).collect();
+	let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+	if type_params.is_empty() {
+		quote! {
+			impl Default for #fn_name {
+				fn default() -> Self {
+					Self
+				}
+			}
+		}
+	} else {
+		quote! {
+
+			impl #impl_generics Default for #fn_name #impl_generics #where_clause {
+				fn default() -> Self {
+					Self(Default::default())
+				}
+			}
+		}
+	}
+}
+
 
 // ---------------------------------------------------------------------------
 // Action-specific helpers
@@ -954,7 +990,8 @@ mod test {
 		assert!(result.contains("where T : Send + Sync"));
 		assert!(result.contains("impl < T >"));
 		assert!(
-			result.contains("IntoAction < my_action < T > > for my_action < T >")
+			result
+				.contains("IntoAction < my_action < T > > for my_action < T >")
 		);
 	}
 
@@ -970,7 +1007,8 @@ mod test {
 		assert!(result.contains("where T : Clone"));
 		assert!(result.contains("impl < T >"));
 		assert!(
-			result.contains("IntoAction < my_action < T > > for my_action < T >")
+			result
+				.contains("IntoAction < my_action < T > > for my_action < T >")
 		);
 		assert!(result.contains("Action :: new_pure"));
 	}
@@ -1243,7 +1281,9 @@ mod test {
 			{ val }
 		});
 		assert!(result.contains("# [require"));
-		assert!(result.contains("Action :: new_pure (my_action_action :: < T >"));
+		assert!(
+			result.contains("Action :: new_pure (my_action_action :: < T >")
+		);
 		assert!(result.contains("fn my_action_action < T >"));
 	}
 }

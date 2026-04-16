@@ -7,16 +7,13 @@ use beet_core::prelude::*;
 /// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
 /// with the final input if all compatible children pass.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Action<Input, Outcome<Input, Output>> = Action::new_async(sequence_action::<Input, Output>))]
+#[require(SequenceAction<Input,Output>)]
 #[reflect(Component, Default)]
 pub struct Sequence<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	/// [`ChildError`] variants to skip instead of propagating.
-	/// Defaults to [`ChildError::empty`] (no errors excluded).
-	exclude_errors: ChildError,
 	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
@@ -28,31 +25,9 @@ where
 {
 	fn default() -> Self {
 		Self {
-			exclude_errors: ChildError::empty(),
 			_marker: PhantomData,
 		}
 	}
-}
-
-impl<Input, Output> Sequence<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	/// Set which child errors to exclude.
-	pub fn with_exclude_errors(mut self, exclude_errors: ChildError) -> Self {
-		self.exclude_errors = exclude_errors;
-		self
-	}
-
-	/// Exclude [`ChildError::NO_ACTION`] so children without an action are skipped.
-	pub fn allow_no_action(mut self) -> Self {
-		self.exclude_errors |= ChildError::NO_ACTION;
-		self
-	}
-
-	/// Get the current excluded errors.
-	pub fn exclude_errors(&self) -> ChildError { self.exclude_errors }
 }
 
 impl Sequence {
@@ -70,7 +45,9 @@ impl Sequence {
 /// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-async fn sequence_action<Input, Output>(
+#[action(default)]
+#[derive(Component)]
+pub async fn SequenceAction<Input, Output>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
@@ -79,7 +56,7 @@ where
 {
 	let exclude_errors = cx
 		.caller
-		.get(|sequence: &Sequence<Input, Output>| sequence.exclude_errors())
+		.get_cloned::<ExcludeErrors>()
 		.await
 		.unwrap_or_default();
 
@@ -224,7 +201,8 @@ mod tests {
 	async fn exclude_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new().with_exclude_errors(ChildError::ACTION_MISMATCH),
+				Sequence::new(),
+				ExcludeErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())
@@ -237,7 +215,8 @@ mod tests {
 	async fn exclude_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new().with_exclude_errors(ChildError::NO_ACTION),
+				Sequence::new(),
+				ExcludeErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))
 			.call::<(), Outcome<(), ()>>(())

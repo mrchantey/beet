@@ -22,6 +22,6 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		Stack::new("lightsail-example"),
 		stack_cli(),
-		LightsailBlock::default(),
+		LightsailBlock::default().with_availability_zone("us-west-1a"),
 	));
 }

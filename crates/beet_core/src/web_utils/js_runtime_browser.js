@@ -38,14 +38,22 @@ globalThis.write_file = (path, content) => {
 };
 
 globalThis.env_args = () => {
+	console.warn(`env_args not available in browser`);
 	return [];
 };
 
 globalThis.env_var = (key) => {
+	console.warn(`env_var not available in browser: ${key}`);
+	return null;
+};
+
+globalThis.set_env = (key, value) => {
+	console.warn(`set_env not available in browser: ${key}`);
 	return null;
 };
 
 globalThis.env_all = () => {
+	console.warn(`env_all: ${key}`);
 	return [];
 };
 
@@ -59,4 +67,5 @@ globalThis.test_create_dir_all = globalThis.create_dir_all;
 globalThis.test_write_file = globalThis.write_file;
 globalThis.test_env_args = globalThis.env_args;
 globalThis.test_env_var = globalThis.env_var;
+globalThis.test_set_env = globalThis.set_env;
 globalThis.test_env_all = globalThis.env_all;

@@ -39,12 +39,15 @@ pub fn args() -> Vec<String> {
 /// threads or while other threads read environment variables is undefined behavior.
 #[allow(unused)]
 pub unsafe fn set_var(key: &str, value: &str) {
-	#[cfg(not(target_arch = "wasm32"))]
 	unsafe {
-		std::env::set_var(key, value);
+		cfg_if! {
+		if #[cfg(not(target_arch = "wasm32"))] {
+			std::env::set_var(key, value);
+		} else {
+			js_runtime::set_env(key, value);
+		}
+		}
 	}
-	#[cfg(target_arch = "wasm32")]
-	unimplemented!("set_var is not supported on wasm");
 }
 
 /// Try get the environment variable with the given key, returning

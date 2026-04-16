@@ -1,9 +1,6 @@
-use std::path::Path;
-
 use crate::prelude::*;
-#[cfg(target_arch = "wasm32")]
-use crate::web_utils::js_runtime;
 use extend::ext;
+use std::path::Path;
 
 /// Extension trait for [`Result`] providing additional conversion methods.
 #[ext]

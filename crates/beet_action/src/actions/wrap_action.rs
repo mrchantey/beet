@@ -218,7 +218,7 @@ mod test {
 
 	/// Inner action defined with `#[action]`, used as the wrapped target.
 	#[action(pure)]
-	#[derive(Debug, Default, Reflect)]
+	#[derive(Debug, Reflect)]
 	fn Doubler(val: i32) -> i32 { val * 2 }
 
 	impl InnerTestAction for Doubler {
