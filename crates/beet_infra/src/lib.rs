@@ -9,6 +9,7 @@
 //! - [`bindings`] for pre-generated bindings of commonly used providers
 pub mod bindings;
 mod types;
+mod actions;
 mod blocks;
 pub mod terra;
 
@@ -16,6 +17,8 @@ pub mod terra;
 pub mod bindings_generator;
 
 pub mod prelude {
+	#[allow(unused)]
+	pub use crate::actions::*;
 	pub use crate::bindings;
 	pub use crate::types::*;
 	#[allow(unused)]

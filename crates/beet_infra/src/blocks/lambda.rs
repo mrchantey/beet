@@ -102,7 +102,7 @@ impl Block for LambdaBlock {
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
-				source_code_hash: Some(default()),
+				source_code_hash: Some("${filebase64sha256(\"lambda.zip\")}".into()),
 				..default()
 			},
 		);

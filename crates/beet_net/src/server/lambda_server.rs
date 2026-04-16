@@ -20,6 +20,11 @@ pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
 
 	tracing::info!("🌱 listening for lambda requests");
 
+	// lambda_http uses Tokio internally, so we need a Tokio runtime context.
+	// The enter guard sets the Tokio reactor for I/O operations while
+	// beet's async-executor drives the future.
+	let _guard = async_ext::tokio().enter();
+
 	lambda_http::run(service_fn(move |lambda_req| {
 		let entity = entity.clone();
 		handle_request(entity, lambda_req)

@@ -24,7 +24,7 @@ pub struct LightsailBlock {
 impl Default for LightsailBlock {
 	fn default() -> Self {
 		Self {
-			server_port: 8080,
+			server_port: 8337,
 			availability_zone: "us-east-1a".into(),
 			blueprint_id: "amazon_linux_2023".into(),
 			bundle_id: "nano_3_0".into(),
@@ -124,6 +124,11 @@ impl Block for LightsailBlock {
 				value: json!(static_ip.field_ref("ip_address")),
 				description: Some("The static IP address".into()),
 				sensitive: None,
+			})?
+			.add_output("ssh_private_key", terra::Output {
+				value: json!(keypair.field_ref("private_key")),
+				description: Some("SSH private key for the instance".into()),
+				sensitive: Some(true),
 			})?;
 
 		Ok(())
@@ -134,6 +139,7 @@ impl LightsailBlock {
 	/// Generate a systemd-based user data script for the application.
 	fn build_user_data(&self, stack: &Stack) -> SmolStr {
 		let app_name = stack.app_name();
+		let server_port = self.server_port;
 		format!(
 			r#"#!/bin/bash
 set -euo pipefail
@@ -149,6 +155,8 @@ WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3
 Environment=RUST_LOG=info
+Environment=BEET_HOST=0.0.0.0
+Environment=BEET_PORT={server_port}
 [Install]
 WantedBy=multi-user.target
 EOF

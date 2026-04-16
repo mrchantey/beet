@@ -1184,6 +1184,7 @@ dependencies = [
  "beet_infra",
  "beet_net",
  "beet_router",
+ "bytes",
  "heck 0.4.1",
  "prettyplease",
  "proc-macro2",

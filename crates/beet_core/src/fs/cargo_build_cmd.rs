@@ -5,7 +5,9 @@ use std::process::Command;
 /// Verbatim clone of cargo build/run args
 #[derive(Debug, Clone, Component)]
 pub struct CargoBuildCmd {
-	/// The top level command to run: `build`, `run`, `test`, etc.
+	/// The program to run, defaults to `cargo`.
+	pub program: String,
+	/// The subcommand to run: `build`, `run`, `test`, `lambda build`, etc.
 	pub cmd: String,
 	/// Package with the target to run
 	pub package: Option<String>,
@@ -72,6 +74,7 @@ pub struct CargoBuildCmd {
 impl Default for CargoBuildCmd {
 	fn default() -> Self {
 		Self {
+			program: "cargo".to_string(),
 			cmd: "build".to_string(),
 			package: None,
 			bin: None,
@@ -122,6 +125,12 @@ impl CargoBuildCmd {
 		self
 	}
 
+	/// Sets the program to run.
+	pub fn program(mut self, program: impl Into<String>) -> Self {
+		self.program = program.into();
+		self
+	}
+
 	/// Enables release mode with optimizations.
 	pub fn release(mut self) -> Self {
 		self.release = true;
@@ -131,6 +140,12 @@ impl CargoBuildCmd {
 	/// Sets the package to build.
 	pub fn package(mut self, package: impl Into<String>) -> Self {
 		self.package = Some(package.into());
+		self
+	}
+
+	/// Sets the example target to build.
+	pub fn example(mut self, example: impl Into<String>) -> Self {
+		self.example = Some(example.into());
 		self
 	}
 
@@ -197,9 +212,16 @@ impl CargoBuildCmd {
 	///
 	/// Panics if no crate name provided and no package, bin or example is set.
 	pub fn exe_path(&self, pkg_name: Option<&str>) -> PathBuf {
+		// cargo lambda outputs to target/lambda/<name>/bootstrap
 		let target_dir = env_ext::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".to_string());
 		let mut path = PathBuf::from(target_dir);
+		if self.cmd.starts_with("lambda") {
+			path.push("lambda");
+			path.push(self.binary_name(pkg_name));
+			path.push("bootstrap");
+			return path;
+		}
 
 		if let Some(target) = &self.target {
 			path.push(target);
@@ -239,6 +261,7 @@ impl CargoBuildCmd {
 	/// excluding `cargo` itself.
 	pub fn get_args(&self) -> Vec<&str> {
 		let CargoBuildCmd {
+			program: _,
 			cmd,
 			package,
 			bin,
@@ -275,7 +298,10 @@ impl CargoBuildCmd {
 
 		// Collect args in a vector for printing
 		let mut args = Vec::new();
-		args.push(cmd.as_str());
+		// split cmd to support multi-word subcommands, ie `lambda build`
+		for part in cmd.split_whitespace() {
+			args.push(part);
+		}
 
 		if let Some(pkg) = package {
 			args.push("--package");
@@ -405,10 +431,10 @@ impl CargoBuildCmd {
 		let args = self.get_args();
 
 		// Print the command
-		debug!("Running: cargo {}", args.join(" "));
+		debug!("Running: {} {}", self.program, args.join(" "));
 
 		// Build and execute command
-		let mut command = Command::new("cargo");
+		let mut command = Command::new(&self.program);
 		command.args(&args);
 
 

@@ -42,6 +42,14 @@ impl Project {
 			return Ok(());
 		}
 		fs_ext::write_async(config_path, &bytes).await?;
+		// ensure lambda.zip exists for filebase64sha256 during validate/plan
+		let lambda_zip_path = dir.join("lambda.zip");
+		if !fs_ext::exists_async(&lambda_zip_path)
+			.await
+			.unwrap_or(false)
+		{
+			fs_ext::write_async(&lambda_zip_path, &[]).await?;
+		}
 		debug!("initializing tofu backend");
 		self.backend().ensure_exists().await?;
 		debug!("initializing tofu project");

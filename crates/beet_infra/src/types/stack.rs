@@ -110,6 +110,8 @@ pub struct StackQuery<'w, 's> {
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
 	children: Query<'w, 's, &'static Children>,
+	#[cfg(feature = "bindings_aws_common")]
+	artifacts_buckets: Query<'w, 's, Entity, With<ArtifactsBucket>>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -142,6 +144,20 @@ impl<'w, 's> StackQuery<'w, 's> {
 		let (_, stack, aws_stack) = self.stacks.get(entity)?;
 		let bucket = self.s3_buckets.get(entity)?;
 		bucket.provider(stack, aws_stack).xok()
+	}
+
+	/// Find the [`ArtifactsBucket`] descendant and create an [`ArtifactsClient`].
+	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
+	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
+		let (root, stack, aws_stack) = self.stacks.get(entity)?;
+		let artifacts_entity = self
+			.children
+			.iter_descendants_inclusive(root)
+			.find(|child| self.artifacts_buckets.get(*child).is_ok())
+			.ok_or_else(|| bevyhow!("no ArtifactsBucket found in descendants"))?;
+		let s3_block = self.s3_buckets.get(artifacts_entity)?;
+		let provider = s3_block.provider(stack, aws_stack);
+		ArtifactsClient::new(Bucket::new(provider)).xok()
 	}
 }
 

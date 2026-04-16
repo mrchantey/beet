@@ -1,8 +1,14 @@
-//! Lambda + API Gateway + Cloudflare DNS example using the typed provider API.
+//! Lambda + API Gateway example with full deploy lifecycle.
 //!
-//! Run with:
+//! Supports the full CLI: validate, plan, apply, deploy,
+//! rollback, rollforward, show, list, destroy.
+//!
 //! ```sh
-//!   cargo run --example lambda --features=lambda_block
+//! cargo run --example lambda --features=lambda_block -- validate
+//! cargo run --example lambda --features=lambda_block -- plan
+//! cargo run --example lambda --features=lambda_block -- deploy
+//! cargo run --example lambda --features=lambda_block -- show
+//! cargo run --example lambda --features=lambda_block -- destroy --force
 //! ```
 use beet::prelude::*;
 
@@ -18,26 +24,30 @@ async fn main() -> Result {
 	Ok(())
 }
 
-
 fn setup(mut commands: Commands) {
 	commands.spawn((
 		Stack::new("lambda-example").with_backend(LocalBackend::default()),
 		LambdaBlock::default(),
+		DeployAssets::new([
+			"examples/router/content",
+			"examples/assets/layouts",
+			"examples/assets/js",
+		]),
+		// cargo lambda handles cross-compilation for Lambda's AL2023 runtime
+		CargoBuildCmd::default()
+			.cmd("lambda build")
+			.release()
+			.example("router")
+			.feature("http_server")
+			.feature("lambda"),
 		stack_cli(),
+		// deploy: build, package as lambda.zip, apply infrastructure
 		OnSpawn::insert_child(route(
 			"deploy",
 			(exchange_sequence(), children![
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|cx: ActionContext<Request>| {
-						println!("in sequence!");
-						Pass(cx.input)
-					},
-				),
-				Action::<Request, Outcome<Request, Response>>::new_pure(
-					|_cx: ActionContext<Request>| {
-						Fail(Response::ok().with_body("Sequence complete!"))
-					}
-				)
+				CargoBuildAction,
+				PackageLambdaAction,
+				TofuApplyAction,
 			]),
 		)),
 	));

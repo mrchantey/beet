@@ -37,9 +37,23 @@ pub struct HttpServer {
 
 impl Default for HttpServer {
 	fn default() -> Self {
+		let port = env_ext::var("BEET_PORT")
+			.ok()
+			.and_then(|val| val.parse().ok())
+			.unwrap_or(DEFAULT_SERVER_PORT);
+		let host = env_ext::var("BEET_HOST")
+			.ok()
+			.map(|val| {
+				if val == "0.0.0.0" {
+					[0, 0, 0, 0]
+				} else {
+					[127, 0, 0, 1]
+				}
+			})
+			.unwrap_or([127, 0, 0, 1]);
 		Self {
-			port: Some(DEFAULT_SERVER_PORT),
-			host: [127, 0, 0, 1],
+			port: Some(port),
+			host,
 		}
 	}
 }

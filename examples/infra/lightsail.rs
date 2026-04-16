@@ -1,11 +1,18 @@
-//! Typed Lightsail infrastructure example.
+//! Lightsail instance example with full deploy lifecycle.
 //!
-//! Run with:
+//! Supports the full CLI: validate, plan, apply, deploy,
+//! rollback, rollforward, show, list, destroy.
+//!
 //! ```sh
-//!   cargo run --example lightsail --features=lightsail_block,bindings_aws_common,aws
+//! cargo run --example lightsail --features=lightsail_block -- validate
+//! cargo run --example lightsail --features=lightsail_block -- plan
+//! cargo run --example lightsail --features=lightsail_block -- apply
+//! cargo run --example lightsail --features=lightsail_block -- deploy
+//! cargo run --example lightsail --features=lightsail_block -- show
+//! cargo run --example lightsail --features=lightsail_block -- destroy --force
 //! ```
-
 use beet::prelude::*;
+
 #[beet::main]
 async fn main() -> Result {
 	App::new()
@@ -20,8 +27,23 @@ async fn main() -> Result {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		Stack::new("lightsail-example"),
+		Stack::new("lightsail-example").with_backend(LocalBackend::default()),
+		LightsailBlock::default(),
+		// cargo zigbuild for Lightsail: glibc-compatible Linux binary
+		CargoBuildCmd::default()
+			.cmd("zigbuild")
+			.release()
+			.example("router")
+			.target("x86_64-unknown-linux-gnu.2.34")
+			.feature("http_server"),
 		stack_cli(),
-		LightsailBlock::default().with_availability_zone("us-west-1a"),
+		// deploy: build, apply infra, SCP binary to instance, restart service
+		OnSpawn::insert_child(route(
+			"deploy",
+			(exchange_sequence(), children![
+				CargoBuildAction,
+				DeployLightsailAction,
+			]),
+		)),
 	));
 }
