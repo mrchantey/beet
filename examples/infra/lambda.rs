@@ -25,17 +25,20 @@ fn setup(mut commands: Commands) {
 		LambdaBlock::default(),
 		stack_cli(),
 		OnSpawn::insert_child(route(
-			"run",
-			(Sequence::<Request, Response>::default(), children![Foobar]),
+			"deploy",
+			(exchange_sequence(), children![
+				Action::<Request, Outcome<Request, Response>>::new_pure(
+					|cx: ActionContext<Request>| {
+						println!("in sequence!");
+						Pass(cx.input)
+					},
+				),
+				Action::<Request, Outcome<Request, Response>>::new_pure(
+					|_cx: ActionContext<Request>| {
+						Fail(Response::ok().with_body("Sequence complete!"))
+					}
+				)
+			]),
 		)),
 	));
-}
-
-
-#[action]
-#[derive(Component)]
-// #[reflect(Component)]
-async fn Foobar(_cx: ActionContext<Request>) -> Result<Outcome<Response>> {
-	println!("FOOBAR");
-	Pass(Response::ok()).xok()
 }

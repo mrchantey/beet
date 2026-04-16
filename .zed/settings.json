@@ -89,7 +89,7 @@
 	"file_scan_inclusions": ["agent/plan*.md"],
 	"file_scan_exclusions": [
 		"crates/beet-cli",
-		"crates/beet_build",
+		// "crates/beet_build",
 		"crates/beet_examples",
 
 		"crates/beet_flow",
