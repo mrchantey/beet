@@ -17,7 +17,8 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((Repeat::new(), children![(
 			Thread::default(),
-			Sequence::new().allow_no_action(),
+			Sequence::new(),
+			ExcludeErrors(ChildError::NO_ACTION),
 			children![
 				(Actor::system(), children![Post::spawn(
 					"Brainstorm and attempt to approve a new product that should absolutely not exist. keep responses under 50 words."

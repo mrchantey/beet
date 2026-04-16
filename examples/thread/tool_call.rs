@@ -20,7 +20,8 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((RepeatTimes::<()>::new(2), children![(
 			Thread::default(),
-			Sequence::new().allow_no_action(),
+			Sequence::new(),
+			ExcludeErrors(ChildError::NO_ACTION),
 			children![
 				(Actor::system(), children![Post::spawn(
 					r#"

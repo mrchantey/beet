@@ -61,10 +61,10 @@ fn scene() -> impl Bundle {
 		// including after scene reload
 		CallOnSpawn::<(), Outcome>::default(),
 		children![(
-			Sequence::new()
-				// the system actor is static and has no action,
-				// so the sequence will skip over it
-				.allow_no_action(),
+			Sequence::new(),
+			// the system actor is static and has no action,
+			// so the sequence will skip over it
+			ExcludeErrors(ChildError::NO_ACTION),
 			children![
 				(Actor::system(), children![Post::spawn(
 					r#"Ask a single brief, challenging question about the user's life choices. Followup with more brief questions based on the users' answers"#

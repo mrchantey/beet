@@ -6,7 +6,8 @@ pub fn routes() -> impl Bundle {
 	(Middleware::<LayoutTemplate, _, _>::default(), children![
 		route("", FileScene::new("examples/router/content/home.md")),
 		route("about", FileScene::new("examples/router/content/about.md")),
-		counter()
+		counter(),
+		sequence()
 	])
 }
 
@@ -34,6 +35,27 @@ fn counter() -> impl Bundle {
 		),
 	)
 }
+
+
+fn sequence() -> impl Bundle {
+	route(
+		"sequence",
+		(exchange_sequence(), children![
+			Action::<Request, Outcome<Request, Response>>::new_pure(
+				|cx: ActionContext<Request>| {
+					println!("in sequence!");
+					Pass(cx.input)
+				},
+			),
+			Action::<Request, Outcome<Request, Response>>::new_pure(
+				|_cx: ActionContext<Request>| {
+					Fail(Response::ok().with_body("Sequence complete!"))
+				}
+			)
+		]),
+	)
+}
+
 
 // ╔═══════════════════════════════════════════╗
 // ║   Layout Template Middleware              ║
