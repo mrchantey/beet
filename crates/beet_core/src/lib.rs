@@ -122,6 +122,9 @@ pub mod prelude {
 	pub use alloc::vec::Vec;
 	pub use core::hash::BuildHasher;
 	pub use core::marker::PhantomData;
+	/// Shorthand for `Ok(())`
+	pub const OK: Result<(), BevyError> = Ok(());
+	pub use std::ops::ControlFlow;
 
 	#[cfg(feature = "std")]
 	pub use crate::arena::*;

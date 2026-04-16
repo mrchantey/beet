@@ -25,20 +25,30 @@ impl Default for SceneStore {
 }
 
 impl SceneStore {
+	pub async fn load_or_create<B: Bundle>(
+		entity: AsyncEntity,
+		create: impl 'static + Send + Sync + AsyncFnOnce(AsyncEntity) -> Result<B>,
+	) -> Result<Vec<Entity>> {
+		if !entity.get_cloned::<Blob>().await?.exists().await? {
+			let bundle = create(entity.clone()).await?;
+			Self::save_bundle(entity, bundle).await?;
+		}
+		Self::load(entity).await
+	}
+
+
 	/// Loads the associated [`Blob`], adding to this entities [`SceneEntities`].
 	/// ## Errors
 	/// - Errors if this entity has no [`Blob`] or [`SceneStore`]
-	pub async fn load(entity: AsyncEntity) -> Result {
+	pub async fn load(entity: AsyncEntity) -> Result<Vec<Entity>> {
 		// store is required for writing
 		entity.get::<SceneStore, _>(|_| {}).await?;
 		let media = entity.get_cloned::<Blob>().await?.get_media().await?;
 		entity
-			.with_then(move |entity| -> Result {
-				SceneLoader::new_entity(entity).load(&media)?;
-				Ok(())
+			.with_then(move |entity| -> Result<_> {
+				SceneLoader::new_entity(entity).load(&media)
 			})
-			.await?;
-		Ok(())
+			.await
 	}
 	/// Writes all [`SceneEntities`] and their created descendents to the associated [`Blob`]
 	///
@@ -115,7 +125,10 @@ pub fn load_scenes_on_insert(
 ) {
 	for (entity, store) in query.iter() {
 		if store.load_on_spawn {
-			commands.entity(entity).queue_async(SceneStore::load);
+			commands.entity(entity).queue_async(async |entity| {
+				SceneStore::load(entity).await?;
+				Ok(())
+			});
 		}
 	}
 }

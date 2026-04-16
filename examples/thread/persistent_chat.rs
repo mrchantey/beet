@@ -38,21 +38,21 @@ fn setup(mut commands: Commands) {
 
 
 	let blob = bucket.blob(RelPath::new(SCENE_FILE));
-	let new = CliArgs::parse_env().params.contains_key("new");
+	let new_thread = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {
+		if new_thread {
+			blob.remove().await.ok();
+		}
 		let store = world
 			.spawn_then((blob.clone(), SceneStore::default()))
 			.await;
-		if new || !blob.exists().await? {
-			SceneStore::save_bundle(store.clone(), default_scene()).await?;
-		}
-		SceneStore::load(store).await?;
+		SceneStore::load_or_create(store, async |_| scene().xok()).await?;
 		Ok(())
 	});
 }
 
-fn default_scene() -> impl Bundle {
+fn scene() -> impl Bundle {
 	(
 		Thread::default(),
 		// adding a blob to a thread indicates it should be persisted

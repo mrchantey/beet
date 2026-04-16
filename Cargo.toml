@@ -439,6 +439,11 @@ path = "examples/thread/chat.rs"
 required-features = ["thread"]
 
 [[example]]
+name = "multi_agent"
+path = "examples/thread/multi_agent.rs"
+required-features = ["thread"]
+
+[[example]]
 name = "oneshot"
 path = "examples/thread/oneshot.rs"
 required-features = ["thread"]

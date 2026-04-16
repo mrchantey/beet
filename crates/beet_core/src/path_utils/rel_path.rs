@@ -74,7 +74,8 @@ impl RelPath {
 		})
 	}
 
-	/// Replaces the file extension with the given value.
+	/// Replaces the file extension with the given value,
+	/// ie `json`
 	pub fn with_extension(mut self, ext: &str) -> Self {
 		self.0.set_extension(ext);
 		self
