@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet_core::prelude::*;
 use std::path::PathBuf;
 
 /// A build step that runs a process and produces an artifact file.

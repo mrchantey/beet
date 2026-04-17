@@ -42,7 +42,7 @@ impl Block for LightsailBlock {
 		let keypair = terra::ResourceDef::new_secondary(
 			keypair_ident.clone(),
 			AwsLightsailKeyPairDetails {
-				name_prefix: Some(keypair_ident.primary_identifier().into()),
+				name_prefix: Some(keypair_ident.primary_identifier().clone()),
 				..default()
 			},
 		);
@@ -51,7 +51,7 @@ impl Block for LightsailBlock {
 		let static_ip = terra::ResourceDef::new_secondary(
 			ip_ident.clone(),
 			AwsLightsailStaticIpDetails {
-				name: ip_ident.primary_identifier().into(),
+				name: ip_ident.primary_identifier().clone(),
 				..default()
 			},
 		);
@@ -61,7 +61,7 @@ impl Block for LightsailBlock {
 			availability_zone: self.availability_zone.clone(),
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
-			name: instance_ident.primary_identifier().into(),
+			name: instance_ident.primary_identifier().clone(),
 			key_pair_name: Some(keypair.field_ref("name").into()),
 			user_data: Some(self.build_user_data(stack)),
 			tags: Some(

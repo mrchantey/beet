@@ -24,6 +24,7 @@ pub enum DnsProvider {
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
 	/// variables, and outputs. Also used as the artifact name.
+	/// Defaults to `main-lambda`
 	label: SmolStr,
 	/// Optional DNS provider configuration.
 	pub dns: Option<DnsProvider>,
@@ -34,7 +35,7 @@ pub struct LambdaBlock {
 impl Default for LambdaBlock {
 	fn default() -> Self {
 		Self {
-			label: Self::DEFAULT_LABEL.into(),
+			label: "main-lambda".into(),
 			dns: None,
 			region: None,
 		}
@@ -42,9 +43,6 @@ impl Default for LambdaBlock {
 }
 
 impl LambdaBlock {
-	/// The default label for a lambda block.
-	pub const DEFAULT_LABEL: &str = "main-lambda";
-
 	/// Build a prefixed label for terraform resources, variables, and outputs.
 	pub fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{}", self.label, suffix)
@@ -138,9 +136,9 @@ impl Block for LambdaBlock {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				region: Some(region.clone()),
 				s3_bucket: Some(var_s3_bucket.into()),
 				s3_key: Some(var_s3_key.into()),
+				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),

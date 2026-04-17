@@ -17,6 +17,9 @@ pub struct Stack {
 	/// A suffix to append to the state backend, defaults to `tofu.tfstate`,
 	/// making the final state key `app-name--stage--state-suffix`
 	state_suffix: SmolStr,
+	/// A suffix to append to the artifact bucket name, defaults to `artifacts`,
+	/// making the final bucket name `app-name--stage--artifacts`
+	artifact_bucket_suffix: SmolStr,
 	/// The opentofu directory for creating
 	/// and deploying infrastructure config.
 	work_directory: WsPathBuf,
@@ -47,6 +50,7 @@ impl Stack {
 			stage: "dev".into(),
 			prod_stage: "prod".into(),
 			params: default(),
+			artifact_bucket_suffix: "artifacts".into(),
 			reconfigure: false,
 			backend: default(),
 			aws_region: crate::bindings::aws::region::DEFAULT.into(),
@@ -86,13 +90,16 @@ impl Stack {
 	pub fn backend_path(&self) -> RelPath {
 		RelPath::new(
 			self.resource_ident(self.state_suffix.clone())
-				.primary_identifier(),
+				.primary_identifier()
+				.to_string(),
 		)
 	}
 
 	/// The S3 bucket name for artifacts storage.
 	pub fn artifact_bucket_name(&self) -> String {
-		self.resource_ident("artifacts").primary_identifier().to_string()
+		self.resource_ident(self.artifact_bucket_suffix.clone())
+			.primary_identifier()
+			.to_string()
 	}
 
 	/// Create an artifacts client for this stack's artifact bucket.

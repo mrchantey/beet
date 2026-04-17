@@ -81,6 +81,7 @@ fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
 
 #[cfg(feature = "lambda_block")]
 fn infra_scene() -> Result<impl Bundle> {
+	let lambda = LambdaBlock::default();
 	(
 		(
 			stack(),
@@ -92,11 +93,11 @@ fn infra_scene() -> Result<impl Bundle> {
 					"http_server,lambda,router,infra,aws".into(),
 				])
 				.into_lambda_build_artifact()
-				.with_label(LambdaBlock::DEFAULT_LABEL),
+				.with_label(lambda.label().clone()),
 			stack_cli(),
 		),
 		children![
-			LambdaBlock::default(),
+			lambda,
 			assets_bucket_block(),
 			route(
 				"deploy",
@@ -300,9 +301,8 @@ async fn LayoutTemplate(
 				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
 		})
 		.await;
-	let layout_bytes = bucket
-		.get(&"layouts/default-layout.html".into())
-		.await?;
+	let layout_bytes =
+		bucket.get(&"layouts/default-layout.html".into()).await?;
 	let layout_html = String::from_utf8(layout_bytes.to_vec())?;
 	let head_html = head_content(&bucket).await?;
 	let nav_html = nav_content();
@@ -396,9 +396,8 @@ fn parse_html_entity(
 
 /// Generates `<head>` content including the theme switcher script.
 async fn head_content(bucket: &Bucket) -> Result<String> {
-	let theme_bytes = bucket
-		.get(&"js/minimal-theme-switcher.js".into())
-		.await?;
+	let theme_bytes =
+		bucket.get(&"js/minimal-theme-switcher.js".into()).await?;
 	let theme_switcher = String::from_utf8(theme_bytes.to_vec())?;
 	Ok(format!(r#"<script>{theme_switcher}</script>"#))
 }

@@ -137,6 +137,12 @@ impl RelPath {
 impl From<String> for RelPath {
 	fn from(value: String) -> Self { Self::new(value) }
 }
+impl From<SmolStr> for RelPath {
+	fn from(value: SmolStr) -> Self { Self::new(value.to_string()) }
+}
+impl From<&SmolStr> for RelPath {
+	fn from(value: &SmolStr) -> Self { Self::new(value.to_string()) }
+}
 
 impl From<&str> for RelPath {
 	fn from(value: &str) -> Self { Self::new(value) }

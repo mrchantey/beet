@@ -53,7 +53,7 @@ pub struct Ident {
 	/// - bucket name
 	/// - lambda function name
 	/// - iam name
-	primary_identifier: String,
+	primary_identifier: SmolStr,
 	/// snake_case label for a resource, preferred for codegen and human readability
 	/// ie:
 	/// - terraform labels
@@ -74,7 +74,7 @@ impl Ident {
 		let label = vec![&app_name, &stage, &label_suffix]
 			.join("__")
 			.to_snake_case();
-		let primary_identifier = label.to_kebab_case();
+		let primary_identifier = label.to_kebab_case().into();
 		Self {
 			app_name,
 			stage,

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::*;
 use std::path::PathBuf;
 
 /// Information for executing a `cargo build` command
@@ -161,10 +162,8 @@ impl CargoBuild {
 		);
 		let full_cmd = format!("{cargo_cmd} && {zip_cmd}");
 		BuildArtifact::new(
-			ChildProcess::new("sh").with_args([
-				SmolStr::from("-c"),
-				SmolStr::from(full_cmd),
-			]),
+			ChildProcess::new("sh")
+				.with_args([SmolStr::from("-c"), SmolStr::from(full_cmd)]),
 			zip_path,
 		)
 	}
@@ -173,6 +172,7 @@ impl CargoBuild {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_core::prelude::*;
 
 	#[test]
 	fn exe_path_example_release() {

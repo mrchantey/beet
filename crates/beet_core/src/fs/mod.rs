@@ -17,17 +17,13 @@
 //! This module is only available on native platforms (not wasm).
 
 mod cargo_build_cmd;
-mod fs_watcher;
 mod child_process;
-mod cargo_build;
-mod build_artifact;
+mod fs_watcher;
 #[cfg(feature = "rand")]
 mod tempdir;
 
 pub use cargo_build_cmd::*;
-pub use fs_watcher::*;
 pub use child_process::*;
-pub use cargo_build::*;
-pub use build_artifact::*;
+pub use fs_watcher::*;
 #[cfg(feature = "rand")]
 pub use tempdir::*;
