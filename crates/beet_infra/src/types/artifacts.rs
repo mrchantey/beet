@@ -5,22 +5,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bytes::Bytes;
 
-/// Additional files and directories to bundle with deploy artifacts.
-/// Paths are relative to the workspace root and are included
-/// with their directory structure preserved.
-#[derive(Debug, Clone, Component)]
-pub struct DeployAssets {
-	pub paths: Vec<WsPathBuf>,
-}
-
-impl DeployAssets {
-	pub fn new(paths: impl IntoIterator<Item = impl Into<WsPathBuf>>) -> Self {
-		Self {
-			paths: paths.into_iter().map(Into::into).collect(),
-		}
-	}
-}
-
 /// Versioned artifact storage backed by an S3 bucket.
 /// Provisions the bucket via the required [`S3BucketBlock`].
 #[cfg(feature = "bindings_aws_common")]

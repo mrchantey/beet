@@ -28,11 +28,6 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		Stack::new("lambda-example").with_backend(LocalBackend::default()),
 		LambdaBlock::default(),
-		DeployAssets::new([
-			"examples/router/content",
-			"examples/assets/layouts",
-			"examples/assets/js",
-		]),
 		// cargo lambda handles cross-compilation for Lambda's AL2023 runtime
 		CargoBuildCmd::default()
 			.cmd("lambda build")

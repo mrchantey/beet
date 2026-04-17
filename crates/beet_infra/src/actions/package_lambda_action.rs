@@ -1,6 +1,5 @@
 //! Package step for Lambda deploy sequences.
-//! Creates `lambda.zip` containing the built binary as `bootstrap`
-//! plus any files specified by [`DeployAssets`].
+//! Creates `lambda.zip` containing the built binary as `bootstrap`.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -8,8 +7,7 @@ use beet_net::prelude::*;
 
 /// Packages the built binary into a `lambda.zip` for AWS Lambda deployment.
 /// Reads [`CargoBuildCmd`] from an ancestor to find the binary path,
-/// [`Stack`] to determine the tofu working directory,
-/// and optionally [`DeployAssets`] to include additional files.
+/// [`Stack`] to determine the tofu working directory
 #[action]
 #[derive(Default, Component)]
 pub async fn PackageLambdaAction(
@@ -28,17 +26,11 @@ pub async fn PackageLambdaAction(
 	let work_dir = cx
 		.caller
 		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).map(|stack| stack.work_directory().into_abs())
+			query
+				.get(entity)
+				.map(|stack| stack.work_directory().into_abs())
 		})
 		.await?;
-
-	// optionally find DeployAssets on ancestor
-	let deploy_assets = cx
-		.caller
-		.with_state::<AncestorQuery<&DeployAssets>, _>(|entity, query| {
-			query.get(entity).ok().cloned()
-		})
-		.await;
 
 	let zip_path = work_dir.join("lambda.zip");
 	info!("packaging {} -> {}", exe_path.display(), zip_path.display());
@@ -73,23 +65,6 @@ pub async fn PackageLambdaAction(
 		.run_async()
 		.await
 		.map_err(|err| bevyhow!("failed to create lambda.zip: {err}"))?;
-
-	// add deploy assets preserving directory structure relative to workspace root
-	if let Some(assets) = deploy_assets {
-		let ws_root = AbsPathBuf::new(fs_ext::workspace_root())?;
-		for ws_path in &assets.paths {
-			let rel_str = ws_path.to_string();
-			info!("bundling asset: {rel_str}");
-			ChildProcess::new("zip")
-				.with_args(&["-r", &zip_str, &rel_str])
-				.with_cwd(&ws_root)
-				.run_async()
-				.await
-				.map_err(|err| {
-					bevyhow!("failed to add {rel_str} to lambda.zip: {err}")
-				})?;
-		}
-	}
 
 	// clean up
 	fs_ext::remove_async(&bootstrap_path).await?;

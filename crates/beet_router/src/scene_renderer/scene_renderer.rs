@@ -148,26 +148,31 @@ async fn CallerScene(cx: ActionContext<Request>) -> Result<SceneEntity> {
 
 
 #[derive(Component, Reflect)]
-#[require(DocumentScope, FileSceneAction)]
-pub struct FileScene {
-	path: WsPathBuf,
+#[require(DocumentScope, BlobSceneAction)]
+pub struct BlobScene {
+	path: RelPath,
 }
-impl FileScene {
-	pub fn new(path: impl Into<WsPathBuf>) -> Self {
-		Self { path: path.into() }
-	}
+impl BlobScene {
+	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
 }
 
 
 #[action(route)]
 #[derive(Default, Component)]
-async fn FileSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
-	let abs_path = cx
+async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
+	let bucket = cx
 		.caller
-		.get::<FileScene, _>(|fs| fs.path.into_abs())
-		.await?;
+		.with_state::<AncestorQuery<&Bucket>, Bucket>(|entity, query| {
+			query
+				.get(entity)
+				.cloned()
+				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
+		})
+		.await;
 
-	let bytes = fs_ext::read_media_async(&abs_path).await?;
+	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
+	let bytes = bucket.get_media(&path).await?;
+
 	cx.caller
 		.with_then(move |mut entity_mut| {
 			MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))

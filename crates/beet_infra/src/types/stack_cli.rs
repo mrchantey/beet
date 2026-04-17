@@ -12,9 +12,9 @@ pub fn stack_cli() -> impl Bundle {
 		OnSpawn::insert_child(Apply),
 		OnSpawn::insert_child(Show),
 		OnSpawn::insert_child(List),
-		OnSpawn::insert_child((Destroy, ParamsPartial::new::<DestroyParams>())),
+		OnSpawn::insert_child(Destroy),
 		#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
-		OnSpawn::insert_child((Rollback, ParamsPartial::new::<RollbackParams>())),
+		OnSpawn::insert_child(Rollback),
 		#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 		OnSpawn::insert_child(Rollforward),
 	)
@@ -74,6 +74,7 @@ struct DestroyParams {
 /// Destroy infrastructure, with optional `--force` flag.
 #[action(route = "destroy")]
 #[derive(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<DestroyParams>())]
 async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
 	let force = cx.has_param("force");
 	let proj = project(&cx.caller).await?;
@@ -107,6 +108,7 @@ struct RollbackParams {
 #[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 #[action(route = "rollback")]
 #[derive(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
 async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 	let count = cx
 		.get_param("count")

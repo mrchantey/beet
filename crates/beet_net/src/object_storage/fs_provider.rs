@@ -7,10 +7,17 @@ use bytes::Bytes;
 ///
 /// Stores objects as files on the local filesystem, with the configured
 /// path representing the full bucket directory.
+///
+/// ## Default
+/// The default bucket is relative to the workspace root.
 #[derive(Debug, Clone, Reflect)]
 pub struct FsBucket {
 	/// The full path to the bucket directory.
 	path: AbsPathBuf,
+}
+
+impl Default for FsBucket {
+	fn default() -> Self { Self::new(WsPathBuf::default()) }
 }
 
 impl FsBucket {
