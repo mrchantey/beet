@@ -14,7 +14,10 @@ pub struct S3BucketBlock {
 	label: SmolStr,
 	#[deref]
 	details: AwsS3BucketDetails,
+	/// add a tofu output for the bucket name
 	output: bool,
+	/// apply the stack default region if none set
+	apply_region: bool,
 }
 
 
@@ -26,6 +29,7 @@ impl S3BucketBlock {
 				force_destroy: Some(true),
 				..default()
 			},
+			apply_region: true,
 			output: true,
 		}
 	}
@@ -37,20 +41,13 @@ impl S3BucketBlock {
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
 	#[cfg(feature = "aws")]
-	pub fn provider(
-		&self,
-		stack: &Stack,
-		aws_stack: Option<&AwsStack>,
-	) -> beet_net::prelude::S3Bucket {
-		let default_region = aws_stack
-			.map_or(AwsStack::DEFAULT_REGION, |stack| stack.default_region());
-		let region =
-			self.region.as_ref().map_or(default_region, |region| region);
+	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Bucket {
+		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());
 
 		beet_net::prelude::S3Bucket::new(
 			bucket_name.primary_identifier(),
-			region,
+			region.clone(),
 		)
 	}
 }
@@ -70,9 +67,13 @@ impl Block for S3BucketBlock {
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
+		let mut details = self.details.clone();
+		if self.apply_region && details.region.is_none() {
+			details.region = Some(stack.aws_region().clone());
+		}
 		let bucket = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
-			self.details.clone(),
+			details,
 		);
 		config.add_resource(&bucket)?;
 		if self.output {

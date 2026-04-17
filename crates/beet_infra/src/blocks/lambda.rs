@@ -28,8 +28,6 @@ pub struct LambdaBlock {
 	pub region: Option<SmolStr>,
 }
 
-
-
 impl Default for LambdaBlock {
 	fn default() -> Self {
 		Self {
@@ -45,25 +43,7 @@ impl Block for LambdaBlock {
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = self.region();
-
-		// S3 Buckets
-		let html_bucket = ResourceDef::new_primary(
-			stack.resource_ident("html"),
-			AwsS3BucketDetails {
-				force_destroy: Some(true),
-				region: Some(region.into()),
-				..default()
-			},
-		);
-		let assets_bucket = ResourceDef::new_primary(
-			stack.resource_ident("assets"),
-			AwsS3BucketDetails {
-				force_destroy: Some(true),
-				region: Some(region.into()),
-				..default()
-			},
-		);
+		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
 
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
@@ -104,7 +84,9 @@ impl Block for LambdaBlock {
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
-				source_code_hash: Some("${filebase64sha256(\"lambda.zip\")}".into()),
+				source_code_hash: Some(
+					"${filebase64sha256(\"lambda.zip\")}".into(),
+				),
 				..default()
 			},
 		);
@@ -188,8 +170,6 @@ impl Block for LambdaBlock {
 
 		// Core resources
 		config
-			.add_resource(&html_bucket)?
-			.add_resource(&assets_bucket)?
 			.add_resource(&lambda_role)?
 			.add_resource(&lambda_policy)?
 			.add_resource(&lambda_function)?
@@ -250,20 +230,9 @@ impl Block for LambdaBlock {
 				value: json!(lambda_url.field_ref("function_url")),
 				description: Some("The Lambda function URL".into()),
 				sensitive: None,
-			})?
-			.add_output("assets_bucket", terra::Output {
-				value: json!(assets_bucket.field_ref("bucket")),
-				description: Some("The S3 assets bucket name".into()),
-				sensitive: None,
 			})?;
 
 		Ok(())
-	}
-}
-
-impl LambdaBlock {
-	fn region(&self) -> &str {
-		self.region.as_deref().unwrap_or(aws::region::DEFAULT)
 	}
 }
 

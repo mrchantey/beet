@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::terra::Project;
 use beet_core::prelude::*;
-#[cfg(feature = "aws")]
 use beet_net::prelude::*;
 
 #[derive(Debug, Clone, Get, SetWith, Component)]
@@ -10,9 +9,6 @@ pub struct Stack {
 	app_name: SmolStr,
 	/// The deployment stage, defaults to `dev`
 	stage: SmolStr,
-	/// Additional parameters, some of which
-	/// may be required by a config generator
-	params: MultiMap<SmolStr, SmolStr>,
 	/// Name of the production stage, which often receives
 	/// special treatment like bucket locking and no subdomain.
 	prod_stage: SmolStr,
@@ -26,6 +22,12 @@ pub struct Stack {
 	work_directory: WsPathBuf,
 	#[set_with(into)]
 	backend: StackBackend,
+
+	/// The default aws region to use
+	aws_region: SmolStr,
+	/// Additional parameters, some of which
+	/// may be required by a config generator
+	params: MultiMap<SmolStr, SmolStr>,
 }
 
 impl Default for Stack {
@@ -47,6 +49,7 @@ impl Stack {
 			params: default(),
 			reconfigure: false,
 			backend: default(),
+			aws_region: crate::bindings::aws::region::DEFAULT.into(),
 		}
 	}
 	/// Create a stack with a local backend and a temporary directory for testing.
@@ -93,7 +96,6 @@ impl Stack {
 		terra::Config::default().with_backend(self.backend().to_json(&key))
 	}
 
-	#[cfg(feature = "aws")]
 	pub fn state_file(&self) -> Blob {
 		self.backend.provider().erased_blob(self.backend_path())
 	}
@@ -102,14 +104,11 @@ impl Stack {
 
 #[derive(SystemParam)]
 pub struct StackQuery<'w, 's> {
-	stacks: AncestorQuery<
-		'w,
-		's,
-		(Entity, &'static Stack, Option<&'static AwsStack>),
-	>,
+	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
-	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
 	children: Query<'w, 's, &'static Children>,
+	#[cfg(feature = "bindings_aws_common")]
+	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
 	#[cfg(feature = "bindings_aws_common")]
 	artifacts_buckets: Query<'w, 's, Entity, With<ArtifactsBucket>>,
 }
@@ -120,10 +119,9 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Sets the AWS provider region from the nearest [`AwsStack`] ancestor,
 	/// ensuring the tofu config and Rust SDK use the same region.
 	pub fn build_project(&self, entity: Entity) -> Result<terra::Project> {
-		let (root, stack, aws_stack) = self.stacks.get(entity)?;
+		let (root, stack) = self.stacks.get(entity)?;
 		let mut config = stack.create_config();
-		let region =
-			aws_stack.map_or(AwsStack::DEFAULT_REGION, |s| s.default_region());
+		let region = stack.aws_region();
 		config.add_provider_config(
 			&terra::Provider::AWS,
 			&serde_json::json!({ "region": region }),
@@ -141,44 +139,24 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Get the provider from an [`S3Bucket`] on this entity
 	#[cfg(feature = "aws")]
 	pub fn s3_provider(&self, entity: Entity) -> Result<S3Bucket> {
-		let (_, stack, aws_stack) = self.stacks.get(entity)?;
+		let (_, stack) = self.stacks.get(entity)?;
 		let bucket = self.s3_buckets.get(entity)?;
-		bucket.provider(stack, aws_stack).xok()
+		bucket.provider(stack).xok()
 	}
 
 	/// Find the [`ArtifactsBucket`] descendant and create an [`ArtifactsClient`].
 	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
-		let (root, stack, aws_stack) = self.stacks.get(entity)?;
+		let (root, stack) = self.stacks.get(entity)?;
 		let artifacts_entity = self
 			.children
 			.iter_descendants_inclusive(root)
 			.find(|child| self.artifacts_buckets.get(*child).is_ok())
-			.ok_or_else(|| bevyhow!("no ArtifactsBucket found in descendants"))?;
+			.ok_or_else(|| {
+				bevyhow!("no ArtifactsBucket found in descendants")
+			})?;
 		let s3_block = self.s3_buckets.get(artifacts_entity)?;
-		let provider = s3_block.provider(stack, aws_stack);
+		let provider = s3_block.provider(stack);
 		ArtifactsClient::new(Bucket::new(provider)).xok()
-	}
-}
-
-/// Define the default region for all descendants of
-/// this entity.
-#[derive(Debug, Clone, Component, Get)]
-pub struct AwsStack {
-	default_region: SmolStr,
-}
-
-impl Default for AwsStack {
-	fn default() -> Self { Self::new(Self::DEFAULT_REGION) }
-}
-
-impl AwsStack {
-	/// The default region used when no ancestor [`AwsStack`] is present.
-	pub const DEFAULT_REGION: &'static str =
-		crate::bindings::aws::region::DEFAULT;
-	pub fn new(region: impl Into<SmolStr>) -> Self {
-		Self {
-			default_region: region.into(),
-		}
 	}
 }

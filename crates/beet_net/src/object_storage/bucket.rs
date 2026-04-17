@@ -503,6 +503,12 @@ fn on_add_typed_bucket<
 		.insert(Bucket::new(inner));
 }
 
+impl<B> From<B> for TypedBucket<B>
+where
+	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+{
+	fn from(bucket: B) -> Self { Self(bucket) }
+}
 
 /// Test utilities for bucket providers.
 #[cfg(test)]

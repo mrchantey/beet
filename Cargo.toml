@@ -359,7 +359,7 @@ beet_action = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["rng-getrandom"] }
 
 [dev-dependencies]
-beet = { path = ".", features = ["ansi_paint", "thread","_mini_browser"] }
+beet = { path = ".", features = ["ansi_paint", "thread", "_mini_browser"] }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
@@ -429,7 +429,7 @@ required-features = ["_mini_browser"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
-required-features = ["router"]
+required-features = ["router","infra"]
 
 # 💡 Examples - Thread
 
@@ -466,11 +466,6 @@ required-features = ["thread","bevy_scene"]
 name = "lifecycle"
 path = "examples/infra/lifecycle.rs"
 required-features = ["bindings_aws_common", "aws"]
-
-[[example]]
-name = "lambda"
-path = "examples/infra/lambda.rs"
-required-features = ["lambda_block", "fs", "rand"]
 
 [[example]]
 name = "lightsail"

@@ -41,10 +41,18 @@ impl StackBackend {
 		}
 	}
 
-	#[cfg(feature = "aws")]
 	pub fn provider(&self) -> Box<dyn BucketProvider> {
 		match self {
-			Self::S3(s3) => s3.provider().box_clone(),
+			#[allow(unused)]
+			Self::S3(s3) => {
+				cfg_if! {
+					if #[cfg(feature = "aws")] {
+						s3.provider().box_clone()
+					} else {
+						panic!("aws feature is required for S3 backend provider usage")
+					}
+				}
+			}
 			Self::Local(local) => local.provider().box_clone(),
 		}
 	}

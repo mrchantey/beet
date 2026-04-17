@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use aws_config::Region;
-
 use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_bucket::HeadBucketError;

@@ -57,7 +57,7 @@ fn main() -> AppExit {
 
 fn setup(mut commands: Commands) -> Result {
 	cfg_if! {
-		if #[cfg(feature="infra")]{
+		if #[cfg(feature="lambda_block")]{
 			// with infra flag we are deploying
 			commands.spawn(infra_scene()?);
 		}else{
@@ -68,12 +68,22 @@ fn setup(mut commands: Commands) -> Result {
 	Ok(())
 }
 
-
+/// The stack is used by both infra and router
+/// for resolving bucket names.
 #[allow(unused)]
+fn stack() -> Stack {
+	Stack::new("router-example").with_aws_region("us-west-2")
+}
+
+#[cfg(feature = "bindings_aws_common")]
+fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
+
+#[cfg(feature = "lambda_block")]
 fn infra_scene() -> Result<impl Bundle> {
 	((
-		Stack::new("lambda-example").with_backend(LocalBackend::default()),
+		stack(),
 		LambdaBlock::default(),
+		assets_bucket_block(),
 		// cargo lambda handles cross-compilation for Lambda's AL2023 runtime
 		CargoBuildCmd::default()
 			.cmd("lambda build")
@@ -95,11 +105,22 @@ fn infra_scene() -> Result<impl Bundle> {
 		.xok()
 }
 
+fn assets_bucket() -> impl BucketProvider {
+	cfg_if! {
+		if #[cfg(feature="lambda")]{
+			assets_bucket_block().provider(&stack())
+		}else{
+			FsBucket::new(WsPathBuf::new("examples/assets"))
+		}
+	}
+}
 
 
 #[allow(unused)]
 fn router_scene() -> Result<impl Bundle> {
 	(
+		// declare the bucket used by the blob scenes
+		Bucket::new(assets_bucket()),
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
 		server_from_cli()?,
@@ -147,13 +168,8 @@ fn server_from_cli() -> Result<OnSpawn> {
 	.xok()
 }
 
-
 fn routes() -> impl Bundle {
 	(
-		// declare the bucket used by the blob scenes
-		// We abstract away the filesystem for compatibility with cloud setups
-		// like lambda/s3
-		Bucket::new(FsBucket::new(WsPathBuf::new("examples/assets"))),
 		// SceneEntity middleware can intercept a scene route before render,
 		// useful for applying a layout
 		Middleware::<LayoutTemplate, _, _>::default(),
