@@ -82,19 +82,3 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	// 	},
 	// );
 }
-
-
-/// Adds infrastructure or router plugins depending on feature flags
-pub struct InfraRouterPlugin;
-
-impl Plugin for InfraRouterPlugin {
-	fn build(&self, app: &mut App) {
-		cfg_if! {
-			if #[cfg(feature="infra")]{
-				app.init_plugin::<InfraPlugin>();
-			}else{
-				app.init_plugin::<RouterAppPlugin>();
-			}
-		}
-	}
-}

@@ -49,7 +49,8 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			InfraRouterPlugin,
+			RouterAppPlugin,
+			InfraPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run()
