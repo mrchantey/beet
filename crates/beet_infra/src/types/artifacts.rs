@@ -25,12 +25,33 @@ impl Default for ArtifactLedger {
 
 impl ArtifactLedger {
 	/// Register an artifact in this ledger.
+	/// Returns an error if an artifact with this label already exists.
 	pub fn push_artifact(
 		&mut self,
-		name: impl Into<SmolStr>,
+		label: impl Into<SmolStr>,
 		entry: ArtifactEntry,
-	) {
-		self.artifacts.insert(name.into(), entry);
+	) -> Result<()> {
+		let label = label.into();
+		if self.artifacts.contains_key(&label) {
+			bevybail!("artifact with label '{}' already exists in ledger {}", label, self.uuid);
+		}
+		self.artifacts.insert(label, entry);
+		Ok(())
+	}
+
+	/// Build Terraform `-var` pairs from this ledger.
+	/// Each artifact label is used as a prefix for the
+	/// `s3_bucket`, `s3_key`, and `source_hash` variables,
+	/// matching the naming convention from [`LambdaBlock::build_label`].
+	pub fn build_vars(&self, bucket_name: &str) -> Vec<(SmolStr, SmolStr)> {
+		let bucket_name: SmolStr = bucket_name.into();
+		let mut vars = Vec::new();
+		for (label, entry) in &self.artifacts {
+			vars.push((format!("{label}--s3_bucket").into(), bucket_name.clone()));
+			vars.push((format!("{label}--s3_key").into(), entry.s3_key.clone()));
+			vars.push((format!("{label}--source_hash").into(), entry.source_hash.clone()));
+		}
+		vars
 	}
 }
 
@@ -111,15 +132,19 @@ impl ArtifactsClient {
 	}
 
 	/// List all deployed versions, sorted chronologically.
+	/// Only collects versioned ledger entries, excluding the current pointer.
 	pub async fn list_versions(&self) -> Result<Vec<Uuid>> {
 		let all_keys = self.bucket.list().await?;
 		let mut versions: Vec<Uuid> = all_keys
 			.iter()
 			.filter_map(|key| {
 				let key_str = key.to_string();
-				let rest = key_str.strip_prefix("versions/")?;
-				let uuid_str = rest.strip_suffix("/ledger.json")?;
-				Uuid::parse_str(uuid_str).ok()
+				// match exactly versions/{uuid}/ledger.json
+				let parts: Vec<&str> = key_str.splitn(3, '/').collect();
+				if parts.len() != 3 || parts[0] != "versions" || parts[2] != "ledger.json" {
+					return None;
+				}
+				Uuid::parse_str(parts[1]).ok()
 			})
 			.collect();
 		versions.sort();
@@ -197,7 +222,7 @@ mod tests {
 					s3_key: s3_key.into(),
 					source_hash: hash.into(),
 				},
-			);
+			).unwrap();
 		}
 		ledger
 	}

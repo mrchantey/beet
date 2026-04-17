@@ -66,15 +66,19 @@ impl CargoBuild {
 		path
 	}
 
-	/// Resolve the expected executable path for a cargo-lambda build.
-	pub fn lambda_exe_path(&self) -> PathBuf {
+	/// Resolve the lambda build output directory.
+	fn lambda_dir(&self) -> PathBuf {
 		let target_dir = env_ext::var("CARGO_TARGET_DIR")
 			.unwrap_or_else(|_| "target".to_string());
 		let mut path = PathBuf::from(target_dir);
 		path.push("lambda");
 		path.push(self.binary_name().as_str());
-		path.push("bootstrap");
 		path
+	}
+
+	/// Resolve the expected executable path for a cargo-lambda build.
+	pub fn lambda_exe_path(&self) -> PathBuf {
+		self.lambda_dir().join("bootstrap")
 	}
 
 	/// Build the cargo command arguments.
@@ -140,13 +144,28 @@ impl CargoBuild {
 	}
 
 	/// Convert into a lambda [`BuildArtifact`].
-	/// The artifact_path points to the lambda bootstrap binary.
+	/// Builds the lambda binary then zips it for S3 deployment,
+	/// as AWS Lambda requires ZIP packages.
 	pub fn into_lambda_build_artifact(self) -> BuildArtifact {
-		let artifact_path = self.lambda_exe_path();
+		let lambda_dir = self.lambda_dir();
+		let zip_path = lambda_dir.join("bootstrap.zip");
 		let args = self.lambda_args();
+		// build the full command: cargo lambda build ... && zip the result
+		let cargo_cmd = std::iter::once(SmolStr::from("cargo"))
+			.chain(args)
+			.collect::<Vec<SmolStr>>()
+			.join(" ");
+		let zip_cmd = format!(
+			"cd {} && zip -j bootstrap.zip bootstrap",
+			lambda_dir.display()
+		);
+		let full_cmd = format!("{cargo_cmd} && {zip_cmd}");
 		BuildArtifact::new(
-			ChildProcess::new("cargo").with_args(args),
-			artifact_path,
+			ChildProcess::new("sh").with_args([
+				SmolStr::from("-c"),
+				SmolStr::from(full_cmd),
+			]),
+			zip_path,
 		)
 	}
 }

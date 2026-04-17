@@ -13,9 +13,7 @@ pub fn stack_cli() -> impl Bundle {
 		OnSpawn::insert_child(Show),
 		OnSpawn::insert_child(List),
 		OnSpawn::insert_child(Destroy),
-		#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 		OnSpawn::insert_child(Rollback),
-		#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 		OnSpawn::insert_child(Rollforward),
 	)
 }
@@ -27,6 +25,35 @@ async fn project(caller: &AsyncEntity) -> Result<terra::Project> {
 			query.build_project(entity)
 		})
 		.await
+}
+
+/// Build an [`ArtifactsClient`] from the nearest ancestor [`Stack`].
+async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
+	caller
+		.with_state::<StackQuery, _>(|entity, query| {
+			query.artifacts_client(entity)
+		})
+		.await
+}
+
+/// Read the current ledger and stack, then apply with artifact vars.
+async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
+	let (proj, stack) = caller
+		.with_state::<(StackQuery, AncestorQuery<&Stack>), _>(
+			|entity, (stack_query, anc_stack)| -> Result<_> {
+				let project = stack_query.build_project(entity)?;
+				let stack = anc_stack.get(entity)?.clone();
+				(project, stack).xok()
+			},
+		)
+		.await?;
+	let client = stack.artifacts_client();
+	let ledger = client.current_ledger().await?.ok_or_else(|| {
+		bevyhow!("no current artifact ledger found")
+	})?;
+	let vars = ledger.build_vars(&stack.artifact_bucket_name());
+	info!("re-applying with {} artifact variables", vars.len());
+	proj.apply_with_vars(&vars).await
 }
 
 /// Validate the stack configuration.
@@ -71,7 +98,7 @@ struct DestroyParams {
 	force: bool,
 }
 
-/// Destroy infrastructure, with optional `--force` flag.
+/// Destroy infrastructure, with optional force flag.
 #[action(route = "destroy")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<DestroyParams>())]
@@ -87,16 +114,6 @@ async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
 	}
 }
 
-/// Build an [`ArtifactsClient`] from the nearest ancestor [`Stack`].
-#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
-async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
-	caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.artifacts_client(entity)
-		})
-		.await
-}
-
 /// Parameters for the rollback action.
 #[derive(Reflect)]
 struct RollbackParams {
@@ -104,8 +121,8 @@ struct RollbackParams {
 	count: Option<u32>,
 }
 
-/// Roll back to a previous artifact version, then re-apply infrastructure.
-#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
+/// Roll back to a previous artifact version, then re-apply infrastructure
+/// with the rolled-back artifact variables.
 #[action(route = "rollback")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
@@ -116,23 +133,23 @@ async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 		.unwrap_or(1);
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollback(count).await?;
-	// re-apply infrastructure with the rolled-back artifact
-	let proj = project(&cx.caller).await?;
-	proj.apply().await?;
-	format!("Rolled back to version {version}").xok()
+	info!("rolled back to version {version}");
+	// re-apply infrastructure with the rolled-back artifact vars
+	apply_with_current_ledger(&cx.caller).await?;
+	format!("Rolled back to version {version} and re-applied").xok()
 }
 
-/// Roll forward to the latest artifact version, then re-apply infrastructure.
-#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
+/// Roll forward to the latest artifact version, then re-apply infrastructure
+/// with the latest artifact variables.
 #[action(route = "rollforward")]
 #[derive(Component)]
 async fn Rollforward(cx: ActionContext) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollforward().await?;
-	// re-apply infrastructure with the latest artifact
-	let proj = project(&cx.caller).await?;
-	proj.apply().await?;
-	format!("Rolled forward to version {version}").xok()
+	info!("rolled forward to version {version}");
+	// re-apply infrastructure with the latest artifact vars
+	apply_with_current_ledger(&cx.caller).await?;
+	format!("Rolled forward to version {version} and re-applied").xok()
 }
 
 
@@ -162,19 +179,7 @@ mod tests {
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
 		tree.find(&["destroy"]).xpect_some();
-	}
-
-	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
-	#[test]
-	fn artifact_routes_discoverable() {
-		let mut world = cli_world();
-		let root = world
-			.spawn((
-				Stack::new("test-app").with_backend(LocalBackend::default()),
-				stack_cli(),
-			))
-			.flush();
-		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		// artifact routes
 		tree.find(&["rollback"]).xpect_some();
 		tree.find(&["rollforward"]).xpect_some();
 	}

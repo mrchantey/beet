@@ -15,7 +15,7 @@ pub async fn GenerateArtifactLedger(
 	info!("generated artifact ledger: {}", ledger.uuid);
 	// insert the ledger on the parent (deploy sequence root)
 	let parent = cx.caller.get_cloned::<ChildOf>().await?.get();
-	cx.caller.world().entity(parent).insert(ledger).await;
+	cx.caller.world().entity(parent).insert(ledger);
 
 	Pass(cx.input).xok()
 }

@@ -19,9 +19,12 @@ pub enum DnsProvider {
 /// - Serverless lambda function with API Gateway v2
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
-#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
 #[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LambdaBlock {
+	/// Label used as a prefix for all terraform resources,
+	/// variables, and outputs. Also used as the artifact name.
+	label: SmolStr,
 	/// Optional DNS provider configuration.
 	pub dns: Option<DnsProvider>,
 	/// AWS region for the buckets and lambda function.
@@ -31,9 +34,20 @@ pub struct LambdaBlock {
 impl Default for LambdaBlock {
 	fn default() -> Self {
 		Self {
+			label: Self::DEFAULT_LABEL.into(),
 			dns: None,
 			region: None,
 		}
+	}
+}
+
+impl LambdaBlock {
+	/// The default label for a lambda block.
+	pub const DEFAULT_LABEL: &str = "main-lambda";
+
+	/// Build a prefixed label for terraform resources, variables, and outputs.
+	pub fn build_label(&self, suffix: &str) -> String {
+		format!("{}--{}", self.label, suffix)
 	}
 }
 
@@ -46,25 +60,40 @@ impl Block for LambdaBlock {
 		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
 
 		// artifact variables for S3-based Lambda deployment
-		config.add_variable("lambda_s3_bucket", terra::Variable {
-			r#type: Some("string".into()),
-			default: Some(serde_json::Value::String(String::new())),
-			description: Some("S3 bucket containing the Lambda deployment package".into()),
-		})?;
-		config.add_variable("lambda_s3_key", terra::Variable {
+		config.add_variable(
+			self.build_label("s3_bucket"),
+			terra::Variable {
+				r#type: Some("string".into()),
+				default: Some(serde_json::Value::String(String::new())),
+				description: Some(
+					"S3 bucket containing the Lambda deployment package".into(),
+				),
+			},
+		)?;
+		config.add_variable(self.build_label("s3_key"), terra::Variable {
 			r#type: Some("string".into()),
 			default: Some(serde_json::Value::String(String::new())),
 			description: Some("S3 key of the Lambda deployment package".into()),
 		})?;
-		config.add_variable("lambda_source_hash", terra::Variable {
+		config
+			.add_variable(self.build_label("source_hash"), terra::Variable {
 			r#type: Some("string".into()),
 			default: Some(serde_json::Value::String(String::new())),
-			description: Some("Base64-encoded SHA256 hash of the Lambda deployment package".into()),
+			description: Some(
+				"Base64-encoded SHA256 hash of the Lambda deployment package"
+					.into(),
+			),
 		})?;
+
+		let var_s3_bucket =
+			format!("${{var.{}}}", self.build_label("s3_bucket"));
+		let var_s3_key = format!("${{var.{}}}", self.build_label("s3_key"));
+		let var_source_hash =
+			format!("${{var.{}}}", self.build_label("source_hash"));
 
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
-			stack.resource_ident("lambda_role"),
+			stack.resource_ident(self.build_label("lambda_role")),
 			AwsIamRoleDetails {
 				assume_role_policy: json!({
 					"Version": "2012-10-17",
@@ -82,7 +111,7 @@ impl Block for LambdaBlock {
 
 		// IAM Role Policy Attachment
 		let lambda_policy = ResourceDef::new_secondary(
-			stack.resource_ident("lambda_basic_policy"),
+			stack.resource_ident(self.build_label("lambda_basic_policy")),
 			AwsIamRolePolicyAttachmentDetails {
 				policy_arn: "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 					.into(),
@@ -91,28 +120,38 @@ impl Block for LambdaBlock {
 			},
 		);
 
+		// S3 Read Access for Lambda to read assets and artifacts
+		let s3_read_policy = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("s3_read_policy")),
+			AwsIamRolePolicyAttachmentDetails {
+				policy_arn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+					.into(),
+				role: lambda_role.field_ref("name").into(),
+				..default()
+			},
+		);
+
 		// Lambda Function
 		let lambda_function = ResourceDef::new_primary(
-			stack.resource_ident("router"),
+			stack.resource_ident(self.build_label("function")),
 			AwsLambdaFunctionDetails {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				s3_bucket: Some("${var.lambda_s3_bucket}".into()),
-				s3_key: Some("${var.lambda_s3_key}".into()),
+				region: Some(region.clone()),
+				s3_bucket: Some(var_s3_bucket.into()),
+				s3_key: Some(var_s3_key.into()),
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
-				source_code_hash: Some(
-					"${var.lambda_source_hash}".into(),
-				),
+				source_code_hash: Some(var_source_hash.into()),
 				..default()
 			},
 		);
 
 		// Lambda Function URL
 		let lambda_url = ResourceDef::new_secondary(
-			stack.resource_ident("router_url"),
+			stack.resource_ident(self.build_label("function_url")),
 			AwsLambdaFunctionUrlDetails {
 				authorization_type: "NONE".into(),
 				function_name: lambda_function
@@ -124,7 +163,7 @@ impl Block for LambdaBlock {
 
 		// API Gateway v2
 		let gateway = ResourceDef::new_primary(
-			stack.resource_ident("gateway"),
+			stack.resource_ident(self.build_label("gateway")),
 			AwsApigatewayv2ApiDetails {
 				protocol_type: "HTTP".into(),
 				..default()
@@ -132,7 +171,7 @@ impl Block for LambdaBlock {
 		);
 
 		let lambda_integration = ResourceDef::new_secondary(
-			stack.resource_ident("lambda_integration"),
+			stack.resource_ident(self.build_label("lambda_integration")),
 			AwsApigatewayv2IntegrationDetails {
 				api_id: gateway.field_ref("id").into(),
 				integration_type: "AWS_PROXY".into(),
@@ -145,7 +184,7 @@ impl Block for LambdaBlock {
 		);
 
 		let default_route = ResourceDef::new_secondary(
-			stack.resource_ident("default_route"),
+			stack.resource_ident(self.build_label("default_route")),
 			AwsApigatewayv2RouteDetails {
 				api_id: gateway.field_ref("id").into(),
 				route_key: "$default".into(),
@@ -161,7 +200,7 @@ impl Block for LambdaBlock {
 		);
 
 		let default_stage = ResourceDef::new_secondary(
-			stack.resource_ident("default_stage"),
+			stack.resource_ident(self.build_label("default_stage")),
 			AwsApigatewayv2StageDetails {
 				api_id: gateway.field_ref("id").into(),
 				name: "$default".into(),
@@ -172,7 +211,7 @@ impl Block for LambdaBlock {
 
 		// Lambda Permission for API Gateway
 		let apigw_permission = ResourceDef::new_secondary(
-			stack.resource_ident("apigw_lambda"),
+			stack.resource_ident(self.build_label("apigw_lambda")),
 			AwsLambdaPermissionDetails {
 				action: "lambda:InvokeFunction".into(),
 				function_name: lambda_function
@@ -191,6 +230,7 @@ impl Block for LambdaBlock {
 		config
 			.add_resource(&lambda_role)?
 			.add_resource(&lambda_policy)?
+			.add_resource(&s3_read_policy)?
 			.add_resource(&lambda_function)?
 			.add_resource(&lambda_url)?
 			.add_resource(&gateway)?
@@ -204,7 +244,7 @@ impl Block for LambdaBlock {
 			match dns {
 				DnsProvider::Cloudflare { authority } => {
 					let dns_def = ResourceDef::new_secondary(
-						stack.resource_ident("dns"),
+						stack.resource_ident(self.build_label("dns")),
 						CloudflareDnsRecordDetails {
 							name: authority.clone(),
 							ttl: 1,
@@ -221,7 +261,7 @@ impl Block for LambdaBlock {
 				}
 				DnsProvider::Route53 { authority, zone_id } => {
 					let dns_def = ResourceDef::new_secondary(
-						stack.resource_ident("dns"),
+						stack.resource_ident(self.build_label("dns")),
 						AwsRoute53RecordDetails {
 							name: authority.clone(),
 							r#type: "CNAME".into(),
@@ -240,12 +280,12 @@ impl Block for LambdaBlock {
 
 		// Outputs
 		config
-			.add_output("api_endpoint", terra::Output {
+			.add_output(self.build_label("api_endpoint"), terra::Output {
 				value: json!(gateway.field_ref("api_endpoint")),
 				description: Some("The API Gateway endpoint URL".into()),
 				sensitive: None,
 			})?
-			.add_output("function_url", terra::Output {
+			.add_output(self.build_label("function_url"), terra::Output {
 				value: json!(lambda_url.field_ref("function_url")),
 				description: Some("The Lambda function URL".into()),
 				sensitive: None,

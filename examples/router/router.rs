@@ -89,9 +89,10 @@ fn infra_scene() -> Result<impl Bundle> {
 				.with_example("router")
 				.with_additional_args(vec![
 					"--features".into(),
-					"http_server,lambda,router,infra".into(),
+					"http_server,lambda,router,infra,aws".into(),
 				])
-				.into_lambda_build_artifact(),
+				.into_lambda_build_artifact()
+				.with_label(LambdaBlock::DEFAULT_LABEL),
 			stack_cli(),
 		),
 		children![
@@ -99,11 +100,12 @@ fn infra_scene() -> Result<impl Bundle> {
 			assets_bucket_block(),
 			route(
 				"deploy",
-				// deploy: generate ledger, build artifact, apply infrastructure
+				// deploy: generate ledger, build, apply, then sync assets
 				(exchange_sequence(), children![
 					GenerateArtifactLedger,
 					BuildArtifactAction,
 					TofuApplyAction,
+					SyncAssetsAction,
 				]),
 			)
 		],
@@ -113,8 +115,12 @@ fn infra_scene() -> Result<impl Bundle> {
 
 fn assets_bucket() -> impl BucketProvider {
 	cfg_if! {
-		if #[cfg(feature="lambda")]{
-			assets_bucket_block().provider(&stack())
+		if #[cfg(feature="aws")]{
+			let stk = stack();
+			let bucket_name = stk.resource_ident("assets")
+				.primary_identifier()
+				.to_string();
+			S3Bucket::new(bucket_name, stk.aws_region().clone())
 		}else{
 			FsBucket::new(WsPathBuf::new("examples/assets"))
 		}
@@ -234,6 +240,31 @@ fn sequence() -> impl Bundle {
 }
 
 
+/// Sync local assets to the S3 assets bucket after infrastructure apply.
+#[cfg(feature = "lambda_block")]
+#[action]
+#[derive(Default, Component)]
+async fn SyncAssetsAction(
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let stk = cx
+		.caller
+		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
+			query.get(entity).cloned()
+		})
+		.await?;
+	let bucket_name = stk
+		.resource_ident("assets")
+		.primary_identifier()
+		.to_string();
+	let local_dir = AbsPathBuf::new_workspace_rel("examples/assets")?;
+	S3Sync::push(local_dir, format!("s3://{bucket_name}/"))
+		.send()
+		.await?;
+	info!("synced assets to s3://{bucket_name}/");
+	Pass(cx.input).xok()
+}
+
 // ╔═══════════════════════════════════════════╗
 // ║   Layout Template Middleware              ║
 // ╚═══════════════════════════════════════════╝
@@ -245,8 +276,8 @@ fn sequence() -> impl Bundle {
 /// and wires up named [`SlotContainer`] for head, nav, and main content.
 /// Non-scene middleware (ie `Request/Response`) is unaffected.
 ///
-/// Loads assets from disk on each request so templates can be edited
-/// without restarting the server.
+/// Loads assets from the nearest ancestor [`Bucket`] on each request,
+/// supporting both local filesystem and S3 backends.
 #[action]
 #[derive(Default, Clone, Component)]
 async fn LayoutTemplate(
@@ -260,10 +291,20 @@ async fn LayoutTemplate(
 	let content = next.call(parts).await?;
 	let content_id = content.entity;
 
-	// read layout and slot content from disk
-	let layout_html =
-		fs_ext::read_to_string("examples/assets/layouts/default-layout.html")?;
-	let head_html = head_content()?;
+	// read layout and slot content from the assets Bucket
+	let bucket = caller
+		.with_state::<AncestorQuery<&Bucket>, Bucket>(|entity, query| {
+			query
+				.get(entity)
+				.cloned()
+				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
+		})
+		.await;
+	let layout_bytes = bucket
+		.get(&"layouts/default-layout.html".into())
+		.await?;
+	let layout_html = String::from_utf8(layout_bytes.to_vec())?;
+	let head_html = head_content(&bucket).await?;
 	let nav_html = nav_content();
 
 	let caller_entity = caller.id();
@@ -354,9 +395,11 @@ fn parse_html_entity(
 }
 
 /// Generates `<head>` content including the theme switcher script.
-fn head_content() -> Result<String> {
-	let theme_switcher =
-		fs_ext::read_to_string("examples/assets/js/minimal-theme-switcher.js")?;
+async fn head_content(bucket: &Bucket) -> Result<String> {
+	let theme_bytes = bucket
+		.get(&"js/minimal-theme-switcher.js".into())
+		.await?;
+	let theme_switcher = String::from_utf8(theme_bytes.to_vec())?;
 	Ok(format!(r#"<script>{theme_switcher}</script>"#))
 }
 

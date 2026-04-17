@@ -291,7 +291,7 @@ tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
-lambda_block = ["infra", "beet_infra?/lambda_block", "fs", "rand"]
+lambda_block = ["infra", "aws", "beet_infra?/lambda_block", "fs", "rand"]
 lightsail_block = ["infra", "beet_infra?/lightsail_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]

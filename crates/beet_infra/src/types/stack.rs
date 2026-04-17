@@ -96,13 +96,18 @@ impl Stack {
 	}
 
 	/// Create an artifacts client for this stack's artifact bucket.
-	#[cfg(feature = "aws")]
 	pub fn artifacts_client(&self) -> ArtifactsClient {
-		let provider = beet_net::prelude::S3Bucket::new(
-			self.artifact_bucket_name(),
-			self.aws_region().clone(),
-		);
-		ArtifactsClient::new(Bucket::new(provider))
+		cfg_if! {
+			if #[cfg(feature = "aws")] {
+				let provider = beet_net::prelude::S3Bucket::new(
+					self.artifact_bucket_name(),
+					self.aws_region().clone(),
+				);
+				ArtifactsClient::new(Bucket::new(provider))
+			} else {
+				panic!("the `aws` feature is required for artifact operations")
+			}
+		}
 	}
 
 	/// Initialize a config with the corresponding backend.
@@ -150,7 +155,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 	}
 
 	/// Create an artifacts client for the stack at the given entity.
-	#[cfg(feature = "aws")]
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
 		let (_, stack) = self.stacks.get(entity)?;
 		stack.artifacts_client().xok()

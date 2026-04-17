@@ -40,15 +40,20 @@ impl S3BucketBlock {
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
-	#[cfg(feature = "aws")]
 	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Bucket {
-		let region = self.region.as_ref().unwrap_or(stack.aws_region());
-		let bucket_name = stack.resource_ident(self.label.clone());
-
-		beet_net::prelude::S3Bucket::new(
-			bucket_name.primary_identifier(),
-			region.clone(),
-		)
+		cfg_if! {
+			if #[cfg(feature = "aws")] {
+				let region = self.region.as_ref().unwrap_or(stack.aws_region());
+				let bucket_name = stack.resource_ident(self.label.clone());
+				beet_net::prelude::S3Bucket::new(
+					bucket_name.primary_identifier(),
+					region.clone(),
+				)
+			} else {
+				let _ = stack;
+				panic!("the `aws` feature is required for S3 bucket providers")
+			}
+		}
 	}
 }
 
