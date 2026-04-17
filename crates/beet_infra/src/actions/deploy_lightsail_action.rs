@@ -22,15 +22,15 @@ pub async fn DeployLightsailAction(
 		})
 		.await?;
 
-	// ensure init has been run so we can read outputs
+	// apply infrastructure to ensure resources are provisioned and outputs are available
 	project.apply().await?;
 
 	let dir = project.work_directory().into_abs();
 
 	// read the static IP from terraform output
 	let ip = ChildProcess::new("tofu")
-		.with_args(&["output", "-raw", "static_ip_address"])
-		.with_cwd(&dir)
+		.with_args(["output", "-raw", "static_ip_address"])
+		.with_cwd(dir.clone())
 		.run_async_stdout()
 		.await
 		.map_err(|err| bevyhow!("failed to read static_ip_address: {err}"))?;
@@ -38,8 +38,8 @@ pub async fn DeployLightsailAction(
 
 	// read the SSH private key from terraform output
 	let key_pem = ChildProcess::new("tofu")
-		.with_args(&["output", "-raw", "ssh_private_key"])
-		.with_cwd(&dir)
+		.with_args(["output", "-raw", "ssh_private_key"])
+		.with_cwd(dir.clone())
 		.run_async_stdout()
 		.await
 		.map_err(|err| bevyhow!("failed to read ssh_private_key: {err}"))?;
@@ -60,8 +60,8 @@ pub async fn DeployLightsailAction(
 	// find the built binary
 	let exe_path = cx
 		.caller
-		.with_state::<AncestorQuery<&CargoBuildCmd>, _>(|entity, query| {
-			query.get(entity).map(|cmd| cmd.exe_path(None))
+		.with_state::<AncestorQuery<&BuildArtifact>, _>(|entity, query| {
+			query.get(entity).map(|build| build.artifact_path().to_path_buf())
 		})
 		.await?;
 	let exe_str = exe_path.display().to_string();
@@ -83,9 +83,10 @@ pub async fn DeployLightsailAction(
 	let mut connected = false;
 	for attempt in 1..=10 {
 		info!("waiting for SSH (attempt {attempt}/10)...");
+		let remote_user = format!("ec2-user@{ip}");
 		let result = ChildProcess::new("ssh")
 			.with_args(
-				&[&ssh_opts[..], &[&format!("ec2-user@{ip}"), "echo", "ready"]]
+				[&ssh_opts[..], &[remote_user.as_str(), "echo", "ready"]]
 					.concat(),
 			)
 			.run_async()
@@ -103,7 +104,7 @@ pub async fn DeployLightsailAction(
 	// SCP the binary to /opt/{app_name}/app
 	let remote_path = format!("ec2-user@{ip}:/tmp/app_binary");
 	ChildProcess::new("scp")
-		.with_args(&[&ssh_opts[..], &[&exe_str, &remote_path]].concat())
+		.with_args([&ssh_opts[..], &[exe_str.as_str(), remote_path.as_str()]].concat())
 		.run_async()
 		.await
 		.map_err(|err| bevyhow!("SCP failed: {err}"))?;
@@ -114,9 +115,10 @@ pub async fn DeployLightsailAction(
 		 sudo chmod +x /opt/{app_name}/app && \
 		 sudo systemctl restart {app_name}.service"
 	);
+	let remote_user = format!("ec2-user@{ip}");
 	ChildProcess::new("ssh")
 		.with_args(
-			&[&ssh_opts[..], &[&format!("ec2-user@{ip}"), &install_cmd]]
+			[&ssh_opts[..], &[remote_user.as_str(), install_cmd.as_str()]]
 				.concat(),
 		)
 		.run_async()

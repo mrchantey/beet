@@ -1179,6 +1179,7 @@ name = "beet_infra"
 version = "0.0.9-dev.8"
 dependencies = [
  "async-process",
+ "base64 0.22.1",
  "beet_action",
  "beet_core",
  "beet_infra",
@@ -1191,6 +1192,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
+ "sha2",
  "syn",
  "thiserror 2.0.18",
 ]

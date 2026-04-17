@@ -13,7 +13,7 @@ repository.workspace = true
 default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-aws = ["beet_net/aws"]
+aws = ["beet_net/aws", "dep:sha2", "dep:base64"]
 lambda_block = ["cli", "aws", "bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
 lightsail_block = ["cli", "aws", "bindings_aws_lightsail"]
 bindings_aws_common = []
@@ -43,6 +43,8 @@ beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true
 heck.workspace = true
+sha2 = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
 
 thiserror = { workspace = true }
 proc-macro2 = { workspace = true, optional = true }

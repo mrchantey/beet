@@ -76,33 +76,38 @@ fn stack() -> Stack {
 	Stack::new("router-example").with_aws_region("us-west-2")
 }
 
-#[cfg(feature = "bindings_aws_common")]
+#[cfg(feature = "lambda_block")]
 fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
 
 #[cfg(feature = "lambda_block")]
 fn infra_scene() -> Result<impl Bundle> {
-	((
-		stack(),
-		LambdaBlock::default(),
-		assets_bucket_block(),
-		// cargo lambda handles cross-compilation for Lambda's AL2023 runtime
-		CargoBuildCmd::default()
-			.cmd("lambda build")
-			.release()
-			.example("router")
-			.feature("http_server")
-			.feature("lambda"),
-		stack_cli(),
-		// deploy: build, package as lambda.zip, apply infrastructure
-		OnSpawn::insert_child(route(
-			"deploy",
-			(exchange_sequence(), children![
-				CargoBuildAction,
-				PackageLambdaAction,
-				TofuApplyAction,
-			]),
-		)),
-	))
+	(
+		(
+			stack(),
+			CargoBuild::default()
+				.with_release(true)
+				.with_example("router")
+				.with_additional_args(vec![
+					"--features".into(),
+					"http_server,lambda,router,infra".into(),
+				])
+				.into_lambda_build_artifact(),
+			stack_cli(),
+		),
+		children![
+			LambdaBlock::default(),
+			assets_bucket_block(),
+			route(
+				"deploy",
+				// deploy: generate ledger, build artifact, apply infrastructure
+				(exchange_sequence(), children![
+					GenerateArtifactLedger,
+					BuildArtifactAction,
+					TofuApplyAction,
+				]),
+			)
+		],
+	)
 		.xok()
 }
 

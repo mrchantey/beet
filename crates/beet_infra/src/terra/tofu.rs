@@ -39,7 +39,7 @@ Please install and try again
 https://opentofu.org/docs/intro/install
 "#;
 
-fn tofu_process<'a>() -> ChildProcess<'a> {
+fn tofu_process() -> ChildProcess {
 	ChildProcess::new("tofu").with_not_found(NOT_FOUND)
 }
 
@@ -47,8 +47,8 @@ fn tofu_process<'a>() -> ChildProcess<'a> {
 /// Export the provider schema based on `./providers.tf.json`
 pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["providers", "schema", "-json"])
+		.with_cwd(dir.clone())
+		.with_args(["providers", "schema", "-json"])
 		.run_async_stdout()
 		.await
 }
@@ -63,8 +63,8 @@ pub async fn init(dir: &AbsPathBuf, force: bool) -> Result {
 	};
 
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&args)
+		.with_cwd(dir.clone())
+		.with_args(args)
 		.run_async()
 		.await?;
 	Ok(())
@@ -73,8 +73,8 @@ pub async fn init(dir: &AbsPathBuf, force: bool) -> Result {
 /// Validates the opentofu file, ie the `main.tf.json`
 pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["validate", "-json"])
+		.with_cwd(dir.clone())
+		.with_args(["validate", "-json"])
 		.run_async_stdout()
 		.await
 }
@@ -82,8 +82,8 @@ pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 /// Show execution plan
 pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["plan"])
+		.with_cwd(dir.clone())
+		.with_args(["plan"])
 		.run_async_stdout()
 		.await
 }
@@ -91,8 +91,25 @@ pub async fn plan(dir: &AbsPathBuf) -> Result<String> {
 /// Apply the execution plan
 pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["apply", "-auto-approve"])
+		.with_cwd(dir.clone())
+		.with_args(["apply", "-auto-approve"])
+		.run_async_stdout()
+		.await
+}
+
+/// Apply the execution plan with Terraform variables.
+pub async fn apply_with_vars(
+	dir: &AbsPathBuf,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["apply".into(), "-auto-approve".into()];
+	for (key, value) in vars {
+		args.push("-var".into());
+		args.push(format!("{key}={value}").into());
+	}
+	tofu_process()
+		.with_cwd(dir.clone())
+		.with_args(args)
 		.run_async_stdout()
 		.await
 }
@@ -100,8 +117,8 @@ pub async fn apply(dir: &AbsPathBuf) -> Result<String> {
 /// Show the current state
 pub async fn show(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["show"])
+		.with_cwd(dir.clone())
+		.with_args(["show"])
 		.run_async_stdout()
 		.await
 }
@@ -109,8 +126,8 @@ pub async fn show(dir: &AbsPathBuf) -> Result<String> {
 /// List all resources in the state
 pub async fn list(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["state", "list"])
+		.with_cwd(dir.clone())
+		.with_args(["state", "list"])
 		.run_async_stdout()
 		.await
 }
@@ -118,8 +135,8 @@ pub async fn list(dir: &AbsPathBuf) -> Result<String> {
 /// Remove a resource from the state
 pub async fn remove(dir: &AbsPathBuf, resource: &str) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["state", "rm", resource])
+		.with_cwd(dir.clone())
+		.with_args(["state", "rm", resource])
 		.run_async_stdout()
 		.await
 }
@@ -127,8 +144,8 @@ pub async fn remove(dir: &AbsPathBuf, resource: &str) -> Result<String> {
 /// Destroy infrastructure
 pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["destroy", "-auto-approve"])
+		.with_cwd(dir.clone())
+		.with_args(["destroy", "-auto-approve"])
 		.run_async_stdout()
 		.await
 }
@@ -138,8 +155,8 @@ pub async fn destroy(dir: &AbsPathBuf) -> Result<String> {
 /// no concurrent operation is active.
 pub async fn destroy_force(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
-		.with_cwd(dir)
-		.with_args(&["destroy", "-auto-approve", "-lock=false"])
+		.with_cwd(dir.clone())
+		.with_args(["destroy", "-auto-approve", "-lock=false"])
 		.run_async_stdout()
 		.await
 }

@@ -4,49 +4,59 @@ use std::process::Output;
 
 /// Helper for spawning processes with
 /// easy stdout collection
-#[derive(Debug, SetWith)]
-pub struct ChildProcess<'a> {
+#[derive(Debug, Clone, SetWith)]
+pub struct ChildProcess {
 	/// The command to run (e.g. "ls", "cargo")
-	command: &'a str,
+	command: SmolStr,
 	/// Arguments to pass to the command
-	args: &'a [&'a str],
+	#[set_with(skip)]
+	args: Vec<SmolStr>,
 	/// Optional working directory for the command. If `None`, uses the current directory.
 	#[set_with(unwrap_option)]
-	cwd: Option<&'a AbsPathBuf>,
+	cwd: Option<AbsPathBuf>,
 	/// Optional error message to use if the command is not found. If `None`, uses the default error.
 	#[set_with(unwrap_option)]
-	not_found: Option<&'a str>,
+	not_found: Option<SmolStr>,
 }
 
-impl std::fmt::Display for ChildProcess<'_> {
+impl std::fmt::Display for ChildProcess {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.command)?;
-		for arg in self.args {
+		for arg in &self.args {
 			write!(f, " {arg}")?;
 		}
 		Ok(())
 	}
 }
 
-impl<'a> ChildProcess<'a> {
+impl ChildProcess {
 	/// Creates a new process with the given command and optional arguments.
-	pub fn new(command: &'a str) -> Self {
+	pub fn new(command: impl Into<SmolStr>) -> Self {
 		Self {
-			command,
-			args: &[],
+			command: command.into(),
+			args: Vec::new(),
 			cwd: None,
 			not_found: None,
 		}
 	}
 
+	/// Sets the arguments to pass to the command.
+	pub fn with_args(
+		mut self,
+		args: impl IntoIterator<Item = impl Into<SmolStr>>,
+	) -> Self {
+		self.args = args.into_iter().map(Into::into).collect();
+		self
+	}
+
 	/// Run the command, collecting stdout
 	#[track_caller]
 	pub fn run(self) -> Result<Output> {
-		let mut cmd = std::process::Command::new(self.command);
-		if let Some(dir) = self.cwd {
+		let mut cmd = std::process::Command::new(self.command.as_str());
+		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}
-		cmd.args(self.args)
+		cmd.args(self.args.iter().map(SmolStr::as_str))
 			.output()
 			.xmap(|result| self.map_result(result))?
 			.xmap(|output| self.map_output(output))
@@ -60,11 +70,11 @@ impl<'a> ChildProcess<'a> {
 	}
 	/// Run the command asynchronously using `async_process`, collecting stdout.
 	pub async fn run_async(self) -> Result<Output> {
-		let mut cmd = async_process::Command::new(self.command);
-		if let Some(dir) = self.cwd {
+		let mut cmd = async_process::Command::new(self.command.as_str());
+		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}
-		cmd.args(self.args)
+		cmd.args(self.args.iter().map(SmolStr::as_str))
 			.output()
 			.await
 			.xmap(|result| self.map_result(result))?
@@ -84,7 +94,7 @@ impl<'a> ChildProcess<'a> {
 	) -> Result<Output> {
 		result.map_err(|e| {
 			if e.kind() == ErrorKind::NotFound
-				&& let Some(msg) = self.not_found
+				&& let Some(msg) = &self.not_found
 			{
 				bevyhow!("{msg}")
 			} else {
@@ -98,7 +108,9 @@ impl<'a> ChildProcess<'a> {
 			output.xok()
 		} else {
 			bevybail!(
-				"process failed: {}\nexited with non-zero status: {}\n{}",
+				"process failed: {}
+exited with non-zero status: {}
+{}",
 				self,
 				output.status,
 				String::from_utf8_lossy(&output.stderr)

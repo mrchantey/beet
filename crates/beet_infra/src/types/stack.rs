@@ -90,6 +90,21 @@ impl Stack {
 		)
 	}
 
+	/// The S3 bucket name for artifacts storage.
+	pub fn artifact_bucket_name(&self) -> String {
+		self.resource_ident("artifacts").primary_identifier().to_string()
+	}
+
+	/// Create an artifacts client for this stack's artifact bucket.
+	#[cfg(feature = "aws")]
+	pub fn artifacts_client(&self) -> ArtifactsClient {
+		let provider = beet_net::prelude::S3Bucket::new(
+			self.artifact_bucket_name(),
+			self.aws_region().clone(),
+		);
+		ArtifactsClient::new(Bucket::new(provider))
+	}
+
 	/// Initialize a config with the corresponding backend.
 	pub fn create_config(&self) -> terra::Config {
 		let key = self.backend_path().to_string();
@@ -109,8 +124,6 @@ pub struct StackQuery<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	#[cfg(feature = "bindings_aws_common")]
 	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
-	#[cfg(feature = "bindings_aws_common")]
-	artifacts_buckets: Query<'w, 's, Entity, With<ArtifactsBucket>>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -136,27 +149,18 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok(Project::new(&stack, config))
 	}
 
-	/// Get the provider from an [`S3Bucket`] on this entity
+	/// Create an artifacts client for the stack at the given entity.
 	#[cfg(feature = "aws")]
+	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
+		let (_, stack) = self.stacks.get(entity)?;
+		stack.artifacts_client().xok()
+	}
+
+	/// Get the provider from an [`S3Bucket`] on this entity
+	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
 	pub fn s3_provider(&self, entity: Entity) -> Result<S3Bucket> {
 		let (_, stack) = self.stacks.get(entity)?;
 		let bucket = self.s3_buckets.get(entity)?;
 		bucket.provider(stack).xok()
-	}
-
-	/// Find the [`ArtifactsBucket`] descendant and create an [`ArtifactsClient`].
-	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
-	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
-		let (root, stack) = self.stacks.get(entity)?;
-		let artifacts_entity = self
-			.children
-			.iter_descendants_inclusive(root)
-			.find(|child| self.artifacts_buckets.get(*child).is_ok())
-			.ok_or_else(|| {
-				bevyhow!("no ArtifactsBucket found in descendants")
-			})?;
-		let s3_block = self.s3_buckets.get(artifacts_entity)?;
-		let provider = s3_block.provider(stack);
-		ArtifactsClient::new(Bucket::new(provider)).xok()
 	}
 }

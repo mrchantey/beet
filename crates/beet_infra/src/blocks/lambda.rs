@@ -45,6 +45,23 @@ impl Block for LambdaBlock {
 	) -> Result {
 		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
 
+		// artifact variables for S3-based Lambda deployment
+		config.add_variable("lambda_s3_bucket", terra::Variable {
+			r#type: Some("string".into()),
+			default: Some(serde_json::Value::String(String::new())),
+			description: Some("S3 bucket containing the Lambda deployment package".into()),
+		})?;
+		config.add_variable("lambda_s3_key", terra::Variable {
+			r#type: Some("string".into()),
+			default: Some(serde_json::Value::String(String::new())),
+			description: Some("S3 key of the Lambda deployment package".into()),
+		})?;
+		config.add_variable("lambda_source_hash", terra::Variable {
+			r#type: Some("string".into()),
+			default: Some(serde_json::Value::String(String::new())),
+			description: Some("Base64-encoded SHA256 hash of the Lambda deployment package".into()),
+		})?;
+
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
 			stack.resource_ident("lambda_role"),
@@ -80,12 +97,14 @@ impl Block for LambdaBlock {
 			AwsLambdaFunctionDetails {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
-				filename: Some("lambda.zip".into()),
+				filename: None,
+				s3_bucket: Some("${var.lambda_s3_bucket}".into()),
+				s3_key: Some("${var.lambda_s3_key}".into()),
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
 				source_code_hash: Some(
-					"${filebase64sha256(\"lambda.zip\")}".into(),
+					"${var.lambda_source_hash}".into(),
 				),
 				..default()
 			},

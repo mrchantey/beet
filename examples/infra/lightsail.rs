@@ -29,19 +29,21 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		Stack::new("lightsail-example").with_backend(LocalBackend::default()),
 		LightsailBlock::default(),
-		// cargo zigbuild for Lightsail: glibc-compatible Linux binary
-		CargoBuildCmd::default()
-			.cmd("zigbuild")
-			.release()
-			.example("router")
-			.target("x86_64-unknown-linux-gnu.2.34")
-			.feature("http_server"),
+		// zigbuild for Lightsail: glibc-compatible Linux binary
+		BuildArtifact::new(
+			ChildProcess::new("cargo").with_args([
+				"zigbuild", "--release", "--example", "router",
+				"--target", "x86_64-unknown-linux-gnu.2.34",
+				"--features", "http_server",
+			]),
+			"target/x86_64-unknown-linux-gnu.2.34/release/examples/router",
+		),
 		stack_cli(),
 		// deploy: build, apply infra, SCP binary to instance, restart service
 		OnSpawn::insert_child(route(
 			"deploy",
 			(exchange_sequence(), children![
-				CargoBuildAction,
+				BuildArtifactAction,
 				DeployLightsailAction,
 			]),
 		)),
