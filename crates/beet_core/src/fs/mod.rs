@@ -7,9 +7,6 @@
 //!
 //! - [`FsWatcher`] - File system watcher with debouncing
 //! - [`ChildProcess`] - Helper for spawning processes with stdout collection
-//! - [`CargoBuildCmd`] - Builder for Cargo build commands
-//! - [`CargoBuild`] - Slim builder for constructing [`BuildArtifact`]
-//! - [`BuildArtifact`] - Build step component for deploy sequences
 //! - [`Tempdir`] - Temporary directory management (requires `rand` feature)
 //!
 //! # Platform Support

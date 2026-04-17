@@ -3,6 +3,44 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use std::path::PathBuf;
+
+/// A build step that runs a process and produces an artifact file.
+/// Used as an ECS Component on deploy sequence entities.
+#[derive(Debug, Clone, Get, SetWith, Component)]
+#[require(BuildArtifactAction)]
+pub struct BuildArtifact {
+	/// The build command to execute
+	process: ChildProcess,
+	/// Label identifying this artifact, used as the key in [`ArtifactLedger`].
+	/// Defaults to file stem, but must be overwritten as required, for instance
+	/// [`LambdaBlock::label`].
+	label: SmolStr,
+	/// Path to the expected output artifact
+	artifact_path: PathBuf,
+}
+
+impl BuildArtifact {
+	/// Create a new build artifact from a process and expected output path.
+	/// The label defaults to the file stem of the artifact path.
+	pub fn new(
+		process: ChildProcess,
+		artifact_path: impl Into<PathBuf>,
+	) -> Self {
+		let artifact_path = artifact_path.into();
+		let label: SmolStr = artifact_path
+			.file_stem()
+			.map(|stem| stem.to_string_lossy())
+			.unwrap_or_else(|| "artifact".into())
+			.into();
+		Self {
+			process,
+			label,
+			artifact_path,
+		}
+	}
+}
+
 
 /// Runs the build process from [`BuildArtifact`] on an ancestor entity,
 /// then uploads the result to the artifacts S3 bucket and registers it
@@ -15,12 +53,7 @@ pub async fn BuildArtifactAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	// step 1: read build artifact config from ancestor
-	let build = cx
-		.caller
-		.with_state::<AncestorQuery<&BuildArtifact>, _>(|entity, query| {
-			query.get(entity).cloned()
-		})
-		.await?;
+	let build = cx.caller.get_cloned::<BuildArtifact>().await?;
 
 	// step 2: run the build process
 	info!("building: {}", build.process());

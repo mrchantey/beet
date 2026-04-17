@@ -81,36 +81,26 @@ fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
 
 #[cfg(feature = "lambda_block")]
 fn infra_scene() -> Result<impl Bundle> {
-	let lambda = LambdaBlock::default();
-	(
-		(
-			stack(),
-			CargoBuild::default()
-				.with_release(true)
-				.with_example("router")
-				.with_additional_args(vec![
-					"--features".into(),
-					"http_server,lambda,router,infra,aws".into(),
-				])
-				.into_lambda_build_artifact()
-				.with_label(lambda.label().clone()),
-			stack_cli(),
-		),
-		children![
-			lambda,
-			assets_bucket_block(),
-			route(
-				"deploy",
-				// deploy: generate ledger, build, apply, then sync assets
-				(exchange_sequence(), children![
-					GenerateArtifactLedger,
-					BuildArtifactAction,
-					TofuApplyAction,
-					SyncAssetsAction,
-				]),
-			)
-		],
-	)
+	(stack(), stack_cli(), children![route(
+		"deploy",
+		// deploy: generate ledger, build, apply, then sync assets
+		(exchange_sequence(), children![
+			GenerateArtifactLedger,
+			(
+				LambdaBlock::default(),
+				CargoBuild::default()
+					.with_release(true)
+					.with_example("router")
+					.with_additional_args(vec![
+						"--features".into(),
+						"http_server,lambda,router,infra,aws".into(),
+					])
+					.into_lambda_build_artifact()
+			),
+			TofuApplyAction,
+			(SyncAssetsAction, assets_bucket_block()),
+		]),
+	)])
 		.xok()
 }
 
