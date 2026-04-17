@@ -9,6 +9,7 @@ use serde_json::json;
 
 
 #[derive(Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Component)]
+#[component(immutable)]
 #[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct S3BucketBlock {
 	label: SmolStr,
@@ -63,6 +64,7 @@ impl Into<BucketDetails> for AwsS3BucketDetails {
 impl Block for S3BucketBlock {
 	fn apply_to_config(
 		&self,
+		_entity: &EntityRef,
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
@@ -97,7 +99,14 @@ mod tests {
 		let (stack, _dir) = Stack::default_local();
 		let block = LambdaBlock::default();
 		let mut config = stack.create_config();
-		block.apply_to_config(&stack, &mut config).unwrap();
+		let mut world = World::new();
+		block
+			.apply_to_config(
+				&world.spawn(()).as_readonly(),
+				&stack,
+				&mut config,
+			)
+			.unwrap();
 		let project = terra::Project::new(&stack, config);
 		project.validate().await.unwrap();
 	}

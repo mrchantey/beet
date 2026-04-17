@@ -9,6 +9,7 @@ use serde_json::json;
 /// - Configurable ports
 /// - Systemd service user data
 #[derive(Debug, Clone, SetWith, Serialize, Deserialize, Component)]
+#[component(immutable)]
 #[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LightsailBlock {
 	/// The port the application server listens on.
@@ -35,6 +36,7 @@ impl Default for LightsailBlock {
 impl Block for LightsailBlock {
 	fn apply_to_config(
 		&self,
+		_entity: &EntityRef,
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
@@ -179,7 +181,14 @@ mod tests {
 		let (stack, _dir) = Stack::default_local();
 		let block = LightsailBlock::default();
 		let mut config = stack.create_config();
-		block.apply_to_config(&stack, &mut config).unwrap();
+		let mut world = World::new();
+		block
+			.apply_to_config(
+				&world.spawn(()).as_readonly(),
+				&stack,
+				&mut config,
+			)
+			.unwrap();
 		let project = terra::Project::new(&stack, config);
 		project.validate().await.unwrap();
 	}

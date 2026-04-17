@@ -5,6 +5,7 @@ use std::sync::Arc;
 pub trait Block {
 	fn apply_to_config(
 		&self,
+		entity: &EntityRef,
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result;
@@ -12,6 +13,7 @@ pub trait Block {
 
 /// Added by blocks for collecting.
 #[derive(Clone, Component)]
+#[component(immutable)]
 pub struct ErasedBlock(
 	Arc<
 		dyn 'static
@@ -31,9 +33,28 @@ impl ErasedBlock {
 					std::any::type_name::<T>()
 				)
 			})?;
-			block.apply_to_config(stack, config)?;
+			block.apply_to_config(entity, stack, config)?;
 			Ok(())
 		}))
+	}
+
+	pub fn on_add<T: 'static + Send + Sync + Clone + Component + Block>()
+	-> impl FnOnce(DeferredWorld, HookContext) {
+		|mut world, cx| {
+			let block = world
+				.entity(cx.entity)
+				.get::<T>()
+				.expect(&format!(
+					"Block component missing: {}",
+					std::any::type_name::<T>()
+				))
+				.clone();
+			// TODO something like this
+			// world
+			// 	.commands()
+			// 	.entity(cx.entity)
+			// 	.insert(ErasedBlock::new(block));
+		}
 	}
 
 	pub fn apply_to_config(

@@ -20,6 +20,7 @@ pub enum DnsProvider {
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
+#[component(immutable)]
 #[require(ErasedBlock=ErasedBlock::new::<Self>())]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
@@ -53,6 +54,7 @@ impl LambdaBlock {
 impl Block for LambdaBlock {
 	fn apply_to_config(
 		&self,
+		_entity: &EntityRef,
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
@@ -304,7 +306,14 @@ mod tests {
 		let (stack, _dir) = Stack::default_local();
 		let block = LambdaBlock::default();
 		let mut config = stack.create_config();
-		block.apply_to_config(&stack, &mut config).unwrap();
+		let mut world = World::new();
+		block
+			.apply_to_config(
+				&world.spawn(()).as_readonly(),
+				&stack,
+				&mut config,
+			)
+			.unwrap();
 		let project = terra::Project::new(&stack, config);
 		project.validate().await.unwrap();
 	}

@@ -25,7 +25,6 @@ pub struct Stack {
 	work_directory: WsPathBuf,
 	#[set_with(into)]
 	backend: StackBackend,
-
 	/// The default aws region to use
 	aws_region: SmolStr,
 	/// Additional parameters, some of which
