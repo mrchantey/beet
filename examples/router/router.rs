@@ -27,6 +27,18 @@
 //! # REPL mode — interactive read-eval-print loop
 //! cargo run --example router -- --server=repl
 //! ```
+//!
+//! ## Infrastructure deployment
+//!
+//! This example is also configured for deploying as infrastructure
+//!
+//! ```sh
+//! cargo run --example router --features=lambda_block -- validate
+//! cargo run --example router --features=lambda_block -- plan
+//! cargo run --example router --features=lambda_block -- deploy
+//! cargo run --example router --features=lambda_block -- show
+//! cargo run --example router --features=lambda_block -- destroy --force
+//! ```
 use beet::prelude::*;
 
 fn main() -> AppExit {
@@ -37,14 +49,57 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			RouterAppPlugin,
+			InfraRouterPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run()
 }
 
 fn setup(mut commands: Commands) -> Result {
-	commands.spawn((
+	cfg_if! {
+		if #[cfg(feature="infra")]{
+			// with infra flag we are deploying
+			commands.spawn(infra_scene()?);
+		}else{
+			// otherwise use the router app
+			commands.spawn(router_scene()?);
+		}
+	}
+	Ok(())
+}
+
+
+#[allow(unused)]
+fn infra_scene() -> Result<impl Bundle> {
+	((
+		Stack::new("lambda-example").with_backend(LocalBackend::default()),
+		LambdaBlock::default(),
+		// cargo lambda handles cross-compilation for Lambda's AL2023 runtime
+		CargoBuildCmd::default()
+			.cmd("lambda build")
+			.release()
+			.example("router")
+			.feature("http_server")
+			.feature("lambda"),
+		stack_cli(),
+		// deploy: build, package as lambda.zip, apply infrastructure
+		OnSpawn::insert_child(route(
+			"deploy",
+			(exchange_sequence(), children![
+				CargoBuildAction,
+				PackageLambdaAction,
+				TofuApplyAction,
+			]),
+		)),
+	))
+		.xok()
+}
+
+
+
+#[allow(unused)]
+fn router_scene() -> Result<impl Bundle> {
+	(
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
 		server_from_cli()?,
@@ -54,8 +109,8 @@ fn setup(mut commands: Commands) -> Result {
 		// the actual routes, children with a PathPartial and associated action
 		// for handling a request
 		routes(),
-	));
-	Ok(())
+	)
+		.xok()
 }
 
 // OnSpawn serves as a type erased bundle
