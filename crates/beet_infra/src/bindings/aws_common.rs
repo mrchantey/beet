@@ -20,6 +20,135 @@ use std::collections::BTreeMap as Map;
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsIamAccessKeyDetails {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create_date: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub encrypted_secret: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub encrypted_ses_smtp_password_v4: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub key_fingerprint: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub pgp_key: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`, `sensitive`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub secret: Option<SmolStr>,
+	/// ## Attribute
+	/// `computed`, `sensitive`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub ses_smtp_password_v4: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub status: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub user: SmolStr,
+}
+impl terra::ToJson for AwsIamAccessKeyDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsIamAccessKeyDetails {
+	fn resource_type(&self) -> &'static str { "aws_iam_access_key" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.create_date.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "create_date",
+				},
+			);
+		}
+		if self.encrypted_secret.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "encrypted_secret",
+				},
+			);
+		}
+		if self.encrypted_ses_smtp_password_v4.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "encrypted_ses_smtp_password_v4",
+				},
+			);
+		}
+		if self.key_fingerprint.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "key_fingerprint",
+				},
+			);
+		}
+		if self.secret.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "secret",
+				},
+			);
+		}
+		if self.ses_smtp_password_v4.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "ses_smtp_password_v4",
+				},
+			);
+		}
+		if self.user.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "user",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsIamRoleDetails {
 	/// ## Attribute
 	/// `computed`
@@ -206,6 +335,159 @@ impl terra::Resource for AwsIamRolePolicyAttachmentDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsIamUserDetails {
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// Delete user even if it has non-Terraform-managed IAM access keys, login profile or MFA devices
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub force_destroy: Option<bool>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub path: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub permissions_boundary: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub unique_id: Option<SmolStr>,
+}
+impl terra::ToJson for AwsIamUserDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsIamUserDetails {
+	fn resource_type(&self) -> &'static str { "aws_iam_user" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		if self.name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "name",
+			});
+		}
+		if self.unique_id.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "unique_id",
+				},
+			);
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct AwsIamUserPolicyAttachmentDetails {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub policy_arn: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub user: SmolStr,
+}
+impl terra::ToJson for AwsIamUserPolicyAttachmentDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsIamUserPolicyAttachmentDetails {
+	fn resource_type(&self) -> &'static str { "aws_iam_user_policy_attachment" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.policy_arn.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "policy_arn",
+			});
+		}
+		if self.user.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "user",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsS3BucketDetails {
 	/// ## Attribute
 	/// `optional`, `computed`
@@ -255,6 +537,7 @@ pub struct AwsS3BucketDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub for_each: Option<Vec<SmolStr>>,
+	/// Delete user even if it has non-Terraform-managed IAM access keys, login profile or MFA devices
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -604,7 +887,7 @@ pub struct DestinationResourceBlockTypeMetrics {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub minutes: Option<i64>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<SmolStr>,
 }
@@ -618,7 +901,7 @@ pub struct DestinationResourceBlockTypeReplicationTime {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub minutes: Option<i64>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub status: Option<SmolStr>,
 }
@@ -704,7 +987,7 @@ pub struct ReplicationConfigurationResourceBlockTypeRules {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub priority: Option<i64>,
 	/// ## Attribute
-	/// `required`
+	/// `optional`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]
 	pub status: SmolStr,
 	#[serde(skip_serializing_if = "Option::is_none")]

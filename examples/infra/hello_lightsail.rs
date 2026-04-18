@@ -58,12 +58,13 @@ fn infra_scene() -> Result<impl Bundle> {
 				LightsailBlock::default(),
 				CargoBuild::default()
 					.with_release(true)
+					.with_target(BuildTarget::Zigbuild)
 					.with_example("hello_lightsail")
 					.with_additional_args(vec![
 						"--features".into(),
 						"http_server,router,aws_sdk,bindings_aws_common".into(),
 					])
-					.into_musl_build_artifact()
+					.into_build_artifact()
 			),
 			TofuApplyAction,
 			(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),

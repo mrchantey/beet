@@ -55,7 +55,7 @@ fn infra_scene() -> Result<impl Bundle> {
 			(
 				LambdaBlock::default(),
 				CargoBuild::default()
-					.with_release(true)
+					.with_target(BuildTarget::Zigbuild)
 					.with_example("hello_lambda")
 					.with_additional_args(vec![
 						"--features".into(),

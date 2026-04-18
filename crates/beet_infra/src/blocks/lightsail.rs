@@ -30,8 +30,9 @@ pub struct LightsailBlock {
 	/// DNS must be configured to point this domain to the instance's public IP.
 	#[set_with(unwrap_option, into)]
 	pub domain: Option<SmolStr>,
-	/// AWS availability zone, defaults to `us-east-1a`.
-	pub availability_zone: SmolStr,
+	/// AWS availability zone. Defaults to the stack's region with suffix 'a', ie `us-west-2a`.
+	#[set_with(unwrap_option, into)]
+	pub availability_zone: Option<SmolStr>,
 	/// Lightsail blueprint ID, defaults to `amazon_linux_2023`.
 	pub blueprint_id: SmolStr,
 	/// Lightsail bundle ID (instance size), defaults to `nano_3_0`.
@@ -45,7 +46,7 @@ impl Default for LightsailBlock {
 		Self {
 			label: "main-lightsail".into(),
 			domain: None,
-			availability_zone: "us-east-1a".into(),
+			availability_zone: None,
 			blueprint_id: "amazon_linux_2023".into(),
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
@@ -191,37 +192,39 @@ impl Block for LightsailBlock {
 	) -> Result {
 		// IAM user for S3 access (binary download + runtime asset retrieval)
 		let user_ident = stack.resource_ident(self.build_label("deploy-user"));
-		config.add_untyped_resource(
-			"aws_iam_user",
-			user_ident.label(),
-			&json!({ "name": user_ident.primary_identifier() }),
-		)?;
-		let user_name_ref =
-			format!("${{aws_iam_user.{}.name}}", user_ident.label());
+		let user = terra::ResourceDef::new_primary(
+			user_ident.clone(),
+			AwsIamUserDetails {
+				name: user_ident.primary_identifier().clone(),
+				..default()
+			},
+		);
+		let user_name_ref = user.field_ref("name");
 
 		// grant the user S3 read access for artifacts and assets
 		let policy_ident =
 			stack.resource_ident(self.build_label("deploy-s3-policy"));
-		config.add_untyped_resource(
-			"aws_iam_user_policy_attachment",
-			policy_ident.label(),
-			&json!({
-				"user": user_name_ref,
-				"policy_arn": "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-			}),
-		)?;
+		let policy = terra::ResourceDef::new_secondary(
+			policy_ident,
+			AwsIamUserPolicyAttachmentDetails {
+				user: user_name_ref.clone().into(),
+				policy_arn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+					.into(),
+				..default()
+			},
+		);
 
 		// access key for the user
 		let key_ident = stack.resource_ident(self.build_label("deploy-key"));
-		config.add_untyped_resource(
-			"aws_iam_access_key",
-			key_ident.label(),
-			&json!({ "user": user_name_ref }),
-		)?;
-		let access_key_id_ref =
-			format!("${{aws_iam_access_key.{}.id}}", key_ident.label());
-		let access_key_secret_ref =
-			format!("${{aws_iam_access_key.{}.secret}}", key_ident.label());
+		let access_key = terra::ResourceDef::new_secondary(
+			key_ident.clone(),
+			AwsIamAccessKeyDetails {
+				user: user_name_ref.into(),
+				..default()
+			},
+		);
+		let access_key_id_ref = access_key.field_ref("id");
+		let access_key_secret_ref = access_key.field_ref("secret");
 
 		// key pair for SSH access
 		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
@@ -241,7 +244,10 @@ impl Block for LightsailBlock {
 			&access_key_secret_ref,
 		);
 		let mut instance_details = AwsLightsailInstanceDetails {
-			availability_zone: self.availability_zone.clone(),
+			availability_zone: self
+				.availability_zone
+				.clone()
+				.unwrap_or_else(|| format!("{}a", stack.aws_region()).into()),
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
 			name: instance_ident.primary_identifier().clone(),
@@ -302,6 +308,9 @@ impl Block for LightsailBlock {
 
 		// add core resources
 		config
+			.add_resource(&user)?
+			.add_resource(&policy)?
+			.add_resource(&access_key)?
 			.add_resource(&keypair)?
 			.add_resource(&instance)?
 			.add_resource(&ports)?;
@@ -327,6 +336,14 @@ impl Block for LightsailBlock {
 				);
 				let addr = json!(static_ip.field_ref("ip_address"));
 				config.add_resource(&static_ip)?.add_resource(&ip_attach)?;
+				// re-attach static IP when instance is replaced
+				config.set_lifecycle(
+					"aws_lightsail_static_ip_attachment",
+					ip_attach.ident().label(),
+					json!({
+						"replace_triggered_by": [instance.field("id")]
+					}),
+				)?;
 				(addr, "static_ipv4")
 			}
 			LightsailNetworking::Ipv6 => {

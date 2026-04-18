@@ -450,6 +450,35 @@ impl Config {
 		Ok(self)
 	}
 
+	/// Inject a `lifecycle` block into an already-added resource.
+	/// The resource must have been added before calling this method.
+	///
+	/// `resource_type` and `label` identify the target resource,
+	/// and `lifecycle` is the JSON value for the lifecycle block, ie:
+	/// ```ignore
+	/// json!({ "replace_triggered_by": ["aws_lightsail_instance.xxx"] })
+	/// ```
+	pub fn set_lifecycle(
+		&mut self,
+		resource_type: &str,
+		label: &str,
+		lifecycle: Value,
+	) -> Result<&mut Self> {
+		let map = self
+			.resources
+			.get_mut(resource_type)
+			.and_then(|v| v.as_object_mut())
+			.ok_or_else(|| bevyhow!("resource type `{resource_type}` not found"))?;
+		let resource = map
+			.get_mut(label)
+			.and_then(|v| v.as_object_mut())
+			.ok_or_else(|| {
+				bevyhow!("resource `{resource_type}.{label}` not found")
+			})?;
+		resource.insert("lifecycle".to_string(), lifecycle);
+		Ok(self)
+	}
+
 	// =====================================================================
 	// Serialization
 	// =====================================================================

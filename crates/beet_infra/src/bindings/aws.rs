@@ -26,6 +26,12 @@ impl terra::PrimaryResource for AwsIamRoleDetails {
 		self.name = Some(name.into())
 	}
 }
+#[cfg(feature = "bindings_aws_common")]
+impl terra::PrimaryResource for AwsIamUserDetails {
+	fn set_primary_identifier(&mut self, name: &str) {
+		self.name = name.into()
+	}
+}
 #[cfg(feature = "bindings_aws_lambda")]
 impl terra::PrimaryResource for AwsLambdaFunctionDetails {
 	fn set_primary_identifier(&mut self, name: &str) {
