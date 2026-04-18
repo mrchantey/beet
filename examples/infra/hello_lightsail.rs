@@ -57,6 +57,7 @@ fn infra_scene() -> Result<impl Bundle> {
 			(
 				LightsailBlock::default(),
 				CargoBuild::default()
+					.with_release(true)
 					.with_example("hello_lightsail")
 					.with_additional_args(vec![
 						"--features".into(),
@@ -65,10 +66,7 @@ fn infra_scene() -> Result<impl Bundle> {
 					.into_musl_build_artifact()
 			),
 			TofuApplyAction,
-			(
-				SyncS3Bucket::new("examples/assets"),
-				assets_bucket_block()
-			),
+			(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
 		]),
 	)])
 		.xok()
@@ -76,11 +74,13 @@ fn infra_scene() -> Result<impl Bundle> {
 
 /// The stack is used by both infra and router for resolving bucket names.
 #[allow(unused)]
-fn stack() -> Stack { Stack::new("hello_lightsail").with_aws_region("us-east-1") }
+fn stack() -> Stack {
+	Stack::new("hello_lightsail").with_aws_region("us-west-2")
+}
 
 #[cfg(feature = "bindings_aws_common")]
 fn assets_bucket_block() -> S3BucketBlock {
-	S3BucketBlock::new("assets").with_deploy_versioned(false)
+	S3BucketBlock::new("assets").with_deploy_versioned(true)
 }
 
 /// Resolve the assets bucket. Identical to the Lambda pattern:

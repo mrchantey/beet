@@ -64,11 +64,7 @@ fn infra_scene() -> Result<impl Bundle> {
 					.into_lambda_build_artifact()
 			),
 			TofuApplyAction,
-			(
-				SyncS3Bucket::new("examples/assets"),
-				// we also declare assets bucket here for sync
-				assets_bucket_block()
-			),
+			(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
 		]),
 	)])
 		.xok()
