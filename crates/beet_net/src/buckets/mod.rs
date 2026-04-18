@@ -42,34 +42,34 @@ pub use aws_cli::*;
 #[cfg(feature = "json")]
 pub use table::*;
 mod bucket_item;
-mod in_memory_provider;
+mod in_memory_bucket;
 pub use blob::*;
 pub use bucket::*;
 pub use bucket_item::*;
-pub use in_memory_provider::*;
+pub use in_memory_bucket::*;
 #[cfg(feature = "bevy_scene")]
 pub use scene_store::*;
-mod fs_provider;
+mod fs_bucket;
 #[cfg(target_arch = "wasm32")]
-mod local_storage_provider;
-pub use fs_provider::*;
+mod local_storage_bucket;
+pub use fs_bucket::*;
 #[cfg(target_arch = "wasm32")]
-pub use local_storage_provider::*;
+pub use local_storage_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub use s3_provider::*;
+pub use s3_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-mod s3_provider;
+mod s3_bucket;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub use dynamo_provider::*;
+pub use dynamo_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-mod dynamo_provider;
+mod dynamo_bucket;
 
 use beet_core::prelude::*;
 
 /// Plugin that registers bucket types for scene serialization.
 ///
 /// Registers [`TypedBucket`] and [`TypedBlob`] instantiations for each
-/// provider so that scenes containing bucket references can be serialized
+/// bucket so that scenes containing bucket references can be serialized
 /// and deserialized.
 #[derive(Default)]
 pub struct BucketPlugin;

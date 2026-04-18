@@ -12,7 +12,7 @@ pub use types::header;
 pub use types::headers;
 /// Re-export media-type-driven serialization at crate level.
 mod net_plugin;
-mod object_storage;
+mod buckets;
 mod server;
 /// WebSocket client and server implementations.
 pub mod sockets;
@@ -21,7 +21,7 @@ pub mod sockets;
 pub mod prelude {
 	/// JavaScript analytics snippet for client-side tracking.
 	#[cfg(feature = "json")]
-	pub const ANALYTICS_JS: &str = include_str!("object_storage/analytics.js");
+	pub const ANALYTICS_JS: &str = include_str!("buckets/analytics.js");
 	/// Default port for a beet server: `8337` (BEET).
 	pub const DEFAULT_SERVER_PORT: u16 = 8337;
 	/// Default port for WebSocket connections.
@@ -36,7 +36,7 @@ pub mod prelude {
 	pub use crate::actions::*;
 	pub use crate::client::*;
 	pub use crate::net_plugin::*;
-	pub use crate::object_storage::*;
+	pub use crate::buckets::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
 	pub use crate::types::*;
