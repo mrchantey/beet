@@ -11,12 +11,16 @@ use bytes::Bytes;
 
 /// AWS DynamoDB provider storing its configuration as serializable fields.
 /// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = Bucket::on_add::<Self>)]
 pub struct DynamoBucket {
 	/// The DynamoDB table name (maps to "bucket name" in the storage abstraction).
 	table_name: SmolStr,
 	/// The AWS region for this table.
 	region: SmolStr,
+	/// Optional subdirectory prefix for all keys.
+	subdir: Option<RelPath>,
 }
 
 impl DynamoBucket {
@@ -28,7 +32,14 @@ impl DynamoBucket {
 		Self {
 			table_name: table_name.into(),
 			region: region.into(),
+			subdir: None,
 		}
+	}
+
+	/// Set the subdirectory prefix for all keys.
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+		self.subdir = Some(subdir.into());
+		self
 	}
 
 	/// Get or create a DynamoDB client for this provider's region.
@@ -53,7 +64,11 @@ impl DynamoBucket {
 
 	/// Resolve a [`RelPath`] to a DynamoDB-friendly attribute value.
 	fn resolve_key(&self, path: &RelPath) -> AttributeValue {
-		AttributeValue::S(path.to_string())
+		let key = match &self.subdir {
+			Some(sub) => format!("{}/{}", sub, path),
+			None => path.to_string(),
+		};
+		AttributeValue::S(key)
 	}
 
 	/// Get the table status, returning `None` if the table does not exist.
@@ -214,6 +229,7 @@ impl BucketProvider for DynamoBucket {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
+			let prefix = this.subdir.as_ref().map(|s| format!("{}/", s));
 			let out = client
 				.scan()
 				.table_name(this.table_name.as_str())
@@ -223,7 +239,14 @@ impl BucketProvider for DynamoBucket {
 			if let Some(items) = out.items {
 				for item in items {
 					if let Some(AttributeValue::S(id)) = item.get("id") {
-						paths.push(RelPath::new(id));
+						let rel = match &prefix {
+							Some(p) => match id.strip_prefix(p.as_str()) {
+								Some(stripped) => stripped,
+								None => continue,
+							},
+							None => id.as_str(),
+						};
+						paths.push(RelPath::new(rel));
 					}
 				}
 			}

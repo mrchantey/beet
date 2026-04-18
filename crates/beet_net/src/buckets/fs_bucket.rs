@@ -10,24 +10,40 @@ use bytes::Bytes;
 ///
 /// ## Default
 /// The default bucket is relative to the workspace root.
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = Bucket::on_add::<Self>)]
 pub struct FsBucket {
 	/// The full path to the bucket directory.
 	path: AbsPathBuf,
+	/// Optional subdirectory from which all paths are resolved.
+	subdir: Option<RelPath>,
 }
 
 impl Default for FsBucket {
-	fn default() -> Self { Self::new(WsPathBuf::default()) }
+	fn default() -> Self { Self { path: WsPathBuf::default().into(), subdir: None } }
 }
 
 impl FsBucket {
 	/// Create a new filesystem bucket with the given bucket path.
 	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
-		Self { path: path.into() }
+		Self { path: path.into(), subdir: None }
+	}
+	/// Set the subdirectory from which all paths are resolved.
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+		self.subdir = Some(subdir.into());
+		self
+	}
+	/// Resolve the effective root directory, including subdir if set.
+	fn effective_root(&self) -> AbsPathBuf {
+		match &self.subdir {
+			Some(sub) => self.path.join(sub.to_string()),
+			None => self.path.clone(),
+		}
 	}
 	/// Resolve the full path for an object key.
 	fn resolve_path(&self, route: &RelPath) -> AbsPathBuf {
-		self.path.join(route.to_string())
+		self.effective_root().join(route.to_string())
 	}
 	/// Create a [`TypedBlob`] handle for a single object in this bucket.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
@@ -49,22 +65,22 @@ impl BucketProvider for FsBucket {
 	fn region(&self) -> Option<String> { None }
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		let path = self.path.clone();
-		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
+		let root = self.effective_root();
+		Box::pin(async move { fs_ext::exists_async(root).await?.xok() })
 	}
 
 	fn bucket_create(&self) -> SendBoxedFuture<Result> {
-		let path = self.path.clone();
+		let root = self.effective_root();
 		Box::pin(async move {
-			fs_ext::create_dir_all_async(path).await?;
+			fs_ext::create_dir_all_async(root).await?;
 			().xok()
 		})
 	}
 
 	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
-		let path = self.path.clone();
+		let root = self.effective_root();
 		Box::pin(async move {
-			fs_ext::remove_async(path).await?;
+			fs_ext::remove_async(root).await?;
 			().xok()
 		})
 	}
@@ -78,14 +94,14 @@ impl BucketProvider for FsBucket {
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let bucket_path = self.path.clone();
+		let root = self.effective_root();
 		Box::pin(async move {
-			ReadDir::files_recursive_async(&bucket_path)
+			ReadDir::files_recursive_async(&root)
 				.await?
 				.into_iter()
 				.map(|path| {
 					let path = path
-						.strip_prefix(&bucket_path)
+						.strip_prefix(&root)
 						.unwrap_or_else(|_| path.as_path());
 					RelPath::new(path)
 				})

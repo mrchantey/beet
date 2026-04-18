@@ -61,7 +61,7 @@ impl SceneStore {
 			.run_flush(async move || {
 				let (blob, bytes) = entity
 					.with_then(move |mut entity| -> Result<_> {
-						let blob = entity.get_or_else::<Blob>()?.clone();
+						let blob = entity.get_or_else_mut::<Blob>()?.clone();
 
 						let spawned_entities =
 							entity.try_get::<SceneEntities>()?.to_vec();

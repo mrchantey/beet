@@ -9,12 +9,16 @@ use bytes::Bytes;
 
 /// AWS S3 bucket provider storing its configuration as serializable fields.
 /// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = Bucket::on_add::<Self>)]
 pub struct S3Bucket {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,
 	/// The AWS region for this bucket.
 	region: SmolStr,
+	/// Optional subdirectory prefix for all keys.
+	subdir: Option<RelPath>,
 }
 
 #[cfg(feature = "json")]
@@ -33,7 +37,14 @@ impl S3Bucket {
 		Self {
 			bucket_name: bucket_name.into(),
 			region: region.into(),
+			subdir: None,
 		}
+	}
+
+	/// Set the subdirectory prefix for all keys.
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+		self.subdir = Some(subdir.into());
+		self
 	}
 
 	/// Get or create an S3 client for this bucket's region.
@@ -52,8 +63,10 @@ impl S3Bucket {
 
 	/// Resolve the S3 object key from a [`RelPath`].
 	fn resolve_key(&self, path: &RelPath) -> String {
-		// this is stupid, just inline
-		path.to_string()
+		match &self.subdir {
+			Some(sub) => format!("{}/{}", sub, path),
+			None => path.to_string(),
+		}
 	}
 
 	/// Create a [`TypedBlob`] handle for a single object in this bucket.
@@ -187,11 +200,15 @@ impl BucketProvider for S3Bucket {
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
 			let bucket_name = this.bucket_name.as_str();
+			let prefix = this.subdir.as_ref().map(|s| format!("{}/", s));
 			let mut paths = Vec::new();
 			let mut continuation_token = None;
 
 			loop {
 				let mut req = client.list_objects_v2().bucket(bucket_name);
+				if let Some(ref prefix) = prefix {
+					req = req.prefix(prefix);
+				}
 				if let Some(token) = &continuation_token {
 					req = req.continuation_token(token);
 				}
@@ -200,7 +217,14 @@ impl BucketProvider for S3Bucket {
 				paths.extend(
 					contents
 						.into_iter()
-						.filter_map(|obj| obj.key.map(RelPath::new)),
+						.filter_map(|obj| {
+							let key = obj.key?;
+							let rel = match &prefix {
+								Some(p) => key.strip_prefix(p.as_str())?,
+								None => &key,
+							};
+							Some(RelPath::new(rel))
+						}),
 				);
 
 				if list_result.is_truncated == Some(true) {

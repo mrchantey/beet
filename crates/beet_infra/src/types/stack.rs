@@ -148,8 +148,7 @@ pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
-	#[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]
-	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
+	buckets: Query<'w, 's, &'static Bucket>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -181,6 +180,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 		stack.artifacts_client().xok()
 	}
 
+	#[cfg(feature = "deploy")]
 	/// Collect artifact entries from block descendants.
 	/// Returns `(BuildArtifact, artifact_label)` for each block
 	/// that has both a [`BuildArtifact`] and an artifact label.
@@ -202,11 +202,8 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok(pairs)
 	}
 
-	/// Get the provider from an [`S3Bucket`] on this entity
-	#[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]
-	pub fn s3_provider(&self, entity: Entity) -> Result<S3Bucket> {
-		let (_, stack) = self.stacks.get(entity)?;
-		let bucket = self.s3_buckets.get(entity)?;
-		bucket.provider(stack).xok()
+	/// Get the [`Bucket`] component from this entity.
+	pub fn bucket(&self, entity: Entity) -> Result<&Bucket> {
+		self.buckets.get(entity)?.xok()
 	}
 }

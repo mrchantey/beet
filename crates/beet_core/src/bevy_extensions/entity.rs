@@ -50,8 +50,14 @@ pub impl<'a> EntityWorldMut<'a> {
 		})
 	}
 
+	/// Gets a reference to the component of type `T`, or returns an error if it doesn't exist.
+	fn get_or_else<T: Component>(&mut self) -> Result<&T> {
+		self.get::<T>().ok_or_else(|| {
+			bevyhow!("Component not found: {}", std::any::type_name::<T>())
+		})
+	}
 	/// Gets a mutable reference to the component of type `T`, or returns an error if it doesn't exist.
-	fn get_or_else<T: Component<Mutability = Mutable>>(
+	fn get_or_else_mut<T: Component<Mutability = Mutable>>(
 		&mut self,
 	) -> Result<Mut<'_, T>> {
 		self.get_mut::<T>().ok_or_else(|| {

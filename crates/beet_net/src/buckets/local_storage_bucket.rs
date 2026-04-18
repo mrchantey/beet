@@ -7,10 +7,14 @@ use js_sys::wasm_bindgen::JsCast;
 /// A bucket provider backed by browser localStorage.
 ///
 /// Uses `bucket:<bucket_name>:<path>` as the localStorage key prefix.
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = Bucket::on_add::<Self>)]
 pub struct LocalStorageBucket {
 	/// The bucket name used as part of the localStorage key prefix.
 	bucket_name: SmolStr,
+	/// Optional subdirectory prefix for all keys.
+	subdir: Option<RelPath>,
 }
 
 impl LocalStorageBucket {
@@ -18,7 +22,14 @@ impl LocalStorageBucket {
 	pub fn new(bucket_name: impl Into<SmolStr>) -> Self {
 		Self {
 			bucket_name: bucket_name.into(),
+			subdir: None,
 		}
+	}
+
+	/// Set the subdirectory prefix for all keys.
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+		self.subdir = Some(subdir.into());
+		self
 	}
 
 	fn bucket_prefix(&self) -> String {
@@ -27,7 +38,11 @@ impl LocalStorageBucket {
 
 	/// Compose the localStorage key for the bucket and path.
 	fn storage_key(&self, path: &RelPath) -> String {
-		self.bucket_prefix().xtend(&path.to_string())
+		let effective = match &self.subdir {
+			Some(sub) => format!("{}/{}", sub, path),
+			None => path.to_string(),
+		};
+		self.bucket_prefix().xtend(&effective)
 	}
 
 	fn local_storage() -> web_sys::Storage {
@@ -112,11 +127,19 @@ impl BucketProvider for LocalStorageBucket {
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let prefix = self.bucket_prefix();
+		let subdir_prefix = self.subdir.as_ref().map(|s| format!("{}/", s));
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let keys: Vec<RelPath> = (0..storage.length().unwrap_or(0))
 				.filter_map(|i| storage.key(i).ok().flatten())
-				.filter_map(|key| key.strip_prefix(&prefix).map(RelPath::new))
+				.filter_map(|key| {
+					let raw = key.strip_prefix(&prefix)?;
+					let rel = match &subdir_prefix {
+						Some(p) => raw.strip_prefix(p.as_str())?,
+						None => raw,
+					};
+					Some(RelPath::new(rel))
+				})
 				.collect();
 			keys.xok()
 		})

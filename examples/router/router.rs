@@ -102,12 +102,16 @@ fn infra_scene() -> Result<impl Bundle> {
 	)])
 		.xok()
 }
-
 fn assets_bucket() -> impl BucketProvider {
 	cfg_if! {
 		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
 			let stk = stack();
-			assets_bucket_block().provider(&stk)
+			let mut bucket = assets_bucket_block().provider(&stk);
+			// use deploy_id as subdir for version-specific assets
+			if let Ok(deploy_id) = std::env::var("DEPLOY_ID") {
+				bucket = bucket.with_subdir(deploy_id);
+			}
+			bucket
 		}else{
 			FsBucket::new(WsPathBuf::new("examples/assets"))
 		}

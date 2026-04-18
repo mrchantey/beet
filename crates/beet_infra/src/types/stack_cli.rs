@@ -121,11 +121,16 @@ async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
 	let proj = project(&cx.caller).await?;
 	if force {
 		proj.force_destroy().await;
-		"Force destroy complete".to_string().xok()
 	} else {
 		proj.destroy().await?;
-		"Destroy complete".to_string().xok()
 	}
+	// tear down the artifacts bucket (not managed by terraform)
+	let client = artifacts_client(&cx.caller).await?;
+	if client.bucket().bucket_exists().await.unwrap_or(false) {
+		info!("removing artifacts bucket");
+		client.bucket().bucket_remove().await?;
+	}
+	"Destroy complete".to_string().xok()
 }
 
 /// Parameters for the rollback action.

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_core::prelude::bevy_ecs::error::ErrorContext;
 use bytes::Bytes;
 use std::sync::Arc;
 
@@ -63,6 +64,29 @@ impl Bucket {
 	/// let blob = bucket.blob(RelPath::new("my-file.txt"));
 	/// ```
 	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
+
+	/// Component hook that reads a concrete bucket component from
+	/// the entity and inserts a [`Bucket`] wrapping it.
+	/// Use with `#[component(on_add = Bucket::on_add::<MyBucket>)]`.
+	pub fn on_add<T: Component + Clone + BucketProvider>(
+		mut world: DeferredWorld,
+		cx: HookContext,
+	) {
+		match world.entity(cx.entity).get_or_else::<T>().cloned() {
+			Ok(provider) => {
+				world
+					.commands()
+					.entity(cx.entity)
+					.insert(Bucket::new(provider));
+			}
+			Err(err) => {
+				world.default_error_handler()(err, ErrorContext::Command {
+					name: std::any::type_name_of_val(&Bucket::on_add::<T>)
+						.into(),
+				});
+			}
+		}
+	}
 
 	/// Insert object into bucket.
 	///
@@ -439,75 +463,6 @@ pub async fn s3_fs_selector(
 			Bucket::new(provider)
 		}
 	}
-}
-
-
-/// Convenience type for scene serialization, inserts a [`Bucket`] on add.
-///
-/// Wraps a concrete [`BucketProvider`] implementation and automatically
-/// inserts a type-erased [`Bucket`] component when added to an entity.
-///
-/// # Example
-/// ```no_run
-/// # use beet_core::prelude::*;
-/// # use beet_net::prelude::*;
-/// # fn run(mut commands: Commands) {
-/// let typed = TypedBucket(FsBucket::new(
-///     AbsPathBuf::new_workspace_rel("my-bucket").unwrap(),
-/// ));
-/// commands.spawn(typed);
-/// // entity now also has a `Bucket` component
-/// # }
-/// ```
-#[derive(Deref, Clone, Component, Reflect)]
-#[reflect(Component)]
-#[component(on_add = on_add_typed_bucket::<B>)]
-pub struct TypedBucket<
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
->(pub B);
-
-impl<
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider + std::fmt::Debug,
-> std::fmt::Debug for TypedBucket<B>
-{
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_tuple("TypedBucket").field(&self.0).finish()
-	}
-}
-
-impl<B: BucketProvider + Clone + Reflect> TypedBucket<B> {
-	/// Create a [`TypedBlob`] handle for a single object in this bucket.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<B> {
-		TypedBlob::new(self.clone(), path)
-	}
-
-	/// Convert to a type-erased [`Bucket`].
-	pub fn to_bucket(&self) -> Bucket { Bucket::new(self.0.clone()) }
-}
-
-fn on_add_typed_bucket<
-	B: 'static + Send + Sync + BucketProvider + Reflect + Clone,
->(
-	mut world: DeferredWorld,
-	cx: HookContext,
-) {
-	let inner = world
-		.entity(cx.entity)
-		.get::<TypedBucket<B>>()
-		.unwrap()
-		.0
-		.clone();
-	world
-		.commands()
-		.entity(cx.entity)
-		.insert(Bucket::new(inner));
-}
-
-impl<B> From<B> for TypedBucket<B>
-where
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
-{
-	fn from(bucket: B) -> Self { Self(bucket) }
 }
 
 /// Test utilities for bucket providers.

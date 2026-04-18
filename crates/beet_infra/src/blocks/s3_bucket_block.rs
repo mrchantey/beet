@@ -2,13 +2,14 @@ use crate::bindings::*;
 use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use serde_json::json;
 
 
 #[derive(
 	Debug, Clone, Get, Deref, DerefMut, Serialize, Deserialize, Component,
 )]
-#[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
+#[component(immutable, on_add = on_add_s3_bucket_block)]
 pub struct S3BucketBlock {
 	label: SmolStr,
 	#[deref]
@@ -47,6 +48,31 @@ impl S3BucketBlock {
 			bucket_name.primary_identifier().clone(),
 			region.clone(),
 		)
+	}
+}
+
+/// Inserts an [`ErasedBlock`] and, when the `aws_sdk` feature is enabled,
+/// also inserts an [`S3Bucket`] (which in turn inserts a [`Bucket`]).
+fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
+	// always insert ErasedBlock
+	ErasedBlock::on_add::<S3BucketBlock>(world.reborrow(), cx);
+
+	// when aws_sdk is available, insert S3Bucket
+	#[cfg(feature = "aws_sdk")]
+	{
+		world.commands().entity(cx.entity).queue(
+			move |mut entity: EntityWorldMut| -> Result {
+				if let Ok(stack) = entity
+					.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
+						query.get(entity).cloned()
+					}) {
+					let block = entity.get_or_else::<S3BucketBlock>()?;
+					let s3_bucket = block.provider(&stack);
+					entity.insert(s3_bucket);
+				}
+				Ok(())
+			},
+		);
 	}
 }
 

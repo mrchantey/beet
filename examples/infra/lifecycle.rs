@@ -46,7 +46,7 @@ fn setup(mut commands: Commands) {
 
 			let bucket = entity
 				.with_state::<StackQuery, _>(|entity, query| {
-					query.s3_provider(entity)
+					query.bucket(entity)
 				})
 				.await?;
 
@@ -89,7 +89,7 @@ fn setup(mut commands: Commands) {
 			);
 
 			println!("🔨 Inserting File..");
-			bucket.insert(&path, content.into()).await?;
+			bucket.insert(&path, content).await?;
 			let bytes = bucket.get(&path).await?;
 			println!("📄 Bucket File Matches: {}", bytes == content.as_bytes());
 

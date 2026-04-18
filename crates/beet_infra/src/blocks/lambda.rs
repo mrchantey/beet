@@ -121,6 +121,18 @@ impl Block for LambdaBlock {
 				timeout: Some(180),
 				memory_size: Some(1024),
 				source_code_hash: source_hash.map(Into::into),
+				environment: Some(vec![
+					AwsLambdaFunctionResourceBlockTypeEnvironment {
+						variables: Some({
+							let mut vars = std::collections::BTreeMap::new();
+							vars.insert(
+								"DEPLOY_ID".into(),
+								stack.deploy_id.to_string().into(),
+							);
+							vars
+						}),
+					},
+				]),
 				..default()
 			},
 		);

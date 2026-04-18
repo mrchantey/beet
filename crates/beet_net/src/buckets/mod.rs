@@ -10,8 +10,8 @@
 //! - [`DynamoBucket`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //!
 //! Use [`BucketPlugin`] to register bucket types for scene serialization.
-//! [`TypedBucket`] and [`TypedBlob`] are the serializable wrappers that
-//! auto-insert their erased counterparts ([`Bucket`] and [`Blob`]) on add.
+//! Concrete bucket types (like [`FsBucket`], [`S3Bucket`]) are Components
+//! that auto-insert a type-erased [`Bucket`] via on_add hooks.
 //!
 //! # Example
 //!
@@ -68,9 +68,7 @@ use beet_core::prelude::*;
 
 /// Plugin that registers bucket types for scene serialization.
 ///
-/// Registers [`TypedBucket`] and [`TypedBlob`] instantiations for each
-/// bucket so that scenes containing bucket references can be serialized
-/// and deserialized.
+/// Registers concrete bucket types for scene serialization.
 #[derive(Default)]
 pub struct BucketPlugin;
 

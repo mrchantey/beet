@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 pub async fn SyncS3BucketAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (bucket_name, region) = cx
+	let (bucket_name, region, deploy_id) = cx
 		.caller
 		.with_state::<(AncestorQuery<&S3BucketBlock>, AncestorQuery<&Stack>), _>(
 			|entity, (bucket_query, stack_query)| -> Result<_> {
@@ -25,14 +25,15 @@ pub async fn SyncS3BucketAction(
 					.as_ref()
 					.unwrap_or(stack.aws_region())
 					.clone();
-				(name, region).xok()
+				let deploy_id = stack.deploy_id.to_string();
+				(name, region, deploy_id).xok()
 			},
 		)
 		.await?;
 	let local_dir = AbsPathBuf::new_workspace_rel("examples/assets")?;
-	S3Sync::push(local_dir, format!("s3://{bucket_name}/"))
+	S3Sync::push(local_dir, format!("s3://{bucket_name}/{deploy_id}/"))
 		.send()
 		.await?;
-	info!("synced assets to s3://{bucket_name}/ (region: {region})");
+	info!("synced assets to s3://{bucket_name}/{deploy_id}/ (region: {region})");
 	Pass(cx.input).xok()
 }
