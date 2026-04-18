@@ -124,7 +124,7 @@
 		// ".env.example",
 		// ".beet",
 		".github",
-		".cargo",
+		// ".cargo",
 		".vscode",
 	],
 }

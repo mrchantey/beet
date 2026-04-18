@@ -12,6 +12,8 @@ pub struct CargoBuild {
 	pub release: bool,
 	/// Target wasm32-unknown-unknown.
 	pub wasm: bool,
+	/// Target x86_64-unknown-linux-musl for static linking.
+	pub musl: bool,
 	/// Used as `-p my-crate`
 	#[set_with(unwrap_option, into)]
 	pub package: Option<SmolStr>,
@@ -52,6 +54,8 @@ impl CargoBuild {
 		let mut path = PathBuf::from(target_dir);
 		if self.wasm {
 			path.push("wasm32-unknown-unknown");
+		} else if self.musl {
+			path.push("x86_64-unknown-linux-musl");
 		}
 		if self.release {
 			path.push("release");
@@ -104,6 +108,9 @@ impl CargoBuild {
 		if self.wasm {
 			args.push("--target".into());
 			args.push("wasm32-unknown-unknown".into());
+		} else if self.musl {
+			args.push("--target".into());
+			args.push("x86_64-unknown-linux-musl".into());
 		}
 		for arg in &self.additional_args {
 			args.push(arg.clone());
@@ -138,6 +145,19 @@ impl CargoBuild {
 	/// Convert into a standard cargo [`BuildArtifact`].
 	#[cfg(feature = "deploy")]
 	pub fn into_build_artifact(self) -> BuildArtifact {
+		let artifact_path = self.exe_path();
+		let args = self.cargo_args();
+		BuildArtifact::new(
+			ChildProcess::new("cargo").with_args(args),
+			artifact_path,
+		)
+	}
+	/// Convert into a musl cross-compiled [`BuildArtifact`] for Lightsail deployment.
+	/// Builds a statically linked release binary targeting `x86_64-unknown-linux-musl`.
+	#[cfg(feature = "deploy")]
+	pub fn into_musl_build_artifact(mut self) -> BuildArtifact {
+		self.musl = true;
+		self.release = true;
 		let artifact_path = self.exe_path();
 		let args = self.cargo_args();
 		BuildArtifact::new(
@@ -185,6 +205,17 @@ mod test {
 		let path = build.exe_path();
 		// exact path depends on CARGO_TARGET_DIR, just check it ends correctly
 		path.ends_with("release/examples/my-app").xpect_true();
+	}
+
+	#[test]
+	fn exe_path_musl_example_release() {
+		let build = CargoBuild::default()
+			.with_release(true)
+			.with_musl(true)
+			.with_example("my-app");
+		let path = build.exe_path();
+		path.ends_with("x86_64-unknown-linux-musl/release/examples/my-app")
+			.xpect_true();
 	}
 
 	#[test]

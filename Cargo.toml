@@ -470,13 +470,13 @@ path = "examples/infra/lifecycle.rs"
 required-features = ["bindings_aws_common", "aws_sdk"]
 
 [[example]]
-name = "lightsail"
-path = "examples/infra/lightsail.rs"
-required-features = ["lightsail_block", "fs", "rand"]
-
-[[example]]
 name = "hello_lambda"
 path = "examples/infra/hello_lambda.rs"
+required-features = ["router", "infra"]
+
+[[example]]
+name = "hello_lightsail"
+path = "examples/infra/hello_lightsail.rs"
 required-features = ["router", "infra"]
 
 # 💡 Examples - flow
