@@ -293,7 +293,7 @@ markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
-lightsail_block = ["deploy", "aws_sdk", "beet_infra?/lightsail_block", "fs", "rand"]
+lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]

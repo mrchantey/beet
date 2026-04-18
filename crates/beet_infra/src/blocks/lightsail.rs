@@ -15,17 +15,21 @@ pub enum LightsailNetworking {
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
+/// - IAM user with S3 read access for runtime asset retrieval via aws_sdk
 /// - Static IP with attachment (configurable via networking mode)
-/// - Configurable ports
-/// - Systemd service user data
+/// - Systemd service that fetches its binary from S3 on startup
+/// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
 #[component(immutable, on_add = ErasedBlock::on_add::<LightsailBlock>)]
 pub struct LightsailBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name.
 	label: SmolStr,
-	/// The port the application server listens on.
-	pub server_port: u16,
+	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
+	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
+	/// DNS must be configured to point this domain to the instance's public IP.
+	#[set_with(unwrap_option, into)]
+	pub domain: Option<SmolStr>,
 	/// AWS availability zone, defaults to `us-east-1a`.
 	pub availability_zone: SmolStr,
 	/// Lightsail blueprint ID, defaults to `amazon_linux_2023`.
@@ -40,7 +44,7 @@ impl Default for LightsailBlock {
 	fn default() -> Self {
 		Self {
 			label: "main-lightsail".into(),
-			server_port: 8337,
+			domain: None,
 			availability_zone: "us-east-1a".into(),
 			blueprint_id: "amazon_linux_2023".into(),
 			bundle_id: "nano_3_0".into(),
@@ -65,14 +69,83 @@ impl LightsailBlock {
 		}
 	}
 
-	/// Generate a systemd-based user data script for the application.
-	fn build_user_data(&self, stack: &Stack) -> SmolStr {
+	/// The port the application server listens on.
+	/// When a domain is set (HTTPS mode), the app runs behind Caddy on an
+	/// internal port. Otherwise the app binds directly to port 80.
+	fn app_port(&self) -> u16 {
+		if self.domain.is_some() {
+			beet_net::prelude::DEFAULT_SERVER_PORT
+		} else {
+			80
+		}
+	}
+
+	/// Build the user data script that provisions the instance.
+	/// Downloads the binary from S3 and creates a systemd service with
+	/// AWS credentials so the binary can access S3 at runtime via aws_sdk.
+	///
+	/// The `access_key_id_ref` and `access_key_secret_ref` are terraform
+	/// interpolation expressions (ie `${aws_iam_access_key.xxx.id}`) that
+	/// get resolved by terraform before the script runs on the instance.
+	fn build_user_data(
+		&self,
+		stack: &Stack,
+		access_key_id_ref: &str,
+		access_key_secret_ref: &str,
+	) -> SmolStr {
 		let app_name = stack.app_name();
-		let server_port = self.server_port;
-		format!(
+		let region = stack.aws_region();
+		let bucket = stack.artifact_bucket_name();
+		let deploy_id = stack.deploy_id();
+		let deploy_timestamp = stack.deploy_timestamp();
+		let label = &self.label;
+		let app_port = self.app_port();
+
+		// build optional HTTPS setup via Caddy
+		let https_setup = if let Some(domain) = &self.domain {
+			let caddyfile =
+				format!("{domain} {{\n    reverse_proxy localhost:8337\n}}");
+			format!(
+				r#"
+# install Caddy for HTTPS reverse proxy with automatic Let's Encrypt
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/setup.rpm.sh' | bash
+dnf install -y caddy
+
+cat > /etc/caddy/Caddyfile <<'CADDY_EOF'
+{caddyfile}
+CADDY_EOF
+
+systemctl enable --now caddy
+"#
+			)
+		} else {
+			String::new()
+		};
+
+		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
+		// which would conflict with Rust's format! macro
+		let script = format!(
 			r#"#!/bin/bash
 set -euo pipefail
+
+# configure AWS credentials for binary download and runtime S3 access
+mkdir -p /root/.aws
+cat > /root/.aws/credentials <<CREDS
+[default]
+aws_access_key_id = __ACCESS_KEY_ID__
+aws_secret_access_key = __ACCESS_KEY_SECRET__
+CREDS
+cat > /root/.aws/config <<CONF
+[default]
+region = {region}
+CONF
+
+# download application binary from S3
 mkdir -p /opt/{app_name}
+aws s3 cp "s3://{bucket}/versions/{deploy_id}/{label}" /opt/{app_name}/app
+chmod +x /opt/{app_name}/app
+
+# create systemd service with AWS credentials for runtime S3 access
 cat > /etc/systemd/system/{app_name}.service <<'EOF'
 [Unit]
 Description={app_name}
@@ -85,16 +158,25 @@ Restart=always
 RestartSec=3
 Environment=RUST_LOG=info
 Environment=BEET_HOST=0.0.0.0
-Environment=BEET_PORT={server_port}
-Environment=BEET_ASSETS_DIR=/opt/{app_name}/assets
+Environment=BEET_PORT={app_port}
+Environment=BEET_DEPLOY_ID={deploy_id}
+Environment=BEET_DEPLOY_TIMESTAMP={deploy_timestamp}
+Environment=AWS_REGION={region}
+Environment=AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
+Environment=AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable {app_name}.service
-"#
-		)
-		.into()
+systemctl enable --now {app_name}.service
+{https_setup}"#
+		);
+
+		// replace placeholder tokens with terraform interpolation expressions
+		script
+			.replace("__ACCESS_KEY_ID__", access_key_id_ref)
+			.replace("__ACCESS_KEY_SECRET__", access_key_secret_ref)
+			.into()
 	}
 }
 
@@ -107,9 +189,42 @@ impl Block for LightsailBlock {
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
+		// IAM user for S3 access (binary download + runtime asset retrieval)
+		let user_ident = stack.resource_ident(self.build_label("deploy-user"));
+		config.add_untyped_resource(
+			"aws_iam_user",
+			user_ident.label(),
+			&json!({ "name": user_ident.primary_identifier() }),
+		)?;
+		let user_name_ref =
+			format!("${{aws_iam_user.{}.name}}", user_ident.label());
+
+		// grant the user S3 read access for artifacts and assets
+		let policy_ident =
+			stack.resource_ident(self.build_label("deploy-s3-policy"));
+		config.add_untyped_resource(
+			"aws_iam_user_policy_attachment",
+			policy_ident.label(),
+			&json!({
+				"user": user_name_ref,
+				"policy_arn": "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+			}),
+		)?;
+
+		// access key for the user
+		let key_ident = stack.resource_ident(self.build_label("deploy-key"));
+		config.add_untyped_resource(
+			"aws_iam_access_key",
+			key_ident.label(),
+			&json!({ "user": user_name_ref }),
+		)?;
+		let access_key_id_ref =
+			format!("${{aws_iam_access_key.{}.id}}", key_ident.label());
+		let access_key_secret_ref =
+			format!("${{aws_iam_access_key.{}.secret}}", key_ident.label());
+
 		// key pair for SSH access
-		let keypair_ident =
-			stack.resource_ident(self.build_label("keypair"));
+		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
 		let keypair = terra::ResourceDef::new_secondary(
 			keypair_ident.clone(),
 			AwsLightsailKeyPairDetails {
@@ -118,16 +233,20 @@ impl Block for LightsailBlock {
 			},
 		);
 
-		// instance configuration
-		let instance_ident =
-			stack.resource_ident(self.build_label("instance"));
+		// instance with self-provisioning user data
+		let instance_ident = stack.resource_ident(self.build_label("instance"));
+		let user_data = self.build_user_data(
+			stack,
+			&access_key_id_ref,
+			&access_key_secret_ref,
+		);
 		let mut instance_details = AwsLightsailInstanceDetails {
 			availability_zone: self.availability_zone.clone(),
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
 			name: instance_ident.primary_identifier().clone(),
 			key_pair_name: Some(keypair.field_ref("name").into()),
-			user_data: Some(self.build_user_data(stack)),
+			user_data: Some(user_data),
 			tags: Some(
 				[
 					(SmolStr::from("Project"), stack.app_name().clone()),
@@ -144,36 +263,44 @@ impl Block for LightsailBlock {
 			instance_details.ip_address_type = Some("dualstack".into());
 		}
 
-		let instance = terra::ResourceDef::new_secondary(
-			instance_ident,
-			instance_details,
-		);
+		let instance =
+			terra::ResourceDef::new_secondary(instance_ident, instance_details);
 
-		// port rules
-		let port_details = AwsLightsailInstancePublicPortsDetails {
-			instance_name: instance.field_ref("name").into(),
-			port_info: Some(vec![
+		// port rules: HTTP (80), SSH (22), and optionally HTTPS (443)
+		let mut port_info = vec![
+			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+				from_port: 80,
+				protocol: "tcp".into(),
+				to_port: 80,
+				..default()
+			},
+			AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
+				from_port: 22,
+				protocol: "tcp".into(),
+				to_port: 22,
+				..default()
+			},
+		];
+		if self.domain.is_some() {
+			port_info.push(
 				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-					from_port: self.server_port as i64,
+					from_port: 443,
 					protocol: "tcp".into(),
-					to_port: self.server_port as i64,
+					to_port: 443,
 					..default()
 				},
-				AwsLightsailInstancePublicPortsResourceBlockTypePortInfo {
-					from_port: 22,
-					protocol: "tcp".into(),
-					to_port: 22,
-					..default()
-				},
-			]),
-			..default()
-		};
+			);
+		}
 		let ports = terra::ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("ports")),
-			port_details,
+			AwsLightsailInstancePublicPortsDetails {
+				instance_name: instance.field_ref("name").into(),
+				port_info: Some(port_info),
+				..default()
+			},
 		);
 
-		// always add keypair, instance, and ports
+		// add core resources
 		config
 			.add_resource(&keypair)?
 			.add_resource(&instance)?
@@ -182,8 +309,7 @@ impl Block for LightsailBlock {
 		// conditionally add static IP resources and resolve public address
 		let (public_address_value, ip_mode) = match &self.networking {
 			LightsailNetworking::StaticIpv4 => {
-				let ip_ident =
-					stack.resource_ident(self.build_label("ip"));
+				let ip_ident = stack.resource_ident(self.build_label("ip"));
 				let static_ip = terra::ResourceDef::new_secondary(
 					ip_ident.clone(),
 					AwsLightsailStaticIpDetails {
@@ -200,9 +326,7 @@ impl Block for LightsailBlock {
 					},
 				);
 				let addr = json!(static_ip.field_ref("ip_address"));
-				config
-					.add_resource(&static_ip)?
-					.add_resource(&ip_attach)?;
+				config.add_resource(&static_ip)?.add_resource(&ip_attach)?;
 				(addr, "static_ipv4")
 			}
 			LightsailNetworking::Ipv6 => {

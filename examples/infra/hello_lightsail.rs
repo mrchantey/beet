@@ -1,6 +1,8 @@
 //! # Hello Lightsail
 //!
 //! Deploys the router example as a Lightsail instance.
+//! Assets are uploaded to S3 during deploy and accessed at runtime
+//! via aws_sdk, identical to the Lambda pattern.
 //!
 //! ## Usage
 //!
@@ -38,6 +40,7 @@ fn setup(mut commands: Commands) -> Result {
 			commands.spawn(infra_scene()?);
 		}else{
 			commands.spawn((
+				// make assets bucket accessible to routes
 				Bucket::new(assets_bucket()),
 				router::router_scene()?
 			));
@@ -53,30 +56,44 @@ fn infra_scene() -> Result<impl Bundle> {
 		(exchange_sequence(), children![
 			(
 				LightsailBlock::default(),
-				LightsailAssets::new("examples/assets"),
 				CargoBuild::default()
 					.with_example("hello_lightsail")
 					.with_additional_args(vec![
 						"--features".into(),
-						"http_server,router,infra".into(),
+						"http_server,router,aws_sdk,bindings_aws_common".into(),
 					])
 					.into_musl_build_artifact()
 			),
 			TofuApplyAction,
-			DeployLightsailAction,
+			(
+				SyncS3Bucket::new("examples/assets"),
+				assets_bucket_block()
+			),
 		]),
 	)])
 		.xok()
 }
 
-/// Resolve the assets bucket, preferring BEET_ASSETS_DIR on deployed instances.
-#[allow(unused)]
-fn assets_bucket() -> FsBucket {
-	match env_ext::var("BEET_ASSETS_DIR") {
-		Ok(dir) => FsBucket::new(AbsPathBuf::new(dir).unwrap()),
-		Err(_) => FsBucket::new(WsPathBuf::new("examples/assets")),
-	}
-}
-
+/// The stack is used by both infra and router for resolving bucket names.
 #[allow(unused)]
 fn stack() -> Stack { Stack::new("hello_lightsail").with_aws_region("us-east-1") }
+
+#[cfg(feature = "bindings_aws_common")]
+fn assets_bucket_block() -> S3BucketBlock {
+	S3BucketBlock::new("assets").with_deploy_versioned(false)
+}
+
+/// Resolve the assets bucket. Identical to the Lambda pattern:
+/// on deployed instances, assets are accessed via S3 at runtime.
+/// During local development, assets are read from the workspace.
+#[allow(unused)]
+fn assets_bucket() -> impl BucketProvider {
+	cfg_if! {
+		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
+			let stk = stack();
+			assets_bucket_block().provider(&stk)
+		}else{
+			FsBucket::new(WsPathBuf::new("examples/assets"))
+		}
+	}
+}

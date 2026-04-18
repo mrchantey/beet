@@ -11,6 +11,9 @@ pub struct ChildProcess {
 	/// Arguments to pass to the command
 	#[set_with(skip)]
 	args: Vec<SmolStr>,
+	/// Environment variables to set for the child process.
+	#[set_with(skip)]
+	envs: Vec<(SmolStr, SmolStr)>,
 	/// Optional working directory for the command. If `None`, uses the current directory.
 	#[set_with(unwrap_option)]
 	cwd: Option<AbsPathBuf>,
@@ -35,6 +38,7 @@ impl ChildProcess {
 		Self {
 			command: command.into(),
 			args: Vec::new(),
+			envs: Vec::new(),
 			cwd: None,
 			not_found: None,
 		}
@@ -49,10 +53,22 @@ impl ChildProcess {
 		self
 	}
 
+	/// Sets environment variables for the child process.
+	pub fn with_envs(
+		mut self,
+		envs: impl IntoIterator<Item = (impl Into<SmolStr>, impl Into<SmolStr>)>,
+	) -> Self {
+		self.envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+		self
+	}
+
 	/// Run the command, collecting stdout
 	#[track_caller]
 	pub fn run(self) -> Result<Output> {
 		let mut cmd = std::process::Command::new(self.command.as_str());
+		for (key, val) in &self.envs {
+			cmd.env(key.as_str(), val.as_str());
+		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}
@@ -71,6 +87,9 @@ impl ChildProcess {
 	/// Run the command asynchronously using `async_process`, collecting stdout.
 	pub async fn run_async(self) -> Result<Output> {
 		let mut cmd = async_process::Command::new(self.command.as_str());
+		for (key, val) in &self.envs {
+			cmd.env(key.as_str(), val.as_str());
+		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
 		}

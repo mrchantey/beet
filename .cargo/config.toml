@@ -17,11 +17,5 @@ runner = 'beet run-wasm'
 # 	# "procmacro2_semver_exempt",
 # ]
 
-
-[target.x86_64-unknown-linux-musl]
-# gcc linker for musl cross-compilation
-linker = "gcc"
-
 [env]
 WORKSPACE_ROOT = { value = "", relative = true }
-CC_x86_64_unknown_linux_musl = "gcc"

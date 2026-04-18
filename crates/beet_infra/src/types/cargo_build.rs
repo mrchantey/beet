@@ -154,6 +154,7 @@ impl CargoBuild {
 	}
 	/// Convert into a musl cross-compiled [`BuildArtifact`] for Lightsail deployment.
 	/// Builds a statically linked release binary targeting `x86_64-unknown-linux-musl`.
+	/// Sets the GCC linker and C compiler environment variables required for musl cross-compilation.
 	#[cfg(feature = "deploy")]
 	pub fn into_musl_build_artifact(mut self) -> BuildArtifact {
 		self.musl = true;
@@ -161,7 +162,12 @@ impl CargoBuild {
 		let artifact_path = self.exe_path();
 		let args = self.cargo_args();
 		BuildArtifact::new(
-			ChildProcess::new("cargo").with_args(args),
+			ChildProcess::new("cargo")
+				.with_args(args)
+				.with_envs([
+					("CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER", "gcc"),
+					("CC_x86_64_unknown_linux_musl", "gcc"),
+				]),
 			artifact_path,
 		)
 	}

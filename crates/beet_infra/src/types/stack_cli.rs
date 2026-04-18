@@ -71,77 +71,6 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 	proj.apply().await
 }
 
-/// After rollback/rollforward, download artifacts from S3 and
-/// redeploy to any instances that require it, ie Lightsail.
-async fn rehydrate_and_redeploy(caller: &AsyncEntity) -> Result {
-	// get the stack and current ledger
-	let stack = caller
-		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).cloned()
-		})
-		.await?;
-	let client = stack.artifacts_client();
-	let ledger = client
-		.current_ledger()
-		.await?
-		.ok_or_else(|| bevyhow!("no current artifact ledger found"))?;
-
-	// collect artifacts from entity tree
-	let artifacts: Vec<(BuildArtifact, SmolStr)> = caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.collect_artifacts(entity)
-		})
-		.await?;
-
-	if artifacts.is_empty() {
-		return Ok(());
-	}
-
-	// download each artifact from S3 to its expected local path
-	for (build_artifact, label) in &artifacts {
-		if ledger.artifacts.contains_key(label.as_str()) {
-			info!("downloading artifact '{label}' from S3");
-			let bytes = client.download(label, &ledger.deploy_id).await?;
-			let local_path = build_artifact.artifact_path();
-			if let Some(parent) = local_path.parent() {
-				fs_ext::create_dir_all_async(parent).await?;
-			}
-			fs_ext::write_async(local_path, bytes.as_ref()).await?;
-			info!(
-				"rehydrated artifact '{label}' to {}",
-				local_path.display()
-			);
-		}
-	}
-
-	// build the project to get work directory and app name
-	let project = caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.build_project(entity)
-		})
-		.await?;
-	let dir = project.work_directory().into_abs();
-	let app_name = project.app_name().to_string();
-
-	// check if this is a Lightsail deployment by probing for public_address output
-	let has_public_address = ChildProcess::new("tofu")
-		.with_args(["output", "-raw", "public_address"])
-		.with_cwd(dir.clone())
-		.run_async_stdout()
-		.await
-		.is_ok();
-
-	if has_public_address {
-		if let Some((build_artifact, _)) = artifacts.first() {
-			info!("redeploying to lightsail instance");
-			deploy_binary_via_ssh(&dir, &app_name, build_artifact.artifact_path(), None)
-				.await?;
-		}
-	}
-
-	Ok(())
-}
-
 /// Validate the stack configuration.
 #[action(route = "validate")]
 #[derive(Component)]
@@ -213,8 +142,7 @@ struct RollbackParams {
 }
 
 /// Roll back to a previous artifact version, then re-apply infrastructure
-/// with the rolled-back deploy_id. Downloads artifacts and redeploys
-/// to instances that require it, ie Lightsail.
+/// with the rolled-back deploy_id.
 #[action(route = "rollback")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
@@ -226,22 +154,21 @@ async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollback(count).await?;
 	info!("rolled back to version {version}");
-	apply_with_current_ledger(&cx.caller).await?;
-	rehydrate_and_redeploy(&cx.caller).await?;
+	let result = apply_with_current_ledger(&cx.caller).await?;
+	info!("{result}");
 	format!("Rolled back to version {version} and re-applied").xok()
 }
 
 /// Roll forward to the latest artifact version, then re-apply infrastructure
-/// with the latest deploy_id. Downloads artifacts and redeploys
-/// to instances that require it, ie Lightsail.
+/// with the latest deploy_id.
 #[action(route = "rollforward")]
 #[derive(Component)]
 async fn Rollforward(cx: ActionContext) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollforward().await?;
 	info!("rolled forward to version {version}");
-	apply_with_current_ledger(&cx.caller).await?;
-	rehydrate_and_redeploy(&cx.caller).await?;
+	let result = apply_with_current_ledger(&cx.caller).await?;
+	info!("{result}");
 	format!("Rolled forward to version {version} and re-applied").xok()
 }
 
