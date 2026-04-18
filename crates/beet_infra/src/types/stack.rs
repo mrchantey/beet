@@ -30,6 +30,10 @@ pub struct Stack {
 	/// Additional parameters, some of which
 	/// may be required by a config generator
 	params: MultiMap<SmolStr, SmolStr>,
+	/// Unique deploy identifier, regenerated for each deployment.
+	pub(crate) deploy_id: Uuid,
+	/// Timestamp for this deployment.
+	deploy_timestamp: String,
 }
 
 impl Default for Stack {
@@ -53,6 +57,8 @@ impl Stack {
 			reconfigure: false,
 			backend: default(),
 			aws_region: crate::bindings::aws::region::DEFAULT.into(),
+			deploy_id: Uuid::now_v7(),
+			deploy_timestamp: crate::types::artifacts::now_timestamp(),
 		}
 	}
 	/// Create a stack with a local backend and a temporary directory for testing.
@@ -101,17 +107,27 @@ impl Stack {
 			.to_string()
 	}
 
+	/// Create an artifact ledger for the current deployment.
+	pub fn create_ledger(&self) -> ArtifactLedger {
+		ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone())
+	}
+
+	/// The S3 key for an artifact in this deployment.
+	pub fn artifact_key(&self, label: &str) -> String {
+		format!("versions/{}/{label}", self.deploy_id)
+	}
+
 	/// Create an artifacts client for this stack's artifact bucket.
 	pub fn artifacts_client(&self) -> ArtifactsClient {
 		cfg_if! {
-			if #[cfg(feature = "aws")] {
+			if #[cfg(feature = "aws_sdk")] {
 				let provider = beet_net::prelude::S3Bucket::new(
 					self.artifact_bucket_name(),
 					self.aws_region().clone(),
 				);
 				ArtifactsClient::new(Bucket::new(provider))
 			} else {
-				panic!("the `aws` feature is required for artifact operations")
+				panic!("the `aws_sdk` feature is required for artifact operations")
 			}
 		}
 	}
@@ -166,8 +182,30 @@ impl<'w, 's> StackQuery<'w, 's> {
 		stack.artifacts_client().xok()
 	}
 
+	/// Collect artifact entries from block descendants.
+	/// Returns `(BuildArtifact, artifact_label)` for each block
+	/// that has both a [`BuildArtifact`] and an artifact label.
+	#[cfg(feature = "deploy")]
+	pub fn collect_artifacts(
+		&self,
+		entity: Entity,
+	) -> Result<Vec<(BuildArtifact, SmolStr)>> {
+		let (root, _) = self.stacks.get(entity)?;
+		let mut pairs = Vec::new();
+		for child in self.children.iter_descendants_inclusive(root) {
+			if let Ok((entity_ref, block)) = self.blocks.get(child) {
+				if let Some(label) = block.artifact_label() {
+					if let Some(artifact) = entity_ref.get::<BuildArtifact>() {
+						pairs.push((artifact.clone(), SmolStr::from(label)));
+					}
+				}
+			}
+		}
+		Ok(pairs)
+	}
+
 	/// Get the provider from an [`S3Bucket`] on this entity
-	#[cfg(all(feature = "aws", feature = "bindings_aws_common"))]
+	#[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]
 	pub fn s3_provider(&self, entity: Entity) -> Result<S3Bucket> {
 		let (_, stack) = self.stacks.get(entity)?;
 		let bucket = self.s3_buckets.get(entity)?;

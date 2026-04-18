@@ -270,7 +270,8 @@ rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
 lambda = ["rustls-tls", "beet_net?/lambda"]
-aws = ["net", "beet_net?/aws","beet_infra?/aws"]
+aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk"]
+deploy = ["infra", "beet_infra?/deploy"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
@@ -291,8 +292,8 @@ tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
-lambda_block = ["infra", "aws", "beet_infra?/lambda_block", "fs", "rand"]
-lightsail_block = ["infra", "beet_infra?/lightsail_block", "fs", "rand"]
+lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
+lightsail_block = ["deploy", "aws_sdk", "beet_infra?/lightsail_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
@@ -466,7 +467,7 @@ required-features = ["thread","bevy_scene"]
 [[example]]
 name = "lifecycle"
 path = "examples/infra/lifecycle.rs"
-required-features = ["bindings_aws_common", "aws"]
+required-features = ["bindings_aws_common", "aws_sdk"]
 
 [[example]]
 name = "lightsail"

@@ -9,8 +9,7 @@ use serde_json::json;
 /// - Configurable ports
 /// - Systemd service user data
 #[derive(Debug, Clone, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable)]
-#[require(ErasedBlock=ErasedBlock::new::<Self>())]
+#[component(immutable, on_add = ErasedBlock::on_add::<LightsailBlock>)]
 pub struct LightsailBlock {
 	/// The port the application server listens on.
 	pub server_port: u16,

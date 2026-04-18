@@ -3,13 +3,13 @@ mod artifacts;
 mod infra_plugin;
 mod stack;
 mod stack_backend;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 mod stack_cli;
 pub use artifacts::*;
 pub use infra_plugin::*;
 pub use stack::*;
 pub use stack_backend::*;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 pub use stack_cli::*;
 mod cargo_build;
 pub use cargo_build::*;

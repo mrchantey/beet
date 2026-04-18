@@ -4,45 +4,68 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Tofu apply step for deploy exchange sequences.
-/// Builds a [`terra::Project`] from the nearest [`Stack`] ancestor and applies it.
-/// If an [`ArtifactLedger`] is present, publishes the ledger to S3 first,
-/// then passes artifact S3 keys and hashes as Terraform variables.
+/// Builds terraform config, uploads artifacts, publishes the ledger, and applies.
+///
+/// Collects each [`BuildArtifact`] + [`ErasedBlock`] pair from
+/// stack descendants to build the [`ArtifactLedger`], using
+/// [`Block::artifact_label`] for the label and
+/// [`BuildArtifact::compute_source_hash`] for the hash.
 #[action]
 #[derive(Default, Component)]
 pub async fn TofuApplyAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// build the project and read the artifact ledger + stack
-	let (project, ledger, stack) = cx
+	// step 1: build the project and collect artifact pairs
+	let (project, stack, artifacts) = cx
 		.caller
-		.with_state::<(
-			StackQuery,
-			AncestorQuery<&ArtifactLedger>,
-			AncestorQuery<&Stack>,
-		), _>(
-			|entity, (stack_query, ledger_query, anc_stack)| -> Result<_> {
+		.with_state::<(StackQuery, AncestorQuery<&Stack>), _>(
+			|entity, (stack_query, anc_stack)| -> Result<_> {
 				let project = stack_query.build_project(entity)?;
-				let ledger = ledger_query.get(entity)?.clone();
 				let stack = anc_stack.get(entity)?.clone();
-				(project, ledger, stack).xok()
+				let artifacts = stack_query.collect_artifacts(entity)?;
+				(project, stack, artifacts).xok()
 			},
 		)
 		.await?;
 
-	// publish ledger to S3 before apply so the artifact is available
-	stack
-		.artifacts_client()
+	// step 2: build ledger, upload artifacts to S3
+	let mut ledger = stack.create_ledger();
+	let client = stack.artifacts_client();
+	client.ensure_bucket().await?;
+
+	for (artifact, label) in &artifacts {
+		let artifact_path = AbsPathBuf::new(artifact.artifact_path())?;
+		let bytes = fs_ext::read_async(artifact_path.as_path()).await?;
+		let source_hash = artifact.compute_source_hash()?;
+		let s3_key = stack.artifact_key(label);
+
+		client
+			.upload_artifact(&ledger.deploy_id, label, bytes)
+			.await?;
+		info!(
+			"uploaded artifact to s3://{}/{}",
+			stack.artifact_bucket_name(),
+			s3_key,
+		);
+
+		ledger.push_artifact(
+			label.clone(),
+			ArtifactEntry {
+				s3_key: s3_key.into(),
+				source_hash: source_hash.into(),
+			},
+		)?;
+	}
+
+	// step 3: publish ledger
+	client
 		.publish_ledger(&ledger)
 		.await
 		.map_err(|err| bevyhow!("failed to publish artifact ledger: {err}"))?;
-	info!("published artifact ledger: {}", ledger.uuid);
+	info!("published artifact ledger: {}", ledger.deploy_id);
 
-	// collect terraform variables from the artifact ledger
-	let vars = ledger.build_vars(&stack.artifact_bucket_name());
-	info!("applying with {} artifact variables", vars.len());
-	let result = project.apply_with_vars(&vars).await?;
-
+	// step 4: apply terraform
+	let result = project.apply().await?;
 	info!("{result}");
 
 	Pass(cx.input).xok()

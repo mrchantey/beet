@@ -20,8 +20,7 @@ pub enum DnsProvider {
 /// - HTML and assets S3 buckets
 /// - Optional DNS configuration (Cloudflare or Route53)
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
-#[component(immutable)]
-#[require(ErasedBlock=ErasedBlock::new::<Self>())]
+#[component(immutable, on_add = ErasedBlock::on_add::<LambdaBlock>)]
 pub struct LambdaBlock {
 	/// Label used as a prefix for all terraform resources,
 	/// variables, and outputs. Also used as the artifact name.
@@ -52,45 +51,21 @@ impl LambdaBlock {
 }
 
 impl Block for LambdaBlock {
+	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
 	fn apply_to_config(
 		&self,
-		_entity: &EntityRef,
+		entity: &EntityRef,
 		stack: &Stack,
 		config: &mut terra::Config,
 	) -> Result {
 		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
 
-		// artifact variables for S3-based Lambda deployment
-		config.add_variable(
-			self.build_label("s3_bucket"),
-			terra::Variable {
-				r#type: Some("string".into()),
-				default: Some(serde_json::Value::String(String::new())),
-				description: Some(
-					"S3 bucket containing the Lambda deployment package".into(),
-				),
-			},
-		)?;
-		config.add_variable(self.build_label("s3_key"), terra::Variable {
-			r#type: Some("string".into()),
-			default: Some(serde_json::Value::String(String::new())),
-			description: Some("S3 key of the Lambda deployment package".into()),
-		})?;
-		config
-			.add_variable(self.build_label("source_hash"), terra::Variable {
-			r#type: Some("string".into()),
-			default: Some(serde_json::Value::String(String::new())),
-			description: Some(
-				"Base64-encoded SHA256 hash of the Lambda deployment package"
-					.into(),
-			),
-		})?;
-
-		let var_s3_bucket =
-			format!("${{var.{}}}", self.build_label("s3_bucket"));
-		let var_s3_key = format!("${{var.{}}}", self.build_label("s3_key"));
-		let var_source_hash =
-			format!("${{var.{}}}", self.build_label("source_hash"));
+		// artifact values computed directly from stack and entity
+		let artifact_bucket = stack.artifact_bucket_name();
+		let artifact_key = stack.artifact_key(&self.label);
+		let source_hash = entity
+			.get::<BuildArtifact>()
+			.and_then(|artifact| artifact.compute_source_hash().ok());
 
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
@@ -139,13 +114,13 @@ impl Block for LambdaBlock {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				s3_bucket: Some(var_s3_bucket.into()),
-				s3_key: Some(var_s3_key.into()),
+				s3_bucket: Some(artifact_bucket.into()),
+				s3_key: Some(artifact_key.into()),
 				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(180),
 				memory_size: Some(1024),
-				source_code_hash: Some(var_source_hash.into()),
+				source_code_hash: source_hash.map(Into::into),
 				..default()
 			},
 		);

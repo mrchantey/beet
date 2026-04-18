@@ -17,7 +17,7 @@ pub enum StackBackend {
 impl Default for StackBackend {
 	fn default() -> Self {
 		cfg_if! {
-			if #[cfg(feature = "aws")] {
+			if #[cfg(feature = "aws_sdk")] {
 				StackBackend::S3(S3Backend::default())
 			} else {
 				StackBackend::Local(LocalBackend::default())
@@ -46,7 +46,7 @@ impl StackBackend {
 			#[allow(unused)]
 			Self::S3(s3) => {
 				cfg_if! {
-					if #[cfg(feature = "aws")] {
+					if #[cfg(feature = "aws_sdk")] {
 						s3.provider().box_clone()
 					} else {
 						panic!("aws feature is required for S3 backend provider usage")
@@ -138,7 +138,7 @@ pub struct S3Backend {
 }
 
 impl S3Backend {
-	#[cfg(feature = "aws")]
+	#[cfg(feature = "aws_sdk")]
 	pub fn provider(&self) -> beet_net::prelude::S3Bucket {
 		beet_net::prelude::S3Bucket::new(
 			self.bucket.clone(),

@@ -1,12 +1,12 @@
-//! Build and upload artifact step for deploy sequences.
-use crate::prelude::*;
+//! Build artifact step for deploy sequences.
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use std::path::PathBuf;
 
 /// A build step that runs a process and produces an artifact file.
-/// Used as an ECS Component on deploy sequence entities.
+/// Used as an ECS Component on deploy sequence entities alongside a block.
+/// The [`TofuApplyAction`] collects these to build the artifact ledger.
 #[derive(Debug, Clone, Get, SetWith, Component)]
 #[require(BuildArtifactAction)]
 pub struct BuildArtifact {
@@ -39,23 +39,41 @@ impl BuildArtifact {
 			artifact_path,
 		}
 	}
+
+	/// Compute a base64-encoded SHA256 hash of the artifact file,
+	/// matching Terraform's `filebase64sha256` function.
+	/// Returns an error if the file cannot be read.
+	pub fn compute_source_hash(&self) -> Result<String> {
+		cfg_if! {
+			if #[cfg(feature = "deploy")] {
+				use base64::Engine;
+				use sha2::Digest;
+				let bytes = std::fs::read(&self.artifact_path)
+					.map_err(|err| bevyhow!(
+						"failed to read artifact {}: {err}",
+						self.artifact_path.display()
+					))?;
+				let hash = sha2::Sha256::digest(&bytes);
+				base64::engine::general_purpose::STANDARD.encode(hash).xok()
+			} else {
+				bevybail!("the `deploy` feature is required for artifact hash computation")
+			}
+		}
+	}
 }
 
-
-/// Runs the build process from [`BuildArtifact`] on an ancestor entity,
-/// then uploads the result to the artifacts S3 bucket and registers it
-/// in the [`ArtifactLedger`].
-/// Errors if no [`ArtifactLedger`] or [`Stack`] ancestor is found,
-/// as a ledger is the only way to deploy an artifact.
+/// Runs the build process from [`BuildArtifact`].
+/// After building, the artifact file exists on disk for
+/// [`TofuApplyAction`] to upload and hash.
 #[action]
 #[derive(Default, Component)]
 pub async fn BuildArtifactAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// step 1: read build artifact config from ancestor
+	// read build artifact config
 	let build = cx.caller.get_cloned::<BuildArtifact>().await?;
 
-	// step 2: run the build process
+	// run the build process
 	info!("building: {}", build.process());
 	build
 		.process()
@@ -67,82 +85,5 @@ pub async fn BuildArtifactAction(
 	let artifact_path = AbsPathBuf::new(build.artifact_path())?;
 	info!("artifact built: {}", artifact_path.display());
 
-	// step 3: upload to S3 and register in the ledger
-	upload_to_ledger(&cx, &build, &artifact_path).await?;
-
 	Pass(cx.input).xok()
-}
-
-/// Read the built artifact, upload to S3, and register in the [`ArtifactLedger`].
-/// Errors if no ledger or stack ancestor is found.
-async fn upload_to_ledger(
-	cx: &ActionContext<Request>,
-	build: &BuildArtifact,
-	artifact_path: &AbsPathBuf,
-) -> Result<()> {
-	// require both a ledger and stack ancestor
-	let (ledger_uuid, stack_client, artifact_bucket_name) = cx
-		.caller
-		.with_state::<(AncestorQuery<&ArtifactLedger>, AncestorQuery<&Stack>), _>(
-			|entity, (ledger_query, stack_query)| -> Result<_> {
-				let ledger = ledger_query.get(entity)
-					.map_err(|_| bevyhow!("no ArtifactLedger ancestor found, a ledger is required to build artifacts"))?;
-				let stack = stack_query.get(entity)
-					.map_err(|_| bevyhow!("no Stack ancestor found, a stack is required to build artifacts"))?;
-				let client = stack.artifacts_client();
-				let bucket_name = stack.artifact_bucket_name();
-				(ledger.uuid, client, bucket_name).xok()
-			},
-		)
-		.await?;
-
-	// read the built artifact
-	let bytes = fs_ext::read_async(artifact_path.as_path()).await?;
-	info!("{} bytes", bytes.len());
-
-	let source_hash = compute_source_hash(&bytes);
-
-	// ensure the artifact bucket exists and upload
-	stack_client.ensure_bucket().await?;
-	let artifact_label = build.label();
-	let s3_key: SmolStr =
-		format!("versions/{}/{}", ledger_uuid, artifact_label).into();
-	stack_client
-		.upload_artifact(&ledger_uuid, artifact_label, bytes)
-		.await?;
-	info!(
-		"uploaded artifact to s3://{}/{}",
-		artifact_bucket_name, s3_key
-	);
-
-	// update the ledger with this artifact, using the BuildArtifact label as key
-	let entry = ArtifactEntry {
-		s3_key: s3_key.clone(),
-		source_hash: source_hash.into(),
-	};
-	let label: SmolStr = artifact_label.clone();
-	cx.caller
-		.with_state::<AncestorQuery<&mut ArtifactLedger>, Result>(
-			move |entity, mut query| {
-				let mut ledger = query.get_mut(entity)?;
-				ledger.push_artifact(label, entry)
-			},
-		)
-		.await
-}
-
-/// Compute a base64-encoded SHA256 hash of the given bytes,
-/// matching Terraform's `filebase64sha256` function.
-fn compute_source_hash(bytes: &[u8]) -> String {
-	cfg_if! {
-		if #[cfg(feature = "aws")] {
-			use base64::Engine;
-			use sha2::Digest;
-			let hash = sha2::Sha256::digest(bytes);
-			base64::engine::general_purpose::STANDARD.encode(hash)
-		} else {
-			let _ = bytes;
-			panic!("the `aws` feature is required for artifact hash computation")
-		}
-	}
 }

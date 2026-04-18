@@ -427,12 +427,12 @@ pub async fn s3_fs_selector(
 			debug!("Bucket Selector - FS: {fs_path}");
 			Bucket::new(FsBucket::new(fs_path))
 		}
-		#[cfg(not(all(feature = "aws", not(target_arch = "wasm32"))))]
+		#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
-			debug!("Bucket Selector - FS (no aws or wasm): {fs_path}");
+			debug!("Bucket Selector - FS (no aws_sdk or wasm): {fs_path}");
 			Bucket::new(FsBucket::new(fs_path))
 		}
-		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Bucket Selector - S3: {bucket_name}");
 			let provider = S3Bucket::new(bucket_name, region);

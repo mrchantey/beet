@@ -33,7 +33,7 @@ hyper = [
 lambda = ["rustls-tls", "dep:lambda_http", "beet_core/tokio"]
 fs = ["beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
-aws = [
+aws_sdk = [
 	"serde",
 	"dep:crc-fast",
 	"dep:aws-sdk-s3",

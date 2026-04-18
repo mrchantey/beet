@@ -375,12 +375,12 @@ pub async fn dynamo_fs_selector<T: TableStoreRow>(
 			debug!("Table Selector - FS: {fs_path}");
 			TableStore::new(FsBucket::new(fs_path.clone()))
 		}
-		#[cfg(not(all(feature = "aws", not(target_arch = "wasm32"))))]
+		#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
-			debug!("Table Selector - FS (no aws feature): {fs_path}");
+			debug!("Table Selector - FS (no aws_sdk feature): {fs_path}");
 			TableStore::new(FsBucket::new(fs_path.clone()))
 		}
-		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - Dynamo: {table_name}");
 			TableStore::new(DynamoBucket::new(table_name, region))

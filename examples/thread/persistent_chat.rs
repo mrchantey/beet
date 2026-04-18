@@ -27,7 +27,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	cfg_if! {
-		if #[cfg(feature="aws")]{
+		if #[cfg(feature="aws_sdk")]{
 			// swap out for s3 storage by changing the bucket
 			// see infra examples for configuring buckets
 			let bucket = S3Bucket::new("some-bucket","some-region");

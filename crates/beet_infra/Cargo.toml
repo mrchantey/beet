@@ -13,9 +13,10 @@ repository.workspace = true
 default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-aws = ["beet_net/aws", "dep:sha2", "dep:base64"]
-lambda_block = ["cli", "aws", "bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
-lightsail_block = ["cli", "aws", "bindings_aws_lightsail"]
+aws_sdk = ["beet_net/aws_sdk"]
+deploy = ["dep:beet_action", "dep:beet_router", "dep:sha2", "dep:base64"]
+lambda_block = ["deploy", "bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
+lightsail_block = ["deploy", "bindings_aws_lightsail"]
 bindings_aws_common = []
 bindings_aws_dns = []
 bindings_aws_lightsail = []
@@ -27,7 +28,6 @@ bindings_aws_all = [
 	"bindings_aws_lambda",
 ]
 bindings_cloudflare_common = []
-cli = ["dep:beet_action", "dep:beet_router"]
 
 [[bin]]
 name = "bindings"

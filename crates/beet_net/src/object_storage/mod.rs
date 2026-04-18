@@ -6,8 +6,8 @@
 //! - [`InMemoryBucket`]: Ephemeral storage for testing
 //! - [`FsBucket`]: Local filesystem storage (native only)
 //! - [`LocalStorageBucket`]: Browser localStorage (WASM only)
-//! - [`S3Bucket`]: AWS S3 storage (requires `aws` feature)
-//! - [`DynamoBucket`]: AWS DynamoDB storage (requires `aws` feature)
+//! - [`S3Bucket`]: AWS S3 storage (requires `aws_sdk` feature)
+//! - [`DynamoBucket`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //!
 //! Use [`BucketPlugin`] to register bucket types for scene serialization.
 //! [`TypedBucket`] and [`TypedBlob`] are the serializable wrappers that
@@ -55,13 +55,13 @@ mod local_storage_provider;
 pub use fs_provider::*;
 #[cfg(target_arch = "wasm32")]
 pub use local_storage_provider::*;
-#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use s3_provider::*;
-#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod s3_provider;
-#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use dynamo_provider::*;
-#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod dynamo_provider;
 
 use beet_core::prelude::*;
@@ -88,7 +88,7 @@ impl Plugin for BucketPlugin {
 			.register_type::<TypedBucket<LocalStorageBucket>>()
 			.register_type::<TypedBlob<LocalStorageBucket>>();
 
-		#[cfg(all(feature = "aws", not(target_arch = "wasm32")))]
+		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Bucket>()
 			.register_type::<DynamoBucket>()
 			.register_type::<TypedBucket<S3Bucket>>()

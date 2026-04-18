@@ -8,9 +8,8 @@ use serde_json::json;
 
 
 
-#[derive(Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Component)]
-#[component(immutable)]
-#[require(ErasedBlock=ErasedBlock::new::<Self>())]
+#[derive(Debug, Clone, Get, Deref, DerefMut, Serialize, Deserialize, Component)]
+#[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
 pub struct S3BucketBlock {
 	label: SmolStr,
 	#[deref]
@@ -41,7 +40,7 @@ impl S3BucketBlock {
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
-	#[cfg(feature = "aws")]
+	#[cfg(feature = "aws_sdk")]
 	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Bucket {
 		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());

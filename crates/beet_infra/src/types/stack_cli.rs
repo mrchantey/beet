@@ -36,24 +36,38 @@ async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 		.await
 }
 
-/// Read the current ledger and stack, then apply with artifact vars.
+/// Read the current ledger, update the stack's deploy_id to match,
+/// rebuild the config, and re-apply terraform.
 async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
-	let (proj, stack) = caller
-		.with_state::<(StackQuery, AncestorQuery<&Stack>), _>(
-			|entity, (stack_query, anc_stack)| -> Result<_> {
-				let project = stack_query.build_project(entity)?;
-				let stack = anc_stack.get(entity)?.clone();
-				(project, stack).xok()
-			},
-		)
+	let stack = caller
+		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
+			query.get(entity).cloned()
+		})
 		.await?;
 	let client = stack.artifacts_client();
 	let ledger = client.current_ledger().await?.ok_or_else(|| {
 		bevyhow!("no current artifact ledger found")
 	})?;
-	let vars = ledger.build_vars(&stack.artifact_bucket_name());
-	info!("re-applying with {} artifact variables", vars.len());
-	proj.apply_with_vars(&vars).await
+
+	// update the stack's deploy_id to point at the target version
+	let target_id = ledger.deploy_id;
+	caller
+		.with_state::<AncestorQuery<&mut Stack>, Result>(
+			move |entity, mut query| {
+				query.get_mut(entity)?.deploy_id = target_id;
+				Ok(())
+			},
+		)
+		.await?;
+
+	// rebuild and re-apply with the updated deploy_id
+	let proj = caller
+		.with_state::<StackQuery, _>(|entity, query| {
+			query.build_project(entity)
+		})
+		.await?;
+	info!("re-applying with deploy_id: {target_id}");
+	proj.apply().await
 }
 
 /// Validate the stack configuration.
@@ -122,7 +136,7 @@ struct RollbackParams {
 }
 
 /// Roll back to a previous artifact version, then re-apply infrastructure
-/// with the rolled-back artifact variables.
+/// with the rolled-back deploy_id.
 #[action(route = "rollback")]
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
@@ -134,20 +148,18 @@ async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollback(count).await?;
 	info!("rolled back to version {version}");
-	// re-apply infrastructure with the rolled-back artifact vars
 	apply_with_current_ledger(&cx.caller).await?;
 	format!("Rolled back to version {version} and re-applied").xok()
 }
 
 /// Roll forward to the latest artifact version, then re-apply infrastructure
-/// with the latest artifact variables.
+/// with the latest deploy_id.
 #[action(route = "rollforward")]
 #[derive(Component)]
 async fn Rollforward(cx: ActionContext) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollforward().await?;
 	info!("rolled forward to version {version}");
-	// re-apply infrastructure with the latest artifact vars
 	apply_with_current_ledger(&cx.caller).await?;
 	format!("Rolled forward to version {version} and re-applied").xok()
 }
@@ -195,7 +207,6 @@ mod tests {
 			.flush();
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		let destroy_node = tree.find(&["destroy"]).unwrap();
-		// verify the entity has a ParamsPartial component
 		world
 			.entity(destroy_node.entity)
 			.get::<ParamsPartial>()

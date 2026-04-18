@@ -1,16 +1,12 @@
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 mod build_artifact;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 mod deploy_lightsail_action;
-#[cfg(feature = "cli")]
-mod generate_artifact_ledger;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 mod tofu_apply_action;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 pub use build_artifact::*;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 pub use deploy_lightsail_action::*;
-#[cfg(feature = "cli")]
-pub use generate_artifact_ledger::*;
-#[cfg(feature = "cli")]
+#[cfg(feature = "deploy")]
 pub use tofu_apply_action::*;

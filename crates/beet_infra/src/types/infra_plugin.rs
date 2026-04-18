@@ -10,7 +10,7 @@ pub struct InfraPlugin;
 impl Plugin for InfraPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>();
-		#[cfg(feature = "cli")]
+		#[cfg(feature = "deploy")]
 		app.init_plugin::<beet_router::prelude::RouterAppPlugin>();
 	}
 }

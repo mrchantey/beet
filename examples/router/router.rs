@@ -58,8 +58,8 @@ fn main() -> AppExit {
 
 fn setup(mut commands: Commands) -> Result {
 	cfg_if! {
-		if #[cfg(feature="lambda_block")]{
-			// with infra flag we are deploying
+		if #[cfg(feature="deploy")]{
+			// with deploy flag we are provisioning infrastructure
 			commands.spawn(infra_scene()?);
 		}else{
 			// otherwise use the router app
@@ -76,16 +76,15 @@ fn stack() -> Stack {
 	Stack::new("router-example").with_aws_region("us-west-2")
 }
 
-#[cfg(feature = "lambda_block")]
+#[cfg(feature = "bindings_aws_common")]
 fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
 
-#[cfg(feature = "lambda_block")]
+#[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
 	(stack(), stack_cli(), children![route(
 		"deploy",
-		// deploy: generate ledger, build, apply, then sync assets
+		// deploy: build, apply, then sync assets
 		(exchange_sequence(), children![
-			GenerateArtifactLedger,
 			(
 				LambdaBlock::default(),
 				CargoBuild::default()
@@ -93,12 +92,12 @@ fn infra_scene() -> Result<impl Bundle> {
 					.with_example("router")
 					.with_additional_args(vec![
 						"--features".into(),
-						"http_server,lambda,router,infra,aws".into(),
+						"http_server,lambda,router,infra,aws_sdk,bindings_aws_common".into(),
 					])
 					.into_lambda_build_artifact()
 			),
 			TofuApplyAction,
-			(SyncAssetsAction, assets_bucket_block()),
+			(SyncBucketAction, assets_bucket_block()),
 		]),
 	)])
 		.xok()
@@ -106,18 +105,14 @@ fn infra_scene() -> Result<impl Bundle> {
 
 fn assets_bucket() -> impl BucketProvider {
 	cfg_if! {
-		if #[cfg(feature="aws")]{
+		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
 			let stk = stack();
-			let bucket_name = stk.resource_ident("assets")
-				.primary_identifier()
-				.to_string();
-			S3Bucket::new(bucket_name, stk.aws_region().clone())
+			assets_bucket_block().provider(&stk)
 		}else{
 			FsBucket::new(WsPathBuf::new("examples/assets"))
 		}
 	}
 }
-
 
 #[allow(unused)]
 fn router_scene() -> Result<impl Bundle> {
@@ -231,28 +226,37 @@ fn sequence() -> impl Bundle {
 }
 
 
-/// Sync local assets to the S3 assets bucket after infrastructure apply.
-#[cfg(feature = "lambda_block")]
+/// Sync local assets to the nearest ancestor [`S3BucketBlock`]'s bucket.
+#[cfg(feature = "deploy")]
 #[action]
 #[derive(Default, Component)]
-async fn SyncAssetsAction(
+async fn SyncBucketAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let stk = cx
+	let (bucket_name, region) = cx
 		.caller
-		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
-			query.get(entity).cloned()
-		})
+		.with_state::<(AncestorQuery<&S3BucketBlock>, AncestorQuery<&Stack>), _>(
+			|entity, (bucket_query, stack_query)| -> Result<_> {
+				let bucket_block = bucket_query.get(entity)?;
+				let stack = stack_query.get(entity)?;
+				let name = stack
+					.resource_ident(bucket_block.label().clone())
+					.primary_identifier()
+					.to_string();
+				let region = bucket_block
+					.region
+					.as_ref()
+					.unwrap_or(stack.aws_region())
+					.clone();
+				(name, region).xok()
+			},
+		)
 		.await?;
-	let bucket_name = stk
-		.resource_ident("assets")
-		.primary_identifier()
-		.to_string();
 	let local_dir = AbsPathBuf::new_workspace_rel("examples/assets")?;
 	S3Sync::push(local_dir, format!("s3://{bucket_name}/"))
 		.send()
 		.await?;
-	info!("synced assets to s3://{bucket_name}/");
+	info!("synced assets to s3://{bucket_name}/ (region: {region})");
 	Pass(cx.input).xok()
 }
 
