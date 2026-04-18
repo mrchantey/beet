@@ -45,16 +45,17 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 		})
 		.await?;
 	let client = stack.artifacts_client();
-	let ledger = client.current_ledger().await?.ok_or_else(|| {
-		bevyhow!("no current artifact ledger found")
-	})?;
+	let ledger = client
+		.current_ledger()
+		.await?
+		.ok_or_else(|| bevyhow!("no current artifact ledger found"))?;
 
 	// update the stack's deploy_id to point at the target version
 	let target_id = ledger.deploy_id;
 	caller
 		.with_state::<AncestorQuery<&mut Stack>, Result>(
 			move |entity, mut query| {
-				query.get_mut(entity)?.deploy_id = target_id;
+				query.get_mut(entity)?.update_from_ledger(&ledger);
 				Ok(())
 			},
 		)

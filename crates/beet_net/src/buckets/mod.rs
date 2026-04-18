@@ -75,7 +75,6 @@ pub struct BucketPlugin;
 impl Plugin for BucketPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<FsBucket>()
-			.register_type::<TypedBucket<FsBucket>>()
 			.register_type::<TypedBlob<FsBucket>>();
 
 		#[cfg(feature = "bevy_scene")]
@@ -83,15 +82,12 @@ impl Plugin for BucketPlugin {
 
 		#[cfg(target_arch = "wasm32")]
 		app.register_type::<LocalStorageBucket>()
-			.register_type::<TypedBucket<LocalStorageBucket>>()
 			.register_type::<TypedBlob<LocalStorageBucket>>();
 
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Bucket>()
 			.register_type::<DynamoBucket>()
-			.register_type::<TypedBucket<S3Bucket>>()
 			.register_type::<TypedBlob<S3Bucket>>()
-			.register_type::<TypedBucket<DynamoBucket>>()
 			.register_type::<TypedBlob<DynamoBucket>>();
 	}
 }

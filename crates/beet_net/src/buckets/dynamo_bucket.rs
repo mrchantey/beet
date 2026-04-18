@@ -135,7 +135,7 @@ impl DynamoBucket {
 
 	/// Create a [`TypedBlob`] handle for a single object in this bucket.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(TypedBucket(self.clone()), path)
+		TypedBlob::new(self.clone(), path)
 	}
 }
 

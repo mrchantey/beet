@@ -132,7 +132,6 @@ impl CargoBuild {
 		}
 		args
 	}
-	#[cfg(feature = "deploy")]
 	/// Convert into a standard cargo [`BuildArtifact`].
 	pub fn into_build_artifact(self) -> BuildArtifact {
 		let artifact_path = self.exe_path();
@@ -142,7 +141,6 @@ impl CargoBuild {
 			artifact_path,
 		)
 	}
-	#[cfg(feature = "deploy")]
 	/// Convert into a lambda [`BuildArtifact`].
 	/// Builds the lambda binary then zips it for S3 deployment,
 	/// as AWS Lambda requires ZIP packages.

@@ -126,8 +126,12 @@ impl Block for LambdaBlock {
 						variables: Some({
 							let mut vars = std::collections::BTreeMap::new();
 							vars.insert(
-								"DEPLOY_ID".into(),
-								stack.deploy_id.to_string().into(),
+								"BEET_DEPLOY_ID".into(),
+								stack.deploy_id().to_string().into(),
+							);
+							vars.insert(
+								"BEET_DEPLOY_TIMESTAMP".into(),
+								stack.deploy_timestamp().to_string().into(),
 							);
 							vars
 						}),

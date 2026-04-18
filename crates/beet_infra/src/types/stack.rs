@@ -31,7 +31,7 @@ pub struct Stack {
 	/// may be required by a config generator
 	params: MultiMap<SmolStr, SmolStr>,
 	/// Unique deploy identifier, regenerated for each deployment.
-	pub(crate) deploy_id: Uuid,
+	deploy_id: Uuid,
 	/// Timestamp for this deployment.
 	deploy_timestamp: String,
 }
@@ -46,6 +46,16 @@ impl Stack {
 	pub fn new(app_name: impl Into<SmolStr>) -> Self {
 		let app_name = app_name.into();
 		let work_directory = WsPathBuf::new(format!("target/infra/{app_name}"));
+
+		let deploy_id = env_ext::var("BEET_DEPLOY_ID")
+			.ok()
+			.and_then(|s| Uuid::parse_str(&s).ok())
+			.unwrap_or_else(Uuid::now_v7);
+
+		let deploy_timestamp = env_ext::var("BEET_DEPLOY_TIMESTAMP")
+			.ok()
+			.unwrap_or_else(crate::types::artifacts::now_timestamp);
+
 		Self {
 			app_name,
 			work_directory,
@@ -57,10 +67,16 @@ impl Stack {
 			reconfigure: false,
 			backend: default(),
 			aws_region: crate::bindings::aws::region::DEFAULT.into(),
-			deploy_id: Uuid::now_v7(),
-			deploy_timestamp: crate::types::artifacts::now_timestamp(),
+			deploy_id,
+			deploy_timestamp,
 		}
 	}
+	pub fn update_from_ledger(&mut self, ledger: &ArtifactLedger) {
+		self.deploy_id = ledger.deploy_id;
+		self.deploy_timestamp = ledger.timestamp.clone();
+	}
+
+
 	/// Create a stack with a local backend and a temporary directory for testing.
 	/// The directory will be removed on drop.
 	#[cfg(test)]
@@ -180,7 +196,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 		stack.artifacts_client().xok()
 	}
 
-	#[cfg(feature = "deploy")]
 	/// Collect artifact entries from block descendants.
 	/// Returns `(BuildArtifact, artifact_label)` for each block
 	/// that has both a [`BuildArtifact`] and an artifact label.

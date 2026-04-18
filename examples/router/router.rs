@@ -77,7 +77,9 @@ fn stack() -> Stack {
 }
 
 #[cfg(feature = "bindings_aws_common")]
-fn assets_bucket_block() -> S3BucketBlock { S3BucketBlock::new("assets") }
+fn assets_bucket_block() -> S3BucketBlock {
+	S3BucketBlock::new("assets").with_deploy_versioned(true)
+}
 
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
@@ -106,12 +108,7 @@ fn assets_bucket() -> impl BucketProvider {
 	cfg_if! {
 		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
 			let stk = stack();
-			let mut bucket = assets_bucket_block().provider(&stk);
-			// use deploy_id as subdir for version-specific assets
-			if let Ok(deploy_id) = std::env::var("DEPLOY_ID") {
-				bucket = bucket.with_subdir(deploy_id);
-			}
-			bucket
+			assets_bucket_block().provider(&stk)
 		}else{
 			FsBucket::new(WsPathBuf::new("examples/assets"))
 		}

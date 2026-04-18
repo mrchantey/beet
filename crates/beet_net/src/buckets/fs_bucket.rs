@@ -21,13 +21,21 @@ pub struct FsBucket {
 }
 
 impl Default for FsBucket {
-	fn default() -> Self { Self { path: WsPathBuf::default().into(), subdir: None } }
+	fn default() -> Self {
+		Self {
+			path: WsPathBuf::default().into(),
+			subdir: None,
+		}
+	}
 }
 
 impl FsBucket {
 	/// Create a new filesystem bucket with the given bucket path.
 	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
-		Self { path: path.into(), subdir: None }
+		Self {
+			path: path.into(),
+			subdir: None,
+		}
 	}
 	/// Set the subdirectory from which all paths are resolved.
 	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
@@ -47,7 +55,7 @@ impl FsBucket {
 	}
 	/// Create a [`TypedBlob`] handle for a single object in this bucket.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(TypedBucket(self.clone()), path)
+		TypedBlob::new(self.clone(), path)
 	}
 }
 

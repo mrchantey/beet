@@ -7,7 +7,15 @@ use serde_json::json;
 
 
 #[derive(
-	Debug, Clone, Get, Deref, DerefMut, Serialize, Deserialize, Component,
+	Debug,
+	Clone,
+	Get,
+	Deref,
+	DerefMut,
+	SetWith,
+	Serialize,
+	Deserialize,
+	Component,
 )]
 #[component(immutable, on_add = on_add_s3_bucket_block)]
 pub struct S3BucketBlock {
@@ -18,6 +26,9 @@ pub struct S3BucketBlock {
 	output: bool,
 	/// apply the stack default region if none set
 	apply_region: bool,
+	/// All objects will be nested under the deploy uuid,
+	/// ensuring unique files per deploy
+	deploy_versioned: bool,
 }
 
 
@@ -31,11 +42,8 @@ impl S3BucketBlock {
 			},
 			apply_region: true,
 			output: true,
+			deploy_versioned: true,
 		}
-	}
-	pub fn with_output(mut self, output: bool) -> Self {
-		self.output = output;
-		self
 	}
 
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
@@ -44,10 +52,15 @@ impl S3BucketBlock {
 	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Bucket {
 		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());
-		beet_net::prelude::S3Bucket::new(
+		let mut bucket = beet_net::prelude::S3Bucket::new(
 			bucket_name.primary_identifier().clone(),
 			region.clone(),
-		)
+		);
+		if self.deploy_versioned {
+			bucket =
+				bucket.with_subdir(RelPath::new(stack.deploy_id().to_string()));
+		}
+		bucket
 	}
 }
 

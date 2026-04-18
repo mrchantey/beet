@@ -71,7 +71,7 @@ impl S3Bucket {
 
 	/// Create a [`TypedBlob`] handle for a single object in this bucket.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(TypedBucket(self.clone()), path)
+		TypedBlob::new(self.clone(), path)
 	}
 }
 
@@ -214,18 +214,14 @@ impl BucketProvider for S3Bucket {
 				}
 				let list_result = req.send().await?;
 				let contents = list_result.contents.unwrap_or_default();
-				paths.extend(
-					contents
-						.into_iter()
-						.filter_map(|obj| {
-							let key = obj.key?;
-							let rel = match &prefix {
-								Some(p) => key.strip_prefix(p.as_str())?,
-								None => &key,
-							};
-							Some(RelPath::new(rel))
-						}),
-				);
+				paths.extend(contents.into_iter().filter_map(|obj| {
+					let key = obj.key?;
+					let rel = match &prefix {
+						Some(p) => key.strip_prefix(p.as_str())?,
+						None => &key,
+					};
+					Some(RelPath::new(rel))
+				}));
 
 				if list_result.is_truncated == Some(true) {
 					continuation_token = list_result.next_continuation_token;

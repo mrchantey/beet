@@ -171,19 +171,19 @@ where
 	path: RelPath,
 	/// Typed bucket that owns this blob.
 	#[get(skip)]
-	bucket: TypedBucket<B>,
+	bucket: B,
 }
 
 fn on_add_typed_blob<B>(mut world: DeferredWorld, cx: HookContext)
 where
 	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
 {
-	let typed = world
+	let blob = world
 		.entity(cx.entity)
 		.get::<TypedBlob<B>>()
 		.unwrap()
-		.clone();
-	let blob = Blob::new(Bucket::new(typed.bucket.0.clone()), typed.path);
+		.clone()
+		.to_blob();
 	world.commands().entity(cx.entity).insert(blob);
 }
 
@@ -192,20 +192,18 @@ where
 	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
 {
 	/// Create a new [`TypedBlob`] from a [`TypedBucket`] and path.
-	pub fn new(bucket: TypedBucket<B>, path: RelPath) -> Self {
-		Self { path, bucket }
-	}
+	pub fn new(bucket: B, path: RelPath) -> Self { Self { path, bucket } }
 
 	/// Convert to an erased [`Blob`].
 	pub fn to_blob(&self) -> Blob {
-		Blob::new(Bucket::new(self.bucket.0.clone()), self.path.clone())
+		Blob::new(Bucket::new(self.bucket.clone()), self.path.clone())
 	}
 
 	/// Get the underlying [`TypedBucket`].
-	pub fn bucket(&self) -> &TypedBucket<B> { &self.bucket }
+	pub fn bucket(&self) -> &B { &self.bucket }
 
 	/// Get the underlying [`Bucket`] (type-erased).
-	pub fn erased_bucket(&self) -> Bucket { Bucket::new(self.bucket.0.clone()) }
+	pub fn erased_bucket(&self) -> Bucket { Bucket::new(self.bucket.clone()) }
 
 	/// Insert (or overwrite) the blob's content.
 	///
