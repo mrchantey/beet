@@ -107,11 +107,6 @@ impl Stack {
 			.to_string()
 	}
 
-	/// Create an artifact ledger for the current deployment.
-	pub fn create_ledger(&self) -> ArtifactLedger {
-		ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone())
-	}
-
 	/// The S3 key for an artifact in this deployment.
 	pub fn artifact_key(&self, label: &str) -> String {
 		format!("versions/{}/{label}", self.deploy_id)
@@ -125,7 +120,10 @@ impl Stack {
 					self.artifact_bucket_name(),
 					self.aws_region().clone(),
 				);
-				ArtifactsClient::new(Bucket::new(provider))
+				ArtifactsClient::new(
+					Bucket::new(provider),
+					ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone())
+				)
 			} else {
 				panic!("the `aws_sdk` feature is required for artifact operations")
 			}

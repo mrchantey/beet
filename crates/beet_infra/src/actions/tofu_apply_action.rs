@@ -29,8 +29,7 @@ pub async fn TofuApplyAction(
 		.await?;
 
 	// step 2: build ledger, upload artifacts to S3
-	let mut ledger = stack.create_ledger();
-	let client = stack.artifacts_client();
+	let mut client = stack.artifacts_client();
 	client.ensure_bucket().await?;
 
 	for (artifact, label) in &artifacts {
@@ -40,29 +39,24 @@ pub async fn TofuApplyAction(
 		let artifact_key = stack.artifact_key(label);
 
 		client
-			.upload_artifact(&ledger.deploy_id, label, bytes)
+			.upload_artifact(label, bytes, ArtifactEntry {
+				bucket_key: artifact_key.clone().into(),
+				source_hash: source_hash.into(),
+			})
 			.await?;
 		info!(
 			"uploaded artifact to s3://{}/{}",
 			stack.artifact_bucket_name(),
 			artifact_key,
 		);
-
-		ledger.push_artifact(
-			label.clone(),
-			ArtifactEntry {
-				bucket_key: artifact_key.into(),
-				source_hash: source_hash.into(),
-			},
-		)?;
 	}
 
 	// step 3: publish ledger
 	client
-		.publish_ledger(&ledger)
+		.publish_ledger()
 		.await
 		.map_err(|err| bevyhow!("failed to publish artifact ledger: {err}"))?;
-	info!("published artifact ledger: {}", ledger.deploy_id);
+	info!("published artifact ledger: {}", client.ledger().deploy_id);
 
 	// step 4: apply terraform
 	let result = project.apply().await?;
