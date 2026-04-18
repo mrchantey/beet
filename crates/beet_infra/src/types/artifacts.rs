@@ -46,7 +46,7 @@ impl ArtifactLedger {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtifactEntry {
 	/// S3 key where the artifact binary is stored
-	pub s3_key: SmolStr,
+	pub bucket_key: SmolStr,
 	/// Base64-encoded SHA256 hash for Terraform source_code_hash
 	pub source_hash: SmolStr,
 }
@@ -196,10 +196,10 @@ mod tests {
 
 	fn test_ledger(artifacts: Vec<(&str, &str, &str)>) -> ArtifactLedger {
 		let mut ledger = ArtifactLedger::new(Uuid::now_v7(), now_timestamp());
-		for (name, s3_key, hash) in artifacts {
+		for (name, artifact_key, hash) in artifacts {
 			ledger
 				.push_artifact(name, ArtifactEntry {
-					s3_key: s3_key.into(),
+					bucket_key: artifact_key.into(),
 					source_hash: hash.into(),
 				})
 				.unwrap();

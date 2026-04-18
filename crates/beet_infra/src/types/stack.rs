@@ -149,7 +149,7 @@ pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
-	#[cfg(feature = "bindings_aws_common")]
+	#[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]
 	s3_buckets: Query<'w, 's, &'static S3BucketBlock>,
 }
 
@@ -185,7 +185,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Collect artifact entries from block descendants.
 	/// Returns `(BuildArtifact, artifact_label)` for each block
 	/// that has both a [`BuildArtifact`] and an artifact label.
-	#[cfg(feature = "deploy")]
 	pub fn collect_artifacts(
 		&self,
 		entity: Entity,

@@ -37,7 +37,7 @@ pub async fn TofuApplyAction(
 		let artifact_path = AbsPathBuf::new(artifact.artifact_path())?;
 		let bytes = fs_ext::read_async(artifact_path.as_path()).await?;
 		let source_hash = artifact.compute_source_hash()?;
-		let s3_key = stack.artifact_key(label);
+		let artifact_key = stack.artifact_key(label);
 
 		client
 			.upload_artifact(&ledger.deploy_id, label, bytes)
@@ -45,13 +45,13 @@ pub async fn TofuApplyAction(
 		info!(
 			"uploaded artifact to s3://{}/{}",
 			stack.artifact_bucket_name(),
-			s3_key,
+			artifact_key,
 		);
 
 		ledger.push_artifact(
 			label.clone(),
 			ArtifactEntry {
-				s3_key: s3_key.into(),
+				bucket_key: artifact_key.into(),
 				source_hash: source_hash.into(),
 			},
 		)?;

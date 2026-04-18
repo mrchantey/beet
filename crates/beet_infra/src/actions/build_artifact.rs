@@ -42,7 +42,10 @@ impl BuildArtifact {
 
 	/// Compute a base64-encoded SHA256 hash of the artifact file,
 	/// matching Terraform's `filebase64sha256` function.
-	/// Returns an error if the file cannot be read.
+	///
+	/// ## Errors
+	/// - Errors if the file cannot be read.
+	/// - Errors if the deploy feature not enabled.
 	pub fn compute_source_hash(&self) -> Result<String> {
 		cfg_if! {
 			if #[cfg(feature = "deploy")] {

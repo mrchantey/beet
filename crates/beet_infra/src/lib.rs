@@ -7,22 +7,23 @@
 //! - [`terra`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`bindings`] for pre-generated bindings of commonly used providers
-pub mod bindings;
-mod types;
+#[cfg(feature = "deploy")]
 mod actions;
+pub mod bindings;
 mod blocks;
 pub mod terra;
+mod types;
 
 #[cfg(feature = "bindings_generator")]
 pub mod bindings_generator;
 
 pub mod prelude {
-	#[allow(unused)]
+	#[cfg(feature = "deploy")]
 	pub use crate::actions::*;
 	pub use crate::bindings;
-	pub use crate::types::*;
 	#[allow(unused)]
 	pub use crate::blocks::*;
 	pub use crate::terra;
 	pub use crate::terra::tofu;
+	pub use crate::types::*;
 }

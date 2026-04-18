@@ -1,12 +1,8 @@
-#[cfg(feature = "deploy")]
 mod build_artifact;
-#[cfg(feature = "deploy")]
 mod deploy_lightsail_action;
-#[cfg(feature = "deploy")]
+mod sync_bucket;
 mod tofu_apply_action;
-#[cfg(feature = "deploy")]
 pub use build_artifact::*;
-#[cfg(feature = "deploy")]
 pub use deploy_lightsail_action::*;
-#[cfg(feature = "deploy")]
+pub use sync_bucket::*;
 pub use tofu_apply_action::*;
