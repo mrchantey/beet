@@ -116,6 +116,7 @@ impl Stack {
 	pub fn artifacts_client(&self) -> ArtifactsClient {
 		cfg_if! {
 			if #[cfg(feature = "aws_sdk")] {
+				// TODO provider agnostic, perhaps something similar to the state_backend.rs pattern
 				let provider = beet_net::prelude::S3Bucket::new(
 					self.artifact_bucket_name(),
 					self.aws_region().clone(),

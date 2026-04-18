@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 /// Sync local assets to the nearest ancestor [`S3BucketBlock`]'s bucket.
 #[action]
 #[derive(Default, Component)]
-pub async fn SyncBucketAction(
+pub async fn SyncS3BucketAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let (bucket_name, region) = cx

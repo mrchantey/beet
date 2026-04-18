@@ -5,10 +5,9 @@ use beet_core::prelude::*;
 use serde_json::json;
 
 
-
-
-
-#[derive(Debug, Clone, Get, Deref, DerefMut, Serialize, Deserialize, Component)]
+#[derive(
+	Debug, Clone, Get, Deref, DerefMut, Serialize, Deserialize, Component,
+)]
 #[component(immutable, on_add = ErasedBlock::on_add::<S3BucketBlock>)]
 pub struct S3BucketBlock {
 	label: SmolStr,
@@ -49,15 +48,6 @@ impl S3BucketBlock {
 			region.clone(),
 		)
 	}
-}
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BucketDetails {
-	Aws(AwsS3BucketDetails),
-}
-impl Into<BucketDetails> for AwsS3BucketDetails {
-	fn into(self) -> BucketDetails { BucketDetails::Aws(self) }
 }
 
 impl Block for S3BucketBlock {

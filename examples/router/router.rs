@@ -97,7 +97,7 @@ fn infra_scene() -> Result<impl Bundle> {
 					.into_lambda_build_artifact()
 			),
 			TofuApplyAction,
-			(SyncBucketAction, assets_bucket_block()),
+			(SyncS3BucketAction, assets_bucket_block()),
 		]),
 	)])
 		.xok()

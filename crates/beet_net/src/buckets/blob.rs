@@ -354,7 +354,7 @@ mod test {
 
 	#[test]
 	fn blob_from_provider_trait() {
-		let provider = InMemoryBucket::created();
+		let provider = InMemoryBucket::new();
 		let blob = provider.erased_blob(RelPath::new("key.dat"));
 		blob.path().to_string().xpect_eq("key.dat");
 	}

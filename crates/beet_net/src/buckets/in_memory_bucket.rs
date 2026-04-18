@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 impl Bucket {
 	/// Create a pre-created [`InMemoryBucket`] bucket for testing.
-	pub fn new_test() -> Self { Self::new(InMemoryBucket::created()) }
+	pub fn new_test() -> Self { Self::new(InMemoryBucket::new()) }
 }
 
 
@@ -15,17 +15,18 @@ impl Bucket {
 ///
 /// Inner state is `None` when the bucket has not been created,
 /// and `Some(map)` when it exists.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct InMemoryBucket(pub Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>);
 
-impl InMemoryBucket {
-	/// Creates a new uncreated in-memory provider.
-	pub fn new() -> Self { Self::default() }
+impl Default for InMemoryBucket {
+	fn default() -> Self { Self::new() }
+}
 
+impl InMemoryBucket {
 	/// Creates a new already-created (empty) in-memory provider.
-	pub fn created() -> Self {
-		Self(Arc::new(RwLock::new(Some(HashMap::new()))))
-	}
+	pub fn new() -> Self { Self(Arc::new(RwLock::new(Some(HashMap::new())))) }
+	/// Creates a new uncreated in-memory provider.
+	pub fn new_empty() -> Self { Self(Arc::new(RwLock::new(None))) }
 }
 
 #[cfg(feature = "json")]
@@ -147,7 +148,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = InMemoryBucket::new();
+		let provider = InMemoryBucket::new_empty();
 		bucket_test::run(provider).await;
 	}
 }

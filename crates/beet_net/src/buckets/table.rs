@@ -358,7 +358,7 @@ pub trait TableProvider<T: TableStoreRow>:
 /// Create temporary in-memory table for testing.
 /// The returned table is pre-created and ready for immediate use.
 pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
-	TableStore::new(InMemoryBucket::created())
+	TableStore::new(InMemoryBucket::new())
 }
 
 /// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]

@@ -397,7 +397,7 @@ pub trait BucketProvider: 'static + Send + Sync {
 
 /// Create temporary in-memory bucket for testing.
 /// The returned bucket is pre-created and ready for immediate use.
-pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryBucket::created()) }
+pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryBucket::new()) }
 
 /// Create local bucket with platform-specific provider.
 /// - wasm: [`LocalStorageBucket`]

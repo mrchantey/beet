@@ -10,6 +10,6 @@ pub use lightsail::*;
 mod block;
 pub use block::*;
 #[cfg(feature = "bindings_aws_common")]
-mod bucket;
+mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
-pub use bucket::*;
+pub use s3_bucket_block::*;
