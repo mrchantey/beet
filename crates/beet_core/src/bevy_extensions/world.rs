@@ -76,18 +76,17 @@ pub impl World {
 	/// single-threaded execution to avoid deadlocks when called from within
 	/// async tasks on IoTaskPool.
 	fn update_local(&mut self) {
-		#[cfg(feature = "bevy_multithreaded")]
-		{
-			// Temporarily force single-threaded execution for all schedules
-			// to avoid deadlock when called from within a spawn_local task.
-			self.force_single_threaded_schedules();
-			self.run_schedule(Main);
-			self.clear_trackers();
-		}
-		#[cfg(not(feature = "bevy_multithreaded"))]
-		{
-			self.run_schedule(Main);
-			self.clear_trackers();
+		cfg_if! {
+			if #[cfg(feature = "bevy_multithreaded")] {
+				// Temporarily force single-threaded execution for all schedules
+				// to avoid deadlock when called from within a spawn_local task.
+				self.force_single_threaded_schedules();
+				self.run_schedule(Main);
+				self.clear_trackers();
+			} else {
+				self.run_schedule(Main);
+				self.clear_trackers();
+			}
 		}
 	}
 

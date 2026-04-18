@@ -46,7 +46,7 @@ fn setup(mut commands: Commands) {
 
 			let bucket = entity
 				.with_state::<StackQuery, _>(|entity, query| {
-					query.bucket(entity)
+					query.bucket(entity).cloned()
 				})
 				.await?;
 

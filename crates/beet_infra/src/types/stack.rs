@@ -199,6 +199,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Collect artifact entries from block descendants.
 	/// Returns `(BuildArtifact, artifact_label)` for each block
 	/// that has both a [`BuildArtifact`] and an artifact label.
+	#[cfg(feature = "deploy")]
 	pub fn collect_artifacts(
 		&self,
 		entity: Entity,

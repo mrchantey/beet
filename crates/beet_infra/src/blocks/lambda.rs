@@ -63,9 +63,15 @@ impl Block for LambdaBlock {
 		// artifact values computed directly from stack and entity
 		let artifact_bucket = stack.artifact_bucket_name();
 		let artifact_key = stack.artifact_key(&self.label);
-		let source_hash = entity
-			.get::<BuildArtifact>()
-			.and_then(|artifact| artifact.compute_source_hash().ok());
+		cfg_if! {
+			if #[cfg(feature = "deploy")] {
+				let source_hash = entity
+					.get::<BuildArtifact>()
+					.and_then(|artifact| artifact.compute_source_hash().ok());
+			} else {
+				let source_hash: Option<String> = None;
+			}
+		}
 
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(

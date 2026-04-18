@@ -58,17 +58,16 @@ pub fn canonicalize(path: impl AsRef<Path>) -> FsResult<PathBuf> {
 /// On wasm platforms this will just ensure the path begins with a `/`
 pub fn absolute(path: impl AsRef<Path>) -> FsResult<PathBuf> {
 	let path = path.as_ref();
-	#[cfg(not(target_arch = "wasm32"))]
-	{
-		std::path::absolute(path).map_err(|e| FsError::io(path, e))
-	}
-	#[cfg(target_arch = "wasm32")]
-	{
-		let path_str = path.to_string_lossy();
-		if path_str.starts_with('/') {
-			Ok(path.to_path_buf())
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			let path_str = path.to_string_lossy();
+			if path_str.starts_with('/') {
+				Ok(path.to_path_buf())
+			} else {
+				Ok(PathBuf::from(format!("/{}", path_str)))
+			}
 		} else {
-			Ok(PathBuf::from(format!("/{}", path_str)))
+			std::path::absolute(path).map_err(|e| FsError::io(path, e))
 		}
 	}
 }

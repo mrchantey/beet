@@ -29,10 +29,13 @@ macro_rules! dir {
 
 /// Get the current working directory
 pub fn current_dir() -> FsResult<PathBuf> {
-	#[cfg(target_arch = "wasm32")]
-	return js_runtime::cwd().xinto::<PathBuf>().xok();
-	#[cfg(not(target_arch = "wasm32"))]
-	return std::env::current_dir().map_err(|e| FsError::io(".", e));
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			return js_runtime::cwd().xinto::<PathBuf>().xok();
+		} else {
+			return std::env::current_dir().map_err(|e| FsError::io(".", e));
+		}
+	}
 }
 
 /// Copy a directory recursively, creating it if it doesnt exist
@@ -62,12 +65,15 @@ pub fn copy_recursive(
 /// Checks if a path exists on the filesystem.
 pub fn exists(path: impl AsRef<Path>) -> FsResult<bool> {
 	let path = path.as_ref();
-	#[cfg(target_arch = "wasm32")]
-	return js_runtime::exists(&path.to_string_lossy()).xok();
-	#[cfg(not(target_arch = "wasm32"))]
-	match fs::exists(path) {
-		Ok(val) => Ok(val),
-		Err(err) => Err(FsError::io(path, err)),
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			return js_runtime::exists(&path.to_string_lossy()).xok();
+		} else {
+			match fs::exists(path) {
+				Ok(val) => Ok(val),
+				Err(err) => Err(FsError::io(path, err)),
+			}
+		}
 	}
 }
 
@@ -92,10 +98,13 @@ pub async fn exists_async(path: impl AsRef<Path>) -> FsResult<bool> {
 /// Creates a directory and all parent directories if they don't exist.
 pub fn create_dir_all(path: impl AsRef<Path>) -> FsResult<()> {
 	let path = path.as_ref();
-	#[cfg(target_arch = "wasm32")]
-	return js_runtime::create_dir_all(&path.to_string_lossy()).xok();
-	#[cfg(not(target_arch = "wasm32"))]
-	return fs::create_dir_all(path).map_err(|err| FsError::io(path, err));
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			return js_runtime::create_dir_all(&path.to_string_lossy()).xok();
+		} else {
+			return fs::create_dir_all(path).map_err(|err| FsError::io(path, err));
+		}
+	}
 }
 
 /// Async version of [`create_dir_all`].
@@ -169,11 +178,14 @@ pub fn workspace_root() -> PathBuf { crate::prelude::workspace_root() }
 
 /// Reads a file as bytes.
 pub fn read(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
-	#[cfg(target_arch = "wasm32")]
-	return js_runtime::read_file(&path.as_ref().to_string_lossy())
-		.ok_or_else(|| FsError::file_not_found(path.as_ref()));
-	#[cfg(not(target_arch = "wasm32"))]
-	return std::fs::read(&path).map_err(|e| FsError::io(path, e));
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			return js_runtime::read_file(&path.as_ref().to_string_lossy())
+				.ok_or_else(|| FsError::file_not_found(path.as_ref()));
+		} else {
+			return std::fs::read(&path).map_err(|e| FsError::io(path, e));
+		}
+	}
 }
 /// Async version of [`read`].
 pub async fn read_async(path: impl AsRef<Path>) -> FsResult<Vec<u8>> {
@@ -348,15 +360,14 @@ pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 	if let Some(parent) = path.parent() {
 		fs_ext::create_dir_all(parent)?;
 	}
-	#[cfg(target_arch = "wasm32")]
-	{
-		js_runtime::write_file(&path.to_string_lossy(), data.as_ref());
-		Ok(())
-	}
-	#[cfg(not(target_arch = "wasm32"))]
-	{
-		fs::write(path, data).map_err(|err| FsError::io(path, err))?;
-		Ok(())
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			js_runtime::write_file(&path.to_string_lossy(), data.as_ref());
+			Ok(())
+		} else {
+			fs::write(path, data).map_err(|err| FsError::io(path, err))?;
+			Ok(())
+		}
 	}
 }
 

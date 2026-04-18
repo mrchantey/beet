@@ -24,33 +24,36 @@ use futures::Stream;
 use send_wrapper::SendWrapper;
 use std::pin::Pin;
 
-#[cfg(target_arch = "wasm32")]
-/// Trait for streams implementing Send on non-wasm platforms
-pub trait MaybeSendStream: Stream<Item = Result<Bytes>> + 'static {}
-#[cfg(target_arch = "wasm32")]
-impl<T> MaybeSendStream for T where T: Stream<Item = Result<Bytes>> + 'static {}
-
-#[cfg(not(target_arch = "wasm32"))]
-/// Trait for streams implementing Send on non-wasm platforms
-pub trait MaybeSendStream:
-	Stream<Item = Result<Bytes>> + Send + Sync + 'static
-{
+cfg_if! {
+	if #[cfg(target_arch = "wasm32")] {
+		/// Trait for streams implementing Send on non-wasm platforms.
+		pub trait MaybeSendStream: Stream<Item = Result<Bytes>> + 'static {}
+		impl<T> MaybeSendStream for T where T: Stream<Item = Result<Bytes>> + 'static {}
+	} else {
+		/// Trait for streams implementing Send on non-wasm platforms.
+		pub trait MaybeSendStream:
+			Stream<Item = Result<Bytes>> + Send + Sync + 'static
+		{
+		}
+		impl<T> MaybeSendStream for T where
+			T: Stream<Item = Result<Bytes>> + Send + Sync + 'static
+		{
+		}
+	}
 }
-#[cfg(not(target_arch = "wasm32"))]
-impl<T> MaybeSendStream for T where
-	T: Stream<Item = Result<Bytes>> + Send + Sync + 'static
-{
-}
 
-/// Streaming body inner type. On wasm, wrapped in [`SendWrapper`] since
-/// streams may not be `Send + Sync`. On native, streams satisfy
-/// `Send + Sync` directly via [`MaybeSendStream`].
-#[cfg(target_arch = "wasm32")]
-type BodyStream = SendWrapper<Pin<Box<dyn MaybeSendStream>>>;
-/// Streaming body inner type. On native platforms, streams are already
-/// `Send + Sync` via [`MaybeSendStream`].
-#[cfg(not(target_arch = "wasm32"))]
-type BodyStream = Pin<Box<dyn MaybeSendStream>>;
+cfg_if! {
+	if #[cfg(target_arch = "wasm32")] {
+		/// Streaming body inner type. On wasm, wrapped in [`SendWrapper`] since
+		/// streams may not be `Send + Sync`. On native, streams satisfy
+		/// `Send + Sync` directly via [`MaybeSendStream`].
+		type BodyStream = SendWrapper<Pin<Box<dyn MaybeSendStream>>>;
+	} else {
+		/// Streaming body inner type. On native platforms, streams are already
+		/// `Send + Sync` via [`MaybeSendStream`].
+		type BodyStream = Pin<Box<dyn MaybeSendStream>>;
+	}
+}
 
 /// The body of an HTTP request or response.
 ///
@@ -66,13 +69,12 @@ pub enum Body {
 impl Body {
 	/// Creates a streaming body from the given stream.
 	pub fn stream(stream: impl 'static + MaybeSendStream) -> Self {
-		#[cfg(target_arch = "wasm32")]
-		{
-			Body::Stream(SendWrapper::new(Box::pin(stream)))
-		}
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			Body::Stream(Box::pin(stream))
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				Body::Stream(SendWrapper::new(Box::pin(stream)))
+			} else {
+				Body::Stream(Box::pin(stream))
+			}
 		}
 	}
 

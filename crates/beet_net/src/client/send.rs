@@ -31,32 +31,18 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 /// This is the HTTP-specific send path used by scheme routing.
 #[allow(unused)]
 async fn send_http(request: Request) -> Result<Response> {
-	#[cfg(target_arch = "wasm32")]
-	{
-		super::impl_web_sys::send_wasm(request).await
-	}
-	#[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
-	{
-		super::impl_ureq::send_ureq(request).await
-	}
-	#[cfg(all(
-		feature = "reqwest",
-		not(feature = "ureq"),
-		not(target_arch = "wasm32")
-	))]
-	{
-		super::impl_reqwest::send_reqwest(request).await
-	}
-
-	#[cfg(not(any(
-		feature = "reqwest",
-		feature = "ureq",
-		target_arch = "wasm32"
-	)))]
-	{
-		bevybail!(
-			"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
-		);
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			super::impl_web_sys::send_wasm(request).await
+		} else if #[cfg(feature = "ureq")] {
+			super::impl_ureq::send_ureq(request).await
+		} else if #[cfg(feature = "reqwest")] {
+			super::impl_reqwest::send_reqwest(request).await
+		} else {
+			bevybail!(
+				"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
+			);
+		}
 	}
 }
 
@@ -100,15 +86,14 @@ impl Request {
 		match self.scheme() {
 			Scheme::Http | Scheme::Https => send_http(self).await,
 			Scheme::File => {
-				#[cfg(feature = "fs")]
-				{
-					send_file(self).await
-				}
-				#[cfg(not(feature = "fs"))]
-				{
-					bevybail!(
-						"The 'fs' feature is required for file:// requests"
-					);
+				cfg_if! {
+					if #[cfg(feature = "fs")] {
+						send_file(self).await
+					} else {
+						bevybail!(
+							"The 'fs' feature is required for file:// requests"
+						);
+					}
 				}
 			}
 			Scheme::None => {
@@ -117,15 +102,14 @@ impl Request {
 					send_http(self).await
 				} else {
 					// No authority — treat as a local file path
-					#[cfg(feature = "fs")]
-					{
-						send_file(self).await
-					}
-					#[cfg(not(feature = "fs"))]
-					{
-						bevybail!(
-							"The 'fs' feature is required for local file requests"
-						);
+					cfg_if! {
+						if #[cfg(feature = "fs")] {
+							send_file(self).await
+						} else {
+							bevybail!(
+								"The 'fs' feature is required for local file requests"
+							);
+						}
 					}
 				}
 			}

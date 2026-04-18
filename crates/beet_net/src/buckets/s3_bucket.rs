@@ -9,7 +9,7 @@ use bytes::Bytes;
 
 /// AWS S3 bucket provider storing its configuration as serializable fields.
 /// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
 #[component(on_add = Bucket::on_add::<Self>)]
 pub struct S3Bucket {
@@ -45,6 +45,14 @@ impl S3Bucket {
 	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
+	}
+
+	/// Construct the full S3 URI including optional subdir.
+	pub fn s3_uri(&self) -> String {
+		match &self.subdir {
+			Some(subdir) => format!("s3://{}/{}/", self.bucket_name, subdir),
+			None => format!("s3://{}/", self.bucket_name),
+		}
 	}
 
 	/// Get or create an S3 client for this bucket's region.

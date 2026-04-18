@@ -68,19 +68,16 @@ impl Socket {
 	/// Returns a connected [`Socket`] that can be used to send and receive messages.
 	#[allow(unused_variables)]
 	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
-		#[cfg(target_arch = "wasm32")]
-		{
-			super::impl_web_sys::connect_wasm(url).await
-		}
-		#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-		{
-			super::impl_tungstenite::connect_tungstenite(url).await
-		}
-		#[cfg(not(any(target_arch = "wasm32", feature = "tungstenite")))]
-		{
-			panic!(
-				"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
-			)
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				super::impl_web_sys::connect_wasm(url).await
+			} else if #[cfg(feature = "tungstenite")] {
+				super::impl_tungstenite::connect_tungstenite(url).await
+			} else {
+				panic!(
+					"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
+				)
+			}
 		}
 	}
 	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.

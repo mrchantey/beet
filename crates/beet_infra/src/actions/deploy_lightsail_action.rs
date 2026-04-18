@@ -47,6 +47,8 @@ pub async fn DeployLightsailAction(
 	// save key to temp file
 	let key_path = dir.join("deploy_key.pem");
 	fs_ext::write_async(&key_path, key_pem.as_bytes()).await?;
+	// SSH requires private key files to have restricted permissions (owner read/write only).
+	// Without this, ssh/scp will refuse to use the key with "Permissions too open" error.
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;

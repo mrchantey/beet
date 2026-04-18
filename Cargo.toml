@@ -474,6 +474,11 @@ name = "lightsail"
 path = "examples/infra/lightsail.rs"
 required-features = ["lightsail_block", "fs", "rand"]
 
+[[example]]
+name = "hello_lambda"
+path = "examples/infra/hello_lambda.rs"
+required-features = ["router", "infra"]
+
 # 💡 Examples - flow
 
 # [[example]]

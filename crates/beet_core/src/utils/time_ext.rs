@@ -54,27 +54,26 @@ pub async fn sleep_micros(micros: u64) {
 /// Cross platform sleep function
 #[allow(unused)]
 pub async fn sleep(duration: Duration) {
-	#[cfg(not(target_arch = "wasm32"))]
-	{
-		async_io::Timer::after(duration).await;
-	}
-	#[cfg(target_arch = "wasm32")]
-	{
-		use wasm_bindgen_futures::JsFuture;
-		use web_sys::window;
-		let window = window().unwrap();
-		let promise = js_sys::Promise::new(&mut |resolve, _| {
-			window
-				.set_timeout_with_callback_and_timeout_and_arguments_0(
-					&resolve,
-					duration.as_millis() as i32,
-				)
-				.expect("should register `setTimeout` OK");
-		});
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			use wasm_bindgen_futures::JsFuture;
+			use web_sys::window;
+			let window = window().unwrap();
+			let promise = js_sys::Promise::new(&mut |resolve, _| {
+				window
+					.set_timeout_with_callback_and_timeout_and_arguments_0(
+						&resolve,
+						duration.as_millis() as i32,
+					)
+					.expect("should register `setTimeout` OK");
+			});
 
-		JsFuture::from(promise)
-			.await
-			.expect("should await `setTimeout` OK");
+			JsFuture::from(promise)
+				.await
+				.expect("should await `setTimeout` OK");
+		} else {
+			async_io::Timer::after(duration).await;
+		}
 	}
 }
 

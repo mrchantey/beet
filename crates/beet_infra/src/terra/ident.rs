@@ -1,6 +1,7 @@
 use crate::terra::Resource;
 use crate::terra::*;
 use beet_core::prelude::*;
+use heck::ToKebabCase;
 use heck::ToSnakeCase;
 
 #[derive(Debug, Clone, Get)]
@@ -66,15 +67,21 @@ impl Ident {
 		stage: impl Into<SmolStr>,
 		label_suffix: impl Into<SmolStr>,
 	) -> Self {
-		use heck::ToKebabCase;
 		let app_name = app_name.into();
 		let stage = stage.into();
 		let label_suffix = label_suffix.into();
 
-		let label = vec![&app_name, &stage, &label_suffix]
-			.join("__")
-			.to_snake_case();
-		let primary_identifier = label.to_kebab_case().into();
+		let label = [&app_name, &stage, &label_suffix]
+			.iter()
+			.map(|part| part.to_snake_case())
+			.collect::<Vec<_>>()
+			.join("__");
+		let primary_identifier = [&app_name, &stage, &label_suffix]
+			.iter()
+			.map(|part| part.to_kebab_case())
+			.collect::<Vec<_>>()
+			.join("--")
+			.into();
 		Self {
 			app_name,
 			stage,

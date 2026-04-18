@@ -428,13 +428,16 @@ pub fn temp_bucket() -> Bucket { Bucket::new(InMemoryBucket::new()) }
 /// - native: [`FsBucket`] at `.cache/buckets/<name>`
 pub fn local_bucket(name: impl Into<String>) -> Bucket {
 	let name = name.into();
-	#[cfg(target_arch = "wasm32")]
-	return Bucket::new(LocalStorageBucket::new(name));
-	#[cfg(not(target_arch = "wasm32"))]
-	return Bucket::new(FsBucket::new(
-		AbsPathBuf::new_workspace_rel(format!(".cache/buckets/{name}"))
-			.unwrap(),
-	));
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			Bucket::new(LocalStorageBucket::new(name))
+		} else {
+			Bucket::new(FsBucket::new(
+				AbsPathBuf::new_workspace_rel(format!(".cache/buckets/{name}"))
+					.unwrap(),
+			))
+		}
+	}
 }
 
 /// Select filesystem or S3 bucket based on [`ServiceAccess`] and feature flags.
@@ -451,16 +454,17 @@ pub async fn s3_fs_selector(
 			debug!("Bucket Selector - FS: {fs_path}");
 			Bucket::new(FsBucket::new(fs_path))
 		}
-		#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
-			debug!("Bucket Selector - FS (no aws_sdk or wasm): {fs_path}");
-			Bucket::new(FsBucket::new(fs_path))
-		}
-		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-		ServiceAccess::Remote => {
-			debug!("Bucket Selector - S3: {bucket_name}");
-			let provider = S3Bucket::new(bucket_name, region);
-			Bucket::new(provider)
+			cfg_if! {
+				if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+					debug!("Bucket Selector - S3: {bucket_name}");
+					let provider = S3Bucket::new(bucket_name, region);
+					Bucket::new(provider)
+				} else {
+					debug!("Bucket Selector - FS (no aws_sdk or wasm): {fs_path}");
+					Bucket::new(FsBucket::new(fs_path))
+				}
+			}
 		}
 	}
 }

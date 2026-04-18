@@ -61,16 +61,15 @@ pub impl MediaBytes {
 		};
 
 		let bytes: Vec<u8> = if is_base64 {
-			#[cfg(feature = "serde")]
-			{
-				use base64::Engine as _;
-				base64::engine::general_purpose::STANDARD
-					.decode(data)
-					.map_err(|err| bevyhow!("base64 decode failed: {err}"))?
-			}
-			#[cfg(not(feature = "serde"))]
-			{
-				bevybail!("base64 decoding requires the 'serde' feature");
+			cfg_if! {
+				if #[cfg(feature = "serde")] {
+					use base64::Engine as _;
+					base64::engine::general_purpose::STANDARD
+						.decode(data)
+						.map_err(|err| bevyhow!("base64 decode failed: {err}"))?
+				} else {
+					bevybail!("base64 decoding requires the 'serde' feature");
+				}
 			}
 		} else {
 			// Percent-decode
@@ -95,18 +94,17 @@ pub impl MediaBytes {
 	/// assert_eq!(back.as_utf8().unwrap(), "Hello");
 	/// ```
 	fn into_url(&self) -> Url {
-		#[cfg(feature = "serde")]
-		{
-			use base64::Engine as _;
-			let encoded =
-				base64::engine::general_purpose::STANDARD.encode(self.bytes());
-			Url::parse(format!("data:{};base64,{}", self.media_type(), encoded))
-		}
-		#[cfg(not(feature = "serde"))]
-		{
-			// Fall back to URL (percent) encoding when base64 is unavailable.
-			let encoded = percent_encode(self.bytes());
-			Url::parse(format!("data:{},{}", self.media_type(), encoded))
+		cfg_if! {
+			if #[cfg(feature = "serde")] {
+				use base64::Engine as _;
+				let encoded =
+					base64::engine::general_purpose::STANDARD.encode(self.bytes());
+				Url::parse(format!("data:{};base64,{}", self.media_type(), encoded))
+			} else {
+				// Fall back to URL (percent) encoding when base64 is unavailable.
+				let encoded = percent_encode(self.bytes());
+				Url::parse(format!("data:{},{}", self.media_type(), encoded))
+			}
 		}
 	}
 }

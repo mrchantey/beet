@@ -23,6 +23,11 @@ pub struct HtmlRenderer {
 	/// attribute values using [`escape_html_text`] and
 	/// [`escape_html_attribute`] respectively.
 	escape_html: bool,
+	/// Raw text elements whose children should not be HTML-escaped,
+	/// per the HTML spec, ie `<script>`, `<style>`.
+	raw_text_elements: Vec<Cow<'static, str>>,
+	/// Tracks whether we are currently inside a raw text element.
+	in_raw_text_element: bool,
 }
 
 /// Indentation style for pretty-printing.
@@ -59,6 +64,8 @@ impl HtmlRenderer {
 			void_elements: default_void_elements(),
 			current_depth: 0,
 			escape_html: true,
+			raw_text_elements: default_raw_text_elements(),
+			in_raw_text_element: false,
 		}
 	}
 
@@ -107,6 +114,10 @@ impl HtmlRenderer {
 	fn is_void_element(&self, name: &str) -> bool {
 		let lower = name.to_ascii_lowercase();
 		self.void_elements.iter().any(|el| el.as_ref() == lower)
+	}
+
+	fn is_raw_text_element(&self, name: &str) -> bool {
+		self.raw_text_elements.iter().any(|el| el.as_ref() == name)
 	}
 
 	fn is_pretty(&self) -> bool { self.indent.is_some() }
@@ -178,10 +189,16 @@ impl NodeVisitor for HtmlRenderer {
 		}
 
 		let is_void = self.is_void_element(view.tag());
+		let is_raw = self.is_raw_text_element(view.tag());
+
 		if is_void {
 			self.buffer.push_str(" />");
 		} else {
 			self.buffer.push('>');
+		}
+
+		if is_raw {
+			self.in_raw_text_element = true;
 		}
 
 		if self.is_pretty() {
@@ -194,6 +211,10 @@ impl NodeVisitor for HtmlRenderer {
 		let is_void = self.is_void_element(element.tag());
 		if is_void {
 			return;
+		}
+
+		if self.is_raw_text_element(element.tag()) {
+			self.in_raw_text_element = false;
 		}
 
 		if self.is_pretty() {
@@ -212,7 +233,7 @@ impl NodeVisitor for HtmlRenderer {
 			self.write_indent();
 		}
 		let raw = value.to_string();
-		if self.escape_html {
+		if self.escape_html && !self.in_raw_text_element {
 			self.buffer.push_str(&escape_html_text(&raw));
 		} else {
 			self.buffer.push_str(&raw);
@@ -275,6 +296,12 @@ fn default_void_elements() -> Vec<Cow<'static, str>> {
 		"track".into(),
 		"wbr".into(),
 	]
+}
+
+/// Raw text elements whose children must not be HTML-escaped,
+/// per the HTML spec.
+fn default_raw_text_elements() -> Vec<Cow<'static, str>> {
+	vec!["script".into(), "style".into()]
 }
 
 
@@ -401,6 +428,52 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_contains("a &amp; b");
+	}
+
+	#[test]
+	fn no_escape_script_content() {
+		// Text inside <script> should not be HTML-escaped.
+		let mut world = World::new();
+		let root = world.spawn(Element::new("script")).id();
+		let text = world.spawn(Value::new("let x = 1 < 2;")).id();
+		world.entity_mut(root).add_children(&[text]);
+
+		HtmlRenderer::new()
+			.with_escape_html()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("let x = 1 < 2;")
+			.xnot()
+			.xpect_contains("&lt;");
+	}
+
+	#[test]
+	fn no_escape_style_content() {
+		// Text inside <style> should not be HTML-escaped.
+		let mut world = World::new();
+		let root = world.spawn(Element::new("style")).id();
+		let text = world
+			.spawn(Value::new("body { font-family: 'a' & 'b'; }"))
+			.id();
+		world.entity_mut(root).add_children(&[text]);
+
+		HtmlRenderer::new()
+			.with_escape_html()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("body { font-family: 'a' & 'b'; }")
+			.xnot()
+			.xpect_contains("&amp;");
+	}
+
+	#[cfg(feature = "html_parser")]
+	#[test]
+	fn roundtrip_script_raw_text() {
+		// Parsing and re-rendering script content should preserve raw text.
+		roundtrip("<script>let x = 1 < 2;</script>")
+			.xpect_eq("<script>let x = 1 < 2;</script>".to_string());
 	}
 
 	#[test]

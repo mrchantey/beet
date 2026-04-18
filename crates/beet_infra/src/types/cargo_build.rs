@@ -1,3 +1,4 @@
+#[allow(unused)]
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
@@ -82,6 +83,7 @@ impl CargoBuild {
 		self.lambda_dir().join("bootstrap")
 	}
 	/// Build the cargo command arguments.
+	#[cfg(feature = "deploy")]
 	fn cargo_args(&self) -> Vec<SmolStr> {
 		let mut args: Vec<SmolStr> = vec!["build".into()];
 		if let Some(pkg) = &self.package {
@@ -110,6 +112,7 @@ impl CargoBuild {
 	}
 
 	/// Build the cargo-lambda command arguments.
+	#[cfg(feature = "deploy")]
 	fn lambda_args(&self) -> Vec<SmolStr> {
 		let mut args: Vec<SmolStr> = vec!["lambda".into(), "build".into()];
 		if let Some(pkg) = &self.package {
@@ -133,6 +136,7 @@ impl CargoBuild {
 		args
 	}
 	/// Convert into a standard cargo [`BuildArtifact`].
+	#[cfg(feature = "deploy")]
 	pub fn into_build_artifact(self) -> BuildArtifact {
 		let artifact_path = self.exe_path();
 		let args = self.cargo_args();
@@ -144,6 +148,7 @@ impl CargoBuild {
 	/// Convert into a lambda [`BuildArtifact`].
 	/// Builds the lambda binary then zips it for S3 deployment,
 	/// as AWS Lambda requires ZIP packages.
+	#[cfg(feature = "deploy")]
 	pub fn into_lambda_build_artifact(self) -> BuildArtifact {
 		let lambda_dir = self.lambda_dir();
 		let zip_path = lambda_dir.join("bootstrap.zip");
