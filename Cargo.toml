@@ -431,7 +431,7 @@ required-features = ["_mini_browser"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
-required-features = ["router","infra"]
+required-features = ["router"]
 
 # 💡 Examples - Thread
 

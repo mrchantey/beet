@@ -12,10 +12,10 @@
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- destroy --force
 //! ```
 
-#[path = "../router/utils.rs"]
-mod utils;
+#[path = "../router/router.rs"]
+mod router;
 use beet::prelude::*;
-use utils::*;
+
 
 fn main() -> AppExit {
 	App::new()
@@ -37,7 +37,11 @@ fn setup(mut commands: Commands) -> Result {
 		if #[cfg(feature="deploy")]{
 			commands.spawn(infra_scene()?);
 		}else{
-			commands.spawn(router_scene()?);
+			commands.spawn((
+				// make assets bucket accessible to routes
+				Bucket::new(assets_bucket()),
+				router::router_scene()?
+			));
 		}
 	}
 	Ok(())
@@ -60,8 +64,36 @@ fn infra_scene() -> Result<impl Bundle> {
 					.into_lambda_build_artifact()
 			),
 			TofuApplyAction,
-			(SyncS3BucketAction, assets_bucket_block()),
+			(
+				SyncS3Bucket::new("examples/assets"),
+				// we also declare assets bucket here for sync
+				assets_bucket_block()
+			),
 		]),
 	)])
 		.xok()
+}
+
+
+
+/// The stack is used by both infra and router
+/// for resolving bucket names.
+#[allow(unused)]
+fn stack() -> Stack { Stack::new("hello_lambda").with_aws_region("us-west-2") }
+
+#[cfg(feature = "bindings_aws_common")]
+fn assets_bucket_block() -> S3BucketBlock {
+	S3BucketBlock::new("assets").with_deploy_versioned(true)
+}
+
+#[allow(unused)]
+fn assets_bucket() -> impl BucketProvider {
+	cfg_if! {
+		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
+			let stk = stack();
+			assets_bucket_block().provider(&stk)
+		}else{
+			FsBucket::new(WsPathBuf::new("examples/assets"))
+		}
+	}
 }
