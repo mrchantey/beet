@@ -70,6 +70,16 @@ impl<T: TableStoreRow> TableProvider<T> for LocalStorageBucket {
 impl BucketProvider for LocalStorageBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
+		Box::new(LocalStorageBucket {
+			bucket_name: self.bucket_name.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
 	fn region(&self) -> Option<String> { None }
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {

@@ -456,6 +456,11 @@ path = "examples/thread/tool_call.rs"
 required-features = ["thread"]
 
 [[example]]
+name = "coding_agent"
+path = "examples/thread/coding_agent.rs"
+required-features = ["thread", "fs"]
+
+[[example]]
 name = "persistent_chat"
 path = "examples/thread/persistent_chat.rs"
 required-features = ["thread","bevy_scene"]

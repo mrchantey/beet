@@ -12,6 +12,7 @@ pub use types::header;
 pub use types::headers;
 /// Re-export media-type-driven serialization at crate level.
 mod net_plugin;
+mod bucket_actions;
 mod buckets;
 mod server;
 /// WebSocket client and server implementations.
@@ -37,6 +38,7 @@ pub mod prelude {
 	pub use crate::client::*;
 	pub use crate::net_plugin::*;
 	pub use crate::buckets::*;
+	pub use crate::bucket_actions::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
 	pub use crate::types::*;

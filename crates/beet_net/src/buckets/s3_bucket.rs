@@ -86,6 +86,17 @@ impl S3Bucket {
 impl BucketProvider for S3Bucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
+		Box::new(S3Bucket {
+			bucket_name: self.bucket_name.clone(),
+			region: self.region.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {

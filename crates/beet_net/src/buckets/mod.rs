@@ -19,7 +19,7 @@
 //! # use beet_net::prelude::*;
 //! # use beet_core::prelude::*;
 //! # async fn run() -> Result<()> {
-//! let bucket = temp_bucket();
+//! let bucket = Bucket::temp();
 //! bucket.insert(&RelPath::from("hello.txt"), "world").await?;
 //! let data = bucket.get(&RelPath::from("hello.txt")).await?;
 //! # Ok(())
@@ -30,6 +30,8 @@ mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 mod blob;
+mod bucket_provider;
+pub use bucket_provider::*;
 mod bucket;
 #[cfg(feature = "bevy_scene")]
 mod scene_store;

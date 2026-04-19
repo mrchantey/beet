@@ -70,6 +70,16 @@ impl<T: TableStoreRow> TableProvider<T> for FsBucket {
 impl BucketProvider for FsBucket {
 	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
 
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
+		Box::new(FsBucket {
+			path: self.path.clone(),
+			subdir: Some(match &self.subdir {
+				Some(existing) => existing.join(&path),
+				None => path,
+			}),
+		})
+	}
+
 	fn region(&self) -> Option<String> { None }
 
 	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
