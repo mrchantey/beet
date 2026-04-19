@@ -103,7 +103,6 @@
 
 		"crates/beet_site",
 		"crates/beet_spatial",
-		"crates/emby",
 		"scripts",
 		// "tests",
 		// "target",

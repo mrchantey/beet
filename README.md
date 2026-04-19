@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a"<a href="https://bevy.org">"Bevy App"</a>", and all structure and behavior is written in Entity Component System architecture.
+Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a <a href="https://bevy.org">Bevy App</a>, and all structure and behavior is written in Entity Component System architecture.
 
 > 🚧 Mind your step! 🚧
 >
@@ -110,8 +110,6 @@ fn Counter(initial: i32) -> impl Bundle {
 | -------------------------------------------------- | ------ | ------------------------------------------------ |
 | [`beet_actor`](crates/beet_actor/Cargo.toml)       | 🐉      | Actor types and systems  |
 | [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
-| [`emby`](crates/emby/Cargo.toml)                   | 🐉      | the beetmash ambassador                          |
-
 
 ## Bevy Versions
 
