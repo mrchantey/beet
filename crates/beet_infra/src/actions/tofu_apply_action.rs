@@ -15,15 +15,16 @@ use beet_net::prelude::*;
 pub async fn TofuApplyAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// step 1: build the project and collect artifact pairs
-	let (project, stack, artifacts) = cx
+	// step 1: build the project and collect variables and artifact pairs
+	let (project, stack, artifacts, variables) = cx
 		.caller
 		.with_state::<(StackQuery, AncestorQuery<&Stack>), _>(
 			|entity, (stack_query, anc_stack)| -> Result<_> {
 				let project = stack_query.build_project(entity)?;
 				let stack = anc_stack.get(entity)?.clone();
 				let artifacts = stack_query.collect_artifacts(entity)?;
-				(project, stack, artifacts).xok()
+				let variables = stack_query.collect_variables(entity)?;
+				(project, stack, artifacts, variables).xok()
 			},
 		)
 		.await?;
@@ -58,8 +59,17 @@ pub async fn TofuApplyAction(
 		.map_err(|err| bevyhow!("failed to publish artifact ledger: {err}"))?;
 	info!("published artifact ledger: {}", client.ledger().deploy_id);
 
-	// step 4: apply terraform
-	let result = project.apply().await?;
+	// step 4: resolve variables
+	let resolved_vars: Vec<(SmolStr, SmolStr)> = variables
+		.iter()
+		.map(|variable| {
+			variable
+				.resolve_value(cx.input.parts())
+				.map(|value| (variable.key().clone(), value))
+		})
+		.collect::<Result<Vec<_>>>()?;
+	// step 5: apply terraform
+	let result = project.apply_with_vars(&resolved_vars).await?;
 	info!("{result}");
 
 	Pass(cx.input).xok()

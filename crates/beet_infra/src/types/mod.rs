@@ -13,5 +13,7 @@ pub use stack_backend::*;
 pub use stack_cli::*;
 mod cargo_build;
 pub use cargo_build::*;
+mod variable;
+pub use variable::*;
 // mod expression;
 // pub use expression::*;

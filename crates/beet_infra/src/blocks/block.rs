@@ -14,6 +14,10 @@ pub trait Block: 'static + Send + Sync {
 
 	/// If this block creates a deployable artifact, return its label.
 	fn artifact_label(&self) -> Option<&str> { None }
+
+	/// Tofu variables declared by this block, resolved
+	/// at deploy time and passed via `tofu apply -var`.
+	fn variables(&self) -> &[Variable] { &[] }
 }
 
 /// Type-erased block for collecting heterogeneous blocks.

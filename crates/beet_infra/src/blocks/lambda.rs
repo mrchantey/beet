@@ -30,6 +30,10 @@ pub struct LambdaBlock {
 	pub dns: Option<DnsProvider>,
 	/// AWS region for the buckets and lambda function.
 	pub region: Option<SmolStr>,
+	/// Tofu variables to be inserted as environment variables
+	/// in the lambda function.
+	#[serde(default)]
+	env_vars: Vec<Variable>,
 }
 
 
@@ -39,6 +43,7 @@ impl Default for LambdaBlock {
 			label: "main-lambda".into(),
 			dns: None,
 			region: None,
+			env_vars: Vec::new(),
 		}
 	}
 }
@@ -52,6 +57,7 @@ impl LambdaBlock {
 
 impl Block for LambdaBlock {
 	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
+	fn variables(&self) -> &[Variable] { &self.env_vars }
 	fn apply_to_config(
 		&self,
 		entity: &EntityRef,
@@ -112,6 +118,14 @@ impl Block for LambdaBlock {
 			},
 		);
 
+		// declare terraform variables for env_vars
+		for variable in &self.env_vars {
+			config.ensure_variable(
+				variable.key().as_str(),
+				variable.tf_declaration(),
+			);
+		}
+
 		// Lambda Function
 		let lambda_function = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("function")),
@@ -138,6 +152,13 @@ impl Block for LambdaBlock {
 								"BEET_DEPLOY_TIMESTAMP".into(),
 								stack.deploy_timestamp().to_string().into(),
 							);
+							// add env_vars as terraform variable references
+							for variable in &self.env_vars {
+								vars.insert(
+									variable.key().clone(),
+									variable.tf_var_ref().into(),
+								);
+							}
 							vars
 						}),
 					},

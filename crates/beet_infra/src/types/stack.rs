@@ -218,6 +218,22 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok(pairs)
 	}
 
+	/// Collect all [`Variable`] declarations from block descendants.
+	#[cfg(feature = "deploy")]
+	pub fn collect_variables(
+		&self,
+		entity: Entity,
+	) -> Result<Vec<Variable>> {
+		let (root, _) = self.stacks.get(entity)?;
+		let mut variables = Vec::new();
+		for child in self.children.iter_descendants_inclusive(root) {
+			if let Ok((_, block)) = self.blocks.get(child) {
+				variables.extend_from_slice(block.variables());
+			}
+		}
+		Ok(variables)
+	}
+
 	/// Get the [`Bucket`] component from this entity.
 	pub fn bucket(&self, entity: Entity) -> Result<&Bucket> {
 		self.buckets.get(entity)?.xok()

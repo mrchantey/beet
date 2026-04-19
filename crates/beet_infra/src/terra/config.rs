@@ -339,6 +339,20 @@ impl Config {
 		Ok(self)
 	}
 
+	/// Add a variable declaration if one with this name doesn't already exist.
+	/// Unlike [`Config::add_variable`], silently succeeds on duplicates.
+	pub fn ensure_variable(
+		&mut self,
+		name: impl Into<String>,
+		variable: Variable,
+	) -> &mut Self {
+		let name = name.into();
+		if !self.variables.contains_key(&name) {
+			self.insert_variable(name, variable).ok();
+		}
+		self
+	}
+
 	/// Add an output definition (chaining).
 	/// ## Errors
 	/// - If an output with the same name already exists

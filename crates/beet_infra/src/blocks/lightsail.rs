@@ -39,6 +39,10 @@ pub struct LightsailBlock {
 	pub bundle_id: SmolStr,
 	/// Networking mode, defaults to static IPv4.
 	pub networking: LightsailNetworking,
+	/// Tofu variables to be inserted as environment variables
+	/// in the lightsail instance.
+	#[serde(default)]
+	env_vars: Vec<Variable>,
 }
 
 impl Default for LightsailBlock {
@@ -50,6 +54,7 @@ impl Default for LightsailBlock {
 			blueprint_id: "amazon_linux_2023".into(),
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
+			env_vars: Vec::new(),
 		}
 	}
 }
@@ -165,6 +170,7 @@ Environment=BEET_DEPLOY_TIMESTAMP={deploy_timestamp}
 Environment=AWS_REGION={region}
 Environment=AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
 Environment=AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
+__ENV_VARS__
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -173,16 +179,37 @@ systemctl enable --now {app_name}.service
 {https_setup}"#
 		);
 
+		// build env var lines for terraform variable references
+		let env_var_lines: String = self
+			.env_vars
+			.iter()
+			.map(|variable| {
+				format!("Environment={}=__VAR_{}__", variable.key(), variable.key())
+			})
+			.collect::<Vec<_>>()
+			.join("\n");
+
 		// replace placeholder tokens with terraform interpolation expressions
-		script
+		let mut script = script
 			.replace("__ACCESS_KEY_ID__", access_key_id_ref)
 			.replace("__ACCESS_KEY_SECRET__", access_key_secret_ref)
-			.into()
+			.replace("__ENV_VARS__", &env_var_lines);
+
+		// replace env_var placeholders with terraform variable references
+		for variable in &self.env_vars {
+			script = script.replace(
+				&format!("__VAR_{}__", variable.key()),
+				&variable.tf_var_ref(),
+			);
+		}
+
+		script.into()
 	}
 }
 
 impl Block for LightsailBlock {
 	fn artifact_label(&self) -> Option<&str> { Some(&self.label) }
+	fn variables(&self) -> &[Variable] { &self.env_vars }
 
 	fn apply_to_config(
 		&self,
@@ -235,6 +262,14 @@ impl Block for LightsailBlock {
 				..default()
 			},
 		);
+
+		// declare terraform variables for env_vars
+		for variable in &self.env_vars {
+			config.ensure_variable(
+				variable.key().as_str(),
+				variable.tf_declaration(),
+			);
+		}
 
 		// instance with self-provisioning user data
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
