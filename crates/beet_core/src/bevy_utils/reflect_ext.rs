@@ -47,6 +47,77 @@ pub fn json_schema<T: Typed>() -> Value {
 	type_info_to_json_schema(T::type_info())
 }
 
+/// Sanitizes a JSON schema for OpenAI strict mode compliance.
+///
+/// Recursively applies the following transformations:
+/// - Adds `"additionalProperties": false` to all object schemas
+/// - Converts `oneOf` to `anyOf` (OpenAI strict mode forbids `oneOf`)
+/// - Ensures all properties are listed in `required`
+///
+/// Applied as a post-processing step so schema generators
+/// don't need to worry about provider-specific constraints.
+pub fn sanitize_schema_for_strict_mode(schema: &mut Value) {
+	let Some(obj) = schema.as_object_mut() else {
+		return;
+	};
+
+	// recurse into nested schemas
+	for key in ["properties", "items", "prefixItems", "$defs"] {
+		if let Some(nested) = obj.get_mut(key) {
+			match nested {
+				Value::Object(map) => {
+					for val in map.values_mut() {
+						sanitize_schema_for_strict_mode(val);
+					}
+				}
+				Value::Array(arr) => {
+					for val in arr.iter_mut() {
+						sanitize_schema_for_strict_mode(val);
+					}
+				}
+				_ => {}
+			}
+		}
+	}
+
+	// convert oneOf to anyOf (OpenAI strict mode forbids oneOf)
+	if let Some(one_of) = obj.remove("oneOf") {
+		obj.insert("anyOf".to_string(), one_of);
+	}
+
+	// recurse into anyOf / allOf variants
+	for key in ["anyOf", "allOf"] {
+		if let Some(Value::Array(arr)) = obj.get_mut(key) {
+			for val in arr.iter_mut() {
+				sanitize_schema_for_strict_mode(val);
+			}
+		}
+	}
+
+	// ensure all properties are required (OpenAI strict mode requirement)
+	if let Some(Value::Object(props)) = obj.get("properties") {
+		let all_keys: Vec<Value> = props
+			.keys()
+			.map(|key| Value::String(key.clone()))
+			.collect();
+		if !all_keys.is_empty() {
+			obj.insert("required".to_string(), Value::Array(all_keys));
+		}
+	}
+
+	// add additionalProperties: false to objects without it,
+	// skip maps (which use additionalProperties for value schemas)
+	if obj.get("type").and_then(|t| t.as_str()) == Some("object") {
+		if !obj.contains_key("additionalProperties") {
+			obj.insert(
+				"additionalProperties".to_string(),
+				Value::Bool(false),
+			);
+		}
+	}
+}
+
+
 /// Converts a Bevy [`TypeInfo`] to a JSON Schema [`Value`], including
 /// `$defs` for all referenced subtypes.
 ///
@@ -622,7 +693,7 @@ fn map_primitive_type(type_path: &str) -> &'static str {
 
 	match short_name {
 		// String types
-		"String" | "str" | "char" | "Cow<str>" => "string",
+		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString" => "string",
 
 		// Unsigned integers
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => "integer",
