@@ -10,6 +10,7 @@
 //! cargo run --example hello_lightsail --features=deploy,lightsail_block -- validate
 //! cargo run --example hello_lightsail --features=deploy,lightsail_block -- plan
 //! cargo run --example hello_lightsail --features=deploy,lightsail_block -- deploy
+//! cargo run --example hello_lightsail --features=deploy,lightsail_block -- watch
 //! cargo run --example hello_lightsail --features=deploy,lightsail_block -- show
 //! cargo run --example hello_lightsail --features=deploy,lightsail_block -- destroy --force
 //! ```
@@ -51,25 +52,32 @@ fn setup(mut commands: Commands) -> Result {
 
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	(stack(), stack_cli(), children![route(
-		"deploy",
-		(exchange_sequence(), children![
-			(
-				LightsailBlock::default(),
-				CargoBuild::default()
-					.with_release(true)
-					.with_target(BuildTarget::Zigbuild)
-					.with_example("hello_lightsail")
-					.with_additional_args(vec![
-						"--features".into(),
-						"http_server,router,aws_sdk,bindings_aws_common".into(),
-					])
-					.into_build_artifact()
-			),
-			TofuApplyAction,
-			(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
-		]),
-	)])
+	(stack(), stack_cli(), children![
+		route("watch", (exchange_sequence(), children![
+			AwsWatch::for_lightsail(&stack()),
+		])),
+		route(
+			"deploy",
+			(exchange_sequence(), children![
+				(
+					LightsailBlock::default(),
+					CargoBuild::default()
+						.with_release(true)
+						.with_target(BuildTarget::Zigbuild)
+						.with_example("hello_lightsail")
+						.with_additional_args(vec![
+							"--features".into(),
+							"http_server,router,aws_sdk,bindings_aws_common".into(),
+						])
+						.into_build_artifact()
+				),
+				TofuApplyAction,
+				(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
+				AwsWatch::for_lightsail(&stack())
+					.with_timeout(Duration::from_secs(30)),
+			]),
+		),
+	])
 		.xok()
 }
 

@@ -128,6 +128,43 @@ systemctl enable --now caddy
 			String::new()
 		};
 
+		// build CloudWatch agent setup for log forwarding
+		let stage = stack.stage();
+		let cloudwatch_setup = format!(
+			r#"
+# install and configure CloudWatch agent for log forwarding
+dnf install -y amazon-cloudwatch-agent
+cat > /opt/aws/amazon-cloudwatch-agent/etc/common-config.toml <<'CCEOF'
+[credentials]
+shared_credential_profile = "default"
+shared_credential_file = "/root/.aws/credentials"
+CCEOF
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
+{{
+  "agent": {{
+    "run_as_user": "root",
+    "region": "{region}"
+  }},
+  "logs": {{
+    "logs_collected": {{
+      "files": {{
+        "collect_list": [
+          {{
+            "file_path": "/var/log/{app_name}.log",
+            "log_group_name": "/{app_name}/{stage}",
+            "log_stream_name": "{app_name}",
+            "retention_in_days": 30
+          }}
+        ]
+      }}
+    }}
+  }}
+}}
+CWEOF
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m onPremise -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+"#
+		);
+
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
 		// which would conflict with Rust's format! macro
 		let script = format!(
@@ -162,6 +199,8 @@ ExecStart=/opt/{app_name}/app
 WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3
+StandardOutput=append:/var/log/{app_name}.log
+StandardError=append:/var/log/{app_name}.log
 Environment=RUST_LOG=info
 Environment=BEET_HOST=0.0.0.0
 Environment=BEET_PORT={app_port}
@@ -176,7 +215,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now {app_name}.service
-{https_setup}"#
+{https_setup}{cloudwatch_setup}"#
 		);
 
 		// build env var lines for terraform variable references
@@ -245,12 +284,25 @@ impl Block for LightsailBlock {
 			},
 		);
 
+		// grant the user CloudWatch Logs write access for the CloudWatch agent
+		let cw_policy_ident =
+			stack.resource_ident(self.build_label("deploy-cw-policy"));
+		let cw_policy = terra::ResourceDef::new_secondary(
+			cw_policy_ident,
+			AwsIamUserPolicyAttachmentDetails {
+				user: user_name_ref.clone().into(),
+				policy_arn: "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+					.into(),
+				..default()
+			},
+		);
+
 		// access key for the user
 		let key_ident = stack.resource_ident(self.build_label("deploy-key"));
 		let access_key = terra::ResourceDef::new_secondary(
 			key_ident.clone(),
 			AwsIamAccessKeyDetails {
-				user: user_name_ref.into(),
+				user: user_name_ref.clone().into(),
 				..default()
 			},
 		);
@@ -349,6 +401,7 @@ impl Block for LightsailBlock {
 		config
 			.add_resource(&user)?
 			.add_resource(&policy)?
+			.add_resource(&cw_policy)?
 			.add_resource(&access_key)?
 			.add_resource(&keypair)?
 			.add_resource(&instance)?

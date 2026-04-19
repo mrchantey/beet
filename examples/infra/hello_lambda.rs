@@ -8,6 +8,7 @@
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- validate
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- plan
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- deploy
+//! cargo run --example hello_lambda --features=deploy,lambda_block -- watch
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- show
 //! cargo run --example hello_lambda --features=deploy,lambda_block -- destroy --force
 //! ```
@@ -49,24 +50,31 @@ fn setup(mut commands: Commands) -> Result {
 
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	(stack(), stack_cli(), children![route(
-		"deploy",
-		(exchange_sequence(), children![
-			(
-				LambdaBlock::default(),
-				CargoBuild::default()
-					.with_target(BuildTarget::Zigbuild)
-					.with_example("hello_lambda")
-					.with_additional_args(vec![
-						"--features".into(),
-						"http_server,lambda,router,infra,aws_sdk,bindings_aws_common".into(),
-					])
-					.into_lambda_build_artifact()
-			),
-			TofuApplyAction,
-			(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
-		]),
-	)])
+	(stack(), stack_cli(), children![
+		route("watch", (exchange_sequence(), children![
+			AwsWatch::for_lambda(&stack(), "main-lambda"),
+		])),
+		route(
+			"deploy",
+			(exchange_sequence(), children![
+				(
+					LambdaBlock::default(),
+					CargoBuild::default()
+						.with_target(BuildTarget::Zigbuild)
+						.with_example("hello_lambda")
+						.with_additional_args(vec![
+							"--features".into(),
+							"http_server,lambda,router,infra,aws_sdk,bindings_aws_common".into(),
+						])
+						.into_lambda_build_artifact()
+				),
+				TofuApplyAction,
+				(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
+				AwsWatch::for_lambda(&stack(), "main-lambda")
+					.with_timeout(Duration::from_secs(30)),
+			]),
+		),
+	])
 		.xok()
 }
 
