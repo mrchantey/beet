@@ -15,7 +15,7 @@ use bytes::Bytes;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let bucket = temp_bucket();
+/// let bucket = Bucket::temp();
 /// let blob = bucket.blob(RelPath::new("my-file.txt"));
 /// blob.insert("hello world").await?;
 /// let data = blob.get().await?;
@@ -43,7 +43,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("content").await?;
 	/// # Ok(())
 	/// # }
@@ -69,7 +69,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("hello").await?;
 	/// let data = blob.get().await?;
 	/// # Ok(())
@@ -95,7 +95,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// let exists = blob.exists().await?;
 	/// # Ok(())
 	/// # }
@@ -112,7 +112,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("temp").await?;
 	/// blob.remove().await?;
 	/// # Ok(())
@@ -130,7 +130,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// if let Some(url) = blob.public_url().await? {
 	///     println!("Public URL: {url}");
 	/// }
@@ -213,7 +213,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("content").await?;
 	/// # Ok(())
 	/// # }
@@ -239,7 +239,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("hello").await?;
 	/// let data = blob.get().await?;
 	/// # Ok(())
@@ -265,7 +265,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// let exists = blob.exists().await?;
 	/// # Ok(())
 	/// # }
@@ -282,7 +282,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("temp").await?;
 	/// blob.remove().await?;
 	/// # Ok(())
@@ -300,7 +300,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = temp_bucket().blob(RelPath::new("doc.txt"));
+	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
 	/// if let Some(url) = blob.public_url().await? {
 	///     println!("Public URL: {url}");
 	/// }
@@ -338,14 +338,14 @@ mod test {
 
 	#[test]
 	fn blob_from_bucket() {
-		let bucket = temp_bucket();
+		let bucket = Bucket::temp();
 		let blob = bucket.blob(RelPath::new("test.txt"));
 		blob.path().to_string().xpect_eq("test.txt");
 	}
 
 	#[test]
 	fn clone_preserves_path() {
-		let blob = temp_bucket().blob(RelPath::new("a/b/c.txt"));
+		let blob = Bucket::temp().blob(RelPath::new("a/b/c.txt"));
 		let cloned = blob.clone();
 		cloned.path().xpect_eq(blob.path().clone());
 	}
@@ -371,7 +371,7 @@ mod test {
 	#[test]
 	fn insert_get_remove() {
 		async_ext::block_on(async {
-			let blob = temp_bucket().blob(RelPath::new("hello.txt"));
+			let blob = Bucket::temp().blob(RelPath::new("hello.txt"));
 			blob.exists().await.unwrap().xpect_false();
 			blob.insert("world").await.unwrap();
 			blob.exists().await.unwrap().xpect_true();
@@ -387,7 +387,7 @@ mod test {
 	#[test]
 	fn get_media_infers_type() {
 		async_ext::block_on(async {
-			let blob = temp_bucket().blob(RelPath::new("data.json"));
+			let blob = Bucket::temp().blob(RelPath::new("data.json"));
 			blob.insert(r#"{"key":"value"}"#).await.unwrap();
 			let media = blob.get_media().await.unwrap();
 			media.media_type().xpect_eq(MediaType::Json);
@@ -398,7 +398,7 @@ mod test {
 	#[test]
 	fn try_insert_fails_if_exists() {
 		async_ext::block_on(async {
-			let blob = temp_bucket().blob(RelPath::new("once.txt"));
+			let blob = Bucket::temp().blob(RelPath::new("once.txt"));
 			blob.insert("first").await.unwrap();
 			blob.try_insert("second").await.xpect_err();
 		});

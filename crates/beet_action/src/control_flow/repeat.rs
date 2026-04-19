@@ -7,43 +7,10 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Action<Input, Outcome> = Action::new_async(repeat_action::<Input>))]
+#[action]
+#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct Repeat<Input = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> Input>,
-}
-
-impl<Input> Default for Repeat<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl Repeat {
-	/// Create a default `Repeat<()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Calls the single child in a loop until it fails.
-///
-/// ## Errors
-///
-/// Returns an error when the child has no [`ActionMeta`] or an
-/// incompatible action signature.
-async fn repeat_action<Input>(cx: ActionContext<Input>) -> Result<Outcome>
-where
-	Input: 'static + Send + Sync + Clone,
-{
+pub async fn Repeat(cx: ActionContext) -> Result<Outcome> {
 	let child = match cx
 		.caller
 		.get(|children: &Children| children.first().copied())
@@ -62,12 +29,12 @@ where
 		.map_err(|err| {
 			bevyhow!("repeat child has no action: {child:?}, error: {err}")
 		})?;
-	action_meta.assert_match::<Input, Outcome>()?;
+	action_meta.assert_match::<(), Outcome>()?;
 
 	loop {
 		match world
 			.entity(child)
-			.call::<Input, Outcome>(cx.input.clone())
+			.call::<(), Outcome>(())
 			.await?
 		{
 			Outcome::Pass(_) => {}
@@ -85,31 +52,20 @@ where
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(Action<Input, Outcome> = Action::new_async(repeat_times_action::<Input>))]
+#[require(RepeatTimesAction)]
 #[reflect(Component)]
-pub struct RepeatTimes<Input = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-{
+pub struct RepeatTimes {
 	/// Maximum number of iterations.
 	total_times: u32,
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> Input>,
 }
 
-impl<Input> RepeatTimes<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
+impl RepeatTimes {
 	/// Sentinel used to represent an effectively unbounded repeat count.
 	pub const FOREVER: u32 = u32::MAX;
 
 	/// Create a bounded repeat counter.
 	pub fn new(total_times: u32) -> Self {
-		Self {
-			total_times,
-			_marker: PhantomData,
-		}
+		Self { total_times }
 	}
 
 	/// Create an unbounded repeat counter.
@@ -119,19 +75,15 @@ where
 	pub fn total_times(&self) -> u32 { self.total_times }
 }
 
-/// Calls the single child up to `total_times`, returning on first failure.
-///
-/// ## Errors
-///
-/// Returns an error when the child has no [`ActionMeta`] or an
-/// incompatible action signature.
-async fn repeat_times_action<Input>(cx: ActionContext<Input>) -> Result<Outcome>
-where
-	Input: 'static + Send + Sync + Clone,
-{
+/// Action component for [`RepeatTimes`], calls the single child up to
+/// `total_times`, returning on first failure.
+#[action]
+#[derive(Debug, Clone, Copy, Default, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn RepeatTimesAction(cx: ActionContext) -> Result<Outcome> {
 	let total_times = cx
 		.caller
-		.get(|rt: &RepeatTimes<Input>| rt.total_times)
+		.get(|rt: &RepeatTimes| rt.total_times)
 		.await
 		.unwrap_or(0);
 
@@ -153,12 +105,12 @@ where
 		.map_err(|err| {
 			bevyhow!("repeat_times child has no action: {child:?}, error: {err}")
 		})?;
-	action_meta.assert_match::<Input, Outcome>()?;
+	action_meta.assert_match::<(), Outcome>()?;
 
 	for _ in 0..total_times {
 		match world
 			.entity(child)
-			.call::<Input, Outcome>(cx.input.clone())
+			.call::<(), Outcome>(())
 			.await?
 		{
 			Outcome::Pass(_) => {}
@@ -200,7 +152,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_no_child() {
 		AsyncPlugin::world()
-			.spawn(Repeat::new())
+			.spawn(Repeat)
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -210,7 +162,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_failing_child() {
 		AsyncPlugin::world()
-			.spawn((Repeat::new(), children![outcome_fail()]))
+			.spawn((Repeat, children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -221,7 +173,7 @@ mod tests {
 	async fn repeat_child_passes_then_fails() {
 		let (count, child) = pass_n_then_fail(3);
 		AsyncPlugin::world()
-			.spawn((Repeat::new(), children![child]))
+			.spawn((Repeat, children![child]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -235,7 +187,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_times_no_child() {
 		AsyncPlugin::world()
-			.spawn(RepeatTimes::<()>::new(5))
+			.spawn(RepeatTimes::new(5))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -246,7 +198,7 @@ mod tests {
 	async fn repeat_times_all_pass() {
 		let (count, child) = pass_n_then_fail(10);
 		AsyncPlugin::world()
-			.spawn((RepeatTimes::<()>::new(3), children![child]))
+			.spawn((RepeatTimes::new(3), children![child]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -258,7 +210,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_times_child_fails_early() {
 		AsyncPlugin::world()
-			.spawn((RepeatTimes::<()>::new(5), children![outcome_fail()]))
+			.spawn((RepeatTimes::new(5), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -268,7 +220,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_times_zero_is_immediate_pass() {
 		AsyncPlugin::world()
-			.spawn((RepeatTimes::<()>::new(0), children![outcome_fail()]))
+			.spawn((RepeatTimes::new(0), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -277,9 +229,9 @@ mod tests {
 
 	#[beet_core::test]
 	async fn repeat_times_accessors() {
-		RepeatTimes::<()>::new(7).total_times().xpect_eq(7);
-		RepeatTimes::<()>::forever()
+		RepeatTimes::new(7).total_times().xpect_eq(7);
+		RepeatTimes::forever()
 			.total_times()
-			.xpect_eq(RepeatTimes::<()>::FOREVER);
+			.xpect_eq(RepeatTimes::FOREVER);
 	}
 }

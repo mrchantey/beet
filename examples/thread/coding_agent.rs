@@ -38,11 +38,11 @@ fn setup(mut commands: Commands) {
 						Actor::new("Coder", ActorKind::Agent),
 						OpenAiProvider::gpt_5_mini().unwrap(),
 						children![
-							route("list-blobs", ListBlobs),
-							route("read-blob", ReadBlob),
-							route("write-blob", WriteBlob),
-							route("edit-text", EditText),
-							route("remove-blob", RemoveBlob),
+							exchange_route("list-blobs", ListBlobs),
+							exchange_route("read-blob", ReadBlob),
+							exchange_route("write-blob", WriteBlob),
+							exchange_route("edit-text", EditText),
+							exchange_route("remove-blob", RemoveBlob),
 						]
 					),
 				]

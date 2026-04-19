@@ -9,7 +9,7 @@ pub struct RemoveBlobParams {
 }
 
 /// Remove a blob from the nearest ancestor [`Bucket`].
-#[action(route)]
+#[action]
 #[derive(Component, Reflect)]
 pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
 	let bucket = cx

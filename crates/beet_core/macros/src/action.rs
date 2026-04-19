@@ -446,10 +446,10 @@ fn make_require_action(
 	beet_action: &syn::Path,
 ) -> TokenStream {
 	if has_route {
-		let beet_net = pkg_ext::internal_or_beet("beet_net");
+		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
-			#beet_net::prelude::ExchangeAction = #beet_net::prelude::ExchangeAction::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
+			#beet_router::prelude::ExchangeAction = #beet_router::prelude::ExchangeAction::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
 		}
 	} else {
 		quote! {
@@ -509,12 +509,21 @@ fn make_struct_def(
 		TokenStream::default()
 	};
 
+	// action structs are always unit structs or PhantomData structs,
+	// both trivially cloneable
+	let derive_clone = if !has_derive(fn_attrs, "Clone") {
+		quote! { #[derive(Clone)] }
+	} else {
+		TokenStream::default()
+	};
+
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
 
 	if type_params.is_empty() {
 		quote! {
 			#(#fn_attrs)*
+			#derive_clone
 			#require_action
 			#require_meta
 			#require_path
@@ -544,6 +553,7 @@ fn make_struct_def(
 		};
 		quote! {
 			#(#fn_attrs)*
+			#derive_clone
 			#require_action
 			#require_meta
 			#require_path

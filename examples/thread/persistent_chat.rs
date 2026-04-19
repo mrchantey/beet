@@ -56,7 +56,7 @@ fn scene() -> impl Bundle {
 	(
 		Thread::default(),
 		// adding a blob to a thread indicates it should be persisted
-		Repeat::new(),
+		Repeat,
 		// this control flow will be triggered on spawn,
 		// including after scene reload
 		CallOnSpawn::<(), Outcome>::default(),

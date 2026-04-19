@@ -233,7 +233,7 @@ mod tests {
 	#[beet_core::test]
 	async fn upload_and_download() {
 		let mut client =
-			ArtifactsClient::new(temp_bucket(), ArtifactLedger::default_test());
+			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
 		let bytes = b"hello world".to_vec();
 		client
 			.upload_artifact(
@@ -252,7 +252,7 @@ mod tests {
 	async fn publish_and_read_ledger() {
 		let ledger =
 			test_ledger(vec![("app.zip", "versions/x/app.zip", "abc123")]);
-		let client = ArtifactsClient::new(temp_bucket(), ledger.clone());
+		let client = ArtifactsClient::new(Bucket::temp(), ledger.clone());
 		client.current_ledger().await.unwrap().xpect_eq(None);
 		client.publish_ledger().await.unwrap();
 		let current = client.current_ledger().await.unwrap().unwrap();
@@ -262,7 +262,7 @@ mod tests {
 
 	#[beet_core::test]
 	async fn list_versions_sorted() {
-		let bucket = temp_bucket();
+		let bucket = Bucket::temp();
 		let client1 = ArtifactsClient::new(
 			bucket.clone(),
 			test_ledger(vec![("app.zip", "v1", "h1")]),
@@ -283,7 +283,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_and_rollforward() {
 		let mut client =
-			ArtifactsClient::new(temp_bucket(), ArtifactLedger::default_test());
+			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
 		let ledger1 = test_ledger(vec![("app.zip", "v1", "h1")]);
 		let ledger2 = test_ledger(vec![("app.zip", "v2", "h2")]);
 		let ledger3 = test_ledger(vec![("app.zip", "v3", "h3")]);
@@ -306,7 +306,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_too_far_fails() {
 		let mut client =
-			ArtifactsClient::new(temp_bucket(), ArtifactLedger::default_test());
+			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
 		let ledger = test_ledger(vec![("app.zip", "v1", "h1")]);
 		client.ledger = ledger.clone();
 		client.publish_ledger().await.unwrap();

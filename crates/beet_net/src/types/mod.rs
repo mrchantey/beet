@@ -60,8 +60,6 @@ pub mod http_ext;
 
 // higher-level exchange patterns
 mod exchange;
-mod exchange_action;
-pub use exchange_action::*;
 mod exchange_stats;
 mod extractors;
 pub use exchange::*;

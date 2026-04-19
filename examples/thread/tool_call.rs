@@ -19,7 +19,7 @@ fn setup(mut commands: Commands) {
 	println!("Tool Call Schema:\n{:#?}", schema);
 
 	commands
-		.spawn((RepeatTimes::<()>::new(2), children![(
+		.spawn((RepeatTimes::new(2), children![(
 			Thread::default(),
 			Sequence::new(),
 			ExcludeErrors(ChildError::NO_ACTION),

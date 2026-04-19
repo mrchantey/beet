@@ -255,28 +255,6 @@ impl BucketProvider for Bucket {
 	}
 }
 
-/// Create temporary in-memory bucket for testing.
-/// The returned bucket is pre-created and ready for immediate use.
-pub fn temp_bucket() -> Bucket { Bucket::temp() }
-
-/// Create local bucket with platform-specific provider.
-/// - wasm: [`LocalStorageBucket`]
-/// - native: [`FsBucket`] at `.cache/buckets/<name>`
-pub fn local_bucket(name: impl Into<String>) -> Bucket {
-	Bucket::new_local(name)
-}
-
-/// Select filesystem or S3 bucket based on [`ServiceAccess`] and feature flags.
-#[allow(unused_variables)]
-pub async fn s3_fs_selector(
-	fs_path: AbsPathBuf,
-	bucket_name: impl AsRef<str>,
-	region: &str,
-	access: ServiceAccess,
-) -> Bucket {
-	Bucket::new_s3_fs_selector(fs_path, bucket_name, region, access).await
-}
-
 /// Test utilities for bucket providers.
 #[cfg(test)]
 pub mod bucket_test {
