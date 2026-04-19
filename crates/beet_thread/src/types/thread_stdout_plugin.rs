@@ -72,13 +72,17 @@ fn post_added(
 
 		let agent_post = post.as_agent_post();
 		let suffix = if agent_post.is_refusal() {
-			"refusal > "
+			"- refusal > "
 		} else if agent_post.is_reasoning_summary()
 			|| agent_post.is_reasoning_content()
 		{
-			"thinking.. "
+			"- thinking > "
 		} else if agent_post.is_url() || agent_post.is_bytes() {
-			"media "
+			"- media > "
+		} else if agent_post.is_function_call() {
+			"- function call > "
+		} else if agent_post.is_function_call_output() {
+			"- function call output > "
 		} else {
 			"> "
 		};

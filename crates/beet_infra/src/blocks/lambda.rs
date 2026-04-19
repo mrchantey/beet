@@ -59,7 +59,6 @@ impl Block for LambdaBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		let region = self.region.as_ref().unwrap_or_else(|| stack.aws_region());
-
 		// artifact values computed directly from stack and entity
 		let artifact_bucket = stack.artifact_bucket_name();
 		let artifact_key = stack.artifact_key(&self.label);

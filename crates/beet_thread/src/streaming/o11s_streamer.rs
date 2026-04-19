@@ -118,6 +118,8 @@ impl O11sStreamer {
 							o11s_mapper::post_to_o11s_input(agent.id(), post)
 						})?;
 
+					trace!("openresponses items: \n{items:#?}");
+
 					let tools = query
 						.tools(agent.entity)
 						.into_iter()

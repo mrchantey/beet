@@ -3,8 +3,6 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() {
-	let schema = reflect_ext::json_schema::<ChoiceInput>();
-	println!("schema: {:#?}", schema);
 	env_ext::load_dotenv();
 	App::new()
 		.add_plugins((
@@ -17,6 +15,9 @@ async fn main() {
 }
 
 fn setup(mut commands: Commands) {
+	let schema = reflect_ext::json_schema::<ChoiceInput>();
+	println!("Tool Call Schema:\n{:#?}", schema);
+
 	commands
 		.spawn((RepeatTimes::<()>::new(2), children![(
 			Thread::default(),
