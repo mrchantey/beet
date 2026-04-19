@@ -26,14 +26,14 @@ pub struct LambdaBlock {
 	/// variables, and outputs. Also used as the artifact name.
 	/// Defaults to `main-lambda`
 	label: SmolStr,
-	/// Optional DNS provider configuration.
-	pub dns: Option<DnsProvider>,
-	/// AWS region for the buckets and lambda function.
-	pub region: Option<SmolStr>,
 	/// Tofu variables to be inserted as environment variables
 	/// in the lambda function.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
+	/// Optional DNS provider configuration.
+	dns: Option<DnsProvider>,
+	/// AWS region for the buckets and lambda function.
+	region: Option<SmolStr>,
 }
 
 

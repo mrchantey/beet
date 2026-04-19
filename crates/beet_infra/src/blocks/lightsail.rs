@@ -25,24 +25,24 @@ pub struct LightsailBlock {
 	/// Label used as a prefix for all terraform resources.
 	/// Also used as the artifact name.
 	label: SmolStr,
-	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
-	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
-	/// DNS must be configured to point this domain to the instance's public IP.
-	#[set_with(unwrap_option, into)]
-	pub domain: Option<SmolStr>,
-	/// AWS availability zone. Defaults to the stack's region with suffix 'a', ie `us-west-2a`.
-	#[set_with(unwrap_option, into)]
-	pub availability_zone: Option<SmolStr>,
-	/// Lightsail blueprint ID, defaults to `amazon_linux_2023`.
-	pub blueprint_id: SmolStr,
-	/// Lightsail bundle ID (instance size), defaults to `nano_3_0`.
-	pub bundle_id: SmolStr,
-	/// Networking mode, defaults to static IPv4.
-	pub networking: LightsailNetworking,
 	/// Tofu variables to be inserted as environment variables
 	/// in the lightsail instance.
 	#[serde(default)]
 	env_vars: Vec<Variable>,
+	/// Optional domain for HTTPS via Caddy reverse proxy with automatic
+	/// Let's Encrypt certificates. When `None`, serves plain HTTP on port 80.
+	/// DNS must be configured to point this domain to the instance's public IP.
+	#[set_with(unwrap_option, into)]
+	domain: Option<SmolStr>,
+	/// AWS availability zone. Defaults to the stack's region with suffix 'a', ie `us-west-2a`.
+	#[set_with(unwrap_option, into)]
+	availability_zone: Option<SmolStr>,
+	/// Lightsail blueprint ID, defaults to `amazon_linux_2023`.
+	blueprint_id: SmolStr,
+	/// Lightsail bundle ID (instance size), defaults to `nano_3_0`.
+	bundle_id: SmolStr,
+	/// Networking mode, defaults to static IPv4.
+	networking: LightsailNetworking,
 }
 
 impl Default for LightsailBlock {
@@ -184,7 +184,11 @@ systemctl enable --now {app_name}.service
 			.env_vars
 			.iter()
 			.map(|variable| {
-				format!("Environment={}=__VAR_{}__", variable.key(), variable.key())
+				format!(
+					"Environment={}=__VAR_{}__",
+					variable.key(),
+					variable.key()
+				)
 			})
 			.collect::<Vec<_>>()
 			.join("\n");
