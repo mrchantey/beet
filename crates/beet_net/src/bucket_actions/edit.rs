@@ -24,7 +24,7 @@ pub struct EditTextParams {
 /// Each `edits[].old_text` must match a unique, non-overlapping region
 /// of the original file. All edits are matched against the original content,
 /// not applied incrementally.
-#[action]
+#[action(route)]
 #[derive(Component, Reflect)]
 pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
 	let bucket = cx

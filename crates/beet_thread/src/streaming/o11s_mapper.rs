@@ -465,13 +465,17 @@ fn stream_to_partial_posts(event: StreamingEvent) -> Result<Vec<PostPartial>> {
 
 pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 	match tool {
-		ToolDefinition::Function(func) => FunctionToolParam {
-			tool_type: "function".to_string(),
-			name: func.path().to_string(),
-			description: func.description().to_string().xsome(),
-			parameters: func.params_schema().clone().xsome(),
-			strict: Some(true),
-		},
+		ToolDefinition::Function(func) => {
+			let mut params = func.params_schema().clone();
+			reflect_ext::sanitize_schema_for_strict_mode(&mut params);
+			FunctionToolParam {
+				tool_type: "function".to_string(),
+				name: func.path().to_string(),
+				description: func.description().to_string().xsome(),
+				parameters: params.xsome(),
+				strict: Some(true),
+			}
+		}
 		ToolDefinition::Provider(provider) => FunctionToolParam {
 			// NOTE: FunctionToolParam restriction is incorrect,
 			// there is an open issue on openresponses to resolve this

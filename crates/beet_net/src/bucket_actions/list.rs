@@ -20,7 +20,12 @@ pub async fn ListBlobs(cx: ActionContext<ListBlobsParams>) -> Result<Vec<RelPath
 			query.get(entity).cloned()
 		})
 		.await?;
-	bucket.with_subdir(cx.input.path).list().await
+	let sub = bucket.with_subdir(cx.input.path);
+	// gracefully return empty list if bucket directory doesn't exist yet
+	match sub.bucket_exists().await {
+		Ok(true) => sub.list().await,
+		_ => Ok(vec![]),
+	}
 }
 
 

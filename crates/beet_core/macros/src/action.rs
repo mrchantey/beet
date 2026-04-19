@@ -446,10 +446,10 @@ fn make_require_action(
 	beet_action: &syn::Path,
 ) -> TokenStream {
 	if has_route {
-		let beet_router = pkg_ext::internal_or_beet("beet_router");
+		let beet_net = pkg_ext::internal_or_beet("beet_net");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
-			#beet_router::prelude::ExchangeAction = #beet_router::prelude::ExchangeAction::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
+			#beet_net::prelude::ExchangeAction = #beet_net::prelude::ExchangeAction::new_detached::<#in_type, #out_type, _, _, _, _>(#action_expr)
 		}
 	} else {
 		quote! {

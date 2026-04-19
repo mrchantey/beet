@@ -1,7 +1,9 @@
 mod post_store;
+mod repeat_while_function_call_output;
 mod skip_if_latest;
 mod thread_stdout_plugin;
 pub use post_store::*;
+pub use repeat_while_function_call_output::*;
 mod thread_plugin;
 pub use skip_if_latest::*;
 pub use thread_plugin::*;
