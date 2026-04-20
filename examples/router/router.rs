@@ -38,7 +38,7 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			RouterAppPlugin,
+			ClientAppPlugin,
 		))
 		.add_systems(Startup, setup)
 		.run()

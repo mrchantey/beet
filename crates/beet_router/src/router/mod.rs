@@ -13,8 +13,6 @@ pub use middleware::*;
 pub use router::*;
 pub use sidebar::*;
 mod route_tree;
-mod router_app_plugin;
 mod router_plugin;
 pub use route_tree::*;
-pub use router_app_plugin::*;
 pub use router_plugin::*;

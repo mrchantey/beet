@@ -82,3 +82,25 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 	// 	},
 	// );
 }
+
+
+/// Master plugin for `beet_router`, combining all sub-plugins.
+///
+/// This plugin initializes:
+/// - [`AsyncPlugin`] — async command infrastructure
+/// - [`DocumentPlugin`] — document field sync (from beet_node)
+/// - [`RouterPlugin`] — route tree building observers
+/// - [`InterfacePlugin`] — single-active-scene enforcement
+/// - [`InputPlugin`] — link click navigation wiring
+#[cfg(feature = "router")]
+#[derive(Default)]
+pub struct ClientAppPlugin;
+
+#[cfg(feature = "router")]
+impl Plugin for ClientAppPlugin {
+	fn build(&self, app: &mut App) {
+		app.init_plugin::<DocumentPlugin>()
+			.init_plugin::<RouterPlugin>()
+			.init_plugin::<NavigatorPlugin>();
+	}
+}

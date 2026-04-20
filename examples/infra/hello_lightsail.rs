@@ -28,7 +28,7 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			RouterAppPlugin,
+			RouterPlugin,
 			InfraPlugin,
 		))
 		.add_systems(Startup, setup)
@@ -53,9 +53,12 @@ fn setup(mut commands: Commands) -> Result {
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
 	(stack(), stack_cli(), children![
-		route("watch", (exchange_sequence(), children![
-			AwsWatch::for_lightsail(&stack()),
-		])),
+		route(
+			"watch",
+			(exchange_sequence(), children![AwsWatch::for_lightsail(
+				&stack()
+			),])
+		),
 		route(
 			"deploy",
 			(exchange_sequence(), children![
@@ -67,7 +70,8 @@ fn infra_scene() -> Result<impl Bundle> {
 						.with_example("hello_lightsail")
 						.with_additional_args(vec![
 							"--features".into(),
-							"http_server,router,aws_sdk,bindings_aws_common".into(),
+							"http_server,router,aws_sdk,bindings_aws_common"
+								.into(),
 						])
 						.into_build_artifact()
 				),

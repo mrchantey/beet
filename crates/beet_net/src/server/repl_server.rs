@@ -8,9 +8,9 @@
 //! is never blocked.
 use super::cli_server::stream_body_to_stdout;
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
-use beet_action::prelude::*;
 
 /// A REPL (read-eval-print loop) server [`Bundle`].
 ///
@@ -39,7 +39,11 @@ use beet_action::prelude::*;
 ///
 /// fn main() {
 ///     let mut app = App::new();
-///     app.add_plugins((MinimalPlugins, LogPlugin::default(), RouterAppPlugin));
+///     app.add_plugins((
+/// 			MinimalPlugins,
+/// 			LogPlugin::default(),
+/// 			RouterPlugin
+/// 		));
 ///     app.world_mut().spawn((
 ///         router(),
 ///         ReplServer,

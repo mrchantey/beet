@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_action::prelude::*;
 
 
 /// Plugin that registers route-building observers for actions.
@@ -15,7 +15,8 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<HelpHandler>()
+		app.init_plugin::<AsyncPlugin>()
+			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
 			.register_type::<PathPartial>()
 			.add_observer(insert_action_path_and_params)

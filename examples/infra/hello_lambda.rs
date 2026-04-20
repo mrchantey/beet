@@ -26,7 +26,7 @@ fn main() -> AppExit {
 				level: Level::TRACE,
 				..default()
 			},
-			RouterAppPlugin,
+			RouterPlugin,
 			InfraPlugin,
 		))
 		.add_systems(Startup, setup)
@@ -51,9 +51,13 @@ fn setup(mut commands: Commands) -> Result {
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
 	(stack(), stack_cli(), children![
-		route("watch", (exchange_sequence(), children![
-			AwsWatch::for_lambda(&stack(), "main-lambda"),
-		])),
+		route(
+			"watch",
+			(exchange_sequence(), children![AwsWatch::for_lambda(
+				&stack(),
+				"main-lambda"
+			),])
+		),
 		route(
 			"deploy",
 			(exchange_sequence(), children![
