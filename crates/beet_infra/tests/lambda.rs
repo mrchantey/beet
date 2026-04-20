@@ -1,3 +1,5 @@
+//! Integration test for Lambda Block
+//! Takes approx 5 mins
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
