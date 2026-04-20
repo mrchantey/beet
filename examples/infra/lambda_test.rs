@@ -1,7 +1,6 @@
 //! Minimal Lambda test binary used by integration tests.
 //! Returns a version marker that tests can verify after deployment.
-use beet_core::prelude::*;
-use beet_net::prelude::*;
+use beet::prelude::*;
 
 /// Test version marker. Integration tests modify this value
 /// to verify binary updates across deploys.

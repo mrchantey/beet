@@ -10,15 +10,6 @@ description = "Terraform configuration represented as high level Bevy scenes"
 repository.workspace = true
 
 
-[[example]]
-name = "lambda_test"
-path = "examples/lambda_test.rs"
-
-[[example]]
-name = "lightsail_test"
-path = "examples/lightsail_test.rs"
-
-
 [features]
 default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]

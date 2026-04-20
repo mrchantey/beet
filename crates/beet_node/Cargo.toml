@@ -12,11 +12,12 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene"]
+default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx"]
 std = []
 action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
+rsx = ["beet_core/rsx"]
 serde = ["dep:serde"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]

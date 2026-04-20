@@ -8,14 +8,13 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 const EXAMPLE_NAME: &str = "lightsail_test";
-const SOURCE_PATH: &str = "crates/beet_infra/examples/lightsail_test.rs";
-const ASSETS_PATH: &str = "crates/beet_infra/examples/assets";
-const ASSETS_FILE: &str = "crates/beet_infra/examples/assets/index.html";
+const SOURCE_PATH: &str = "examples/infra/lightsail_test.rs";
+const ASSETS_PATH: &str = "examples/infra/assets";
+const ASSETS_FILE: &str = "examples/infra/assets/index.html";
 const MARKER_V1: &str = "test-v1";
 const MARKER_V2: &str = "test-v2";
 
 #[beet_core::test(timeout_ms = 900_000)]
-#[ignore = "requires AWS infrastructure"]
 async fn lightsail_lifecycle() {
 	// resolve source paths and create revert guards
 	let source = AbsPathBuf::new_workspace_rel(SOURCE_PATH).unwrap();
@@ -291,7 +290,7 @@ async fn verify_dead(address: &str) -> Result {
 fn swap_version(path: &AbsPathBuf, from: &str, to: &str) -> Result {
 	let content = std::fs::read_to_string(path.as_path())?;
 	let updated =
-		content.replacen(&format!("\"{from}\""), &format!("\"{to}\""), 1);
+		content.replacen(from, to, 1);
 	if content == updated {
 		bevybail!("marker '{from}' not found in {}", path.display());
 	}

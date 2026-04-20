@@ -10,6 +10,8 @@ mod mdx;
 mod sendit;
 mod test_attr;
 mod to_tokens;
+#[cfg(feature = "rsx")]
+mod rsx;
 
 
 /// Implements `TokenizeSelf` for a struct or enum.
@@ -181,6 +183,28 @@ pub fn beet_test(
 #[proc_macro]
 pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	mdx::impl_mdx(input)
+}
+
+/// JSX-like macro for constructing Bevy ECS bundles from HTML-like syntax.
+///
+/// Lowercase tags become [`Element`] bundles, capitalized tags become
+/// component constructors using `Default + SetWith` patterns.
+///
+/// ## Example
+///
+/// ```rust ignore
+/// fn my_ui() -> impl Bundle {
+///     rsx! {
+///         <div class="container">
+///             <span>"hello"</span>
+///         </div>
+///     }
+/// }
+/// ```
+#[cfg(feature = "rsx")]
+#[proc_macro]
+pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	rsx::impl_rsx(input)
 }
 
 

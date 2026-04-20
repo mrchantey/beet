@@ -72,6 +72,7 @@ tokens = [
 	"dep:proc-macro2-diagnostics",
 	"dep:variadics_please",
 ]
+rsx = ["beet_core_macros/rsx"]
 
 
 [dependencies]
