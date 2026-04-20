@@ -7,7 +7,7 @@ use beet_rsx::prelude::*;
 
 #[test]
 fn css() {
-	HtmlDocument::parse_bundle(rsx! {
+	HtmlDocument::parse_bundle(rsx!{
 		<div>
 			hello world
 		<style>
@@ -19,6 +19,6 @@ fn css() {
 }
 #[test]
 fn fs_src() {
-	HtmlDocument::parse_bundle(rsx! { <style src="./test_file.css" /> })
+	HtmlDocument::parse_bundle(rsx!{ <style src="./test_file.css" /> })
 		.xpect_snapshot();
 }

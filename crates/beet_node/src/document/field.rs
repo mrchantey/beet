@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// via [`on_missing`](FieldRef::on_missing).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
-#[component(immutable)]
+#[component(immutable, on_add=on_add)]
 pub struct FieldRef {
 	/// The path to the document
 	pub document: DocumentPath,
@@ -16,6 +16,17 @@ pub struct FieldRef {
 	pub field_path: Vec<FieldPath>,
 	/// Behavior when the field is missing from the document.
 	pub on_missing: OnMissingField,
+}
+
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	if !world.entity(cx.entity).contains::<Value>() {
+		let this = world.entity(cx.entity).get::<FieldRef>().unwrap();
+		let value = match this.on_missing.clone() {
+			OnMissingField::Init { value } => value,
+			_ => Value::default(),
+		};
+		world.commands().entity(cx.entity).insert(value);
+	}
 }
 
 
@@ -44,20 +55,6 @@ impl FieldRef {
 	pub fn error_on_missing(mut self) -> Self {
 		self.on_missing = OnMissingField::EmitError;
 		self
-	}
-
-	/// Create a tuple of this field reference and an initial [`Value`].
-	///
-	/// When [`OnMissingField::Init`] is set, the returned value is a
-	/// [`Value::Str`] of the init value's string representation.
-	/// Otherwise returns [`Value::default`].
-	pub fn as_text(self) -> (Self, Value) {
-		let text_value = match self.on_missing {
-			OnMissingField::Init { ref value } => Value::Str(value.to_string()),
-			_ => Value::default(),
-		};
-
-		(self, text_value)
 	}
 
 	/// Set the behavior when the field is missing.

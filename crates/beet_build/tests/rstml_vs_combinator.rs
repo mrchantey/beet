@@ -26,11 +26,11 @@ fn is_equal(a: impl Bundle, b: impl Bundle) {
 #[test]
 fn works() {
 	is_equal(
-		rsx! {<div>hello</div>},
+		rsx!{<div>hello</div>},
 		rsx_combinator! {"<div>hello</div>"},
 	);
 	is_equal(
-		rsx! {<div>{"hello"}</div>},
+		rsx!{<div>{"hello"}</div>},
 		rsx_combinator! {r#"<div>{"hello"}</div>"#},
 	);
 }

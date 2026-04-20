@@ -14,7 +14,7 @@ fn works() {
 
 	let entity = app
 		.world_mut()
-		.spawn((HtmlDocument, rsx! {
+		.spawn((HtmlDocument, rsx!{
 			<Roundtrip/>
 		}))
 		.id();
@@ -32,7 +32,7 @@ fn works() {
 
 #[template]
 fn Roundtrip() -> impl Bundle {
-	rsx! {
+	rsx!{
 		<div>
 			<h1>Roundtrip Test</h1>
 		</div>

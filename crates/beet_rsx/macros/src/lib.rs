@@ -25,7 +25,7 @@ pub fn bsx(tokens: TokenStream) -> TokenStream {
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
 /// ```ignore
-/// world.spawn(rsx! {<div> the value is {3}</div>});
+/// world.spawn(rsx!{<div> the value is {3}</div>});
 /// ```
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {

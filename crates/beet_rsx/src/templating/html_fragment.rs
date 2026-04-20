@@ -150,7 +150,7 @@ mod test {
 
 	#[test]
 	fn doctype() {
-		rsx! { <!DOCTYPE /> }
+		rsx!{ <!DOCTYPE /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<!DOCTYPE html>");
 	}
@@ -158,56 +158,56 @@ mod test {
 	#[test]
 	fn comment() {
 		// comment (in rstml must be quoted)
-		rsx! { <!-- "howdy" --> }
+		rsx!{ <!-- "howdy" --> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<!--howdy-->");
 	}
 
 	#[test]
 	fn raw_text() {
-		rsx! { howdy }
+		rsx!{ howdy }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn quoted_text() {
-		rsx! { "howdy" }
+		rsx!{ "howdy" }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn fragment() {
-		rsx! { <>"howdy"</> }
+		rsx!{ <>"howdy"</> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn block() {
-		rsx! { {"howdy"} }
+		rsx!{ {"howdy"} }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("howdy");
 	}
 
 	#[test]
 	fn self_closing_tag() {
-		rsx! { <br /> }
+		rsx!{ <br /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<br/>");
 	}
 
 	#[test]
 	fn not_self_closing_tag() {
-		rsx! { <span>hello</span> }
+		rsx!{ <span>hello</span> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<span>hello</span>");
 	}
 
 	#[test]
 	fn child_elements() {
-		rsx! {
+		rsx!{
 			<span>
 				<span>hello</span>
 			</span>
@@ -218,35 +218,35 @@ mod test {
 
 	#[test]
 	fn simple_attribute() {
-		rsx! { <div class="container"></div> }
+		rsx!{ <div class="container"></div> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<div class=\"container\"></div>");
 	}
 
 	#[test]
 	fn multiple_attributes() {
-		rsx! { <div class="container" id="main"></div> }
+		rsx!{ <div class="container" id="main"></div> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<div class=\"container\" id=\"main\"></div>");
 	}
 
 	#[test]
 	fn boolean_attribute() {
-		rsx! { <input disabled /> }
+		rsx!{ <input disabled /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<input disabled/>");
 	}
 
 	#[test]
 	fn attribute_in_self_closing_tag() {
-		rsx! { <img src="/image.jpg" /> }
+		rsx!{ <img src="/image.jpg" /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<img src=\"/image.jpg\"/>");
 	}
 
 	#[test]
 	fn complex_nested_with_attributes() {
-		rsx! {
+		rsx!{
 			<div class="wrapper">
 				<span id="text">content</span>
 			</div>
@@ -260,7 +260,7 @@ mod test {
 	#[test]
 	fn expr_attributes() {
 		let val = true;
-		rsx! { <input hidden=val /> }
+		rsx!{ <input hidden=val /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<input hidden=\"true\"/>");
 	}
@@ -268,7 +268,7 @@ mod test {
 	#[template]
 	#[derive(Reflect)]
 	fn Template() -> impl Bundle {
-		rsx! {
+		rsx!{
 			<div class="container">
 				<span>hello</span>
 			</div>
@@ -276,7 +276,7 @@ mod test {
 	}
 	#[test]
 	fn templates() {
-		rsx! {
+		rsx!{
 			"outer"
 			<Template />
 		}
@@ -285,7 +285,7 @@ mod test {
 	}
 	#[test]
 	fn client_islands() {
-		rsx! {
+		rsx!{
 			"outer"
 			<Template client:load />
 		}
@@ -294,7 +294,7 @@ mod test {
 	}
 	#[test]
 	fn events() {
-		rsx! { <div onclick=|| {} /> }
+		rsx!{ <div onclick=|| {} /> }
 			.xmap(HtmlDocument::parse_bundle)
 			.xpect_contains(
 				"<div onclick=\"_beet_event_handler(0, event)\" data-beet-dom-idx=\"0\"/>",
@@ -302,12 +302,12 @@ mod test {
 	}
 	#[test]
 	fn iterators() {
-		rsx! {
+		rsx!{
 			<div>
 				{vec![
-					rsx! { <span>foo</span> },
-					rsx! { <span>bar</span> },
-					rsx! { <span>baz</span> },
+					rsx!{ <span>foo</span> },
+					rsx!{ <span>bar</span> },
+					rsx!{ <span>baz</span> },
 				]}
 			</div>
 		}
@@ -319,14 +319,14 @@ mod test {
 	#[test]
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
-		rsx! { <div>{get}</div> }
+		rsx!{ <div>{get}</div> }
 			.xmap(HtmlDocument::parse_bundle).xpect_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\"><!--bt|1-->foo<!--/bt--></div></body></html>");
 	}
 
 	#[test]
 	#[cfg(feature = "css")]
 	fn style_inline() {
-		HtmlDocument::parse_bundle(rsx! {<style>body { color: red; }</style>})
+		HtmlDocument::parse_bundle(rsx!{<style>body { color: red; }</style>})
 			.xpect_snapshot();
 	}
 
@@ -334,7 +334,7 @@ mod test {
 	#[cfg(feature = "css")]
 	fn style_src() {
 		HtmlFragment::parse_bundle(
-			rsx! { <style src="../../tests/test_file.css" /> },
+			rsx!{ <style src="../../tests/test_file.css" /> },
 		)
 		.xpect_snapshot();
 	}
@@ -344,20 +344,20 @@ mod test {
 	#[test]
 	fn script() {
 		HtmlFragment::parse_bundle(
-			rsx! { <script type="pizza">let foo = "bar"</script> },
+			rsx!{ <script type="pizza">let foo = "bar"</script> },
 		)
 		.xpect_str("<script type=\"pizza\">let foo = \"bar\"</script>");
 	}
 	#[test]
 	fn code() {
 		HtmlFragment::parse_bundle(
-			rsx! { <code lang="js">let foo = "bar"</code> },
+			rsx!{ <code lang="js">let foo = "bar"</code> },
 		)
 		.xpect_snapshot();
 	}
 	#[test]
 	fn escapes() {
-		HtmlFragment::parse_bundle(rsx! {
+		HtmlFragment::parse_bundle(rsx!{
 			<pre>
 				<code class="language-rust">fn foobar() -> String {}</code>
 			</pre>

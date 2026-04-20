@@ -8,6 +8,9 @@ pub trait IntoBundle<M> {
 }
 
 pub struct BundleMarker;
+// all non-bundle impls begin with this to distinguish from
+// bundle markers in variadics
+pub struct NotBundleMarker;
 
 impl<T: Bundle> IntoBundle<BundleMarker> for T {
 	fn into_bundle(self) -> impl Bundle { self }
@@ -18,12 +21,9 @@ pub impl<T, M> T
 where
 	T: IntoBundle<M>,
 {
-	fn any_bundle(self) -> OnSpawn {
-		let bundle = self.into_bundle();
-		OnSpawn::new(move |entity| {
-			entity.insert(bundle);
-		})
-	}
+	/// Type erased bundle, inserted on spawn.
+	/// Useful for match statements and other conditional bundle returns
+	fn any_bundle(self) -> OnSpawn { OnSpawn::insert(self.into_bundle()) }
 }
 
 #[extend::ext(name=AnyBundleCloneExt)]
@@ -38,7 +38,8 @@ where
 
 pub struct ObserverMarker;
 
-impl<T, E, B: Bundle, M> IntoBundle<(ObserverMarker, E, B, M)> for T
+impl<T, E, B: Bundle, M>
+	IntoBundle<(NotBundleMarker, (ObserverMarker, E, B, M))> for T
 where
 	E: Event,
 	B: Bundle,
@@ -48,7 +49,7 @@ where
 }
 
 // Option
-impl<T, M> IntoBundle<(Self, M)> for Option<T>
+impl<T, M> IntoBundle<(NotBundleMarker, (Self, M))> for Option<T>
 where
 	T: IntoBundle<M>,
 {
@@ -61,7 +62,7 @@ where
 }
 
 /// Vec
-impl<T, M> IntoBundle<(Self, M)> for Vec<T>
+impl<T, M> IntoBundle<(NotBundleMarker, (Self, M))> for Vec<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,
 {
@@ -76,7 +77,7 @@ where
 ///
 /// `rsx!{<div>{entity}</div>}` spawns an entity with this OnSpawn effect,
 /// which becomes the parent of the entity passed in.
-impl IntoBundle<Self> for Entity {
+impl IntoBundle<(NotBundleMarker, Self)> for Entity {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawnTyped::new(move |spawned_entity| {
 			// here the spawned entity is a fragment
@@ -88,9 +89,10 @@ impl IntoBundle<Self> for Entity {
 	}
 }
 
+// all primitives: string, bool, u32 etc
 pub struct IntoValueMarker;
 
-impl<T: Into<Value>> IntoBundle<IntoValueMarker> for T {
+impl<T: Into<Value>> IntoBundle<(NotBundleMarker, IntoValueMarker)> for T {
 	fn into_bundle(self) -> impl Bundle { self.into() }
 }
 
@@ -99,13 +101,13 @@ use variadics_please::all_tuples;
 
 /// Marker that distinguishes variadic tuple [`IntoBundle`] impls
 /// from the observer and blanket impls.
-pub struct TupleMarker<T>(core::marker::PhantomData<T>);
+pub struct TupleMarker;
 
 macro_rules! impl_into_bundle_tuple {
 	($(($T:ident, $t:ident, $M:ident)),*) => {
-		impl<$($T, $M),*> IntoBundle<TupleMarker<($($M,)*)>> for ($($T,)*)
+		impl<$($T, $M),*> IntoBundle<(TupleMarker,($($M,)*))> for ($($T,)*)
 		where
-			$($T: IntoBundle<$M>,)*
+			$($T: IntoBundle<(NotBundleMarker, $M)>,)*
 		{
 			fn into_bundle(self) -> impl Bundle {
 				let ($($t,)*) = self;
@@ -138,6 +140,6 @@ mod test {
 		is_bundle((0_i32, "hello"));
 		is_bundle((Entity::PLACEHOLDER, "text", 42_i32));
 		is_bundle(Bar);
-		// is_bundle((Bar, Bar));
+		is_bundle((Bar, Bar));
 	}
 }

@@ -98,7 +98,10 @@ fn tokenize_node(node: &Node<CustomNode>) -> TokenStream {
 			}
 		}
 		Node::Custom(_) => {
-			let err = syn::Error::new(Span::call_site(), "unhandled custom rstml node");
+			let err = syn::Error::new(
+				Span::call_site(),
+				"unhandled custom rstml node",
+			);
 			err.into_compile_error()
 		}
 	}
@@ -208,7 +211,6 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 	};
 
 	let mut with_calls: Vec<TokenStream> = Vec::new();
-	let mut struct_fields: Option<TokenStream> = None;
 	let mut block_attrs: Vec<TokenStream> = Vec::new();
 
 	for attr in &el.open_tag.attributes {
@@ -218,11 +220,11 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 				// ie `<MyComponent {Foo}>` inserts Foo alongside MyComponent
 				block_attrs.push(quote! { #block });
 			}
-			NodeAttribute::Block(NodeBlock::Invalid(tokens)) => {
-				// struct init block, ie `<MyComponent {foo: bar, bazz: boo}>`
-				// these are not valid Rust expressions so rstml puts them in Invalid
-				struct_fields =
-					Some(quote! { { #tokens, ..Default::default() } });
+			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
+				let span = invalid.span();
+				let err =
+					syn::Error::new(span, "invalid block in element attribute");
+				block_attrs.push(err.into_compile_error());
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
@@ -244,16 +246,9 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 		}
 	}
 
-	let constructor = if let Some(fields) = struct_fields {
-		// struct init with provided fields and ..Default::default()
-		quote! { #tag_ident #fields }
-	} else {
-		quote! { <#tag_ident as Default>::default() }
-	};
-
 	// collect all parts: constructor + with_calls, block attrs, children
 	let mut parts: Vec<TokenStream> = Vec::new();
-	parts.push(quote! { (#constructor #(#with_calls)*).into_bundle() });
+	parts.push(quote! { #tag_ident::default() #(#with_calls)*.into_bundle() });
 
 	// block attribute spreads become direct tuple members
 	for block in block_attrs {

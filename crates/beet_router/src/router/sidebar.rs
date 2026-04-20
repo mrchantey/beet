@@ -98,9 +98,10 @@ impl SidebarState {
 	/// Spawn a "Home" link as a child of `parent_id`.
 	fn spawn_home(&self, world: &mut World, parent_id: Entity) {
 		let bundle = if self.current_path.segments().is_empty() {
-			OnSpawn::insert(rsx! { <li><a href="/" aria-current="page">"Home"</a></li> })
+			rsx! { <li><a href="/" aria-current="page">"Home"</a></li> }
+				.any_bundle()
 		} else {
-			OnSpawn::insert(rsx! { <li><a href="/">"Home"</a></li> })
+			rsx! { <li><a href="/">"Home"</a></li> }.any_bundle()
 		};
 		world.spawn((bundle, ChildOf(parent_id)));
 	}
@@ -144,13 +145,15 @@ impl SidebarState {
 		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls
 		let text = (Value::Str(label.into()),);
 		let bundle = if is_active {
-			OnSpawn::insert(rsx! {
+			rsx! {
 				<li><a href=href aria-current="page">{text}</a></li>
-			})
+			}
+			.any_bundle()
 		} else {
-			OnSpawn::insert(rsx! {
+			rsx! {
 				<li><a href=href>{text}</a></li>
-			})
+			}
+			.any_bundle()
 		};
 		world.spawn((bundle, ChildOf(parent_id)));
 	}
@@ -194,18 +197,21 @@ impl SidebarState {
 		let summary_bundle = if tree.node().is_some() {
 			let href = path.with_leading_slash();
 			if path == &self.current_path {
-				OnSpawn::insert(rsx! {
+				rsx! {
 					<summary><a href=href aria-current="page">{text}</a></summary>
-				})
+				}
+				.any_bundle()
 			} else {
-				OnSpawn::insert(rsx! {
+				rsx! {
 					<summary><a href=href>{text}</a></summary>
-				})
+				}
+				.any_bundle()
 			}
 		} else {
-			OnSpawn::insert(rsx! {
+			rsx! {
 				<summary>{text}</summary>
-			})
+			}
+			.any_bundle()
 		};
 		world.spawn((summary_bundle, ChildOf(details_id)));
 
@@ -401,10 +407,7 @@ mod test {
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![fixed_scene(
-				"about",
-				rsx! { <p>"about"</p> }
-			)])
+			.spawn(children![fixed_scene("about", rsx! { <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -448,12 +451,14 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(PathPartial::new("docs"), children![
-					fixed_scene("intro", rsx! { <p>"intro"</p> }),
-				]),
-				(PathPartial::new("blog"), children![
-					fixed_scene("post1", rsx! { <p>"post1"</p> }),
-				]),
+				(PathPartial::new("docs"), children![fixed_scene(
+					"intro",
+					rsx! { <p>"intro"</p> }
+				),]),
+				(PathPartial::new("blog"), children![fixed_scene(
+					"post1",
+					rsx! { <p>"post1"</p> }
+				),]),
 			])
 			.flush();
 
@@ -472,10 +477,7 @@ mod test {
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![fixed_scene(
-				"about",
-				rsx! { <p>"about"</p> }
-			)])
+			.spawn(children![fixed_scene("about", rsx! { <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -572,10 +574,7 @@ mod test {
 					// a children![] that conflicts with the outer children![]
 					Element::new("p").with_inner_text("docs index")
 				),
-				children![fixed_scene(
-					"intro",
-					rsx! { <p>"intro"</p> }
-				)],
+				children![fixed_scene("intro", rsx! { <p>"intro"</p> })],
 			)])
 			.flush();
 

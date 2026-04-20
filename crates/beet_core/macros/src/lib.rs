@@ -194,7 +194,7 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// ```rust ignore
 /// fn my_ui() -> impl Bundle {
-///     rsx! {
+///     rsx!{
 ///         <div class="container">
 ///             <span>"hello"</span>
 ///         </div>

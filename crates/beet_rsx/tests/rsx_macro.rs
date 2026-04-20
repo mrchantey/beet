@@ -13,7 +13,7 @@ fn reactivity() {
 	let mut world = World::new();
 	let button = world
 		.spawn(
-			rsx! { <button onclick=move |ev| set(ev.value())>click me</button> },
+			rsx!{ <button onclick=move |ev| set(ev.value())>click me</button> },
 		)
 		.get::<Children>()
 		.unwrap()[0];
@@ -28,7 +28,7 @@ fn reactivity() {
 #[test]
 fn inner_text() {
 	let code = "let foo = {bar};";
-	rsx! { <code inner:text=code /> }
+	rsx!{ <code inner:text=code /> }
 		.xmap(HtmlFragment::parse_bundle)
 		.xpect_eq("<code>let foo = {bar};</code>");
 }
@@ -42,7 +42,7 @@ fn r#ref() {
 
 	let mut world = World::new();
 	let div = world
-		.spawn(rsx! { <div ref=set /> })
+		.spawn(rsx!{ <div ref=set /> })
 		.get::<Children>()
 		.unwrap()[0];
 	get().xpect_eq(div);

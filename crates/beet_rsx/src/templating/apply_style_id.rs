@@ -132,7 +132,7 @@ mod test {
 
 	#[template]
 	fn MyTemplate() -> impl Bundle {
-		rsx! {
+		rsx!{
 			<div />
 			<slot />
 		}
@@ -146,7 +146,7 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style {replace_hash()} />
 			<span />
 		})
@@ -156,7 +156,7 @@ mod test {
 	#[test]
 	#[cfg(feature = "css")]
 	fn updates_style_content() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style> body{ color: red; }</style>
 			<div/>
 		})
@@ -164,7 +164,7 @@ mod test {
 	}
 	#[test]
 	fn deduplicates() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<div>
 				<style {replace_hash()} />
 				<style {replace_hash()} />
@@ -175,7 +175,7 @@ mod test {
 	}
 	#[test]
 	fn assigns_id_to_all() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<div>
 				<style {replace_hash()} />
 				<span />
@@ -185,7 +185,7 @@ mod test {
 	}
 	#[test]
 	fn ignores_templates() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style {replace_hash()} />
 			<MyTemplate />
 		})
@@ -193,7 +193,7 @@ mod test {
 	}
 	// #[test]
 	// fn visits_templates() {
-	// 	HtmlDocument::parse_bundle(rsx! {
+	// 	HtmlDocument::parse_bundle(rsx!{
 	// 		<style {replace_hash()}/>
 	// 		<MyTemplate/>
 	// 		<MyTemplate/>
@@ -201,7 +201,7 @@ mod test {
 
 	#[test]
 	fn applies_to_slots() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style {replace_hash()} />
 			<MyTemplate>
 				<span />
@@ -211,9 +211,9 @@ mod test {
 	}
 	#[test]
 	fn expressions() {
-		let foo = rsx! { <div /> };
+		let foo = rsx!{ <div /> };
 
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style {replace_hash()} />
 			{foo}
 		})
@@ -222,7 +222,7 @@ mod test {
 
 	#[test]
 	fn cascades() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<style {replace_hash()} />
 			<MyTemplate style:cascade />
 		})
@@ -233,14 +233,14 @@ mod test {
 	fn nested_template() {
 		#[template]
 		fn StyledTemplate(repeat: bool) -> impl Bundle {
-			rsx! {
+			rsx!{
 				<style {replace_hash()}/>
 				<div/>
 				{repeat.xmap_true(||rsx!{<StyledTemplate repeat=false/>})}
 			}
 		}
 
-		HtmlDocument::parse_bundle(rsx! { <StyledTemplate repeat=true /> })
+		HtmlDocument::parse_bundle(rsx!{ <StyledTemplate repeat=true /> })
 			.xpect_snapshot();
 	}
 
@@ -259,6 +259,6 @@ mod test {
 			"}
 		}
 
-		HtmlDocument::parse_bundle(rsx! { <Style /> }).xpect_snapshot();
+		HtmlDocument::parse_bundle(rsx!{ <Style /> }).xpect_snapshot();
 	}
 }

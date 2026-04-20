@@ -275,12 +275,12 @@ mod test {
 	fn retains_parent() {
 		let mut world = World::new();
 		world
-			.spawn((SnippetRoot::default(), StaticRoot, rsx! { <span /> }))
+			.spawn((SnippetRoot::default(), StaticRoot, rsx!{ <span /> }))
 			.remove::<InstanceRoot>();
 
 		let child =
-			world.spawn((SnippetRoot::default(), rsx! { <div /> })).id();
-		let parent = world.spawn(rsx! { <main></main> }).id();
+			world.spawn((SnippetRoot::default(), rsx!{ <div /> })).id();
+		let parent = world.spawn(rsx!{ <main></main> }).id();
 		let main = world.entity(parent).get::<Children>().unwrap()[0];
 		world.entity_mut(main).add_child(child);
 
@@ -293,7 +293,7 @@ mod test {
 	#[test]
 	#[should_panic = "Not all ExprIdx were applied.."]
 	fn rsx_snippet_missing_idx() {
-		parse(rsx! { <div>{7}</div> }, rsx! {
+		parse(rsx!{ <div>{7}</div> }, rsx!{
 			<div>
 				<br />
 			</div>
@@ -303,12 +303,12 @@ mod test {
 	#[should_panic = "The instance is missing an ExprIdx.."]
 	fn instance_missing_idx() {
 		parse(
-			rsx! {
+			rsx!{
 				<div>
 					<br />
 				</div>
 			},
-			rsx! { <div>{7}</div> },
+			rsx!{ <div>{7}</div> },
 		);
 	}
 
@@ -316,9 +316,9 @@ mod test {
 	#[test]
 	fn block_nodes() {
 		parse(
-			rsx! { <main>{7}</main> },
+			rsx!{ <main>{7}</main> },
 			// because ExprIdx matches, this should be replace with 7
-			rsx! {
+			rsx!{
 				<div>
 					<span>{()}</span>
 					<br />
@@ -339,9 +339,9 @@ mod test {
 	#[test]
 	fn iterators() {
 		parse(
-			rsx! { <main>{vec!["a", "b", "c"]}</main> },
+			rsx!{ <main>{vec!["a", "b", "c"]}</main> },
 			// because ExprIdx matches, this should be replace with 7
-			rsx! {
+			rsx!{
 				<div>
 					<span>{()}</span>
 					<br />
@@ -354,7 +354,7 @@ mod test {
 	fn attribute_values() {
 		let val1 = 1;
 		let val2 = 7;
-		parse(rsx! { <main key=val2 /> }, rsx! {
+		parse(rsx!{ <main key=val2 /> }, rsx!{
 			<div>
 				<span key=val1></span>
 				<br />
@@ -366,8 +366,8 @@ mod test {
 	fn events() {
 		// didnt panic
 		parse(
-			rsx! { <main onclick=|| {} /> },
-			rsx! { <main oninput=|| {} /> },
+			rsx!{ <main onclick=|| {} /> },
+			rsx!{ <main oninput=|| {} /> },
 		)
 		.xpect_eq("<main oninput/>");
 	}
@@ -378,7 +378,7 @@ mod test {
 		struct Foo {
 			key: u32,
 		}
-		parse(rsx! { <main {Foo { key: 9 }} /> }, rsx! {
+		parse(rsx!{ <main {Foo { key: 9 }} /> }, rsx!{
 			<div>
 				<span {()}></span>
 				<br />
@@ -388,7 +388,7 @@ mod test {
 	}
 	#[test]
 	fn root() {
-		parse(rsx! { {7} }, rsx! {
+		parse(rsx!{ {7} }, rsx!{
 			hello
 			{()}
 		})
@@ -397,7 +397,7 @@ mod test {
 
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
-		rsx! { {initial}<slot/> }
+		rsx!{ {initial}<slot/> }
 	}
 	#[template]
 	fn SomeOtherName() -> impl Bundle { () }
@@ -405,10 +405,10 @@ mod test {
 	#[test]
 	fn template_simple() {
 		parse(
-			rsx! { <MyTemplate initial=3 /> },
+			rsx!{ <MyTemplate initial=3 /> },
 			// the name doesnt matter, a <SomeTitleCase/> is treated the same as
 			// any other block {}
-			rsx! {
+			rsx!{
 				<span>
 					<SomeOtherName />
 				</span>
@@ -419,8 +419,8 @@ mod test {
 	#[test]
 	fn template_children() {
 		parse(
-			rsx! { <MyTemplate initial=3><span>foo</span></MyTemplate> },
-			rsx! {
+			rsx!{ <MyTemplate initial=3><span>foo</span></MyTemplate> },
+			rsx!{
 					<MyTemplate initial=4><div>bar</div></MyTemplate>
 			},
 		)
@@ -434,7 +434,7 @@ mod test {
 		parse(
 			// attributes are resolved here, there is only one ExprIdx
 			// in this tree
-			rsx! { <MyTemplate initial=val /> },
+			rsx!{ <MyTemplate initial=val /> },
 			// this is something like the static/tokens representation
 			// of a template, ie attributes have not been resolved yet,
 			// this test ensures we dont try to resolve them
@@ -469,14 +469,14 @@ mod test {
 			.spawn((
 				StaticRoot,
 				child_idx.clone(),
-				rsx! { <div>pizza is <MyTemplate initial=4 /></div> },
+				rsx!{ <div>pizza is <MyTemplate initial=4 /></div> },
 			))
 			.remove::<InstanceRoot>();
 
 		let child = world
 			.spawn((
 				child_idx,
-				rsx! { <div>pasta is <MyTemplate initial=3 /></div> },
+				rsx!{ <div>pasta is <MyTemplate initial=3 /></div> },
 			))
 			.id();
 		//this is ugly hack should be automatic
@@ -494,7 +494,7 @@ mod test {
 			.xpect_eq("<div>pizza is 3</div>");
 
 		world
-			.spawn((StaticRoot, parent_idx.clone(), rsx! {
+			.spawn((StaticRoot, parent_idx.clone(), rsx!{
 				<article>
 					<h1>all about pizza</h1>
 					{child}
@@ -503,7 +503,7 @@ mod test {
 			.remove::<InstanceRoot>()
 			.insert(());
 		let parent = world
-			.spawn((parent_idx, rsx! {
+			.spawn((parent_idx, rsx!{
 				<article>
 					<h1>all about pasta</h1>
 					{child}
@@ -590,10 +590,10 @@ mod test {
 	fn flush_on_spawn_templates() {
 		#[template]
 		fn MyTemplate() -> impl Bundle {
-			rsx! { <div /> }
+			rsx!{ <div /> }
 		}
 
-		parse_instance(rsx! { <MyTemplate /> }).xpect_str("<div/>");
+		parse_instance(rsx!{ <MyTemplate /> }).xpect_str("<div/>");
 	}
 	#[test]
 	fn flush_on_spawn_attribute_blocks() {
@@ -606,10 +606,10 @@ mod test {
 		fn MyTemplate(
 			#[field(flatten)] attrs: MyAttributeBlock,
 		) -> impl Bundle {
-			rsx! { <div {attrs} /> }
+			rsx!{ <div {attrs} /> }
 		}
 
-		parse_instance(rsx! { <MyTemplate class="foo" /> })
+		parse_instance(rsx!{ <MyTemplate class="foo" /> })
 			.xpect_str("<div class=\"foo\"/>");
 	}
 }

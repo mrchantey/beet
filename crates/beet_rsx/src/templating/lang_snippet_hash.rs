@@ -85,15 +85,15 @@ mod test {
 	fn hashes() {
 		let mut world = World::new();
 		let entity1 = world
-			.spawn(rsx! {<style>div { color: red; }</div>})
+			.spawn(rsx!{<style>div { color: red; }</div>})
 			.get::<Children>()
 			.unwrap()[0];
 		let entity2 = world
-			.spawn(rsx! {<style>div { color: blue; }</div>})
+			.spawn(rsx!{<style>div { color: blue; }</div>})
 			.get::<Children>()
 			.unwrap()[0];
 		let entity3 = world
-			.spawn(rsx! {<style>div { color: blue; }</div>})
+			.spawn(rsx!{<style>div { color: blue; }</div>})
 			.get::<Children>()
 			.unwrap()[0];
 		world

@@ -249,7 +249,7 @@ mod test {
 
 		let mut world = World::new();
 		let ent = world
-			.spawn(rsx! { <button onclick=move |ev| set(ev.value())/> })
+			.spawn(rsx!{ <button onclick=move |ev| set(ev.value())/> })
 			.get::<Children>()
 			.unwrap()[0];
 		world

@@ -455,7 +455,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("about", rsx! { <p>"about"</p> }),
+				fixed_scene("about", rsx!{ <p>"about"</p> }),
 				action_at("action"),
 			])
 			.flush();

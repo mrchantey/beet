@@ -197,7 +197,7 @@ mod test {
 
 	#[template]
 	fn Span() -> impl Bundle {
-		rsx! {
+		rsx!{
 			<span>
 				<slot />
 			</span>
@@ -206,7 +206,7 @@ mod test {
 
 	#[template]
 	fn MyComponent() -> impl Bundle {
-		rsx! {
+		rsx!{
 			<html>
 				<slot name="header">Fallback Title</slot>
 				<br />
@@ -218,7 +218,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		rsx! {
+		rsx!{
 			<MyComponent>
 				<div>Default</div>
 				<div slot="header">Title</div>
@@ -230,7 +230,7 @@ mod test {
 
 	#[test]
 	fn component_slots() {
-		rsx! {
+		rsx!{
 			<MyComponent>
 				<div>Default</div>
 				<Span slot="header">Title</Span>
@@ -242,14 +242,14 @@ mod test {
 
 	#[test]
 	fn fallback() {
-		rsx! { <MyComponent /> }
+		rsx!{ <MyComponent /> }
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect_eq("<html>Fallback Title<br/></html>");
 	}
 
 	#[test]
 	fn recursive() {
-		rsx! {
+		rsx!{
 			<Span>
 				<MyComponent>
 					<div>Default</div>
@@ -267,7 +267,7 @@ mod test {
 	fn transfer_simple() {
 		#[template]
 		fn Layout() -> impl Bundle {
-			rsx! {
+			rsx!{
 				<Header>
 					<slot name="header" slot="default" />
 				</Header>
@@ -276,13 +276,13 @@ mod test {
 
 		#[template]
 		fn Header() -> impl Bundle {
-			rsx! {
+			rsx!{
 				<header>
 					<slot />
 				</header>
 			}
 		}
-		rsx! {
+		rsx!{
 			<Layout>
 				<h1 slot="header">"Title"</h1>
 			</Layout>
@@ -295,7 +295,7 @@ mod test {
 	fn transfer_complex() {
 		#[template]
 		fn Layout() -> impl Bundle {
-			rsx! {
+			rsx!{
 				<body>
 					<Middle>
 						<slot name="header" slot="header" />
@@ -308,7 +308,7 @@ mod test {
 		}
 		#[template]
 		fn Middle() -> impl Bundle {
-			rsx! {
+			rsx!{
 				<Header>
 					<slot name="header" slot="default" />
 				</Header>
@@ -317,7 +317,7 @@ mod test {
 
 		#[template]
 		fn Header() -> impl Bundle {
-			rsx! {
+			rsx!{
 				<header>
 					<slot />
 				</header>
@@ -325,7 +325,7 @@ mod test {
 		}
 
 
-		rsx! {
+		rsx!{
 			<Layout>
 				<div>"Content"</div>
 				<h1 slot="header">"Title"</h1>

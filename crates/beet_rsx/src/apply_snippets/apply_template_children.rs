@@ -75,14 +75,14 @@ mod test {
 
 	#[template]
 	pub fn MyTemplate() -> impl Bundle {
-		rsx! { <div><div><slot/>hello world!</div></div> }
+		rsx!{ <div><div><slot/>hello world!</div></div> }
 	}
 
 
 	#[test]
 	fn no_children() {
 		World::new()
-			.spawn(rsx! { <div /> })
+			.spawn(rsx!{ <div /> })
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
@@ -91,7 +91,7 @@ mod test {
 	#[test]
 	fn visits_nested_rsx() {
 		World::new()
-			.spawn(rsx! { <div>{rsx!{<div/>}}</div> })
+			.spawn(rsx!{ <div>{rsx!{<div/>}}</div> })
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()
@@ -101,7 +101,7 @@ mod test {
 	fn skips_template_roots_simple() {
 		let mut world = World::new();
 		world
-			.spawn(rsx! {
+			.spawn(rsx!{
 				<div>
 					<MyTemplate/>
 				</div>
@@ -117,7 +117,7 @@ mod test {
 	fn skips_template_roots_complex() {
 		let mut world = World::new();
 		world
-			.spawn(rsx! {
+			.spawn(rsx!{
 				<div>
 					<MyTemplate>
 						<span>
@@ -136,7 +136,7 @@ mod test {
 	fn skips_resolved_template() {
 		let mut world = World::new();
 		world
-			.spawn(rsx! { <div>{rsx!{<MyTemplate/>}}</div> })
+			.spawn(rsx!{ <div>{rsx!{<MyTemplate/>}}</div> })
 			.get::<TemplateChildren>()
 			.unwrap()
 			.len()

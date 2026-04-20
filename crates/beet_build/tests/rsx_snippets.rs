@@ -30,7 +30,7 @@ fn expressions() {
 
 	// println!("Exported Scene:\n{}", scene);
 
-	apply_and_render(&scene, rsx! {
+	apply_and_render(&scene, rsx!{
 		<button key={1}> this will be replaced {2}</button>
 	})
 	.xpect_contains(
@@ -48,13 +48,13 @@ fn style() {
 			h1{font-size: 1px;}
 		</style>
 	});
-	apply_and_render(&scene, rsx! {"placeholder"}).xpect_str("<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>");
+	apply_and_render(&scene, rsx!{"placeholder"}).xpect_str("<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>");
 }
 #[test]
 fn simple_template() {
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
-		rsx! {
+		rsx!{
 			<span>"value: "{initial}</span>
 		}
 	}
@@ -65,7 +65,7 @@ fn simple_template() {
 		<SomeCapitalizedTagToIndicateATemplate/>
 	</div>
 	});
-	apply_and_render(&scene, rsx! {
+	apply_and_render(&scene, rsx!{
 		<div>
 			<MyTemplate initial={1} />
 		</div>
@@ -103,12 +103,12 @@ fn nested_template() {
 
 	#[template]
 	fn NestedTemplate(initial: u32) -> impl Bundle {
-		(common_idx_nested(), rsx! {
+		(common_idx_nested(), rsx!{
 			<span>"value: "{initial}</span>
 		})
 	}
 
-	apply_and_render(&scene, rsx! {
+	apply_and_render(&scene, rsx!{
 		<div>
 			<NestedTemplate initial={1} />
 		</div>

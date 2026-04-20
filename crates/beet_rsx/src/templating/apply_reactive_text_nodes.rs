@@ -50,19 +50,19 @@ mod test {
 
 	#[test]
 	fn ignores_static() {
-		HtmlDocument::parse_bundle(rsx! { <div>hello {"world"}</div> })
+		HtmlDocument::parse_bundle(rsx!{ <div>hello {"world"}</div> })
 		.xpect_str("<!DOCTYPE html><html><head></head><body><div>hello world</div></body></html>");
 	}
 	#[test]
 	fn simple() {
 		let (get, _set) = signal("world".to_string());
-		HtmlDocument::parse_bundle(rsx! { <div>hello {get}</div> })
+		HtmlDocument::parse_bundle(rsx!{ <div>hello {get}</div> })
 	.xpect_str("<!DOCTYPE html><html><head></head><body><div data-beet-dom-idx=\"0\">hello <!--bt|1-->world<!--/bt--></div></body></html>");
 	}
 	#[template]
 	fn Adjective() -> impl Bundle {
 		let (get, _set) = signal("and".to_string());
-		rsx! {
+		rsx!{
 			"lazy "
 			{get}
 			<slot />
@@ -73,7 +73,7 @@ mod test {
 		let desc = "quick";
 		let color = "brown";
 		let (get, _set) = signal("jumps over".to_string());
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<div>
 				"The "{desc}" and "{color}<b>fox</b> {get}" the "
 				<Adjective>" fat "</Adjective>"dog"

@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 #[test]
 fn works() {
 	let (get, _set) = signal(7);
-	rsx! {
+	rsx!{
 		<MyNode
 			is_required=38
 			is_boxed=|| 3
@@ -67,7 +67,7 @@ fn MyNode(
 	// #[field(foo)]
 	// is_bad_macro: String,
 ) -> impl Bundle {
-	rsx! {
+	rsx!{
 		<div>
 			<p>is_optional: {format!("{:?}", is_optional)}</p>
 			<p>is_required: {format!("{:?}", is_required)}</p>

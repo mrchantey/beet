@@ -13,7 +13,7 @@ fn children() {
 
 	let temp_val: Cow<'static, str> = "Hello, World!".into();
 	// more than 12 items uses builder instead of related!
-	App::new().world_mut().spawn(rsx! {
+	App::new().world_mut().spawn(rsx!{
 		<div>
 			<br>{temp_val}</br>
 			<br />

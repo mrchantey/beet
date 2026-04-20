@@ -82,7 +82,7 @@ Crates for building and deploying web apps. These crates are very experimental a
 fn Counter(initial: i32) -> impl Bundle {
   let (get, set) = signal(initial);
 
-  rsx! {
+  rsx!{
     <button onclick=move |_| set(get() + 1)>
       Cookie Count: {get}
     </button>

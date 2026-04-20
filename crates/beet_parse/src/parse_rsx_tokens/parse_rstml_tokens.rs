@@ -69,7 +69,7 @@ pub fn create_rstml_parser(
 			.raw_text_elements(constants.raw_text_elements.clone())
 			// here we define the rsx! macro as the constant thats used
 			// to resolve raw text blocks more correctly
-			.macro_call_pattern(quote::quote!(rsx! {%%}))
+			.macro_call_pattern(quote::quote!(rsx!{%%}))
 			.custom_node::<RstmlCustomNode>(),
 	)
 }

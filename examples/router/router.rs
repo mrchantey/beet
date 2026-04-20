@@ -92,11 +92,11 @@ fn server_from_cli() -> Result<OnSpawn> {
 	{
 		// use on_spawn to avoid clobbering children!
 		#[cfg(feature = "http_server")]
-		"http" => OnSpawn::insert(HttpServer::default()),
+		"http" => HttpServer::default().any_bundle(),
 		#[cfg(not(feature = "http_server"))]
 		"http" => bevybail!("Add the 'http_server' feature for http servers"),
-		"repl" => OnSpawn::insert(ReplServer::default()),
-		"cli" => OnSpawn::insert(CliServer::default()),
+		"repl" => ReplServer::default().any_bundle(),
+		"cli" => CliServer::default().any_bundle(),
 		_ => {
 			bevybail!(
 				"Invalid server type specified. Accepted options are http,repl,cli"
@@ -133,19 +133,13 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").init_with(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		fixed_scene(
-			"counter",
-			rsx! {
-				<div>
-					<h1>"Cookie Counter"</h1>
-					<p>
-						"Cookie Counter: "
-						{OnSpawn::insert(field_ref.clone().as_text())}
-					</p>
-					{increment(field_ref)}
-				</div>
-			},
-		),
+		fixed_scene("counter", rsx! {
+			<div>
+				<h1>"Cookie Counter"</h1>
+				<p>"Value: "{field_ref.clone()}</p>
+				{increment(field_ref)}
+			</div>
+		}),
 	)
 }
 

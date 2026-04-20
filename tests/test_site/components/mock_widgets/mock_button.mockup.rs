@@ -2,7 +2,7 @@ use beet_rsx::prelude::*;
 
 
 pub fn get() -> impl Bundle {
-	rsx! {
+	rsx!{
 		<div></div>
 	}
 }

@@ -151,7 +151,7 @@ async fn spawn_help_scene(
 ) -> SceneEntity {
 	let children: Vec<OnSpawn> = nodes
 		.iter()
-		.map(|node| OnSpawn::insert(format_action_node_bundle(node)))
+		.map(|node| format_action_node_bundle(node).any_bundle())
 		.collect();
 
 	let world = caller.world();
@@ -176,7 +176,7 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 
 	if let Some(ancestor) = info.ancestor_path {
 		let ancestor_href = format!("/{ancestor}");
-		OnSpawn::insert(rsx! {
+		rsx! {
 			<div>
 				<p>
 					"Route "
@@ -187,9 +187,10 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 				</p>
 				<h2>"Available routes"</h2>
 			</div>
-		})
+		}
+		.any_bundle()
 	} else {
-		OnSpawn::insert(rsx! {
+		rsx! {
 			<div>
 				<p>
 					"Route "
@@ -198,7 +199,8 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 				</p>
 				<h2>"Available routes"</h2>
 			</div>
-		})
+		}
+		.any_bundle()
 	}
 }
 
@@ -210,7 +212,7 @@ async fn spawn_not_found_scene(
 ) -> SceneEntity {
 	let children: Vec<OnSpawn> = nodes
 		.iter()
-		.map(|node| OnSpawn::insert(format_action_node_bundle(node)))
+		.map(|node| format_action_node_bundle(node).any_bundle())
 		.collect();
 
 	let world = caller.world();

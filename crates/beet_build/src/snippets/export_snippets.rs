@@ -151,7 +151,7 @@ mod test {
 
 		// let _entity = app
 		// 	.world_mut()
-		// 	.spawn((HtmlDocument, rsx! {<style>div{color:blue;}</style>}))
+		// 	.spawn((HtmlDocument, rsx!{<style>div{color:blue;}</style>}))
 		// 	.id();
 
 		fs_ext::remove(&path).ok();

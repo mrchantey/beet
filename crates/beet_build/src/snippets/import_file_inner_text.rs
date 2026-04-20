@@ -86,7 +86,7 @@ mod test {
 
 	// this file will be parsed and used by the test
 	#[allow(unexpected_cfgs)]
-	fn _foobar() { let _ = rsx! {<style src="../../tests/test_file.css"/>}; }
+	fn _foobar() { let _ = rsx!{<style src="../../tests/test_file.css"/>}; }
 
 
 	#[test]

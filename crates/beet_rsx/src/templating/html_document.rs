@@ -212,19 +212,19 @@ mod test {
 
 	#[test]
 	fn text() {
-		HtmlDocument::parse_bundle(rsx! { hello world }).xpect_str(
+		HtmlDocument::parse_bundle(rsx!{ hello world }).xpect_str(
 			"<!DOCTYPE html><html><head></head><body>hello world</body></html>",
 		);
 	}
 	#[test]
 	fn elements() {
-		HtmlDocument::parse_bundle(rsx! { <br /> }).xpect_str(
+		HtmlDocument::parse_bundle(rsx!{ <br /> }).xpect_str(
 			"<!DOCTYPE html><html><head></head><body><br/></body></html>",
 		);
 	}
 	#[test]
 	fn fragment() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<br />
 			<br />
 		})
@@ -234,13 +234,13 @@ mod test {
 	}
 	#[test]
 	fn empty_fragment() {
-		HtmlDocument::parse_bundle(rsx! {</>}).xpect_str(
+		HtmlDocument::parse_bundle(rsx!{</>}).xpect_str(
 			"<!DOCTYPE html><html><head></head><body></body></html>",
 		);
 	}
 	#[test]
 	fn ignores_incomplete() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<head>
 				<br />
 			</head>
@@ -254,7 +254,7 @@ mod test {
 	#[ignore = "noisy"]
 	#[should_panic(expected = "Invalid HTML document: no body tag found")]
 	fn partial() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<!DOCTYPE html>
 			<html>
 				<head>
@@ -270,12 +270,12 @@ mod test {
 	#[test]
 	#[cfg(feature = "css")]
 	fn hoist_style_tag() {
-		HtmlDocument::parse_bundle(rsx! { <style>foo{}</style> })
+		HtmlDocument::parse_bundle(rsx!{ <style>foo{}</style> })
 			.xpect_snapshot();
 	}
 	#[test]
 	fn hoist_script_tag() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<script></script>
 			<br />
 		})
@@ -283,7 +283,7 @@ mod test {
 	}
 	#[test]
 	fn hoist_top_tag() {
-		HtmlDocument::parse_bundle(rsx! {
+		HtmlDocument::parse_bundle(rsx!{
 			<script />
 			<!DOCTYPE html>
 			<html>
@@ -298,7 +298,7 @@ mod test {
 	#[test]
 	fn hoist_directive() {
 		HtmlDocument::parse_bundle(
-		rsx! {
+		rsx!{
 			<!DOCTYPE html>
 			<html>
 				<head>
@@ -317,6 +317,6 @@ mod test {
 	}
 	#[test]
 	fn hydration_scripts() {
-		HtmlDocument::parse_bundle(rsx! {<div client:load>}).xpect_snapshot();
+		HtmlDocument::parse_bundle(rsx!{<div client:load>}).xpect_snapshot();
 	}
 }
