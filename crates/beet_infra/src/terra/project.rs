@@ -105,25 +105,43 @@ impl Project {
 	pub async fn destroy(&self) -> Result {
 		self.init().await?;
 		tofu::destroy(&self.dir()).await?;
+		// remove state file
 		self.backend()
 			.provider()
 			.remove(&self.backend_path())
 			.await?;
+		// remove S3 native lock file
+		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
+		self.backend()
+			.provider()
+			.remove(&lock_path)
+			.await
+			.ok();
 		fs_ext::remove_async(&self.dir()).await?;
 		Ok(())
 	}
-	/// Destroys infrastructure without initializing, moving forward
+	/// Destroys infrastructure moving forward
 	/// with each step, even if other parts fail ie dir exists but no backend state.
 	/// - clears stale state locks from interrupted runs
 	/// - runs tofu destroy (lock-free), tearing down all infrastructure
 	/// - removes the state file from the state bucket
 	/// - removes the working directory
 	pub async fn force_destroy(&self) {
+		// init so destroy can access providers and state even after partial cleanup
+		self.init().await.ok();
 		self.backend().clear_stale_locks();
 		tofu::destroy_force(&self.dir()).await.ok();
+		// remove state file
 		self.backend()
 			.provider()
 			.remove(&self.backend_path())
+			.await
+			.ok();
+		// remove S3 native lock file left by interrupted runs
+		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
+		self.backend()
+			.provider()
+			.remove(&lock_path)
 			.await
 			.ok();
 		fs_ext::remove_async(&self.dir()).await.ok();

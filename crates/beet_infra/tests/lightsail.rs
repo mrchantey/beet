@@ -15,6 +15,7 @@ const MARKER_V1: &str = "test-v1";
 const MARKER_V2: &str = "test-v2";
 
 #[beet_core::test(timeout_ms = 900_000)]
+// #[ignore = "deploys resources and takes ten minutes"]
 async fn lightsail_lifecycle() {
 	// resolve source paths and create revert guards
 	let source = AbsPathBuf::new_workspace_rel(SOURCE_PATH).unwrap();
@@ -31,8 +32,7 @@ async fn lightsail_lifecycle() {
 		original: original_assets,
 	};
 
-	let mut stack =
-		Stack::new("lightsail-test").with_aws_region("us-west-2");
+	let mut stack = Stack::new("lightsail-test").with_aws_region("us-west-2");
 
 	// clean up any prior state
 	let project = build_project(&stack).unwrap();
@@ -47,8 +47,7 @@ async fn lightsail_lifecycle() {
 
 	// 2. verify v1 is live
 	let project = build_project(&stack).unwrap();
-	let address =
-		project.output("public_address").await.unwrap();
+	let address = project.output("public_address").await.unwrap();
 	info!("step 2: verifying v1 at {address}");
 	verify_live(&address, MARKER_V1).await.unwrap();
 
@@ -60,14 +59,12 @@ async fn lightsail_lifecycle() {
 	info!("step 4-5: deploying v2");
 	swap_version(&source, MARKER_V1, MARKER_V2).unwrap();
 	swap_version(&assets_file, MARKER_V1, MARKER_V2).unwrap();
-	stack =
-		Stack::new("lightsail-test").with_aws_region("us-west-2");
+	stack = Stack::new("lightsail-test").with_aws_region("us-west-2");
 	deploy(&stack).await.unwrap();
 
 	// 6. verify v2
 	let project = build_project(&stack).unwrap();
-	let address =
-		project.output("public_address").await.unwrap();
+	let address = project.output("public_address").await.unwrap();
 	info!("step 6: verifying v2 at {address}");
 	verify_live(&address, MARKER_V2).await.unwrap();
 
@@ -83,8 +80,7 @@ async fn lightsail_lifecycle() {
 
 	// 9. verify v1 after rollback
 	let project = build_project(&stack).unwrap();
-	let address =
-		project.output("public_address").await.unwrap();
+	let address = project.output("public_address").await.unwrap();
 	info!("step 9: verifying v1 after rollback at {address}");
 	verify_live(&address, MARKER_V1).await.unwrap();
 
@@ -100,8 +96,7 @@ async fn lightsail_lifecycle() {
 
 	// 12. verify v2 after rollforward
 	let project = build_project(&stack).unwrap();
-	let address =
-		project.output("public_address").await.unwrap();
+	let address = project.output("public_address").await.unwrap();
 	info!("step 12: verifying v2 after rollforward at {address}");
 	verify_live(&address, MARKER_V2).await.unwrap();
 
@@ -181,10 +176,7 @@ async fn deploy(stack: &Stack) -> Result {
 		.with_target(BuildTarget::Zigbuild)
 		.with_package("beet_infra")
 		.with_example(EXAMPLE_NAME)
-		.with_additional_args(vec![
-			"--features".into(),
-			"deploy".into(),
-		])
+		.with_additional_args(vec!["--features".into(), "deploy".into()])
 		.into_build_artifact();
 
 	let response = AsyncPlugin::world()
@@ -193,11 +185,7 @@ async fn deploy(stack: &Stack) -> Result {
 			assets_s3_fs_bucket(stack),
 			assets_bucket_block(),
 			exchange_sequence(),
-			children![
-				(block, cargo),
-				TofuApplyAction,
-				SyncS3BucketAction,
-			],
+			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
 		))
 		.exchange(Request::get(""))
 		.await;
@@ -289,8 +277,7 @@ async fn verify_dead(address: &str) -> Result {
 /// Modify a file to use a different version marker.
 fn swap_version(path: &AbsPathBuf, from: &str, to: &str) -> Result {
 	let content = std::fs::read_to_string(path.as_path())?;
-	let updated =
-		content.replacen(from, to, 1);
+	let updated = content.replacen(from, to, 1);
 	if content == updated {
 		bevybail!("marker '{from}' not found in {}", path.display());
 	}

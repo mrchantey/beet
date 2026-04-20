@@ -95,7 +95,7 @@
 		"crates/beet_flow",
 		"crates/beet_ml",
 		"crates/beet_router_old",
-		"crates/beet_design",
+		// "crates/beet_design",
 		// "crates/beet_dom",
 		// "crates/beet_parse",
 		// "crates/beet_rsx",

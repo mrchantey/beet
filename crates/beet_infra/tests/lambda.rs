@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration test for Lambda Block.
-//! Takes approx 5 mins.
+//! Takes approx 20-40 mins.
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
@@ -14,7 +14,7 @@ const ASSETS_FILE: &str = "examples/infra/assets/index.html";
 const MARKER_V1: &str = "test-v1";
 const MARKER_V2: &str = "test-v2";
 
-#[beet_core::test(timeout_ms = 600_000)]
+#[beet_core::test(timeout_ms = 900_000)]
 async fn lambda_lifecycle() {
 	// resolve source paths and create revert guards
 	let source = AbsPathBuf::new_workspace_rel(SOURCE_PATH).unwrap();
@@ -176,7 +176,7 @@ async fn deploy(stack: &Stack) -> Result {
 		.with_example(EXAMPLE_NAME)
 		.with_additional_args(vec![
 			"--features".into(),
-			"deploy".into(),
+			"deploy,beet_net/lambda".into(),
 		])
 		.into_lambda_build_artifact();
 
@@ -186,11 +186,7 @@ async fn deploy(stack: &Stack) -> Result {
 			assets_s3_fs_bucket(stack),
 			assets_bucket_block(),
 			exchange_sequence(),
-			children![
-				(block, cargo),
-				TofuApplyAction,
-				SyncS3BucketAction,
-			],
+			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
 		))
 		.exchange(Request::get(""))
 		.await;
@@ -279,8 +275,7 @@ async fn verify_dead(url: &str) -> Result {
 /// Modify a file to use a different version marker.
 fn swap_version(path: &AbsPathBuf, from: &str, to: &str) -> Result {
 	let content = std::fs::read_to_string(path.as_path())?;
-	let updated =
-		content.replacen(from, to, 1);
+	let updated = content.replacen(from, to, 1);
 	if content == updated {
 		bevybail!("marker '{}' not found in {}", from, path.display());
 	}
