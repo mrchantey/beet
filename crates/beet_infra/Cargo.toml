@@ -57,7 +57,7 @@ prettyplease = { workspace = true, optional = true }
 async-process = { workspace = true }
 
 [dev-dependencies]
-beet_net = { workspace = true, features = ["ureq", "native-tls","server"] }
+beet_net = { workspace = true, features = ["ureq", "rustls-tls","server"] }
 beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }
 beet_infra = { path = ".", features = [

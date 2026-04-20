@@ -82,37 +82,42 @@ impl SidebarState {
 			OnSpawn::new(move |entity: &mut EntityWorldMut| {
 				let nav_id = entity.id();
 				entity.world_scope(move |world| {
-					let ul_id =
-						world.spawn((Element::new("ul"), ChildOf(nav_id))).id();
-					// Home link
-					state.spawn_home(world, ul_id);
-					// Recursive children
+					// spawn all children first
+					let home = state.spawn_home(world);
+					let mut all_children: Vec<Entity> = vec![home];
 					for child in &sorted {
-						state.spawn_child(world, child, ul_id);
+						if let Some(id) = state.spawn_child(world, child) {
+							all_children.push(id);
+						}
 					}
+					// build ul with children, attach to nav
+					let ul = world
+						.spawn(rsx! { <ul>{all_children}</ul> })
+						.flush();
+					world.entity_mut(nav_id).add_child(ul);
 				});
 			}),
 		)
 	}
 
-	/// Spawn a "Home" link as a child of `parent_id`.
-	fn spawn_home(&self, world: &mut World, parent_id: Entity) {
+	/// Spawn a "Home" `<li>` and return its entity.
+	fn spawn_home(&self, world: &mut World) -> Entity {
 		let bundle = if self.current_path.segments().is_empty() {
 			rsx! { <li><a href="/" aria-current="page">"Home"</a></li> }
 				.any_bundle()
 		} else {
 			rsx! { <li><a href="/">"Home"</a></li> }.any_bundle()
 		};
-		world.spawn((bundle, ChildOf(parent_id)));
+		world.spawn(bundle).flush()
 	}
 
-	/// Recursively spawn a sidebar entry as a child of `parent_id`.
+	/// Recursively spawn a sidebar entry, returning its entity
+	/// or `None` if the tree node has no route and no children.
 	fn spawn_child(
 		&self,
 		world: &mut World,
 		tree: &RouteTree,
-		parent_id: Entity,
-	) {
+	) -> Option<Entity> {
 		let path = tree.path.annotated_rel_path();
 		let config = self.nodes.get(&path);
 		let children = self.sort_children(tree);
@@ -120,11 +125,13 @@ impl SidebarState {
 		if children.is_empty() {
 			// Leaf: render as link if it has a route
 			if tree.node().is_some() {
-				self.spawn_leaf(world, &path, config, parent_id);
+				Some(self.spawn_leaf(world, &path, config))
+			} else {
+				None
 			}
 		} else {
 			// Branch: render as collapsible details
-			self.spawn_branch(world, tree, &path, config, &children, parent_id);
+			Some(self.spawn_branch(world, tree, &path, config, &children))
 		}
 	}
 
@@ -134,8 +141,7 @@ impl SidebarState {
 		world: &mut World,
 		path: &RelPath,
 		config: Option<&SidebarNode>,
-		parent_id: Entity,
-	) {
+	) -> Entity {
 		let label = config
 			.and_then(|cfg| cfg.label.clone())
 			.unwrap_or_else(|| Self::default_label(path));
@@ -155,7 +161,7 @@ impl SidebarState {
 			}
 			.any_bundle()
 		};
-		world.spawn((bundle, ChildOf(parent_id)));
+		world.spawn(bundle).flush()
 	}
 
 	/// Spawn a branch:
@@ -167,8 +173,7 @@ impl SidebarState {
 		path: &RelPath,
 		config: Option<&SidebarNode>,
 		children: &[RouteTree],
-		parent_id: Entity,
-	) {
+	) -> Entity {
 		let label = config
 			.and_then(|cfg| cfg.label.clone())
 			.unwrap_or_else(|| Self::default_label(path));
@@ -179,52 +184,51 @@ impl SidebarState {
 			None => self.is_ancestor_of_current(path),
 		};
 
-		// Outer structure stays imperative since children are dynamic
-		let li_id = world.spawn((Element::new("li"), ChildOf(parent_id))).id();
-		let details_id =
-			world.spawn((Element::new("details"), ChildOf(li_id))).id();
+		// spawn recursive children first
+		let child_entities: Vec<Entity> = children
+			.iter()
+			.filter_map(|child| self.spawn_child(world, child))
+			.collect();
+
+		// build summary
+		let text = (Value::Str(label.into()),);
+		let summary = if tree.node().is_some() {
+			let href = path.with_leading_slash();
+			if path == &self.current_path {
+				rsx! { <summary><a href=href aria-current="page">{text}</a></summary> }
+					.any_bundle()
+			} else {
+				rsx! { <summary><a href=href>{text}</a></summary> }
+					.any_bundle()
+			}
+		} else {
+			rsx! { <summary>{text}</summary> }.any_bundle()
+		};
+		let summary = world.spawn(summary).flush();
+
+		// build nested ul with children
+		let ul = world.spawn(rsx! { <ul>{child_entities}</ul> }).flush();
+
+		// build details containing summary and ul
+		let details =
+			world.spawn(rsx! { <details>{summary}{ul}</details> }).flush();
+
+		// add open attribute
 		if is_expanded {
 			world.spawn((
 				Attribute::new("open"),
 				Value::Bool(true),
-				AttributeOf::new(details_id),
+				AttributeOf::new(details),
 			));
 		}
 
-		// Use rsx! for the summary content.
-		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls.
-		let text = (Value::Str(label.into()),);
-		let summary_bundle = if tree.node().is_some() {
-			let href = path.with_leading_slash();
-			if path == &self.current_path {
-				rsx! {
-					<summary><a href=href aria-current="page">{text}</a></summary>
-				}
-				.any_bundle()
-			} else {
-				rsx! {
-					<summary><a href=href>{text}</a></summary>
-				}
-				.any_bundle()
-			}
-		} else {
-			rsx! {
-				<summary>{text}</summary>
-			}
-			.any_bundle()
-		};
-		world.spawn((summary_bundle, ChildOf(details_id)));
-
-		// Custom attributes on the details element
+		// custom attributes
 		if let Some(config) = config {
-			Self::spawn_custom_attrs(world, details_id, config);
+			Self::spawn_custom_attrs(world, details, config);
 		}
 
-		// Nested list for children
-		let ul_id = world.spawn((Element::new("ul"), ChildOf(details_id))).id();
-		for child in children {
-			self.spawn_child(world, child, ul_id);
-		}
+		// wrap in li
+		world.spawn(rsx! { <li>{details}</li> }).flush()
 	}
 
 	/// Spawn custom attributes from config onto an element.

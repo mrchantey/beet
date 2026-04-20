@@ -179,11 +179,11 @@ async fn deploy(stack: &Stack) -> Result {
 	let cargo = CargoBuild::default()
 		.with_release(true)
 		.with_target(BuildTarget::Zigbuild)
-		.with_package("beet")
+		.with_package("beet_infra")
 		.with_example(EXAMPLE_NAME)
 		.with_additional_args(vec![
 			"--features".into(),
-			"http_server,router,infra".into(),
+			"deploy".into(),
 		])
 		.into_build_artifact();
 

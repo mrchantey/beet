@@ -155,6 +155,13 @@ async fn spawn_help_scene(
 		.collect();
 
 	let world = caller.world();
+	// spawn children first
+	let mut child_ids = Vec::new();
+	for child in children {
+		let child_entity = world.spawn_then(child).await;
+		child_ids.push(child_entity.id());
+	}
+	// build parent with heading
 	let entity = world
 		.spawn_then(rsx! {
 			<div>
@@ -162,9 +169,17 @@ async fn spawn_help_scene(
 			</div>
 		})
 		.await;
-	for child in children {
-		entity.insert_then(OnSpawn::insert_child(child)).await;
-	}
+	// add pre-spawned children to parent
+	let parent_id = entity.id();
+	entity
+		.with_then(move |mut entity| {
+			entity.world_scope(move |world| {
+				for child_id in child_ids {
+					world.entity_mut(parent_id).add_child(child_id);
+				}
+			});
+		})
+		.await;
 	SceneEntity::new_ephemeral(entity.id())
 }
 
@@ -216,10 +231,25 @@ async fn spawn_not_found_scene(
 		.collect();
 
 	let world = caller.world();
-	let entity = world.spawn_then(not_found_preamble(info)).await;
+	// spawn children first
+	let mut child_ids = Vec::new();
 	for child in children {
-		entity.insert_then(OnSpawn::insert_child(child)).await;
+		let child_entity = world.spawn_then(child).await;
+		child_ids.push(child_entity.id());
 	}
+	// build parent from preamble
+	let entity = world.spawn_then(not_found_preamble(info)).await;
+	// add pre-spawned children to parent
+	let parent_id = entity.id();
+	entity
+		.with_then(move |mut entity| {
+			entity.world_scope(move |world| {
+				for child_id in child_ids {
+					world.entity_mut(parent_id).add_child(child_id);
+				}
+			});
+		})
+		.await;
 	SceneEntity::new_ephemeral(entity.id())
 }
 
@@ -263,25 +293,31 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 	(
 		Element::new("li"),
 		OnSpawn::new(move |entity| {
-			let id = entity.id();
+			let li_id = entity.id();
 			entity.world_scope(move |world| {
-				// heading text
-				world.spawn((Value::Str(heading.into()), ChildOf(id)));
-				// nested detail list
+				// spawn heading text first
+				let heading_entity =
+					world.spawn(Value::Str(heading.into())).flush();
+				// spawn nested detail list if needed
 				if !details.is_empty() {
-					let ul = world.spawn(rsx! { <ul /> }).flush();
-					world.entity_mut(ul).insert(ChildOf(id));
-					for (label, value) in details {
-						let li = world
-							.spawn(rsx! {
-								<li>
-									<strong>{format!("{label}:")}</strong>
-									{format!(" {value}")}
-								</li>
-							})
-							.flush();
-						world.entity_mut(li).insert(ChildOf(ul));
-					}
+					let lis: Vec<Entity> = details
+						.into_iter()
+						.map(|(label, value)| {
+							world
+								.spawn(rsx! {
+									<li>
+										<strong>{format!("{label}:")}</strong>
+										{format!(" {value}")}
+									</li>
+								})
+								.flush()
+						})
+						.collect();
+					let ul = world.spawn(rsx! { <ul>{lis}</ul> }).flush();
+					// add heading and ul as children of li
+					world.entity_mut(li_id).add_children(&[heading_entity, ul]);
+				} else {
+					world.entity_mut(li_id).add_child(heading_entity);
 				}
 			});
 		}),
