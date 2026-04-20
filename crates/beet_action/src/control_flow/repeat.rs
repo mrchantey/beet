@@ -7,10 +7,49 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[action]
-#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn Repeat(cx: ActionContext) -> Result<Outcome> {
+#[derive(Debug, Component)]
+#[require(RepeatAction<Input>)]
+pub struct Repeat<Input = ()>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	_marker: PhantomData<fn() -> Input>,
+}
+
+impl<Input> Clone for Repeat<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	fn clone(&self) -> Self {
+		Self {
+			_marker: PhantomData,
+		}
+	}
+}
+impl<Input> Copy for Repeat<Input> where Input: 'static + Send + Sync + Clone {}
+
+impl<Input> Default for Repeat<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	fn default() -> Self {
+		Self {
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl Repeat<()> {
+	/// Create a default `Repeat<()>`.
+	pub fn new() -> Self { Self::default() }
+}
+
+#[action(default)]
+#[derive(Component)]
+pub async fn RepeatAction<Input>(cx: ActionContext<Input>) -> Result<Outcome>
+where
+	Input: 'static + Send + Sync + Clone,
+{
 	let child = match cx
 		.caller
 		.get(|children: &Children| children.first().copied())
@@ -29,12 +68,13 @@ pub async fn Repeat(cx: ActionContext) -> Result<Outcome> {
 		.map_err(|err| {
 			bevyhow!("repeat child has no action: {child:?}, error: {err}")
 		})?;
-	action_meta.assert_match::<(), Outcome>()?;
+	action_meta.assert_match::<Input, Outcome>()?;
 
+	let input = cx.input;
 	loop {
 		match world
 			.entity(child)
-			.call::<(), Outcome>(())
+			.call::<Input, Outcome>(input.clone())
 			.await?
 		{
 			Outcome::Pass(_) => {}
@@ -51,39 +91,75 @@ pub async fn Repeat(cx: ActionContext) -> Result<Outcome> {
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(RepeatTimesAction)]
-#[reflect(Component)]
-pub struct RepeatTimes {
+#[derive(Debug, Component)]
+#[require(RepeatTimesAction<Input>)]
+pub struct RepeatTimes<Input = ()>
+where
+	Input: 'static + Send + Sync + Clone,
+{
 	/// Maximum number of iterations.
 	total_times: u32,
+	_marker: PhantomData<fn() -> Input>,
 }
 
-impl RepeatTimes {
+impl<Input> Clone for RepeatTimes<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	fn clone(&self) -> Self {
+		Self {
+			total_times: self.total_times,
+			_marker: PhantomData,
+		}
+	}
+}
+impl<Input> Copy for RepeatTimes<Input> where Input: 'static + Send + Sync + Clone {}
+
+impl<Input> RepeatTimes<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	/// Configured repeat limit.
+	pub fn total_times(&self) -> u32 { self.total_times }
+}
+
+impl RepeatTimes<()> {
 	/// Sentinel used to represent an effectively unbounded repeat count.
 	pub const FOREVER: u32 = u32::MAX;
 
 	/// Create a bounded repeat counter.
 	pub fn new(total_times: u32) -> Self {
-		Self { total_times }
+		Self { total_times, _marker: PhantomData }
 	}
 
 	/// Create an unbounded repeat counter.
 	pub fn forever() -> Self { Self::new(Self::FOREVER) }
+}
 
-	/// Configured repeat limit.
-	pub fn total_times(&self) -> u32 { self.total_times }
+impl<Input> RepeatTimes<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	/// Create a bounded repeat counter with a typed input marker.
+	pub fn typed(total_times: u32) -> Self {
+		Self { total_times, _marker: PhantomData }
+	}
+
+	/// Create an unbounded typed repeat counter.
+	pub fn typed_forever() -> Self { Self::typed(u32::MAX) }
 }
 
 /// Action component for [`RepeatTimes`], calls the single child up to
 /// `total_times`, returning on first failure.
-#[action]
-#[derive(Debug, Clone, Copy, Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn RepeatTimesAction(cx: ActionContext) -> Result<Outcome> {
+#[action(default)]
+#[derive(Component)]
+pub async fn RepeatTimesAction<Input>(cx: ActionContext<Input>) -> Result<Outcome>
+where
+	Input: 'static + Send + Sync + Clone,
+{
 	let total_times = cx
 		.caller
-		.get(|rt: &RepeatTimes| rt.total_times)
+		.get(|rt: &RepeatTimes<Input>| rt.total_times)
 		.await
 		.unwrap_or(0);
 
@@ -105,12 +181,13 @@ pub async fn RepeatTimesAction(cx: ActionContext) -> Result<Outcome> {
 		.map_err(|err| {
 			bevyhow!("repeat_times child has no action: {child:?}, error: {err}")
 		})?;
-	action_meta.assert_match::<(), Outcome>()?;
+	action_meta.assert_match::<Input, Outcome>()?;
 
+	let input = cx.input;
 	for _ in 0..total_times {
 		match world
 			.entity(child)
-			.call::<(), Outcome>(())
+			.call::<Input, Outcome>(input.clone())
 			.await?
 		{
 			Outcome::Pass(_) => {}
@@ -152,7 +229,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_no_child() {
 		AsyncPlugin::world()
-			.spawn(Repeat)
+			.spawn(Repeat::new())
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -162,7 +239,7 @@ mod tests {
 	#[beet_core::test]
 	async fn repeat_failing_child() {
 		AsyncPlugin::world()
-			.spawn((Repeat, children![outcome_fail()]))
+			.spawn((Repeat::new(), children![outcome_fail()]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
@@ -173,7 +250,7 @@ mod tests {
 	async fn repeat_child_passes_then_fails() {
 		let (count, child) = pass_n_then_fail(3);
 		AsyncPlugin::world()
-			.spawn((Repeat, children![child]))
+			.spawn((Repeat::new(), children![child]))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()

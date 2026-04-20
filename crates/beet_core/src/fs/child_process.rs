@@ -32,6 +32,34 @@ impl std::fmt::Display for ChildProcess {
 	}
 }
 
+
+/// Handle for a long-running child process.
+/// Kills the process on drop, and also supports explicit [`kill`](ChildHandle::kill).
+pub struct ChildHandle {
+	inner: async_process::Child,
+}
+
+impl ChildHandle {
+	/// Kill the child process.
+	pub fn kill(&mut self) -> Result<()> {
+		self.inner
+			.kill()
+			.map_err(|err| bevyhow!("failed to kill child process: {err}"))
+	}
+
+	/// Wait for the child process to complete and return its exit status.
+	pub async fn status(&mut self) -> Result<std::process::ExitStatus> {
+		self.inner
+			.status()
+			.await
+			.map_err(|err| bevyhow!("child process failed: {err}"))
+	}
+}
+
+impl Drop for ChildHandle {
+	fn drop(&mut self) { self.inner.kill().ok(); }
+}
+
 impl ChildProcess {
 	/// Creates a new process with the given command and optional arguments.
 	pub fn new(command: impl Into<SmolStr>) -> Self {
@@ -58,7 +86,10 @@ impl ChildProcess {
 		mut self,
 		envs: impl IntoIterator<Item = (impl Into<SmolStr>, impl Into<SmolStr>)>,
 	) -> Self {
-		self.envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+		self.envs = envs
+			.into_iter()
+			.map(|(k, v)| (k.into(), v.into()))
+			.collect();
 		self
 	}
 
@@ -84,6 +115,20 @@ impl ChildProcess {
 		self.run()
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
+
+	/// Convert this `ChildProcess` into a `std::process::Command` without running it.
+	pub fn into_command_async(self) -> async_process::Command {
+		let mut cmd = async_process::Command::new(self.command.as_str());
+		for (key, val) in &self.envs {
+			cmd.env(key.as_str(), val.as_str());
+		}
+		if let Some(dir) = &self.cwd {
+			cmd.current_dir(dir);
+		}
+		cmd.args(self.args.iter().map(SmolStr::as_str));
+		cmd
+	}
+
 	/// Run the command asynchronously using `async_process`, collecting stdout.
 	pub async fn run_async(self) -> Result<Output> {
 		let mut cmd = async_process::Command::new(self.command.as_str());
@@ -105,6 +150,31 @@ impl ChildProcess {
 		self.run_async()
 			.await
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+	}
+
+	/// Spawn the command as a long-running child process.
+	/// Returns a [`ChildHandle`] that kills the process on drop.
+	pub fn spawn(self) -> Result<ChildHandle> {
+		let mut cmd = async_process::Command::new(self.command.as_str());
+		for (key, val) in &self.envs {
+			cmd.env(key.as_str(), val.as_str());
+		}
+		if let Some(dir) = &self.cwd {
+			cmd.current_dir(dir);
+		}
+		let child = cmd
+			.args(self.args.iter().map(SmolStr::as_str))
+			.spawn()
+			.map_err(|err| {
+				if err.kind() == ErrorKind::NotFound
+					&& let Some(msg) = &self.not_found
+				{
+					bevyhow!("{msg}")
+				} else {
+					err.into()
+				}
+			})?;
+		Ok(ChildHandle { inner: child })
 	}
 
 	fn map_result(

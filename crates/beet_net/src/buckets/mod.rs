@@ -62,6 +62,10 @@ pub use s3_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod s3_bucket;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+mod s3_fs_bucket;
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+pub use s3_fs_bucket::*;
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use dynamo_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod dynamo_bucket;

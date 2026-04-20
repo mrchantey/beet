@@ -3,10 +3,11 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Creates a router bundle with help and navigate middleware.
+/// Creates a router bundle with logging, help, and navigate middleware.
 ///
 /// This is the standard way to set up routing. It includes:
-/// - [`Router2`] for route lookup and dispatch
+/// - [`Router`] for route lookup and dispatch
+/// - [`RequestLogger`] middleware for per-request logging
 /// - [`HelpHandler`] middleware for `--help` support
 /// - [`NavigateHandler`] middleware for `--navigate` support
 ///
@@ -16,6 +17,7 @@ use beet_net::prelude::*;
 pub fn router() -> impl Bundle {
 	(
 		Router,
+		Middleware::<RequestLogger, Request, Response>::default(),
 		Middleware::<HelpHandler, Request, Response>::default(),
 		Middleware::<NavigateHandler, Request, Response>::default(),
 	)

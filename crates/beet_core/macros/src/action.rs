@@ -23,11 +23,12 @@ pub fn impl_action(
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 1. Parse attributes ──
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out", "route", "pure", "default"])?;
+	attrs.assert_types(&[], &["result_out", "route", "pure", "default", "no_default", "no_clone"])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
 	let has_route = attrs.contains_key("route");
-	let derive_default = attrs.contains_key("default");
+	let no_default = attrs.contains_key("no_default");
+	let no_clone = attrs.contains_key("no_clone");
 	let route_expr: Option<&syn::Expr> = attrs.get("route");
 
 	// ── 2. Extract function data ──
@@ -88,8 +89,9 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		Some(require_action),
 		route_expr,
 		is_middleware,
+		no_clone,
 	);
-	let default_impl = if derive_default {
+	let default_impl = if !no_default && !has_derive(fn_attrs, "Default") {
 		make_default(fn_name, generics)
 	} else {
 		TokenStream::default()
@@ -469,6 +471,7 @@ fn make_struct_def(
 	require_action: Option<TokenStream>,
 	route_expr: Option<&syn::Expr>,
 	is_middleware: bool,
+	no_clone: bool,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
 	let has_reflect = has_derive(fn_attrs, "Reflect");
@@ -511,10 +514,10 @@ fn make_struct_def(
 
 	// action structs are always unit structs or PhantomData structs,
 	// both trivially cloneable
-	let derive_clone = if !has_derive(fn_attrs, "Clone") {
-		quote! { #[derive(Clone)] }
-	} else {
+	let derive_clone = if no_clone || has_derive(fn_attrs, "Clone") {
 		TokenStream::default()
+	} else {
+		quote! { #[derive(Clone)] }
 	};
 
 	let type_params: Vec<&syn::Ident> =
@@ -1295,5 +1298,45 @@ mod test {
 			result.contains("Action :: new_pure (my_action_action :: < T >")
 		);
 		assert!(result.contains("fn my_action_action < T >"));
+	}
+
+	#[test]
+	fn no_default_suppresses_auto_default() {
+		let result = parse_str(
+			quote!(no_default),
+			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
+		);
+		assert!(!result.contains("impl Default"));
+	}
+
+	#[test]
+	fn auto_default_for_unit_struct() {
+		let result = parse_str(
+			quote!(),
+			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
+		);
+		assert!(result.contains("impl Default for my_action"));
+	}
+
+	#[test]
+	fn no_clone_suppresses_auto_clone() {
+		let result = parse_str(
+			quote!(no_clone),
+			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
+		);
+		assert!(!result.contains("derive (Clone)"));
+	}
+
+	#[test]
+	fn user_derive_default_no_double_impl() {
+		let result = parse_str(
+			quote!(),
+			syn::parse_quote! {
+				#[derive(Default, Component)]
+				async fn my_action() -> i32 { 42 }
+			},
+		);
+		// derive(Default) is in the user attrs, so macro should NOT generate impl Default
+		assert!(!result.contains("impl Default for my_action"));
 	}
 }

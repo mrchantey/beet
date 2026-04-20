@@ -55,35 +55,6 @@ impl Bucket {
 		}
 	}
 
-	/// Select filesystem or S3 bucket based on [`ServiceAccess`] and feature flags.
-	#[allow(unused_variables)]
-	pub async fn new_s3_fs_selector(
-		fs_path: AbsPathBuf,
-		bucket_name: impl AsRef<str>,
-		region: &str,
-		access: ServiceAccess,
-	) -> Bucket {
-		let bucket_name = bucket_name.as_ref();
-		match access {
-			ServiceAccess::Local => {
-				debug!("Bucket Selector - FS: {fs_path}");
-				Bucket::new(FsBucket::new(fs_path))
-			}
-			ServiceAccess::Remote => {
-				cfg_if! {
-					if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-						debug!("Bucket Selector - S3: {bucket_name}");
-						let provider = S3Bucket::new(bucket_name, region);
-						Bucket::new(provider)
-					} else {
-						debug!("Bucket Selector - FS (no aws_sdk or wasm): {fs_path}");
-						Bucket::new(FsBucket::new(fs_path))
-					}
-				}
-			}
-		}
-	}
-
 	/// Returns a new bucket scoped to the given subdirectory.
 	pub fn with_subdir(&self, path: RelPath) -> Bucket {
 		Bucket::from_arc(Arc::from(self.provider.with_subdir(path)))

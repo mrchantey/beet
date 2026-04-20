@@ -43,7 +43,7 @@ impl FsBucket {
 		self
 	}
 	/// Resolve the effective root directory, including subdir if set.
-	fn effective_root(&self) -> AbsPathBuf {
+	pub fn effective_root(&self) -> AbsPathBuf {
 		match &self.subdir {
 			Some(sub) => self.path.join(sub.to_string()),
 			None => self.path.clone(),

@@ -39,7 +39,6 @@ fn setup(mut commands: Commands) -> Result {
 			commands.spawn(infra_scene()?);
 		}else{
 			commands.spawn((
-				// make assets bucket accessible to routes
 				Bucket::new(assets_bucket()),
 				router::router_scene()?
 			));
@@ -50,19 +49,19 @@ fn setup(mut commands: Commands) -> Result {
 
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
-	(stack(), stack_cli(), children![
+	let block = LambdaBlock::default();
+	(stack(), stack_cli(), assets_s3_fs_bucket(), children![
 		route(
 			"watch",
-			(exchange_sequence(), children![AwsWatch::for_lambda(
-				&stack(),
-				"main-lambda"
-			),])
+			(exchange_sequence(), children![
+				AwsWatch::for_lambda(&stack(), &block),
+			])
 		),
 		route(
 			"deploy",
 			(exchange_sequence(), children![
 				(
-					LambdaBlock::default(),
+					block.clone(),
 					CargoBuild::default()
 						.with_target(BuildTarget::Zigbuild)
 						.with_example("hello_lambda")
@@ -73,8 +72,8 @@ fn infra_scene() -> Result<impl Bundle> {
 						.into_lambda_build_artifact()
 				),
 				TofuApplyAction,
-				(SyncS3Bucket::new("examples/assets"), assets_bucket_block()),
-				AwsWatch::for_lambda(&stack(), "main-lambda")
+				SyncS3BucketAction,
+				AwsWatch::for_lambda(&stack(), &block)
 					.with_timeout(Duration::from_secs(30)),
 			]),
 		),
@@ -82,16 +81,22 @@ fn infra_scene() -> Result<impl Bundle> {
 		.xok()
 }
 
-
-
-/// The stack is used by both infra and router
-/// for resolving bucket names.
+/// The stack is used by both infra and router for resolving bucket names.
 #[allow(unused)]
 fn stack() -> Stack { Stack::new("hello_lambda").with_aws_region("us-west-2") }
 
 #[cfg(feature = "bindings_aws_common")]
 fn assets_bucket_block() -> S3BucketBlock {
 	S3BucketBlock::new("assets").with_deploy_versioned(true)
+}
+
+#[cfg(feature = "deploy")]
+fn assets_s3_fs_bucket() -> S3FsBucket {
+	let stk = stack();
+	S3FsBucket::new(
+		FsBucket::new(WsPathBuf::new("examples/assets")),
+		assets_bucket_block().provider(&stk),
+	)
 }
 
 #[allow(unused)]

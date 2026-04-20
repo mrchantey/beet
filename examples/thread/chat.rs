@@ -15,7 +15,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	commands
-		.spawn((Repeat, children![(
+		.spawn((Repeat::new(), children![(
 			Thread::default(),
 			ExcludeErrors(ChildError::NO_ACTION),
 			Sequence::new(),

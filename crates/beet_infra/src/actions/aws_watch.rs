@@ -27,9 +27,9 @@ impl AwsWatch {
 
 	/// Create an [`AwsWatch`] for a Lambda function's CloudWatch log group.
 	/// The log group follows the AWS convention `/aws/lambda/{function-name}`.
-	pub fn for_lambda(stack: &Stack, block_label: &str) -> Self {
+	pub fn for_lambda(stack: &Stack, block: &LambdaBlock) -> Self {
 		let func_ident =
-			stack.resource_ident(format!("{block_label}--function"));
+			stack.resource_ident(format!("{}--function", block.label()));
 		Self::new(format!(
 			"/aws/lambda/{}",
 			func_ident.primary_identifier()
@@ -37,9 +37,9 @@ impl AwsWatch {
 	}
 
 	/// Create an [`AwsWatch`] for a Lightsail instance's CloudWatch log group.
-	/// Uses the convention `/{app-name}/{stage}`.
-	pub fn for_lightsail(stack: &Stack) -> Self {
-		Self::new(format!("/{}/{}", stack.app_name(), stack.stage()))
+	/// Uses the convention `/{app-name}/{label}/{stage}`.
+	pub fn for_lightsail(stack: &Stack, block: &LightsailBlock) -> Self {
+		Self::new(format!("/{}/{}/{}", stack.app_name(), block.label(), stack.stage()))
 	}
 }
 
@@ -65,8 +65,8 @@ pub async fn AwsWatchAction(
 	);
 
 	// spawn aws logs tail with inherited stdout/stderr for streaming output
-	let mut child = async_process::Command::new("aws")
-		.args([
+	let mut child = ChildProcess::new("aws")
+		.with_args([
 			"logs",
 			"tail",
 			watch.log_group().as_str(),
@@ -76,19 +76,15 @@ pub async fn AwsWatchAction(
 			"--format",
 			"short",
 		])
-		.spawn()
-		.map_err(|err| bevyhow!("failed to start aws logs tail: {err}"))?;
+		.spawn()?;
 
 	// if timeout is set, wait then kill; otherwise follow indefinitely
 	if let Some(timeout) = watch.timeout() {
 		time_ext::sleep(*timeout).await;
-		let _ = child.kill();
+		child.kill().ok();
 		info!("watch timed out after {timeout:?}");
 	} else {
-		let status = child
-			.status()
-			.await
-			.map_err(|err| bevyhow!("aws logs tail failed: {err}"))?;
+		let status = child.status().await?;
 		if !status.success() {
 			bevybail!("aws logs tail exited with status: {status}");
 		}
