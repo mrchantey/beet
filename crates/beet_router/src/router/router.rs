@@ -151,10 +151,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((router(), children![fixed_scene(
-				"about",
-				Element::new("p").with_inner_text("About page")
-			),]))
+			.spawn((router(), children![fixed_scene("about", rsx! { <p>"About page"</p> }),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -167,10 +164,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((router(), children![fixed_scene(
-				"",
-				Element::new("p").with_inner_text("Root content")
-			),]))
+			.spawn((router(), children![fixed_scene("", rsx! { <p>"Root content"</p> }),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap()
@@ -183,14 +177,8 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
 			.spawn((router(), children![
-				fixed_scene("", children![
-					Element::new("h1").with_inner_text("My Server"),
-					Element::new("p").with_inner_text("welcome!"),
-				]),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("", rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -206,10 +194,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -224,10 +209,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -253,14 +235,8 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((router(), children![
-				fixed_scene("", children![
-					Element::new("h1").with_inner_text("My Server"),
-					Element::new("p").with_inner_text("welcome!"),
-				]),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("", rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("").unwrap())
 			.await
@@ -284,10 +260,7 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.flush();
 
@@ -331,10 +304,7 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("counter nonsense").unwrap(),

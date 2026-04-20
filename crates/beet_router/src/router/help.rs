@@ -144,25 +144,23 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
 		.cloned()
 		.collect()
 }
-
 /// Spawns a help scene entity tree with route documentation.
 async fn spawn_help_scene(
 	caller: &AsyncEntity,
 	nodes: &[ActionNode],
 ) -> SceneEntity {
-	let children: Vec<(Element, OnSpawn)> = nodes
+	let children: Vec<OnSpawn> = nodes
 		.iter()
-		.map(|node| format_action_node_bundle(node))
+		.map(|node| OnSpawn::insert(format_action_node_bundle(node)))
 		.collect();
 
 	let world = caller.world();
 	let entity = world
-		.spawn_then((
-			Element::new("div"),
-			OnSpawn::insert_child(
-				Element::new("h2").with_inner_text("Available routes"),
-			),
-		))
+		.spawn_then(rsx! {
+			<div>
+				<h2>"Available routes"</h2>
+			</div>
+		})
 		.await;
 	for child in children {
 		entity.insert_then(OnSpawn::insert_child(child)).await;
@@ -172,72 +170,36 @@ async fn spawn_help_scene(
 
 /// Builds the not-found preamble with anchor tags for the missing route
 /// and optional ancestor route.
-fn not_found_preamble(info: NotFoundInfo) -> (Element, OnSpawn) {
+fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 	let not_found_path = info.not_found_path;
-	let ancestor_path = info.ancestor_path;
-	(
-		Element::new("div"),
-		OnSpawn::new(move |entity| {
-			let div_id = entity.id();
-			entity.world_scope(move |world| {
-				// <p> with inline anchors for the route names
-				let p_id =
-					world.spawn((Element::new("p"), ChildOf(div_id))).id();
+	let not_found_href = format!("/{not_found_path}");
 
-				world.spawn((Value::Str("Route ".into()), ChildOf(p_id)));
-
-				// <a href="/not/found/path">/not/found/path</a>
-				let not_found_href = format!("/{not_found_path}");
-				let anchor_id =
-					world.spawn((Element::new("a"), ChildOf(p_id))).id();
-				world.spawn((
-					Attribute::new("href"),
-					Value::Str(not_found_href.clone().into()),
-					AttributeOf::new(anchor_id),
-				));
-				world.spawn((
-					Value::Str(not_found_href.into()),
-					ChildOf(anchor_id),
-				));
-
-				if let Some(ancestor) = ancestor_path {
-					world.spawn((
-						Value::Str(" not found. Showing help for ".into()),
-						ChildOf(p_id),
-					));
-
-					// <a href="/ancestor">/ancestor</a>
-					let ancestor_href = format!("/{ancestor}");
-					let a2_id =
-						world.spawn((Element::new("a"), ChildOf(p_id))).id();
-					world.spawn((
-						Attribute::new("href"),
-						Value::Str(ancestor_href.clone().into()),
-						AttributeOf::new(a2_id),
-					));
-					world.spawn((
-						Value::Str(ancestor_href.into()),
-						ChildOf(a2_id),
-					));
-
-					world.spawn((Value::Str(":".into()), ChildOf(p_id)));
-				} else {
-					world.spawn((
-						Value::Str(" not found.".into()),
-						ChildOf(p_id),
-					));
-				}
-
-				// <h2>Available routes</h2>
-				let h2_id =
-					world.spawn((Element::new("h2"), ChildOf(div_id))).id();
-				world.spawn((
-					Value::Str("Available routes".into()),
-					ChildOf(h2_id),
-				));
-			});
-		}),
-	)
+	if let Some(ancestor) = info.ancestor_path {
+		let ancestor_href = format!("/{ancestor}");
+		OnSpawn::insert(rsx! {
+			<div>
+				<p>
+					"Route "
+					<a href=not_found_href.clone()>{not_found_href}</a>
+					" not found. Showing help for "
+					<a href=ancestor_href.clone()>{ancestor_href}</a>
+					":"
+				</p>
+				<h2>"Available routes"</h2>
+			</div>
+		})
+	} else {
+		OnSpawn::insert(rsx! {
+			<div>
+				<p>
+					"Route "
+					<a href=not_found_href.clone()>{not_found_href}</a>
+					" not found."
+				</p>
+				<h2>"Available routes"</h2>
+			</div>
+		})
+	}
 }
 
 /// Spawns a not-found scene entity tree with anchor-tagged preamble and help.
@@ -246,9 +208,9 @@ async fn spawn_not_found_scene(
 	info: NotFoundInfo,
 	nodes: &[ActionNode],
 ) -> SceneEntity {
-	let children: Vec<(Element, OnSpawn)> = nodes
+	let children: Vec<OnSpawn> = nodes
 		.iter()
-		.map(|node| format_action_node_bundle(node))
+		.map(|node| OnSpawn::insert(format_action_node_bundle(node)))
 		.collect();
 
 	let world = caller.world();
@@ -305,21 +267,18 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 				world.spawn((Value::Str(heading.into()), ChildOf(id)));
 				// nested detail list
 				if !details.is_empty() {
-					let ul_id =
-						world.spawn((Element::new("ul"), ChildOf(id))).id();
+					let ul = world.spawn(rsx! { <ul /> }).flush();
+					world.entity_mut(ul).insert(ChildOf(id));
 					for (label, value) in details {
-						let li_id = world
-							.spawn((Element::new("li"), ChildOf(ul_id)))
-							.id();
-						world.spawn((
-							Element::new("strong")
-								.with_inner_text(&format!("{label}:")),
-							ChildOf(li_id),
-						));
-						world.spawn((
-							Value::Str(format!(" {value}").into()),
-							ChildOf(li_id),
-						));
+						let li = world
+							.spawn(rsx! {
+								<li>
+									<strong>{format!("{label}:")}</strong>
+									{format!(" {value}")}
+								</li>
+							})
+							.flush();
+						world.entity_mut(li).insert(ChildOf(ul));
 					}
 				}
 			});
@@ -375,7 +334,7 @@ fn format_action_node_text(output: &mut String, node: &ActionNode) {
 
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();
-		// Skip Request→Response and scene action signatures
+		// Skip Request->Response and scene action signatures
 		let is_exchange = input_type.ends_with("Request")
 			&& output_type.ends_with("Response");
 		if !is_exchange && !node.is_scene() {
@@ -537,10 +496,7 @@ mod test {
 		let root = world
 			.spawn(children![
 				help(),
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 				increment(FieldRef::new("count")),
 			])
 			.flush();

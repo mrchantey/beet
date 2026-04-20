@@ -68,3 +68,13 @@ beet_infra = { path = ".", features = [
 	"lambda_block",
 	"lightsail_block",
 ] }
+
+[[example]]
+name = "lambda_test"
+path = "examples/lambda_test.rs"
+required-features = ["deploy", "aws_sdk", "lambda_block"]
+
+[[example]]
+name = "lightsail_test"
+path = "examples/lightsail_test.rs"
+required-features = ["deploy", "aws_sdk", "lightsail_block"]

@@ -95,21 +95,49 @@ impl<T: Into<Value>> IntoBundle<IntoValueMarker> for T {
 }
 
 
+use variadics_please::all_tuples;
+
+/// Marker that distinguishes variadic tuple [`IntoBundle`] impls
+/// from the observer and blanket impls.
+pub struct TupleMarker<T>(core::marker::PhantomData<T>);
+
+macro_rules! impl_into_bundle_tuple {
+	($(($T:ident, $t:ident, $M:ident)),*) => {
+		impl<$($T, $M),*> IntoBundle<TupleMarker<($($M,)*)>> for ($($T,)*)
+		where
+			$($T: IntoBundle<$M>,)*
+		{
+			fn into_bundle(self) -> impl Bundle {
+				let ($($t,)*) = self;
+				($($t.into_bundle(),)*)
+			}
+		}
+	}
+}
+
+all_tuples!(impl_into_bundle_tuple, 2, 15, T, t, M);
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	fn is_bundle<M>(_: impl IntoBundle<M>) {}
 
 	#[test]
 	fn works() {
-		fn is_bundle<M>(_: impl IntoBundle<M>) {}
 		#[derive(Event)]
 		struct Foo;
+		#[derive(Component)]
+		struct Bar;
 		is_bundle(());
 		is_bundle(Name::new("foo"));
 		is_bundle(|_: On<Foo>| {});
 		is_bundle(Entity::PLACEHOLDER);
 		is_bundle(0_i32);
 		is_bundle("foo");
+		is_bundle((0_i32, "hello"));
+		is_bundle((Entity::PLACEHOLDER, "text", 42_i32));
+		is_bundle(Bar);
+		// is_bundle((Bar, Bar));
 	}
 }

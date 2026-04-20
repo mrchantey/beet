@@ -135,14 +135,16 @@ fn counter() -> impl Bundle {
 		ParamsPartial::new::<CounterParams>(),
 		fixed_scene(
 			"counter",
-			(Element::new("div"), children![
-				Element::new("h1").with_inner_text("Cookie Counter"),
-				(Element::new("p"), children![
-					Value::Str("Cookie Counter: ".into()),
-					field_ref.clone().as_text(),
-				]),
-				increment(field_ref),
-			]),
+			rsx! {
+				<div>
+					<h1>"Cookie Counter"</h1>
+					<p>
+						"Cookie Counter: "
+						{OnSpawn::insert(field_ref.clone().as_text())}
+					</p>
+					{increment(field_ref)}
+				</div>
+			},
 		),
 	)
 }

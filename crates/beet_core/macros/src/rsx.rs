@@ -6,18 +6,22 @@
 //! - Attributes become `related!(Attributes[...])` entries
 //! - Children become `children![...]` entries
 //! - Block expressions `{(foo, bar)}` are spread as tuple components
+//! - `{Foo}` on both uppercase and lowercase tags inserts `Foo` as an
+//!   additional component
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use rstml::Parser;
+use rstml::ParserConfig;
 use rstml::node::KeyedAttributeValue;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
-use rstml::Parser;
-use rstml::ParserConfig;
+use syn::spanned::Spanned;
 
 /// Custom node type, currently unused.
 type CustomNode = rstml::Infallible;
@@ -30,7 +34,9 @@ pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 			.macro_call_pattern(quote!(rsx! {%%})),
 	);
 
-	let (nodes, errors) = parser.parse_recoverable(proc_macro2::TokenStream::from(input)).split_vec();
+	let (nodes, errors) = parser
+		.parse_recoverable(proc_macro2::TokenStream::from(input))
+		.split_vec();
 	let error_tokens: Vec<TokenStream> = errors
 		.into_iter()
 		.map(|err| err.emit_as_expr_tokens())
@@ -41,8 +47,7 @@ pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 		tokenize_node(&nodes[0])
 	} else {
 		// multiple root elements, wrap in children!
-		let items: Vec<TokenStream> =
-			nodes.iter().map(tokenize_node).collect();
+		let items: Vec<TokenStream> = nodes.iter().map(tokenize_node).collect();
 		quote! { children![#(#items),*] }
 	};
 
@@ -62,13 +67,26 @@ fn tokenize_node(node: &Node<CustomNode>) -> TokenStream {
 			let value = text.value_string();
 			quote! { Value::new(#value) }
 		}
+		Node::RawText(text) => {
+			let value = text.to_string_best();
+			quote! { Value::new(#value) }
+		}
 		Node::Block(NodeBlock::ValidBlock(block)) => {
 			// block expression in child position, ie `>{expr}<`
 			quote! { (#block).into_bundle() }
 		}
+		Node::Block(NodeBlock::Invalid(invalid)) => {
+			let span = invalid.span();
+			let err = syn::Error::new(span, "invalid block expression");
+			err.into_compile_error()
+		}
 		Node::Comment(comment) => {
 			let value = comment.value.value();
 			quote! { Comment::new(#value) }
+		}
+		Node::Doctype(doctype) => {
+			let value = doctype.value.to_string_best();
+			quote! { Doctype::new(#value) }
 		}
 		Node::Fragment(fragment) => {
 			let items: Vec<TokenStream> =
@@ -79,7 +97,10 @@ fn tokenize_node(node: &Node<CustomNode>) -> TokenStream {
 				quote! { children![#(#items),*] }
 			}
 		}
-		_ => quote! { () },
+		Node::Custom(_) => {
+			let err = syn::Error::new(Span::call_site(), "unhandled custom rstml node");
+			err.into_compile_error()
+		}
 	}
 }
 
@@ -97,7 +118,10 @@ fn tokenize_element(el: &NodeElement<CustomNode>) -> TokenStream {
 }
 
 /// Tokenize a lowercase HTML element like `<div foo="bar">child</div>`.
-fn tokenize_html_element(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
+fn tokenize_html_element(
+	el: &NodeElement<CustomNode>,
+	tag: &str,
+) -> TokenStream {
 	let mut parts: Vec<TokenStream> = Vec::new();
 
 	// element tag
@@ -112,6 +136,12 @@ fn tokenize_html_element(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				// block attribute spread, ie `<div {(foo, bar)}>`
 				block_attrs.push(quote! { #block });
+			}
+			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
+				let span = invalid.span();
+				let err =
+					syn::Error::new(span, "invalid block in element attribute");
+				block_attrs.push(err.into_compile_error());
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
@@ -131,7 +161,6 @@ fn tokenize_html_element(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream
 					}
 				}
 			}
-			_ => {}
 		}
 	}
 
@@ -161,26 +190,39 @@ fn tokenize_html_element(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream
 
 /// Tokenize a capitalized component like `<MyComponent foo bar=bazz />`.
 ///
+/// - `{Foo}` block attrs insert `Foo` as an additional component
 /// - `{field: val, ...}` blocks become struct init with `..Default::default()`
 /// - Flag attributes become `.with_field(true)`
 /// - `key=value` attributes become `.with_key(value)`
 fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
-	let tag_ident: syn::Path =
-		syn::parse_str(tag).expect("invalid component path");
+	let tag_span = el.open_tag.name.span();
+	let tag_ident: syn::Path = match syn::parse_str(tag) {
+		Ok(path) => path,
+		Err(_) => {
+			let err = syn::Error::new(
+				tag_span,
+				format!("invalid component path: `{tag}`"),
+			);
+			return err.into_compile_error();
+		}
+	};
 
 	let mut with_calls: Vec<TokenStream> = Vec::new();
 	let mut struct_fields: Option<TokenStream> = None;
+	let mut block_attrs: Vec<TokenStream> = Vec::new();
 
 	for attr in &el.open_tag.attributes {
 		match attr {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				// valid block attribute, ie `<MyComponent {valid_expr}>`
-				struct_fields = Some(quote! { #block });
+				// block attribute inserts as additional component,
+				// ie `<MyComponent {Foo}>` inserts Foo alongside MyComponent
+				block_attrs.push(quote! { #block });
 			}
 			NodeAttribute::Block(NodeBlock::Invalid(tokens)) => {
 				// struct init block, ie `<MyComponent {foo: bar, bazz: boo}>`
 				// these are not valid Rust expressions so rstml puts them in Invalid
-				struct_fields = Some(quote! { { #tokens, ..Default::default() } });
+				struct_fields =
+					Some(quote! { { #tokens, ..Default::default() } });
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
@@ -209,18 +251,24 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 		quote! { <#tag_ident as Default>::default() }
 	};
 
-	let mut expr = quote! { #constructor #(#with_calls)* };
+	// collect all parts: constructor + with_calls, block attrs, children
+	let mut parts: Vec<TokenStream> = Vec::new();
+	parts.push(quote! { (#constructor #(#with_calls)*).into_bundle() });
 
-	// children of component elements
+	// block attribute spreads become direct tuple members
+	for block in block_attrs {
+		parts.push(quote! { #block });
+	}
+
+	// children
 	let child_tokens: Vec<TokenStream> =
 		el.children.iter().map(tokenize_node).collect();
 	if !child_tokens.is_empty() {
-		expr = quote! {
-			(#expr.into_bundle(), children![#(#child_tokens),*])
-		};
-	} else {
-		expr = quote! { #expr.into_bundle() };
+		parts.push(quote! {
+			children![#(#child_tokens),*]
+		});
 	}
 
-	expr
+	// wrap in tuple
+	quote! { (#(#parts),*) }
 }

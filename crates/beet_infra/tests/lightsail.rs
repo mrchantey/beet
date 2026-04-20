@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 const EXAMPLE_NAME: &str = "lightsail_test";
-const SOURCE_PATH: &str = "examples/infra/lightsail_test.rs";
+const SOURCE_PATH: &str = "crates/beet_infra/examples/lightsail_test.rs";
 const ASSETS_PATH: &str = "examples/infra/assets";
 const ASSETS_FILE: &str = "examples/infra/assets/index.html";
 const MARKER_V1: &str = "test-v1";

@@ -41,6 +41,7 @@ nu-ansi-term = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 thiserror.workspace = true
+variadics_please.workspace = true
 webbrowser.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

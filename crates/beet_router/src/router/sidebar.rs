@@ -97,23 +97,12 @@ impl SidebarState {
 
 	/// Spawn a "Home" link as a child of `parent_id`.
 	fn spawn_home(&self, world: &mut World, parent_id: Entity) {
-		let li_id = world.spawn((Element::new("li"), ChildOf(parent_id))).id();
-		let a_id = world
-			.spawn((Element::new("a").with_inner_text("Home"), ChildOf(li_id)))
-			.id();
-		world.spawn((
-			Attribute::new("href"),
-			Value::new("/"),
-			AttributeOf::new(a_id),
-		));
-		// Mark active when at root
-		if self.current_path.segments().is_empty() {
-			world.spawn((
-				Attribute::new("aria-current"),
-				Value::new("page"),
-				AttributeOf::new(a_id),
-			));
-		}
+		let bundle = if self.current_path.segments().is_empty() {
+			OnSpawn::insert(rsx! { <li><a href="/" aria-current="page">"Home"</a></li> })
+		} else {
+			OnSpawn::insert(rsx! { <li><a href="/">"Home"</a></li> })
+		};
+		world.spawn((bundle, ChildOf(parent_id)));
 	}
 
 	/// Recursively spawn a sidebar entry as a child of `parent_id`.
@@ -150,28 +139,20 @@ impl SidebarState {
 			.and_then(|cfg| cfg.label.clone())
 			.unwrap_or_else(|| Self::default_label(path));
 		let href = path.with_leading_slash();
+		let is_active = path == &self.current_path;
 
-		let li_id = world.spawn((Element::new("li"), ChildOf(parent_id))).id();
-		let a_id = world
-			.spawn((Element::new("a").with_inner_text(&label), ChildOf(li_id)))
-			.id();
-		world.spawn((
-			Attribute::new("href"),
-			Value::new(href),
-			AttributeOf::new(a_id),
-		));
-		// Active page marker
-		if path == &self.current_path {
-			world.spawn((
-				Attribute::new("aria-current"),
-				Value::new("page"),
-				AttributeOf::new(a_id),
-			));
-		}
-		// Custom attributes
-		if let Some(config) = config {
-			Self::spawn_custom_attrs(world, a_id, config);
-		}
+		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls
+		let text = (Value::Str(label.into()),);
+		let bundle = if is_active {
+			OnSpawn::insert(rsx! {
+				<li><a href=href aria-current="page">{text}</a></li>
+			})
+		} else {
+			OnSpawn::insert(rsx! {
+				<li><a href=href>{text}</a></li>
+			})
+		};
+		world.spawn((bundle, ChildOf(parent_id)));
 	}
 
 	/// Spawn a branch:
@@ -195,6 +176,7 @@ impl SidebarState {
 			None => self.is_ancestor_of_current(path),
 		};
 
+		// Outer structure stays imperative since children are dynamic
 		let li_id = world.spawn((Element::new("li"), ChildOf(parent_id))).id();
 		let details_id =
 			world.spawn((Element::new("details"), ChildOf(li_id))).id();
@@ -206,35 +188,26 @@ impl SidebarState {
 			));
 		}
 
-		// Summary element
-		let summary_id = world
-			.spawn((Element::new("summary"), ChildOf(details_id)))
-			.id();
-
-		// If this branch also has a route, make the summary a link
-		if tree.node().is_some() {
+		// Use rsx! for the summary content.
+		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls.
+		let text = (Value::Str(label.into()),);
+		let summary_bundle = if tree.node().is_some() {
 			let href = path.with_leading_slash();
-			let a_id = world
-				.spawn((
-					Element::new("a").with_inner_text(&label),
-					ChildOf(summary_id),
-				))
-				.id();
-			world.spawn((
-				Attribute::new("href"),
-				Value::new(href),
-				AttributeOf::new(a_id),
-			));
 			if path == &self.current_path {
-				world.spawn((
-					Attribute::new("aria-current"),
-					Value::new("page"),
-					AttributeOf::new(a_id),
-				));
+				OnSpawn::insert(rsx! {
+					<summary><a href=href aria-current="page">{text}</a></summary>
+				})
+			} else {
+				OnSpawn::insert(rsx! {
+					<summary><a href=href>{text}</a></summary>
+				})
 			}
 		} else {
-			world.spawn((Value::Str(label.into()), ChildOf(summary_id)));
-		}
+			OnSpawn::insert(rsx! {
+				<summary>{text}</summary>
+			})
+		};
+		world.spawn((summary_bundle, ChildOf(details_id)));
 
 		// Custom attributes on the details element
 		if let Some(config) = config {
@@ -389,11 +362,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
-				fixed_scene("docs", Element::new("p").with_inner_text("docs")),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
+				fixed_scene("docs", rsx! { <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -414,11 +384,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
-				fixed_scene("docs", Element::new("p").with_inner_text("docs")),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
+				fixed_scene("docs", rsx! { <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -436,7 +403,7 @@ mod test {
 		let root = world
 			.spawn(children![fixed_scene(
 				"about",
-				Element::new("p").with_inner_text("about")
+				rsx! { <p>"about"</p> }
 			)])
 			.flush();
 
@@ -455,19 +422,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene(
-					"about",
-					Element::new("p").with_inner_text("about")
-				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 				(PathPartial::new("docs"), children![
-					fixed_scene(
-						"intro",
-						Element::new("p").with_inner_text("intro")
-					),
-					fixed_scene(
-						"api",
-						Element::new("p").with_inner_text("api")
-					),
+					fixed_scene("intro", rsx! { <p>"intro"</p> }),
+					fixed_scene("api", rsx! { <p>"api"</p> }),
 				]),
 			])
 			.flush();
@@ -490,14 +448,12 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(PathPartial::new("docs"), children![fixed_scene(
-					"intro",
-					Element::new("p").with_inner_text("intro")
-				),]),
-				(PathPartial::new("blog"), children![fixed_scene(
-					"post1",
-					Element::new("p").with_inner_text("post1")
-				),]),
+				(PathPartial::new("docs"), children![
+					fixed_scene("intro", rsx! { <p>"intro"</p> }),
+				]),
+				(PathPartial::new("blog"), children![
+					fixed_scene("post1", rsx! { <p>"post1"</p> }),
+				]),
 			])
 			.flush();
 
@@ -518,7 +474,7 @@ mod test {
 		let root = world
 			.spawn(children![fixed_scene(
 				"about",
-				Element::new("p").with_inner_text("about")
+				rsx! { <p>"about"</p> }
 			)])
 			.flush();
 
@@ -540,11 +496,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("zulu", Element::new("p").with_inner_text("zulu")),
-				fixed_scene(
-					"alpha",
-					Element::new("p").with_inner_text("alpha")
-				),
+				fixed_scene("zulu", rsx! { <p>"zulu"</p> }),
+				fixed_scene("alpha", rsx! { <p>"alpha"</p> }),
 			])
 			.flush();
 
@@ -592,10 +545,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("docs"), children![
-				fixed_scene(
-					"intro",
-					Element::new("p").with_inner_text("intro")
-				),
+				fixed_scene("intro", rsx! { <p>"intro"</p> }),
 			])])
 			.flush();
 
@@ -618,11 +568,13 @@ mod test {
 			.spawn(children![(
 				fixed_scene(
 					"docs",
+					// Use with_inner_text here because rsx! produces
+					// a children![] that conflicts with the outer children![]
 					Element::new("p").with_inner_text("docs index")
 				),
 				children![fixed_scene(
 					"intro",
-					Element::new("p").with_inner_text("intro")
+					rsx! { <p>"intro"</p> }
 				)],
 			)])
 			.flush();

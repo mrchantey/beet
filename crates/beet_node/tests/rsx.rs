@@ -106,3 +106,28 @@ fn combined_attributes() {
 		<div my_flag foo=bar bazz="boo" bang=3 {(foo,boo)}>"child"</div>
 	});
 }
+
+
+#[test]
+fn component_with_block_attr_inserts_additional_component() {
+	let extra = Name::new("extra");
+	is_bundle(rsx! {
+		<MyComponent foo {extra}/>
+	});
+}
+
+#[test]
+fn component_with_children() {
+	is_bundle(rsx! {
+		<MyComponent foo>
+			<span>"child"</span>
+		</MyComponent>
+	});
+}
+
+#[test]
+fn doctype_node() {
+	is_bundle(rsx! {
+		<!DOCTYPE html>
+	});
+}

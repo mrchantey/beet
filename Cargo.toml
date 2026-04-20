@@ -180,7 +180,6 @@ quote = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
-rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
 
 #💡 attributes
 strum = { version = "0.26", features = ["derive"] }
@@ -484,16 +483,6 @@ required-features = ["router", "infra"]
 name = "hello_lightsail"
 path = "examples/infra/hello_lightsail.rs"
 required-features = ["router", "infra"]
-
-[[example]]
-name = "lambda_test"
-path = "examples/infra/lambda_test.rs"
-required-features = ["http_server", "lambda", "router", "infra"]
-
-[[example]]
-name = "lightsail_test"
-path = "examples/infra/lightsail_test.rs"
-required-features = ["http_server", "router", "infra"]
 
 # 💡 Examples - flow
 
