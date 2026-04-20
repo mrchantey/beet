@@ -1,9 +1,11 @@
 mod exchange_action;
 pub use exchange_action::*;
 mod exchange_fallback;
+mod request_logger;
 pub use exchange_fallback::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
+pub use request_logger::*;
 mod help;
 mod middleware;
 mod router;

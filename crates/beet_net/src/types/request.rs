@@ -488,6 +488,13 @@ where
 	}
 }
 
+impl FromRequest<Self> for RequestParts {
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+		Box::pin(async move { Ok(request.parts) })
+	}
+}
 
 
 /// Marker type for [`FromRequest`] implementations via [`TryFrom`].

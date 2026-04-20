@@ -771,6 +771,17 @@ impl AsyncEntity {
 		.await
 	}
 
+	/// Gets a cloned component from an [`AncestorQuery`]
+	pub async fn get_in_acestors_cloned<T: Component + Clone>(
+		&self,
+	) -> Result<T> {
+		self.with_state::<AncestorQuery<&T>, _>(|entity, query| {
+			query.get(entity).cloned().xok()
+		})
+		.await
+		.flatten()
+	}
+
 	/// Gets a cloned component.
 	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
 		self.get::<T, _>(|comp| comp.clone()).await

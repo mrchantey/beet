@@ -15,7 +15,7 @@ pub enum LightsailNetworking {
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
-/// - IAM user with S3 read access for runtime asset retrieval via aws_sdk
+/// - IAM user with S3 full access for runtime asset retrieval and persistence via aws_sdk
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
 /// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt
@@ -271,14 +271,14 @@ impl Block for LightsailBlock {
 		);
 		let user_name_ref = user.field_ref("name");
 
-		// grant the user S3 read access for artifacts and assets
+		// grant the user S3 full access for artifacts, assets, and runtime persistence
 		let policy_ident =
 			stack.resource_ident(self.build_label("deploy-s3-policy"));
 		let policy = terra::ResourceDef::new_secondary(
 			policy_ident,
 			AwsIamUserPolicyAttachmentDetails {
 				user: user_name_ref.clone().into(),
-				policy_arn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 					.into(),
 				..default()
 			},

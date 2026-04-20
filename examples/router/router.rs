@@ -64,6 +64,8 @@ pub fn router_scene() -> Result<impl Bundle> {
 		// the router will handle the request, shortcircuiting
 		// on a `help` param, otherwise directing to a child route
 		router(),
+		// per request logging info
+		Middleware::<RequestLogger, _, _>::default(),
 		// the actual routes, children with a PathPartial and associated action
 		// for handling a request
 		routes(),
