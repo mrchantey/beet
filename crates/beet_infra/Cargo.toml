@@ -9,6 +9,16 @@ readme.workspace = true
 description = "Terraform configuration represented as high level Bevy scenes"
 repository.workspace = true
 
+
+[[example]]
+name = "lambda_test"
+path = "examples/lambda_test.rs"
+
+[[example]]
+name = "lightsail_test"
+path = "examples/lightsail_test.rs"
+
+
 [features]
 default = []
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
@@ -56,8 +66,12 @@ prettyplease = { workspace = true, optional = true }
 async-process = { workspace = true }
 
 [dev-dependencies]
+beet_net = { workspace = true, features = ["ureq", "native-tls","server"] }
+beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }
 beet_infra = { path = ".", features = [
+	"deploy",
+	"aws_sdk",
 	"bindings_generator",
 	"bindings_aws_dns",
 	"lambda_block",

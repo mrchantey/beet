@@ -80,6 +80,12 @@ impl Project {
 		tofu::show(&self.dir()).await
 	}
 
+	/// Read a specific output value from the tofu state.
+	pub async fn output(&self, name: &str) -> Result<String> {
+		self.init().await?;
+		tofu::output(&self.dir(), name).await
+	}
+
 	/// List all resources in the state.
 	pub async fn list(&self) -> Result<String> {
 		self.init().await?;

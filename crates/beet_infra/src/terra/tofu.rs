@@ -123,6 +123,17 @@ pub async fn show(dir: &AbsPathBuf) -> Result<String> {
 		.await
 }
 
+
+/// Read a specific output value from the tofu state.
+pub async fn output(dir: &AbsPathBuf, name: &str) -> Result<String> {
+	tofu_process()
+		.with_cwd(dir.clone())
+		.with_args(["output", "-raw", name])
+		.run_async_stdout()
+		.await
+		.map(|val| val.trim().to_string())
+}
+
 /// List all resources in the state
 pub async fn list(dir: &AbsPathBuf) -> Result<String> {
 	tofu_process()
