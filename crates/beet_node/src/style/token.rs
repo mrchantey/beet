@@ -16,19 +16,17 @@ pub struct Token<T> {
 /// Shorthand for defining style token metadata
 #[macro_export]
 macro_rules! token {
-	($kind:ident,$name:ident, $meta_name:ident, $descriptor:expr, $label:expr, $description:expr) => {
+	($kind:ident,$name:ident, $descriptor:expr) => {
 		pub const $name: Token<$kind> = Token::new_static($descriptor);
-		pub const $meta_name: TokenMeta<$kind> =
-			TokenMeta::new_static($descriptor, $label, $description);
 	};
 }
 
-impl<T: AsTokenValue> std::fmt::Debug for Token<T> {
+impl<T> std::fmt::Debug for Token<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Property")
 			.field("namespace", &self.namespace)
 			.field("descriptor", &self.descriptor)
-			.field("category", &T::category())
+			.field("category", &Token::<T>::category())
 			.finish()
 	}
 }
@@ -63,15 +61,15 @@ impl<T> Ord for Token<T> {
 	}
 }
 
-impl<T: AsTokenValue> std::hash::Hash for Token<T> {
+impl<T> std::hash::Hash for Token<T> {
 	fn hash<H: Hasher>(&self, state: &mut H) {
 		self.namespace.hash(state);
-		T::category().hash(state);
+		Token::<T>::category().hash(state);
 		self.descriptor.hash(state);
 	}
 }
 
-impl<T: AsTokenValue> Token<T> {
+impl<T> Token<T> {
 	pub const fn new(descriptor: SmolStr) -> Self {
 		Self {
 			namespace: SmolStr::new_static(env!("CARGO_PKG_NAME")),
@@ -98,12 +96,21 @@ impl<T: AsTokenValue> Token<T> {
 		}
 	}
 
+	pub fn category() -> String {
+		ShortName::of::<T>().to_string().to_lowercase()
+	}
+
 	pub fn to_css_key(&self) -> String {
-		format!("{}-{}-{}", self.namespace, T::category(), self.descriptor)
+		format!(
+			"{}-{}-{}",
+			self.namespace,
+			Self::category(),
+			self.descriptor
+		)
 	}
 }
 
-impl<T: AsTokenValue> std::fmt::Display for Token<T> {
+impl<T> std::fmt::Display for Token<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.to_css_key().fmt(f)
 	}
@@ -128,7 +135,7 @@ pub struct TokenMeta<T> {
 	phantom: PhantomData<T>,
 }
 
-impl<T: AsTokenValue> std::fmt::Debug for TokenMeta<T> {
+impl<T> std::fmt::Debug for TokenMeta<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Token")
 			.field("key", &self.key)
@@ -137,7 +144,7 @@ impl<T: AsTokenValue> std::fmt::Debug for TokenMeta<T> {
 			.finish()
 	}
 }
-impl<T: AsTokenValue> std::fmt::Display for TokenMeta<T> {
+impl<T> std::fmt::Display for TokenMeta<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.key.fmt(f)
 	}
@@ -172,13 +179,13 @@ impl<T> Ord for TokenMeta<T> {
 	}
 }
 
-impl<T: AsTokenValue> std::hash::Hash for TokenMeta<T> {
+impl<T> std::hash::Hash for TokenMeta<T> {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 		self.key.hash(state);
 	}
 }
 
-impl<T: AsTokenValue> TokenMeta<T> {
+impl<T> TokenMeta<T> {
 	pub fn new(
 		key: Token<T>,
 		label: impl Into<SmolStr>,
@@ -206,54 +213,11 @@ impl<T: AsTokenValue> TokenMeta<T> {
 	}
 }
 
-pub enum TokenValue<T> {
-	Value(T),
-	Ref(Token<T>),
-}
-
-impl<T> TokenValue<T> {
-	pub fn as_value(&self) -> Option<&T> {
-		match self {
-			TokenValue::Value(value) => Some(value),
-			_ => None,
-		}
-	}
-	pub fn as_ref(&self) -> Option<&Token<T>> {
-		match self {
-			TokenValue::Ref(token) => Some(token),
-			_ => None,
-		}
-	}
-}
-
-impl<T> From<T> for TokenValue<T> {
-	fn from(value: T) -> Self { Self::Value(value) }
-}
-impl<T> From<Token<T>> for TokenValue<T> {
-	fn from(token: Token<T>) -> Self { Self::Ref(token) }
-}
-/// Allows for second order into token value,
-/// ie &'static str into SmolStr or SrgbColor into Color
-pub trait IntoTokenValue<T, M> {
-	fn into_token_value(self) -> TokenValue<T>;
-}
-
-pub struct ValueIntoTokenValueMarker;
-impl<T, U: Into<T>> IntoTokenValue<T, ValueIntoTokenValueMarker> for U {
-	fn into_token_value(self) -> TokenValue<T> {
-		TokenValue::Value(self.into())
-	}
-}
-
-impl<T> IntoTokenValue<T, Self> for Token<T> {
-	fn into_token_value(self) -> TokenValue<T> { TokenValue::Ref(self) }
-}
-pub trait AsTokenValue {
-	fn category() -> &'static str;
+pub trait CssToken {
 	fn to_css_value(&self) -> String;
 }
-
-pub struct TokenStore<T>(HashMap<Token<T>, TokenValue<T>>);
+#[derive(Debug, Resource, Deref)]
+pub struct TokenStore<T>(HashMap<Token<T>, T>);
 
 impl<T> Default for TokenStore<T> {
 	fn default() -> Self { Self::new() }
@@ -261,94 +225,75 @@ impl<T> Default for TokenStore<T> {
 
 impl<T> TokenStore<T> {
 	pub fn new() -> Self { Self(HashMap::new()) }
+	pub fn with(mut self, token: Token<T>, value: impl Into<T>) -> Self {
+		self.0.insert(token, value.into());
+		self
+	}
 }
 
-impl<T: AsTokenValue> TokenStore<T> {
-	pub fn insert<M>(
-		&mut self,
-		token: Token<T>,
-		value: impl IntoTokenValue<T, M>,
-	) -> Result<()> {
-		if self.0.contains_key(&token) {
-			bevybail!("Token key already exists: {:?}", token.to_css_key());
+
+impl<T> Merge for TokenStore<T> {
+	fn merge(&mut self, other: Self) -> Result {
+		for (key, value) in other.0 {
+			self.0.insert(key, value);
 		}
-		self.0.insert(token, value.into_token_value());
 		Ok(())
 	}
-
-	pub fn get(&self, key: &Token<T>) -> Option<&TokenValue<T>> {
-		self.0.get(key)
-	}
-
-	pub fn resolve(&self, key: &Token<T>) -> Result<&T, ResolveKeyError> {
-		let mut visited = HashSet::new();
-		let mut current_key = key;
-
-		loop {
-			if visited.contains(current_key) {
-				return Err(ResolveKeyError::CircularReference(
-					current_key.to_css_key(),
-				));
-			}
-			visited.insert(current_key);
-
-			match self.get(current_key) {
-				Some(TokenValue::Value(value)) => return Ok(value),
-				Some(TokenValue::Ref(ref_key)) => current_key = ref_key,
-				None => {
-					return Err(ResolveKeyError::KeyNotFound(
-						current_key.to_css_key(),
-					));
-				}
-			}
-		}
-	}
 }
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum ResolveKeyError {
-	#[error("Token key not found: {0:?}")]
+	#[error("Token not found: {0:?}")]
 	KeyNotFound(String),
-	#[error(
-		"Token value is a reference, but the referenced key was not found: {0:?}"
-	)]
-	ReferenceNotFound(String),
-	#[error("Circular reference detected for token key: {0:?}")]
+	#[error("Circular reference detected for token: {0:?}")]
 	CircularReference(String),
 }
 
+/// Maps tokens to other tokens, allowing for high level aliasing,
+/// light/dark theming etc.
+/// Token maps are applied from root to child entity when resolving
+/// properties
+#[derive(Debug, Clone, Component)]
+pub struct TokenMap<T>(HashMap<Token<T>, Token<T>>);
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::style::color::*;
+impl<T> Default for TokenMap<T> {
+	fn default() -> Self { Self::new() }
+}
+impl<T> TokenMap<T> {
+	pub fn new() -> Self { Self(HashMap::new()) }
 
-	#[test]
-	fn token_store() {
-		let mut store = TokenStore::<Color>::default();
+	pub fn with(mut self, from: Token<T>, to: Token<T>) -> Self {
+		self.0.insert(from, to);
+		self
+	}
+	pub fn with_checked(
+		mut self,
+		from: Token<T>,
+		to: Token<T>,
+	) -> Result<Self> {
+		if self.0.contains_key(&from) {
+			bevybail!("Token mapping already exists: {:?}", from.to_css_key());
+		}
+		self.0.insert(from, to);
+		Ok(self)
+	}
 
-		store
-			.insert(PRIMARY_BACKGROUND, palettes::basic::RED)
-			.unwrap();
-		store.insert(SURFACE_TINT, PRIMARY_BACKGROUND).unwrap();
-		store
-			.get(&PRIMARY_BACKGROUND)
-			.unwrap()
-			.as_value()
-			.unwrap()
-			.to_srgba()
-			.xpect_eq(palettes::basic::RED);
-		store
-			.resolve(&PRIMARY_BACKGROUND)
-			.unwrap()
-			.to_srgba()
-			.xpect_eq(palettes::basic::RED);
-		store
-			.resolve(&SURFACE_TINT)
-			.unwrap()
-			.to_srgba()
-			.xpect_eq(palettes::basic::RED);
-		store.resolve(&PRIMARY_FOREGROUND).unwrap_err();
+	pub fn insert(&mut self, from: Token<T>, to: Token<T>) -> Result<()> {
+		if self.0.contains_key(&from) {
+			bevybail!("Token mapping already exists: {:?}", from.to_css_key());
+		}
+		self.0.insert(from, to);
+		Ok(())
+	}
+
+	pub fn get(&self, key: &Token<T>) -> Option<&Token<T>> { self.0.get(key) }
+}
+
+impl<T> Merge for TokenMap<T> {
+	fn merge(&mut self, other: Self) -> Result {
+		for (key, value) in other.0 {
+			self.0.insert(key, value);
+		}
+		Ok(())
 	}
 }

@@ -25,8 +25,6 @@ impl std::fmt::Display for Unit {
 	}
 }
 
-impl AsTokenValue for Unit {
-	fn category() -> &'static str { "unit" }
+impl CssToken for Unit {
 	fn to_css_value(&self) -> String { self.to_string() }
 }
-

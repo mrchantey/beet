@@ -159,14 +159,3 @@ pub fn result_to_panic<T, E>(result: Result<T, E>) {
 		}
 	}
 }
-
-/// A libtest name is the fully qualified path
-/// ie `test_case::backtrace_error::test::result_builder`
-/// we want to shorten this to just the last part
-pub fn short_name(test: &TestDesc) -> String {
-	let path = test.name.to_string();
-	path.split("::")
-		.last()
-		.map(|p| p.to_string())
-		.unwrap_or(path)
-}

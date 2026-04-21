@@ -13,6 +13,7 @@
 
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
+use bevy::ecs::component::Mutable;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -56,6 +57,19 @@ impl OnSpawn {
 				});
 			}
 		}))
+	}
+
+	/// Merges the given value into the existing component of the same type on spawn,
+	/// or inserts it if no existing component is found.
+	pub fn merge<T: Merge + Component<Mutability = Mutable>>(value: T) -> Self {
+		Self::new(move |entity| {
+			if let Some(mut existing) = entity.get_mut::<T>() {
+				existing.merge(value)?;
+			} else {
+				entity.insert(value);
+			}
+			Ok(())
+		})
 	}
 
 	/// Inserts a bundle into the entity on spawn.
@@ -437,4 +451,10 @@ mod test {
 
 		store.get().xpect_eq(3);
 	}
+}
+
+/// Trait for merging two values of the same type
+pub trait Merge {
+	/// Merges `other` into `self`, returning an error if the values are incompatible.
+	fn merge(&mut self, other: Self) -> Result;
 }
