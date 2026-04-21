@@ -182,6 +182,9 @@ pub mod prelude {
 	pub use bevy::reflect as bevy_reflect;
 	pub use bevy::time::Stopwatch;
 
+	#[cfg(feature = "bevy_color")]
+	pub use bevy::color::palettes;
+
 	#[cfg(feature = "std")]
 	pub use crate::pkg_config;
 	#[cfg(target_arch = "wasm32")]

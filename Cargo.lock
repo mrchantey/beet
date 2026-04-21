@@ -1275,6 +1275,7 @@ dependencies = [
  "bevy_ratatui",
  "bytes",
  "extend",
+ "material-colors",
  "nu-ansi-term",
  "postcard",
  "pulldown-cmark",
@@ -5508,6 +5509,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
+]
+
+[[package]]
+name = "material-colors"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e226ffda362d5bc26bb8f730d637a0851eedfb05e35d92108c9d8b48d2e47941"
+dependencies = [
+ "ahash",
+ "indexmap 2.14.0",
+ "serde",
 ]
 
 [[package]]

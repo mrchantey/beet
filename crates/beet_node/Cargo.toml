@@ -12,12 +12,13 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx"]
+default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx","style"]
 std = []
 action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
+style = ["dep:material-colors", "beet_core/bevy_color"]
 serde = ["dep:serde"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -43,6 +44,7 @@ postcard = { workspace = true, optional = true }
 thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true
+material-colors = {version = "0.4.2", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ratatui = {workspace = true, optional = true, features=["crossterm","unstable-rendered-line-info"]}

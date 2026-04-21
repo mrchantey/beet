@@ -43,6 +43,7 @@ bevy_scene = ["bevy/bevy_scene", "serde"]
 bevy_keyboard = ["bevy/keyboard", "serde"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
+bevy_color = ["bevy/bevy_color"]
 serde = [
 	"bevy/serialize",
 	"dep:serde",

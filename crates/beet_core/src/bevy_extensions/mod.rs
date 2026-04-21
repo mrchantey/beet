@@ -25,6 +25,8 @@
 
 mod app;
 mod app_exit;
+#[cfg(feature = "bevy_color")]
+mod color;
 mod commands;
 mod entity;
 mod hierarchy;
@@ -42,6 +44,8 @@ mod world;
 
 pub use app::*;
 pub use app_exit::*;
+#[cfg(feature = "bevy_color")]
+pub use color::*;
 pub use commands::*;
 pub use entity::*;
 pub use hierarchy::*;

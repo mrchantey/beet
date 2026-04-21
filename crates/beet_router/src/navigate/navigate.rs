@@ -6,9 +6,9 @@
 //! is absent, calls the inner handler via [`Next`].
 
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_action::prelude::*;
 
 /// The direction to navigate relative to the current path.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
@@ -245,10 +245,9 @@ fn path_segments(pattern: &PathPattern) -> Result<Vec<String>> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_node::prelude::*;
-	use beet_action::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -282,8 +281,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				fixed_scene("", rsx!{ <h1>"Root"</h1> }),
-				fixed_scene("about", rsx!{ <p>"About page"</p> }),
+				fixed_scene("", rsx! { <h1>"Root"</h1> }),
+				fixed_scene("about", rsx! { <p>"About page"</p> }),
 			]))
 			.flush();
 
@@ -304,8 +303,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				fixed_scene("alpha", rsx!{ <p>"Alpha page"</p> }),
-				fixed_scene("beta", rsx!{ <p>"Beta page"</p> }),
+				fixed_scene("alpha", rsx! { <p>"Alpha page"</p> }),
+				fixed_scene("beta", rsx! { <p>"Beta page"</p> }),
 			]))
 			.flush();
 
@@ -326,8 +325,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				fixed_scene("alpha", rsx!{ <p>"Alpha page"</p> }),
-				fixed_scene("beta", rsx!{ <p>"Beta page"</p> }),
+				fixed_scene("alpha", rsx! { <p>"Alpha page"</p> }),
+				fixed_scene("beta", rsx! { <p>"Beta page"</p> }),
 			]))
 			.flush();
 
@@ -361,8 +360,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((router(), children![
-				fixed_scene("alpha", rsx!{ <p>"Alpha page"</p> }),
-				fixed_scene("beta", rsx!{ <p>"Beta page"</p> }),
+				fixed_scene("alpha", rsx! { <p>"Alpha page"</p> }),
+				fixed_scene("beta", rsx! { <p>"Beta page"</p> }),
 			]))
 			.flush();
 
@@ -383,7 +382,10 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![fixed_scene("about", rsx!{ <p>"About page"</p> }),]))
+			.spawn((router(), children![fixed_scene(
+				"about",
+				rsx! { <p>"About page"</p> }
+			),]))
 			.flush();
 
 		// No --navigate param, should route normally
