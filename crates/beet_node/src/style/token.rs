@@ -287,6 +287,11 @@ impl<T> TokenMap<T> {
 	}
 
 	pub fn get(&self, key: &Token<T>) -> Option<&Token<T>> { self.0.get(key) }
+
+	/// Iterates over all `(from, to)` token mappings.
+	pub fn iter(&self) -> impl Iterator<Item = (&Token<T>, &Token<T>)> {
+		self.0.iter()
+	}
 }
 
 impl<T> Merge for TokenMap<T> {
