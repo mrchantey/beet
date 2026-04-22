@@ -1,10 +1,10 @@
 use crate::style::*;
 use beet_core::prelude::*;
 
-#[derive(SystemParam)]
+#[derive(SystemParam, Get)]
 pub struct StyleQuery<'w, 's, T: 'static + Send + Sync = ()> {
 	// token stores
-	global_token_store: Res<'w, TokenStore<T>>,
+	global_token_store: Option<Res<'w, TokenStore<T>>>,
 	token_stores: Query<'w, 's, (Entity, &'static TokenStore<T>)>,
 	// token maps
 	global_token_map: Option<Res<'w, TokenMap>>,
@@ -92,10 +92,13 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	) -> Result<HashMap<Property, TokenValue<T>>> {
 		let mut properties = self.collect_properties(entity)?;
 		self.apply_token_maps(entity, &mut properties);
+		let stores = self.collect_token_stores(entity);
 		let mut map = HashMap::new();
 		for (key, token) in properties.into_iter() {
-			if let Some(value) = self.resolve_token_value(entity, &token) {
-				map.insert(key, value);
+			if let Some(value) =
+				stores.iter().find_map(|store| store.get(&token))
+			{
+				map.insert(key, value.clone());
 			} else {
 				bevybail!("Token not found in store: {:?}", token.to_css_key());
 			}
@@ -136,15 +139,16 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 					token_store.push((
 						Some(entity),
 						token.clone(),
-						token.clone(),
+						value.type_tag(),
 					));
 				}
 			}
 		}
-
-		for (token, value) in self.global_token_store.iter() {
-			if token.type_tag().as_str() != value.type_tag().as_str() {
-				token_store.push((None, token.clone(), token.clone()));
+		if let Some(global_store) = &self.global_token_store {
+			for (token, value) in global_store.iter() {
+				if token.type_tag().as_str() != value.type_tag().as_str() {
+					token_store.push((None, token.clone(), value.type_tag()));
+				}
 			}
 		}
 
@@ -184,20 +188,19 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		}
 	}
 
-	fn resolve_token_value(
-		&self,
-		entity: Entity,
-		token: &Token,
-	) -> Option<TokenValue<T>> {
-		self.ancestors
+	/// Collects token stores in order from closest to furthest ancestor and global
+	pub fn collect_token_stores(&self, entity: Entity) -> Vec<&TokenStore<T>> {
+		let mut stores: Vec<&TokenStore<T>> = self
+			.ancestors
 			.iter_ancestors_inclusive(entity)
-			.find_map(|ancestor| {
-				self.token_stores
-					.get(ancestor)
-					.ok()
-					.and_then(|(_, store)| store.get(token).cloned())
+			.filter_map(|ancestor| {
+				self.token_stores.get(ancestor).ok().map(|(_, store)| store)
 			})
-			.or_else(|| self.global_token_store.get(token).cloned())
+			.collect();
+		if let Some(global) = self.global_token_store.as_ref() {
+			stores.push(global);
+		}
+		stores
 	}
 }
 
@@ -206,7 +209,7 @@ pub enum ValidateTokensError {
 	#[error("style token type mismatch")]
 	TypeMismatch {
 		/// Entity is `None` when the mismatch came from a resource.
-		token_store: Vec<(Option<Entity>, Token, Token)>,
+		token_store: Vec<(Option<Entity>, Token, SmolStr)>,
 		/// Entity is `None` when the mismatch came from a resource.
 		token_map: Vec<(Option<Entity>, Token, Token)>,
 		property: Vec<(Entity, PropertyDef, Token)>,
@@ -486,7 +489,7 @@ mod tests {
 				token_store.len().xpect_eq(1);
 				token_store[0].0.xpect_eq(Some(entity));
 				token_store[0].1.xpect_eq(colors::PRIMARY);
-				token_store[0].2.xpect_eq(colors::PRIMARY);
+				token_store[0].2.xpect_eq(SmolStr::new("length"));
 			}
 		}
 	}
