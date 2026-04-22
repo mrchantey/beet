@@ -20,7 +20,7 @@ pub impl Color {
 }
 
 
-pub fn from_color(color: impl Into<Color>) -> TokenStore<Color> {
+pub fn from_color(color: impl Into<Color>) -> TokenStore {
 	let theme = ThemeBuilder::with_source(color.into().to_argb())
 		// .variant(Variant::TonalSpot)
 		// .color_match(false)

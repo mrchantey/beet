@@ -302,7 +302,7 @@ mod tests {
 				schemes::dark(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
-				ResolvedPropertyMap::<Color>::default(),
+				ResolvedPropertyMap::new(),
 			)]))
 			.id();
 
@@ -311,10 +311,8 @@ mod tests {
 		let child = first_child(&world, root);
 		let expected = scheme_color(&world, &schemes::dark(), colors::PRIMARY);
 
-		let resolved = world
-			.entity(child)
-			.get::<ResolvedPropertyMap<Color>>()
-			.unwrap();
+		let resolved =
+			world.entity(child).get::<ResolvedPropertyMap>().unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
 			TokenValue::Color(value) => {
@@ -332,7 +330,7 @@ mod tests {
 				schemes::light(),
 				PropertyMap::default()
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
-				children![ResolvedPropertyMap::<Color>::default()],
+				children![ResolvedPropertyMap::new()],
 			))
 			.id();
 
@@ -342,10 +340,8 @@ mod tests {
 		let expected =
 			scheme_color(&world, &schemes::light(), colors::ON_PRIMARY);
 
-		let resolved = world
-			.entity(child)
-			.get::<ResolvedPropertyMap<Color>>()
-			.unwrap();
+		let resolved =
+			world.entity(child).get::<ResolvedPropertyMap>().unwrap();
 
 		match resolved.get(&fg_prop()).unwrap() {
 			TokenValue::Color(value) => {
@@ -363,17 +359,15 @@ mod tests {
 				schemes::light(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
-				children![ResolvedPropertyMap::<Color>::default()],
+				children![ResolvedPropertyMap::new()],
 			))
 			.id();
 
 		run_style_query(&mut world);
 
 		let child = first_child(&world, root);
-		let resolved = world
-			.entity(child)
-			.get::<ResolvedPropertyMap<Color>>()
-			.unwrap();
+		let resolved =
+			world.entity(child).get::<ResolvedPropertyMap>().unwrap();
 
 		resolved.get(&bg_prop()).xpect_none();
 	}
@@ -385,21 +379,17 @@ mod tests {
 		// so the entity store must override the tone, not the semantic color.
 		let root = world
 			.spawn((
-				TokenStore::<Color>::new()
-					.with(tones::PRIMARY_40, Color::WHITE),
+				TokenStore::new().with(tones::PRIMARY_40, Color::WHITE),
 				schemes::light(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
-				ResolvedPropertyMap::<Color>::default(),
+				ResolvedPropertyMap::new(),
 			))
 			.id();
 
 		run_style_query(&mut world);
 
-		let resolved = world
-			.entity(root)
-			.get::<ResolvedPropertyMap<Color>>()
-			.unwrap();
+		let resolved = world.entity(root).get::<ResolvedPropertyMap>().unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
 			TokenValue::Color(value) => {
@@ -419,7 +409,7 @@ mod tests {
 		));
 
 		world
-			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.with_state::<StyleQuery, _>(|query| query.validate_tokens())
 			.unwrap();
 	}
 
@@ -436,7 +426,7 @@ mod tests {
 			.id();
 
 		let err = world
-			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.with_state::<StyleQuery, _>(|query| query.validate_tokens())
 			.unwrap_err();
 
 		match err {
@@ -461,7 +451,7 @@ mod tests {
 				.id();
 
 		let err = world
-			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.with_state::<StyleQuery, _>(|query| query.validate_tokens())
 			.unwrap_err();
 
 		match err {
@@ -481,13 +471,13 @@ mod tests {
 		let mut world = red_world();
 		let entity = world
 			.spawn(
-				TokenStore::<Color>::new()
+				TokenStore::new()
 					.with(colors::PRIMARY, TokenValue::Unit(Unit::Px(4.0))),
 			)
 			.id();
 
 		let err = world
-			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.with_state::<StyleQuery, _>(|query| query.validate_tokens())
 			.unwrap_err();
 
 		match err {
