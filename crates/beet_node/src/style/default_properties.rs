@@ -7,24 +7,44 @@ use beet_core::prelude::*;
 
 
 
-pub struct DefaultPropertySet<T> {
+pub struct DefaultPropertySet {
 	// tags to include
 	include_tags: Vec<SmolStr>,
 	exclude_tags: Vec<SmolStr>,
-	_property_map: PropertyMap<T>,
+	property_map: PropertyMap,
 }
 
-impl<T> DefaultPropertySet<T> {
-	/// Checks if a path passes the filter.
-	///
-	/// To pass a path must:
-	/// 1. Not be present in the exclude patterns
-	/// 2. Be present in the include patterns or the include patterns are empty
-	///
-	/// Currently converts paths to strings with forward slashes.
+impl DefaultPropertySet {
+	pub fn new(tag:impl Into<SmolStr>)->Self{
+		Self{
+			include_tags: vec![tag.into()],
+			exclude_tags: Vec::new()
+		}
+	}
+	pub fn with(
+		mut self,
+		property: impl Into<Property>,
+		value: Token,
+	) -> Self {
+		self.0.insert(property.into(), value);
+		self
+	}	
+	
 	pub fn passes(&self, el: &Element) -> bool {
 		(self.include_tags.is_empty()
 			|| self.include_tags.iter().any(|tag| tag == el.tag()))
 			&& !self.exclude_tags.iter().any(|tag| tag == el.tag())
 	}
+}
+
+
+pub struct DefaultPropertyMap(Vec<DefaultPropertySet>);
+
+
+pub fn baseline_default_properties()->DefaultPropertyMap{
+	DefaultPropertyMap(
+	vec![
+		DefaultPropertySet::new("a")
+			.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY)		
+	])
 }

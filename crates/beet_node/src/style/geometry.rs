@@ -25,6 +25,6 @@ impl std::fmt::Display for Unit {
 	}
 }
 
-impl CssToken for Unit {
+impl CssValue for Unit {
 	fn to_css_value(&self) -> String { self.to_string() }
 }

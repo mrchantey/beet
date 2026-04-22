@@ -3,7 +3,7 @@ use crate::style::colors;
 use crate::style::tones;
 use beet_core::prelude::*;
 
-pub fn light() -> TokenMap<Color> {
+pub fn light() -> TokenMap {
 	TokenMap::default()
 		.with(colors::PRIMARY, tones::PRIMARY_40)
 		.with(colors::ON_PRIMARY, tones::PRIMARY_100)
@@ -36,7 +36,7 @@ pub fn light() -> TokenMap<Color> {
 		.with(colors::INVERSE_PRIMARY, tones::PRIMARY_80)
 }
 
-pub fn dark() -> TokenMap<Color> {
+pub fn dark() -> TokenMap {
 	TokenMap::default()
 		.with(colors::PRIMARY, tones::PRIMARY_80)
 		.with(colors::ON_PRIMARY, tones::PRIMARY_20)

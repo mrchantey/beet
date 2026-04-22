@@ -4,190 +4,87 @@
 use beet_core::prelude::*;
 use std::hash::Hasher;
 
-#[derive(Reflect)]
-pub struct Token<T> {
+use crate::style::Unit;
+
+pub trait TypeTag {
+	const TYPE_TAG: SmolStr;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Get, Reflect)]
+pub struct Token {
 	/// The namespace for the key, defaults to env!(CARGO_PKG_NAME)
 	namespace: SmolStr,
 	descriptor: SmolStr,
-	#[reflect(ignore)]
-	phantom: PhantomData<T>,
+	type_tag: SmolStr,
 }
 
 /// Shorthand for defining style token metadata
 #[macro_export]
 macro_rules! token {
-	($kind:ident,$name:ident, $descriptor:expr) => {
-		pub const $name: Token<$kind> = Token::new_static($descriptor);
+	($kind:ty,$name:ident, $descriptor:expr) => {
+		pub const $name: Token = Token::new_static::<$kind>($descriptor);
 	};
 }
 
-impl<T> std::fmt::Debug for Token<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Property")
-			.field("namespace", &self.namespace)
-			.field("descriptor", &self.descriptor)
-			.field("category", &Token::<T>::category())
-			.finish()
-	}
-}
-
-impl<T> PartialEq for Token<T> {
-	fn eq(&self, other: &Self) -> bool {
-		self.namespace == other.namespace && self.descriptor == other.descriptor
-	}
-}
-
-impl<T> Clone for Token<T> {
-	fn clone(&self) -> Self {
+impl Token {
+	pub const fn new(
+		namespace: SmolStr,
+		descriptor: SmolStr,
+		type_tag: SmolStr,
+	) -> Self {
 		Self {
-			namespace: self.namespace.clone(),
-			descriptor: self.descriptor.clone(),
-			phantom: PhantomData,
-		}
-	}
-}
-
-impl<T> Eq for Token<T> {}
-impl<T> PartialOrd for Token<T> {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-impl<T> Ord for Token<T> {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		self.namespace
-			.cmp(&other.namespace)
-			.then_with(|| self.descriptor.cmp(&other.descriptor))
-	}
-}
-
-impl<T> std::hash::Hash for Token<T> {
-	fn hash<H: Hasher>(&self, state: &mut H) {
-		self.namespace.hash(state);
-		Token::<T>::category().hash(state);
-		self.descriptor.hash(state);
-	}
-}
-
-impl<T> Token<T> {
-	pub const fn new(descriptor: SmolStr) -> Self {
-		Self {
-			namespace: SmolStr::new_static(env!("CARGO_PKG_NAME")),
+			namespace,
 			descriptor,
-			phantom: PhantomData,
+			type_tag,
 		}
 	}
-	pub const fn new_static(descriptor: &'static str) -> Self {
+
+	pub const fn new_static<T: TypeTag>(descriptor: &'static str) -> Self {
 		Self {
 			namespace: SmolStr::new_static(env!("CARGO_PKG_NAME")),
 			descriptor: SmolStr::new_static(descriptor),
-			phantom: PhantomData,
+			type_tag: T::TYPE_TAG,
 		}
 	}
 
-	pub const fn new_with_namespace(
+	pub const fn new_with_namespace<T: TypeTag>(
 		namespace: SmolStr,
 		descriptor: SmolStr,
 	) -> Self {
 		Self {
 			namespace,
 			descriptor,
-			phantom: PhantomData,
+			type_tag: T::TYPE_TAG,
 		}
 	}
 
-	pub fn category() -> String {
-		ShortName::of::<T>().to_string().to_lowercase()
-	}
-
 	pub fn to_css_key(&self) -> String {
-		format!(
-			"{}-{}-{}",
-			self.namespace,
-			Self::category(),
-			self.descriptor
-		)
+		format!("{}-{}-{}", self.namespace, self.type_tag, self.descriptor)
 	}
 }
 
-impl<T> std::fmt::Display for Token<T> {
+/// A style token, defined by its [`Token`], to be wrapped in
+/// metadata for docs and tooling.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Get, Reflect)]
+pub struct TokenMeta {
+	/// This token's key
+	#[deref]
+	key: Token,
+	/// Human readable label for the token
+	label: SmolStr,
+	/// Short description for this token
+	description: SmolStr,
+}
+
+impl std::fmt::Display for Token {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.to_css_key().fmt(f)
 	}
 }
 
-
-/// A style token, defined by its [`TokenKey`], to be wrapped in
-/// newtype components like `ForegroundColor(Property<Color>)`.
-/// There must only be a single definition per key used in a
-/// single application, PartialEq, PartialOrd, Hash etc
-/// only use the `key` field.
-#[derive(Get, Reflect, Deref)]
-pub struct TokenMeta<T> {
-	/// This token's key
-	#[deref]
-	key: Token<T>,
-	/// Human readable label for the token
-	label: SmolStr,
-	/// Short description for this token
-	description: SmolStr,
-	#[reflect(ignore)]
-	phantom: PhantomData<T>,
-}
-
-impl<T> std::fmt::Debug for TokenMeta<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Token")
-			.field("key", &self.key)
-			.field("label", &self.label)
-			.field("description", &self.description)
-			.finish()
-	}
-}
-impl<T> std::fmt::Display for TokenMeta<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.key.fmt(f)
-	}
-}
-
-impl<T> Clone for TokenMeta<T> {
-	fn clone(&self) -> Self {
-		Self {
-			label: self.label.clone(),
-			description: self.description.clone(),
-			key: self.key.clone(),
-			phantom: std::marker::PhantomData,
-		}
-	}
-}
-
-impl<T> PartialEq for TokenMeta<T> {
-	fn eq(&self, other: &Self) -> bool { self.key == other.key }
-}
-
-impl<T> Eq for TokenMeta<T> {}
-
-impl<T> PartialOrd for TokenMeta<T> {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl<T> Ord for TokenMeta<T> {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		self.key.cmp(&other.key)
-	}
-}
-
-impl<T> std::hash::Hash for TokenMeta<T> {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.key.hash(state);
-	}
-}
-
-impl<T> TokenMeta<T> {
+impl TokenMeta {
 	pub fn new(
-		key: Token<T>,
+		key: Token,
 		label: impl Into<SmolStr>,
 		description: impl Into<SmolStr>,
 	) -> Self {
@@ -195,29 +92,61 @@ impl<T> TokenMeta<T> {
 			key,
 			label: label.into(),
 			description: description.into(),
-			phantom: PhantomData,
 		}
 	}
 
-	pub const fn new_static(
+	pub const fn new_static<T: TypeTag>(
 		descriptor: &'static str,
 		label: &'static str,
 		description: &'static str,
 	) -> Self {
 		Self {
-			key: Token::new_static(descriptor),
+			key: Token::new_static::<T>(descriptor),
 			label: SmolStr::new_static(label),
 			description: SmolStr::new_static(description),
-			phantom: PhantomData,
 		}
 	}
 }
 
-pub trait CssToken {
+impl std::fmt::Display for TokenMeta {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.key.fmt(f)
+	}
+}
+
+pub trait CssValue {
 	fn to_css_value(&self) -> String;
 }
-#[derive(Debug, Resource, Deref)]
-pub struct TokenStore<T>(HashMap<Token<T>, T>);
+
+#[derive(Debug, Clone, PartialEq, Reflect)]
+pub enum StyleValue<T = ()> {
+	Color(Color),
+	Unit(Unit),
+	JustifyContent,
+	AlignItems,
+	AlignSelf,
+	FlexSize,
+	Direction,
+	Custom(T),
+}
+
+impl StyleValue<()> {
+	pub fn type_tag(&self) -> SmolStr {
+		match self {
+			Self::Color(_) => Color::TYPE_TAG.clone(),
+			Self::Unit(_) => Unit::TYPE_TAG.clone(),
+			Self::JustifyContent => JustifyContent::TYPE_TAG.clone(),
+			Self::AlignItems => AlignItems::TYPE_TAG.clone(),
+			Self::AlignSelf => AlignSelf::TYPE_TAG.clone(),
+			Self::FlexSize => FlexSize::TYPE_TAG.clone(),
+			Self::Direction => Direction::TYPE_TAG.clone(),
+			Self::Custom(()) => SmolStr::new_static("custom"),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Component, Resource, Deref)]
+pub struct TokenStore<T = ()>(HashMap<Token, StyleValue<T>>);
 
 impl<T> Default for TokenStore<T> {
 	fn default() -> Self { Self::new() }
@@ -225,12 +154,24 @@ impl<T> Default for TokenStore<T> {
 
 impl<T> TokenStore<T> {
 	pub fn new() -> Self { Self(HashMap::new()) }
-	pub fn with(mut self, token: Token<T>, value: impl Into<T>) -> Self {
+
+	pub fn with(
+		mut self,
+		token: Token,
+		value: impl Into<StyleValue<T>>,
+	) -> Self {
 		self.0.insert(token, value.into());
 		self
 	}
-}
 
+	pub fn insert(
+		&mut self,
+		token: Token,
+		value: impl Into<StyleValue<T>>,
+	) -> Option<StyleValue<T>> {
+		self.0.insert(token, value.into())
+	}
+}
 
 impl<T> Merge for TokenStore<T> {
 	fn merge(&mut self, other: Self) -> Result {
@@ -254,24 +195,22 @@ pub enum ResolveKeyError {
 /// A token map can be a global resource or applied to entities,
 /// resolving from global, to root and continuing to the child,
 /// overwriting as nessecary.
-#[derive(Debug, Clone, Component, Resource)]
-pub struct TokenMap<T>(HashMap<Token<T>, Token<T>>);
+#[derive(Debug, Clone, Component, Resource, Deref)]
+pub struct TokenMap(HashMap<Token, Token>);
 
-impl<T> Default for TokenMap<T> {
+impl Default for TokenMap {
 	fn default() -> Self { Self::new() }
 }
-impl<T> TokenMap<T> {
+
+impl TokenMap {
 	pub fn new() -> Self { Self(HashMap::new()) }
 
-	pub fn with(mut self, from: Token<T>, to: Token<T>) -> Self {
+	pub fn with(mut self, from: Token, to: Token) -> Self {
 		self.0.insert(from, to);
 		self
 	}
-	pub fn with_checked(
-		mut self,
-		from: Token<T>,
-		to: Token<T>,
-	) -> Result<Self> {
+
+	pub fn with_checked(mut self, from: Token, to: Token) -> Result<Self> {
 		if self.0.contains_key(&from) {
 			bevybail!("Token mapping already exists: {:?}", from.to_css_key());
 		}
@@ -279,7 +218,7 @@ impl<T> TokenMap<T> {
 		Ok(self)
 	}
 
-	pub fn insert(&mut self, from: Token<T>, to: Token<T>) -> Result<()> {
+	pub fn insert(&mut self, from: Token, to: Token) -> Result<()> {
 		if self.0.contains_key(&from) {
 			bevybail!("Token mapping already exists: {:?}", from.to_css_key());
 		}
@@ -287,19 +226,55 @@ impl<T> TokenMap<T> {
 		Ok(())
 	}
 
-	pub fn get(&self, key: &Token<T>) -> Option<&Token<T>> { self.0.get(key) }
+	pub fn get(&self, key: &Token) -> Option<&Token> { self.0.get(key) }
 
 	/// Iterates over all `(from, to)` token mappings.
-	pub fn iter(&self) -> impl Iterator<Item = (&Token<T>, &Token<T>)> {
+	pub fn iter(&self) -> impl Iterator<Item = (&Token, &Token)> {
 		self.0.iter()
 	}
 }
 
-impl<T> Merge for TokenMap<T> {
+impl Merge for TokenMap {
 	fn merge(&mut self, other: Self) -> Result {
 		for (key, value) in other.0 {
 			self.0.insert(key, value);
 		}
 		Ok(())
 	}
+}
+
+impl TypeTag for Color {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("color");
+}
+
+impl TypeTag for Unit {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("unit");
+}
+
+impl TypeTag for JustifyContent {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("justify-content");
+}
+
+impl TypeTag for AlignItems {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("align-items");
+}
+
+impl TypeTag for AlignSelf {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("align-self");
+}
+
+impl TypeTag for FlexSize {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("flex-size");
+}
+
+impl TypeTag for Direction {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("direction");
+}
+
+impl From<Color> for StyleValue<()> {
+	fn from(value: Color) -> Self { Self::Color(value) }
+}
+
+impl From<Unit> for StyleValue<()> {
+	fn from(value: Unit) -> Self { Self::Unit(value) }
 }

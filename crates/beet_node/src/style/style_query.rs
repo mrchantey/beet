@@ -3,13 +3,18 @@ use beet_core::prelude::*;
 
 #[derive(SystemParam)]
 pub struct StyleQuery<'w, 's, T: 'static + Send + Sync> {
-	token_store: Res<'w, TokenStore<T>>,
-	global_token_map: Option<Res<'w, TokenMap<T>>>,
-	token_maps: Query<'w, 's, &'static TokenMap<T>>,
-	ancestors: Query<'w, 's, &'static ChildOf>,
-	props: Query<'w, 's, &'static PropertyMap<T>>,
+	// token stores
+	global_token_store: Res<'w, TokenStore<T>>,
+	token_stores: Query<'w, 's, (Entity, &'static TokenStore<T>)>,
+	// token maps
+	global_token_map: Option<Res<'w, TokenMap>>,
+	token_maps: Query<'w, 's, (Entity, &'static TokenMap)>,
+	// props
+	props: Query<'w, 's, (Entity, &'static PropertyMap)>,
 	resolved_property_maps:
 		Query<'w, 's, (Entity, &'static mut ResolvedPropertyMap<T>)>,
+	// utils
+	ancestors: Query<'w, 's, &'static ChildOf>,
 }
 
 impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
@@ -20,8 +25,8 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	pub fn collect_properties(
 		&self,
 		entity: Entity,
-	) -> Result<HashMap<Property<T>, Token<T>>> {
-		let mut map = HashMap::<Property<T>, Token<T>>::new();
+	) -> Result<HashMap<Property, Token>> {
+		let mut map = HashMap::<Property, Token>::new();
 		let mut ancestors = self
 			.ancestors
 			.iter_ancestors_inclusive(entity)
@@ -29,7 +34,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		// iter from root for correct override
 		ancestors.reverse();
 		for ancestor in ancestors.iter() {
-			if let Ok(props) = self.props.get(*ancestor) {
+			if let Ok((_, props)) = self.props.get(*ancestor) {
 				for (key, value) in props.iter() {
 					if key.should_inherit() || *ancestor == entity {
 						map.insert(key.clone(), value.clone());
@@ -48,13 +53,15 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	pub fn apply_token_maps(
 		&self,
 		entity: Entity,
-		properties: &mut HashMap<Property<T>, Token<T>>,
+		properties: &mut HashMap<Property, Token>,
 	) {
 		// Collect ancestor token maps from entity outward, then reverse to root-first.
 		let mut token_maps: Vec<_> = self
 			.ancestors
 			.iter_ancestors_inclusive(entity)
-			.filter_map(|e| self.token_maps.get(e).ok())
+			.filter_map(|entity| {
+				self.token_maps.get(entity).ok().map(|(_, map)| map)
+			})
 			.collect();
 		if let Some(global) = self.global_token_map.as_ref() {
 			token_maps.push(global);
@@ -63,7 +70,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		token_maps.reverse();
 
 		// Merge all maps: child entries overwrite parent entries.
-		let mut merged: HashMap<Token<T>, Token<T>> = HashMap::new();
+		let mut merged: HashMap<Token, Token> = HashMap::new();
 		for map in &token_maps {
 			for (from, to) in map.iter() {
 				merged.insert(from.clone(), to.clone());
@@ -82,13 +89,13 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	pub fn collect_resolved_properties(
 		&self,
 		entity: Entity,
-	) -> Result<HashMap<Property<T>, T>> {
+	) -> Result<HashMap<Property, StyleValue<T>>> {
 		let mut properties = self.collect_properties(entity)?;
 		self.apply_token_maps(entity, &mut properties);
 		let mut map = HashMap::new();
 		for (key, token) in properties.into_iter() {
-			if let Some(value) = self.token_store.get(&token) {
-				map.insert(key, value.clone());
+			if let Some(value) = self.resolve_token_value(entity, &token) {
+				map.insert(key, value);
 			} else {
 				bevybail!("Token not found in store: {:?}", token.to_css_key());
 			}
@@ -113,8 +120,95 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		}
 		Ok(())
 	}
+
+	/// Validates token and property type tags across all stores and maps.
+	pub fn validate_tokens(&self) -> Result<(), ValidateTokensError> {
+		let mut token_store = Vec::new();
+		let mut token_map = Vec::new();
+		let mut property = Vec::new();
+
+		for (entity, store) in self.token_stores.iter() {
+			for (token, value) in store.iter() {
+				if token.type_tag() != &value.type_tag() {
+					token_store.push((
+						Some(entity),
+						token.clone(),
+						token.clone(),
+					));
+				}
+			}
+		}
+
+		for (token, value) in self.global_token_store.iter() {
+			if token.type_tag() != &value.type_tag() {
+				token_store.push((None, token.clone(), token.clone()));
+			}
+		}
+
+		if let Some(global_map) = self.global_token_map.as_ref() {
+			for (from, to) in global_map.iter() {
+				if from.type_tag() != to.type_tag() {
+					token_map.push((None, from.clone(), to.clone()));
+				}
+			}
+		}
+
+		for (entity, map) in self.token_maps.iter() {
+			for (from, to) in map.iter() {
+				if from.type_tag() != to.type_tag() {
+					token_map.push((Some(entity), from.clone(), to.clone()));
+				}
+			}
+		}
+
+		for (entity, props) in self.props.iter() {
+			for (prop, token) in props.iter() {
+				if prop.def().type_tag() != token.type_tag() {
+					property.push((entity, prop.def().clone(), token.clone()));
+				}
+			}
+		}
+
+		if token_store.is_empty() && token_map.is_empty() && property.is_empty()
+		{
+			Ok(())
+		} else {
+			Err(ValidateTokensError::TypeMismatch {
+				token_store,
+				token_map,
+				property,
+			})
+		}
+	}
+
+	fn resolve_token_value(
+		&self,
+		entity: Entity,
+		token: &Token,
+	) -> Option<StyleValue<T>> {
+		self.ancestors
+			.iter_ancestors_inclusive(entity)
+			.find_map(|ancestor| {
+				self.token_stores
+					.get(ancestor)
+					.ok()
+					.and_then(|(_, store)| store.get(token).cloned())
+			})
+			.or_else(|| self.global_token_store.get(token).cloned())
+	}
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ValidateTokensError {
+	#[error("style token type mismatch")]
+	TypeMismatch {
+		/// Entity is `None` when the mismatch came from a resource.
+		token_store: Vec<(Option<Entity>, Token, Token)>,
+		/// Entity is `None` when the mismatch came from a resource.
+		token_map: Vec<(Option<Entity>, Token, Token)>,
+		property: Vec<(Entity, PropertyDef, Token)>,
+	},
+}
 
 #[cfg(test)]
 mod tests {
@@ -131,6 +225,7 @@ mod tests {
 	fn run_style_query(world: &mut World) {
 		world
 			.with_state::<StyleQuery<Color>, _>(|mut query| {
+				query.validate_tokens()?;
 				query.apply_resolved_properties()
 			})
 			.unwrap();
@@ -139,16 +234,19 @@ mod tests {
 	/// Resolves a semantic token through `scheme` to its concrete color.
 	fn scheme_color(
 		world: &World,
-		scheme: &TokenMap<Color>,
-		semantic: Token<Color>,
+		scheme: &TokenMap,
+		semantic: Token,
 	) -> Color {
 		let store = world.resource::<TokenStore<Color>>();
-		let tone = scheme.get(&semantic).expect("semantic token not in scheme");
-		*store.get(tone).expect("tone not in store")
+		let tone = scheme.get(&semantic).unwrap();
+		match store.get(tone).unwrap() {
+			StyleValue::Color(value) => *value,
+			other => panic!("expected color style value, found {other:?}"),
+		}
 	}
 
-	fn bg_prop() -> Property<Color> { props::BACKGROUND_COLOR.into() }
-	fn fg_prop() -> Property<Color> { props::FOREGROUND_COLOR.into() }
+	fn bg_prop() -> Property { props::BACKGROUND_COLOR.into() }
+	fn fg_prop() -> Property { props::FOREGROUND_COLOR.into() }
 
 	fn first_child(world: &World, parent: Entity) -> Entity {
 		world.entity(parent).get::<Children>().unwrap()[0]
@@ -156,14 +254,13 @@ mod tests {
 
 	// ── tests ─────────────────────────────────────────────────────────────────
 
-	/// A single entity with a scheme and [`PropertyMap`] resolves to the correct colors.
 	#[test]
 	fn resolves_basic_properties() {
 		let mut world = red_world();
 		let entity = world
 			.spawn((
 				schemes::light(),
-				PropertyMap::<Color>::default()
+				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY)
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
 				ResolvedPropertyMap::<Color>::default(),
@@ -181,19 +278,24 @@ mod tests {
 			.entity(entity)
 			.get::<ResolvedPropertyMap<Color>>()
 			.unwrap();
-		resolved.get(&bg_prop()).unwrap().xpect_eq(expected_bg);
-		resolved.get(&fg_prop()).unwrap().xpect_eq(expected_fg);
+
+		match resolved.get(&bg_prop()).unwrap() {
+			StyleValue::Color(value) => value.xpect_eq(&expected_bg),
+			other => panic!("expected color style value, found {other:?}"),
+		}
+		match resolved.get(&fg_prop()).unwrap() {
+			StyleValue::Color(value) => value.xpect_eq(&expected_fg),
+			other => panic!("expected color style value, found {other:?}"),
+		}
 	}
 
-	/// A child's dark scheme fully overrides the parent's light scheme
-	/// for the same semantic tokens, verifying the merge-then-apply approach.
 	#[test]
 	fn child_scheme_overrides_parent() {
 		let mut world = red_world();
 		let root = world
 			.spawn((schemes::light(), children![(
 				schemes::dark(),
-				PropertyMap::<Color>::default()
+				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 				ResolvedPropertyMap::<Color>::default(),
 			)]))
@@ -202,25 +304,26 @@ mod tests {
 		run_style_query(&mut world);
 
 		let child = first_child(&world, root);
-		// Expected: dark-scheme tone (PRIMARY_80), not light-scheme (PRIMARY_40).
 		let expected = scheme_color(&world, &schemes::dark(), colors::PRIMARY);
 
 		let resolved = world
 			.entity(child)
 			.get::<ResolvedPropertyMap<Color>>()
 			.unwrap();
-		resolved.get(&bg_prop()).unwrap().xpect_eq(expected);
+
+		match resolved.get(&bg_prop()).unwrap() {
+			StyleValue::Color(value) => value.xpect_eq(&expected),
+			other => panic!("expected color style value, found {other:?}"),
+		}
 	}
 
-	/// Inheritable properties (`FOREGROUND_COLOR`, `inherit = true`) propagate
-	/// from a parent entity to a child that has no [`PropertyMap`] of its own.
 	#[test]
 	fn inherited_property_propagates() {
 		let mut world = red_world();
 		let root = world
 			.spawn((
 				schemes::light(),
-				PropertyMap::<Color>::default()
+				PropertyMap::default()
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
 				children![ResolvedPropertyMap::<Color>::default()],
 			))
@@ -236,18 +339,20 @@ mod tests {
 			.entity(child)
 			.get::<ResolvedPropertyMap<Color>>()
 			.unwrap();
-		resolved.get(&fg_prop()).unwrap().xpect_eq(expected);
+
+		match resolved.get(&fg_prop()).unwrap() {
+			StyleValue::Color(value) => value.xpect_eq(&expected),
+			other => panic!("expected color style value, found {other:?}"),
+		}
 	}
 
-	/// Non-inheritable properties (`BACKGROUND_COLOR`, `inherit = false`) must
-	/// not appear in a child entity's resolved map when set only on the parent.
 	#[test]
 	fn non_inherited_property_does_not_propagate() {
 		let mut world = red_world();
 		let root = world
 			.spawn((
 				schemes::light(),
-				PropertyMap::<Color>::default()
+				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 				children![ResolvedPropertyMap::<Color>::default()],
 			))
@@ -260,6 +365,122 @@ mod tests {
 			.entity(child)
 			.get::<ResolvedPropertyMap<Color>>()
 			.unwrap();
+
 		resolved.get(&bg_prop()).xpect_none();
+	}
+
+	#[test]
+	fn token_store_component_overrides_resource() {
+		let mut world = red_world();
+		let root = world
+			.spawn((
+				TokenStore::<Color>::new().with(colors::PRIMARY, Color::WHITE),
+				schemes::light(),
+				PropertyMap::default()
+					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
+				ResolvedPropertyMap::<Color>::default(),
+			))
+			.id();
+
+		run_style_query(&mut world);
+
+		let resolved = world
+			.entity(root)
+			.get::<ResolvedPropertyMap<Color>>()
+			.unwrap();
+
+		match resolved.get(&bg_prop()).unwrap() {
+			StyleValue::Color(value) => value.xpect_eq(&Color::WHITE),
+			other => panic!("expected color style value, found {other:?}"),
+		}
+	}
+
+	#[test]
+	fn validate_tokens_accepts_matching_tags() {
+		let mut world = red_world();
+		world.spawn((
+			schemes::light(),
+			PropertyMap::default()
+				.with(props::BACKGROUND_COLOR, colors::PRIMARY),
+		));
+
+		world
+			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.unwrap();
+	}
+
+	#[test]
+	fn validate_tokens_rejects_property_type_mismatch() {
+		let mut world = red_world();
+		let entity = world
+			.spawn(
+				PropertyMap::default()
+					.with(props::BACKGROUND_COLOR, tones::PRIMARY_40),
+			)
+			.id();
+
+		let err = world
+			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.unwrap_err();
+
+		match err {
+			ValidateTokensError::TypeMismatch { property, .. } => {
+				property.len().xpect_eq(1);
+				property[0].0.xpect_eq(entity);
+				property[0].1.xpect_eq(props::BACKGROUND_COLOR.clone());
+				property[0].2.xpect_eq(tones::PRIMARY_40);
+			}
+		}
+	}
+
+	#[test]
+	fn validate_tokens_rejects_token_map_type_mismatch() {
+		let mut world = red_world();
+		let entity =
+			world
+				.spawn(TokenMap::default().with(
+					colors::PRIMARY,
+					Token::new_static::<Unit>("space-sm"),
+				))
+				.id();
+
+		let err = world
+			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.unwrap_err();
+
+		match err {
+			ValidateTokensError::TypeMismatch { token_map, .. } => {
+				token_map.len().xpect_eq(1);
+				token_map[0].0.xpect_eq(Some(entity));
+				token_map[0].1.xpect_eq(colors::PRIMARY);
+				token_map[0]
+					.2
+					.xpect_eq(Token::new_static::<Unit>("space-sm"));
+			}
+		}
+	}
+
+	#[test]
+	fn validate_tokens_rejects_token_store_type_mismatch() {
+		let mut world = red_world();
+		let entity = world
+			.spawn(
+				TokenStore::<Color>::new()
+					.with(colors::PRIMARY, StyleValue::Unit(Unit::Px(4.0))),
+			)
+			.id();
+
+		let err = world
+			.with_state::<StyleQuery<Color>, _>(|query| query.validate_tokens())
+			.unwrap_err();
+
+		match err {
+			ValidateTokensError::TypeMismatch { token_store, .. } => {
+				token_store.len().xpect_eq(1);
+				token_store[0].0.xpect_eq(Some(entity));
+				token_store[0].1.xpect_eq(colors::PRIMARY);
+				token_store[0].2.xpect_eq(colors::PRIMARY);
+			}
+		}
 	}
 }

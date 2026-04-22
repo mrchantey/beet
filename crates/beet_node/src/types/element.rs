@@ -37,6 +37,11 @@ impl ElementQuery<'_, '_> {
 					attrs
 						.iter()
 						.filter_map(|attr| self.attributes.get(attr).ok())
+						.map(|(entity, attribute, value)| AttributeView {
+							entity,
+							attribute,
+							value,
+						})
 						.collect()
 				})
 				.unwrap_or_default();
@@ -54,6 +59,11 @@ impl ElementQuery<'_, '_> {
 					attrs
 						.iter()
 						.filter_map(|attr| self.attributes.get(attr).ok())
+						.map(|(entity, attribute, value)| AttributeView {
+							entity,
+							attribute,
+							value,
+						})
 						.collect()
 				})
 				.unwrap_or_default();

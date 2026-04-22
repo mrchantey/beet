@@ -8,8 +8,8 @@ pub struct ElementView<'a> {
 	pub entity: Entity,
 	/// The element component.
 	pub element: &'a Element,
-	/// Attribute triples `(entity, key, value)` for this element.
-	pub attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+	/// Attributes for this element.
+	pub attributes: Vec<AttributeView<'a>>,
 }
 
 
@@ -17,8 +17,8 @@ pub struct AttributeView<'a> {
 	/// The entity of this attribute.
 	pub entity: Entity,
 	/// The attribute component.
-	pub attribute: &'a Element,
-	/// The value for the attribute
+	pub attribute: &'a Attribute,
+	/// The value for this attribute.
 	pub value: &'a Value,
 }
 
@@ -34,7 +34,7 @@ impl<'a> ElementView<'a> {
 	pub fn new(
 		entity: Entity,
 		element: &'a Element,
-		attributes: Vec<(Entity, &'a Attribute, &'a Value)>,
+		attributes: Vec<AttributeView<'a>>,
 	) -> Self {
 		Self {
 			entity,
@@ -60,8 +60,8 @@ impl<'a> ElementView<'a> {
 	pub fn attribute(&self, key: &str) -> Option<&'a Value> {
 		self.attributes
 			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(_, _, val)| *val)
+			.find(|attr| attr.attribute.as_str() == key)
+			.map(|attr| attr.value)
 	}
 
 	/// Look up the first attribute matching `key` and return its
@@ -72,8 +72,8 @@ impl<'a> ElementView<'a> {
 	) -> Option<(Entity, &'a Value)> {
 		self.attributes
 			.iter()
-			.find(|(_, attr, _)| attr.as_str() == key)
-			.map(|(entity, _, val)| (*entity, *val))
+			.find(|attr| attr.attribute.as_str() == key)
+			.map(|attr| (attr.entity, attr.value))
 	}
 
 	/// Look up an attribute and convert its value to a [`String`].

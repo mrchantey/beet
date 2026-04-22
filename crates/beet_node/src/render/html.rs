@@ -168,16 +168,16 @@ impl NodeVisitor for HtmlRenderer {
 		self.buffer.push('<');
 		self.buffer.push_str(view.tag());
 
-		for (_entity, attr, value) in &view.attributes {
+		for attr in &view.attributes {
 			self.buffer.push(' ');
-			self.buffer.push_str(attr);
-			match value {
+			self.buffer.push_str(attr.attribute.as_str());
+			match attr.value {
 				Value::Null => {
 					// boolean attribute, no value
 				}
 				_ => {
 					self.buffer.push_str("=\"");
-					let raw = value.to_string();
+					let raw = attr.value.to_string();
 					if self.escape_html {
 						self.buffer.push_str(&escape_html_attribute(&raw));
 					} else {

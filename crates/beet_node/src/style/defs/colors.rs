@@ -56,7 +56,7 @@ token!(Color, SCRIM, "scrim");
 
 
 
-impl CssToken for Color {
+impl CssValue for Color {
 	fn to_css_value(&self) -> String {
 		let this = self.to_srgba();
 		format!(
