@@ -251,9 +251,10 @@ pub enum ResolveKeyError {
 
 /// Maps tokens to other tokens, allowing for high level aliasing,
 /// light/dark theming etc.
-/// Token maps are applied from root to child entity when resolving
-/// properties
-#[derive(Debug, Clone, Component)]
+/// A token map can be a global resource or applied to entities,
+/// resolving from global, to root and continuing to the child,
+/// overwriting as nessecary.
+#[derive(Debug, Clone, Component, Resource)]
 pub struct TokenMap<T>(HashMap<Token<T>, Token<T>>);
 
 impl<T> Default for TokenMap<T> {

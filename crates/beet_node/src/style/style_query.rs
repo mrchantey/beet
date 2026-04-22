@@ -4,6 +4,7 @@ use beet_core::prelude::*;
 #[derive(SystemParam)]
 pub struct StyleQuery<'w, 's, T: 'static + Send + Sync> {
 	token_store: Res<'w, TokenStore<T>>,
+	global_token_map: Option<Res<'w, TokenMap<T>>>,
 	token_maps: Query<'w, 's, &'static TokenMap<T>>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	props: Query<'w, 's, &'static PropertyMap<T>>,
@@ -50,17 +51,21 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		properties: &mut HashMap<Property<T>, Token<T>>,
 	) {
 		// Collect ancestor token maps from entity outward, then reverse to root-first.
-		let mut ancestors: Vec<_> = self
+		let mut token_maps: Vec<_> = self
 			.ancestors
 			.iter_ancestors_inclusive(entity)
 			.filter_map(|e| self.token_maps.get(e).ok())
 			.collect();
-		ancestors.reverse(); // root to entity
+		if let Some(global) = self.global_token_map.as_ref() {
+			token_maps.push(global);
+		}
+		// global to root to entity
+		token_maps.reverse();
 
 		// Merge all maps: child entries overwrite parent entries.
 		let mut merged: HashMap<Token<T>, Token<T>> = HashMap::new();
-		for ancestor in &ancestors {
-			for (from, to) in ancestor.iter() {
+		for map in &token_maps {
+			for (from, to) in map.iter() {
 				merged.insert(from.clone(), to.clone());
 			}
 		}

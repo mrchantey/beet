@@ -13,6 +13,16 @@ pub struct ElementView<'a> {
 }
 
 
+pub struct AttributeView<'a> {
+	/// The entity of this attribute.
+	pub entity: Entity,
+	/// The attribute component.
+	pub attribute: &'a Element,
+	/// The value for the attribute
+	pub value: &'a Value,
+}
+
+
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
 	OrderedList(OrderedListView<'a>),
 	Link(LinkView<'a>),

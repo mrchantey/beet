@@ -1,9 +1,11 @@
+mod css_builder;
+mod default_properties;
 mod geometry;
 mod layout;
 mod property;
 mod style_query;
 mod typography;
-mod css_builder;
+pub use default_properties::*;
 pub use property::*;
 pub use style_query::*;
 mod defs;
