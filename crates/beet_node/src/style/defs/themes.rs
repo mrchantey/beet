@@ -35,7 +35,7 @@ pub fn from_color(color: impl Into<Color>) -> TokenStore<Color> {
 		error,
 	} = theme.palettes;
 
-	TokenStore::<Color>::new()
+	TokenStore::new()
 		.with(tones::PRIMARY_0, Color::from_argb(primary.tone(0)))
 		.with(tones::PRIMARY_10, Color::from_argb(primary.tone(10)))
 		.with(tones::PRIMARY_20, Color::from_argb(primary.tone(20)))

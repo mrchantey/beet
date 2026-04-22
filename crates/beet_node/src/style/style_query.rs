@@ -2,7 +2,7 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 #[derive(SystemParam)]
-pub struct StyleQuery<'w, 's, T: 'static + Send + Sync> {
+pub struct StyleQuery<'w, 's, T: 'static + Send + Sync = ()> {
 	// token stores
 	global_token_store: Res<'w, TokenStore<T>>,
 	token_stores: Query<'w, 's, (Entity, &'static TokenStore<T>)>,
@@ -116,7 +116,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 			self.resolved_property_maps
 				.get_mut(entity)?
 				.1
-				.set_if_neq(ResolvedPropertyMap::new(map));
+				.set_if_neq(ResolvedPropertyMap::new_with_map(map));
 		}
 		Ok(())
 	}
@@ -227,7 +227,7 @@ mod tests {
 
 	fn run_style_query(world: &mut World) {
 		world
-			.with_state::<StyleQuery<Color>, _>(|mut query| {
+			.with_state::<StyleQuery, _>(|mut query| {
 				query.validate_tokens()?;
 				query.apply_resolved_properties()
 			})
@@ -240,7 +240,7 @@ mod tests {
 		scheme: &TokenMap,
 		semantic: Token,
 	) -> Color {
-		let store = world.resource::<TokenStore<Color>>();
+		let store = world.resource::<TokenStore>();
 		let tone = scheme.get(&semantic).unwrap();
 		match store.get(tone).unwrap() {
 			TokenValue::Color(value) => *value,
@@ -266,7 +266,7 @@ mod tests {
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY)
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
-				ResolvedPropertyMap::<Color>::default(),
+				ResolvedPropertyMap::new(),
 			))
 			.id();
 
@@ -277,10 +277,8 @@ mod tests {
 		let expected_fg =
 			scheme_color(&world, &schemes::light(), colors::ON_PRIMARY);
 
-		let resolved = world
-			.entity(entity)
-			.get::<ResolvedPropertyMap<Color>>()
-			.unwrap();
+		let resolved =
+			world.entity(entity).get::<ResolvedPropertyMap>().unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
 			TokenValue::Color(value) => {

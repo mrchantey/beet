@@ -109,11 +109,20 @@ impl std::hash::Hash for Property {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component)]
 pub struct ResolvedPropertyMap<T = ()>(HashMap<Property, TokenValue<T>>);
 
+impl<T> Default for ResolvedPropertyMap<T> {
+	fn default() -> Self { Self(default()) }
+}
+impl ResolvedPropertyMap<()> {
+	pub fn new() -> Self { Self(default()) }
+}
+
 impl<T> ResolvedPropertyMap<T> {
-	pub fn new(map: HashMap<Property, TokenValue<T>>) -> Self { Self(map) }
+	pub fn new_with_map(map: HashMap<Property, TokenValue<T>>) -> Self {
+		Self(map)
+	}
 }
 
 #[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
