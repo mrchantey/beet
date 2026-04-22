@@ -70,10 +70,25 @@ pub impl<T: Sized> T {
 		self
 	}
 
-	/// Prints the debug-formatted value with a prefix and returns `self`.
-	///
-	/// Uses [`cross_log!`](crate::cross_log) for cross-platform output.
-	fn xprint(self, prefix: impl AsRef<str>) -> Self
+	/// Calls `print!` on the display-formatted value and returns `self`.
+	fn xprint(self) -> Self
+	where
+		Self: core::fmt::Display,
+	{
+		print!("{}", self);
+		self
+	}
+	/// Calls `println!` on the display-formatted value and returns `self`.
+	fn xprintln(self) -> Self
+	where
+		Self: core::fmt::Display,
+	{
+		println!("{}", self);
+		self
+	}
+
+	/// Cross-Print lines the debug-formatted value with a prefix and returns `self`.
+	fn xlog(self, prefix: impl AsRef<str>) -> Self
 	where
 		Self: core::fmt::Debug,
 	{

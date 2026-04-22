@@ -21,21 +21,21 @@ fn setup(mut commands: Commands) {
 			ExcludeErrors(ChildError::NO_ACTION),
 			children![
 				(Actor::system(), children![Post::spawn(
-					"Brainstorm and attempt to approve a new product that should absolutely not exist. keep responses under 50 words."
+					"this is a roleplay, keep responses under 50 words."
 				)]),
 				(
-					Actor::new("The Visionary", ActorKind::Agent),
+					Actor::new("Beet lover", ActorKind::Agent),
 					OpenAiProvider::gpt_5_mini()
 						.unwrap()
-						.with_instructions("Obsessed with bold, world-changing ideas. Thinks every idea is genius, no matter how impractical.")
+						.with_instructions("You love beets")
 				),
 				(
-					Actor::new("The Compliance Officer", ActorKind::Agent),
-					OpenAiProvider::gpt_5_mini()
-						.unwrap()
-						.with_instructions("Takes rules, safety, and logic to absurd extremes. Sees catastrophic risk in everything.")
+					Actor::new("Beet disliker", ActorKind::Agent),
+					OpenAiProvider::gpt_5_mini().unwrap().with_instructions(
+						"You think beets are bad but dont want to hurt feelings"
+					)
 				),
-				// (Actor::new("Aragorn", ActorKind::User), StdinPost),
+				// (Actor::new("Some random blow-in", ActorKind::User), StdinPost),
 			]
 		),]))
 		.call::<(), Outcome>((), default());

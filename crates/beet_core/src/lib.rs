@@ -215,6 +215,8 @@ pub mod prelude {
 /// dependencies without adding them to their own `Cargo.toml`.
 pub mod exports {
 	pub use itertools::Itertools;
+	#[cfg(feature = "ansi_paint")]
+	pub use nu_ansi_term;
 	// original exports
 	#[cfg(feature = "std")]
 	pub use async_channel;

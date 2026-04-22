@@ -101,15 +101,8 @@ impl TypeTag for Shape {
 
 impl CssValue for Shape {
 	fn to_css_value(&self) -> String {
-		todo!("resolve tokens");
-		let corner = Length::default();
-		match self.edge {
-			ShapeEdge::None => format!("{corner}"),
-			ShapeEdge::Top => format!("{corner} {corner} 0 0"),
-			ShapeEdge::End => format!("0 {corner} {corner} 0"),
-			ShapeEdge::Start => format!("{corner} 0 0 {corner}"),
-			ShapeEdge::Bottom => format!("0 0 {corner} {corner}"),
-		}
+		// Requires a token store to resolve `self.corner`; handled by the CSS builder.
+		todo!("resolve corner token via token store")
 	}
 }
 

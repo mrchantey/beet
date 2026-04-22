@@ -581,6 +581,7 @@ pub struct BytesView<'a> {
 	post: &'a Post,
 }
 
+
 impl<'a> BytesView<'a> {
 	pub fn try_new(post: &'a Post) -> Option<Self> {
 		(!post.media_type().is_text() && post.media_type() != &MediaType::Url)

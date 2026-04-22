@@ -261,14 +261,26 @@ where
 					_ev => {}
 				}
 				let ev_result =
-					serde_json::from_str::<o11s::StreamingEvent>(&event.data)
-						.map_err(|err| {
-							bevyhow!(
-								"Failed to parse streaming event: {}\nRaw: {}",
-								err,
-								event.data
-							)
-						});
+					serde_json::from_str::<StreamingEventOrUnknown>(
+						&event.data,
+					)
+					.map_err(|err| {
+						bevyhow!(
+							"Failed to parse streaming event: {}\nRaw: {}",
+							err,
+							event.data
+						)
+					});
+
+				let ev_result = match ev_result {
+					Ok(StreamingEventOrUnknown::Known(ev)) => Ok(ev),
+					Ok(StreamingEventOrUnknown::Unknown(ev)) => {
+						info!("Ignoring unknown streaming event: {:#?}", ev);
+						return Poll::Pending;
+					}
+					Err(err) => Err(err),
+				};
+
 				// if matches!(ev_result,Ok(o11s::StreamingEvent::ResponseCreated(_)))
 
 				let res_partial = ev_result
@@ -293,4 +305,12 @@ where
 			Poll::Pending => Poll::Pending,
 		}
 	}
+}
+
+// handle other events like keepalive
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum StreamingEventOrUnknown {
+	Known(o11s::StreamingEvent),
+	Unknown(serde_json::Value),
 }

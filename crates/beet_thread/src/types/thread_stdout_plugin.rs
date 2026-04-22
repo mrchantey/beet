@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
+use beet_core::exports::nu_ansi_term::Color;
+use beet_core::exports::nu_ansi_term::Style;
 use beet_core::prelude::*;
 
 #[derive(Default)]
@@ -70,36 +72,73 @@ fn post_added(
 			continue;
 		}
 
-		let agent_post = post.as_agent_post();
-		let suffix = if agent_post.is_refusal() {
-			"- refusal > "
-		} else if agent_post.is_reasoning_summary()
-			|| agent_post.is_reasoning_content()
-		{
-			"- thinking > "
-		} else if agent_post.is_url() || agent_post.is_bytes() {
-			"- media > "
-		} else if agent_post.is_function_call() {
-			"- function call > "
-		} else if agent_post.is_function_call_output() {
-			"- function call output > "
-		} else {
-			"> "
+
+		let text = Style::new();
+		let primary = Style::new().fg(Color::Cyan);
+		let url = Style::new().fg(Color::Blue);
+		let error = Style::new().fg(Color::Red).bold();
+		let tool_call = Style::new().fg(Color::Yellow);
+		let tool_output = Style::new().fg(Color::Yellow);
+		let reasoning = Style::new().fg(Color::Green).dimmed();
+		primary.paint(actor.name()).xprint();
+
+		// subheading
+		match post.as_agent_post() {
+			AgentPost::Text(_) => {
+				primary.paint(" >").xprint();
+			}
+			AgentPost::Refusal(_) => {
+				error.paint(" - refusal\n").xprint();
+			}
+			AgentPost::Url(_) => {
+				url.paint(" - url\n").xprint();
+			}
+			AgentPost::Bytes(_) => {
+				primary.dimmed().paint(" - bytes\n").xprint();
+			}
+			AgentPost::Error(_) => {
+				error.paint(" - error\n").xprint();
+			}
+			AgentPost::FunctionCall(_) => {
+				tool_call.paint(" - function call\n").xprint();
+			}
+			AgentPost::FunctionCallOutput(_) => {
+				tool_output.paint(" - function call output\n").xprint();
+			}
+			AgentPost::ReasoningContent(_) | AgentPost::ReasoningSummary(_) => {
+				reasoning.paint(" - reasoning..").xprint();
+			}
 		};
 
-		let heading =
-			paint_ext::cyan_bold(format!("{} {}", actor.name(), suffix));
-		print!("{heading}");
-
 		let mut cursor = StdoutCursor::default();
-		print_delta(post, &mut cursor);
+		// action
+		match post.as_agent_post() {
+			AgentPost::Bytes(bytes) => {
+				text.paint(format!("received bytes: {}", bytes.bytes().len()))
+					.xprintln();
+			}
+			AgentPost::FunctionCall(fc) => {
+				text.paint(fc.name()).xprintln();
+				print_delta(post, &mut cursor);
+			}
+			AgentPost::FunctionCallOutput(fc) => {
+				text.paint(fc.name().unwrap_or("unknown")).xprintln();
+				print_delta(post, &mut cursor);
+			}
+			AgentPost::ReasoningContent(_) | AgentPost::ReasoningSummary(_) => {
+				print_delta(post, &mut cursor);
+			}
+			_ => {
+				print_delta(post, &mut cursor);
+			}
+		};
+
 		commands.entity(entity).insert(cursor);
 	}
 	std::io::Write::flush(&mut std::io::stdout())?;
 
 	Ok(())
 }
-
 
 fn post_changed(
 	filter: Res<StdoutActorFilter>,
@@ -117,6 +156,10 @@ fn post_changed(
 			continue;
 		}
 		print_delta(post, &mut cursor);
+
+		if !post.in_progress() {
+			// todo print pretty formatted tool call/ output
+		}
 	}
 	std::io::Write::flush(&mut std::io::stdout())?;
 
@@ -126,19 +169,15 @@ fn post_changed(
 fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 	let body = post.to_string();
 
-	let new_content = &body[cursor.pos as usize..];
-	let agent_post = post.as_agent_post();
-	let colored = if agent_post.is_refusal() {
-		paint_ext::red(new_content)
-	} else if agent_post.is_reasoning_summary()
-		|| agent_post.is_reasoning_content()
-	{
-		paint_ext::dimmed(new_content)
-	} else {
-		new_content.to_string()
+	let style = match post.as_agent_post() {
+		AgentPost::ReasoningContent(_) | AgentPost::ReasoningSummary(_) => {
+			Style::default().dimmed()
+		}
+		_ => Style::default(),
 	};
 
-	print!("{}", colored);
+	let new_content = &body[cursor.pos as usize..];
+	print!("{}", style.paint(new_content));
 	cursor.pos = body.len() as u32;
 	if !cursor.complete && !post.in_progress() {
 		print!("\n\n");
