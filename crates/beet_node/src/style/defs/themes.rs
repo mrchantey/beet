@@ -4,7 +4,17 @@ use material_colors::theme::Palettes;
 use material_colors::theme::ThemeBuilder;
 
 use crate::style::TokenStore;
+use crate::style::colors;
 use crate::style::tones;
+
+
+pub fn default_opacities() -> TokenStore {
+	TokenStore::new()
+		.with(colors::OPACITY_HOVERED, 0.08)
+		.with(colors::OPACITY_FOCUSED, 0.12)
+		.with(colors::OPACITY_PRESSED, 0.12)
+		.with(colors::OPACITY_DRAGGED, 0.16)
+}
 
 
 #[extend::ext(name=MaterialColorExt)]

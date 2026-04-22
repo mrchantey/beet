@@ -1,4 +1,4 @@
-use super::*;
+use crate::style::*;
 use beet_core::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
@@ -88,7 +88,7 @@ impl CssValue for AlignSelf {
 pub enum FlexSize {
 	#[default]
 	Auto,
-	Unit(Unit),
+	Unit(Length),
 	Grow(u16),
 	Shrink(u16),
 }

@@ -3,7 +3,7 @@ use crate::style::colors;
 use crate::style::tones;
 
 
-pub fn light() -> TokenMap {
+pub fn light_scheme() -> TokenMap {
 	TokenMap::default()
 		.with(colors::PRIMARY, tones::PRIMARY_40)
 		.with(colors::ON_PRIMARY, tones::PRIMARY_100)
@@ -36,7 +36,7 @@ pub fn light() -> TokenMap {
 		.with(colors::INVERSE_PRIMARY, tones::PRIMARY_80)
 }
 
-pub fn dark() -> TokenMap {
+pub fn dark_scheme() -> TokenMap {
 	TokenMap::default()
 		.with(colors::PRIMARY, tones::PRIMARY_80)
 		.with(colors::ON_PRIMARY, tones::PRIMARY_20)

@@ -3,9 +3,10 @@ use beet_core::prelude::*;
 use crate::style::*;
 use crate::prelude::*;
 
-impl TypeTag for Color {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("color");
-}
+token!(f32, OPACITY_HOVERED, "opacity-hovered");
+token!(f32, OPACITY_FOCUSED, "opacity-focused");
+token!(f32, OPACITY_PRESSED, "opacity-pressed");
+token!(f32, OPACITY_DRAGGED, "opacity-dragged");
 
 token!(Color, PRIMARY, "primary");
 token!(Color, ON_PRIMARY, "on-primary");
@@ -56,30 +57,3 @@ token!(Color, BACKGROUND, "background");
 token!(Color, ON_BACKGROUND, "on-background");
 token!(Color, SHADOW, "shadow");
 token!(Color, SCRIM, "scrim");
-
-
-
-
-impl CssValue for Color {
-	fn to_css_value(&self) -> String {
-		let this = self.to_srgba();
-		format!(
-			"rgba({}, {}, {}, {})",
-			(this.red * 255.0).round() as u8,
-			(this.green * 255.0).round() as u8,
-			(this.blue * 255.0).round() as u8,
-			this.alpha
-		)
-	}
-}
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_name() {
-		println!("Token Name: {}", PRIMARY);
-	}
-}

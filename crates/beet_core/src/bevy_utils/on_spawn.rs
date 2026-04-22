@@ -64,7 +64,7 @@ impl OnSpawn {
 	pub fn merge<T: Merge + Component<Mutability = Mutable>>(value: T) -> Self {
 		Self::new(move |entity| {
 			if let Some(mut existing) = entity.get_mut::<T>() {
-				existing.merge(value)?;
+				existing.try_merge(value)?;
 			} else {
 				entity.insert(value);
 			}
@@ -455,6 +455,24 @@ mod test {
 
 /// Trait for merging two values of the same type
 pub trait Merge {
+	/// Returns a new value by merging `self` with `other`.
+	fn with_merge(mut self, other: Self) -> Self
+	where
+		Self: Sized,
+	{
+		self.merge(other);
+		self
+	}
+
+	/// Merges `other` into `self`.
+	fn merge(&mut self, other: Self);
+
 	/// Merges `other` into `self`, returning an error if the values are incompatible.
-	fn merge(&mut self, other: Self) -> Result;
+	fn try_merge(&mut self, other: Self) -> Result
+	where
+		Self: Sized,
+	{
+		self.merge(other);
+		Ok(())
+	}
 }

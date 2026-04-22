@@ -139,11 +139,10 @@ impl PropertyMap {
 
 /// When merging we do allow overwriting for ordered insertion.
 impl Merge for PropertyMap {
-	fn merge(&mut self, other: Self) -> Result {
+	fn merge(&mut self, other: Self) {
 		for (key, value) in other.0 {
 			self.0.insert(key, value);
 		}
-		Ok(())
 	}
 }
 
