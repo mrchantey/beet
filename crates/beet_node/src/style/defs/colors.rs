@@ -3,6 +3,10 @@ use beet_core::prelude::*;
 use crate::style::*;
 use crate::prelude::*;
 
+impl TypeTag for Color {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("color");
+}
+
 token!(Color, PRIMARY, "primary");
 token!(Color, ON_PRIMARY, "on-primary");
 token!(Color, PRIMARY_CONTAINER, "primary-container");

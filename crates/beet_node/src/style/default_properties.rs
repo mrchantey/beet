@@ -3,9 +3,13 @@ use crate::style::PropertyMap;
 use beet_core::prelude::*;
 
 pub struct DefaultPropertySet {
-	// tags to include
+	/// Element tags to match
 	include_tags: Vec<SmolStr>,
 	exclude_tags: Vec<SmolStr>,
+	/// Attribute keys to match,
+	/// and optionally also ensure values match
+	include_attributes: Vec<SmolStr, Option<Value>>,
+	exclude_attribute: Vec<SmolStr, Option<Value>>,
 	property_map: PropertyMap,
 }
 
@@ -27,10 +31,21 @@ impl DefaultPropertySet {
 		self
 	}
 
-	pub fn passes(&self, el: &Element) -> bool {
+	pub fn passes(&self, el: &ElementView) -> bool {}
+
+	pub fn passes_tags(&self, el: &Element) -> bool {
 		(self.include_tags.is_empty()
 			|| self.include_tags.iter().any(|tag| tag == el.tag()))
 			&& !self.exclude_tags.iter().any(|tag| tag == el.tag())
+	}
+
+	pub fn passes_attributes(&self, el: &ElementView) -> bool {
+		(self.include_attributes.is_empty()
+			|| self.include_attributes.iter().any(|(key, val)| {
+				// complete the check
+			})) && !self.exclude_attributes.iter().any(|(key, val)| {
+			// complete here
+		})
 	}
 
 	pub fn property_map(&self) -> &PropertyMap { &self.property_map }

@@ -109,11 +109,11 @@ impl std::hash::Hash for Property {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Component)]
-pub struct ResolvedPropertyMap<T = ()>(HashMap<Property, StyleValue<T>>);
+#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]
+pub struct ResolvedPropertyMap<T = ()>(HashMap<Property, TokenValue<T>>);
 
 impl<T> ResolvedPropertyMap<T> {
-	pub fn new(map: HashMap<Property, StyleValue<T>>) -> Self { Self(map) }
+	pub fn new(map: HashMap<Property, TokenValue<T>>) -> Self { Self(map) }
 }
 
 #[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
@@ -152,8 +152,6 @@ mod tests {
 
 	#[test]
 	fn property_def_tracks_type_tag() {
-		props::FOREGROUND_COLOR
-			.type_tag()
-			.xpect_eq(&Color::TYPE_TAG);
+		props::FOREGROUND_COLOR.type_tag().xpect_eq(Color::TYPE_TAG);
 	}
 }

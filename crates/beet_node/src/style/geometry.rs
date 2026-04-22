@@ -1,8 +1,6 @@
 use super::*;
 use beet_core::prelude::*;
 
-
-
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub enum Unit {
 	Px(f32),
@@ -15,6 +13,7 @@ impl Unit {
 	pub fn rem(value: f32) -> Self { Self::Rem(value) }
 	pub fn percent(value: f32) -> Self { Self::Percent(value) }
 }
+
 impl std::fmt::Display for Unit {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
@@ -23,6 +22,10 @@ impl std::fmt::Display for Unit {
 			Self::Percent(value) => write!(f, "{}%", value),
 		}
 	}
+}
+
+impl TypeTag for Unit {
+	const TYPE_TAG: SmolStr = SmolStr::new_static("unit");
 }
 
 impl CssValue for Unit {

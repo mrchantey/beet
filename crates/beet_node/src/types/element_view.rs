@@ -23,6 +23,10 @@ pub struct AttributeView<'a> {
 }
 
 
+impl<'a> AttributeView<'a> {
+	pub fn key(&self) -> &str { &self.attribute }
+}
+
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
 	OrderedList(OrderedListView<'a>),
 	Link(LinkView<'a>),

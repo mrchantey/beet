@@ -89,7 +89,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	pub fn collect_resolved_properties(
 		&self,
 		entity: Entity,
-	) -> Result<HashMap<Property, StyleValue<T>>> {
+	) -> Result<HashMap<Property, TokenValue<T>>> {
 		let mut properties = self.collect_properties(entity)?;
 		self.apply_token_maps(entity, &mut properties);
 		let mut map = HashMap::new();
@@ -122,14 +122,17 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 	}
 
 	/// Validates token and property type tags across all stores and maps.
-	pub fn validate_tokens(&self) -> Result<(), ValidateTokensError> {
+	pub fn validate_tokens(&self) -> Result<(), ValidateTokensError>
+	where
+		T: TypeTag,
+	{
 		let mut token_store = Vec::new();
 		let mut token_map = Vec::new();
 		let mut property = Vec::new();
 
 		for (entity, store) in self.token_stores.iter() {
 			for (token, value) in store.iter() {
-				if token.type_tag() != &value.type_tag() {
+				if token.type_tag().as_str() != value.type_tag().as_str() {
 					token_store.push((
 						Some(entity),
 						token.clone(),
@@ -140,7 +143,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		}
 
 		for (token, value) in self.global_token_store.iter() {
-			if token.type_tag() != &value.type_tag() {
+			if token.type_tag().as_str() != value.type_tag().as_str() {
 				token_store.push((None, token.clone(), token.clone()));
 			}
 		}
@@ -185,7 +188,7 @@ impl<'w, 's, T: 'static + Send + Sync + PartialEq + Clone>
 		&self,
 		entity: Entity,
 		token: &Token,
-	) -> Option<StyleValue<T>> {
+	) -> Option<TokenValue<T>> {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
 			.find_map(|ancestor| {
@@ -240,7 +243,7 @@ mod tests {
 		let store = world.resource::<TokenStore<Color>>();
 		let tone = scheme.get(&semantic).unwrap();
 		match store.get(tone).unwrap() {
-			StyleValue::Color(value) => *value,
+			TokenValue::Color(value) => *value,
 			other => panic!("expected color style value, found {other:?}"),
 		}
 	}
@@ -280,11 +283,15 @@ mod tests {
 			.unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
-			StyleValue::Color(value) => value.xpect_eq(&expected_bg),
+			TokenValue::Color(value) => {
+				value.xpect_eq(expected_bg);
+			}
 			other => panic!("expected color style value, found {other:?}"),
 		}
 		match resolved.get(&fg_prop()).unwrap() {
-			StyleValue::Color(value) => value.xpect_eq(&expected_fg),
+			TokenValue::Color(value) => {
+				value.xpect_eq(expected_fg);
+			}
 			other => panic!("expected color style value, found {other:?}"),
 		}
 	}
@@ -312,7 +319,9 @@ mod tests {
 			.unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
-			StyleValue::Color(value) => value.xpect_eq(&expected),
+			TokenValue::Color(value) => {
+				value.xpect_eq(expected);
+			}
 			other => panic!("expected color style value, found {other:?}"),
 		}
 	}
@@ -341,7 +350,9 @@ mod tests {
 			.unwrap();
 
 		match resolved.get(&fg_prop()).unwrap() {
-			StyleValue::Color(value) => value.xpect_eq(&expected),
+			TokenValue::Color(value) => {
+				value.xpect_eq(expected);
+			}
 			other => panic!("expected color style value, found {other:?}"),
 		}
 	}
@@ -372,9 +383,12 @@ mod tests {
 	#[test]
 	fn token_store_component_overrides_resource() {
 		let mut world = red_world();
+		// The light scheme remaps colors::PRIMARY -> tones::PRIMARY_40,
+		// so the entity store must override the tone, not the semantic color.
 		let root = world
 			.spawn((
-				TokenStore::<Color>::new().with(colors::PRIMARY, Color::WHITE),
+				TokenStore::<Color>::new()
+					.with(tones::PRIMARY_40, Color::WHITE),
 				schemes::light(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
@@ -390,7 +404,9 @@ mod tests {
 			.unwrap();
 
 		match resolved.get(&bg_prop()).unwrap() {
-			StyleValue::Color(value) => value.xpect_eq(&Color::WHITE),
+			TokenValue::Color(value) => {
+				value.xpect_eq(Color::WHITE);
+			}
 			other => panic!("expected color style value, found {other:?}"),
 		}
 	}
@@ -412,10 +428,12 @@ mod tests {
 	#[test]
 	fn validate_tokens_rejects_property_type_mismatch() {
 		let mut world = red_world();
+		// Map a color property to a unit token — clear type mismatch.
+		let unit_token = Token::new_static::<Unit>("space-sm");
 		let entity = world
 			.spawn(
 				PropertyMap::default()
-					.with(props::BACKGROUND_COLOR, tones::PRIMARY_40),
+					.with(props::BACKGROUND_COLOR, unit_token.clone()),
 			)
 			.id();
 
@@ -428,7 +446,7 @@ mod tests {
 				property.len().xpect_eq(1);
 				property[0].0.xpect_eq(entity);
 				property[0].1.xpect_eq(props::BACKGROUND_COLOR.clone());
-				property[0].2.xpect_eq(tones::PRIMARY_40);
+				property[0].2.xpect_eq(unit_token);
 			}
 		}
 	}
@@ -466,7 +484,7 @@ mod tests {
 		let entity = world
 			.spawn(
 				TokenStore::<Color>::new()
-					.with(colors::PRIMARY, StyleValue::Unit(Unit::Px(4.0))),
+					.with(colors::PRIMARY, TokenValue::Unit(Unit::Px(4.0))),
 			)
 			.id();
 
