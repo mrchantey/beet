@@ -1,7 +1,5 @@
 use crate::style::TokenStore;
-use crate::style::motion::*;
-use crate::style::themes;
-use crate::style::*;
+use crate::style::defs::*;
 use beet_core::prelude::Merge;
 use bevy::color::Color;
 

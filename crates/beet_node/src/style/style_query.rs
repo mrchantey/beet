@@ -262,7 +262,7 @@ mod tests {
 		let mut world = red_world();
 		let entity = world
 			.spawn((
-				schemes::light_scheme(),
+				colors::light_scheme(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY)
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
@@ -273,9 +273,9 @@ mod tests {
 		run_style_query(&mut world);
 
 		let expected_bg =
-			scheme_color(&world, &schemes::light_scheme(), colors::PRIMARY);
+			scheme_color(&world, &colors::light_scheme(), colors::PRIMARY);
 		let expected_fg =
-			scheme_color(&world, &schemes::light_scheme(), colors::ON_PRIMARY);
+			scheme_color(&world, &colors::light_scheme(), colors::ON_PRIMARY);
 
 		let resolved =
 			world.entity(entity).get::<ResolvedPropertyMap>().unwrap();
@@ -298,8 +298,8 @@ mod tests {
 	fn child_scheme_overrides_parent() {
 		let mut world = red_world();
 		let root = world
-			.spawn((schemes::light_scheme(), children![(
-				schemes::dark_scheme(),
+			.spawn((colors::light_scheme(), children![(
+				colors::dark_scheme(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 				ResolvedPropertyMap::new(),
@@ -309,7 +309,8 @@ mod tests {
 		run_style_query(&mut world);
 
 		let child = first_child(&world, root);
-		let expected = scheme_color(&world, &schemes::dark_scheme(), colors::PRIMARY);
+		let expected =
+			scheme_color(&world, &colors::dark_scheme(), colors::PRIMARY);
 
 		let resolved =
 			world.entity(child).get::<ResolvedPropertyMap>().unwrap();
@@ -327,7 +328,7 @@ mod tests {
 		let mut world = red_world();
 		let root = world
 			.spawn((
-				schemes::light_scheme(),
+				colors::light_scheme(),
 				PropertyMap::default()
 					.with(props::FOREGROUND_COLOR, colors::ON_PRIMARY),
 				children![ResolvedPropertyMap::new()],
@@ -338,7 +339,7 @@ mod tests {
 
 		let child = first_child(&world, root);
 		let expected =
-			scheme_color(&world, &schemes::light_scheme(), colors::ON_PRIMARY);
+			scheme_color(&world, &colors::light_scheme(), colors::ON_PRIMARY);
 
 		let resolved =
 			world.entity(child).get::<ResolvedPropertyMap>().unwrap();
@@ -356,7 +357,7 @@ mod tests {
 		let mut world = red_world();
 		let root = world
 			.spawn((
-				schemes::light_scheme(),
+				colors::light_scheme(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 				children![ResolvedPropertyMap::new()],
@@ -380,7 +381,7 @@ mod tests {
 		let root = world
 			.spawn((
 				TokenStore::new().with(tones::PRIMARY_40, Color::WHITE),
-				schemes::light_scheme(),
+				colors::light_scheme(),
 				PropertyMap::default()
 					.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 				ResolvedPropertyMap::new(),
@@ -403,7 +404,7 @@ mod tests {
 	fn validate_tokens_accepts_matching_tags() {
 		let mut world = red_world();
 		world.spawn((
-			schemes::light_scheme(),
+			colors::light_scheme(),
 			PropertyMap::default()
 				.with(props::BACKGROUND_COLOR, colors::PRIMARY),
 		));
