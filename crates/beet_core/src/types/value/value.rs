@@ -6,9 +6,6 @@ use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::Typed;
 
-/// A map of string keys to [`Value`]s.
-pub type Map = HashMap<SmolStr, Value>;
-
 /// A json-like value type suitable for application level operations.
 ///
 /// ## Floats
@@ -184,55 +181,75 @@ impl Value {
 		}
 	}
 
-	/// Returns this value as a bool, if it is one.
-	pub fn as_bool(&self) -> Option<bool> {
+	/// Returns this value as a bool.
+	///
+	/// ## Errors
+	/// Returns an error if the value is not a [`Bool`](Value::Bool).
+	pub fn as_bool(&self) -> Result<bool> {
 		match self {
-			Value::Bool(val) => Some(*val),
-			_ => None,
+			Value::Bool(val) => Ok(*val),
+			_ => bevybail!("Expected bool, got {:?}", self),
 		}
 	}
 
 	/// Returns this value as an i64, with cross-numeric coercion.
-	pub fn as_i64(&self) -> Option<i64> {
+	///
+	/// ## Errors
+	/// Returns an error if the value cannot be represented as i64.
+	pub fn as_i64(&self) -> Result<i64> {
 		match self {
-			Value::Int(val) => Some(*val),
-			Value::Uint(val) => i64::try_from(*val).ok(),
-			_ => None,
+			Value::Int(val) => Ok(*val),
+			Value::Uint(val) => i64::try_from(*val)
+				.map_err(|_| bevyhow!("u64 {} overflows i64", val)),
+			_ => bevybail!("Expected i64, got {:?}", self),
 		}
 	}
 
 	/// Returns this value as a u64, with cross-numeric coercion.
-	pub fn as_u64(&self) -> Option<u64> {
+	///
+	/// ## Errors
+	/// Returns an error if the value cannot be represented as u64.
+	pub fn as_u64(&self) -> Result<u64> {
 		match self {
-			Value::Uint(val) => Some(*val),
-			Value::Int(val) => u64::try_from(*val).ok(),
-			_ => None,
+			Value::Uint(val) => Ok(*val),
+			Value::Int(val) => u64::try_from(*val)
+				.map_err(|_| bevyhow!("i64 {} is negative", val)),
+			_ => bevybail!("Expected u64, got {:?}", self),
 		}
 	}
 
 	/// Returns this value as an f64, with numeric coercion.
-	pub fn as_f64(&self) -> Option<f64> {
+	///
+	/// ## Errors
+	/// Returns an error if the value is not numeric.
+	pub fn as_f64(&self) -> Result<f64> {
 		match self {
-			Value::Float(val) => Some(*val),
-			Value::Int(val) => Some(*val as f64),
-			Value::Uint(val) => Some(*val as f64),
-			_ => None,
+			Value::Float(val) => Ok(*val),
+			Value::Int(val) => Ok(*val as f64),
+			Value::Uint(val) => Ok(*val as f64),
+			_ => bevybail!("Expected f64, got {:?}", self),
 		}
 	}
 
-	/// Returns this value as a string reference, if it is one.
-	pub fn as_str(&self) -> Option<&str> {
+	/// Returns this value as a string reference.
+	///
+	/// ## Errors
+	/// Returns an error if the value is not a [`Str`](Value::Str).
+	pub fn as_str(&self) -> Result<&str> {
 		match self {
-			Value::Str(val) => Some(val.as_str()),
-			_ => None,
+			Value::Str(val) => Ok(val.as_str()),
+			_ => bevybail!("Expected str, got {:?}", self),
 		}
 	}
 
-	/// Returns this value as a byte slice, if it is one.
-	pub fn as_bytes(&self) -> Option<&[u8]> {
+	/// Returns this value as a byte slice.
+	///
+	/// ## Errors
+	/// Returns an error if the value is not [`Bytes`](Value::Bytes).
+	pub fn as_bytes(&self) -> Result<&[u8]> {
 		match self {
-			Value::Bytes(val) => Some(val),
-			_ => None,
+			Value::Bytes(val) => Ok(val),
+			_ => bevybail!("Expected bytes, got {:?}", self),
 		}
 	}
 
@@ -244,13 +261,13 @@ impl Value {
 		key: impl Into<SmolStr>,
 		value: impl Into<Value>,
 	) -> Result<Option<Value>> {
-		self.as_map_mut()?.insert(key.into(), value.into()).xok()
+		self.as_map_mut()?.insert(key, value).xok()
 	}
 
 	/// Gets a value from a map by key.
 	pub fn get(&self, key: &str) -> Option<&Value> {
 		match self {
-			Self::Map(map) => map.get(key),
+			Self::Map(map) => map.get(key).ok(),
 			_ => None,
 		}
 	}
@@ -258,7 +275,7 @@ impl Value {
 	/// Gets a mutable value from a map by key.
 	pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
 		match self {
-			Self::Map(map) => map.get_mut(key),
+			Self::Map(map) => map.0.get_mut(key),
 			_ => None,
 		}
 	}
@@ -396,14 +413,8 @@ impl core::hash::Hash for Value {
 			}
 			Value::Bytes(val) => val.hash(state),
 			Value::Str(val) => val.hash(state),
-			Value::Map(map) => {
-				let mut entries: Vec<_> = map.iter().collect();
-				entries.sort_by_key(|(key, _)| key.as_str());
-				for (key, value) in entries {
-					key.hash(state);
-					value.hash(state);
-				}
-			}
+			// delegate to Map's own Hash impl (sorted key-value pairs)
+			Value::Map(map) => map.hash(state),
 			Value::List(list) => list.hash(state),
 		}
 	}
@@ -569,75 +580,63 @@ impl<'de> serde::Deserialize<'de> for Value {
 impl From<bool> for Value {
 	fn from(value: bool) -> Self { Value::Bool(value) }
 }
-
-impl From<i64> for Value {
-	fn from(value: i64) -> Self { Value::Int(value) }
-}
-
-impl From<i32> for Value {
-	fn from(value: i32) -> Self { Value::Int(value as i64) }
-}
-
-impl From<i16> for Value {
-	fn from(value: i16) -> Self { Value::Int(value as i64) }
-}
-
 impl From<i8> for Value {
 	fn from(value: i8) -> Self { Value::Int(value as i64) }
 }
-
-impl From<u64> for Value {
-	fn from(value: u64) -> Self { Value::Uint(value) }
+impl From<i16> for Value {
+	fn from(value: i16) -> Self { Value::Int(value as i64) }
 }
-
-impl From<u32> for Value {
-	fn from(value: u32) -> Self { Value::Uint(value as u64) }
+impl From<i32> for Value {
+	fn from(value: i32) -> Self { Value::Int(value as i64) }
 }
-
-impl From<u16> for Value {
-	fn from(value: u16) -> Self { Value::Uint(value as u64) }
+impl From<i64> for Value {
+	fn from(value: i64) -> Self { Value::Int(value) }
 }
-
+impl From<isize> for Value {
+	fn from(value: isize) -> Self { Value::Int(value as i64) }
+}
 impl From<u8> for Value {
 	fn from(value: u8) -> Self { Value::Uint(value as u64) }
 }
-
-impl From<f64> for Value {
-	fn from(value: f64) -> Self { Value::Float(value) }
+impl From<u16> for Value {
+	fn from(value: u16) -> Self { Value::Uint(value as u64) }
 }
-
+impl From<u32> for Value {
+	fn from(value: u32) -> Self { Value::Uint(value as u64) }
+}
+impl From<u64> for Value {
+	fn from(value: u64) -> Self { Value::Uint(value) }
+}
+impl From<usize> for Value {
+	fn from(value: usize) -> Self { Value::Uint(value as u64) }
+}
 impl From<f32> for Value {
 	fn from(value: f32) -> Self { Value::Float(value as f64) }
 }
-
-impl From<SmolStr> for Value {
-	fn from(value: SmolStr) -> Self { Value::Str(value) }
+impl From<f64> for Value {
+	fn from(value: f64) -> Self { Value::Float(value) }
 }
-
-impl From<String> for Value {
-	fn from(value: String) -> Self { Value::str(value) }
-}
-
 impl From<&str> for Value {
 	fn from(value: &str) -> Self { Value::str(value) }
 }
-
+impl From<String> for Value {
+	fn from(value: String) -> Self { Value::str(value) }
+}
+impl From<SmolStr> for Value {
+	fn from(value: SmolStr) -> Self { Value::Str(value) }
+}
 impl<'a> From<Cow<'a, str>> for Value {
 	fn from(value: Cow<'a, str>) -> Self { Value::str(value.as_ref()) }
 }
-
-impl From<Vec<u8>> for Value {
-	fn from(value: Vec<u8>) -> Self { Value::Bytes(value) }
-}
-
 impl From<&[u8]> for Value {
 	fn from(value: &[u8]) -> Self { Value::Bytes(value.to_vec()) }
 }
-
+impl From<Vec<u8>> for Value {
+	fn from(value: Vec<u8>) -> Self { Value::Bytes(value) }
+}
 impl From<Vec<Value>> for Value {
 	fn from(value: Vec<Value>) -> Self { Value::List(value) }
 }
-
 impl<T: Into<Value>> From<Option<T>> for Value {
 	fn from(value: Option<T>) -> Self {
 		match value {
@@ -646,7 +645,9 @@ impl<T: Into<Value>> From<Option<T>> for Value {
 		}
 	}
 }
-
+impl From<Map> for Value {
+	fn from(map: Map) -> Self { Value::Map(map) }
+}
 impl<V: Into<Value>> From<HashMap<String, V>> for Value {
 	fn from(value: HashMap<String, V>) -> Self {
 		Self::Map(
@@ -657,7 +658,6 @@ impl<V: Into<Value>> From<HashMap<String, V>> for Value {
 		)
 	}
 }
-
 impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
 	fn from(value: HashMap<SmolStr, V>) -> Self {
 		Self::Map(
@@ -707,12 +707,9 @@ macro_rules! val {
 	// Object
 	({ $($key:tt : $value:tt),* $(,)? }) => {
 		{
-			let mut map = $crate::prelude::HashMap::default();
+			let mut map = $crate::prelude::Map::default();
 			$(
-				map.insert(
-					$crate::prelude::SmolStr::from($key),
-					$crate::val!($value),
-				);
+				map.insert($key, $crate::val!($value));
 			)*
 			$crate::prelude::Value::Map(map)
 		}

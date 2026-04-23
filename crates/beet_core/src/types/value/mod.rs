@@ -1,5 +1,7 @@
 mod field;
 pub use field::*;
+pub mod map;
+pub use map::*;
 mod value;
 pub use value::*;
 pub(self) mod reflect_ext;

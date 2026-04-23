@@ -329,15 +329,13 @@ impl PostPartialMap {
 				call_id: _,
 			} => {
 				post.set_text(arguments);
-				post.metadata_mut()
-					.insert("fc_name".into(), Value::from(name));
+				post.metadata_mut().insert("fc_name", name);
 			}
 
 			// ── FunctionCallOutput updates output and call_id ───────
 			PartialContent::FunctionCallOutput { output, call_id } => {
 				post.set_text(output);
-				post.metadata_mut()
-					.insert("fc_id".into(), Value::from(call_id));
+				post.metadata_mut().insert("fc_id", call_id);
 			}
 
 			// ── ReasoningContent/Summary replace in place ───────────

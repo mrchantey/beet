@@ -152,7 +152,7 @@ impl<'a> TypedElementView<'a> for LinkView<'a> {
 	) -> Result<Self, FromElementError> {
 		let href = element
 			.attribute("href")
-			.and_then(|val| val.as_str())
+			.and_then(|val| val.as_str().ok())
 			.unwrap_or("");
 
 		Ok(Self { element, href })

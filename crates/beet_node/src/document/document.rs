@@ -134,7 +134,7 @@ impl Document {
 						.as_map()
 						.map_err(DocumentError::from)?
 						.get(key)
-						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
+						.map_err(|_| DocumentError::ObjectKeyNotFound {
 							key: key.to_string(),
 							path: path.into_field_path(),
 						})?;

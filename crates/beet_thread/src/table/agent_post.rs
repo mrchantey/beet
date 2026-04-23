@@ -56,11 +56,11 @@ pub fn set_post_status(post: &mut Post, status: PostStatus) {
 			map.remove("in_progress");
 		}
 		PostStatus::Interrupted => {
-			map.insert("interrupted".into(), true.into());
+			map.insert("interrupted", true);
 			map.remove("in_progress");
 		}
 		PostStatus::InProgress => {
-			map.insert("in_progress".into(), true.into());
+			map.insert("in_progress", true);
 			map.remove("interrupted");
 		}
 	}
@@ -339,7 +339,7 @@ impl AgentPost<'static> {
 	) -> Post {
 		let mut metadata = Map::default();
 		if let Some(stem) = file_stem {
-			metadata.insert("file_stem".into(), Value::from(stem));
+			metadata.insert("file_stem", stem);
 		}
 		let mut post = Post::new_raw(
 			author,
@@ -364,7 +364,7 @@ impl AgentPost<'static> {
 	) -> Post {
 		let mut metadata = Map::default();
 		if let Some(stem) = file_stem {
-			metadata.insert("file_stem".into(), Value::from(stem));
+			metadata.insert("file_stem", stem);
 		}
 		let mut post = Post::new_raw(
 			author,
@@ -445,9 +445,9 @@ impl AgentPost<'static> {
 		status: PostStatus,
 	) -> Post {
 		let mut metadata = Map::default();
-		metadata.insert("post_kind".into(), "function_call".into());
-		metadata.insert("fc_name".into(), Value::from(name.into()));
-		metadata.insert("fc_id".into(), Value::from(call_id.into()));
+		metadata.insert("post_kind", "function_call");
+		metadata.insert("fc_name", name.into());
+		metadata.insert("fc_id", call_id.into());
 		let mut post = Post::new_raw(
 			author,
 			thread,
@@ -470,10 +470,10 @@ impl AgentPost<'static> {
 		status: PostStatus,
 	) -> Post {
 		let mut metadata = Map::default();
-		metadata.insert("post_kind".into(), "function_call_output".into());
-		metadata.insert("fc_id".into(), Value::from(call_id.into()));
+		metadata.insert("post_kind", "function_call_output");
+		metadata.insert("fc_id", call_id.into());
 		if let Some(fc_name) = name {
-			metadata.insert("fc_name".into(), Value::from(fc_name));
+			metadata.insert("fc_name", fc_name);
 		}
 		let mut post = Post::new_raw(
 			author,
@@ -553,6 +553,7 @@ impl<'a> UrlView<'a> {
 			.metadata()
 			.get("file_stem")
 			.and_then(|val| val.as_str())
+			.ok()
 	}
 	/// Constructs a filename from metadata `file_stem` and the media type
 	/// extension.
@@ -585,6 +586,7 @@ impl<'a> BytesView<'a> {
 			.metadata()
 			.get("file_stem")
 			.and_then(|val| val.as_str())
+			.ok()
 	}
 	/// Constructs a filename from metadata `file_stem` and the media type
 	/// extension.
@@ -635,6 +637,7 @@ impl<'a> FunctionCallView<'a> {
 		post.metadata()
 			.get("post_kind")
 			.and_then(|val| val.as_str())
+			.ok()
 			.filter(|kind| *kind == "function_call")
 			.map(|_| Self { post })
 	}
@@ -644,6 +647,7 @@ impl<'a> FunctionCallView<'a> {
 			.metadata()
 			.get("fc_name")
 			.and_then(|val| val.as_str())
+			.ok()
 			.expect("checked on construction")
 	}
 	/// The unique call identifier.
@@ -652,6 +656,7 @@ impl<'a> FunctionCallView<'a> {
 			.metadata()
 			.get("fc_id")
 			.and_then(|val| val.as_str())
+			.ok()
 			.expect("checked on construction")
 	}
 	/// The arguments as a JSON string (the body).
@@ -696,6 +701,7 @@ impl<'a> FunctionCallOutputView<'a> {
 		post.metadata()
 			.get("post_kind")
 			.and_then(|val| val.as_str())
+			.ok()
 			.filter(|kind| *kind == "function_call_output")
 			.map(|_| Self { post })
 	}
@@ -705,6 +711,7 @@ impl<'a> FunctionCallOutputView<'a> {
 			.metadata()
 			.get("fc_id")
 			.and_then(|val| val.as_str())
+			.ok()
 			.expect("checked on construction")
 	}
 	/// The function name, if available.
@@ -713,6 +720,7 @@ impl<'a> FunctionCallOutputView<'a> {
 			.metadata()
 			.get("fc_name")
 			.and_then(|val| val.as_str())
+			.ok()
 	}
 	/// The output string (the body).
 	pub fn output(&self) -> &str {

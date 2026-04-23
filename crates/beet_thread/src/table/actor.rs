@@ -4,7 +4,15 @@ use beet_core::prelude::*;
 pub type ActorId = Uuid7<Actor>;
 
 #[derive(
-	Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Reflect, Component,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Hash,
+	Serialize,
+	Deserialize,
+	Reflect,
+	Component,
 )]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Actor {
@@ -41,14 +49,6 @@ impl Actor {
 	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
 }
 
-impl std::hash::Hash for Actor {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.id.hash(state);
-		self.name.hash(state);
-		self.kind.hash(state);
-		// metadata excluded: HashMap does not implement Hash
-	}
-}
 
 /// The kind of actor this entity is.
 /// Distinct from [`OpenResponses::MessageRole`] in that

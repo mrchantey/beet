@@ -69,7 +69,8 @@ pub fn find_named_slot(
 					if let (Some(attr), Some(value)) =
 						(attr_ref.get::<Attribute>(), attr_ref.get::<Value>())
 					{
-						if **attr == "name" && value.as_str() == Some(slot_name)
+						if **attr == "name"
+							&& value.as_str().ok() == Some(slot_name)
 						{
 							return Some(entity);
 						}

@@ -96,7 +96,7 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 				let field_value = s.field_at(idx).ok_or_else(|| {
 					bevyhow!("struct field at index {} not found", idx)
 				})?;
-				map.insert(field_name.into(), reflect_to_value(field_value)?);
+				map.insert(field_name, reflect_to_value(field_value)?);
 			}
 			Ok(Value::Map(map))
 		}
@@ -212,7 +212,7 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 						fields.push(reflect_to_value(field)?);
 					}
 					let mut variant_map = Map::default();
-					variant_map.insert(variant_name.into(), fields.into());
+					variant_map.insert(variant_name, fields);
 					Ok(Value::Map(variant_map))
 				}
 				bevy::reflect::VariantType::Struct => {
@@ -230,13 +230,10 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 								idx
 							)
 						})?;
-						fields.insert(
-							field_name.into(),
-							reflect_to_value(field)?,
-						);
+						fields.insert(field_name, reflect_to_value(field)?);
 					}
 					let mut variant_map = Map::default();
-					variant_map.insert(variant_name.into(), fields.into());
+					variant_map.insert(variant_name, fields);
 					Ok(Value::Map(variant_map))
 				}
 			}
@@ -303,7 +300,7 @@ fn build_dynamic_struct(
 		let field_type_id = field.type_id();
 		let field_type_info = field.type_info();
 
-		let field_value = map.get(field_name);
+		let field_value = map.get(field_name).ok();
 
 		if let Some(built) = build_field_value(
 			field_value,
@@ -583,7 +580,7 @@ fn build_dynamic_enum(
 					let mut struct_variant =
 						bevy::reflect::DynamicStruct::default();
 					for field_info in struct_info.iter() {
-						let field_value = field_map.get(field_info.name());
+						let field_value = field_map.get(field_info.name()).ok();
 						if let Some(built) = build_field_value(
 							field_value,
 							field_info.name(),
@@ -615,115 +612,64 @@ fn build_opaque_value(
 	type_id: TypeId,
 ) -> Result<Box<dyn PartialReflect>> {
 	if type_id == TypeId::of::<bool>() {
-		let val = value
-			.as_bool()
-			.ok_or_else(|| bevyhow!("expected Bool value for bool field"))?;
-		return Ok(Box::new(val));
+		return Ok(Box::new(value.as_bool()?));
 	}
 
 	if type_id == TypeId::of::<String>() {
-		let val = value.as_str().ok_or_else(|| {
-			bevyhow!("expected Str value for String field, found {:?}", value)
-		})?;
-		return Ok(Box::new(val.to_string()));
+		return Ok(Box::new(value.as_str()?.to_string()));
 	}
 
 	// Signed integers
 	if type_id == TypeId::of::<i8>() {
-		let val = value
-			.as_i64()
-			.ok_or_else(|| bevyhow!("expected integer value for i8 field"))?;
-		return Ok(Box::new(val as i8));
+		return Ok(Box::new(value.as_i64()? as i8));
 	}
 	if type_id == TypeId::of::<i16>() {
-		let val = value
-			.as_i64()
-			.ok_or_else(|| bevyhow!("expected integer value for i16 field"))?;
-		return Ok(Box::new(val as i16));
+		return Ok(Box::new(value.as_i64()? as i16));
 	}
 	if type_id == TypeId::of::<i32>() {
-		let val = value
-			.as_i64()
-			.ok_or_else(|| bevyhow!("expected integer value for i32 field"))?;
-		return Ok(Box::new(val as i32));
+		return Ok(Box::new(value.as_i64()? as i32));
 	}
 	if type_id == TypeId::of::<i64>() {
-		let val = value
-			.as_i64()
-			.ok_or_else(|| bevyhow!("expected integer value for i64 field"))?;
-		return Ok(Box::new(val));
+		return Ok(Box::new(value.as_i64()?));
 	}
 	if type_id == TypeId::of::<i128>() {
-		let val = value
-			.as_i64()
-			.ok_or_else(|| bevyhow!("expected integer value for i128 field"))?;
-		return Ok(Box::new(val as i128));
+		return Ok(Box::new(value.as_i64()? as i128));
 	}
 	if type_id == TypeId::of::<isize>() {
-		let val = value.as_i64().ok_or_else(|| {
-			bevyhow!("expected integer value for isize field")
-		})?;
-		return Ok(Box::new(val as isize));
+		return Ok(Box::new(value.as_i64()? as isize));
 	}
 
 	// Unsigned integers
 	if type_id == TypeId::of::<u8>() {
-		let val = value
-			.as_u64()
-			.ok_or_else(|| bevyhow!("expected integer value for u8 field"))?;
-		return Ok(Box::new(val as u8));
+		return Ok(Box::new(value.as_u64()? as u8));
 	}
 	if type_id == TypeId::of::<u16>() {
-		let val = value
-			.as_u64()
-			.ok_or_else(|| bevyhow!("expected integer value for u16 field"))?;
-		return Ok(Box::new(val as u16));
+		return Ok(Box::new(value.as_u64()? as u16));
 	}
 	if type_id == TypeId::of::<u32>() {
-		let val = value
-			.as_u64()
-			.ok_or_else(|| bevyhow!("expected integer value for u32 field"))?;
-		return Ok(Box::new(val as u32));
+		return Ok(Box::new(value.as_u64()? as u32));
 	}
 	if type_id == TypeId::of::<u64>() {
-		let val = value
-			.as_u64()
-			.ok_or_else(|| bevyhow!("expected integer value for u64 field"))?;
-		return Ok(Box::new(val));
+		return Ok(Box::new(value.as_u64()?));
 	}
 	if type_id == TypeId::of::<u128>() {
-		let val = value
-			.as_u64()
-			.ok_or_else(|| bevyhow!("expected integer value for u128 field"))?;
-		return Ok(Box::new(val as u128));
+		return Ok(Box::new(value.as_u64()? as u128));
 	}
 	if type_id == TypeId::of::<usize>() {
-		let val = value.as_u64().ok_or_else(|| {
-			bevyhow!("expected integer value for usize field")
-		})?;
-		return Ok(Box::new(val as usize));
+		return Ok(Box::new(value.as_u64()? as usize));
 	}
 
 	// Floats
 	if type_id == TypeId::of::<f32>() {
-		let val = value
-			.as_f64()
-			.ok_or_else(|| bevyhow!("expected float value for f32 field"))?;
-		return Ok(Box::new(val as f32));
+		return Ok(Box::new(value.as_f64()? as f32));
 	}
 	if type_id == TypeId::of::<f64>() {
-		let val = value
-			.as_f64()
-			.ok_or_else(|| bevyhow!("expected float value for f64 field"))?;
-		return Ok(Box::new(val));
+		return Ok(Box::new(value.as_f64()?));
 	}
 
 	// Bytes
 	if type_id == TypeId::of::<Vec<u8>>() {
-		let bytes = value.as_bytes().ok_or_else(|| {
-			bevyhow!("expected Bytes value for Vec<u8> field")
-		})?;
-		return Ok(Box::new(bytes.to_vec()));
+		return Ok(Box::new(value.as_bytes()?.to_vec()));
 	}
 
 	bevybail!("unsupported opaque type")
@@ -793,9 +739,9 @@ mod tests {
 	#[test]
 	fn into_reflect_simple_struct() {
 		let mut map = Map::default();
-		map.insert("name".into(), Value::Str("world".into()));
-		map.insert("count".into(), Value::Uint(7));
-		map.insert("active".into(), Value::Bool(false));
+		map.insert("name", "world");
+		map.insert("count", 7);
+		map.insert("active", false);
 		let value = Value::Map(map);
 		let s: SimpleStruct = value_to_type(&value).unwrap();
 		s.name.xpect_eq("world");

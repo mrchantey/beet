@@ -85,7 +85,9 @@ impl std::fmt::Display for PostIntent {
 /// as this is relative to the Actor.
 ///
 /// Posts implement [`Ord`], sorted by [`Self::created`]
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Reflect, Component)]
+#[derive(
+	Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, Component,
+)]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Post {
 	id: PostId,
@@ -126,18 +128,6 @@ impl std::fmt::Debug for Post {
 }
 
 
-impl std::hash::Hash for Post {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.id.hash(state);
-		self.created.hash(state);
-		self.author.hash(state);
-		self.thread.hash(state);
-		self.intent.hash(state);
-		self.media_type.hash(state);
-		self.body.hash(state);
-		// metadata excluded: HashMap does not implement Hash
-	}
-}
 
 impl PartialOrd for Post {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -189,7 +179,10 @@ impl Post {
 
 	/// Returns the `file_stem` from metadata, if present.
 	pub fn file_stem(&self) -> Option<&str> {
-		self.metadata.get("file_stem").and_then(|val| val.as_str())
+		self.metadata
+			.get("file_stem")
+			.and_then(|val| val.as_str())
+			.ok()
 	}
 
 	/// Hash self, used for change detection during streaming.
