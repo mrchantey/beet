@@ -435,7 +435,7 @@ pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
 	match tool {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
-			reflect_ext::sanitize_schema_for_strict_mode(&mut params);
+			schema_ext::sanitize_schema_for_strict_mode(&mut params);
 			ChatCompletionTools::Function(ChatCompletionTool {
 				function: FunctionObject {
 					name: func.path().to_string(),

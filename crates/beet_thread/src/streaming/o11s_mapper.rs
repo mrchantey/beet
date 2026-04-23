@@ -467,7 +467,7 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 	match tool {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
-			reflect_ext::sanitize_schema_for_strict_mode(&mut params);
+			schema_ext::sanitize_schema_for_strict_mode(&mut params);
 			FunctionToolParam {
 				tool_type: "function".to_string(),
 				name: func.path().to_string(),

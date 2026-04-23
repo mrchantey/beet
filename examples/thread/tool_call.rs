@@ -15,7 +15,7 @@ async fn main() {
 }
 
 fn setup(mut commands: Commands) {
-	let schema = reflect_ext::json_schema::<ChoiceInput>();
+	let schema = schema_ext::json_schema::<ChoiceInput>();
 	println!("Tool Call Schema:\n{:#?}", schema);
 
 	commands

@@ -61,7 +61,7 @@ mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 #[cfg(feature = "json")]
-pub mod reflect_ext;
+pub mod schema_ext;
 #[cfg(feature = "json")]
 mod reflect_json;
 #[cfg(feature = "json")]

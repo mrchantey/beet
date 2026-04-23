@@ -15,8 +15,10 @@ const MARKER_V1: &str = "test-v1";
 const MARKER_V2: &str = "test-v2";
 
 #[beet_core::test(timeout_ms = 900_000)]
-// #[ignore = "deploys resources and takes ten minutes"]
+#[ignore = "deploys resources and takes ten minutes"]
 async fn lightsail_lifecycle() {
+	pretty_env_logger::init();
+
 	// resolve source paths and create revert guards
 	let source = AbsPathBuf::new_workspace_rel(SOURCE_PATH).unwrap();
 	let original_source = std::fs::read_to_string(source.as_path()).unwrap();

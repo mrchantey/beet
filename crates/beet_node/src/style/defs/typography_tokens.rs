@@ -75,16 +75,11 @@ token!(Typography, LABEL_SMALL,     "label-small");
 /// Includes ref tokens (typefaces, weights, font sizes, line heights)
 /// and sys tokens (the 15 composite typescale entries).
 pub fn default_typography() -> TokenStore {
-	// Common typeface stacks
-	let brand = Typeface::new(["Google Sans", "Product Sans", "Inter", "Work Sans", "system-ui", "sans-serif"]);
-	let plain = Typeface::new(["Roboto", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]);
-	let mono  = Typeface::new(["Roboto Mono", "'Courier New'", "monospace"]);
-
 	TokenStore::new()
 		// ── Typeface ref tokens ───────────────────────────────────────────────
-		.with(TYPEFACE_PLAIN,  plain)
-		.with(TYPEFACE_BRAND,  brand)
-		.with(TYPEFACE_MONO,   mono)
+		.with(TYPEFACE_PLAIN,  Typeface::new(["Google Sans", "Product Sans", "Inter", "Work Sans", "system-ui", "sans-serif"]))
+		.with(TYPEFACE_BRAND,  Typeface::new(["Roboto", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]))
+		.with(TYPEFACE_MONO,   Typeface::new(["Roboto Mono", "'Courier New'", "monospace"]))
 		// ── Weight ref tokens ─────────────────────────────────────────────────
 		.with(WEIGHT_REGULAR,  FontWeight::Absolute(400))
 		.with(WEIGHT_MEDIUM,   FontWeight::Absolute(500))

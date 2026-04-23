@@ -6,15 +6,14 @@ use beet_net::prelude::*;
 
 /// Test version marker. Integration tests modify this value
 /// to verify binary updates across deploys.
+/// Changes here indicate test is running or something went wrong,
+/// and should be discarded.
 const TEST_VERSION: &str = "test-v1";
 
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, ServerPlugin))
-		.spawn_then((
-			HttpServer::default(),
-			exchange_handler(handle_request),
-		))
+		.spawn_then((HttpServer::default(), exchange_handler(handle_request)))
 		.run()
 }
 

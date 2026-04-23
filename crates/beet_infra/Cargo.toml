@@ -60,6 +60,7 @@ async-process = { workspace = true }
 beet_net = { workspace = true, features = ["ureq", "rustls-tls","server"] }
 beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }
+pretty_env_logger.workspace = true
 beet_infra = { path = ".", features = [
 	"deploy",
 	"aws_sdk",

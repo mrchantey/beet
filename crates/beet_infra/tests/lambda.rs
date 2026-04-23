@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(custom_test_frameworks))]
 #![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration test for Lambda Block.
-//! Takes approx 20-40 mins.
+//! Takes approx 5 mins.
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
@@ -15,7 +15,10 @@ const MARKER_V1: &str = "test-v1";
 const MARKER_V2: &str = "test-v2";
 
 #[beet_core::test(timeout_ms = 900_000)]
+#[ignore = "deploys resources and takes five minutes"]
 async fn lambda_lifecycle() {
+	pretty_env_logger::init();
+
 	// resolve source paths and create revert guards
 	let source = AbsPathBuf::new_workspace_rel(SOURCE_PATH).unwrap();
 	let original_source = std::fs::read_to_string(source.as_path()).unwrap();

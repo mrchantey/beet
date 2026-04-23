@@ -21,7 +21,7 @@
 //! }
 //!
 //! // Returns a JSON Schema object with properties, required fields, etc.
-//! let schema = reflect_ext::type_info_to_json_schema(MyRequest::type_info());
+//! let schema = schema_ext::type_info_to_json_schema(MyRequest::type_info());
 //! ```
 
 use crate::prelude::*;
@@ -159,7 +159,7 @@ pub fn sanitize_schema_for_strict_mode(schema: &mut Value) {
 ///     color: Color,
 /// }
 ///
-/// let schema = reflect_ext::type_info_to_json_schema(Painted::type_info());
+/// let schema = schema_ext::type_info_to_json_schema(Painted::type_info());
 /// // The `color` property will be `{ "$ref": "#/$defs/Color" }` and
 /// // `$defs.Color` will contain the full enum schema.
 /// ```
