@@ -13,7 +13,7 @@ pub struct FieldRef {
 	/// The path to the document
 	pub document: DocumentPath,
 	/// The path to the field within the document
-	pub field_path: Vec<FieldPath>,
+	pub field_path: FieldPath,
 	/// Behavior when the field is missing from the document.
 	pub on_missing: OnMissingField,
 }
@@ -37,10 +37,10 @@ impl FieldRef {
 	/// Use [`with_document`](Self::with_document) to specify a different document.
 	///
 	/// By default, missing fields are initialized with [`Value::Null`].
-	pub fn new(field_path: impl IntoFieldPathVec) -> Self {
+	pub fn new(field_path: impl IntoFieldPath) -> Self {
 		Self {
 			document: DocumentPath::default(),
-			field_path: field_path.into_field_path_vec(),
+			field_path: field_path.into_field_path(),
 			on_missing: OnMissingField::default(),
 		}
 	}
@@ -72,12 +72,31 @@ impl FieldRef {
 	}
 }
 
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	DerefMut,
+	Reflect,
+)]
+pub struct FieldPath(Vec<FieldSegment>);
+
+impl From<Vec<FieldSegment>> for FieldPath {
+	fn from(segments: Vec<FieldSegment>) -> Self { Self(segments) }
+}
+
 
 /// A path segment for navigating document structure.
 ///
 /// Paths are built from sequences of these segments to access nested fields.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
-pub enum FieldPath {
+pub enum FieldSegment {
 	/// Access an array element by index.
 	ArrayIndex(usize),
 	/// Access an object field by key.
@@ -86,43 +105,50 @@ pub enum FieldPath {
 
 
 /// Convert various types into a field path vector for document navigation.
-pub trait IntoFieldPathVec {
+pub trait IntoFieldPath {
 	/// Convert this type into a vector of field path segments.
-	fn into_field_path_vec(self) -> Vec<FieldPath>;
+	fn into_field_path(self) -> FieldPath;
 }
-impl IntoFieldPathVec for Vec<FieldPath> {
-	fn into_field_path_vec(self) -> Vec<FieldPath> { self }
+impl IntoFieldPath for Vec<FieldSegment> {
+	fn into_field_path(self) -> FieldPath { self.into() }
 }
-impl IntoFieldPathVec for Vec<String> {
-	fn into_field_path_vec(self) -> Vec<FieldPath> {
-		self.into_iter().map(FieldPath::ObjectKey).collect()
-	}
-}
-impl IntoFieldPathVec for Vec<&str> {
-	fn into_field_path_vec(self) -> Vec<FieldPath> {
+impl IntoFieldPath for Vec<String> {
+	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
-			.map(|s| FieldPath::ObjectKey(s.to_string()))
-			.collect()
+			.map(FieldSegment::ObjectKey)
+			.collect::<Vec<_>>()
+			.into()
+	}
+}
+impl IntoFieldPath for Vec<&str> {
+	fn into_field_path(self) -> FieldPath {
+		self.into_iter()
+			.map(|s| FieldSegment::ObjectKey(s.to_string()))
+			.collect::<Vec<_>>()
+			.into()
 	}
 }
 
-impl IntoFieldPathVec for Vec<usize> {
-	fn into_field_path_vec(self) -> Vec<FieldPath> {
-		self.into_iter().map(FieldPath::ArrayIndex).collect()
+impl IntoFieldPath for Vec<usize> {
+	fn into_field_path(self) -> FieldPath {
+		self.into_iter()
+			.map(FieldSegment::ArrayIndex)
+			.collect::<Vec<_>>()
+			.into()
 	}
 }
 
-impl IntoFieldPathVec for &[FieldPath] {
-	fn into_field_path_vec(self) -> Vec<FieldPath> { self.to_vec() }
+impl IntoFieldPath for &[FieldSegment] {
+	fn into_field_path(self) -> FieldPath { self.to_vec().into() }
 }
-impl IntoFieldPathVec for &str {
-	fn into_field_path_vec(self) -> Vec<FieldPath> {
-		vec![FieldPath::ObjectKey(self.to_string())]
+impl IntoFieldPath for &str {
+	fn into_field_path(self) -> FieldPath {
+		vec![FieldSegment::ObjectKey(self.to_string())].into()
 	}
 }
-impl IntoFieldPathVec for String {
-	fn into_field_path_vec(self) -> Vec<FieldPath> {
-		vec![FieldPath::ObjectKey(self)]
+impl IntoFieldPath for String {
+	fn into_field_path(self) -> FieldPath {
+		vec![FieldSegment::ObjectKey(self)].into()
 	}
 }
 
@@ -134,24 +160,24 @@ mod test {
 
 	#[test]
 	fn field_path_conversion() {
-		let string_vec: Vec<FieldPath> =
-			vec!["a".to_string(), "b".to_string()].into_field_path_vec();
-		string_vec.xpect_eq(vec![
-			FieldPath::ObjectKey("a".to_string()),
-			FieldPath::ObjectKey("b".to_string()),
+		let string_vec =
+			vec!["a".to_string(), "b".to_string()].into_field_path();
+		string_vec.0.xpect_eq(vec![
+			FieldSegment::ObjectKey("a".to_string()),
+			FieldSegment::ObjectKey("b".to_string()),
 		]);
 
-		let str_vec: Vec<FieldPath> = vec!["x", "y"].into_field_path_vec();
-		str_vec.xpect_eq(vec![
-			FieldPath::ObjectKey("x".to_string()),
-			FieldPath::ObjectKey("y".to_string()),
+		let str_vec = vec!["x", "y"].into_field_path();
+		str_vec.0.xpect_eq(vec![
+			FieldSegment::ObjectKey("x".to_string()),
+			FieldSegment::ObjectKey("y".to_string()),
 		]);
 
-		let index_vec: Vec<FieldPath> = vec![0, 1, 2].into_field_path_vec();
-		index_vec.xpect_eq(vec![
-			FieldPath::ArrayIndex(0),
-			FieldPath::ArrayIndex(1),
-			FieldPath::ArrayIndex(2),
+		let index_vec = vec![0, 1, 2].into_field_path();
+		index_vec.0.xpect_eq(vec![
+			FieldSegment::ArrayIndex(0),
+			FieldSegment::ArrayIndex(1),
+			FieldSegment::ArrayIndex(2),
 		]);
 	}
 
@@ -162,7 +188,8 @@ mod test {
 		field.document.xpect_eq(DocumentPath::Ancestor);
 		field
 			.field_path
-			.xpect_eq(vec![FieldPath::ObjectKey("field".to_string())]);
+			.0
+			.xpect_eq(vec![FieldSegment::ObjectKey("field".to_string())]);
 		field
 			.on_missing
 			.xpect_eq(OnMissingField::Init { value: Value::Null });

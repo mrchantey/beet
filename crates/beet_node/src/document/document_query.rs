@@ -140,7 +140,7 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field_ref(&[FieldPath::ObjectKey(
+					doc.get_field_ref(&[FieldSegment::ObjectKey(
 						"value".to_string(),
 					)])
 					.unwrap()
@@ -159,7 +159,7 @@ mod test {
 					let mut doc =
 						query.get_mut(entity, &DocumentPath::Ancestor).unwrap();
 					let val = doc
-						.get_field_mut(&[FieldPath::ObjectKey(
+						.get_field_mut(&[FieldSegment::ObjectKey(
 							"value".to_string(),
 						)])
 						.unwrap();
@@ -175,7 +175,7 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<i64>(&[FieldPath::ObjectKey(
+					doc.get_field::<i64>(&[FieldSegment::ObjectKey(
 						"value".to_string(),
 					)])
 					.unwrap()
@@ -215,7 +215,7 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<i64>(&[FieldPath::ObjectKey(
+					doc.get_field::<i64>(&[FieldSegment::ObjectKey(
 						"count".to_string(),
 					)])
 					.unwrap()
@@ -252,7 +252,7 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<String>(&[FieldPath::ObjectKey(
+					doc.get_field::<String>(&[FieldSegment::ObjectKey(
 						"new_field".to_string(),
 					)])
 					.unwrap()
@@ -279,7 +279,7 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<String>(&[FieldPath::ObjectKey(
+					doc.get_field::<String>(&[FieldSegment::ObjectKey(
 						"card_data".to_string(),
 					)])
 					.unwrap()
@@ -302,7 +302,7 @@ mod test {
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc = query.get(entity, &DocumentPath::Root).unwrap();
-					doc.get_field::<String>(&[FieldPath::ObjectKey(
+					doc.get_field::<String>(&[FieldSegment::ObjectKey(
 						"root_data".to_string(),
 					)])
 					.unwrap()

@@ -44,7 +44,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<DocumentPath>()
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
-			.register_type::<FieldPath>()
+			.register_type::<FieldSegment>()
 			.register_type::<Value>()
 			.register_type::<DocumentScope>();
 

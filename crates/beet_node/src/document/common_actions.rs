@@ -333,7 +333,7 @@ mod test {
 			.entity(entity)
 			.get::<Document>()
 			.unwrap()
-			.get_field::<String>(&[FieldPath::ObjectKey("message".to_string())])
+			.get_field::<String>(&[FieldSegment::ObjectKey("message".to_string())])
 			.unwrap()
 			.xpect_eq("Hello");
 	}
@@ -359,7 +359,7 @@ mod test {
 			.entity(entity)
 			.get::<Document>()
 			.unwrap()
-			.get_field::<String>(&[FieldPath::ObjectKey("status".to_string())])
+			.get_field::<String>(&[FieldSegment::ObjectKey("status".to_string())])
 			.unwrap()
 			.xpect_eq("complete");
 	}
@@ -380,7 +380,7 @@ mod test {
 			.entity(entity)
 			.get::<Document>()
 			.unwrap()
-			.get_field::<String>(&[FieldPath::ObjectKey("message".to_string())])
+			.get_field::<String>(&[FieldSegment::ObjectKey("message".to_string())])
 			.unwrap()
 			.xpect_eq("Hello");
 	}
@@ -406,7 +406,7 @@ mod test {
 			.entity(entity)
 			.get::<Document>()
 			.unwrap()
-			.get_field::<String>(&[FieldPath::ObjectKey("status".to_string())])
+			.get_field::<String>(&[FieldSegment::ObjectKey("status".to_string())])
 			.unwrap()
 			.xpect_eq("complete");
 	}

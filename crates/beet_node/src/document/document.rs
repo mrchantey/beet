@@ -7,7 +7,7 @@ use bevy::reflect::Typed;
 ///
 /// Documents provide structured storage for cards and other entities,
 /// similar to document databases. Fields can be accessed and modified
-/// using [`FieldPath`] to navigate nested structures.
+/// using [`FieldSegment`] to navigate nested structures.
 #[derive(
 	Debug,
 	Default,
@@ -47,14 +47,14 @@ impl Document {
 	/// Errors if an array or object is expected, and the actual type is not the expected, nor empty.
 	pub(super) fn try_init_field_with(
 		&mut self,
-		path: &[FieldPath],
+		path: &[FieldSegment],
 		init_value: &Value,
 	) -> Result<&mut Value> {
 		let mut current = &mut self.0;
 
 		for segment in path {
 			match segment {
-				FieldPath::ArrayIndex(idx) => {
+				FieldSegment::ArrayIndex(idx) => {
 					// initialize as array if null or empty
 					if current.is_null() {
 						*current = Value::List(Vec::new());
@@ -67,7 +67,7 @@ impl Document {
 					}
 					current = &mut array[*idx];
 				}
-				FieldPath::ObjectKey(key) => {
+				FieldSegment::ObjectKey(key) => {
 					// initialize as object if null or empty
 					if current.is_null() {
 						*current = Value::Map(Default::default());
@@ -90,7 +90,10 @@ impl Document {
 	///
 	/// Returns an error if the path doesn't exist, the type is incorrect,
 	/// or conversion fails.
-	pub fn get_field<T>(&self, path: &[FieldPath]) -> Result<T, DocumentError>
+	pub fn get_field<T>(
+		&self,
+		path: &[FieldSegment],
+	) -> Result<T, DocumentError>
 	where
 		T: 'static + Send + Sync + FromReflect + Typed,
 	{
@@ -99,7 +102,7 @@ impl Document {
 			.into_reflect()
 			.map_err(|err| DocumentError::FailedToDeserialize {
 				error: err.to_string(),
-				path: path.to_vec(),
+				path: path.into_field_path(),
 			})
 	}
 	/// Get a reference to a field in the document by path.
@@ -109,13 +112,13 @@ impl Document {
 	/// Returns an error if the path doesn't exist or encounters a type mismatch.
 	pub fn get_field_ref(
 		&self,
-		path: &[FieldPath],
+		path: &[FieldSegment],
 	) -> Result<&Value, DocumentError> {
 		let mut current = &self.0;
 
 		for segment in path {
 			match segment {
-				FieldPath::ArrayIndex(idx) => {
+				FieldSegment::ArrayIndex(idx) => {
 					current = current
 						.as_list()
 						.map_err(DocumentError::from)?
@@ -123,18 +126,18 @@ impl Document {
 						.ok_or_else(|| {
 							DocumentError::ArrayIndexOutOfBounds {
 								index: *idx,
-								path: path.to_vec(),
+								path: path.into_field_path(),
 							}
 						})?;
 				}
-				FieldPath::ObjectKey(key) => {
+				FieldSegment::ObjectKey(key) => {
 					current = current
 						.as_map()
 						.map_err(DocumentError::from)?
 						.get(key)
 						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
-							path: path.to_vec(),
+							path: path.into_field_path(),
 						})?;
 				}
 			}
@@ -149,31 +152,31 @@ impl Document {
 	/// Returns an error if the path doesn't exist or encounters a type mismatch.
 	pub fn get_field_mut(
 		&mut self,
-		path: &[FieldPath],
+		path: &[FieldSegment],
 	) -> Result<&mut Value, DocumentError> {
 		let mut current = &mut self.0;
 
 		for segment in path {
 			match segment {
-				FieldPath::ArrayIndex(idx) => {
+				FieldSegment::ArrayIndex(idx) => {
 					let idx_val = *idx;
 					let array =
 						current.as_list_mut().map_err(DocumentError::from)?;
 					if idx_val >= array.len() {
 						return Err(DocumentError::ArrayIndexOutOfBounds {
 							index: idx_val,
-							path: path.to_vec(),
+							path: path.to_vec().into(),
 						});
 					}
 					current = &mut array[idx_val];
 				}
-				FieldPath::ObjectKey(key) => {
+				FieldSegment::ObjectKey(key) => {
 					let object =
 						current.as_map_mut().map_err(DocumentError::from)?;
 					if !object.contains_key(key) {
 						return Err(DocumentError::ObjectKeyNotFound {
 							key: key.clone(),
-							path: path.to_vec(),
+							path: path.into_field_path(),
 						});
 					}
 					current = object.get_mut(key).unwrap();
@@ -197,7 +200,7 @@ pub enum DocumentError {
 		/// The index that was out of bounds.
 		index: usize,
 		/// The path where the error occurred.
-		path: Vec<FieldPath>,
+		path: FieldPath,
 	},
 	/// Object key was not found at the given path.
 	#[error("object key '{key}' not found\nAt path {path:?}")]
@@ -205,7 +208,7 @@ pub enum DocumentError {
 		/// The key that was not found.
 		key: String,
 		/// The path where the error occurred.
-		path: Vec<FieldPath>,
+		path: FieldPath,
 	},
 	/// Failed to deserialize value to the requested type.
 	#[error("Failed to deserialize: '{error}'\nAt path {path:?}")]
@@ -213,7 +216,7 @@ pub enum DocumentError {
 		/// The deserialization error message.
 		error: String,
 		/// The path where the error occurred.
-		path: Vec<FieldPath>,
+		path: FieldPath,
 	},
 }
 
@@ -265,21 +268,21 @@ mod test {
 			"nested": { "value": "deep" }
 		}));
 
-		doc.get_field_ref(&[FieldPath::ObjectKey("name".to_string())])
+		doc.get_field_ref(&[FieldSegment::ObjectKey("name".to_string())])
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("Test");
 
-		doc.get_field_ref(&[FieldPath::ObjectKey("count".to_string())])
+		doc.get_field_ref(&[FieldSegment::ObjectKey("count".to_string())])
 			.unwrap()
 			.as_i64()
 			.unwrap()
 			.xpect_eq(42);
 
 		doc.get_field_ref(&[
-			FieldPath::ObjectKey("nested".to_string()),
-			FieldPath::ObjectKey("value".to_string()),
+			FieldSegment::ObjectKey("nested".to_string()),
+			FieldSegment::ObjectKey("value".to_string()),
 		])
 		.unwrap()
 		.as_str()
@@ -294,11 +297,11 @@ mod test {
 			"count": 42i64
 		}));
 
-		doc.get_field::<String>(&[FieldPath::ObjectKey("name".to_string())])
+		doc.get_field::<String>(&[FieldSegment::ObjectKey("name".to_string())])
 			.unwrap()
 			.xpect_eq("Test");
 
-		doc.get_field::<i64>(&[FieldPath::ObjectKey("count".to_string())])
+		doc.get_field::<i64>(&[FieldSegment::ObjectKey("count".to_string())])
 			.unwrap()
 			.xpect_eq(42);
 	}
@@ -310,8 +313,8 @@ mod test {
 		}));
 
 		doc.get_field_ref(&[
-			FieldPath::ObjectKey("items".to_string()),
-			FieldPath::ArrayIndex(2),
+			FieldSegment::ObjectKey("items".to_string()),
+			FieldSegment::ArrayIndex(2),
 		])
 		.unwrap()
 		.as_i64()
@@ -324,11 +327,11 @@ mod test {
 		let mut doc = Document::new(val!({ "count": 10i64 }));
 
 		let value = doc
-			.get_field_mut(&[FieldPath::ObjectKey("count".to_string())])
+			.get_field_mut(&[FieldSegment::ObjectKey("count".to_string())])
 			.unwrap();
 		*value = Value::Int(20);
 
-		doc.get_field::<i64>(&[FieldPath::ObjectKey("count".to_string())])
+		doc.get_field::<i64>(&[FieldSegment::ObjectKey("count".to_string())])
 			.unwrap()
 			.xpect_eq(20);
 	}
@@ -340,8 +343,8 @@ mod test {
 		let value = doc
 			.try_init_field_with(
 				&[
-					FieldPath::ObjectKey("nested".to_string()),
-					FieldPath::ObjectKey("value".to_string()),
+					FieldSegment::ObjectKey("nested".to_string()),
+					FieldSegment::ObjectKey("value".to_string()),
 				],
 				&Value::Null,
 			)
@@ -350,8 +353,8 @@ mod test {
 		*value = Value::Str("initialized".to_string());
 
 		doc.get_field::<String>(&[
-			FieldPath::ObjectKey("nested".to_string()),
-			FieldPath::ObjectKey("value".to_string()),
+			FieldSegment::ObjectKey("nested".to_string()),
+			FieldSegment::ObjectKey("value".to_string()),
 		])
 		.unwrap()
 		.xpect_eq("initialized");
@@ -364,8 +367,8 @@ mod test {
 		let value = doc
 			.try_init_field_with(
 				&[
-					FieldPath::ObjectKey("items".to_string()),
-					FieldPath::ArrayIndex(2),
+					FieldSegment::ObjectKey("items".to_string()),
+					FieldSegment::ArrayIndex(2),
 				],
 				&Value::Null,
 			)
@@ -374,8 +377,8 @@ mod test {
 		*value = Value::Int(42);
 
 		doc.get_field::<i64>(&[
-			FieldPath::ObjectKey("items".to_string()),
-			FieldPath::ArrayIndex(2),
+			FieldSegment::ObjectKey("items".to_string()),
+			FieldSegment::ArrayIndex(2),
 		])
 		.unwrap()
 		.xpect_eq(42);
