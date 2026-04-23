@@ -84,7 +84,7 @@ mod tests {
 		field
 			.field_path
 			.deref()
-			.xpect_eq(vec![FieldSegment::ObjectKey("field".to_string())]);
+			.xpect_eq(vec![FieldSegment::key("field")]);
 		field
 			.on_missing
 			.xpect_eq(OnMissingField::Init { value: Value::Null });

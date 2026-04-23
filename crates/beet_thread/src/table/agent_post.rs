@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 // ═══════════════════════════════════════════════════════════════════════
 // PostStatus
@@ -306,7 +304,7 @@ impl AgentPost<'static> {
 			PostIntent::OK,
 			MediaType::Text,
 			text.into().into_bytes(),
-			serde_json::Map::new(),
+			Map::default(),
 		);
 		post.set_status(status);
 		post
@@ -325,7 +323,7 @@ impl AgentPost<'static> {
 			PostIntent::REFUSAL,
 			MediaType::Text,
 			text.into().into_bytes(),
-			serde_json::Map::new(),
+			Map::default(),
 		);
 		post.set_status(status);
 		post
@@ -339,10 +337,9 @@ impl AgentPost<'static> {
 		file_stem: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = serde_json::Map::new();
+		let mut metadata = Map::default();
 		if let Some(stem) = file_stem {
-			metadata
-				.insert("file_stem".into(), serde_json::Value::String(stem));
+			metadata.insert("file_stem".into(), Value::from(stem));
 		}
 		let mut post = Post::new_raw(
 			author,
@@ -365,10 +362,9 @@ impl AgentPost<'static> {
 		file_stem: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = serde_json::Map::new();
+		let mut metadata = Map::default();
 		if let Some(stem) = file_stem {
-			metadata
-				.insert("file_stem".into(), serde_json::Value::String(stem));
+			metadata.insert("file_stem".into(), Value::from(stem));
 		}
 		let mut post = Post::new_raw(
 			author,
@@ -395,7 +391,7 @@ impl AgentPost<'static> {
 			PostIntent::INTERNAL_ERROR,
 			MediaType::Text,
 			message.into().into_bytes(),
-			serde_json::Map::new(),
+			Map::default(),
 		);
 		post.set_status(status);
 		post
@@ -414,7 +410,7 @@ impl AgentPost<'static> {
 			PostIntent::REASONING_CONTENT,
 			MediaType::Text,
 			text.into().into_bytes(),
-			serde_json::Map::new(),
+			Map::default(),
 		);
 		post.set_status(status);
 		post
@@ -433,7 +429,7 @@ impl AgentPost<'static> {
 			PostIntent::REASONING_SUMMARY,
 			MediaType::Text,
 			text.into().into_bytes(),
-			serde_json::Map::new(),
+			Map::default(),
 		);
 		post.set_status(status);
 		post
@@ -448,12 +444,10 @@ impl AgentPost<'static> {
 		arguments: impl Into<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = serde_json::Map::new();
+		let mut metadata = Map::default();
 		metadata.insert("post_kind".into(), "function_call".into());
-		metadata
-			.insert("fc_name".into(), serde_json::Value::String(name.into()));
-		metadata
-			.insert("fc_id".into(), serde_json::Value::String(call_id.into()));
+		metadata.insert("fc_name".into(), Value::from(name.into()));
+		metadata.insert("fc_id".into(), Value::from(call_id.into()));
 		let mut post = Post::new_raw(
 			author,
 			thread,
@@ -475,13 +469,11 @@ impl AgentPost<'static> {
 		name: Option<String>,
 		status: PostStatus,
 	) -> Post {
-		let mut metadata = serde_json::Map::new();
+		let mut metadata = Map::default();
 		metadata.insert("post_kind".into(), "function_call_output".into());
-		metadata
-			.insert("fc_id".into(), serde_json::Value::String(call_id.into()));
+		metadata.insert("fc_id".into(), Value::from(call_id.into()));
 		if let Some(fc_name) = name {
-			metadata
-				.insert("fc_name".into(), serde_json::Value::String(fc_name));
+			metadata.insert("fc_name".into(), Value::from(fc_name));
 		}
 		let mut post = Post::new_raw(
 			author,

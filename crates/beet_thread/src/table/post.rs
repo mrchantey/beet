@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 pub type PostId = Uuid7<Post>;
 
@@ -87,9 +85,7 @@ impl std::fmt::Display for PostIntent {
 /// as this is relative to the Actor.
 ///
 /// Posts implement [`Ord`], sorted by [`Self::created`]
-#[derive(
-	Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, Component,
-)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Reflect, Component)]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Post {
 	id: PostId,
@@ -109,7 +105,7 @@ pub struct Post {
 	)]
 	body: Vec<u8>,
 	/// Extensible key-value metadata.
-	metadata: JsonMap,
+	metadata: Map,
 }
 impl std::fmt::Debug for Post {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -129,6 +125,19 @@ impl std::fmt::Debug for Post {
 	}
 }
 
+
+impl std::hash::Hash for Post {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.id.hash(state);
+		self.created.hash(state);
+		self.author.hash(state);
+		self.thread.hash(state);
+		self.intent.hash(state);
+		self.media_type.hash(state);
+		self.body.hash(state);
+		// metadata excluded: HashMap does not implement Hash
+	}
+}
 
 impl PartialOrd for Post {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -158,15 +167,9 @@ impl Post {
 	pub fn intent(&self) -> PostIntent { self.intent }
 	pub fn media_type(&self) -> &MediaType { &self.media_type }
 	pub fn body_bytes(&self) -> &[u8] { &self.body }
-	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
-		&self.metadata
-	}
+	pub fn metadata(&self) -> &Map { &self.metadata }
 	/// Returns a mutable reference to the metadata.
-	pub fn metadata_mut(
-		&mut self,
-	) -> &mut serde_json::Map<String, serde_json::Value> {
-		&mut self.metadata
-	}
+	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
 
 	pub fn set_intent(&mut self, intent: PostIntent) { self.intent = intent; }
 
@@ -238,7 +241,7 @@ impl Post {
 		intent: PostIntent,
 		media_type: MediaType,
 		body: Vec<u8>,
-		metadata: serde_json::Map<String, serde_json::Value>,
+		metadata: Map,
 	) -> Self {
 		Self {
 			id: Uuid7::new_now(),
@@ -248,7 +251,7 @@ impl Post {
 			intent,
 			media_type,
 			body,
-			metadata: JsonMap(metadata),
+			metadata,
 		}
 	}
 

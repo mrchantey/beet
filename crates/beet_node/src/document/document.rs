@@ -135,7 +135,7 @@ impl Document {
 						.map_err(DocumentError::from)?
 						.get(key)
 						.ok_or_else(|| DocumentError::ObjectKeyNotFound {
-							key: key.clone(),
+							key: key.to_string(),
 							path: path.into_field_path(),
 						})?;
 				}
@@ -174,7 +174,7 @@ impl Document {
 						current.as_map_mut().map_err(DocumentError::from)?;
 					if !object.contains_key(key) {
 						return Err(DocumentError::ObjectKeyNotFound {
-							key: key.clone(),
+							key: key.to_string(),
 							path: path.into_field_path(),
 						});
 					}
@@ -267,21 +267,21 @@ mod test {
 			"nested": { "value": "deep" }
 		}));
 
-		doc.get_field_ref(&[FieldSegment::ObjectKey("name".to_string())])
+		doc.get_field_ref(&[FieldSegment::key("name")])
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("Test");
 
-		doc.get_field_ref(&[FieldSegment::ObjectKey("count".to_string())])
+		doc.get_field_ref(&[FieldSegment::key("count")])
 			.unwrap()
 			.as_i64()
 			.unwrap()
 			.xpect_eq(42);
 
 		doc.get_field_ref(&[
-			FieldSegment::ObjectKey("nested".to_string()),
-			FieldSegment::ObjectKey("value".to_string()),
+			FieldSegment::key("nested"),
+			FieldSegment::key("value"),
 		])
 		.unwrap()
 		.as_str()
@@ -296,11 +296,11 @@ mod test {
 			"count": 42i64
 		}));
 
-		doc.get_field::<String>(&[FieldSegment::ObjectKey("name".to_string())])
+		doc.get_field::<String>(&[FieldSegment::key("name")])
 			.unwrap()
 			.xpect_eq("Test");
 
-		doc.get_field::<i64>(&[FieldSegment::ObjectKey("count".to_string())])
+		doc.get_field::<i64>(&[FieldSegment::key("count")])
 			.unwrap()
 			.xpect_eq(42);
 	}
@@ -312,7 +312,7 @@ mod test {
 		}));
 
 		doc.get_field_ref(&[
-			FieldSegment::ObjectKey("items".to_string()),
+			FieldSegment::key("items"),
 			FieldSegment::ArrayIndex(2),
 		])
 		.unwrap()
@@ -325,12 +325,10 @@ mod test {
 	fn document_get_field_mut() {
 		let mut doc = Document::new(val!({ "count": 10i64 }));
 
-		let value = doc
-			.get_field_mut(&[FieldSegment::ObjectKey("count".to_string())])
-			.unwrap();
+		let value = doc.get_field_mut(&[FieldSegment::key("count")]).unwrap();
 		*value = Value::Int(20);
 
-		doc.get_field::<i64>(&[FieldSegment::ObjectKey("count".to_string())])
+		doc.get_field::<i64>(&[FieldSegment::key("count")])
 			.unwrap()
 			.xpect_eq(20);
 	}
@@ -341,19 +339,16 @@ mod test {
 
 		let value = doc
 			.try_init_field_with(
-				&[
-					FieldSegment::ObjectKey("nested".to_string()),
-					FieldSegment::ObjectKey("value".to_string()),
-				],
+				&[FieldSegment::key("nested"), FieldSegment::key("value")],
 				&Value::Null,
 			)
 			.unwrap();
 
-		*value = Value::Str("initialized".to_string());
+		*value = Value::Str("initialized".into());
 
 		doc.get_field::<String>(&[
-			FieldSegment::ObjectKey("nested".to_string()),
-			FieldSegment::ObjectKey("value".to_string()),
+			FieldSegment::key("nested"),
+			FieldSegment::key("value"),
 		])
 		.unwrap()
 		.xpect_eq("initialized");
@@ -365,10 +360,7 @@ mod test {
 
 		let value = doc
 			.try_init_field_with(
-				&[
-					FieldSegment::ObjectKey("items".to_string()),
-					FieldSegment::ArrayIndex(2),
-				],
+				&[FieldSegment::key("items"), FieldSegment::ArrayIndex(2)],
 				&Value::Null,
 			)
 			.unwrap();
@@ -376,7 +368,7 @@ mod test {
 		*value = Value::Int(42);
 
 		doc.get_field::<i64>(&[
-			FieldSegment::ObjectKey("items".to_string()),
+			FieldSegment::key("items"),
 			FieldSegment::ArrayIndex(2),
 		])
 		.unwrap()

@@ -132,7 +132,7 @@ impl NodeVisitor for MarkdownRenderer {
 						Value::Str(class) => class
 							.strip_prefix("language-")
 							.map(|lang| lang.to_string())
-							.or_else(|| Some(class.clone())),
+							.or_else(|| Some(class.to_string())),
 						_ => None,
 					})
 					.unwrap_or_default();

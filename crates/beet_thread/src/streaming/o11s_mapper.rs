@@ -467,12 +467,14 @@ pub fn tool_to_function_param(tool: &ToolDefinition) -> FunctionToolParam {
 	match tool {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
-			schema_ext::sanitize_schema_for_strict_mode(&mut params);
+			params.sanitize_for_strict_mode();
+			let json_params: serde_json::Value =
+				params.into_inner().into_json();
 			FunctionToolParam {
 				tool_type: "function".to_string(),
 				name: func.path().to_string(),
 				description: func.description().to_string().xsome(),
-				parameters: params.xsome(),
+				parameters: json_params.xsome(),
 				strict: Some(true),
 			}
 		}

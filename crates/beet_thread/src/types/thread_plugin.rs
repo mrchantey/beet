@@ -34,9 +34,6 @@ impl Plugin for ThreadPlugin {
 			.register_type::<PostIntent>()
 			.register_type::<Timestamp>()
 			.register_type::<ResponseMeta>()
-			// ── JSON reflect wrappers ─────────────────────────────────────
-			.register_type::<JsonValue>()
-			.register_type::<JsonMap>()
 			// ── Streaming types ───────────────────────────────────────────
 			.register_type::<EnvVar>()
 			.register_type::<ModelDef>()

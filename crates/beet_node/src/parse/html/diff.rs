@@ -629,7 +629,7 @@ fn diff_attributes(
 			// expression attributes
 			let expr_value: Value = value
 				.as_ref()
-				.map(|val| Value::Str(val.clone()))
+				.map(|val| Value::str(val))
 				.unwrap_or(Value::Null);
 
 			// try to find matching existing attribute
@@ -671,7 +671,7 @@ fn diff_attributes(
 					if parse_values {
 						Value::parse_string(val)
 					} else {
-						Value::Str(val.clone())
+						Value::str(val)
 					}
 				})
 				.unwrap_or(Value::Null);

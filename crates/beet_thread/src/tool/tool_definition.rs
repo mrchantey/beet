@@ -33,7 +33,7 @@ impl ToolDefinition {
 	pub fn function(
 		name: impl Into<String>,
 		description: impl Into<String>,
-		params_schema: serde_json::Value,
+		params_schema: impl Into<Schema>,
 	) -> Self {
 		Self::Function(FunctionToolDefinition::new(
 			name,
@@ -73,23 +73,23 @@ pub struct FunctionToolDefinition {
 	/// A description of the function. Used by the model to decide when to call it.
 	description: String,
 	/// A json schema for the parameters.
-	params_schema: JsonValue,
+	params_schema: Schema,
 }
 impl FunctionToolDefinition {
 	pub fn new(
 		path: impl Into<String>,
 		description: impl Into<String>,
-		params_schema: serde_json::Value,
+		params_schema: impl Into<Schema>,
 	) -> Self {
 		Self {
 			path: path.into(),
 			description: description.into(),
-			params_schema: JsonValue(params_schema),
+			params_schema: params_schema.into(),
 		}
 	}
 	pub fn path(&self) -> &str { &self.path }
 	pub fn description(&self) -> &str { &self.description }
-	pub fn params_schema(&self) -> &serde_json::Value { &self.params_schema }
+	pub fn params_schema(&self) -> &Schema { &self.params_schema }
 
 	pub fn from_meta(
 		(meta, path): (&ActionMeta, &PathPattern),

@@ -6,16 +6,16 @@ use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::Typed;
 
+/// A map of string keys to [`Value`]s.
+pub type Map = HashMap<SmolStr, Value>;
 
-/// A json-like value type suitable for application level operations,
-/// and implementing
+/// A json-like value type suitable for application level operations.
 ///
 /// ## Floats
 /// A wrapper around f64 that implements Eq and Hash by comparing the bit
 /// representation of the float.
 #[derive(Debug, Default, Clone, PartialEq, Reflect, Component)]
 #[reflect(Default, Component)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Value {
 	/// A null value
 	#[default]
@@ -31,12 +31,14 @@ pub enum Value {
 	/// A byte slice value.
 	Bytes(Vec<u8>),
 	/// A string value.
-	Str(String),
+	Str(SmolStr),
 	/// A map of string keys to values.
-	Map(HashMap<String, Value>),
+	Map(Map),
 	/// An ordered list of values.
 	List(Vec<Value>),
 }
+
+
 
 impl Eq for Value {}
 
@@ -95,12 +97,21 @@ pub enum ValueError {
 impl Value {
 	/// Creates a new value from anything convertible.
 	pub fn new(value: impl Into<Self>) -> Self { value.into() }
+	/// Creates a new string value.
+	pub fn str(value: impl Into<SmolStr>) -> Self { Self::Str(value.into()) }
+
+	/// Creates a new list value from an iterable of key-value pairs.
+	pub fn new_list<T: Into<Value>>(
+		values: impl IntoIterator<Item = T>,
+	) -> Self {
+		Self::List(values.into_iter().map(Into::into).collect())
+	}
 
 	/// Creates a new null value.
 	pub fn null() -> Self { Self::Null }
 
 	/// Creates a new empty map value.
-	pub fn map() -> Self { Self::Map(HashMap::default()) }
+	pub fn map() -> Self { Self::Map(Map::default()) }
 
 	/// Creates a new empty list value.
 	pub fn list() -> Self { Self::List(Vec::new()) }
@@ -130,7 +141,7 @@ impl Value {
 	}
 
 	/// Returns this value as a map reference.
-	pub fn as_map(&self) -> Result<&HashMap<String, Value>, ValueError> {
+	pub fn as_map(&self) -> Result<&Map, ValueError> {
 		match self {
 			Self::Map(map) => Ok(map),
 			other => Err(ValueError::KindMismatch {
@@ -141,9 +152,7 @@ impl Value {
 	}
 
 	/// Returns this value as a mutable map reference.
-	pub fn as_map_mut(
-		&mut self,
-	) -> Result<&mut HashMap<String, Value>, ValueError> {
+	pub fn as_map_mut(&mut self) -> Result<&mut Map, ValueError> {
 		match self {
 			Self::Map(map) => Ok(map),
 			other => Err(ValueError::KindMismatch {
@@ -214,7 +223,7 @@ impl Value {
 	/// Returns this value as a string reference, if it is one.
 	pub fn as_str(&self) -> Option<&str> {
 		match self {
-			Value::Str(val) => Some(val),
+			Value::Str(val) => Some(val.as_str()),
 			_ => None,
 		}
 	}
@@ -232,7 +241,7 @@ impl Value {
 	/// Returns the previous value if the key existed.
 	pub fn insert(
 		&mut self,
-		key: impl Into<String>,
+		key: impl Into<SmolStr>,
 		value: impl Into<Value>,
 	) -> Result<Option<Value>> {
 		self.as_map_mut()?.insert(key.into(), value.into()).xok()
@@ -313,6 +322,18 @@ impl Value {
 	{
 		reflect_ext::value_to_type(self)
 	}
+
+	/// Convert from a [`serde_json::Value`].
+	#[cfg(feature = "json")]
+	pub fn from_json(json: serde_json::Value) -> Self {
+		crate::types::value::json_ext::json_to_value(json)
+	}
+
+	/// Convert into a [`serde_json::Value`].
+	#[cfg(feature = "json")]
+	pub fn into_json(self) -> serde_json::Value {
+		crate::types::value::json_ext::value_to_json(self)
+	}
 }
 
 impl core::fmt::Display for Value {
@@ -347,7 +368,7 @@ impl core::fmt::Display for Value {
 			}
 			Value::Map(map) => {
 				let mut entries: Vec<_> = map.iter().collect();
-				entries.sort_by_key(|(key, _)| *key);
+				entries.sort_by_key(|(key, _)| key.as_str());
 				write!(
 					f,
 					"{{{}}}",
@@ -377,7 +398,7 @@ impl core::hash::Hash for Value {
 			Value::Str(val) => val.hash(state),
 			Value::Map(map) => {
 				let mut entries: Vec<_> = map.iter().collect();
-				entries.sort_by_key(|(key, _)| *key);
+				entries.sort_by_key(|(key, _)| key.as_str());
 				for (key, value) in entries {
 					key.hash(state);
 					value.hash(state);
@@ -385,6 +406,163 @@ impl core::hash::Hash for Value {
 			}
 			Value::List(list) => list.hash(state),
 		}
+	}
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Value {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error> {
+		match self {
+			Value::Null => serializer.serialize_unit(),
+			Value::Bool(b) => serializer.serialize_bool(*b),
+			Value::Int(i) => serializer.serialize_i64(*i),
+			Value::Uint(u) => serializer.serialize_u64(*u),
+			Value::Float(f) => serializer.serialize_f64(*f),
+			Value::Bytes(bytes) => {
+				use serde::ser::SerializeSeq;
+				let mut seq = serializer.serialize_seq(Some(bytes.len()))?;
+				for b in bytes {
+					seq.serialize_element(b)?;
+				}
+				seq.end()
+			}
+			Value::Str(s) => serializer.serialize_str(s.as_str()),
+			Value::List(list) => {
+				use serde::ser::SerializeSeq;
+				let mut seq = serializer.serialize_seq(Some(list.len()))?;
+				for item in list {
+					seq.serialize_element(item)?;
+				}
+				seq.end()
+			}
+			Value::Map(map) => {
+				use serde::ser::SerializeMap;
+				let mut sorted: Vec<_> = map.iter().collect();
+				sorted.sort_by_key(|(k, _)| k.as_str());
+				let mut m = serializer.serialize_map(Some(sorted.len()))?;
+				for (k, v) in sorted {
+					m.serialize_entry(k.as_str(), v)?;
+				}
+				m.end()
+			}
+		}
+	}
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Value {
+	fn deserialize<D: serde::Deserializer<'de>>(
+		deserializer: D,
+	) -> core::result::Result<Self, D::Error> {
+		struct ValueVisitor;
+
+		impl<'de> serde::de::Visitor<'de> for ValueVisitor {
+			type Value = Value;
+
+			fn expecting(
+				&self,
+				formatter: &mut core::fmt::Formatter<'_>,
+			) -> core::fmt::Result {
+				formatter.write_str("a JSON-like value")
+			}
+
+			fn visit_unit<E: serde::de::Error>(
+				self,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Null)
+			}
+
+			fn visit_none<E: serde::de::Error>(
+				self,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Null)
+			}
+
+			fn visit_bool<E: serde::de::Error>(
+				self,
+				v: bool,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Bool(v))
+			}
+
+			fn visit_i64<E: serde::de::Error>(
+				self,
+				v: i64,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Int(v))
+			}
+
+			fn visit_u64<E: serde::de::Error>(
+				self,
+				v: u64,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Uint(v))
+			}
+
+			fn visit_f64<E: serde::de::Error>(
+				self,
+				v: f64,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Float(v))
+			}
+
+			fn visit_str<E: serde::de::Error>(
+				self,
+				v: &str,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::str(v))
+			}
+
+			fn visit_string<E: serde::de::Error>(
+				self,
+				v: String,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::str(v))
+			}
+
+			fn visit_bytes<E: serde::de::Error>(
+				self,
+				v: &[u8],
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Bytes(v.to_vec()))
+			}
+
+			fn visit_byte_buf<E: serde::de::Error>(
+				self,
+				v: Vec<u8>,
+			) -> core::result::Result<Value, E> {
+				Ok(Value::Bytes(v))
+			}
+
+			fn visit_seq<A: serde::de::SeqAccess<'de>>(
+				self,
+				mut seq: A,
+			) -> core::result::Result<Value, A::Error> {
+				let mut list = Vec::new();
+				while let Some(elem) = seq.next_element()? {
+					list.push(elem);
+				}
+				Ok(Value::List(list))
+			}
+
+			fn visit_map<A: serde::de::MapAccess<'de>>(
+				self,
+				mut map: A,
+			) -> core::result::Result<Value, A::Error> {
+				let mut result = Map::default();
+				while let Some((key, value)) =
+					map.next_entry::<SmolStr, Value>()?
+				{
+					result.insert(key, value);
+				}
+				Ok(Value::Map(result))
+			}
+		}
+
+		deserializer.deserialize_any(ValueVisitor)
 	}
 }
 
@@ -432,16 +610,20 @@ impl From<f32> for Value {
 	fn from(value: f32) -> Self { Value::Float(value as f64) }
 }
 
+impl From<SmolStr> for Value {
+	fn from(value: SmolStr) -> Self { Value::Str(value) }
+}
+
 impl From<String> for Value {
-	fn from(value: String) -> Self { Value::Str(value) }
+	fn from(value: String) -> Self { Value::str(value) }
 }
 
 impl From<&str> for Value {
-	fn from(value: &str) -> Self { Value::Str(value.to_string()) }
+	fn from(value: &str) -> Self { Value::str(value) }
 }
 
 impl<'a> From<Cow<'a, str>> for Value {
-	fn from(value: Cow<'a, str>) -> Self { Value::Str(value.into_owned()) }
+	fn from(value: Cow<'a, str>) -> Self { Value::str(value.as_ref()) }
 }
 
 impl From<Vec<u8>> for Value {
@@ -450,6 +632,10 @@ impl From<Vec<u8>> for Value {
 
 impl From<&[u8]> for Value {
 	fn from(value: &[u8]) -> Self { Value::Bytes(value.to_vec()) }
+}
+
+impl From<Vec<Value>> for Value {
+	fn from(value: Vec<Value>) -> Self { Value::List(value) }
 }
 
 impl<T: Into<Value>> From<Option<T>> for Value {
@@ -466,11 +652,23 @@ impl<V: Into<Value>> From<HashMap<String, V>> for Value {
 		Self::Map(
 			value
 				.into_iter()
+				.map(|(key, val)| (SmolStr::from(key), val.into()))
+				.collect(),
+		)
+	}
+}
+
+impl<V: Into<Value>> From<HashMap<SmolStr, V>> for Value {
+	fn from(value: HashMap<SmolStr, V>) -> Self {
+		Self::Map(
+			value
+				.into_iter()
 				.map(|(key, val)| (key, val.into()))
 				.collect(),
 		)
 	}
 }
+
 // ── val! macro ──────────────────────────────────────────────────────
 
 /// Creates a [`Value`] from a literal expression.
@@ -511,7 +709,10 @@ macro_rules! val {
 		{
 			let mut map = $crate::prelude::HashMap::default();
 			$(
-				map.insert($key.to_string(), $crate::val!($value));
+				map.insert(
+					$crate::prelude::SmolStr::from($key),
+					$crate::val!($value),
+				);
 			)*
 			$crate::prelude::Value::Map(map)
 		}
@@ -581,7 +782,7 @@ mod test {
 	#[test]
 	fn value_is_methods() {
 		Value::Null.is_null().xpect_true();
-		Value::Map(HashMap::default()).is_map().xpect_true();
+		Value::Map(Map::default()).is_map().xpect_true();
 		Value::List(Vec::new()).is_list().xpect_true();
 	}
 
@@ -747,7 +948,7 @@ mod test {
 
 	#[test]
 	fn from_hashmap_impl() {
-		let mut input = HashMap::default();
+		let mut input: HashMap<String, i64> = HashMap::default();
 		input.insert("key".to_string(), 42i64);
 		let value = Value::from(input);
 		value.is_map().xpect_true();

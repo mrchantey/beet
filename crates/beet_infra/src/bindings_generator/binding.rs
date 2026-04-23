@@ -62,39 +62,39 @@ pub struct TerraformSchemaExport {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Schema {
+struct Schema {
 	provider: Provider,
 	data_source_schemas: Option<BTreeMap<String, SchemaItem>>,
 	resource_schemas: Option<BTreeMap<String, SchemaItem>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Provider {
+struct Provider {
 	version: i64,
 	block: Block,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct SchemaItem {
+struct SchemaItem {
 	version: i64,
 	block: Block,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Block {
+struct Block {
 	attributes: Option<BTreeMap<String, Attribute>>,
 	block_types: Option<BTreeMap<String, NestedBlock>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
-pub enum StringKind {
+enum StringKind {
 	Plain,
 	Markdown,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Attribute {
+struct Attribute {
 	r#type: Option<AttributeType>,
 	description: Option<String>,
 	required: Option<bool>,
@@ -108,7 +108,7 @@ pub struct Attribute {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct NestedBlock {
+struct NestedBlock {
 	block: Block,
 	nesting_mode: Option<String>,
 	min_items: Option<u8>,

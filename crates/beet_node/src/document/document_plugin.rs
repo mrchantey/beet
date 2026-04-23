@@ -104,7 +104,7 @@ mod test {
 
 		// Initial value
 		let (value, _) = &world.query_once::<(&Value, &FieldRef)>()[0];
-		(*value).clone().xpect_eq(Value::Str("0".into()));
+		(*value).clone().xpect_eq(Value::Int(0));
 
 		// Update the document
 		world.entity_mut(card).get_mut::<Document>().unwrap().0 =
@@ -114,7 +114,7 @@ mod test {
 
 		// Value should be updated
 		let (value, _) = &world.query_once::<(&Value, &FieldRef)>()[0];
-		(*value).clone().xpect_eq(Value::Str("42".into()));
+		(*value).clone().xpect_eq(Value::Int(42));
 	}
 
 	#[test]

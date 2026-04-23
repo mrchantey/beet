@@ -101,7 +101,9 @@ pub(super) fn update_text_fields(
 		for field in doc_fields.iter() {
 			if let Ok((field_ref, mut text)) = text_fields.get_mut(field) {
 				let field = doc.get_field_ref(&field_ref.field_path)?;
-				*text = Value::Str(field.to_string());
+				// why is this cohersing into text?
+				// *text = Value::str(field.to_string());
+				*text = field.clone();
 			}
 		}
 	}
@@ -271,7 +273,7 @@ mod test {
 			.iter()
 			.map(|(val, _)| (*val).clone())
 			.collect();
-		synced[0].xpect_eq(Value::Str("null".into()));
+		synced[0].xpect_eq(Value::Null);
 	}
 
 	#[test]
@@ -291,7 +293,7 @@ mod test {
 			.iter()
 			.map(|(val, _)| (*val).clone())
 			.collect();
-		synced[0].xpect_eq(Value::Str("[1, 2, 3]".into()));
+		synced[0].xpect_eq(Value::new_list([1, 2, 3]));
 	}
 
 	#[test]
@@ -311,6 +313,6 @@ mod test {
 			.iter()
 			.map(|(val, _)| (*val).clone())
 			.collect();
-		synced[0].xpect_eq(Value::Str("true".into()));
+		synced[0].xpect_eq(Value::Bool(true));
 	}
 }

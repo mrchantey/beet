@@ -435,12 +435,14 @@ pub fn tool_to_completions_tool(tool: &ToolDefinition) -> ChatCompletionTools {
 	match tool {
 		ToolDefinition::Function(func) => {
 			let mut params = func.params_schema().clone();
-			schema_ext::sanitize_schema_for_strict_mode(&mut params);
+			params.sanitize_for_strict_mode();
+			let json_params: serde_json::Value =
+				params.into_inner().into_json();
 			ChatCompletionTools::Function(ChatCompletionTool {
 				function: FunctionObject {
 					name: func.path().to_string(),
 					description: Some(func.description().to_string()),
-					parameters: Some(params),
+					parameters: Some(json_params),
 					strict: Some(true),
 				},
 			})

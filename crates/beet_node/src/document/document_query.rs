@@ -140,13 +140,11 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field_ref(&[FieldSegment::ObjectKey(
-						"value".to_string(),
-					)])
-					.unwrap()
-					.as_i64()
-					.unwrap()
-					.xpect_eq(42);
+					doc.get_field_ref(&[FieldSegment::key("value")])
+						.unwrap()
+						.as_i64()
+						.unwrap()
+						.xpect_eq(42);
 				},
 				entity,
 			)
@@ -159,9 +157,7 @@ mod test {
 					let mut doc =
 						query.get_mut(entity, &DocumentPath::Ancestor).unwrap();
 					let val = doc
-						.get_field_mut(&[FieldSegment::ObjectKey(
-							"value".to_string(),
-						)])
+						.get_field_mut(&[FieldSegment::key("value")])
 						.unwrap();
 					*val = Value::Int(100);
 				},
@@ -175,11 +171,9 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<i64>(&[FieldSegment::ObjectKey(
-						"value".to_string(),
-					)])
-					.unwrap()
-					.xpect_eq(100);
+					doc.get_field::<i64>(&[FieldSegment::key("value")])
+						.unwrap()
+						.xpect_eq(100);
 				},
 				entity,
 			)
@@ -215,11 +209,9 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<i64>(&[FieldSegment::ObjectKey(
-						"count".to_string(),
-					)])
-					.unwrap()
-					.xpect_eq(6);
+					doc.get_field::<i64>(&[FieldSegment::key("count")])
+						.unwrap()
+						.xpect_eq(6);
 				},
 				entity,
 			)
@@ -239,7 +231,7 @@ mod test {
 				 mut query: DocumentQuery| {
 					query
 						.with_field(entity, &field, |value| {
-							*value = Value::Str("created".to_string());
+							*value = Value::Str("created".into());
 						})
 						.unwrap();
 				},
@@ -252,11 +244,9 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<String>(&[FieldSegment::ObjectKey(
-						"new_field".to_string(),
-					)])
-					.unwrap()
-					.xpect_eq("created");
+					doc.get_field::<String>(&[FieldSegment::key("new_field")])
+						.unwrap()
+						.xpect_eq("created");
 				},
 				entity,
 			)
@@ -279,11 +269,9 @@ mod test {
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc =
 						query.get(entity, &DocumentPath::Ancestor).unwrap();
-					doc.get_field::<String>(&[FieldSegment::ObjectKey(
-						"card_data".to_string(),
-					)])
-					.unwrap()
-					.xpect_eq("test");
+					doc.get_field::<String>(&[FieldSegment::key("card_data")])
+						.unwrap()
+						.xpect_eq("test");
 				},
 				child,
 			)
@@ -302,11 +290,9 @@ mod test {
 			.run_system_cached_with(
 				|In(entity): In<Entity>, mut query: DocumentQuery| {
 					let doc = query.get(entity, &DocumentPath::Root).unwrap();
-					doc.get_field::<String>(&[FieldSegment::ObjectKey(
-						"root_data".to_string(),
-					)])
-					.unwrap()
-					.xpect_eq("root_test");
+					doc.get_field::<String>(&[FieldSegment::key("root_data")])
+						.unwrap()
+						.xpect_eq("root_test");
 				},
 				child,
 			)

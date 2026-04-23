@@ -26,12 +26,11 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 		return Ok(Value::Bool(*val));
 	}
 	if let Some(val) = reflect.try_downcast_ref::<String>() {
-		return Ok(Value::Str(val.clone()));
+		return Ok(Value::str(val));
 	}
 	if let Some(val) = reflect.try_downcast_ref::<&str>() {
-		return Ok(Value::Str((*val).to_string()));
+		return Ok(Value::str(*val));
 	}
-
 
 	// Unsigned integers
 	if let Some(val) = reflect.try_downcast_ref::<u8>() {
@@ -52,7 +51,6 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 	if let Some(val) = reflect.try_downcast_ref::<usize>() {
 		return Ok(Value::Uint(*val as u64));
 	}
-
 
 	// Signed integers
 	if let Some(val) = reflect.try_downcast_ref::<i8>() {
@@ -90,7 +88,7 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 	// Handle complex types via reflection
 	match reflect.reflect_ref() {
 		ReflectRef::Struct(s) => {
-			let mut map = HashMap::default();
+			let mut map = Map::default();
 			for idx in 0..s.field_len() {
 				let field_name = s.name_at(idx).ok_or_else(|| {
 					bevyhow!("struct field at index {} has no name", idx)
@@ -98,10 +96,7 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 				let field_value = s.field_at(idx).ok_or_else(|| {
 					bevyhow!("struct field at index {} not found", idx)
 				})?;
-				map.insert(
-					field_name.to_string(),
-					reflect_to_value(field_value)?,
-				);
+				map.insert(field_name.into(), reflect_to_value(field_value)?);
 			}
 			Ok(Value::Map(map))
 		}
@@ -157,13 +152,14 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 			Ok(Value::List(list))
 		}
 		ReflectRef::Map(m) => {
-			let mut map = HashMap::default();
+			let mut map = Map::default();
 			for (key, value) in m.iter() {
 				let key_str = key
 					.try_downcast_ref::<String>()
-					.map(|s| s.clone())
+					.map(|s| SmolStr::from(s.as_str()))
 					.or_else(|| {
-						key.try_downcast_ref::<&str>().map(|s| s.to_string())
+						key.try_downcast_ref::<&str>()
+							.map(|s| SmolStr::from(*s))
 					})
 					.ok_or_else(|| bevyhow!("map key must be a string"))?;
 				map.insert(key_str, reflect_to_value(value)?);
@@ -202,7 +198,7 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 
 			match e.variant_type() {
 				bevy::reflect::VariantType::Unit => {
-					Ok(Value::Str(variant_name.to_string()))
+					Ok(Value::str(variant_name))
 				}
 				bevy::reflect::VariantType::Tuple => {
 					let mut fields = Vec::with_capacity(e.field_len());
@@ -215,13 +211,12 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 						})?;
 						fields.push(reflect_to_value(field)?);
 					}
-					let mut variant_map = HashMap::default();
-					variant_map
-						.insert(variant_name.to_string(), Value::List(fields));
+					let mut variant_map = Map::default();
+					variant_map.insert(variant_name.into(), fields.into());
 					Ok(Value::Map(variant_map))
 				}
 				bevy::reflect::VariantType::Struct => {
-					let mut fields = HashMap::default();
+					let mut fields = Map::default();
 					for idx in 0..e.field_len() {
 						let field_name = e.name_at(idx).ok_or_else(|| {
 							bevyhow!(
@@ -236,13 +231,12 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 							)
 						})?;
 						fields.insert(
-							field_name.to_string(),
+							field_name.into(),
 							reflect_to_value(field)?,
 						);
 					}
-					let mut variant_map = HashMap::default();
-					variant_map
-						.insert(variant_name.to_string(), Value::Map(fields));
+					let mut variant_map = Map::default();
+					variant_map.insert(variant_name.into(), fields.into());
 					Ok(Value::Map(variant_map))
 				}
 			}
@@ -271,6 +265,7 @@ where
 		bevyhow!("failed to convert Value to {}", type_info.type_path())
 	})
 }
+
 /// Build a dynamic reflected value from a [`Value`] and type info.
 pub fn value_to_dynamic(
 	value: &Value,
@@ -458,15 +453,24 @@ fn build_dynamic_map(
 
 	let mut dynamic = bevy::reflect::DynamicMap::default();
 	let value_type_info = info.value_info();
+	let key_type_id = info.key_ty().id();
 
 	for (key, val) in map {
 		if let Some(built) = build_field_value(
 			Some(val),
-			key,
+			key.as_str(),
 			info.value_ty().id(),
 			value_type_info,
 		)? {
-			dynamic.insert_boxed(Box::new(key.clone()), built);
+			// Insert key as String if the map's key type is String,
+			// otherwise insert as SmolStr.
+			let key_box: Box<dyn PartialReflect> =
+				if key_type_id == TypeId::of::<String>() {
+					Box::new(key.as_str().to_string())
+				} else {
+					Box::new(key.clone())
+				};
+			dynamic.insert_boxed(key_box, built);
 		}
 	}
 
@@ -522,8 +526,10 @@ fn build_dynamic_enum(
 		Value::Str(variant_name) => {
 			// Unit variant
 			let mut dynamic = bevy::reflect::DynamicEnum::default();
-			dynamic
-				.set_variant(variant_name, bevy::reflect::DynamicVariant::Unit);
+			dynamic.set_variant(
+				variant_name.as_str(),
+				bevy::reflect::DynamicVariant::Unit,
+			);
 			Ok(Box::new(dynamic))
 		}
 		Value::Map(map) => {
@@ -537,16 +543,17 @@ fn build_dynamic_enum(
 
 			let (variant_name, fields) = map.iter().next().unwrap();
 
-			let variant_info = info.variant(variant_name).ok_or_else(|| {
-				bevyhow!("unknown enum variant: {}", variant_name)
-			})?;
+			let variant_info =
+				info.variant(variant_name.as_str()).ok_or_else(|| {
+					bevyhow!("unknown enum variant: {}", variant_name)
+				})?;
 
 			let mut dynamic = bevy::reflect::DynamicEnum::default();
 
 			match variant_info {
 				bevy::reflect::VariantInfo::Unit(_) => {
 					dynamic.set_variant(
-						variant_name,
+						variant_name.as_str(),
 						bevy::reflect::DynamicVariant::Unit,
 					);
 				}
@@ -566,7 +573,7 @@ fn build_dynamic_enum(
 						}
 					}
 					dynamic.set_variant(
-						variant_name,
+						variant_name.as_str(),
 						bevy::reflect::DynamicVariant::Tuple(tuple),
 					);
 				}
@@ -588,7 +595,7 @@ fn build_dynamic_enum(
 						}
 					}
 					dynamic.set_variant(
-						variant_name,
+						variant_name.as_str(),
 						bevy::reflect::DynamicVariant::Struct(struct_variant),
 					);
 				}
@@ -757,62 +764,57 @@ fn build_field_value(
 	)
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
-
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
 	#[reflect(Default)]
 	struct SimpleStruct {
 		name: String,
-		count: i64,
+		count: u32,
 		active: bool,
 	}
 
 	#[test]
 	fn from_reflect_simple_struct() {
-		let original = SimpleStruct {
-			name: "test".into(),
+		let s = SimpleStruct {
+			name: "hello".to_string(),
 			count: 42,
 			active: true,
 		};
-
-		let value = Value::from_reflect(&original).unwrap();
-
+		let value = reflect_to_value(&s).unwrap();
 		let map = value.as_map().unwrap();
-		map.get("name").unwrap().as_str().unwrap().xpect_eq("test");
-		map.get("count").unwrap().as_i64().unwrap().xpect_eq(42);
+		map.get("name").unwrap().as_str().unwrap().xpect_eq("hello");
+		map.get("count").unwrap().as_u64().unwrap().xpect_eq(42u64);
 		map.get("active").unwrap().as_bool().unwrap().xpect_true();
 	}
 
 	#[test]
 	fn into_reflect_simple_struct() {
-		let value = val!({
-			"name": "test",
-			"count": 42i64,
-			"active": true
-		});
-
-		let result: SimpleStruct = value.into_reflect().unwrap();
-		result.name.xpect_eq("test");
-		result.count.xpect_eq(42);
-		result.active.xpect_true();
+		let mut map = Map::default();
+		map.insert("name".into(), Value::Str("world".into()));
+		map.insert("count".into(), Value::Uint(7));
+		map.insert("active".into(), Value::Bool(false));
+		let value = Value::Map(map);
+		let s: SimpleStruct = value_to_type(&value).unwrap();
+		s.name.xpect_eq("world");
+		s.count.xpect_eq(7u32);
+		s.active.xpect_false();
 	}
 
 	#[test]
 	fn roundtrip_simple_struct() {
 		let original = SimpleStruct {
-			name: "roundtrip".into(),
-			count: 100,
-			active: false,
+			name: "roundtrip".to_string(),
+			count: 99,
+			active: true,
 		};
-
-		let value = Value::from_reflect(&original).unwrap();
-		let result: SimpleStruct = value.into_reflect().unwrap();
-
-		result.xpect_eq(original);
+		let value = reflect_to_value(&original).unwrap();
+		let result: SimpleStruct = value_to_type(&value).unwrap();
+		result.name.xpect_eq("roundtrip");
+		result.count.xpect_eq(99u32);
+		result.active.xpect_true();
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
@@ -826,35 +828,36 @@ mod tests {
 	fn roundtrip_nested_struct() {
 		let original = NestedStruct {
 			inner: SimpleStruct {
-				name: "inner".into(),
-				count: 5,
-				active: true,
+				name: "inner".to_string(),
+				count: 1,
+				active: false,
 			},
-			label: "outer".into(),
+			label: "outer".to_string(),
 		};
-
-		let value = Value::from_reflect(&original).unwrap();
-		let result: NestedStruct = value.into_reflect().unwrap();
-
-		result.xpect_eq(original);
+		let value = reflect_to_value(&original).unwrap();
+		let result: NestedStruct = value_to_type(&value).unwrap();
+		result.label.xpect_eq("outer");
+		result.inner.name.xpect_eq("inner");
+		result.inner.count.xpect_eq(1u32);
+		result.inner.active.xpect_false();
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
 	#[reflect(Default)]
 	struct WithVec {
-		items: Vec<i64>,
+		items: Vec<String>,
 	}
 
 	#[test]
 	fn roundtrip_with_vec() {
 		let original = WithVec {
-			items: vec![1, 2, 3],
+			items: vec!["a".to_string(), "b".to_string()],
 		};
-
-		let value = Value::from_reflect(&original).unwrap();
-		let result: WithVec = value.into_reflect().unwrap();
-
-		result.xpect_eq(original);
+		let value = reflect_to_value(&original).unwrap();
+		let result: WithVec = value_to_type(&value).unwrap();
+		result.items.len().xpect_eq(2);
+		result.items[0].xpect_eq("a");
+		result.items[1].xpect_eq("b");
 	}
 
 	#[derive(Debug, Reflect, Default, PartialEq)]
@@ -866,22 +869,18 @@ mod tests {
 	#[test]
 	fn roundtrip_option_some() {
 		let original = WithOption {
-			maybe: Some("present".into()),
+			maybe: Some("yes".to_string()),
 		};
-
-		let value = Value::from_reflect(&original).unwrap();
-		let result: WithOption = value.into_reflect().unwrap();
-
-		result.xpect_eq(original);
+		let value = reflect_to_value(&original).unwrap();
+		let result: WithOption = value_to_type(&value).unwrap();
+		result.maybe.unwrap().xpect_eq("yes");
 	}
 
 	#[test]
 	fn roundtrip_option_none() {
 		let original = WithOption { maybe: None };
-
-		let value = Value::from_reflect(&original).unwrap();
-		let result: WithOption = value.into_reflect().unwrap();
-
-		result.xpect_eq(original);
+		let value = reflect_to_value(&original).unwrap();
+		let result: WithOption = value_to_type(&value).unwrap();
+		result.maybe.xpect_none();
 	}
 }

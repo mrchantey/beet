@@ -84,7 +84,7 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 				dynamic.insert(&key, val);
 			}
 			Value::Str(val) => {
-				dynamic.insert(&key, val);
+				dynamic.insert(&key, val.to_string());
 			}
 			Value::Bytes(val) => {
 				dynamic.insert(&key, val);
@@ -155,7 +155,7 @@ fn parse_yaml_value(raw: &str) -> Value {
 
 	// if it was quoted, treat as string
 	if unquoted.len() != effective.len() {
-		return Value::Str(unquoted.to_string());
+		return Value::str(unquoted);
 	}
 
 	// try parsing as typed value
@@ -226,7 +226,7 @@ fn parse_toml_value(raw: &str) -> Value {
 	// quoted strings
 	let unquoted = strip_quotes(effective);
 	if unquoted.len() != effective.len() {
-		return Value::Str(unquoted.to_string());
+		return Value::str(unquoted);
 	}
 
 	// try numeric parsing

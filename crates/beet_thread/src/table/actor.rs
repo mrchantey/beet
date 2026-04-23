@@ -4,15 +4,7 @@ use beet_core::prelude::*;
 pub type ActorId = Uuid7<Actor>;
 
 #[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	Hash,
-	Serialize,
-	Deserialize,
-	Reflect,
-	Component,
+	Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Reflect, Component,
 )]
 #[reflect(Serialize, Deserialize, Component)]
 pub struct Actor {
@@ -21,7 +13,7 @@ pub struct Actor {
 	name: String,
 	kind: ActorKind,
 	/// Extensible key-value metadata.
-	metadata: JsonMap,
+	metadata: Map,
 }
 
 impl Table for Actor {
@@ -45,13 +37,16 @@ impl Actor {
 
 	pub fn name(&self) -> &str { &self.name }
 	pub fn kind(&self) -> ActorKind { self.kind }
-	pub fn metadata(&self) -> &serde_json::Map<String, serde_json::Value> {
-		&self.metadata
-	}
-	pub fn metadata_mut(
-		&mut self,
-	) -> &mut serde_json::Map<String, serde_json::Value> {
-		&mut self.metadata
+	pub fn metadata(&self) -> &Map { &self.metadata }
+	pub fn metadata_mut(&mut self) -> &mut Map { &mut self.metadata }
+}
+
+impl std::hash::Hash for Actor {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.id.hash(state);
+		self.name.hash(state);
+		self.kind.hash(state);
+		// metadata excluded: HashMap does not implement Hash
 	}
 }
 

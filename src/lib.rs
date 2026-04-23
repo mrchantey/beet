@@ -62,10 +62,9 @@ pub mod prelude {
 	pub use crate::node::prelude::Pointer;
 	#[cfg(feature = "node")]
 	pub use crate::node::prelude::*;
-	#[cfg(feature = "node")]
-	pub use crate::node::val;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
+	pub use beet_core::val;
 	// #[cfg(feature = "build")]
 	// pub use crate::build::prelude::*;
 	#[cfg(feature = "thread")]

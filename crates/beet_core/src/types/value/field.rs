@@ -29,9 +29,14 @@ pub enum FieldSegment {
 	/// Access an array element by index.
 	ArrayIndex(usize),
 	/// Access an object field by key.
-	ObjectKey(String),
+	ObjectKey(SmolStr),
 }
-
+impl FieldSegment {
+	/// Create a field segment for an object key.
+	pub fn key(key: impl Into<SmolStr>) -> Self { Self::ObjectKey(key.into()) }
+	/// Create a field segment for an array index.
+	pub fn index(index: usize) -> Self { Self::ArrayIndex(index) }
+}
 
 /// Convert various types into a field path vector for document navigation.
 pub trait IntoFieldPath {
@@ -44,7 +49,7 @@ impl IntoFieldPath for Vec<FieldSegment> {
 impl IntoFieldPath for Vec<String> {
 	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
-			.map(FieldSegment::ObjectKey)
+			.map(FieldSegment::key)
 			.collect::<Vec<_>>()
 			.into()
 	}
@@ -52,7 +57,7 @@ impl IntoFieldPath for Vec<String> {
 impl IntoFieldPath for Vec<&str> {
 	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
-			.map(|s| FieldSegment::ObjectKey(s.to_string()))
+			.map(FieldSegment::key)
 			.collect::<Vec<_>>()
 			.into()
 	}
@@ -72,12 +77,12 @@ impl IntoFieldPath for &[FieldSegment] {
 }
 impl IntoFieldPath for &str {
 	fn into_field_path(self) -> FieldPath {
-		vec![FieldSegment::ObjectKey(self.to_string())].into()
+		vec![FieldSegment::key(self)].into()
 	}
 }
 impl IntoFieldPath for String {
 	fn into_field_path(self) -> FieldPath {
-		vec![FieldSegment::ObjectKey(self)].into()
+		vec![FieldSegment::key(self)].into()
 	}
 }
 
@@ -91,22 +96,20 @@ mod test {
 	fn field_path_conversion() {
 		let string_vec =
 			vec!["a".to_string(), "b".to_string()].into_field_path();
-		string_vec.0.xpect_eq(vec![
-			FieldSegment::ObjectKey("a".to_string()),
-			FieldSegment::ObjectKey("b".to_string()),
-		]);
+		string_vec
+			.0
+			.xpect_eq(vec![FieldSegment::key("a"), FieldSegment::key("b")]);
 
 		let str_vec = vec!["x", "y"].into_field_path();
-		str_vec.0.xpect_eq(vec![
-			FieldSegment::ObjectKey("x".to_string()),
-			FieldSegment::ObjectKey("y".to_string()),
-		]);
+		str_vec
+			.0
+			.xpect_eq(vec![FieldSegment::key("x"), FieldSegment::key("y")]);
 
 		let index_vec = vec![0, 1, 2].into_field_path();
 		index_vec.0.xpect_eq(vec![
-			FieldSegment::ArrayIndex(0),
-			FieldSegment::ArrayIndex(1),
-			FieldSegment::ArrayIndex(2),
+			FieldSegment::index(0),
+			FieldSegment::index(1),
+			FieldSegment::index(2),
 		]);
 	}
 }

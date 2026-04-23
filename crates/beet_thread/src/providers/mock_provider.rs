@@ -51,16 +51,18 @@ impl MockPostStreamer {
 	}
 
 	/// Generates default arguments for a tool based on its parameter schema.
-	fn generate_default_arguments(parameters: &serde_json::Value) -> String {
+	fn generate_default_arguments(schema: &Schema) -> String {
+		// Convert to serde_json::Value for traversal and serialization
+		let json_schema = schema.clone().into_inner().into_json();
 		let Some(properties) =
-			parameters.get("properties").and_then(|p| p.as_object())
+			json_schema.get("properties").and_then(|p| p.as_object())
 		else {
 			return "{}".to_string();
 		};
 
 		let mut args = serde_json::Map::new();
-		for (name, schema) in properties {
-			let default_value = Self::default_value_for_schema(schema);
+		for (name, field_schema) in properties {
+			let default_value = Self::default_value_for_schema(field_schema);
 			args.insert(name.clone(), default_value);
 		}
 		serde_json::to_string(&serde_json::Value::Object(args))
@@ -107,7 +109,7 @@ impl PostStreamer for MockPostStreamer {
 						ActorId,
 						ThreadId,
 						String,
-						Option<(String, serde_json::Value)>,
+						Option<(String, Schema)>,
 					)> {
 						let thread = query.thread(actor_entity)?;
 						let agent = thread.actor(actor_entity)?;

@@ -1,15 +1,11 @@
-//! Convert Bevy [`TypeInfo`] to JSON Schema.
-//!
-//! This module provides utilities for converting Bevy's reflection type information
-//! into standard JSON Schema format, useful for API documentation, tool definitions,
-//! and schema validation.
+//! JSON Schema generation from Bevy [`TypeInfo`].
 //!
 //! Nested struct and enum types are recursively resolved and placed in a `$defs`
 //! section at the root, referenced via `$ref`.
 //!
 //! # Example
 //!
-//! ```
+//! ```rust
 //! use bevy::reflect::{Reflect, Typed};
 //! use beet_core::prelude::*;
 //!
@@ -21,9 +17,8 @@
 //! }
 //!
 //! // Returns a JSON Schema object with properties, required fields, etc.
-//! let schema = schema_ext::type_info_to_json_schema(MyRequest::type_info());
+//! let schema = Schema::new::<MyRequest>();
 //! ```
-
 use crate::prelude::*;
 use bevy::reflect::ArrayInfo;
 use bevy::reflect::EnumInfo;
@@ -37,42 +32,62 @@ use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::VariantInfo;
-use serde_json::Map;
-use serde_json::Value;
-use serde_json::json;
 
-/// Generates a JSON Schema [`Value`] for a given Bevy reflect type `T`,
-/// see [`type_info_to_json_schema`].
-pub fn json_schema<T: Typed>() -> Value {
-	type_info_to_json_schema(T::type_info())
+/// A JSON Schema represented as a [`Value`].
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Reflect)]
+#[reflect(opaque)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct Schema(Value);
+
+impl Schema {
+	/// Generate a schema for type `T`.
+	pub fn new<T: Typed>() -> Self { Self::from_type_info(T::type_info()) }
+
+	/// Generate a schema from [`TypeInfo`].
+	pub fn from_type_info(type_info: &TypeInfo) -> Self {
+		let mut ctx = SchemaCtx::new();
+		let mut schema = build_schema(type_info, &mut ctx);
+		if !ctx.defs.is_empty() {
+			if let Ok(map) = schema.as_map_mut() {
+				map.insert("$defs".into(), Value::Map(ctx.defs));
+			}
+		}
+		Self(schema)
+	}
+
+	/// Wraps an existing [`Value`] as a schema.
+	pub fn from_value(value: Value) -> Self { Self(value) }
+
+	/// Returns the inner [`Value`].
+	pub fn into_inner(self) -> Value { self.0 }
+
+	/// Sanitizes this schema for OpenAI strict mode in place.
+	///
+	/// - Adds `"additionalProperties": false` to all object schemas
+	/// - Converts `oneOf` to `anyOf`
+	/// - Ensures all properties are in `required`
+	pub fn sanitize_for_strict_mode(&mut self) -> &mut Self {
+		sanitize_value_for_strict_mode(&mut self.0);
+		self
+	}
 }
 
-/// Sanitizes a JSON schema for OpenAI strict mode compliance.
-///
-/// Recursively applies the following transformations:
-/// - Adds `"additionalProperties": false` to all object schemas
-/// - Converts `oneOf` to `anyOf` (OpenAI strict mode forbids `oneOf`)
-/// - Ensures all properties are listed in `required`
-///
-/// Applied as a post-processing step so schema generators
-/// don't need to worry about provider-specific constraints.
-pub fn sanitize_schema_for_strict_mode(schema: &mut Value) {
-	let Some(obj) = schema.as_object_mut() else {
-		return;
-	};
+fn sanitize_value_for_strict_mode(value: &mut Value) {
+	let Value::Map(obj) = value else { return };
 
 	// recurse into nested schemas
 	for key in ["properties", "items", "prefixItems", "$defs"] {
 		if let Some(nested) = obj.get_mut(key) {
 			match nested {
-				Value::Object(map) => {
+				Value::Map(map) => {
 					for val in map.values_mut() {
-						sanitize_schema_for_strict_mode(val);
+						sanitize_value_for_strict_mode(val);
 					}
 				}
-				Value::Array(arr) => {
+				Value::List(arr) => {
 					for val in arr.iter_mut() {
-						sanitize_schema_for_strict_mode(val);
+						sanitize_value_for_strict_mode(val);
 					}
 				}
 				_ => {}
@@ -82,113 +97,63 @@ pub fn sanitize_schema_for_strict_mode(schema: &mut Value) {
 
 	// convert oneOf to anyOf (OpenAI strict mode forbids oneOf)
 	if let Some(one_of) = obj.remove("oneOf") {
-		obj.insert("anyOf".to_string(), one_of);
+		obj.insert("anyOf".into(), one_of);
 	}
 
 	// recurse into anyOf / allOf variants
 	for key in ["anyOf", "allOf"] {
-		if let Some(Value::Array(arr)) = obj.get_mut(key) {
+		if let Some(Value::List(arr)) = obj.get_mut(key) {
 			for val in arr.iter_mut() {
-				sanitize_schema_for_strict_mode(val);
+				sanitize_value_for_strict_mode(val);
 			}
 		}
 	}
 
 	// ensure all properties are required (OpenAI strict mode requirement)
-	if let Some(Value::Object(props)) = obj.get("properties") {
-		let all_keys: Vec<Value> = props
-			.keys()
-			.map(|key| Value::String(key.clone()))
-			.collect();
+	if let Some(Value::Map(props)) = obj.get("properties").cloned() {
+		let all_keys: Vec<Value> =
+			props.keys().map(|k| Value::Str(k.clone())).collect();
 		if !all_keys.is_empty() {
-			obj.insert("required".to_string(), Value::Array(all_keys));
+			obj.insert("required".into(), Value::List(all_keys));
 		}
 	}
 
-	// add additionalProperties: false to objects without it,
-	// skip maps (which use additionalProperties for value schemas)
+	// add additionalProperties: false to objects without it
 	if obj.get("type").and_then(|t| t.as_str()) == Some("object") {
 		if !obj.contains_key("additionalProperties") {
-			obj.insert(
-				"additionalProperties".to_string(),
-				Value::Bool(false),
-			);
+			obj.insert("additionalProperties".into(), Value::Bool(false));
 		}
 	}
-}
-
-
-/// Converts a Bevy [`TypeInfo`] to a JSON Schema [`Value`], including
-/// `$defs` for all referenced subtypes.
-///
-/// This function recursively resolves nested struct and enum types,
-/// placing their definitions in a `$defs` section at the root and
-/// using `$ref` to reference them from properties.
-///
-/// This function handles all Bevy reflect type variants:
-/// - Structs → `object` with `properties`
-/// - Enums → `oneOf` with variants (simple enums become string enums)
-/// - Tuples/TupleStructs → `array` with `prefixItems`
-/// - Lists/Arrays/Sets → `array` with `items`
-/// - Maps → `object` with `additionalProperties`
-/// - Opaque values → mapped to primitive JSON types
-///
-/// # Type Mapping
-///
-/// Rust types are mapped to JSON Schema types as follows:
-/// - `String`, `&str`, `char` → `string`
-/// - `i8`-`i128`, `isize` → `integer`
-/// - `u8`-`u128`, `usize` → `integer`
-/// - `f32`, `f64` → `number`
-/// - `bool` → `boolean`
-/// - `Vec<T>`, `[T; N]` → `array`
-/// - Other types → `object`
-///
-/// # Example
-///
-/// ```
-/// use bevy::reflect::{Reflect, Typed};
-/// use beet_core::prelude::*;
-///
-/// #[derive(Reflect)]
-/// enum Color { Red, Green, Blue }
-///
-/// #[derive(Reflect)]
-/// struct Painted {
-///     label: String,
-///     color: Color,
-/// }
-///
-/// let schema = schema_ext::type_info_to_json_schema(Painted::type_info());
-/// // The `color` property will be `{ "$ref": "#/$defs/Color" }` and
-/// // `$defs.Color` will contain the full enum schema.
-/// ```
-pub fn type_info_to_json_schema(type_info: &TypeInfo) -> Value {
-	let mut ctx = SchemaCtx::new();
-	let mut schema = build_schema(type_info, &mut ctx);
-
-	if !ctx.defs.is_empty() {
-		if let Some(obj) = schema.as_object_mut() {
-			obj.insert("$defs".to_string(), Value::Object(ctx.defs));
-		}
-	}
-
-	schema
 }
 
 /// Context that accumulates `$defs` entries while building a schema.
 struct SchemaCtx {
-	defs: Map<String, Value>,
-	visited: HashSet<String>,
+	defs: Map,
+	visited: HashSet<SmolStr>,
 }
 
 impl SchemaCtx {
 	fn new() -> Self {
 		Self {
-			defs: Map::new(),
-			visited: HashSet::new(),
+			defs: Map::default(),
+			visited: HashSet::default(),
 		}
 	}
+}
+
+/// Adds a type definition to `ctx.defs`.
+fn add_type_def(name: &str, schema: Value, ctx: &mut SchemaCtx) {
+	ctx.defs.insert(SmolStr::from(name), schema);
+}
+
+/// Builds a `{ "$ref": "#/$defs/<name>" }` value.
+fn make_ref(name: &str) -> Value {
+	let mut m = Map::default();
+	m.insert(
+		"$ref".into(),
+		Value::str(format!("#/$defs/{}", name)),
+	);
+	Value::Map(m)
 }
 
 /// Builds the inline schema for a [`TypeInfo`], adding nested type definitions
@@ -207,37 +172,24 @@ fn build_schema(type_info: &TypeInfo, ctx: &mut SchemaCtx) -> Value {
 	};
 
 	// Add type metadata
-	if let Some(obj) = schema.as_object_mut() {
+	if let Ok(map) = schema.as_map_mut() {
 		let type_path = type_info.type_path();
 		let short_name = type_info.type_path_table().short_path();
 
-		// Only add metadata if not a primitive type
 		if !is_primitive_type_path(type_path) {
-			obj.insert(
-				"title".to_string(),
-				Value::String(short_name.to_string()),
-			);
+			map.insert("title".into(), Value::str(short_name));
 		}
 
-		// Add docs if available and bevy_reflect_documentation feature is enabled
 		#[cfg(feature = "bevy_reflect_documentation")]
 		if let Some(docs) = type_info.docs() {
-			obj.insert(
-				"description".to_string(),
-				Value::String(docs.to_string()),
-			);
+			map.insert("description".into(), Value::str(docs));
 		}
 	}
 
 	schema
 }
 
-/// Resolves a field / item type to its schema.
-///
-/// When `type_info` is available (via [`NamedField::type_info`],
-/// [`ListInfo::item_info`], etc.), complex types are added to `$defs` and
-/// referenced via `$ref`. When unavailable, falls back to the string-based
-/// [`type_path_to_schema`].
+/// Resolves a field/item type to its schema, adding complex types to `$defs`.
 fn resolve_type(
 	type_info: Option<&TypeInfo>,
 	type_path: &str,
@@ -261,44 +213,58 @@ fn resolve_type(
 				list_info.item_ty().path(),
 				ctx,
 			);
-			json!({ "type": "array", "items": item_schema })
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("array".into()));
+			m.insert("items".into(), item_schema);
+			Value::Map(m)
 		}
+
 		TypeInfo::Array(arr_info) => {
 			let item_schema = resolve_type(
 				arr_info.item_info(),
 				arr_info.item_ty().path(),
 				ctx,
 			);
-			json!({
-				"type": "array",
-				"items": item_schema,
-				"minItems": arr_info.capacity(),
-				"maxItems": arr_info.capacity(),
-			})
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("array".into()));
+			m.insert("items".into(), item_schema);
+			m.insert(
+				"minItems".into(),
+				Value::Uint(arr_info.capacity() as u64),
+			);
+			m.insert(
+				"maxItems".into(),
+				Value::Uint(arr_info.capacity() as u64),
+			);
+			Value::Map(m)
 		}
+
 		TypeInfo::Map(map_info) => {
 			let value_schema = resolve_type(
 				map_info.value_info(),
 				map_info.value_ty().path(),
 				ctx,
 			);
-			json!({
-				"type": "object",
-				"additionalProperties": value_schema,
-			})
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("object".into()));
+			m.insert("additionalProperties".into(), value_schema);
+			Value::Map(m)
 		}
+
 		TypeInfo::Set(set_info) => {
-			// SetInfo doesn't expose value_info(); fall back to type path
 			let item_schema = type_path_to_schema(set_info.value_ty().path());
-			json!({
-				"type": "array",
-				"items": item_schema,
-				"uniqueItems": true,
-			})
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("array".into()));
+			m.insert("items".into(), item_schema);
+			m.insert("uniqueItems".into(), Value::Bool(true));
+			Value::Map(m)
 		}
+
 		TypeInfo::Tuple(tuple_info) => {
 			if tuple_info.field_len() == 0 {
-				return json!({ "type": "null" });
+				let mut m = Map::default();
+				m.insert("type".into(), Value::Str("null".into()));
+				return Value::Map(m);
 			}
 			let prefix_items: Vec<Value> = tuple_info
 				.iter()
@@ -306,12 +272,13 @@ fn resolve_type(
 					resolve_type(field.type_info(), field.type_path(), ctx)
 				})
 				.collect();
-			json!({
-				"type": "array",
-				"prefixItems": prefix_items,
-				"items": false,
-			})
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("array".into()));
+			m.insert("prefixItems".into(), Value::List(prefix_items));
+			m.insert("items".into(), Value::Bool(false));
+			Value::Map(m)
 		}
+
 		TypeInfo::TupleStruct(ts_info) => {
 			// Newtypes unwrap to their inner type
 			if ts_info.field_len() == 1 {
@@ -320,8 +287,15 @@ fn resolve_type(
 				return resolve_type(field.type_info(), field.type_path(), ctx);
 			}
 			// Multi-field tuple structs → $defs
-			add_type_def(info, ctx)
+			let short_name = info.type_path_table().short_path();
+			if !ctx.visited.contains(short_name) {
+				ctx.visited.insert(SmolStr::from(short_name));
+				let schema = build_schema(info, ctx);
+				add_type_def(short_name, schema, ctx);
+			}
+			make_ref(short_name)
 		}
+
 		TypeInfo::Enum(enum_info) => {
 			// Handle Option<T> specially
 			if is_option_type(type_path) {
@@ -334,73 +308,62 @@ fn resolve_type(
 							field.type_path(),
 							ctx,
 						);
-						return json!({
-							"oneOf": [
-								{ "type": "null" },
-								inner,
-							]
-						});
+						let mut null_m = Map::default();
+						null_m.insert("type".into(), Value::Str("null".into()));
+						let mut m = Map::default();
+						m.insert(
+							"oneOf".into(),
+							Value::List(vec![Value::Map(null_m), inner]),
+						);
+						return Value::Map(m);
 					}
 				}
 			}
 			// Other enums → $defs
-			add_type_def(info, ctx)
+			let short_name = info.type_path_table().short_path();
+			if !ctx.visited.contains(short_name) {
+				ctx.visited.insert(SmolStr::from(short_name));
+				let schema = build_schema(info, ctx);
+				add_type_def(short_name, schema, ctx);
+			}
+			make_ref(short_name)
 		}
-		TypeInfo::Struct(_) => add_type_def(info, ctx),
+
+		TypeInfo::Struct(_) => {
+			let short_name = info.type_path_table().short_path();
+			if !ctx.visited.contains(short_name) {
+				ctx.visited.insert(SmolStr::from(short_name));
+				let schema = build_schema(info, ctx);
+				add_type_def(short_name, schema, ctx);
+			}
+			make_ref(short_name)
+		}
 	}
-}
-
-/// Adds a complex type's definition to `$defs` (if not already visited)
-/// and returns a `{ "$ref": "#/$defs/<ShortName>" }`.
-fn add_type_def(type_info: &TypeInfo, ctx: &mut SchemaCtx) -> Value {
-	let type_path = type_info.type_path().to_string();
-	let short_name = type_info.type_path_table().short_path().to_string();
-
-	if !ctx.visited.contains(&type_path) {
-		ctx.visited.insert(type_path);
-		let schema = build_schema(type_info, ctx);
-		ctx.defs.insert(short_name.clone(), schema);
-	}
-
-	json!({ "$ref": format!("#/$defs/{}", short_name) })
-}
-
-/// Returns `true` if the type path represents an `Option` type.
-fn is_option_type(type_path: &str) -> bool {
-	type_path.starts_with("core::option::Option<")
-		|| type_path.starts_with("Option<")
 }
 
 /// Converts a struct's [`TypeInfo`] to JSON Schema.
 fn struct_to_schema(info: &StructInfo, ctx: &mut SchemaCtx) -> Value {
-	let mut properties = Map::new();
+	let mut properties = Map::default();
 	let mut required = Vec::new();
 
 	for field in info.iter() {
 		let field_schema = named_field_to_schema(field, ctx);
-		let field_name = field.name().to_string();
+		let field_name = field.name();
 
 		if is_required_field(field.type_path()) {
-			required.push(Value::String(field_name.clone()));
+			required.push(Value::str(field_name));
 		}
-
-		properties.insert(field_name, field_schema);
+		properties.insert(SmolStr::from(field_name), field_schema);
 	}
 
-	let mut schema = json!({
-		"type": "object",
-		"properties": properties,
-		"additionalProperties": false,
-	});
-
+	let mut schema = Map::default();
+	schema.insert("type".into(), Value::Str("object".into()));
+	schema.insert("properties".into(), Value::Map(properties));
+	schema.insert("additionalProperties".into(), Value::Bool(false));
 	if !required.is_empty() {
-		schema
-			.as_object_mut()
-			.unwrap()
-			.insert("required".to_string(), Value::Array(required));
+		schema.insert("required".into(), Value::List(required));
 	}
-
-	schema
+	Value::Map(schema)
 }
 
 /// Converts a tuple struct's [`TypeInfo`] to JSON Schema.
@@ -418,17 +381,19 @@ fn tuple_struct_to_schema(
 		.map(|field| resolve_type(field.type_info(), field.type_path(), ctx))
 		.collect();
 
-	json!({
-		"type": "array",
-		"prefixItems": prefix_items,
-		"items": false,
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("array".into()));
+	m.insert("prefixItems".into(), Value::List(prefix_items));
+	m.insert("items".into(), Value::Bool(false));
+	Value::Map(m)
 }
 
 /// Converts a tuple's [`TypeInfo`] to JSON Schema.
 fn tuple_to_schema(info: &TupleInfo, ctx: &mut SchemaCtx) -> Value {
 	if info.field_len() == 0 {
-		return json!({ "type": "null" });
+		let mut m = Map::default();
+		m.insert("type".into(), Value::Str("null".into()));
+		return Value::Map(m);
 	}
 
 	let prefix_items: Vec<Value> = info
@@ -436,58 +401,53 @@ fn tuple_to_schema(info: &TupleInfo, ctx: &mut SchemaCtx) -> Value {
 		.map(|field| resolve_type(field.type_info(), field.type_path(), ctx))
 		.collect();
 
-	json!({
-		"type": "array",
-		"prefixItems": prefix_items,
-		"items": false,
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("array".into()));
+	m.insert("prefixItems".into(), Value::List(prefix_items));
+	m.insert("items".into(), Value::Bool(false));
+	Value::Map(m)
 }
 
 /// Converts a list's [`TypeInfo`] to JSON Schema.
 fn list_to_schema(info: &ListInfo, ctx: &mut SchemaCtx) -> Value {
 	let item_schema =
 		resolve_type(info.item_info(), info.item_ty().path(), ctx);
-
-	json!({
-		"type": "array",
-		"items": item_schema,
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("array".into()));
+	m.insert("items".into(), item_schema);
+	Value::Map(m)
 }
 
 /// Converts an array's [`TypeInfo`] to JSON Schema.
 fn array_to_schema(info: &ArrayInfo, ctx: &mut SchemaCtx) -> Value {
 	let item_schema =
 		resolve_type(info.item_info(), info.item_ty().path(), ctx);
-
-	json!({
-		"type": "array",
-		"items": item_schema,
-		"minItems": info.capacity(),
-		"maxItems": info.capacity(),
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("array".into()));
+	m.insert("items".into(), item_schema);
+	m.insert("minItems".into(), Value::Uint(info.capacity() as u64));
+	m.insert("maxItems".into(), Value::Uint(info.capacity() as u64));
+	Value::Map(m)
 }
 
 /// Converts a map's [`TypeInfo`] to JSON Schema.
 fn map_to_schema(info: &MapInfo, ctx: &mut SchemaCtx) -> Value {
 	let value_schema =
 		resolve_type(info.value_info(), info.value_ty().path(), ctx);
-
-	json!({
-		"type": "object",
-		"additionalProperties": value_schema,
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("object".into()));
+	m.insert("additionalProperties".into(), value_schema);
+	Value::Map(m)
 }
 
 /// Converts a set's [`TypeInfo`] to JSON Schema.
 fn set_to_schema(info: &SetInfo, _ctx: &mut SchemaCtx) -> Value {
-	// SetInfo doesn't expose value_info(); fall back to type path
 	let item_schema = type_path_to_schema(info.value_ty().path());
-
-	json!({
-		"type": "array",
-		"items": item_schema,
-		"uniqueItems": true,
-	})
+	let mut m = Map::default();
+	m.insert("type".into(), Value::Str("array".into()));
+	m.insert("items".into(), item_schema);
+	m.insert("uniqueItems".into(), Value::Bool(true));
+	Value::Map(m)
 }
 
 /// Converts an enum's [`TypeInfo`] to JSON Schema.
@@ -499,30 +459,28 @@ fn enum_to_schema(info: &EnumInfo, ctx: &mut SchemaCtx) -> Value {
 	if is_simple {
 		let variants: Vec<Value> = info
 			.iter()
-			.map(|variant| Value::String(variant.name().to_string()))
+			.map(|v| Value::str(v.name()))
 			.collect();
-
-		return json!({
-			"type": "string",
-			"enum": variants,
-		});
+		let mut m = Map::default();
+		m.insert("type".into(), Value::Str("string".into()));
+		m.insert("enum".into(), Value::List(variants));
+		return Value::Map(m);
 	}
 
 	let one_of: Vec<Value> =
 		info.iter().map(|v| variant_to_schema(v, ctx)).collect();
-
-	json!({
-		"oneOf": one_of,
-	})
+	let mut m = Map::default();
+	m.insert("oneOf".into(), Value::List(one_of));
+	Value::Map(m)
 }
 
 /// Converts an enum variant to JSON Schema.
 fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 	match variant {
 		VariantInfo::Unit(info) => {
-			json!({
-				"const": info.name(),
-			})
+			let mut m = Map::default();
+			m.insert("const".into(), Value::str(info.name()));
+			Value::Map(m)
 		}
 		VariantInfo::Tuple(info) => {
 			if info.field_len() == 1 {
@@ -530,15 +488,19 @@ fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 					info.field_at(0).expect("tuple variant has 1 field");
 				let inner_schema =
 					resolve_type(field.type_info(), field.type_path(), ctx);
-				let mut props = Map::new();
-				props.insert(info.name().to_string(), inner_schema);
 
-				json!({
-					"type": "object",
-					"properties": props,
-					"required": [info.name()],
-					"additionalProperties": false,
-				})
+				let mut props = Map::default();
+				props.insert(SmolStr::from(info.name()), inner_schema);
+
+				let mut m = Map::default();
+				m.insert("type".into(), Value::Str("object".into()));
+				m.insert("properties".into(), Value::Map(props));
+				m.insert(
+					"required".into(),
+					Value::List(vec![Value::str(info.name())]),
+				);
+				m.insert("additionalProperties".into(), Value::Bool(false));
+				Value::Map(m)
 			} else {
 				let prefix_items: Vec<Value> = info
 					.iter()
@@ -547,66 +509,65 @@ fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 					})
 					.collect();
 
-				let inner_schema = json!({
-					"type": "array",
-					"prefixItems": prefix_items,
-					"items": false,
-				});
+				let mut inner = Map::default();
+				inner.insert("type".into(), Value::Str("array".into()));
+				inner.insert("prefixItems".into(), Value::List(prefix_items));
+				inner.insert("items".into(), Value::Bool(false));
 
-				let mut props = Map::new();
-				props.insert(info.name().to_string(), inner_schema);
+				let mut props = Map::default();
+				props.insert(SmolStr::from(info.name()), Value::Map(inner));
 
-				json!({
-					"type": "object",
-					"properties": props,
-					"required": [info.name()],
-					"additionalProperties": false,
-				})
+				let mut m = Map::default();
+				m.insert("type".into(), Value::Str("object".into()));
+				m.insert("properties".into(), Value::Map(props));
+				m.insert(
+					"required".into(),
+					Value::List(vec![Value::str(info.name())]),
+				);
+				m.insert("additionalProperties".into(), Value::Bool(false));
+				Value::Map(m)
 			}
 		}
 		VariantInfo::Struct(info) => {
-			let mut properties = Map::new();
+			let mut properties = Map::default();
 			let mut required = Vec::new();
 
 			for field in info.iter() {
-				let field_name = field.name().to_string();
+				let field_name = field.name();
 				let field_schema =
 					resolve_type(field.type_info(), field.type_path(), ctx);
 
 				if is_required_field(field.type_path()) {
-					required.push(Value::String(field_name.clone()));
+					required.push(Value::str(field_name));
 				}
-
-				properties.insert(field_name, field_schema);
+				properties.insert(SmolStr::from(field_name), field_schema);
 			}
 
-			let mut inner_schema = json!({
-				"type": "object",
-				"properties": properties,
-				"additionalProperties": false,
-			});
-
+			let mut inner = Map::default();
+			inner.insert("type".into(), Value::Str("object".into()));
+			inner.insert("properties".into(), Value::Map(properties));
+			inner.insert("additionalProperties".into(), Value::Bool(false));
 			if !required.is_empty() {
-				inner_schema
-					.as_object_mut()
-					.unwrap()
-					.insert("required".to_string(), Value::Array(required));
+				inner.insert("required".into(), Value::List(required));
 			}
 
-			let mut props = Map::new();
-			props.insert(info.name().to_string(), inner_schema);
+			let mut props = Map::default();
+			props.insert(SmolStr::from(info.name()), Value::Map(inner));
 
-			json!({
-				"type": "object",
-				"properties": props,
-				"required": [info.name()],
-				"additionalProperties": false,
-			})
+			let mut m = Map::default();
+			m.insert("type".into(), Value::Str("object".into()));
+			m.insert("properties".into(), Value::Map(props));
+			m.insert(
+				"required".into(),
+				Value::List(vec![Value::str(info.name())]),
+			);
+			m.insert("additionalProperties".into(), Value::Bool(false));
+			Value::Map(m)
 		}
 	}
 }
 
-/// Converts a named field to JSON Schema.
+/// Converts a named field to JSON Schema, with optional doc comment support.
 fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 	#[cfg(feature = "bevy_reflect_documentation")]
 	{
@@ -614,16 +575,16 @@ fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 			resolve_type(field.type_info(), field.type_path(), ctx);
 
 		if let Some(docs) = field.docs() {
-			let description = Value::String(docs.to_string());
-			// $ref cannot have sibling keywords, ie in OpenAI strict mode; wrap in anyOf
+			let description = Value::str(docs);
+			// $ref cannot have sibling keywords in strict mode; wrap in anyOf
 			if schema.get("$ref").is_some() {
-				return json!({
-					"anyOf": [schema],
-					"description": description,
-				});
+				let mut m = Map::default();
+				m.insert("anyOf".into(), Value::List(vec![schema]));
+				m.insert("description".into(), description);
+				return Value::Map(m);
 			}
-			if let Some(obj) = schema.as_object_mut() {
-				obj.insert("description".to_string(), description);
+			if let Ok(obj) = schema.as_map_mut() {
+				obj.insert("description".into(), description);
 			}
 		}
 
@@ -633,36 +594,38 @@ fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 	#[cfg(not(feature = "bevy_reflect_documentation"))]
 	resolve_type(field.type_info(), field.type_path(), ctx)
 }
+
 /// Maps a Rust type path to a JSON Schema type.
 fn type_path_to_schema(type_path: &str) -> Value {
-	// Handle Option<T> specially - extract inner type
+	// Handle Option<T>
 	if let Some(inner) = extract_option_inner(type_path) {
 		let inner_schema = type_path_to_schema(inner);
-		// Option types can be null or the inner type
-		return json!({
-			"oneOf": [
-				{ "type": "null" },
-				inner_schema,
-			]
-		});
+		let mut null_m = Map::default();
+		null_m.insert("type".into(), Value::Str("null".into()));
+		let mut m = Map::default();
+		m.insert(
+			"oneOf".into(),
+			Value::List(vec![Value::Map(null_m), inner_schema]),
+		);
+		return Value::Map(m);
 	}
 
 	// Handle Vec<T>
 	if let Some(inner) = extract_generic_inner(type_path, "Vec") {
 		let inner_schema = type_path_to_schema(inner);
-		return json!({
-			"type": "array",
-			"items": inner_schema,
-		});
+		let mut m = Map::default();
+		m.insert("type".into(), Value::Str("array".into()));
+		m.insert("items".into(), inner_schema);
+		return Value::Map(m);
 	}
 
 	// Handle HashMap/BTreeMap
 	if let Some(inner) = extract_map_value_type(type_path) {
 		let value_schema = type_path_to_schema(inner);
-		return json!({
-			"type": "object",
-			"additionalProperties": value_schema,
-		});
+		let mut m = Map::default();
+		m.insert("type".into(), Value::Str("object".into()));
+		m.insert("additionalProperties".into(), value_schema);
+		return Value::Map(m);
 	}
 
 	// Handle HashSet/BTreeSet
@@ -670,21 +633,22 @@ fn type_path_to_schema(type_path: &str) -> Value {
 		.or_else(|| extract_generic_inner(type_path, "BTreeSet"))
 	{
 		let inner_schema = type_path_to_schema(inner);
-		return json!({
-			"type": "array",
-			"items": inner_schema,
-			"uniqueItems": true,
-		});
+		let mut m = Map::default();
+		m.insert("type".into(), Value::Str("array".into()));
+		m.insert("items".into(), inner_schema);
+		m.insert("uniqueItems".into(), Value::Bool(true));
+		return Value::Map(m);
 	}
 
 	// Map primitive types
 	let json_type = map_primitive_type(type_path);
-	json!({ "type": json_type })
+	let mut m = Map::default();
+	m.insert("type".into(), Value::str(json_type));
+	Value::Map(m)
 }
 
 /// Maps a primitive Rust type path to a JSON Schema type string.
 fn map_primitive_type(type_path: &str) -> &'static str {
-	// Extract the short name for comparison
 	let short_name = type_path
 		.rsplit("::")
 		.next()
@@ -692,34 +656,27 @@ fn map_primitive_type(type_path: &str) -> &'static str {
 		.trim_start_matches('&');
 
 	match short_name {
-		// String types
-		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString" => "string",
-
-		// Unsigned integers
+		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString" => {
+			"string"
+		}
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => "integer",
-
-		// Signed integers
 		"i8" | "i16" | "i32" | "i64" | "i128" | "isize" => "integer",
-
-		// Floating point
 		"f32" | "f64" => "number",
-
-		// Boolean
 		"bool" => "boolean",
-
-		// Unit type
 		"()" => "null",
-
-		// Default to object for complex types
 		_ => "object",
 	}
 }
 
-/// Checks if a type path represents an Option type and extracts the inner type.
+/// Checks if a type path represents an `Option` type.
+fn is_option_type(type_path: &str) -> bool {
+	type_path.starts_with("core::option::Option<")
+		|| type_path.starts_with("Option<")
+}
+
+/// Extracts the inner type from `Option<T>`.
 fn extract_option_inner(type_path: &str) -> Option<&str> {
 	let path = type_path.trim();
-
-	// Handle both core::option::Option<T> and Option<T>
 	let inner = if path.starts_with("core::option::Option<") {
 		path.strip_prefix("core::option::Option<")
 	} else if path.starts_with("Option<") {
@@ -727,8 +684,6 @@ fn extract_option_inner(type_path: &str) -> Option<&str> {
 	} else {
 		None
 	}?;
-
-	// Remove trailing >
 	inner.strip_suffix('>')
 }
 
@@ -738,8 +693,6 @@ fn extract_generic_inner<'a>(
 	generic_name: &str,
 ) -> Option<&'a str> {
 	let path = type_path.trim();
-
-	// Try full path first (alloc::vec::Vec<T>)
 	let patterns = [
 		format!("alloc::vec::{}<", generic_name),
 		format!("std::vec::{}<", generic_name),
@@ -747,20 +700,17 @@ fn extract_generic_inner<'a>(
 		format!("alloc::collections::{}<", generic_name),
 		format!("{}<", generic_name),
 	];
-
 	for pattern in &patterns {
 		if let Some(rest) = path.strip_prefix(pattern.as_str()) {
 			return rest.strip_suffix('>');
 		}
 	}
-
 	None
 }
 
 /// Extracts the value type from a map type like `HashMap<K, V>`.
 fn extract_map_value_type(type_path: &str) -> Option<&str> {
 	let path = type_path.trim();
-
 	let prefixes = [
 		"std::collections::HashMap<",
 		"std::collections::BTreeMap<",
@@ -768,11 +718,9 @@ fn extract_map_value_type(type_path: &str) -> Option<&str> {
 		"HashMap<",
 		"BTreeMap<",
 	];
-
 	for prefix in &prefixes {
 		if let Some(rest) = path.strip_prefix(*prefix) {
 			let rest = rest.strip_suffix('>')?;
-			// Find the comma separating K and V (accounting for nested generics)
 			let mut depth = 0;
 			for (idx, ch) in rest.char_indices() {
 				match ch {
@@ -786,17 +734,16 @@ fn extract_map_value_type(type_path: &str) -> Option<&str> {
 			}
 		}
 	}
-
 	None
 }
 
-/// Checks if a field type path represents a required (non-Option) field.
+/// Returns `true` if the field type represents a required (non-Option) field.
 fn is_required_field(type_path: &str) -> bool {
 	!type_path.starts_with("core::option::Option<")
 		&& !type_path.starts_with("Option<")
 }
 
-/// Checks if a type path represents a primitive JSON type.
+/// Returns `true` if the type path represents a primitive JSON type.
 fn is_primitive_type_path(type_path: &str) -> bool {
 	let short_name = type_path.rsplit("::").next().unwrap_or(type_path);
 	matches!(
@@ -817,7 +764,6 @@ fn is_primitive_type_path(type_path: &str) -> bool {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use bevy::reflect::Typed;
 
 	#[derive(Reflect)]
 	struct SimpleStruct {
@@ -873,22 +819,21 @@ mod test {
 
 	#[test]
 	fn simple_struct_schema() {
-		let schema = type_info_to_json_schema(SimpleStruct::type_info());
-		let obj = schema.as_object().unwrap();
+		let schema = Schema::new::<SimpleStruct>();
 
-		obj.get("type")
+		schema
+			.get("type")
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("object");
 
-		let properties = obj.get("properties").unwrap().as_object().unwrap();
-		properties.contains_key("name").xpect_true();
-		properties.contains_key("count").xpect_true();
-		properties.contains_key("enabled").xpect_true();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
+		props.contains_key("name").xpect_true();
+		props.contains_key("count").xpect_true();
+		props.contains_key("enabled").xpect_true();
 
-		// Check field types
-		properties
+		props
 			.get("name")
 			.unwrap()
 			.get("type")
@@ -897,7 +842,7 @@ mod test {
 			.unwrap()
 			.xpect_eq("string");
 
-		properties
+		props
 			.get("count")
 			.unwrap()
 			.get("type")
@@ -906,7 +851,7 @@ mod test {
 			.unwrap()
 			.xpect_eq("integer");
 
-		properties
+		props
 			.get("enabled")
 			.unwrap()
 			.get("type")
@@ -915,24 +860,18 @@ mod test {
 			.unwrap()
 			.xpect_eq("boolean");
 
-		// All fields should be required
-		let required = obj.get("required").unwrap().as_array().unwrap();
+		let required = schema.get("required").unwrap().as_list().unwrap();
 		required.len().xpect_eq(3);
 	}
 
 	#[test]
 	fn complex_struct_schema() {
-		let schema = json_schema::<ComplexStruct>();
-		let obj = schema.as_object().unwrap();
+		let schema = Schema::new::<ComplexStruct>();
 
-		// Should have $defs
-		let defs = obj.get("$defs").unwrap().as_object().unwrap();
-
-		// Should contain SimpleEnum and ComplexEnum definitions
+		let defs = schema.get("$defs").unwrap().as_map().unwrap();
 		defs.contains_key("SimpleEnum").xpect_true();
 		defs.contains_key("ComplexEnum").xpect_true();
 
-		// SimpleEnum should be a string enum
 		let simple_enum_def = defs.get("SimpleEnum").unwrap();
 		simple_enum_def
 			.get("type")
@@ -940,30 +879,26 @@ mod test {
 			.as_str()
 			.unwrap()
 			.xpect_eq("string");
-		let variants = simple_enum_def.get("enum").unwrap().as_array().unwrap();
+		let variants = simple_enum_def.get("enum").unwrap().as_list().unwrap();
 		variants.len().xpect_eq(3);
 
-		// ComplexEnum should use oneOf
 		let complex_enum_def = defs.get("ComplexEnum").unwrap();
-		let one_of = complex_enum_def.get("oneOf").unwrap().as_array().unwrap();
+		let one_of = complex_enum_def.get("oneOf").unwrap().as_list().unwrap();
 		one_of.len().xpect_eq(3);
 
-		// Properties should use $ref
-		let properties = obj.get("properties").unwrap().as_object().unwrap();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
 
-		// simple_enum should be a $ref
-		let simple_enum_prop = properties.get("simple_enum").unwrap();
-		simple_enum_prop
+		props
+			.get("simple_enum")
+			.unwrap()
 			.get("$ref")
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("#/$defs/SimpleEnum");
 
-		// complex_enum should be oneOf [null, $ref]
-		let complex_enum_prop = properties.get("complex_enum").unwrap();
-		let ce_one_of =
-			complex_enum_prop.get("oneOf").unwrap().as_array().unwrap();
+		let ce_prop = props.get("complex_enum").unwrap();
+		let ce_one_of = ce_prop.get("oneOf").unwrap().as_list().unwrap();
 		ce_one_of.len().xpect_eq(2);
 		ce_one_of[0]
 			.get("type")
@@ -978,9 +913,9 @@ mod test {
 			.unwrap()
 			.xpect_eq("#/$defs/ComplexEnum");
 
-		// field (bool) should be inline
-		let field_prop = properties.get("field").unwrap();
-		field_prop
+		props
+			.get("field")
+			.unwrap()
 			.get("type")
 			.unwrap()
 			.as_str()
@@ -990,22 +925,18 @@ mod test {
 
 	#[test]
 	fn nested_struct_schema() {
-		let schema = json_schema::<WithNested>();
-		let obj = schema.as_object().unwrap();
+		let schema = Schema::new::<WithNested>();
 
-		// Should have $defs with SimpleStruct
-		let defs = obj.get("$defs").unwrap().as_object().unwrap();
+		let defs = schema.get("$defs").unwrap().as_map().unwrap();
 		defs.contains_key("SimpleStruct").xpect_true();
 
-		// SimpleStruct def should have proper properties
 		let simple_def = defs.get("SimpleStruct").unwrap();
 		let simple_props =
-			simple_def.get("properties").unwrap().as_object().unwrap();
+			simple_def.get("properties").unwrap().as_map().unwrap();
 		simple_props.contains_key("name").xpect_true();
 		simple_props.contains_key("count").xpect_true();
 		simple_props.contains_key("enabled").xpect_true();
 
-		// name should be string
 		simple_props
 			.get("name")
 			.unwrap()
@@ -1015,19 +946,19 @@ mod test {
 			.unwrap()
 			.xpect_eq("string");
 
-		// inner field should use $ref
-		let properties = obj.get("properties").unwrap().as_object().unwrap();
-		let inner_prop = properties.get("inner").unwrap();
-		inner_prop
+		let props = schema.get("properties").unwrap().as_map().unwrap();
+		props
+			.get("inner")
+			.unwrap()
 			.get("$ref")
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("#/$defs/SimpleStruct");
 
-		// value should be inline integer
-		let value_prop = properties.get("value").unwrap();
-		value_prop
+		props
+			.get("value")
+			.unwrap()
 			.get("type")
 			.unwrap()
 			.as_str()
@@ -1037,28 +968,23 @@ mod test {
 
 	#[test]
 	fn optional_fields_not_required() {
-		let schema = type_info_to_json_schema(WithOptional::type_info());
-		let obj = schema.as_object().unwrap();
+		let schema = Schema::new::<WithOptional>();
 
-		let required = obj.get("required").unwrap().as_array().unwrap();
-
-		// Only required_field should be in required array
+		let required = schema.get("required").unwrap().as_list().unwrap();
 		required.len().xpect_eq(1);
 		required[0].as_str().unwrap().xpect_eq("required_field");
 
-		// Optional field should have oneOf with null
-		let properties = obj.get("properties").unwrap().as_object().unwrap();
-		let optional_schema = properties.get("optional_field").unwrap();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
+		let optional_schema = props.get("optional_field").unwrap();
 		optional_schema.get("oneOf").is_some().xpect_true();
 	}
 
 	#[test]
 	fn vec_field_schema() {
-		let schema = type_info_to_json_schema(WithVec::type_info());
-		let obj = schema.as_object().unwrap();
-		let properties = obj.get("properties").unwrap().as_object().unwrap();
+		let schema = Schema::new::<WithVec>();
+		let props = schema.get("properties").unwrap().as_map().unwrap();
 
-		let items_schema = properties.get("items").unwrap();
+		let items_schema = props.get("items").unwrap();
 		items_schema
 			.get("type")
 			.unwrap()
@@ -1077,16 +1003,16 @@ mod test {
 
 	#[test]
 	fn simple_enum_schema() {
-		let schema = type_info_to_json_schema(SimpleEnum::type_info());
-		let obj = schema.as_object().unwrap();
+		let schema = Schema::new::<SimpleEnum>();
 
-		obj.get("type")
+		schema
+			.get("type")
 			.unwrap()
 			.as_str()
 			.unwrap()
 			.xpect_eq("string");
 
-		let variants = obj.get("enum").unwrap().as_array().unwrap();
+		let variants = schema.get("enum").unwrap().as_list().unwrap();
 		variants.len().xpect_eq(3);
 
 		let variant_names: Vec<&str> =
@@ -1098,31 +1024,30 @@ mod test {
 
 	#[test]
 	fn complex_enum_schema() {
-		let schema = type_info_to_json_schema(ComplexEnum::type_info());
-		let obj = schema.as_object().unwrap();
-
-		let one_of = obj.get("oneOf").unwrap().as_array().unwrap();
+		let schema = Schema::new::<ComplexEnum>();
+		let one_of = schema.get("oneOf").unwrap().as_list().unwrap();
 		one_of.len().xpect_eq(3);
 	}
 
 	#[test]
 	fn tuple_struct_schema() {
-		let schema = type_info_to_json_schema(TupleStruct::type_info());
-		let obj = schema.as_object().unwrap();
-
-		obj.get("type").unwrap().as_str().unwrap().xpect_eq("array");
-
-		let prefix_items = obj.get("prefixItems").unwrap().as_array().unwrap();
+		let schema = Schema::new::<TupleStruct>();
+		schema
+			.get("type")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("array");
+		let prefix_items =
+			schema.get("prefixItems").unwrap().as_list().unwrap();
 		prefix_items.len().xpect_eq(2);
 	}
 
 	#[test]
 	fn newtype_struct_unwraps() {
-		let schema = type_info_to_json_schema(NewtypeStruct::type_info());
-		let obj = schema.as_object().unwrap();
-
-		// Newtype should unwrap to inner type
-		obj.get("type")
+		let schema = Schema::new::<NewtypeStruct>();
+		schema
+			.get("type")
 			.unwrap()
 			.as_str()
 			.unwrap()
@@ -1131,10 +1056,13 @@ mod test {
 
 	#[test]
 	fn unit_type_schema() {
-		let schema = type_info_to_json_schema(<()>::type_info());
-		let obj = schema.as_object().unwrap();
-
-		obj.get("type").unwrap().as_str().unwrap().xpect_eq("null");
+		let schema = Schema::new::<()>();
+		schema
+			.get("type")
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("null");
 	}
 
 	#[test]
@@ -1142,9 +1070,7 @@ mod test {
 		extract_option_inner("core::option::Option<String>")
 			.unwrap()
 			.xpect_eq("String");
-
 		extract_option_inner("Option<i32>").unwrap().xpect_eq("i32");
-
 		extract_option_inner("String").xpect_none();
 	}
 
