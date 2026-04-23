@@ -345,11 +345,11 @@ fn struct_to_schema(info: &StructInfo, ctx: &mut SchemaCtx) -> Value {
 	}
 
 	let mut schema = Map::default();
-	schema.insert("type", Value::Str("object".into()));
-	schema.insert("properties", Value::Map(properties));
-	schema.insert("additionalProperties", Value::Bool(false));
+	schema.insert("type", "object");
+	schema.insert("properties", properties);
+	schema.insert("additionalProperties", false);
 	if !required.is_empty() {
-		schema.insert("required", Value::List(required));
+		schema.insert("required", required);
 	}
 	Value::Map(schema)
 }
@@ -370,9 +370,9 @@ fn tuple_struct_to_schema(
 		.collect();
 
 	let mut m = Map::default();
-	m.insert("type", Value::Str("array".into()));
-	m.insert("prefixItems", Value::List(prefix_items));
-	m.insert("items", Value::Bool(false));
+	m.insert("type", "array");
+	m.insert("prefixItems", prefix_items);
+	m.insert("items", false);
 	Value::Map(m)
 }
 
@@ -380,7 +380,7 @@ fn tuple_struct_to_schema(
 fn tuple_to_schema(info: &TupleInfo, ctx: &mut SchemaCtx) -> Value {
 	if info.field_len() == 0 {
 		let mut m = Map::default();
-		m.insert("type", Value::Str("null".into()));
+		m.insert("type", "null");
 		return Value::Map(m);
 	}
 
@@ -390,9 +390,9 @@ fn tuple_to_schema(info: &TupleInfo, ctx: &mut SchemaCtx) -> Value {
 		.collect();
 
 	let mut m = Map::default();
-	m.insert("type", Value::Str("array".into()));
-	m.insert("prefixItems", Value::List(prefix_items));
-	m.insert("items", Value::Bool(false));
+	m.insert("type", "array");
+	m.insert("prefixItems", prefix_items);
+	m.insert("items", false);
 	Value::Map(m)
 }
 
@@ -401,7 +401,7 @@ fn list_to_schema(info: &ListInfo, ctx: &mut SchemaCtx) -> Value {
 	let item_schema =
 		resolve_type(info.item_info(), info.item_ty().path(), ctx);
 	let mut m = Map::default();
-	m.insert("type", Value::Str("array".into()));
+	m.insert("type", "array");
 	m.insert("items", item_schema);
 	Value::Map(m)
 }
@@ -411,10 +411,10 @@ fn array_to_schema(info: &ArrayInfo, ctx: &mut SchemaCtx) -> Value {
 	let item_schema =
 		resolve_type(info.item_info(), info.item_ty().path(), ctx);
 	let mut m = Map::default();
-	m.insert("type", Value::Str("array".into()));
+	m.insert("type", "array");
 	m.insert("items", item_schema);
-	m.insert("minItems", Value::Uint(info.capacity() as u64));
-	m.insert("maxItems", Value::Uint(info.capacity() as u64));
+	m.insert("minItems", info.capacity());
+	m.insert("maxItems", info.capacity());
 	Value::Map(m)
 }
 
@@ -423,7 +423,7 @@ fn map_to_schema(info: &MapInfo, ctx: &mut SchemaCtx) -> Value {
 	let value_schema =
 		resolve_type(info.value_info(), info.value_ty().path(), ctx);
 	let mut m = Map::default();
-	m.insert("type", Value::Str("object".into()));
+	m.insert("type", "object");
 	m.insert("additionalProperties", value_schema);
 	Value::Map(m)
 }
@@ -432,9 +432,9 @@ fn map_to_schema(info: &MapInfo, ctx: &mut SchemaCtx) -> Value {
 fn set_to_schema(info: &SetInfo, _ctx: &mut SchemaCtx) -> Value {
 	let item_schema = type_path_to_schema(info.value_ty().path());
 	let mut m = Map::default();
-	m.insert("type", Value::Str("array".into()));
+	m.insert("type", "array");
 	m.insert("items", item_schema);
-	m.insert("uniqueItems", Value::Bool(true));
+	m.insert("uniqueItems", true);
 	Value::Map(m)
 }
 
@@ -448,15 +448,15 @@ fn enum_to_schema(info: &EnumInfo, ctx: &mut SchemaCtx) -> Value {
 		let variants: Vec<Value> =
 			info.iter().map(|v| Value::str(v.name())).collect();
 		let mut m = Map::default();
-		m.insert("type", Value::Str("string".into()));
-		m.insert("enum", Value::List(variants));
+		m.insert("type", "string");
+		m.insert("enum", variants);
 		return Value::Map(m);
 	}
 
 	let one_of: Vec<Value> =
 		info.iter().map(|v| variant_to_schema(v, ctx)).collect();
 	let mut m = Map::default();
-	m.insert("oneOf", Value::List(one_of));
+	m.insert("oneOf", one_of);
 	Value::Map(m)
 }
 
@@ -479,13 +479,10 @@ fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 				props.insert(SmolStr::from(info.name()), inner_schema);
 
 				let mut m = Map::default();
-				m.insert("type", Value::Str("object".into()));
-				m.insert("properties", Value::Map(props));
-				m.insert(
-					"required",
-					Value::List(vec![Value::str(info.name())]),
-				);
-				m.insert("additionalProperties", Value::Bool(false));
+				m.insert("type", "object");
+				m.insert("properties", props);
+				m.insert("required", vec![Value::str(info.name())]);
+				m.insert("additionalProperties", false);
 				Value::Map(m)
 			} else {
 				let prefix_items: Vec<Value> = info
@@ -496,21 +493,18 @@ fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 					.collect();
 
 				let mut inner = Map::default();
-				inner.insert("type", Value::Str("array".into()));
-				inner.insert("prefixItems", Value::List(prefix_items));
-				inner.insert("items", Value::Bool(false));
+				inner.insert("type", "array");
+				inner.insert("prefixItems", prefix_items);
+				inner.insert("items", false);
 
 				let mut props = Map::default();
 				props.insert(SmolStr::from(info.name()), Value::Map(inner));
 
 				let mut m = Map::default();
-				m.insert("type", Value::Str("object".into()));
-				m.insert("properties", Value::Map(props));
-				m.insert(
-					"required",
-					Value::List(vec![Value::str(info.name())]),
-				);
-				m.insert("additionalProperties", Value::Bool(false));
+				m.insert("type", "object");
+				m.insert("properties", props);
+				m.insert("required", vec![Value::str(info.name())]);
+				m.insert("additionalProperties", false);
 				Value::Map(m)
 			}
 		}
@@ -530,21 +524,21 @@ fn variant_to_schema(variant: &VariantInfo, ctx: &mut SchemaCtx) -> Value {
 			}
 
 			let mut inner = Map::default();
-			inner.insert("type", Value::Str("object".into()));
-			inner.insert("properties", Value::Map(properties));
-			inner.insert("additionalProperties", Value::Bool(false));
+			inner.insert("type", "object");
+			inner.insert("properties", properties);
+			inner.insert("additionalProperties", false);
 			if !required.is_empty() {
-				inner.insert("required", Value::List(required));
+				inner.insert("required", required);
 			}
 
 			let mut props = Map::default();
 			props.insert(SmolStr::from(info.name()), Value::Map(inner));
 
 			let mut m = Map::default();
-			m.insert("type", Value::Str("object".into()));
-			m.insert("properties", Value::Map(props));
-			m.insert("required", Value::List(vec![Value::str(info.name())]));
-			m.insert("additionalProperties", Value::Bool(false));
+			m.insert("type", "object");
+			m.insert("properties", props);
+			m.insert("required", vec![Value::str(info.name())]);
+			m.insert("additionalProperties", false);
 			Value::Map(m)
 		}
 	}
@@ -562,7 +556,7 @@ fn named_field_to_schema(field: &NamedField, ctx: &mut SchemaCtx) -> Value {
 			// $ref cannot have sibling keywords in strict mode; wrap in anyOf
 			if schema.get("$ref").is_some() {
 				let mut m = Map::default();
-				m.insert("anyOf", Value::List(vec![schema]));
+				m.insert("anyOf", vec![schema]);
 				m.insert("description", description);
 				return Value::Map(m);
 			}
