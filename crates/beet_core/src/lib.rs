@@ -111,6 +111,8 @@ pub use crate::testing::test_runner;
 /// use beet_core::prelude::*;
 /// ```
 pub mod prelude {
+	pub use crate::val;
+
 	// Re-export alloc types so modules using `crate::prelude::*` get them
 	// regardless of std/no_std. This avoids scattering `use alloc::*`
 	// throughout this crate and downstream no_std crates.

@@ -27,7 +27,6 @@ pub mod prelude {
 	pub use crate::token;
 
 	pub use crate::types::*;
-	pub use crate::val;
 }
 
 

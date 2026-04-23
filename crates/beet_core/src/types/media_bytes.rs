@@ -1,3 +1,4 @@
+//! Bytes typed by a [`MediaType`]
 use crate::prelude::*;
 
 /// Owned bytes paired with a [`MediaType`].

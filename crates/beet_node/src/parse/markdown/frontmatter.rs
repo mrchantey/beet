@@ -5,7 +5,6 @@
 //! the existing [`Value`](crate::prelude::Value) type and assembled
 //! into a `bevy::reflect::DynamicStruct`.
 
-use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::DynamicStruct;
 
@@ -82,7 +81,7 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 				dynamic.insert(&key, val);
 			}
 			Value::Float(val) => {
-				dynamic.insert(&key, val.0);
+				dynamic.insert(&key, val);
 			}
 			Value::Str(val) => {
 				dynamic.insert(&key, val);
@@ -295,7 +294,7 @@ mod test {
 	#[test]
 	fn yaml_float() {
 		let pairs = parse_yaml_kv("weight: 3.14").unwrap();
-		pairs[0].1.xpect_eq(Value::Float(Float(3.14)));
+		pairs[0].1.xpect_eq(Value::Float(3.14));
 	}
 
 	#[test]
@@ -353,7 +352,7 @@ mod test {
 	#[test]
 	fn toml_float() {
 		let pairs = parse_toml_kv("weight = 3.14").unwrap();
-		pairs[0].1.xpect_eq(Value::Float(Float(3.14)));
+		pairs[0].1.xpect_eq(Value::Float(3.14));
 	}
 
 	#[test]
