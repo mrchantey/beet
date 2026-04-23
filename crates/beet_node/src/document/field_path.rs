@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet_core::prelude::*;
 
 /// A path to a specific field within a [`Value`].
 #[derive(

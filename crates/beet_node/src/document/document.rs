@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::Typed;

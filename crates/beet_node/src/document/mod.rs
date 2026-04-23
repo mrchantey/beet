@@ -6,6 +6,7 @@ mod document_query;
 mod document_scope;
 mod document_sync;
 mod field;
+mod field_path;
 #[cfg(feature = "action")]
 pub use common_actions::*;
 pub use document::*;
@@ -14,3 +15,4 @@ pub use document_query::*;
 pub use document_scope::*;
 pub use document_sync::*;
 pub use field::*;
+pub use field_path::*;
