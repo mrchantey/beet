@@ -187,15 +187,15 @@ macro_rules! token2 {
         impl Default for $new_ty {
             fn default() -> Self {
                 Self(
-                    Token2::new_value::<$schema_ty>($default_val)
+                    Token2::new_value::<$schema_ty>($default_val.into())
                         .expect("Failed to create Token2 with default value")
                 )
             }
         }
 
-        impl AsRef<Token2> for $new_ty {
-            fn as_ref(&self) -> &Token2 {
-                &self.0
+        impl Into<Token2> for $new_ty {
+            fn into(self) -> Token2 {
+                self.0
             }
         }
     };
@@ -217,9 +217,9 @@ macro_rules! token2 {
             }
         }
 
-        impl AsRef<Token2> for $new_ty {
-            fn as_ref(&self) -> &Token2 {
-                &self.0
+        impl Into<Token2> for $new_ty {
+            fn into(self) -> Token2 {
+                self.0
             }
         }
     };
@@ -244,6 +244,5 @@ mod tests {
 			Color
 	);
 	token2!(Bar, Color);
-
-	token2!(Boo, Color, palettes::basic::GREEN.into());
+	token2!(Boo, Color, palettes::basic::GREEN);
 }

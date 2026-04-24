@@ -2,6 +2,7 @@ mod css_builder;
 mod default_properties;
 mod property;
 mod selector;
+pub mod material;
 mod style_query;
 mod values;
 pub use default_properties::*;

@@ -10,10 +10,26 @@ pub struct Property2 {
 	css_name: SmolStr,
 	/// Whether this property should traverse
 	/// up the stack and inherit parent properties
-	inherit_base: bool,
+	inheritance: Inheritance,
 	/// Token for the value of this property.
 	value: Token2,
 }
+
+
+impl Property2 {
+	pub fn new(
+		css_name: impl Into<SmolStr>,
+		inheritance: Inheritance,
+		value: impl Into<Token2>,
+	) -> Self {
+		Self {
+			css_name: css_name.into(),
+			inheritance,
+			value: value.into(),
+		}
+	}
+}
+
 
 
 
@@ -64,7 +80,7 @@ impl From<PropertyDef> for Property {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub enum Inheritance {
 	Inherited,
 	Initial,
