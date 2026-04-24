@@ -24,9 +24,8 @@
 //!
 //! let mut world = DocumentPlugin::world();
 //!
-//! // Create a scope with a document and value child
+//! // Create a document with a value child
 //! world.spawn((
-//!     DocumentScope,
 //!     Document::new(val!({ "score": 100i64 })),
 //!     children![(Value::default(), FieldRef::new("score"))],
 //! ));
@@ -100,10 +99,11 @@ pub(super) fn update_text_fields(
 	for (doc, doc_fields) in query {
 		for field in doc_fields.iter() {
 			if let Ok((field_ref, mut text)) = text_fields.get_mut(field) {
-				let field = doc.get_field_ref(&field_ref.field_path)?;
-				// why is this cohersing into text?
-				// *text = Value::str(field.to_string());
-				*text = field.clone();
+				// skip if field not yet present (document may be uninitialized)
+				if let Ok(field_val) = doc.get_field_ref(&field_ref.field_path)
+				{
+					*text = field_val.clone();
+				}
 			}
 		}
 	}
@@ -119,9 +119,7 @@ mod test {
 	fn link_creates_relationship() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((DocumentScope, Document::new(val!({ "x": "value" }))))
-			.id();
+		let card = world.spawn(Document::new(val!({ "x": "value" }))).id();
 		let text = world
 			.spawn((ChildOf(card), Value::default(), FieldRef::new("x")))
 			.id();
@@ -132,7 +130,7 @@ mod test {
 		let field_of = world.entity(text).get::<FieldOf>().unwrap();
 		field_of.document.xpect_eq(card);
 
-		// DocumentScope should have Fields tracking the text entity
+		// Document entity should have Fields tracking the text entity
 		let fields = world.entity(card).get::<Fields>().unwrap();
 		fields
 			.iter()
@@ -145,9 +143,7 @@ mod test {
 	fn unlink_removes_relationship() {
 		let mut world = DocumentPlugin::world();
 
-		let card = world
-			.spawn((DocumentScope, Document::new(val!({ "x": "value" }))))
-			.id();
+		let card = world.spawn(Document::new(val!({ "x": "value" }))).id();
 		let text = world
 			.spawn((ChildOf(card), Value::default(), FieldRef::new("x")))
 			.id();
@@ -196,13 +192,12 @@ mod test {
 	fn resolves_card_document_path() {
 		let mut world = DocumentPlugin::world();
 
-		// Root without DocumentScope marker
+		// Root document
 		let root = world.spawn(Document::default()).id();
-		// DocumentScope in the middle
+		// Nested document in the middle
 		let card = world
 			.spawn((
 				ChildOf(root),
-				DocumentScope,
 				Document::new(val!({ "card_val": "from_card" })),
 			))
 			.id();
@@ -257,14 +252,10 @@ mod test {
 	fn handles_null_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((
-			DocumentScope,
-			Document::new(val!({ "nullable": null })),
-			children![(
-				Value::Str("initial".into()),
-				FieldRef::new("nullable")
-			)],
-		));
+		world.spawn((Document::new(val!({ "nullable": null })), children![(
+			Value::Str("initial".into()),
+			FieldRef::new("nullable")
+		)]));
 
 		world.update_local();
 
@@ -281,7 +272,6 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			DocumentScope,
 			Document::new(val!({ "items": [1i64, 2i64, 3i64] })),
 			children![(Value::default(), FieldRef::new("items"))],
 		));
@@ -300,11 +290,10 @@ mod test {
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((
-			DocumentScope,
-			Document::new(val!({ "flag": true })),
-			children![(Value::default(), FieldRef::new("flag"))],
-		));
+		world.spawn((Document::new(val!({ "flag": true })), children![(
+			Value::default(),
+			FieldRef::new("flag")
+		)]));
 
 		world.update_local();
 

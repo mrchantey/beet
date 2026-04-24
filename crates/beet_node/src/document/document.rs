@@ -245,7 +245,7 @@ impl Default for OnMissingField {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 pub enum DocumentPath {
-	/// The document for the nearest ancestor with [`DocumentScope`].
+	/// The document for the nearest ancestor with a [`Document`] component.
 	#[default]
 	Ancestor,
 	/// The root entity.

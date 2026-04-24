@@ -1,15 +1,15 @@
 //! Scoped entity traversal within scene route boundaries.
 //!
 //! This module provides [`RouteQuery`], a system parameter for iterating
-//! entities within the scope of a [`DocumentScope`]. Many systems, ie markdown
+//! entities within the scope of a [`Document`]. Many systems, ie markdown
 //! rendering, must only operate on entities belonging to a specific scene.
 //!
 //! # Traversal Rules
 //!
 //! Given an entity, RouteQuery:
-//! 1. Traverses up to find the containing [`DocumentScope`], or root if no scene exists
+//! 1. Traverses up to find the containing [`Document`], or root if no scene exists
 //! 2. Iterates descendants within that scene, stopping at and excluding
-//! [`DocumentScope`] boundaries (unless it's the scene root itself)
+//! [`Document`] boundaries (unless it's the scene root itself)
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -25,7 +25,7 @@ pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	scenes: Query<'w, 's, (), With<DocumentScope>>,
+	scenes: Query<'w, 's, (), With<Document>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
@@ -39,7 +39,7 @@ impl<'w, 's> RouteQuery<'w, 's> {
 
 	/// Finds the scene root for the given entity.
 	///
-	/// Traverses ancestors to find the nearest [`DocumentScope`], or returns
+	/// Traverses ancestors to find the nearest [`Document`], or returns
 	/// the root ancestor if no scene is found.
 	pub fn scene_root(&self, entity: Entity) -> Entity {
 		self.ancestors
@@ -48,18 +48,18 @@ impl<'w, 's> RouteQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity has a [`DocumentScope`].
+	/// Returns true if the entity has a [`Document`].
 	pub fn is_scene(&self, entity: Entity) -> bool {
 		self.scenes.contains(entity)
 	}
 
-	/// Returns true if the entity is a DocumentScope boundary.
+	/// Returns true if the entity is a [`Document`] boundary.
 	fn is_boundary(&self, entity: Entity) -> bool { self.is_scene(entity) }
 
 	/// Creates a depth-first iterator over entities within the scene.
 	///
 	/// Starts from the given entity's scene root and traverses descendants,
-	/// stopping at DocumentScope boundaries.
+	/// stopping at Document boundaries.
 	pub fn iter_dfs(&self, entity: Entity) -> SceneRouteDfsIter<'_, 'w, 's> {
 		let root = self.scene_root(entity);
 		SceneRouteDfsIter {
@@ -87,7 +87,7 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Creates a breadth-first iterator over entities within the scene.
 	///
 	/// Starts from the given entity's scene root and traverses descendants,
-	/// stopping at DocumentScope boundaries.
+	/// stopping at Document boundaries.
 	pub fn iter_bfs(&self, entity: Entity) -> SceneRouteBfsIter<'_, 'w, 's> {
 		let root = self.scene_root(entity);
 		SceneRouteBfsIter {
@@ -138,7 +138,7 @@ impl Iterator for SceneRouteDfsIter<'_, '_, '_> {
 		// Add children in reverse order for correct DFS traversal
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter().rev() {
-				// Stop at boundaries (DocumentScope), unless the child is the root itself
+				// Stop at boundaries (Document), unless the child is the root itself
 				if child != self.root && self.query.is_boundary(child) {
 					continue;
 				}
@@ -166,7 +166,7 @@ impl Iterator for SceneRouteBfsIter<'_, '_, '_> {
 		// Add children to queue
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter() {
-				// Stop at boundaries (DocumentScope), unless the child is the root itself
+				// Stop at boundaries (Document), unless the child is the root itself
 				if child != self.root && self.query.is_boundary(child) {
 					continue;
 				}
@@ -187,7 +187,7 @@ mod test {
 	fn scene_root_finds_scene() {
 		let mut world = World::new();
 
-		let scene = world.spawn(DocumentScope).id();
+		let scene = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(scene)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
@@ -244,7 +244,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(DocumentScope).id();
+		let root = world.spawn(Document::default()).id();
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -270,7 +270,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(DocumentScope).id();
+		let root = world.spawn(Document::default()).id();
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -295,9 +295,10 @@ mod test {
 	fn stops_at_nested_scene() {
 		let mut world = World::new();
 
-		let scene = world.spawn(DocumentScope).id();
+		let scene = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(scene)).id();
-		let nested_scene = world.spawn((DocumentScope, ChildOf(child))).id();
+		let nested_scene =
+			world.spawn((Document::default(), ChildOf(child))).id();
 		let _nested_child = world.spawn(ChildOf(nested_scene)).id();
 
 		let expected = vec![scene, child];
@@ -319,9 +320,9 @@ mod test {
 	fn stops_at_scene_boundary() {
 		let mut world = World::new();
 
-		let scene = world.spawn(DocumentScope).id();
+		let scene = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(scene)).id();
-		let boundary = world.spawn((DocumentScope, ChildOf(child))).id();
+		let boundary = world.spawn((Document::default(), ChildOf(child))).id();
 		let _boundary_child = world.spawn(ChildOf(boundary)).id();
 
 		let expected = vec![scene, child];
@@ -343,7 +344,7 @@ mod test {
 	fn iter_from_child_finds_scene_root() {
 		let mut world = World::new();
 
-		let scene = world.spawn(DocumentScope).id();
+		let scene = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(scene)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
@@ -366,7 +367,7 @@ mod test {
 	fn iter_dfs_from_starts_at_given_entity() {
 		let mut world = World::new();
 
-		let scene = world.spawn(DocumentScope).id();
+		let scene = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(scene)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 

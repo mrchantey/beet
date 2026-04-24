@@ -18,9 +18,8 @@ use beet_core::prelude::*;
 ///
 /// let mut world = DocumentPlugin::world();
 ///
-/// // Create a scope with a document and value child
+/// // Create a document with a value child
 /// world.spawn((
-///     DocumentScope,
 ///     Document::new(val!({ "name": "Alice" })),
 ///     children![(Value::default(), FieldRef::new("name"))],
 /// ));
@@ -44,8 +43,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
 			.register_type::<FieldSegment>()
-			.register_type::<Value>()
-			.register_type::<DocumentScope>();
+			.register_type::<Value>();
 
 		// Register action types when the action feature is enabled
 		#[cfg(feature = "action")]
@@ -72,12 +70,10 @@ mod test {
 	fn text_field_syncs_on_insert() {
 		let mut world = DocumentPlugin::world();
 
-		// Create scope with document and value child
-		world.spawn((
-			DocumentScope,
-			Document::new(val!({ "greeting": "Hello" })),
-			children![(Value::default(), FieldRef::new("greeting"))],
-		));
+		// Create document with a value child
+		world.spawn((Document::new(val!({ "greeting": "Hello" })), children![
+			(Value::default(), FieldRef::new("greeting"))
+		]));
 
 		// Run update to trigger sync
 		world.update_local();
@@ -91,13 +87,12 @@ mod test {
 	fn text_field_syncs_on_document_change() {
 		let mut world = DocumentPlugin::world();
 
-		// Create scope with document and value child
+		// Create document with a value child
 		let card = world
-			.spawn((
-				DocumentScope,
-				Document::new(val!({ "count": 0i64 })),
-				children![(Value::default(), FieldRef::new("count"))],
-			))
+			.spawn((Document::new(val!({ "count": 0i64 })), children![(
+				Value::default(),
+				FieldRef::new("count")
+			)]))
 			.id();
 
 		world.update_local();
@@ -122,7 +117,6 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			DocumentScope,
 			Document::new(val!({ "user": { "name": "Bob" } })),
 			children![(Value::default(), FieldRef::new(vec!["user", "name"]))],
 		));
@@ -138,7 +132,6 @@ mod test {
 		let mut world = DocumentPlugin::world();
 
 		world.spawn((
-			DocumentScope,
 			Document::new(val!({
 				"first": "Alice",
 				"second": "Bob"
@@ -165,14 +158,10 @@ mod test {
 	fn text_block_with_field_ref() {
 		let mut world = DocumentPlugin::world();
 
-		world.spawn((
-			DocumentScope,
-			Document::new(val!({ "name": "World" })),
-			children![
-				Value::Str("Hello, ".into()),
-				(FieldRef::new("name"), Value::default()),
-			],
-		));
+		world.spawn((Document::new(val!({ "name": "World" })), children![
+			Value::Str("Hello, ".into()),
+			(FieldRef::new("name"), Value::default()),
+		]));
 
 		world.update_local();
 

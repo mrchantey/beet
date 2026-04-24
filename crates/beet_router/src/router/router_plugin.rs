@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
 /// whenever actions are spawned in an entity hierarchy. Scene routes
-/// register as actions (via [`DocumentScope`] + [`ActionMeta`]), so there
+/// register as actions (via [`Document`] + [`ActionMeta`]), so there
 /// is no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;

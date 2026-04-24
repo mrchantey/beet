@@ -9,7 +9,6 @@ use beet_core::prelude::*;
 pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	doc_query: Query<'w, 's, &'static mut Document>,
-	scope_query: Query<'w, 's, &'static DocumentScope>,
 	commands: Commands<'w, 's>,
 }
 
@@ -21,7 +20,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			DocumentPath::Ancestor => self
 				.ancestors
 				.iter_ancestors(subject)
-				.find(|entity| self.scope_query.get(*entity).is_ok())
+				.find(|entity| self.doc_query.contains(*entity))
 				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
 			DocumentPath::Entity(entity) => *entity,
 		}
@@ -183,9 +182,7 @@ mod test {
 	#[test]
 	fn document_query_with_field() {
 		let mut world = World::new();
-		let entity = world
-			.spawn((DocumentScope, Document::new(val!({ "count": 5i64 }))))
-			.id();
+		let entity = world.spawn(Document::new(val!({ "count": 5i64 }))).id();
 
 		let field = FieldRef::new("count");
 
@@ -221,7 +218,7 @@ mod test {
 	#[test]
 	fn document_query_with_field_initializes() {
 		let mut world = World::new();
-		let entity = world.spawn(DocumentScope).id();
+		let entity = world.spawn_empty().id();
 
 		let field = FieldRef::new("new_field");
 
@@ -257,10 +254,7 @@ mod test {
 	fn document_query_resolve_card() {
 		let mut world = World::new();
 		let card = world
-			.spawn((
-				DocumentScope,
-				Document::new(val!({ "card_data": "test" })),
-			))
+			.spawn(Document::new(val!({ "card_data": "test" })))
 			.id();
 		let child = world.spawn(ChildOf(card)).id();
 

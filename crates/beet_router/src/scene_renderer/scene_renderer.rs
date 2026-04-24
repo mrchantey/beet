@@ -141,14 +141,14 @@ pub fn fixed_scene<B: Bundle>(path: &str, bundle: B) -> impl Bundle {
 /// Simply returns the caller as the scene to be rendered.
 #[action(route)]
 #[derive(Default, Component)]
-#[require(DocumentScope)]
+#[require(Document)]
 async fn CallerScene(cx: ActionContext<Request>) -> Result<SceneEntity> {
 	SceneEntity::new_fixed(cx.id()).xok()
 }
 
 
 #[derive(Component, Reflect)]
-#[require(DocumentScope, BlobSceneAction)]
+#[require(Document, BlobSceneAction)]
 pub struct BlobScene {
 	path: RelPath,
 }

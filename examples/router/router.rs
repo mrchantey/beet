@@ -275,14 +275,14 @@ async fn LayoutTemplate(
 }
 
 /// Parses an HTML string into a new entity. If `scope` is true, the
-/// entity gets a [`DocumentScope`] component.
+/// entity gets a [`Document`] component as a boundary marker.
 fn parse_html_entity(
 	world: &mut World,
 	html: &str,
 	scope: bool,
 ) -> Result<Entity> {
 	let entity = if scope {
-		world.spawn(DocumentScope).id()
+		world.spawn(Document::default()).id()
 	} else {
 		world.spawn_empty().id()
 	};
