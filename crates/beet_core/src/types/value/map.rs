@@ -24,6 +24,24 @@ impl core::hash::Hash for Map {
 	}
 }
 
+impl Ord for Map {
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+		let mut self_entries: Vec<_> = self.0.iter().collect();
+		self_entries.sort_by_key(|(key, _)| key.as_str());
+
+		let mut other_entries: Vec<_> = other.0.iter().collect();
+		other_entries.sort_by_key(|(key, _)| key.as_str());
+
+		self_entries.cmp(&other_entries)
+	}
+}
+
+impl PartialOrd for Map {
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
 impl Map {
 	/// Gets a value by key.
 	///

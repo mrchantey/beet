@@ -9,7 +9,17 @@ use beet_core::prelude::*;
 /// fields are initialized with `null` if missing, unless configured otherwise
 /// via [`on_missing`](FieldRef::on_missing).
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component, SetWith,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+	SetWith,
 )]
 #[reflect(Component)]
 #[component(immutable, on_add=on_add)]

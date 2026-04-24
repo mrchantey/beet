@@ -34,7 +34,9 @@ use bevy::reflect::Typed;
 use bevy::reflect::VariantInfo;
 
 /// A JSON Schema represented as a [`Value`].
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut, Reflect,
+)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]

@@ -2,24 +2,22 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
-#[derive(Debug, Clone, Reflect, Get)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token2 {
+	/// A unique and stable human readable id for this token, used for resolving its schema.
+	id: TokenId,
 	/// The value or fieldref for this token, matching its
 	/// associated schema.
 	value: ValueOrRef,
-	/// Schema for the value of this instance.
-	/// This may be a reference to an external schema,
-	/// which must be available for validation.
-	schema: TokenSchema,
 }
 
 
 impl Token2 {
-	pub fn new(value: impl Into<ValueOrRef>, schema: TokenSchema) -> Self {
+	pub fn new(value: impl Into<ValueOrRef>, schema: TokenId) -> Self {
 		Self {
 			value: value.into(),
-			schema,
+			id: schema,
 		}
 	}
 
@@ -27,7 +25,7 @@ impl Token2 {
 		let value = Value::from_reflect(&value)?;
 		Self {
 			value: ValueOrRef::Value(value),
-			schema: TokenSchema::of::<T>(),
+			id: TokenId::of::<T>(),
 		}
 		.xok()
 	}
@@ -36,7 +34,7 @@ impl Token2 {
 	pub fn new_field<Token: TypePath, Schema: TypePath>() -> Self {
 		Self {
 			value: FieldRef::of::<Token>().into(),
-			schema: TokenSchema::of::<Schema>(),
+			id: TokenId::of::<Schema>(),
 		}
 	}
 	/// Create new token, using `Token` for the field path,
@@ -47,13 +45,13 @@ impl Token2 {
 		let value = Value::from_reflect(&value)?;
 		Self {
 			value: FieldRef::of::<Token>().with_init(value).into(),
-			schema: TokenSchema::of::<Val>(),
+			id: TokenId::of::<Val>(),
 		}
 		.xok()
 	}
 }
 
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValueOrRef {
 	Value(Value),
@@ -68,43 +66,52 @@ impl From<FieldRef> for ValueOrRef {
 	fn from(field_ref: FieldRef) -> Self { Self::Ref(field_ref) }
 }
 
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenSchema {
-	inner: TokenSchemaInner,
+pub struct TokenId {
+	inner: TokenIdInner,
 }
 
-impl TokenSchema {
-	pub fn new(schema: Schema) -> Self {
+impl TokenId {
+	/// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
+	/// ie `org.beet/foo/bar`
+	pub fn new(namespace_id: SmolStr) -> Self {
 		Self {
-			inner: TokenSchemaInner::Schema(schema),
+			inner: TokenIdInner::Namespace(namespace_id),
 		}
 	}
 	pub fn of<T: bevy::reflect::TypePath>() -> Self {
 		Self {
-			inner: TokenSchemaInner::Path(SmolStr::new_static(T::type_path())),
+			inner: TokenIdInner::TypePath(SmolStr::new_static(T::type_path())),
 		}
 	}
 }
 
+impl std::fmt::Display for TokenId {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.inner.fmt(f)
+	}
+}
+
 // sealed to protect Path variant from typepath/typename confusion
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-enum TokenSchemaInner {
-	/// The instance represents a dynamic type built at runtime
-	Schema(Schema),
+enum TokenIdInner {
+	/// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
+	/// ie `org.beet/foo/bar`
+	Namespace(SmolStr),
 	/// The stable bevy [`TypePath::type_path`] to the type
 	/// of this instance.
 	/// This is not the [`std::any::type_name`], which
 	/// is unstable.
-	Path(SmolStr),
+	TypePath(SmolStr),
 }
 
-impl std::fmt::Display for TokenSchemaInner {
+impl std::fmt::Display for TokenIdInner {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Path(s) => write!(f, "Path({})", s),
-			Self::Schema(_) => write!(f, "Schema(..)"),
+			Self::Namespace(s) => write!(f, "Namespace({})", s),
+			Self::TypePath(s) => write!(f, "TypePath({})", s),
 		}
 	}
 }
@@ -234,7 +241,7 @@ mod tests {
 	#[test]
 	fn test_name() {
 		// Name::type_info().type_path().xprintln();
-		let _inst = TokenSchema::of::<Name>();
+		let _inst = TokenId::of::<Name>();
 	}
 
 	token2!(

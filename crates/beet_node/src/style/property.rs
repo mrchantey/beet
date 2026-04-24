@@ -26,7 +26,7 @@ impl Property2 {
 			css_name: css_name.into(),
 			value: Token2::new(
 				FieldRef::of::<Token>().with_document(document_path),
-				TokenSchema::of::<Schema>(),
+				TokenId::of::<Schema>(),
 			),
 		}
 	}

@@ -7,7 +7,7 @@ pub struct Selector {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
 	rules: Vec<Rule>,
-	tokens: Vec<Token2>,
+	tokens: HashMap<TokenId, TokenId>,
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`

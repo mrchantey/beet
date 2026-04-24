@@ -9,7 +9,7 @@ use crate::style::*;
 
 
 pub fn primary_text()->Selector{
-	todo!("selector is hashmap Token,Token")
+	todo!("selector is hashmap<Token,Token>")
 	// let token2:Token2 = props::ForegroundColor2::default().into();
 	// Selector::new().with_rule(Rule::class("text-primary"))
 		// .with_token(

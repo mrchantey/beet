@@ -1,10 +1,11 @@
 mod css_builder;
 mod default_properties;
+pub mod material;
 mod property;
 mod selector;
-pub mod material;
 mod style_query;
 mod values;
+pub use css_builder::*;
 pub use default_properties::*;
 pub use property::*;
 pub use selector::*;

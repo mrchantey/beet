@@ -425,6 +425,32 @@ impl core::hash::Hash for Value {
 	}
 }
 
+impl PartialOrd for Value {
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for Value {
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+		use core::cmp::Ordering;
+		match (self, other) {
+			(Value::Null, Value::Null) => Ordering::Equal,
+			(Value::Bool(a), Value::Bool(b)) => a.cmp(b),
+			(Value::Int(a), Value::Int(b)) => a.cmp(b),
+			(Value::Uint(a), Value::Uint(b)) => a.cmp(b),
+			(Value::Float(a), Value::Float(b)) => a.to_bits().cmp(&b.to_bits()),
+			(Value::Str(a), Value::Str(b)) => a.cmp(b),
+			(Value::Bytes(a), Value::Bytes(b)) => a.cmp(b),
+			(Value::List(a), Value::List(b)) => a.cmp(b),
+			(Value::Map(a), Value::Map(b)) => a.cmp(b),
+			// For different types, order by discriminant
+			_ => self.kind().to_string().cmp(&other.kind().to_string()),
+		}
+	}
+}
+
+
 impl From<bool> for Value {
 	fn from(value: bool) -> Self { Value::Bool(value) }
 }
