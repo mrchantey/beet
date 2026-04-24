@@ -582,7 +582,7 @@ impl NodeVisitor for TuiNodeRenderer {
 				let src = view.attribute_string("src");
 				let alt = view
 					.attribute("alt")
-					.map(|val| val.to_string())
+					.map(|attr| attr.value.to_string())
 					.unwrap_or_else(|| "image".to_string());
 				let label = if src.is_empty() {
 					format!("[{alt}]")

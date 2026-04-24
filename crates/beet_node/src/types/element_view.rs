@@ -10,22 +10,9 @@ pub struct ElementView<'a> {
 	pub element: &'a Element,
 	/// Attributes for this element.
 	pub attributes: Vec<AttributeView<'a>>,
+	pub state: Option<&'a ElementStateMap>,
 }
 
-
-pub struct AttributeView<'a> {
-	/// The entity of this attribute.
-	pub entity: Entity,
-	/// The attribute component.
-	pub attribute: &'a Attribute,
-	/// The value for this attribute.
-	pub value: &'a Value,
-}
-
-
-impl<'a> AttributeView<'a> {
-	pub fn key(&self) -> &str { &self.attribute }
-}
 
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
 	OrderedList(OrderedListView<'a>),
@@ -39,11 +26,13 @@ impl<'a> ElementView<'a> {
 		entity: Entity,
 		element: &'a Element,
 		attributes: Vec<AttributeView<'a>>,
+		state: Option<&'a ElementStateMap>,
 	) -> Self {
 		Self {
 			entity,
 			element,
 			attributes,
+			state,
 		}
 	}
 
@@ -61,11 +50,27 @@ impl<'a> ElementView<'a> {
 	pub fn tag(&self) -> &str { self.element.tag() }
 
 	/// Look up the first attribute matching `key` and return its value.
-	pub fn attribute(&self, key: &str) -> Option<&'a Value> {
+	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
 		self.attributes
 			.iter()
 			.find(|attr| attr.attribute.as_str() == key)
-			.map(|attr| attr.value)
+	}
+
+	pub fn contains_state(&self, state: &ElementState) -> bool {
+		self.state.map(|s| s.contains(state)).unwrap_or(false)
+	}
+
+	pub fn contains_class(&self, class: &str) -> bool {
+		self.attribute("class")
+			.map(|attr| {
+				attr.value
+					.as_str()
+					.map(|classes| {
+						classes.split_whitespace().any(|c| c == class)
+					})
+					.unwrap_or(false)
+			})
+			.unwrap_or(false)
 	}
 
 	/// Look up the first attribute matching `key` and return its
@@ -84,7 +89,7 @@ impl<'a> ElementView<'a> {
 	/// Returns an empty string when the attribute is absent.
 	pub fn attribute_string(&self, key: &str) -> String {
 		self.attribute(key)
-			.map(|val| val.to_string())
+			.map(|attr| attr.value.to_string())
 			.unwrap_or_default()
 	}
 }
@@ -112,7 +117,7 @@ impl<'a> TypedElementView<'a> for OrderedListView<'a> {
 	) -> Result<Self, FromElementError> {
 		let start = element
 			.attribute("start")
-			.and_then(|val| match val {
+			.and_then(|attr| match attr.value {
 				Value::Uint(num) => Some(*num as usize),
 				Value::Int(num) => Some(*num as usize),
 				_ => None,
@@ -152,9 +157,25 @@ impl<'a> TypedElementView<'a> for LinkView<'a> {
 	) -> Result<Self, FromElementError> {
 		let href = element
 			.attribute("href")
-			.and_then(|val| val.as_str().ok())
+			.and_then(|attr| attr.value.as_str().ok())
 			.unwrap_or("");
 
 		Ok(Self { element, href })
 	}
+}
+
+
+
+pub struct AttributeView<'a> {
+	/// The entity of this attribute.
+	pub entity: Entity,
+	/// The attribute component.
+	pub attribute: &'a Attribute,
+	/// The value for this attribute.
+	pub value: &'a Value,
+}
+
+
+impl<'a> AttributeView<'a> {
+	pub fn key(&self) -> &str { &self.attribute }
 }

@@ -1,6 +1,21 @@
 use super::*;
+use crate::prelude::*;
 use beet_core::prelude::*;
 use std::hash::Hasher;
+
+#[derive(Debug, Clone, Reflect, Get)]
+pub struct Property2 {
+	/// The name of this property in css,
+	/// ie `background-color`
+	css_name: SmolStr,
+	/// Whether this property should traverse
+	/// up the stack and inherit parent properties
+	inherit_base: bool,
+	/// Token for the value of this property.
+	value: Token2,
+}
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Get)]
 pub struct PropertyDef {
@@ -48,15 +63,6 @@ impl From<PropertyDef> for Property {
 	fn from(def: PropertyDef) -> Self { def.property() }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum State {
-	Hovered,
-	Focused,
-	Pressed,
-	Dragged,
-	Disabled,
-	Selected,
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Inheritance {
@@ -72,14 +78,14 @@ pub struct Property {
 	#[set_with(skip)]
 	def: PropertyDef,
 	inherit_override: Option<Inheritance>,
-	state: Option<State>,
+	state: Option<ElementState>,
 }
 
 impl Property {
 	pub const fn new(
 		def: PropertyDef,
 		inherit_override: Option<Inheritance>,
-		state: Option<State>,
+		state: Option<ElementState>,
 	) -> Self {
 		Self {
 			def,

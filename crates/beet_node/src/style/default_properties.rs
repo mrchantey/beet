@@ -56,14 +56,16 @@ impl DefaultPropertySet {
 	pub fn passes_attributes(&self, el: &ElementView) -> bool {
 		(self.include_attributes.is_empty()
 			|| self.include_attributes.iter().any(|(key, val)| match val {
-				Some(expected) => {
-					el.attribute(key).map(|v| v == expected).unwrap_or(false)
-				}
+				Some(expected) => el
+					.attribute(key)
+					.map(|v| v.value == expected)
+					.unwrap_or(false),
 				None => el.attribute(key).is_some(),
 			})) && !self.exclude_attributes.iter().any(|(key, val)| match val {
-			Some(expected) => {
-				el.attribute(key).map(|v| v == expected).unwrap_or(false)
-			}
+			Some(expected) => el
+				.attribute(key)
+				.map(|v| v.value == expected)
+				.unwrap_or(false),
 			None => el.attribute(key).is_some(),
 		})
 	}

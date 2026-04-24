@@ -1,86 +1,73 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-#[derive(Debug, Clone, Reflect, Get)]
-pub struct Property2 {
-	/// The name of this property in css,
-	/// ie `background-color`
-	css_name: SmolStr,
-	/// Whether this property should traverse
-	/// up the stack and inherit parent properties
-	inherit_base: bool,
-	/// Token for the value of this property.
-	value: Token2,
-}
-
-todo!("replace these with rules, ie negated etc");
 /// A set of default properties applied to elements matching the given criteria.
-#[derive(Get)]
+#[derive(Default, Get)]
 pub struct Selector {
-	/// Element tags to match; empty means match any tag.
-	include_tags: Vec<SmolStr>,
-	exclude_tags: Vec<SmolStr>,
-	/// Attribute keys to match, with optional value constraint.
-	include_attributes: Vec<(SmolStr, Option<Value>)>,
-	exclude_attributes: Vec<(SmolStr, Option<Value>)>,
+	/// All the rules an element must match for styles to be applied.
+	/// Empty matches all elements
+	rules: Vec<Rule>,
 	tokens: TokenMap2,
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
-pub enum Rule {}
+/// A match rule
+pub enum Rule {
+	/// Must have this tag, eg `div`
+	Tag(SmolStr),
+	/// Must have this class, eg `.my-class`
+	Class(SmolStr),
+	/// Must be in this state, eg `:hover`
+	State(ElementState),
+	/// Must have the attribute, ie 'display=flex'
+	Attribute {
+		key: SmolStr,
+		/// Optionally also
+		value: Option<Value>,
+	},
+	/// Negate a rule, ie must not have tag
+	Not(Box<Rule>),
+}
+
+impl Rule {
+	pub fn matches(&self, el: &ElementView) -> bool {
+		match self {
+			Rule::Tag(tag) => el.element.tag() == tag,
+			Rule::Attribute { key, value } => match value {
+				Some(expected) => el
+					.attribute(key)
+					.map(|attr| attr.value == expected)
+					.unwrap_or(false),
+				None => el.attribute(key).is_some(),
+			},
+			Rule::State(state) => el.contains_state(state),
+			Rule::Class(class) => el.contains_class(class),
+			Rule::Not(inner) => !inner.matches(el),
+		}
+	}
+}
+
 
 impl Selector {
 	/// Match elements with the given tag.
-	pub fn new_tag(tag: impl Into<SmolStr>) -> Self {
-		Self {
-			include_tags: vec![tag.into()],
-			exclude_tags: Vec::new(),
-			include_attributes: Vec::new(),
-			exclude_attributes: Vec::new(),
-			tokens: default(),
-		}
-	}
-
-	/// Match any element regardless of tag.
-	pub fn any() -> Self {
-		Self {
-			include_tags: Vec::new(),
-			exclude_tags: Vec::new(),
-			include_attributes: Vec::new(),
-			exclude_attributes: Vec::new(),
-			tokens: default(),
-		}
-	}
+	pub fn new() -> Self { Self::default() }
 
 	/// Add a property mapped to a token.
-	pub fn with(mut self, path: FieldPath, value: Token2) -> Result<Self> {
+	pub fn with_token(
+		mut self,
+		path: FieldPath,
+		value: Token2,
+	) -> Result<Self> {
 		self.tokens.insert(path, value)?;
 		self.xok()
 	}
 
-	/// Returns true if the element satisfies all tag and attribute criteria.
-	pub fn passes(&self, el: &ElementView) -> bool {
-		self.passes_tags(el.element) && self.passes_attributes(el)
+	pub fn with_rule(mut self, rule: Rule) -> Self {
+		self.rules.push(rule);
+		self
 	}
-
-	pub fn passes_tags(&self, el: &Element) -> bool {
-		(self.include_tags.is_empty()
-			|| self.include_tags.iter().any(|tag| tag == el.tag()))
-			&& !self.exclude_tags.iter().any(|tag| tag == el.tag())
-	}
-
-	pub fn passes_attributes(&self, el: &ElementView) -> bool {
-		(self.include_attributes.is_empty()
-			|| self.include_attributes.iter().any(|(key, val)| match val {
-				Some(expected) => {
-					el.attribute(key).map(|v| v == expected).unwrap_or(false)
-				}
-				None => el.attribute(key).is_some(),
-			})) && !self.exclude_attributes.iter().any(|(key, val)| match val {
-			Some(expected) => {
-				el.attribute(key).map(|v| v == expected).unwrap_or(false)
-			}
-			None => el.attribute(key).is_some(),
-		})
+	/// Matches all rules, or `true` if empty
+	pub fn matches(&self, el: &ElementView) -> bool {
+		self.rules.iter().all(|rule| rule.matches(el))
 	}
 }

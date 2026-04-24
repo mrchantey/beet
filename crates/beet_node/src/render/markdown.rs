@@ -128,7 +128,7 @@ impl NodeVisitor for MarkdownRenderer {
 				// fenced code block: extract language from class
 				let info = view
 					.attribute("class")
-					.and_then(|val| match val {
+					.and_then(|attr| match attr.value {
 						Value::Str(class) => class
 							.strip_prefix("language-")
 							.map(|lang| lang.to_string())
