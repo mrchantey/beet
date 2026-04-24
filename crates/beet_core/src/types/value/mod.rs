@@ -6,4 +6,4 @@ pub(self) mod reflect_ext;
 pub mod schema;
 pub use schema::*;
 #[cfg(feature = "serde")]
-pub mod serde_ext;
+pub(self) mod serde_ext;
