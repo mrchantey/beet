@@ -19,7 +19,23 @@ pub struct FieldPath(Vec<FieldSegment>);
 impl From<Vec<FieldSegment>> for FieldPath {
 	fn from(segments: Vec<FieldSegment>) -> Self { Self(segments) }
 }
-
+impl From<&[FieldSegment]> for FieldPath {
+	fn from(segments: &[FieldSegment]) -> Self { Self(segments.to_vec()) }
+}
+impl std::fmt::Display for FieldPath {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let segments = self
+			.0
+			.iter()
+			.map(|seg| match seg {
+				FieldSegment::ArrayIndex(i) => format!("[{}]", i),
+				FieldSegment::ObjectKey(k) => k.to_string(),
+			})
+			.collect::<Vec<_>>()
+			.join(".");
+		write!(f, "{}", segments)
+	}
+}
 
 /// A path segment for navigating [`Value`] structures.
 ///
