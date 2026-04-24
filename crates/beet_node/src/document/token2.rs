@@ -66,6 +66,8 @@ impl From<FieldRef> for ValueOrRef {
 	fn from(field_ref: FieldRef) -> Self { Self::Ref(field_ref) }
 }
 
+/// Represents a unique id to a token, using either a [`TypePath`]
+/// or user defined namspace. These can be directly mapped to a FieldId
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenId {
@@ -105,6 +107,19 @@ enum TokenIdInner {
 	/// This is not the [`std::any::type_name`], which
 	/// is unstable.
 	TypePath(SmolStr),
+}
+
+impl Into<FieldPath> for TokenId {
+	fn into(self) -> FieldPath {
+		match self.inner {
+			TokenIdInner::Namespace(ns) => {
+				ns.split('/').filter(|s| !s.is_empty()).into_field_path()
+			}
+			TokenIdInner::TypePath(path) => {
+				path.split("::").filter(|s| !s.is_empty()).into_field_path()
+			}
+		}
+	}
 }
 
 impl std::fmt::Display for TokenIdInner {

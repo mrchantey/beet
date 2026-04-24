@@ -40,6 +40,7 @@ impl From<Vec<FieldSegment>> for FieldPath {
 impl From<&[FieldSegment]> for FieldPath {
 	fn from(segments: &[FieldSegment]) -> Self { Self(segments.to_vec()) }
 }
+
 impl std::fmt::Display for FieldPath {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let segments = self
@@ -73,6 +74,31 @@ impl FieldSegment {
 	pub fn index(index: usize) -> Self { Self::ArrayIndex(index) }
 }
 
+impl From<&str> for FieldSegment {
+	fn from(s: &str) -> Self { Self::key(s) }
+}
+impl From<&&str> for FieldSegment {
+	fn from(s: &&str) -> Self { Self::key(*s) }
+}
+impl From<String> for FieldSegment {
+	fn from(s: String) -> Self { Self::key(s) }
+}
+impl From<usize> for FieldSegment {
+	fn from(i: usize) -> Self { Self::index(i) }
+}
+impl From<u32> for FieldSegment {
+	fn from(i: u32) -> Self { Self::index(i as usize) }
+}
+impl From<u64> for FieldSegment {
+	fn from(i: u64) -> Self { Self::index(i as usize) }
+}
+impl From<i32> for FieldSegment {
+	fn from(i: i32) -> Self { Self::index(i as usize) }
+}
+impl From<i64> for FieldSegment {
+	fn from(i: i64) -> Self { Self::index(i as usize) }
+}
+
 /// Convert various types into a field path vector for document navigation.
 pub trait IntoFieldPath<M> {
 	/// Convert this type into a vector of field path segments.
@@ -81,32 +107,15 @@ pub trait IntoFieldPath<M> {
 impl IntoFieldPath<Self> for FieldPath {
 	fn into_field_path(self) -> FieldPath { self }
 }
-impl IntoFieldPath<Self> for Vec<FieldSegment> {
-	fn into_field_path(self) -> FieldPath { self.into() }
-}
-impl IntoFieldPath<Self> for Vec<String> {
-	fn into_field_path(self) -> FieldPath {
-		self.into_iter()
-			.map(FieldSegment::key)
-			.collect::<Vec<_>>()
-			.into()
-	}
-}
-impl IntoFieldPath<Self> for Vec<&str> {
-	fn into_field_path(self) -> FieldPath {
-		self.into_iter()
-			.map(FieldSegment::key)
-			.collect::<Vec<_>>()
-			.into()
-	}
-}
+pub struct IteratorIntoFieldPathMarker;
 
-impl IntoFieldPath<Self> for Vec<usize> {
+impl<T, U> IntoFieldPath<IteratorIntoFieldPathMarker> for T
+where
+	T: IntoIterator<Item = U>,
+	U: Into<FieldSegment>,
+{
 	fn into_field_path(self) -> FieldPath {
-		self.into_iter()
-			.map(FieldSegment::ArrayIndex)
-			.collect::<Vec<_>>()
-			.into()
+		self.into_iter().map(Into::into).collect::<Vec<_>>().into()
 	}
 }
 

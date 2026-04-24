@@ -67,8 +67,8 @@ impl Selector {
 	pub fn new() -> Self { Self::default() }
 
 	/// Add a property mapped to a token.
-	pub fn with_token(mut self, value: impl Into<Token2>) -> Self {
-		self.tokens.push(value.into());
+	pub fn with_token(mut self, from: TokenId, to: TokenId) -> Self {
+		self.tokens.insert(from, to);
 		self
 	}
 
