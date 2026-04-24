@@ -20,13 +20,8 @@ pub enum ValueOrRef {
 	Ref(FieldRef),
 }
 
-pub trait InstancePath {
-	fn path(&self) -> &FieldPath;
-	/// The schema for this type.
-	fn schema(&self) -> &InstanceSchema;
-}
 
-#[derive(Debug, Reflect)]
+#[derive(Debug, Clone, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct InstanceSchema {
 	inner: InstanceSchemaInner,
@@ -48,7 +43,7 @@ impl InstanceSchema {
 }
 
 
-#[derive(Debug, Reflect)]
+#[derive(Debug, Clone, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum InstanceSchemaInner {
 	/// The instance represents a dynamic type built at runtime
@@ -107,6 +102,26 @@ impl InstanceMap {
 
 		self.instances.insert(path, instance);
 		Ok(self)
+	}
+
+	/// Convert the InstanceMap to a Document, resolving FieldRef values
+	pub fn resolve(
+		&self,
+		entity: Entity,
+		document_query: &mut DocumentQuery,
+	) -> Result<Document> {
+		let mut doc = Document::default();
+		for (path, instance) in self.instances.iter() {
+			match &instance.value {
+				ValueOrRef::Value(value) => doc.insert(&path, value)?,
+				ValueOrRef::Ref(field_ref) => document_query
+					.with_field(entity, field_ref, |value| {
+						doc.insert(&path, &value)
+					})
+					.flatten()?,
+			};
+		}
+		doc.xok()
 	}
 }
 

@@ -19,6 +19,8 @@ mod types;
 pub mod prelude {
 	pub use crate::document::*;
 	pub use crate::input::*;
+	#[cfg(feature = "style")]
+	pub use crate::token2;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	#[cfg(feature = "style")]

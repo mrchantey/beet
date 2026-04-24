@@ -67,6 +67,23 @@ impl Map {
 	}
 }
 
+
+impl std::fmt::Display for Map {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut entries: Vec<_> = self.0.iter().collect();
+		entries.sort_by_key(|(key, _)| key.as_str());
+		write!(
+			f,
+			"{{{}}}",
+			entries
+				.iter()
+				.map(|(key, val)| format!("{}: {}", key, val))
+				.collect::<Vec<_>>()
+				.join(", ")
+		)
+	}
+}
+
 impl From<HashMap<SmolStr, Value>> for Map {
 	fn from(map: HashMap<SmolStr, Value>) -> Self { Self(map) }
 }

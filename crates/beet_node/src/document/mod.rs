@@ -7,6 +7,7 @@ mod document_sync;
 mod field_path;
 mod field_ref;
 mod instance;
+mod token;
 #[cfg(feature = "action")]
 pub use common_actions::*;
 pub use document::*;
@@ -16,3 +17,4 @@ pub use document_sync::*;
 pub use field_path::*;
 pub use field_ref::*;
 pub use instance::*;
+pub use token::*;

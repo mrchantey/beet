@@ -17,6 +17,23 @@ use beet_core::prelude::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldPath(Vec<FieldSegment>);
 
+impl FieldPath {
+	pub fn new<T>(segments: impl IntoIterator<Item = T>) -> Self
+	where
+		T: Into<FieldSegment>,
+	{
+		Self(segments.into_iter().map(Into::into).collect())
+	}
+
+	pub fn of<T: TypePath>() -> Self {
+		let segments = T::type_path()
+			.split("::")
+			.map(|s| FieldSegment::ObjectKey(SmolStr::new_static(s)))
+			.collect();
+		Self(segments)
+	}
+}
+
 impl From<Vec<FieldSegment>> for FieldPath {
 	fn from(segments: Vec<FieldSegment>) -> Self { Self(segments) }
 }
@@ -57,14 +74,17 @@ impl FieldSegment {
 }
 
 /// Convert various types into a field path vector for document navigation.
-pub trait IntoFieldPath {
+pub trait IntoFieldPath<M> {
 	/// Convert this type into a vector of field path segments.
 	fn into_field_path(self) -> FieldPath;
 }
-impl IntoFieldPath for Vec<FieldSegment> {
+impl IntoFieldPath<Self> for FieldPath {
+	fn into_field_path(self) -> FieldPath { self }
+}
+impl IntoFieldPath<Self> for Vec<FieldSegment> {
 	fn into_field_path(self) -> FieldPath { self.into() }
 }
-impl IntoFieldPath for Vec<String> {
+impl IntoFieldPath<Self> for Vec<String> {
 	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
 			.map(FieldSegment::key)
@@ -72,7 +92,7 @@ impl IntoFieldPath for Vec<String> {
 			.into()
 	}
 }
-impl IntoFieldPath for Vec<&str> {
+impl IntoFieldPath<Self> for Vec<&str> {
 	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
 			.map(FieldSegment::key)
@@ -81,7 +101,7 @@ impl IntoFieldPath for Vec<&str> {
 	}
 }
 
-impl IntoFieldPath for Vec<usize> {
+impl IntoFieldPath<Self> for Vec<usize> {
 	fn into_field_path(self) -> FieldPath {
 		self.into_iter()
 			.map(FieldSegment::ArrayIndex)
@@ -90,15 +110,15 @@ impl IntoFieldPath for Vec<usize> {
 	}
 }
 
-impl IntoFieldPath for &[FieldSegment] {
+impl IntoFieldPath<Self> for &[FieldSegment] {
 	fn into_field_path(self) -> FieldPath { self.to_vec().into() }
 }
-impl IntoFieldPath for &str {
+impl IntoFieldPath<Self> for &str {
 	fn into_field_path(self) -> FieldPath {
 		vec![FieldSegment::key(self)].into()
 	}
 }
-impl IntoFieldPath for String {
+impl IntoFieldPath<Self> for String {
 	fn into_field_path(self) -> FieldPath {
 		vec![FieldSegment::key(self)].into()
 	}

@@ -40,13 +40,15 @@ impl FieldRef {
 	/// Use [`with_document`](Self::with_document) to specify a different document.
 	///
 	/// By default, missing fields are initialized with [`Value::Null`].
-	pub fn new(field_path: impl IntoFieldPath) -> Self {
+	pub fn new<M>(field_path: impl IntoFieldPath<M>) -> Self {
 		Self {
 			document: DocumentPath::default(),
 			field_path: field_path.into_field_path(),
 			on_missing: OnMissingField::default(),
 		}
 	}
+
+	pub fn of<T: TypePath>() -> Self { Self::new(FieldPath::of::<T>()) }
 
 	/// Set the document path for this field reference.
 	pub fn with_document(mut self, document: DocumentPath) -> Self {
@@ -67,7 +69,7 @@ impl FieldRef {
 	}
 
 	/// Set the field to initialize with a specific value if missing.
-	pub fn init_with(mut self, value: impl Into<Value>) -> Self {
+	pub fn with_init(mut self, value: impl Into<Value>) -> Self {
 		self.on_missing = OnMissingField::Init {
 			value: value.into(),
 		};

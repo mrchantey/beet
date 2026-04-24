@@ -130,7 +130,7 @@ struct CounterParams {
 
 
 fn counter() -> impl Bundle {
-	let field_ref = FieldRef::new("count").init_with(0);
+	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
 		fixed_scene("counter", rsx! {
