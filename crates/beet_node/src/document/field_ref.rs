@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+
+
 /// A reference to a specific field in a document.
 ///
 /// Used by content and actions to interact with document fields. By default,
@@ -9,6 +11,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[reflect(Component)]
 #[component(immutable, on_add=on_add)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldRef {
 	/// The path to the document
 	pub document: DocumentPath,

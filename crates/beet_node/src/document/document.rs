@@ -16,7 +16,7 @@ use bevy::reflect::Typed;
 	Eq,
 	Hash,
 	Deref,
-	DerefMut,
+	// DerefMut,
 	Component,
 	Reflect,
 )]
@@ -45,7 +45,7 @@ impl Document {
 	/// ## Errors
 	///
 	/// Errors if an array or object is expected, and the actual type is not the expected, nor empty.
-	pub(super) fn try_init_field_with(
+	pub(super) fn insert(
 		&mut self,
 		path: &[FieldSegment],
 		init_value: &Value,
@@ -59,25 +59,25 @@ impl Document {
 					if current.is_null() {
 						*current = Value::List(Vec::new());
 					}
-					let array =
+					let list =
 						current.as_list_mut().map_err(DocumentError::from)?;
 					// expand array if needed
-					while array.len() <= *idx {
-						array.push(Value::Null);
+					while list.len() <= *idx {
+						list.push(Value::Null);
 					}
-					current = &mut array[*idx];
+					current = &mut list[*idx];
 				}
 				FieldSegment::ObjectKey(key) => {
 					// initialize as object if null or empty
 					if current.is_null() {
 						*current = Value::Map(Default::default());
 					}
-					let object =
+					let map =
 						current.as_map_mut().map_err(DocumentError::from)?;
-					if !object.contains_key(key) {
-						object.insert(key.clone(), init_value.clone());
+					if !map.contains_key(key) {
+						map.insert(key.clone(), init_value.clone());
 					}
-					current = object.get_mut(key).unwrap();
+					current = map.get_mut(key).unwrap();
 				}
 			}
 		}
@@ -223,6 +223,7 @@ pub enum DocumentError {
 
 /// Specifies behavior when a field is missing from a document.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum OnMissingField {
 	/// Initialize the field with the provided value if it doesn't exist.
 	Init {
@@ -244,6 +245,7 @@ impl Default for OnMissingField {
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DocumentPath {
 	/// The document for the nearest ancestor with a [`Document`] component.
 	#[default]
@@ -339,7 +341,7 @@ mod test {
 		let mut doc = Document::default();
 
 		let value = doc
-			.try_init_field_with(
+			.insert(
 				&[FieldSegment::key("nested"), FieldSegment::key("value")],
 				&Value::Null,
 			)
@@ -360,7 +362,7 @@ mod test {
 		let mut doc = Document::default();
 
 		let value = doc
-			.try_init_field_with(
+			.insert(
 				&[FieldSegment::key("items"), FieldSegment::ArrayIndex(2)],
 				&Value::Null,
 			)

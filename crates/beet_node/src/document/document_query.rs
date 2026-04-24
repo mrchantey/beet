@@ -93,7 +93,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			} else if let OnMissingField::Init { value: init_value } =
 				&field.on_missing
 			{
-				doc.try_init_field_with(&field.field_path, init_value)?
+				doc.insert(&field.field_path, init_value)?
 			} else {
 				return Err(DocumentError::ObjectKeyNotFound {
 					path: field.field_path.clone(),
@@ -107,8 +107,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		{
 			// create the document and run the method with it
 			let mut doc = Document::default();
-			let value =
-				doc.try_init_field_with(&field.field_path, init_value)?;
+			let value = doc.insert(&field.field_path, init_value)?;
 			let out = func(value);
 			self.commands.entity(doc_entity).insert(doc);
 			Ok(out)

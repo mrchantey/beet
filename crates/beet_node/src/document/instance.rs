@@ -1,15 +1,23 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-#[derive(Get)]
+#[derive(Debug, Reflect, Get)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Instance {
 	/// The value of this instance, matching its
 	/// associated schema.
-	value: Value,
+	value: ValueOrRef,
 	/// Schema for the value of this instance.
 	/// This may be a reference to an external schema,
 	/// which must be available for validation.
 	schema: InstanceSchema,
+}
+
+#[derive(Debug, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ValueOrRef {
+	Value(Value),
+	Ref(FieldRef),
 }
 
 pub trait InstancePath {

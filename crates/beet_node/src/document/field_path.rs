@@ -14,6 +14,7 @@ use beet_core::prelude::*;
 	DerefMut,
 	Reflect,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldPath(Vec<FieldSegment>);
 
 impl From<Vec<FieldSegment>> for FieldPath {
@@ -41,6 +42,7 @@ impl std::fmt::Display for FieldPath {
 ///
 /// Paths are built from sequences of these segments to access nested fields.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FieldSegment {
 	/// Access an array element by index.
 	ArrayIndex(usize),
