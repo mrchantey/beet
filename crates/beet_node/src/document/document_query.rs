@@ -23,6 +23,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				.find(|entity| self.doc_query.contains(*entity))
 				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
 			DocumentPath::Entity(entity) => *entity,
+			DocumentPath::This => subject,
 		}
 	}
 

@@ -250,10 +250,13 @@ pub enum DocumentPath {
 	/// The document for the nearest ancestor with a [`Document`] component.
 	#[default]
 	Ancestor,
+	/// Do not traverse at all
+	This,
 	/// The root entity.
 	Root,
 	/// A specific document by entity id.
 	Entity(Entity),
+	// TODO url, perhaps with some automerge style synchronous system
 }
 
 

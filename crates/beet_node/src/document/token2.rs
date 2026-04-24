@@ -31,6 +31,7 @@ impl Token2 {
 		}
 		.xok()
 	}
+
 	/// Create new token, using `Token` for the field path
 	pub fn new_field<Token: TypePath, Schema: TypePath>() -> Self {
 		Self {

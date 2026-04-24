@@ -8,26 +8,38 @@ pub struct Property2 {
 	/// The name of this property in css,
 	/// ie `background-color`
 	css_name: SmolStr,
-	/// Whether this property should traverse
-	/// up the stack and inherit parent properties
-	inheritance: Inheritance,
 	/// Token for the value of this property.
 	value: Token2,
 }
 
 
 impl Property2 {
-	pub fn new(
+	/// Create a new property,
+	/// using [`Schema`] for the schema type,
+	/// and Token as the FieldPath, resulting in
+	/// traveral up ancestors if not found.
+	pub fn new<Token: TypePath, Schema: TypePath>(
 		css_name: impl Into<SmolStr>,
-		inheritance: Inheritance,
+		document_path: DocumentPath,
+	) -> Self {
+		Self {
+			css_name: css_name.into(),
+			value: Token2::new(
+				FieldRef::of::<Token>().with_document(document_path),
+				TokenSchema::of::<Schema>(),
+			),
+		}
+	}
+	pub fn new_with_value(
+		css_name: impl Into<SmolStr>,
 		value: impl Into<Token2>,
 	) -> Self {
 		Self {
 			css_name: css_name.into(),
-			inheritance,
 			value: value.into(),
 		}
 	}
+
 }
 
 

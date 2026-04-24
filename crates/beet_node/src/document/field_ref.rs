@@ -8,7 +8,9 @@ use beet_core::prelude::*;
 /// Used by content and actions to interact with document fields. By default,
 /// fields are initialized with `null` if missing, unless configured otherwise
 /// via [`on_missing`](FieldRef::on_missing).
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component, SetWith,
+)]
 #[reflect(Component)]
 #[component(immutable, on_add=on_add)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -49,12 +51,6 @@ impl FieldRef {
 	}
 
 	pub fn of<T: TypePath>() -> Self { Self::new(FieldPath::of::<T>()) }
-
-	/// Set the document path for this field reference.
-	pub fn with_document(mut self, document: DocumentPath) -> Self {
-		self.document = document;
-		self
-	}
 
 	/// Set this field reference to error if the field is missing instead of initializing it.
 	pub fn error_on_missing(mut self) -> Self {

@@ -1,9 +1,20 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
+use crate::prelude::style;
 use crate::prelude::*;
-use crate::style::material::colors;
 use crate::style::*;
-use crate::token2;
-use beet_core::prelude::*;
+// use crate::style::material::colors;
+// use crate::style::*;
+// use crate::token2;
+// use beet_core::prelude::*;
 
-token2!(BackgroundColor, Property2, Property2::new("background-color", Inheritance::Inherited, colors::Primary::default()));
-token2!(ForegroundColor, Property2, Property2::new("color", Inheritance::Inherited, colors::OnPrimary::default()));
+
+pub fn primary_text()->Selector{
+	todo!("selector is hashmap Token,Token")
+	// let token2:Token2 = props::ForegroundColor2::default().into();
+	// Selector::new().with_rule(Rule::class("text-primary"))
+		// .with_token(
+		// props::ForegroundColor2::default().xinto()
+		// Token2::from())
+		// )
+	// )
+}

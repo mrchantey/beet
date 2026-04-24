@@ -7,7 +7,7 @@ pub struct Selector {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
 	rules: Vec<Rule>,
-	tokens: TokenMap2,
+	tokens: Vec<Token2>,
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
@@ -30,6 +30,20 @@ pub enum Rule {
 }
 
 impl Rule {
+	pub fn class(class: impl Into<SmolStr>) -> Self {
+		Self::Class(class.into())
+	}
+	pub fn tag(tag: impl Into<SmolStr>) -> Self { Self::Tag(tag.into()) }
+	pub fn state(state: ElementState) -> Self { Self::State(state) }
+
+	pub fn attribute(key: impl Into<SmolStr>, value: Option<Value>) -> Self {
+		Self::Attribute {
+			key: key.into(),
+			value,
+		}
+	}
+	pub fn not(rule: Rule) -> Self { Self::Not(Box::new(rule)) }
+
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
 			Rule::Tag(tag) => el.element.tag() == tag,
@@ -53,13 +67,9 @@ impl Selector {
 	pub fn new() -> Self { Self::default() }
 
 	/// Add a property mapped to a token.
-	pub fn with_token(
-		mut self,
-		path: FieldPath,
-		value: Token2,
-	) -> Result<Self> {
-		self.tokens.insert(path, value)?;
-		self.xok()
+	pub fn with_token(mut self, value: impl Into<Token2>) -> Self {
+		self.tokens.push(value.into());
+		self
 	}
 
 	pub fn with_rule(mut self, rule: Rule) -> Self {
