@@ -41,49 +41,51 @@ token!(OutlineWidthThick,  Length);
 
 /// Returns a [`Selector`] with all MD3 elevation default values.
 pub fn default_elevations() -> Selector {
-	Selector::new()
+	let elevation_color = Color::srgba(0., 0., 0., 0.2);
+
+	Selector::root()
 		.with_value::<Elevation0>(Elevation::default()).unwrap()
 		.with_value::<Elevation1>(Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(1.0),
 			blur_radius:   Length::Px(3.0),
 			spread_radius: Length::Px(1.0),
-			color:         palettes::basic::BLACK.into(),
+			color:         elevation_color.clone(),
 		}).unwrap()
 		.with_value::<Elevation2>(Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(2.0),
 			blur_radius:   Length::Px(6.0),
 			spread_radius: Length::Px(2.0),
-			color:         palettes::basic::BLACK.into(),
+			color:         elevation_color.clone(),
 		}).unwrap()
 		.with_value::<Elevation3>(Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(4.0),
 			blur_radius:   Length::Px(8.0),
 			spread_radius: Length::Px(3.0),
-			color:         palettes::basic::BLACK.into(),
+			color:         elevation_color.clone(),
 		}).unwrap()
 		.with_value::<Elevation4>(Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(6.0),
 			blur_radius:   Length::Px(10.0),
 			spread_radius: Length::Px(4.0),
-			color:         palettes::basic::BLACK.into(),
+			color:         elevation_color.clone(),
 		}).unwrap()
 		.with_value::<Elevation5>(Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(8.0),
 			blur_radius:   Length::Px(12.0),
 			spread_radius: Length::Px(6.0),
-			color:         palettes::basic::BLACK.into(),
+			color:         elevation_color.clone(),
 		}).unwrap()
 }
 
 /// Returns a [`Selector`] with all MD3 shape corner, composite shape, and
 /// outline width default values.
 pub fn default_shapes() -> Selector {
-	Selector::new()
+	Selector::root()
 		// corner length ref tokens
 		.with_value::<ShapeCornerNone>(Length::Px(0.0)).unwrap()
 		.with_value::<ShapeCornerExtraSmall>(Length::Px(4.0)).unwrap()

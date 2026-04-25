@@ -11,13 +11,46 @@ pub struct Selector {
 	tokens: HashMap<TokenPath, ValueOrToken>,
 }
 
+
+impl Selector {
+	pub fn root() -> Self { Self::new().with_rule(Rule::Root) }
+
+	/// Match elements with the given tag.
+	pub fn new() -> Self { Self::default() }
+
+	pub fn with_typed<K: TypedToken, V: TypedToken>(self) -> Self {
+		self.with_token(K::path(), V::token())
+	}
+	pub fn with_value<K: TypedToken>(self, value: impl Typed) -> Result<Self> {
+		self.with_token(K::path(), TypedValue::new(value)?).xok()
+	}
+	/// Add a property mapped to a token.
+	pub fn with_token(
+		mut self,
+		token: TokenPath,
+		value: impl Into<ValueOrToken>,
+	) -> Self {
+		self.tokens.insert(token, value.into());
+		self
+	}
+
+	pub fn with_rule(mut self, rule: Rule) -> Self {
+		self.rules.push(rule);
+		self
+	}
+	/// Matches all rules, or `true` if empty
+	pub fn matches(&self, el: &ElementView) -> bool {
+		self.rules.iter().all(|rule| rule.matches(el))
+	}
+}
+
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
 #[derive(Reflect)]
 pub enum Rule {
-	// /// A global selector, in css this will evaluate to `:root`,
-	// /// and in other contexts
-	// Root,
+	/// A global selector, in css this will evaluate to `:root`,
+	/// and will always match true
+	Root,
 	/// Must have this tag, eg `div`
 	Tag(SmolStr),
 	/// Must have this class, eg `.my-class`
@@ -51,6 +84,7 @@ impl Rule {
 
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
+			Rule::Root => true,
 			Rule::Tag(tag) => el.element.tag() == tag,
 			Rule::Attribute { key, value } => match value {
 				Some(expected) => el
@@ -63,36 +97,5 @@ impl Rule {
 			Rule::Class(class) => el.contains_class(class),
 			Rule::Not(inner) => !inner.iter().any(|rule| rule.matches(el)),
 		}
-	}
-}
-
-
-impl Selector {
-	/// Match elements with the given tag.
-	pub fn new() -> Self { Self::default() }
-
-	pub fn with_typed<K: TypedToken, V: TypedToken>(self) -> Self {
-		self.with_token(K::path(), V::token())
-	}
-	pub fn with_value<K: TypedToken>(self, value: impl Typed) -> Result<Self> {
-		self.with_token(K::path(), TypedValue::new(value)?).xok()
-	}
-	/// Add a property mapped to a token.
-	pub fn with_token(
-		mut self,
-		token: TokenPath,
-		value: impl Into<ValueOrToken>,
-	) -> Self {
-		self.tokens.insert(token, value.into());
-		self
-	}
-
-	pub fn with_rule(mut self, rule: Rule) -> Self {
-		self.rules.push(rule);
-		self
-	}
-	/// Matches all rules, or `true` if empty
-	pub fn matches(&self, el: &ElementView) -> bool {
-		self.rules.iter().all(|rule| rule.matches(el))
 	}
 }

@@ -57,7 +57,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 				#f_vis #f_ident: Token,
 			});
 			from_tokens_bindings.push(quote! {
-				let #f_ident = query.get_token(entity, &tokens.#f_ident)?.into_reflect()?;
+				let #f_ident = style_query.get_token(entity, tokens.#f_ident.path())?.into_reflect()?;
 			});
 		} else {
 			tokens_fields.push(quote! {
@@ -84,7 +84,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			fn from_tokens(
 				tokens: Self::Tokens,
 				entity: Entity,
-				query: &DocumentQuery,
+				style_query: &StyleQuery,
 			) -> Result<Self> {
 				#(#from_tokens_bindings)*
 				Ok(Self { #(#field_names),* })
@@ -132,7 +132,7 @@ mod test {
 			"expected ease: EaseFunction"
 		);
 		// get_token call for duration
-		assert!(result.contains("get_token"), "expected get_token call");
+		assert!(result.contains("style_query . get_token"), "expected style_query.get_token call");
 		// plain passthrough for ease
 		assert!(
 			result.contains("let ease = tokens . ease"),

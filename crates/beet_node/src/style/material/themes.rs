@@ -20,9 +20,13 @@ pub impl Color {
 	}
 }
 
+pub const LIGHT_SCHEME_CLASS: &str = "light-scheme";
+pub const DARK_SCHEME_CLASS: &str = "dark-scheme";
+
 /// Returns a [`Selector`] mapping semantic color tokens to their light-scheme tones.
 pub fn light_scheme() -> Selector {
 	Selector::new()
+		.with_rule(Rule::class(LIGHT_SCHEME_CLASS))
 		.with_typed::<colors::Primary,                  tones::Primary40>()
 		.with_typed::<colors::OnPrimary,                tones::Primary100>()
 		.with_typed::<colors::PrimaryContainer,         tones::Primary90>()
@@ -57,6 +61,7 @@ pub fn light_scheme() -> Selector {
 /// Returns a [`Selector`] mapping semantic color tokens to their dark-scheme tones.
 pub fn dark_scheme() -> Selector {
 	Selector::new()
+		.with_rule(Rule::class(DARK_SCHEME_CLASS))
 		.with_typed::<colors::Primary,                  tones::Primary80>()
 		.with_typed::<colors::OnPrimary,                tones::Primary20>()
 		.with_typed::<colors::PrimaryContainer,         tones::Primary30>()
@@ -94,7 +99,7 @@ pub fn from_color(color: impl Into<Color>) -> Selector {
 	let theme = ThemeBuilder::with_source(color.into().to_argb()).build();
 	let Palettes { primary, secondary, tertiary, neutral, neutral_variant: nv, error } = theme.palettes;
 
-	Selector::new()
+	Selector::root()
 		// ── Primary tones ─────────────────────────────────────────────────────
 		.with_value::<tones::Primary0>(Color::from_argb(primary.tone(0))).unwrap()
 		.with_value::<tones::Primary10>(Color::from_argb(primary.tone(10))).unwrap()
@@ -183,7 +188,7 @@ pub fn from_color(color: impl Into<Color>) -> Selector {
 
 /// Returns a [`Selector`] with default opacity scalar values.
 pub fn default_opacities() -> Selector {
-	Selector::new()
+	Selector::root()
 		.with_value::<colors::OpacityHovered>(0.08_f32).unwrap()
 		.with_value::<colors::OpacityFocused>(0.12_f32).unwrap()
 		.with_value::<colors::OpacityPressed>(0.12_f32).unwrap()

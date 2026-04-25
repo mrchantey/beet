@@ -2,7 +2,7 @@ assets
 agent/*
 .beet/infra
 !agent/skills
-
+out.txt
 examples/thread/persistent_chat.json
 
 !examples/assets

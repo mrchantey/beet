@@ -120,8 +120,8 @@ mod tests {
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
 		let store = SelectorStore::default()
-			.with(Selector::new().with_value::<colors::Primary>(red).unwrap())
-			.with(Selector::new().with_value::<colors::Primary>(blue).unwrap());
+			.with(Selector::root().with_value::<colors::Primary>(red).unwrap())
+			.with(Selector::root().with_value::<colors::Primary>(blue).unwrap());
 
 		let mut world = World::new();
 		let entity = world.spawn((Element::new("div"), store)).id();
@@ -142,7 +142,7 @@ mod tests {
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
 		world.insert_resource(
 			SelectorStore::default().with(
-				Selector::new().with_value::<colors::Primary>(red).unwrap(),
+				Selector::root().with_value::<colors::Primary>(red).unwrap(),
 			),
 		);
 
@@ -151,7 +151,7 @@ mod tests {
 			.spawn((
 				Element::new("div"),
 				SelectorStore::default().with(
-					Selector::new()
+					Selector::root()
 						.with_value::<colors::Primary>(blue)
 						.unwrap(),
 				),

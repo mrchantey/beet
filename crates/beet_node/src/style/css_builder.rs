@@ -43,7 +43,7 @@ pub struct CssFuncMap(
 			dyn 'static
 				+ Send
 				+ Sync
-				+ Fn(&Value, Entity, &DocumentQuery) -> Result<String>,
+				+ Fn(&Value, Entity, &StyleQuery) -> Result<String>,
 		>,
 	>,
 );
@@ -59,8 +59,10 @@ impl CssFuncMap {
 	{
 		self.0.insert(
 			TokenPath::of::<T::Tokens>(),
-			Arc::new(|value, entity, query| {
-				T::from_value(value, entity, query)?.to_css_value().xok()
+			Arc::new(|value, entity, style_query| {
+				T::from_value(value, entity, style_query)?
+					.to_css_value()
+					.xok()
 			}),
 		);
 		self
@@ -70,10 +72,10 @@ impl CssFuncMap {
 		&self,
 		value: &TypedValue,
 		entity: Entity,
-		query: &DocumentQuery,
+		style_query: &StyleQuery,
 	) -> Result<String> {
 		if let Some(func) = self.0.get(value.schema()) {
-			func(value.value(), entity, query)
+			func(value.value(), entity, style_query)
 		} else {
 			bevybail!(
 				"No CSS function registered for this schema: {:#?}",
@@ -172,7 +174,6 @@ impl CssBuilder {
 		ident_map: &CssIdentMap,
 		func_map: &CssFuncMap,
 		style_query: &StyleQuery,
-		document_query: &DocumentQuery,
 	) -> Result<String> {
 		let selectors = style_query
 			.collect_selectors(entity)
@@ -181,9 +182,9 @@ impl CssBuilder {
 				self.build_selector(
 					selector,
 					entity,
-					document_query,
 					func_map,
 					ident_map,
+					style_query,
 				)
 			})?;
 
@@ -197,9 +198,9 @@ impl CssBuilder {
 		&self,
 		selector: &Selector,
 		entity: Entity,
-		document_query: &DocumentQuery,
 		func_map: &CssFuncMap,
 		ident_map: &CssIdentMap,
+		style_query: &StyleQuery,
 	) -> Result<String> {
 		let rules = self.rules_to_css(&selector.rules());
 
@@ -209,7 +210,7 @@ impl CssBuilder {
 
 				let value = match value {
 					ValueOrToken::Value(value) => {
-						func_map.resolve(value, entity, document_query)?
+						func_map.resolve(value, entity, style_query)?
 					}
 					ValueOrToken::Token(token) => self
 						.ident_to_css(&token.path(), ident_map)?
@@ -263,15 +264,20 @@ impl CssBuilder {
 	}
 
 	fn rules_to_css(&self, rules: &[Rule]) -> String {
-		rules
-			.iter()
-			.map(|rule| self.rule_to_css(rule))
-			.collect::<Vec<_>>()
-			.join(" ")
+		if rules.is_empty() {
+			return "*".to_string();
+		} else {
+			rules
+				.iter()
+				.map(|rule| self.rule_to_css(rule))
+				.collect::<Vec<_>>()
+				.join(" ")
+		}
 	}
 
 	fn rule_to_css(&self, rule: &Rule) -> String {
 		match rule {
+			Rule::Root => ":root".to_string(),
 			Rule::Tag(tag) => tag.to_string(),
 			Rule::Class(class) => format!(".{}", class),
 			Rule::State(ElementState::Hovered) => ":hover".to_string(),
@@ -311,14 +317,17 @@ mod tests {
 			(material::MaterialStylePlugin::default(), CssPlugin).into_world();
 
 
-		let css = world.spawn(rsx! {
-			<div class="text-primary">hello world!</div>
-		}).with_state::<(Res<CssIdentMap>,
-		Res<CssFuncMap>,
-		StyleQuery,
-		DocumentQuery),_>(|entity,state|{
-			CssBuilder::default().build(entity,&state.0,&state.1,&state.2,&state.3).xunwrap()
-		});
+		let css = world
+			.spawn(rsx! {
+				<div class="text-primary">hello world!</div>
+			})
+			.with_state::<(Res<CssIdentMap>, Res<CssFuncMap>, StyleQuery), _>(
+				|entity, state| {
+					CssBuilder::default()
+						.build(entity, &state.0, &state.1, &state.2)
+						.xunwrap()
+				},
+			);
 		println!("{css}");
 	}
 }
