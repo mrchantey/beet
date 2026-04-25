@@ -4,10 +4,11 @@ use super::FontWeight as StyleFontWeight;
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
+use bevy::reflect::Typed;
 
 /// Converts a value to its CSS string representation.
 pub trait CssValue {
-	fn to_css_value(&self) -> String;
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String>;
 }
 
 pub struct CssPlugin;
@@ -21,17 +22,17 @@ impl Plugin for CssPlugin {
 
 pub fn default_func_map() -> CssFuncMap {
 	CssFuncMap::default()
-		.insert::<Color, _>()
-		.insert::<f32, _>()
-		.insert::<Length, _>()
-		.insert::<Typeface, _>()
-		.insert::<StyleFontWeight, _>()
-		.insert::<Duration, _>()
-		.insert::<Shape, _>()
-		.insert::<Elevation, _>()
+		.insert::<Color>()
+		.insert::<f32>()
+		.insert::<Length>()
+		.insert::<Typeface>()
+		.insert::<StyleFontWeight>()
+		.insert::<Duration>()
+		.insert::<Shape>()
+		.insert::<Elevation>()
 		// types with a custom Tokens struct must specify Self as the marker
-		.insert::<Typography, Typography>()
-		.insert::<Motion, Motion>()
+		.insert::<TypographyTokens>()
+		.insert::<MotionTokens>()
 }
 
 /// Store methods for looking up a schema path and resolving a value
@@ -43,7 +44,7 @@ pub struct CssFuncMap(
 			dyn 'static
 				+ Send
 				+ Sync
-				+ Fn(&Value, Entity, &StyleQuery) -> Result<String>,
+				+ Fn(&Value, &CssBuilder) -> Result<String>,
 		>,
 	>,
 );
@@ -53,16 +54,11 @@ impl CssFuncMap {
 	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
 	/// (the type actually passed to `with_value`), not the output type,
 	/// so the key must match that tokens type.
-	pub fn insert<T: TypePath + FromTokens<M> + CssValue, M>(mut self) -> Self
-	where
-		T::Tokens: TypePath,
-	{
+	pub fn insert<T: Typed + FromReflect + CssValue>(mut self) -> Self {
 		self.0.insert(
-			TokenPath::of::<T::Tokens>(),
-			Arc::new(|value, entity, style_query| {
-				T::from_value(value, entity, style_query)?
-					.to_css_value()
-					.xok()
+			TokenPath::of::<T>(),
+			Arc::new(|value, builder| {
+				value.into_reflect::<T>()?.to_css_value(builder)
 			}),
 		);
 		self
@@ -71,11 +67,10 @@ impl CssFuncMap {
 	pub fn resolve(
 		&self,
 		value: &TypedValue,
-		entity: Entity,
-		style_query: &StyleQuery,
+		builder: &CssBuilder,
 	) -> Result<String> {
 		if let Some(func) = self.0.get(value.schema()) {
-			func(value.value(), entity, style_query)
+			func(value.value(), builder)
 		} else {
 			bevybail!(
 				"No CSS function registered for this schema: {:#?}",
@@ -150,43 +145,45 @@ impl std::fmt::Display for CssIdent {
 }
 
 impl CssValue for Color {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		let this = self.to_srgba();
-		format!(
-			"rgba({}, {}, {}, {})",
-			(this.red * 255.0).round() as u8,
-			(this.green * 255.0).round() as u8,
-			(this.blue * 255.0).round() as u8,
-			this.alpha
-		)
+		let alpha = this.alpha;
+		// still undecided about this..
+		// what if user wants to overwrite
+		if alpha == 1.0 {
+			format!(
+				"rgb({}, {}, {})",
+				(this.red * 255.0).round() as u8,
+				(this.green * 255.0).round() as u8,
+				(this.blue * 255.0).round() as u8,
+			)
+		} else {
+			format!(
+				"rgba({}, {}, {}, {})",
+				(this.red * 255.0).round() as u8,
+				(this.green * 255.0).round() as u8,
+				(this.blue * 255.0).round() as u8,
+				alpha
+			)
+		}
+		.xok()
 	}
 }
-#[derive(Default)]
-pub struct CssBuilder {
+pub struct CssBuilder<'a, 'w, 's> {
 	minify: bool,
+	ident_map: &'a CssIdentMap,
+	func_map: &'a CssFuncMap,
+	style_query: &'a StyleQuery<'w, 's>,
 }
 
 
-impl CssBuilder {
-	pub fn build(
-		&self,
-		entity: Entity,
-		ident_map: &CssIdentMap,
-		func_map: &CssFuncMap,
-		style_query: &StyleQuery,
-	) -> Result<String> {
-		let selectors = style_query
+impl CssBuilder<'_, '_, '_> {
+	pub fn build(&self, entity: Entity) -> Result<String> {
+		let selectors = self
+			.style_query
 			.collect_selectors(entity)
 			.into_iter()
-			.xtry_map(|selector| {
-				self.build_selector(
-					selector,
-					entity,
-					func_map,
-					ident_map,
-					style_query,
-				)
-			})?;
+			.xtry_map(|selector| self.build_selector(selector))?;
 
 		match self.minify {
 			true => Ok(selectors.join(" ")),
@@ -194,27 +191,20 @@ impl CssBuilder {
 		}
 	}
 
-	fn build_selector(
-		&self,
-		selector: &Selector,
-		entity: Entity,
-		func_map: &CssFuncMap,
-		ident_map: &CssIdentMap,
-		style_query: &StyleQuery,
-	) -> Result<String> {
+	fn build_selector(&self, selector: &Selector) -> Result<String> {
 		let rules = self.rules_to_css(&selector.rules());
 
 		let properties = selector.tokens().iter().xtry_map(
 			|(key, value)| -> Result<String> {
-				let key = self.ident_to_css(key, ident_map)?;
+				let key = self.ident_to_css(key)?;
 
 				let value = match value {
 					ValueOrToken::Value(value) => {
-						func_map.resolve(value, entity, style_query)?
+						self.func_map.resolve(value, self)?
 					}
-					ValueOrToken::Token(token) => self
-						.ident_to_css(&token.path(), ident_map)?
-						.as_css_value(),
+					ValueOrToken::Token(token) => {
+						self.ident_to_css(&token.path())?.as_css_value()
+					}
 				};
 
 				Ok(format!("{key}: {value}"))
@@ -232,7 +222,7 @@ impl CssBuilder {
 			}
 			false => {
 				format!(
-					"{} {{\n    {}\n}}",
+					"{} {{\n{}\n}}",
 					rules,
 					properties
 						.into_iter()
@@ -249,17 +239,13 @@ impl CssBuilder {
 	/// if a mapping is found, otherwise the last part of
 	/// the field path as a variable.
 	/// Non-specified idents are assumed to be variables, not properties.
-	fn ident_to_css(
-		&self,
-		path: &TokenPath,
-		ident_map: &CssIdentMap,
-	) -> Result<CssIdent> {
-		if let Some(ident) = ident_map.get(path) {
+	pub fn ident_to_css(&self, path: &TokenPath) -> Result<CssIdent> {
+		if let Some(ident) = self.ident_map.get(path) {
 			return ident.clone().xok();
 		}
 		use heck::ToKebabCase;
 		let path = path.to_string().to_kebab_case().replace("/", "--");
-		// TODO full path instead?
+		// TODO hash in prod
 		CssIdent::variable(path).xok()
 	}
 
@@ -323,9 +309,14 @@ mod tests {
 			})
 			.with_state::<(Res<CssIdentMap>, Res<CssFuncMap>, StyleQuery), _>(
 				|entity, state| {
-					CssBuilder::default()
-						.build(entity, &state.0, &state.1, &state.2)
-						.xunwrap()
+					CssBuilder {
+						minify: false,
+						ident_map: &state.0,
+						func_map: &state.1,
+						style_query: &state.2,
+					}
+					.build(entity)
+					.xunwrap()
 				},
 			);
 		println!("{css}");

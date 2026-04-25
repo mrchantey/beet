@@ -13,7 +13,7 @@ pub enum JustifyContent {
 }
 
 impl CssValue for JustifyContent {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -23,6 +23,7 @@ impl CssValue for JustifyContent {
 			Self::SpaceAround => "space-around",
 		}
 		.to_string()
+		.xok()
 	}
 }
 
@@ -37,7 +38,7 @@ pub enum AlignItems {
 }
 
 impl CssValue for AlignItems {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -46,6 +47,7 @@ impl CssValue for AlignItems {
 			Self::Baseline => "baseline",
 		}
 		.to_string()
+		.xok()
 	}
 }
 
@@ -60,7 +62,7 @@ pub enum AlignSelf {
 }
 
 impl CssValue for AlignSelf {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -69,6 +71,7 @@ impl CssValue for AlignSelf {
 			Self::Baseline => "baseline",
 		}
 		.to_string()
+		.xok()
 	}
 }
 
@@ -82,13 +85,14 @@ pub enum FlexSize {
 }
 
 impl CssValue for FlexSize {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Auto => "auto".to_string(),
-			Self::Unit(unit) => unit.to_css_value(),
+			Self::Unit(unit) => unit.to_css_value(builder)?,
 			Self::Grow(n) => n.to_string(),
 			Self::Shrink(n) => n.to_string(),
 		}
+		.xok()
 	}
 }
 
@@ -102,7 +106,7 @@ pub enum Direction {
 }
 
 impl CssValue for Direction {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Horizontal => "horizontal",
 			Self::Vertical => "vertical",
@@ -110,5 +114,6 @@ impl CssValue for Direction {
 			Self::ViewportMax => "vmax",
 		}
 		.to_string()
+		.xok()
 	}
 }

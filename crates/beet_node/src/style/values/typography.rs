@@ -18,7 +18,7 @@ impl Typeface {
 }
 
 impl CssValue for Typeface {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		// system font keywords must not be quoted
 		const SYSTEM_FONT_KEYWORDS: LazyLock<HashSet<&'static str>> =
 			LazyLock::new(|| {
@@ -62,7 +62,7 @@ impl CssValue for Typeface {
 				out.push(format!("\"{}\"", family));
 			}
 		}
-		out.join(", ")
+		out.join(", ").xok()
 	}
 }
 
@@ -75,12 +75,13 @@ pub enum FontWeight {
 }
 
 impl CssValue for FontWeight {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			Self::Normal => "normal".into(),
 			Self::Bold => "bold".into(),
 			Self::Absolute(val) => val.to_string(),
 		}
+		.xok()
 	}
 }
 
@@ -101,20 +102,52 @@ pub struct Typography {
 impl CssValue for Typography {
 	/// Returns CSS font properties as a space-separated shorthand:
 	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
 		let size = if let Some(lh) = &self.line_height {
-			format!("{}/{}", self.size.to_css_value(), lh.to_css_value())
+			format!(
+				"{}/{}",
+				self.size.to_css_value(builder)?,
+				lh.to_css_value(builder)?
+			)
 		} else {
-			self.size.to_css_value()
+			self.size.to_css_value(builder)?
 		};
 		let mut parts = vec![
-			self.weight.to_css_value(),
+			self.weight.to_css_value(builder)?,
 			size,
-			self.typeface.to_css_value(),
+			self.typeface.to_css_value(builder)?,
 		];
 		if let Some(ls) = &self.letter_spacing {
-			parts.push(format!("letter-spacing:{}", ls.to_css_value()));
+			parts.push(format!("letter-spacing:{}", ls.to_css_value(builder)?));
 		}
-		parts.join(" ")
+		parts.join(" ").xok()
+	}
+}
+
+impl CssValue for TypographyTokens {
+	/// Returns CSS font properties as a space-separated shorthand:
+	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+		let size = if let Some(lh) = &self.line_height {
+			format!(
+				"{}/{}",
+				self.size.to_css_value(builder)?,
+				lh.to_css_value(builder)?
+			)
+		} else {
+			self.size.to_css_value(builder)?
+		};
+		let mut parts = vec![
+			builder.ident_to_css(self.weight.path())?.as_css_value(),
+			// builder.ide
+			// builder.iden
+			// builder.self.weight.to_css_value(builder),
+			size,
+			builder.ident_to_css(self.typeface.path())?.as_css_value(),
+		];
+		if let Some(ls) = &self.letter_spacing {
+			parts.push(format!("letter-spacing:{}", ls.to_css_value(builder)?));
+		}
+		parts.join(" ").xok()
 	}
 }

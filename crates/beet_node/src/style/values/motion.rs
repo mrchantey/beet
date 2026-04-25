@@ -12,22 +12,35 @@ pub struct Motion {
 }
 
 impl CssValue for Motion {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
 		format!(
 			"{} {}",
-			self.duration.to_css_value(),
-			self.ease.to_css_value()
+			self.duration.to_css_value(builder)?,
+			self.ease.to_css_value(builder)?
 		)
+		.xok()
+	}
+}
+impl CssValue for MotionTokens {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+		format!(
+			"{} {}",
+			builder.ident_to_css(self.duration.path())?.as_css_value(),
+			self.ease.to_css_value(builder)?
+		)
+		.xok()
 	}
 }
 
 impl CssValue for Duration {
-	fn to_css_value(&self) -> String { format!("{}ms", self.as_millis()) }
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+		format!("{}ms", self.as_millis()).xok()
+	}
 }
 
 impl CssValue for EaseFunction {
 	#[rustfmt::skip]
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
 		match self {
 			// --- Standard Cubic Beziers ---
 			EaseFunction::Linear => 				"linear".to_string(),
@@ -60,6 +73,6 @@ impl CssValue for EaseFunction {
 			EaseFunction::ElasticIn => 					"linear(0, -0.01, 0.02, -0.05, 0.13, -0.32, 1)".to_string(),
 			// Fallback for types not explicitly mapped
 			_ => 																"ease-in-out".to_string(),
-		}
+		}.xok()
 	}
 }

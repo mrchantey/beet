@@ -2,7 +2,9 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 impl CssValue for f32 {
-	fn to_css_value(&self) -> String { self.to_string() }
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+		self.to_string().xok()
+	}
 }
 
 
@@ -34,7 +36,9 @@ impl std::fmt::Display for Length {
 }
 
 impl CssValue for Length {
-	fn to_css_value(&self) -> String { self.to_string() }
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+		self.to_string().xok()
+	}
 }
 
 
@@ -60,16 +64,17 @@ impl Default for Elevation {
 }
 
 impl CssValue for Elevation {
-	fn to_css_value(&self) -> String {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
 		[
-			self.offset_x.to_css_value(),
-			self.offset_y.to_css_value(),
-			self.blur_radius.to_css_value(),
-			self.spread_radius.to_css_value(),
-			self.color.to_css_value(),
+			self.offset_x.to_css_value(builder)?,
+			self.offset_y.to_css_value(builder)?,
+			self.blur_radius.to_css_value(builder)?,
+			self.spread_radius.to_css_value(builder)?,
+			self.color.to_css_value(builder)?,
 		]
 		.join(" ")
 		.to_string()
+		.xok()
 	}
 }
 
@@ -82,7 +87,9 @@ pub struct Shape {
 }
 
 impl CssValue for Shape {
-	fn to_css_value(&self) -> String { self.corner.to_css_value() }
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+		self.corner.to_css_value(builder)
+	}
 }
 
 /// Which edge(s) a shape corner radius applies to.
