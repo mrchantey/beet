@@ -95,27 +95,3 @@ impl Selector {
 		self.rules.iter().all(|rule| rule.matches(el))
 	}
 }
-
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use crate::style::common_props;
-	use crate::style::material;
-
-	#[test]
-	#[allow(unused)]
-	fn test() {
-		let scheme = material::themes::light_scheme();
-		let primary_text = material::selectors::primary_text();
-
-		let css_map = common_props::css_key_map();
-
-		let mut world = World::new();
-
-		world.spawn(rsx! {
-			<div class="text-primary">hello world!</div>
-		});
-	}
-}

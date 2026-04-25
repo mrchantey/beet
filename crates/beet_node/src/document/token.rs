@@ -19,18 +19,18 @@ pub struct Token {
 	schema: TokenPath,
 }
 
-pub trait FromTokens: Sized {
+pub trait FromTokens<M>: Sized {
 	type Tokens: Typed + FromReflect;
 	fn from_value(
 		value: &Value,
 		entity: Entity,
-		document_query: &DocumentQuery,
+		query: &DocumentQuery,
 	) -> Result<Self>
 	where
 		Self::Tokens: Sized,
 	{
 		let tokens = value.into_reflect::<Self::Tokens>()?;
-		Self::from_tokens(tokens, entity, document_query)
+		Self::from_tokens(tokens, entity, query)
 	}
 	fn from_tokens(
 		tokens: Self::Tokens,
@@ -38,9 +38,24 @@ pub trait FromTokens: Sized {
 		document_query: &DocumentQuery,
 	) -> Result<Self>;
 }
+pub struct SelfFromTokensMarker;
+
+impl<T> FromTokens<SelfFromTokensMarker> for T
+where
+	T: Sized + Typed + FromReflect,
+{
+	type Tokens = Self;
+	fn from_tokens(
+		this: Self::Tokens,
+		_entity: Entity,
+		_document_query: &DocumentQuery,
+	) -> Result<Self> {
+		this.xok()
+	}
+}
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Get)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedValue {
 	value: Value,

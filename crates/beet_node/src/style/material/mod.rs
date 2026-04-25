@@ -1,12 +1,12 @@
 pub mod colors;
-pub mod default_store;
+pub mod material_plugin;
 pub mod geometry;
 pub mod motion;
 pub mod selectors;
 pub mod themes;
 pub mod tones;
 pub mod typography;
-pub use default_store::*;
+pub use material_plugin::*;
 pub use geometry::*;
 pub use motion::*;
 pub use typography::*;

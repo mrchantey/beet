@@ -32,7 +32,6 @@ impl SelectorStore {
 /// implemented; add the entity's own selectors or use the global store.
 #[derive(SystemParam, Get)]
 pub struct StyleQuery<'w, 's> {
-	css_key_map: Option<Res<'w, CssIdentMap>>,
 	entity_selectors: Query<'w, 's, (Entity, &'static SelectorStore)>,
 	global_selectors: Option<Res<'w, SelectorStore>>,
 	elements: ElementQuery<'w, 's>,

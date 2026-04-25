@@ -57,7 +57,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 				#f_vis #f_ident: Token,
 			});
 			from_tokens_bindings.push(quote! {
-				let #f_ident = document_query.get_token(entity, &tokens.#f_ident)?.into_reflect()?;
+				let #f_ident = query.get_token(entity, &tokens.#f_ident)?.into_reflect()?;
 			});
 		} else {
 			tokens_fields.push(quote! {
@@ -79,12 +79,12 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			#(#tokens_fields)*
 		}
 
-		impl #impl_generics FromTokens for #ident #type_generics #where_clause {
+		impl #impl_generics FromTokens<Self> for #ident #type_generics #where_clause {
 			type Tokens = #tokens_ident #type_generics;
 			fn from_tokens(
 				tokens: Self::Tokens,
 				entity: Entity,
-				document_query: &DocumentQuery,
+				query: &DocumentQuery,
 			) -> Result<Self> {
 				#(#from_tokens_bindings)*
 				Ok(Self { #(#field_names),* })

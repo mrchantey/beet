@@ -1,9 +1,28 @@
-use crate::style::material::geometry;
-use crate::style::material::motion;
-use crate::style::material::themes;
-use crate::style::material::typography;
-use crate::style::*;
+use super::*;
 use beet_core::prelude::*;
+
+use crate::style::SelectorStore;
+pub struct MaterialStylePlugin {
+	color: Color,
+}
+impl Default for MaterialStylePlugin {
+	fn default() -> Self {
+		Self {
+			color: palettes::basic::GREEN.into(),
+		}
+	}
+}
+
+impl Plugin for MaterialStylePlugin {
+	fn build(&self, app: &mut App) {
+		app.insert_resource(
+			default_store(self.color.clone())
+				.with(themes::light_scheme())
+				.with(selectors::primary_text()),
+		);
+	}
+}
+
 
 /// Returns a [`SelectorStore`] with all material design default values.
 ///

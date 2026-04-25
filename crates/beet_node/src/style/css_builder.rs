@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
@@ -7,14 +9,71 @@ pub trait CssValue {
 	fn to_css_value(&self) -> String;
 }
 
+pub struct CssPlugin;
+
+impl Plugin for CssPlugin {
+	fn build(&self, app: &mut App) {
+		app.insert_resource(default_func_map())
+			.insert_resource(common_props::css_ident_map());
+	}
+}
+
+pub fn default_func_map() -> CssFuncMap {
+	CssFuncMap::default()
+		.insert::<Color, _>()
+		// types with an actual Tokens impl must specify Self
+		.insert::<Typography, Typography>()
+		.insert::<Motion, Motion>()
+}
+
+/// Store methods for looking up a schema path and resolving a value
+#[derive(Default, Deref, Resource)]
+pub struct CssFuncMap(
+	HashMap<
+		TokenPath,
+		Arc<
+			dyn 'static
+				+ Send
+				+ Sync
+				+ Fn(&Value, Entity, &DocumentQuery) -> Result<String>,
+		>,
+	>,
+);
+impl CssFuncMap {
+	pub fn insert<T: TypePath + FromTokens<M> + CssValue, M>(mut self) -> Self {
+		self.0.insert(
+			TokenPath::of::<T>(),
+			Arc::new(|value, entity, query| {
+				T::from_value(value, entity, query)?.to_css_value().xok()
+			}),
+		);
+		self
+	}
+
+	pub fn resolve(
+		&self,
+		value: &TypedValue,
+		entity: Entity,
+		query: &DocumentQuery,
+	) -> Result<String> {
+		if let Some(func) = self.0.get(value.schema()) {
+			func(value.value(), entity, query)
+		} else {
+			bevybail!(
+				"No CSS function registered for this schema: {:#?}",
+				value
+			)
+		}
+	}
+}
+
+
+
 /// Map a token path to a css key,
 /// Multiple tokens may point to the same key,
 /// but usually dont when defined in the same crate.
 #[derive(Default, Deref, Resource)]
 pub struct CssIdentMap(HashMap<TokenPath, CssIdent>);
-
-#[derive(Default, Deref, Resource)]
-pub struct CssFuncMap(HashMap<TokenPath, CssIdent>);
 
 
 impl CssIdentMap {
@@ -84,12 +143,7 @@ impl CssValue for Color {
 		)
 	}
 }
-
-
-pub struct CssRule {
-	selectors: String,
-	properties: HashMap<String, String>,
-}
+#[derive(Default)]
 pub struct CssBuilder {
 	minify: bool,
 }
@@ -99,34 +153,50 @@ impl CssBuilder {
 	pub fn build(
 		&self,
 		entity: Entity,
+		ident_map: &CssIdentMap,
+		func_map: &CssFuncMap,
 		style_query: &StyleQuery,
 		document_query: &DocumentQuery,
 	) -> Result<String> {
-		let ident_map = style_query.css_key_map().as_deref();
-
 		let selectors = style_query
 			.collect_selectors(entity)
 			.into_iter()
-			.xtry_map(|selector| self.build_selector(selector, ident_map))?;
+			.xtry_map(|selector| {
+				self.build_selector(
+					selector,
+					entity,
+					document_query,
+					func_map,
+					ident_map,
+				)
+			})?;
 
-		String::new().xok()
+		match self.minify {
+			true => Ok(selectors.join(" ")),
+			false => Ok(selectors.join("\n\n")),
+		}
 	}
 
 	fn build_selector(
 		&self,
 		selector: &Selector,
-		key_map: Option<&CssIdentMap>,
+		entity: Entity,
+		document_query: &DocumentQuery,
+		func_map: &CssFuncMap,
+		ident_map: &CssIdentMap,
 	) -> Result<String> {
 		let rules = self.rules_to_css(&selector.rules());
 
 		let properties = selector.tokens().iter().xtry_map(
 			|(key, value)| -> Result<String> {
-				let key = self.ident_to_css(key, key_map)?;
+				let key = self.ident_to_css(key, ident_map)?;
 
 				let value = match value {
-					ValueOrToken::Value(value) => self.value_to_css(value)?,
+					ValueOrToken::Value(value) => {
+						func_map.resolve(value, entity, document_query)?
+					}
 					ValueOrToken::Token(token) => self
-						.ident_to_css(&token.path(), key_map)?
+						.ident_to_css(&token.path(), ident_map)?
 						.as_css_value(),
 				};
 
@@ -158,10 +228,6 @@ impl CssBuilder {
 		.xok()
 	}
 
-	fn value_to_css(&self, value: &TypedValue) -> Result<String> {
-		String::default().xok()
-	}
-
 	/// Returns the ident in css form, using the [`CssIdentMap`]
 	/// if a mapping is found, otherwise the last part of
 	/// the field path as a variable.
@@ -169,9 +235,9 @@ impl CssBuilder {
 	fn ident_to_css(
 		&self,
 		path: &TokenPath,
-		key_map: Option<&CssIdentMap>,
+		ident_map: &CssIdentMap,
 	) -> Result<CssIdent> {
-		if let Some(ident) = key_map.and_then(|map| map.0.get(path)) {
+		if let Some(ident) = ident_map.get(path) {
 			return ident.clone().xok();
 		}
 		use heck::ToKebabCase;
@@ -221,7 +287,22 @@ impl CssBuilder {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::style::material;
 
 	#[test]
-	fn test_name() {}
+	fn test() {
+		let mut world =
+			(material::MaterialStylePlugin::default(), CssPlugin).into_world();
+
+
+		let css = world.spawn(rsx! {
+			<div class="text-primary">hello world!</div>
+		}).with_state::<(Res<CssIdentMap>,
+		Res<CssFuncMap>,
+		StyleQuery,
+		DocumentQuery),_>(|entity,state|{
+			CssBuilder::default().build(entity,&state.0,&state.1,&state.2,&state.3).unwrap()
+		});
+		println!("{css}");
+	}
 }

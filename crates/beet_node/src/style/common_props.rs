@@ -28,7 +28,7 @@ token!(
 token!(LineHeight, Length, DocumentPath::Ancestor);
 token!(Tracking, Length, DocumentPath::Ancestor);
 
-pub fn css_key_map() -> CssIdentMap {
+pub fn css_ident_map() -> CssIdentMap {
 	CssIdentMap::default()
 		.with_property::<ForegroundColor>("color")
 		.with_property::<BackgroundColor>("background-color")
