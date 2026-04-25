@@ -38,6 +38,20 @@ pub struct StyleQuery<'w, 's> {
 }
 
 impl StyleQuery<'_, '_> {
+	/// Collects selectors in order:
+	/// 1. Global [`SelectorStore`] resource (lowest priority)
+	/// 2. Entity-local [`SelectorStore`] component (highest priority)
+	pub fn collect_selectors(&self, entity: Entity) -> Vec<&Selector> {
+		let mut selectors = Vec::new();
+		if let Some(global) = &self.global_selectors {
+			selectors.extend(global.iter());
+		}
+		if let Ok((_, store)) = self.entity_selectors.get(entity) {
+			selectors.extend(store.iter());
+		}
+		selectors
+	}
+
 	/// Collect all token values for `entity` by applying matching selectors.
 	///
 	/// Applies selectors in order:
@@ -55,34 +69,16 @@ impl StyleQuery<'_, '_> {
 			return map;
 		};
 
-		// global selectors — lowest priority
-		if let Some(global) = &self.global_selectors {
-			for selector in global.iter() {
-				if selector.matches(&el) {
-					map.extend(
-						selector
-							.tokens()
-							.iter()
-							.map(|(k, v)| (k.clone(), v.clone())),
-					);
-				}
+		for selector in self.collect_selectors(entity) {
+			if selector.matches(&el) {
+				map.extend(
+					selector
+						.tokens()
+						.iter()
+						.map(|(k, v)| (k.clone(), v.clone())),
+				);
 			}
 		}
-
-		// entity-local selectors — override global
-		if let Ok((_, store)) = self.entity_selectors.get(entity) {
-			for selector in store.iter() {
-				if selector.matches(&el) {
-					map.extend(
-						selector
-							.tokens()
-							.iter()
-							.map(|(k, v)| (k.clone(), v.clone())),
-					);
-				}
-			}
-		}
-
 		map
 	}
 }

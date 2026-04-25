@@ -247,10 +247,10 @@ impl Default for OnMissingField {
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DocumentPath {
-	/// The document for the nearest ancestor with a [`Document`] component.
+	/// The nearest ancestor (inclusive) with a [`Document`] component.
 	#[default]
 	Ancestor,
-	/// Do not traverse at all
+	/// This entity only, do not traverse.
 	This,
 	/// The root entity.
 	Root,

@@ -110,7 +110,7 @@ pub impl<T: Sized> T {
 	where
 		Self: core::fmt::Debug,
 	{
-		crate::cross_log!("{:?}", self);
+		crate::cross_log!("{:#?}", self);
 		self
 	}
 

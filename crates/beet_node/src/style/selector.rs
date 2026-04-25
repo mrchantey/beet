@@ -14,6 +14,9 @@ pub struct Selector {
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
 pub enum Rule {
+	// /// A global selector, in css this will evaluate to `:root`,
+	// /// and in other contexts
+	// Root,
 	/// Must have this tag, eg `div`
 	Tag(SmolStr),
 	/// Must have this class, eg `.my-class`
