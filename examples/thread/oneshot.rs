@@ -2,13 +2,17 @@ use beet::prelude::*;
 
 #[beet::main]
 async fn main() {
+	env_ext::load_dotenv();
+
 	let posts = ThreadMut::spawn()
 		.insert_actor(Actor::system())
 		.insert_post("make like a duck and quack")
 		.thread_view()
 		.insert_actor(Actor::agent())
 		.with_bundle(
-			OllamaProvider::default_12gb()
+			BedrockProvider::kimi_k2_5()
+				.unwrap()
+				// OllamaProvider::default_12gb()
 				// disable streaming since we're aggregating
 				.without_streaming(),
 		)

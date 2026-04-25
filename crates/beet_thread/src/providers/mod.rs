@@ -1,8 +1,10 @@
+mod bedrock;
 mod gemini;
 mod mock_provider;
-pub mod ollama;
-pub mod openai;
-pub use gemini::GeminiProvider;
+mod ollama;
+mod openai;
+pub use bedrock::*;
+pub use gemini::*;
 pub use mock_provider::*;
-pub use ollama::OllamaProvider;
-pub use openai::OpenAiProvider;
+pub use ollama::*;
+pub use openai::*;
