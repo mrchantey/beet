@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;

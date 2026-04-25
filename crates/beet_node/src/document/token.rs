@@ -121,7 +121,7 @@ enum TokenSchemaInner {
 
 /// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
 /// ie `org.beet/foo/bar`
-// pub struct Namespace(SmolStr);
+// pub struct Namespace(FieldPath);
 
 
 impl std::fmt::Display for TokenSchemaInner {
@@ -245,14 +245,13 @@ mod tests {
 		let _inst = TokenSchema::of::<Name>();
 		Foo::path()
 			.to_string()
-			.xpect_eq("beet_node.document.token2.tests.Foo");
+			.xpect_eq("beet_node.document.token.tests.Foo");
 	}
 
 	token!(
 			/// Some cool type
 			/// This now works perfectly!
 			#[derive(Debug, Clone)]
-			#[allow(unused)]
 			Foo,
 			Color,
 			DocumentPath::Ancestor
@@ -260,11 +259,6 @@ mod tests {
 	token!(
 		#[allow(unused)]
 		Bar,
-		Color
-	);
-	token!(
-		#[allow(unused)]
-		Boo,
 		Color
 	);
 }

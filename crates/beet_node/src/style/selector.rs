@@ -106,6 +106,7 @@ mod tests {
 	use crate::style::material;
 
 	#[test]
+	#[allow(unused)]
 	fn test() {
 		let scheme = material::themes::light_scheme();
 		let primary_text = material::selectors::primary_text();
