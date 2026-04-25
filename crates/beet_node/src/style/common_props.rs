@@ -4,9 +4,11 @@ use beet_core::prelude::Color;
 
 token!(ForegroundColor, Color, DocumentPath::Ancestor);
 token!(BackgroundColor, Color, DocumentPath::This);
+
+token!(Font, TypographyTokens, DocumentPath::This);
+
 token!(Height, Length, DocumentPath::This);
 token!(Width, Length, DocumentPath::This);
-token!(Size, Length, DocumentPath::This);
 token!(Padding, Length, DocumentPath::This);
 token!(Spacing, Length, DocumentPath::This);
 token!(
@@ -19,7 +21,7 @@ token!(
 );
 token!(OutlineWidth, Length, DocumentPath::This);
 token!(OutlineOffset, Length, DocumentPath::This);
-token!(Font, Typeface, DocumentPath::Ancestor);
+// token!(Font, Typeface, DocumentPath::Ancestor);
 token!(FontSize, Length, DocumentPath::Ancestor);
 token!(
     /// Font weight property token, named to avoid conflict with the [`FontWeight`] type.
@@ -28,13 +30,12 @@ token!(
 token!(LineHeight, Length, DocumentPath::Ancestor);
 token!(Tracking, Length, DocumentPath::Ancestor);
 
-pub fn css_ident_map() -> CssIdentMap {
-	CssIdentMap::default()
+pub fn css_ident_map() -> CssProperties {
+	CssProperties::default()
 		.with_property::<ForegroundColor>("color")
 		.with_property::<BackgroundColor>("background-color")
 		.with_property::<Height>("height")
 		.with_property::<Width>("width")
-		.with_variable::<Size>("size")
 		.with_property::<Padding>("padding")
 		.with_property::<Spacing>("gap")
 		.with_property::<ShapeProp>("border-radius")

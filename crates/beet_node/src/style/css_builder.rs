@@ -20,158 +20,9 @@ impl Plugin for CssPlugin {
 	}
 }
 
-pub fn default_func_map() -> CssFuncMap {
-	CssFuncMap::default()
-		.insert::<Color>()
-		.insert::<f32>()
-		.insert::<Length>()
-		.insert::<Typeface>()
-		.insert::<StyleFontWeight>()
-		.insert::<Duration>()
-		.insert::<Shape>()
-		.insert::<Elevation>()
-		// types with a custom Tokens struct must specify Self as the marker
-		.insert::<TypographyTokens>()
-		.insert::<MotionTokens>()
-}
-
-/// Store methods for looking up a schema path and resolving a value
-#[derive(Default, Deref, Resource)]
-pub struct CssFuncMap(
-	HashMap<
-		TokenPath,
-		Arc<
-			dyn 'static
-				+ Send
-				+ Sync
-				+ Fn(&Value, &CssBuilder) -> Result<String>,
-		>,
-	>,
-);
-impl CssFuncMap {
-	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
-	///
-	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
-	/// (the type actually passed to `with_value`), not the output type,
-	/// so the key must match that tokens type.
-	pub fn insert<T: Typed + FromReflect + CssValue>(mut self) -> Self {
-		self.0.insert(
-			TokenPath::of::<T>(),
-			Arc::new(|value, builder| {
-				value.into_reflect::<T>()?.to_css_value(builder)
-			}),
-		);
-		self
-	}
-
-	pub fn resolve(
-		&self,
-		value: &TypedValue,
-		builder: &CssBuilder,
-	) -> Result<String> {
-		if let Some(func) = self.0.get(value.schema()) {
-			func(value.value(), builder)
-		} else {
-			bevybail!(
-				"No CSS function registered for this schema: {:#?}",
-				value
-			)
-		}
-	}
-}
-
-
-
-/// Map a token path to a css key,
-/// Multiple tokens may point to the same key,
-/// but usually dont when defined in the same crate.
-#[derive(Default, Deref, Resource)]
-pub struct CssIdentMap(HashMap<TokenPath, CssIdent>);
-
-
-impl CssIdentMap {
-	pub fn with(mut self, path: TokenPath, ident: CssIdent) -> Self {
-		self.0.insert(path, ident);
-		self
-	}
-	pub fn with_property<T: TypedToken>(
-		self,
-		prop: impl Into<SmolStr>,
-	) -> Self {
-		self.with(T::path(), CssIdent::Property(prop.into()))
-	}
-	pub fn with_variable<T: TypedToken>(
-		self,
-		variable: impl Into<SmolStr>,
-	) -> Self {
-		self.with(T::path(), CssIdent::Variable(variable.into()))
-	}
-}
-
-
-
-
-#[derive(Debug, Clone)]
-pub enum CssIdent {
-	/// The variable name without a leading `--`
-	Variable(SmolStr),
-	Property(SmolStr),
-}
-
-impl CssIdent {
-	pub fn variable(name: impl Into<SmolStr>) -> Self {
-		Self::Variable(name.into())
-	}
-	pub fn property(name: impl Into<SmolStr>) -> Self {
-		Self::Property(name.into())
-	}
-
-	pub fn as_css_property(&self) -> String { self.to_string() }
-	pub fn as_css_value(&self) -> String {
-		match self {
-			CssIdent::Variable(var) => format!("var(--{})", var),
-			CssIdent::Property(prop) => prop.to_string(),
-		}
-	}
-}
-
-impl std::fmt::Display for CssIdent {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			CssIdent::Variable(var) => write!(f, "--{}", var),
-			CssIdent::Property(prop) => write!(f, "{}", prop),
-		}
-	}
-}
-
-impl CssValue for Color {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
-		let this = self.to_srgba();
-		let alpha = this.alpha;
-		// still undecided about this..
-		// what if user wants to overwrite
-		if alpha == 1.0 {
-			format!(
-				"rgb({}, {}, {})",
-				(this.red * 255.0).round() as u8,
-				(this.green * 255.0).round() as u8,
-				(this.blue * 255.0).round() as u8,
-			)
-		} else {
-			format!(
-				"rgba({}, {}, {}, {})",
-				(this.red * 255.0).round() as u8,
-				(this.green * 255.0).round() as u8,
-				(this.blue * 255.0).round() as u8,
-				alpha
-			)
-		}
-		.xok()
-	}
-}
 pub struct CssBuilder<'a, 'w, 's> {
 	minify: bool,
-	ident_map: &'a CssIdentMap,
+	ident_map: &'a CssProperties,
 	func_map: &'a CssFuncMap,
 	style_query: &'a StyleQuery<'w, 's>,
 }
@@ -292,22 +143,172 @@ impl CssBuilder<'_, '_, '_> {
 }
 
 
+
+/// Registers tokens that should represent properties
+/// instead of other variables.
+#[derive(Default, Deref, Resource)]
+pub struct CssProperties(HashMap<TokenPath, CssIdent>);
+
+
+impl CssProperties {
+	pub fn with(mut self, path: TokenPath, ident: CssIdent) -> Self {
+		self.0.insert(path, ident);
+		self
+	}
+	pub fn with_property<T: TypedToken>(
+		self,
+		prop: impl Into<SmolStr>,
+	) -> Self {
+		self.with(T::path(), CssIdent::Property(prop.into()))
+	}
+	pub fn with_variable<T: TypedToken>(
+		self,
+		variable: impl Into<SmolStr>,
+	) -> Self {
+		self.with(T::path(), CssIdent::Variable(variable.into()))
+	}
+}
+
+
+
+
+#[derive(Debug, Clone)]
+pub enum CssIdent {
+	/// The variable name without a leading `--`
+	Variable(SmolStr),
+	Property(SmolStr),
+}
+
+impl CssIdent {
+	pub fn variable(name: impl Into<SmolStr>) -> Self {
+		Self::Variable(name.into())
+	}
+	pub fn property(name: impl Into<SmolStr>) -> Self {
+		Self::Property(name.into())
+	}
+
+	pub fn as_css_property(&self) -> String { self.to_string() }
+	pub fn as_css_value(&self) -> String {
+		match self {
+			CssIdent::Variable(var) => format!("var(--{})", var),
+			CssIdent::Property(prop) => prop.to_string(),
+		}
+	}
+}
+
+impl std::fmt::Display for CssIdent {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			CssIdent::Variable(var) => write!(f, "--{}", var),
+			CssIdent::Property(prop) => write!(f, "{}", prop),
+		}
+	}
+}
+
+impl CssValue for Color {
+	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+		let this = self.to_srgba();
+		let alpha = this.alpha;
+		// still undecided about this..
+		// what if user wants to overwrite
+		if alpha == 1.0 {
+			format!(
+				"rgb({}, {}, {})",
+				(this.red * 255.0).round() as u8,
+				(this.green * 255.0).round() as u8,
+				(this.blue * 255.0).round() as u8,
+			)
+		} else {
+			format!(
+				"rgba({}, {}, {}, {})",
+				(this.red * 255.0).round() as u8,
+				(this.green * 255.0).round() as u8,
+				(this.blue * 255.0).round() as u8,
+				alpha
+			)
+		}
+		.xok()
+	}
+}
+pub fn default_func_map() -> CssFuncMap {
+	CssFuncMap::default()
+		.insert::<Color>()
+		.insert::<f32>()
+		.insert::<Length>()
+		.insert::<Typeface>()
+		.insert::<StyleFontWeight>()
+		.insert::<Duration>()
+		.insert::<Shape>()
+		.insert::<Elevation>()
+		// types with a custom Tokens struct must specify Self as the marker
+		.insert::<TypographyTokens>()
+		.insert::<MotionTokens>()
+}
+
+/// Store methods for looking up a schema path and resolving a value
+#[derive(Default, Deref, Resource)]
+pub struct CssFuncMap(
+	HashMap<
+		TokenPath,
+		Arc<
+			dyn 'static
+				+ Send
+				+ Sync
+				+ Fn(&Value, &CssBuilder) -> Result<String>,
+		>,
+	>,
+);
+impl CssFuncMap {
+	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
+	///
+	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
+	/// (the type actually passed to `with_value`), not the output type,
+	/// so the key must match that tokens type.
+	pub fn insert<T: Typed + FromReflect + CssValue>(mut self) -> Self {
+		self.0.insert(
+			TokenPath::of::<T>(),
+			Arc::new(|value, builder| {
+				value.into_reflect::<T>()?.to_css_value(builder)
+			}),
+		);
+		self
+	}
+
+	pub fn resolve(
+		&self,
+		value: &TypedValue,
+		builder: &CssBuilder,
+	) -> Result<String> {
+		if let Some(func) = self.0.get(value.schema()) {
+			func(value.value(), builder)
+		} else {
+			bevybail!(
+				"No CSS function registered for this schema: {:#?}",
+				value
+			)
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::style::material;
+	use crate::style::material::selectors;
 
 	#[test]
 	fn test() {
-		let mut world =
-			(material::MaterialStylePlugin::default(), CssPlugin).into_world();
+		// let mut world =
+		// 	(material::MaterialStylePlugin::default(), CssPlugin).into_world();
+		let mut world = (CssPlugin).into_world();
 
-
+		world.insert_resource(
+			SelectorStore::default().with(selectors::hero_heading()),
+		);
 		let css = world
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
-			.with_state::<(Res<CssIdentMap>, Res<CssFuncMap>, StyleQuery), _>(
+			.with_state::<(Res<CssProperties>, Res<CssFuncMap>, StyleQuery), _>(
 				|entity, state| {
 					CssBuilder {
 						minify: false,

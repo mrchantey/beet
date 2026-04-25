@@ -18,7 +18,7 @@ impl Plugin for MaterialStylePlugin {
 		app.insert_resource(
 			default_store(self.color.clone())
 				.with(themes::light_scheme())
-				.with(selectors::primary_text()),
+				.with(selectors::hero_heading()),
 		);
 	}
 }
