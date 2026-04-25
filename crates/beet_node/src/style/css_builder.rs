@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
@@ -101,12 +100,9 @@ impl CssBuilder {
 		&self,
 		entity: Entity,
 		style_query: &StyleQuery,
-		document_query: &mut DocumentQuery,
+		document_query: &DocumentQuery,
 	) -> Result<String> {
 		let ident_map = style_query.css_key_map().as_deref();
-		let mut get_value = |field: &FieldRef| -> Result<Value> {
-			document_query.with_field(entity, &field, |val| val.clone())
-		};
 
 		let selectors = style_query
 			.collect_selectors(entity)

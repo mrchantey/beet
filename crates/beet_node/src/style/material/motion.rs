@@ -24,12 +24,12 @@ token!(ExtraLong4,  Duration);
 
 // ── Motion sys tokens ─────────────────────────────────────────────────────────
 
-token!(MotionStandard,            Motion);
-token!(MotionStandardAccelerate,  Motion);
-token!(MotionStandardDecelerate,  Motion);
-token!(MotionEmphasized,          Motion);
-token!(MotionEmphasizedAccelerate,Motion);
-token!(MotionEmphasizedDecelerate,Motion);
+token!(MotionStandard,            MotionTokens);
+token!(MotionStandardAccelerate,  MotionTokens);
+token!(MotionStandardDecelerate,  MotionTokens);
+token!(MotionEmphasized,          MotionTokens);
+token!(MotionEmphasizedAccelerate,MotionTokens);
+token!(MotionEmphasizedDecelerate,MotionTokens);
 
 /// Returns a [`Selector`] with all MD3 duration default values.
 pub fn default_durations() -> Selector {
@@ -58,27 +58,27 @@ pub fn default_durations() -> Selector {
 /// embedding the duration directly.
 pub fn default_motions() -> Selector {
 	Selector::new()
-		.with_value::<MotionStandard>(Motion {
+		.with_value::<MotionStandard>(MotionTokens {
 			ease:     EaseFunction::CubicInOut,
 			duration: Medium2::token(),
 		}).unwrap()
-		.with_value::<MotionStandardAccelerate>(Motion {
+		.with_value::<MotionStandardAccelerate>(MotionTokens {
 			ease:     EaseFunction::CubicIn,
 			duration: Short4::token(),
 		}).unwrap()
-		.with_value::<MotionStandardDecelerate>(Motion {
+		.with_value::<MotionStandardDecelerate>(MotionTokens {
 			ease:     EaseFunction::CubicOut,
 			duration: Medium1::token(),
 		}).unwrap()
-		.with_value::<MotionEmphasized>(Motion {
+		.with_value::<MotionEmphasized>(MotionTokens {
 			ease:     EaseFunction::QuinticInOut,
 			duration: Long2::token(),
 		}).unwrap()
-		.with_value::<MotionEmphasizedAccelerate>(Motion {
+		.with_value::<MotionEmphasizedAccelerate>(MotionTokens {
 			ease:     EaseFunction::QuarticIn,
 			duration: Short4::token(),
 		}).unwrap()
-		.with_value::<MotionEmphasizedDecelerate>(Motion {
+		.with_value::<MotionEmphasizedDecelerate>(MotionTokens {
 			ease:     EaseFunction::QuarticOut,
 			duration: Medium4::token(),
 		}).unwrap()

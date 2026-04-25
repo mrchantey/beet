@@ -4,18 +4,39 @@ use beet_core::prelude::*;
 
 /// A motion token combining an easing function with a [`FieldRef`] to a duration token.
 #[derive(Debug, Clone, PartialEq, Reflect)]
-pub struct Motion {
+pub struct MotionTokens {
 	/// [`FieldRef`] pointing to the [`Duration`] token.
 	pub duration: Token,
 	pub ease: EaseFunction,
 }
-pub struct ResolvedMotion {
+pub struct Motion {
 	pub duration: Duration,
 	pub ease: EaseFunction,
 }
 
+impl ResolveTokens for MotionTokens {
+	type Resolved = Motion;
+	fn resolve(
+		self,
+		entity: Entity,
+		document_query: &DocumentQuery,
+	) -> Result<Self::Resolved> {
+		let duration = document_query.get_token(entity, &self.duration)?;
+		Ok(Motion {
+			duration: duration.into_reflect()?,
+			ease: self.ease.clone(),
+		})
+	}
+}
+
 impl CssValue for Motion {
-	fn to_css_value(&self) -> String { todo!("resolve duration via field ref") }
+	fn to_css_value(&self) -> String {
+		format!(
+			"{} {}",
+			self.duration.to_css_value(),
+			self.ease.to_css_value()
+		)
+	}
 }
 
 impl CssValue for Duration {

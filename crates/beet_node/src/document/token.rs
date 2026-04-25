@@ -19,9 +19,25 @@ pub struct Token {
 	schema: TokenPath,
 }
 
-pub trait ResolveToken {
+pub trait ResolveTokens: Typed + FromReflect {
 	type Resolved;
-	fn resolve(&self, value: &Value) -> Self::Resolved;
+	fn resolve_value(
+		entity: Entity,
+		value: &Value,
+		document_query: &DocumentQuery,
+	) -> Result<Self::Resolved>
+	where
+		Self: Sized,
+	{
+		value
+			.into_reflect::<Self>()?
+			.resolve(entity, document_query)
+	}
+	fn resolve(
+		self,
+		entity: Entity,
+		document_query: &DocumentQuery,
+	) -> Result<Self::Resolved>;
 }
 
 
