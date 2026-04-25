@@ -27,19 +27,23 @@ impl AwsWatch {
 
 	/// Create an [`AwsWatch`] for a Lambda function's CloudWatch log group.
 	/// The log group follows the AWS convention `/aws/lambda/{function-name}`.
+	#[cfg(feature = "lambda_block")]
 	pub fn for_lambda(stack: &Stack, block: &LambdaBlock) -> Self {
 		let func_ident =
 			stack.resource_ident(format!("{}--function", block.label()));
-		Self::new(format!(
-			"/aws/lambda/{}",
-			func_ident.primary_identifier()
-		))
+		Self::new(format!("/aws/lambda/{}", func_ident.primary_identifier()))
 	}
 
 	/// Create an [`AwsWatch`] for a Lightsail instance's CloudWatch log group.
 	/// Uses the convention `/{app-name}/{label}/{stage}`.
+	#[cfg(feature = "lightsail_block")]
 	pub fn for_lightsail(stack: &Stack, block: &LightsailBlock) -> Self {
-		Self::new(format!("/{}/{}/{}", stack.app_name(), block.label(), stack.stage()))
+		Self::new(format!(
+			"/{}/{}/{}",
+			stack.app_name(),
+			block.label(),
+			stack.stage()
+		))
 	}
 }
 

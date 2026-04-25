@@ -84,23 +84,37 @@ impl CssValue for FontWeight {
 	}
 }
 
-/// A complete typography token combining typeface, size, and weight
-/// into a CSS font shorthand.
-#[derive(Debug, Clone, PartialEq, Reflect)]
+/// A complete typography style combining typeface, size, weight, and optional spacing.
+#[derive(Debug, Clone, PartialEq, Reflect, FromTokens)]
 pub struct Typography {
 	/// [`FieldRef`] pointing to the [`Typeface`] token.
-	pub typeface: Token,
+	#[token]
+	pub typeface: Typeface,
 	/// [`FieldRef`] pointing to the [`FontWeight`] token.
-	pub weight: Token,
+	#[token]
+	pub weight: FontWeight,
 	pub size: Length,
 	pub line_height: Option<Length>,
 	pub letter_spacing: Option<Length>,
 }
 
 impl CssValue for Typography {
-	/// Returns a CSS font shorthand: `"{weight} {size} {family}"`.
-	/// Requires resolving typeface and weight [`FieldRef`]s via a token store.
+	/// Returns CSS font properties as a space-separated shorthand:
+	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
 	fn to_css_value(&self) -> String {
-		todo!("resolve typeface and weight FieldRefs via token store")
+		let size = if let Some(lh) = &self.line_height {
+			format!("{}/{}", self.size.to_css_value(), lh.to_css_value())
+		} else {
+			self.size.to_css_value()
+		};
+		let mut parts = vec![
+			self.weight.to_css_value(),
+			size,
+			self.typeface.to_css_value(),
+		];
+		if let Some(ls) = &self.letter_spacing {
+			parts.push(format!("letter-spacing:{}", ls.to_css_value()));
+		}
+		parts.join(" ")
 	}
 }

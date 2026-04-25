@@ -57,21 +57,21 @@ token!(LineHeightLabelSmall,     Length);
 
 // ── Sys tokens: composite typography scales ───────────────────────────────────
 
-token!(DisplayLarge,   Typography);
-token!(DisplayMedium,  Typography);
-token!(DisplaySmall,   Typography);
-token!(HeadlineLarge,  Typography);
-token!(HeadlineMedium, Typography);
-token!(HeadlineSmall,  Typography);
-token!(TitleLarge,     Typography);
-token!(TitleMedium,    Typography);
-token!(TitleSmall,     Typography);
-token!(BodyLarge,      Typography);
-token!(BodyMedium,     Typography);
-token!(BodySmall,      Typography);
-token!(LabelLarge,     Typography);
-token!(LabelMedium,    Typography);
-token!(LabelSmall,     Typography);
+token!(DisplayLarge,   TypographyTokens);
+token!(DisplayMedium,  TypographyTokens);
+token!(DisplaySmall,   TypographyTokens);
+token!(HeadlineLarge,  TypographyTokens);
+token!(HeadlineMedium, TypographyTokens);
+token!(HeadlineSmall,  TypographyTokens);
+token!(TitleLarge,     TypographyTokens);
+token!(TitleMedium,    TypographyTokens);
+token!(TitleSmall,     TypographyTokens);
+token!(BodyLarge,      TypographyTokens);
+token!(BodyMedium,     TypographyTokens);
+token!(BodySmall,      TypographyTokens);
+token!(LabelLarge,     TypographyTokens);
+token!(LabelMedium,    TypographyTokens);
+token!(LabelSmall,     TypographyTokens);
 
 /// Returns a [`Selector`] with all MD3 typography default values.
 ///
@@ -120,19 +120,19 @@ pub fn default_typography() -> Selector {
 		.with_value::<LineHeightLabelMedium>(Length::rem(1.0)).unwrap()
 		.with_value::<LineHeightLabelSmall>(Length::rem(1.0)).unwrap()
 		// ── Composite typography sys tokens ───────────────────────────────────
-		.with_value::<DisplayLarge>(Typography   { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(3.5625), line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<DisplayMedium>(Typography  { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(2.8125), line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<DisplaySmall>(Typography   { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(2.25),   line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<HeadlineLarge>(Typography  { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(2.0),    line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<HeadlineMedium>(Typography { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.75),   line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<HeadlineSmall>(Typography  { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.5),    line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<TitleLarge>(Typography     { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.375),  line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<TitleMedium>(Typography    { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(1.0),    line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<TitleSmall>(Typography     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<BodyLarge>(Typography      { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.0),    line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<BodyMedium>(Typography     { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<BodySmall>(Typography      { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(0.75),   line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<LabelLarge>(Typography     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<LabelMedium>(Typography    { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.75),   line_height: None, letter_spacing: None }).unwrap()
-		.with_value::<LabelSmall>(Typography     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.6875), line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<DisplayLarge>(TypographyTokens   { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(3.5625), line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<DisplayMedium>(TypographyTokens  { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(2.8125), line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<DisplaySmall>(TypographyTokens   { typeface: TypefaceBrand::token(), weight: WeightRegular::token(), size: Length::rem(2.25),   line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<HeadlineLarge>(TypographyTokens  { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(2.0),    line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<HeadlineMedium>(TypographyTokens { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.75),   line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<HeadlineSmall>(TypographyTokens  { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.5),    line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<TitleLarge>(TypographyTokens     { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.375),  line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<TitleMedium>(TypographyTokens    { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(1.0),    line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<TitleSmall>(TypographyTokens     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<BodyLarge>(TypographyTokens      { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(1.0),    line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<BodyMedium>(TypographyTokens     { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<BodySmall>(TypographyTokens      { typeface: TypefacePlain::token(), weight: WeightRegular::token(), size: Length::rem(0.75),   line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<LabelLarge>(TypographyTokens     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.875),  line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<LabelMedium>(TypographyTokens    { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.75),   line_height: None, letter_spacing: None }).unwrap()
+		.with_value::<LabelSmall>(TypographyTokens     { typeface: TypefacePlain::token(), weight: WeightMedium::token(),  size: Length::rem(0.6875), line_height: None, letter_spacing: None }).unwrap()
 }
