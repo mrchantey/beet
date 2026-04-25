@@ -76,6 +76,15 @@ impl FieldSegment {
 	pub fn index(index: usize) -> Self { Self::ArrayIndex(index) }
 }
 
+impl std::fmt::Display for FieldSegment {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			FieldSegment::ArrayIndex(i) => write!(f, "{}", i),
+			FieldSegment::ObjectKey(k) => write!(f, "{}", k),
+		}
+	}
+}
+
 impl From<&str> for FieldSegment {
 	fn from(s: &str) -> Self { Self::key(s) }
 }

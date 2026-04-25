@@ -30,7 +30,7 @@ pub enum Rule {
 		value: Option<Value>,
 	},
 	/// Negate a rule, ie must not have tag
-	Not(Box<Rule>),
+	Not(Vec<Rule>),
 }
 
 impl Rule {
@@ -46,7 +46,7 @@ impl Rule {
 			value,
 		}
 	}
-	pub fn not(rule: Rule) -> Self { Self::Not(Box::new(rule)) }
+	pub fn not(rules: Vec<Rule>) -> Self { Self::Not(rules) }
 
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
@@ -60,7 +60,7 @@ impl Rule {
 			},
 			Rule::State(state) => el.contains_state(state),
 			Rule::Class(class) => el.contains_class(class),
-			Rule::Not(inner) => !inner.matches(el),
+			Rule::Not(inner) => !inner.iter().any(|rule| rule.matches(el)),
 		}
 	}
 }

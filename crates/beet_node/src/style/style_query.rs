@@ -30,15 +30,15 @@ impl SelectorStore {
 /// # Future work
 /// Ancestor [`SelectorStore`] traversal (CSS cascade) is not yet
 /// implemented; add the entity's own selectors or use the global store.
-#[derive(SystemParam)]
+#[derive(SystemParam, Get)]
 pub struct StyleQuery<'w, 's> {
+	css_key_map: Option<Res<'w, CssIdentMap>>,
 	entity_selectors: Query<'w, 's, (Entity, &'static SelectorStore)>,
 	global_selectors: Option<Res<'w, SelectorStore>>,
 	elements: ElementQuery<'w, 's>,
 }
 
 impl StyleQuery<'_, '_> {
-
 	/// Collect selectors in order:
 	/// 1. Global [`SelectorStore`] resource (lowest priority)
 	/// 2. Entity-local [`SelectorStore`] component (highest priority)
