@@ -75,45 +75,34 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			.await?
 	}
 
-	pub fn get_token(
+	pub fn try_get_field(
 		&self,
 		entity: Entity,
-		token: &Token,
+		path: &FieldPath,
 	) -> Result<&Value, DocumentError> {
+		self.doc_query
+			.get(entity)
+			.map_err(|_| DocumentError::DocumentNotFound { entity })?
+			.get_field_ref(&path)
+	}
+
+	pub fn get_token(&self, entity: Entity, token: &Token) -> Result<&Value> {
 		let path = token.path().clone().xinto::<FieldPath>();
 		match token.document() {
-			DocumentPath::Root => {
-				self.ancestors.root_ancestor(entity).xmap(|e| {
-					self.doc_query
-						.get(e)
-						.ok()
-						.and_then(|doc| doc.get_field_ref(&path).ok())
-				})
-			}
+			DocumentPath::Root => self
+				.ancestors
+				.root_ancestor(entity)
+				.xmap(|entity| self.try_get_field(entity, &path))?,
 			DocumentPath::Ancestor => self
 				.ancestors
 				.iter_ancestors_inclusive(entity)
-				.find_map(|entity| {
-					self.doc_query
-						.get(entity)
-						.ok()
-						.and_then(|doc| doc.get_field_ref(&path).ok())
-				}),
-			DocumentPath::Entity(entity) => self
-				.doc_query
-				.get(*entity)
-				.ok()
-				.and_then(|doc| doc.get_field_ref(&path).ok()),
-			DocumentPath::This => self
-				.doc_query
-				.get(entity)
-				.ok()
-				.and_then(|doc| doc.get_field_ref(&path).ok()),
+				.xtry_find_map(|entity| self.try_get_field(entity, &path))?,
+			DocumentPath::Entity(entity) => {
+				self.try_get_field(*entity, &path)?
+			}
+			DocumentPath::This => self.try_get_field(entity, &path)?,
 		}
-		.ok_or_else(|| DocumentError::DocumentNotFound {
-			entity,
-			path: token.document().clone(),
-		})
+		.xok()
 	}
 
 	/// Execute a function with a mutable reference to a field.

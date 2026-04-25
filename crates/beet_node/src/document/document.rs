@@ -59,8 +59,12 @@ impl Document {
 					if current.is_null() {
 						*current = Value::List(Vec::new());
 					}
-					let list =
-						current.as_list_mut().map_err(DocumentError::from)?;
+					let list = current.as_list_mut().map_err(|error| {
+						DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						}
+					})?;
 					// expand array if needed
 					while list.len() <= *idx {
 						list.push(Value::Null);
@@ -72,8 +76,12 @@ impl Document {
 					if current.is_null() {
 						*current = Value::Map(Default::default());
 					}
-					let map =
-						current.as_map_mut().map_err(DocumentError::from)?;
+					let map = current.as_map_mut().map_err(|error| {
+						DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						}
+					})?;
 					if !map.contains_key(key) {
 						map.insert(key.clone(), init_value.clone());
 					}
@@ -121,7 +129,10 @@ impl Document {
 				FieldSegment::ArrayIndex(idx) => {
 					current = current
 						.as_list()
-						.map_err(DocumentError::from)?
+						.map_err(|error| DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						})?
 						.get(*idx)
 						.ok_or_else(|| {
 							DocumentError::ArrayIndexOutOfBounds {
@@ -133,7 +144,10 @@ impl Document {
 				FieldSegment::ObjectKey(key) => {
 					current = current
 						.as_map()
-						.map_err(DocumentError::from)?
+						.map_err(|error| DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						})?
 						.get(key)
 						.map_err(|_| DocumentError::ObjectKeyNotFound {
 							key: key.to_string(),
@@ -160,8 +174,12 @@ impl Document {
 			match segment {
 				FieldSegment::ArrayIndex(idx) => {
 					let idx_val = *idx;
-					let array =
-						current.as_list_mut().map_err(DocumentError::from)?;
+					let array = current.as_list_mut().map_err(|error| {
+						DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						}
+					})?;
 					if idx_val >= array.len() {
 						return Err(DocumentError::ArrayIndexOutOfBounds {
 							index: idx_val,
@@ -171,8 +189,12 @@ impl Document {
 					current = &mut array[idx_val];
 				}
 				FieldSegment::ObjectKey(key) => {
-					let object =
-						current.as_map_mut().map_err(DocumentError::from)?;
+					let object = current.as_map_mut().map_err(|error| {
+						DocumentError::ValueError {
+							path: path.into_field_path(),
+							error,
+						}
+					})?;
 					if !object.contains_key(key) {
 						return Err(DocumentError::ObjectKeyNotFound {
 							key: key.to_string(),
@@ -192,8 +214,8 @@ impl Document {
 #[derive(Debug, thiserror::Error)]
 pub enum DocumentError {
 	/// Value type mismatch from a [`Value`] accessor.
-	#[error(transparent)]
-	ValueError(#[from] ValueError),
+	#[error("failed to parse value at path {path}, {error}")]
+	ValueError { path: FieldPath, error: ValueError },
 	/// Array index was out of bounds.
 	#[error("array index {index} out of bounds\nAt path {path:?}")]
 	ArrayIndexOutOfBounds {
@@ -219,12 +241,10 @@ pub enum DocumentError {
 		path: FieldPath,
 	},
 	/// Document was not found for the specified entity.
-	#[error("document not found for entity {entity:?} and path {path:?}")]
+	#[error("document not found for entity {entity:?}")]
 	DocumentNotFound {
 		/// The entity for which the document was not found.
 		entity: Entity,
-		/// The path where the error occurred.
-		path: DocumentPath,
 	},
 }
 

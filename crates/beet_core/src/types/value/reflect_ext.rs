@@ -31,6 +31,12 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 	if let Some(val) = reflect.try_downcast_ref::<&str>() {
 		return Ok(Value::str(*val));
 	}
+	if let Some(val) = reflect.try_downcast_ref::<std::time::Duration>() {
+		return Ok(Value::Uint(val.as_millis() as u64));
+	}
+	if let Some(val) = reflect.try_downcast_ref::<SmolStr>() {
+		return Ok(Value::str(val.as_str()));
+	}
 
 	// Unsigned integers
 	if let Some(val) = reflect.try_downcast_ref::<u8>() {
@@ -745,6 +751,14 @@ fn build_opaque_value(
 		return Ok(Box::new(value.as_str()?.to_string()));
 	}
 
+	if type_id == TypeId::of::<SmolStr>() {
+		return Ok(Box::new(SmolStr::new(value.as_str()?)));
+	}
+
+	if type_id == TypeId::of::<std::time::Duration>() {
+		return Ok(Box::new(std::time::Duration::from_millis(value.as_u64()?)));
+	}
+
 	// Signed integers
 	if type_id == TypeId::of::<i8>() {
 		return Ok(Box::new(value.as_i64()? as i8));
@@ -815,8 +829,16 @@ fn build_field_value(
 		return Ok(None);
 	};
 
-	// Handle Null as missing
+	// Handle Null: for Option<T> fields emit None variant; otherwise skip field
 	if value.is_null() {
+		if let Some(TypeInfo::Enum(enum_info)) = field_type_info {
+			if enum_info.type_path().starts_with("core::option::Option") {
+				let mut dynamic = bevy::reflect::DynamicEnum::default();
+				dynamic
+					.set_variant("None", bevy::reflect::DynamicVariant::Unit);
+				return Ok(Some(Box::new(dynamic)));
+			}
+		}
 		return Ok(None);
 	}
 

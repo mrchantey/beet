@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 /// A set of default properties applied to elements matching the given criteria.
-#[derive(Default, Get)]
+#[derive(Default, Reflect, Get)]
 pub struct Selector {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
@@ -13,6 +13,7 @@ pub struct Selector {
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
+#[derive(Reflect)]
 pub enum Rule {
 	// /// A global selector, in css this will evaluate to `:root`,
 	// /// and in other contexts

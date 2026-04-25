@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::FontWeight as StyleFontWeight;
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
@@ -21,7 +22,14 @@ impl Plugin for CssPlugin {
 pub fn default_func_map() -> CssFuncMap {
 	CssFuncMap::default()
 		.insert::<Color, _>()
-		// types with an actual Tokens impl must specify Self
+		.insert::<f32, _>()
+		.insert::<Length, _>()
+		.insert::<Typeface, _>()
+		.insert::<StyleFontWeight, _>()
+		.insert::<Duration, _>()
+		.insert::<Shape, _>()
+		.insert::<Elevation, _>()
+		// types with a custom Tokens struct must specify Self as the marker
 		.insert::<Typography, Typography>()
 		.insert::<Motion, Motion>()
 }
@@ -40,9 +48,17 @@ pub struct CssFuncMap(
 	>,
 );
 impl CssFuncMap {
-	pub fn insert<T: TypePath + FromTokens<M> + CssValue, M>(mut self) -> Self {
+	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
+	///
+	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
+	/// (the type actually passed to `with_value`), not the output type,
+	/// so the key must match that tokens type.
+	pub fn insert<T: TypePath + FromTokens<M> + CssValue, M>(mut self) -> Self
+	where
+		T::Tokens: TypePath,
+	{
 		self.0.insert(
-			TokenPath::of::<T>(),
+			TokenPath::of::<T::Tokens>(),
 			Arc::new(|value, entity, query| {
 				T::from_value(value, entity, query)?.to_css_value().xok()
 			}),
@@ -295,9 +311,11 @@ mod tests {
 			(material::MaterialStylePlugin::default(), CssPlugin).into_world();
 
 
-		let css = world.spawn(rsx! {
+		let css = world.spawn((
+			Document::new(default()),
+			rsx! {
 			<div class="text-primary">hello world!</div>
-		}).with_state::<(Res<CssIdentMap>,
+		})).with_state::<(Res<CssIdentMap>,
 		Res<CssFuncMap>,
 		StyleQuery,
 		DocumentQuery),_>(|entity,state|{

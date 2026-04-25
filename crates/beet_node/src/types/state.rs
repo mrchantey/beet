@@ -1,7 +1,7 @@
 use beet_core::prelude::*;
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub enum ElementState {
 	Hovered,
 	Focused,
@@ -15,5 +15,3 @@ pub enum ElementState {
 
 #[derive(Component, Deref, DerefMut)]
 pub struct ElementStateMap(HashSet<ElementState>);
-
-
