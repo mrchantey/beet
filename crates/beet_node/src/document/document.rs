@@ -259,7 +259,16 @@ pub enum DocumentPath {
 	// TODO url, perhaps with some automerge style synchronous system
 }
 
-
+impl std::fmt::Display for DocumentPath {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			DocumentPath::Ancestor => write!(f, "Ancestor"),
+			DocumentPath::This => write!(f, "This"),
+			DocumentPath::Root => write!(f, "Root"),
+			DocumentPath::Entity(entity) => write!(f, "Entity({entity:?})"),
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {

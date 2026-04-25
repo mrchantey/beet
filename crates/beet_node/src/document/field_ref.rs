@@ -44,6 +44,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	}
 }
 
+impl std::fmt::Display for FieldRef {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}#{}", self.document, self.field_path)
+	}
+}
+
 
 impl FieldRef {
 	/// Create a new field reference with the given field path.

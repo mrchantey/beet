@@ -3,48 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::hash::Hasher;
 
-#[derive(Debug, Clone, Reflect, Get)]
-pub struct Property2 {
-	/// The name of this property in css,
-	/// ie `background-color`
-	css_name: SmolStr,
-	/// Token for the value of this property.
-	value: Token2,
-}
-
-
-impl Property2 {
-	/// Create a new property,
-	/// using [`Schema`] for the schema type,
-	/// and Token as the FieldPath, resulting in
-	/// traveral up ancestors if not found.
-	pub fn new<Token: TypePath, Schema: TypePath>(
-		css_name: impl Into<SmolStr>,
-		document_path: DocumentPath,
-	) -> Self {
-		Self {
-			css_name: css_name.into(),
-			value: Token2::new(
-				FieldRef::of::<Token>().with_document(document_path),
-				TokenId::of::<Schema>(),
-			),
-		}
-	}
-	pub fn new_with_value(
-		css_name: impl Into<SmolStr>,
-		value: impl Into<Token2>,
-	) -> Self {
-		Self {
-			css_name: css_name.into(),
-			value: value.into(),
-		}
-	}
-
-}
-
-
-
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Get)]
 pub struct PropertyDef {
 	/// The name of this property in css,

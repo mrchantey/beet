@@ -7,7 +7,7 @@ pub struct Selector {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
 	rules: Vec<Rule>,
-	tokens: HashMap<TokenId, TokenId>,
+	tokens: HashMap<FieldPath, ValueOrRef>,
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
@@ -66,9 +66,22 @@ impl Selector {
 	/// Match elements with the given tag.
 	pub fn new() -> Self { Self::default() }
 
+	pub fn with_typed<T: TypedToken, U: TypedToken>(self) -> Self {
+		self.with_token(T::path(), U::field())
+	}
+	pub fn with_typed_value<T: TypedToken>(
+		self,
+		value: impl Into<ValueOrRef>,
+	) -> Self {
+		self.with_token(T::path(), value)
+	}
 	/// Add a property mapped to a token.
-	pub fn with_token(mut self, from: TokenId, to: TokenId) -> Self {
-		self.tokens.insert(from, to);
+	pub fn with_token(
+		mut self,
+		field: FieldPath,
+		value: impl Into<ValueOrRef>,
+	) -> Self {
+		self.tokens.insert(field, value.into());
 		self
 	}
 

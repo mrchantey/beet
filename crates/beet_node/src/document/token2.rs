@@ -2,39 +2,28 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
+
+/// A token is like a typed pointer for the application layer.
+/// It stores a path to a document field, and a schema.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token2 {
-	/// A unique and stable human readable id for this token, used for resolving its schema.
-	id: TokenId,
-	/// The value or fieldref for this token, matching its
-	/// associated schema.
-	value: ValueOrRef,
+	/// Path to the value for this token
+	field: FieldRef,
+	schema: TokenSchema,
 }
 
 
 impl Token2 {
-	pub fn new(value: impl Into<ValueOrRef>, schema: TokenId) -> Self {
-		Self {
-			value: value.into(),
-			id: schema,
-		}
-	}
-
-	pub fn new_value<T: Typed>(value: T) -> Result<Self> {
-		let value = Value::from_reflect(&value)?;
-		Self {
-			value: ValueOrRef::Value(value),
-			id: TokenId::of::<T>(),
-		}
-		.xok()
+	pub fn new(field: FieldRef, schema: TokenSchema) -> Self {
+		Self { field, schema }
 	}
 
 	/// Create new token, using `Token` for the field path
-	pub fn new_field<Token: TypePath, Schema: TypePath>() -> Self {
+	pub fn of<Field: TypePath, Schema: TypePath>() -> Self {
 		Self {
-			value: FieldRef::of::<Token>().into(),
-			id: TokenId::of::<Schema>(),
+			field: FieldRef::of::<Field>(),
+			schema: TokenSchema::of::<Schema>(),
 		}
 	}
 	/// Create new token, using `Token` for the field path,
@@ -44,11 +33,28 @@ impl Token2 {
 	) -> Result<Self> {
 		let value = Value::from_reflect(&value)?;
 		Self {
-			value: FieldRef::of::<Token>().with_init(value).into(),
-			id: TokenId::of::<Val>(),
+			field: FieldRef::of::<Token>().with_init(value).into(),
+			schema: TokenSchema::of::<Val>(),
 		}
 		.xok()
 	}
+}
+
+/// A type which represents a token, see `token2!` for defining.
+pub trait TypedToken {
+	fn schema() -> TokenSchema;
+	fn path() -> FieldPath;
+	fn field() -> FieldRef;
+	fn token() -> Token2 {
+		Token2 {
+			field: Self::field(),
+			schema: Self::schema(),
+		}
+	}
+}
+
+impl<T: TypedToken> From<T> for Token2 {
+	fn from(_: T) -> Self { T::token() }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
@@ -56,6 +62,10 @@ impl Token2 {
 pub enum ValueOrRef {
 	Value(Value),
 	Ref(FieldRef),
+}
+
+impl<T: Into<Token2>> From<T> for FieldRef {
+	fn from(value: T) -> Self { value.into().field }
 }
 
 impl<T: Into<Value>> From<T> for ValueOrRef {
@@ -70,26 +80,26 @@ impl From<FieldRef> for ValueOrRef {
 /// or user defined namspace. These can be directly mapped to a FieldId
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenId {
-	inner: TokenIdInner,
+pub struct TokenSchema {
+	inner: TokenSchemaInner,
 }
 
-impl TokenId {
-	/// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
-	/// ie `org.beet/foo/bar`
-	pub fn new(namespace_id: SmolStr) -> Self {
+impl TokenSchema {
+	pub fn new_field(field: FieldRef) -> Self {
 		Self {
-			inner: TokenIdInner::Namespace(namespace_id),
+			inner: TokenSchemaInner::Field(field),
 		}
 	}
 	pub fn of<T: bevy::reflect::TypePath>() -> Self {
 		Self {
-			inner: TokenIdInner::TypePath(SmolStr::new_static(T::type_path())),
+			inner: TokenSchemaInner::TypePath(SmolStr::new_static(
+				T::type_path(),
+			)),
 		}
 	}
 }
 
-impl std::fmt::Display for TokenId {
+impl std::fmt::Display for TokenSchema {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.inner.fmt(f)
 	}
@@ -98,10 +108,9 @@ impl std::fmt::Display for TokenId {
 // sealed to protect Path variant from typepath/typename confusion
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-enum TokenIdInner {
-	/// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
-	/// ie `org.beet/foo/bar`
-	Namespace(SmolStr),
+enum TokenSchemaInner {
+	/// For dynamic schemas, point to the field where it can be located
+	Field(FieldRef),
 	/// The stable bevy [`TypePath::type_path`] to the type
 	/// of this instance.
 	/// This is not the [`std::any::type_name`], which
@@ -109,23 +118,16 @@ enum TokenIdInner {
 	TypePath(SmolStr),
 }
 
-impl Into<FieldPath> for TokenId {
-	fn into(self) -> FieldPath {
-		match self.inner {
-			TokenIdInner::Namespace(ns) => {
-				ns.split('/').filter(|s| !s.is_empty()).into_field_path()
-			}
-			TokenIdInner::TypePath(path) => {
-				path.split("::").filter(|s| !s.is_empty()).into_field_path()
-			}
-		}
-	}
-}
 
-impl std::fmt::Display for TokenIdInner {
+/// A user defined string, in [reverse domain name format](https://en.wikipedia.org/wiki/Reverse_domain_name_notation),
+/// ie `org.beet/foo/bar`
+// pub struct Namespace(SmolStr);
+
+
+impl std::fmt::Display for TokenSchemaInner {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Namespace(s) => write!(f, "Namespace({})", s),
+			Self::Field(s) => write!(f, "Field({})", s),
 			Self::TypePath(s) => write!(f, "TypePath({})", s),
 		}
 	}
@@ -179,14 +181,11 @@ impl TokenMap2 {
 	) -> Result<Document> {
 		let mut doc = Document::default();
 		for (path, token) in self.tokens.iter() {
-			match &token.value {
-				ValueOrRef::Value(value) => doc.insert(&path, value)?,
-				ValueOrRef::Ref(field_ref) => document_query
-					.with_field(entity, field_ref, |value| {
-						doc.insert(&path, &value)
-					})
-					.flatten()?,
-			};
+			document_query
+				.with_field(entity, &token.field, |value| {
+					doc.insert(&path, &value)
+				})
+				.flatten()?;
 		}
 		doc.xok()
 	}
@@ -196,56 +195,42 @@ impl TokenMap2 {
 
 #[macro_export]
 macro_rules! token2 {
-    // Arm for: token2!(Name, Schema, default_value)
-    (
-        $(#[$meta:meta])*
-        $new_ty:ident,
-        $schema_ty:ident,
-        $default_val:expr
-    ) => {
-        $(#[$meta])*
-        #[derive(Reflect)]
-        pub struct $new_ty(Token2);
-
-        impl Default for $new_ty {
-            fn default() -> Self {
-                Self(
-                    Token2::new_value::<$schema_ty>($default_val.into())
-                        .expect("Failed to create Token2 with default value")
-                )
-            }
-        }
-
-        impl Into<Token2> for $new_ty {
-            fn into(self) -> Token2 {
-                self.0
-            }
-        }
-    };
-
-    // uses Token2::field
-    // `token2!(Name, Schema)`
-    (
-        $(#[$meta:meta])*
-        $new_ty:ident,
-        $schema_ty:ident
-    ) => {
-        $(#[$meta])*
-        #[derive(Reflect)]
-        pub struct $new_ty(Token2);
-
-        impl Default for $new_ty {
-            fn default() -> Self {
-                Self(Token2::new_field::<Self, $schema_ty>())
-            }
-        }
-
-        impl Into<Token2> for $new_ty {
-            fn into(self) -> Token2 {
-                self.0
-            }
-        }
-    };
+	(
+		$(#[$meta:meta])*
+		$new_ty:ident,
+		$schema_ty:ident
+	) => {
+		token2!(
+			$(#[$meta])* $new_ty,
+			$schema_ty,
+			$crate::prelude::DocumentPath::default()
+		);
+	};
+	(
+		$(#[$meta:meta])*
+		$new_ty:ident,
+		$schema_ty:ident,
+		$doc_path: expr
+	) => {
+		$(#[$meta])*
+		pub struct $new_ty;
+		impl $crate::prelude::TypedToken for $new_ty {
+			fn schema() -> $crate::prelude::TokenSchema {
+				$crate::prelude::TokenSchema::of::<$schema_ty>()
+			}
+			fn path() -> $crate::prelude::FieldPath {
+				let path = ::core::concat!(
+					::core::concat!(::core::module_path!(), "::"),
+					::core::stringify!($new_ty)
+				);
+				$crate::prelude::FieldPath::from_module_path(path)
+			}
+			fn field() -> $crate::prelude::FieldRef {
+				$crate::prelude::FieldRef::new(Self::path())
+				.with_document($doc_path)
+			}
+		}
+	};
 }
 
 
@@ -256,16 +241,29 @@ mod tests {
 	#[test]
 	fn test_name() {
 		// Name::type_info().type_path().xprintln();
-		let _inst = TokenId::of::<Name>();
+		let _inst = TokenSchema::of::<Name>();
+		Foo::path()
+			.to_string()
+			.xpect_eq("beet_node.document.token2.tests.Foo");
 	}
 
 	token2!(
 			/// Some cool type
 			/// This now works perfectly!
 			#[derive(Debug, Clone)]
+			#[allow(unused)]
 			Foo,
-			Color
+			Color,
+			DocumentPath::Ancestor
 	);
-	token2!(Bar, Color);
-	token2!(Boo, Color, palettes::basic::GREEN);
+	token2!(
+		#[allow(unused)]
+		Bar,
+		Color
+	);
+	token2!(
+		#[allow(unused)]
+		Boo,
+		Color
+	);
 }

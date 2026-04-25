@@ -1,19 +1,11 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use beet_core::prelude::Reflect;
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::Color;
 
 
-
-macro_rules! property {
-	($schema:ty, $name:ident,$document_path: expr, $css_name:literal) => {
-		token2!($name, Property2, Property2::new::<$schema,Self>($css_name,$document_path));
-	};
-}
-
-property!(Color,BackgroundColor2, DocumentPath::Ancestor, "background-color");
-property!(Color,ForegroundColor2, DocumentPath::Ancestor, "color");
+token2!(BackgroundColor2, Color, DocumentPath::This);
+token2!(ForegroundColor2, Color, DocumentPath::Ancestor);
 
 
 /// Stroke color of the text and other foreground elements.
