@@ -173,7 +173,7 @@ impl DynamicDocument {
 		Ok(self)
 	}
 
-	/// Convert the TokenMap to a Document, resolving FieldRef values
+	/// Convert this [`DynamicDocument`] to a [`Document`], resolving [`FieldRef`] values
 	pub fn resolve(
 		&self,
 		entity: Entity,
@@ -212,6 +212,7 @@ macro_rules! token2 {
 		$schema_ty:ident,
 		$doc_path: expr
 	) => {
+		#[derive(::bevy::reflect::TypePath)]
 		$(#[$meta])*
 		pub struct $new_ty;
 		impl $crate::prelude::TypedToken for $new_ty {

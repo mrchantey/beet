@@ -1,39 +1,21 @@
+use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
+/// A motion token combining an easing function with a [`FieldRef`] to a duration token.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Motion {
-	pub duration: Duration,
+	/// [`FieldRef`] pointing to the [`Duration`] token.
+	pub duration: FieldRef,
 	pub ease: EaseFunction,
 }
 
-
-
-impl TypeTag for Motion {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("motion");
-}
 impl CssValue for Motion {
-	fn to_css_value(&self) -> String {
-		format!(
-			"{} {}",
-			self.duration.to_css_value(),
-			self.ease.to_css_value(),
-		)
-	}
-}
-
-impl TypeTag for Duration {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("duration");
+	fn to_css_value(&self) -> String { todo!("resolve duration via field ref") }
 }
 
 impl CssValue for Duration {
 	fn to_css_value(&self) -> String { format!("{}ms", self.as_millis()) }
-}
-
-
-
-impl TypeTag for EaseFunction {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("ease-function");
 }
 
 impl CssValue for EaseFunction {

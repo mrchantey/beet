@@ -1,6 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Converts a value to its CSS string representation.
+pub trait CssValue {
+	fn to_css_value(&self) -> String;
+}
 
 /// Map a token path to a css key,
 /// Multiple tokens may point to the same key,

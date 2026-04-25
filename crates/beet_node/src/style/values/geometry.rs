@@ -1,10 +1,6 @@
 use crate::style::*;
 use beet_core::prelude::*;
 
-impl TypeTag for f32 {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("scalar");
-}
-
 impl CssValue for f32 {
 	fn to_css_value(&self) -> String { self.to_string() }
 }
@@ -37,10 +33,6 @@ impl std::fmt::Display for Length {
 	}
 }
 
-impl TypeTag for Length {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("length");
-}
-
 impl CssValue for Length {
 	fn to_css_value(&self) -> String { self.to_string() }
 }
@@ -67,11 +59,6 @@ impl Default for Elevation {
 	}
 }
 
-
-impl TypeTag for Elevation {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("elevation");
-}
-
 impl CssValue for Elevation {
 	fn to_css_value(&self) -> String {
 		[
@@ -87,23 +74,15 @@ impl CssValue for Elevation {
 }
 
 
-
 /// Combined shape token: a corner radius applied to an optional edge.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Shape {
-	pub corner: Token,
+	pub corner: Length,
 	pub edge: ShapeEdge,
 }
 
-impl TypeTag for Shape {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("shape");
-}
-
 impl CssValue for Shape {
-	fn to_css_value(&self) -> String {
-		// Requires a token store to resolve `self.corner`; handled by the CSS builder.
-		todo!("resolve corner token via token store")
-	}
+	fn to_css_value(&self) -> String { self.corner.to_css_value() }
 }
 
 /// Which edge(s) a shape corner radius applies to.

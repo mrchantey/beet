@@ -1,3 +1,4 @@
+use crate::prelude::FieldRef;
 use crate::style::*;
 use beet_core::prelude::*;
 use std::sync::LazyLock;
@@ -5,10 +6,6 @@ use std::sync::LazyLock;
 /// The typeface family list to use, with the first match selected
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Reflect)]
 pub struct Typeface(Vec<SmolStr>);
-
-impl TypeTag for Typeface {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("typeface");
-}
 
 impl Typeface {
 	pub fn new<T: Into<SmolStr>>(
@@ -42,7 +39,6 @@ impl CssValue for Typeface {
 					"fangsong",
 					"nastaliq",
 					// Vendor-Specific / Legacy Prefixed Keywords
-					// (Note: These are also unquoted identifiers)
 					"-apple-system",      // Safari/iOS legacy
 					"BlinkMacSystemFont", // Chrome on macOS legacy
 					// Global CSS Identifiers
@@ -78,10 +74,6 @@ pub enum FontWeight {
 	Absolute(u16),
 }
 
-impl TypeTag for FontWeight {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("font-weight");
-}
-
 impl CssValue for FontWeight {
 	fn to_css_value(&self) -> String {
 		match self {
@@ -96,26 +88,19 @@ impl CssValue for FontWeight {
 /// into a CSS font shorthand.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Typography {
-	pub typeface: Token,
-	pub weight: Token,
+	/// [`FieldRef`] pointing to the [`Typeface`] token.
+	pub typeface: FieldRef,
+	/// [`FieldRef`] pointing to the [`FontWeight`] token.
+	pub weight: FieldRef,
 	pub size: Length,
 	pub line_height: Option<Length>,
 	pub letter_spacing: Option<Length>,
 }
 
-impl TypeTag for Typography {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("typography");
-}
-
 impl CssValue for Typography {
 	/// Returns a CSS font shorthand: `"{weight} {size} {family}"`.
+	/// Requires resolving typeface and weight [`FieldRef`]s via a token store.
 	fn to_css_value(&self) -> String {
-		todo!("use type store, get typeface and weight")
-		// format!(
-		// 	"{} {} {}",
-		// 	self.weight.to_css_value(),
-		// 	self.size.to_css_value(),
-		// 	self.typeface.to_css_value()
-		// )
+		todo!("resolve typeface and weight FieldRefs via token store")
 	}
 }

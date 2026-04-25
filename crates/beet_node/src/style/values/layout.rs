@@ -12,10 +12,6 @@ pub enum JustifyContent {
 	SpaceAround,
 }
 
-impl TypeTag for JustifyContent {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("justify-content");
-}
-
 impl CssValue for JustifyContent {
 	fn to_css_value(&self) -> String {
 		match self {
@@ -38,10 +34,6 @@ pub enum AlignItems {
 	Center,
 	Stretch,
 	Baseline,
-}
-
-impl TypeTag for AlignItems {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("align-items");
 }
 
 impl CssValue for AlignItems {
@@ -67,10 +59,6 @@ pub enum AlignSelf {
 	Baseline,
 }
 
-impl TypeTag for AlignSelf {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("align-self");
-}
-
 impl CssValue for AlignSelf {
 	fn to_css_value(&self) -> String {
 		match self {
@@ -93,10 +81,6 @@ pub enum FlexSize {
 	Shrink(u16),
 }
 
-impl TypeTag for FlexSize {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("flex-size");
-}
-
 impl CssValue for FlexSize {
 	fn to_css_value(&self) -> String {
 		match self {
@@ -115,10 +99,6 @@ pub enum Direction {
 	Vertical,
 	ViewportMin,
 	ViewportMax,
-}
-
-impl TypeTag for Direction {
-	const TYPE_TAG: SmolStr = SmolStr::new_static("direction");
 }
 
 impl CssValue for Direction {
