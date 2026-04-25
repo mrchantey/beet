@@ -4,96 +4,96 @@ use beet_core::prelude::*;
 
 // ── Primary ───────────────────────────────────────────────────────────────────
 
-token2!(Primary0,   Color);
-token2!(Primary10,  Color);
-token2!(Primary20,  Color);
-token2!(Primary30,  Color);
-token2!(Primary40,  Color);
-token2!(Primary50,  Color);
-token2!(Primary60,  Color);
-token2!(Primary70,  Color);
-token2!(Primary80,  Color);
-token2!(Primary90,  Color);
-token2!(Primary95,  Color);
-token2!(Primary99,  Color);
-token2!(Primary100, Color);
+token!(Primary0,   Color);
+token!(Primary10,  Color);
+token!(Primary20,  Color);
+token!(Primary30,  Color);
+token!(Primary40,  Color);
+token!(Primary50,  Color);
+token!(Primary60,  Color);
+token!(Primary70,  Color);
+token!(Primary80,  Color);
+token!(Primary90,  Color);
+token!(Primary95,  Color);
+token!(Primary99,  Color);
+token!(Primary100, Color);
 
 // ── Secondary ─────────────────────────────────────────────────────────────────
 
-token2!(Secondary0,   Color);
-token2!(Secondary10,  Color);
-token2!(Secondary20,  Color);
-token2!(Secondary30,  Color);
-token2!(Secondary40,  Color);
-token2!(Secondary50,  Color);
-token2!(Secondary60,  Color);
-token2!(Secondary70,  Color);
-token2!(Secondary80,  Color);
-token2!(Secondary90,  Color);
-token2!(Secondary95,  Color);
-token2!(Secondary99,  Color);
-token2!(Secondary100, Color);
+token!(Secondary0,   Color);
+token!(Secondary10,  Color);
+token!(Secondary20,  Color);
+token!(Secondary30,  Color);
+token!(Secondary40,  Color);
+token!(Secondary50,  Color);
+token!(Secondary60,  Color);
+token!(Secondary70,  Color);
+token!(Secondary80,  Color);
+token!(Secondary90,  Color);
+token!(Secondary95,  Color);
+token!(Secondary99,  Color);
+token!(Secondary100, Color);
 
 // ── Tertiary ──────────────────────────────────────────────────────────────────
 
-token2!(Tertiary0,   Color);
-token2!(Tertiary10,  Color);
-token2!(Tertiary20,  Color);
-token2!(Tertiary30,  Color);
-token2!(Tertiary40,  Color);
-token2!(Tertiary50,  Color);
-token2!(Tertiary60,  Color);
-token2!(Tertiary70,  Color);
-token2!(Tertiary80,  Color);
-token2!(Tertiary90,  Color);
-token2!(Tertiary95,  Color);
-token2!(Tertiary99,  Color);
-token2!(Tertiary100, Color);
+token!(Tertiary0,   Color);
+token!(Tertiary10,  Color);
+token!(Tertiary20,  Color);
+token!(Tertiary30,  Color);
+token!(Tertiary40,  Color);
+token!(Tertiary50,  Color);
+token!(Tertiary60,  Color);
+token!(Tertiary70,  Color);
+token!(Tertiary80,  Color);
+token!(Tertiary90,  Color);
+token!(Tertiary95,  Color);
+token!(Tertiary99,  Color);
+token!(Tertiary100, Color);
 
 // ── Neutral ───────────────────────────────────────────────────────────────────
 
-token2!(Neutral0,   Color);
-token2!(Neutral10,  Color);
-token2!(Neutral20,  Color);
-token2!(Neutral30,  Color);
-token2!(Neutral40,  Color);
-token2!(Neutral50,  Color);
-token2!(Neutral60,  Color);
-token2!(Neutral70,  Color);
-token2!(Neutral80,  Color);
-token2!(Neutral90,  Color);
-token2!(Neutral95,  Color);
-token2!(Neutral99,  Color);
-token2!(Neutral100, Color);
+token!(Neutral0,   Color);
+token!(Neutral10,  Color);
+token!(Neutral20,  Color);
+token!(Neutral30,  Color);
+token!(Neutral40,  Color);
+token!(Neutral50,  Color);
+token!(Neutral60,  Color);
+token!(Neutral70,  Color);
+token!(Neutral80,  Color);
+token!(Neutral90,  Color);
+token!(Neutral95,  Color);
+token!(Neutral99,  Color);
+token!(Neutral100, Color);
 
 // ── NeutralVariant ────────────────────────────────────────────────────────────
 
-token2!(NeutralVariant0,   Color);
-token2!(NeutralVariant10,  Color);
-token2!(NeutralVariant20,  Color);
-token2!(NeutralVariant30,  Color);
-token2!(NeutralVariant40,  Color);
-token2!(NeutralVariant50,  Color);
-token2!(NeutralVariant60,  Color);
-token2!(NeutralVariant70,  Color);
-token2!(NeutralVariant80,  Color);
-token2!(NeutralVariant90,  Color);
-token2!(NeutralVariant95,  Color);
-token2!(NeutralVariant99,  Color);
-token2!(NeutralVariant100, Color);
+token!(NeutralVariant0,   Color);
+token!(NeutralVariant10,  Color);
+token!(NeutralVariant20,  Color);
+token!(NeutralVariant30,  Color);
+token!(NeutralVariant40,  Color);
+token!(NeutralVariant50,  Color);
+token!(NeutralVariant60,  Color);
+token!(NeutralVariant70,  Color);
+token!(NeutralVariant80,  Color);
+token!(NeutralVariant90,  Color);
+token!(NeutralVariant95,  Color);
+token!(NeutralVariant99,  Color);
+token!(NeutralVariant100, Color);
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
-token2!(Error0,   Color);
-token2!(Error10,  Color);
-token2!(Error20,  Color);
-token2!(Error30,  Color);
-token2!(Error40,  Color);
-token2!(Error50,  Color);
-token2!(Error60,  Color);
-token2!(Error70,  Color);
-token2!(Error80,  Color);
-token2!(Error90,  Color);
-token2!(Error95,  Color);
-token2!(Error99,  Color);
-token2!(Error100, Color);
+token!(Error0,   Color);
+token!(Error10,  Color);
+token!(Error20,  Color);
+token!(Error30,  Color);
+token!(Error40,  Color);
+token!(Error50,  Color);
+token!(Error60,  Color);
+token!(Error70,  Color);
+token!(Error80,  Color);
+token!(Error90,  Color);
+token!(Error95,  Color);
+token!(Error99,  Color);
+token!(Error100, Color);

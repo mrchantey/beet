@@ -5,31 +5,31 @@ use beet_core::prelude::*;
 
 // ── Duration ref tokens ───────────────────────────────────────────────────────
 
-token2!(Short1,      Duration);
-token2!(Short2,      Duration);
-token2!(Short3,      Duration);
-token2!(Short4,      Duration);
-token2!(Medium1,     Duration);
-token2!(Medium2,     Duration);
-token2!(Medium3,     Duration);
-token2!(Medium4,     Duration);
-token2!(Long1,       Duration);
-token2!(Long2,       Duration);
-token2!(Long3,       Duration);
-token2!(Long4,       Duration);
-token2!(ExtraLong1,  Duration);
-token2!(ExtraLong2,  Duration);
-token2!(ExtraLong3,  Duration);
-token2!(ExtraLong4,  Duration);
+token!(Short1,      Duration);
+token!(Short2,      Duration);
+token!(Short3,      Duration);
+token!(Short4,      Duration);
+token!(Medium1,     Duration);
+token!(Medium2,     Duration);
+token!(Medium3,     Duration);
+token!(Medium4,     Duration);
+token!(Long1,       Duration);
+token!(Long2,       Duration);
+token!(Long3,       Duration);
+token!(Long4,       Duration);
+token!(ExtraLong1,  Duration);
+token!(ExtraLong2,  Duration);
+token!(ExtraLong3,  Duration);
+token!(ExtraLong4,  Duration);
 
 // ── Motion sys tokens ─────────────────────────────────────────────────────────
 
-token2!(MotionStandard,            Motion);
-token2!(MotionStandardAccelerate,  Motion);
-token2!(MotionStandardDecelerate,  Motion);
-token2!(MotionEmphasized,          Motion);
-token2!(MotionEmphasizedAccelerate,Motion);
-token2!(MotionEmphasizedDecelerate,Motion);
+token!(MotionStandard,            Motion);
+token!(MotionStandardAccelerate,  Motion);
+token!(MotionStandardDecelerate,  Motion);
+token!(MotionEmphasized,          Motion);
+token!(MotionEmphasizedAccelerate,Motion);
+token!(MotionEmphasizedDecelerate,Motion);
 
 /// Returns a [`Selector`] with all MD3 duration default values.
 pub fn default_durations() -> Selector {

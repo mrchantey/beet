@@ -7,14 +7,14 @@ use bevy::reflect::Typed;
 /// It stores a path to a document field, and a schema.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Token2 {
+pub struct Token {
 	/// Path to the value for this token
 	field: FieldRef,
 	schema: TokenSchema,
 }
 
 
-impl Token2 {
+impl Token {
 	pub fn new(field: FieldRef, schema: TokenSchema) -> Self {
 		Self { field, schema }
 	}
@@ -45,15 +45,15 @@ pub trait TypedToken {
 	fn schema() -> TokenSchema;
 	fn path() -> FieldPath;
 	fn field() -> FieldRef;
-	fn token() -> Token2 {
-		Token2 {
+	fn token() -> Token {
+		Token {
 			field: Self::field(),
 			schema: Self::schema(),
 		}
 	}
 }
 
-impl<T: TypedToken> From<T> for Token2 {
+impl<T: TypedToken> From<T> for Token {
 	fn from(_: T) -> Self { T::token() }
 }
 
@@ -64,7 +64,7 @@ pub enum ValueOrRef {
 	Ref(FieldRef),
 }
 
-impl<T: Into<Token2>> From<T> for FieldRef {
+impl<T: Into<Token>> From<T> for FieldRef {
 	fn from(value: T) -> Self { value.into().field }
 }
 
@@ -140,7 +140,7 @@ impl std::fmt::Display for TokenSchemaInner {
 /// typed, than a freeform json value.
 #[derive(Default, Deref)]
 pub struct DynamicDocument {
-	tokens: HashMap<FieldPath, Token2>,
+	tokens: HashMap<FieldPath, Token>,
 }
 impl DynamicDocument {
 	pub fn new() -> Self {
@@ -155,7 +155,7 @@ impl DynamicDocument {
 	pub fn insert(
 		&mut self,
 		path: FieldPath,
-		token: Token2,
+		token: Token,
 	) -> Result<&mut Self> {
 		// check for overlapping paths
 		for i in 1..=path.len() {
@@ -194,13 +194,13 @@ impl DynamicDocument {
 
 
 #[macro_export]
-macro_rules! token2 {
+macro_rules! token {
 	(
 		$(#[$meta:meta])*
 		$new_ty:ident,
 		$schema_ty:ident
 	) => {
-		token2!(
+		token!(
 			$(#[$meta])* $new_ty,
 			$schema_ty,
 			$crate::prelude::DocumentPath::default()
@@ -248,7 +248,7 @@ mod tests {
 			.xpect_eq("beet_node.document.token2.tests.Foo");
 	}
 
-	token2!(
+	token!(
 			/// Some cool type
 			/// This now works perfectly!
 			#[derive(Debug, Clone)]
@@ -257,12 +257,12 @@ mod tests {
 			Color,
 			DocumentPath::Ancestor
 	);
-	token2!(
+	token!(
 		#[allow(unused)]
 		Bar,
 		Color
 	);
-	token2!(
+	token!(
 		#[allow(unused)]
 		Boo,
 		Color

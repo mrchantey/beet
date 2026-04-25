@@ -24,7 +24,7 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style;
 	#[cfg(feature = "style")]
-	pub use crate::token2;
+	pub use crate::token;
 
 	pub use crate::types::*;
 }

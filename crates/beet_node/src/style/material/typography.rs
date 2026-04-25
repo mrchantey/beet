@@ -5,9 +5,9 @@ use crate::style::*;
 
 // ── Typeface ref tokens ───────────────────────────────────────────────────────
 
-token2!(TypefaceBrand, Typeface);
-token2!(TypefacePlain, Typeface);
-token2!(
+token!(TypefaceBrand, Typeface);
+token!(TypefacePlain, Typeface);
+token!(
 	/// Monospace family for code and pre elements.
 	TypefaceMono,
 	Typeface
@@ -15,63 +15,63 @@ token2!(
 
 // ── Weight ref tokens ─────────────────────────────────────────────────────────
 
-token2!(WeightRegular, FontWeight);
-token2!(WeightMedium,  FontWeight);
-token2!(WeightBold,    FontWeight);
+token!(WeightRegular, FontWeight);
+token!(WeightMedium,  FontWeight);
+token!(WeightBold,    FontWeight);
 
 // ── Font size ref tokens (MD3 type scale) ─────────────────────────────────────
 
-token2!(FontSizeDisplayLarge,   Length);
-token2!(FontSizeDisplayMedium,  Length);
-token2!(FontSizeDisplaySmall,   Length);
-token2!(FontSizeHeadlineLarge,  Length);
-token2!(FontSizeHeadlineMedium, Length);
-token2!(FontSizeHeadlineSmall,  Length);
-token2!(FontSizeTitleLarge,     Length);
-token2!(FontSizeTitleMedium,    Length);
-token2!(FontSizeTitleSmall,     Length);
-token2!(FontSizeBodyLarge,      Length);
-token2!(FontSizeBodyMedium,     Length);
-token2!(FontSizeBodySmall,      Length);
-token2!(FontSizeLabelLarge,     Length);
-token2!(FontSizeLabelMedium,    Length);
-token2!(FontSizeLabelSmall,     Length);
+token!(FontSizeDisplayLarge,   Length);
+token!(FontSizeDisplayMedium,  Length);
+token!(FontSizeDisplaySmall,   Length);
+token!(FontSizeHeadlineLarge,  Length);
+token!(FontSizeHeadlineMedium, Length);
+token!(FontSizeHeadlineSmall,  Length);
+token!(FontSizeTitleLarge,     Length);
+token!(FontSizeTitleMedium,    Length);
+token!(FontSizeTitleSmall,     Length);
+token!(FontSizeBodyLarge,      Length);
+token!(FontSizeBodyMedium,     Length);
+token!(FontSizeBodySmall,      Length);
+token!(FontSizeLabelLarge,     Length);
+token!(FontSizeLabelMedium,    Length);
+token!(FontSizeLabelSmall,     Length);
 
 // ── Line height ref tokens (MD3 type scale) ───────────────────────────────────
 
-token2!(LineHeightDisplayLarge,   Length);
-token2!(LineHeightDisplayMedium,  Length);
-token2!(LineHeightDisplaySmall,   Length);
-token2!(LineHeightHeadlineLarge,  Length);
-token2!(LineHeightHeadlineMedium, Length);
-token2!(LineHeightHeadlineSmall,  Length);
-token2!(LineHeightTitleLarge,     Length);
-token2!(LineHeightTitleMedium,    Length);
-token2!(LineHeightTitleSmall,     Length);
-token2!(LineHeightBodyLarge,      Length);
-token2!(LineHeightBodyMedium,     Length);
-token2!(LineHeightBodySmall,      Length);
-token2!(LineHeightLabelLarge,     Length);
-token2!(LineHeightLabelMedium,    Length);
-token2!(LineHeightLabelSmall,     Length);
+token!(LineHeightDisplayLarge,   Length);
+token!(LineHeightDisplayMedium,  Length);
+token!(LineHeightDisplaySmall,   Length);
+token!(LineHeightHeadlineLarge,  Length);
+token!(LineHeightHeadlineMedium, Length);
+token!(LineHeightHeadlineSmall,  Length);
+token!(LineHeightTitleLarge,     Length);
+token!(LineHeightTitleMedium,    Length);
+token!(LineHeightTitleSmall,     Length);
+token!(LineHeightBodyLarge,      Length);
+token!(LineHeightBodyMedium,     Length);
+token!(LineHeightBodySmall,      Length);
+token!(LineHeightLabelLarge,     Length);
+token!(LineHeightLabelMedium,    Length);
+token!(LineHeightLabelSmall,     Length);
 
 // ── Sys tokens: composite typography scales ───────────────────────────────────
 
-token2!(DisplayLarge,   Typography);
-token2!(DisplayMedium,  Typography);
-token2!(DisplaySmall,   Typography);
-token2!(HeadlineLarge,  Typography);
-token2!(HeadlineMedium, Typography);
-token2!(HeadlineSmall,  Typography);
-token2!(TitleLarge,     Typography);
-token2!(TitleMedium,    Typography);
-token2!(TitleSmall,     Typography);
-token2!(BodyLarge,      Typography);
-token2!(BodyMedium,     Typography);
-token2!(BodySmall,      Typography);
-token2!(LabelLarge,     Typography);
-token2!(LabelMedium,    Typography);
-token2!(LabelSmall,     Typography);
+token!(DisplayLarge,   Typography);
+token!(DisplayMedium,  Typography);
+token!(DisplaySmall,   Typography);
+token!(HeadlineLarge,  Typography);
+token!(HeadlineMedium, Typography);
+token!(HeadlineSmall,  Typography);
+token!(TitleLarge,     Typography);
+token!(TitleMedium,    Typography);
+token!(TitleSmall,     Typography);
+token!(BodyLarge,      Typography);
+token!(BodyMedium,     Typography);
+token!(BodySmall,      Typography);
+token!(LabelLarge,     Typography);
+token!(LabelMedium,    Typography);
+token!(LabelSmall,     Typography);
 
 /// Returns a [`Selector`] with all MD3 typography default values.
 ///

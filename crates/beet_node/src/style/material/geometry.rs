@@ -5,39 +5,39 @@ use beet_core::prelude::*;
 
 // ── Elevation tokens ──────────────────────────────────────────────────────────
 
-token2!(Elevation0, Elevation);
-token2!(Elevation1, Elevation);
-token2!(Elevation2, Elevation);
-token2!(Elevation3, Elevation);
-token2!(Elevation4, Elevation);
-token2!(Elevation5, Elevation);
+token!(Elevation0, Elevation);
+token!(Elevation1, Elevation);
+token!(Elevation2, Elevation);
+token!(Elevation3, Elevation);
+token!(Elevation4, Elevation);
+token!(Elevation5, Elevation);
 
 // ── Shape corner radius ref tokens ────────────────────────────────────────────
 
-token2!(ShapeCornerNone,       Length);
-token2!(ShapeCornerExtraSmall, Length);
-token2!(ShapeCornerSmall,      Length);
-token2!(ShapeCornerMedium,     Length);
-token2!(ShapeCornerLarge,      Length);
-token2!(ShapeCornerExtraLarge, Length);
-token2!(ShapeCornerFull,       Length);
+token!(ShapeCornerNone,       Length);
+token!(ShapeCornerExtraSmall, Length);
+token!(ShapeCornerSmall,      Length);
+token!(ShapeCornerMedium,     Length);
+token!(ShapeCornerLarge,      Length);
+token!(ShapeCornerExtraLarge, Length);
+token!(ShapeCornerFull,       Length);
 
 // ── Shape sys tokens ──────────────────────────────────────────────────────────
 
-token2!(ShapeNone,       Shape);
-token2!(ShapeExtraSmall, Shape);
-token2!(ShapeSmall,      Shape);
-token2!(ShapeMedium,     Shape);
-token2!(ShapeLarge,      Shape);
-token2!(ShapeExtraLarge, Shape);
-token2!(ShapeFull,       Shape);
+token!(ShapeNone,       Shape);
+token!(ShapeExtraSmall, Shape);
+token!(ShapeSmall,      Shape);
+token!(ShapeMedium,     Shape);
+token!(ShapeLarge,      Shape);
+token!(ShapeExtraLarge, Shape);
+token!(ShapeFull,       Shape);
 
 // ── Outline width tokens ──────────────────────────────────────────────────────
 
-token2!(OutlineWidthNone,   Length);
-token2!(OutlineWidthThin,   Length);
-token2!(OutlineWidthMedium, Length);
-token2!(OutlineWidthThick,  Length);
+token!(OutlineWidthNone,   Length);
+token!(OutlineWidthThin,   Length);
+token!(OutlineWidthMedium, Length);
+token!(OutlineWidthThick,  Length);
 
 /// Returns a [`Selector`] with all MD3 elevation default values.
 pub fn default_elevations() -> Selector {

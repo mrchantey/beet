@@ -2,31 +2,31 @@
 use crate::{prelude::*, style::*};
 use beet_core::prelude::Color;
 
-token2!(ForegroundColor, Color, DocumentPath::Ancestor);
-token2!(BackgroundColor, Color, DocumentPath::This);
-token2!(Height, Length, DocumentPath::This);
-token2!(Width, Length, DocumentPath::This);
-token2!(Size, Length, DocumentPath::This);
-token2!(Padding, Length, DocumentPath::This);
-token2!(Spacing, Length, DocumentPath::This);
-token2!(
+token!(ForegroundColor, Color, DocumentPath::Ancestor);
+token!(BackgroundColor, Color, DocumentPath::This);
+token!(Height, Length, DocumentPath::This);
+token!(Width, Length, DocumentPath::This);
+token!(Size, Length, DocumentPath::This);
+token!(Padding, Length, DocumentPath::This);
+token!(Spacing, Length, DocumentPath::This);
+token!(
     /// Shape property token, named to avoid conflict with the [`Shape`] type.
     ShapeProp, Shape, DocumentPath::This
 );
-token2!(
+token!(
     /// Elevation property token, named to avoid conflict with the [`Elevation`] type.
     ElevationProp, Elevation, DocumentPath::This
 );
-token2!(OutlineWidth, Length, DocumentPath::This);
-token2!(OutlineOffset, Length, DocumentPath::This);
-token2!(Font, Typeface, DocumentPath::Ancestor);
-token2!(FontSize, Length, DocumentPath::Ancestor);
-token2!(
+token!(OutlineWidth, Length, DocumentPath::This);
+token!(OutlineOffset, Length, DocumentPath::This);
+token!(Font, Typeface, DocumentPath::Ancestor);
+token!(FontSize, Length, DocumentPath::Ancestor);
+token!(
     /// Font weight property token, named to avoid conflict with the [`FontWeight`] type.
     FontWeightProp, FontWeight, DocumentPath::Ancestor
 );
-token2!(LineHeight, Length, DocumentPath::Ancestor);
-token2!(Tracking, Length, DocumentPath::Ancestor);
+token!(LineHeight, Length, DocumentPath::Ancestor);
+token!(Tracking, Length, DocumentPath::Ancestor);
 
 pub fn css_key_map() -> CssKeyMap {
 	CssKeyMap::default()
