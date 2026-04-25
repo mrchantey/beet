@@ -825,4 +825,98 @@ mod test {
 		value.is_map().xpect_true();
 		value.get("key").unwrap().as_i64().unwrap().xpect_eq(42);
 	}
+
+	#[cfg(feature = "json")]
+	mod serde_reflect {
+		use super::*;
+		use bevy::math::Vec3;
+		use bevy::reflect::FromReflect;
+		use bevy::transform::components::Transform;
+
+		/// Tests all 4 roundtrip paths: reflect→reflect, reflect→serde, serde→serde, serde→reflect.
+		fn roundtrip_for<T>(val: T)
+		where
+			T: Clone
+				+ core::fmt::Debug
+				+ PartialEq
+				+ bevy::reflect::Typed
+				+ bevy::reflect::Reflect
+				+ FromReflect
+				+ serde::Serialize
+				+ serde::de::DeserializeOwned
+				+ Send
+				+ Sync
+				+ 'static,
+		{
+			let v = Value::from_reflect(&val).unwrap();
+			v.clone().into_reflect::<T>().unwrap().xpect_eq(val.clone());
+
+			let v = Value::from_reflect(&val).unwrap();
+			v.into_serde::<T>().unwrap().xpect_eq(val.clone());
+
+			let v = Value::from_serde(&val).unwrap();
+			v.into_serde::<T>().unwrap().xpect_eq(val.clone());
+
+			let v = Value::from_serde(&val).unwrap();
+			v.into_reflect::<T>().unwrap().xpect_eq(val);
+		}
+
+		#[test]
+		fn roundtrip_string() { roundtrip_for("hello world".to_string()); }
+
+		#[test]
+		fn roundtrip_u32() { roundtrip_for(389_u32); }
+
+		#[test]
+		fn roundtrip_vec3() { roundtrip_for(Vec3::new(0., 1., 2.)); }
+
+		#[test]
+		fn roundtrip_transform() {
+			roundtrip_for(Transform::from_translation(Vec3::new(1., 2., 3.)));
+		}
+
+		#[cfg(feature = "bevy_color")]
+		#[test]
+		fn roundtrip_color() {
+			use bevy::color::Color;
+			use bevy::color::palettes;
+			roundtrip_for(palettes::basic::GREEN.xinto::<Color>());
+		}
+
+		// Custom enum to test all variant types
+		#[derive(
+			Debug,
+			Clone,
+			Default,
+			PartialEq,
+			bevy::reflect::Reflect,
+			serde::Serialize,
+			serde::Deserialize,
+		)]
+		#[reflect(Default)]
+		enum TestEnum {
+			#[default]
+			Unit,
+			Newtype(u32),
+			Tuple(u32, u32),
+			Struct {
+				x: u32,
+				y: u32,
+			},
+		}
+
+		#[test]
+		fn roundtrip_enum_unit() { roundtrip_for(TestEnum::Unit); }
+
+		#[test]
+		fn roundtrip_enum_newtype() { roundtrip_for(TestEnum::Newtype(42)); }
+
+		#[test]
+		fn roundtrip_enum_tuple() { roundtrip_for(TestEnum::Tuple(1, 2)); }
+
+		#[test]
+		fn roundtrip_enum_struct() {
+			roundtrip_for(TestEnum::Struct { x: 3, y: 4 });
+		}
+	}
 }

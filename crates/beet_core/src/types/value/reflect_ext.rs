@@ -85,6 +85,86 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 		return Ok(Value::Bytes(val.clone()));
 	}
 
+	// Glam types serialize as sequences in serde; match that format here
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::Vec2>() {
+		return Ok(Value::List(vec![
+			Value::Float(v.x as f64),
+			Value::Float(v.y as f64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::Vec3>() {
+		return Ok(Value::List(vec![
+			Value::Float(v.x as f64),
+			Value::Float(v.y as f64),
+			Value::Float(v.z as f64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::Vec3A>() {
+		return Ok(Value::List(vec![
+			Value::Float(v.x as f64),
+			Value::Float(v.y as f64),
+			Value::Float(v.z as f64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::Vec4>() {
+		return Ok(Value::List(vec![
+			Value::Float(v.x as f64),
+			Value::Float(v.y as f64),
+			Value::Float(v.z as f64),
+			Value::Float(v.w as f64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::Quat>() {
+		return Ok(Value::List(vec![
+			Value::Float(v.x as f64),
+			Value::Float(v.y as f64),
+			Value::Float(v.z as f64),
+			Value::Float(v.w as f64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::IVec2>() {
+		return Ok(Value::List(vec![
+			Value::Int(v.x as i64),
+			Value::Int(v.y as i64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::IVec3>() {
+		return Ok(Value::List(vec![
+			Value::Int(v.x as i64),
+			Value::Int(v.y as i64),
+			Value::Int(v.z as i64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::IVec4>() {
+		return Ok(Value::List(vec![
+			Value::Int(v.x as i64),
+			Value::Int(v.y as i64),
+			Value::Int(v.z as i64),
+			Value::Int(v.w as i64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::UVec2>() {
+		return Ok(Value::List(vec![
+			Value::Uint(v.x as u64),
+			Value::Uint(v.y as u64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::UVec3>() {
+		return Ok(Value::List(vec![
+			Value::Uint(v.x as u64),
+			Value::Uint(v.y as u64),
+			Value::Uint(v.z as u64),
+		]));
+	}
+	if let Some(v) = reflect.try_downcast_ref::<bevy::math::UVec4>() {
+		return Ok(Value::List(vec![
+			Value::Uint(v.x as u64),
+			Value::Uint(v.y as u64),
+			Value::Uint(v.z as u64),
+			Value::Uint(v.w as u64),
+		]));
+	}
+
 	// Handle complex types via reflection
 	match reflect.reflect_ref() {
 		ReflectRef::Struct(s) => {
@@ -201,19 +281,30 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 					Ok(Value::str(variant_name))
 				}
 				bevy::reflect::VariantType::Tuple => {
-					let mut fields = Vec::with_capacity(e.field_len());
-					for idx in 0..e.field_len() {
-						let field = e.field_at(idx).ok_or_else(|| {
-							bevyhow!(
-								"enum tuple field at index {} not found",
-								idx
-							)
+					// Single-field tuple variants (newtypes) match serde: use inner value directly
+					if e.field_len() == 1 {
+						let field = e.field_at(0).ok_or_else(|| {
+							bevyhow!("enum tuple field 0 not found")
 						})?;
-						fields.push(reflect_to_value(field)?);
+						let inner = reflect_to_value(field)?;
+						let mut variant_map = Map::default();
+						variant_map.insert(variant_name, inner);
+						Ok(Value::Map(variant_map))
+					} else {
+						let mut fields = Vec::with_capacity(e.field_len());
+						for idx in 0..e.field_len() {
+							let field = e.field_at(idx).ok_or_else(|| {
+								bevyhow!(
+									"enum tuple field at index {} not found",
+									idx
+								)
+							})?;
+							fields.push(reflect_to_value(field)?);
+						}
+						let mut variant_map = Map::default();
+						variant_map.insert(variant_name, fields);
+						Ok(Value::Map(variant_map))
 					}
-					let mut variant_map = Map::default();
-					variant_map.insert(variant_name, fields);
-					Ok(Value::Map(variant_map))
 				}
 				bevy::reflect::VariantType::Struct => {
 					let mut fields = Map::default();
@@ -288,6 +379,25 @@ fn build_dynamic_struct(
 	value: &Value,
 	info: &StructInfo,
 ) -> Result<Box<dyn PartialReflect>> {
+	// Handle list-indexed structs (eg glam Vec3, Quat) where fields are in sequence order
+	if let Value::List(list) = value {
+		let mut dynamic = DynamicStruct::default();
+		for (idx, item) in list.iter().enumerate() {
+			let Some(field) = info.field_at(idx) else {
+				continue;
+			};
+			if let Some(built) = build_field_value(
+				Some(item),
+				field.name(),
+				field.type_id(),
+				field.type_info(),
+			)? {
+				dynamic.insert_boxed(field.name(), built);
+			}
+		}
+		return Ok(Box::new(dynamic));
+	}
+
 	let map = value.as_map()?;
 
 	let mut dynamic = DynamicStruct::default();
@@ -555,18 +665,34 @@ fn build_dynamic_enum(
 					);
 				}
 				bevy::reflect::VariantInfo::Tuple(tuple_info) => {
-					let list = fields.as_list()?;
-
 					let mut tuple = bevy::reflect::DynamicTuple::default();
-					for (idx, field_info) in tuple_info.iter().enumerate() {
-						let field_value = list.get(idx);
+
+					if tuple_info.field_len() == 1 {
+						// Single-field tuple variants (newtypes) store the inner value directly
+						let field_info =
+							tuple_info.field_at(0).ok_or_else(|| {
+								bevyhow!("enum tuple variant missing field 0")
+							})?;
 						if let Some(built) = build_field_value(
-							field_value,
-							&idx.to_string(),
+							Some(fields),
+							"0",
 							field_info.type_id(),
 							field_info.type_info(),
 						)? {
 							tuple.insert_boxed(built);
+						}
+					} else {
+						let list = fields.as_list()?;
+						for (idx, field_info) in tuple_info.iter().enumerate() {
+							let field_value = list.get(idx);
+							if let Some(built) = build_field_value(
+								field_value,
+								&idx.to_string(),
+								field_info.type_id(),
+								field_info.type_info(),
+							)? {
+								tuple.insert_boxed(built);
+							}
 						}
 					}
 					dynamic.set_variant(

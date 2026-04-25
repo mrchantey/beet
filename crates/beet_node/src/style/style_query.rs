@@ -38,7 +38,8 @@ pub struct StyleQuery<'w, 's> {
 }
 
 impl StyleQuery<'_, '_> {
-	/// Collects selectors in order:
+
+	/// Collect selectors in order:
 	/// 1. Global [`SelectorStore`] resource (lowest priority)
 	/// 2. Entity-local [`SelectorStore`] component (highest priority)
 	pub fn collect_selectors(&self, entity: Entity) -> Vec<&Selector> {
