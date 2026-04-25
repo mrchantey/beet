@@ -81,6 +81,31 @@ impl StyleQuery<'_, '_> {
 		}
 		map
 	}
+
+	/// Recursively resolves token path to a value
+	pub fn get_token(
+		&self,
+		entity: Entity,
+		path: &TokenPath,
+	) -> Result<&Value> {
+		let Ok(el) = self.elements.get(entity) else {
+			bevybail!("Entity {} does not have an Element component", entity);
+		};
+
+		for selector in self.collect_selectors(entity) {
+			if selector.matches(&el)
+				&& let Some(val) = selector.tokens().get(path)
+			{
+				match val {
+					ValueOrToken::Value(value) => return Ok(value.value()),
+					ValueOrToken::Token(token) => {
+						return self.get_token(entity, token.path());
+					}
+				}
+			}
+		}
+		bevybail!("Token not found for path: {}", path.as_str())
+	}
 }
 
 #[cfg(test)]

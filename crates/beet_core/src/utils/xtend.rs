@@ -401,3 +401,15 @@ where
 impl<T> XIntoIterator<Self, T> for T {
 	fn xinto_iter(self) -> impl Iterator<Item = T> { [self].into_iter() }
 }
+
+/// Extension methods for `Result` types.
+#[extend::ext(name = XResult)]
+pub impl<T, E> Result<T, E> {
+	/// Display Unwrap: Unwraps the `Ok` value or panics with the `Err` value's display representation.
+	fn xunwrap(self) -> T
+	where
+		E: core::fmt::Display,
+	{
+		self.unwrap_or_else(|e| panic!("Error: {}", e))
+	}
+}

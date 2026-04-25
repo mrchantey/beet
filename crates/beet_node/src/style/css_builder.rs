@@ -311,15 +311,13 @@ mod tests {
 			(material::MaterialStylePlugin::default(), CssPlugin).into_world();
 
 
-		let css = world.spawn((
-			Document::new(default()),
-			rsx! {
+		let css = world.spawn(rsx! {
 			<div class="text-primary">hello world!</div>
-		})).with_state::<(Res<CssIdentMap>,
+		}).with_state::<(Res<CssIdentMap>,
 		Res<CssFuncMap>,
 		StyleQuery,
 		DocumentQuery),_>(|entity,state|{
-			CssBuilder::default().build(entity,&state.0,&state.1,&state.2,&state.3).unwrap()
+			CssBuilder::default().build(entity,&state.0,&state.1,&state.2,&state.3).xunwrap()
 		});
 		println!("{css}");
 	}
