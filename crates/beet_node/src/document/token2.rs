@@ -134,15 +134,15 @@ impl std::fmt::Display for TokenSchemaInner {
 }
 
 
-/// An token map is like a [`Value`] where branch nodes
+/// Like a [`Value`] where branch nodes
 /// are nested maps and leaf nodes are typed values.
 /// It is perhaps more akin to a filesystem where files are
 /// typed, than a freeform json value.
 #[derive(Default, Deref)]
-pub struct TokenMap2 {
+pub struct DynamicDocument {
 	tokens: HashMap<FieldPath, Token2>,
 }
-impl TokenMap2 {
+impl DynamicDocument {
 	pub fn new() -> Self {
 		Self {
 			tokens: HashMap::new(),

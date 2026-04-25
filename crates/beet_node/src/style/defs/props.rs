@@ -1,11 +1,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::Color;
 
-
-token2!(BackgroundColor2, Color, DocumentPath::This);
-token2!(ForegroundColor2, Color, DocumentPath::Ancestor);
 
 
 /// Stroke color of the text and other foreground elements.

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::Typed;
 
 /// A set of default properties applied to elements matching the given criteria.
 #[derive(Default, Get)]
@@ -66,14 +67,12 @@ impl Selector {
 	/// Match elements with the given tag.
 	pub fn new() -> Self { Self::default() }
 
-	pub fn with_typed<T: TypedToken, U: TypedToken>(self) -> Self {
-		self.with_token(T::path(), U::field())
+	pub fn with_typed<K: TypedToken, V: TypedToken>(self) -> Self {
+		self.with_token(K::path(), V::field())
 	}
-	pub fn with_typed_value<T: TypedToken>(
-		self,
-		value: impl Into<ValueOrRef>,
-	) -> Self {
-		self.with_token(T::path(), value)
+	pub fn with_value<K: TypedToken>(self, value: impl Typed) -> Result<Self> {
+		let value = Value::from_reflect(&value)?;
+		self.with_token(K::path(), value).xok()
 	}
 	/// Add a property mapped to a token.
 	pub fn with_token(
