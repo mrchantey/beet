@@ -63,7 +63,7 @@ impl StyleQuery<'_, '_> {
 	pub fn collect_tokens(
 		&self,
 		entity: Entity,
-	) -> HashMap<FieldPath, ValueOrRef> {
+	) -> HashMap<TokenPath, ValueOrToken> {
 		let mut map = HashMap::new();
 
 		let Ok(el) = self.elements.get(entity) else {
@@ -105,7 +105,7 @@ mod tests {
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
 			let val = tokens.get(&colors::Primary::path()).unwrap();
-			matches!(val, ValueOrRef::Value(_)).xpect_true();
+			matches!(val, ValueOrToken::Value(_)).xpect_true();
 		});
 	}
 
@@ -138,7 +138,7 @@ mod tests {
 			let tokens = query.collect_tokens(entity);
 			let val = tokens.get(&colors::Primary::path()).unwrap();
 			// entity-local value wins
-			matches!(val, ValueOrRef::Value(_)).xpect_true();
+			matches!(val, ValueOrToken::Value(_)).xpect_true();
 		});
 	}
 
@@ -198,7 +198,7 @@ mod tests {
 			let tokens = query.collect_tokens(entity);
 			// Primary should now point to a tones::Primary40 FieldRef
 			let val = tokens.get(&colors::Primary::path()).unwrap();
-			matches!(val, ValueOrRef::Ref(_)).xpect_true();
+			matches!(val, ValueOrToken::Token(_)).xpect_true();
 		});
 	}
 }

@@ -6,7 +6,11 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Motion {
 	/// [`FieldRef`] pointing to the [`Duration`] token.
-	pub duration: FieldRef,
+	pub duration: Token,
+	pub ease: EaseFunction,
+}
+pub struct ResolvedMotion {
+	pub duration: Duration,
 	pub ease: EaseFunction,
 }
 

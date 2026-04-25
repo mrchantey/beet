@@ -1,4 +1,4 @@
-use crate::prelude::FieldRef;
+use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 use std::sync::LazyLock;
@@ -89,9 +89,9 @@ impl CssValue for FontWeight {
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Typography {
 	/// [`FieldRef`] pointing to the [`Typeface`] token.
-	pub typeface: FieldRef,
+	pub typeface: Token,
 	/// [`FieldRef`] pointing to the [`FontWeight`] token.
-	pub weight: FieldRef,
+	pub weight: Token,
 	pub size: Length,
 	pub line_height: Option<Length>,
 	pub letter_spacing: Option<Length>,

@@ -12,11 +12,14 @@ pub trait CssValue {
 /// Multiple tokens may point to the same key,
 /// but usually dont when defined in the same crate.
 #[derive(Default, Deref, Resource)]
-pub struct CssIdentMap(HashMap<FieldPath, CssIdent>);
+pub struct CssIdentMap(HashMap<TokenPath, CssIdent>);
+
+#[derive(Default, Deref, Resource)]
+pub struct CssFuncMap(HashMap<TokenPath, CssIdent>);
 
 
 impl CssIdentMap {
-	pub fn with(mut self, path: FieldPath, ident: CssIdent) -> Self {
+	pub fn with(mut self, path: TokenPath, ident: CssIdent) -> Self {
 		self.0.insert(path, ident);
 		self
 	}
@@ -125,9 +128,9 @@ impl CssBuilder {
 				let key = self.ident_to_css(key, key_map)?;
 
 				let value = match value {
-					ValueOrRef::Value(val) => self.value_to_css(val)?,
-					ValueOrRef::Ref(field_ref) => self
-						.ident_to_css(&field_ref.field_path, key_map)?
+					ValueOrToken::Value(value) => self.value_to_css(value)?,
+					ValueOrToken::Token(token) => self
+						.ident_to_css(&token.path(), key_map)?
 						.as_css_value(),
 				};
 
@@ -159,7 +162,7 @@ impl CssBuilder {
 		.xok()
 	}
 
-	fn value_to_css(&self, value: &Value) -> Result<String> {
+	fn value_to_css(&self, value: &TypedValue) -> Result<String> {
 		String::default().xok()
 	}
 
@@ -169,21 +172,16 @@ impl CssBuilder {
 	/// Non-specified idents are assumed to be variables, not properties.
 	fn ident_to_css(
 		&self,
-		path: &FieldPath,
+		path: &TokenPath,
 		key_map: Option<&CssIdentMap>,
 	) -> Result<CssIdent> {
 		if let Some(ident) = key_map.and_then(|map| map.0.get(path)) {
 			return ident.clone().xok();
 		}
-		let last = path.last().ok_or_else(|| {
-			bevyhow!(
-				"Path {} is empty and cannot be converted to a CSS key",
-				path
-			)
-		})?;
 		use heck::ToKebabCase;
+		let path = path.to_string().to_kebab_case().replace("/", "--");
 		// TODO full path instead?
-		CssIdent::variable(last.to_string().to_kebab_case()).xok()
+		CssIdent::variable(path).xok()
 	}
 
 	fn rules_to_css(&self, rules: &[Rule]) -> String {

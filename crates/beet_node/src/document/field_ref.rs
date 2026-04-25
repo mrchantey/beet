@@ -66,8 +66,6 @@ impl FieldRef {
 		}
 	}
 
-	pub fn of<T: TypePath>() -> Self { Self::new(FieldPath::of::<T>()) }
-
 	/// Set this field reference to error if the field is missing instead of initializing it.
 	pub fn error_on_missing(mut self) -> Self {
 		self.on_missing = OnMissingField::EmitError;

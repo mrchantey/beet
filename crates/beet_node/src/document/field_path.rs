@@ -24,16 +24,7 @@ impl FieldPath {
 	{
 		Self(segments.into_iter().map(Into::into).collect())
 	}
-
-	/// Splits by double colons `::`
-	pub fn from_module_path(val: &'static str) -> Self {
-		val.split("::")
-			.map(|s| FieldSegment::ObjectKey(SmolStr::new_static(s)))
-			.collect::<Vec<_>>()
-			.into()
-	}
-
-	pub fn of<T: TypePath>() -> Self { Self::from_module_path(T::type_path()) }
+	pub fn into_inner(self) -> Vec<FieldSegment> { self.0 }
 }
 
 impl From<Vec<FieldSegment>> for FieldPath {

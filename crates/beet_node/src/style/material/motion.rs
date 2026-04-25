@@ -60,26 +60,26 @@ pub fn default_motions() -> Selector {
 	Selector::new()
 		.with_value::<MotionStandard>(Motion {
 			ease:     EaseFunction::CubicInOut,
-			duration: FieldRef::of::<Medium2>(),
+			duration: Medium2::token(),
 		}).unwrap()
 		.with_value::<MotionStandardAccelerate>(Motion {
 			ease:     EaseFunction::CubicIn,
-			duration: FieldRef::of::<Short4>(),
+			duration: Short4::token(),
 		}).unwrap()
 		.with_value::<MotionStandardDecelerate>(Motion {
 			ease:     EaseFunction::CubicOut,
-			duration: FieldRef::of::<Medium1>(),
+			duration: Medium1::token(),
 		}).unwrap()
 		.with_value::<MotionEmphasized>(Motion {
 			ease:     EaseFunction::QuinticInOut,
-			duration: FieldRef::of::<Long2>(),
+			duration: Long2::token(),
 		}).unwrap()
 		.with_value::<MotionEmphasizedAccelerate>(Motion {
 			ease:     EaseFunction::QuarticIn,
-			duration: FieldRef::of::<Short4>(),
+			duration: Short4::token(),
 		}).unwrap()
 		.with_value::<MotionEmphasizedDecelerate>(Motion {
 			ease:     EaseFunction::QuarticOut,
-			duration: FieldRef::of::<Medium4>(),
+			duration: Medium4::token(),
 		}).unwrap()
 }

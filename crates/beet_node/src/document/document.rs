@@ -218,6 +218,14 @@ pub enum DocumentError {
 		/// The path where the error occurred.
 		path: FieldPath,
 	},
+	/// Document was not found for the specified entity.
+	#[error("document not found for entity {entity:?} and path {path:?}")]
+	DocumentNotFound {
+		/// The entity for which the document was not found.
+		entity: Entity,
+		/// The path where the error occurred.
+		path: DocumentPath,
+	},
 }
 
 

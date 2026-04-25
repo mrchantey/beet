@@ -19,7 +19,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			DocumentPath::Root => self.ancestors.root_ancestor(subject),
 			DocumentPath::Ancestor => self
 				.ancestors
-				.iter_ancestors(subject)
+				.iter_ancestors_inclusive(subject)
 				.find(|entity| self.doc_query.contains(*entity))
 				.unwrap_or_else(|| self.ancestors.root_ancestor(subject)),
 			DocumentPath::Entity(entity) => *entity,
@@ -73,6 +73,47 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				)
 			})
 			.await?
+	}
+
+	pub fn get_token(
+		&self,
+		entity: Entity,
+		token: &Token,
+	) -> Result<&Value, DocumentError> {
+		let path = token.path().clone().xinto::<FieldPath>();
+		match token.document() {
+			DocumentPath::Root => {
+				self.ancestors.root_ancestor(entity).xmap(|e| {
+					self.doc_query
+						.get(e)
+						.ok()
+						.and_then(|doc| doc.get_field_ref(&path).ok())
+				})
+			}
+			DocumentPath::Ancestor => self
+				.ancestors
+				.iter_ancestors_inclusive(entity)
+				.find_map(|entity| {
+					self.doc_query
+						.get(entity)
+						.ok()
+						.and_then(|doc| doc.get_field_ref(&path).ok())
+				}),
+			DocumentPath::Entity(entity) => self
+				.doc_query
+				.get(*entity)
+				.ok()
+				.and_then(|doc| doc.get_field_ref(&path).ok()),
+			DocumentPath::This => self
+				.doc_query
+				.get(entity)
+				.ok()
+				.and_then(|doc| doc.get_field_ref(&path).ok()),
+		}
+		.ok_or_else(|| DocumentError::DocumentNotFound {
+			entity,
+			path: token.document().clone(),
+		})
 	}
 
 	/// Execute a function with a mutable reference to a field.
