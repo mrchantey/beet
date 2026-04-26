@@ -1,11 +1,28 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use crate::{prelude::*, style::*};
-use beet_core::prelude::Color;
+use crate::prelude::*;
+use crate::style::*;
+use crate::style::FontWeight;
+use beet_core::prelude::*;
 
 token!(ForegroundColor, Color, DocumentPath::Ancestor);
+impl CssToken for ForegroundColor {
+	fn properties() -> Vec<SmolStr> {
+		vec!["color".into()]
+	}
+	fn declarations(
+		value: &Value,
+		builder: &CssBuilder,
+	    ) -> Result<Vec<(String, String)>> {
+    let color = value.into_reflect::<Color>()?.to_css_value(builder)?;
+    Ok(vec![("color".into(), color)])
+  }
+}
+
+
 token!(BackgroundColor, Color, DocumentPath::This);
 
-token!(Font, Typography, DocumentPath::This);
+token!(Font, Typography, DocumentPath::This)
+;
 
 token!(Height, Length, DocumentPath::This);
 token!(Width, Length, DocumentPath::This);

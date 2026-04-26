@@ -293,7 +293,7 @@ impl CssFuncMap {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::style::material::selectors;
+	use crate::style::material::*;
 
 	#[test]
 	fn test() {
@@ -302,7 +302,17 @@ mod tests {
 		let mut world = (CssPlugin).into_world();
 
 		world.insert_resource(
-			SelectorStore::default().with(selectors::hero_heading()),
+			SelectorStore::default()
+				.with(selectors::hero_heading())
+				.with(
+					Selector::root()
+						.with_typed::<colors::OnPrimary, tones::Primary20>(),
+				)
+				.with(
+					Selector::root()
+						.with_value::<tones::Primary20>(Color::srgb(0., 1., 0.))
+						.unwrap(),
+				),
 		);
 		let css = world
 			.spawn(rsx! {
