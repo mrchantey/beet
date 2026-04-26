@@ -154,11 +154,7 @@ macro_rules! token {
 				$crate::prelude::TokenKey::of::<$schema_ty>()
 			}
 			fn key() -> $crate::prelude::TokenKey {
-				let path = ::core::concat!(
-					::core::concat!(::core::module_path!(), "::"),
-					::core::stringify!($new_ty)
-				);
-				$crate::prelude::TokenKey::from_module_path(path)
+				$crate::prelude::TokenKey::of::<Self>()
 			}
 			fn token() -> $crate::prelude::Token {
 				$crate::prelude::Token::new(Self::key(), Self::schema())

@@ -6,8 +6,9 @@ use beet_core::prelude::*;
 
 
 pub trait CssToken {
-	fn selectors() -> Vec<Rule> { default() }
+	fn selectors(&self) -> Vec<Rule> { default() }
 	fn declarations(
+		&self,
 		builder: &CssBuilder,
 		value: &TokenValue,
 	) -> Result<Vec<(String, String)>>;
@@ -31,6 +32,7 @@ macro_rules! css_property {
   );
   impl $crate::prelude::style::CssToken for $new_ty {
    fn declarations(
+   	&self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
@@ -59,6 +61,7 @@ macro_rules! css_variable {
   );
   impl $crate::prelude::style::CssToken for $new_ty {
    fn declarations(
+   	&self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {

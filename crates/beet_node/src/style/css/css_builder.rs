@@ -221,15 +221,7 @@ impl CssValue for Color {
 /// Store methods for looking up a schema path and resolving a value
 #[derive(Default, Deref, Resource)]
 pub struct CssTokenMap(
-	HashMap<
-		TokenKey,
-		Arc<
-			dyn 'static
-				+ Send
-				+ Sync
-				+ Fn(&CssBuilder, &TokenValue) -> Result<Vec<(String, String)>>,
-		>,
-	>,
+	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + CssToken>>,
 );
 impl CssTokenMap {
 	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
@@ -237,11 +229,11 @@ impl CssTokenMap {
 	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
 	/// (the type actually passed to `with_value`), not the output type,
 	/// so the key must match that tokens type.
-	pub fn insert<T: TypedTokenKey + CssToken>(mut self) -> Self {
-		self.0.insert(
-			TokenKey::of::<T>(),
-			Arc::new(|builder, value| T::declarations(builder, value)),
-		);
+	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + CssToken>(
+		mut self,
+		token: T,
+	) -> Self {
+		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
 		self
 	}
 
@@ -256,9 +248,9 @@ impl CssTokenMap {
 		key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Vec<(String, String)>> {
-		if let Some(func) = self.0.get(key) {
+		if let Some(token) = self.0.get(key) {
 			// if let Some(func) = self.0.get(value.schema()) {
-			func(builder, value)
+			token.declarations(builder, value)
 		} else {
 			bevybail!("No CSS Token registered for this schema:\n{}", key)
 		}
@@ -278,9 +270,9 @@ mod tests {
 
 		world.insert_resource(
 			CssTokenMap::default()
-				.insert::<colors::OnPrimary>()
-				.insert::<tones::Primary20>()
-				.insert::<common_props::ForegroundColor>(),
+				.insert(colors::OnPrimary)
+				.insert(tones::Primary20)
+				.insert(common_props::ForegroundColor),
 		);
 
 		world.insert_resource(

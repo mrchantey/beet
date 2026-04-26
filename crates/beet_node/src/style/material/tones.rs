@@ -1,116 +1,191 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use crate::{prelude::*, style::{CssBuilder, CssToken}};
+use crate::{prelude::*, style::CssTokenMap};
 use beet_core::prelude::*;
+
+
+pub fn token_map() -> CssTokenMap {
+	CssTokenMap::default()
+		.insert(Primary0)
+		.insert(Primary10)
+		.insert(Primary20)
+		.insert(Primary30)
+		.insert(Primary40)
+		.insert(Primary50)
+		.insert(Primary60)
+		.insert(Primary70)
+		.insert(Primary80)
+		.insert(Primary90)
+		.insert(Primary95)
+		.insert(Primary99)
+		.insert(Primary100)
+
+		.insert(Secondary0)
+		.insert(Secondary10)
+		.insert(Secondary20)
+		.insert(Secondary30)
+		.insert(Secondary40)
+		.insert(Secondary50)
+		.insert(Secondary60)
+		.insert(Secondary70)
+		.insert(Secondary80)
+		.insert(Secondary90)
+		.insert(Secondary95)
+		.insert(Secondary99)
+		.insert(Secondary100)
+
+	  .insert(Tertiary0)
+	  .insert(Tertiary10)
+	  .insert(Tertiary20)
+	  .insert(Tertiary30)
+	  .insert(Tertiary40)
+	  .insert(Tertiary50)
+	  .insert(Tertiary60)
+	  .insert(Tertiary70)
+	  .insert(Tertiary80)
+	  .insert(Tertiary90)
+	  .insert(Tertiary95)
+	  .insert(Tertiary99)
+	  .insert(Tertiary100)
+
+	  .insert(Neutral0)
+	  .insert(Neutral10)
+	  .insert(Neutral20)
+	  .insert(Neutral30)
+	  .insert(Neutral40)
+	  .insert(Neutral50)
+	  .insert(Neutral60)
+	  .insert(Neutral70)
+	  .insert(Neutral80)
+	  .insert(Neutral90)
+	  .insert(Neutral95)
+	  .insert(Neutral99)
+	  .insert(Neutral100)
+
+		.insert(NeutralVariant0)
+		.insert(NeutralVariant10)
+		.insert(NeutralVariant20)
+		.insert(NeutralVariant30)
+		.insert(NeutralVariant40)
+		.insert(NeutralVariant50)
+		.insert(NeutralVariant60)
+		.insert(NeutralVariant70)
+		.insert(NeutralVariant80)
+		.insert(NeutralVariant90)
+		.insert(NeutralVariant95)
+		.insert(NeutralVariant99)
+		.insert(NeutralVariant100)
+
+		.insert(Error0)
+		.insert(Error10)
+		.insert(Error20)
+		.insert(Error30)
+		.insert(Error40)
+		.insert(Error50)
+		.insert(Error60)
+		.insert(Error70)
+		.insert(Error80)
+		.insert(Error90)
+		.insert(Error95)
+		.insert(Error99)
+		.insert(Error100)
+}
 
 // ── Primary ───────────────────────────────────────────────────────────────────
 
-token!(Primary0,   Color);
+css_variable!(Primary0,   Color);
 
 
 
-token!(Primary10,  Color);
-token!(Primary20,  Color);
+css_variable!(Primary10,  Color);
+css_variable!(Primary20,  Color);
 
-impl CssToken for Primary20 {
-	fn declarations(
-		builder: &CssBuilder,
-		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
-		Ok(vec![(
-			builder.ident_to_css(&Self::token_key())?.as_css_key(),
-			builder.token_value_to_css::<Color>(value)?,
-		)])
-	}
-}
-
-
-token!(Primary30,  Color);
-token!(Primary40,  Color);
-token!(Primary50,  Color);
-token!(Primary60,  Color);
-token!(Primary70,  Color);
-token!(Primary80,  Color);
-token!(Primary90,  Color);
-token!(Primary95,  Color);
-token!(Primary99,  Color);
-token!(Primary100, Color);
+css_variable!(Primary30,  Color);
+css_variable!(Primary40,  Color);
+css_variable!(Primary50,  Color);
+css_variable!(Primary60,  Color);
+css_variable!(Primary70,  Color);
+css_variable!(Primary80,  Color);
+css_variable!(Primary90,  Color);
+css_variable!(Primary95,  Color);
+css_variable!(Primary99,  Color);
+css_variable!(Primary100, Color);
 
 // ── Secondary ─────────────────────────────────────────────────────────────────
 
-token!(Secondary0,   Color);
-token!(Secondary10,  Color);
-token!(Secondary20,  Color);
-token!(Secondary30,  Color);
-token!(Secondary40,  Color);
-token!(Secondary50,  Color);
-token!(Secondary60,  Color);
-token!(Secondary70,  Color);
-token!(Secondary80,  Color);
-token!(Secondary90,  Color);
-token!(Secondary95,  Color);
-token!(Secondary99,  Color);
-token!(Secondary100, Color);
+css_variable!(Secondary0,   Color);
+css_variable!(Secondary10,  Color);
+css_variable!(Secondary20,  Color);
+css_variable!(Secondary30,  Color);
+css_variable!(Secondary40,  Color);
+css_variable!(Secondary50,  Color);
+css_variable!(Secondary60,  Color);
+css_variable!(Secondary70,  Color);
+css_variable!(Secondary80,  Color);
+css_variable!(Secondary90,  Color);
+css_variable!(Secondary95,  Color);
+css_variable!(Secondary99,  Color);
+css_variable!(Secondary100, Color);
 
 // ── Tertiary ──────────────────────────────────────────────────────────────────
 
-token!(Tertiary0,   Color);
-token!(Tertiary10,  Color);
-token!(Tertiary20,  Color);
-token!(Tertiary30,  Color);
-token!(Tertiary40,  Color);
-token!(Tertiary50,  Color);
-token!(Tertiary60,  Color);
-token!(Tertiary70,  Color);
-token!(Tertiary80,  Color);
-token!(Tertiary90,  Color);
-token!(Tertiary95,  Color);
-token!(Tertiary99,  Color);
-token!(Tertiary100, Color);
+css_variable!(Tertiary0,   Color);
+css_variable!(Tertiary10,  Color);
+css_variable!(Tertiary20,  Color);
+css_variable!(Tertiary30,  Color);
+css_variable!(Tertiary40,  Color);
+css_variable!(Tertiary50,  Color);
+css_variable!(Tertiary60,  Color);
+css_variable!(Tertiary70,  Color);
+css_variable!(Tertiary80,  Color);
+css_variable!(Tertiary90,  Color);
+css_variable!(Tertiary95,  Color);
+css_variable!(Tertiary99,  Color);
+css_variable!(Tertiary100, Color);
 
 // ── Neutral ───────────────────────────────────────────────────────────────────
 
-token!(Neutral0,   Color);
-token!(Neutral10,  Color);
-token!(Neutral20,  Color);
-token!(Neutral30,  Color);
-token!(Neutral40,  Color);
-token!(Neutral50,  Color);
-token!(Neutral60,  Color);
-token!(Neutral70,  Color);
-token!(Neutral80,  Color);
-token!(Neutral90,  Color);
-token!(Neutral95,  Color);
-token!(Neutral99,  Color);
-token!(Neutral100, Color);
+css_variable!(Neutral0,   Color);
+css_variable!(Neutral10,  Color);
+css_variable!(Neutral20,  Color);
+css_variable!(Neutral30,  Color);
+css_variable!(Neutral40,  Color);
+css_variable!(Neutral50,  Color);
+css_variable!(Neutral60,  Color);
+css_variable!(Neutral70,  Color);
+css_variable!(Neutral80,  Color);
+css_variable!(Neutral90,  Color);
+css_variable!(Neutral95,  Color);
+css_variable!(Neutral99,  Color);
+css_variable!(Neutral100, Color);
 
 // ── NeutralVariant ────────────────────────────────────────────────────────────
 
-token!(NeutralVariant0,   Color);
-token!(NeutralVariant10,  Color);
-token!(NeutralVariant20,  Color);
-token!(NeutralVariant30,  Color);
-token!(NeutralVariant40,  Color);
-token!(NeutralVariant50,  Color);
-token!(NeutralVariant60,  Color);
-token!(NeutralVariant70,  Color);
-token!(NeutralVariant80,  Color);
-token!(NeutralVariant90,  Color);
-token!(NeutralVariant95,  Color);
-token!(NeutralVariant99,  Color);
-token!(NeutralVariant100, Color);
+css_variable!(NeutralVariant0,   Color);
+css_variable!(NeutralVariant10,  Color);
+css_variable!(NeutralVariant20,  Color);
+css_variable!(NeutralVariant30,  Color);
+css_variable!(NeutralVariant40,  Color);
+css_variable!(NeutralVariant50,  Color);
+css_variable!(NeutralVariant60,  Color);
+css_variable!(NeutralVariant70,  Color);
+css_variable!(NeutralVariant80,  Color);
+css_variable!(NeutralVariant90,  Color);
+css_variable!(NeutralVariant95,  Color);
+css_variable!(NeutralVariant99,  Color);
+css_variable!(NeutralVariant100, Color);
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
-token!(Error0,   Color);
-token!(Error10,  Color);
-token!(Error20,  Color);
-token!(Error30,  Color);
-token!(Error40,  Color);
-token!(Error50,  Color);
-token!(Error60,  Color);
-token!(Error70,  Color);
-token!(Error80,  Color);
-token!(Error90,  Color);
-token!(Error95,  Color);
-token!(Error99,  Color);
-token!(Error100, Color);
+css_variable!(Error0,   Color);
+css_variable!(Error10,  Color);
+css_variable!(Error20,  Color);
+css_variable!(Error30,  Color);
+css_variable!(Error40,  Color);
+css_variable!(Error50,  Color);
+css_variable!(Error60,  Color);
+css_variable!(Error70,  Color);
+css_variable!(Error80,  Color);
+css_variable!(Error90,  Color);
+css_variable!(Error95,  Color);
+css_variable!(Error99,  Color);
+css_variable!(Error100, Color);
