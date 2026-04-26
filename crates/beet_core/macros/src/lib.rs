@@ -4,7 +4,6 @@ mod action;
 mod as_any;
 mod bundle_effect;
 mod entity_target_event;
-mod from_tokens;
 mod getset;
 mod main_attr;
 mod mdx;
@@ -44,34 +43,6 @@ pub fn derive_to_tokens(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	to_tokens::impl_derive_to_tokens(input).into()
-}
-/// Derive [`FromTokens`] for a struct, generating a companion `*Tokens` struct.
-///
-/// Fields marked with `#[token]` will be replaced by [`Token`] in the generated
-/// `*Tokens` struct. Doc comments from the original struct are copied to `*Tokens`.
-/// The generated struct always derives `Debug, Clone, PartialEq, Reflect` — the
-/// minimum set required to satisfy `type Tokens: Typed + FromReflect`.
-///
-/// > **Note:** rustc strips `#[derive(...)]` from `input.attrs` before invoking
-/// > derive proc macros, so derives cannot be copied from the original struct.
-///
-/// ## Example
-///
-/// ```ignore
-/// #[derive(Debug, Clone, PartialEq, Reflect, FromTokens)]
-/// pub struct Motion {
-///     #[token]
-///     pub duration: Duration,
-///     pub ease: EaseFunction,
-/// }
-/// // Generates MotionTokens { duration: Token, ease: EaseFunction }
-/// // and impl FromTokens for Motion { ... }
-/// ```
-#[proc_macro_derive(FromTokens, attributes(token))]
-pub fn derive_from_tokens(
-	input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	from_tokens::impl_from_tokens(input)
 }
 
 /// Creates a [SendWrapper](send_wrapper::SendWrapper) newtype that implements `Send` for a struct or enum.

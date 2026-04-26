@@ -11,12 +11,12 @@ use bevy::reflect::Typed;
 pub struct Token {
 	/// Path to the value for this token
 	/// ie `io.crates/beet_net/style/material/colors/PrimaryColor`
-	path: TokenPath,
+	key: TokenKey,
 	/// The path to the document
 	document: DocumentPath,
-	/// Path to the token representing the type of this token,
+	/// Path to the token representing the value of this token,
 	/// ie `io.crates/bevy_math/Color`
-	schema: TokenPath,
+	schema: TokenKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Get)]
@@ -25,14 +25,14 @@ pub struct TypedValue {
 	value: Value,
 	/// Path to the token representing the type of this token,
 	/// ie `io.crates/bevy_math/Color`
-	schema: TokenPath,
+	schema: TokenKey,
 }
 
 impl TypedValue {
 	pub fn new<T: Typed>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_reflect(&value)?,
-			schema: TokenPath::of::<T>(),
+			schema: TokenKey::of::<T>(),
 		}
 		.xok()
 	}
@@ -40,9 +40,9 @@ impl TypedValue {
 
 
 impl Token {
-	pub fn new(path: TokenPath, schema: TokenPath) -> Self {
+	pub fn new(key: TokenKey, schema: TokenKey) -> Self {
 		Self {
-			path,
+			key,
 			schema,
 			document: default(),
 		}
@@ -51,8 +51,8 @@ impl Token {
 	/// Create new token, using `Token` for the field path
 	pub fn of<Path: TypePath, Schema: TypePath>() -> Self {
 		Self {
-			path: TokenPath::of::<Path>(),
-			schema: TokenPath::of::<Schema>(),
+			key: TokenKey::of::<Path>(),
+			schema: TokenKey::of::<Schema>(),
 			document: default(),
 		}
 	}
@@ -60,11 +60,11 @@ impl Token {
 
 /// A type which represents a token, see `token2!` for defining.
 pub trait TypedToken {
-	fn schema() -> TokenPath;
-	fn path() -> TokenPath;
+	fn schema() -> TokenKey;
+	fn key() -> TokenKey;
 	fn token() -> Token {
 		Token {
-			path: Self::path(),
+			key: Self::key(),
 			schema: Self::schema(),
 			document: default(),
 		}
@@ -74,34 +74,45 @@ pub trait TypedToken {
 impl<T: TypedToken> From<T> for Token {
 	fn from(_: T) -> Self { T::token() }
 }
+impl<T: TypedToken> From<T> for TokenKey {
+	fn from(_: T) -> Self { T::key() }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ValueOrToken {
+pub enum TokenValue {
 	Value(TypedValue),
 	Token(Token),
 }
 
-impl From<TypedValue> for ValueOrToken {
+impl From<TypedValue> for TokenValue {
 	fn from(value: TypedValue) -> Self { Self::Value(value) }
 }
-impl From<Token> for ValueOrToken {
+impl From<Token> for TokenValue {
 	fn from(token: Token) -> Self { Self::Token(token) }
 }
 
-/// Like a [`Value`] where branch nodes
+/// Like a [`Document`] where branch nodes
 /// are nested maps and leaf nodes are typed values.
 /// It is perhaps more akin to a filesystem where files are
 /// typed, than a freeform json value.
 #[derive(Default, Deref)]
-pub struct DynamicDocument {
-	tokens: HashMap<TokenPath, Token>,
+pub struct TokenMap {
+	tokens: HashMap<TokenKey, TokenValue>,
 }
-impl DynamicDocument {
+impl TokenMap {
 	pub fn new() -> Self {
 		Self {
 			tokens: HashMap::new(),
 		}
+	}
+	pub fn with(
+		mut self,
+		key: impl Into<TokenKey>,
+		value: impl Into<TokenValue>,
+	) -> Self {
+		self.tokens.insert(key.into(), value.into());
+		self
 	}
 }
 
@@ -130,18 +141,18 @@ macro_rules! token {
 		$(#[$meta])*
 		pub struct $new_ty;
 		impl $crate::prelude::TypedToken for $new_ty {
-			fn schema() -> $crate::prelude::TokenPath {
-				$crate::prelude::TokenPath::of::<$schema_ty>()
+			fn schema() -> $crate::prelude::TokenKey {
+				$crate::prelude::TokenKey::of::<$schema_ty>()
 			}
-			fn path() -> $crate::prelude::TokenPath {
+			fn key() -> $crate::prelude::TokenKey {
 				let path = ::core::concat!(
 					::core::concat!(::core::module_path!(), "::"),
 					::core::stringify!($new_ty)
 				);
-				$crate::prelude::TokenPath::from_module_path(path)
+				$crate::prelude::TokenKey::from_module_path(path)
 			}
 			fn token() -> $crate::prelude::Token {
-				$crate::prelude::Token::new(Self::path(),Self::schema())
+				$crate::prelude::Token::new(Self::key(), Self::schema())
 					.with_document($doc_path)
 			}
 		}
@@ -157,11 +168,11 @@ mod tests {
 	fn test_name() {
 		// Name::type_info().type_path().xprintln();
 		Token::of::<Name, Name>()
-			.path()
+			.key()
 			.to_string()
 			.xpect_eq("io.crates/bevy_ecs/name/Name");
 
-		Foo::path()
+		Foo::key()
 			.to_string()
 			.xpect_eq("io.crates/beet_node/document/token/tests/Foo");
 	}

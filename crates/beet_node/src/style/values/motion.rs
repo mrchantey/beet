@@ -3,11 +3,10 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 /// A motion token combining an easing function with a duration token.
-#[derive(Debug, Clone, PartialEq, Reflect, FromTokens)]
+#[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Motion {
 	/// [`FieldRef`] pointing to the [`Duration`] token.
-	#[token]
-	pub duration: Duration,
+	pub duration: Token,
 	pub ease: EaseFunction,
 }
 
@@ -15,17 +14,7 @@ impl CssValue for Motion {
 	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
 		format!(
 			"{} {}",
-			self.duration.to_css_value(builder)?,
-			self.ease.to_css_value(builder)?
-		)
-		.xok()
-	}
-}
-impl CssValue for MotionTokens {
-	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
-		format!(
-			"{} {}",
-			builder.ident_to_css(self.duration.path())?.as_css_value(),
+			builder.ident_to_css(self.duration.key())?.as_css_value(),
 			self.ease.to_css_value(builder)?
 		)
 		.xok()

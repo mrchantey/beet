@@ -87,20 +87,20 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	}
 
 	pub fn get_token(&self, entity: Entity, token: &Token) -> Result<&Value> {
-		let path = token.path().clone().xinto::<FieldPath>();
+		let key = token.key().clone().xinto::<FieldPath>();
 		match token.document() {
 			DocumentPath::Root => self
 				.ancestors
 				.root_ancestor(entity)
-				.xmap(|entity| self.try_get_field(entity, &path))?,
+				.xmap(|entity| self.try_get_field(entity, &key))?,
 			DocumentPath::Ancestor => self
 				.ancestors
 				.iter_ancestors_inclusive(entity)
-				.xtry_find_map(|entity| self.try_get_field(entity, &path))?,
+				.xtry_find_map(|entity| self.try_get_field(entity, &key))?,
 			DocumentPath::Entity(entity) => {
-				self.try_get_field(*entity, &path)?
+				self.try_get_field(*entity, &key)?
 			}
-			DocumentPath::This => self.try_get_field(entity, &path)?,
+			DocumentPath::This => self.try_get_field(entity, &key)?,
 		}
 		.xok()
 	}

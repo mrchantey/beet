@@ -50,11 +50,11 @@ impl CssBuilder<'_, '_, '_> {
 				let key = self.ident_to_css(key)?;
 
 				let value = match value {
-					ValueOrToken::Value(value) => {
+					TokenValue::Value(value) => {
 						self.func_map.resolve(value, self)?
 					}
-					ValueOrToken::Token(token) => {
-						self.ident_to_css(&token.path())?.as_css_value()
+					TokenValue::Token(token) => {
+						self.ident_to_css(&token.key())?.as_css_value()
 					}
 				};
 
@@ -90,7 +90,7 @@ impl CssBuilder<'_, '_, '_> {
 	/// if a mapping is found, otherwise the last part of
 	/// the field path as a variable.
 	/// Non-specified idents are assumed to be variables, not properties.
-	pub fn ident_to_css(&self, path: &TokenPath) -> Result<CssIdent> {
+	pub fn ident_to_css(&self, path: &TokenKey) -> Result<CssIdent> {
 		if let Some(ident) = self.ident_map.get(path) {
 			return ident.clone().xok();
 		}
@@ -147,11 +147,11 @@ impl CssBuilder<'_, '_, '_> {
 /// Registers tokens that should represent properties
 /// instead of other variables.
 #[derive(Default, Deref, Resource)]
-pub struct CssProperties(HashMap<TokenPath, CssIdent>);
+pub struct CssProperties(HashMap<TokenKey, CssIdent>);
 
 
 impl CssProperties {
-	pub fn with(mut self, path: TokenPath, ident: CssIdent) -> Self {
+	pub fn with(mut self, path: TokenKey, ident: CssIdent) -> Self {
 		self.0.insert(path, ident);
 		self
 	}
@@ -159,13 +159,13 @@ impl CssProperties {
 		self,
 		prop: impl Into<SmolStr>,
 	) -> Self {
-		self.with(T::path(), CssIdent::Property(prop.into()))
+		self.with(T::key(), CssIdent::Property(prop.into()))
 	}
 	pub fn with_variable<T: TypedToken>(
 		self,
 		variable: impl Into<SmolStr>,
 	) -> Self {
-		self.with(T::path(), CssIdent::Variable(variable.into()))
+		self.with(T::key(), CssIdent::Variable(variable.into()))
 	}
 }
 
@@ -241,15 +241,15 @@ pub fn default_func_map() -> CssFuncMap {
 		.insert::<Shape>()
 		.insert::<Elevation>()
 		// types with a custom Tokens struct must specify Self as the marker
-		.insert::<TypographyTokens>()
-		.insert::<MotionTokens>()
+		.insert::<Typography>()
+		.insert::<Motion>()
 }
 
 /// Store methods for looking up a schema path and resolving a value
 #[derive(Default, Deref, Resource)]
 pub struct CssFuncMap(
 	HashMap<
-		TokenPath,
+		TokenKey,
 		Arc<
 			dyn 'static
 				+ Send
@@ -266,7 +266,7 @@ impl CssFuncMap {
 	/// so the key must match that tokens type.
 	pub fn insert<T: Typed + FromReflect + CssValue>(mut self) -> Self {
 		self.0.insert(
-			TokenPath::of::<T>(),
+			TokenKey::of::<T>(),
 			Arc::new(|value, builder| {
 				value.into_reflect::<T>()?.to_css_value(builder)
 			}),

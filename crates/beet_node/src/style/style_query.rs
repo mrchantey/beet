@@ -62,7 +62,7 @@ impl StyleQuery<'_, '_> {
 	pub fn collect_tokens(
 		&self,
 		entity: Entity,
-	) -> HashMap<TokenPath, ValueOrToken> {
+	) -> HashMap<TokenKey, TokenValue> {
 		let mut map = HashMap::new();
 
 		let Ok(el) = self.elements.get(entity) else {
@@ -86,7 +86,7 @@ impl StyleQuery<'_, '_> {
 	pub fn get_token(
 		&self,
 		entity: Entity,
-		path: &TokenPath,
+		key: &TokenKey,
 	) -> Result<&Value> {
 		let Ok(el) = self.elements.get(entity) else {
 			bevybail!("Entity {} does not have an Element component", entity);
@@ -94,17 +94,17 @@ impl StyleQuery<'_, '_> {
 
 		for selector in self.collect_selectors(entity) {
 			if selector.matches(&el)
-				&& let Some(val) = selector.tokens().get(path)
+				&& let Some(val) = selector.tokens().get(key)
 			{
 				match val {
-					ValueOrToken::Value(value) => return Ok(value.value()),
-					ValueOrToken::Token(token) => {
-						return self.get_token(entity, token.path());
+					TokenValue::Value(value) => return Ok(value.value()),
+					TokenValue::Token(token) => {
+						return self.get_token(entity, token.key());
 					}
 				}
 			}
 		}
-		bevybail!("Token not found for path: {}", path.as_str())
+		bevybail!("Token not found for path: {}", key.as_str())
 	}
 }
 
@@ -128,8 +128,8 @@ mod tests {
 
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
-			let val = tokens.get(&colors::Primary::path()).unwrap();
-			matches!(val, ValueOrToken::Value(_)).xpect_true();
+			let val = tokens.get(&colors::Primary::key()).unwrap();
+			matches!(val, TokenValue::Value(_)).xpect_true();
 		});
 	}
 
@@ -160,9 +160,9 @@ mod tests {
 
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
-			let val = tokens.get(&colors::Primary::path()).unwrap();
+			let val = tokens.get(&colors::Primary::key()).unwrap();
 			// entity-local value wins
-			matches!(val, ValueOrToken::Value(_)).xpect_true();
+			matches!(val, TokenValue::Value(_)).xpect_true();
 		});
 	}
 
@@ -199,10 +199,10 @@ mod tests {
 			let button_tokens = query.collect_tokens(button);
 			let div_tokens = query.collect_tokens(div);
 			button_tokens
-				.contains_key(&colors::Primary::path())
+				.contains_key(&colors::Primary::key())
 				.xpect_true();
 			div_tokens
-				.contains_key(&colors::Primary::path())
+				.contains_key(&colors::Primary::key())
 				.xpect_false();
 		});
 	}
@@ -221,8 +221,8 @@ mod tests {
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
 			// Primary should now point to a tones::Primary40 FieldRef
-			let val = tokens.get(&colors::Primary::path()).unwrap();
-			matches!(val, ValueOrToken::Token(_)).xpect_true();
+			let val = tokens.get(&colors::Primary::key()).unwrap();
+			matches!(val, TokenValue::Token(_)).xpect_true();
 		});
 	}
 }

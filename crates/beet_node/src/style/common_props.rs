@@ -5,7 +5,7 @@ use beet_core::prelude::Color;
 token!(ForegroundColor, Color, DocumentPath::Ancestor);
 token!(BackgroundColor, Color, DocumentPath::This);
 
-token!(Font, TypographyTokens, DocumentPath::This);
+token!(Font, Typography, DocumentPath::This);
 
 token!(Height, Length, DocumentPath::This);
 token!(Width, Length, DocumentPath::This);

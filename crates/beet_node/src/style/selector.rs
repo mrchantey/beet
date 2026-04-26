@@ -8,7 +8,7 @@ pub struct Selector {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
 	rules: Vec<Rule>,
-	tokens: HashMap<TokenPath, ValueOrToken>,
+	tokens: HashMap<TokenKey, TokenValue>,
 }
 
 
@@ -19,16 +19,16 @@ impl Selector {
 	pub fn new() -> Self { Self::default() }
 
 	pub fn with_typed<K: TypedToken, V: TypedToken>(self) -> Self {
-		self.with_token(K::path(), V::token())
+		self.with_token(K::key(), V::token())
 	}
 	pub fn with_value<K: TypedToken>(self, value: impl Typed) -> Result<Self> {
-		self.with_token(K::path(), TypedValue::new(value)?).xok()
+		self.with_token(K::key(), TypedValue::new(value)?).xok()
 	}
 	/// Add a property mapped to a token.
 	pub fn with_token(
 		mut self,
-		token: TokenPath,
-		value: impl Into<ValueOrToken>,
+		token: TokenKey,
+		value: impl Into<TokenValue>,
 	) -> Self {
 		self.tokens.insert(token, value.into());
 		self
