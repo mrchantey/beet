@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-
+css_property!(ColorRoleProps, ColorRole, DocumentPath::Ancestor);
 
 #[derive(Reflect)]
 pub struct ColorRole {
@@ -24,24 +24,5 @@ impl AsCssValues for ColorRole {
 			builder.ident_to_css(self.foreground.key())?.as_css_value(),
 		]
 		.xok()
-	}
-}
-
-#[derive(Reflect)]
-pub struct ColorRoleProps;
-
-impl CssToken for ColorRoleProps {
-	fn declarations(
-		&self,
-		builder: &CssBuilder,
-		value: &TokenValue,
-	) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-		let values = builder.token_value_to_css::<ColorRole>(value)?;
-		ColorRole::properties()
-			.into_iter()
-			.map(|prop| prop.to_string())
-			.zip(values)
-			.collect::<Vec<_>>()
-			.xok()
 	}
 }

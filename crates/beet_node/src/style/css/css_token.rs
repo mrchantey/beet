@@ -62,12 +62,12 @@ impl CssTokenMap {
 
 #[macro_export]
 macro_rules! css_property {
+	// collects props via $schema_ty::properties()
  (
   $(#[$meta:meta])*
   $new_ty:ident,
   $schema_ty:ident,
-  $doc_path: expr,
-  $property: expr
+  $doc_path: expr
  ) => {
   $crate::token!(
    $(#[$meta])*
@@ -77,22 +77,46 @@ macro_rules! css_property {
   );
   impl $crate::prelude::style::CssToken for $new_ty {
    fn declarations(
-   	&self,
+    &self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-    let values = builder.token_value_to_css::<$schema_ty>(value)?;
-    $property
-    	.to_string()
-     	.xvec()
-      .into_iter()
-      .zip(values)
-      .collect::<Vec<_>>()
-      .xok()
+   builder.props_and_value_to_css::<$schema_ty>(
+   	$schema_ty::properties(),
+    value
+   )
+   }
+  }
+ };
+	// properties are hardcoded
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+  $doc_path: expr,
+  $($property: expr),+
+ ) => {
+  $crate::token!(
+   $(#[$meta])*
+   $new_ty,
+   $schema_ty,
+   $doc_path
+  );
+  impl $crate::prelude::style::CssToken for $new_ty {
+   fn declarations(
+    &self,
+    builder: &$crate::style::CssBuilder,
+    value: &$crate::prelude::TokenValue,
+   ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
+   builder.props_and_value_to_css::<$schema_ty>(
+   	vec![$($property.to_string()),+],
+    value
+   )
    }
   }
  };
 }
+
 
 #[macro_export]
 macro_rules! css_variable {

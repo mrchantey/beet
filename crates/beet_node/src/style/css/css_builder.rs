@@ -127,6 +127,66 @@ impl CssBuilder<'_, '_, '_> {
 		CssIdent::variable(path).xok()
 	}
 
+	pub fn props_and_value_to_css<
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		&self,
+		keys: Vec<impl std::fmt::Debug + ToString>,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		let values = self.token_value_to_css::<V>(&value)?;
+		if keys.len() != values.len() {
+			bevybail!(
+				"Property count mismatch:\nkeys: {keys:#?}\nvalues:{values:#?}",
+			);
+		}
+		keys.into_iter()
+			.map(|key| key.to_string())
+			.zip(values)
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+
+	/// Used in CssToken declarations section.
+	/// The value type will be checked for multiple properties, and
+	/// appended to the key ident if found.
+	pub fn key_value_to_css<
+		K: TypedTokenKey,
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		&self,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		let ident = self.ident_to_css(&K::token_key())?;
+		let values = self.token_value_to_css::<V>(value)?;
+		let props = V::properties();
+		if props.len() <= 1 {
+			// no need for suffix for no declared props
+			ident.as_css_key().xvec()
+		} else {
+			props
+				.into_iter()
+				.map(|prop| ident.clone().with_suffix(prop).as_css_key())
+				.collect::<Vec<String>>()
+		}
+		.into_iter()
+		.zip(values)
+		.collect::<Vec<_>>()
+		.xok()
+	}
 
 	pub fn token_value_to_css<
 		V: 'static
@@ -169,38 +229,12 @@ impl CssBuilder<'_, '_, '_> {
 				.xok()
 		}
 	}
-
-	pub fn key_value_to_css<
-		K: TypedTokenKey,
-		V: 'static
-			+ Send
-			+ Sync
-			+ FromReflect
-			+ Typed
-			+ TypedTokenKey
-			+ AsCssValues,
-	>(
-		&self,
-		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
-		let ident = self.ident_to_css(&K::token_key())?;
-		let values = self.token_value_to_css::<V>(value)?;
-		let props = V::properties();
-		if props.len() <= 1 {
-			// no need for suffix for no declared props
-			ident.as_css_key().xvec()
-		} else {
-			props
-				.into_iter()
-				.map(|prop| ident.clone().with_suffix(prop).as_css_key())
-				.collect::<Vec<String>>()
-		}
-		.into_iter()
-		.zip(values)
-		.collect::<Vec<_>>()
-		.xok()
-	}
 }
+
+
+// pub struct CssAssignment{
+// 	target: CssIdent,
+// }
 
 #[cfg(test)]
 mod tests {
