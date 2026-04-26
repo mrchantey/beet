@@ -7,7 +7,7 @@ use crate::style::material::*;
 pub fn hero_heading()->Selector{
 	Selector::new()
 		.with_rule(Rule::class("hero-heading"))
-		.with_typed::<common_props::ForegroundColor, colors::OnPrimary>()
+		.with_token::<common_props::ForegroundColor, colors::OnPrimary>()
 		// .with_typed::<common_props::BackgroundColor, colors::Primary>()
 		// .with_typed::<common_props::Font, typography::TitleMedium>()
 }

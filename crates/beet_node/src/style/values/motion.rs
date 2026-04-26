@@ -10,26 +10,27 @@ pub struct Motion {
 	pub ease: EaseFunction,
 }
 
-impl CssValue for Motion {
-	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for Motion {
+	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
 		format!(
 			"{} {}",
 			builder.ident_to_css(self.duration.key())?.as_css_value(),
-			self.ease.to_css_value(builder)?
+			self.ease.as_css_values(builder)?[0]
 		)
+		.xvec()
 		.xok()
 	}
 }
 
-impl CssValue for Duration {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
-		format!("{}ms", self.as_millis()).xok()
+impl AsCssValues for Duration {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
+		format!("{}ms", self.as_millis()).xvec().xok()
 	}
 }
 
-impl CssValue for EaseFunction {
+impl AsCssValues for EaseFunction {
 	#[rustfmt::skip]
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
 			// --- Standard Cubic Beziers ---
 			EaseFunction::Linear => 				"linear".to_string(),
@@ -62,6 +63,6 @@ impl CssValue for EaseFunction {
 			EaseFunction::ElasticIn => 					"linear(0, -0.01, 0.02, -0.05, 0.13, -0.32, 1)".to_string(),
 			// Fallback for types not explicitly mapped
 			_ => 																"ease-in-out".to_string(),
-		}.xok()
+		}.xvec().xok()
 	}
 }

@@ -18,14 +18,18 @@ impl Selector {
 	/// Match elements with the given tag.
 	pub fn new() -> Self { Self::default() }
 
-	pub fn with_typed<K: TypedToken, V: TypedToken>(self) -> Self {
-		self.with_token(K::key(), V::token())
+	pub fn with_token<K: TypedTokenKey, V: TypedToken>(self) -> Self {
+		self.with(K::token_key(), V::token())
 	}
-	pub fn with_value<K: TypedToken>(self, value: impl Typed) -> Result<Self> {
-		self.with_token(K::key(), TypedValue::new(value)?).xok()
+	pub fn with_value<K: TypedTokenKey>(
+		self,
+		value: impl Typed,
+	) -> Result<Self> {
+		self.with(K::token_key(), TypedValue::new(value)?)
+			.xok()
 	}
 	/// Add a property mapped to a token.
-	pub fn with_token(
+	pub fn with(
 		mut self,
 		token: TokenKey,
 		value: impl Into<TokenValue>,

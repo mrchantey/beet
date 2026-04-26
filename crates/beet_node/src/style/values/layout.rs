@@ -12,8 +12,8 @@ pub enum JustifyContent {
 	SpaceAround,
 }
 
-impl CssValue for JustifyContent {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for JustifyContent {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -23,6 +23,7 @@ impl CssValue for JustifyContent {
 			Self::SpaceAround => "space-around",
 		}
 		.to_string()
+		.xvec()
 		.xok()
 	}
 }
@@ -37,8 +38,8 @@ pub enum AlignItems {
 	Baseline,
 }
 
-impl CssValue for AlignItems {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for AlignItems {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -47,6 +48,7 @@ impl CssValue for AlignItems {
 			Self::Baseline => "baseline",
 		}
 		.to_string()
+		.xvec()
 		.xok()
 	}
 }
@@ -61,8 +63,8 @@ pub enum AlignSelf {
 	Baseline,
 }
 
-impl CssValue for AlignSelf {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for AlignSelf {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -71,6 +73,7 @@ impl CssValue for AlignSelf {
 			Self::Baseline => "baseline",
 		}
 		.to_string()
+		.xvec()
 		.xok()
 	}
 }
@@ -84,13 +87,13 @@ pub enum FlexSize {
 	Shrink(u16),
 }
 
-impl CssValue for FlexSize {
-	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for FlexSize {
+	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
-			Self::Auto => "auto".to_string(),
-			Self::Unit(unit) => unit.to_css_value(builder)?,
-			Self::Grow(n) => n.to_string(),
-			Self::Shrink(n) => n.to_string(),
+			Self::Auto => "auto".to_string().xvec(),
+			Self::Unit(unit) => unit.as_css_values(builder)?,
+			Self::Grow(n) => n.to_string().xvec(),
+			Self::Shrink(n) => n.to_string().xvec(),
 		}
 		.xok()
 	}
@@ -105,8 +108,8 @@ pub enum Direction {
 	ViewportMax,
 }
 
-impl CssValue for Direction {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
+impl AsCssValues for Direction {
+	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
 		match self {
 			Self::Horizontal => "horizontal",
 			Self::Vertical => "vertical",
@@ -114,6 +117,7 @@ impl CssValue for Direction {
 			Self::ViewportMax => "vmax",
 		}
 		.to_string()
+		.xvec()
 		.xok()
 	}
 }

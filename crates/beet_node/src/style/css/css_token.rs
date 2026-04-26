@@ -1,9 +1,8 @@
+use std::sync::Arc;
+
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
-
-
-
 
 pub trait CssToken {
 	fn selectors(&self) -> Vec<Rule> { default() }
@@ -13,6 +12,47 @@ pub trait CssToken {
 		value: &TokenValue,
 	) -> Result<Vec<(String, String)>>;
 }
+
+/// Store methods for looking up a schema path and resolving a value
+#[derive(Default, Deref, Resource)]
+pub struct CssTokenMap(
+	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + CssToken>>,
+);
+impl CssTokenMap {
+	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
+	///
+	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
+	/// (the type actually passed to `with_value`), not the output type,
+	/// so the key must match that tokens type.
+	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + CssToken>(
+		mut self,
+		token: T,
+	) -> Self {
+		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
+		self
+	}
+
+	pub fn merge(mut self, other: Self) -> Self {
+		self.0.extend(other.0);
+		self
+	}
+
+	pub fn resolve(
+		&self,
+		builder: &CssBuilder,
+		key: &TokenKey,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		if let Some(token) = self.0.get(key) {
+			// if let Some(func) = self.0.get(value.schema()) {
+			token.declarations(builder, value)
+		} else {
+			bevybail!("No CSS Token registered for this schema:\n{}", key)
+		}
+	}
+}
+
+
 
 
 #[macro_export]
@@ -36,10 +76,14 @@ macro_rules! css_property {
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-    Ok(vec![(
-     $property.into(),
-     builder.token_value_to_css::<$schema_ty>(value)?,
-    )])
+    let values = builder.token_value_to_css::<$schema_ty>(value)?;
+    $property
+    	.to_string()
+     	.xvec()
+      .into_iter()
+      .zip(values)
+      .collect::<Vec<_>>()
+      .xok()
    }
   }
  };
@@ -65,11 +109,15 @@ macro_rules! css_variable {
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-    Ok(vec![(
-     builder.css_key::<Self>()?,
-     builder.token_value_to_css::<$schema_ty>(value)?,
-    )])
-   }
+   	let values = builder.token_value_to_css::<$schema_ty>(value)?;
+    builder.css_key::<Self>()?
+   		.to_string()
+     .xvec()
+     .into_iter()
+     .zip(values)
+     .collect::<Vec<_>>()
+     .xok()
+	 }
   }
  };
  (

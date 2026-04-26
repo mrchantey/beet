@@ -1,7 +1,9 @@
 mod geometry;
+mod color_role;
 mod layout;
 mod motion;
 mod typography;
+pub use color_role::*;
 pub use geometry::*;
 pub use layout::*;
 pub use motion::*;

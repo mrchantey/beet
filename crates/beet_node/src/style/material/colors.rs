@@ -38,39 +38,40 @@ pub fn token_map() -> CssTokenMap {
 		.insert(ErrorContainer)
 		.insert(OnErrorContainer)
 
- 	   .insert(SurfaceDim)
-     .insert(Surface)
-     .insert(SurfaceTint)
-     .insert(SurfaceBright)
-     .insert(SurfaceContainerLowest)
-     .insert(SurfaceContainerLow)
-     .insert(SurfaceContainer)
-     .insert(SurfaceContainerHigh)
-     .insert(SurfaceContainerHighest)
-     .insert(OnSurface)
-     .insert(OnSurfaceVariant)
-     .insert(SurfaceVariant)
+ 	  .insert(SurfaceDim)
+    .insert(Surface)
+    .insert(SurfaceTint)
+    .insert(SurfaceBright)
+    .insert(SurfaceContainerLowest)
+    .insert(SurfaceContainerLow)
+    .insert(SurfaceContainer)
+    .insert(SurfaceContainerHigh)
+    .insert(SurfaceContainerHighest)
+    .insert(OnSurface)
+    .insert(OnSurfaceVariant)
+    .insert(SurfaceVariant)
 
-     .insert(Outline)
-     .insert(OutlineVariant)
+    .insert(Outline)
+    .insert(OutlineVariant)
 
-     .insert(InverseSurface)
-     .insert(InverseOnSurface)
+    .insert(InverseSurface)
+    .insert(InverseOnSurface)
 
-     .insert(Background)
-     .insert(OnBackground)
+    .insert(Background)
+    .insert(OnBackground)
 
-     .insert(Shadow)
-     .insert(Scrim)
+    .insert(Shadow)
+    .insert(Scrim)
 
-     .insert(OpacityHovered)
-     .insert(OpacityFocused)
-     .insert(OpacityPressed)
-     .insert(OpacityDragged)
+    .insert(OpacityHovered)
+    .insert(OpacityFocused)
+    .insert(OpacityPressed)
+    .insert(OpacityDragged)
 
 }
 
 // ── Primary ───────────────────────────────────────────────────────────────────
+css_variable!(PrimaryRole, ColorRole);
 
 css_variable!(Primary, Color);
 css_variable!(OnPrimary, Color);

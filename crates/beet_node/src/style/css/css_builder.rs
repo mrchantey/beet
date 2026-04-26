@@ -2,12 +2,6 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
-use std::sync::Arc;
-
-/// Converts a value to its CSS string representation.
-pub trait CssValue {
-	fn to_css_value(&self, builder: &CssBuilder) -> Result<String>;
-}
 
 pub fn default_token_map() -> CssTokenMap {
 	common_props::token_map().merge(material::token_map())
@@ -135,124 +129,23 @@ impl CssBuilder<'_, '_, '_> {
 	}
 
 	pub fn token_value_to_css<
-		T: 'static + Send + Sync + FromReflect + Typed + TypedTokenKey + CssValue,
+		T: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
 	>(
 		&self,
 		value: &TokenValue,
-	) -> Result<String> {
+	) -> Result<Vec<String>> {
 		match value {
 			TokenValue::Value(value) => {
 				value.schema().assert_eq::<T>()?;
-				value.value().into_reflect::<T>()?.to_css_value(&self)
+				value.value().into_reflect::<T>()?.as_css_values(&self)
 			}
-			TokenValue::Token(token) => token.key().to_css_value(&self),
-		}
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum CssIdent {
-	/// The variable name without a leading `--`
-	Variable(SmolStr),
-	Property(SmolStr),
-}
-
-impl CssIdent {
-	pub fn variable(name: impl Into<SmolStr>) -> Self {
-		Self::Variable(name.into())
-	}
-	pub fn property(name: impl Into<SmolStr>) -> Self {
-		Self::Property(name.into())
-	}
-
-	pub fn as_css_key(&self) -> String { self.to_string() }
-	pub fn as_css_value(&self) -> String {
-		match self {
-			CssIdent::Variable(var) => format!("var(--{})", var),
-			CssIdent::Property(prop) => prop.to_string(),
-		}
-	}
-}
-
-impl std::fmt::Display for CssIdent {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			CssIdent::Variable(var) => write!(f, "--{}", var),
-			CssIdent::Property(prop) => write!(f, "{}", prop),
-		}
-	}
-}
-
-/// A token key is always represented as a css variable
-/// when in the css value position, ie:
-/// `foo: var(--path-to-this-token)`
-impl CssValue for TokenKey {
-	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
-		builder.ident_to_css(self)?.as_css_value().xok()
-	}
-}
-
-impl CssValue for Color {
-	fn to_css_value(&self, _builder: &CssBuilder) -> Result<String> {
-		let this = self.to_srgba();
-		let alpha = this.alpha;
-		// still undecided about this..
-		// what if user wants to overwrite
-		if alpha == 1.0 {
-			format!(
-				"rgb({}, {}, {})",
-				(this.red * 255.0).round() as u8,
-				(this.green * 255.0).round() as u8,
-				(this.blue * 255.0).round() as u8,
-			)
-		} else {
-			format!(
-				"rgba({}, {}, {}, {})",
-				(this.red * 255.0).round() as u8,
-				(this.green * 255.0).round() as u8,
-				(this.blue * 255.0).round() as u8,
-				alpha
-			)
-		}
-		.xok()
-	}
-}
-
-/// Store methods for looking up a schema path and resolving a value
-#[derive(Default, Deref, Resource)]
-pub struct CssTokenMap(
-	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + CssToken>>,
-);
-impl CssTokenMap {
-	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
-	///
-	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
-	/// (the type actually passed to `with_value`), not the output type,
-	/// so the key must match that tokens type.
-	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + CssToken>(
-		mut self,
-		token: T,
-	) -> Self {
-		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
-		self
-	}
-
-	pub fn merge(mut self, other: Self) -> Self {
-		self.0.extend(other.0);
-		self
-	}
-
-	pub fn resolve(
-		&self,
-		builder: &CssBuilder,
-		key: &TokenKey,
-		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
-		if let Some(token) = self.0.get(key) {
-			// if let Some(func) = self.0.get(value.schema()) {
-			token.declarations(builder, value)
-		} else {
-			bevybail!("No CSS Token registered for this schema:\n{}", key)
+			TokenValue::Token(token) => token.as_css_values(&self),
 		}
 	}
 }
@@ -263,10 +156,8 @@ mod tests {
 	use crate::style::material::*;
 
 	#[test]
-	fn test() {
-		// let mut world =
-		// 	(material::MaterialStylePlugin::default(), CssPlugin).into_world();
-		let mut world = (CssPlugin).into_world();
+	fn test_color() {
+		let mut world = World::new();
 
 		world.insert_resource(
 			CssTokenMap::default()
@@ -280,13 +171,67 @@ mod tests {
 				.with(selectors::hero_heading())
 				.with(
 					Selector::root()
-						.with_typed::<colors::OnPrimary, tones::Primary20>(),
+						.with_token::<colors::OnPrimary, tones::Primary20>(),
 				)
 				.with(
 					Selector::root()
 						.with_value::<tones::Primary20>(Color::srgb(0., 1., 0.))
 						.unwrap(),
 				),
+		);
+		let css = world
+			.spawn(rsx! {
+				<div class="text-primary">hello world!</div>
+			})
+			.with_state::<(Res<CssTokenMap>, StyleQuery), _>(
+				|entity, state| {
+					CssBuilder {
+						minify: false,
+						css_token_map: &state.0,
+						style_query: &state.1,
+					}
+					.build(entity)
+					.xunwrap()
+				},
+			);
+		println!("{css}");
+	}
+	#[test]
+	fn test_color_role() {
+		let mut world = World::new();
+
+		world.insert_resource(
+			CssTokenMap::default()
+				// .insert(colors::Primary)
+				// .insert(colors::OnPrimary)
+				// .insert(tones::Primary80)
+				// .insert(tones::Primary20)
+				.insert(colors::PrimaryRole)
+				.insert(ColorRoleProps),
+			// .insert(common_props::ForegroundColor),
+		);
+
+		world.insert_resource(
+			SelectorStore::default().with(
+				Selector::new()
+					.with_rule(Rule::class("primary-role"))
+					.with_token::<style::ColorRoleProps, colors::PrimaryRole>(),
+			), // .with(
+			   // 	Selector::root()
+			   // 		.with_typed::<colors::Primary, tones::Primary80>()
+			   // 		.with_typed::<colors::OnPrimary, tones::Primary20>(),
+			   // )
+			   // .with(
+			   // 	Selector::root()
+			   // 		.with_value::<tones::Primary80>(Color::srgb(
+			   // 			0., 0.8, 0.,
+			   // 		))
+			   // 		.unwrap()
+			   // 		.with_value::<tones::Primary20>(Color::srgb(
+			   // 			0., 0.2, 0.,
+			   // 		))
+			   // 		.unwrap(),
+			   // ),
 		);
 		let css = world
 			.spawn(rsx! {
