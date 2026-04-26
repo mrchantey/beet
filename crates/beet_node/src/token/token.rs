@@ -85,6 +85,15 @@ pub enum TokenValue {
 	Token(Token),
 }
 
+impl TokenValue {
+	pub fn schema(&self) -> &TokenKey {
+		match self {
+			TokenValue::Value(value) => &value.schema,
+			TokenValue::Token(token) => &token.schema,
+		}
+	}
+}
+
 impl From<TypedValue> for TokenValue {
 	fn from(value: TypedValue) -> Self { Self::Value(value) }
 }

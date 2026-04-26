@@ -18,13 +18,16 @@ mod types;
 
 /// Exports the most commonly used items.
 pub mod prelude {
+	#[cfg(feature = "style")]
+	pub use crate::css_property;
+	#[cfg(feature = "style")]
+	pub use crate::css_variable;
 	pub use crate::document::*;
 	pub use crate::input::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
-	#[cfg(feature = "style")]
 	pub use crate::token;
 	pub use crate::token::*;
 

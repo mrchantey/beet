@@ -25,15 +25,32 @@ pub struct TokenKey(SmolStr);
 impl TokenKey {
 	pub fn new(path: impl Into<SmolStr>) -> Self { Self(path.into()) }
 
+	pub fn assert_eq<Expected: TypedTokenKey>(&self) -> Result<&Self> {
+		let expected = Expected::token_key();
+		if self == &expected {
+			self.xok()
+		} else {
+			bevybail!(
+				"Token Key Mismatch\nExpected: `{expected}`\nReceived: `{self}`"
+			)
+		}
+	}
+
 	/// Splits by double colons `::`
 	pub fn from_module_path(val: &str) -> Self {
 		let val = "io.crates/".xtend(val.replace("::", "/"));
 		Self(val.into())
 	}
 
-	pub fn of<T: TypePath>() -> Self { Self::from_module_path(T::type_path()) }
+	pub fn of<T: TypedTokenKey>() -> Self { T::token_key() }
 }
 
+pub trait TypedTokenKey {
+	fn token_key() -> TokenKey;
+}
+impl<T: TypePath> TypedTokenKey for T {
+	fn token_key() -> TokenKey { TokenKey::from_module_path(T::type_path()) }
+}
 impl From<TokenKey> for FieldPath {
 	fn from(token_path: TokenKey) -> Self {
 		FieldPath::new(token_path.0.split('/'))

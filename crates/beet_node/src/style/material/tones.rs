@@ -1,12 +1,29 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use crate::prelude::*;
+use crate::{prelude::*, style::{CssBuilder, CssToken}};
 use beet_core::prelude::*;
 
 // ── Primary ───────────────────────────────────────────────────────────────────
 
 token!(Primary0,   Color);
+
+
+
 token!(Primary10,  Color);
 token!(Primary20,  Color);
+
+impl CssToken for Primary20 {
+	fn declarations(
+		builder: &CssBuilder,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		Ok(vec![(
+			builder.ident_to_css(&Self::token_key())?.as_css_key(),
+			builder.token_value_to_css::<Color>(value)?,
+		)])
+	}
+}
+
+
 token!(Primary30,  Color);
 token!(Primary40,  Color);
 token!(Primary50,  Color);

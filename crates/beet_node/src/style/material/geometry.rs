@@ -5,39 +5,71 @@ use beet_core::prelude::*;
 
 // ── Elevation tokens ──────────────────────────────────────────────────────────
 
-token!(Elevation0, Elevation);
-token!(Elevation1, Elevation);
-token!(Elevation2, Elevation);
-token!(Elevation3, Elevation);
-token!(Elevation4, Elevation);
-token!(Elevation5, Elevation);
+css_variable!(Elevation0, Elevation);
+css_variable!(Elevation1, Elevation);
+css_variable!(Elevation2, Elevation);
+css_variable!(Elevation3, Elevation);
+css_variable!(Elevation4, Elevation);
+css_variable!(Elevation5, Elevation);
 
 // ── Shape corner radius ref tokens ────────────────────────────────────────────
 
-token!(ShapeCornerNone,       Length);
-token!(ShapeCornerExtraSmall, Length);
-token!(ShapeCornerSmall,      Length);
-token!(ShapeCornerMedium,     Length);
-token!(ShapeCornerLarge,      Length);
-token!(ShapeCornerExtraLarge, Length);
-token!(ShapeCornerFull,       Length);
+css_variable!(ShapeCornerNone,       Length);
+css_variable!(ShapeCornerExtraSmall, Length);
+css_variable!(ShapeCornerSmall,      Length);
+css_variable!(ShapeCornerMedium,     Length);
+css_variable!(ShapeCornerLarge,      Length);
+css_variable!(ShapeCornerExtraLarge, Length);
+css_variable!(ShapeCornerFull,       Length);
 
 // ── Shape sys tokens ──────────────────────────────────────────────────────────
 
-token!(ShapeNone,       Shape);
-token!(ShapeExtraSmall, Shape);
-token!(ShapeSmall,      Shape);
-token!(ShapeMedium,     Shape);
-token!(ShapeLarge,      Shape);
-token!(ShapeExtraLarge, Shape);
-token!(ShapeFull,       Shape);
+css_variable!(ShapeNone,       Shape);
+css_variable!(ShapeExtraSmall, Shape);
+css_variable!(ShapeSmall,      Shape);
+css_variable!(ShapeMedium,     Shape);
+css_variable!(ShapeLarge,      Shape);
+css_variable!(ShapeExtraLarge, Shape);
+css_variable!(ShapeFull,       Shape);
 
 // ── Outline width tokens ──────────────────────────────────────────────────────
 
-token!(OutlineWidthNone,   Length);
-token!(OutlineWidthThin,   Length);
-token!(OutlineWidthMedium, Length);
-token!(OutlineWidthThick,  Length);
+css_variable!(OutlineWidthNone,   Length);
+css_variable!(OutlineWidthThin,   Length);
+css_variable!(OutlineWidthMedium, Length);
+css_variable!(OutlineWidthThick,  Length);
+
+pub fn token_map() -> CssTokenMap {
+	CssTokenMap::default()
+		.insert::<Elevation0>()
+		.insert::<Elevation1>()
+		.insert::<Elevation2>()
+		.insert::<Elevation3>()
+		.insert::<Elevation4>()
+		.insert::<Elevation5>()
+
+		.insert::<ShapeCornerNone>()
+		.insert::<ShapeCornerExtraSmall>()
+		.insert::<ShapeCornerSmall>()
+		.insert::<ShapeCornerMedium>()
+		.insert::<ShapeCornerLarge>()
+		.insert::<ShapeCornerExtraLarge>()
+		.insert::<ShapeCornerFull>()
+
+		.insert::<ShapeNone>()
+		.insert::<ShapeExtraSmall>()
+		.insert::<ShapeSmall>()
+		.insert::<ShapeMedium>()
+		.insert::<ShapeLarge>()
+		.insert::<ShapeExtraLarge>()
+		.insert::<ShapeFull>()
+
+		.insert::<OutlineWidthNone>()
+		.insert::<OutlineWidthThin>()
+		.insert::<OutlineWidthMedium>()
+		.insert::<OutlineWidthThick>()
+}
+
 
 /// Returns a [`Selector`] with all MD3 elevation default values.
 pub fn default_elevations() -> Selector {

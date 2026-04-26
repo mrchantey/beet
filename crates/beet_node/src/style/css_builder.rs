@@ -1,29 +1,28 @@
-use std::sync::Arc;
-
-use super::FontWeight as StyleFontWeight;
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
+use std::sync::Arc;
 
 /// Converts a value to its CSS string representation.
 pub trait CssValue {
 	fn to_css_value(&self, builder: &CssBuilder) -> Result<String>;
 }
 
+pub fn default_token_map() -> CssTokenMap {
+	common_props::token_map().merge(material::token_map())
+}
+
+
 pub struct CssPlugin;
 
 impl Plugin for CssPlugin {
-	fn build(&self, app: &mut App) {
-		app.insert_resource(default_func_map())
-			.insert_resource(common_props::css_ident_map());
-	}
+	fn build(&self, app: &mut App) { app.insert_resource(default_token_map()); }
 }
 
 pub struct CssBuilder<'a, 'w, 's> {
 	minify: bool,
-	ident_map: &'a CssProperties,
-	func_map: &'a CssFuncMap,
+	css_token_map: &'a CssTokenMap,
 	style_query: &'a StyleQuery<'w, 's>,
 }
 
@@ -45,22 +44,15 @@ impl CssBuilder<'_, '_, '_> {
 	fn build_selector(&self, selector: &Selector) -> Result<String> {
 		let rules = self.rules_to_css(&selector.rules());
 
-		let properties = selector.tokens().iter().xtry_map(
-			|(key, value)| -> Result<String> {
-				let key = self.ident_to_css(key)?;
-
-				let value = match value {
-					TokenValue::Value(value) => {
-						self.func_map.resolve(value, self)?
-					}
-					TokenValue::Token(token) => {
-						self.ident_to_css(&token.key())?.as_css_value()
-					}
-				};
-
-				Ok(format!("{key}: {value}"))
-			},
-		)?;
+		let properties = selector
+			.tokens()
+			.iter()
+			.xtry_map(|(key, value)| -> Result<_> {
+				self.css_token_map.resolve(self, key, value)
+			})?
+			.into_iter()
+			.flatten()
+			.map(|(key, value)| format!("{key}: {value}"));
 
 
 		match self.minify {
@@ -68,7 +60,7 @@ impl CssBuilder<'_, '_, '_> {
 				format!(
 					"{} {{ {} }}",
 					rules,
-					properties.into_iter().collect::<Vec<_>>().join("; ")
+					properties.collect::<Vec<_>>().join("; ")
 				)
 			}
 			false => {
@@ -91,13 +83,14 @@ impl CssBuilder<'_, '_, '_> {
 	/// the field path as a variable.
 	/// Non-specified idents are assumed to be variables, not properties.
 	pub fn ident_to_css(&self, path: &TokenKey) -> Result<CssIdent> {
-		if let Some(ident) = self.ident_map.get(path) {
-			return ident.clone().xok();
-		}
 		use heck::ToKebabCase;
 		let path = path.to_string().to_kebab_case().replace("/", "--");
 		// TODO hash in prod
 		CssIdent::variable(path).xok()
+	}
+
+	pub fn css_key<T: TypedTokenKey>(&self) -> Result<String> {
+		self.ident_to_css(&T::token_key())?.as_css_key().xok()
 	}
 
 	fn rules_to_css(&self, rules: &[Rule]) -> String {
@@ -140,37 +133,22 @@ impl CssBuilder<'_, '_, '_> {
 			}
 		}
 	}
-}
 
-
-
-/// Registers tokens that should represent properties
-/// instead of other variables.
-#[derive(Default, Deref, Resource)]
-pub struct CssProperties(HashMap<TokenKey, CssIdent>);
-
-
-impl CssProperties {
-	pub fn with(mut self, path: TokenKey, ident: CssIdent) -> Self {
-		self.0.insert(path, ident);
-		self
-	}
-	pub fn with_property<T: TypedToken>(
-		self,
-		prop: impl Into<SmolStr>,
-	) -> Self {
-		self.with(T::key(), CssIdent::Property(prop.into()))
-	}
-	pub fn with_variable<T: TypedToken>(
-		self,
-		variable: impl Into<SmolStr>,
-	) -> Self {
-		self.with(T::key(), CssIdent::Variable(variable.into()))
+	pub fn token_value_to_css<
+		T: 'static + Send + Sync + FromReflect + Typed + TypedTokenKey + CssValue,
+	>(
+		&self,
+		value: &TokenValue,
+	) -> Result<String> {
+		match value {
+			TokenValue::Value(value) => {
+				value.schema().assert_eq::<T>()?;
+				value.value().into_reflect::<T>()?.to_css_value(&self)
+			}
+			TokenValue::Token(token) => token.key().to_css_value(&self),
+		}
 	}
 }
-
-
-
 
 #[derive(Debug, Clone)]
 pub enum CssIdent {
@@ -187,7 +165,7 @@ impl CssIdent {
 		Self::Property(name.into())
 	}
 
-	pub fn as_css_property(&self) -> String { self.to_string() }
+	pub fn as_css_key(&self) -> String { self.to_string() }
 	pub fn as_css_value(&self) -> String {
 		match self {
 			CssIdent::Variable(var) => format!("var(--{})", var),
@@ -202,6 +180,15 @@ impl std::fmt::Display for CssIdent {
 			CssIdent::Variable(var) => write!(f, "--{}", var),
 			CssIdent::Property(prop) => write!(f, "{}", prop),
 		}
+	}
+}
+
+/// A token key is always represented as a css variable
+/// when in the css value position, ie:
+/// `foo: var(--path-to-this-token)`
+impl CssValue for TokenKey {
+	fn to_css_value(&self, builder: &CssBuilder) -> Result<String> {
+		builder.ident_to_css(self)?.as_css_value().xok()
 	}
 }
 
@@ -230,62 +217,50 @@ impl CssValue for Color {
 		.xok()
 	}
 }
-pub fn default_func_map() -> CssFuncMap {
-	CssFuncMap::default()
-		.insert::<Color>()
-		.insert::<f32>()
-		.insert::<Length>()
-		.insert::<Typeface>()
-		.insert::<StyleFontWeight>()
-		.insert::<Duration>()
-		.insert::<Shape>()
-		.insert::<Elevation>()
-		// types with a custom Tokens struct must specify Self as the marker
-		.insert::<Typography>()
-		.insert::<Motion>()
-}
 
 /// Store methods for looking up a schema path and resolving a value
 #[derive(Default, Deref, Resource)]
-pub struct CssFuncMap(
+pub struct CssTokenMap(
 	HashMap<
 		TokenKey,
 		Arc<
 			dyn 'static
 				+ Send
 				+ Sync
-				+ Fn(&Value, &CssBuilder) -> Result<String>,
+				+ Fn(&CssBuilder, &TokenValue) -> Result<Vec<(String, String)>>,
 		>,
 	>,
 );
-impl CssFuncMap {
+impl CssTokenMap {
 	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
 	///
 	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
 	/// (the type actually passed to `with_value`), not the output type,
 	/// so the key must match that tokens type.
-	pub fn insert<T: Typed + FromReflect + CssValue>(mut self) -> Self {
+	pub fn insert<T: TypedTokenKey + CssToken>(mut self) -> Self {
 		self.0.insert(
 			TokenKey::of::<T>(),
-			Arc::new(|value, builder| {
-				value.into_reflect::<T>()?.to_css_value(builder)
-			}),
+			Arc::new(|builder, value| T::declarations(builder, value)),
 		);
+		self
+	}
+
+	pub fn merge(mut self, other: Self) -> Self {
+		self.0.extend(other.0);
 		self
 	}
 
 	pub fn resolve(
 		&self,
-		value: &TypedValue,
 		builder: &CssBuilder,
-	) -> Result<String> {
-		if let Some(func) = self.0.get(value.schema()) {
-			func(value.value(), builder)
+		key: &TokenKey,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		if let Some(func) = self.0.get(key) {
+			// if let Some(func) = self.0.get(value.schema()) {
+			func(builder, value)
 		} else {
-			bevybail!(
-				"No CSS function registered for this schema: {:#?}",
-				value
-			)
+			bevybail!("No CSS Token registered for this schema:\n{}", key)
 		}
 	}
 }
@@ -300,6 +275,13 @@ mod tests {
 		// let mut world =
 		// 	(material::MaterialStylePlugin::default(), CssPlugin).into_world();
 		let mut world = (CssPlugin).into_world();
+
+		world.insert_resource(
+			CssTokenMap::default()
+				.insert::<colors::OnPrimary>()
+				.insert::<tones::Primary20>()
+				.insert::<common_props::ForegroundColor>(),
+		);
 
 		world.insert_resource(
 			SelectorStore::default()
@@ -318,13 +300,12 @@ mod tests {
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
-			.with_state::<(Res<CssProperties>, Res<CssFuncMap>, StyleQuery), _>(
+			.with_state::<(Res<CssTokenMap>, StyleQuery), _>(
 				|entity, state| {
 					CssBuilder {
 						minify: false,
-						ident_map: &state.0,
-						func_map: &state.1,
-						style_query: &state.2,
+						css_token_map: &state.0,
+						style_query: &state.1,
 					}
 					.build(entity)
 					.xunwrap()
