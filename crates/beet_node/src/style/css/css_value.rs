@@ -1,9 +1,10 @@
-use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
 /// Converts a value to its CSS string representation.
 pub trait AsCssValues {
+	/// If the type uses multiple properties declare them here.
+	fn properties() -> Vec<SmolStr> { default() }
 	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>>;
 }
 
@@ -20,6 +21,17 @@ impl CssIdent {
 	}
 	pub fn property(name: impl Into<SmolStr>) -> Self {
 		Self::Property(name.into())
+	}
+
+	pub fn with_suffix(&self, suffix: impl Into<SmolStr>) -> Self {
+		match self {
+			CssIdent::Variable(var) => {
+				CssIdent::Variable(format!("{}-{}", var, suffix.into()).into())
+			}
+			CssIdent::Property(prop) => {
+				CssIdent::Property(format!("{}-{}", prop, suffix.into()).into())
+			}
+		}
 	}
 
 	pub fn as_css_key(&self) -> String { self.to_string() }
@@ -40,18 +52,6 @@ impl std::fmt::Display for CssIdent {
 	}
 }
 
-/// A token key is always represented as a css variable
-/// when in the css value position, ie:
-/// `foo: var(--path-to-this-token)`
-impl AsCssValues for Token {
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
-		builder
-			.ident_to_css(self.key())?
-			.as_css_value()
-			.xvec()
-			.xok()
-	}
-}
 
 impl AsCssValues for Color {
 	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {

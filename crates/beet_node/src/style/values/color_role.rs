@@ -11,6 +11,13 @@ pub struct ColorRole {
 }
 
 impl AsCssValues for ColorRole {
+	fn properties() -> Vec<SmolStr> {
+		vec![
+			SmolStr::new_static("background-color"),
+			SmolStr::new_static("color"),
+		]
+	}
+
 	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
 		vec![
 			builder.ident_to_css(self.background.key())?.as_css_value(),
@@ -30,8 +37,9 @@ impl CssToken for ColorRoleProps {
 		value: &TokenValue,
 	) -> ::bevy::prelude::Result<Vec<(String, String)>> {
 		let values = builder.token_value_to_css::<ColorRole>(value)?;
-		vec!["background-color".to_string(), "color".to_string()]
+		ColorRole::properties()
 			.into_iter()
+			.map(|prop| prop.to_string())
 			.zip(values)
 			.collect::<Vec<_>>()
 			.xok()

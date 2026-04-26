@@ -31,6 +31,11 @@ impl CssTokenMap {
 		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
 		self
 	}
+	pub fn get(&self, key: &TokenKey) -> Result<&(dyn Send + Sync + CssToken)> {
+		self.0.get(key).map(|arc| arc.as_ref()).ok_or_else(|| {
+			bevyhow!("No CSS Token registered for this schema:\n{}", key)
+		})
+	}
 
 	pub fn merge(mut self, other: Self) -> Self {
 		self.0.extend(other.0);
@@ -109,14 +114,7 @@ macro_rules! css_variable {
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-   	let values = builder.token_value_to_css::<$schema_ty>(value)?;
-    builder.css_key::<Self>()?
-   		.to_string()
-     .xvec()
-     .into_iter()
-     .zip(values)
-     .collect::<Vec<_>>()
-     .xok()
+    	builder.key_value_to_css::<$new_ty,$schema_ty>(value)
 	 }
   }
  };

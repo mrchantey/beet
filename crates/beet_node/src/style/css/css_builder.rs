@@ -14,6 +14,7 @@ impl Plugin for CssPlugin {
 	fn build(&self, app: &mut App) { app.insert_resource(default_token_map()); }
 }
 
+#[derive(Get)]
 pub struct CssBuilder<'a, 'w, 's> {
 	minify: bool,
 	css_token_map: &'a CssTokenMap,
@@ -72,20 +73,6 @@ impl CssBuilder<'_, '_, '_> {
 		.xok()
 	}
 
-	/// Returns the ident in css form, using the [`CssIdentMap`]
-	/// if a mapping is found, otherwise the last part of
-	/// the field path as a variable.
-	/// Non-specified idents are assumed to be variables, not properties.
-	pub fn ident_to_css(&self, path: &TokenKey) -> Result<CssIdent> {
-		use heck::ToKebabCase;
-		let path = path.to_string().to_kebab_case().replace("/", "--");
-		// TODO hash in prod
-		CssIdent::variable(path).xok()
-	}
-
-	pub fn css_key<T: TypedTokenKey>(&self) -> Result<String> {
-		self.ident_to_css(&T::token_key())?.as_css_key().xok()
-	}
 
 	fn rules_to_css(&self, rules: &[Rule]) -> String {
 		if rules.is_empty() {
@@ -128,8 +115,21 @@ impl CssBuilder<'_, '_, '_> {
 		}
 	}
 
+
+	/// Returns the ident in css form, using the [`CssIdentMap`]
+	/// if a mapping is found, otherwise the last part of
+	/// the field path as a variable.
+	/// Non-specified idents are assumed to be variables, not properties.
+	pub fn ident_to_css(&self, path: &TokenKey) -> Result<CssIdent> {
+		use heck::ToKebabCase;
+		let path = path.to_string().to_kebab_case().replace("/", "--");
+		// TODO hash in prod
+		CssIdent::variable(path).xok()
+	}
+
+
 	pub fn token_value_to_css<
-		T: 'static
+		V: 'static
 			+ Send
 			+ Sync
 			+ FromReflect
@@ -140,13 +140,65 @@ impl CssBuilder<'_, '_, '_> {
 		&self,
 		value: &TokenValue,
 	) -> Result<Vec<String>> {
+		value.schema().assert_eq::<V>()?;
 		match value {
 			TokenValue::Value(value) => {
-				value.schema().assert_eq::<T>()?;
-				value.value().into_reflect::<T>()?.as_css_values(&self)
+				value.value().into_reflect::<V>()?.as_css_values(&self)
 			}
-			TokenValue::Token(token) => token.as_css_values(&self),
+			TokenValue::Token(token) => self.token_to_css_value::<V>(token),
 		}
+	}
+
+	/// Represent tokens as css values, appending the property names in
+	/// the case there are multiple
+	fn token_to_css_value<T: AsCssValues>(
+		&self,
+		token: &Token,
+	) -> Result<Vec<String>> {
+		// println!("here! {self:#?}");
+		let ident = self.ident_to_css(token.key())?;
+		let props = T::properties();
+		if props.len() <= 1 {
+			// no need for suffix for no declared props
+			ident.as_css_value().xvec().xok()
+		} else {
+			props
+				.into_iter()
+				.map(|prop| ident.clone().with_suffix(prop).as_css_value())
+				.collect::<Vec<_>>()
+				.xok()
+		}
+	}
+
+	pub fn key_value_to_css<
+		K: TypedTokenKey,
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		&self,
+		value: &TokenValue,
+	) -> Result<Vec<(String, String)>> {
+		let ident = self.ident_to_css(&K::token_key())?;
+		let values = self.token_value_to_css::<V>(value)?;
+		let props = V::properties();
+		if props.len() <= 1 {
+			// no need for suffix for no declared props
+			ident.as_css_key().xvec()
+		} else {
+			props
+				.into_iter()
+				.map(|prop| ident.clone().with_suffix(prop).as_css_key())
+				.collect::<Vec<String>>()
+		}
+		.into_iter()
+		.zip(values)
+		.collect::<Vec<_>>()
+		.xok()
 	}
 }
 
@@ -202,36 +254,40 @@ mod tests {
 
 		world.insert_resource(
 			CssTokenMap::default()
-				// .insert(colors::Primary)
-				// .insert(colors::OnPrimary)
-				// .insert(tones::Primary80)
-				// .insert(tones::Primary20)
+				.insert(colors::Primary)
+				.insert(colors::OnPrimary)
+				.insert(tones::Primary80)
+				.insert(tones::Primary20)
 				.insert(colors::PrimaryRole)
-				.insert(ColorRoleProps),
-			// .insert(common_props::ForegroundColor),
+				.insert(ColorRoleProps)
+				.insert(common_props::ForegroundColor),
 		);
 
 		world.insert_resource(
-			SelectorStore::default().with(
-				Selector::new()
-					.with_rule(Rule::class("primary-role"))
-					.with_token::<style::ColorRoleProps, colors::PrimaryRole>(),
-			), // .with(
-			   // 	Selector::root()
-			   // 		.with_typed::<colors::Primary, tones::Primary80>()
-			   // 		.with_typed::<colors::OnPrimary, tones::Primary20>(),
-			   // )
-			   // .with(
-			   // 	Selector::root()
-			   // 		.with_value::<tones::Primary80>(Color::srgb(
-			   // 			0., 0.8, 0.,
-			   // 		))
-			   // 		.unwrap()
-			   // 		.with_value::<tones::Primary20>(Color::srgb(
-			   // 			0., 0.2, 0.,
-			   // 		))
-			   // 		.unwrap(),
-			   // ),
+			SelectorStore::default()
+				.with(
+					Selector::new()
+						.with_rule(Rule::class("primary-role"))
+						.with_token::<style::ColorRoleProps, colors::PrimaryRole>(),
+				)
+				.with(
+					Selector::root()
+						.with_token::<colors::Primary, tones::Primary80>()
+						.with_token::<colors::OnPrimary, tones::Primary20>()
+						.with_value::<colors::PrimaryRole>(ColorRole {
+							background: colors::Primary::token(),
+							foreground: colors::OnPrimary::token(),
+						})
+						.unwrap()
+						.with_value::<tones::Primary80>(Color::srgb(
+							0., 0.8, 0.,
+						))
+						.unwrap()
+						.with_value::<tones::Primary20>(Color::srgb(
+							0., 0.2, 0.,
+						))
+						.unwrap(),
+				),
 		);
 		let css = world
 			.spawn(rsx! {
