@@ -48,32 +48,6 @@ impl CssTokenMap {
 
 #[macro_export]
 macro_rules! css_property {
-	// collects props via $schema_ty::properties()
- (
-  $(#[$meta:meta])*
-  $new_ty:ident,
-  $schema_ty:ident,
-  $doc_path: expr
- ) => {
-  $crate::token!(
-   $(#[$meta])*
-   $new_ty,
-   $schema_ty,
-   $doc_path
-  );
-  impl $crate::prelude::style::CssToken for $new_ty {
-   fn as_css_rule(
-    &self,
-    value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
-   $crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
-   	$schema_ty::properties(),
-    value
-   )
-   }
-  }
- };
-	// properties are hardcoded
  (
   $(#[$meta:meta])*
   $new_ty:ident,

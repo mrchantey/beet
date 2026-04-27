@@ -63,3 +63,23 @@ pub fn default_declarations(color: impl Into<Color>) -> Rule {
 		.extend(motion::default_durations())
 		.extend(motion::default_motions())
 }
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn validate_rules() {
+		let mut world = MaterialStylePlugin::world();
+		let css = world
+			.spawn(rsx! {
+				<div class="text-primary">hello world!</div>
+			})
+			.with_state::<StyleQuery, _>(|entity, query| {
+				query.build_css(&default(), entity)
+			})
+			.xunwrap();
+		println!("Generated CSS: \n{css}");
+	}
+}

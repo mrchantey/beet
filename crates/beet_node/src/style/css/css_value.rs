@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 
 /// Converts a value to its CSS string representation.
 pub trait AsCssValues {
-	fn properties() -> Vec<CssKey>;
+	fn suffixes() -> Vec<CssKey>;
 	fn as_css_values(&self) -> Result<Vec<CssValue>>;
 }
 
@@ -14,7 +14,7 @@ pub trait AsCssValue {
 }
 
 impl<T: AsCssValue> AsCssValues for T {
-	fn properties() -> Vec<CssKey> {
+	fn suffixes() -> Vec<CssKey> {
 		if let Some(prop) = T::property() {
 			vec![prop]
 		} else {

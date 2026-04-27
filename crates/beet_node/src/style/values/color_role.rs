@@ -3,6 +3,7 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 
+
 #[derive(Reflect)]
 pub struct ColorRole {
 	pub background: Token,
@@ -10,11 +11,8 @@ pub struct ColorRole {
 }
 
 impl AsCssValues for ColorRole {
-	fn properties() -> Vec<CssKey> {
-		vec![
-			CssKey::static_property("background-color"),
-			CssKey::static_property("color"),
-		]
+	fn suffixes() -> Vec<CssKey> {
+		vec![CssKey::static_property("bg"), CssKey::static_property("fg")]
 	}
 
 	fn as_css_values(&self) -> Result<Vec<CssValue>> {

@@ -274,19 +274,21 @@ impl CssRule {
 	) -> Result<Self> {
 		let key = CssVariable::from_token_key(&K::token_key());
 		let values = CssValue::from_token_value::<V>(value)?;
-		let props = V::properties();
-		let declarations = if props.len() <= 1 {
+		let suffixes = V::suffixes();
+		let declarations = if suffixes.len() <= 1 {
 			// no need for suffix for zero or one props
 			key.xinto::<CssKey>().xvec()
 		} else {
-			if props.len() != values.len() {
+			if suffixes.len() != values.len() {
 				bevybail!(
-					"Property count mismatch:\nkeys: {props:#?}\nvalues:{values:#?}",
+					"Property count mismatch:\nkeys: {suffixes:#?}\nvalues:{values:#?}",
 				);
 			}
-			props
+			suffixes
 				.into_iter()
-				.map(|prop| key.with_suffix(prop.to_string()).xinto::<CssKey>())
+				.map(|suffix| {
+					key.with_suffix(suffix.to_string()).xinto::<CssKey>()
+				})
 				.collect::<Vec<_>>()
 		};
 		Self::default()
@@ -423,14 +425,16 @@ impl CssValue {
 	/// the case there are multiple
 	pub fn from_token<T: AsCssValues>(token: &Token) -> Vec<Self> {
 		let var = CssVariable::from_token_key(token.key());
-		let props = T::properties();
-		if props.len() <= 1 {
+		let suffixes = T::suffixes();
+		if suffixes.len() <= 1 {
 			// no need for suffix for no declared props
 			var.xinto::<Self>().xvec()
 		} else {
-			props
+			suffixes
 				.into_iter()
-				.map(|prop| var.with_suffix(prop.to_string()).xinto::<Self>())
+				.map(|suffix| {
+					var.with_suffix(suffix.to_string()).xinto::<Self>()
+				})
 				.collect::<Vec<_>>()
 		}
 	}
@@ -578,13 +582,13 @@ mod tests {
 		// println!("{css}");
 		css
 			.xpect_contains(".primary-role")
-			.xpect_contains("background-color: var(--io-crates-beet-node-style-material-colors-primary-role-background-color)")
-			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-primary-role-color)")
+			.xpect_contains("background-color: var(--io-crates-beet-node-style-material-colors-primary-role-bg)")
+			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-primary-role-fg)")
 			.xpect_contains(":root")
 			.xpect_contains("--io-crates-beet-node-style-material-colors-primary: var(--io-crates-beet-node-style-material-tones-primary80)")
 			.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 51, 0)")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-background-color: var(--io-crates-beet-node-style-material-colors-primary)")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-color: var(--io-crates-beet-node-style-material-colors-on-primary)")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-bg: var(--io-crates-beet-node-style-material-colors-primary)")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-fg: var(--io-crates-beet-node-style-material-colors-on-primary)")
 			.xpect_contains("--io-crates-beet-node-style-material-tones-primary80: rgb(0, 204, 0)")
 			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)");
 	}
