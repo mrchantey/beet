@@ -1,20 +1,21 @@
+use crate::style::*;
 use crate::token::TokenKey;
 use beet_core::prelude::*;
 
 /// Converts a value to its CSS string representation.
 pub trait AsCssValues {
 	/// If the type uses multiple properties declare them here.
-	fn properties() -> Vec<SmolStr> { default() }
+	fn properties() -> Vec<CssKey> { default() }
 	fn as_css_values(&self) -> Result<Vec<String>>;
 }
 
 pub trait AsCssValue {
-	fn property() -> Option<SmolStr> { None }
+	fn property() -> Option<CssKey> { None }
 	fn as_css_value(&self) -> Result<String>;
 }
 
 impl<T: AsCssValue> AsCssValues for T {
-	fn properties() -> Vec<SmolStr> {
+	fn properties() -> Vec<CssKey> {
 		if let Some(prop) = T::property() {
 			vec![prop]
 		} else {

@@ -10,7 +10,7 @@ pub trait CssToken {
 		&self,
 		builder: &CssBuilder,
 		value: &TokenValue,
-	) -> Result<Vec<(String, String)>>;
+	) -> Result<Vec<(CssKey, CssValue)>>;
 }
 
 /// Store methods for looking up a schema path and resolving a value
@@ -47,7 +47,7 @@ impl CssTokenMap {
 		builder: &CssBuilder,
 		key: &TokenKey,
 		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
+	) -> Result<Vec<(CssKey, CssValue)>> {
 		if let Some(token) = self.0.get(key) {
 			// if let Some(func) = self.0.get(value.schema()) {
 			token.declarations(builder, value)
@@ -80,7 +80,10 @@ macro_rules! css_property {
     &self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
+   ) -> ::bevy::prelude::Result<Vec<(
+   	$crate::prelude::style::CssKey,
+    $crate::prelude::style::CssValue
+   )>> {
    builder.props_value_to_css::<$schema_ty>(
    	$schema_ty::properties(),
     value
@@ -107,9 +110,12 @@ macro_rules! css_property {
     &self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-   builder.props_value_to_css::<$schema_ty>(
-   	vec![$($property.to_string()),+],
+   ) -> ::bevy::prelude::Result<Vec<(
+   	$crate::prelude::style::CssKey,
+    $crate::prelude::style::CssValue
+   )>> {
+   	builder.props_value_to_css::<$schema_ty>(
+   	vec![$($crate::prelude::style::CssKey::static_property($property)),+],
     value
    )
    }
@@ -137,8 +143,11 @@ macro_rules! css_variable {
    	&self,
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-    	builder.key_value_to_css::<$new_ty,$schema_ty>(value)
+   ) -> ::bevy::prelude::Result<Vec<(
+   	$crate::prelude::style::CssKey,
+    $crate::prelude::style::CssValue
+   )>> {    	
+   	builder.key_value_to_css::<$new_ty,$schema_ty>(value)
 	 }
   }
  };

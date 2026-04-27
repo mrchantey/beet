@@ -125,20 +125,16 @@ impl CssBuilder<'_, '_, '_> {
 			+ AsCssValues,
 	>(
 		&self,
-		keys: Vec<impl std::fmt::Debug + ToString>,
+		keys: Vec<CssKey>,
 		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
-		let values = self.token_value_to_css::<V>(&value)?;
+	) -> Result<Vec<(CssKey, CssValue)>> {
+		let values = CssValue::from_token_value::<V>(value)?;
 		if keys.len() != values.len() {
 			bevybail!(
 				"Property count mismatch:\nkeys: {keys:#?}\nvalues:{values:#?}",
 			);
 		}
-		keys.into_iter()
-			.map(|key| key.to_string())
-			.zip(values)
-			.collect::<Vec<_>>()
-			.xok()
+		keys.into_iter().zip(values).collect::<Vec<_>>().xok()
 	}
 
 
@@ -157,13 +153,13 @@ impl CssBuilder<'_, '_, '_> {
 	>(
 		&self,
 		value: &TokenValue,
-	) -> Result<Vec<(String, String)>> {
-		let ident = CssIdent::from_token_key(&K::token_key());
-		let values = self.token_value_to_css::<V>(value)?;
+	) -> Result<Vec<(CssKey, CssValue)>> {
+		let key = CssVariable::from_token_key(&K::token_key());
+		let values = CssValue::from_token_value::<V>(value)?;
 		let props = V::properties();
 		if props.len() <= 1 {
 			// no need for suffix for zero or one props
-			ident.as_css_key().xvec()
+			key.xinto::<CssKey>().xvec()
 		} else {
 			if props.len() != values.len() {
 				bevybail!(
@@ -172,54 +168,13 @@ impl CssBuilder<'_, '_, '_> {
 			}
 			props
 				.into_iter()
-				.map(|prop| ident.clone().with_suffix(prop).as_css_key())
-				.collect::<Vec<String>>()
+				.map(|prop| key.with_suffix(prop.to_string()).xinto::<CssKey>())
+				.collect::<Vec<_>>()
 		}
 		.into_iter()
 		.zip(values)
 		.collect::<Vec<_>>()
 		.xok()
-	}
-
-	pub fn token_value_to_css<
-		V: 'static
-			+ Send
-			+ Sync
-			+ FromReflect
-			+ Typed
-			+ TypedTokenKey
-			+ AsCssValues,
-	>(
-		&self,
-		value: &TokenValue,
-	) -> Result<Vec<String>> {
-		value.schema().assert_eq::<V>()?;
-		match value {
-			TokenValue::Value(value) => {
-				value.value().into_reflect::<V>()?.as_css_values()
-			}
-			TokenValue::Token(token) => self.token_to_css_value::<V>(token),
-		}
-	}
-
-	/// Represent tokens as css values, appending the property names in
-	/// the case there are multiple
-	fn token_to_css_value<T: AsCssValues>(
-		&self,
-		token: &Token,
-	) -> Result<Vec<String>> {
-		let ident = CssIdent::from_token_key(token.key());
-		let props = T::properties();
-		if props.len() <= 1 {
-			// no need for suffix for no declared props
-			ident.as_css_value().xvec().xok()
-		} else {
-			props
-				.into_iter()
-				.map(|prop| ident.clone().with_suffix(prop).as_css_value())
-				.collect::<Vec<_>>()
-				.xok()
-		}
 	}
 }
 
@@ -228,11 +183,119 @@ struct CssRule {
 	declarations: HashMap<CssIdent, CssValue>,
 }
 
-enum CssValue {
-	Variable(String),
+/// The right hand side of a css declaration
+#[derive(Debug, Clone)]
+pub enum CssKey {
+	/// A variable, ie `--color-primary`
+	Variable(CssVariable),
+	/// A css property, ie `background-color`
+	Property(SmolStr),
+}
+
+impl CssKey {
+	pub fn static_property(name: &'static str) -> Self {
+		Self::Property(SmolStr::new_static(name))
+	}
+}
+impl From<CssVariable> for CssKey {
+	fn from(var: CssVariable) -> Self { Self::Variable(var) }
+}
+
+impl std::fmt::Display for CssKey {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			CssKey::Variable(var) => var.as_css_key().fmt(f),
+			CssKey::Property(prop) => prop.fmt(f),
+		}
+	}
+}
+
+/// The right hand side of a css declaration
+#[derive(Debug, Clone)]
+pub enum CssValue {
+	/// A variable, ie `var(--color-primary)`
+	Variable(CssVariable),
+	/// A raw expression, ie `rgb(0,0,0)`
 	Expression(String),
 }
 
+impl CssValue {
+	pub fn from_token_value<
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		value: &TokenValue,
+	) -> Result<Vec<Self>> {
+		value.schema().assert_eq::<V>()?;
+		match value {
+			TokenValue::Value(value) => value
+				.value()
+				.into_reflect::<V>()?
+				.as_css_values()?
+				.into_iter()
+				.map(Self::Expression)
+				.collect::<Vec<_>>()
+				.xok(),
+			TokenValue::Token(token) => Self::from_token::<V>(token).xok(),
+		}
+	}
+	/// Represent tokens as css values, appending the property names in
+	/// the case there are multiple
+	pub fn from_token<T: AsCssValues>(token: &Token) -> Vec<Self> {
+		let var = CssVariable::from_token_key(token.key());
+		let props = T::properties();
+		if props.len() <= 1 {
+			// no need for suffix for no declared props
+			var.xinto::<Self>().xvec()
+		} else {
+			props
+				.into_iter()
+				.map(|prop| var.with_suffix(prop.to_string()).xinto::<Self>())
+				.collect::<Vec<_>>()
+		}
+	}
+}
+
+impl std::fmt::Display for CssValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			CssValue::Variable(var) => var.as_css_value().fmt(f),
+			CssValue::Expression(expr) => expr.fmt(f),
+		}
+	}
+}
+
+impl From<CssVariable> for CssValue {
+	fn from(var: CssVariable) -> Self { Self::Variable(var) }
+}
+
+/// A css variable, the inner string
+/// is stored without the leading `--`
+#[derive(Debug, Clone)]
+pub struct CssVariable(String);
+
+impl CssVariable {
+	pub fn from_token_key(token_key: &TokenKey) -> Self {
+		use heck::ToKebabCase;
+		let token_key = token_key.to_string().to_kebab_case().replace("/", "-");
+		Self(token_key)
+	}
+	pub fn as_css_key(&self) -> String { self.to_string() }
+	pub fn as_css_value(&self) -> String { format!("var({})", self) }
+	pub fn with_suffix(&self, suffix: impl Into<SmolStr>) -> Self {
+		Self(format!("{}-{}", self.0, suffix.into()))
+	}
+}
+impl std::fmt::Display for CssVariable {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "--{}", self.0)
+	}
+}
 
 #[cfg(test)]
 mod tests {

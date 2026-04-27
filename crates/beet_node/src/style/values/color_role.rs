@@ -10,10 +10,10 @@ pub struct ColorRole {
 }
 
 impl AsCssValues for ColorRole {
-	fn properties() -> Vec<SmolStr> {
+	fn properties() -> Vec<CssKey> {
 		vec![
-			SmolStr::new_static("background-color"),
-			SmolStr::new_static("color"),
+			CssKey::static_property("background-color"),
+			CssKey::static_property("color"),
 		]
 	}
 
