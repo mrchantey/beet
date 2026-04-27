@@ -18,7 +18,7 @@ impl Typeface {
 }
 
 impl AsCssValue for Typeface {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		// system font keywords must not be quoted
 		const SYSTEM_FONT_KEYWORDS: LazyLock<HashSet<&'static str>> =
 			LazyLock::new(|| {
@@ -62,7 +62,7 @@ impl AsCssValue for Typeface {
 				out.push(format!("\"{}\"", family));
 			}
 		}
-		out.join(", ").xok()
+		out.join(", ").xmap(CssValue::expression).xok()
 	}
 }
 
@@ -75,12 +75,13 @@ pub enum FontWeight {
 }
 
 impl AsCssValue for FontWeight {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Normal => "normal".into(),
 			Self::Bold => "bold".into(),
 			Self::Absolute(val) => val.to_string(),
 		}
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }
@@ -101,15 +102,11 @@ pub struct Typography {
 impl AsCssValue for Typography {
 	/// Returns CSS font properties as a space-separated shorthand:
 	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		let size = if let Some(lh) = &self.line_height {
-			format!(
-				"{}/{}",
-				self.size.as_css_values()?[0],
-				lh.as_css_values()?[0]
-			)
+			format!("{}/{}", self.size.as_css_value()?, lh.as_css_value()?)
 		} else {
-			self.size.as_css_values()?[0].clone()
+			self.size.as_css_value()?.to_string()
 		};
 		let mut parts = vec![
 			CssIdent::from_token_key(self.weight.key()).as_css_value(),
@@ -120,8 +117,8 @@ impl AsCssValue for Typography {
 			CssIdent::from_token_key(self.typeface.key()).as_css_value(),
 		];
 		if let Some(ls) = &self.letter_spacing {
-			parts.push(format!("letter-spacing:{}", ls.as_css_values()?[0]));
+			parts.push(format!("letter-spacing:{}", ls.as_css_value()?));
 		}
-		parts.join(" ").xok()
+		parts.join(" ").xmap(CssValue::expression).xok()
 	}
 }

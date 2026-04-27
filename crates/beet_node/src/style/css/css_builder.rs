@@ -180,7 +180,7 @@ impl CssBuilder<'_, '_, '_> {
 
 struct CssRule {
 	selectors: Vec<Selector>,
-	declarations: HashMap<CssIdent, CssValue>,
+	declarations: HashMap<CssKey, CssValue>,
 }
 
 /// The right hand side of a css declaration
@@ -220,6 +220,10 @@ pub enum CssValue {
 }
 
 impl CssValue {
+	pub fn expression(value: impl Into<String>) -> Self {
+		Self::Expression(value.into())
+	}
+
 	pub fn from_token_value<
 		V: 'static
 			+ Send
@@ -233,14 +237,9 @@ impl CssValue {
 	) -> Result<Vec<Self>> {
 		value.schema().assert_eq::<V>()?;
 		match value {
-			TokenValue::Value(value) => value
-				.value()
-				.into_reflect::<V>()?
-				.as_css_values()?
-				.into_iter()
-				.map(Self::Expression)
-				.collect::<Vec<_>>()
-				.xok(),
+			TokenValue::Value(value) => {
+				value.value().into_reflect::<V>()?.as_css_values()
+			}
 			TokenValue::Token(token) => Self::from_token::<V>(token).xok(),
 		}
 	}

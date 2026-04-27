@@ -6,12 +6,12 @@ use beet_core::prelude::*;
 pub trait AsCssValues {
 	/// If the type uses multiple properties declare them here.
 	fn properties() -> Vec<CssKey> { default() }
-	fn as_css_values(&self) -> Result<Vec<String>>;
+	fn as_css_values(&self) -> Result<Vec<CssValue>>;
 }
 
 pub trait AsCssValue {
 	fn property() -> Option<CssKey> { None }
-	fn as_css_value(&self) -> Result<String>;
+	fn as_css_value(&self) -> Result<CssValue>;
 }
 
 impl<T: AsCssValue> AsCssValues for T {
@@ -22,7 +22,7 @@ impl<T: AsCssValue> AsCssValues for T {
 			default()
 		}
 	}
-	fn as_css_values(&self) -> Result<Vec<String>> {
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
 		self.as_css_value().map(|val| val.xvec())
 	}
 }
@@ -85,7 +85,7 @@ impl std::fmt::Display for CssIdent {
 
 
 impl AsCssValue for Color {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		let this = self.to_srgba();
 		let alpha = this.alpha;
 		// still undecided about this..
@@ -106,6 +106,7 @@ impl AsCssValue for Color {
 				alpha
 			)
 		}
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }

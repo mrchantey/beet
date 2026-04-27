@@ -13,7 +13,7 @@ pub enum JustifyContent {
 }
 
 impl AsCssValue for JustifyContent {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -23,6 +23,7 @@ impl AsCssValue for JustifyContent {
 			Self::SpaceAround => "space-around",
 		}
 		.to_string()
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }
@@ -38,7 +39,7 @@ pub enum AlignItems {
 }
 
 impl AsCssValue for AlignItems {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -46,7 +47,7 @@ impl AsCssValue for AlignItems {
 			Self::Stretch => "stretch",
 			Self::Baseline => "baseline",
 		}
-		.to_string()
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }
@@ -62,7 +63,7 @@ pub enum AlignSelf {
 }
 
 impl AsCssValue for AlignSelf {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Start => "start",
 			Self::End => "end",
@@ -70,7 +71,7 @@ impl AsCssValue for AlignSelf {
 			Self::Stretch => "stretch",
 			Self::Baseline => "baseline",
 		}
-		.to_string()
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }
@@ -85,12 +86,12 @@ pub enum FlexSize {
 }
 
 impl AsCssValue for FlexSize {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
-			Self::Auto => "auto".to_string(),
+			Self::Auto => CssValue::expression("auto"),
 			Self::Unit(unit) => unit.as_css_value()?,
-			Self::Grow(n) => n.to_string(),
-			Self::Shrink(n) => n.to_string(),
+			Self::Grow(n) => n.as_css_value()?,
+			Self::Shrink(n) => n.as_css_value()?,
 		}
 		.xok()
 	}
@@ -106,14 +107,14 @@ pub enum Direction {
 }
 
 impl AsCssValue for Direction {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Horizontal => "horizontal",
 			Self::Vertical => "vertical",
 			Self::ViewportMin => "vmin",
 			Self::ViewportMax => "vmax",
 		}
-		.to_string()
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }

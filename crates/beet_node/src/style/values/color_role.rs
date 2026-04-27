@@ -17,10 +17,12 @@ impl AsCssValues for ColorRole {
 		]
 	}
 
-	fn as_css_values(&self) -> Result<Vec<String>> {
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
 		vec![
-			CssIdent::from_token_key(self.background.key()).as_css_value(),
-			CssIdent::from_token_key(self.foreground.key()).as_css_value(),
+			CssVariable::from_token_key(self.background.key())
+				.xinto::<CssValue>(),
+			CssVariable::from_token_key(self.foreground.key())
+				.xinto::<CssValue>(),
 		]
 		.xok()
 	}

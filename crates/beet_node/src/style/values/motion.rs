@@ -11,25 +11,28 @@ pub struct Motion {
 }
 
 impl AsCssValue for Motion {
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		format!(
 			"{} {}",
 			CssIdent::from_token_key(self.duration.key()).as_css_value(),
 			self.ease.as_css_value()?
 		)
+		.xmap(CssValue::expression)
 		.xok()
 	}
 }
 
 impl AsCssValue for Duration {
-	fn as_css_value(&self) -> Result<String> {
-		format!("{}ms", self.as_millis()).xok()
+	fn as_css_value(&self) -> Result<CssValue> {
+		format!("{}ms", self.as_millis())
+			.xmap(CssValue::expression)
+			.xok()
 	}
 }
 
 impl AsCssValue for EaseFunction {
 	#[rustfmt::skip]
-	fn as_css_value(&self) -> Result<String> {
+	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			// --- Standard Cubic Beziers ---
 			EaseFunction::Linear => 				"linear".to_string(),
@@ -62,6 +65,8 @@ impl AsCssValue for EaseFunction {
 			EaseFunction::ElasticIn => 					"linear(0, -0.01, 0.02, -0.05, 0.13, -0.32, 1)".to_string(),
 			// Fallback for types not explicitly mapped
 			_ => 																"ease-in-out".to_string(),
-		}.xok()
+		}
+		.xmap(CssValue::expression)
+		.xok()
 	}
 }
