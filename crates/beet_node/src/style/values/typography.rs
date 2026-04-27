@@ -3,6 +3,17 @@ use crate::style::*;
 use beet_core::prelude::*;
 use std::sync::LazyLock;
 
+css_property!(
+	TypographyProps,
+	Typography,
+	DocumentPath::Ancestor,
+	"font-family",
+	"font-weight",
+	"font-size",
+	"line-height",
+	"letter-spacing"
+);
+
 /// The typeface family list to use, with the first match selected
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Reflect)]
 pub struct Typeface(Vec<SmolStr>);
@@ -86,39 +97,43 @@ impl AsCssValue for FontWeight {
 	}
 }
 
-/// A complete typography style combining typeface, size, weight, and optional spacing.
+/// A complete typography style combining typeface, size, weight, line height, and letter spacing.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Typography {
-	/// [`FieldRef`] pointing to the [`Typeface`] token.
+	/// [`Token`] pointing to the [`Typeface`] token.
 	pub typeface: Token,
-	/// [`FieldRef`] pointing to the [`FontWeight`] token.
+	/// [`Token`] pointing to the [`FontWeight`] token.
 	pub weight: Token,
-	pub size: Length,
-	pub line_height: Option<Length>,
-	pub letter_spacing: Option<Length>,
+	/// [`Token`] pointing to the font size [`Length`] token.
+	pub size: Token,
+	/// [`Token`] pointing to the line height [`Length`] token.
+	pub line_height: Token,
+	/// [`Token`] pointing to the letter spacing [`Length`] token.
+	pub letter_spacing: Token,
 }
 
+impl AsCssValues for Typography {
+	fn suffixes() -> Vec<CssKey> {
+		vec![
+			CssKey::static_property("family"),
+			CssKey::static_property("weight"),
+			CssKey::static_property("size"),
+			CssKey::static_property("lh"),
+			CssKey::static_property("ls"),
+		]
+	}
 
-impl AsCssValue for Typography {
-	/// Returns CSS font properties as a space-separated shorthand:
-	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
-	fn as_css_value(&self) -> Result<CssValue> {
-		let size = if let Some(lh) = &self.line_height {
-			format!("{}/{}", self.size.as_css_value()?, lh.as_css_value()?)
-		} else {
-			self.size.as_css_value()?.to_string()
-		};
-		let mut parts = vec![
-			CssIdent::from_token_key(self.weight.key()).as_css_value(),
-			// builder.ide
-			// builder.iden
-			// builder.self.weight.to_css_value(builder),
-			size,
-			CssIdent::from_token_key(self.typeface.key()).as_css_value(),
-		];
-		if let Some(ls) = &self.letter_spacing {
-			parts.push(format!("letter-spacing:{}", ls.as_css_value()?));
-		}
-		parts.join(" ").xmap(CssValue::expression).xok()
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
+		vec![
+			CssVariable::from_token_key(self.typeface.key())
+				.xinto::<CssValue>(),
+			CssVariable::from_token_key(self.weight.key()).xinto::<CssValue>(),
+			CssVariable::from_token_key(self.size.key()).xinto::<CssValue>(),
+			CssVariable::from_token_key(self.line_height.key())
+				.xinto::<CssValue>(),
+			CssVariable::from_token_key(self.letter_spacing.key())
+				.xinto::<CssValue>(),
+		]
+		.xok()
 	}
 }

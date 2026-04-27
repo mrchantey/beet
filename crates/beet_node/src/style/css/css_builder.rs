@@ -489,7 +489,28 @@ mod tests {
 			format_variables: FormatVariables::Full,
 		}
 	}
-
+	#[test]
+	fn mismatch() {
+		World::new()
+			.with_resource(
+				CssTokenMap::default().insert(common_props::ForegroundColor),
+			)
+			.with_resource(
+				RuleStore::default().with(
+					Rule::new()
+						.with_selector(Selector::class("color-primary"))
+						.with_token::<common_props::ForegroundColor, colors::PrimaryRole>(
+						),
+				),
+			)
+			.spawn_empty()
+			.with_state::<StyleQuery, _>(|entity, query| {
+				query.build_css(&test_builder(), entity)
+			})
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Token Key Mismatch");
+	}
 	#[test]
 	fn test_color() {
 		let mut world = World::new();
@@ -503,7 +524,12 @@ mod tests {
 
 		world.insert_resource(
 			RuleStore::default()
-				.with(rules::hero_heading())
+				.with(
+					Rule::new()
+						.with_selector(Selector::class("color-primary"))
+						.with_token::<common_props::ForegroundColor, colors::OnPrimary>(
+						),
+				)
 				.with(
 					Rule::new()
 						.with_token::<colors::OnPrimary, tones::Primary20>(),
@@ -524,7 +550,7 @@ mod tests {
 			.xunwrap();
 		// println!("{css}");
 		css
-			.xpect_contains(".hero-heading")
+			.xpect_contains(".color-primary")
 			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-on-primary)")
 			.xpect_contains(":root")
 			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)")

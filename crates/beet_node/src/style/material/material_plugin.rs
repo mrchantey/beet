@@ -40,16 +40,18 @@ pub fn default_token_map() -> CssTokenMap {
 		.with_extend(colors::token_map())
 		.with_extend(geometry::token_map())
 		.with_extend(motion::token_map())
-	// .merge(typography::token_map())
+		.with_extend(typography::token_map())
 }
 
 /// All default material declarations and classes
 pub fn default_rule_store(color: impl Into<Color>) -> RuleStore {
-	RuleStore::default()
-		.with(default_declarations(color))
-		.with(themes::light_scheme())
-		.with(themes::dark_scheme())
-		.with(rules::hero_heading())
+	rules::all_rules().into_iter().fold(
+		RuleStore::default()
+			.with(default_declarations(color))
+			.with(themes::light_scheme())
+			.with(themes::dark_scheme()),
+		|store, rule| store.with(rule),
+	)
 }
 
 /// Returns a [`Rule`] with all material design default values.

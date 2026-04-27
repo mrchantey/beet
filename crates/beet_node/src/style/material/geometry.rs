@@ -56,6 +56,7 @@ pub fn token_map() -> CssTokenMap {
 		.insert(ShapeCornerExtraLarge)
 		.insert(ShapeCornerFull)
 
+		.insert(ShapeProps)
 		.insert(ShapeNone)
 		.insert(ShapeExtraSmall)
 		.insert(ShapeSmall)
@@ -127,13 +128,13 @@ pub fn default_shapes() -> Rule {
 		.with_value::<ShapeCornerExtraLarge>(Length::Px(28.0)).unwrap()
 		.with_value::<ShapeCornerFull>(Length::Percent(100.0)).unwrap()
 		// composite shape sys tokens
-		.with_value::<ShapeNone>(Shape       { corner: Length::Px(0.0),          edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeExtraSmall>(Shape  { corner: Length::Px(4.0),          edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeSmall>(Shape       { corner: Length::Px(8.0),          edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeMedium>(Shape      { corner: Length::Px(12.0),         edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeLarge>(Shape       { corner: Length::Px(16.0),         edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeExtraLarge>(Shape  { corner: Length::Px(28.0),         edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeFull>(Shape        { corner: Length::Percent(100.0),   edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeNone>(Shape       { corner: ShapeCornerNone::token(),       edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeExtraSmall>(Shape { corner: ShapeCornerExtraSmall::token(), edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeSmall>(Shape      { corner: ShapeCornerSmall::token(),      edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeMedium>(Shape     { corner: ShapeCornerMedium::token(),     edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeLarge>(Shape      { corner: ShapeCornerLarge::token(),      edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeExtraLarge>(Shape { corner: ShapeCornerExtraLarge::token(), edge: ShapeEdge::None }).unwrap()
+		.with_value::<ShapeFull>(Shape       { corner: ShapeCornerFull::token(),       edge: ShapeEdge::None }).unwrap()
 		// outline width tokens
 		.with_value::<OutlineWidthNone>(Length::Px(0.0)).unwrap()
 		.with_value::<OutlineWidthThin>(Length::Px(1.0)).unwrap()

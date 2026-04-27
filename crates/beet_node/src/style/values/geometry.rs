@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
@@ -88,15 +89,56 @@ impl AsCssValue for Elevation {
 }
 
 
+css_property!(
+	ShapeProps,
+	Shape,
+	DocumentPath::Ancestor,
+	"border-top-left-radius",
+	"border-top-right-radius",
+	"border-bottom-right-radius",
+	"border-bottom-left-radius"
+);
+
 /// Combined shape token: a corner radius applied to an optional edge.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Shape {
-	pub corner: Length,
+	/// [`Token`] pointing to the corner radius [`Length`] token.
+	pub corner: Token,
 	pub edge: ShapeEdge,
 }
 
-impl AsCssValue for Shape {
-	fn as_css_value(&self) -> Result<CssValue> { self.corner.as_css_value() }
+impl AsCssValues for Shape {
+	fn suffixes() -> Vec<CssKey> {
+		vec![
+			CssKey::static_property("tl"),
+			CssKey::static_property("tr"),
+			CssKey::static_property("br"),
+			CssKey::static_property("bl"),
+		]
+	}
+
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
+		let zero = Length::Px(0.0).as_css_value()?;
+		let corner =
+			CssVariable::from_token_key(self.corner.key()).xinto::<CssValue>();
+
+		match self.edge {
+			ShapeEdge::None => {
+				vec![corner.clone(), corner.clone(), corner.clone(), corner]
+			}
+			ShapeEdge::Top => vec![corner.clone(), corner, zero.clone(), zero],
+			ShapeEdge::End => {
+				vec![zero.clone(), corner.clone(), corner, zero]
+			}
+			ShapeEdge::Start => {
+				vec![corner.clone(), zero.clone(), zero, corner]
+			}
+			ShapeEdge::Bottom => {
+				vec![zero.clone(), zero, corner.clone(), corner]
+			}
+		}
+		.xok()
+	}
 }
 
 /// Which edge(s) a shape corner radius applies to.
