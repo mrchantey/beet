@@ -22,6 +22,8 @@ pub struct StyleQuery<'w, 's> {
 	entity_rules: Query<'w, 's, (Entity, &'static RuleStore)>,
 	global_rules: Option<Res<'w, RuleStore>>,
 	elements: ElementQuery<'w, 's>,
+
+	css_map: Option<Res<'w, CssTokenMap>>,
 }
 
 impl StyleQuery<'_, '_> {
@@ -88,6 +90,19 @@ impl StyleQuery<'_, '_> {
 		}
 		bevybail!("Token not found for path: {}", key.as_str())
 	}
+
+
+	pub fn build_css(
+		&self,
+		builder: &CssBuilder,
+		entity: Entity,
+	) -> Result<String> {
+		let Some(css_map) = &self.css_map else {
+			bevybail!("No CssTokenMap resource found");
+		};
+		let rules = self.collect_rules(entity);
+		builder.build(&rules, css_map)
+	}
 }
 
 #[cfg(test)]
@@ -102,8 +117,8 @@ mod tests {
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
 		let store = RuleStore::default()
-			.with(Rule::root().with_value::<colors::Primary>(red).unwrap())
-			.with(Rule::root().with_value::<colors::Primary>(blue).unwrap());
+			.with(Rule::new().with_value::<colors::Primary>(red).unwrap())
+			.with(Rule::new().with_value::<colors::Primary>(blue).unwrap());
 
 		let mut world = World::new();
 		let entity = world.spawn((Element::new("div"), store)).id();
@@ -122,17 +137,17 @@ mod tests {
 		// Global: Primary → RED
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
-		world
-			.insert_resource(RuleStore::default().with(
-				Rule::root().with_value::<colors::Primary>(red).unwrap(),
-			));
+		world.insert_resource(
+			RuleStore::default()
+				.with(Rule::new().with_value::<colors::Primary>(red).unwrap()),
+		);
 
 		// Entity-local: Primary → BLUE
 		let entity = world
 			.spawn((
 				Element::new("div"),
 				RuleStore::default().with(
-					Rule::root().with_value::<colors::Primary>(blue).unwrap(),
+					Rule::new().with_value::<colors::Primary>(blue).unwrap(),
 				),
 			))
 			.id();
@@ -165,7 +180,7 @@ mod tests {
 		world.insert_resource(
 			RuleStore::default().with(
 				Rule::new()
-					.with_rule(Selector::tag("button"))
+					.with_selector(Selector::tag("button"))
 					.with_value::<colors::Primary>(red)
 					.unwrap(),
 			),
@@ -197,10 +212,12 @@ mod tests {
 		let entity = world
 			.spawn((
 				Element::new("div"),
-				related!(Attributes[(
-					Attribute::new("class"),
-					Value::str(themes::LIGHT_SCHEME_CLASS)
-				)]),
+				related!(
+					Attributes[(
+						Attribute::new("class"),
+						Value::str(themes::LIGHT_SCHEME_CLASS)
+					)]
+				),
 			))
 			.id();
 

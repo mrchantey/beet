@@ -5,12 +5,7 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 pub trait CssToken {
-	fn selectors(&self) -> Vec<Selector> { default() }
-	fn declarations(
-		&self,
-		builder: &CssBuilder,
-		value: &TokenValue,
-	) -> Result<Vec<(CssKey, CssValue)>>;
+	fn as_css_rule(&self, value: &TokenValue) -> Result<CssRule>;
 }
 
 /// Store methods for looking up a schema path and resolving a value
@@ -41,20 +36,6 @@ impl CssTokenMap {
 		self.0.extend(other.0);
 		self
 	}
-
-	pub fn resolve(
-		&self,
-		builder: &CssBuilder,
-		key: &TokenKey,
-		value: &TokenValue,
-	) -> Result<Vec<(CssKey, CssValue)>> {
-		if let Some(token) = self.0.get(key) {
-			// if let Some(func) = self.0.get(value.schema()) {
-			token.declarations(builder, value)
-		} else {
-			bevybail!("No CSS Token registered for this schema:\n{}", key)
-		}
-	}
 }
 
 
@@ -76,15 +57,11 @@ macro_rules! css_property {
    $doc_path
   );
   impl $crate::prelude::style::CssToken for $new_ty {
-   fn declarations(
+   fn as_css_rule(
     &self,
-    builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(
-   	$crate::prelude::style::CssKey,
-    $crate::prelude::style::CssValue
-   )>> {
-   builder.props_value_to_css::<$schema_ty>(
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
+   $crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
    	$schema_ty::properties(),
     value
    )
@@ -106,15 +83,11 @@ macro_rules! css_property {
    $doc_path
   );
   impl $crate::prelude::style::CssToken for $new_ty {
-   fn declarations(
+   fn as_css_rule(
     &self,
-    builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(
-   	$crate::prelude::style::CssKey,
-    $crate::prelude::style::CssValue
-   )>> {
-   	builder.props_value_to_css::<$schema_ty>(
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
+   	$crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
    	vec![$($crate::prelude::style::CssKey::static_property($property)),+],
     value
    )
@@ -139,15 +112,11 @@ macro_rules! css_variable {
    $doc_path
   );
   impl $crate::prelude::style::CssToken for $new_ty {
-   fn declarations(
+   fn as_css_rule(
    	&self,
-    builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<Vec<(
-   	$crate::prelude::style::CssKey,
-    $crate::prelude::style::CssValue
-   )>> {    	
-   	builder.key_value_to_css::<$new_ty,$schema_ty>(value)
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
+   	$crate::prelude::style::CssRule::from_key_value::<$new_ty,$schema_ty>(value)
 	 }
   }
  };
@@ -163,33 +132,6 @@ macro_rules! css_variable {
    $crate::prelude::DocumentPath::default()
   );
  };
-}
-
-
-
-
-
-#[macro_export]
-macro_rules! css_token {
-	(
-		$(#[$meta:meta])*
-		$new_ty:ident,
-		$schema_ty:ident,
-		$doc_path: expr,
-		[$(props:expr),*]
-	) => {
-		$crate::token!(
-			$(#[$meta])
-			*$new_ty,
-			$schema_ty,
-			$doc_path
-		)
-		impl $crate::prelude::CssToken for $new_ty{
-			fn properties() -> Vec<SmolStr> {
-				vec![$(SmolStr::from($props)),*]
-			}
-		}
-	};
 }
 
 #[cfg(test)]

@@ -15,80 +15,314 @@ impl Plugin for CssPlugin {
 }
 
 #[derive(Get)]
-pub struct CssBuilder<'a, 'w, 's> {
+pub struct CssBuilder {
 	minify: bool,
-	css_token_map: &'a CssTokenMap,
-	style_query: &'a StyleQuery<'w, 's>,
+	max_iterations: usize,
+	format_variables: FormatVariables,
 }
-
-
-impl CssBuilder<'_, '_, '_> {
-	pub fn build(&self, entity: Entity) -> Result<String> {
-		let rules = self
-			.style_query
-			.collect_rules(entity)
-			.into_iter()
-			.xtry_map(|rule| self.build_rule(rule))?;
-
-		match self.minify {
-			true => Ok(rules.join(" ")),
-			false => Ok(rules.join("\n\n")),
+impl Default for CssBuilder {
+	fn default() -> Self {
+		cfg_if! {
+			if #[cfg(debug_assertions)] {
+				Self {
+					minify: false,
+					max_iterations: 8,
+					format_variables: FormatVariables::Full,
+				}
+			} else {
+				Self {
+					minify: true,
+					max_iterations: 8,
+					format_variables: FormatVariables::Hash { min_len: 4 },
+				}
+			}
 		}
 	}
+}
 
-	fn build_rule(&self, rule: &Rule) -> Result<String> {
-		let rules = self.rules_to_css(&rule.rules());
+impl CssBuilder {
+	pub fn build(
+		&self,
+		rules: &[&Rule],
+		css_map: &CssTokenMap,
+	) -> Result<String> {
+		let css_rules =
+			rules.xtry_map(|rule| CssRule::from_rule(&css_map, rule))?;
 
-		let properties = rule
-			.declarations()
-			.iter()
-			.xtry_map(|(key, value)| -> Result<_> {
-				self.css_token_map.resolve(self, key, value)
-			})?
-			.into_iter()
-			.flatten()
-			.map(|(key, value)| format!("{key}: {value}"));
+		// iteration variables
+		let mut declared = HashMap::default();
+		let mut format_variables = self.format_variables;
 
-
-		match self.minify {
-			true => {
-				format!(
-					"{} {{ {} }}",
-					rules,
-					properties.collect::<Vec<_>>().join("; ")
-				)
+		for i in 0..self.max_iterations {
+			match css_rules.iter().xtry_map(|rule| {
+				self.format_rule(rule, format_variables, &mut declared)
+			}) {
+				Ok(formatted) => {
+					return if self.minify {
+						formatted.join("")
+					} else {
+						formatted.join("\n\n")
+					}
+					.xok();
+				}
+				Err(CollisionFound {
+					original,
+					formatted,
+				}) => {
+					warn!(
+						"Collision found:\n variable: `{original}`\nformated: `{formatted}`\nFormat rules:\n{format_variables:?}\niteration:{i}/{}",
+						self.max_iterations
+					);
+					format_variables = format_variables.increment_widening();
+					declared.clear();
+				}
 			}
-			false => {
-				format!(
-					"{} {{\n{}\n}}",
-					rules,
-					properties
-						.into_iter()
-						.map(|prop| format!("    {prop};"))
-						.collect::<Vec<_>>()
-						.join("\n")
-				)
-			}
+		}
+		bevybail!(
+			"Max iterations reached, unable to resolve variable name collisions\nformatting: {:?}\nmax iterations: {}",
+			self.format_variables,
+			self.max_iterations
+		)
+	}
+	fn format_rule(
+		&self,
+		rule: &CssRule,
+		format_variables: FormatVariables,
+		declared: &mut HashMap<CssVariable, CssVariable>,
+	) -> Result<String, CollisionFound> {
+		let selector = rule.selector_to_css();
+		let declarations =
+			rule.declarations.iter().xtry_map(|(key, value)| {
+				Self::format_declaration(key, value, format_variables, declared)
+			})?;
+
+		if self.minify {
+			format!("{} {{ {} }}", selector, declarations.join(" "))
+		} else {
+			format!(
+				"{} {{\n{}\n}}",
+				selector,
+				declarations
+					.into_iter()
+					.map(|dec| format!("    {dec}"))
+					.collect::<Vec<_>>()
+					.join("\n")
+			)
 		}
 		.xok()
 	}
 
+	fn format_declaration(
+		key: &CssKey,
+		value: &CssValue,
+		format_variables: FormatVariables,
+		declared: &mut HashMap<CssVariable, CssVariable>,
+	) -> Result<String, CollisionFound> {
+		let mut format_var =
+			|original: &CssVariable| -> Result<CssVariable, CollisionFound> {
+				let formatted = format_variables.format(original);
+				if let Some(prev_original) = declared.get(&formatted) {
+					if prev_original != original {
+						// collision found
+						return Err(CollisionFound {
+							original: original.clone(),
+							formatted,
+						});
+					} else {
+						// already declared with the same original, return formatted
+						return Ok(formatted);
+					}
+				} else {
+					declared.insert(formatted.clone(), original.clone());
+					return Ok(formatted);
+				}
+			};
 
-	fn rules_to_css(&self, rules: &[Selector]) -> String {
-		if rules.is_empty() {
-			return "*".to_string();
-		} else {
-			rules
-				.iter()
-				.map(|rule| self.rule_to_css(rule))
-				.collect::<Vec<_>>()
-				.join(" ")
+		let key = match key {
+			CssKey::Variable(var) => format_var(var)?.as_css_key(),
+			CssKey::Property(prop) => prop.to_string(),
+		};
+		let value = match value {
+			CssValue::Variable(var) => format_var(var)?.as_css_value(),
+			CssValue::Expression(expr) => expr.clone(),
+		};
+
+		format!("{}: {};", key, value).xok()
+	}
+}
+
+
+struct CollisionFound {
+	original: CssVariable,
+	formatted: CssVariable,
+}
+
+
+#[derive(Debug, Default, Copy, Clone)]
+pub enum FormatVariables {
+	#[default]
+	Full,
+	/// Splits the name by dashes, removing the first
+	/// n parts
+	Short {
+		/// The number of parts to remove
+		skip_parts: usize,
+	},
+	Hash {
+		/// Specify the minimum hash length,
+		/// this will be extended in the case of collisions
+		min_len: usize,
+	},
+}
+
+
+impl FormatVariables {
+	/// Widens the formatting rules,
+	/// - Hash: increment min_len
+	/// - Short: decrement skip_parts
+	/// - Full: remains the same
+	fn increment_widening(&self) -> Self {
+		match self {
+			Self::Full => Self::Full,
+			Self::Short { skip_parts } => Self::Short {
+				skip_parts: skip_parts.saturating_sub(1),
+			},
+			Self::Hash { min_len } => Self::Hash {
+				min_len: *min_len + 1,
+			},
 		}
 	}
 
-	fn rule_to_css(&self, rule: &Selector) -> String {
+	fn format(&self, name: &CssVariable) -> CssVariable {
+		match self {
+			Self::Full => name.clone(),
+			Self::Short { skip_parts } => name
+				.0
+				.split('-')
+				.skip(*skip_parts)
+				.collect::<Vec<_>>()
+				.join("-")
+				.xmap(CssVariable),
+			Self::Hash { min_len } => {
+				use std::hash::Hash;
+				use std::hash::Hasher;
+				let mut hasher = FixedHasher::default().build_hasher();
+				name.hash(&mut hasher);
+				let hash = hasher.finish();
+				format!("{:x}", hash)[..(*min_len).min(16)]
+					.to_string()
+					.xmap(CssVariable)
+			}
+		}
+	}
+}
+
+
+#[derive(Default, Get, SetWith)]
+pub struct CssRule {
+	selector: Selector,
+	declarations: HashMap<CssKey, CssValue>,
+}
+
+impl CssRule {
+	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
+		let mut this = Self::default().with_selector(rule.selector().clone());
+
+		for (key, value) in rule.declarations() {
+			let css_rule = Self::resolve(token_map, key, value)?;
+			this.merge_any(css_rule);
+		}
+		this.xok()
+	}
+
+	pub fn merge_any(&mut self, other: CssRule) {
+		self.selector = self.selector.clone().merge_any(other.selector);
+		self.declarations.extend(other.declarations);
+	}
+
+	pub fn resolve(
+		token_map: &CssTokenMap,
+		key: &TokenKey,
+		value: &TokenValue,
+	) -> Result<Self> {
+		token_map.get(key)?.as_css_rule(&value)
+	}
+
+	/// Used in CssToken declarations section.
+	/// The value type will be checked for multiple properties, and
+	/// appended to the key ident if found.
+	pub fn from_key_value<
+		K: TypedTokenKey,
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		value: &TokenValue,
+	) -> Result<Self> {
+		let key = CssVariable::from_token_key(&K::token_key());
+		let values = CssValue::from_token_value::<V>(value)?;
+		let props = V::properties();
+		let declarations = if props.len() <= 1 {
+			// no need for suffix for zero or one props
+			key.xinto::<CssKey>().xvec()
+		} else {
+			if props.len() != values.len() {
+				bevybail!(
+					"Property count mismatch:\nkeys: {props:#?}\nvalues:{values:#?}",
+				);
+			}
+			props
+				.into_iter()
+				.map(|prop| key.with_suffix(prop.to_string()).xinto::<CssKey>())
+				.collect::<Vec<_>>()
+		};
+		Self::default()
+			.with_declarations(declarations.into_iter().zip(values).collect())
+			.xok()
+	}
+	pub fn from_props_value<
+		V: 'static
+			+ Send
+			+ Sync
+			+ FromReflect
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		keys: Vec<CssKey>,
+		value: &TokenValue,
+	) -> Result<Self> {
+		let values = CssValue::from_token_value::<V>(value)?;
+		if keys.len() != values.len() {
+			bevybail!(
+				"Property count mismatch:\nkeys: {keys:#?}\nvalues:{values:#?}",
+			);
+		}
+		Self::default()
+			.with_declarations(keys.into_iter().zip(values).collect())
+			.xok()
+	}
+
+	pub fn selector_to_css(&self) -> String {
+		Self::selector_to_css_inner(&self.selector)
+	}
+
+	fn selector_to_css_inner(rule: &Selector) -> String {
 		match rule {
+			Selector::Any => "*".to_string(),
 			Selector::Root => ":root".to_string(),
+			Selector::AnyOf(rules) => rules
+				.iter()
+				.map(|rule| Self::selector_to_css_inner(rule))
+				.collect::<Vec<_>>()
+				.join(", "),
+			Selector::AllOf(_rules) => {
+				unimplemented!("how to do this properly?")
+			}
 			Selector::Tag(tag) => tag.to_string(),
 			Selector::Class(class) => format!(".{}", class),
 			Selector::State(ElementState::Hovered) => ":hover".to_string(),
@@ -110,81 +344,14 @@ impl CssBuilder<'_, '_, '_> {
 				None => format!("[{}]", key),
 			},
 			Selector::Not(inner) => {
-				format!(":not({})", self.rules_to_css(inner.as_ref()))
+				format!(":not({})", Self::selector_to_css_inner(inner))
 			}
 		}
 	}
-
-	pub fn props_value_to_css<
-		V: 'static
-			+ Send
-			+ Sync
-			+ FromReflect
-			+ Typed
-			+ TypedTokenKey
-			+ AsCssValues,
-	>(
-		&self,
-		keys: Vec<CssKey>,
-		value: &TokenValue,
-	) -> Result<Vec<(CssKey, CssValue)>> {
-		let values = CssValue::from_token_value::<V>(value)?;
-		if keys.len() != values.len() {
-			bevybail!(
-				"Property count mismatch:\nkeys: {keys:#?}\nvalues:{values:#?}",
-			);
-		}
-		keys.into_iter().zip(values).collect::<Vec<_>>().xok()
-	}
-
-
-	/// Used in CssToken declarations section.
-	/// The value type will be checked for multiple properties, and
-	/// appended to the key ident if found.
-	pub fn key_value_to_css<
-		K: TypedTokenKey,
-		V: 'static
-			+ Send
-			+ Sync
-			+ FromReflect
-			+ Typed
-			+ TypedTokenKey
-			+ AsCssValues,
-	>(
-		&self,
-		value: &TokenValue,
-	) -> Result<Vec<(CssKey, CssValue)>> {
-		let key = CssVariable::from_token_key(&K::token_key());
-		let values = CssValue::from_token_value::<V>(value)?;
-		let props = V::properties();
-		if props.len() <= 1 {
-			// no need for suffix for zero or one props
-			key.xinto::<CssKey>().xvec()
-		} else {
-			if props.len() != values.len() {
-				bevybail!(
-					"Property count mismatch:\nkeys: {props:#?}\nvalues:{values:#?}",
-				);
-			}
-			props
-				.into_iter()
-				.map(|prop| key.with_suffix(prop.to_string()).xinto::<CssKey>())
-				.collect::<Vec<_>>()
-		}
-		.into_iter()
-		.zip(values)
-		.collect::<Vec<_>>()
-		.xok()
-	}
-}
-
-struct CssRule {
-	selectors: Vec<Selector>,
-	declarations: HashMap<CssKey, CssValue>,
 }
 
 /// The right hand side of a css declaration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CssKey {
 	/// A variable, ie `--color-primary`
 	Variable(CssVariable),
@@ -275,7 +442,7 @@ impl From<CssVariable> for CssValue {
 
 /// A css variable, the inner string
 /// is stored without the leading `--`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CssVariable(String);
 
 impl CssVariable {
@@ -302,6 +469,14 @@ mod tests {
 	use crate::style::common_props;
 	use crate::style::material::*;
 
+	fn test_builder() -> CssBuilder {
+		CssBuilder {
+			minify: false,
+			max_iterations: 8,
+			format_variables: FormatVariables::Full,
+		}
+	}
+
 	#[test]
 	fn test_color() {
 		let mut world = World::new();
@@ -317,11 +492,11 @@ mod tests {
 			RuleStore::default()
 				.with(rules::hero_heading())
 				.with(
-					Rule::root()
+					Rule::new()
 						.with_token::<colors::OnPrimary, tones::Primary20>(),
 				)
 				.with(
-					Rule::root()
+					Rule::new()
 						.with_value::<tones::Primary20>(Color::srgb(0., 1., 0.))
 						.unwrap(),
 				),
@@ -330,17 +505,10 @@ mod tests {
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
-			.with_state::<(Res<CssTokenMap>, StyleQuery), _>(
-				|entity, state| {
-					CssBuilder {
-						minify: false,
-						css_token_map: &state.0,
-						style_query: &state.1,
-					}
-					.build(entity)
-					.xunwrap()
-				},
-			);
+			.with_state::<StyleQuery, _>(|entity, query| {
+				query.build_css(&test_builder(), entity)
+			})
+			.xunwrap();
 		// println!("{css}");
 		css
 			.xpect_contains(".hero-heading")
@@ -367,12 +535,12 @@ mod tests {
 			RuleStore::default()
 				.with(
 					Rule::new()
-						.with_rule(Selector::class("primary-role"))
+						.with_selector(Selector::class("primary-role"))
 						.with_token::<common_props::ColorRoleProps, colors::PrimaryRole>(
 					),
 				)
 				.with(
-					Rule::root()
+					Rule::new()
 						.with_token::<colors::Primary, tones::Primary80>()
 						.with_token::<colors::OnPrimary, tones::Primary20>()
 						.with_value::<colors::PrimaryRole>(ColorRole {
@@ -394,17 +562,10 @@ mod tests {
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
-			.with_state::<(Res<CssTokenMap>, StyleQuery), _>(
-				|entity, state| {
-					CssBuilder {
-						minify: false,
-						css_token_map: &state.0,
-						style_query: &state.1,
-					}
-					.build(entity)
-					.xunwrap()
-				},
-			);
+			.with_state::<StyleQuery, _>(|entity, query| {
+				query.build_css(&test_builder(), entity)
+			})
+			.xunwrap();
 		// println!("{css}");
 		css
 			.xpect_contains(".primary-role")

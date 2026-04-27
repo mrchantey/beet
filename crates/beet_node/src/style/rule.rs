@@ -1,21 +1,18 @@
+use std::sync::Arc;
+
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 /// A set of default properties applied to elements matching the given criteria.
-#[derive(Debug, Default, Clone, Reflect, Get)]
+#[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
 pub struct Rule {
-	/// All the rules an element must match for styles to be applied.
-	/// Empty matches all elements
-	rules: Vec<Selector>,
+	selector: Selector,
 	declarations: HashMap<TokenKey, TokenValue>,
 }
 
 
 impl Rule {
-	pub fn root() -> Self { Self::new().with_rule(Selector::Root) }
-
-	/// Match elements with the given tag.
 	pub fn new() -> Self { Self::default() }
 
 	pub fn with_token<K: TypedTokenKey, V: TypedToken>(self) -> Self {
@@ -37,23 +34,28 @@ impl Rule {
 		self
 	}
 
-	pub fn with_rule(mut self, rule: Selector) -> Self {
-		self.rules.push(rule);
-		self
-	}
+
 	/// Matches all rules, or `true` if empty
 	pub fn matches(&self, el: &ElementView) -> bool {
-		self.rules.iter().all(|rule| rule.matches(el))
+		self.selector.matches(el)
 	}
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Default, Clone, Reflect)]
 pub enum Selector {
 	/// A global selector, in css this will evaluate to `:root`,
-	/// and will always match true
+	/// and in bevy apps will always pass predicates
+	#[default]
 	Root,
+	/// Selects any element, in css this will evaluate to `*`,
+	/// and in bevy apps will always pass predicates
+	Any,
+	/// Match any of the rules, eg `div, .my-class` (note the comma) in css
+	AnyOf(Vec<Selector>),
+	/// Match all of the rules, eg `div.my-class` (note no comma) in css
+	AllOf(Vec<Selector>),
 	/// Must have this tag, eg `div`
 	Tag(SmolStr),
 	/// Must have this class, eg `.my-class`
@@ -67,7 +69,7 @@ pub enum Selector {
 		value: Option<Value>,
 	},
 	/// Negate a rule, ie must not have tag
-	Not(Vec<Selector>),
+	Not(Arc<Self>),
 }
 
 impl Selector {
@@ -83,11 +85,29 @@ impl Selector {
 			value,
 		}
 	}
-	pub fn not(rules: Vec<Selector>) -> Self { Self::Not(rules) }
+	pub fn not(inner: Selector) -> Self { Self::Not(Arc::new(inner)) }
+
+	/// Merge two rules, as an AnyOf,
+	/// collapsing global selectors like Root and Any
+	pub fn merge_any(self, other: Self) -> Self {
+		match (self, other) {
+			(Self::Root, Self::Root) => Self::Root,
+			// (Self::Root, r) | (r, Self::Root) => r,
+			(Self::Any, _) | (_, Self::Any) => Self::Any,
+			(Self::AnyOf(mut rules), r) | (r, Self::AnyOf(mut rules)) => {
+				rules.push(r);
+				Self::AnyOf(rules)
+			}
+			(r1, r2) => Self::AnyOf(vec![r1, r2]),
+		}
+	}
 
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
 			Selector::Root => true,
+			Selector::Any => true,
+			Selector::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
+			Selector::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
 			Selector::Tag(tag) => el.element.tag() == tag,
 			Selector::Attribute { key, value } => match value {
 				Some(expected) => el
@@ -98,9 +118,7 @@ impl Selector {
 			},
 			Selector::State(state) => el.contains_state(state),
 			Selector::Class(class) => el.contains_class(class),
-			Selector::Not(inner) => {
-				!inner.iter().any(|rule| rule.matches(el))
-			}
+			Selector::Not(inner) => !inner.matches(el),
 		}
 	}
 }

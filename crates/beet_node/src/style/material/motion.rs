@@ -33,7 +33,7 @@ token!(MotionEmphasizedDecelerate,Motion);
 
 /// Returns a [`Rule`] with all MD3 duration default values.
 pub fn default_durations() -> Rule {
-	Rule::root()
+	Rule::new()
 		.with_value::<Short1>(Duration::from_millis(50)).unwrap()
 		.with_value::<Short2>(Duration::from_millis(100)).unwrap()
 		.with_value::<Short3>(Duration::from_millis(150)).unwrap()
@@ -57,7 +57,7 @@ pub fn default_durations() -> Rule {
 /// Each [`Motion`] references a duration token via [`FieldRef`] rather than
 /// embedding the duration directly.
 pub fn default_motions() -> Rule {
-	Rule::root()
+	Rule::new()
 		.with_value::<MotionStandard>(Motion {
 			ease:     EaseFunction::CubicInOut,
 			duration: Medium2::token(),
