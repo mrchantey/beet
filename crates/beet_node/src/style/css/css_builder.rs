@@ -186,6 +186,12 @@ pub enum FormatVariables {
 
 
 impl FormatVariables {
+	/// Formats variables shortening the full name by five parts:
+	/// - `--io-crates-beet-node-style-material-colors-primary`
+	/// becomes
+	/// - `--material-colors-primary`
+	pub fn short() -> Self { Self::Short { skip_parts: 5 } }
+
 	/// Widens the formatting rules,
 	/// - Hash: increment min_len
 	/// - Short: decrement skip_parts

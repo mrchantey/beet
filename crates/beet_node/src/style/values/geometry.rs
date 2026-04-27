@@ -19,17 +19,17 @@ pub enum Length {
 	Px(f32),
 	Rem(f32),
 	Percent(f32),
+	// percentage of viewport min
+	ViewportMin(f32),
+	// percentage of viewport max
+	ViewportMax(f32),
 }
 
 impl Default for Length {
 	fn default() -> Self { Self::Px(0.0) }
 }
 
-impl Length {
-	pub fn px(value: f32) -> Self { Self::Px(value) }
-	pub fn rem(value: f32) -> Self { Self::Rem(value) }
-	pub fn percent(value: f32) -> Self { Self::Percent(value) }
-}
+impl Length {}
 
 impl std::fmt::Display for Length {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,6 +37,8 @@ impl std::fmt::Display for Length {
 			Self::Px(value) => write!(f, "{}px", value),
 			Self::Rem(value) => write!(f, "{}rem", value),
 			Self::Percent(value) => write!(f, "{}%", value),
+			Self::ViewportMin(value) => write!(f, "{}vmin", value),
+			Self::ViewportMax(value) => write!(f, "{}vmax", value),
 		}
 	}
 }

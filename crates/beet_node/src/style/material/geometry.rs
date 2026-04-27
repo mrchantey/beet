@@ -126,7 +126,7 @@ pub fn default_shapes() -> Rule {
 		.with_value::<ShapeCornerMedium>(Length::Px(12.0)).unwrap()
 		.with_value::<ShapeCornerLarge>(Length::Px(16.0)).unwrap()
 		.with_value::<ShapeCornerExtraLarge>(Length::Px(28.0)).unwrap()
-		.with_value::<ShapeCornerFull>(Length::Percent(100.0)).unwrap()
+		.with_value::<ShapeCornerFull>(Length::ViewportMax(100.0)).unwrap()
 		// composite shape sys tokens
 		.with_value::<ShapeNone>(Shape       { corner: ShapeCornerNone::token(),       edge: ShapeEdge::None }).unwrap()
 		.with_value::<ShapeExtraSmall>(Shape { corner: ShapeCornerExtraSmall::token(), edge: ShapeEdge::None }).unwrap()

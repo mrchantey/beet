@@ -1,25 +1,18 @@
-//! # Basic Server
+//! # Material Design Style Example
 //!
-//! This example demonstrates creating a basic server in Beet
-//! using [`Action::new_pure`], the simplest synchronous exchange pattern.
-//! For concurrent request handling see [`spawn_exchange`].
-//!
+//! This example demonstrates the Material Design 3 styling system in Beet,
+//! including buttons, cards, typography, and layout components.
 //!
 //! ## Running the Example
 //!
 //! ```sh
-//! cargo run --example server --features http_server
-//! # or with CliServer
-//! cargo run --example server --features http_server -- --name=billy
+//! cargo run --example style --features http_server
 //! ```
 //!
-//! Then test it with:
-//! ```sh
-//! curl http://localhost:8337
-//! curl http://localhost:8337?name=billy
+//! Then open your browser to:
 //! ```
-//!
-//! Try refreshing multiple times to see the visitor count increment!
+//! http://localhost:8337
+//! ```
 //!
 use beet::prelude::style::*;
 use beet::prelude::*;
@@ -30,7 +23,7 @@ fn main() {
 			MinimalPlugins,
 			LogPlugin::default(),
 			ServerPlugin::default(),
-			material::MaterialStylePlugin::new(palettes::basic::RED),
+			material::MaterialStylePlugin::new(palettes::basic::YELLOW),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
 			commands.spawn((
@@ -41,22 +34,26 @@ fn main() {
 		.run();
 }
 
-/// Handler function that processes all incoming requests.
+/// Handler function that generates a Material Design 3 styled page.
 fn handler(
 	cx: In<ActionContext<Request>>,
 	query: StyleQuery,
 ) -> Result<Response> {
 	let css = query.build_css(
-		&CssBuilder::default().with_format_variables(FormatVariables::Full),
+		&CssBuilder::default()
+			// .with_format_variables(FormatVariables::Full),
+			// .with_format_variables(FormatVariables::Hash { min_len: 1 }),
+			.with_format_variables(FormatVariables::short()),
 		cx.id(),
 	)?;
 
 	let html = format!(
-		r#"
-<!DOCTYPE html>
+		r#"<!DOCTYPE html>
 <html>
 <head>
-	<title>Beet Style Example</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Beet Style</title>
 	<link
 		rel="stylesheet"
 		href="https://unpkg.com/tailwindcss@4/preflight.css"
@@ -64,10 +61,16 @@ fn handler(
 	<style>{css}</style>
 </head>
 <body>
-<header>Hello World</header>
+	<header>Hello World!</header>
 </body>
-"#
+</html>"#
 	);
+
+	fs_ext::write(
+		AbsPathBuf::new_workspace_rel("target/examples/style/index.html")
+			.unwrap(),
+		&html,
+	)?;
 
 	Response::ok_body(html, MimeType::Html).xok()
 }

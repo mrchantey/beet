@@ -14,7 +14,9 @@ impl AsCssValue for Motion {
 	fn as_css_value(&self) -> Result<CssValue> {
 		format!(
 			"{} {}",
-			CssIdent::from_token_key(self.duration.key()).as_css_value(),
+			// TODO shorthand wont work, cannot transform this CssVariable
+			// split out into duration and ease
+			CssVariable::from_token_key(self.duration.key()).as_css_value(),
 			self.ease.as_css_value()?
 		)
 		.xmap(CssValue::expression)
