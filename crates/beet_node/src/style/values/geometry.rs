@@ -1,10 +1,8 @@
 use crate::style::*;
 use beet_core::prelude::*;
 
-impl AsCssValues for f32 {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
-		self.to_string().xvec().xok()
-	}
+impl AsCssValue for f32 {
+	fn as_css_value(&self) -> Result<String> { self.to_string().xok() }
 }
 
 
@@ -35,10 +33,8 @@ impl std::fmt::Display for Length {
 	}
 }
 
-impl AsCssValues for Length {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
-		self.to_string().xvec().xok()
-	}
+impl AsCssValue for Length {
+	fn as_css_value(&self) -> Result<String> { self.to_string().xok() }
 }
 
 
@@ -63,22 +59,22 @@ impl Default for Elevation {
 	}
 }
 
-impl AsCssValues for Elevation {
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
-		// consider not doing shorthand
+// consider not doing shorthand
+// and implementing as_css_values instead
+impl AsCssValue for Elevation {
+	fn as_css_value(&self) -> Result<String> {
 		[
-			self.offset_x.as_css_values(builder)?,
-			self.offset_y.as_css_values(builder)?,
-			self.blur_radius.as_css_values(builder)?,
-			self.spread_radius.as_css_values(builder)?,
-			self.color.as_css_values(builder)?,
+			self.offset_x.as_css_values()?,
+			self.offset_y.as_css_values()?,
+			self.blur_radius.as_css_values()?,
+			self.spread_radius.as_css_values()?,
+			self.color.as_css_values()?,
 		]
 		.into_iter()
 		.flatten()
 		.collect::<Vec<_>>()
 		.join(" ")
 		.to_string()
-		.xvec()
 		.xok()
 	}
 }
@@ -91,10 +87,8 @@ pub struct Shape {
 	pub edge: ShapeEdge,
 }
 
-impl AsCssValues for Shape {
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
-		self.corner.as_css_values(builder)
-	}
+impl AsCssValue for Shape {
+	fn as_css_value(&self) -> Result<String> { self.corner.as_css_value() }
 }
 
 /// Which edge(s) a shape corner radius applies to.

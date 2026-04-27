@@ -1,4 +1,3 @@
-use crate::style::*;
 use crate::token::TokenKey;
 use beet_core::prelude::*;
 
@@ -6,7 +5,25 @@ use beet_core::prelude::*;
 pub trait AsCssValues {
 	/// If the type uses multiple properties declare them here.
 	fn properties() -> Vec<SmolStr> { default() }
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>>;
+	fn as_css_values(&self) -> Result<Vec<String>>;
+}
+
+pub trait AsCssValue {
+	fn property() -> Option<SmolStr> { None }
+	fn as_css_value(&self) -> Result<String>;
+}
+
+impl<T: AsCssValue> AsCssValues for T {
+	fn properties() -> Vec<SmolStr> {
+		if let Some(prop) = T::property() {
+			vec![prop]
+		} else {
+			default()
+		}
+	}
+	fn as_css_values(&self) -> Result<Vec<String>> {
+		self.as_css_value().map(|val| val.xvec())
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -66,8 +83,8 @@ impl std::fmt::Display for CssIdent {
 }
 
 
-impl AsCssValues for Color {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
+impl AsCssValue for Color {
+	fn as_css_value(&self) -> Result<String> {
 		let this = self.to_srgba();
 		let alpha = this.alpha;
 		// still undecided about this..
@@ -88,7 +105,6 @@ impl AsCssValues for Color {
 				alpha
 			)
 		}
-		.xvec()
 		.xok()
 	}
 }

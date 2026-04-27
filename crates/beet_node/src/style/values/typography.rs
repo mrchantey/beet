@@ -17,8 +17,8 @@ impl Typeface {
 	pub fn iter(&self) -> impl Iterator<Item = &SmolStr> { self.0.iter() }
 }
 
-impl AsCssValues for Typeface {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
+impl AsCssValue for Typeface {
+	fn as_css_value(&self) -> Result<String> {
 		// system font keywords must not be quoted
 		const SYSTEM_FONT_KEYWORDS: LazyLock<HashSet<&'static str>> =
 			LazyLock::new(|| {
@@ -62,7 +62,7 @@ impl AsCssValues for Typeface {
 				out.push(format!("\"{}\"", family));
 			}
 		}
-		out.join(", ").xvec().xok()
+		out.join(", ").xok()
 	}
 }
 
@@ -74,14 +74,13 @@ pub enum FontWeight {
 	Absolute(u16),
 }
 
-impl AsCssValues for FontWeight {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
+impl AsCssValue for FontWeight {
+	fn as_css_value(&self) -> Result<String> {
 		match self {
 			Self::Normal => "normal".into(),
 			Self::Bold => "bold".into(),
 			Self::Absolute(val) => val.to_string(),
 		}
-		.xvec()
 		.xok()
 	}
 }
@@ -99,18 +98,18 @@ pub struct Typography {
 }
 
 
-impl AsCssValues for Typography {
+impl AsCssValue for Typography {
 	/// Returns CSS font properties as a space-separated shorthand:
 	/// `"{weight} {size}/{line_height} {family}"`, omitting optional parts when absent.
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
+	fn as_css_value(&self) -> Result<String> {
 		let size = if let Some(lh) = &self.line_height {
 			format!(
 				"{}/{}",
-				self.size.as_css_values(builder)?[0],
-				lh.as_css_values(builder)?[0]
+				self.size.as_css_values()?[0],
+				lh.as_css_values()?[0]
 			)
 		} else {
-			self.size.as_css_values(builder)?[0].clone()
+			self.size.as_css_values()?[0].clone()
 		};
 		let mut parts = vec![
 			CssIdent::from_token_key(self.weight.key()).as_css_value(),
@@ -121,11 +120,8 @@ impl AsCssValues for Typography {
 			CssIdent::from_token_key(self.typeface.key()).as_css_value(),
 		];
 		if let Some(ls) = &self.letter_spacing {
-			parts.push(format!(
-				"letter-spacing:{}",
-				ls.as_css_values(builder)?[0]
-			));
+			parts.push(format!("letter-spacing:{}", ls.as_css_values()?[0]));
 		}
-		parts.join(" ").xvec().xok()
+		parts.join(" ").xok()
 	}
 }

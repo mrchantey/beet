@@ -10,27 +10,26 @@ pub struct Motion {
 	pub ease: EaseFunction,
 }
 
-impl AsCssValues for Motion {
-	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
+impl AsCssValue for Motion {
+	fn as_css_value(&self) -> Result<String> {
 		format!(
 			"{} {}",
 			CssIdent::from_token_key(self.duration.key()).as_css_value(),
-			self.ease.as_css_values(builder)?[0]
+			self.ease.as_css_value()?
 		)
-		.xvec()
 		.xok()
 	}
 }
 
-impl AsCssValues for Duration {
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
-		format!("{}ms", self.as_millis()).xvec().xok()
+impl AsCssValue for Duration {
+	fn as_css_value(&self) -> Result<String> {
+		format!("{}ms", self.as_millis()).xok()
 	}
 }
 
-impl AsCssValues for EaseFunction {
+impl AsCssValue for EaseFunction {
 	#[rustfmt::skip]
-	fn as_css_values(&self, _builder: &CssBuilder) -> Result<Vec<String>> {
+	fn as_css_value(&self) -> Result<String> {
 		match self {
 			// --- Standard Cubic Beziers ---
 			EaseFunction::Linear => 				"linear".to_string(),
@@ -63,6 +62,6 @@ impl AsCssValues for EaseFunction {
 			EaseFunction::ElasticIn => 					"linear(0, -0.01, 0.02, -0.05, 0.13, -0.32, 1)".to_string(),
 			// Fallback for types not explicitly mapped
 			_ => 																"ease-in-out".to_string(),
-		}.xvec().xok()
+		}.xok()
 	}
 }

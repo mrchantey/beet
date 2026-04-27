@@ -196,7 +196,7 @@ impl CssBuilder<'_, '_, '_> {
 		value.schema().assert_eq::<V>()?;
 		match value {
 			TokenValue::Value(value) => {
-				value.value().into_reflect::<V>()?.as_css_values(&self)
+				value.value().into_reflect::<V>()?.as_css_values()
 			}
 			TokenValue::Token(token) => self.token_to_css_value::<V>(token),
 		}
