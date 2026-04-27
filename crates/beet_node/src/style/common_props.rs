@@ -28,7 +28,6 @@ pub fn token_map()->CssTokenMap{
 css_property!(ForegroundColor, Color, DocumentPath::Ancestor, "color");
 css_property!(BackgroundColor, Color, DocumentPath::This, "background-color");
 
-css_property!(ColorRoleProps, ColorRole, DocumentPath::Ancestor, "background-color", "color");
 
 css_property!(Font, Typography, DocumentPath::This, "font-family");
 

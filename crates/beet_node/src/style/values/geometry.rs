@@ -68,9 +68,8 @@ impl Default for Elevation {
 	}
 }
 
-// consider not doing shorthand
-// and implementing as_css_values instead
 impl AsCssValue for Elevation {
+	// box shadow shorthand
 	fn as_css_value(&self) -> Result<CssValue> {
 		[
 			self.offset_x.as_css_value()?.to_string(),

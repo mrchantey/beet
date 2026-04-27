@@ -541,7 +541,7 @@ mod tests {
 				.insert(tones::Primary80)
 				.insert(tones::Primary20)
 				.insert(colors::PrimaryRole)
-				.insert(common_props::ColorRoleProps),
+				.insert(ColorRoleProps),
 		);
 
 		world.insert_resource(
@@ -549,8 +549,7 @@ mod tests {
 				.with(
 					Rule::new()
 						.with_selector(Selector::class("primary-role"))
-						.with_token::<common_props::ColorRoleProps, colors::PrimaryRole>(
-					),
+						.with_token::<ColorRoleProps, colors::PrimaryRole>(),
 				)
 				.with(
 					Rule::new()

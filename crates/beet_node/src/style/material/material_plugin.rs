@@ -72,7 +72,7 @@ mod tests {
 	#[test]
 	fn validate_rules() {
 		let mut world = MaterialStylePlugin::world();
-		let css = world
+		let _css = world
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
@@ -80,6 +80,6 @@ mod tests {
 				query.build_css(&default(), entity)
 			})
 			.xunwrap();
-		println!("Generated CSS: \n{css}");
+		// println!("Generated CSS: \n{css}");
 	}
 }
