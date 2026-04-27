@@ -23,10 +23,10 @@ pub impl Color {
 pub const LIGHT_SCHEME_CLASS: &str = "light-scheme";
 pub const DARK_SCHEME_CLASS: &str = "dark-scheme";
 
-/// Returns a [`Selector`] mapping semantic color tokens to their light-scheme tones.
-pub fn light_scheme() -> Selector {
-	Selector::new()
-		.with_rule(Rule::class(LIGHT_SCHEME_CLASS))
+/// Returns a [`Rule`] mapping semantic color tokens to their light-scheme tones.
+pub fn light_scheme() -> Rule {
+	Rule::new()
+		.with_rule(Selector::class(LIGHT_SCHEME_CLASS))
 		.with_token::<colors::Primary,                  tones::Primary40>()
 		.with_token::<colors::OnPrimary,                tones::Primary100>()
 		.with_token::<colors::PrimaryContainer,         tones::Primary90>()
@@ -58,10 +58,10 @@ pub fn light_scheme() -> Selector {
 		.with_token::<colors::InverseOnSurface,         tones::Neutral95>()
 }
 
-/// Returns a [`Selector`] mapping semantic color tokens to their dark-scheme tones.
-pub fn dark_scheme() -> Selector {
-	Selector::new()
-		.with_rule(Rule::class(DARK_SCHEME_CLASS))
+/// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
+pub fn dark_scheme() -> Rule {
+	Rule::new()
+		.with_rule(Selector::class(DARK_SCHEME_CLASS))
 		.with_token::<colors::Primary,                  tones::Primary80>()
 		.with_token::<colors::OnPrimary,                tones::Primary20>()
 		.with_token::<colors::PrimaryContainer,         tones::Primary30>()
@@ -93,13 +93,13 @@ pub fn dark_scheme() -> Selector {
 		.with_token::<colors::InverseOnSurface,         tones::Neutral20>()
 }
 
-/// Returns a [`Selector`] with concrete [`Color`] values for every palette tone,
+/// Returns a [`Rule`] with concrete [`Color`] values for every palette tone,
 /// generated from a seed color.
-pub fn from_color(color: impl Into<Color>) -> Selector {
+pub fn from_color(color: impl Into<Color>) -> Rule {
 	let theme = ThemeBuilder::with_source(color.into().to_argb()).build();
 	let Palettes { primary, secondary, tertiary, neutral, neutral_variant: nv, error } = theme.palettes;
 
-	Selector::root()
+	Rule::root()
 		// ── Primary tones ─────────────────────────────────────────────────────
 		.with_value::<tones::Primary0>(Color::from_argb(primary.tone(0))).unwrap()
 		.with_value::<tones::Primary10>(Color::from_argb(primary.tone(10))).unwrap()
@@ -186,9 +186,9 @@ pub fn from_color(color: impl Into<Color>) -> Selector {
 		.with_value::<tones::Error100>(Color::from_argb(error.tone(100))).unwrap()
 }
 
-/// Returns a [`Selector`] with default opacity scalar values.
-pub fn default_opacities() -> Selector {
-	Selector::root()
+/// Returns a [`Rule`] with default opacity scalar values.
+pub fn default_opacities() -> Rule {
+	Rule::root()
 		.with_value::<colors::OpacityHovered>(0.08_f32).unwrap()
 		.with_value::<colors::OpacityFocused>(0.12_f32).unwrap()
 		.with_value::<colors::OpacityPressed>(0.12_f32).unwrap()

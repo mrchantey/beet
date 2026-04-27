@@ -3,17 +3,17 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 /// A set of default properties applied to elements matching the given criteria.
-#[derive(Default, Reflect, Get)]
-pub struct Selector {
+#[derive(Debug, Default, Clone, Reflect, Get)]
+pub struct Rule {
 	/// All the rules an element must match for styles to be applied.
 	/// Empty matches all elements
-	rules: Vec<Rule>,
-	tokens: HashMap<TokenKey, TokenValue>,
+	rules: Vec<Selector>,
+	declarations: HashMap<TokenKey, TokenValue>,
 }
 
 
-impl Selector {
-	pub fn root() -> Self { Self::new().with_rule(Rule::Root) }
+impl Rule {
+	pub fn root() -> Self { Self::new().with_rule(Selector::Root) }
 
 	/// Match elements with the given tag.
 	pub fn new() -> Self { Self::default() }
@@ -25,8 +25,7 @@ impl Selector {
 		self,
 		value: impl Typed,
 	) -> Result<Self> {
-		self.with(K::token_key(), TypedValue::new(value)?)
-			.xok()
+		self.with(K::token_key(), TypedValue::new(value)?).xok()
 	}
 	/// Add a property mapped to a token.
 	pub fn with(
@@ -34,11 +33,11 @@ impl Selector {
 		token: TokenKey,
 		value: impl Into<TokenValue>,
 	) -> Self {
-		self.tokens.insert(token, value.into());
+		self.declarations.insert(token, value.into());
 		self
 	}
 
-	pub fn with_rule(mut self, rule: Rule) -> Self {
+	pub fn with_rule(mut self, rule: Selector) -> Self {
 		self.rules.push(rule);
 		self
 	}
@@ -50,8 +49,8 @@ impl Selector {
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
-#[derive(Reflect)]
-pub enum Rule {
+#[derive(Debug, Clone, Reflect)]
+pub enum Selector {
 	/// A global selector, in css this will evaluate to `:root`,
 	/// and will always match true
 	Root,
@@ -68,10 +67,10 @@ pub enum Rule {
 		value: Option<Value>,
 	},
 	/// Negate a rule, ie must not have tag
-	Not(Vec<Rule>),
+	Not(Vec<Selector>),
 }
 
-impl Rule {
+impl Selector {
 	pub fn class(class: impl Into<SmolStr>) -> Self {
 		Self::Class(class.into())
 	}
@@ -84,22 +83,24 @@ impl Rule {
 			value,
 		}
 	}
-	pub fn not(rules: Vec<Rule>) -> Self { Self::Not(rules) }
+	pub fn not(rules: Vec<Selector>) -> Self { Self::Not(rules) }
 
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
-			Rule::Root => true,
-			Rule::Tag(tag) => el.element.tag() == tag,
-			Rule::Attribute { key, value } => match value {
+			Selector::Root => true,
+			Selector::Tag(tag) => el.element.tag() == tag,
+			Selector::Attribute { key, value } => match value {
 				Some(expected) => el
 					.attribute(key)
 					.map(|attr| attr.value == expected)
 					.unwrap_or(false),
 				None => el.attribute(key).is_some(),
 			},
-			Rule::State(state) => el.contains_state(state),
-			Rule::Class(class) => el.contains_class(class),
-			Rule::Not(inner) => !inner.iter().any(|rule| rule.matches(el)),
+			Selector::State(state) => el.contains_state(state),
+			Selector::Class(class) => el.contains_class(class),
+			Selector::Not(inner) => {
+				!inner.iter().any(|rule| rule.matches(el))
+			}
 		}
 	}
 }

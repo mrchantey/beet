@@ -24,23 +24,23 @@ pub struct CssBuilder<'a, 'w, 's> {
 
 impl CssBuilder<'_, '_, '_> {
 	pub fn build(&self, entity: Entity) -> Result<String> {
-		let selectors = self
+		let rules = self
 			.style_query
-			.collect_selectors(entity)
+			.collect_rules(entity)
 			.into_iter()
-			.xtry_map(|selector| self.build_selector(selector))?;
+			.xtry_map(|rule| self.build_rule(rule))?;
 
 		match self.minify {
-			true => Ok(selectors.join(" ")),
-			false => Ok(selectors.join("\n\n")),
+			true => Ok(rules.join(" ")),
+			false => Ok(rules.join("\n\n")),
 		}
 	}
 
-	fn build_selector(&self, selector: &Selector) -> Result<String> {
-		let rules = self.rules_to_css(&selector.rules());
+	fn build_rule(&self, rule: &Rule) -> Result<String> {
+		let rules = self.rules_to_css(&rule.rules());
 
-		let properties = selector
-			.tokens()
+		let properties = rule
+			.declarations()
 			.iter()
 			.xtry_map(|(key, value)| -> Result<_> {
 				self.css_token_map.resolve(self, key, value)
@@ -74,7 +74,7 @@ impl CssBuilder<'_, '_, '_> {
 	}
 
 
-	fn rules_to_css(&self, rules: &[Rule]) -> String {
+	fn rules_to_css(&self, rules: &[Selector]) -> String {
 		if rules.is_empty() {
 			return "*".to_string();
 		} else {
@@ -86,30 +86,32 @@ impl CssBuilder<'_, '_, '_> {
 		}
 	}
 
-	fn rule_to_css(&self, rule: &Rule) -> String {
+	fn rule_to_css(&self, rule: &Selector) -> String {
 		match rule {
-			Rule::Root => ":root".to_string(),
-			Rule::Tag(tag) => tag.to_string(),
-			Rule::Class(class) => format!(".{}", class),
-			Rule::State(ElementState::Hovered) => ":hover".to_string(),
-			Rule::State(ElementState::Focused) => ":focus".to_string(),
-			Rule::State(ElementState::Pressed) => ":active".to_string(),
-			Rule::State(ElementState::Selected) => {
+			Selector::Root => ":root".to_string(),
+			Selector::Tag(tag) => tag.to_string(),
+			Selector::Class(class) => format!(".{}", class),
+			Selector::State(ElementState::Hovered) => ":hover".to_string(),
+			Selector::State(ElementState::Focused) => ":focus".to_string(),
+			Selector::State(ElementState::Pressed) => ":active".to_string(),
+			Selector::State(ElementState::Selected) => {
 				"[aria-selected=\"true\"]".to_string()
 			}
-			Rule::State(ElementState::Dragged) => {
+			Selector::State(ElementState::Dragged) => {
 				"[data-dragging=\"true\"]".to_string()
 			}
-			Rule::State(ElementState::Disabled) => ":disabled".to_string(),
-			Rule::State(ElementState::Custom(val)) => {
+			Selector::State(ElementState::Disabled) => {
+				":disabled".to_string()
+			}
+			Selector::State(ElementState::Custom(val)) => {
 				// TODO needs design work
 				format!("[data-state-{}]", val)
 			}
-			Rule::Attribute { key, value } => match value {
+			Selector::Attribute { key, value } => match value {
 				Some(value) => format!("[{}=\"{}\"]", key, value),
 				None => format!("[{}]", key),
 			},
-			Rule::Not(inner) => {
+			Selector::Not(inner) => {
 				format!(":not({})", self.rules_to_css(inner.as_ref()))
 			}
 		}
@@ -127,7 +129,7 @@ impl CssBuilder<'_, '_, '_> {
 		CssIdent::variable(path).xok()
 	}
 
-	pub fn props_and_value_to_css<
+	pub fn props_value_to_css<
 		V: 'static
 			+ Send
 			+ Sync
@@ -174,9 +176,14 @@ impl CssBuilder<'_, '_, '_> {
 		let values = self.token_value_to_css::<V>(value)?;
 		let props = V::properties();
 		if props.len() <= 1 {
-			// no need for suffix for no declared props
+			// no need for suffix for zero or one props
 			ident.as_css_key().xvec()
 		} else {
+			if props.len() != values.len() {
+				bevybail!(
+					"Property count mismatch:\nkeys: {props:#?}\nvalues:{values:#?}",
+				);
+			}
 			props
 				.into_iter()
 				.map(|prop| ident.clone().with_suffix(prop).as_css_key())
@@ -231,14 +238,28 @@ impl CssBuilder<'_, '_, '_> {
 	}
 }
 
-
 // pub struct CssAssignment{
 // 	target: CssIdent,
+// }
+
+// pub struct DeclarationBlock{
+
+// }
+
+// pub enum Expr{
+// 	Ident(CssIdent),
+// 	Value(String),
+// }
+
+// pub struct Rule{
+// 	selectors:Vec<()>,
+// 	declarations: HashMap
 // }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::style::common_props;
 	use crate::style::material::*;
 
 	#[test]
@@ -253,14 +274,14 @@ mod tests {
 		);
 
 		world.insert_resource(
-			SelectorStore::default()
-				.with(selectors::hero_heading())
+			RuleStore::default()
+				.with(rules::hero_heading())
 				.with(
-					Selector::root()
+					Rule::root()
 						.with_token::<colors::OnPrimary, tones::Primary20>(),
 				)
 				.with(
-					Selector::root()
+					Rule::root()
 						.with_value::<tones::Primary20>(Color::srgb(0., 1., 0.))
 						.unwrap(),
 				),
@@ -280,7 +301,14 @@ mod tests {
 					.xunwrap()
 				},
 			);
-		println!("{css}");
+		// println!("{css}");
+		css
+			.xpect_contains(".hero-heading")
+			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-on-primary)")
+			.xpect_contains(":root")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)")
+			.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 255, 0)");
+
 	}
 	#[test]
 	fn test_color_role() {
@@ -293,19 +321,19 @@ mod tests {
 				.insert(tones::Primary80)
 				.insert(tones::Primary20)
 				.insert(colors::PrimaryRole)
-				.insert(ColorRoleProps)
-				.insert(common_props::ForegroundColor),
+				.insert(common_props::ColorRoleProps),
 		);
 
 		world.insert_resource(
-			SelectorStore::default()
+			RuleStore::default()
 				.with(
-					Selector::new()
-						.with_rule(Rule::class("primary-role"))
-						.with_token::<style::ColorRoleProps, colors::PrimaryRole>(),
+					Rule::new()
+						.with_rule(Selector::class("primary-role"))
+						.with_token::<common_props::ColorRoleProps, colors::PrimaryRole>(
+					),
 				)
 				.with(
-					Selector::root()
+					Rule::root()
 						.with_token::<colors::Primary, tones::Primary80>()
 						.with_token::<colors::OnPrimary, tones::Primary20>()
 						.with_value::<colors::PrimaryRole>(ColorRole {
@@ -338,6 +366,17 @@ mod tests {
 					.xunwrap()
 				},
 			);
-		println!("{css}");
+		// println!("{css}");
+		css
+			.xpect_contains(".primary-role")
+			.xpect_contains("background-color: var(--io-crates-beet-node-style-material-colors-primary-role-background-color)")
+			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-primary-role-color)")
+			.xpect_contains(":root")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-primary: var(--io-crates-beet-node-style-material-tones-primary80)")
+			.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 51, 0)")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-background-color: var(--io-crates-beet-node-style-material-colors-primary)")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-color: var(--io-crates-beet-node-style-material-colors-on-primary)")
+			.xpect_contains("--io-crates-beet-node-style-material-tones-primary80: rgb(0, 204, 0)")
+			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)");
 	}
 }

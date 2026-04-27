@@ -179,7 +179,7 @@ mod tests {
 
 		Foo::key()
 			.to_string()
-			.xpect_eq("io.crates/beet_node/document/token/tests/Foo");
+			.xpect_eq("io.crates/beet_node/token/token/tests/Foo");
 	}
 
 	token!(

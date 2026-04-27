@@ -2,61 +2,48 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-/// An ordered collection of [`Selector`]s applied from first to last.
+/// An ordered collection of [`Rule`]s applied from first to last.
 ///
-/// Later selectors override earlier ones for the same token path.
+/// Later ruless override earlier ones for the same token path.
 /// Can be used as a global [`Resource`] or per-entity [`Component`].
 #[derive(Default, Deref, DerefMut, Resource, Component)]
-pub struct SelectorStore(Vec<Selector>);
+pub struct RuleStore(Vec<Rule>);
 
-impl SelectorStore {
-	/// Add a selector to this store.
-	pub fn with(mut self, selector: Selector) -> Self {
-		self.0.push(selector);
+impl RuleStore {
+	/// Add a rule to this store.
+	pub fn with(mut self, rule: Rule) -> Self {
+		self.0.push(rule);
 		self
 	}
 }
 
-/// Resolves token values for elements using [`Selector`]s.
-///
-/// Applies selectors from a global [`SelectorStore`] resource and
-/// per-entity [`SelectorStore`] components. Entity-local selectors
-/// override global ones for the same token path.
-///
-/// Token inheritance across the entity hierarchy is handled by
-/// [`DocumentPath`] on each token definition — this query only
-/// collects values for the given entity.
-///
-/// # Future work
-/// Ancestor [`SelectorStore`] traversal (CSS cascade) is not yet
-/// implemented; add the entity's own selectors or use the global store.
 #[derive(SystemParam, Get)]
 pub struct StyleQuery<'w, 's> {
-	entity_selectors: Query<'w, 's, (Entity, &'static SelectorStore)>,
-	global_selectors: Option<Res<'w, SelectorStore>>,
+	entity_rules: Query<'w, 's, (Entity, &'static RuleStore)>,
+	global_rules: Option<Res<'w, RuleStore>>,
 	elements: ElementQuery<'w, 's>,
 }
 
 impl StyleQuery<'_, '_> {
-	/// Collect selectors in order:
-	/// 1. Global [`SelectorStore`] resource (lowest priority)
-	/// 2. Entity-local [`SelectorStore`] component (highest priority)
-	pub fn collect_selectors(&self, entity: Entity) -> Vec<&Selector> {
-		let mut selectors = Vec::new();
-		if let Some(global) = &self.global_selectors {
-			selectors.extend(global.iter());
+	/// Collect ruless in order:
+	/// 1. Global [`RuleStore`] resource (lowest priority)
+	/// 2. Entity-local [`RuleStore`] component (highest priority)
+	pub fn collect_rules(&self, entity: Entity) -> Vec<&Rule> {
+		let mut rules = Vec::new();
+		if let Some(global) = &self.global_rules {
+			rules.extend(global.iter());
 		}
-		if let Ok((_, store)) = self.entity_selectors.get(entity) {
-			selectors.extend(store.iter());
+		if let Ok((_, store)) = self.entity_rules.get(entity) {
+			rules.extend(store.iter());
 		}
-		selectors
+		rules
 	}
 
-	/// Collect all token values for `entity` by applying matching selectors.
+	/// Collect all token values for `entity` by applying matching rules.
 	///
-	/// Applies selectors in order:
-	/// 1. Global [`SelectorStore`] resource (lowest priority)
-	/// 2. Entity-local [`SelectorStore`] component (highest priority)
+	/// Applies rules in order:
+	/// 1. Global [`RuleStore`] resource (lowest priority)
+	/// 2. Entity-local [`RuleStore`] component (highest priority)
 	///
 	/// Returns a map of token [`FieldPath`] → [`ValueOrRef`].
 	pub fn collect_tokens(
@@ -69,11 +56,10 @@ impl StyleQuery<'_, '_> {
 			return map;
 		};
 
-		for selector in self.collect_selectors(entity) {
-			if selector.matches(&el) {
+		for rule in self.collect_rules(entity) {
+			if rule.matches(&el) {
 				map.extend(
-					selector
-						.tokens()
+					rule.declarations()
 						.iter()
 						.map(|(k, v)| (k.clone(), v.clone())),
 				);
@@ -83,18 +69,14 @@ impl StyleQuery<'_, '_> {
 	}
 
 	/// Recursively resolves token path to a value
-	pub fn get_token(
-		&self,
-		entity: Entity,
-		key: &TokenKey,
-	) -> Result<&Value> {
+	pub fn get_token(&self, entity: Entity, key: &TokenKey) -> Result<&Value> {
 		let Ok(el) = self.elements.get(entity) else {
 			bevybail!("Entity {} does not have an Element component", entity);
 		};
 
-		for selector in self.collect_selectors(entity) {
-			if selector.matches(&el)
-				&& let Some(val) = selector.tokens().get(key)
+		for rule in self.collect_rules(entity) {
+			if rule.matches(&el)
+				&& let Some(val) = rule.declarations().get(key)
 			{
 				match val {
 					TokenValue::Value(value) => return Ok(value.value()),
@@ -115,13 +97,13 @@ mod tests {
 
 
 	#[test]
-	fn selector_store_applies_in_order() {
-		// Later selectors override earlier ones for the same token path.
+	fn rule_store_applies_in_order() {
+		// Later rules override earlier ones for the same token path.
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
-		let store = SelectorStore::default()
-			.with(Selector::root().with_value::<colors::Primary>(red).unwrap())
-			.with(Selector::root().with_value::<colors::Primary>(blue).unwrap());
+		let store = RuleStore::default()
+			.with(Rule::root().with_value::<colors::Primary>(red).unwrap())
+			.with(Rule::root().with_value::<colors::Primary>(blue).unwrap());
 
 		let mut world = World::new();
 		let entity = world.spawn((Element::new("div"), store)).id();
@@ -140,20 +122,17 @@ mod tests {
 		// Global: Primary → RED
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		let blue: Color = bevy::color::palettes::basic::BLUE.into();
-		world.insert_resource(
-			SelectorStore::default().with(
-				Selector::root().with_value::<colors::Primary>(red).unwrap(),
-			),
-		);
+		world
+			.insert_resource(RuleStore::default().with(
+				Rule::root().with_value::<colors::Primary>(red).unwrap(),
+			));
 
 		// Entity-local: Primary → BLUE
 		let entity = world
 			.spawn((
 				Element::new("div"),
-				SelectorStore::default().with(
-					Selector::root()
-						.with_value::<colors::Primary>(blue)
-						.unwrap(),
+				RuleStore::default().with(
+					Rule::root().with_value::<colors::Primary>(blue).unwrap(),
 				),
 			))
 			.id();
@@ -178,15 +157,15 @@ mod tests {
 	}
 
 	#[test]
-	fn rule_based_selector_only_matches_tagged_element() {
-		use crate::style::Rule;
+	fn selector_based_rule_only_matches_tagged_element() {
+		use crate::style::Selector;
 		let mut world = World::new();
 
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		world.insert_resource(
-			SelectorStore::default().with(
-				Selector::new()
-					.with_rule(Rule::tag("button"))
+			RuleStore::default().with(
+				Rule::new()
+					.with_rule(Selector::tag("button"))
 					.with_value::<colors::Primary>(red)
 					.unwrap(),
 			),
@@ -208,15 +187,22 @@ mod tests {
 	}
 
 	#[test]
-	fn light_scheme_selector_maps_primary_to_tone() {
+	fn light_scheme_rule_maps_primary_to_tone() {
 		use crate::style::material::themes;
 		let mut world = World::new();
 
-		world.insert_resource(
-			SelectorStore::default().with(themes::light_scheme()),
-		);
+		world
+			.insert_resource(RuleStore::default().with(themes::light_scheme()));
 
-		let entity = world.spawn(Element::new("div")).id();
+		let entity = world
+			.spawn((
+				Element::new("div"),
+				related!(Attributes[
+					Attribute::new("class"),
+					Value::str(themes::LIGHT_SCHEME_CLASS)
+				]),
+			))
+			.id();
 
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);

@@ -71,11 +71,11 @@ pub fn token_map() -> CssTokenMap {
 }
 
 
-/// Returns a [`Selector`] with all MD3 elevation default values.
-pub fn default_elevations() -> Selector {
+/// Returns a [`Rule`] with all MD3 elevation default values.
+pub fn default_elevations() -> Rule {
 	let elevation_color = Color::srgba(0., 0., 0., 0.2);
 
-	Selector::root()
+	Rule::root()
 		.with_value::<Elevation0>(Elevation::default()).unwrap()
 		.with_value::<Elevation1>(Elevation {
 			offset_x:      Length::Px(0.0),
@@ -114,10 +114,10 @@ pub fn default_elevations() -> Selector {
 		}).unwrap()
 }
 
-/// Returns a [`Selector`] with all MD3 shape corner, composite shape, and
+/// Returns a [`Rule`] with all MD3 shape corner, composite shape, and
 /// outline width default values.
-pub fn default_shapes() -> Selector {
-	Selector::root()
+pub fn default_shapes() -> Rule {
+	Rule::root()
 		// corner length ref tokens
 		.with_value::<ShapeCornerNone>(Length::Px(0.0)).unwrap()
 		.with_value::<ShapeCornerExtraSmall>(Length::Px(4.0)).unwrap()

@@ -5,7 +5,7 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 pub trait CssToken {
-	fn selectors(&self) -> Vec<Rule> { default() }
+	fn selectors(&self) -> Vec<Selector> { default() }
 	fn declarations(
 		&self,
 		builder: &CssBuilder,
@@ -81,7 +81,7 @@ macro_rules! css_property {
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-   builder.props_and_value_to_css::<$schema_ty>(
+   builder.props_value_to_css::<$schema_ty>(
    	$schema_ty::properties(),
     value
    )
@@ -108,7 +108,7 @@ macro_rules! css_property {
     builder: &$crate::style::CssBuilder,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<Vec<(String, String)>> {
-   builder.props_and_value_to_css::<$schema_ty>(
+   builder.props_value_to_css::<$schema_ty>(
    	vec![$($property.to_string()),+],
     value
    )
@@ -210,6 +210,6 @@ mod tests {
 
 		Bar::key()
 			.to_string()
-			.xpect_eq("io.crates/beet_node/document/token/tests/Foo");
+			.xpect_eq("io.crates/beet_node/style/css/css_token/tests/Bar");
 	}
 }

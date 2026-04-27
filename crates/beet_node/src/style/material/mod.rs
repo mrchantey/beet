@@ -2,7 +2,7 @@ pub mod colors;
 pub mod geometry;
 pub mod material_plugin;
 pub mod motion;
-pub mod selectors;
+pub mod rules;
 pub mod themes;
 pub mod tones;
 pub mod typography;

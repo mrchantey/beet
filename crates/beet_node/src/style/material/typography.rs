@@ -73,12 +73,12 @@ token!(LabelLarge,     Typography);
 token!(LabelMedium,    Typography);
 token!(LabelSmall,     Typography);
 
-/// Returns a [`Selector`] with all MD3 typography default values.
+/// Returns a [`Rule`] with all MD3 typography default values.
 ///
 /// Includes ref tokens (typefaces, weights, font sizes, line heights)
 /// and sys tokens (15 composite typescale entries).
-pub fn default_typography() -> Selector {
-	Selector::root()
+pub fn default_typography() -> Rule {
+	Rule::root()
 		// ── Typeface ref tokens ───────────────────────────────────────────────
 		.with_value::<TypefacePlain>(Typeface::new(["Google Sans", "Product Sans", "Inter", "Work Sans", "system-ui", "sans-serif"])).unwrap()
 		.with_value::<TypefaceBrand>(Typeface::new(["Roboto", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"])).unwrap()

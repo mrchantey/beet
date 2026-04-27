@@ -1,7 +1,7 @@
 use super::*;
 use beet_core::prelude::*;
 
-use crate::style::SelectorStore;
+use crate::style::RuleStore;
 pub struct MaterialStylePlugin {
 	color: Color,
 }
@@ -18,18 +18,18 @@ impl Plugin for MaterialStylePlugin {
 		app.insert_resource(
 			default_store(self.color.clone())
 				.with(themes::light_scheme())
-				.with(selectors::hero_heading()),
+				.with(rules::hero_heading()),
 		);
 	}
 }
 
 
-/// Returns a [`SelectorStore`] with all material design default values.
+/// Returns a [`RuleStore`] with all material design default values.
 ///
-/// Applies selectors in order: color tones from seed, opacities, typography,
+/// Applies rules in order: color tones from seed, opacities, typography,
 /// shapes, elevations, durations, and motions.
-pub fn default_store(color: impl Into<Color>) -> SelectorStore {
-	SelectorStore::default()
+pub fn default_store(color: impl Into<Color>) -> RuleStore {
+	RuleStore::default()
 		.with(themes::from_color(color))
 		.with(themes::default_opacities())
 		.with(typography::default_typography())

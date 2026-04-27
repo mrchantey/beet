@@ -8,6 +8,7 @@ pub fn token_map()->CssTokenMap{
 	CssTokenMap::default()
 		.insert(ForegroundColor)
 		.insert(BackgroundColor)
+		.insert(ColorRoleProps)
 		.insert(Font)
 		.insert(Height)
 		.insert(Width)
@@ -26,6 +27,8 @@ pub fn token_map()->CssTokenMap{
 
 css_property!(ForegroundColor, Color, DocumentPath::Ancestor, "color");
 css_property!(BackgroundColor, Color, DocumentPath::This, "background-color");
+
+css_property!(ColorRoleProps, ColorRole, DocumentPath::Ancestor);
 
 css_property!(Font, Typography, DocumentPath::This, "font-family");
 
