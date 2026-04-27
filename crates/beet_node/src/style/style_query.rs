@@ -197,10 +197,10 @@ mod tests {
 		let entity = world
 			.spawn((
 				Element::new("div"),
-				related!(Attributes[
+				related!(Attributes[(
 					Attribute::new("class"),
 					Value::str(themes::LIGHT_SCHEME_CLASS)
-				]),
+				)]),
 			))
 			.id();
 
