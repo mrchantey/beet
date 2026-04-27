@@ -113,12 +113,12 @@ impl AsCssValues for Typography {
 			self.size.as_css_values(builder)?[0].clone()
 		};
 		let mut parts = vec![
-			builder.ident_to_css(self.weight.key())?.as_css_value(),
+			CssIdent::from_token_key(self.weight.key()).as_css_value(),
 			// builder.ide
 			// builder.iden
 			// builder.self.weight.to_css_value(builder),
 			size,
-			builder.ident_to_css(self.typeface.key())?.as_css_value(),
+			CssIdent::from_token_key(self.typeface.key()).as_css_value(),
 		];
 		if let Some(ls) = &self.letter_spacing {
 			parts.push(format!(

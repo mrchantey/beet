@@ -14,7 +14,7 @@ impl AsCssValues for Motion {
 	fn as_css_values(&self, builder: &CssBuilder) -> Result<Vec<String>> {
 		format!(
 			"{} {}",
-			builder.ident_to_css(self.duration.key())?.as_css_value(),
+			CssIdent::from_token_key(self.duration.key()).as_css_value(),
 			self.ease.as_css_values(builder)?[0]
 		)
 		.xvec()

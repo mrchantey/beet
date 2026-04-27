@@ -100,9 +100,7 @@ impl CssBuilder<'_, '_, '_> {
 			Selector::State(ElementState::Dragged) => {
 				"[data-dragging=\"true\"]".to_string()
 			}
-			Selector::State(ElementState::Disabled) => {
-				":disabled".to_string()
-			}
+			Selector::State(ElementState::Disabled) => ":disabled".to_string(),
 			Selector::State(ElementState::Custom(val)) => {
 				// TODO needs design work
 				format!("[data-state-{}]", val)
@@ -115,18 +113,6 @@ impl CssBuilder<'_, '_, '_> {
 				format!(":not({})", self.rules_to_css(inner.as_ref()))
 			}
 		}
-	}
-
-
-	/// Returns the ident in css form, using the [`CssIdentMap`]
-	/// if a mapping is found, otherwise the last part of
-	/// the field path as a variable.
-	/// Non-specified idents are assumed to be variables, not properties.
-	pub fn ident_to_css(&self, path: &TokenKey) -> Result<CssIdent> {
-		use heck::ToKebabCase;
-		let path = path.to_string().to_kebab_case().replace("/", "--");
-		// TODO hash in prod
-		CssIdent::variable(path).xok()
 	}
 
 	pub fn props_value_to_css<
@@ -172,7 +158,7 @@ impl CssBuilder<'_, '_, '_> {
 		&self,
 		value: &TokenValue,
 	) -> Result<Vec<(String, String)>> {
-		let ident = self.ident_to_css(&K::token_key())?;
+		let ident = CssIdent::from_token_key(&K::token_key());
 		let values = self.token_value_to_css::<V>(value)?;
 		let props = V::properties();
 		if props.len() <= 1 {
@@ -222,8 +208,7 @@ impl CssBuilder<'_, '_, '_> {
 		&self,
 		token: &Token,
 	) -> Result<Vec<String>> {
-		// println!("here! {self:#?}");
-		let ident = self.ident_to_css(token.key())?;
+		let ident = CssIdent::from_token_key(token.key());
 		let props = T::properties();
 		if props.len() <= 1 {
 			// no need for suffix for no declared props
@@ -238,23 +223,16 @@ impl CssBuilder<'_, '_, '_> {
 	}
 }
 
-// pub struct CssAssignment{
-// 	target: CssIdent,
-// }
+struct CssRule {
+	selectors: Vec<Selector>,
+	declarations: HashMap<CssIdent, CssValue>,
+}
 
-// pub struct DeclarationBlock{
+enum CssValue {
+	Variable(String),
+	Expression(String),
+}
 
-// }
-
-// pub enum Expr{
-// 	Ident(CssIdent),
-// 	Value(String),
-// }
-
-// pub struct Rule{
-// 	selectors:Vec<()>,
-// 	declarations: HashMap
-// }
 
 #[cfg(test)]
 mod tests {
@@ -308,7 +286,6 @@ mod tests {
 			.xpect_contains(":root")
 			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)")
 			.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 255, 0)");
-
 	}
 	#[test]
 	fn test_color_role() {

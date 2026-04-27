@@ -1,4 +1,5 @@
 use crate::style::*;
+use crate::token::TokenKey;
 use beet_core::prelude::*;
 
 /// Converts a value to its CSS string representation.
@@ -16,6 +17,18 @@ pub enum CssIdent {
 }
 
 impl CssIdent {
+	/// Returns the ident in css form, using the [`CssIdentMap`]
+	/// if a mapping is found, otherwise the last part of
+	/// the field path as a variable.
+	/// Non-specified idents are assumed to be variables, not properties.
+	pub fn from_token_key(token_key: &TokenKey) -> Self {
+		use heck::ToKebabCase;
+		let token_key =
+			token_key.to_string().to_kebab_case().replace("/", "--");
+		CssIdent::variable(token_key)
+	}
+
+
 	pub fn variable(name: impl Into<SmolStr>) -> Self {
 		Self::Variable(name.into())
 	}
