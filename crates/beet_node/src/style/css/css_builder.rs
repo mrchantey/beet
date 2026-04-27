@@ -62,7 +62,7 @@ impl CssBuilder {
 					return if self.minify {
 						formatted.join("")
 					} else {
-						formatted.join("\n\n")
+						String::from("\n").xtend(formatted.join("\n\n"))
 					}
 					.xok();
 				}
@@ -92,10 +92,12 @@ impl CssBuilder {
 		rule: &CssRule,
 	) -> Result<String, CollisionFound> {
 		let selector = rule.selector_to_css();
-		let declarations =
+		let mut declarations =
 			rule.declarations.iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
 			})?;
+
+		declarations.sort();
 
 		if self.minify {
 			format!("{} {{ {} }}", selector, declarations.join(" "))
@@ -105,7 +107,7 @@ impl CssBuilder {
 				selector,
 				declarations
 					.into_iter()
-					.map(|dec| format!("    {dec}"))
+					.map(|dec| format!("  {dec}"))
 					.collect::<Vec<_>>()
 					.join("\n")
 			)

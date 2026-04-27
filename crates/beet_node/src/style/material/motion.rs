@@ -38,6 +38,7 @@ css_variable!(MotionEmphasizedDecelerate,Motion);
 
 pub fn token_map() -> CssTokenMap {
 	CssTokenMap::default()
+    .insert(MotionProps)
 		.insert(Short1)
 		.insert(Short2)
 		.insert(Short3)

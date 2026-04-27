@@ -2,20 +2,6 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-/// An ordered collection of [`Rule`]s applied from first to last.
-///
-/// Later ruless override earlier ones for the same token path.
-/// Can be used as a global [`Resource`] or per-entity [`Component`].
-#[derive(Default, Deref, DerefMut, Resource, Component)]
-pub struct RuleStore(Vec<Rule>);
-
-impl RuleStore {
-	/// Add a rule to this store.
-	pub fn with(mut self, rule: Rule) -> Self {
-		self.0.push(rule);
-		self
-	}
-}
 
 #[derive(SystemParam, Get)]
 pub struct StyleQuery<'w, 's> {

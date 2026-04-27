@@ -2,6 +2,15 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
+css_property!(
+	MotionProps,
+	Motion,
+	DocumentPath::Ancestor,
+	"duration",
+	"timing-function"
+);
+
+
 /// A motion token combining an easing function with a duration token.
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct Motion {
@@ -10,16 +19,20 @@ pub struct Motion {
 	pub ease: EaseFunction,
 }
 
-impl AsCssValue for Motion {
-	fn as_css_value(&self) -> Result<CssValue> {
-		format!(
-			"{} {}",
-			// TODO shorthand wont work, cannot transform this CssVariable
-			// split out into duration and ease
-			CssVariable::from_token_key(self.duration.key()).as_css_value(),
-			self.ease.as_css_value()?
-		)
-		.xmap(CssValue::expression)
+impl AsCssValues for Motion {
+	fn suffixes() -> Vec<CssKey> {
+		vec![
+			CssKey::static_property("duration"),
+			CssKey::static_property("ease"),
+		]
+	}
+
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
+		vec![
+			CssVariable::from_token_key(&self.duration.key())
+				.xinto::<CssValue>(),
+			self.ease.as_css_value()?,
+		]
 		.xok()
 	}
 }

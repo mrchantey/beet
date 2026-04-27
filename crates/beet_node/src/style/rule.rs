@@ -1,8 +1,26 @@
-use std::sync::Arc;
-
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
+use std::sync::Arc;
+
+/// An ordered collection of [`Rule`]s applied from first to last.
+///
+/// Later ruless override earlier ones for the same token path.
+/// Can be used as a global [`Resource`] or per-entity [`Component`].
+#[derive(Default, Deref, DerefMut, Resource, Component)]
+pub struct RuleStore(Vec<Rule>);
+
+impl RuleStore {
+	/// Add a rule to this store.
+	pub fn with(mut self, rule: Rule) -> Self {
+		self.0.push(rule);
+		self
+	}
+	pub fn with_rules(mut self, rules: impl IntoIterator<Item = Rule>) -> Self {
+		self.0.extend(rules);
+		self
+	}
+}
 
 /// A set of default properties applied to elements matching the given criteria.
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
@@ -34,7 +52,7 @@ impl Rule {
 		self
 	}
 
-	pub fn extend(mut self, other: Self) -> Self {
+	pub fn merge_any(mut self, other: Self) -> Self {
 		self.selector = self.selector.clone().merge_any(other.selector);
 		self.declarations.extend(other.declarations);
 		self
@@ -100,6 +118,10 @@ impl Selector {
 			(Self::Root, Self::Root) => Self::Root,
 			// (Self::Root, r) | (r, Self::Root) => r,
 			(Self::Any, _) | (_, Self::Any) => Self::Any,
+			(Self::AnyOf(mut rules), Self::AnyOf(other)) => {
+				rules.extend(other);
+				Self::AnyOf(rules)
+			}
 			(Self::AnyOf(mut rules), r) | (r, Self::AnyOf(mut rules)) => {
 				rules.push(r);
 				Self::AnyOf(rules)

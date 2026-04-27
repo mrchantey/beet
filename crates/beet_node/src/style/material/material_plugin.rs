@@ -45,25 +45,23 @@ pub fn default_token_map() -> CssTokenMap {
 
 /// All default material declarations and classes
 pub fn default_rule_store(color: impl Into<Color>) -> RuleStore {
-	rules::all_rules().into_iter().fold(
-		RuleStore::default()
-			.with(default_declarations(color))
-			.with(themes::light_scheme())
-			.with(themes::dark_scheme()),
-		|store, rule| store.with(rule),
-	)
+	RuleStore::default()
+		.with(default_declarations(color))
+		.with(themes::light_scheme())
+		.with(themes::dark_scheme())
+		.with_rules(rules::all_rules())
 }
 
 /// Returns a [`Rule`] with all material design default values.
 pub fn default_declarations(color: impl Into<Color>) -> Rule {
 	Rule::default()
-		.extend(themes::from_color(color))
-		.extend(themes::default_opacities())
-		.extend(typography::default_typography())
-		.extend(geometry::default_shapes())
-		.extend(geometry::default_elevations())
-		.extend(motion::default_durations())
-		.extend(motion::default_motions())
+		.merge_any(themes::from_color(color))
+		.merge_any(themes::default_opacities())
+		.merge_any(typography::default_typography())
+		.merge_any(geometry::default_shapes())
+		.merge_any(geometry::default_elevations())
+		.merge_any(motion::default_durations())
+		.merge_any(motion::default_motions())
 }
 
 
