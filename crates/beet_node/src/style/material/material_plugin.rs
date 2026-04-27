@@ -1,10 +1,18 @@
-use super::*;
+use crate::style::material::*;
+use crate::style::*;
 use beet_core::prelude::*;
-
-use crate::style::RuleStore;
 pub struct MaterialStylePlugin {
 	color: Color,
 }
+
+impl MaterialStylePlugin {
+	pub fn new(color: impl Into<Color>) -> Self {
+		Self {
+			color: color.into(),
+		}
+	}
+}
+
 impl Default for MaterialStylePlugin {
 	fn default() -> Self {
 		Self {
@@ -15,26 +23,43 @@ impl Default for MaterialStylePlugin {
 
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
-		app.insert_resource(
-			default_store(self.color.clone())
-				.with(themes::light_scheme())
-				.with(rules::hero_heading()),
-		);
+		app.init_plugin::<CssPlugin>()
+			.insert_resource(default_rule_store(self.color.clone()));
+		app.world_mut()
+			.get_resource_or_init::<CssTokenMap>()
+			.extend(default_token_map());
 	}
 }
 
 
-/// Returns a [`RuleStore`] with all material design default values.
-///
-/// Applies rules in order: color tones from seed, opacities, typography,
-/// shapes, elevations, durations, and motions.
-pub fn default_store(color: impl Into<Color>) -> RuleStore {
+
+
+pub fn default_token_map() -> CssTokenMap {
+	CssTokenMap::default()
+		.with_extend(tones::token_map())
+		.with_extend(colors::token_map())
+		.with_extend(geometry::token_map())
+		.with_extend(motion::token_map())
+	// .merge(typography::token_map())
+}
+
+/// All default material declarations and classes
+pub fn default_rule_store(color: impl Into<Color>) -> RuleStore {
 	RuleStore::default()
-		.with(themes::from_color(color))
-		.with(themes::default_opacities())
-		.with(typography::default_typography())
-		.with(geometry::default_shapes())
-		.with(geometry::default_elevations())
-		.with(motion::default_durations())
-		.with(motion::default_motions())
+		.with(default_declarations(color))
+		.with(themes::light_scheme())
+		.with(themes::dark_scheme())
+		.with(rules::hero_heading())
+}
+
+/// Returns a [`Rule`] with all material design default values.
+pub fn default_declarations(color: impl Into<Color>) -> Rule {
+	Rule::default()
+		.extend(themes::from_color(color))
+		.extend(themes::default_opacities())
+		.extend(typography::default_typography())
+		.extend(geometry::default_shapes())
+		.extend(geometry::default_elevations())
+		.extend(motion::default_durations())
+		.extend(motion::default_motions())
 }

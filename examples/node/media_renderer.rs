@@ -2,7 +2,7 @@
 //! list of accepted [`MediaType`]. Use cli args to specify the output
 //!
 //! ```sh
-//! # ansi-term
+//! # ansi-term (default)
 //! cargo run --example media_renderer -- --media-type text/ansi-term
 //! # html
 //! cargo run --example media_renderer -- --media-type text/html

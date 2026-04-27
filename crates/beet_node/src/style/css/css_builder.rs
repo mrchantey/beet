@@ -3,18 +3,19 @@ use crate::style::*;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
-pub fn default_token_map() -> CssTokenMap {
-	common_props::token_map().merge(material::token_map())
-}
 
-
+#[derive(Default)]
 pub struct CssPlugin;
 
 impl Plugin for CssPlugin {
-	fn build(&self, app: &mut App) { app.insert_resource(default_token_map()); }
+	fn build(&self, app: &mut App) {
+		app.world_mut()
+			.get_resource_or_init::<CssTokenMap>()
+			.extend(common_props::token_map());
+	}
 }
 
-#[derive(Get)]
+#[derive(Get, SetWith)]
 pub struct CssBuilder {
 	minify: bool,
 	max_iterations: usize,
@@ -43,8 +44,8 @@ impl Default for CssBuilder {
 impl CssBuilder {
 	pub fn build(
 		&self,
-		rules: &[&Rule],
 		css_map: &CssTokenMap,
+		rules: &[&Rule],
 	) -> Result<String> {
 		let css_rules =
 			rules.xtry_map(|rule| CssRule::from_rule(&css_map, rule))?;
@@ -55,7 +56,7 @@ impl CssBuilder {
 
 		for i in 0..self.max_iterations {
 			match css_rules.iter().xtry_map(|rule| {
-				self.format_rule(rule, format_variables, &mut declared)
+				self.format_rule(format_variables, &mut declared, rule)
 			}) {
 				Ok(formatted) => {
 					return if self.minify {
@@ -86,14 +87,14 @@ impl CssBuilder {
 	}
 	fn format_rule(
 		&self,
-		rule: &CssRule,
 		format_variables: FormatVariables,
 		declared: &mut HashMap<CssVariable, CssVariable>,
+		rule: &CssRule,
 	) -> Result<String, CollisionFound> {
 		let selector = rule.selector_to_css();
 		let declarations =
 			rule.declarations.iter().xtry_map(|(key, value)| {
-				Self::format_declaration(key, value, format_variables, declared)
+				Self::format_declaration(format_variables, declared, key, value)
 			})?;
 
 		if self.minify {
@@ -113,41 +114,49 @@ impl CssBuilder {
 	}
 
 	fn format_declaration(
-		key: &CssKey,
-		value: &CssValue,
 		format_variables: FormatVariables,
 		declared: &mut HashMap<CssVariable, CssVariable>,
+		key: &CssKey,
+		value: &CssValue,
 	) -> Result<String, CollisionFound> {
-		let mut format_var =
-			|original: &CssVariable| -> Result<CssVariable, CollisionFound> {
-				let formatted = format_variables.format(original);
-				if let Some(prev_original) = declared.get(&formatted) {
-					if prev_original != original {
-						// collision found
-						return Err(CollisionFound {
-							original: original.clone(),
-							formatted,
-						});
-					} else {
-						// already declared with the same original, return formatted
-						return Ok(formatted);
-					}
-				} else {
-					declared.insert(formatted.clone(), original.clone());
-					return Ok(formatted);
-				}
-			};
-
 		let key = match key {
-			CssKey::Variable(var) => format_var(var)?.as_css_key(),
+			CssKey::Variable(var) => {
+				Self::format_var(format_variables, declared, var)?.as_css_key()
+			}
 			CssKey::Property(prop) => prop.to_string(),
 		};
 		let value = match value {
-			CssValue::Variable(var) => format_var(var)?.as_css_value(),
+			CssValue::Variable(var) => {
+				Self::format_var(format_variables, declared, var)?
+					.as_css_value()
+			}
 			CssValue::Expression(expr) => expr.clone(),
 		};
 
 		format!("{}: {};", key, value).xok()
+	}
+
+	fn format_var(
+		format_variables: FormatVariables,
+		declared: &mut HashMap<CssVariable, CssVariable>,
+		original: &CssVariable,
+	) -> Result<CssVariable, CollisionFound> {
+		let formatted = format_variables.format(original);
+		if let Some(prev_original) = declared.get(&formatted) {
+			if prev_original != original {
+				// collision found
+				return Err(CollisionFound {
+					original: original.clone(),
+					formatted,
+				});
+			} else {
+				// already declared with the same original, return formatted
+				return Ok(formatted);
+			}
+		} else {
+			declared.insert(formatted.clone(), original.clone());
+			return Ok(formatted);
+		}
 	}
 }
 

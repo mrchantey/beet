@@ -288,6 +288,7 @@ thread = ["dep:beet_thread","net","action"]
 
 action = ["dep:beet_action"]
 node = ["dep:beet_node"]
+style = ["node", "beet_node?/style"]
 tui = ["beet_node?/tui"]
 markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 
@@ -414,6 +415,10 @@ required-features = ["http_server"]
 name = "media_renderer"
 path = "examples/node/media_renderer.rs"
 required-features = ["node"]
+[[example]]
+name = "style"
+path = "examples/node/style.rs"
+required-features = ["http_server", "style"]
 
 [[example]]
 name = "pretty_curl"

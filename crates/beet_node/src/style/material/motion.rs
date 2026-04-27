@@ -3,33 +3,65 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
+
+
+
 // ── Duration ref tokens ───────────────────────────────────────────────────────
 
-token!(Short1,      Duration);
-token!(Short2,      Duration);
-token!(Short3,      Duration);
-token!(Short4,      Duration);
-token!(Medium1,     Duration);
-token!(Medium2,     Duration);
-token!(Medium3,     Duration);
-token!(Medium4,     Duration);
-token!(Long1,       Duration);
-token!(Long2,       Duration);
-token!(Long3,       Duration);
-token!(Long4,       Duration);
-token!(ExtraLong1,  Duration);
-token!(ExtraLong2,  Duration);
-token!(ExtraLong3,  Duration);
-token!(ExtraLong4,  Duration);
+css_variable!(Short1,      Duration);
+css_variable!(Short2,      Duration);
+css_variable!(Short3,      Duration);
+css_variable!(Short4,      Duration);
+css_variable!(Medium1,     Duration);
+css_variable!(Medium2,     Duration);
+css_variable!(Medium3,     Duration);
+css_variable!(Medium4,     Duration);
+css_variable!(Long1,       Duration);
+css_variable!(Long2,       Duration);
+css_variable!(Long3,       Duration);
+css_variable!(Long4,       Duration);
+css_variable!(ExtraLong1,  Duration);
+css_variable!(ExtraLong2,  Duration);
+css_variable!(ExtraLong3,  Duration);
+css_variable!(ExtraLong4,  Duration);
 
 // ── Motion sys tokens ─────────────────────────────────────────────────────────
 
-token!(MotionStandard,            Motion);
-token!(MotionStandardAccelerate,  Motion);
-token!(MotionStandardDecelerate,  Motion);
-token!(MotionEmphasized,          Motion);
-token!(MotionEmphasizedAccelerate,Motion);
-token!(MotionEmphasizedDecelerate,Motion);
+css_variable!(MotionStandard,            Motion);
+css_variable!(MotionStandardAccelerate,  Motion);
+css_variable!(MotionStandardDecelerate,  Motion);
+css_variable!(MotionEmphasized,          Motion);
+css_variable!(MotionEmphasizedAccelerate,Motion);
+css_variable!(MotionEmphasizedDecelerate,Motion);
+
+
+
+pub fn token_map() -> CssTokenMap {
+	CssTokenMap::default()
+		.insert(Short1)
+		.insert(Short2)
+		.insert(Short3)
+		.insert(Short4)
+		.insert(Medium1)
+		.insert(Medium2)
+		.insert(Medium3)
+		.insert(Medium4)
+		.insert(Long1)
+		.insert(Long2)
+		.insert(Long3)
+		.insert(Long4)
+		.insert(ExtraLong1)
+		.insert(ExtraLong2)
+		.insert(ExtraLong3)
+		.insert(ExtraLong4)
+		.insert(MotionStandard)
+		.insert(MotionStandardAccelerate)
+		.insert(MotionStandardDecelerate)
+		.insert(MotionEmphasized)
+		.insert(MotionEmphasizedAccelerate)
+		.insert(MotionEmphasizedDecelerate)
+}
+
 
 /// Returns a [`Rule`] with all MD3 duration default values.
 pub fn default_durations() -> Rule {

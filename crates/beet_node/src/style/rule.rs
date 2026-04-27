@@ -34,6 +34,12 @@ impl Rule {
 		self
 	}
 
+	pub fn extend(mut self, other: Self) -> Self {
+		self.selector = self.selector.clone().merge_any(other.selector);
+		self.declarations.extend(other.declarations);
+		self
+	}
+
 
 	/// Matches all rules, or `true` if empty
 	pub fn matches(&self, el: &ElementView) -> bool {

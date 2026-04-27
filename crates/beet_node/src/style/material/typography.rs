@@ -5,9 +5,9 @@ use crate::style::*;
 
 // ── Typeface ref tokens ───────────────────────────────────────────────────────
 
-token!(TypefaceBrand, Typeface);
-token!(TypefacePlain, Typeface);
-token!(
+css_variable!(TypefaceBrand, Typeface);
+css_variable!(TypefacePlain, Typeface);
+css_variable!(
 	/// Monospace family for code and pre elements.
 	TypefaceMono,
 	Typeface
@@ -15,63 +15,106 @@ token!(
 
 // ── Weight ref tokens ─────────────────────────────────────────────────────────
 
-token!(WeightRegular, FontWeight);
-token!(WeightMedium,  FontWeight);
-token!(WeightBold,    FontWeight);
+css_variable!(WeightRegular, FontWeight);
+css_variable!(WeightMedium,  FontWeight);
+css_variable!(WeightBold,    FontWeight);
 
 // ── Font size ref tokens (MD3 type scale) ─────────────────────────────────────
 
-token!(FontSizeDisplayLarge,   Length);
-token!(FontSizeDisplayMedium,  Length);
-token!(FontSizeDisplaySmall,   Length);
-token!(FontSizeHeadlineLarge,  Length);
-token!(FontSizeHeadlineMedium, Length);
-token!(FontSizeHeadlineSmall,  Length);
-token!(FontSizeTitleLarge,     Length);
-token!(FontSizeTitleMedium,    Length);
-token!(FontSizeTitleSmall,     Length);
-token!(FontSizeBodyLarge,      Length);
-token!(FontSizeBodyMedium,     Length);
-token!(FontSizeBodySmall,      Length);
-token!(FontSizeLabelLarge,     Length);
-token!(FontSizeLabelMedium,    Length);
-token!(FontSizeLabelSmall,     Length);
+css_variable!(FontSizeDisplayLarge,   Length);
+css_variable!(FontSizeDisplayMedium,  Length);
+css_variable!(FontSizeDisplaySmall,   Length);
+css_variable!(FontSizeHeadlineLarge,  Length);
+css_variable!(FontSizeHeadlineMedium, Length);
+css_variable!(FontSizeHeadlineSmall,  Length);
+css_variable!(FontSizeTitleLarge,     Length);
+css_variable!(FontSizeTitleMedium,    Length);
+css_variable!(FontSizeTitleSmall,     Length);
+css_variable!(FontSizeBodyLarge,      Length);
+css_variable!(FontSizeBodyMedium,     Length);
+css_variable!(FontSizeBodySmall,      Length);
+css_variable!(FontSizeLabelLarge,     Length);
+css_variable!(FontSizeLabelMedium,    Length);
+css_variable!(FontSizeLabelSmall,     Length);
 
 // ── Line height ref tokens (MD3 type scale) ───────────────────────────────────
 
-token!(LineHeightDisplayLarge,   Length);
-token!(LineHeightDisplayMedium,  Length);
-token!(LineHeightDisplaySmall,   Length);
-token!(LineHeightHeadlineLarge,  Length);
-token!(LineHeightHeadlineMedium, Length);
-token!(LineHeightHeadlineSmall,  Length);
-token!(LineHeightTitleLarge,     Length);
-token!(LineHeightTitleMedium,    Length);
-token!(LineHeightTitleSmall,     Length);
-token!(LineHeightBodyLarge,      Length);
-token!(LineHeightBodyMedium,     Length);
-token!(LineHeightBodySmall,      Length);
-token!(LineHeightLabelLarge,     Length);
-token!(LineHeightLabelMedium,    Length);
-token!(LineHeightLabelSmall,     Length);
+css_variable!(LineHeightDisplayLarge,   Length);
+css_variable!(LineHeightDisplayMedium,  Length);
+css_variable!(LineHeightDisplaySmall,   Length);
+css_variable!(LineHeightHeadlineLarge,  Length);
+css_variable!(LineHeightHeadlineMedium, Length);
+css_variable!(LineHeightHeadlineSmall,  Length);
+css_variable!(LineHeightTitleLarge,     Length);
+css_variable!(LineHeightTitleMedium,    Length);
+css_variable!(LineHeightTitleSmall,     Length);
+css_variable!(LineHeightBodyLarge,      Length);
+css_variable!(LineHeightBodyMedium,     Length);
+css_variable!(LineHeightBodySmall,      Length);
+css_variable!(LineHeightLabelLarge,     Length);
+css_variable!(LineHeightLabelMedium,    Length);
+css_variable!(LineHeightLabelSmall,     Length);
 
 // ── Sys tokens: composite typography scales ───────────────────────────────────
 
-token!(DisplayLarge,   Typography);
-token!(DisplayMedium,  Typography);
-token!(DisplaySmall,   Typography);
-token!(HeadlineLarge,  Typography);
-token!(HeadlineMedium, Typography);
-token!(HeadlineSmall,  Typography);
-token!(TitleLarge,     Typography);
-token!(TitleMedium,    Typography);
-token!(TitleSmall,     Typography);
-token!(BodyLarge,      Typography);
-token!(BodyMedium,     Typography);
-token!(BodySmall,      Typography);
-token!(LabelLarge,     Typography);
-token!(LabelMedium,    Typography);
-token!(LabelSmall,     Typography);
+css_variable!(DisplayLarge,   Typography);
+css_variable!(DisplayMedium,  Typography);
+css_variable!(DisplaySmall,   Typography);
+css_variable!(HeadlineLarge,  Typography);
+css_variable!(HeadlineMedium, Typography);
+css_variable!(HeadlineSmall,  Typography);
+css_variable!(TitleLarge,     Typography);
+css_variable!(TitleMedium,    Typography);
+css_variable!(TitleSmall,     Typography);
+css_variable!(BodyLarge,      Typography);
+css_variable!(BodyMedium,     Typography);
+css_variable!(BodySmall,      Typography);
+css_variable!(LabelLarge,     Typography);
+css_variable!(LabelMedium,    Typography);
+css_variable!(LabelSmall,     Typography);
+
+
+pub fn token_map() -> CssTokenMap {
+	CssTokenMap::default()
+		.insert(TypefaceBrand)
+		.insert(TypefacePlain)
+		.insert(TypefaceMono)
+		.insert(WeightRegular)
+		.insert(WeightMedium)
+		.insert(WeightBold)
+		.insert(FontSizeDisplayLarge)
+		.insert(FontSizeDisplayMedium)
+		.insert(FontSizeDisplaySmall)
+		.insert(FontSizeHeadlineLarge)
+		.insert(FontSizeHeadlineMedium)
+		.insert(FontSizeHeadlineSmall)
+		.insert(FontSizeTitleLarge)
+		.insert(FontSizeTitleMedium)
+		.insert(FontSizeTitleSmall)
+		.insert(FontSizeBodyLarge)
+		.insert(FontSizeBodyMedium)
+		.insert(FontSizeBodySmall)
+		.insert(FontSizeLabelLarge)
+		.insert(FontSizeLabelMedium)
+		.insert(FontSizeLabelSmall)
+		.insert(LineHeightDisplayLarge)
+		.insert(LineHeightDisplayMedium)
+		.insert(LineHeightDisplaySmall)
+		.insert(LineHeightHeadlineLarge)
+		.insert(LineHeightHeadlineMedium)
+		.insert(LineHeightHeadlineSmall)
+		.insert(LineHeightTitleLarge)
+		.insert(LineHeightTitleMedium)
+		.insert(LineHeightTitleSmall)
+		.insert(LineHeightBodyLarge)
+		.insert(LineHeightBodyMedium)
+		.insert(LineHeightBodySmall)
+		.insert(LineHeightLabelLarge)
+		.insert(LineHeightLabelMedium)
+		.insert(LineHeightLabelSmall)
+}
+
+
 
 /// Returns a [`Rule`] with all MD3 typography default values.
 ///

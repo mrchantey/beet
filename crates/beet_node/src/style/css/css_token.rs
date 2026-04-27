@@ -32,7 +32,12 @@ impl CssTokenMap {
 		})
 	}
 
-	pub fn merge(mut self, other: Self) -> Self {
+	pub fn extend(&mut self, other: Self) -> &mut Self {
+		self.0.extend(other.0);
+		self
+	}
+
+	pub fn with_extend(mut self, other: Self) -> Self {
 		self.0.extend(other.0);
 		self
 	}

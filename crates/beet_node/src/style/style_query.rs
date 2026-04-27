@@ -101,7 +101,7 @@ impl StyleQuery<'_, '_> {
 			bevybail!("No CssTokenMap resource found");
 		};
 		let rules = self.collect_rules(entity);
-		builder.build(&rules, css_map)
+		builder.build(css_map, &rules)
 	}
 }
 
