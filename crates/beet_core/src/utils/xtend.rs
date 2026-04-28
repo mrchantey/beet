@@ -195,11 +195,11 @@ pub impl<T: Sized> T {
 	/// # use beet_core::prelude::*;
 	/// assert_eq!(7_u32.xinto::<u64>(), 7);
 	/// ```
-	fn xinto<U: From<Self>>(self) -> U
+	fn xinto<U>(self) -> U
 	where
-		Self: Sized,
+		Self: Sized + Into<U>,
 	{
-		U::from(self)
+		self.into()
 	}
 
 	/// Returns a pretty-printed `Debug` representation.

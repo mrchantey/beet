@@ -93,26 +93,26 @@ pub fn default_motions() -> Rule {
 	Rule::new()
 		.with_value::<MotionStandard>(Motion {
 			ease:     EaseFunction::CubicInOut,
-			duration: Medium2::token(),
+			duration: Medium2.into(),
 		}).unwrap()
 		.with_value::<MotionStandardAccelerate>(Motion {
 			ease:     EaseFunction::CubicIn,
-			duration: Short4::token(),
+			duration: Short4.into(),
 		}).unwrap()
 		.with_value::<MotionStandardDecelerate>(Motion {
 			ease:     EaseFunction::CubicOut,
-			duration: Medium1::token(),
+			duration: Medium1.into(),
 		}).unwrap()
 		.with_value::<MotionEmphasized>(Motion {
 			ease:     EaseFunction::QuinticInOut,
-			duration: Long2::token(),
+			duration: Long2.into(),
 		}).unwrap()
 		.with_value::<MotionEmphasizedAccelerate>(Motion {
 			ease:     EaseFunction::QuarticIn,
-			duration: Short4::token(),
+			duration: Short4.into(),
 		}).unwrap()
 		.with_value::<MotionEmphasizedDecelerate>(Motion {
 			ease:     EaseFunction::QuarticOut,
-			duration: Medium4::token(),
+			duration: Medium4.into(),
 		}).unwrap()
 }

@@ -28,8 +28,11 @@ impl TokenStore {
 		todo!("token schema comparison");
 		// self.xok()
 	}
-	pub fn with_token<K: TypedTokenKey, V: TypedToken>(self) -> Result<Self> {
-		self.with(K::token_key(), V::token())
+	pub fn with_token<K: TypedTokenKey>(
+		self,
+		value: impl Into<Token>,
+	) -> Result<Self> {
+		self.with(K::token_key(), value)
 	}
 	pub fn with_value<K: TypedTokenKey>(
 		self,

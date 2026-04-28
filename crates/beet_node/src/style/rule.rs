@@ -33,8 +33,8 @@ pub struct Rule {
 impl Rule {
 	pub fn new() -> Self { Self::default() }
 
-	pub fn with_token<K: TypedTokenKey, V: TypedToken>(self) -> Self {
-		self.with(K::token_key(), V::token())
+	pub fn with_token<K: TypedTokenKey>(self, token: impl Into<Token>) -> Self {
+		self.with(K::token_key(), token)
 	}
 	pub fn with_value<K: TypedTokenKey>(
 		self,
@@ -134,8 +134,12 @@ impl Predicate {
 		match self {
 			Predicate::Root => true,
 			Predicate::Any => true,
-			Predicate::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
-			Predicate::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
+			Predicate::AnyOf(rules) => {
+				rules.iter().any(|rule| rule.matches(el))
+			}
+			Predicate::AllOf(rules) => {
+				rules.iter().all(|rule| rule.matches(el))
+			}
 			Predicate::Tag(tag) => el.element.tag() == tag,
 			Predicate::Attribute { key, value } => match value {
 				Some(expected) => el

@@ -111,7 +111,8 @@ mod tests {
 
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
-			let val = tokens.get(&colors::Primary::key()).unwrap();
+			let val =
+				tokens.get(colors::Primary.xinto::<Token>().key()).unwrap();
 			matches!(val, TokenValue::Value(_)).xpect_true();
 		});
 	}
@@ -140,7 +141,8 @@ mod tests {
 
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
-			let val = tokens.get(&colors::Primary::key()).unwrap();
+			let val =
+				tokens.get(colors::Primary.xinto::<Token>().key()).unwrap();
 			// entity-local value wins
 			matches!(val, TokenValue::Value(_)).xpect_true();
 		});
@@ -179,10 +181,10 @@ mod tests {
 			let button_tokens = query.collect_tokens(button);
 			let div_tokens = query.collect_tokens(div);
 			button_tokens
-				.contains_key(&colors::Primary::key())
+				.contains_key(colors::Primary.xinto::<Token>().key())
 				.xpect_true();
 			div_tokens
-				.contains_key(&colors::Primary::key())
+				.contains_key(colors::Primary.xinto::<Token>().key())
 				.xpect_false();
 		});
 	}
@@ -210,7 +212,8 @@ mod tests {
 		world.with_state::<StyleQuery, _>(|query| {
 			let tokens = query.collect_tokens(entity);
 			// Primary should now point to a tones::Primary40 FieldRef
-			let val = tokens.get(&colors::Primary::key()).unwrap();
+			let val =
+				tokens.get(colors::Primary.xinto::<Token>().key()).unwrap();
 			matches!(val, TokenValue::Token(_)).xpect_true();
 		});
 	}

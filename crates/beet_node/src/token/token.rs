@@ -58,26 +58,6 @@ impl Token {
 	}
 }
 
-/// A type which represents a token, see `token2!` for defining.
-pub trait TypedToken {
-	fn schema() -> TokenKey;
-	fn key() -> TokenKey;
-	fn token() -> Token {
-		Token {
-			key: Self::key(),
-			schema: Self::schema(),
-			document: default(),
-		}
-	}
-}
-
-impl<T: TypedToken> From<T> for Token {
-	fn from(_: T) -> Self { T::token() }
-}
-impl<T: TypedToken> From<T> for TokenKey {
-	fn from(_: T) -> Self { T::key() }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TokenValue {
@@ -97,8 +77,11 @@ impl TokenValue {
 impl From<TypedValue> for TokenValue {
 	fn from(value: TypedValue) -> Self { Self::Value(value) }
 }
-impl From<Token> for TokenValue {
-	fn from(token: Token) -> Self { Self::Token(token) }
+impl<T> From<T> for TokenValue
+where
+	T: Into<Token>,
+{
+	fn from(token: T) -> Self { Self::Token(token.into()) }
 }
 
 
@@ -125,15 +108,12 @@ macro_rules! token {
 		#[derive(::bevy::reflect::TypePath)]
 		$(#[$meta])*
 		pub struct $new_ty;
-		impl $crate::prelude::TypedToken for $new_ty {
-			fn schema() -> $crate::prelude::TokenKey {
-				$crate::prelude::TokenKey::of::<$schema_ty>()
-			}
-			fn key() -> $crate::prelude::TokenKey {
-				$crate::prelude::TokenKey::of::<Self>()
-			}
-			fn token() -> $crate::prelude::Token {
-				$crate::prelude::Token::new(Self::key(), Self::schema())
+		impl Into<$crate::prelude::Token> for $new_ty {
+			fn into(self) -> $crate::prelude::Token {
+				$crate::prelude::Token::new(
+					$crate::prelude::TokenKey::of::<Self>(),
+					$crate::prelude::TokenKey::of::<$schema_ty>()
+				)
 					.with_document($doc_path)
 			}
 		}
@@ -154,7 +134,8 @@ mod tests {
 			.to_string()
 			.xpect_eq("io.crates/bevy_ecs/name/Name");
 
-		Foo::key()
+		Foo.xinto::<Token>()
+			.key()
 			.to_string()
 			.xpect_eq("io.crates/beet_node/token/token/tests/Foo");
 	}

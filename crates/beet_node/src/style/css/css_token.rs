@@ -138,7 +138,8 @@ mod tests {
 			.to_string()
 			.xpect_eq("io.crates/bevy_ecs/name/Name");
 
-		Bar::key()
+		Bar.xinto::<Token>()
+			.key()
 			.to_string()
 			.xpect_eq("io.crates/beet_node/style/css/css_token/tests/Bar");
 	}

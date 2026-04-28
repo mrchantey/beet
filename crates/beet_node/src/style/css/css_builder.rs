@@ -507,7 +507,8 @@ mod tests {
 				RuleStore::default().with(
 					Rule::new()
 						.with_predicate(Predicate::class("color-primary"))
-						.with_token::<common_props::ForegroundColor, colors::PrimaryRole>(
+						.with_token::<common_props::ForegroundColor>(
+							colors::PrimaryRole,
 						),
 				),
 			)
@@ -535,12 +536,13 @@ mod tests {
 				.with(
 					Rule::new()
 						.with_predicate(Predicate::class("color-primary"))
-						.with_token::<common_props::ForegroundColor, colors::OnPrimary>(
+						.with_token::<common_props::ForegroundColor>(
+							colors::OnPrimary,
 						),
 				)
 				.with(
 					Rule::new()
-						.with_token::<colors::OnPrimary, tones::Primary20>(),
+						.with_token::<colors::OnPrimary>(tones::Primary20),
 				)
 				.with(
 					Rule::new()
@@ -583,15 +585,15 @@ mod tests {
 				.with(
 					Rule::new()
 						.with_predicate(Predicate::class("primary-role"))
-						.with_token::<ColorRoleProps, colors::PrimaryRole>(),
+						.with_token::<ColorRoleProps>(colors::PrimaryRole),
 				)
 				.with(
 					Rule::new()
-						.with_token::<colors::Primary, tones::Primary80>()
-						.with_token::<colors::OnPrimary, tones::Primary20>()
+						.with_token::<colors::Primary>(tones::Primary80)
+						.with_token::<colors::OnPrimary>(tones::Primary20)
 						.with_value::<colors::PrimaryRole>(ColorRole {
-							background: colors::Primary::token(),
-							foreground: colors::OnPrimary::token(),
+							background: colors::Primary.into(),
+							foreground: colors::OnPrimary.into(),
 						})
 						.unwrap()
 						.with_value::<tones::Primary80>(Color::srgb(
