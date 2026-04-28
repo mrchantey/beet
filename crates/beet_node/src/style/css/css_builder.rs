@@ -47,8 +47,8 @@ impl CssBuilder {
 		css_map: &CssTokenMap,
 		tokens: &[(&TokenKey, &TokenValue)],
 	) -> Result<String> {
-		let css_rules =
-			rules.xtry_map(|rule| CssRule::from_rule(&css_map, rule))?;
+		let css_rules = tokens
+			.xtry_map(|(key, value)| CssToken::resolve(&css_map, key, value))?;
 
 		// iteration variables
 		let mut declared = HashMap::default();
@@ -89,11 +89,11 @@ impl CssBuilder {
 		&self,
 		format_variables: FormatVariables,
 		declared: &mut HashMap<CssVariable, CssVariable>,
-		rule: &CssRule,
+		css_token: &CssToken,
 	) -> Result<String, CollisionFound> {
-		let predicate = rule.predicate_to_css();
+		let predicate = css_token.predicate_to_css();
 		let mut declarations =
-			rule.declarations.iter().xtry_map(|(key, value)| {
+			css_token.declarations.iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
 			})?;
 
@@ -236,12 +236,12 @@ impl FormatVariables {
 
 
 #[derive(Default, Get, SetWith)]
-pub struct CssRule {
+pub struct CssToken {
 	predicate: Predicate,
 	declarations: HashMap<CssKey, CssValue>,
 }
 
-impl CssRule {
+impl CssToken {
 	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
 		let mut this = Self::default().with_predicate(rule.predicate().clone());
 
@@ -252,24 +252,23 @@ impl CssRule {
 		this.xok()
 	}
 
-	pub fn merge_any(&mut self, other: CssRule) {
+	pub fn merge_any(&mut self, other: CssToken) {
 		self.predicate = self.predicate.clone().merge_any(other.predicate);
 		self.declarations.extend(other.declarations);
 	}
 
 	pub fn resolve(
-		token_map: &CssTokenMap,
+		css_map: &CssTokenMap,
 		key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Self> {
-		token_map.get(key)?.as_css_rule(&value)
+		css_map.get(key)?.as_css_token(&value)
 	}
 
 	/// Used in CssToken declarations section.
 	/// The value type will be checked for multiple properties, and
 	/// appended to the key ident if found.
 	pub fn from_key_value<
-		K: TypedTokenKey,
 		V: 'static
 			+ Send
 			+ Sync
@@ -278,9 +277,10 @@ impl CssRule {
 			+ TypedTokenKey
 			+ AsCssValues,
 	>(
+		key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Self> {
-		let key = CssVariable::from_token_key(&K::token_key());
+		let key = CssVariable::from_token_key(&key);
 		let values = CssValue::from_token_value::<V>(value)?;
 		let suffixes = V::suffixes();
 		let declarations = if suffixes.len() <= 1 {
@@ -499,6 +499,7 @@ mod tests {
 	}
 	#[test]
 	fn mismatch() {
+		todo!("make it nice to define rule tokens inline");
 		World::new()
 			.with_resource(
 				CssTokenMap::default().insert(common_props::ForegroundColor),

@@ -4,14 +4,14 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-pub trait CssToken {
-	fn as_css_rule(&self, value: &TokenValue) -> Result<CssRule>;
+pub trait AsCssToken {
+	fn as_css_token(&self, value: &TokenValue) -> Result<CssToken>;
 }
 
 /// Store methods for looking up a schema path and resolving a value
 #[derive(Default, Deref, Resource)]
 pub struct CssTokenMap(
-	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + CssToken>>,
+	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + AsCssToken>>,
 );
 impl CssTokenMap {
 	/// Registers a CSS value resolver keyed on `T::Tokens`'s type path.
@@ -19,14 +19,17 @@ impl CssTokenMap {
 	/// Stored [`TypedValue`]s carry the schema of their *tokens* struct
 	/// (the type actually passed to `with_value`), not the output type,
 	/// so the key must match that tokens type.
-	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + CssToken>(
+	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + AsCssToken>(
 		mut self,
 		token: T,
 	) -> Self {
 		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
 		self
 	}
-	pub fn get(&self, key: &TokenKey) -> Result<&(dyn Send + Sync + CssToken)> {
+	pub fn get(
+		&self,
+		key: &TokenKey,
+	) -> Result<&(dyn Send + Sync + AsCssToken)> {
 		self.0.get(key).map(|arc| arc.as_ref()).ok_or_else(|| {
 			bevyhow!("No CSS Token registered for this schema:\n{}", key)
 		})
@@ -61,12 +64,12 @@ macro_rules! css_property {
    $schema_ty,
    $doc_path
   );
-  impl $crate::prelude::style::CssToken for $new_ty {
-   fn as_css_rule(
+  impl $crate::prelude::style::AsCssToken for $new_ty {
+   fn as_css_token(
     &self,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
-   	$crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssToken> {
+   	$crate::prelude::style::CssToken::from_props_value::<$schema_ty>(
    	vec![$($crate::prelude::style::CssKey::static_property($property)),+],
     value
    )
@@ -90,12 +93,12 @@ macro_rules! css_variable {
    $schema_ty,
    $doc_path
   );
-  impl $crate::prelude::style::CssToken for $new_ty {
-   fn as_css_rule(
+  impl $crate::prelude::style::AsCssToken for $new_ty {
+   fn as_css_token(
    	&self,
     value: &$crate::prelude::TokenValue,
-   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
-   	$crate::prelude::style::CssRule::from_key_value::<$new_ty,$schema_ty>(value)
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssToken> {
+   	$crate::prelude::style::CssToken::from_key_value::<$schema_ty>(&$new_ty::token_key(),value)
 	 }
   }
  };

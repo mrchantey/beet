@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 /// A set of default properties applied to elements matching the given criteria.
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
 	predicate: Predicate,
 	declarations: TokenStore,
@@ -50,6 +50,7 @@ impl Rule {
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
 #[derive(Debug, Default, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Predicate {
 	/// A global predicate, in css this will evaluate to `:root`,
 	/// and in bevy apps will always pass predicates
