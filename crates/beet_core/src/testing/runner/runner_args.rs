@@ -15,8 +15,10 @@ pub struct TestRunnerConfig {
 	started: Instant,
 	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode.
 	pub watch: bool,
-	/// Do not log test outcomes as they complete.
+	/// Do not log test cases or file outcomes as they complete.
 	pub no_incremental: bool,
+	/// Log the name of individual test cases, not files
+	pub log_cases: bool,
 	/// Log each test name before running it.
 	pub log_runs: bool,
 	/// Log each skipped test.
@@ -53,6 +55,7 @@ impl TestRunnerConfig {
 		let no_color = params.contains_key("no-color");
 		let quiet = params.contains_key("quiet");
 		let exact = params.contains_key("exact");
+		let log_cases = params.contains_key("log-cases");
 
 		// Parse timeout
 		let timeout_ms = params
@@ -68,6 +71,9 @@ impl TestRunnerConfig {
 		if let Some(excludes) = params.get_vec("exclude") {
 			filter = filter.extend_exclude(excludes);
 		}
+
+
+
 		// Extend include by positional args
 		filter = filter.extend_include(&args.path);
 		// Wrap patterns in wildcards unless exact mode
@@ -79,6 +85,7 @@ impl TestRunnerConfig {
 			started: Instant::now(),
 			watch,
 			no_incremental,
+			log_cases,
 			log_runs,
 			log_skipped,
 			no_color,

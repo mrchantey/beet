@@ -245,7 +245,7 @@ impl CssRule {
 	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
 		let mut this = Self::default().with_predicate(rule.predicate().clone());
 
-		for (key, value) in rule.declarations() {
+		for (key, value) in rule.declarations().iter() {
 			let css_rule = Self::resolve(token_map, key, value)?;
 			this.merge_any(css_rule);
 		}

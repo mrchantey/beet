@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
@@ -59,7 +61,7 @@ pub(super) fn log_case_outcomes(
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
 ) -> Result {
 	for (_entity, config, children) in requests {
-		if config.quiet || config.no_incremental {
+		if config.quiet || config.no_incremental || !config.log_cases {
 			continue;
 		}
 		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
@@ -73,7 +75,7 @@ pub(super) fn log_case_outcomes(
 			if outcome.is_skip() && !config.log_skipped {
 				continue;
 			}
-			log_case_output(&test, outcome).xprint_display();
+			test_heading_log(&outcome.ansi_str(), &test).xprint_display();
 		}
 	}
 	Ok(())
@@ -86,18 +88,80 @@ fn log_case_runs(test: &Test) -> String {
 	test_heading_log(&prefix, test)
 }
 
+/// Collects test outcomes once all tests have finished running
+pub(super) fn log_file_outcomes(
+	requests: Populated<
+		(Entity, &TestRunnerConfig, &Children),
+		With<TestRunnerConfig>,
+	>,
+	_trigger: Populated<(), Added<TestOutcome>>,
+	running: Query<&Test, Without<TestOutcome>>,
+	finished: Query<(&Test, &TestOutcome)>,
+) -> Result {
+	for (_entity, config, children) in requests {
+		if config.quiet || config.no_incremental || config.log_cases {
+			continue;
+		}
+		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
-/// Returns the colored or non-colored outcome prefix for the test:
-/// - pass: " PASS "
-/// - skip: " SKIP "
-/// - fail: " FAIL "
-fn log_case_output(test: &Test, outcome: &TestOutcome) -> String {
-	let prefix = match outcome {
-		TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
-		TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
-		TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
-	};
-	test_heading_log(&prefix, test)
+		let running = children
+			.iter()
+			.filter_map(|child| running.get(child).ok())
+			.map(|test| test.source_file)
+			.collect::<HashSet<_>>();
+
+		let finished = children
+			.iter()
+			.filter_map(|child| finished.get(child).ok())
+			.fold(HashMap::new(), |mut map, (test, outcome)| {
+				if !running.contains(test.source_file) {
+					map.entry(test.short_file())
+						.or_insert_with(Vec::new)
+						.push((test, outcome));
+				}
+				map
+			});
+
+		for (short_file, finished) in
+			finished.into_iter().sorted_by_key(|a| a.0)
+		{
+			use TestOutcome::*;
+			if finished.iter().any(|(_test, outcome)| outcome.is_fail()) {
+				// if any failed, fall back to individual logging
+				for (test, outcome) in finished {
+					test_heading_log(&outcome.ansi_str(), &test)
+						.xprint_display();
+				}
+			} else {
+				let outcome =
+					finished.iter().fold(Pass, |acc, (_, outcome)| {
+						match (acc, outcome) {
+							(Pass, Pass) => Pass,
+							(_, Fail(_)) => {
+								Fail(outcome.as_fail().unwrap().clone())
+							}
+							(acc, Skip(reason)) => {
+								if acc.is_fail() {
+									acc
+								} else {
+									Skip(reason.clone())
+								}
+							}
+							(acc, _) => acc,
+						}
+					});
+				if !outcome.is_skip() {
+					format!(
+						"{} {}",
+						outcome.ansi_str(),
+						short_file.to_string()
+					)
+					.xprint_display();
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 fn test_heading_log(prefix: &str, test: &Test) -> String {

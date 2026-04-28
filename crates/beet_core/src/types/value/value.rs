@@ -747,9 +747,8 @@ mod test {
 		hasher1.finish().xpect_eq(hasher2.finish());
 	}
 
-	#[derive(
-		Debug, Reflect, Default, PartialEq, serde::Serialize, serde::Deserialize,
-	)]
+	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 	#[reflect(Default)]
 	struct AllNumericTypes {
 		signed_8: i8,
@@ -762,36 +761,6 @@ mod test {
 		unsigned_64: u64,
 		float_32: f32,
 		float_64: f64,
-	}
-
-	#[test]
-	fn roundtrip_all_numeric_types() {
-		let original = AllNumericTypes {
-			signed_8: -8,
-			signed_16: -16,
-			signed_32: -32,
-			signed_64: -64,
-			unsigned_8: 8,
-			unsigned_16: 16,
-			unsigned_32: 32,
-			unsigned_64: 64,
-			float_32: 3.14,
-			float_64: 2.718,
-		};
-
-		let value = Value::from_serde(&original).unwrap();
-		let result: AllNumericTypes = value.into_serde().unwrap();
-
-		result.signed_8.xpect_eq(original.signed_8);
-		result.signed_16.xpect_eq(original.signed_16);
-		result.signed_32.xpect_eq(original.signed_32);
-		result.signed_64.xpect_eq(original.signed_64);
-		result.unsigned_8.xpect_eq(original.unsigned_8);
-		result.unsigned_16.xpect_eq(original.unsigned_16);
-		result.unsigned_32.xpect_eq(original.unsigned_32);
-		result.unsigned_64.xpect_eq(original.unsigned_64);
-		((result.float_32 - original.float_32).abs() < 0.001).xpect_true();
-		((result.float_64 - original.float_64).abs() < 0.001).xpect_true();
 	}
 
 	#[test]
@@ -827,6 +796,37 @@ mod test {
 			let v = Value::from_serde(&val).unwrap();
 			v.into_serde::<T>().unwrap().xpect_eq(val);
 		}
+
+		#[test]
+		fn roundtrip_all_numeric_types() {
+			let original = AllNumericTypes {
+				signed_8: -8,
+				signed_16: -16,
+				signed_32: -32,
+				signed_64: -64,
+				unsigned_8: 8,
+				unsigned_16: 16,
+				unsigned_32: 32,
+				unsigned_64: 64,
+				float_32: 3.14,
+				float_64: 2.718,
+			};
+
+			let value = Value::from_serde(&original).unwrap();
+			let result: AllNumericTypes = value.into_serde().unwrap();
+
+			result.signed_8.xpect_eq(original.signed_8);
+			result.signed_16.xpect_eq(original.signed_16);
+			result.signed_32.xpect_eq(original.signed_32);
+			result.signed_64.xpect_eq(original.signed_64);
+			result.unsigned_8.xpect_eq(original.unsigned_8);
+			result.unsigned_16.xpect_eq(original.unsigned_16);
+			result.unsigned_32.xpect_eq(original.unsigned_32);
+			result.unsigned_64.xpect_eq(original.unsigned_64);
+			((result.float_32 - original.float_32).abs() < 0.001).xpect_true();
+			((result.float_64 - original.float_64).abs() < 0.001).xpect_true();
+		}
+
 
 		#[test]
 		fn roundtrip_string() { roundtrip_for("hello world".to_string()); }

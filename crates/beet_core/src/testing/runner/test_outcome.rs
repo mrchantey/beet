@@ -18,6 +18,19 @@ pub enum TestOutcome {
 	/// The test failed.
 	Fail(TestFail),
 }
+impl TestOutcome {
+	/// Returns the colored or non-colored outcome prefix for the test:
+	/// - pass: " PASS "
+	/// - skip: " SKIP "
+	/// - fail: " FAIL "
+	pub fn ansi_str(&self) -> String {
+		match self {
+			TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
+			TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
+			TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
+		}
+	}
+}
 
 
 /// Reasons why a test was skipped.

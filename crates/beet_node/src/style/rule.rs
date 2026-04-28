@@ -26,7 +26,7 @@ impl RuleStore {
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
 pub struct Rule {
 	predicate: Predicate,
-	declarations: HashMap<TokenKey, TokenValue>,
+	declarations: TokenStore,
 }
 
 
@@ -54,7 +54,7 @@ impl Rule {
 
 	pub fn merge_any(mut self, other: Self) -> Self {
 		self.predicate = self.predicate.clone().merge_any(other.predicate);
-		self.declarations.extend(other.declarations);
+		self.declarations = self.declarations.extend(other.declarations);
 		self
 	}
 

@@ -9,13 +9,14 @@ use bevy::reflect::Typed;
 #[derive(
 	Debug,
 	Default,
+	Clone,
 	Deref,
 	DerefMut,
-	Resource,
 	Reflect,
+	Serialize,
+	Deserialize,
+	Resource,
 	Component,
-	serde::Serialize,
-	serde::Deserialize,
 )]
 pub struct TokenStore {
 	tokens: HashMap<TokenKey, TokenValue>,
@@ -47,7 +48,7 @@ impl TokenStore {
 	pub fn with_value(
 		self,
 		key: impl Into<Token>,
-		value: impl Typed + serde::Serialize,
+		value: impl Typed + Serialize,
 	) -> Result<Self> {
 		self.with(key, TypedValue::new(value)?)
 	}
@@ -82,6 +83,13 @@ impl TokenStore {
 	}
 }
 
+
+impl IntoIterator for TokenStore {
+	type Item = (TokenKey, TokenValue);
+	type IntoIter =
+		bevy::platform::collections::hash_map::IntoIter<TokenKey, TokenValue>;
+	fn into_iter(self) -> Self::IntoIter { self.tokens.into_iter() }
+}
 
 #[cfg(test)]
 mod tests {

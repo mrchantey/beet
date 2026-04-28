@@ -80,6 +80,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 	- `some().long().chain().xpect_close(0.300001);`
 	- `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar");`
 - Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
+- by default only test files are logged, use `--log-cases` to see individual cases, and 
 
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.

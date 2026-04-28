@@ -51,6 +51,7 @@ impl Plugin for TestPlugin {
 					trigger_timeouts,
 					insert_suite_outcome,
 					log_case_outcomes,
+					log_file_outcomes,
 					log_suite_outcome,
 					exit_on_suite_outcome,
 				)
