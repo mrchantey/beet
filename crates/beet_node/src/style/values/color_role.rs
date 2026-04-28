@@ -12,6 +12,7 @@ css_property!(
 
 
 #[derive(Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorRole {
 	pub background: Token,
 	pub foreground: Token,

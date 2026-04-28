@@ -16,6 +16,7 @@ css_property!(
 
 /// The typeface family list to use, with the first match selected
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Typeface(Vec<SmolStr>);
 
 impl Typeface {
@@ -79,6 +80,7 @@ impl AsCssValue for Typeface {
 
 /// Font weight token, mapping semantic names to numeric CSS values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FontWeight {
 	Normal,
 	Bold,
@@ -99,6 +101,7 @@ impl AsCssValue for FontWeight {
 
 /// A complete typography style combining typeface, size, weight, line height, and letter spacing.
 #[derive(Debug, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Typography {
 	/// [`Token`] pointing to the [`Typeface`] token.
 	pub typeface: Token,

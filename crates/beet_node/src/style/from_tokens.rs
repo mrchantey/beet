@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use bevy::reflect::FromReflect;
 use bevy::reflect::Typed;
 
 /// Trait for types that can be constructed from their token representation.
@@ -9,7 +8,7 @@ use bevy::reflect::Typed;
 ///
 /// The `M` type parameter is a marker used to distinguish different impls.
 pub trait FromTokens<M>: Sized {
-	type Tokens: Typed + FromReflect;
+	type Tokens: Typed + serde::de::DeserializeOwned;
 	fn from_value(
 		value: &Value,
 		entity: Entity,
@@ -18,7 +17,7 @@ pub trait FromTokens<M>: Sized {
 	where
 		Self::Tokens: Sized,
 	{
-		let tokens = value.into_reflect::<Self::Tokens>()?;
+		let tokens = value.clone().into_serde::<Self::Tokens>()?;
 		Self::from_tokens(tokens, entity, query)
 	}
 	fn from_tokens(
@@ -37,7 +36,7 @@ pub struct SelfFromTokensMarker;
 /// without needing a separate Tokens struct.
 impl<T> FromTokens<SelfFromTokensMarker> for T
 where
-	T: Sized + Typed + FromReflect,
+	T: Sized + Typed + serde::de::DeserializeOwned,
 {
 	type Tokens = Self;
 	fn from_tokens(

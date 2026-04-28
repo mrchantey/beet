@@ -21,7 +21,6 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Do not create non-doc examples without being explictly asked to do so.
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
-- `./agent` is your directory, use it for temporary scratchpads, outputs, etc
 
 ## Conventions
 

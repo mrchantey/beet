@@ -1,10 +1,6 @@
 //! Module for the [`Value`] type
 use crate::prelude::*;
-use crate::types::value::reflect_ext;
 use alloc::borrow::Cow;
-use bevy::reflect::FromReflect;
-use bevy::reflect::PartialReflect;
-use bevy::reflect::Typed;
 
 /// A json-like value type suitable for application level operations.
 ///
@@ -323,21 +319,6 @@ impl Value {
 		} else {
 			Value::new(input)
 		}
-	}
-
-	/// Convert a reflected type into a [`Value`].
-	///
-	/// Walks the reflection tree and builds a corresponding [`Value`] structure.
-	pub fn from_reflect(reflect: &dyn PartialReflect) -> Result<Self> {
-		reflect_ext::reflect_to_value(reflect)
-	}
-
-	/// Convert this [`Value`] into a concrete type using reflection.
-	pub fn into_reflect<T>(&self) -> Result<T>
-	where
-		T: 'static + Send + Sync + FromReflect + Typed,
-	{
-		reflect_ext::value_to_type(self)
 	}
 
 	/// Convert from a [`serde_json::Value`].
@@ -766,7 +747,9 @@ mod test {
 		hasher1.finish().xpect_eq(hasher2.finish());
 	}
 
-	#[derive(Debug, Reflect, Default, PartialEq)]
+	#[derive(
+		Debug, Reflect, Default, PartialEq, serde::Serialize, serde::Deserialize,
+	)]
 	#[reflect(Default)]
 	struct AllNumericTypes {
 		signed_8: i8,
@@ -796,8 +779,8 @@ mod test {
 			float_64: 2.718,
 		};
 
-		let value = Value::from_reflect(&original).unwrap();
-		let result: AllNumericTypes = value.into_reflect().unwrap();
+		let value = Value::from_serde(&original).unwrap();
+		let result: AllNumericTypes = value.into_serde().unwrap();
 
 		result.signed_8.xpect_eq(original.signed_8);
 		result.signed_16.xpect_eq(original.signed_16);
@@ -827,38 +810,22 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	mod serde_reflect {
+	mod serde_tests {
 		use super::*;
 		use bevy::math::Vec3;
-		use bevy::reflect::FromReflect;
 		use bevy::transform::components::Transform;
 
-		/// Tests all 4 roundtrip paths: reflect→reflect, reflect→serde, serde→serde, serde→reflect.
+		/// Tests serde roundtrip path: serde→serde.
 		fn roundtrip_for<T>(val: T)
 		where
 			T: Clone
 				+ core::fmt::Debug
 				+ PartialEq
-				+ bevy::reflect::Typed
-				+ bevy::reflect::Reflect
-				+ FromReflect
 				+ serde::Serialize
-				+ serde::de::DeserializeOwned
-				+ Send
-				+ Sync
-				+ 'static,
+				+ serde::de::DeserializeOwned,
 		{
-			let v = Value::from_reflect(&val).unwrap();
-			v.clone().into_reflect::<T>().unwrap().xpect_eq(val.clone());
-
-			let v = Value::from_reflect(&val).unwrap();
-			v.into_serde::<T>().unwrap().xpect_eq(val.clone());
-
 			let v = Value::from_serde(&val).unwrap();
-			v.into_serde::<T>().unwrap().xpect_eq(val.clone());
-
-			let v = Value::from_serde(&val).unwrap();
-			v.into_reflect::<T>().unwrap().xpect_eq(val);
+			v.into_serde::<T>().unwrap().xpect_eq(val);
 		}
 
 		#[test]

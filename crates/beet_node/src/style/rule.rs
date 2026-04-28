@@ -38,7 +38,7 @@ impl Rule {
 	}
 	pub fn with_value<K: TypedTokenKey>(
 		self,
-		value: impl Typed,
+		value: impl Typed + serde::Serialize,
 	) -> Result<Self> {
 		self.with(K::token_key(), TypedValue::new(value)?).xok()
 	}

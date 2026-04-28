@@ -273,7 +273,7 @@ impl CssRule {
 		V: 'static
 			+ Send
 			+ Sync
-			+ FromReflect
+			+ serde::de::DeserializeOwned
 			+ Typed
 			+ TypedTokenKey
 			+ AsCssValues,
@@ -307,7 +307,7 @@ impl CssRule {
 		V: 'static
 			+ Send
 			+ Sync
-			+ FromReflect
+			+ serde::de::DeserializeOwned
 			+ Typed
 			+ TypedTokenKey
 			+ AsCssValues,
@@ -414,7 +414,7 @@ impl CssValue {
 		V: 'static
 			+ Send
 			+ Sync
-			+ FromReflect
+			+ serde::de::DeserializeOwned
 			+ Typed
 			+ TypedTokenKey
 			+ AsCssValues,
@@ -424,7 +424,7 @@ impl CssValue {
 		value.schema().assert_eq_ty::<V>()?;
 		match value {
 			TokenValue::Value(value) => {
-				value.value().into_reflect::<V>()?.as_css_values()
+				value.value().clone().into_serde::<V>()?.as_css_values()
 			}
 			TokenValue::Token(token) => Self::from_token::<V>(token).xok(),
 		}

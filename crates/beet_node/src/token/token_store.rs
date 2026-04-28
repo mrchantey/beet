@@ -6,7 +6,17 @@ use bevy::reflect::Typed;
 /// are nested maps and leaf nodes are typed values.
 /// It is perhaps more akin to a filesystem where files are
 /// typed, than a freeform json value.
-#[derive(Debug, Default, Deref, DerefMut, Resource, Reflect, Component)]
+#[derive(
+	Debug,
+	Default,
+	Deref,
+	DerefMut,
+	Resource,
+	Reflect,
+	Component,
+	serde::Serialize,
+	serde::Deserialize,
+)]
 pub struct TokenStore {
 	tokens: HashMap<TokenKey, TokenValue>,
 }
@@ -37,7 +47,7 @@ impl TokenStore {
 	pub fn with_value(
 		self,
 		key: impl Into<Token>,
-		value: impl Typed,
+		value: impl Typed + serde::Serialize,
 	) -> Result<Self> {
 		self.with(key, TypedValue::new(value)?)
 	}
@@ -58,7 +68,10 @@ impl TokenStore {
 			None => bevybail!("Token Not Found: `{key}`"),
 		}
 	}
-	pub fn get_typed<T: Typed + FromReflect>(&self, key: &Token) -> Result<T> {
+	pub fn get_typed<T: Typed + serde::de::DeserializeOwned>(
+		&self,
+		key: &Token,
+	) -> Result<T> {
 		key.schema().assert_eq_ty::<T>()?;
 		match self.get(key)? {
 			TokenValue::Value(value) => value.into_typed::<T>(),

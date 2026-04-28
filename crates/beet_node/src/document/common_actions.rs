@@ -136,10 +136,10 @@ pub fn SetFieldTyped<T>(
 	fields: Query<&FieldRef>,
 ) -> Result<()>
 where
-	T: 'static + Send + Sync + FromReflect + Typed,
+	T: 'static + Send + Sync + serde::Serialize + Typed,
 {
 	let field = fields.get(cx.id())?;
-	let new_value = Value::from_reflect(&cx.input)?;
+	let new_value = Value::from_serde(&cx.input)?;
 	query.with_field(cx.id(), field, move |value| {
 		*value = new_value;
 	})
@@ -148,7 +148,7 @@ where
 /// Convenience constructor for set_field_typed with a field reference and path.
 pub fn set_field_typed<T>(field: FieldRef) -> impl Bundle
 where
-	T: 'static + Send + Sync + FromReflect + Typed,
+	T: 'static + Send + Sync + serde::Serialize + Typed,
 {
 	(
 		field,
@@ -192,7 +192,7 @@ pub fn ReadFieldTyped<T>(
 	fields: Query<&FieldRef>,
 ) -> Result<T>
 where
-	T: 'static + Send + Sync + FromReflect + Typed,
+	T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
 {
 	let field = fields.get(cx.id())?;
 	let doc = query.get(cx.id(), &field.document)?;
@@ -202,7 +202,7 @@ where
 /// Convenience constructor for get_field_typed with a field reference and path.
 pub fn get_field_typed<T>(field: FieldRef) -> impl Bundle
 where
-	T: 'static + Send + Sync + FromReflect + Typed,
+	T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
 {
 	(
 		field,

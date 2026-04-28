@@ -13,6 +13,7 @@ css_property!(
 
 /// A motion token combining an easing function with a duration token.
 #[derive(Debug, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Motion {
 	/// [`FieldRef`] pointing to the [`Duration`] token.
 	pub duration: Token,

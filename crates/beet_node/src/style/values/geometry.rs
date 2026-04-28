@@ -15,6 +15,7 @@ impl AsCssValue for u16 {
 
 
 #[derive(Debug, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Length {
 	Px(f32),
 	Rem(f32),
@@ -51,6 +52,7 @@ impl AsCssValue for Length {
 
 
 #[derive(Debug, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Elevation {
 	pub offset_x: Length,
 	pub offset_y: Length,
@@ -103,6 +105,7 @@ css_property!(
 
 /// Combined shape token: a corner radius applied to an optional edge.
 #[derive(Debug, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Shape {
 	/// [`Token`] pointing to the corner radius [`Length`] token.
 	pub corner: Token,
@@ -145,6 +148,7 @@ impl AsCssValues for Shape {
 
 /// Which edge(s) a shape corner radius applies to.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ShapeEdge {
 	#[default]
 	None,

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::reflect::FromReflect;
+
 use bevy::reflect::Typed;
 
 /// In-memory document that can be attached to entities.
@@ -27,15 +27,13 @@ impl Document {
 	/// Create a new document from a [`Value`].
 	pub fn new(value: Value) -> Self { Self(value) }
 
-	/// Create a document from a reflectable value.
+	/// Create a document from a serializable value.
 	///
 	/// ## Errors
 	///
-	/// Returns an error if reflection conversion fails.
-	pub fn from_reflect<T: bevy::reflect::PartialReflect>(
-		value: &T,
-	) -> Result<Self> {
-		Value::from_reflect(value).map(Self)
+	/// Returns an error if serialization conversion fails.
+	pub fn from_reflect<T: serde::Serialize>(value: &T) -> Result<Self> {
+		Value::from_serde(value).map(Self)
 	}
 
 	/// Initialize a nested field in a document unless there is a type clash.
@@ -103,15 +101,15 @@ impl Document {
 		path: &[FieldSegment],
 	) -> Result<T, DocumentError>
 	where
-		T: 'static + Send + Sync + FromReflect + Typed,
+		T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
 	{
 		let value = self.get_field_ref(path)?;
-		value
-			.into_reflect()
-			.map_err(|err| DocumentError::FailedToDeserialize {
+		value.clone().into_serde().map_err(|err| {
+			DocumentError::FailedToDeserialize {
 				error: err.to_string(),
 				path: path.into_field_path(),
-			})
+			}
+		})
 	}
 	/// Get a reference to a field in the document by path.
 	///

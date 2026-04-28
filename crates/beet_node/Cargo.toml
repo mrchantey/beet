@@ -12,7 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx","style"]
+default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx","style", "json", "serde"]
 std = []
 action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]

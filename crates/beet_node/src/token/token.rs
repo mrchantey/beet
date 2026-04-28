@@ -51,16 +51,18 @@ pub struct TypedValue {
 }
 
 impl TypedValue {
-	pub fn new<T: Typed>(value: T) -> Result<Self> {
+	pub fn new<T: Typed + serde::Serialize>(value: T) -> Result<Self> {
 		Self {
-			value: Value::from_reflect(&value)?,
+			value: Value::from_serde(&value)?,
 			schema: TokenKey::of::<T>(),
 		}
 		.xok()
 	}
-	pub fn into_typed<T: Typed + FromReflect>(&self) -> Result<T> {
+	pub fn into_typed<T: Typed + serde::de::DeserializeOwned>(
+		&self,
+	) -> Result<T> {
 		self.schema.assert_eq_ty::<T>()?;
-		self.value.into_reflect::<T>()
+		self.value.clone().into_serde::<T>()
 	}
 }
 
