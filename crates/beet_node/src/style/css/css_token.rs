@@ -132,12 +132,6 @@ mod tests {
 
 	#[test]
 	fn test_name() {
-		// Name::type_info().type_path().xprintln();
-		Token::of::<Name, Name>()
-			.key()
-			.to_string()
-			.xpect_eq("io.crates/bevy_ecs/name/Name");
-
 		Bar.xinto::<Token>()
 			.key()
 			.to_string()

@@ -12,12 +12,28 @@ pub struct Token {
 	/// Path to the value for this token
 	/// ie `io.crates/beet_net/style/material/colors/PrimaryColor`
 	key: TokenKey,
-	/// The path to the document
-	document: DocumentPath,
 	/// Path to the token representing the value of this token,
 	/// ie `io.crates/bevy_math/Color`
 	schema: TokenKey,
+	/// The path to the document
+	document: DocumentPath,
 }
+
+
+impl Token {
+	pub const fn new(
+		key: TokenKey,
+		schema: TokenKey,
+		document: DocumentPath,
+	) -> Self {
+		Self {
+			key,
+			schema,
+			document,
+		}
+	}
+}
+
 
 impl std::fmt::Display for Token {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -45,26 +61,6 @@ impl TypedValue {
 	pub fn into_typed<T: Typed + FromReflect>(&self) -> Result<T> {
 		self.schema.assert_eq_ty::<T>()?;
 		self.value.into_reflect::<T>()
-	}
-}
-
-
-impl Token {
-	pub fn new(key: TokenKey, schema: TokenKey) -> Self {
-		Self {
-			key,
-			schema,
-			document: default(),
-		}
-	}
-
-	/// Create new token, using `Token` for the field path
-	pub fn of<Path: TypePath, Schema: TypePath>() -> Self {
-		Self {
-			key: TokenKey::of::<Path>(),
-			schema: TokenKey::of::<Schema>(),
-			document: default(),
-		}
 	}
 }
 
@@ -122,28 +118,19 @@ macro_rules! token {
 			fn into(self) -> $crate::prelude::Token {
 				$crate::prelude::Token::new(
 					$crate::prelude::TokenKey::of::<Self>(),
-					$crate::prelude::TokenKey::of::<$schema_ty>()
+					$crate::prelude::TokenKey::of::<$schema_ty>(),
+					$doc_path
 				)
-					.with_document($doc_path)
 			}
 		}
 	};
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
 	use super::*;
 	#[test]
 	fn test_name() {
-		// Name::type_info().type_path().xprintln();
-		Token::of::<Name, Name>()
-			.key()
-			.to_string()
-			.xpect_eq("io.crates/bevy_ecs/name/Name");
-
 		Foo.xinto::<Token>()
 			.key()
 			.to_string()
