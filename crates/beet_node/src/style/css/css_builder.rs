@@ -421,7 +421,7 @@ impl CssValue {
 	>(
 		value: &TokenValue,
 	) -> Result<Vec<Self>> {
-		value.schema().assert_eq::<V>()?;
+		value.schema().assert_eq_ty::<V>()?;
 		match value {
 			TokenValue::Value(value) => {
 				value.value().into_reflect::<V>()?.as_css_values()

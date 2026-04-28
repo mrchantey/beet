@@ -25,9 +25,11 @@ pub struct TokenKey(SmolStr);
 impl TokenKey {
 	pub fn new(path: impl Into<SmolStr>) -> Self { Self(path.into()) }
 
-	pub fn assert_eq<Expected: TypedTokenKey>(&self) -> Result<&Self> {
-		let expected = Expected::token_key();
-		if self == &expected {
+	pub fn assert_eq_ty<Expected: TypedTokenKey>(&self) -> Result<&Self> {
+		self.assert_eq(&Expected::token_key())
+	}
+	pub fn assert_eq(&self, expected: &TokenKey) -> Result<&Self> {
+		if self == expected {
 			self.xok()
 		} else {
 			bevybail!(

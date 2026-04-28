@@ -101,30 +101,6 @@ impl From<Token> for TokenValue {
 	fn from(token: Token) -> Self { Self::Token(token) }
 }
 
-/// Like a [`Document`] where branch nodes
-/// are nested maps and leaf nodes are typed values.
-/// It is perhaps more akin to a filesystem where files are
-/// typed, than a freeform json value.
-#[derive(Default, Deref)]
-pub struct TokenMap {
-	tokens: HashMap<TokenKey, TokenValue>,
-}
-impl TokenMap {
-	pub fn new() -> Self {
-		Self {
-			tokens: HashMap::new(),
-		}
-	}
-	pub fn with(
-		mut self,
-		key: impl Into<TokenKey>,
-		value: impl Into<TokenValue>,
-	) -> Self {
-		self.tokens.insert(key.into(), value.into());
-		self
-	}
-}
-
 
 
 #[macro_export]
@@ -132,7 +108,7 @@ macro_rules! token {
 	(
 		$(#[$meta:meta])*
 		$new_ty:ident,
-		$schema_ty:ident
+		$schema_ty:ty
 	) => {
 		token!(
 			$(#[$meta])* $new_ty,
@@ -143,7 +119,7 @@ macro_rules! token {
 	(
 		$(#[$meta:meta])*
 		$new_ty:ident,
-		$schema_ty:ident,
+		$schema_ty:ty,
 		$doc_path: expr
 	) => {
 		#[derive(::bevy::reflect::TypePath)]
@@ -163,6 +139,7 @@ macro_rules! token {
 		}
 	};
 }
+
 
 
 
