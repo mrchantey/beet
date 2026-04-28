@@ -184,7 +184,6 @@ mod tests {
 
 	token!(
 			/// Some cool type
-			/// This now works perfectly!
 			#[derive(Debug, Clone)]
 			Foo,
 			Color,

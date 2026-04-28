@@ -26,7 +26,7 @@ pub const DARK_SCHEME_CLASS: &str = "dark-scheme";
 /// Returns a [`Rule`] mapping semantic color tokens to their light-scheme tones.
 pub fn light_scheme() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(LIGHT_SCHEME_CLASS))
+		.with_predicate(Predicate::class(LIGHT_SCHEME_CLASS))
 		.with_token::<colors::Primary,                  tones::Primary40>()
 		.with_token::<colors::OnPrimary,                tones::Primary100>()
 		.with_token::<colors::PrimaryContainer,         tones::Primary90>()
@@ -61,7 +61,7 @@ pub fn light_scheme() -> Rule {
 /// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
 pub fn dark_scheme() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(DARK_SCHEME_CLASS))
+		.with_predicate(Predicate::class(DARK_SCHEME_CLASS))
 		.with_token::<colors::Primary,                  tones::Primary80>()
 		.with_token::<colors::OnPrimary,                tones::Primary20>()
 		.with_token::<colors::PrimaryContainer,         tones::Primary30>()

@@ -158,15 +158,15 @@ mod tests {
 	}
 
 	#[test]
-	fn selector_based_rule_only_matches_tagged_element() {
-		use crate::style::Selector;
+	fn predicate_based_rule_only_matches_tagged_element() {
+		use crate::style::Predicate;
 		let mut world = World::new();
 
 		let red: Color = bevy::color::palettes::basic::RED.into();
 		world.insert_resource(
 			RuleStore::default().with(
 				Rule::new()
-					.with_selector(Selector::tag("button"))
+					.with_predicate(Predicate::tag("button"))
 					.with_value::<colors::Primary>(red)
 					.unwrap(),
 			),

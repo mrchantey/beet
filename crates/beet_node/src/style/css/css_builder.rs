@@ -91,7 +91,7 @@ impl CssBuilder {
 		declared: &mut HashMap<CssVariable, CssVariable>,
 		rule: &CssRule,
 	) -> Result<String, CollisionFound> {
-		let selector = rule.selector_to_css();
+		let predicate = rule.predicate_to_css();
 		let mut declarations =
 			rule.declarations.iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
@@ -100,11 +100,11 @@ impl CssBuilder {
 		declarations.sort();
 
 		if self.minify {
-			format!("{} {{ {} }}", selector, declarations.join(" "))
+			format!("{} {{ {} }}", predicate, declarations.join(" "))
 		} else {
 			format!(
 				"{} {{\n{}\n}}",
-				selector,
+				predicate,
 				declarations
 					.into_iter()
 					.map(|dec| format!("  {dec}"))
@@ -237,13 +237,13 @@ impl FormatVariables {
 
 #[derive(Default, Get, SetWith)]
 pub struct CssRule {
-	selector: Selector,
+	predicate: Predicate,
 	declarations: HashMap<CssKey, CssValue>,
 }
 
 impl CssRule {
 	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
-		let mut this = Self::default().with_selector(rule.selector().clone());
+		let mut this = Self::default().with_predicate(rule.predicate().clone());
 
 		for (key, value) in rule.declarations() {
 			let css_rule = Self::resolve(token_map, key, value)?;
@@ -253,7 +253,7 @@ impl CssRule {
 	}
 
 	pub fn merge_any(&mut self, other: CssRule) {
-		self.selector = self.selector.clone().merge_any(other.selector);
+		self.predicate = self.predicate.clone().merge_any(other.predicate);
 		self.declarations.extend(other.declarations);
 	}
 
@@ -326,44 +326,44 @@ impl CssRule {
 			.xok()
 	}
 
-	pub fn selector_to_css(&self) -> String {
-		Self::selector_to_css_inner(&self.selector)
+	pub fn predicate_to_css(&self) -> String {
+		Self::predicate_to_css_inner(&self.predicate)
 	}
 
-	fn selector_to_css_inner(rule: &Selector) -> String {
+	fn predicate_to_css_inner(rule: &Predicate) -> String {
 		match rule {
-			Selector::Any => "*".to_string(),
-			Selector::Root => ":root".to_string(),
-			Selector::AnyOf(rules) => rules
+			Predicate::Any => "*".to_string(),
+			Predicate::Root => ":root".to_string(),
+			Predicate::AnyOf(rules) => rules
 				.iter()
-				.map(|rule| Self::selector_to_css_inner(rule))
+				.map(|rule| Self::predicate_to_css_inner(rule))
 				.collect::<Vec<_>>()
 				.join(", "),
-			Selector::AllOf(_rules) => {
+			Predicate::AllOf(_rules) => {
 				unimplemented!("how to do this properly?")
 			}
-			Selector::Tag(tag) => tag.to_string(),
-			Selector::Class(class) => format!(".{}", class),
-			Selector::State(ElementState::Hovered) => ":hover".to_string(),
-			Selector::State(ElementState::Focused) => ":focus".to_string(),
-			Selector::State(ElementState::Pressed) => ":active".to_string(),
-			Selector::State(ElementState::Selected) => {
+			Predicate::Tag(tag) => tag.to_string(),
+			Predicate::Class(class) => format!(".{}", class),
+			Predicate::State(ElementState::Hovered) => ":hover".to_string(),
+			Predicate::State(ElementState::Focused) => ":focus".to_string(),
+			Predicate::State(ElementState::Pressed) => ":active".to_string(),
+			Predicate::State(ElementState::Selected) => {
 				"[aria-selected=\"true\"]".to_string()
 			}
-			Selector::State(ElementState::Dragged) => {
+			Predicate::State(ElementState::Dragged) => {
 				"[data-dragging=\"true\"]".to_string()
 			}
-			Selector::State(ElementState::Disabled) => ":disabled".to_string(),
-			Selector::State(ElementState::Custom(val)) => {
+			Predicate::State(ElementState::Disabled) => ":disabled".to_string(),
+			Predicate::State(ElementState::Custom(val)) => {
 				// TODO needs design work
 				format!("[data-state-{}]", val)
 			}
-			Selector::Attribute { key, value } => match value {
+			Predicate::Attribute { key, value } => match value {
 				Some(value) => format!("[{}=\"{}\"]", key, value),
 				None => format!("[{}]", key),
 			},
-			Selector::Not(inner) => {
-				format!(":not({})", Self::selector_to_css_inner(inner))
+			Predicate::Not(inner) => {
+				format!(":not({})", Self::predicate_to_css_inner(inner))
 			}
 		}
 	}
@@ -506,7 +506,7 @@ mod tests {
 			.with_resource(
 				RuleStore::default().with(
 					Rule::new()
-						.with_selector(Selector::class("color-primary"))
+						.with_predicate(Predicate::class("color-primary"))
 						.with_token::<common_props::ForegroundColor, colors::PrimaryRole>(
 						),
 				),
@@ -534,7 +534,7 @@ mod tests {
 			RuleStore::default()
 				.with(
 					Rule::new()
-						.with_selector(Selector::class("color-primary"))
+						.with_predicate(Predicate::class("color-primary"))
 						.with_token::<common_props::ForegroundColor, colors::OnPrimary>(
 						),
 				)
@@ -582,7 +582,7 @@ mod tests {
 			RuleStore::default()
 				.with(
 					Rule::new()
-						.with_selector(Selector::class("primary-role"))
+						.with_predicate(Predicate::class("primary-role"))
 						.with_token::<ColorRoleProps, colors::PrimaryRole>(),
 				)
 				.with(
