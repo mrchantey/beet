@@ -6,8 +6,9 @@
 
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-use crate::style::*;
+use crate::{style::*, token};
 use crate::style::material::*;
+use crate::token::TokenStore;
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -371,62 +372,99 @@ pub fn page() -> Rule {
 }
 
 
+token!(ButtonBase, Rule);
+token!(ButtonFilled, Rule);
+token!(ButtonOutlined, Rule);
+token!(ButtonText, Rule);
+token!(ButtonTonal, Rule);
+token!(ButtonElevated, Rule);
+token!(CardFilled, Rule);
+token!(CardElevated, Rule);
+token!(CardOutlined, Rule);
+token!(TextDisplayLarge, Rule);
+token!(TextDisplayMedium, Rule);
+token!(TextDisplaySmall, Rule);
+token!(TextHeadlineLarge, Rule);
+token!(TextHeadlineMedium, Rule);
+token!(TextHeadlineSmall, Rule);
+token!(TextTitleLarge, Rule);
+token!(TextTitleMedium, Rule);
+token!(TextTitleSmall, Rule);
+token!(TextBodyLarge, Rule);
+token!(TextBodyMedium, Rule);
+token!(TextBodySmall, Rule);
+token!(TextLabelLarge, Rule);
+token!(TextLabelMedium, Rule);
+token!(TextLabelSmall, Rule);
+token!(ColorPrimary, Rule);
+token!(ShapeNone, Rule);
+token!(ShapeExtraSmall, Rule);
+token!(ShapeSmall, Rule);
+token!(ShapeMedium, Rule);
+token!(ShapeLarge, Rule);
+token!(ShapeExtraLarge, Rule);
+token!(ShapeFull, Rule);
+token!(Elevation0, Rule);
+token!(Elevation1, Rule);
+token!(Elevation2, Rule);
+token!(Elevation3, Rule);
+token!(Elevation4, Rule);
+token!(Elevation5, Rule);
+token!(AppBar, Rule);
+token!(AppBarScrolled, Rule);
+token!(Container, Rule);
+token!(Page, Rule);
+
+
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Returns all Material Design component rules as a [`Vec`].
+/// Returns all Material Design component rules as a [`TokenStore`].
 ///
 /// This includes buttons, cards, typography utilities, color utilities,
 /// shape utilities, elevation utilities, and layout components.
-pub fn all_rules() -> Vec<Rule> {
-	vec![
-		// Buttons
-		button_base(),
-		button_filled(),
-		button_outlined(),
-		button_text(),
-		button_tonal(),
-		button_elevated(),
-		// Cards
-		card_filled(),
-		card_elevated(),
-		card_outlined(),
-		// Typography
-		text_display_large(),
-		text_display_medium(),
-		text_display_small(),
-		text_headline_large(),
-		text_headline_medium(),
-		text_headline_small(),
-		text_title_large(),
-		text_title_medium(),
-		text_title_small(),
-		text_body_large(),
-		text_body_medium(),
-		text_body_small(),
-		text_label_large(),
-		text_label_medium(),
-		text_label_small(),
-		// Colors
-		color_primary(),
-		// Shapes
-		shape_none(),
-		shape_extra_small(),
-		shape_small(),
-		shape_medium(),
-		shape_large(),
-		shape_extra_large(),
-		shape_full(),
-		// Elevation
-		elevation_0(),
-		elevation_1(),
-		elevation_2(),
-		elevation_3(),
-		elevation_4(),
-		elevation_5(),
-		// Layout
-		app_bar(),
-		app_bar_scrolled(),
-		container(),
-		page(),
-	]
+pub fn all_rules() -> TokenStore {
+	TokenStore::default()
+		.with_value(ButtonBase, button_base()).unwrap()
+		.with_value(ButtonFilled, button_filled()).unwrap()
+		.with_value(ButtonOutlined, button_outlined()).unwrap()
+		.with_value(ButtonText, button_text()).unwrap()
+		.with_value(ButtonTonal, button_tonal()).unwrap()
+		.with_value(ButtonElevated, button_elevated()).unwrap()
+		.with_value(CardFilled, card_filled()).unwrap()
+		.with_value(CardElevated, card_elevated()).unwrap()
+		.with_value(CardOutlined, card_outlined()).unwrap()
+		.with_value(TextDisplayLarge, text_display_large()).unwrap()
+		.with_value(TextDisplayMedium, text_display_medium()).unwrap()
+		.with_value(TextDisplaySmall, text_display_small()).unwrap()
+		.with_value(TextHeadlineLarge, text_headline_large()).unwrap()
+		.with_value(TextHeadlineMedium, text_headline_medium()).unwrap()
+		.with_value(TextHeadlineSmall, text_headline_small()).unwrap()
+		.with_value(TextTitleLarge, text_title_large()).unwrap()
+		.with_value(TextTitleMedium, text_title_medium()).unwrap()
+		.with_value(TextTitleSmall, text_title_small()).unwrap()
+		.with_value(TextBodyLarge, text_body_large()).unwrap()
+		.with_value(TextBodyMedium, text_body_medium()).unwrap()
+		.with_value(TextBodySmall, text_body_small()).unwrap()
+		.with_value(TextLabelLarge, text_label_large()).unwrap()
+		.with_value(TextLabelMedium, text_label_medium()).unwrap()
+		.with_value(TextLabelSmall, text_label_small()).unwrap()
+		.with_value(ColorPrimary, color_primary()).unwrap()
+		.with_value(ShapeNone, shape_none()).unwrap()
+		.with_value(ShapeExtraSmall, shape_extra_small()).unwrap()
+		.with_value(ShapeSmall, shape_small()).unwrap()
+		.with_value(ShapeMedium, shape_medium()).unwrap()
+		.with_value(ShapeLarge, shape_large()).unwrap()
+		.with_value(ShapeExtraLarge, shape_extra_large()).unwrap()
+		.with_value(ShapeFull, shape_full()).unwrap()
+		.with_value(Elevation0, elevation_0()).unwrap()
+		.with_value(Elevation1, elevation_1()).unwrap()
+		.with_value(Elevation2, elevation_2()).unwrap()
+		.with_value(Elevation3, elevation_3()).unwrap()
+		.with_value(Elevation4, elevation_4()).unwrap()
+		.with_value(Elevation5, elevation_5()).unwrap()
+		.with_value(AppBar, app_bar()).unwrap()
+		.with_value(AppBarScrolled, app_bar_scrolled()).unwrap()
+		.with_value(Container, container()).unwrap()
+		.with_value(Page, page()).unwrap()
 }

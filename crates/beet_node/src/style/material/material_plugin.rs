@@ -1,5 +1,6 @@
 use crate::style::material::*;
 use crate::style::*;
+use crate::token::TokenStore;
 use beet_core::prelude::*;
 pub struct MaterialStylePlugin {
 	color: Color,
@@ -24,7 +25,7 @@ impl Default for MaterialStylePlugin {
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<CssPlugin>()
-			.insert_resource(default_rule_store(self.color.clone()));
+			.insert_resource(default_token_store(self.color.clone()));
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
@@ -44,24 +45,26 @@ pub fn default_token_map() -> CssTokenMap {
 }
 
 /// All default material declarations and classes
-pub fn default_rule_store(color: impl Into<Color>) -> RuleStore {
-	RuleStore::default()
-		.with(default_declarations(color))
-		.with(themes::light_scheme())
-		.with(themes::dark_scheme())
-		.with_rules(rules::all_rules())
+pub fn default_token_store(color: impl Into<Color>) -> TokenStore {
+	TokenStore::default()
+		.extend(default_declarations(color))
+		.extend(rules::all_rules())
+		.with_value(themes::LightScheme, themes::light_scheme())
+		.unwrap()
+		.with_value(themes::DarkScheme, themes::dark_scheme())
+		.unwrap()
 }
 
 /// Returns a [`Rule`] with all material design default values.
-pub fn default_declarations(color: impl Into<Color>) -> Rule {
-	Rule::default()
-		.merge_any(themes::from_color(color))
-		.merge_any(themes::default_opacities())
-		.merge_any(typography::default_typography())
-		.merge_any(geometry::default_shapes())
-		.merge_any(geometry::default_elevations())
-		.merge_any(motion::default_durations())
-		.merge_any(motion::default_motions())
+pub fn default_declarations(color: impl Into<Color>) -> TokenStore {
+	TokenStore::default()
+		.extend(themes::from_color(color))
+		.extend(themes::default_opacities())
+		.extend(typography::default_typography())
+		.extend(geometry::default_shapes())
+		.extend(geometry::default_elevations())
+		.extend(motion::default_durations())
+		.extend(motion::default_motions())
 }
 
 

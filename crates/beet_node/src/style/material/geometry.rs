@@ -73,40 +73,40 @@ pub fn token_map() -> CssTokenMap {
 
 
 /// Returns a [`Rule`] with all MD3 elevation default values.
-pub fn default_elevations() -> Rule {
+pub fn default_elevations() -> TokenStore {
 	let elevation_color = Color::srgba(0., 0., 0., 0.2);
 
-	Rule::default()
-		.with_value::<Elevation0>(Elevation::default()).unwrap()
-		.with_value::<Elevation1>(Elevation {
+	TokenStore::default()
+		.with_value(Elevation0, Elevation::default()).unwrap()
+		.with_value(Elevation1, Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(1.0),
 			blur_radius:   Length::Px(3.0),
 			spread_radius: Length::Px(1.0),
 			color:         elevation_color.clone(),
 		}).unwrap()
-		.with_value::<Elevation2>(Elevation {
+		.with_value(Elevation2, Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(2.0),
 			blur_radius:   Length::Px(6.0),
 			spread_radius: Length::Px(2.0),
 			color:         elevation_color.clone(),
 		}).unwrap()
-		.with_value::<Elevation3>(Elevation {
+		.with_value(Elevation3, Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(4.0),
 			blur_radius:   Length::Px(8.0),
 			spread_radius: Length::Px(3.0),
 			color:         elevation_color.clone(),
 		}).unwrap()
-		.with_value::<Elevation4>(Elevation {
+		.with_value(Elevation4, Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(6.0),
 			blur_radius:   Length::Px(10.0),
 			spread_radius: Length::Px(4.0),
 			color:         elevation_color.clone(),
 		}).unwrap()
-		.with_value::<Elevation5>(Elevation {
+		.with_value(Elevation5, Elevation {
 			offset_x:      Length::Px(0.0),
 			offset_y:      Length::Px(8.0),
 			blur_radius:   Length::Px(12.0),
@@ -117,27 +117,27 @@ pub fn default_elevations() -> Rule {
 
 /// Returns a [`Rule`] with all MD3 shape corner, composite shape, and
 /// outline width default values.
-pub fn default_shapes() -> Rule {
-	Rule::new()
+pub fn default_shapes() -> TokenStore {
+	TokenStore::default()
 		// corner length ref tokens
-		.with_value::<ShapeCornerNone>(Length::Px(0.0)).unwrap()
-		.with_value::<ShapeCornerExtraSmall>(Length::Px(4.0)).unwrap()
-		.with_value::<ShapeCornerSmall>(Length::Px(8.0)).unwrap()
-		.with_value::<ShapeCornerMedium>(Length::Px(12.0)).unwrap()
-		.with_value::<ShapeCornerLarge>(Length::Px(16.0)).unwrap()
-		.with_value::<ShapeCornerExtraLarge>(Length::Px(28.0)).unwrap()
-		.with_value::<ShapeCornerFull>(Length::ViewportMax(100.0)).unwrap()
+		.with_value(ShapeCornerNone, Length::Px(0.0)).unwrap()
+		.with_value(ShapeCornerExtraSmall, Length::Px(4.0)).unwrap()
+		.with_value(ShapeCornerSmall, Length::Px(8.0)).unwrap()
+		.with_value(ShapeCornerMedium, Length::Px(12.0)).unwrap()
+		.with_value(ShapeCornerLarge, Length::Px(16.0)).unwrap()
+		.with_value(ShapeCornerExtraLarge, Length::Px(28.0)).unwrap()
+		.with_value(ShapeCornerFull, Length::ViewportMax(100.0)).unwrap()
 		// composite shape sys tokens
-		.with_value::<ShapeNone>(Shape       { corner: ShapeCornerNone.into(),       edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeExtraSmall>(Shape { corner: ShapeCornerExtraSmall.into(), edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeSmall>(Shape      { corner: ShapeCornerSmall.into(),      edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeMedium>(Shape     { corner: ShapeCornerMedium.into(),     edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeLarge>(Shape      { corner: ShapeCornerLarge.into(),      edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeExtraLarge>(Shape { corner: ShapeCornerExtraLarge.into(), edge: ShapeEdge::None }).unwrap()
-		.with_value::<ShapeFull>(Shape       { corner: ShapeCornerFull.into(),       edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeNone, Shape       { corner: ShapeCornerNone.into(),       edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeExtraSmall, Shape { corner: ShapeCornerExtraSmall.into(), edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeSmall, Shape      { corner: ShapeCornerSmall.into(),      edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeMedium, Shape     { corner: ShapeCornerMedium.into(),     edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeLarge, Shape      { corner: ShapeCornerLarge.into(),      edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeExtraLarge, Shape { corner: ShapeCornerExtraLarge.into(), edge: ShapeEdge::None }).unwrap()
+		.with_value(ShapeFull, Shape       { corner: ShapeCornerFull.into(),       edge: ShapeEdge::None }).unwrap()
 		// outline width tokens
-		.with_value::<OutlineWidthNone>(Length::Px(0.0)).unwrap()
-		.with_value::<OutlineWidthThin>(Length::Px(1.0)).unwrap()
-		.with_value::<OutlineWidthMedium>(Length::Px(2.0)).unwrap()
-		.with_value::<OutlineWidthThick>(Length::Px(3.0)).unwrap()
+		.with_value(OutlineWidthNone, Length::Px(0.0)).unwrap()
+		.with_value(OutlineWidthThin, Length::Px(1.0)).unwrap()
+		.with_value(OutlineWidthMedium, Length::Px(2.0)).unwrap()
+		.with_value(OutlineWidthThick, Length::Px(3.0)).unwrap()
 }

@@ -45,7 +45,7 @@ impl CssBuilder {
 	pub fn build(
 		&self,
 		css_map: &CssTokenMap,
-		rules: &[&Rule],
+		tokens: &[(&TokenKey, &TokenValue)],
 	) -> Result<String> {
 		let css_rules =
 			rules.xtry_map(|rule| CssRule::from_rule(&css_map, rule))?;

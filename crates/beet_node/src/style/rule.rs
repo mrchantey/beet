@@ -3,27 +3,9 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 use std::sync::Arc;
 
-/// An ordered collection of [`Rule`]s applied from first to last.
-///
-/// Later ruless override earlier ones for the same token path.
-/// Can be used as a global [`Resource`] or per-entity [`Component`].
-#[derive(Default, Deref, DerefMut, Resource, Component)]
-pub struct RuleStore(Vec<Rule>);
-
-impl RuleStore {
-	/// Add a rule to this store.
-	pub fn with(mut self, rule: Rule) -> Self {
-		self.0.push(rule);
-		self
-	}
-	pub fn with_rules(mut self, rules: impl IntoIterator<Item = Rule>) -> Self {
-		self.0.extend(rules);
-		self
-	}
-}
-
 /// A set of default properties applied to elements matching the given criteria.
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Rule {
 	predicate: Predicate,
 	declarations: TokenStore,
