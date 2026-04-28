@@ -19,6 +19,12 @@ pub struct Token {
 	schema: TokenKey,
 }
 
+impl std::fmt::Display for Token {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.key.fmt(f)
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Get)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedValue {
@@ -35,6 +41,10 @@ impl TypedValue {
 			schema: TokenKey::of::<T>(),
 		}
 		.xok()
+	}
+	pub fn into_typed<T: Typed + FromReflect>(&self) -> Result<T> {
+		self.schema.assert_eq_ty::<T>()?;
+		self.value.into_reflect::<T>()
 	}
 }
 

@@ -6,7 +6,7 @@ use bevy::reflect::Typed;
 /// are nested maps and leaf nodes are typed values.
 /// It is perhaps more akin to a filesystem where files are
 /// typed, than a freeform json value.
-#[derive(Default, Deref, DerefMut, Resource, Reflect, Component)]
+#[derive(Debug, Default, Deref, DerefMut, Resource, Reflect, Component)]
 pub struct TokenStore {
 	tokens: HashMap<TokenKey, TokenValue>,
 }
@@ -16,29 +16,30 @@ impl TokenStore {
 			tokens: HashMap::new(),
 		}
 	}
-	pub fn with(
+	fn with(
 		mut self,
-		key: impl Into<TokenKey>,
+		key: impl Into<Token>,
 		value: impl Into<TokenValue>,
 	) -> Result<Self> {
 		let value = value.into();
 		let key = key.into();
-		key.assert_eq(value.schema())?;
-		self.tokens.insert(key.into(), value.into());
-		todo!("token schema comparison");
-		// self.xok()
+		key.schema().assert_eq(value.schema())?;
+		self.tokens.insert(key.key().clone(), value.into());
+		self.xok()
 	}
-	pub fn with_token<K: TypedTokenKey>(
+	pub fn with_token(
 		self,
+		key: impl Into<Token>,
 		value: impl Into<Token>,
 	) -> Result<Self> {
-		self.with(K::token_key(), value)
+		self.with(key, value)
 	}
-	pub fn with_value<K: TypedTokenKey>(
+	pub fn with_value(
 		self,
+		key: impl Into<Token>,
 		value: impl Typed,
 	) -> Result<Self> {
-		self.with(K::token_key(), TypedValue::new(value)?)
+		self.with(key, TypedValue::new(value)?)
 	}
 	pub fn extend(
 		mut self,
@@ -47,36 +48,75 @@ impl TokenStore {
 		self.tokens.extend(rules);
 		self
 	}
+
+	pub fn get(&self, key: &Token) -> Result<&TokenValue> {
+		match self.tokens.get(key.key()) {
+			Some(value) => {
+				key.schema().assert_eq(value.schema())?;
+				Ok(value)
+			}
+			None => bevybail!("Token Not Found: `{key}`"),
+		}
+	}
+	pub fn get_typed<T: Typed + FromReflect>(&self, key: &Token) -> Result<T> {
+		key.schema().assert_eq_ty::<T>()?;
+		match self.get(key)? {
+			TokenValue::Value(value) => value.into_typed::<T>(),
+			TokenValue::Token(_) => {
+				bevybail!("Expected Value, found Token: `{key}`")
+			}
+		}
+	}
 }
 
 
-// #[cfg(test)]
-// mod tests {
-// 	use super::*;
+#[cfg(test)]
+mod tests {
+	use super::*;
 
-// 	#[test]
-// 	fn mismatch() {
-// 		let mut world = World::new();
-// 		world.insert_resource(
-// 			TokenStore::default()
-// 				.with_value::<CoolNumbers>(vec![0u64, 1, 2])
-// 				.unwrap(),
-// 		);
-// 	}
 
-// 	#[test]
-// 	fn works() {
-// 		let mut world = World::new();
-// 		world.insert_resource(
-// 			TokenStore::default()
-// 				.with_value::<CoolNumbers>(vec![0u32, 1, 2])
-// 				.unwrap(),
-// 		);
-// 	}
+	token!(CoolInts, Vec<u32>);
+	token!(CoolFloats, Vec<f32>);
+	token!(CoolStore, TokenStore);
 
-// 	token!(
-// 		#[allow(unused)]
-// 		CoolNumbers,
-// 		Vec<u32>
-// 	);
-// }
+	#[test]
+	fn mismatch() {
+		TokenStore::default()
+			.with_value(CoolInts, vec![0., 1., 2.])
+			.unwrap_err();
+		TokenStore::default()
+			.with_token(CoolInts, CoolFloats)
+			.unwrap_err();
+	}
+
+	#[test]
+	fn works() {
+		let store = TokenStore::default()
+			.with_value(CoolInts, vec![0u32, 1, 2])
+			.unwrap();
+		store.get(&CoolFloats.into()).xpect_err();
+		store.get(&CoolInts.into()).xpect_ok();
+		store.get_typed::<Vec<f32>>(&CoolInts.into()).xpect_err();
+		store
+			.get_typed::<Vec<u32>>(&CoolInts.into())
+			.unwrap()
+			.xpect_eq(vec![0u32, 1, 2]);
+	}
+	#[test]
+	fn nested() {
+		let store = TokenStore::default()
+			.with_value(
+				CoolStore,
+				TokenStore::default()
+					.with_value(CoolInts, vec![0u32, 1, 2])
+					.unwrap(),
+			)
+			.unwrap();
+		store
+			.get_typed::<TokenStore>(&CoolStore.into())
+			.unwrap()
+			.get_typed::<Vec<u32>>(&CoolInts.into())
+			.unwrap()
+			.xpect_eq(vec![0u32, 1, 2]);
+	}
+}

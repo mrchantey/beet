@@ -240,14 +240,12 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 		ReflectRef::Map(m) => {
 			let mut map = Map::default();
 			for (key, value) in m.iter() {
-				let key_str = key
-					.try_downcast_ref::<String>()
-					.map(|s| SmolStr::from(s.as_str()))
-					.or_else(|| {
-						key.try_downcast_ref::<&str>()
-							.map(|s| SmolStr::from(*s))
-					})
-					.ok_or_else(|| bevyhow!("map key must be a string"))?;
+				let key_str = try_string(key).map_err(|_| {
+					bevyhow!(
+						"map key is not a string: {:?}",
+						key.reflect_ref().kind()
+					)
+				})?;
 				map.insert(key_str, reflect_to_value(value)?);
 			}
 			Ok(Value::Map(map))
@@ -346,6 +344,36 @@ pub fn reflect_to_value(reflect: &dyn PartialReflect) -> Result<Value> {
 		other => {
 			bevybail!("unsupported reflect kind: {:?}", other.kind())
 		}
+	}
+}
+
+pub fn try_string(value: &dyn PartialReflect) -> Result<SmolStr> {
+	match value.reflect_ref() {
+		// ReflectRef::Struct(_) => todo!(),
+		ReflectRef::TupleStruct(tuple_struct)
+			if tuple_struct.field_len() == 1 =>
+		{
+			try_string(tuple_struct.field(0).unwrap())
+		}
+		ReflectRef::Opaque(value) => value
+			.try_downcast_ref::<String>()
+			.map(|s| SmolStr::from(s))
+			.or_else(|| {
+				value.try_downcast_ref::<&str>().map(|s| SmolStr::from(*s))
+			})
+			.or_else(|| value.try_downcast_ref::<SmolStr>().map(|s| s.clone()))
+			.ok_or_else(|| bevyhow!("value is not a string")),
+		other => {
+			bevybail!(
+				"unsupported reflect kind for string conversion: {:?}",
+				other.kind()
+			)
+		} // ReflectRef::Tuple(tuple) => todo!(),
+		  // ReflectRef::List(list) => todo!(),
+		  // ReflectRef::Array(array) => todo!(),
+		  // ReflectRef::Map(map) => todo!(),
+		  // ReflectRef::Set(set) => todo!(),
+		  // ReflectRef::Enum(_) => todo!(),
 	}
 }
 
