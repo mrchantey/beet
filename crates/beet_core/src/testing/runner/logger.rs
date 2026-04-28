@@ -94,7 +94,7 @@ pub(super) fn log_file_outcomes(
 		(Entity, &TestRunnerConfig, &Children),
 		With<TestRunnerConfig>,
 	>,
-	_trigger: Populated<(), Added<TestOutcome>>,
+	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
 	running: Query<&Test, Without<TestOutcome>>,
 	finished: Query<(&Test, &TestOutcome)>,
 ) -> Result {
@@ -104,17 +104,32 @@ pub(super) fn log_file_outcomes(
 		}
 		let _guard = paint_ext::SetPaintEnabledTemp::new(!config.no_color);
 
+		// get newly finished tests
+		let just_finished = children
+			.iter()
+			.filter_map(|child| just_finished.get(child).ok())
+			.collect::<Vec<_>>();
+
+		// get files that have tests still running
 		let running = children
 			.iter()
 			.filter_map(|child| running.get(child).ok())
 			.map(|test| test.source_file)
 			.collect::<HashSet<_>>();
 
+		// collect files with newly finished tests that are now complete
+		let files_to_log = just_finished
+			.iter()
+			.map(|(test, _)| test.source_file)
+			.filter(|file| !running.contains(file))
+			.collect::<HashSet<_>>();
+
+		// collect all finished tests for files that should be logged
 		let finished = children
 			.iter()
 			.filter_map(|child| finished.get(child).ok())
 			.fold(HashMap::new(), |mut map, (test, outcome)| {
-				if !running.contains(test.source_file) {
+				if files_to_log.contains(test.source_file) {
 					map.entry(test.short_file())
 						.or_insert_with(Vec::new)
 						.push((test, outcome));
