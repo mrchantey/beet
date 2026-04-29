@@ -13,11 +13,6 @@ pub trait NodeParser {
 	fn parse(&mut self, cx: ParseContext<'_, '_>) -> Result<(), ParseError>;
 }
 
-/// Triggered on an entity after parsing is complete
-#[derive(EntityEvent)]
-pub struct NodeParsed(pub Entity);
-
-
 /// Context passed to [`NodeParser::parse`].
 ///
 /// Two lifetimes: `'w` for the world borrow inside [`EntityWorldMut`],

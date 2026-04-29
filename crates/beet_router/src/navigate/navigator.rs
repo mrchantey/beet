@@ -1,6 +1,6 @@
+use beet_action::prelude::AsyncEntityActionExt;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
@@ -225,26 +225,13 @@ impl Navigator {
 
 		let media_bytes = response.into_media_bytes().await?;
 
-		let render_targets = entity.get_cloned::<RenderTargets>().await?;
-		entity
-			.world()
-			.with_then(move |world| {
-				for target in render_targets.iter() {
-					world.entity_mut(target).trigger(|entity| {
-						RenderMedia::new(entity, media_bytes.clone())
-					});
-				}
-				// for target in render_targets.iter() {
-				// 	world.entity_mut(target).call_with::<Request, Response>(
-				// 		Request::with_media(
-				// 			Url::default(),
-				// 			media_bytes.clone(),
-				// 		),
-				// 		default(),
-				// 	)?;
-				// }
-				// Ok(())
-			})
+		// trigger a Request on this entity, expecting some
+		// renderer to handle it
+		let response = entity
+			.call::<Request, Response>(Request::with_media(
+				Url::default(),
+				media_bytes,
+			))
 			.await;
 
 		entity
@@ -252,6 +239,9 @@ impl Navigator {
 				nav.loading = false;
 			})
 			.await?;
+
+		// ensure the render request was succesful
+		let _response = response?.into_result().await?;
 
 		if let Some(_redirect_url) = redirect {
 			todo!("handle redirects");

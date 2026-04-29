@@ -30,22 +30,50 @@ fn setup(mut commands: Commands) {
 		.cloned()
 		.unwrap_or_else(|| "http://example.com".to_string());
 
-	let navigator = commands.spawn(Navigator::new(url.clone())).id();
-
 	commands.spawn((Layout::vertical(), children![
 		TuiTextBox::new("url", &url),
 		(
-			// listens for responses delivered by Navigator
-			RenderedBy(navigator),
-			// parses the RenderMedia observer into the entity
-			MediaParser::default(),
-			// renders this entity on a NodeParsed event,
-			// triggering a Changed<TuiWidget> which results in
-			// a ratatui refresh
+			Navigator::new(url.clone()),
+			Middleware::new(Render),
+			SpawnAndRender,
 			TuiNodeRenderer::default(),
 		)
 	]));
 }
+
+#[action]
+#[derive(Component)]
+async fn Render(
+	cx: ActionContext<(RequestParts, Next<RequestParts, Response>)>,
+) -> Result<Response> {
+	let mut renderer = cx.caller.get_cloned::<TuiNodeRenderer>().await?;
+	cx.caller
+		.with_then(move |mut entity| {
+			renderer.run(&mut entity, vec![MediaType::Ratatui])
+		})
+		.await?;
+	Response::ok().xok()
+}
+
+// for a given request, parse its body then spawn and render as an ephemeral scene entity
+#[action]
+#[derive(Component)]
+async fn SpawnAndRender(cx: ActionContext<Request>) -> Result<Response> {
+	let parts = cx.input().parts().clone();
+	let caller_id = cx.id();
+	let media = cx.input.into_media_bytes().await?;
+	cx.caller
+		.with_then(move |mut entity| {
+			entity.despawn_children();
+			MediaParser::new().parse(ParseContext::new(&mut entity, &media))
+		})
+		.await?;
+
+	SceneEntity::new_fixed(caller_id)
+		.render_scene(&cx.caller, parts)
+		.await
+}
+
 
 use beet::exports::bevy_ratatui::event::KeyMessage;
 use beet::exports::bevy_ratatui::event::MouseMessage;

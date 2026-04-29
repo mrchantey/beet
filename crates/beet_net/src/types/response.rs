@@ -37,7 +37,7 @@ use std::convert::Infallible;
 /// let response = Response::ok();
 /// assert_eq!(response.status(), StatusCode::OK);  // From ResponseParts
 /// ```
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Get)]
 #[require(ResponseMarker = ResponseMarker{_sealed:()})]
 pub struct Response {
 	/// The response metadata including status code and headers.

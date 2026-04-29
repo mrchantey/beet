@@ -42,9 +42,10 @@ use bytes::Bytes;
 /// assert_eq!(request.method(), &HttpMethod::Get);
 /// assert_eq!(request.path(), &["api", "users"]);
 /// ```
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Get)]
 #[component(on_add = on_add)]
 pub struct Request {
+	/// The request metadata, including method, path, headers, etc.
 	parts: RequestParts,
 	/// The request body, which may be bytes or a stream.
 	pub body: Body,
@@ -75,8 +76,9 @@ impl std::ops::DerefMut for Request {
 /// Cloned from the [`Request`] when its added, allowing the [`Request`]
 /// to be consumed and for these parts to still be accessible.
 /// This component should not be removed.
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Get)]
 pub struct RequestMeta {
+	/// The request metadata, including method, path, headers, etc.
 	parts: RequestParts,
 	/// Note this is taken the moment the request is inserted. It does not account
 	/// for the approx 70us overhead created by using bevy at all.
@@ -92,14 +94,8 @@ impl RequestMeta {
 		}
 	}
 
-	/// Returns a reference to the request parts
-	pub fn parts(&self) -> &RequestParts { &self.parts }
-
 	/// Returns the HTTP method of the request.
 	pub fn method(&self) -> HttpMethod { *self.parts.method() }
-
-	/// Returns the instant when the request was received.
-	pub fn started(&self) -> Instant { self.started }
 
 	/// Returns a reference to the request parts
 	pub fn request_parts(&self) -> &RequestParts { &self.parts }
@@ -121,9 +117,6 @@ impl Request {
 			body: default(),
 		}
 	}
-
-	/// Returns a reference to the request parts
-	pub fn parts(&self) -> &RequestParts { &self.parts }
 
 	/// Creates a request from parts and body
 	pub fn from_parts(parts: RequestParts, body: Body) -> Self {

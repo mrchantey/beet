@@ -56,7 +56,7 @@ pub async fn HelpHandler(
 		.await?;
 
 	let scene = spawn_help_scene(&caller, &nodes).await;
-	scene.render(&caller, parts).await
+	scene.render_scene(&caller, parts).await
 }
 
 /// Fallback handler that shows help scoped to the nearest ancestor scene
@@ -80,8 +80,9 @@ pub(crate) async fn ContextualNotFound(
 		.await?;
 
 	let scene = spawn_not_found_scene(&cx.caller, info, &nodes).await;
-	let mut response =
-		scene.render(&cx.caller, cx.input.parts().clone()).await?;
+	let mut response = scene
+		.render_scene(&cx.caller, cx.input.parts().clone())
+		.await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }

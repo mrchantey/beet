@@ -8,21 +8,25 @@ pub async fn RequestLogger(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let now = Instant::now();
-	debug!("RequestLogger: Received request: \n{:?}", cx.input.0);
+	let request_parts = cx.input.0.parts().clone();
+	debug!(
+		"RequestLogger: Received request: \n{:#?}",
+		cx.input.0.parts()
+	);
 	let response = cx.input.1.call(cx.input.0).await?;
-	if response.status.is_ok() {
+	debug!(
+		"RequestLogger: {} Response in {}",
+		response.status(),
+		time_ext::pretty_print_duration(now.elapsed())
+	);
+	if !response.status.is_ok() {
 		// status only if ok
 		debug!(
-			"RequestLogger: Response in (took {:?}):\n {:?} ",
-			response.status(),
-			now.elapsed()
+			"RequestLogger: Non-ok response:\n Request: {:#?}\n Response: {:#?}",
+			request_parts,
+			response.parts(),
 		);
 	} else {
-		debug!(
-			"RequestLogger: Response in (took {:?}):\n {:?} ",
-			response,
-			now.elapsed()
-		);
 	}
 
 	Ok(response)

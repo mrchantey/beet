@@ -41,7 +41,11 @@ impl SceneEntity {
 		self.despawn.extend(child.despawn);
 		self
 	}
-	pub async fn render(
+
+	/// Applies two levels of middleware:
+	/// 1. RequestParts/SceneEntity middleware, ie layout wrapping
+	/// 2. RequestParts/Response middleware, ie renderers
+	pub async fn render_scene(
 		self,
 		caller: &AsyncEntity,
 		parts: RequestParts,
@@ -85,7 +89,7 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
-		Box::pin(async move { self.render(&caller, parts).await })
+		Box::pin(async move { self.render_scene(&caller, parts).await })
 	}
 }
 

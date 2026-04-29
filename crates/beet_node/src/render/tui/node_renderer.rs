@@ -51,7 +51,6 @@ use std::borrow::Cow;
 /// and layout metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 #[require(TuiScrollState, TuiWidget = widget())]
-#[component(on_add=on_add)]
 pub struct TuiNodeRenderer {
 	/// Remaining drawable area; shrinks as content is emitted.
 	area: Rect,
@@ -99,24 +98,6 @@ fn widget() -> TuiWidget {
 		renderer.render_inner(cx.entity, cx.draw_area, cx.buffer)?;
 		Ok(())
 	})
-}
-
-
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world
-		.commands()
-		.entity(cx.entity)
-		.observe(mark_widget_changed);
-}
-
-fn mark_widget_changed(ev: On<NodeParsed>, mut query: Query<&mut TuiWidget>) {
-	query
-		.get_mut(ev.event_target())
-		.map(|mut widget| {
-			widget.set_changed();
-		})
-		// ignore missing component
-		.ok();
 }
 
 /// Create a new [`TuiRenderer`], its rect will be updated

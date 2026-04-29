@@ -15,8 +15,7 @@ use beet_core::prelude::*;
 /// respective feature flags. When `plaintext_fallback` is enabled,
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
-#[derive(Debug, Clone, Component)]
-#[cfg_attr(feature = "net", component(on_add=on_add))]
+#[derive(Debug, Clone)]
 pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
 	plaintext_fallback: bool,
@@ -27,36 +26,10 @@ pub struct MediaParser {
 	markdown_parser: MarkdownParser,
 }
 
-#[cfg(feature = "net")]
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).observe(render_media);
+
+impl Default for MediaParser {
+	fn default() -> Self { Self::new() }
 }
-#[cfg(feature = "net")]
-fn render_media(ev: On<RenderMedia>, mut commands: Commands) -> Result {
-	let entity = ev.event_target();
-	let media_bytes = ev.event().clone();
-	commands.queue(move |world: &mut World| -> Result {
-		let mut entity = world.entity_mut(entity);
-		// let mut parser = entity.get::<MediaParser>().unwrap().clone();
-		let Some(mut parser) = entity.take::<MediaParser>() else {
-			return Ok(());
-		};
-
-		// TODO this is a hack because our diffing is resulting in
-		// stale data.. though we are visiting a new site, probs
-		// fair to be clearing all anyway..
-		entity.despawn_related::<Children>();
-
-		parser.parse(ParseContext::new(&mut entity, &media_bytes))?;
-
-		entity.insert(parser).trigger(NodeParsed);
-
-		Ok(())
-	});
-
-	Ok(())
-}
-
 
 
 
@@ -98,10 +71,6 @@ impl MediaParser {
 		self.markdown_parser = parser;
 		self
 	}
-}
-
-impl Default for MediaParser {
-	fn default() -> Self { Self::new() }
 }
 
 

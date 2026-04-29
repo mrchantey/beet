@@ -27,6 +27,19 @@ where
 	fn default() -> Self { Self(default()) }
 }
 
+impl<T, In, Out> Middleware<T, In, Out>
+where
+	In: 'static,
+	Out: 'static,
+	T: Component
+		+ Clone
+		+ IntoAction<T, In = (In, Next<In, Out>), Out = Out>
+		+ Default,
+{
+	pub fn new(inner: T) -> Self { Self(inner) }
+}
+
+
 fn on_add<T, In, Out>(mut world: DeferredWorld, cx: HookContext)
 where
 	In: 'static,
