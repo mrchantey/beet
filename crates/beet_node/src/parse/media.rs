@@ -104,6 +104,7 @@ impl Default for MediaParser {
 	fn default() -> Self { Self::new() }
 }
 
+
 impl NodeParser for MediaParser {
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type().clone();

@@ -234,6 +234,16 @@ impl Navigator {
 						RenderMedia::new(entity, media_bytes.clone())
 					});
 				}
+				// for target in render_targets.iter() {
+				// 	world.entity_mut(target).call_with::<Request, Response>(
+				// 		Request::with_media(
+				// 			Url::default(),
+				// 			media_bytes.clone(),
+				// 		),
+				// 		default(),
+				// 	)?;
+				// }
+				// Ok(())
 			})
 			.await;
 

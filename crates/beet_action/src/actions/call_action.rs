@@ -6,8 +6,7 @@ use beet_core::prelude::*;
 
 /// Dispatches an action call through a cached system, then flushes the world.
 fn call_world<Input, Out>(
-	entity: Entity,
-	world: &mut World,
+	entity: &mut EntityWorldMut,
 	input: Input,
 	out_handler: OutHandler<Out>,
 ) -> Result
@@ -15,12 +14,15 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	world.run_system_cached_with::<_, Result, _, _>(
-		call_action_system::<Input, Out>,
-		(entity, input, out_handler),
-	)??;
-	world.flush();
-	Ok(())
+	let id = entity.id();
+	entity.world_scope(move |world| -> Result {
+		world.run_system_cached_with::<_, Result, _, _>(
+			call_action_system::<Input, Out>,
+			(id, input, out_handler),
+		)??;
+		world.flush();
+		Ok(())
+	})
 }
 
 fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
@@ -60,8 +62,7 @@ fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
 /// back to the caller instead of silently closing the channel.
 #[track_caller]
 fn call_with_channel<Input, Out>(
-	entity: Entity,
-	world: &mut World,
+	entity: &mut EntityWorldMut,
 	input: Input,
 ) -> Result<Receiver<Result<Out>>>
 where
@@ -74,7 +75,7 @@ where
 			bevyhow!("Failed to send action output through channel: {err:?}")
 		})
 	});
-	call_world(entity, world, input, out_handler)?;
+	call_world(entity, input, out_handler)?;
 	Ok(recv)
 }
 
@@ -93,17 +94,16 @@ fn unwrap_channel_result<Out>(
 
 /// Drives an action call to completion from an [`EntityWorldMut`] context,
 /// polling the world as needed while waiting for the result.
-async fn call_inner<Input, Out>(
-	entity: EntityWorldMut<'_>,
+async fn call_polling<Input, Out>(
+	mut entity: EntityWorldMut<'_>,
 	input: Input,
 ) -> Result<Out>
 where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let id = entity.id();
+	let recv = call_with_channel::<Input, Out>(&mut entity, input)?;
 	let world = entity.into_world_mut();
-	let recv = call_with_channel::<Input, Out>(id, world, input)?;
 	match recv.try_recv() {
 		Ok(result) => result,
 		Err(TryRecvError::Empty) => {
@@ -132,7 +132,7 @@ pub impl EntityWorldMut<'_> {
 		self,
 		input: Input,
 	) -> Result<Out> {
-		async_ext::block_on(call_inner(self, input))
+		async_ext::block_on(call_polling(self, input))
 	}
 
 	/// Call an action asynchronously, polling the world until completion.
@@ -144,7 +144,14 @@ pub impl EntityWorldMut<'_> {
 		self,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
-		call_inner(self, input)
+		call_polling(self, input)
+	}
+	fn call_with<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
+		&mut self,
+		input: Input,
+		out_handler: OutHandler<Out>,
+	) -> Result {
+		call_world::<Input, Out>(self, input, out_handler)
 	}
 }
 
@@ -183,14 +190,12 @@ pub impl AsyncEntity {
 		&self,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
-		let entity_id = self.id();
-		let world = self.world().clone();
 		async move {
-			let recv = world
+			let recv = self
 				.with_then(
 					// #[track_caller]
-					move |w: &mut World| {
-						call_with_channel::<Input, Out>(entity_id, w, input)
+					move |mut entity| {
+						call_with_channel::<Input, Out>(&mut entity, input)
 					},
 				)
 				.await?;
@@ -243,10 +248,8 @@ pub impl EntityCommands<'_> {
 		input: Input,
 		out_handler: OutHandler<Out>,
 	) {
-		self.queue(move |entity: EntityWorldMut| -> Result {
-			let id = entity.id();
-			let world = entity.into_world_mut();
-			call_world::<Input, Out>(id, world, input, out_handler)?;
+		self.queue(move |mut entity: EntityWorldMut| -> Result {
+			call_world::<Input, Out>(&mut entity, input, out_handler)?;
 			Ok(())
 		});
 	}
