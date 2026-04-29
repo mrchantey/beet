@@ -63,19 +63,8 @@ pub async fn Router(cx: ActionContext<Request>) -> Response {
 		Err(err) => return bevyhow!("{err}").into_response(),
 	};
 
-	// wrap the inner action with ancestor middleware resolved from the
-	// dispatch entity so route-scoped middleware is correctly applied
-	let dispatch_id = dispatch_entity.id();
-	let action = world
-		.with_state::<MiddlewareQuery<Request, Response>, _>(move |query| {
-			query.resolve_action(dispatch_id, inner_action)
-		})
-		.await;
-
-	// dispatch on the route entity so cx.caller in the exchange action
-	// (and inner actions) is the route entity, not the server entity
 	dispatch_entity
-		.call_detached(action, request)
+		.call_with_middleware(inner_action, request)
 		.await
 		.unwrap_or_else(|err| err.into_response())
 }
@@ -151,7 +140,10 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((router(), children![fixed_scene("about", rsx!{ <p>"About page"</p> }),]))
+			.spawn((router(), children![fixed_scene(
+				"about",
+				rsx! { <p>"About page"</p> }
+			),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -164,7 +156,10 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((router(), children![fixed_scene("", rsx!{ <p>"Root content"</p> }),]))
+			.spawn((router(), children![fixed_scene(
+				"",
+				rsx! { <p>"Root content"</p> }
+			),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap()
@@ -177,8 +172,11 @@ mod test {
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
 			.spawn((router(), children![
-				fixed_scene("", rsx!{ <h1>"My Server"</h1> <p>"welcome!"</p> }),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene(
+					"",
+					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -194,7 +192,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -209,7 +207,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![
 				increment(FieldRef::new("count")),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
 			.await
@@ -235,8 +233,11 @@ mod test {
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
 			.spawn((router(), children![
-				fixed_scene("", rsx!{ <h1>"My Server"</h1> <p>"welcome!"</p> }),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene(
+					"",
+					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+				),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("").unwrap())
 			.await
@@ -260,7 +261,7 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.flush();
 
@@ -304,7 +305,7 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				fixed_scene("about", rsx! { <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(
 				Request::from_cli_str("counter nonsense").unwrap(),

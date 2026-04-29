@@ -54,7 +54,9 @@ impl SceneActionRenderer {
 		parts: RequestParts,
 	) -> Result<Response> {
 		// apply ancestor scene middleware (layout wrapping, etc.)
-		let scene = Self::apply_scene_middleware(caller, scene, &parts).await?;
+		let scene = caller
+			.call_with_middleware(Action::new_fixed(scene), parts.clone())
+			.await?;
 
 		// find the nearest ancestor SceneActionRenderer or fall back
 		let render_action = Self::resolve(caller).await;
@@ -69,45 +71,6 @@ impl SceneActionRenderer {
 		}
 
 		result
-	}
-
-	/// Applies ancestor [`MiddlewareQuery`] middleware to the scene.
-	///
-	/// Creates an inner action that returns the original scene, wraps
-	/// it with any ancestor `RequestParts/SceneEntity` middleware,
-	/// and executes the chain. When no middleware exists the original
-	/// scene is returned unchanged.
-	async fn apply_scene_middleware(
-		caller: &AsyncEntity,
-		scene: SceneEntity,
-		parts: &RequestParts,
-	) -> Result<SceneEntity> {
-		// check for ancestor scene middleware first
-		let has_middleware = caller
-			.with_state::<MiddlewareQuery<RequestParts, SceneEntity>, _>(
-				|entity, query| query.has_middleware(entity),
-			)
-			.await;
-		if !has_middleware {
-			return Ok(scene);
-		}
-
-		// build inner action that returns the original scene
-		let inner: Action<RequestParts, SceneEntity> = Action::new_async({
-			let scene = scene.clone();
-			async move |_cx: ActionContext<RequestParts>| {
-				scene.xok::<BevyError>()
-			}
-		});
-
-		// wrap with ancestor scene middleware and execute
-		let wrapped = caller
-			.with_state::<MiddlewareQuery<RequestParts, SceneEntity>, _>({
-				move |entity, query| query.resolve_action(entity, inner)
-			})
-			.await;
-
-		caller.call_detached(wrapped, parts.clone()).await
 	}
 }
 

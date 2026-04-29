@@ -6,13 +6,21 @@ where
 	In: 'static,
 	Out: 'static,
 {
+	pub fn new_fixed(value: Out) -> Self
+	where
+		Out: 'static + Send + Sync + Clone,
+	{
+		Self::new_pure(move |_| value)
+	}
+
 	/// Create an [`Action`] from a pure closure that receives [`ActionContext`]
 	/// and returns a value convertible to `Result<Out>` via [`IntoResult`].
 	///
 	/// Accepts closures returning either `Out` or `Result<Out>`.
 	pub fn new_pure<Func, RawOut>(func: Func) -> Self
 	where
-		Func: 'static + Send + Sync + Clone + FnOnce(ActionContext<In>) -> RawOut,
+		Func:
+			'static + Send + Sync + Clone + FnOnce(ActionContext<In>) -> RawOut,
 		RawOut: IntoResult<Out>,
 	{
 		Action::new(
@@ -46,7 +54,9 @@ where
 	type In = I;
 	type Out = O;
 
-	fn into_action(self) -> Action<Self::In, Self::Out> { Action::new_pure(self) }
+	fn into_action(self) -> Action<Self::In, Self::Out> {
+		Action::new_pure(self)
+	}
 }
 
 pub struct TypedFuncActionMarker;

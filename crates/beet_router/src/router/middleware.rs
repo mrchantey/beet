@@ -118,16 +118,16 @@ where
 	Out: 'static,
 {
 	/// Wraps an action with all ancestor middleware for the given entity.
-	pub fn resolve_action(
+	fn resolve_action<M>(
 		&self,
 		entity: Entity,
-		action: Action<In, Out>,
+		action: impl IntoAction<M, In = In, Out = Out>,
 	) -> Action<In, Out>
 	where
 		In: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
 	{
-		let mut wrapped = action;
+		let mut wrapped = action.into_action();
 		for list in self.middleware.get_ancestors(entity) {
 			wrapped = list.wrap(&wrapped);
 		}
@@ -136,7 +136,8 @@ where
 
 	/// Returns `true` if any middleware exists on ancestors
 	/// of the given entity.
-	pub fn has_middleware(&self, entity: Entity) -> bool {
+	#[allow(unused)]
+	fn has_middleware(&self, entity: Entity) -> bool {
 		let ancestors = self.middleware.get_ancestors(entity);
 		for list in ancestors {
 			if !list.0.is_empty() {
@@ -144,5 +145,29 @@ where
 			}
 		}
 		false
+	}
+}
+
+
+
+#[extend::ext(name=AsyncEntityMiddleware)]
+pub impl AsyncEntity {
+	fn call_with_middleware<In, Out>(
+		&self,
+		action: Action<In, Out>,
+		input: In,
+	) -> MaybeSendBoxedFuture<'_, Result<Out>>
+	where
+		In: 'static + Send + Sync,
+		Out: 'static + Send + Sync,
+	{
+		Box::pin(async move {
+			let action = self
+				.with_state::<MiddlewareQuery<In, Out>, _>(
+					move |entity, query| query.resolve_action(entity, action),
+				)
+				.await;
+			self.call_detached(action, input).await
+		})
 	}
 }
