@@ -1296,6 +1296,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "uuid",
  "variadics_please",
  "webbrowser",
  "winnow 0.7.15",

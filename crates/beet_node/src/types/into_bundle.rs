@@ -140,5 +140,7 @@ mod test {
 		is_bundle((Entity::PLACEHOLDER, "text", 42_i32));
 		is_bundle(Bar);
 		is_bundle((Bar, Bar));
+		// not bundle: cannot mix IntoBundle<Self> with impl Bundle
+		// is_bundle((Entity::PLACEHOLDER, Bar));
 	}
 }

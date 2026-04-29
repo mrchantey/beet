@@ -35,6 +35,7 @@ beet_action = {workspace = true,optional = true }
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
+uuid.workspace = true
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
