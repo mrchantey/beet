@@ -118,7 +118,7 @@ where
 	Out: 'static,
 {
 	/// Wraps an action with all ancestor middleware for the given entity.
-	fn resolve_action<M>(
+	pub fn resolve_action<M>(
 		&self,
 		entity: Entity,
 		action: impl IntoAction<M, In = In, Out = Out>,

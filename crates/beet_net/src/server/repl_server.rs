@@ -1,8 +1,6 @@
 //! A REPL server that reads lines from stdin in a loop, dispatching
 //! each as a [`Request`] and streaming the [`Response`] body to stdout.
 //!
-//! Typically paired with a [`SceneActionRenderer`] so that scenes
-//! render their content for terminal output.
 //!
 //! Uses a background thread for stdin reading so the async executor
 //! is never blocked.
@@ -22,8 +20,7 @@ use beet_core::prelude::*;
 /// [`Request`], dispatched through the owning entity's action pipeline,
 /// and the response body is streamed to stdout.
 ///
-/// Typically paired with a [`SceneActionRenderer`] for rendering
-/// scene content in the terminal, and a [`History`] component for
+/// Typically paired with a [`History`] component for
 /// tracking the current path, enabling relative navigation via
 /// `--navigate=<direction>`.
 ///

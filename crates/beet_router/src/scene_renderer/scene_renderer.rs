@@ -4,88 +4,96 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_node::prelude::*;
 
-/// Component on a server entity that controls how scenes are rendered.
-/// When absent, the default content-negotiated renderer via
-/// [`MediaRenderer`] is used as a fallback.
-#[derive(Debug, Clone, Component)]
-pub struct SceneActionRenderer {
-	action: Action<RequestParts, Response>,
+/// A route output representing a scene entity to be rendered.
+/// Entities in `despawn` are cleaned up after rendering,
+/// ie help pages, not-found pages.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SceneEntity {
+	/// The entity to render.
+	pub entity: Entity,
+	/// Entities to despawn after rendering.
+	pub despawn: Vec<Entity>,
 }
-
-impl Default for SceneActionRenderer {
-	fn default() -> Self {
+impl SceneEntity {
+	/// A scene entity that should not be despawned after render.
+	pub fn new_fixed(entity: Entity) -> Self {
 		Self {
-			action: Action::new_async(default_scene_renderer),
+			entity,
+			despawn: default(),
 		}
 	}
-}
 
-impl SceneActionRenderer {
-	/// Creates a renderer with a custom action.
-	pub fn new(action: Action<RequestParts, Response>) -> Self {
-		Self { action }
+	/// A scene entity that should be despawned after render,
+	/// ie a help page or not found route.
+	pub fn new_ephemeral(entity: Entity) -> Self {
+		Self {
+			entity,
+			despawn: vec![entity],
+		}
+	}
+	pub fn push_despawn(mut self, entity: Entity) -> Self {
+		self.despawn.push(entity);
+		self
 	}
 
-	async fn resolve(entity: &AsyncEntity) -> Action<RequestParts, Response> {
-		entity
-			.with_state::<AncestorQuery<&SceneActionRenderer>, _>(
-				|entity, state| {
-					state
-						.get(entity)
-						.cloned()
-						.map(|renderer| renderer.into_action())
-				},
-			)
-			.await
-			.unwrap_or_else(|_| Action::new_async(default_scene_renderer))
+	/// Merge another scene's despawn list into this one.
+	pub fn with_join(mut self, child: SceneEntity) -> Self {
+		self.despawn.extend(child.despawn);
+		self
 	}
-
-	/// Renders the given scene entity using the ancestor
-	/// [`SceneActionRenderer`], falling back to the default renderer
-	/// when none is found.
-	///
-	/// Before rendering, applies any ancestor scene middleware
-	/// ([`MiddlewareList<RequestParts, SceneEntity>`]) to allow
-	/// layout wrapping via slots. Entities in `despawn` are cleaned
-	/// up after rendering.
-	pub async fn render_entity(
+	pub async fn render(
+		self,
 		caller: &AsyncEntity,
-		scene: SceneEntity,
 		parts: RequestParts,
 	) -> Result<Response> {
 		// apply ancestor scene middleware (layout wrapping, etc.)
 		let scene = caller
-			.call_with_middleware(Action::new_fixed(scene), parts.clone())
+			.call_with_middleware(Action::new_fixed(self), parts.clone())
 			.await?;
 
-		// find the nearest ancestor SceneActionRenderer or fall back
-		let render_action = Self::resolve(caller).await;
+		let render_action = caller
+			.with_state::<MiddlewareQuery<RequestParts, Response>, _>(
+				move |entity, query| {
+					query.resolve_action(
+						entity,
+						Action::new_async(default_scene_renderer),
+					)
+				},
+			)
+			.await;
 
 		let scene_entity = caller.world().entity(scene.entity);
 		let result = scene_entity.call_detached(render_action, parts).await;
 
 		// despawn all ephemeral entities
-		let world = caller.world();
-		for entity in scene.despawn {
-			world.entity(entity).despawn().await;
-		}
+		caller
+			.world()
+			.with_then(|world| {
+				for entity in scene.despawn {
+					world.entity_mut(entity).despawn();
+				}
+			})
+			.await;
 
 		result
 	}
 }
 
-impl IntoAction<Self> for SceneActionRenderer {
-	type In = RequestParts;
-	type Out = Response;
-	fn into_action(self) -> Action<RequestParts, Response> { self.action }
+impl ExchangeRouteOut<Self> for SceneEntity {
+	fn into_route_response(
+		self,
+		caller: AsyncEntity,
+		parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move { self.render(&caller, parts).await })
+	}
 }
-
 
 /// Creates a fixed routable scene from a path and content bundle.
 ///
 /// The entity itself becomes both the route and the scene content.
 /// The [`ExchangeAction`] handles the `Request` → `Response`
-/// conversion via [`SceneActionRenderer`].
+/// conversion.
 ///
 /// # Example
 ///

@@ -11,9 +11,6 @@ use beet_net::prelude::*;
 /// - [`HelpHandler`] middleware for `--help` support
 /// - [`NavigateHandler`] middleware for `--navigate` support
 ///
-/// Does **not** include a [`SceneActionRenderer`] — rendering falls
-/// back to the default renderer when no [`SceneActionRenderer`] is
-/// found on an ancestor.
 pub fn router() -> impl Bundle {
 	(
 		Router,
@@ -68,63 +65,6 @@ pub async fn Router(cx: ActionContext<Request>) -> Response {
 		.await
 		.unwrap_or_else(|err| err.into_response())
 }
-
-
-/// A route that returns a [`SceneEntity`] is a scene route.
-/// The entity is rendered via the ancestor [`SceneActionRenderer`]
-/// and then converted to a response. Ephemeral scene entities
-/// are cleaned up after rendering.
-impl ExchangeRouteOut<Self> for SceneEntity {
-	fn into_route_response(
-		self,
-		caller: AsyncEntity,
-		parts: RequestParts,
-	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
-		Box::pin(async move {
-			SceneActionRenderer::render_entity(&caller, self, parts).await
-		})
-	}
-}
-
-/// A route output representing a scene entity to be rendered.
-/// Entities in `despawn` are cleaned up after rendering,
-/// ie help pages, not-found pages.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SceneEntity {
-	/// The entity to render.
-	pub entity: Entity,
-	/// Entities to despawn after rendering.
-	pub despawn: Vec<Entity>,
-}
-impl SceneEntity {
-	/// A scene entity that should not be despawned after render.
-	pub fn new_fixed(entity: Entity) -> Self {
-		Self {
-			entity,
-			despawn: default(),
-		}
-	}
-
-	/// A scene entity that should be despawned after render,
-	/// ie a help page or not found route.
-	pub fn new_ephemeral(entity: Entity) -> Self {
-		Self {
-			entity,
-			despawn: vec![entity],
-		}
-	}
-	pub fn push_despawn(mut self, entity: Entity) -> Self {
-		self.despawn.push(entity);
-		self
-	}
-
-	/// Merge another scene's despawn list into this one.
-	pub fn with_join(mut self, child: SceneEntity) -> Self {
-		self.despawn.extend(child.despawn);
-		self
-	}
-}
-
 
 
 #[cfg(test)]
