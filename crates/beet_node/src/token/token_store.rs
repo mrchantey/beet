@@ -11,7 +11,6 @@ use bevy::reflect::Typed;
 	Default,
 	Clone,
 	Deref,
-	DerefMut,
 	Reflect,
 	Serialize,
 	Deserialize,
@@ -21,21 +20,31 @@ use bevy::reflect::Typed;
 pub struct TokenStore {
 	tokens: HashMap<TokenKey, TokenValue>,
 }
+
+
 impl TokenStore {
 	pub fn new() -> Self {
 		Self {
 			tokens: HashMap::new(),
 		}
 	}
+	pub fn insert(
+		&mut self,
+		key: impl Into<Token>,
+		value: impl Into<TokenValue>,
+	) -> Result<&mut Self> {
+		let value = value.into();
+		let key = key.into();
+		key.schema().assert_eq(value.schema())?;
+		self.tokens.insert(key.key().clone(), value.into());
+		self.xok()
+	}
 	fn with(
 		mut self,
 		key: impl Into<Token>,
 		value: impl Into<TokenValue>,
 	) -> Result<Self> {
-		let value = value.into();
-		let key = key.into();
-		key.schema().assert_eq(value.schema())?;
-		self.tokens.insert(key.key().clone(), value.into());
+		self.insert(key, value)?;
 		self.xok()
 	}
 	pub fn with_token(
@@ -50,6 +59,14 @@ impl TokenStore {
 		key: impl Into<Token>,
 		value: impl Typed + Serialize,
 	) -> Result<Self> {
+		self.with(key, TypedValue::new(value)?)
+	}
+	#[track_caller]
+	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
+	where
+		T: Typed + Serialize,
+	{
+		let key = Token::new_inline(TokenKey::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 	pub fn extend(

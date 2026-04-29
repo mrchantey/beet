@@ -15,25 +15,45 @@ pub struct Rule {
 impl Rule {
 	pub fn new() -> Self { Self::default() }
 
-	pub fn with_token<K: TypedTokenKey>(self, token: impl Into<Token>) -> Self {
-		self.with(K::token_key(), token)
-	}
-	pub fn with_value<K: TypedTokenKey>(
-		self,
-		value: impl Typed + serde::Serialize,
-	) -> Result<Self> {
-		self.with(K::token_key(), TypedValue::new(value)?).xok()
-	}
-	/// Add a property mapped to a token.
-	pub fn with(
-		mut self,
-		token: TokenKey,
+	pub fn insert(
+		&mut self,
+		key: impl Into<Token>,
 		value: impl Into<TokenValue>,
-	) -> Self {
-		self.declarations.insert(token, value.into());
-		self
+	) -> Result<&mut Self> {
+		self.declarations.insert(key, value)?;
+		self.xok()
+	}
+	fn with(
+		mut self,
+		key: impl Into<Token>,
+		value: impl Into<TokenValue>,
+	) -> Result<Self> {
+		self.insert(key, value)?;
+		self.xok()
 	}
 
+	pub fn with_token(
+		self,
+		key: impl Into<Token>,
+		value: impl Into<Token>,
+	) -> Result<Self> {
+		self.with(key, value)
+	}
+	pub fn with_value(
+		self,
+		key: impl Into<Token>,
+		value: impl Typed + Serialize,
+	) -> Result<Self> {
+		self.with(key, TypedValue::new(value)?)
+	}
+	#[track_caller]
+	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
+	where
+		T: Typed + Serialize,
+	{
+		let key = Token::new_inline(TokenKey::of::<T>());
+		self.with(key, TypedValue::new(value)?)
+	}
 	pub fn merge_any(mut self, other: Self) -> Self {
 		self.predicate = self.predicate.clone().merge_any(other.predicate);
 		self.declarations = self.declarations.extend(other.declarations);

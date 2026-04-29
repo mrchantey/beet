@@ -23,6 +23,18 @@ use beet_core::prelude::*;
 pub struct TokenKey(SmolStr);
 
 impl TokenKey {
+	#[track_caller]
+	pub fn new_inline() -> Self {
+		let location = std::panic::Location::caller();
+		let key = format!(
+			"{}:{}:{}",
+			location.file(),
+			location.line(),
+			location.column()
+		);
+		Self(SmolStr::from(key))
+	}
+
 	pub fn new(path: impl Into<SmolStr>) -> Self { Self(path.into()) }
 
 	pub fn assert_eq_ty<Expected: TypedTokenKey>(&self) -> Result<&Self> {

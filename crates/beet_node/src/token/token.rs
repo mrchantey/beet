@@ -32,6 +32,14 @@ impl Token {
 			document,
 		}
 	}
+	#[track_caller]
+	pub fn new_inline(schema: TokenKey) -> Self {
+		Self {
+			key: TokenKey::new_inline(),
+			schema,
+			document: DocumentPath::default(),
+		}
+	}
 }
 
 
