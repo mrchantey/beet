@@ -190,6 +190,8 @@ impl Navigator {
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
+		// get response without checking status,
+		// do not bail on 404, render anyway
 		let response = Request::get(&url)
 			.with_header::<header::UserAgent>(user_agent)
 			.with_header::<header::Accept>(accepts)
@@ -200,16 +202,12 @@ impl Navigator {
 				if err.is_empty() {
 					err = "unknown error".to_string();
 				}
-
 				Response::from_status_body(
 					StatusCode::BAD_REQUEST,
 					err,
 					MediaType::Text,
 				)
 			});
-		// do not bail on 404, render anyway
-		// .into_result()
-		// .await?;
 
 		let redirect = if response.status().is_redirect_location() {
 			response

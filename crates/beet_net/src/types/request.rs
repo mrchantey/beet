@@ -234,10 +234,9 @@ impl Request {
 	}
 
 	/// Creates a POST request with a [`MediaBytes`] body and appropriate `content-type` header.
-	#[cfg(feature = "serde")]
 	pub fn with_media(url: impl Into<Url>, bytes: MediaBytes) -> Self {
-		let (media_type, raw) = bytes.take();
-		let mut request = Self::post(url).with_body(raw);
+		let (media_type, bytes) = bytes.take();
+		let mut request = Self::post(url).with_body(bytes);
 		request.headers.set_content_type(media_type);
 		request
 	}

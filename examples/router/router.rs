@@ -54,7 +54,7 @@ fn setup(mut commands: Commands) -> Result {
 
 
 
-#[allow(unused)]
+#[allow(unused, reason = "module not used when deploying infra")]
 pub fn router_scene() -> Result<impl Bundle> {
 	(
 		// declare the bucket used by the blob scenes
