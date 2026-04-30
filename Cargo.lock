@@ -1286,6 +1286,7 @@ dependencies = [
  "bevy",
  "bevy_ratatui",
  "bytes",
+ "crossterm",
  "extend",
  "heck 0.4.1",
  "material-colors",

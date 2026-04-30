@@ -66,37 +66,24 @@ pub struct Cell {
 
 // ── FlexChild ─────────────────────────────────────────────────────────────────
 
-pub struct FlexChild {
-	pub widget: Box<dyn Widget>,
-	/// 0 = no grow. Positive values share free space proportionally.
-	pub flex_grow: u16,
+#[derive(Default)]
+pub struct LayoutStyle {
+	pub flex_grow: Option<u16>,
 }
 
-impl FlexChild {
-	pub fn new(widget: impl Widget + 'static) -> Self {
-		Self {
-			widget: Box::new(widget),
-			flex_grow: 0,
-		}
-	}
-	pub fn grow(mut self, g: u16) -> Self {
-		self.flex_grow = g;
-		self
-	}
-}
-
-// ── FlexBox ───────────────────────────────────────────────────────────────────
 
 pub struct FlexBox {
 	pub direction: Direction,
+	pub layout_style: LayoutStyle,
 	pub wrap: FlexWrap,
 	pub align_items: AlignItems,
-	pub children: Vec<FlexChild>,
+	pub children: Vec<Box<dyn Widget>>,
 }
 
 impl FlexBox {
 	pub fn row() -> Self {
 		Self {
+			layout_style: LayoutStyle::default(),
 			direction: Direction::Row,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
@@ -105,22 +92,23 @@ impl FlexBox {
 	}
 	pub fn col() -> Self {
 		Self {
+			layout_style: LayoutStyle::default(),
 			direction: Direction::Col,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
 			children: vec![],
 		}
 	}
-	pub fn wrap(mut self, w: FlexWrap) -> Self {
-		self.wrap = w;
+	pub fn wrap(mut self, wrap: FlexWrap) -> Self {
+		self.wrap = wrap;
 		self
 	}
-	pub fn align_items(mut self, a: AlignItems) -> Self {
-		self.align_items = a;
+	pub fn align_items(mut self, align: AlignItems) -> Self {
+		self.align_items = align;
 		self
 	}
-	pub fn child(mut self, c: FlexChild) -> Self {
-		self.children.push(c);
+	pub fn child(mut self, child: impl 'static + Widget) -> Self {
+		self.children.push(Box::new(child));
 		self
 	}
 
@@ -139,7 +127,7 @@ impl FlexBox {
 		let mut main_used = 0u16;
 
 		for (i, child) in self.children.iter().enumerate() {
-			let size = child.widget.measure(available);
+			let size = child.measure(available);
 			let child_main = main_size(size, self.direction);
 
 			// Would adding this child overflow the current line?
@@ -173,12 +161,22 @@ impl FlexBox {
 			.sum();
 
 		let free = container_main.saturating_sub(natural_total);
-		let total_grow: u16 =
-			line.iter().map(|(i, _)| self.children[*i].flex_grow).sum();
+		let total_grow: u16 = line
+			.iter()
+			.map(|(i, _)| {
+				self.children[*i]
+					.layout_style()
+					.flex_grow
+					.unwrap_or_default()
+			})
+			.sum();
 
 		line.iter()
 			.map(|(idx, nat)| {
-				let grow = self.children[*idx].flex_grow;
+				let grow = self.children[*idx]
+					.layout_style()
+					.flex_grow
+					.unwrap_or_default();
 				let bonus = if total_grow > 0 {
 					(free as u32 * grow as u32 / total_grow as u32) as u16
 				} else {
@@ -219,6 +217,7 @@ impl FlexBox {
 }
 
 impl Widget for FlexBox {
+	fn layout_style(&self) -> &LayoutStyle { &self.layout_style }
 	fn measure(&self, available: Size) -> Size {
 		let lines = self.form_lines(available);
 		match self.direction {
@@ -281,7 +280,7 @@ impl Widget for FlexBox {
 						let child_y =
 							cursor_y + self.cross_offset(child_h, line_h);
 
-						self.children[*idx].widget.layout(
+						self.children[*idx].layout(
 							Rect {
 								x: cursor_x,
 								y: child_y,
@@ -321,7 +320,7 @@ impl Widget for FlexBox {
 						let child_x =
 							cursor_x + self.cross_offset(child_w, line_w);
 
-						self.children[*idx].widget.layout(
+						self.children[*idx].layout(
 							Rect {
 								x: child_x,
 								y: cursor_y,

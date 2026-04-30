@@ -28,6 +28,8 @@ pub fn render(cells: &[Cell], width: u16, height: u16) -> String {
 // ── Widget trait ──────────────────────────────────────────────────────────────
 
 pub trait Widget {
+	fn layout_style(&self) -> &LayoutStyle;
+
 	/// Pass 1 (bottom-up): given available space as a hint, return desired size.
 	fn measure(&self, available: Size) -> Size;
 
@@ -38,9 +40,11 @@ pub trait Widget {
 
 pub struct Button {
 	pub label: String,
+	pub layout_style: LayoutStyle,
 }
 
 impl Widget for Button {
+	fn layout_style(&self) -> &LayoutStyle { &self.layout_style }
 	fn measure(&self, _available: Size) -> Size {
 		Size {
 			w: self.label.len() as u16 + 4, // "[ label ]"

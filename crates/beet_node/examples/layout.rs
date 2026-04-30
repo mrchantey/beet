@@ -3,10 +3,9 @@ use beet_node::prelude::*;
 
 
 fn main() {
-	let btn = |label: &str| {
-		FlexChild::new(Button {
-			label: label.into(),
-		})
+	let btn = |label: &str| Button {
+		label: label.into(),
+		layout_style: Default::default(),
 	};
 
 	let toolbar = FlexBox::row()
@@ -16,13 +15,11 @@ fn main() {
 		.child(btn("Cancel")) // 10 wide
 		.child(btn("Delete")) // 10 wide
 		.child(btn("Preview")) // 11 wide
-		.child(
-			FlexChild::new(
-				// spacer, grows to fill remaining row space
-				TextWidget::new("foobar bazz"),
-			)
-			.grow(1),
-		);
+		.child(TextWidget {
+			content: "foobar bazz".into(),
+			layout_style: LayoutStyle { flex_grow: Some(1) },
+			align: TextAlign::Left,
+		});
 
 	let mut cells = Vec::new();
 	toolbar.layout(

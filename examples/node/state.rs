@@ -1,6 +1,3 @@
-// use beet::exports::ratatui::text;
-// use beet::exports::ratatui::widgets;
-// use beet::exports::ratatui::widgets::Widget;
 use beet::prelude::*;
 
 fn main() {
@@ -10,12 +7,20 @@ fn main() {
 		.run();
 }
 
-fn setup(mut _commands: Commands) {
-	// commands.spawn(EntityWidget::new(render));
+fn token() {
+	todo!();
 }
+fn increment(_token: ()) {
+	todo!();
+}
+fn setup(mut commands: Commands) {
+	let value_token = token();
+	let increment_token = increment(value_token);
 
-
-// fn render(mut cx: TuiRenderContext) -> Result {
-// 	text::Span::raw("hello world").render(cx.draw_area, cx.buffer);
-// 	Ok(())
-// }
+	commands.spawn(rsx! {
+		<div>
+			<span> Count: {value_token}</span>
+			<button onclick={increment_token}>Increment</button>
+		</div>
+	});
+}

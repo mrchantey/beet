@@ -155,7 +155,7 @@ fn tokenize_html_element(
 						// key=value attribute
 						let val_expr = &value.value;
 						attr_entries.push(quote! {
-							(Attribute::new(#key_str), Value::new(#val_expr))
+							(Attribute::new(#key_str), #val_expr.into_bundle())
 						});
 					}
 					_ => {

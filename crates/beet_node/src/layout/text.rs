@@ -4,6 +4,7 @@ use super::*;
 
 pub struct TextWidget {
 	pub content: String,
+	pub layout_style: LayoutStyle,
 	pub align: TextAlign,
 }
 
@@ -11,6 +12,7 @@ impl TextWidget {
 	pub fn new(content: impl Into<String>) -> Self {
 		Self {
 			content: content.into(),
+			layout_style: LayoutStyle::default(),
 			align: TextAlign::Left,
 		}
 	}
@@ -21,6 +23,8 @@ impl TextWidget {
 }
 
 impl Widget for TextWidget {
+	fn layout_style(&self) -> &LayoutStyle { &self.layout_style }
+
 	fn measure(&self, available: Size) -> Size {
 		let lines = word_wrap(&self.content, available.w);
 		Size {
