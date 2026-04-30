@@ -34,36 +34,24 @@ fn setup(mut commands: Commands) {
 		TuiTextBox::new("url", &url),
 		(
 			Navigator::new(url.clone()),
-			Middleware::new(Render),
-			SpawnAndRender,
+			Middleware::new(RenderTui),
+			ParseRequest,
 			TuiNodeRenderer::default(),
 		)
 	]));
 }
 
+// parse the request body into a tree of Elements with the MediaParser.
 #[action]
 #[derive(Component)]
-async fn Render(
-	cx: ActionContext<(RequestParts, Next<RequestParts, Response>)>,
-) -> Result<Response> {
-	let mut renderer = cx.caller.get_cloned::<TuiNodeRenderer>().await?;
-	cx.caller
-		.with_then(move |mut entity| {
-			renderer.run(&mut entity, vec![MediaType::Ratatui])
-		})
-		.await?;
-	Response::ok().xok()
-}
-
-// for a given request, parse its body then spawn and render as an ephemeral scene entity
-#[action]
-#[derive(Component)]
-async fn SpawnAndRender(cx: ActionContext<Request>) -> Result<Response> {
+async fn ParseRequest(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input().parts().clone();
 	let caller_id = cx.id();
 	let media = cx.input.into_media_bytes().await?;
 	cx.caller
 		.with_then(move |mut entity| {
+			// ideally we wouldnt need to despawn children,
+			// parser should be diffing
 			entity.despawn_children();
 			MediaParser::new().parse(ParseContext::new(&mut entity, &media))
 		})
@@ -74,6 +62,20 @@ async fn SpawnAndRender(cx: ActionContext<Request>) -> Result<Response> {
 		.await
 }
 
+// apply the element tree to the tui
+#[action]
+#[derive(Component)]
+async fn RenderTui(
+	cx: ActionContext<(RequestParts, Next<RequestParts, Response>)>,
+) -> Result<Response> {
+	let mut renderer = cx.caller.get_cloned::<TuiNodeRenderer>().await?;
+	cx.caller
+		.with_then(move |mut entity| {
+			renderer.run(&mut entity, vec![MediaType::Ratatui])
+		})
+		.await?;
+	Response::ok().xok()
+}
 
 use beet::exports::bevy_ratatui::event::KeyMessage;
 use beet::exports::bevy_ratatui::event::MouseMessage;

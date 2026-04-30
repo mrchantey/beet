@@ -9,6 +9,7 @@ extern crate std;
 
 mod document;
 mod input;
+mod layout;
 mod parse;
 mod render;
 #[cfg(feature = "style")]
@@ -25,6 +26,7 @@ pub mod prelude {
 	pub use crate::css_variable;
 	pub use crate::document::*;
 	pub use crate::input::*;
+	pub use crate::layout::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
 	#[cfg(feature = "style")]

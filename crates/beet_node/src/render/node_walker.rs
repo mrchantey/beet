@@ -76,6 +76,7 @@ impl NodeWalker<'_, '_> {
 			visitor.visit_element(&cx, view);
 		}
 		// 4. Value
+		// note: elements can also have a value
 		if let Some(value) = value {
 			visitor.visit_value(&cx, value);
 		}

@@ -426,12 +426,16 @@ path = "examples/node/pretty_curl.rs"
 required-features = ["_pretty_curl"]
 
 [[example]]
+name = "state"
+path = "examples/node/state.rs"
+required-features = ["tui"]
+
+# 💡 Examples - Router
+
+[[example]]
 name = "mini_browser"
 path = "examples/router/mini_browser.rs"
 required-features = ["_mini_browser"]
-
-
-# 💡 Examples - Router
 
 [[example]]
 name = "router"
