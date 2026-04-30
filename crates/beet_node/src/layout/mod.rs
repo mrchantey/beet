@@ -6,8 +6,14 @@
 //! Ratatui for a few additional features:
 //!
 //! 1. Interactivity
-//! - we need to know which entity was responsible for the cells, 
+//! - we need to know which entity was responsible for the cells,
 //! for remapping on click
 //!
 //! 2. Multiline wrap
 //! - we need wrapping support for buttons and other multiline elements
+mod flex;
+mod render;
+mod text;
+pub use flex::*;
+pub use render::*;
+pub use text::*;

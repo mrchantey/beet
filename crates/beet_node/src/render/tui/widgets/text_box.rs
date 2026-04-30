@@ -5,6 +5,7 @@ use beet_core::prelude::*;
 use ratatui::prelude::*;
 use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
+use ratatui::widgets::Widget;
 
 #[derive(Clone, Component)]
 #[require(TuiWidget=widget())]

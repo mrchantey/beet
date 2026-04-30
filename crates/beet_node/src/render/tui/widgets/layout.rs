@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use ratatui::prelude::Direction;
 use ratatui::prelude::Layout as RatLayout;
 use ratatui::prelude::*;
 

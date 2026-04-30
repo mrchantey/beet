@@ -41,6 +41,7 @@ pub use beet_thread as thread;
 // pub use beet_rsx as rsx;
 // #[cfg(feature = "spatial")]
 // pub use beet_spatial as spatial;
+#[rustfmt::skip]
 pub mod prelude {
 	#[cfg(feature = "action")]
 	pub use crate::action::prelude::*;
@@ -52,14 +53,6 @@ pub mod prelude {
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
-	#[cfg(all(
-		feature = "node",
-		feature = "tui",
-		not(target_arch = "wasm32")
-	))]
-	pub use crate::node::prelude::Justify;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::Pointer;
 	#[cfg(feature = "node")]
 	pub use crate::node::prelude::*;
 	#[cfg(feature = "router")]
@@ -85,7 +78,25 @@ pub mod prelude {
 	// pub use crate::rsx::prelude::*;
 	// #[cfg(feature = "spatial")]
 	// pub use crate::spatial::prelude::*;
+	// 	/// NODE REEXPORTS
+	#[cfg(all(
+		feature = "node",
+		feature = "tui",
+		not(target_arch = "wasm32")
+	))]
+	pub use crate::node::prelude::Justify;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::Pointer;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::Button;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::AlignItems;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::FlexWrap;
+	#[cfg(feature = "node")]
+	pub use crate::node::prelude::Rect;
 }
+
 pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "net")]
