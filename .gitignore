@@ -1,4 +1,7 @@
-agent/reference
+agent
+.beet/infra
+examples/thread/persistent_chat.json
+out.txt
 assets
 !examples/assets
 target

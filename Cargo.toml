@@ -15,7 +15,7 @@ opt-level = 3
 version = "0.0.9-rc.1.0"
 authors = ["Pete Hayman"]
 edition = "2024"
-description = "A personal application framework"
+description = "A malleable application framework"
 documentation = "https://docs.rs/beet"
 readme = "README.md"
 homepage = "https://beetstack.dev"
@@ -130,7 +130,7 @@ chrono = "0.4"
 rand = "0.9"
 rand_chacha = "0.9"
 # wasm_js ignored in native
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
 variadics_please = "1"
 
 #💡 logging
@@ -308,7 +308,7 @@ beet_examples = { workspace = true, optional = true }
 # required for rand 0.9 to compile on wasm targets
 uuid = { workspace = true, features = ["rng-getrandom"] }
 # getrandom = { workspace = true }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom.workspace = true
 
 [dev-dependencies]
 beet = { path = ".", features = ["flow"] }

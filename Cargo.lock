@@ -1121,7 +1121,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "futures",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "serde",
  "serde_json",
  "uuid",
@@ -1224,7 +1224,7 @@ dependencies = [
  "extend",
  "futures",
  "futures-lite",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "glob",
  "heck 0.4.1",
  "http 1.4.0",
@@ -5072,10 +5072,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de51e6874e94e7bf76d726fc5d13ba782deca734ff60d5bb2fb2607c7406555"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 6.0.0",
  "wasip2",
  "wasip3",
+ "wasm-bindgen",
 ]
 
 [[package]]
