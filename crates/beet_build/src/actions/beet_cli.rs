@@ -143,7 +143,8 @@ pub fn beet_cli() -> impl Bundle {
 										Sequence,
 										children![
 											FileExprChanged::new(),
-											build_wasm(),
+											// skip wasm build for now, just doing blog posts
+											// build_wasm(),
 											BuildServer,
 										]
 									),
