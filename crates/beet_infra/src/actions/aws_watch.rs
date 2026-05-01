@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Tails CloudWatch logs for a given log group.
-/// Use [`AwsWatch::for_lambda`] or [`AwsWatch::for_lightsail`]
+/// Use [`AwsWatch::for_lambda`], [`AwsWatch::for_lightsail`], or [`AwsWatch::for_fargate`]
 /// for convenient construction from a [`Stack`].
 #[derive(Debug, Clone, Get, SetWith, Component)]
 #[require(AwsWatchAction)]
@@ -44,6 +44,13 @@ impl AwsWatch {
 			block.label(),
 			stack.stage()
 		))
+	}
+
+	/// Create an [`AwsWatch`] for a Fargate service's CloudWatch log group.
+	/// Uses the ECS convention `/ecs/{app-name}/{stage}`.
+	#[cfg(feature = "fargate_block")]
+	pub fn for_fargate(stack: &Stack, _block: &FargateBlock) -> Self {
+		Self::new(format!("/ecs/{}/{}", stack.app_name(), stack.stage()))
 	}
 }
 

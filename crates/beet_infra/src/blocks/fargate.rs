@@ -18,9 +18,11 @@ pub enum LoadBalancerType {
 pub enum ContainerImage {
 	/// Scratch image - most lightweight, requires static binary.
 	Scratch,
-	/// Alpine Linux - lightweight with shell and basic utilities.
-	#[default]
+	/// Alpine Linux - lightweight with shell and basic utilities, uses musl libc.
 	Alpine,
+	/// Debian slim - small Debian-based image with glibc.
+	#[default]
+	DebianSlim,
 }
 
 impl ContainerImage {
@@ -29,6 +31,7 @@ impl ContainerImage {
 		match self {
 			Self::Scratch => "scratch",
 			Self::Alpine => "alpine:latest",
+			Self::DebianSlim => "debian:bookworm-slim",
 		}
 	}
 
@@ -96,15 +99,21 @@ impl FargateBlock {
 		format!("{}--{}", self.label, suffix)
 	}
 
-	/// Build a short name for AWS resources with strict length limits.
-	/// Uses a hash of the full label to stay under 32 characters.
-	fn short_name(&self, suffix: &str) -> SmolStr {
+	/// Generate a shortened name for AWS resources with length limits (e.g. ALB names).
+	/// Includes stack prefix in the length calculation and uses a hash if over 32 characters.
+	fn short_name(&self, stack: &Stack, suffix: &str) -> SmolStr {
 		use std::collections::hash_map::DefaultHasher;
 		use std::hash::Hash;
 		use std::hash::Hasher;
 
-		let full = format!("{}--{}", self.label, suffix);
-		if full.len() <= 32 {
+		let full = format!(
+			"{}--{}--{}--{}",
+			stack.app_name(),
+			stack.stage(),
+			self.label,
+			suffix
+		);
+		let result = if full.len() <= 32 {
 			full.into()
 		} else {
 			// use hash to shorten
@@ -118,7 +127,8 @@ impl FargateBlock {
 				hash[..31].to_string()
 			};
 			truncated.into()
-		}
+		};
+		result
 	}
 
 	/// Get the container image URI for the task definition.
@@ -421,8 +431,8 @@ impl Block for FargateBlock {
 			LoadBalancerType::NetworkLoadBalancer => "network",
 		};
 		let lb_ident = stack.resource_ident(self.build_label("lb"));
-		let lb = terra::ResourceDef::new_primary(lb_ident, AwsLbDetails {
-			name: Some(self.short_name("lb")),
+		let lb = terra::ResourceDef::new_secondary(lb_ident, AwsLbDetails {
+			name: Some(self.short_name(stack, "lb")),
 			load_balancer_type: Some(lb_type.into()),
 			security_groups: Some(vec![alb_sg.field_ref("id").into()]),
 			subnets: Some(vec![

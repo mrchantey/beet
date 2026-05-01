@@ -295,6 +295,7 @@ markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
 lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
+fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
@@ -496,6 +497,11 @@ required-features = ["router", "infra"]
 [[example]]
 name = "hello_lightsail"
 path = "examples/infra/hello_lightsail.rs"
+required-features = ["router", "infra"]
+
+[[example]]
+name = "hello_fargate"
+path = "examples/infra/hello_fargate.rs"
 required-features = ["router", "infra"]
 
 # 💡 Examples - flow
