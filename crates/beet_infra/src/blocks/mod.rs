@@ -7,6 +7,10 @@ pub use lambda::*;
 mod lightsail;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail::*;
+#[cfg(feature = "fargate_block")]
+mod fargate;
+#[cfg(feature = "fargate_block")]
+pub use fargate::*;
 mod block;
 pub use block::*;
 #[cfg(feature = "bindings_aws_common")]

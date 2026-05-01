@@ -53,6 +53,27 @@ async fn main() -> Result {
 				]),
 		)
 		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_fargate.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_cloudwatch_log_group",
+					"aws_ecr_repository",
+					"aws_ecs_cluster",
+					"aws_ecs_service",
+					"aws_ecs_task_definition",
+					"aws_internet_gateway",
+					"aws_lb",
+					"aws_lb_listener",
+					"aws_lb_target_group",
+					"aws_route",
+					"aws_route_table",
+					"aws_route_table_association",
+					"aws_security_group",
+					"aws_security_group_rule",
+					"aws_subnet",
+					"aws_vpc",
+				]),
+		)
+		.with_file(
 			BindingFile::new(
 				"crates/beet_infra/src/bindings/cloudflare_common.rs",
 			)

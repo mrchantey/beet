@@ -31,7 +31,7 @@ pub struct TuiQuery<'w, 's> {
 
 impl TuiQuery<'_, '_> {
 	pub fn render(&self, entity: Entity) -> Result<Buffer> {
-		let size = terminal_ext::size().unwrap_or_else(|_| UVec2::new(80, 24));
+		let size = UVec2::new(80, 24);
 		self.render_rect(entity, URect::new(0, 0, size.x, size.y))
 	}
 

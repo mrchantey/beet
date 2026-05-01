@@ -18,15 +18,18 @@ aws_sdk = ["beet_net/aws_sdk"]
 deploy = ["dep:beet_action", "dep:beet_router", "dep:sha2", "dep:base64"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_dns","bindings_cloudflare_common"]
 lightsail_block = ["bindings_aws_common","bindings_aws_lightsail"]
+fargate_block = ["bindings_aws_common","bindings_aws_fargate"]
 bindings_aws_common = []
 bindings_aws_dns = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
+bindings_aws_fargate = []
 bindings_aws_all = [
 	"bindings_aws_common",
 	"bindings_aws_dns",
 	"bindings_aws_lightsail",
 	"bindings_aws_lambda",
+	"bindings_aws_fargate",
 ]
 bindings_cloudflare_common = []
 
@@ -68,6 +71,7 @@ beet_infra = { path = ".", features = [
 	"bindings_aws_dns",
 	"lambda_block",
 	"lightsail_block",
+	"fargate_block",
 ] }
 
 [[example]]
@@ -79,3 +83,8 @@ required-features = ["deploy", "aws_sdk", "lambda_block"]
 name = "lightsail_test"
 path = "examples/lightsail_test.rs"
 required-features = ["deploy", "aws_sdk", "lightsail_block"]
+
+[[example]]
+name = "fargate_test"
+path = "examples/fargate_test.rs"
+required-features = ["deploy", "aws_sdk", "fargate_block"]

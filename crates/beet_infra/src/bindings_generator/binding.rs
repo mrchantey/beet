@@ -353,11 +353,19 @@ fn export_attributes(
 ) -> Result<Option<Container>> {
 	let mut target_attrs = Vec::new();
 	for (an, at) in attrs {
-		let an = RESERVED_WORDS
-			.iter()
-			.find(|word| an == &word.to_string())
-			.map(|word| format!("r#{}", word))
-			.unwrap_or_else(|| an.to_string());
+		let an = if an == "self" {
+			// 'self' cannot use raw identifier syntax, rename to 'self_ref'
+			"self_ref".to_string()
+		} else if an == "Self" {
+			// 'Self' cannot use raw identifier syntax, rename to 'Self_ref'
+			"Self_ref".to_string()
+		} else {
+			RESERVED_WORDS
+				.iter()
+				.find(|word| an == &word.to_string())
+				.map(|word| format!("r#{}", word))
+				.unwrap_or_else(|| an.to_string())
+		};
 
 		// When `type` is absent the attribute uses `nested_type` (an inline
 		// structural definition).  Treat it as a map of strings for now.
@@ -833,5 +841,86 @@ mod test {
 					.to_owned()
 			})
 			.xpect_eq(Some("REGEX".to_owned()));
+	}
+
+	#[test]
+	fn handles_reserved_words_in_attributes() {
+		// Test that 'self' and 'Self' are renamed to avoid raw identifier issues
+		let mut attrs = BTreeMap::new();
+		attrs.insert("self".to_string(), Attribute {
+			r#type: Some(AttributeType(serde_json::Value::String(
+				"bool".to_string(),
+			))),
+			description: None,
+			required: Some(false),
+			optional: Some(true),
+			computed: None,
+			sensitive: None,
+			description_kind: None,
+			deprecated: None,
+			nested_type: None,
+		});
+		attrs.insert("Self".to_string(), Attribute {
+			r#type: Some(AttributeType(serde_json::Value::String(
+				"string".to_string(),
+			))),
+			description: None,
+			required: Some(true),
+			optional: None,
+			computed: None,
+			sensitive: None,
+			description_kind: None,
+			deprecated: None,
+			nested_type: None,
+		});
+		attrs.insert("type".to_string(), Attribute {
+			r#type: Some(AttributeType(serde_json::Value::String(
+				"string".to_string(),
+			))),
+			description: None,
+			required: Some(true),
+			optional: None,
+			computed: None,
+			sensitive: None,
+			description_kind: None,
+			deprecated: None,
+			nested_type: None,
+		});
+
+		let result = export_attributes(&attrs);
+		result.is_ok().xpect_true();
+
+		let container = result.unwrap();
+		container.is_some().xpect_true();
+
+		if let Some(Container::Struct(fields)) = container {
+			// 'self' should be renamed to 'self_ref'
+			fields
+				.iter()
+				.find(|f| f.name == "self_ref")
+				.is_some()
+				.xpect_true();
+
+			// 'Self' should be renamed to 'Self_ref'
+			fields
+				.iter()
+				.find(|f| f.name == "Self_ref")
+				.is_some()
+				.xpect_true();
+
+			// other reserved words should use raw identifier
+			fields
+				.iter()
+				.find(|f| f.name == "r#type")
+				.is_some()
+				.xpect_true();
+
+			// should not contain raw identifiers for self/Self
+			fields
+				.iter()
+				.find(|f| f.name == "r#self" || f.name == "r#Self")
+				.is_none()
+				.xpect_true();
+		}
 	}
 }

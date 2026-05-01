@@ -28,9 +28,7 @@ impl terra::PrimaryResource for AwsIamRoleDetails {
 }
 #[cfg(feature = "bindings_aws_common")]
 impl terra::PrimaryResource for AwsIamUserDetails {
-	fn set_primary_identifier(&mut self, name: &str) {
-		self.name = name.into()
-	}
+	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
 }
 #[cfg(feature = "bindings_aws_lambda")]
 impl terra::PrimaryResource for AwsLambdaFunctionDetails {
@@ -41,4 +39,25 @@ impl terra::PrimaryResource for AwsLambdaFunctionDetails {
 #[cfg(feature = "bindings_aws_lambda")]
 impl terra::PrimaryResource for AwsApigatewayv2ApiDetails {
 	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
+}
+
+#[cfg(feature = "bindings_aws_fargate")]
+impl terra::PrimaryResource for AwsEcrRepositoryDetails {
+	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
+}
+#[cfg(feature = "bindings_aws_fargate")]
+impl terra::PrimaryResource for AwsEcsClusterDetails {
+	fn set_primary_identifier(&mut self, name: &str) { self.name = name.into() }
+}
+#[cfg(feature = "bindings_aws_fargate")]
+impl terra::PrimaryResource for AwsEcsTaskDefinitionDetails {
+	fn set_primary_identifier(&mut self, name: &str) {
+		self.family = name.into()
+	}
+}
+#[cfg(feature = "bindings_aws_fargate")]
+impl terra::PrimaryResource for AwsLbDetails {
+	fn set_primary_identifier(&mut self, name: &str) {
+		self.name = Some(name.into())
+	}
 }
