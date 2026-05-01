@@ -8,7 +8,7 @@ title = "The Full Moon Harvest"
 ###### [#11 — User Modifiable Users](/blog/post-11)
 *Pete Hayman — 1st May, 2026*
 
-Can malleable software consistently help us become our favorite version of ourselves? Also some thoughts on declarative cross-application state.
+Is malleable software the key to effective personal development tech? Also some progression on cross-application state.
 
 <br/>
 
