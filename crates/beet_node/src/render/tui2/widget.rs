@@ -1,22 +1,16 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::Arc;
 
 
-#[derive(Clone, Component)]
+#[derive(Component, Deref, DerefMut)]
 pub struct EntityWidget {
-	render: Arc<dyn 'static + Send + Sync + Fn(TuiRenderContext) -> Result>,
+	widget: Box<dyn 'static + Send + Sync + Widget>,
 }
 
 impl EntityWidget {
-	pub fn new(
-		render: impl 'static + Send + Sync + Fn(TuiRenderContext) -> Result,
-	) -> Self {
+	pub fn new(render: impl 'static + Send + Sync + Widget) -> Self {
 		Self {
-			render: Arc::new(render),
+			widget: Box::new(render),
 		}
-	}
-	pub fn render(&mut self, cx: TuiRenderContext) -> Result {
-		(self.render)(cx)
 	}
 }

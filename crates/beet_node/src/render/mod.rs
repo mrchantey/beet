@@ -2,9 +2,7 @@
 mod tui;
 #[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 pub use tui::*;
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 mod tui2;
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 pub use tui2::*;
 #[cfg(feature = "bevy_scene")]
 mod scene;

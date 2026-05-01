@@ -39,7 +39,7 @@ impl Widget for TextWidget {
 		)
 	}
 
-	fn layout(&self, rect: URect, buffer: &mut Buffer) {
+	fn layout(&self, buffer: &mut Buffer, rect: URect) {
 		let lines = word_wrap(&self.content, rect.width());
 		for (i, line) in lines.iter().enumerate() {
 			let y = rect.min.y + i as u32;

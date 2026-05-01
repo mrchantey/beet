@@ -4,12 +4,12 @@ use bevy::math::UVec2;
 
 /// A widget that wraps a child in a border.
 pub struct Bordered {
-	pub child: Box<dyn Widget>,
+	pub child: Box<dyn 'static + Send + Sync + Widget>,
 	pub layout_style: LayoutStyle,
 }
 
 impl Bordered {
-	pub fn new(child: impl 'static + Widget) -> Self {
+	pub fn new(child: impl 'static + Send + Sync + Widget) -> Self {
 		Self {
 			child: Box::new(child),
 			layout_style: LayoutStyle::default(),
@@ -38,7 +38,7 @@ impl Widget for Bordered {
 		)
 	}
 
-	fn layout(&self, rect: URect, buffer: &mut Buffer) {
+	fn layout(&self, buffer: &mut Buffer, rect: URect) {
 		let width = rect.width();
 		let height = rect.height();
 
@@ -96,6 +96,6 @@ impl Widget for Bordered {
 			rect.max.x.saturating_sub(1),
 			rect.max.y.saturating_sub(1),
 		);
-		self.child.layout(inner_rect, buffer);
+		self.child.layout(buffer, inner_rect);
 	}
 }

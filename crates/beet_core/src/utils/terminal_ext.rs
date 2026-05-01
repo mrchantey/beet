@@ -78,3 +78,14 @@ pub fn move_to(x: u16, y: u16) -> std::io::Result<()> {
 	stdout.flush()?;
 	Ok(())
 }
+
+#[cfg(feature = "crossterm")]
+use crate::prelude::*;
+
+/// Returns the terminal size.
+#[cfg(feature = "crossterm")]
+pub fn size() -> Result<UVec2> {
+	use crossterm::terminal::size;
+	let (cols, rows) = size()?;
+	UVec2::new(cols as u32, rows as u32).xok()
+}

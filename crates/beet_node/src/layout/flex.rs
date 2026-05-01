@@ -114,7 +114,7 @@ pub struct FlexBox {
 	pub justify_content: JustifyContent,
 	pub row_gap: u32,
 	pub column_gap: u32,
-	pub children: Vec<Box<dyn Widget>>,
+	pub children: Vec<Box<dyn 'static + Send + Sync + Widget>>,
 }
 
 impl FlexBox {
@@ -173,7 +173,7 @@ impl FlexBox {
 		self.column_gap = gap;
 		self
 	}
-	pub fn child(mut self, child: impl 'static + Widget) -> Self {
+	pub fn child(mut self, child: impl 'static + Send + Sync + Widget) -> Self {
 		self.children.push(Box::new(child));
 		self
 	}
@@ -526,7 +526,7 @@ impl Widget for FlexBox {
 		}
 	}
 
-	fn layout(&self, rect: URect, buffer: &mut Buffer) {
+	fn layout(&self, buffer: &mut Buffer, rect: URect) {
 		let available = UVec2::new(rect.width(), rect.height());
 		let lines = self.form_lines(available);
 
@@ -596,7 +596,7 @@ impl Widget for FlexBox {
 							child_y + child_h,
 						);
 
-						self.children[*idx].layout(child_rect, buffer);
+						self.children[*idx].layout(buffer, child_rect);
 					}
 				}
 			}
@@ -648,7 +648,7 @@ impl Widget for FlexBox {
 							child_y + fsize.y,
 						);
 
-						self.children[*idx].layout(child_rect, buffer);
+						self.children[*idx].layout(buffer, child_rect);
 					}
 				}
 			}

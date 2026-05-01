@@ -26,6 +26,18 @@ impl<'w, 's, D: 'static + QueryData, F: 'static + QueryFilter>
 		self.ancestors.root_ancestor(entity)
 	}
 
+	/// Get the r query data for the matching entity highest up the
+	/// hierarchy, which may not be the actual root ancestors.
+	pub fn find_root_ancestor(
+		&self,
+		entity: Entity,
+	) -> Result<<<D as QueryData>::ReadOnly as QueryData>::Item<'_, '_>> {
+		let items = self.get_ancestors(entity);
+		items.into_iter().next().ok_or_else(|| {
+			bevyhow!("No ancestor found matching query for entity {:?}", entity)
+		})
+	}
+
 	/// Gets all matching ancestors inclusive of the given entity,
 	/// in order from root to entity.
 	pub fn get_ancestors(

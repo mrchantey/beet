@@ -11,6 +11,12 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[[example]]
+name = "simple"
+path = "examples/simple.rs"
+required-features = ["crossterm"]
+
+
 [features]
 default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "bevy_scene", "rsx","style", "json", "serde"]
 std = []
@@ -20,12 +26,13 @@ tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 style = ["dep:material-colors", "beet_core/bevy_color","heck"]
 serde = ["dep:serde"]
+crossterm = ["beet_core/crossterm"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
 ansi_paint = ["beet_core/ansi_paint", "dep:nu-ansi-term"]
-tui = ["dep:bevy_ratatui", "dep:ratatui", "dep:crossterm"]
+tui = ["dep:bevy_ratatui", "dep:ratatui", "crossterm"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
@@ -38,7 +45,6 @@ bytes.workspace = true
 uuid.workspace = true
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
-crossterm = { version = "0.29", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 nu-ansi-term = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

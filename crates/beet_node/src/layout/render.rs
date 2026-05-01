@@ -145,5 +145,5 @@ pub trait Widget {
 	fn measure(&self, available: UVec2) -> UVec2;
 
 	/// Pass 2 (top-down): given the assigned rect, emit render cells to buffer.
-	fn layout(&self, rect: URect, buffer: &mut Buffer);
+	fn layout(&self, buffer: &mut Buffer, rect: URect);
 }

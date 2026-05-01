@@ -86,15 +86,17 @@ pub mod prelude {
 	))]
 	pub use crate::node::prelude::Justify;
 	#[cfg(feature = "node")]
+	pub use crate::node::prelude::JustifyContent;
+	#[cfg(feature = "node")]
 	pub use crate::node::prelude::Pointer;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::Button;
-	#[cfg(feature = "node")]
+#[cfg(feature = "node")]
+	pub use crate::node::prelude::AlignSelf;
+#[cfg(feature = "node")]
 	pub use crate::node::prelude::AlignItems;
+#[cfg(feature = "node")]
+	pub use crate::node::prelude::AlignContent;
 	#[cfg(feature = "node")]
 	pub use crate::node::prelude::FlexWrap;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::Rect;
 }
 
 pub mod exports {

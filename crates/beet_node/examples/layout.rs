@@ -153,7 +153,7 @@ fn demo_nested(width: u32) {
 fn render_demo(title: &str, widget: impl Widget, width: u32, height: u32) {
 	let rect = URect::new(0, 0, width, height);
 	let mut buffer = Buffer::new(rect);
-	widget.layout(rect, &mut buffer);
+	widget.layout(&mut buffer, rect);
 
 	println!("{}: ", title);
 	println!("{}", buffer.render_plain());
