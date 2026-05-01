@@ -39,6 +39,21 @@ fn handler(
 	cx: In<ActionContext<Request>>,
 	query: StyleQuery,
 ) -> Result<Response> {
+	let store = query
+		.collect_token_store(cx.id())
+		.into_iter()
+		.collect::<HashMap<_, _>>();
+
+	// write the store for inspection
+	let json = serde_json::to_string_pretty(&store).unwrap();
+	fs_ext::write(
+		AbsPathBuf::new_workspace_rel("target/examples/style/token_store.json")
+			.unwrap(),
+		json,
+	)
+	.unwrap();
+
+
 	let css = query.build_css(
 		&CssBuilder::default()
 			// .with_format_variables(FormatVariables::Full),
@@ -66,6 +81,7 @@ fn handler(
 </html>"#
 	);
 
+	// write the html for inspection
 	fs_ext::write(
 		AbsPathBuf::new_workspace_rel("target/examples/style/index.html")
 			.unwrap(),
