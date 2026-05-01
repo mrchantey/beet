@@ -69,7 +69,10 @@ impl Project {
 	}
 
 	/// Apply the execution plan with Terraform variables.
-	pub async fn apply_with_vars(&self, vars: &[(SmolStr, SmolStr)]) -> Result<String> {
+	pub async fn apply_with_vars(
+		&self,
+		vars: &[(SmolStr, SmolStr)],
+	) -> Result<String> {
 		self.init().await?;
 		tofu::apply_with_vars(&self.dir(), vars).await
 	}
@@ -112,11 +115,7 @@ impl Project {
 			.await?;
 		// remove S3 native lock file
 		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
-		self.backend()
-			.provider()
-			.remove(&lock_path)
-			.await
-			.ok();
+		self.backend().provider().remove(&lock_path).await.ok();
 		fs_ext::remove_async(&self.dir()).await?;
 		Ok(())
 	}
@@ -139,11 +138,7 @@ impl Project {
 			.ok();
 		// remove S3 native lock file left by interrupted runs
 		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
-		self.backend()
-			.provider()
-			.remove(&lock_path)
-			.await
-			.ok();
+		self.backend().provider().remove(&lock_path).await.ok();
 		fs_ext::remove_async(&self.dir()).await.ok();
 	}
 }

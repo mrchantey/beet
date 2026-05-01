@@ -14,7 +14,7 @@ const EXAMPLE_NAME: &str = "fargate_test";
 const SOURCE_PATH: &str = "crates/beet_infra/examples/fargate_test.rs";
 
 #[beet_core::test(timeout_ms = 900_000)]
-#[ignore = "deploys resources and takes ten minutes"]
+// #[ignore = "deploys resources and takes ten minutes"]
 async fn fargate_lifecycle() {
 	pretty_env_logger::init();
 
@@ -128,8 +128,16 @@ fn build_project(stack: &Stack) -> Result<terra::Project> {
 
 /// Build, upload artifacts, sync assets, build/push Docker image, and apply terraform.
 async fn deploy(stack: &Stack) -> Result {
-	// first, build the binary
-	let binary_path = build_binary(stack).await?;
+	let block = FargateBlock::default();
+	let cargo = CargoBuild::default()
+		.with_release(true)
+		.with_target(BuildTarget::Zigbuild)
+		.with_package("beet_infra")
+		.with_example(EXAMPLE_NAME)
+		.with_additional_args(vec!["--features".into(), "deploy".into()]);
+
+	// build the binary first
+	let binary_path = build_binary_with_cargo(&cargo).await?;
 	info!("binary built at: {}", binary_path.display());
 
 	// build and push Docker image to ECR
@@ -137,7 +145,6 @@ async fn deploy(stack: &Stack) -> Result {
 	info!("docker image pushed to: {ecr_url}");
 
 	// now deploy the infrastructure with assets
-	let block = FargateBlock::default();
 	let response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
@@ -159,44 +166,18 @@ async fn deploy(stack: &Stack) -> Result {
 	}
 }
 
-/// Build the binary for the Fargate container.
-async fn build_binary(_stack: &Stack) -> Result<AbsPathBuf> {
-	let target_dir_str = env_ext::var("CARGO_TARGET_DIR")
-		.unwrap_or_else(|_| "target".to_string());
-	let target_dir = if target_dir_str.starts_with('/') {
-		// absolute path
-		AbsPathBuf::new(&target_dir_str)?
-	} else {
-		// relative to workspace
-		AbsPathBuf::new_workspace_rel(&target_dir_str)?
-	};
-	let binary_name = EXAMPLE_NAME;
-
-	// build using zigbuild for x86_64-unknown-linux-musl
-	let cmd = ChildProcess::new("cargo").with_args([
-		"zigbuild",
-		"--release",
-		"--target",
-		"x86_64-unknown-linux-musl",
-		"-p",
-		"beet_infra",
-		"--example",
-		EXAMPLE_NAME,
-		"--features",
-		"deploy",
-	]);
+/// Build the binary for the Fargate container using CargoBuild.
+async fn build_binary_with_cargo(cargo: &CargoBuild) -> Result<AbsPathBuf> {
+	let artifact = cargo.clone().into_build_artifact();
+	let cmd = artifact.process();
 
 	info!("building binary: {}", cmd);
-	let output = cmd.run_async().await?;
+	let output = cmd.clone().run_async().await?;
 	if !output.status.success() {
 		bevybail!("build failed: {}", String::from_utf8_lossy(&output.stderr));
 	}
 
-	let binary_path = target_dir
-		.join("x86_64-unknown-linux-musl")
-		.join("release")
-		.join("examples")
-		.join(binary_name);
+	let binary_path = AbsPathBuf::new(artifact.artifact_path())?;
 
 	if !binary_path.exists() {
 		bevybail!("binary not found at: {}", binary_path.display());
