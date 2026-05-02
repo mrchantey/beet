@@ -3,6 +3,57 @@ use beet_core::prelude::*;
 
 // ── Widget trait ──────────────────────────────────────────────────────────────
 
+pub mod tui_render {
+	use super::*;
+	pub fn render_half(
+		query: &StyledNodeQuery,
+		entity: Entity,
+	) -> Result<Buffer> {
+		let mut size =
+			terminal_ext::size().unwrap_or_else(|_| UVec2::new(80, 24));
+		size.y /= 2;
+		render_rect(query, entity, URect::new(0, 0, size.x, size.y))
+	}
+	pub fn render(query: &StyledNodeQuery, entity: Entity) -> Result<Buffer> {
+		let size = terminal_ext::size().unwrap_or_else(|_| UVec2::new(80, 24));
+		render_rect(query, entity, URect::new(0, 0, size.x, size.y))
+	}
+
+	pub fn render_rect(
+		query: &StyledNodeQuery,
+		entity: Entity,
+		rect: URect,
+	) -> Result<Buffer> {
+		let mut buffer = Buffer::new(rect);
+		let node = query.get_view(entity);
+		layout(&node, &mut buffer, rect)?;
+		buffer.xok()
+	}
+
+
+	pub fn measure() {}
+	pub fn measure_children() {}
+	pub fn layout(
+		node: &StyledNodeView,
+		buffer: &mut Buffer,
+		rect: URect,
+	) -> Result {
+		TextWidget::layout2(node, buffer, rect)
+	}
+}
+
+
+pub trait TuiRender {
+	fn measure2(node: &StyledNodeView, available: UVec2) -> Result<UVec2>;
+	fn layout2(
+		node: &StyledNodeView,
+		buffer: &mut Buffer,
+		rect: URect,
+	) -> Result;
+}
+
+
+
 pub trait Widget {
 	fn layout_style(&self) -> &LayoutStyle;
 
@@ -26,69 +77,14 @@ impl EntityWidget {
 	}
 }
 
-pub struct WidgetRef<'a> {
-	entity: Entity,
-	widget: &'a EntityWidget,
-	children: Vec<WidgetRef<'a>>,
-}
-
-impl Widget for WidgetRef<'_> {
-	fn layout_style(&self) -> &LayoutStyle { self.widget.layout_style() }
-	fn measure(&self, available: UVec2) -> UVec2 {
-		self.widget.measure(available)
-	}
-	fn layout(&self, buffer: &mut Buffer, rect: URect) {
-		self.widget.layout(buffer, rect);
-	}
-}
-
-
 #[derive(SystemParam)]
 pub struct WidgetQuery<'w, 's> {
-	// widgets: Query<'w, 's, &'static EntityWidget>,
 	changed: Query<'w, 's, Entity, Changed<EntityWidget>>,
-	children: Query<'w, 's, &'static Children>,
-	widgets: Query<'w, 's, &'static EntityWidget>,
 	root_widgets: AncestorQuery<'w, 's, (Entity, &'static EntityWidget)>,
 }
 
 
 impl WidgetQuery<'_, '_> {
-	pub fn root_widget(&self, entity: Entity) -> Result<WidgetRef<'_>> {
-		let (entity, root_widget) =
-			self.root_widgets.find_root_ancestor(entity)?;
-
-		WidgetRef {
-			entity,
-			widget: root_widget,
-			children: self.widget_children(entity),
-		}
-		.xok()
-	}
-
-	fn widget_children(&self, entity: Entity) -> Vec<WidgetRef<'_>> {
-		let Ok(children) = self.children.get(entity) else {
-			return default();
-		};
-		children
-			.iter()
-			.map(|child| {
-				if let Ok(widget) = self.widgets.get(child) {
-					WidgetRef {
-						entity: child,
-						widget,
-						children: self.widget_children(child),
-					}
-					.xvec()
-				} else {
-					// an empty child may have widget children
-					self.widget_children(child)
-				}
-			})
-			.flatten()
-			.collect()
-	}
-
 	pub fn render(&self, entity: Entity) -> Result<Buffer> {
 		let size = UVec2::new(80, 24);
 		self.render_rect(entity, URect::new(0, 0, size.x, size.y))
@@ -114,7 +110,7 @@ pub(super) fn render_changed(query: WidgetQuery) -> Result {
 	}
 
 	for (_entity, _widget) in root_widgets {
-		todo!("render to some backend resource");
+		todo!("render to some buffer component?");
 	}
 
 	Ok(())

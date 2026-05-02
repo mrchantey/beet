@@ -12,7 +12,7 @@ impl Plugin for TuiPlugin2 {
 			enable_kitty_protocol: true,
 			enable_mouse_capture: true,
 			enable_input_forwarding: true,
-		})
-		.add_systems(PostUpdate, super::render_changed);
+		});
+		app.add_systems(PostUpdate, super::render_changed);
 	}
 }

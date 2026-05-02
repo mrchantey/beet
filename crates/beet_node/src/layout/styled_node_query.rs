@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 
 
 pub struct StyledNodeView<'a> {
+	pub entity: Entity,
 	pub element: Option<ElementView<'a>>,
 	pub value: Option<&'a Value>,
 	pub flexbox: Option<&'a FlexBox>,
@@ -43,6 +44,7 @@ impl<'w, 's> StyledNodeQuery<'w, 's> {
 			.unwrap_or_default();
 
 		StyledNodeView {
+			entity,
 			element,
 			value,
 			flexbox,
