@@ -1,6 +1,7 @@
 use crate::prelude::terra::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::BucketProvider;
 
 
 
@@ -108,15 +109,7 @@ impl Project {
 	pub async fn destroy(&self) -> Result {
 		self.init().await?;
 		tofu::destroy(&self.dir()).await?;
-		// remove state file
-		self.backend()
-			.provider()
-			.remove(&self.backend_path())
-			.await?;
-		// remove S3 native lock file
-		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
-		self.backend().provider().remove(&lock_path).await.ok();
-		fs_ext::remove_async(&self.dir()).await?;
+		self.destroy_common().await;
 		Ok(())
 	}
 	/// Destroys infrastructure moving forward
@@ -130,6 +123,10 @@ impl Project {
 		self.init().await.ok();
 		self.backend().clear_stale_locks();
 		tofu::destroy_force(&self.dir()).await.ok();
+		self.destroy_common().await;
+	}
+
+	async fn destroy_common(&self) {
 		// remove state file
 		self.backend()
 			.provider()
@@ -139,6 +136,13 @@ impl Project {
 		// remove S3 native lock file left by interrupted runs
 		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
 		self.backend().provider().remove(&lock_path).await.ok();
+		// TODO should be possible to just include artifacts client in the project
+		self.stack
+			.artifacts_client()
+			.bucket()
+			.bucket_remove()
+			.await
+			.ok();
 		fs_ext::remove_async(&self.dir()).await.ok();
 	}
 }

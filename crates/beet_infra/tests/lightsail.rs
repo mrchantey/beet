@@ -97,8 +97,7 @@ async fn lightsail_lifecycle() {
 
 	// 14. destroy
 	info!("step 14: destroying");
-	let project = build_project(&stack).unwrap();
-	cleanup(&stack, project).await.unwrap();
+	build_project(&stack).unwrap().destroy().await.unwrap();
 
 	// 15. verify dead
 	info!("step 15: verifying dead");

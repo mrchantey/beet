@@ -137,17 +137,6 @@ pub async fn verify_dead(
 	bevybail!("endpoint still reachable after destroy")
 }
 
-/// Common cleanup: destroy project and remove artifacts bucket.
-/// The artifacts bucket is not managed by terraform, so we clean it manually.
-/// The assets bucket IS managed by terraform (S3BucketBlock), so terraform cleans it.
-pub async fn cleanup(stack: &Stack, project: terra::Project) -> Result {
-	project.destroy().await?;
-	// only clean artifacts bucket - not managed by terraform
-	let client = stack.artifacts_client();
-	client.bucket().bucket_remove().await.ok();
-	Ok(())
-}
-
 /// Setup source guards for test files.
 pub fn setup_source_guards(
 	source_path: &str,
