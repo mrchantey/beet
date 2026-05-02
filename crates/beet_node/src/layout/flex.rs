@@ -8,7 +8,6 @@ use crate::style::JustifyContent;
 use crate::style::LayoutStyle;
 use beet_core::prelude::*;
 use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
 use bevy::math::URect;
 use bevy::math::UVec2;
 use bevy::prelude::Result;
@@ -130,7 +129,6 @@ fn cross_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
 
 /// Measure pass: calculate the size needed for this flexbox and its children.
 pub fn flex_measure(
-	query: &StyledNodeQuery,
 	node: &StyledNodeView,
 	available: UVec2,
 	viewport: URect,
@@ -139,7 +137,7 @@ pub fn flex_measure(
 		return Ok(UVec2::ZERO);
 	};
 
-	let lines = form_lines_ecs(query, node, flexbox, available, viewport)?;
+	let lines = form_lines_ecs(node, flexbox, available, viewport)?;
 
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
@@ -206,8 +204,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 	};
 
 	let available = UVec2::new(cx.rect.width(), cx.rect.height());
-	let lines =
-		form_lines_ecs(&cx.query, cx.node, flexbox, available, cx.viewport)?;
+	let lines = form_lines_ecs(&cx.node, flexbox, available, cx.viewport)?;
 
 	// collect line cross sizes
 	let line_cross_sizes: Vec<u32> = lines
@@ -227,7 +224,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 		}
 	};
 
-	let line_positions = apply_align_content_ecs(
+	let line_positions = apply_align_content(
 		flexbox,
 		&line_cross_sizes,
 		container_cross,
@@ -258,14 +255,14 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					break;
 				}
 
-				let final_sizes = apply_flex_grow_ecs(
+				let final_sizes = apply_flex_grow(
 					cx.node,
 					flexbox,
 					line,
 					cx.rect.width(),
 					cx.viewport,
 				);
-				let main_positions = apply_justify_ecs(
+				let main_positions = apply_justify(
 					flexbox,
 					line,
 					&final_sizes,
@@ -273,24 +270,17 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					cx.viewport,
 				);
 
-				for (item_idx, ((entity, _), fsize)) in
+				for (item_idx, ((child_node, _), fsize)) in
 					line.iter().zip(final_sizes.iter()).enumerate()
 				{
-					let child_node = cx.query.get_view(*entity);
-					let align =
-						resolve_align_ecs(&child_node, flexbox.align_items);
+					let align = resolve_align(&child_node, flexbox.align_items);
 					// stretch overrides the child's natural cross size
 					let child_h = match align {
 						AlignItems::Stretch => line_h,
 						_ => fsize.y.min(line_h),
 					};
 					let child_y = line_y
-						+ cross_offset_ecs(
-							&child_node,
-							flexbox,
-							child_h,
-							line_h,
-						);
+						+ cross_offset(&child_node, flexbox, child_h, line_h);
 					let child_x = cx.rect.min.x + main_positions[item_idx];
 
 					let child_rect = URect::new(
@@ -336,14 +326,14 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					break;
 				}
 
-				let final_sizes = apply_flex_grow_ecs(
+				let final_sizes = apply_flex_grow(
 					cx.node,
 					flexbox,
 					line,
 					cx.rect.height(),
 					cx.viewport,
 				);
-				let main_positions = apply_justify_ecs(
+				let main_positions = apply_justify(
 					flexbox,
 					line,
 					&final_sizes,
@@ -351,23 +341,16 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					cx.viewport,
 				);
 
-				for (item_idx, ((entity, _), fsize)) in
+				for (item_idx, ((child_node, _), fsize)) in
 					line.iter().zip(final_sizes.iter()).enumerate()
 				{
-					let child_node = cx.query.get_view(*entity);
-					let align =
-						resolve_align_ecs(&child_node, flexbox.align_items);
+					let align = resolve_align(&child_node, flexbox.align_items);
 					let child_w = match align {
 						AlignItems::Stretch => line_w,
 						_ => fsize.x.min(line_w),
 					};
 					let child_x = line_x
-						+ cross_offset_ecs(
-							&child_node,
-							flexbox,
-							child_w,
-							line_w,
-						);
+						+ cross_offset(&child_node, flexbox, child_w, line_w);
 					let child_y = cx.rect.min.y + main_positions[item_idx];
 
 					let child_rect = URect::new(
@@ -396,16 +379,12 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 	Ok(())
 }
 
-// ── ECS helper functions ──────────────────────────────────────────────────────
-
-/// Greedy line-forming pass, using entity children instead of widget children.
-fn form_lines_ecs(
-	query: &StyledNodeQuery,
-	node: &StyledNodeView,
+fn form_lines_ecs<'a>(
+	node: &StyledNodeView<'a>,
 	flexbox: &FlexBox,
 	available: UVec2,
 	viewport: URect,
-) -> Result<Vec<Vec<(Entity, UVec2)>>> {
+) -> Result<Vec<Vec<(StyledNodeView<'a>, UVec2)>>> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_main = match direction {
 		Direction::Horizontal => available.x,
@@ -415,8 +394,8 @@ fn form_lines_ecs(
 		}
 	};
 
-	let mut lines: Vec<Vec<(Entity, UVec2)>> = vec![];
-	let mut current: Vec<(Entity, UVec2)> = vec![];
+	let mut lines: Vec<Vec<(StyledNodeView, UVec2)>> = vec![];
+	let mut current: Vec<(StyledNodeView, UVec2)> = vec![];
 	let mut main_used = 0u32;
 
 	let main_gap = match direction {
@@ -428,16 +407,11 @@ fn form_lines_ecs(
 	};
 
 	// sort children by flex_order
-	let mut child_entities: Vec<Entity> =
-		node.children.iter().map(|c| c.entity).collect();
-	child_entities.sort_by_key(|&entity| {
-		let child_node = query.get_view(entity);
-		child_node.layout.map(|l| l.flex_order).unwrap_or(0)
-	});
+	let mut sorted = node.children.clone();
+	sorted.sort_by_key(|child| child.layout.map(|l| l.flex_order).unwrap_or(0));
 
-	for entity in child_entities {
-		let child_node = query.get_view(entity);
-		let size = measure_node(query, &child_node, available, viewport)?;
+	for child in sorted {
+		let size = measure_node(&child, available, viewport)?;
 		let child_main = main_size(size, flexbox.direction, viewport);
 
 		// account for gap between items
@@ -459,7 +433,7 @@ fn form_lines_ecs(
 		}
 
 		main_used += child_main;
-		current.push((entity, size));
+		current.push((child, size));
 	}
 	if !current.is_empty() {
 		lines.push(current);
@@ -469,14 +443,13 @@ fn form_lines_ecs(
 
 /// Measure a single node (recursively measuring flex children if needed).
 fn measure_node(
-	query: &StyledNodeQuery,
 	node: &StyledNodeView,
 	available: UVec2,
 	viewport: URect,
 ) -> Result<UVec2> {
 	// if node has flexbox, use flex_measure
 	if node.flexbox.is_some() {
-		return flex_measure(query, node, available, viewport);
+		return flex_measure(node, available, viewport);
 	}
 	// if node has text, use text_measure
 	if node.value.is_some() {
@@ -498,7 +471,7 @@ fn line_cross_size_for(
 		.unwrap_or(0)
 }
 
-fn resolve_align_ecs(
+fn resolve_align(
 	node: &StyledNodeView,
 	default_align: AlignItems,
 ) -> AlignItems {
@@ -516,13 +489,13 @@ fn resolve_align_ecs(
 	}
 }
 
-fn cross_offset_ecs(
+fn cross_offset(
 	node: &StyledNodeView,
 	flexbox: &FlexBox,
 	child_cross: u32,
 	line_cross: u32,
 ) -> u32 {
-	let align = resolve_align_ecs(node, flexbox.align_items);
+	let align = resolve_align(node, flexbox.align_items);
 	match align {
 		AlignItems::Start | AlignItems::Stretch => 0,
 		AlignItems::Center => line_cross.saturating_sub(child_cross) / 2,
@@ -531,10 +504,10 @@ fn cross_offset_ecs(
 	}
 }
 
-fn apply_flex_grow_ecs(
+fn apply_flex_grow(
 	node: &StyledNodeView,
 	flexbox: &FlexBox,
-	line: &[(Entity, UVec2)],
+	line: &[(StyledNodeView, UVec2)],
 	container_main: u32,
 	viewport: URect,
 ) -> Vec<UVec2> {
@@ -563,9 +536,12 @@ fn apply_flex_grow_ecs(
 	// collect flex_grow values from children
 	let grow_values: Vec<u32> = line
 		.iter()
-		.map(|(entity, _)| {
-			let child =
-				node.children.iter().find(|c| c.entity == *entity).unwrap();
+		.map(|(line_node, _)| {
+			let child = node
+				.children
+				.iter()
+				.find(|c| c.entity == line_node.entity)
+				.unwrap();
 			child.layout.map(|l| l.flex_grow).unwrap_or(0)
 		})
 		.collect();
@@ -592,9 +568,9 @@ fn apply_flex_grow_ecs(
 		.collect()
 }
 
-fn apply_justify_ecs(
+fn apply_justify(
 	flexbox: &FlexBox,
-	line: &[(Entity, UVec2)],
+	line: &[(StyledNodeView, UVec2)],
 	final_sizes: &[UVec2],
 	container_main: u32,
 	viewport: URect,
@@ -677,7 +653,7 @@ fn apply_justify_ecs(
 	positions
 }
 
-fn apply_align_content_ecs(
+fn apply_align_content(
 	flexbox: &FlexBox,
 	line_cross_sizes: &[u32],
 	container_cross: u32,

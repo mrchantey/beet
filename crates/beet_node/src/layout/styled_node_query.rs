@@ -1,8 +1,9 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use crate::style::*;
+use beet_core::prelude::*;
 
 
+#[derive(Clone)]
 pub struct StyledNodeView<'a> {
 	pub entity: Entity,
 	pub element: Option<ElementView<'a>>,

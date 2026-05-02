@@ -49,7 +49,7 @@ fn render(
 	query: StyledNodeQuery,
 ) -> Result {
 	let entity = root.single()?;
-	let buffer = TuiRenderContext::render(&query, entity)?;
+	let buffer = TuiRenderContext::render_half(&query, entity)?;
 	println!("{}", buffer.render_plain());
 	Ok(())
 }
@@ -70,9 +70,6 @@ fn padding() -> LayoutStyle {
 	LayoutStyle::default().with_padding(Spacing::all(Length::Rem(1.)))
 }
 
-fn flex_grow(value: u32) -> LayoutStyle {
-	LayoutStyle::default().with_flex_grow(value)
-}
 
 // ── JustifyContent ────────────────────────────────────────────────────────────
 
@@ -255,8 +252,8 @@ fn setup_gaps(mut commands: Commands) {
 fn setup_flex_grow(mut commands: Commands) {
 	commands.spawn((FlexBox::row().column_gap(1), children![
 		(rsx! {"Fixed"}, bordered()),
-		(rsx! {"Grow 1"}, bordered(), flex_grow(1)),
-		(rsx! {"Grow 2"}, bordered(), flex_grow(2)),
+		(rsx! {"Grow 1"}, bordered().with_flex_grow(1)),
+		(rsx! {"Grow 2"}, bordered().with_flex_grow(2)),
 		(rsx! {"Fixed"}, bordered()),
 	]));
 }

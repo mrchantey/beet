@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 
 /// Read-only view of an element and its attributes, provided to
 /// [`NodeVisitor::visit_element`] for convenient attribute lookup.
+#[derive(Clone)]
 pub struct ElementView<'a> {
 	/// The entity of this element.
 	pub entity: Entity,
@@ -165,7 +166,7 @@ impl<'a> TypedElementView<'a> for LinkView<'a> {
 }
 
 
-
+#[derive(Clone)]
 pub struct AttributeView<'a> {
 	/// The entity of this attribute.
 	pub entity: Entity,
