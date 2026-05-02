@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_core::prelude::Component;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
@@ -94,17 +95,19 @@ impl Spacing {
 
 // ── LayoutStyle ───────────────────────────────────────────────────────────────
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone, Component)]
 pub struct LayoutStyle {
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
 	pub padding: Spacing,
 	pub margin: Spacing,
+	pub text_align: TextAlign,
 }
 
 // ── FlexBox ───────────────────────────────────────────────────────────────────
 
+#[derive(Component)]
 pub struct FlexBox {
 	pub direction: Direction,
 	pub layout_style: LayoutStyle,

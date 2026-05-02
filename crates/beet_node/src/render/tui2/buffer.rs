@@ -117,7 +117,7 @@ impl Cell {
 
 
 /// Visual styling for a cell.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Component)]
 pub struct VisualStyle {
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,

@@ -37,6 +37,8 @@
 mod bordered;
 mod flex;
 mod text;
+mod styled_node_query;
+pub use styled_node_query::*;
 pub use bordered::*;
 pub use flex::*;
 pub use text::*;

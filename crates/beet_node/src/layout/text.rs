@@ -7,7 +7,6 @@ use bevy::math::UVec2;
 pub struct TextWidget {
 	pub content: String,
 	pub layout_style: LayoutStyle,
-	pub align: TextAlign,
 }
 
 impl TextWidget {
@@ -15,11 +14,10 @@ impl TextWidget {
 		Self {
 			content: content.into(),
 			layout_style: LayoutStyle::default(),
-			align: TextAlign::Left,
 		}
 	}
 	pub fn align(mut self, a: TextAlign) -> Self {
-		self.align = a;
+		self.layout_style.text_align = a;
 		self
 	}
 	pub fn flex_grow(mut self, grow: u32) -> Self {
@@ -46,7 +44,8 @@ impl Widget for TextWidget {
 			if y >= rect.max.y {
 				break;
 			}
-			let aligned = align_line(line, rect.width(), self.align);
+			let aligned =
+				align_line(line, rect.width(), self.layout_style.text_align);
 			buffer.write_text(
 				UVec2::new(rect.min.x, y),
 				&aligned,

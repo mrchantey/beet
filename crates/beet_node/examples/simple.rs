@@ -19,7 +19,7 @@ fn setup(mut commands: Commands) {
 	let widget = Bordered::new(TextWidget::new("foobar"));
 	commands.spawn(EntityWidget::new(widget));
 }
-fn update(elements: Query<Entity>, query: TuiQuery) -> Result {
+fn update(elements: Query<Entity>, query: WidgetQuery) -> Result {
 	let buffer = query.render(elements.single()?)?;
 	println!("{}", buffer.render_plain());
 	println!();
