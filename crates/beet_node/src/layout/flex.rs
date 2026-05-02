@@ -729,3 +729,61 @@ fn apply_align_content(
 	}
 	positions
 }
+
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::style::*;
+
+	fn render(bundle: impl Bundle) -> String {
+		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
+			|entity, query| {
+				let buffer = TuiRenderContext::render_rect(
+					&query,
+					entity,
+					// adjust if needed
+					URect::new(0, 0, 40, 20),
+				)
+				.unwrap();
+				buffer.render_plain_remove_empty()
+			},
+		)
+	}
+
+
+	fn bordered() -> LayoutStyle {
+		LayoutStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+	}
+
+	// helper so we can write pretty assertions
+	fn trim_empty(value: &str) -> String {
+		value
+			.lines()
+			.filter(|line| !line.trim().is_empty())
+			.collect::<Vec<_>>()
+			.join("\n")
+	}
+
+	#[test]
+	fn justify_start() {
+		render((
+			FlexBox::row()
+				.justify_content(JustifyContent::Start)
+				.column_gap(1),
+			children![
+				(rsx! {"A"}, bordered()),
+				(rsx! {"B"}, bordered()),
+				(rsx! {"C"}, bordered()),
+			],
+		))
+		.xpect_eq(trim_empty(
+			r#"
+┌─┐ ┌─┐ ┌─┐
+│A│ │B│ │C│
+└─┘ └─┘ └─┘
+"#,
+		));
+	}
+}
