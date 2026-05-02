@@ -13,7 +13,10 @@ use beet_infra::prelude::*;
 
 #[beet_core::main]
 async fn main() -> Result {
-	let generator = SchemaBindingGenerator::default()
+	// Use the existing schema.json instead of running the full tofu init cycle.
+	beet_core::cross_log!("Generating provider bindings from schema.json ...");
+
+	SchemaBindingGenerator::default()
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
 				.with_resources(terra::Provider::AWS, [
@@ -80,12 +83,9 @@ async fn main() -> Result {
 			.with_resources(terra::Provider::CLOUDFLARE, [
 				"cloudflare_dns_record",
 			]),
-		);
-
-	// Use the existing schema.json instead of running the full tofu init cycle.
-	beet_core::cross_log!("Generating provider bindings from schema.json ...");
-	generator.generate().await?;
+		)
+		.generate()
+		.await?;
 	beet_core::cross_log!("Done!");
-
 	Ok(())
 }
