@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+use beet_node::prelude::style::*;
 use beet_node::prelude::*;
 use beet_node::*;
 // use bevy::math::URect;
@@ -18,7 +19,8 @@ fn setup(mut commands: Commands) {
 	// commands.spawn(rsx! {<div>hello world</div>});
 	// let widget = Bordered::new(TextWidget::new("foobar"));
 	// commands.spawn(EntityWidget::new(widget));
-	commands.spawn((rsx! {<div>"hello world!"</div>}, VisualStyle::default()));
+	// commands.spawn((rsx! {<div>"hello world!"</div>}, VisualStyle::default()));
+	commands.spawn((rsx! {"hello world!"}, VisualStyle::default()));
 }
 fn update(
 	root: Query<Entity, (Without<ChildOf>, Without<AttributeOf>)>,

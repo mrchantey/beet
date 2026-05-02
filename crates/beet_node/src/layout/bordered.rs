@@ -1,6 +1,9 @@
 use crate::prelude::*;
+use crate::style::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
+
+
 
 /// A widget that wraps a child in a border.
 pub struct Bordered {

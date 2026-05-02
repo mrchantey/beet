@@ -53,6 +53,22 @@ pub trait TuiRender {
 }
 
 
+// pub struct BoxModel;
+
+// impl TuiRender for BoxModel {
+// 	fn measure2(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
+// 		todo!()
+// 	}
+
+// 	fn layout2(
+// 		node: &StyledNodeView,
+// 		buffer: &mut Buffer,
+// 		rect: URect,
+// 	) -> Result {
+// 		todo!()
+// 	}
+// }
+
 
 pub trait Widget {
 	fn layout_style(&self) -> &LayoutStyle;

@@ -2,6 +2,23 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
+
+/// Visual styling for a cell.
+#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
+pub struct VisualStyle {
+	pub foreground: Option<Color>,
+	pub background: Option<Color>,
+	pub underline: Option<Color>,
+	pub outline_left: Option<Outline>,
+}
+
+
+#[derive(Debug, Clone, PartialEq, SetWith)]
+pub struct Outline {
+	color: Color,
+	length: Length,
+}
+
 impl AsCssValue for f32 {
 	fn as_css_value(&self) -> Result<CssValue> {
 		CssValue::expression(self.to_string()).xok()

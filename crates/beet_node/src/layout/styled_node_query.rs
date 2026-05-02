@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use crate::style::*;
 
 
 pub struct StyledNodeView<'a> {

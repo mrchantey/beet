@@ -1,3 +1,4 @@
+use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::color::Color;
 use bevy::math::URect;
@@ -112,24 +113,5 @@ impl Cell {
 	pub fn with_bg(mut self, color: Color) -> Self {
 		self.style.background = Some(color);
 		self
-	}
-}
-
-
-/// Visual styling for a cell.
-#[derive(Debug, Clone, PartialEq, SetWith, Component)]
-pub struct VisualStyle {
-	pub foreground: Option<Color>,
-	pub background: Option<Color>,
-	pub underline: Option<Color>,
-}
-
-impl Default for VisualStyle {
-	fn default() -> Self {
-		Self {
-			foreground: None,
-			background: None,
-			underline: None,
-		}
 	}
 }
