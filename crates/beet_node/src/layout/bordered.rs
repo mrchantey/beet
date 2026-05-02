@@ -112,6 +112,16 @@ pub fn border_layout(cx: &mut TuiRenderContext) {
 	if width < 2 || height < 2 {
 		return; // too small for border
 	}
+	let border = cx
+		.node
+		.layout
+		.map(|layout| &layout.border)
+		.unwrap_or(&Spacing::DEFAULT);
+	if border == &Spacing::DEFAULT {
+		return; // no border to draw
+	}
+
+
 	let style = cx.node.visual.unwrap_or(&VisualStyle::DEFAULT);
 
 	let TuiRenderContext { buffer, rect, .. } = cx;

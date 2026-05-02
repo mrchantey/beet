@@ -4,9 +4,6 @@ use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
-// ── Text ──────────────────────────────────────────────────────────────────────
-
-// TODO helper methods
 pub fn text_measure(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
 	let Some(value) = node.value else {
 		return Ok(UVec2::ZERO);

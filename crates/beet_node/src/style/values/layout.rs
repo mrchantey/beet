@@ -173,6 +173,13 @@ pub struct Spacing {
 }
 
 impl Spacing {
+	pub const DEFAULT: Self = Self {
+		top: Length::DEFAULT,
+		right: Length::DEFAULT,
+		bottom: Length::DEFAULT,
+		left: Length::DEFAULT,
+	};
+
 	pub fn all(length: Length) -> Self {
 		Self {
 			top: length,

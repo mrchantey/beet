@@ -16,15 +16,12 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	// commands.spawn(rsx! {<div>hello world</div>});
-	// let widget = Bordered::new(TextWidget::new("foobar"));
-	// commands.spawn(EntityWidget::new(widget));
-	// commands.spawn((rsx! {<div>"hello world!"</div>}, VisualStyle::default()));
 	commands.spawn((
 		rsx! {"hello world!"},
 		VisualStyle::default(),
 		LayoutStyle::default()
 			.with_margin(Spacing::all(Length::Rem(3.)))
+			.with_border(Spacing::all(Length::Rem(1.)))
 			.with_padding(Spacing::all(Length::Rem(3.))),
 	));
 }

@@ -15,7 +15,7 @@ impl Buffer {
 		let size = (rect.width() * rect.height()) as usize;
 		Self {
 			rect,
-			cells: vec![None; size],
+			cells: alloc::vec::from_elem(None, size),
 		}
 	}
 

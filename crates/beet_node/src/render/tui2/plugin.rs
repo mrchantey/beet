@@ -13,6 +13,9 @@ impl Plugin for TuiPlugin2 {
 			enable_mouse_capture: true,
 			enable_input_forwarding: true,
 		});
-		app.add_systems(PostUpdate, super::render_changed);
+		app.add_systems(PostUpdate, render_changed);
 	}
+}
+fn render_changed() {
+	//TODO
 }
