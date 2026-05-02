@@ -35,23 +35,14 @@ fn main() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn run_demo(name: &str, setup: fn(Commands)) {
-	println!("{name}:");
-	App::new()
-		.add_systems(Startup, setup)
-		.add_systems(Update, render)
-		.run();
-	println!();
-}
-
-fn render(
-	root: Query<Entity, (Without<ChildOf>, Without<AttributeOf>)>,
-	query: StyledNodeQuery,
-) -> Result {
-	let entity = root.single()?;
-	let buffer = TuiRenderContext::render_half(&query, entity)?;
-	println!("{}", buffer.render_plain());
-	Ok(())
+fn run_demo<B: Bundle>(name: &str, setup: fn() -> B) {
+	let out = World::new()
+		.spawn(setup())
+		.with_state::<StyledNodeQuery, _>(|entity, query| {
+			let buffer = TuiRenderContext::render_half(&query, entity).unwrap();
+			buffer.render_plain_remove_empty()
+		});
+	println!("\n{name}:\n{out}\n");
 }
 
 fn bordered() -> LayoutStyle {
@@ -73,8 +64,8 @@ fn padding() -> LayoutStyle {
 
 // ── JustifyContent ────────────────────────────────────────────────────────────
 
-fn setup_justify_start(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_start() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::Start)
 			.column_gap(1),
@@ -83,11 +74,11 @@ fn setup_justify_start(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_justify_center(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_center() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::Center)
 			.column_gap(1),
@@ -96,11 +87,11 @@ fn setup_justify_center(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_justify_end(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_end() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::End)
 			.column_gap(1),
@@ -109,11 +100,11 @@ fn setup_justify_end(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_justify_space_between(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_space_between() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::SpaceBetween)
 			.column_gap(1),
@@ -122,11 +113,11 @@ fn setup_justify_space_between(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_justify_space_around(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_space_around() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::SpaceAround)
 			.column_gap(1),
@@ -135,11 +126,11 @@ fn setup_justify_space_around(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_justify_space_evenly(mut commands: Commands) {
-	commands.spawn((
+fn setup_justify_space_evenly() -> impl Bundle {
+	(
 		FlexBox::row()
 			.justify_content(JustifyContent::SpaceEvenly)
 			.column_gap(1),
@@ -148,13 +139,13 @@ fn setup_justify_space_evenly(mut commands: Commands) {
 			(rsx! {"B"}, bordered()),
 			(rsx! {"C"}, bordered()),
 		],
-	));
+	)
 }
 
 // ── AlignItems ────────────────────────────────────────────────────────────────
 
-fn setup_align_start(mut commands: Commands) {
-	commands.spawn((
+fn setup_align_start() -> impl Bundle {
+	(
 		FlexBox::row().align_items(AlignItems::Start).column_gap(1),
 		children![
 			(
@@ -169,11 +160,11 @@ fn setup_align_start(mut commands: Commands) {
 			(rsx! {"Short"}, bordered()),
 			(rsx! {"B"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_align_center(mut commands: Commands) {
-	commands.spawn((
+fn setup_align_center() -> impl Bundle {
+	(
 		FlexBox::row().align_items(AlignItems::Center).column_gap(1),
 		children![
 			(
@@ -188,11 +179,11 @@ fn setup_align_center(mut commands: Commands) {
 			(rsx! {"Short"}, bordered()),
 			(rsx! {"B"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_align_end(mut commands: Commands) {
-	commands.spawn((
+fn setup_align_end() -> impl Bundle {
+	(
 		FlexBox::row().align_items(AlignItems::End).column_gap(1),
 		children![
 			(
@@ -207,11 +198,11 @@ fn setup_align_end(mut commands: Commands) {
 			(rsx! {"Short"}, bordered()),
 			(rsx! {"B"}, bordered()),
 		],
-	));
+	)
 }
 
-fn setup_align_stretch(mut commands: Commands) {
-	commands.spawn((
+fn setup_align_stretch() -> impl Bundle {
+	(
 		FlexBox::row()
 			.align_items(AlignItems::Stretch)
 			.column_gap(1),
@@ -228,13 +219,13 @@ fn setup_align_stretch(mut commands: Commands) {
 			(rsx! {"Short"}, bordered()),
 			(rsx! {"B"}, bordered()),
 		],
-	));
+	)
 }
 
 // ── Gaps ──────────────────────────────────────────────────────────────────────
 
-fn setup_gaps(mut commands: Commands) {
-	commands.spawn((
+fn setup_gaps() -> impl Bundle {
+	(
 		FlexBox::row().wrap(FlexWrap::Wrap).row_gap(1).column_gap(2),
 		children![
 			(rsx! {"1"}, bordered()),
@@ -244,34 +235,34 @@ fn setup_gaps(mut commands: Commands) {
 			(rsx! {"5"}, bordered()),
 			(rsx! {"6"}, bordered()),
 		],
-	));
+	)
 }
 
 // ── Flex Grow ─────────────────────────────────────────────────────────────────
 
-fn setup_flex_grow(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(1), children![
+fn setup_flex_grow() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
 		(rsx! {"Fixed"}, bordered()),
 		(rsx! {"Grow 1"}, bordered().with_flex_grow(1)),
 		(rsx! {"Grow 2"}, bordered().with_flex_grow(2)),
 		(rsx! {"Fixed"}, bordered()),
-	]));
+	])
 }
 
 // ── Wrapping ──────────────────────────────────────────────────────────────────
 
-fn setup_no_wrap(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(1), children![
+fn setup_no_wrap() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
 		(rsx! {"Item 1"}, bordered()),
 		(rsx! {"Item 2"}, bordered()),
 		(rsx! {"Item 3"}, bordered()),
 		(rsx! {"Item 4"}, bordered()),
 		(rsx! {"Item 5"}, bordered()),
-	]));
+	])
 }
 
-fn setup_wrap(mut commands: Commands) {
-	commands.spawn((
+fn setup_wrap() -> impl Bundle {
+	(
 		FlexBox::row().wrap(FlexWrap::Wrap).column_gap(1).row_gap(1),
 		children![
 			(rsx! {"Item 1"}, bordered()),
@@ -280,13 +271,13 @@ fn setup_wrap(mut commands: Commands) {
 			(rsx! {"Item 4"}, bordered()),
 			(rsx! {"Item 5"}, bordered()),
 		],
-	));
+	)
 }
 
 // ── Nested Layouts ────────────────────────────────────────────────────────────
 
-fn setup_nested(mut commands: Commands) {
-	commands.spawn((FlexBox::col().row_gap(1), children![
+fn setup_nested() -> impl Bundle {
+	(FlexBox::col().row_gap(1), children![
 		(
 			FlexBox::row().column_gap(1),
 			children![
@@ -310,39 +301,39 @@ fn setup_nested(mut commands: Commands) {
 			],
 			bordered()
 		),
-	]));
+	])
 }
 
 // ── Margins, Borders, Padding ─────────────────────────────────────────────────
 
-fn setup_margin_only(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(0), children![
+fn setup_margin_only() -> impl Bundle {
+	(FlexBox::row().column_gap(0), children![
 		(rsx! {"A"}, margin()),
 		(rsx! {"B"}, margin()),
 		(rsx! {"C"}, margin()),
-	]));
+	])
 }
 
-fn setup_border_only(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(0), children![
+fn setup_border_only() -> impl Bundle {
+	(FlexBox::row().column_gap(0), children![
 		(rsx! {"A"}, border()),
 		(rsx! {"B"}, border()),
 		(rsx! {"C"}, border()),
-	]));
+	])
 }
 
-fn setup_padding_only(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(0), children![
+fn setup_padding_only() -> impl Bundle {
+	(FlexBox::row().column_gap(0), children![
 		(rsx! {"A"}, padding(), border()),
 		(rsx! {"B"}, padding(), border()),
 		(rsx! {"C"}, padding(), border()),
-	]));
+	])
 }
 
-fn setup_all_spacing(mut commands: Commands) {
-	commands.spawn((FlexBox::row().column_gap(0), children![
+fn setup_all_spacing() -> impl Bundle {
+	(FlexBox::row().column_gap(0), children![
 		(rsx! {"A"}, margin(), border(), padding()),
 		(rsx! {"B"}, margin(), border(), padding()),
 		(rsx! {"C"}, margin(), border(), padding()),
-	]));
+	])
 }

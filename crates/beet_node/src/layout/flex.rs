@@ -292,7 +292,6 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 
 					// render child
 					let mut child_cx = TuiRenderContext {
-						query: cx.query,
 						node: &child_node,
 						viewport: cx.viewport,
 						rect: child_rect,
@@ -362,7 +361,6 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 
 					// render child
 					let mut child_cx = TuiRenderContext {
-						query: cx.query,
 						node: &child_node,
 						viewport: cx.viewport,
 						rect: child_rect,

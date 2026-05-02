@@ -2,8 +2,7 @@ use crate::prelude::*;
 use crate::style::Spacing;
 use beet_core::prelude::*;
 
-pub struct TuiRenderContext<'w, 's, 'a> {
-	pub query: &'a StyledNodeQuery<'w, 's>,
+pub struct TuiRenderContext<'a> {
 	pub node: &'a StyledNodeView<'a>,
 	pub viewport: URect,
 	pub rect: URect,
@@ -21,7 +20,7 @@ fn terminal_size() -> UVec2 {
 	}
 }
 
-impl<'w, 's, 'a> TuiRenderContext<'w, 's, 'a> {
+impl<'a> TuiRenderContext<'a> {
 	pub fn render_half(
 		query: &StyledNodeQuery,
 		entity: Entity,
@@ -32,11 +31,7 @@ impl<'w, 's, 'a> TuiRenderContext<'w, 's, 'a> {
 	}
 	pub fn render(query: &StyledNodeQuery, entity: Entity) -> Result<Buffer> {
 		let size = terminal_size();
-		Self::render_rect(
-			query,
-			entity,
-			URect::new(0, 0, size.x, size.y),
-		)
+		Self::render_rect(query, entity, URect::new(0, 0, size.x, size.y))
 	}
 	pub fn render_rect(
 		query: &StyledNodeQuery,
@@ -46,7 +41,7 @@ impl<'w, 's, 'a> TuiRenderContext<'w, 's, 'a> {
 		let mut buffer = Buffer::new(rect);
 		let node = query.get_view(entity);
 		let mut this = TuiRenderContext {
-			query,
+			// query,
 			node: &node,
 			viewport: rect,
 			rect,
