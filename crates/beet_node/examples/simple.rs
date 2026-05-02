@@ -27,7 +27,7 @@ fn update(
 	query: StyledNodeQuery,
 ) -> Result {
 	let entity = root.single()?;
-	let buffer = tui_render::render_half(&query, entity)?;
+	let buffer = render_tui::render_half(&query, entity)?;
 	println!("{}", buffer.render_plain());
 	Ok(())
 }

@@ -31,7 +31,7 @@ impl AsCssValue for u16 {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Length {
 	Px(f32),

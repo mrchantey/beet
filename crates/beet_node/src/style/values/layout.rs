@@ -1,7 +1,19 @@
 use crate::style::*;
 use beet_core::prelude::*;
 
-#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+
+#[derive(Debug, Default, Clone, Component)]
+pub struct LayoutStyle {
+	pub flex_order: i32,
+	pub flex_grow: u32,
+	pub align_self: AlignSelf,
+	pub padding: Spacing,
+	pub margin: Spacing,
+	pub text_align: TextAlign,
+}
+
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 pub enum JustifyContent {
 	#[default]
 	Start,
@@ -28,7 +40,7 @@ impl AsCssValue for JustifyContent {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 pub enum AlignItems {
 	#[default]
 	Start,
@@ -55,6 +67,7 @@ impl AsCssValue for AlignItems {
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 pub enum AlignSelf {
 	#[default]
+	Auto, // inherit from container's align_items
 	Start,
 	End,
 	Center,
@@ -65,6 +78,7 @@ pub enum AlignSelf {
 impl AsCssValue for AlignSelf {
 	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
+			Self::Auto => "auto",
 			Self::Start => "start",
 			Self::End => "end",
 			Self::Center => "center",
@@ -97,7 +111,7 @@ impl AsCssValue for FlexSize {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 pub enum Direction {
 	#[default]
 	Horizontal,
@@ -117,4 +131,55 @@ impl AsCssValue for Direction {
 		.xmap(CssValue::expression)
 		.xok()
 	}
+}
+
+
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum TextAlign {
+	#[default]
+	Left,
+	Center,
+	Right,
+}
+
+/// How to distribute lines along the cross axis when wrapping.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum AlignContent {
+	#[default]
+	Start,
+	Center,
+	End,
+	SpaceBetween,
+	SpaceAround,
+	Stretch,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum FlexWrap {
+	#[default]
+	NoWrap,
+	Wrap,
+}
+
+/// Spacing around an element.
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub struct Spacing {
+	pub top: Length,
+	pub right: Length,
+	pub bottom: Length,
+	pub left: Length,
+}
+
+impl Spacing {
+	pub fn all(length: Length) -> Self {
+		Self {
+			top: length,
+			right: length,
+			bottom: length,
+			left: length,
+		}
+	}
+	// pub fn horizontal(&self) -> Length { self.left + self.right }
+	// pub fn vertical(&self) -> Length { self.top + self.bottom }
 }

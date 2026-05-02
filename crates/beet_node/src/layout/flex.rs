@@ -1,111 +1,8 @@
 use crate::prelude::*;
+use crate::style::*;
 use beet_core::prelude::Component;
 use bevy::math::URect;
 use bevy::math::UVec2;
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum TextAlign {
-	#[default]
-	Left,
-	Center,
-	Right,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Direction {
-	Row,
-	Col,
-}
-
-/// Where children sit on the cross axis of their flex line.
-/// Row container → cross axis is vertical.
-/// Col container → cross axis is horizontal.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum AlignItems {
-	#[default]
-	Start,
-	Center,
-	End,
-	Stretch, // expand child to fill the line's cross size
-}
-
-/// How to distribute children along the main axis.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum JustifyContent {
-	#[default]
-	Start,
-	Center,
-	End,
-	SpaceBetween,
-	SpaceAround,
-	SpaceEvenly,
-}
-
-/// How to distribute lines along the cross axis when wrapping.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum AlignContent {
-	#[default]
-	Start,
-	Center,
-	End,
-	SpaceBetween,
-	SpaceAround,
-	Stretch,
-}
-
-/// Individual item alignment override.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum AlignSelf {
-	#[default]
-	Auto, // inherit from container's align_items
-	Start,
-	Center,
-	End,
-	Stretch,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum FlexWrap {
-	#[default]
-	NoWrap,
-	Wrap,
-}
-
-/// Spacing around an element.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Spacing {
-	pub top: u32,
-	pub right: u32,
-	pub bottom: u32,
-	pub left: u32,
-}
-
-impl Spacing {
-	pub fn all(value: u32) -> Self {
-		Self {
-			top: value,
-			right: value,
-			bottom: value,
-			left: value,
-		}
-	}
-	pub fn horizontal(&self) -> u32 { self.left + self.right }
-	pub fn vertical(&self) -> u32 { self.top + self.bottom }
-}
-
-// ── LayoutStyle ───────────────────────────────────────────────────────────────
-
-#[derive(Debug, Default, Clone, Component)]
-pub struct LayoutStyle {
-	pub flex_order: i32,
-	pub flex_grow: u32,
-	pub align_self: AlignSelf,
-	pub padding: Spacing,
-	pub margin: Spacing,
-	pub text_align: TextAlign,
-}
-
-// ── FlexBox ───────────────────────────────────────────────────────────────────
 
 #[derive(Component)]
 pub struct FlexBox {
@@ -124,7 +21,7 @@ impl FlexBox {
 	pub fn row() -> Self {
 		Self {
 			layout_style: LayoutStyle::default(),
-			direction: Direction::Row,
+			direction: Direction::Horizontal,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
 			align_content: AlignContent::default(),
@@ -137,7 +34,7 @@ impl FlexBox {
 	pub fn col() -> Self {
 		Self {
 			layout_style: LayoutStyle::default(),
-			direction: Direction::Col,
+			direction: Direction::Vertical,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
 			align_content: AlignContent::default(),
@@ -185,8 +82,11 @@ impl FlexBox {
 
 	fn main_gap(&self) -> u32 {
 		match self.direction {
-			Direction::Row => self.column_gap,
-			Direction::Col => self.row_gap,
+			Direction::Horizontal => self.column_gap,
+			Direction::Vertical => self.row_gap,
+			Direction::ViewportMin | Direction::ViewportMax => {
+				todo!("get viewport size")
+			}
 		}
 	}
 
@@ -194,8 +94,9 @@ impl FlexBox {
 	/// Returns Vec of lines; each line is Vec<(child_index, natural_size)>.
 	fn form_lines(&self, available: UVec2) -> Vec<Vec<(usize, UVec2)>> {
 		let container_main = match self.direction {
-			Direction::Row => available.x,
-			Direction::Col => available.y,
+			Direction::Horizontal => available.x,
+			Direction::Vertical => available.y,
+			_ => todo!("viewport size"),
 		};
 
 		let mut lines: Vec<Vec<(usize, UVec2)>> = vec![];
@@ -275,8 +176,9 @@ impl FlexBox {
 				};
 
 				match self.direction {
-					Direction::Row => UVec2::new(nat.x + bonus, nat.y),
-					Direction::Col => UVec2::new(nat.x, nat.y + bonus),
+					Direction::Horizontal => UVec2::new(nat.x + bonus, nat.y),
+					Direction::Vertical => UVec2::new(nat.x, nat.y + bonus),
+					_ => todo!("viewport size"),
 				}
 			})
 			.collect()
@@ -299,6 +201,7 @@ impl FlexBox {
 			AlignSelf::Center => AlignItems::Center,
 			AlignSelf::End => AlignItems::End,
 			AlignSelf::Stretch => AlignItems::Stretch,
+			AlignSelf::Baseline => todo!(),
 		}
 	}
 
@@ -314,6 +217,7 @@ impl FlexBox {
 			AlignItems::Start | AlignItems::Stretch => 0,
 			AlignItems::Center => line_cross.saturating_sub(child_cross) / 2,
 			AlignItems::End => line_cross.saturating_sub(child_cross),
+			AlignItems::Baseline => todo!(),
 		}
 	}
 
@@ -399,8 +303,9 @@ impl FlexBox {
 		container_cross: u32,
 	) -> Vec<u32> {
 		let line_gap = match self.direction {
-			Direction::Row => self.row_gap,
-			Direction::Col => self.column_gap,
+			Direction::Horizontal => self.row_gap,
+			Direction::Vertical => self.column_gap,
+			_ => todo!("viewport size"),
 		};
 
 		let gap_total = if line_cross_sizes.len() > 1 {
@@ -475,12 +380,13 @@ impl Widget for FlexBox {
 		let lines = self.form_lines(available);
 
 		let line_gap = match self.direction {
-			Direction::Row => self.row_gap,
-			Direction::Col => self.column_gap,
+			Direction::Horizontal => self.row_gap,
+			Direction::Vertical => self.column_gap,
+			_ => todo!("viewport size"),
 		};
 
 		match self.direction {
-			Direction::Row => {
+			Direction::Horizontal => {
 				// Lines stack vertically → total_h = sum of line heights
 				//                          total_w = max of line widths
 				let mut total_h = 0u32;
@@ -503,7 +409,7 @@ impl Widget for FlexBox {
 				}
 				UVec2::new(max_w, total_h)
 			}
-			Direction::Col => {
+			Direction::Vertical => {
 				// Lines (columns) sit side by side → total_w = sum of line widths
 				//                                    total_h = max of line heights
 				let mut total_w = 0u32;
@@ -526,6 +432,7 @@ impl Widget for FlexBox {
 				}
 				UVec2::new(total_w, max_h)
 			}
+			_ => todo!("viewport size"),
 		}
 	}
 
@@ -543,8 +450,9 @@ impl Widget for FlexBox {
 			.collect();
 
 		let container_cross = match self.direction {
-			Direction::Row => rect.height(),
-			Direction::Col => rect.width(),
+			Direction::Horizontal => rect.height(),
+			Direction::Vertical => rect.width(),
+			_ => todo!("viewport size"),
 		};
 
 		let line_positions =
@@ -553,7 +461,7 @@ impl Widget for FlexBox {
 		match self.direction {
 			// ── Row layout ────────────────────────────────────────────────────
 			// Each line is a horizontal strip. Lines stack top-to-bottom.
-			Direction::Row => {
+			Direction::Horizontal => {
 				for (line_idx, line) in lines.iter().enumerate() {
 					let line_y = rect.min.y + line_positions[line_idx];
 					let line_h = if self.align_content == AlignContent::Stretch
@@ -606,7 +514,7 @@ impl Widget for FlexBox {
 
 			// ── Col layout ────────────────────────────────────────────────────
 			// Each "line" is a vertical column. Columns sit left-to-right.
-			Direction::Col => {
+			Direction::Vertical => {
 				for (line_idx, line) in lines.iter().enumerate() {
 					let line_x = rect.min.x + line_positions[line_idx];
 					let line_w = if self.align_content == AlignContent::Stretch
@@ -655,6 +563,7 @@ impl Widget for FlexBox {
 					}
 				}
 			}
+			_ => todo!("viewport size"),
 		}
 	}
 }
@@ -663,14 +572,16 @@ impl Widget for FlexBox {
 
 fn main_size(s: UVec2, dir: Direction) -> u32 {
 	match dir {
-		Direction::Row => s.x,
-		Direction::Col => s.y,
+		Direction::Horizontal => s.x,
+		Direction::Vertical => s.y,
+		_ => todo!("viewport size"),
 	}
 }
 
 fn cross_size(s: UVec2, dir: Direction) -> u32 {
 	match dir {
-		Direction::Row => s.y,
-		Direction::Col => s.x,
+		Direction::Horizontal => s.y,
+		Direction::Vertical => s.x,
+		_ => todo!("viewport size"),
 	}
 }
