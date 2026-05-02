@@ -138,7 +138,7 @@ async fn deploy(stack: &Stack) -> Result {
 		.with_additional_args(vec!["--features".into(), "deploy".into()])
 		.into_build_artifact();
 
-	let response = AsyncPlugin::world()
+	let _response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
 			assets_s3_fs_bucket(stack),
@@ -147,16 +147,11 @@ async fn deploy(stack: &Stack) -> Result {
 			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
 		))
 		.exchange(Request::get(""))
-		.await;
-
-	let status = response.status();
-	if status.is_success() {
-		info!("deploy complete");
-		Ok(())
-	} else {
-		let body = response.unwrap_str().await;
-		bevybail!("deploy failed: {status} - {body}")
-	}
+		.await
+		.into_result()
+		.await?;
+	info!("deploy complete");
+	Ok(())
 }
 
 /// Lightsail-specific verify_live wrapper.

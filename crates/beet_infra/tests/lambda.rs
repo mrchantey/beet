@@ -140,7 +140,7 @@ async fn deploy(stack: &Stack) -> Result {
 		])
 		.into_lambda_build_artifact();
 
-	let response = AsyncPlugin::world()
+	let _response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
 			assets_s3_fs_bucket(stack),
@@ -149,16 +149,13 @@ async fn deploy(stack: &Stack) -> Result {
 			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],
 		))
 		.exchange(Request::get(""))
-		.await;
+		.await
+		.into_result()
+		.await?;
 
-	let status = response.status();
-	if status.is_success() {
-		info!("deploy complete");
-		Ok(())
-	} else {
-		let body = response.unwrap_str().await;
-		bevybail!("deploy failed: {status} - {body}")
-	}
+	info!("deploy complete");
+
+	Ok(())
 }
 
 /// Lambda-specific verify_live wrapper.

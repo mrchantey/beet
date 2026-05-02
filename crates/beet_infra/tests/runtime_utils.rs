@@ -170,8 +170,10 @@ pub fn setup_source_guards(
 
 /// Clean up any prior state before test starts.
 pub async fn cleanup_prior_state(stack: &Stack, project: terra::Project) {
+	info!("cleanup_prior_state: calling force_destroy");
 	project.force_destroy().await;
-	let client = stack.artifacts_client();
-	client.bucket().bucket_remove().await.ok();
+	info!("cleanup_prior_state: removing artifacts bucket");
+	stack.artifacts_client().bucket().bucket_remove().await.ok();
+	info!("cleanup_prior_state: removing assets bucket");
 	assets_bucket(stack).bucket_remove().await.ok();
 }
