@@ -1,60 +1,7 @@
-use super::*;
+use beet_core::prelude::*;
 use bevy::color::Color;
 use bevy::math::URect;
 use bevy::math::UVec2;
-
-// ── Cell & VisualStyle ────────────────────────────────────────────────────────
-
-/// Visual styling for a cell.
-#[derive(Debug, Clone, PartialEq)]
-pub struct VisualStyle {
-	pub foreground: Option<Color>,
-	pub background: Option<Color>,
-	pub underline: Option<Color>,
-}
-
-impl Default for VisualStyle {
-	fn default() -> Self {
-		Self {
-			foreground: None,
-			background: None,
-			underline: None,
-		}
-	}
-}
-
-/// A single terminal cell with text and styling.
-#[derive(Debug, Clone)]
-pub struct Cell {
-	pub symbol: String,
-	pub style: VisualStyle,
-}
-
-impl Cell {
-	pub fn new(symbol: impl Into<String>) -> Self {
-		Self {
-			symbol: symbol.into(),
-			style: VisualStyle::default(),
-		}
-	}
-
-	pub fn with_style(mut self, style: VisualStyle) -> Self {
-		self.style = style;
-		self
-	}
-
-	pub fn with_fg(mut self, color: Color) -> Self {
-		self.style.foreground = Some(color);
-		self
-	}
-
-	pub fn with_bg(mut self, color: Color) -> Self {
-		self.style.background = Some(color);
-		self
-	}
-}
-
-// ── Buffer ────────────────────────────────────────────────────────────────────
 
 /// A rectangular buffer of cells, indexed by position.
 pub struct Buffer {
@@ -107,7 +54,7 @@ impl Buffer {
 				break;
 			}
 			self.set(cell_pos, Cell {
-				symbol: ch.to_string(),
+				symbol: SmolStr::new(ch.to_string()),
 				style: style.clone(),
 			});
 		}
@@ -136,14 +83,53 @@ impl Buffer {
 	}
 }
 
-// ── Widget trait ──────────────────────────────────────────────────────────────
 
-pub trait Widget {
-	fn layout_style(&self) -> &LayoutStyle;
+/// A single terminal cell with text and styling.
+#[derive(Debug, Clone)]
+pub struct Cell {
+	pub symbol: SmolStr,
+	pub style: VisualStyle,
+}
 
-	/// Pass 1 (bottom-up): given available space as a hint, return desired size.
-	fn measure(&self, available: UVec2) -> UVec2;
+impl Cell {
+	pub fn new(symbol: impl Into<SmolStr>) -> Self {
+		Self {
+			symbol: symbol.into(),
+			style: VisualStyle::default(),
+		}
+	}
 
-	/// Pass 2 (top-down): given the assigned rect, emit render cells to buffer.
-	fn layout(&self, buffer: &mut Buffer, rect: URect);
+	pub fn with_style(mut self, style: VisualStyle) -> Self {
+		self.style = style;
+		self
+	}
+
+	pub fn with_fg(mut self, color: Color) -> Self {
+		self.style.foreground = Some(color);
+		self
+	}
+
+	pub fn with_bg(mut self, color: Color) -> Self {
+		self.style.background = Some(color);
+		self
+	}
+}
+
+
+/// Visual styling for a cell.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VisualStyle {
+	pub foreground: Option<Color>,
+	pub background: Option<Color>,
+	pub underline: Option<Color>,
+}
+
+impl Default for VisualStyle {
+	fn default() -> Self {
+		Self {
+			foreground: None,
+			background: None,
+			underline: None,
+		}
+	}
 }

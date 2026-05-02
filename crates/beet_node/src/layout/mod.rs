@@ -36,9 +36,7 @@
 //! 3. **Styling**: per-cell visual styling with colors and effects
 mod bordered;
 mod flex;
-mod render;
 mod text;
 pub use bordered::*;
 pub use flex::*;
-pub use render::*;
 pub use text::*;

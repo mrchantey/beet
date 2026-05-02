@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
