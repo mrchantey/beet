@@ -78,6 +78,24 @@ impl Block for LambdaBlock {
 			}
 		}
 
+		// CloudWatch log group for Lambda logs
+		// Must be created before the Lambda function to ensure proper cleanup
+		let function_ident = stack.resource_ident(self.build_label("function"));
+		let log_group = ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("logs")),
+			AwsCloudwatchLogGroupDetails {
+				name: Some(
+					format!(
+						"/aws/lambda/{}",
+						function_ident.primary_identifier()
+					)
+					.into(),
+				),
+				retention_in_days: Some(30),
+				..default()
+			},
+		);
+
 		// IAM Role for Lambda
 		let lambda_role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("lambda_role")),
@@ -128,7 +146,7 @@ impl Block for LambdaBlock {
 
 		// Lambda Function
 		let lambda_function = ResourceDef::new_primary(
-			stack.resource_ident(self.build_label("function")),
+			function_ident,
 			AwsLambdaFunctionDetails {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
@@ -246,6 +264,7 @@ impl Block for LambdaBlock {
 
 		// Core resources
 		config
+			.add_resource(&log_group)?
 			.add_resource(&lambda_role)?
 			.add_resource(&lambda_policy)?
 			.add_resource(&s3_read_policy)?

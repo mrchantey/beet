@@ -1,17 +1,76 @@
-//! Docker build and push action for Fargate deployments.
+//! Docker/Podman build and push action for Fargate deployments.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Builds and pushes a Docker image to ECR for Fargate deployment.
+/// Container engine to use for building images.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize,
+)]
+pub enum ContainerEngine {
+	#[default]
+	/// Podman engine.
+	Podman,
+	/// Docker engine.
+	Docker,
+}
+
+impl ContainerEngine {
+	/// Get the command name for this engine.
+	fn command(&self) -> &'static str {
+		match self {
+			Self::Docker => "docker",
+			Self::Podman => "podman",
+		}
+	}
+}
+
+/// Configuration for building Docker/Podman images.
+#[derive(Debug, Clone, Component, Serialize, Deserialize)]
+pub struct BuildDockerImage {
+	/// Container engine to use (Docker or Podman).
+	pub engine: ContainerEngine,
+}
+
+impl Default for BuildDockerImage {
+	fn default() -> Self {
+		Self {
+			engine: ContainerEngine::default(),
+		}
+	}
+}
+
+impl BuildDockerImage {
+	/// Create with Docker engine.
+	pub fn with_docker() -> Self {
+		Self {
+			engine: ContainerEngine::Docker,
+		}
+	}
+
+	/// Create with Podman engine.
+	pub fn with_podman() -> Self {
+		Self {
+			engine: ContainerEngine::Podman,
+		}
+	}
+}
+
+/// Builds and pushes a container image to ECR for Fargate deployment.
 /// Looks for a [`BuildArtifact`] sibling to find the binary to containerize,
 /// and a [`FargateBlock`] sibling to determine the ECR repository name.
+/// Uses the [`BuildDockerImage`] component to determine which engine to use,
+/// defaulting to Podman if not present.
 #[action]
 #[derive(Default, Component)]
+#[require(BuildDockerImage)]
 pub async fn BuildDockerImageAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	// get the container engine configuration
+	let engine = cx.caller.get_cloned::<BuildDockerImage>().await?.engine;
+
 	// get the stack for region and deploy_id
 	let stack = cx
 		.caller
@@ -124,12 +183,13 @@ pub async fn BuildDockerImageAction(
 	// ensure ECR repository exists
 	ensure_ecr_repository(region, ecr_repo_name).await?;
 
-	// authenticate Docker to ECR
-	info!("authenticating docker to ECR");
+	// authenticate to ECR
+	let engine_cmd = engine.command();
+	info!("authenticating {} to ECR", engine_cmd);
 	let auth_cmd = ChildProcess::new("sh").with_args([
 		"-c",
 		&format!(
-			"aws ecr get-login-password --region {region} | docker login \
+			"aws ecr get-login-password --region {region} | {engine_cmd} login \
 			 --username AWS --password-stdin \
 			 {account_id}.dkr.ecr.{region}.amazonaws.com"
 		),
@@ -139,10 +199,10 @@ pub async fn BuildDockerImageAction(
 		.await
 		.map_err(|err| bevyhow!("ECR authentication failed: {err}"))?;
 
-	// build Docker image
+	// build container image
 	let image_tag = format!("{}:{}", ecr_url, stack.deploy_id());
-	info!("building docker image: {image_tag}");
-	let build_cmd = ChildProcess::new("docker").with_args([
+	info!("building {} image: {image_tag}", engine_cmd);
+	let build_cmd = ChildProcess::new(engine_cmd).with_args([
 		"build",
 		"-t",
 		&image_tag,
@@ -153,17 +213,18 @@ pub async fn BuildDockerImageAction(
 	build_cmd
 		.run_async()
 		.await
-		.map_err(|err| bevyhow!("docker build failed: {err}"))?;
+		.map_err(|err| bevyhow!("{} build failed: {err}", engine_cmd))?;
 
 	// push to ECR
-	info!("pushing docker image to ECR");
-	let push_cmd = ChildProcess::new("docker").with_args(["push", &image_tag]);
+	info!("pushing {} image to ECR", engine_cmd);
+	let push_cmd =
+		ChildProcess::new(engine_cmd).with_args(["push", &image_tag]);
 	push_cmd
 		.run_async()
 		.await
-		.map_err(|err| bevyhow!("docker push failed: {err}"))?;
+		.map_err(|err| bevyhow!("{} push failed: {err}", engine_cmd))?;
 
-	info!("docker image pushed: {image_tag}");
+	info!("{} image pushed: {image_tag}", engine_cmd);
 	Pass(cx.input).xok()
 }
 
@@ -186,7 +247,7 @@ async fn get_aws_account_id() -> Result<String> {
 		.map(|s| s.trim().to_string())
 }
 
-/// Ensure ECR repository exists.
+/// Verify ECR repository exists (should be created by Terraform).
 async fn ensure_ecr_repository(region: &str, repo_name: &str) -> Result {
 	let cmd = ChildProcess::new("aws").with_args([
 		"ecr",
@@ -197,33 +258,17 @@ async fn ensure_ecr_repository(region: &str, repo_name: &str) -> Result {
 		repo_name,
 	]);
 
-	// check if repo exists (non-zero exit is ok, means it doesn't exist)
 	let result = cmd.run_async().await;
 	match result {
 		Ok(output) if output.status.success() => {
-			info!("ECR repository {repo_name} already exists");
-			return Ok(());
+			info!("ECR repository {repo_name} exists");
+			Ok(())
 		}
 		_ => {
-			// repo doesn't exist, create it
+			bevybail!(
+				"ECR repository {repo_name} does not exist. Run Terraform apply \
+				 first to create infrastructure."
+			)
 		}
 	}
-
-	// create repository
-	info!("creating ECR repository: {repo_name}");
-	let create_cmd = ChildProcess::new("aws").with_args([
-		"ecr",
-		"create-repository",
-		"--region",
-		region,
-		"--repository-name",
-		repo_name,
-	]);
-
-	create_cmd
-		.run_async()
-		.await
-		.map_err(|err| bevyhow!("failed to create ECR repository: {err}"))?;
-
-	Ok(())
 }

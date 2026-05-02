@@ -66,10 +66,10 @@ fn infra_scene() -> Result<impl Bundle> {
 				block.clone(),
 				// build binary for containerization
 				build_fargate_binary(),
-				// build and push Docker image (ensures ECR repo exists first)
-				BuildDockerImageAction,
-				// deploy infrastructure (task definition references the pushed image)
+				// deploy infrastructure first (creates ECR repo)
 				TofuApplyAction,
+				// build and push Docker image (ECR repo now exists)
+				BuildDockerImageAction,
 				// sync assets to S3
 				SyncS3BucketAction,
 				AwsWatch::for_fargate(&stack(), &block)

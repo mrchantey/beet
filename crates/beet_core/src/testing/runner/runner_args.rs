@@ -32,6 +32,10 @@ pub struct TestRunnerConfig {
 	/// By default the glob filter wraps all patterns in wildcards,
 	/// so `*foo*` will match `/foo.rs`. Specify `--exact` to disable this.
 	pub exact: bool,
+	/// Run only ignored tests.
+	pub ignored: bool,
+	/// Run both ignored and non-ignored tests.
+	pub include_ignored: bool,
 	/// Timeout per test in milliseconds.
 	pub timeout_ms: u64,
 }
@@ -56,6 +60,8 @@ impl TestRunnerConfig {
 		let quiet = params.contains_key("quiet");
 		let exact = params.contains_key("exact");
 		let log_cases = params.contains_key("log-cases");
+		let ignored = params.contains_key("ignored");
+		let include_ignored = params.contains_key("include-ignored");
 
 		// Parse timeout
 		let timeout_ms = params
@@ -91,6 +97,8 @@ impl TestRunnerConfig {
 			no_color,
 			quiet,
 			exact,
+			ignored,
+			include_ignored,
 			filter,
 			timeout_ms,
 		}

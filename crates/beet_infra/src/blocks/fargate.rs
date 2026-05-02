@@ -181,7 +181,6 @@ impl Block for FargateBlock {
 		let ecr_repo = terra::ResourceDef::new_primary(
 			ecr_ident,
 			AwsEcrRepositoryDetails {
-				name: self.label.clone(),
 				force_delete: Some(true),
 				..default()
 			},

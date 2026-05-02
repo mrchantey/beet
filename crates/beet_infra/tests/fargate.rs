@@ -135,68 +135,29 @@ fn build_project(stack: &Stack) -> Result<terra::Project> {
 /// Build, upload artifacts, sync assets, build/push Docker image, and apply terraform.
 async fn deploy(stack: &Stack) -> Result {
 	info!("deploy: starting fargate deployment");
-	info!("deploy: ENTRY POINT");
 	let block = FargateBlock::default();
-	let cargo = CargoBuild::default()
-		.with_release(true)
-		.with_target(BuildTarget::Zigbuild)
-		.with_package("beet_infra")
-		.with_example(EXAMPLE_NAME)
-		.with_additional_args(vec!["--features".into(), "deploy".into()]);
 
-	// STAGE 1: Run terraform to create ECR and basic infrastructure
-	// This will create the ECR repository so we can push the Docker image
-	info!("deploy: stage 1 - attempting terraform apply for ECR creation");
-	let project = build_project(stack)?;
-	let apply_result = project.apply().await;
-	match &apply_result {
-		Err(e) => {
-			info!("deploy: terraform apply had errors: {}", e);
-			info!("deploy: will manually ensure ECR exists");
-		}
-		Ok(_) => {
-			info!("deploy: terraform apply succeeded");
-		}
-	}
-
-	// Ensure ECR repository exists (either from terraform or create manually)
-	let ecr_repo_name = "main-fargate";
-	let region = stack.aws_region();
-	ensure_ecr_exists(region, ecr_repo_name).await?;
-	info!("deploy: ECR repository confirmed to exist");
-
-	// STAGE 2: Build the binary
-	info!("deploy: building binary with cargo");
-	info!("deploy: stage 2 - building binary");
-	let binary_path = build_binary_with_cargo(&cargo).await?;
-	info!("binary built at: {}", binary_path.display());
-	info!("deploy: binary built at: {}", binary_path.display());
-
-	// STAGE 3: Build and push Docker image to ECR
-	info!("deploy: building and pushing docker image");
-	info!("deploy: stage 3 - building and pushing docker image");
-	let ecr_url = build_and_push_image(stack, &binary_path).await?;
-	info!("docker image pushed to: {ecr_url}");
-	info!("deploy: docker image pushed to: {}", ecr_url);
-
-	// STAGE 4: Run terraform again to complete the deployment with sync assets
-	info!("deploy: stage 4 - final terraform apply with asset sync");
+	// spawn entity with action sequence, similar to hello_fargate example
 	let response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
 			assets_s3_fs_bucket(stack),
 			assets_bucket_block(),
 			exchange_sequence(),
-			children![block, TofuApplyAction, SyncS3BucketAction,],
+			children![
+				block,
+				// build binary for containerization
+				build_fargate_binary(),
+				// deploy infrastructure first (creates ECR repo)
+				TofuApplyAction,
+				// build and push Docker image (ECR repo now exists)
+				BuildDockerImageAction,
+				// sync assets to S3
+				SyncS3BucketAction,
+			],
 		))
 		.exchange(Request::get(""))
 		.await;
-	info!("deploy: AsyncPlugin exchange completed");
-
-	info!(
-		"deploy: action sequence completed, response status: {}",
-		response.status()
-	);
 
 	let status = response.status();
 	if status.is_success() {
@@ -208,197 +169,15 @@ async fn deploy(stack: &Stack) -> Result {
 	}
 }
 
-/// Build the binary for the Fargate container using CargoBuild.
-async fn build_binary_with_cargo(cargo: &CargoBuild) -> Result<AbsPathBuf> {
-	info!("build_binary_with_cargo: starting");
-	let artifact = cargo.clone().into_build_artifact();
-	let cmd = artifact.process();
-
-	info!("building binary: {}", cmd);
-	let output = cmd.clone().run_async().await?;
-	if !output.status.success() {
-		bevybail!("build failed: {}", String::from_utf8_lossy(&output.stderr));
-	}
-	info!("build_binary_with_cargo: cargo build completed successfully");
-
-	let binary_path = AbsPathBuf::new(artifact.artifact_path())?;
-
-	if !binary_path.exists() {
-		bevybail!("binary not found at: {}", binary_path.display());
-	}
-	info!(
-		"build_binary_with_cargo: binary verified at {}",
-		binary_path.display()
-	);
-
-	Ok(binary_path)
-}
-
-/// Build and push Docker image to ECR.
-async fn build_and_push_image(
-	stack: &Stack,
-	binary_path: &AbsPathBuf,
-) -> Result<String> {
-	info!("build_and_push_image: starting");
-	let workspace_root = AbsPathBuf::new_workspace_rel(".")?;
-	let dockerfile_dir = workspace_root.join("target").join("fargate-test");
-	info!(
-		"build_and_push_image: creating dockerfile directory at {}",
-		dockerfile_dir.display()
-	);
-	std::fs::create_dir_all(&dockerfile_dir)?;
-
-	// copy binary to dockerfile directory
-	info!("build_and_push_image: copying binary to dockerfile directory");
-	let binary_dest = dockerfile_dir.join(EXAMPLE_NAME);
-	std::fs::copy(binary_path, &binary_dest)?;
-
-	// create simple Dockerfile using Debian to match glibc-linked binary
-	info!("build_and_push_image: creating Dockerfile");
-	let dockerfile_content = format!(
-		"FROM debian:bookworm-slim\n\
-		 COPY {EXAMPLE_NAME} /app\n\
-		 RUN chmod +x /app\n\
-		 EXPOSE {}\n\
-		 CMD [\"/app\"]\n",
-		beet_net::prelude::DEFAULT_SERVER_PORT
-	);
-	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
-
-	// get ECR repository URL
-	info!("build_and_push_image: getting AWS account ID and ECR details");
-	let ecr_repo_name = "main-fargate";
-	let region = stack.aws_region();
-	let account_id = get_aws_account_id().await?;
-	let ecr_url =
-		format!("{account_id}.dkr.ecr.{region}.amazonaws.com/{ecr_repo_name}");
-	info!("build_and_push_image: ECR URL: {}", ecr_url);
-
-	// ECR repository was created by terraform in stage 1
-
-	// authenticate Docker to ECR
-	info!("authenticating docker to ECR");
-	let auth_cmd = ChildProcess::new("sh").with_args([
-		"-c",
-		&format!(
-			"aws ecr get-login-password --region {region} | docker login \
-			 --username AWS --password-stdin {account_id}.dkr.ecr.{region}.amazonaws.com"
-		),
-	]);
-	info!("build_and_push_image: running ECR authentication");
-	let output = auth_cmd.run_async().await?;
-	if !output.status.success() {
-		bevybail!(
-			"ECR auth failed: {}",
-			String::from_utf8_lossy(&output.stderr)
-		);
-	}
-	info!("build_and_push_image: ECR authentication successful");
-
-	// build Docker image
-	let image_tag = format!("{}:{}", ecr_url, stack.deploy_id());
-	info!("building docker image: {image_tag}");
-	let build_cmd = ChildProcess::new("docker").with_args([
-		"build",
-		"-t",
-		&image_tag,
-		"--platform",
-		"linux/amd64",
-		dockerfile_dir.to_str().unwrap(),
-	]);
-	info!("build_and_push_image: running docker build");
-	let output = build_cmd.run_async().await?;
-	if !output.status.success() {
-		bevybail!(
-			"docker build failed: {}",
-			String::from_utf8_lossy(&output.stderr)
-		);
-	}
-	info!("build_and_push_image: docker build successful");
-
-	// push to ECR
-	info!("pushing docker image to ECR");
-	let push_cmd = ChildProcess::new("docker").with_args(["push", &image_tag]);
-	info!("build_and_push_image: running docker push");
-	let output = push_cmd.run_async().await?;
-	if !output.status.success() {
-		bevybail!(
-			"docker push failed: {}",
-			String::from_utf8_lossy(&output.stderr)
-		);
-	}
-	info!("build_and_push_image: docker push successful");
-
-	info!(
-		"build_and_push_image: complete, returning ECR URL: {}",
-		ecr_url
-	);
-	Ok(ecr_url)
-}
-
-/// Get AWS account ID.
-async fn get_aws_account_id() -> Result<String> {
-	let cmd = ChildProcess::new("aws").with_args([
-		"sts",
-		"get-caller-identity",
-		"--query",
-		"Account",
-		"--output",
-		"text",
-	]);
-	let output = cmd.run_async().await?;
-	if !output.status.success() {
-		bevybail!("failed to get AWS account ID");
-	}
-	String::from_utf8(output.stdout)
-		.map_err(|e| bevyhow!("invalid UTF-8 in account ID: {e}"))
-		.map(|s| s.trim().to_string())
-}
-
-/// Ensure ECR repository exists, creating it if necessary.
-async fn ensure_ecr_exists(region: &str, repo_name: &str) -> Result {
-	// check if repository exists
-	let check_cmd = ChildProcess::new("aws").with_args([
-		"ecr",
-		"describe-repositories",
-		"--region",
-		region,
-		"--repository-names",
-		repo_name,
-	]);
-
-	let check_result = check_cmd.run_async().await;
-	match check_result {
-		Ok(output) if output.status.success() => {
-			info!("ECR repository '{}' already exists", repo_name);
-			return Ok(());
-		}
-		_ => {
-			// repository doesn't exist, create it
-		}
-	}
-
-	// create repository
-	info!("Creating ECR repository: {}", repo_name);
-	let create_cmd = ChildProcess::new("aws").with_args([
-		"ecr",
-		"create-repository",
-		"--region",
-		region,
-		"--repository-name",
-		repo_name,
-	]);
-
-	let output = create_cmd.run_async().await?;
-	if !output.status.success() {
-		bevybail!(
-			"Failed to create ECR repository: {}",
-			String::from_utf8_lossy(&output.stderr)
-		);
-	}
-
-	info!("Successfully created ECR repository: {}", repo_name);
-	Ok(())
+/// Build configuration for the Fargate binary.
+fn build_fargate_binary() -> impl Bundle {
+	CargoBuild::default()
+		.with_release(true)
+		.with_target(BuildTarget::Zigbuild)
+		.with_package("beet_infra")
+		.with_example(EXAMPLE_NAME)
+		.with_additional_args(vec!["--features".into(), "deploy".into()])
+		.into_build_artifact()
 }
 
 /// Fargate-specific verify_live wrapper.

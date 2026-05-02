@@ -3,6 +3,7 @@ use beet_core::prelude::*;
 
 // ── Widget trait ──────────────────────────────────────────────────────────────
 
+#[cfg(feature = "crossterm")]
 pub mod tui_render {
 	use super::*;
 	pub fn render_half(
