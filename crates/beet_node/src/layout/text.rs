@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
-use bevy::math::URect;
 use bevy::math::UVec2;
 
 pub fn text_measure(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
@@ -41,57 +40,6 @@ pub fn text_layout(cx: &mut TuiRenderContext) -> Result {
 	Ok(())
 }
 
-
-pub struct TextWidget {
-	pub content: String,
-	pub layout_style: LayoutStyle,
-}
-
-impl TextWidget {
-	pub fn new(content: impl Into<String>) -> Self {
-		Self {
-			content: content.into(),
-			layout_style: LayoutStyle::default(),
-		}
-	}
-	pub fn align(mut self, a: TextAlign) -> Self {
-		self.layout_style.text_align = a;
-		self
-	}
-	pub fn flex_grow(mut self, grow: u32) -> Self {
-		self.layout_style.flex_grow = grow;
-		self
-	}
-}
-
-impl Widget for TextWidget {
-	fn layout_style(&self) -> &LayoutStyle { &self.layout_style }
-
-	fn measure(&self, available: UVec2) -> UVec2 {
-		let lines = word_wrap(&self.content, available.x);
-		UVec2::new(
-			lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
-			lines.len() as u32,
-		)
-	}
-
-	fn layout(&self, buffer: &mut Buffer, rect: URect) {
-		let lines = word_wrap(&self.content, rect.width());
-		for (i, line) in lines.iter().enumerate() {
-			let y = rect.min.y + i as u32;
-			if y >= rect.max.y {
-				break;
-			}
-			let aligned =
-				align_line(line, rect.width(), self.layout_style.text_align);
-			buffer.write_text(
-				UVec2::new(rect.min.x, y),
-				&aligned,
-				VisualStyle::default(),
-			);
-		}
-	}
-}
 
 // ── Word wrap ─────────────────────────────────────────────────────────────────
 

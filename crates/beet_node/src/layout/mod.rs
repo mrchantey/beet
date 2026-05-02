@@ -5,9 +5,9 @@
 //!
 //! This module provides a complete flexbox layout system using bevy's
 //! coordinate types ([`UVec2`] and [`URect`]) for measuring and positioning.
-//! Layout is performed in two passes:
+//! Layout is performed via ECS components and systems:
 //!
-//! 1. **Measure**: bottom-up calculation of natural sizes
+//! 1. **Measure**: bottom-up calculation of natural sizes via measure functions
 //! 2. **Layout**: top-down assignment of final positions, writing to a [`Buffer`]
 //!
 //! # Features
@@ -21,24 +21,24 @@
 //!   - flex-order for reordering children
 //!   - flex-grow for distributing free space
 //!   - align-self for individual alignment
-//!   - padding and margin (not yet fully implemented)
-//! - **TextWidget**: multi-line text with word wrapping and alignment
-//! - **Bordered**: wraps a child widget in a border
+//!   - padding, margin, and border spacing
+//! - **Text rendering**: multi-line text with word wrapping and alignment
+//! - **Border rendering**: box drawing characters for borders
 //! - **Buffer**: cell-based rendering with optional styling (foreground, background, underline)
 //!
 //! # Rendering
 //!
 //! Uses a discrete coordinate system for TUI and similar renderers.
-//! Custom rendering instead of Ratatui provides:
+//! Custom rendering provides:
 //!
 //! 1. **Interactivity**: track which entity rendered each cell for click remapping
 //! 2. **Multiline wrap**: proper wrapping for bordered elements and text
 //! 3. **Styling**: per-cell visual styling with colors and effects
 mod bordered;
 mod flex;
-mod text;
 mod styled_node_query;
-pub use styled_node_query::*;
+mod text;
 pub use bordered::*;
 pub use flex::*;
+pub use styled_node_query::*;
 pub use text::*;
