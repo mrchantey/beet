@@ -4,4 +4,5 @@ mod plugin;
 pub use buffer::*;
 pub use plugin::*;
 mod buffer;
-pub mod render_tui;
+mod render_tui;
+pub use render_tui::*;

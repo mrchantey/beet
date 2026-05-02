@@ -2,13 +2,14 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 
-#[derive(Debug, Default, Clone, Component)]
+#[derive(Debug, Default, Clone, SetWith, Component)]
 pub struct LayoutStyle {
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
 	pub padding: Spacing,
 	pub margin: Spacing,
+	pub border: Spacing,
 	pub text_align: TextAlign,
 }
 
@@ -163,7 +164,7 @@ pub enum FlexWrap {
 }
 
 /// Spacing around an element.
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, SetWith)]
 pub struct Spacing {
 	pub top: Length,
 	pub right: Length,
@@ -180,6 +181,21 @@ impl Spacing {
 			left: length,
 		}
 	}
+
+	/// Create a URect where the min represents left and top,
+	/// and the max represents right and bottom
+	pub fn rem_urect(&self, viewport: Vec2) -> URect {
+		let left = self.left.into_rem(viewport).round() as u32;
+		let right = self.right.into_rem(viewport).round() as u32;
+		let top = self.top.into_rem(viewport).round() as u32;
+		let bottom = self.bottom.into_rem(viewport).round() as u32;
+
+		URect {
+			min: UVec2::new(left, top),
+			max: UVec2::new(right, bottom),
+		}
+	}
+
 	// pub fn horizontal(&self) -> Length { self.left + self.right }
 	// pub fn vertical(&self) -> Length { self.top + self.bottom }
 }

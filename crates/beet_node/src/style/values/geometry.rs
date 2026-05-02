@@ -9,14 +9,30 @@ pub struct VisualStyle {
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
 	pub underline: Option<Color>,
-	pub outline_left: Option<Outline>,
+	pub border_left: Option<Color>,
+	pub border_right: Option<Color>,
+	pub border_top: Option<Color>,
+	pub border_bottom: Option<Color>,
 }
 
-
-#[derive(Debug, Clone, PartialEq, SetWith)]
-pub struct Outline {
-	color: Color,
-	length: Length,
+impl VisualStyle {
+	pub const DEFAULT: Self = Self {
+		foreground: None,
+		background: None,
+		underline: None,
+		border_left: None,
+		border_right: None,
+		border_top: None,
+		border_bottom: None,
+	};
+	pub fn with_border(mut self, color: impl Into<Color>) -> Self {
+		let color = Some(color.into());
+		self.border_left = color;
+		self.border_right = color;
+		self.border_top = color;
+		self.border_bottom = color;
+		self
+	}
 }
 
 impl AsCssValue for f32 {
@@ -47,7 +63,24 @@ impl Default for Length {
 	fn default() -> Self { Self::Px(0.0) }
 }
 
-impl Length {}
+const REM_PIXELS: f32 = 16.0;
+
+impl Length {
+	/// Convert to unit size, mapping 16 pixels to 1 rem
+	pub fn into_rem(self, viewport: Vec2) -> f32 {
+		match self {
+			Self::Px(value) => value / REM_PIXELS,
+			Self::Rem(value) => value,
+			Self::Percent(value) => value / 100.0 * viewport.y / REM_PIXELS,
+			Self::ViewportMin(value) => {
+				value / 100.0 * viewport.min_element() / REM_PIXELS
+			}
+			Self::ViewportMax(value) => {
+				value / 100.0 * viewport.max_element() / REM_PIXELS
+			}
+		}
+	}
+}
 
 impl std::fmt::Display for Length {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

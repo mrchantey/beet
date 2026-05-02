@@ -6,6 +6,45 @@ use bevy::math::UVec2;
 
 // ── Text ──────────────────────────────────────────────────────────────────────
 
+// TODO helper methods
+pub fn text_measure(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
+	let Some(value) = node.value else {
+		return Ok(UVec2::ZERO);
+	};
+	let lines = word_wrap(&value.to_string(), available.x);
+	UVec2::new(
+		lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
+		lines.len() as u32,
+	)
+	.xok()
+}
+
+pub fn text_layout(cx: &mut TuiRenderContext) -> Result {
+	let Some(value) = cx.node.value else {
+		return Ok(());
+	};
+	let lines = word_wrap(&value.to_string(), cx.rect.width());
+	for (i, line) in lines.iter().enumerate() {
+		let y = cx.rect.min.y + i as u32;
+		if y >= cx.rect.max.y {
+			break;
+		}
+		let text_align = cx
+			.node
+			.layout
+			.map(|style| style.text_align)
+			.unwrap_or_default();
+		let aligned = align_line(line, cx.rect.width(), text_align);
+		cx.buffer.write_text(
+			UVec2::new(cx.rect.min.x, y),
+			&aligned,
+			VisualStyle::default(),
+		);
+	}
+	Ok(())
+}
+
+
 pub struct TextWidget {
 	pub content: String,
 	pub layout_style: LayoutStyle,
@@ -27,49 +66,6 @@ impl TextWidget {
 		self
 	}
 }
-
-impl TuiRender for TextWidget {
-	fn measure2(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
-		let Some(value) = node.value else {
-			return Ok(UVec2::ZERO);
-		};
-		let lines = word_wrap(&value.to_string(), available.x);
-		UVec2::new(
-			lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
-			lines.len() as u32,
-		)
-		.xok()
-	}
-
-	fn layout2(
-		node: &StyledNodeView,
-		buffer: &mut Buffer,
-		rect: URect,
-	) -> Result {
-		let Some(value) = node.value else {
-			return Ok(());
-		};
-		let lines = word_wrap(&value.to_string(), rect.width());
-		for (i, line) in lines.iter().enumerate() {
-			let y = rect.min.y + i as u32;
-			if y >= rect.max.y {
-				break;
-			}
-			let text_align = node
-				.layout
-				.map(|style| style.text_align)
-				.unwrap_or_default();
-			let aligned = align_line(line, rect.width(), text_align);
-			buffer.write_text(
-				UVec2::new(rect.min.x, y),
-				&aligned,
-				VisualStyle::default(),
-			);
-		}
-		Ok(())
-	}
-}
-
 
 impl Widget for TextWidget {
 	fn layout_style(&self) -> &LayoutStyle { &self.layout_style }
