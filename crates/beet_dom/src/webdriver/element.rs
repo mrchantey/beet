@@ -217,7 +217,7 @@ impl Element {
 		.await?;
 		Ok(())
 	}
-	/// InnerTExt convenience getter.
+	/// InnerText convenience getter.
 	pub async fn inner_text(&self) -> Result<String> {
 		let resp = self
 			.call_function("function(){ return this.innerText; }", &[], true)

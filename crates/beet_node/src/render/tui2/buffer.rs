@@ -83,12 +83,8 @@ impl Buffer {
 		result
 	}
 
-	pub fn render_plain_remove_empty(&self) -> String {
-		let raw = self.render_plain();
-		raw.lines()
-			.filter(|line| !line.trim().is_empty())
-			.collect::<Vec<_>>()
-			.join("\n")
+	pub fn render_plain_trim(&self) -> String {
+		self.render_plain().trim_start_lines().trim_end_lines()
 	}
 }
 

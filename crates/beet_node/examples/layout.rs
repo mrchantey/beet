@@ -39,10 +39,10 @@ fn run_demo<B: Bundle>(name: &str, setup: fn() -> B) {
 	let out = World::new()
 		.spawn(setup())
 		.with_state::<StyledNodeQuery, _>(|entity, query| {
-			let buffer = TuiRenderContext::render_half(&query, entity).unwrap();
-			buffer.render_plain_remove_empty()
+			let buffer = TuiRenderContext::render(&query, entity).unwrap();
+			buffer.render_plain_trim()
 		});
-	println!("\n{name}:\n{out}\n");
+	println!("\n{name}: \n{out}");
 }
 
 fn bordered() -> LayoutStyle {
@@ -51,14 +51,6 @@ fn bordered() -> LayoutStyle {
 
 fn margin() -> LayoutStyle {
 	LayoutStyle::default().with_margin(Spacing::all(Length::Rem(1.)))
-}
-
-fn border() -> LayoutStyle {
-	LayoutStyle::default().with_border(Spacing::all(Length::Rem(1.)))
-}
-
-fn padding() -> LayoutStyle {
-	LayoutStyle::default().with_padding(Spacing::all(Length::Rem(1.)))
 }
 
 
@@ -316,24 +308,31 @@ fn setup_margin_only() -> impl Bundle {
 
 fn setup_border_only() -> impl Bundle {
 	(FlexBox::row().column_gap(0), children![
-		(rsx! {"A"}, border()),
-		(rsx! {"B"}, border()),
-		(rsx! {"C"}, border()),
+		(rsx! {"A"}, bordered()),
+		(rsx! {"B"}, bordered()),
+		(rsx! {"C"}, bordered()),
 	])
 }
 
 fn setup_padding_only() -> impl Bundle {
+	let style = bordered().with_padding(Spacing::all(Length::Rem(1.)));
 	(FlexBox::row().column_gap(0), children![
-		(rsx! {"A"}, padding(), border()),
-		(rsx! {"B"}, padding(), border()),
-		(rsx! {"C"}, padding(), border()),
+		(rsx! {"A"}, style.clone()),
+		(rsx! {"B"}, style.clone()),
+		(rsx! {"C"}, style.clone()),
 	])
 }
 
 fn setup_all_spacing() -> impl Bundle {
+	let style = LayoutStyle::default()
+		.with_margin(Spacing::all(Length::Rem(1.)))
+		.with_border(Spacing::all(Length::Rem(1.)))
+		.with_padding(Spacing::all(Length::Rem(1.)));
+
+
 	(FlexBox::row().column_gap(0), children![
-		(rsx! {"A"}, margin(), border(), padding()),
-		(rsx! {"B"}, margin(), border(), padding()),
-		(rsx! {"C"}, margin(), border(), padding()),
+		(rsx! {"A"}, style.clone()),
+		(rsx! {"B"}, style.clone()),
+		(rsx! {"C"}, style.clone()),
 	])
 }

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 
 /// Extension trait for collecting [`RelationshipTarget`] entities into a [`Vec`].
-#[extend::ext]
+#[extend::ext(name=RelationshipTargetExt)]
 pub impl<T> T
 where
 	T: RelationshipTarget,
