@@ -738,32 +738,26 @@ mod tests {
 	use crate::style::*;
 
 	fn render(bundle: impl Bundle) -> String {
-		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
-			|entity, query| {
-				let buffer = TuiRenderContext::render_rect(
+		World::new()
+			.spawn(bundle)
+			.with_state::<StyledNodeQuery, _>(|entity, query| {
+				TuiRenderContext::render_rect(
 					&query,
 					entity,
 					// adjust if needed
 					URect::new(0, 0, 40, 20),
 				)
-				.unwrap();
-				buffer.render_plain_remove_empty()
-			},
-		)
+			})
+			.unwrap()
+			.render_plain_trim()
+			// use an icon for clearer whitespace diffs
+			.replace(" ", "+")
+			.into()
 	}
 
 
 	fn bordered() -> LayoutStyle {
 		LayoutStyle::default().with_border(Spacing::all(Length::Rem(1.)))
-	}
-
-	// helper so we can write pretty assertions
-	fn trim_empty(value: &str) -> String {
-		value
-			.lines()
-			.filter(|line| !line.trim().is_empty())
-			.collect::<Vec<_>>()
-			.join("\n")
 	}
 
 	#[test]
@@ -778,12 +772,183 @@ mod tests {
 				(rsx! {"C"}, bordered()),
 			],
 		))
-		.xpect_eq(trim_empty(
-			r#"
-┌─┐ ┌─┐ ┌─┐
-│A│ │B│ │C│
-└─┘ └─┘ └─┘
-"#,
-		));
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn justify_end() {
+		render((
+			FlexBox::row()
+				.justify_content(JustifyContent::End)
+				.column_gap(1),
+			children![
+				(rsx! {"A"}, bordered()),
+				(rsx! {"B"}, bordered()),
+				(rsx! {"C"}, bordered()),
+			],
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn justify_center() {
+		render((
+			FlexBox::row()
+				.justify_content(JustifyContent::Center)
+				.column_gap(1),
+			children![
+				(rsx! {"A"}, bordered()),
+				(rsx! {"B"}, bordered()),
+				(rsx! {"C"}, bordered()),
+			],
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn column_gap() {
+		render((FlexBox::row().column_gap(3), children![
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+		]))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn flex_grow_distributes_space() {
+		let output = render((FlexBox::row().column_gap(1), children![
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered().with_flex_grow(1)),
+			(rsx! {"C"}, bordered()),
+		]));
+		output.xpect_snapshot();
+		// B should be wider than A and C
+		let lines: Vec<&str> = output.lines().collect();
+		let top = lines[0];
+		// count dashes in each box segment to verify B is wider
+		let segments: Vec<&str> = top.split('+').collect();
+		segments.len().xpect_eq(3); // should have 3 boxes
+		let b_width = segments[1].len();
+		let a_width = segments[0].len();
+		(b_width > a_width).xpect_true();
+	}
+
+	#[test]
+	fn align_items_center() {
+		render((
+			FlexBox::row().align_items(AlignItems::Center).column_gap(1),
+			children![
+				(
+					FlexBox::col(),
+					children![
+						(rsx! {"Tall"}, bordered()),
+						(rsx! {"Item"}, bordered()),
+					],
+					bordered()
+				),
+				(rsx! {"Short"}, bordered()),
+			],
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn align_items_start() {
+		render((
+			FlexBox::row().align_items(AlignItems::Start).column_gap(1),
+			children![
+				(
+					FlexBox::col(),
+					children![
+						(rsx! {"Tall"}, bordered()),
+						(rsx! {"Item"}, bordered()),
+					],
+					bordered()
+				),
+				(rsx! {"Short"}, bordered()),
+			],
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn align_items_end() {
+		render((
+			FlexBox::row().align_items(AlignItems::End).column_gap(1),
+			children![
+				(
+					FlexBox::col(),
+					children![
+						(rsx! {"Tall"}, bordered()),
+						(rsx! {"Item"}, bordered()),
+					],
+					bordered()
+				),
+				(rsx! {"Short"}, bordered()),
+			],
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn nested_flex() {
+		render((FlexBox::col().row_gap(1), children![
+			(
+				FlexBox::row().column_gap(1),
+				children![(rsx! {"A"}, bordered()), (rsx! {"B"}, bordered()),],
+				bordered()
+			),
+			(
+				FlexBox::row().column_gap(1),
+				children![(rsx! {"C"}, bordered()), (rsx! {"D"}, bordered()),],
+				bordered()
+			),
+		]))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn padding_with_content() {
+		render((FlexBox::row(), children![(
+			rsx! {"X"},
+			LayoutStyle::default()
+				.with_border(Spacing::all(Length::Rem(1.)))
+				.with_padding(Spacing::all(Length::Rem(0.5)))
+		)]))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn column_with_multiple_items() {
+		render((FlexBox::col().row_gap(1), children![
+			(rsx! {"First"}, bordered()),
+			(rsx! {"Second"}, bordered()),
+			(rsx! {"Third"}, bordered()),
+		]))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn nested_column_in_row() {
+		render((FlexBox::row(), children![(
+			FlexBox::col(),
+			children![
+				(rsx! {"A"}, bordered()),
+				(rsx! {"B"}, bordered()),
+				(rsx! {"C"}, bordered()),
+			],
+			bordered()
+		)]))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn column_without_gap() {
+		render((FlexBox::col(), children![
+			(rsx! {"First"}, bordered()),
+			(rsx! {"Second"}, bordered()),
+			(rsx! {"Third"}, bordered()),
+		]))
+		.xpect_snapshot();
 	}
 }
