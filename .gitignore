@@ -27,6 +27,3 @@ bevy
 
 packages/beet_state/node_modules
 packages/beet_state/dist
-
-
-crates/beet_infra/src/bindings/aws_fargate.rs
