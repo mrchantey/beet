@@ -2,7 +2,7 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, TuiPlugin2))
+		.add_plugins((MinimalPlugins, CharcellPlugin))
 		.add_systems(Startup, setup)
 		.run();
 }

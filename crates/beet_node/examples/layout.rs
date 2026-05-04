@@ -39,7 +39,7 @@ fn run_demo<B: Bundle>(name: &str, setup: fn() -> B) {
 	let out = World::new()
 		.spawn(setup())
 		.with_state::<StyledNodeQuery, _>(|entity, query| {
-			let buffer = TuiRenderContext::render_full(&query, entity).unwrap();
+			let buffer = CharcellRenderContext::render_full(&query, entity).unwrap();
 			buffer.render_plain_trim()
 		});
 	println!("\n{name}: \n{out}");

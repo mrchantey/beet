@@ -131,7 +131,7 @@ pub fn flex_measure(
 }
 
 /// Layout pass: position and render flexbox children.
-pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
+pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 	let Some(flexbox) = cx.node.flexbox else {
 		return Ok(());
 	};
@@ -226,7 +226,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					);
 
 					// render child
-					TuiRenderContext::for_child(
+					CharcellRenderContext::for_child(
 						&child_node,
 						cx.viewport,
 						child_rect,
@@ -296,7 +296,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					);
 
 					// render child
-					TuiRenderContext::for_child(
+					CharcellRenderContext::for_child(
 						&child_node,
 						cx.viewport,
 						child_rect,
@@ -680,7 +680,7 @@ mod tests {
 		World::new()
 			.spawn(bundle)
 			.with_state::<StyledNodeQuery, _>(|entity, query| {
-				TuiRenderContext::render_rect(
+				CharcellRenderContext::render_rect(
 					&query,
 					entity,
 					// adjust if needed

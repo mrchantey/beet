@@ -30,7 +30,7 @@ fn update(
 	query: StyledNodeQuery,
 ) -> Result {
 	let entity = root.single()?;
-	let buffer = TuiRenderContext::render_half(&query, entity)?;
+	let buffer = CharcellRenderContext::render_half(&query, entity)?;
 	println!("{}", buffer.render_plain());
 	Ok(())
 }

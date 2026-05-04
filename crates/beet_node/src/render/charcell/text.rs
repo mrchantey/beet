@@ -15,7 +15,7 @@ pub fn text_measure(node: &StyledNodeView, available: UVec2) -> Result<UVec2> {
 	.xok()
 }
 
-pub fn text_layout(cx: &mut TuiRenderContext) -> Result {
+pub fn text_layout(cx: &mut CharcellRenderContext) -> Result {
 	let Some(value) = cx.node.value else {
 		return Ok(());
 	};

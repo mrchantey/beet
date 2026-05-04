@@ -3,9 +3,9 @@ use beet_core::prelude::*;
 
 
 
-pub struct TuiPlugin2;
+pub struct CharcellPlugin;
 
-impl Plugin for TuiPlugin2 {
+impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
 		#[cfg(feature = "tui")]
 		app.add_plugins(bevy_ratatui::RatatuiPlugins {
