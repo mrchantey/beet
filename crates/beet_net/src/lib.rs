@@ -10,13 +10,16 @@ mod types;
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
-/// Re-export media-type-driven serialization at crate level.
-mod net_plugin;
 mod bucket_actions;
 mod buckets;
+/// Re-export media-type-driven serialization at crate level.
+mod net_plugin;
 mod server;
 /// WebSocket client and server implementations.
 pub mod sockets;
+/// SSH client and server implementations.
+#[cfg(any(feature = "russh_server", feature = "russh_client"))]
+pub mod ssh;
 
 /// Prelude module re-exporting commonly used items.
 pub mod prelude {
@@ -35,12 +38,14 @@ pub mod prelude {
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
 	pub use crate::actions::*;
+	pub use crate::bucket_actions::*;
+	pub use crate::buckets::*;
 	pub use crate::client::*;
 	pub use crate::net_plugin::*;
-	pub use crate::buckets::*;
-	pub use crate::bucket_actions::*;
 	pub use crate::server::*;
 	pub use crate::sockets;
+	#[cfg(any(feature = "russh_server", feature = "russh_client"))]
+	pub use crate::ssh::*;
 	pub use crate::types::*;
 	// Re-export core types used in beet_net's public API
 	pub use beet_core::prelude::MediaBytes;

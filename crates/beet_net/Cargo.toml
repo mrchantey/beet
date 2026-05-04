@@ -74,6 +74,16 @@ rustls-tls = [
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
+russh_server = [
+	"dep:russh",
+	"dep:tokio",
+	"dep:rand",
+	"server",
+]
+russh_client = [
+	"dep:russh",
+	"dep:tokio",
+]
 
 [dependencies]
 beet_core = {workspace = true,features=["http"]}
@@ -130,6 +140,11 @@ webpki-roots = { version = "1", optional = true }
 #💡 server
 async-io = { workspace = true, optional = true }
 futures-lite = { workspace = true, optional = true }
+#💡 ssh
+russh = { version = "0.60", optional = true }
+tokio = { workspace = true, optional = true, features = ["net", "sync", "io-util", "time", "macros"] }
+# version must match russh's rand_core requirement for PrivateKey::random
+rand = { version = "0.10", optional = true }
 #💡 hyper server
 hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }
