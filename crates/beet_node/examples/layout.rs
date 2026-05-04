@@ -9,58 +9,45 @@ use beet_node::*;
 fn main() {
 	println!("=== Beet Layout Engine Demo ===\n");
 
-	run_demo("JustifyContent::Start", setup_justify_start);
-	run_demo("JustifyContent::Center", setup_justify_center);
-	run_demo("JustifyContent::End", setup_justify_end);
-	run_demo("JustifyContent::SpaceBetween", setup_justify_space_between);
-	run_demo("JustifyContent::SpaceAround", setup_justify_space_around);
-	run_demo("JustifyContent::SpaceEvenly", setup_justify_space_evenly);
+	render("JustifyContent::Start", setup_justify_start);
+	render("JustifyContent::Center", setup_justify_center);
+	render("JustifyContent::End", setup_justify_end);
+	render("JustifyContent::SpaceBetween", setup_justify_space_between);
+	render("JustifyContent::SpaceAround", setup_justify_space_around);
+	render("JustifyContent::SpaceEvenly", setup_justify_space_evenly);
 
-	run_demo("AlignItems::Start", setup_align_start);
-	run_demo("AlignItems::Center", setup_align_center);
-	run_demo("AlignItems::End", setup_align_end);
-	run_demo("AlignItems::Stretch", setup_align_stretch);
+	render("AlignItems::Start", setup_align_start);
+	render("AlignItems::Center", setup_align_center);
+	render("AlignItems::End", setup_align_end);
+	render("AlignItems::Stretch", setup_align_stretch);
 
-	run_demo("Row and Column Gaps", setup_gaps);
-	run_demo("Flex Grow", setup_flex_grow);
-	run_demo("No Wrap", setup_no_wrap);
-	run_demo("Wrap", setup_wrap);
-	run_demo("Nested Rows and Columns", setup_nested);
+	render("Row and Column Gaps", setup_gaps);
+	render("Flex Grow", setup_flex_grow);
+	render("No Wrap", setup_no_wrap);
+	render("Wrap", setup_wrap);
+	render("Nested Rows and Columns", setup_nested);
 
-	run_demo("Margin Only", setup_margin_only);
-	run_demo("Border Only", setup_border_only);
-	run_demo("Padding Only", setup_padding_only);
-	run_demo("Margin + Border + Padding", setup_all_spacing);
+	render("Margin Only", setup_margin_only);
+	render("Border Only", setup_border_only);
+	render("Padding Only", setup_padding_only);
+	render("Margin + Border + Padding", setup_all_spacing);
 
 	// Style demos (ANSI color output)
-	run_ansi_demo("Foreground Color", setup_foreground_color);
-	run_ansi_demo("Background Color", setup_background_color);
-	run_ansi_demo("Border Color (per-side)", setup_border_color);
-	run_ansi_demo("Text Underline", setup_text_underline);
-	run_ansi_demo("Text Align + Style", setup_text_align_style);
+	render("Foreground Color", setup_foreground_color);
+	render("Background Color", setup_background_color);
+	render("Border Color (per-side)", setup_border_color);
+	render("Text Underline", setup_text_underline);
+	render("Text Align + Style", setup_text_align_style);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn run_demo<B: Bundle>(name: &str, setup: fn() -> B) {
-	let out = World::new()
-		.spawn(setup())
-		.with_state::<StyledNodeQuery, _>(|entity, query| {
-			let buffer =
-				CharcellRenderContext::render_full(&query, entity).unwrap();
-			buffer.render_plain_trim()
-		});
-	println!("\n{name}: \n{out}");
-}
-
-fn run_ansi_demo<B: Bundle>(name: &str, setup: fn() -> B) {
-	let out = World::new()
-		.spawn(setup())
-		.with_state::<StyledNodeQuery, _>(|entity, query| {
-			let buffer =
-				CharcellRenderContext::render_full(&query, entity).unwrap();
-			buffer.render_ansi().trim_start_lines().trim_end_lines()
-		});
+fn render<B: Bundle>(name: &str, setup: fn() -> B) {
+	let out = RenderCharcell::default()
+		.render_oneshot(setup())
+		.unwrap()
+		.render()
+		.trim_lines();
 	println!("\n{name}: \n{out}");
 }
 

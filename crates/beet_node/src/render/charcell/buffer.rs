@@ -60,6 +60,16 @@ impl Buffer {
 		}
 	}
 
+	pub fn render(&self) -> String {
+		cfg_if! {
+			if #[cfg(feature = "ansi_paint")] {
+				self.render_ansi()
+			} else {
+				self.render_plain()
+			}
+		}
+	}
+
 	/// Render the buffer to a string (plain text, no styling).
 	pub fn render_plain(&self) -> String {
 		let width = self.size.x as usize;
@@ -80,10 +90,6 @@ impl Buffer {
 			}
 		}
 		result
-	}
-
-	pub fn render_plain_trim(&self) -> String {
-		self.render_plain().trim_start_lines().trim_end_lines()
 	}
 
 	/// Render the buffer to a string with ANSI styling.

@@ -116,43 +116,24 @@ mod tests {
 	/// Render a bundle into a 10×5 buffer and return the plain trimmed output
 	/// with spaces replaced by `+` for readable diffs.
 	fn render(bundle: impl Bundle) -> String {
-		World::new()
-			.spawn(bundle)
-			.with_state::<StyledNodeQuery, _>(|entity, query| {
-				CharcellRenderContext::render_rect(
-					&query,
-					entity,
-					URect::new(0, 0, 10, 5),
-				)
-			})
+		// adjust if needed
+		let viewport = URect::new(0, 0, 10, 1);
+		RenderCharcell::new(viewport)
+			.render_oneshot(bundle)
 			.unwrap()
-			.render_plain_trim()
-			.replace(" ", "+")
-			.into()
+			.render()
+			.trim_lines()
+		// use an icon for clearer whitespace diffs
 	}
-
-	/// Render a bundle into a 5×1 buffer and return the ANSI-styled output.
-	#[cfg(feature = "ansi_paint")]
-	fn render_styled(bundle: impl Bundle) -> String {
-		World::new()
-			.spawn(bundle)
-			.with_state::<StyledNodeQuery, _>(|entity, query| {
-				CharcellRenderContext::render_rect(
-					&query,
-					entity,
-					URect::new(0, 0, 5, 1),
-				)
-			})
-			.unwrap()
-			.render_ansi()
-			.into()
+	fn render_pluses(bundle: impl Bundle) -> String {
+		render(bundle).replace(" ", "+")
 	}
 
 	// ── Layout ────────────────────────────────────────────────────────────────
 
 	#[test]
 	fn text_align_left() {
-		render((
+		render_pluses((
 			rsx! { "Hi" },
 			LayoutStyle::default().with_text_align(TextAlign::Left),
 		))
@@ -161,7 +142,7 @@ mod tests {
 
 	#[test]
 	fn text_align_right() {
-		render((
+		render_pluses((
 			rsx! { "Hi" },
 			LayoutStyle::default().with_text_align(TextAlign::Right),
 		))
@@ -170,7 +151,7 @@ mod tests {
 
 	#[test]
 	fn text_align_center() {
-		render((
+		render_pluses((
 			rsx! { "Hi" },
 			LayoutStyle::default().with_text_align(TextAlign::Center),
 		))
@@ -186,7 +167,7 @@ mod tests {
 			foreground: Some(Color::srgb(1., 0., 0.)),
 			..VisualStyle::default()
 		};
-		render_styled((rsx! { "Hi" }, visual)).xpect_snapshot();
+		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 
 	#[cfg(feature = "ansi_paint")]
@@ -196,6 +177,6 @@ mod tests {
 			decoration_line: vec![TextDecoration::Underline],
 			..VisualStyle::default()
 		};
-		render_styled((rsx! { "Hi" }, visual)).xpect_snapshot();
+		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 }

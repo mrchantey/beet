@@ -5,6 +5,69 @@ use crate::style::StyledNodeView;
 use beet_core::prelude::*;
 use bevy::math::Vec2;
 
+#[derive(Get)]
+pub struct RenderCharcell {
+	viewport: URect,
+}
+
+impl Default for RenderCharcell {
+	fn default() -> Self {
+		let size = Self::terminal_size();
+		Self {
+			viewport: URect::new(0, 0, size.x, size.y),
+		}
+	}
+}
+
+impl RenderCharcell {
+	pub fn new(viewport: URect) -> Self { Self { viewport } }
+
+	/// Half the viewport height for an easier read when testing
+	pub fn halved(mut self) -> Self {
+		self.viewport.max.y /= 2;
+		self
+	}
+
+	/// Render into a buffer bounded by an explicit `rect`.
+	pub fn render_rect(
+		&self,
+		query: &StyledNodeQuery,
+		entity: Entity,
+	) -> Result<Buffer> {
+		let mut buffer = Buffer::new(self.viewport.size());
+		let node = query.get_view(entity);
+		let mut cx = CharcellRenderContext::new(
+			node,
+			self.viewport,
+			self.viewport,
+			&mut buffer,
+		);
+		cx.render()?;
+		buffer.xok()
+	}
+
+	/// Create a world, spawn the bundle and render to a buffer
+	pub fn render_oneshot(&self, bundle: impl Bundle) -> Result<Buffer> {
+		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
+			|entity, query| self.render_rect(&query, entity),
+		)
+	}
+
+	fn terminal_size() -> UVec2 {
+		let default_size = UVec2::new(80, 24);
+		cfg_if! {
+			if #[cfg(feature = "crossterm")] {
+				terminal_ext::size().unwrap_or(default_size)
+			} else {
+				default_size
+			}
+		}
+	}
+}
+
+
+
+
 /// Rendering context passed through the node tree during a TUI render pass.
 pub struct CharcellRenderContext<'a> {
 	pub(super) node: StyledNodeView<'a>,
@@ -36,38 +99,6 @@ impl<'a> CharcellRenderContext<'a> {
 			content_rect,
 			buffer,
 		}
-	}
-
-	/// Render into a half-height buffer sized to the current terminal.
-	pub fn render_half(
-		query: &StyledNodeQuery,
-		entity: Entity,
-	) -> Result<Buffer> {
-		let mut size = terminal_size();
-		size.y /= 2;
-		Self::render_rect(query, entity, URect::new(0, 0, size.x, size.y))
-	}
-
-	/// Render into a full-size buffer sized to the current terminal.
-	pub fn render_full(
-		query: &StyledNodeQuery,
-		entity: Entity,
-	) -> Result<Buffer> {
-		let size = terminal_size();
-		Self::render_rect(query, entity, URect::new(0, 0, size.x, size.y))
-	}
-
-	/// Render into a buffer bounded by an explicit `rect`.
-	pub fn render_rect(
-		query: &StyledNodeQuery,
-		entity: Entity,
-		rect: URect,
-	) -> Result<Buffer> {
-		let mut buffer = Buffer::new(rect.size());
-		let node = query.get_view(entity);
-		let mut cx = CharcellRenderContext::new(node, rect, rect, &mut buffer);
-		cx.render()?;
-		buffer.xok()
 	}
 
 	/// Main entry point — draws border, then delegates to flex and text layout.
@@ -172,17 +203,6 @@ impl BoxModel {
 	}
 }
 
-
-fn terminal_size() -> UVec2 {
-	let default_size = UVec2::new(80, 24);
-	cfg_if! {
-		if #[cfg(feature = "crossterm")] {
-			terminal_ext::size().unwrap_or(default_size)
-		} else {
-			default_size
-		}
-	}
-}
 
 /// Inset `outer` by the amounts in `insets`, returning the shrunken rect.
 ///

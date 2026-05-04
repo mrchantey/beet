@@ -85,18 +85,18 @@ pub mod prelude {
 		not(target_arch = "wasm32")
 	))]
 	pub use crate::node::prelude::Justify;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::JustifyContent;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::Pointer;
-#[cfg(feature = "node")]
-	pub use crate::node::prelude::AlignSelf;
-#[cfg(feature = "node")]
-	pub use crate::node::prelude::AlignItems;
-#[cfg(feature = "node")]
-	pub use crate::node::prelude::AlignContent;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::FlexWrap;
+	cfg_if! {
+		if #[cfg(feature = "node")]{
+			pub use crate::node::prelude::Pointer;
+			pub use crate::node::prelude::style::*;
+			pub use crate::node::prelude::style::JustifyContent;
+			pub use crate::node::prelude::style::FontWeight;
+			pub use crate::node::prelude::style::AlignSelf;
+			pub use crate::node::prelude::style::AlignItems;
+			pub use crate::node::prelude::style::AlignContent;
+			pub use crate::node::prelude::style::FlexWrap;
+		}
+	}
 }
 
 pub mod exports {

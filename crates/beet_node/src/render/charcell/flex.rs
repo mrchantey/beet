@@ -677,21 +677,15 @@ mod tests {
 	use crate::style::*;
 
 	fn render(bundle: impl Bundle) -> String {
-		World::new()
-			.spawn(bundle)
-			.with_state::<StyledNodeQuery, _>(|entity, query| {
-				CharcellRenderContext::render_rect(
-					&query,
-					entity,
-					// adjust if needed
-					URect::new(0, 0, 40, 20),
-				)
-			})
+		// adjust if needed
+		let viewport = URect::new(0, 0, 40, 20);
+		RenderCharcell::new(viewport)
+			.render_oneshot(bundle)
 			.unwrap()
-			.render_plain_trim()
+			.render()
+			.trim_lines()
 			// use an icon for clearer whitespace diffs
 			.replace(" ", "+")
-			.into()
 	}
 
 

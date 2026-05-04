@@ -4,6 +4,11 @@ use extend::ext;
 /// String extensions
 #[ext]
 pub impl<T: AsRef<str>> T {
+	/// Skip leading and trailing empty lines, while preserving
+	/// whitespace in the first and last non-empty lines.
+	fn trim_lines(&self) -> String { self.trim_start_lines().trim_end_lines() }
+
+
 	/// Skip empty lines, while preserving
 	/// whitespace in the first non-empty line.
 	fn trim_start_lines(&self) -> String {
