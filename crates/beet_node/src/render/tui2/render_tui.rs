@@ -84,7 +84,7 @@ fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
 
 	// 1. margin
 	let margin = cx.tui_spacing(&layout.margin);
-	let border_rect = subtract_rect(&cx.rect, &margin);
+	let border_rect = inset_rect(&cx.rect, &margin);
 	cx.rect = border_rect;
 
 	// 2. border
@@ -92,7 +92,7 @@ fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
 
 	// 3. padding
 	let padding = cx.tui_spacing(&layout.padding);
-	let content_rect = subtract_rect(&cx.rect, &padding);
+	let content_rect = inset_rect(&cx.rect, &padding);
 	cx.rect = content_rect;
 
 	Ok(())
@@ -101,7 +101,7 @@ fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
 /// For a given outer rect, create a new rect by moving
 /// inward at all points. Returns the outer rect if subtraction
 /// would result in an invalid rect.
-fn subtract_rect(outer: &URect, inner: &URect) -> URect {
+fn inset_rect(outer: &URect, inner: &URect) -> URect {
 	let left = outer.min.x + inner.min.x;
 	let top = outer.min.y + inner.min.y;
 	let right = outer.max.x.saturating_sub(inner.max.x);

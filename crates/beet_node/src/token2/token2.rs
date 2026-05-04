@@ -29,7 +29,7 @@ impl Token2KeyValue {
 pub enum Token2Key {
 	Inline(SmolStr),
 	Url(SmolStr),
-	Uuid(uuid::Uuid),
+	// Uuid(uuid::Uuid),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]

@@ -217,7 +217,6 @@ where
 mod test {
 	use super::*;
 	use beet_action::prelude::*;
-	use bevy::ecs::entity::EntityHashMap;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
 
@@ -484,7 +483,9 @@ mod test {
 	}
 
 	#[test]
+	#[cfg(feature = "bevy_scene")]
 	fn roundtrip_increment_scene() {
+		use bevy::ecs::entity::EntityHashMap;
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.init_plugin::<DocumentPlugin>();
