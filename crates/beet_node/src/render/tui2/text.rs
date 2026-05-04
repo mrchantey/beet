@@ -19,10 +19,10 @@ pub fn text_layout(cx: &mut TuiRenderContext) -> Result {
 	let Some(value) = cx.node.value else {
 		return Ok(());
 	};
-	let lines = word_wrap(&value.to_string(), cx.rect.width());
+	let lines = word_wrap(&value.to_string(), cx.content_rect.width());
 	for (i, line) in lines.iter().enumerate() {
-		let y = cx.rect.min.y + i as u32;
-		if y >= cx.rect.max.y {
+		let y = cx.content_rect.min.y + i as u32;
+		if y >= cx.content_rect.max.y {
 			break;
 		}
 		let text_align = cx
@@ -30,9 +30,9 @@ pub fn text_layout(cx: &mut TuiRenderContext) -> Result {
 			.layout
 			.map(|style| style.text_align)
 			.unwrap_or_default();
-		let aligned = align_line(line, cx.rect.width(), text_align);
+		let aligned = align_line(line, cx.content_rect.width(), text_align);
 		cx.buffer.write_text(
-			UVec2::new(cx.rect.min.x, y),
+			UVec2::new(cx.content_rect.min.x, y),
 			&aligned,
 			VisualStyle::default(),
 		);

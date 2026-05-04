@@ -1,3 +1,4 @@
+use super::BoxModel;
 use crate::prelude::*;
 use crate::style::AlignContent;
 use crate::style::AlignItems;
@@ -135,7 +136,8 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 		return Ok(());
 	};
 
-	let available = UVec2::new(cx.rect.width(), cx.rect.height());
+	let available =
+		UVec2::new(cx.content_rect.width(), cx.content_rect.height());
 	let lines = form_lines_ecs(&cx.node, flexbox, available, cx.viewport)?;
 
 	// collect line cross sizes
@@ -149,8 +151,8 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 
 	let direction = resolve_direction(flexbox.direction, cx.viewport);
 	let container_cross = match direction {
-		Direction::Horizontal => cx.rect.height(),
-		Direction::Vertical => cx.rect.width(),
+		Direction::Horizontal => cx.content_rect.height(),
+		Direction::Vertical => cx.content_rect.width(),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -168,7 +170,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 		// Each line is a horizontal strip. Lines stack top-to-bottom.
 		Direction::Horizontal => {
 			for (line_idx, line) in lines.iter().enumerate() {
-				let line_y = cx.rect.min.y + line_positions[line_idx];
+				let line_y = cx.content_rect.min.y + line_positions[line_idx];
 				let line_h = if flexbox.align_content == AlignContent::Stretch {
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
@@ -183,7 +185,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					line_cross_sizes[line_idx]
 				};
 
-				if line_y >= cx.rect.max.y {
+				if line_y >= cx.content_rect.max.y {
 					break;
 				}
 
@@ -191,14 +193,14 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					cx.node,
 					flexbox,
 					line,
-					cx.rect.width(),
+					cx.content_rect.width(),
 					cx.viewport,
 				);
 				let main_positions = apply_justify(
 					flexbox,
 					line,
 					&final_sizes,
-					cx.rect.width(),
+					cx.content_rect.width(),
 					cx.viewport,
 				);
 
@@ -213,7 +215,8 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					};
 					let child_y = line_y
 						+ cross_offset(&child_node, flexbox, child_h, line_h);
-					let child_x = cx.rect.min.x + main_positions[item_idx];
+					let child_x =
+						cx.content_rect.min.x + main_positions[item_idx];
 
 					let child_rect = URect::new(
 						child_x,
@@ -223,13 +226,13 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					);
 
 					// render child
-					let mut child_cx = TuiRenderContext {
-						node: &child_node,
-						viewport: cx.viewport,
-						rect: child_rect,
-						buffer: cx.buffer,
-					};
-					child_cx.render()?;
+					TuiRenderContext::for_child(
+						&child_node,
+						cx.viewport,
+						child_rect,
+						cx.buffer,
+					)
+					.render()?;
 				}
 			}
 		}
@@ -238,7 +241,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 		// Each "line" is a vertical column. Columns sit left-to-right.
 		Direction::Vertical => {
 			for (line_idx, line) in lines.iter().enumerate() {
-				let line_x = cx.rect.min.x + line_positions[line_idx];
+				let line_x = cx.content_rect.min.x + line_positions[line_idx];
 				let line_w = if flexbox.align_content == AlignContent::Stretch {
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
@@ -253,7 +256,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					line_cross_sizes[line_idx]
 				};
 
-				if line_x >= cx.rect.max.x {
+				if line_x >= cx.content_rect.max.x {
 					break;
 				}
 
@@ -261,14 +264,14 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					cx.node,
 					flexbox,
 					line,
-					cx.rect.height(),
+					cx.content_rect.height(),
 					cx.viewport,
 				);
 				let main_positions = apply_justify(
 					flexbox,
 					line,
 					&final_sizes,
-					cx.rect.height(),
+					cx.content_rect.height(),
 					cx.viewport,
 				);
 
@@ -282,7 +285,8 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					};
 					let child_x = line_x
 						+ cross_offset(&child_node, flexbox, child_w, line_w);
-					let child_y = cx.rect.min.y + main_positions[item_idx];
+					let child_y =
+						cx.content_rect.min.y + main_positions[item_idx];
 
 					let child_rect = URect::new(
 						child_x,
@@ -292,13 +296,13 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 					);
 
 					// render child
-					let mut child_cx = TuiRenderContext {
-						node: &child_node,
-						viewport: cx.viewport,
-						rect: child_rect,
-						buffer: cx.buffer,
-					};
-					child_cx.render()?;
+					TuiRenderContext::for_child(
+						&child_node,
+						cx.viewport,
+						child_rect,
+						cx.buffer,
+					)
+					.render()?;
 				}
 			}
 		}
@@ -377,36 +381,11 @@ fn measure_node(
 	available: UVec2,
 	viewport: URect,
 ) -> Result<UVec2> {
-	// calculate box model spacing
-	let spacing = if let Some(layout) = node.layout {
-		let viewport_size =
-			Vec2::new(viewport.width() as f32, viewport.height() as f32);
-		let margin = layout.margin.rem_urect(viewport_size);
-		let border = layout.border.rem_urect(viewport_size);
-		let padding = layout.padding.rem_urect(viewport_size);
-
-		// double x values for rem consistency (TUI uses 2:1 aspect ratio)
-		let margin_x = (margin.min.x + margin.max.x) * 2;
-		let margin_y = margin.min.y + margin.max.y;
-		let border_x = (border.min.x + border.max.x) * 2;
-		let border_y = border.min.y + border.max.y;
-		let padding_x = (padding.min.x + padding.max.x) * 2;
-		let padding_y = padding.min.y + padding.max.y;
-
-		UVec2::new(
-			margin_x + border_x + padding_x,
-			margin_y + border_y + padding_y,
-		)
-	} else {
-		UVec2::ZERO
-	};
-
-	// measure content (subtract spacing from available)
+	let overhead = BoxModel::from_node(node, viewport).overhead();
 	let content_available = UVec2::new(
-		available.x.saturating_sub(spacing.x),
-		available.y.saturating_sub(spacing.y),
+		available.x.saturating_sub(overhead.x),
+		available.y.saturating_sub(overhead.y),
 	);
-
 	let content_size = if node.flexbox.is_some() {
 		flex_measure(node, content_available, viewport)?
 	} else if node.value.is_some() {
@@ -414,9 +393,7 @@ fn measure_node(
 	} else {
 		UVec2::ZERO
 	};
-
-	// add spacing back to content size
-	(content_size + spacing).xok()
+	(content_size + overhead).xok()
 }
 
 fn line_cross_size_for(
