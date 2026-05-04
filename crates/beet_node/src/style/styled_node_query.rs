@@ -2,7 +2,6 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-
 #[derive(Clone)]
 pub struct StyledNodeView<'a> {
 	pub entity: Entity,
@@ -17,10 +16,10 @@ pub struct StyledNodeView<'a> {
 
 impl<'a> StyledNodeView<'a> {
 	pub fn visual_style(&self) -> &VisualStyle {
-		self.visual.unwrap_or(&VisualStyle::DEFAULT)
+		self.visual.unwrap_or(&VISUAL_STYLE_DEFAULT)
 	}
 	pub fn layout_style(&self) -> &LayoutStyle {
-		self.layout.unwrap_or(&LayoutStyle::DEFAULT)
+		self.layout.unwrap_or(&LAYOUT_STYLE_DEFAULT)
 	}
 }
 

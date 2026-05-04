@@ -34,7 +34,8 @@ pub fn text_layout(cx: &mut CharcellRenderContext) -> Result {
 		cx.buffer.write_text(
 			UVec2::new(cx.content_rect.min.x, y),
 			&aligned,
-			VisualStyle::default(),
+			cx.node.visual_style().clone(),
+			cx.node.entity,
 		);
 	}
 	Ok(())
@@ -103,5 +104,98 @@ fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 			let l = pad / 2;
 			format!("{}{line}{}", " ".repeat(l), " ".repeat(pad - l))
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use bevy::math::URect;
+
+	/// Render a bundle into a 10×5 buffer and return the plain trimmed output
+	/// with spaces replaced by `+` for readable diffs.
+	fn render(bundle: impl Bundle) -> String {
+		World::new()
+			.spawn(bundle)
+			.with_state::<StyledNodeQuery, _>(|entity, query| {
+				CharcellRenderContext::render_rect(
+					&query,
+					entity,
+					URect::new(0, 0, 10, 5),
+				)
+			})
+			.unwrap()
+			.render_plain_trim()
+			.replace(" ", "+")
+			.into()
+	}
+
+	/// Render a bundle into a 5×1 buffer and return the ANSI-styled output.
+	#[cfg(feature = "ansi_paint")]
+	fn render_styled(bundle: impl Bundle) -> String {
+		World::new()
+			.spawn(bundle)
+			.with_state::<StyledNodeQuery, _>(|entity, query| {
+				CharcellRenderContext::render_rect(
+					&query,
+					entity,
+					URect::new(0, 0, 5, 1),
+				)
+			})
+			.unwrap()
+			.render_ansi()
+			.into()
+	}
+
+	// ── Layout ────────────────────────────────────────────────────────────────
+
+	#[test]
+	fn text_align_left() {
+		render((
+			rsx! { "Hi" },
+			LayoutStyle::default().with_text_align(TextAlign::Left),
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn text_align_right() {
+		render((
+			rsx! { "Hi" },
+			LayoutStyle::default().with_text_align(TextAlign::Right),
+		))
+		.xpect_snapshot();
+	}
+
+	#[test]
+	fn text_align_center() {
+		render((
+			rsx! { "Hi" },
+			LayoutStyle::default().with_text_align(TextAlign::Center),
+		))
+		.xpect_snapshot();
+	}
+
+	// ── Style ─────────────────────────────────────────────────────────────────
+
+	#[cfg(feature = "ansi_paint")]
+	#[test]
+	fn foreground_color() {
+		let visual = VisualStyle {
+			foreground: Some(Color::srgb(1., 0., 0.)),
+			..VisualStyle::default()
+		};
+		render_styled((rsx! { "Hi" }, visual)).xpect_snapshot();
+	}
+
+	#[cfg(feature = "ansi_paint")]
+	#[test]
+	fn text_underline() {
+		let visual = VisualStyle {
+			decoration_line: vec![TextDecoration::Underline],
+			..VisualStyle::default()
+		};
+		render_styled((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 }

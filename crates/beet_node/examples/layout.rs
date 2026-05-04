@@ -31,6 +31,13 @@ fn main() {
 	run_demo("Border Only", setup_border_only);
 	run_demo("Padding Only", setup_padding_only);
 	run_demo("Margin + Border + Padding", setup_all_spacing);
+
+	// Style demos (ANSI color output)
+	run_ansi_demo("Foreground Color", setup_foreground_color);
+	run_ansi_demo("Background Color", setup_background_color);
+	run_ansi_demo("Border Color (per-side)", setup_border_color);
+	run_ansi_demo("Text Underline", setup_text_underline);
+	run_ansi_demo("Text Align + Style", setup_text_align_style);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,8 +46,20 @@ fn run_demo<B: Bundle>(name: &str, setup: fn() -> B) {
 	let out = World::new()
 		.spawn(setup())
 		.with_state::<StyledNodeQuery, _>(|entity, query| {
-			let buffer = CharcellRenderContext::render_full(&query, entity).unwrap();
+			let buffer =
+				CharcellRenderContext::render_full(&query, entity).unwrap();
 			buffer.render_plain_trim()
+		});
+	println!("\n{name}: \n{out}");
+}
+
+fn run_ansi_demo<B: Bundle>(name: &str, setup: fn() -> B) {
+	let out = World::new()
+		.spawn(setup())
+		.with_state::<StyledNodeQuery, _>(|entity, query| {
+			let buffer =
+				CharcellRenderContext::render_full(&query, entity).unwrap();
+			buffer.render_ansi().trim_start_lines().trim_end_lines()
 		});
 	println!("\n{name}: \n{out}");
 }
@@ -334,5 +353,100 @@ fn setup_all_spacing() -> impl Bundle {
 		(rsx! {"A"}, style.clone()),
 		(rsx! {"B"}, style.clone()),
 		(rsx! {"C"}, style.clone()),
+	])
+}
+
+// ── Style / Color ────────────────────────────────────────────────────────────────────────────
+
+fn setup_foreground_color() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
+		(rsx! { "Red" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(1., 0., 0.)),
+			..VisualStyle::default()
+		},),
+		(rsx! { "Green" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(0., 0.8, 0.)),
+			..VisualStyle::default()
+		},),
+		(rsx! { "Blue" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(0.2, 0.4, 1.)),
+			..VisualStyle::default()
+		},),
+	])
+}
+
+fn setup_background_color() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
+		(
+			rsx! { "A" },
+			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
+			VisualStyle {
+				background: Some(Color::srgb(0.5, 0., 0.5)),
+				foreground: Some(Color::WHITE),
+				..VisualStyle::default()
+			},
+		),
+		(
+			rsx! { "B" },
+			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
+			VisualStyle {
+				background: Some(Color::srgb(0., 0.4, 0.6)),
+				foreground: Some(Color::WHITE),
+				..VisualStyle::default()
+			},
+		),
+	])
+}
+
+fn setup_border_color() -> impl Bundle {
+	// Each node gets per-side border colors: top=red, bottom=blue, left=green, right=yellow
+	(FlexBox::row().column_gap(1), children![(
+		rsx! { "Box" },
+		bordered(),
+		VisualStyle {
+			border_top: Some(Color::srgb(1., 0., 0.)),
+			border_bottom: Some(Color::srgb(0., 0.4, 1.)),
+			border_left: Some(Color::srgb(0., 0.8, 0.)),
+			border_right: Some(Color::srgb(1., 0.8, 0.)),
+			..VisualStyle::default()
+		},
+	),])
+}
+
+fn setup_text_underline() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
+		(rsx! { "Underline" }, bordered(), VisualStyle {
+			decoration_line: vec![TextDecoration::Underline],
+			..VisualStyle::default()
+		},),
+		(rsx! { "Strike" }, bordered(), VisualStyle {
+			decoration_line: vec![TextDecoration::LineThrough],
+			..VisualStyle::default()
+		},),
+	])
+}
+
+fn setup_text_align_style() -> impl Bundle {
+	(FlexBox::row().column_gap(1), children![
+		(
+			rsx! { "Left" },
+			LayoutStyle::default()
+				.with_border(Spacing::all(Length::Rem(1.)))
+				.with_text_align(TextAlign::Left),
+			VisualStyle {
+				foreground: Some(Color::srgb(0.8, 0.4, 0.)),
+				..VisualStyle::default()
+			},
+		),
+		(
+			rsx! { "Center" },
+			LayoutStyle::default()
+				.with_border(Spacing::all(Length::Rem(1.)))
+				.with_text_align(TextAlign::Center),
+			VisualStyle {
+				foreground: Some(Color::srgb(0., 0.8, 0.8)),
+				..VisualStyle::default()
+			},
+		),
 	])
 }

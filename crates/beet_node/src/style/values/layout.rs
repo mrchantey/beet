@@ -71,6 +71,7 @@ impl FlexBox {
 }
 
 
+pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
 #[derive(Debug, Default, Clone, SetWith, Component)]
 pub struct LayoutStyle {

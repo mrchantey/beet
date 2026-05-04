@@ -3,6 +3,9 @@ use crate::style::*;
 use beet_core::prelude::*;
 
 
+pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
+
+
 /// Visual styling for a cell.
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct VisualStyle {

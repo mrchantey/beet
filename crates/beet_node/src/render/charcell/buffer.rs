@@ -1,38 +1,31 @@
 use crate::style::TextDecoration;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
-use bevy::math::URect;
 use bevy::math::UVec2;
 
 /// A rectangular buffer of cells, indexed by position.
 pub struct Buffer {
-	rect: URect,
+	size: UVec2,
 	cells: Vec<Option<Cell>>,
 }
 
 impl Buffer {
-	pub fn new(rect: URect) -> Self {
-		let size = (rect.width() * rect.height()) as usize;
+	pub fn new(size: UVec2) -> Self {
+		let len = (size.x * size.y) as usize;
 		Self {
-			rect,
-			cells: alloc::vec::from_elem(None, size),
+			size,
+			cells: alloc::vec::from_elem(None, len),
 		}
 	}
 
-	pub fn rect(&self) -> URect { self.rect }
+	pub fn size(&self) -> UVec2 { self.size }
 
 	/// Convert position to buffer index.
 	fn index(&self, pos: UVec2) -> Option<usize> {
-		if pos.x < self.rect.min.x
-			|| pos.y < self.rect.min.y
-			|| pos.x >= self.rect.max.x
-			|| pos.y >= self.rect.max.y
-		{
+		if pos.x >= self.size.x || pos.y >= self.size.y {
 			return None;
 		}
-		let local_x = pos.x - self.rect.min.x;
-		let local_y = pos.y - self.rect.min.y;
-		Some((local_y * self.rect.width() + local_x) as usize)
+		Some((pos.y * self.size.x + pos.x) as usize)
 	}
 
 	/// Set a cell at the given position.
@@ -53,20 +46,24 @@ impl Buffer {
 		pos: UVec2,
 		text: &str,
 		style: impl Clone + Into<CharStyle>,
+		entity: Entity,
 	) {
 		for (i, ch) in text.chars().enumerate() {
 			let cell_pos = UVec2::new(pos.x + i as u32, pos.y);
-			if cell_pos.x >= self.rect.max.x {
+			if cell_pos.x >= self.size.x {
 				break;
 			}
-			self.set(cell_pos, Cell::new(ch.to_string(), style.clone()));
+			self.set(
+				cell_pos,
+				Cell::new(ch.to_string(), style.clone(), entity),
+			);
 		}
 	}
 
 	/// Render the buffer to a string (plain text, no styling).
 	pub fn render_plain(&self) -> String {
-		let width = self.rect.width() as usize;
-		let height = self.rect.height() as usize;
+		let width = self.size.x as usize;
+		let height = self.size.y as usize;
 		let mut result = String::with_capacity(self.cells.len());
 
 		for y in 0..height {
@@ -88,8 +85,33 @@ impl Buffer {
 	pub fn render_plain_trim(&self) -> String {
 		self.render_plain().trim_start_lines().trim_end_lines()
 	}
-}
 
+	/// Render the buffer to a string with ANSI styling.
+	#[cfg(feature = "ansi_paint")]
+	pub fn render_ansi(&self) -> String {
+		let width = self.size.x as usize;
+		let height = self.size.y as usize;
+		let mut result = String::with_capacity(self.cells.len());
+
+		for y in 0..height {
+			for x in 0..width {
+				let idx = y * width + x;
+				if let Some(cell) = &self.cells[idx] {
+					let ansi_style = char_style_to_ansi(&cell.style);
+					result.push_str(
+						&ansi_style.paint(cell.symbol.as_str()).to_string(),
+					);
+				} else {
+					result.push(' ');
+				}
+			}
+			if y < height - 1 {
+				result.push('\n');
+			}
+		}
+		result
+	}
+}
 
 /// A single terminal cell with text and styling.
 #[derive(Debug, Clone, SetWith)]
@@ -97,23 +119,26 @@ pub struct Cell {
 	pub symbol: SmolStr,
 	#[set_with(into)]
 	pub style: CharStyle,
+	pub entity: Entity,
 }
 
 impl Cell {
 	pub fn new(
 		symbol: impl Into<SmolStr>,
 		style: impl Into<CharStyle>,
+		entity: Entity,
 	) -> Self {
 		Self {
 			symbol: symbol.into(),
 			style: style.into(),
+			entity,
 		}
 	}
 }
 
 #[derive(Debug, Default, Clone, PartialEq, SetWith)]
 pub struct CharStyle {
-	/// In ansi renderers an alpha channel of <50% will apply the `dim` attributes
+	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
 	pub decoration_color: Option<Color>,
@@ -129,4 +154,47 @@ impl From<VisualStyle> for CharStyle {
 			decoration_line: style.decoration_line,
 		}
 	}
+}
+
+#[cfg(feature = "ansi_paint")]
+fn color_to_ansi(color: Color) -> nu_ansi_term::Color {
+	let s = color.to_srgba_u8();
+	nu_ansi_term::Color::Rgb(s.red, s.green, s.blue)
+}
+
+#[cfg(feature = "ansi_paint")]
+fn char_style_to_ansi(style: &CharStyle) -> nu_ansi_term::Style {
+	let mut ansi_style = nu_ansi_term::Style::new();
+
+	if let Some(color) = style.foreground {
+		let s = color.to_srgba_u8();
+		ansi_style = ansi_style.fg(color_to_ansi(color));
+		// alpha < 50% maps to the terminal `dim` attribute
+		if s.alpha < 128 {
+			ansi_style = ansi_style.dimmed();
+		}
+	}
+
+	if let Some(color) = style.background {
+		ansi_style = ansi_style.on(color_to_ansi(color));
+	}
+
+	for decoration in &style.decoration_line {
+		match decoration {
+			TextDecoration::Underline
+			| TextDecoration::UnderlineDouble
+			| TextDecoration::UnderlineWavy
+			| TextDecoration::UnderlinDash => {
+				ansi_style = ansi_style.underline();
+			}
+			TextDecoration::Overline => {
+				// not supported in ANSI terminals, skip
+			}
+			TextDecoration::LineThrough => {
+				ansi_style = ansi_style.strikethrough();
+			}
+		}
+	}
+
+	ansi_style
 }

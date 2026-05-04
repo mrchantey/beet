@@ -63,7 +63,7 @@ impl<'a> CharcellRenderContext<'a> {
 		entity: Entity,
 		rect: URect,
 	) -> Result<Buffer> {
-		let mut buffer = Buffer::new(rect);
+		let mut buffer = Buffer::new(rect.size());
 		let node = query.get_view(entity);
 		let mut cx = CharcellRenderContext::new(node, rect, rect, &mut buffer);
 		cx.render()?;
@@ -76,11 +76,10 @@ impl<'a> CharcellRenderContext<'a> {
 
 		// 1. draw border if the node has one
 		if box_model.has_border {
-			let style = self.node.visual_style();
 			super::draw_border(
 				self.buffer,
 				box_model.border_rect(self.containing_block),
-				style,
+				&self.node,
 			);
 		}
 
