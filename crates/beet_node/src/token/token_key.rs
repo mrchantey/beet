@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::exports::Itertools;
 use beet_core::prelude::*;
 
 /// Identifies a token instance.
@@ -17,6 +16,9 @@ pub enum TokenKey {
 	Url(SmolStr),
 	/// An inline key at a specific source location (file:line:col).
 	Inline(SmolStr),
+	// /// uuid reflect impl feature gated behind bevy_scene?
+	// #[cfg(feature="bevy_scene")]
+	// Uuid(uuid::Uuid),
 }
 
 impl Default for TokenKey {
@@ -111,19 +113,6 @@ impl std::fmt::Display for TokenKey {
 		match self {
 			Self::RustType(s) | Self::Url(s) | Self::Inline(s) => s.fmt(f),
 		}
-	}
-}
-
-impl From<FieldPath> for TokenKey {
-	fn from(field_path: FieldPath) -> Self {
-		Self::RustType(
-			field_path
-				.into_inner()
-				.into_iter()
-				.map(|seg| seg.to_string())
-				.join("/")
-				.into(),
-		)
 	}
 }
 
