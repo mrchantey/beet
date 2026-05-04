@@ -18,9 +18,12 @@ const SOURCE_PATH: &str = "crates/beet_infra/examples/lambda_test.rs";
 async fn lambda_lifecycle() {
 	pretty_env_logger::init();
 
-	// resolve source paths and create revert guards
-	let (source, _source_guard, assets_file, _assets_guard) =
-		setup_source_guards(SOURCE_PATH, ASSETS_FILE).unwrap();
+	// resolve source paths and create isolated temp assets to prevent
+	// interference with concurrent tests
+	let guards = setup_isolated_test_guards(SOURCE_PATH).unwrap();
+	let source = &guards.source;
+	let assets_file = &guards.assets_file;
+	let assets_dir = &guards.assets_dir;
 
 	let mut stack = Stack::new("lambda-test").with_aws_region("us-west-2");
 
@@ -30,7 +33,7 @@ async fn lambda_lifecycle() {
 
 	// 1. deploy v1
 	info!("step 1: deploying v1");
-	deploy(&stack).await.unwrap();
+	deploy(&stack, assets_dir).await.unwrap();
 
 	// 2. verify v1 is live
 	let project = build_project(&stack).unwrap();
@@ -44,10 +47,10 @@ async fn lambda_lifecycle() {
 
 	// 4-5. modify source and assets to v2, deploy again
 	info!("step 4-5: deploying v2");
-	swap_version(&source, MARKER_V1, MARKER_V2).unwrap();
-	swap_version(&assets_file, MARKER_V1, MARKER_V2).unwrap();
+	swap_version(source, MARKER_V1, MARKER_V2).unwrap();
+	swap_version(assets_file, MARKER_V1, MARKER_V2).unwrap();
 	stack = Stack::new("lambda-test").with_aws_region("us-west-2");
-	deploy(&stack).await.unwrap();
+	deploy(&stack, assets_dir).await.unwrap();
 
 	// 6. verify v2
 	let project = build_project(&stack).unwrap();
@@ -103,9 +106,8 @@ async fn lambda_lifecycle() {
 	info!("step 15: verifying dead");
 	verify_dead(&url, 30, 10, 10).await.unwrap();
 
-	// revert source files (guards also handle this)
-	swap_version(&source, MARKER_V2, MARKER_V1).ok();
-	swap_version(&assets_file, MARKER_V2, MARKER_V1).ok();
+	// revert source file (guard handles assets)
+	swap_version(source, MARKER_V2, MARKER_V1).ok();
 }
 
 /// Build the terraform project for the Lambda test stack.
@@ -127,7 +129,7 @@ fn build_project(stack: &Stack) -> Result<terra::Project> {
 
 /// Build, upload artifacts, sync assets, and apply terraform
 /// using the deploy action sequence.
-async fn deploy(stack: &Stack) -> Result {
+async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 	let block = LambdaBlock::default();
 	let cargo = CargoBuild::default()
 		.with_target(BuildTarget::Zigbuild)
@@ -142,7 +144,7 @@ async fn deploy(stack: &Stack) -> Result {
 	let _response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
-			assets_s3_fs_bucket(stack),
+			assets_s3_fs_bucket(stack, assets_dir),
 			assets_bucket_block(),
 			exchange_sequence(),
 			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],

@@ -4,7 +4,7 @@ use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
 pub const ASSETS_PATH: &str = "examples/infra/assets";
-pub const ASSETS_FILE: &str = "examples/infra/assets/index.html";
+
 pub const MARKER_V1: &str = "test-v1";
 pub const MARKER_V2: &str = "test-v2";
 
@@ -20,15 +20,81 @@ impl Drop for SourceRevert {
 	}
 }
 
+/// Owns isolated temp assets so tests can run in parallel without
+/// interfering via the shared `examples/infra/assets/` directory.
+/// Fields drop in declaration order: source/assets reverts first,
+/// then the temp dir is removed.
+pub struct IsolatedTestGuards {
+	/// Path to the real source file (eg `examples/fargate_test.rs`).
+	pub source: AbsPathBuf,
+	/// Path to `index.html` inside the isolated temp assets dir.
+	pub assets_file: AbsPathBuf,
+	/// Isolated temp assets directory used by `assets_s3_fs_bucket`.
+	pub assets_dir: AbsPathBuf,
+	// reverts first
+	_source_guard: SourceRevert,
+	// reverts second (temp file still alive)
+	_assets_guard: SourceRevert,
+	// deleted last
+	_temp_dir: TempDir,
+}
+
+/// Create isolated test guards: reverts real source on drop and
+/// copies assets into a per-test temp dir to prevent concurrent modifications.
+pub fn setup_isolated_test_guards(
+	source_path: &str,
+) -> Result<IsolatedTestGuards> {
+	// real source file guard
+	let source = AbsPathBuf::new_workspace_rel(source_path)?;
+	let original_source = std::fs::read_to_string(source.as_path())?;
+	let source_guard = SourceRevert {
+		path: source.clone(),
+		original: original_source,
+	};
+
+	// isolated temp assets dir
+	let temp_dir = TempDir::new_workspace()?;
+	let src_assets = AbsPathBuf::new_workspace_rel(ASSETS_PATH)?;
+	for entry in std::fs::read_dir(src_assets.as_path())? {
+		let entry = entry?;
+		if entry.file_type()?.is_file() {
+			std::fs::copy(
+				entry.path(),
+				temp_dir.path().as_path().join(entry.file_name()),
+			)?;
+		}
+	}
+	let assets_dir = temp_dir.path().clone();
+	let assets_file = AbsPathBuf::new(assets_dir.join("index.html"))?;
+	let original_assets = std::fs::read_to_string(&assets_file.as_path())?;
+	let assets_guard = SourceRevert {
+		path: assets_file.clone(),
+		original: original_assets,
+	};
+
+	Ok(IsolatedTestGuards {
+		source,
+		assets_file,
+		assets_dir,
+		_source_guard: source_guard,
+		_assets_guard: assets_guard,
+		_temp_dir: temp_dir,
+	})
+}
+
 /// Create the assets bucket block used across all tests.
 pub fn assets_bucket_block() -> S3BucketBlock {
 	S3BucketBlock::new("assets").with_deploy_versioned(true)
 }
 
 /// Create the S3FsBucket for syncing local assets to S3.
-pub fn assets_s3_fs_bucket(stack: &Stack) -> S3FsBucket {
+/// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
+pub fn assets_s3_fs_bucket(
+	stack: &Stack,
+	assets_dir: &AbsPathBuf,
+) -> S3FsBucket {
 	S3FsBucket::new(
-		FsBucket::new(WsPathBuf::new(ASSETS_PATH)),
+		FsBucket::new(assets_dir.clone()),
 		assets_bucket_block().provider(stack),
 	)
 }
@@ -137,27 +203,7 @@ pub async fn verify_dead(
 	bevybail!("endpoint still reachable after destroy")
 }
 
-/// Setup source guards for test files.
-pub fn setup_source_guards(
-	source_path: &str,
-	assets_file: &str,
-) -> Result<(AbsPathBuf, SourceRevert, AbsPathBuf, SourceRevert)> {
-	let source = AbsPathBuf::new_workspace_rel(source_path)?;
-	let original_source = std::fs::read_to_string(source.as_path())?;
-	let source_guard = SourceRevert {
-		path: source.clone(),
-		original: original_source,
-	};
 
-	let assets = AbsPathBuf::new_workspace_rel(assets_file)?;
-	let original_assets = std::fs::read_to_string(assets.as_path())?;
-	let assets_guard = SourceRevert {
-		path: assets.clone(),
-		original: original_assets,
-	};
-
-	Ok((source, source_guard, assets, assets_guard))
-}
 
 /// Clean up any prior state before test starts.
 /// Terraform should handle all infrastructure cleanup, we only need to clean
