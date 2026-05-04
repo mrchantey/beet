@@ -9,17 +9,6 @@ pub struct TuiRenderContext<'a> {
 	pub buffer: &'a mut Buffer,
 }
 
-fn terminal_size() -> UVec2 {
-	let default_size = UVec2::new(80, 24);
-	cfg_if! {
-		if #[cfg(feature = "crossterm")] {
-			terminal_ext::size().unwrap_or(default_size)
-		}else{
-			default_size
-		}
-	}
-}
-
 impl<'a> TuiRenderContext<'a> {
 	pub fn render_half(
 		query: &StyledNodeQuery,
@@ -29,7 +18,10 @@ impl<'a> TuiRenderContext<'a> {
 		size.y /= 2;
 		Self::render_rect(query, entity, URect::new(0, 0, size.x, size.y))
 	}
-	pub fn render(query: &StyledNodeQuery, entity: Entity) -> Result<Buffer> {
+	pub fn render_full(
+		query: &StyledNodeQuery,
+		entity: Entity,
+	) -> Result<Buffer> {
 		let size = terminal_size();
 		Self::render_rect(query, entity, URect::new(0, 0, size.x, size.y))
 	}
@@ -47,7 +39,7 @@ impl<'a> TuiRenderContext<'a> {
 			rect,
 			buffer: &mut buffer,
 		};
-		render_node(&mut this)?;
+		this.render()?;
 		buffer.xok()
 	}
 	pub fn viewport_size(&self) -> Vec2 {
@@ -62,19 +54,17 @@ impl<'a> TuiRenderContext<'a> {
 		val.max.x *= 2;
 		val
 	}
-}
 
-/// Main entry point for rendering a node and its descendants.
-pub fn render_node(cx: &mut TuiRenderContext) -> Result {
-	// 1. apply box model (margin, border, padding)
-	content_box_layout(cx)?;
-
-	// 2. render flex layout if present
-	flex_layout(cx)?;
-
-	// 3. render text content if present
-	text_layout(cx)?;
-	Ok(())
+	/// Main entry point for rendering a node and its descendants.
+	pub fn render(&mut self) -> Result {
+		// 1. apply box model (margin, border, padding)
+		content_box_layout(self)?;
+		// 2. render flex layout if present
+		flex_layout(self)?;
+		// 3. render text content if present
+		text_layout(self)?;
+		Ok(())
+	}
 }
 
 fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
@@ -97,6 +87,19 @@ fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
 
 	Ok(())
 }
+
+
+fn terminal_size() -> UVec2 {
+	let default_size = UVec2::new(80, 24);
+	cfg_if! {
+		if #[cfg(feature = "crossterm")] {
+			terminal_ext::size().unwrap_or(default_size)
+		}else{
+			default_size
+		}
+	}
+}
+
 
 /// For a given outer rect, create a new rect by moving
 /// inward at all points. Returns the outer rect if subtraction

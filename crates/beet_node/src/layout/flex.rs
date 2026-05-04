@@ -297,7 +297,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 						rect: child_rect,
 						buffer: cx.buffer,
 					};
-					render_node(&mut child_cx)?;
+					child_cx.render()?;
 				}
 			}
 		}
@@ -366,7 +366,7 @@ pub fn flex_layout(cx: &mut TuiRenderContext) -> Result<()> {
 						rect: child_rect,
 						buffer: cx.buffer,
 					};
-					render_node(&mut child_cx)?;
+					child_cx.render()?;
 				}
 			}
 		}
@@ -445,16 +445,46 @@ fn measure_node(
 	available: UVec2,
 	viewport: URect,
 ) -> Result<UVec2> {
-	// if node has flexbox, use flex_measure
-	if node.flexbox.is_some() {
-		return flex_measure(node, available, viewport);
-	}
-	// if node has text, use text_measure
-	if node.value.is_some() {
-		return text_measure(node, available);
-	}
-	// otherwise return zero size
-	UVec2::ZERO.xok()
+	// calculate box model spacing
+	let spacing = if let Some(layout) = node.layout {
+		let viewport_size =
+			Vec2::new(viewport.width() as f32, viewport.height() as f32);
+		let margin = layout.margin.rem_urect(viewport_size);
+		let border = layout.border.rem_urect(viewport_size);
+		let padding = layout.padding.rem_urect(viewport_size);
+
+		// double x values for rem consistency (TUI uses 2:1 aspect ratio)
+		let margin_x = (margin.min.x + margin.max.x) * 2;
+		let margin_y = margin.min.y + margin.max.y;
+		let border_x = (border.min.x + border.max.x) * 2;
+		let border_y = border.min.y + border.max.y;
+		let padding_x = (padding.min.x + padding.max.x) * 2;
+		let padding_y = padding.min.y + padding.max.y;
+
+		UVec2::new(
+			margin_x + border_x + padding_x,
+			margin_y + border_y + padding_y,
+		)
+	} else {
+		UVec2::ZERO
+	};
+
+	// measure content (subtract spacing from available)
+	let content_available = UVec2::new(
+		available.x.saturating_sub(spacing.x),
+		available.y.saturating_sub(spacing.y),
+	);
+
+	let content_size = if node.flexbox.is_some() {
+		flex_measure(node, content_available, viewport)?
+	} else if node.value.is_some() {
+		text_measure(node, content_available)?
+	} else {
+		UVec2::ZERO
+	};
+
+	// add spacing back to content size
+	(content_size + spacing).xok()
 }
 
 fn line_cross_size_for(
