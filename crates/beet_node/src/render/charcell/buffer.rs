@@ -1,6 +1,6 @@
+use crate::style::TextDecoration;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
-use bevy::color::Color;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
@@ -48,16 +48,18 @@ impl Buffer {
 	}
 
 	/// Write text starting at position, wrapping each character into a cell.
-	pub fn write_text(&mut self, pos: UVec2, text: &str, style: VisualStyle) {
+	pub fn write_text(
+		&mut self,
+		pos: UVec2,
+		text: &str,
+		style: impl Clone + Into<CharStyle>,
+	) {
 		for (i, ch) in text.chars().enumerate() {
 			let cell_pos = UVec2::new(pos.x + i as u32, pos.y);
 			if cell_pos.x >= self.rect.max.x {
 				break;
 			}
-			self.set(cell_pos, Cell {
-				symbol: SmolStr::new(ch.to_string()),
-				style: style.clone(),
-			});
+			self.set(cell_pos, Cell::new(ch.to_string(), style.clone()));
 		}
 	}
 
@@ -90,32 +92,41 @@ impl Buffer {
 
 
 /// A single terminal cell with text and styling.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SetWith)]
 pub struct Cell {
 	pub symbol: SmolStr,
-	pub style: VisualStyle,
+	#[set_with(into)]
+	pub style: CharStyle,
 }
 
 impl Cell {
-	pub fn new(symbol: impl Into<SmolStr>) -> Self {
+	pub fn new(
+		symbol: impl Into<SmolStr>,
+		style: impl Into<CharStyle>,
+	) -> Self {
 		Self {
 			symbol: symbol.into(),
-			style: VisualStyle::default(),
+			style: style.into(),
 		}
 	}
+}
 
-	pub fn with_style(mut self, style: VisualStyle) -> Self {
-		self.style = style;
-		self
-	}
+#[derive(Debug, Default, Clone, PartialEq, SetWith)]
+pub struct CharStyle {
+	/// In ansi renderers an alpha channel of <50% will apply the `dim` attributes
+	pub foreground: Option<Color>,
+	pub background: Option<Color>,
+	pub decoration_color: Option<Color>,
+	pub decoration_line: Vec<TextDecoration>,
+}
 
-	pub fn with_fg(mut self, color: Color) -> Self {
-		self.style.foreground = Some(color);
-		self
-	}
-
-	pub fn with_bg(mut self, color: Color) -> Self {
-		self.style.background = Some(color);
-		self
+impl From<VisualStyle> for CharStyle {
+	fn from(style: VisualStyle) -> Self {
+		Self {
+			foreground: style.foreground,
+			background: style.background,
+			decoration_color: style.decoration_color,
+			decoration_line: style.decoration_line,
+		}
 	}
 }

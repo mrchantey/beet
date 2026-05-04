@@ -83,6 +83,18 @@ pub struct LayoutStyle {
 	pub text_align: TextAlign,
 }
 
+impl LayoutStyle {
+	pub const DEFAULT: Self = Self {
+		flex_order: 0,
+		flex_grow: 0,
+		align_self: AlignSelf::Auto,
+		padding: Spacing::DEFAULT,
+		margin: Spacing::DEFAULT,
+		border: Spacing::DEFAULT,
+		text_align: TextAlign::Left,
+	};
+}
+
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 pub enum JustifyContent {

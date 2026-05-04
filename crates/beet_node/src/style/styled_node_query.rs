@@ -15,6 +15,15 @@ pub struct StyledNodeView<'a> {
 }
 
 
+impl<'a> StyledNodeView<'a> {
+	pub fn visual_style(&self) -> &VisualStyle {
+		self.visual.unwrap_or(&VisualStyle::DEFAULT)
+	}
+	pub fn layout_style(&self) -> &LayoutStyle {
+		self.layout.unwrap_or(&LayoutStyle::DEFAULT)
+	}
+}
+
 #[derive(SystemParam)]
 pub struct StyledNodeQuery<'w, 's> {
 	elements: ElementQuery<'w, 's>,

@@ -6,9 +6,11 @@ use beet_core::prelude::*;
 /// Visual styling for a cell.
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct VisualStyle {
+	/// In ansi renderers an alpha channel of <50% will apply the `dim` attributes
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
-	pub underline: Option<Color>,
+	pub decoration_color: Option<Color>,
+	pub decoration_line: Vec<TextDecoration>,
 	pub border_left: Option<Color>,
 	pub border_right: Option<Color>,
 	pub border_top: Option<Color>,
@@ -19,7 +21,8 @@ impl VisualStyle {
 	pub const DEFAULT: Self = Self {
 		foreground: None,
 		background: None,
-		underline: None,
+		decoration_color: None,
+		decoration_line: Vec::new(),
 		border_left: None,
 		border_right: None,
 		border_top: None,
@@ -33,6 +36,23 @@ impl VisualStyle {
 		self.border_bottom = color;
 		self
 	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TextDecoration {
+	/// `text-decoration: underline`
+	Underline,
+	/// `text-decoration: underline double`
+	UnderlineDouble,
+	/// `text-decoration: underline wavy`
+	UnderlineWavy,
+	/// `text-decoration: underline dashed`
+	UnderlinDash,
+	/// `text-decoration: overline`
+	Overline,
+	/// `text-decoration: line-through`
+	LineThrough,
 }
 
 impl AsCssValue for f32 {

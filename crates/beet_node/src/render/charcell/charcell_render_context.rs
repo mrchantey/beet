@@ -2,13 +2,12 @@ use crate::prelude::*;
 use crate::style::Spacing;
 use crate::style::StyledNodeQuery;
 use crate::style::StyledNodeView;
-use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::Vec2;
 
 /// Rendering context passed through the node tree during a TUI render pass.
 pub struct CharcellRenderContext<'a> {
-	pub(super) node: &'a StyledNodeView<'a>,
+	pub(super) node: StyledNodeView<'a>,
 	/// Terminal viewport used for rem-unit calculations.
 	pub(super) viewport: URect,
 	/// The rect allocated by the parent (or the root rect for the root node).
@@ -22,13 +21,13 @@ impl<'a> CharcellRenderContext<'a> {
 	/// Construct a context for a child node inside `containing_block`.
 	///
 	/// Computes `content_rect` from the node's box model immediately.
-	pub(super) fn for_child(
-		node: &'a StyledNodeView<'a>,
+	pub(super) fn new(
+		node: StyledNodeView<'a>,
 		viewport: URect,
 		containing_block: URect,
 		buffer: &'a mut Buffer,
 	) -> Self {
-		let box_model = BoxModel::from_node(node, viewport);
+		let box_model = BoxModel::from_node(&node, viewport);
 		let content_rect = box_model.content_rect(containing_block);
 		Self {
 			node,
@@ -66,19 +65,18 @@ impl<'a> CharcellRenderContext<'a> {
 	) -> Result<Buffer> {
 		let mut buffer = Buffer::new(rect);
 		let node = query.get_view(entity);
-		let mut cx =
-			CharcellRenderContext::for_child(&node, rect, rect, &mut buffer);
+		let mut cx = CharcellRenderContext::new(node, rect, rect, &mut buffer);
 		cx.render()?;
 		buffer.xok()
 	}
 
 	/// Main entry point — draws border, then delegates to flex and text layout.
 	pub fn render(&mut self) -> Result {
-		let box_model = BoxModel::from_node(self.node, self.viewport);
+		let box_model = BoxModel::from_node(&self.node, self.viewport);
 
 		// 1. draw border if the node has one
 		if box_model.has_border {
-			let style = self.node.visual.unwrap_or(&VisualStyle::DEFAULT);
+			let style = self.node.visual_style();
 			super::draw_border(
 				self.buffer,
 				box_model.border_rect(self.containing_block),

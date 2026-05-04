@@ -190,7 +190,7 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 				}
 
 				let final_sizes = apply_flex_grow(
-					cx.node,
+					&cx.node,
 					flexbox,
 					line,
 					cx.content_rect.width(),
@@ -226,8 +226,8 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 					);
 
 					// render child
-					CharcellRenderContext::for_child(
-						&child_node,
+					CharcellRenderContext::new(
+						child_node.clone(),
 						cx.viewport,
 						child_rect,
 						cx.buffer,
@@ -261,7 +261,7 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 				}
 
 				let final_sizes = apply_flex_grow(
-					cx.node,
+					&cx.node,
 					flexbox,
 					line,
 					cx.content_rect.height(),
@@ -296,8 +296,8 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 					);
 
 					// render child
-					CharcellRenderContext::for_child(
-						&child_node,
+					CharcellRenderContext::new(
+						child_node.clone(),
 						cx.viewport,
 						child_rect,
 						cx.buffer,
