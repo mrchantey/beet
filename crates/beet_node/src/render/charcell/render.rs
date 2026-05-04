@@ -21,6 +21,11 @@ impl Default for RenderCharcell {
 
 impl RenderCharcell {
 	pub fn new(viewport: URect) -> Self { Self { viewport } }
+	pub fn new_size(width: u32, height: u32) -> Self {
+		Self {
+			viewport: URect::new(0, 0, width, height),
+		}
+	}
 
 	/// Half the viewport height for an easier read when testing
 	pub fn halved(mut self) -> Self {

@@ -111,14 +111,12 @@ fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use bevy::math::URect;
 
 	/// Render a bundle into a 10×5 buffer and return the plain trimmed output
 	/// with spaces replaced by `+` for readable diffs.
 	fn render(bundle: impl Bundle) -> String {
 		// adjust if needed
-		let viewport = URect::new(0, 0, 10, 1);
-		RenderCharcell::new(viewport)
+		RenderCharcell::new_size(10, 1)
 			.render_oneshot(bundle)
 			.unwrap()
 			.render()

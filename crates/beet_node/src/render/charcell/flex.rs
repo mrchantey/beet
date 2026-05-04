@@ -678,8 +678,7 @@ mod tests {
 
 	fn render(bundle: impl Bundle) -> String {
 		// adjust if needed
-		let viewport = URect::new(0, 0, 40, 20);
-		RenderCharcell::new(viewport)
+		RenderCharcell::new_size(40, 20)
 			.render_oneshot(bundle)
 			.unwrap()
 			.render()

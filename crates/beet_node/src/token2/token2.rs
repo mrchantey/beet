@@ -1,13 +1,25 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub struct TokenSet(HashSet<Token2>);
+
+impl TokenSet {
+	pub fn new(items: impl IntoIterator<Item = Token2>) -> Self {
+		Self(items.into_iter().collect())
+	}
+}
+
+
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, SetWith, Get,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token2 {
 	key: Token2Key,
-	schema: Token2Key,
+	schema: Token2Schema,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Get)]
@@ -35,45 +47,8 @@ pub enum Token2Key {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Token2Schema {
-	ModulePath(SmolStr),
+	/// The schema is a bevy [`TypePath`] to a concrete rust type, with `::` delimiters
+	RustType(SmolStr),
+	/// The schema is a url
 	Url(SmolStr),
 }
-
-
-
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-#[relationship(relationship_target = Tokens)]
-pub struct TokenOf(Entity);
-
-impl TokenOf {
-	pub fn new(value: Entity) -> Self { Self(value) }
-}
-
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[relationship_target(relationship = TokenOf,linked_spawn)]
-pub struct Tokens(Vec<Entity>);
