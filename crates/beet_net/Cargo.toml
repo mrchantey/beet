@@ -60,7 +60,8 @@ native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",
 	"async-tungstenite?/async-native-tls",
-	"dep:async-native-tls"
+	"dep:async-native-tls",
+	"russh?/ring",
 ]
 rustls-tls = [
 	"reqwest?/rustls-tls",
@@ -70,18 +71,23 @@ rustls-tls = [
 	"aws-sdk-s3?/rustls",
 	"dep:futures-rustls",
 	"dep:webpki-roots",
+	"russh?/aws-lc-rs",
 ]
 bevy_scene = ["beet_core/bevy_scene"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 russh_server = [
 	"dep:russh",
+	"russh?/ring",
+	"beet_core/tokio",
 	"dep:tokio",
 	"dep:rand",
 	"server",
 ]
 russh_client = [
 	"dep:russh",
+	"russh?/ring",
+	"beet_core/tokio",
 	"dep:tokio",
 ]
 

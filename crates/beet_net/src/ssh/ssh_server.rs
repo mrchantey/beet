@@ -1,34 +1,63 @@
-use crate::ssh::*;
 use beet_core::prelude::*;
 
 /// Plugin for running bevy SSH servers.
-pub struct SshServerPlugin {}
-
-impl SshServerPlugin {}
-
-impl Default for SshServerPlugin {
-	fn default() -> Self { Self {} }
-}
+#[derive(Default)]
+pub struct SshServerPlugin;
 
 impl Plugin for SshServerPlugin {
 	fn build(&self, app: &mut App) { app.init_plugin::<AsyncPlugin>(); }
 }
 
+/// Optional username/password credentials for an SSH server.
+///
+/// If set on [`SshServer`], only clients matching both fields are accepted.
+/// If absent, all authentication attempts are accepted.
+#[derive(Debug, Clone)]
+pub struct SshCredentials {
+	/// The required username.
+	pub username: String,
+	/// The required password.
+	pub password: String,
+}
+
+impl SshCredentials {
+	/// Creates new credentials from username and password.
+	pub fn new(
+		username: impl Into<String>,
+		password: impl Into<String>,
+	) -> Self {
+		Self {
+			username: username.into(),
+			password: password.into(),
+		}
+	}
+}
+
 /// An SSH server that accepts incoming connections.
 ///
-/// Each accepted connection spawns a child entity with an [`SshConnection`]
-/// component for bidirectional data exchange.
+/// Each accepted connection spawns a child entity with [`SshPeerInfo`] and
+/// bidirectional [`SshDataSend`]/[`SshDataRecv`] event flow.
 #[derive(Clone, Component)]
 #[component(on_add = on_ssh_server_add)]
 pub struct SshServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
+	/// Optional credentials. If `None`, all connections are accepted.
+	pub credentials: Option<SshCredentials>,
 }
 
 impl std::fmt::Debug for SshServer {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("SshServer")
 			.field("port", &self.port)
+			.field(
+				"credentials",
+				if self.credentials.is_some() {
+					&"Some(..)"
+				} else {
+					&"None"
+				},
+			)
 			.finish()
 	}
 }
@@ -37,18 +66,36 @@ impl std::fmt::Debug for SshServer {
 fn on_ssh_server_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(test)]
 	return;
-	#[cfg(all(feature = "russh_server", not(target_arch = "wasm32")))]
-	world
-		.commands()
-		.entity(cx.entity)
-		.queue_async(super::impl_russh_server::start_russh_server);
-	#[cfg(not(all(feature = "russh_server", not(target_arch = "wasm32"))))]
-	panic!("SSH server requires 'russh_server' feature");
+	cfg_if! {
+		if #[cfg(all(feature = "russh_server", not(target_arch = "wasm32")))] {
+			world
+				.commands()
+				.entity(cx.entity)
+				.queue_async(super::impl_russh_server::start_russh_server);
+		} else {
+			panic!("SSH server requires the 'russh_server' feature on non-wasm32 targets");
+		}
+	}
 }
 
 impl SshServer {
 	/// Creates a new SSH server bound to the specified port.
-	pub fn new(port: u16) -> Self { Self { port: Some(port) } }
+	pub fn new(port: u16) -> Self {
+		Self {
+			port: Some(port),
+			credentials: None,
+		}
+	}
+
+	/// Sets the required credentials for this server.
+	pub fn with_credentials(
+		mut self,
+		username: impl Into<String>,
+		password: impl Into<String>,
+	) -> Self {
+		self.credentials = Some(SshCredentials::new(username, password));
+		self
+	}
 
 	/// Creates a new server with an OS-assigned port for testing.
 	///
@@ -64,7 +111,10 @@ impl SshServer {
 			.expect("failed to bind test SSH server");
 		let port = listener.local_addr().unwrap().port();
 		(
-			Self { port: Some(port) },
+			Self {
+				port: Some(port),
+				credentials: None,
+			},
 			OnSpawn::new_async(move |entity| {
 				super::impl_russh_server::start_russh_server_with_tcp(
 					entity, listener,
@@ -84,50 +134,22 @@ impl Default for SshServer {
 	fn default() -> Self { Self::new(2222) }
 }
 
-/// Bidirectional channel connecting the server to a single SSH client session.
-#[derive(BundleEffect)]
-pub struct SshConnection {
-	pub(crate) to_client: async_channel::Sender<SshData>,
-	pub(crate) from_client: async_channel::Receiver<SshData>,
-}
-
-impl SshConnection {
-	fn effect(self, entity: &mut EntityWorldMut) {
-		let to_client = self.to_client.clone();
-		let from_client = self.from_client;
-
-		entity
-			.observe_any(
-				move |ev: On<SshDataSend>,
-				      mut commands: AsyncCommands|
-				      -> Result {
-					let to_client = to_client.clone();
-					let data = ev.event().clone();
-					commands.run_local(async move |_| {
-						// forward data to client channel
-						to_client
-							.send(data.take())
-							.await
-							.unwrap_or_else(|err| error!("{:?}", err));
-					});
-					Ok(())
-				},
-			)
-			.run_async_local(async move |entity| {
-				while let Ok(data) = from_client.recv().await {
-					entity.trigger_target_then(SshDataRecv(data)).await;
-				}
-				entity.trigger_target_then(SshClientDisconnected).await;
-			});
-	}
-}
-
-/// Triggered on the server entity when a new SSH client opens a session.
+/// Triggered when a new SSH client opens a session.
+///
+/// Propagates from the connection (child) entity up to the server entity,
+/// so observers on the server receive it with `ev.original_target()` pointing
+/// to the connection entity.
 #[derive(EntityTargetEvent)]
+#[event(auto_propagate)]
 pub struct SshClientConnected;
 
-/// Triggered on a connection entity when the SSH client disconnects.
+/// Triggered when the SSH client disconnects.
+///
+/// Propagates from the connection (child) entity up to the server entity,
+/// so observers on the server receive it with `ev.original_target()` pointing
+/// to the connection entity.
 #[derive(EntityTargetEvent)]
+#[event(auto_propagate)]
 pub struct SshClientDisconnected;
 
 #[cfg(test)]
@@ -138,6 +160,7 @@ pub struct SshClientDisconnected;
 ))]
 mod tests {
 	use super::*;
+	use crate::ssh::*;
 
 	/// Verifies that a client can connect and data flows bidirectionally.
 	#[beet_core::test]
@@ -150,7 +173,7 @@ mod tests {
 		// start the bevy app with an echo server
 		std::thread::spawn(move || {
 			let mut app = App::new();
-			app.add_plugins((MinimalPlugins, SshServerPlugin::default()));
+			app.add_plugins((MinimalPlugins, SshServerPlugin));
 			app.world_mut().spawn(server).observe_any(
 				|ev: On<SshDataRecv>, mut commands: Commands| {
 					if let Some(text) = ev.event().inner().as_str() {
@@ -170,7 +193,6 @@ mod tests {
 		time_ext::sleep_millis(300).await;
 
 		let store_inner = store_clone.clone();
-		// use insert_on_connect so observers are set up before SshSessionReady fires
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
 		app.world_mut()
@@ -189,5 +211,27 @@ mod tests {
 		app.run();
 
 		store.get().as_deref().xpect_eq(Some("echo:hello"));
+	}
+
+	/// Verifies that optional credentials are enforced.
+	#[beet_core::test]
+	async fn server_rejects_bad_credentials() {
+		let (server, on_spawn) = SshServer::new_test();
+		let server = server.with_credentials("admin", "secret");
+		let addr = server.local_address();
+
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, SshServerPlugin));
+			app.world_mut().spawn((server, on_spawn));
+			app.run();
+		});
+
+		time_ext::sleep_millis(300).await;
+
+		// wrong password — should fail
+		let result =
+			SshSession::connect_raw(&addr, Some("admin"), Some("wrong")).await;
+		result.xpect_err();
 	}
 }

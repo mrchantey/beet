@@ -1,21 +1,18 @@
 //! SSH client example
 //!
-//! Demonstrates connecting to an SSH server and sending/receiving data.
+//! Connects to the ssh_server example, sends a shell command, and prints the response.
 //!
 //! Make sure the server is running first:
 //! ```sh
 //! cargo run --example ssh_server --features ssh_server
 //! ```
-//!
-//! Run with:
+//! Then run:
 //! ```sh
 //! cargo run --example ssh_client --features ssh_client
 //! ```
 
 use beet::net::prelude::*;
 use beet::prelude::*;
-
-const MESSAGES: &[&str] = &["hello from beet", "second message", "goodbye"];
 
 fn main() {
 	App::new()
@@ -24,60 +21,37 @@ fn main() {
 			LogPlugin::default(),
 			AsyncPlugin::default(),
 		))
-		.insert_resource(MessageIndex(0))
 		.spawn_then((
 			SshSession::insert_on_connect("127.0.0.1:2222", "guest", "beet"),
 			OnSpawn::observe(on_ready),
 			OnSpawn::observe(on_recv),
 		))
 		.run();
-	info!("Done");
 }
 
-/// Tracks which message we're sending next.
-#[derive(Resource)]
-struct MessageIndex(usize);
-
-/// Sends the first message once the session is connected.
-fn on_ready(
-	ev: On<SshSessionReady>,
-	mut commands: Commands,
-	mut idx: ResMut<MessageIndex>,
-) {
-	info!("SSH session ready, sending messages…");
-	if let Some(msg) = MESSAGES.get(idx.0) {
-		commands
-			.entity(ev.target())
-			.trigger_target(SshDataSend(SshData::text(*msg)));
-		idx.0 += 1;
-	}
+/// Sends a shell command once the session is connected.
+fn on_ready(ev: On<SshSessionReady>, mut commands: Commands) {
+	info!("SSH session ready, sending command…");
+	commands
+		.entity(ev.target())
+		.trigger_target(SshDataSend(SshData::text("echo hello from beet\n")));
 }
 
-/// Logs responses and sends the next message in sequence, then exits.
-fn on_recv(
-	ev: On<SshDataRecv>,
-	mut commands: Commands,
-	mut idx: ResMut<MessageIndex>,
-) {
+/// Logs responses and exits after seeing the expected command output.
+fn on_recv(ev: On<SshDataRecv>, mut commands: Commands) {
 	match ev.event().inner() {
 		SshData::Bytes(_) => {
 			if let Some(text) = ev.event().inner().as_str() {
-				info!("Received: {}", text.trim());
-				// send the next queued message
-				if let Some(msg) = MESSAGES.get(idx.0) {
-					commands
-						.entity(ev.target())
-						.trigger_target(SshDataSend(SshData::text(*msg)));
-					idx.0 += 1;
-				} else {
-					// all messages sent and at least one echoed, we're done
-					info!("All messages exchanged, disconnecting.");
+				let trimmed = text.trim();
+				info!("Received: {:?}", trimmed);
+				// Exit once the echo output arrives
+				if trimmed.contains("hello from beet") {
 					commands.write_message(AppExit::Success);
 				}
 			}
 		}
 		SshData::Exit(code) => {
-			info!("Server exit code: {}", code);
+			info!("Session exit code: {}", code);
 			commands.write_message(AppExit::Success);
 		}
 	}

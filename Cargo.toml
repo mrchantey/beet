@@ -167,7 +167,7 @@ async-lock = "3"
 async-process = "2"
 async-task = "4"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
-russh = { version = "0.60", default-features = false, features = ["ring"] }
+russh = { version = "0.60", default-features = false }
 
 #💡 macros
 
@@ -279,8 +279,8 @@ reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
 _pretty_curl = ["net", "node", "ureq", "rustls-tls"]
 _mini_browser = ["_pretty_curl", "tui", "router"]
-ssh_server = ["net", "beet_net?/russh_server"]
-ssh_client = ["net", "beet_net?/russh_client"]
+ssh_server = ["net", "beet_net?/russh_server", "native-tls"]
+ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
 
 
 thread = ["dep:beet_thread","net","action"]

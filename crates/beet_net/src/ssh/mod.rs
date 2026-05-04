@@ -1,26 +1,16 @@
 //! SSH client and server implementations.
 //!
-//! Provides cross-platform SSH support for Bevy applications:
+//! Provides cross-platform SSH support for Bevy applications.
 //!
-//! - **Server**: [`SshServer`] accepts incoming SSH connections, spawning an
-//!   [`SshConnection`] child entity per client session.
-//! - **Client**: [`SshSession::connect`] establishes an outbound SSH session.
+//! - **Server**: [`SshServer`] accepts incoming connections. Each connection
+//!   spawns a child entity with [`SshPeerInfo`] and bidirectional
+//!   [`SshDataSend`]/[`SshDataRecv`] event flow.
+//! - **Client**: [`SshSession::insert_on_connect`] establishes an outbound session.
 //!
 //! ## Features
 //!
 //! - `russh_server` — enables [`SshServer`] on native targets
-//! - `russh_client` — enables [`SshSession::connect`] on native targets
-//!
-//! ## Example
-//!
-//! ```ignore
-//! # use beet_net::ssh::*;
-//! # use beet_core::prelude::*;
-//! # async fn run() -> Result<()> {
-//! let session = SshSession::connect("127.0.0.1:2222", "user", "pass").await?;
-//! # Ok(())
-//! # }
-//! ```
+//! - `russh_client` — enables [`SshSession::insert_on_connect`] on native targets
 mod ssh_data;
 mod ssh_server;
 mod ssh_session;

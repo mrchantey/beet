@@ -8163,6 +8163,7 @@ dependencies = [
  "polyval 0.7.1",
  "rand 0.10.1",
  "rand_core 0.10.1",
+ "ring",
  "rsa",
  "russh-cryptovec",
  "russh-util",

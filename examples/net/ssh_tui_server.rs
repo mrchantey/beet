@@ -102,5 +102,81 @@ fn on_data(
 
 /// Cleans up the connection entity on disconnect.
 fn on_disconnected(ev: On<SshClientDisconnected>, mut commands: Commands) {
-	commands.entity(ev.target()).despawn();
+	// original_target() is the connection entity (event propagated up from child)
+	commands.entity(ev.original_target()).despawn();
+}
+
+#[cfg(test)]
+#[cfg(all(
+	feature = "ssh_server",
+	feature = "ssh_client",
+	not(target_arch = "wasm32")
+))]
+mod tests {
+	use super::*;
+	use beet::net::prelude::*;
+	use beet::prelude::*;
+	use std::time::Duration;
+
+	/// Verifies that pressing '+' increments the TUI counter from 0 to 1.
+	#[test]
+	fn counter_increments() {
+		let (server, on_spawn) = SshServer::new_test();
+		let addr = server.local_address();
+		let store = Store::<Option<String>>::default();
+		let store_clone = store.clone();
+		let initial_received = Store::<bool>::default();
+		let initial_clone = initial_received.clone();
+
+		// Start the TUI server in a background thread.
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, SshServerPlugin::default()));
+			app.world_mut().spawn((
+				server,
+				on_spawn,
+				OnSpawn::observe(on_connected),
+				OnSpawn::observe(on_data),
+				OnSpawn::observe(on_disconnected),
+			));
+			app.run();
+		});
+
+		// Give the server time to start.
+		std::thread::sleep(Duration::from_millis(300));
+
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
+		app.world_mut()
+			.spawn(SshSession::insert_on_connect(&addr, "guest", "beet"))
+			.observe_any(move |ev: On<SshDataRecv>, mut commands: Commands| {
+				match ev.event().inner() {
+					SshData::Bytes(_) => {
+						if let Some(text) = ev.event().inner().as_str() {
+							if !initial_clone.get() && text.contains("Counter:")
+							{
+								// Initial frame received — Counter is now inserted, send '+'.
+								initial_clone.set(true);
+								commands.entity(ev.target()).trigger_target(
+									SshDataSend(SshData::text("+")),
+								);
+							} else if initial_clone.get()
+								&& text.contains("Counter:")
+								&& text.contains("     1")
+							{
+								// Updated frame shows count = 1.
+								store_clone.set(Some(text.to_owned()));
+								commands.write_message(AppExit::Success);
+							}
+						}
+					}
+					SshData::Exit(_) => {
+						commands.write_message(AppExit::Success);
+					}
+				}
+			});
+		app.run();
+
+		store.get().is_some().xpect_true();
+	}
 }

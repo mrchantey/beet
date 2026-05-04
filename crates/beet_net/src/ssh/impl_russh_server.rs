@@ -10,15 +10,14 @@ use russh::server::Session;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Message sent from the russh tokio thread to the beet accept loop.
+/// Info passed from the russh tokio task to the beet accept loop per connection.
 pub(crate) struct NewConnectionInfo {
-	/// Send data to this client from bevy.
 	pub to_client: async_channel::Sender<SshData>,
-	/// Receive data from this client in bevy.
 	pub from_client: async_channel::Receiver<SshData>,
+	pub username: Option<String>,
 }
 
-/// Beet async fn: starts the SSH server and accepts connections.
+/// Beet async fn: binds the SSH server and enters the accept loop.
 pub(crate) async fn start_russh_server(entity: AsyncEntity) -> Result {
 	let addr = entity.get::<SshServer, _>(|s| s.local_address()).await?;
 	let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
@@ -36,47 +35,105 @@ pub(crate) async fn start_russh_server_with_tcp(
 		.local_addr()
 		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-	// channel for russh thread to notify beet of new connections
+	let credentials = entity
+		.get::<SshServer, _>(|s| s.credentials.clone())
+		.await?;
+
 	let (new_conn_tx, new_conn_rx) =
 		async_channel::unbounded::<NewConnectionInfo>();
 
-	// run russh in a dedicated tokio thread
-	std::thread::spawn(move || {
-		let rt = tokio::runtime::Runtime::new()
-			.expect("failed to create tokio runtime for SSH server");
-		rt.block_on(run_russh_server_with_tcp_inner(listener, new_conn_tx));
-	});
+	// Spawn the russh server on the shared tokio runtime (fire-and-forget).
+	async_ext::tokio().spawn(run_russh_server_inner(
+		listener,
+		new_conn_tx,
+		credentials,
+	));
 
 	info!("SSH server listening on {}", addr);
 
-	// beet accept loop: receive connections from the russh thread
+	// Accept loop: receive connections from the russh task and set up entities.
 	loop {
 		match new_conn_rx.recv().await {
 			Ok(info) => {
-				// spawn a child entity per connection
-				entity
-					.spawn_child(SshConnection {
-						to_client: info.to_client,
-						from_client: info.from_client,
-					})
-					.await;
-				entity.trigger_target_then(SshClientConnected).await;
+				// Use fire-and-forget so the accept loop is not blocked.
+				entity.with(move |mut server| {
+					server.run_async_local(|server| {
+						handle_connection(server, info)
+					});
+				});
 			}
-			Err(_) => {
-				// channel closed, server is shutting down
-				break;
-			}
+			Err(_) => break, // channel closed — server shutting down
 		}
 	}
 	Ok(())
 }
 
-/// Runs the russh server inside a tokio runtime (blocks until shutdown).
-async fn run_russh_server_with_tcp_inner(
+/// Spawns child entity with [`SshPeerInfo`] and wires up bidirectional data flow.
+async fn handle_connection(
+	server: AsyncEntity,
+	info: NewConnectionInfo,
+) -> Result {
+	let server_id = server.id();
+	let to_client = info.to_client;
+	let from_client = info.from_client;
+	let username = info.username;
+
+	// Clone for the send observer (the recv loop takes the original).
+	let to_client_obs = to_client.clone();
+
+	// Spawn child entity and return its ID so we can trigger SshClientConnected on it.
+	let child_id = server
+		.world()
+		.with_then(move |world: &mut World| -> Entity {
+			let mut entity_mut =
+				world.spawn((SshPeerInfo { username }, ChildOf(server_id)));
+			let child_id = entity_mut.id();
+			entity_mut
+				.observe_any(
+					move |ev: On<SshDataSend>,
+					      mut commands: AsyncCommands|
+					      -> Result {
+						let to_client = to_client_obs.clone();
+						let data = ev.event().clone();
+						commands.run_local(async move |_| {
+							to_client
+								.send(data.take())
+								.await
+								.unwrap_or_else(|err| error!("{:?}", err));
+						});
+						Ok(())
+					},
+				)
+				.run_async_local(async move |child_entity| {
+					while let Ok(data) = from_client.recv().await {
+						child_entity
+							.trigger_target_then(SshDataRecv(data))
+							.await;
+					}
+					child_entity
+						.trigger_target_then(SshClientDisconnected)
+						.await;
+				});
+			child_id
+		})
+		.await;
+
+	// Trigger SshClientConnected on the child entity — auto_propagate carries it
+	// up to the server entity, so server observers get original_target() == child.
+	server
+		.world()
+		.entity(child_id)
+		.trigger_target_then(SshClientConnected)
+		.await;
+	Ok(())
+}
+
+/// Runs the russh server loop inside the shared tokio runtime.
+async fn run_russh_server_inner(
 	listener: std::net::TcpListener,
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
+	credentials: Option<SshCredentials>,
 ) {
-	// generate ephemeral host key
 	let host_key = russh::keys::PrivateKey::random(
 		&mut rand::rng(),
 		russh::keys::Algorithm::Ed25519,
@@ -91,16 +148,17 @@ async fn run_russh_server_with_tcp_inner(
 		..Default::default()
 	});
 
-	let tokio_listener = {
-		// tokio requires the socket to be in non-blocking mode
-		listener
-			.set_nonblocking(true)
-			.expect("failed to set non-blocking mode");
-		tokio::net::TcpListener::from_std(listener)
-			.expect("failed to convert listener to tokio")
-	};
+	// tokio requires the socket to be in non-blocking mode
+	listener
+		.set_nonblocking(true)
+		.expect("failed to set non-blocking mode");
+	let tokio_listener = tokio::net::TcpListener::from_std(listener)
+		.expect("failed to convert listener to tokio");
 
-	let mut app = BeetSshApp { new_conn_tx, id: 0 };
+	let mut app = BeetSshApp {
+		new_conn_tx,
+		credentials,
+	};
 	if let Err(err) = app.run_on_socket(config, &tokio_listener).await {
 		error!("SSH server error: {:?}", err);
 	}
@@ -110,7 +168,7 @@ async fn run_russh_server_with_tcp_inner(
 #[derive(Clone)]
 struct BeetSshApp {
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
-	id: usize,
+	credentials: Option<SshCredentials>,
 }
 
 impl RusshServer for BeetSshApp {
@@ -120,27 +178,36 @@ impl RusshServer for BeetSshApp {
 		&mut self,
 		_addr: Option<std::net::SocketAddr>,
 	) -> BeetSshHandler {
-		let handler = BeetSshHandler {
+		BeetSshHandler {
 			new_conn_tx: self.new_conn_tx.clone(),
+			credentials: self.credentials.clone(),
+			authenticated_user: None,
 			from_client_tx: None,
 			channel_id: None,
-		};
-		self.id += 1;
-		handler
+		}
 	}
 
 	fn handle_session_error(
 		&mut self,
 		error: <Self::Handler as russh::server::Handler>::Error,
 	) {
-		error!("SSH session error: {:?}", error);
+		// UnexpectedEof is normal when a client disconnects abruptly.
+		match &error {
+			russh::Error::IO(e)
+				if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+			{
+				debug!("SSH client disconnected (eof)");
+			}
+			_ => error!("SSH session error: {:?}", error),
+		}
 	}
 }
 
 /// Per-connection handler state.
 struct BeetSshHandler {
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
-	/// Sends client data to the bevy world.
+	credentials: Option<SshCredentials>,
+	authenticated_user: Option<String>,
 	from_client_tx: Option<async_channel::Sender<SshData>>,
 	channel_id: Option<ChannelId>,
 }
@@ -161,23 +228,22 @@ impl russh::server::Handler for BeetSshHandler {
 		self.from_client_tx = Some(from_client_tx);
 		self.channel_id = Some(channel.id());
 
-		// tokio task: forward bevy → russh client
+		// Forward bevy → SSH client in a dedicated tokio task.
 		let handle = session.handle();
 		let channel_id = channel.id();
 		tokio::spawn(async move {
 			while let Ok(data) = to_client_rx.recv().await {
 				if let SshData::Bytes(bytes) = data {
-					// ignore send errors (client disconnected)
 					handle.data(channel_id, bytes).await.ok();
 				}
 			}
 		});
 
-		// notify beet of this new connection
 		self.new_conn_tx
 			.send(NewConnectionInfo {
 				to_client: to_client_tx,
 				from_client: from_client_rx,
+				username: self.authenticated_user.clone(),
 			})
 			.await
 			.map_err(|_| russh::Error::Disconnect)?;
@@ -190,15 +256,35 @@ impl russh::server::Handler for BeetSshHandler {
 		_user: &str,
 		_key: &russh::keys::ssh_key::PublicKey,
 	) -> std::result::Result<Auth, Self::Error> {
-		Ok(Auth::Accept)
+		// Accept public key auth only when no password credentials are required.
+		if self.credentials.is_none() {
+			Ok(Auth::Accept)
+		} else {
+			Ok(Auth::Reject {
+				proceed_with_methods: None,
+				partial_success: false,
+			})
+		}
 	}
 
 	async fn auth_password(
 		&mut self,
-		_user: &str,
-		_password: &str,
+		user: &str,
+		password: &str,
 	) -> std::result::Result<Auth, Self::Error> {
-		Ok(Auth::Accept)
+		let accepted = match &self.credentials {
+			None => true,
+			Some(creds) => creds.username == user && creds.password == password,
+		};
+		if accepted {
+			self.authenticated_user = Some(user.to_owned());
+			Ok(Auth::Accept)
+		} else {
+			Ok(Auth::Reject {
+				proceed_with_methods: None,
+				partial_success: false,
+			})
+		}
 	}
 
 	async fn data(
@@ -208,7 +294,6 @@ impl russh::server::Handler for BeetSshHandler {
 		_session: &mut Session,
 	) -> std::result::Result<(), Self::Error> {
 		if let Some(tx) = &self.from_client_tx {
-			// forward client data to the bevy world
 			tx.send(SshData::bytes(Bytes::copy_from_slice(data)))
 				.await
 				.ok();

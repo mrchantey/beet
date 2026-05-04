@@ -56,3 +56,10 @@ impl SshDataRecv {
 	/// Returns a reference to the inner [`SshData`].
 	pub fn inner(&self) -> &SshData { &self.0 }
 }
+
+/// Per-connection info inserted on each connection entity when a client opens a session.
+#[derive(Debug, Clone, Component)]
+pub struct SshPeerInfo {
+	/// The username supplied during authentication, if any.
+	pub username: Option<String>,
+}
