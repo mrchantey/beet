@@ -51,7 +51,7 @@ impl Rule {
 	where
 		T: Typed + Serialize,
 	{
-		let key = Token::new_inline(TokenKey::of::<T>());
+		let key = Token::new_inline(TokenSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 	pub fn merge_any(mut self, other: Self) -> Self {

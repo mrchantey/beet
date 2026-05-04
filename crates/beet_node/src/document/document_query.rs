@@ -88,21 +88,11 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 
 	pub fn get_token(&self, entity: Entity, token: &Token) -> Result<&Value> {
 		let key = token.key().clone().xinto::<FieldPath>();
-		match token.document() {
-			DocumentPath::Root => self
-				.ancestors
-				.root_ancestor(entity)
-				.xmap(|entity| self.try_get_field(entity, &key))?,
-			DocumentPath::Ancestor => self
-				.ancestors
-				.iter_ancestors_inclusive(entity)
-				.xtry_find_map(|entity| self.try_get_field(entity, &key))?,
-			DocumentPath::Entity(entity) => {
-				self.try_get_field(*entity, &key)?
-			}
-			DocumentPath::This => self.try_get_field(entity, &key)?,
-		}
-		.xok()
+		// Traverse ancestors to find the token value
+		self.ancestors
+			.iter_ancestors_inclusive(entity)
+			.xtry_find_map(|entity| self.try_get_field(entity, &key))?
+			.xok()
 	}
 
 	/// Execute a function with a mutable reference to a field.

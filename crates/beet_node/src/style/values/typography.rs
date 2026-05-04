@@ -6,7 +6,6 @@ use std::sync::LazyLock;
 css_property!(
 	TypographyProps,
 	Typography,
-	DocumentPath::Ancestor,
 	"font-family",
 	"font-weight",
 	"font-size",

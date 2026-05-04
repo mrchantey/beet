@@ -13,13 +13,22 @@ pub struct CssToken {
 
 impl CssToken {
 	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
-		let mut this = Self::default().with_predicate(rule.predicate().clone());
-
+		// Collect all declarations under the rule's predicate, ignoring inner predicates
+		let predicate = rule.predicate().clone();
+		let mut declarations = HashMap::default();
 		for (key, value) in rule.declarations().iter() {
-			let css_rule = Self::resolve(token_map, key, value)?;
-			this.merge_any(css_rule);
+			let css_token = Self::resolve(token_map, key, value)?;
+			declarations.extend(css_token.into_declarations());
 		}
-		this.xok()
+		Self::default()
+			.with_predicate(predicate)
+			.with_declarations(declarations)
+			.xok()
+	}
+
+	/// Consumes this token, returning its declarations map.
+	pub fn into_declarations(self) -> HashMap<CssKey, CssValue> {
+		self.declarations
 	}
 
 	pub fn merge_any(&mut self, other: CssToken) {
@@ -29,12 +38,23 @@ impl CssToken {
 
 	pub fn resolve(
 		css_map: &CssTokenMap,
-		_key: &TokenKey,
+		key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Self> {
-		// todo key or schema?
-		let schema = value.schema();
-		css_map.get(schema)?.as_css_token(&value)
+		// Special-case Rule: deserialize and build CSS recursively
+		if value.schema() == &TokenSchema::of::<Rule>() {
+			let rule: Rule = match value {
+				TokenValue::Value(tv) => tv.value().clone().into_serde()?,
+				TokenValue::Token(_) => bevybail!("Expected Rule value"),
+			};
+			return Self::from_rule(css_map, &rule);
+		}
+		// Named tokens: look up by key; anonymous (inline) tokens: fall back to schema
+		let schema_key = value.schema().as_token_key();
+		match css_map.get(key) {
+			Ok(resolver) => resolver.as_css_token(value),
+			Err(_) => css_map.get(&schema_key)?.as_css_token(value),
+		}
 	}
 
 	/// Used in CssToken declarations section.
@@ -210,10 +230,15 @@ impl CssTokenMap {
 }
 
 impl TypeAsCssToken for Rule {
-	fn as_css_token(_value: &TokenValue) -> Result<CssToken> { todo!("") }
+	fn as_css_token(_value: &TokenValue) -> Result<CssToken> {
+		// Rules are handled by CssToken::resolve before reaching here
+		unimplemented!("Rule CSS generation goes through CssToken::resolve")
+	}
 }
 impl TypeAsCssToken for TokenStore {
-	fn as_css_token(_value: &TokenValue) -> Result<CssToken> { todo!("") }
+	fn as_css_token(_value: &TokenValue) -> Result<CssToken> {
+		unimplemented!("TokenStore CSS generation not yet implemented")
+	}
 }
 
 
@@ -223,14 +248,12 @@ macro_rules! css_property {
   $(#[$meta:meta])*
   $new_ty:ident,
   $schema_ty:ident,
-  $doc_path: expr,
   $($property: expr),+
  ) => {
   $crate::token!(
    $(#[$meta])*
    $new_ty,
-   $schema_ty,
-   $doc_path
+   $schema_ty
   );
   impl $crate::prelude::style::AsCssToken for $new_ty {
    fn as_css_token(
@@ -252,35 +275,21 @@ macro_rules! css_variable {
  (
   $(#[$meta:meta])*
   $new_ty:ident,
-  $schema_ty:ident,
-  $doc_path: expr
+  $schema_ty:ident
  ) => {
   $crate::token!(
    $(#[$meta])*
    $new_ty,
-   $schema_ty,
-   $doc_path
+   $schema_ty
   );
   impl $crate::prelude::style::AsCssToken for $new_ty {
    fn as_css_token(
-   	&self,
+    &self,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<$crate::prelude::style::CssToken> {
-   	$crate::prelude::style::CssToken::from_key_value::<$schema_ty>(&$new_ty::token_key(),value)
-	 }
+    $crate::prelude::style::CssToken::from_key_value::<$schema_ty>(&$new_ty::token_key(), value)
+   }
   }
- };
- (
-  $(#[$meta:meta])*
-  $new_ty:ident,
-  $schema_ty:ident
- ) => {
-  $crate::css_variable!(
-   $(#[$meta])*
-   $new_ty,
-   $schema_ty,
-   $crate::prelude::DocumentPath::default()
-  );
  };
 }
 
@@ -291,14 +300,12 @@ mod tests {
 		#[allow(unused)]
 		Foo,
 		Color,
-		DocumentPath::Ancestor,
 		"color"
 	);
 	css_variable!(
 		#[allow(unused)]
 		Bar,
-		Color,
-		DocumentPath::Ancestor
+		Color
 	);
 
 	#[test]

@@ -2,13 +2,7 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-css_property!(
-	MotionProps,
-	Motion,
-	DocumentPath::Ancestor,
-	"duration",
-	"timing-function"
-);
+css_property!(MotionProps, Motion, "duration", "timing-function");
 
 
 /// A motion token combining an easing function with a duration token.

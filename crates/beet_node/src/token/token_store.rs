@@ -66,7 +66,7 @@ impl TokenStore {
 	where
 		T: Typed + Serialize,
 	{
-		let key = Token::new_inline(TokenKey::of::<T>());
+		let key = Token::new_inline(TokenSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 	pub fn extend(

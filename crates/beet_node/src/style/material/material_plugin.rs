@@ -73,7 +73,6 @@ mod tests {
 	use super::*;
 
 	#[test]
-	#[ignore = "todo new token system"]
 	fn validate_rules() {
 		let mut world = MaterialStylePlugin::world();
 		let _css = world

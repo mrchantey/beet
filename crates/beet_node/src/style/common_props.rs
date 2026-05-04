@@ -25,30 +25,29 @@ pub fn token_map()->CssTokenMap{
 }
 
 
-css_property!(ForegroundColor, Color, DocumentPath::Ancestor, "color");
-css_property!(BackgroundColor, Color, DocumentPath::This, "background-color");
+css_property!(ForegroundColor, Color, "color");
+css_property!(BackgroundColor, Color, "background-color");
 
+css_property!(Font, Typography, "font-family");
 
-css_property!(Font, Typography, DocumentPath::This, "font-family");
-
-css_property!(Height, Length, DocumentPath::This, "height");
-css_property!(Width, Length, DocumentPath::This, "width");
-css_property!(Padding, Length, DocumentPath::This, "padding");
-css_property!(Spacing, Length, DocumentPath::This, "gap");
+css_property!(Height, Length, "height");
+css_property!(Width, Length, "width");
+css_property!(Padding, Length, "padding");
+css_property!(Spacing, Length, "gap");
 css_property!(
 	/// Shape property token, named to avoid conflict with the [`Shape`] type.
-	ShapeProp, Shape, DocumentPath::This, "border-radius"
+	ShapeProp, Shape, "border-radius"
 );
 css_property!(
 	/// Elevation property token, named to avoid conflict with the [`Elevation`] type.
-	ElevationProp, Elevation, DocumentPath::This, "box-shadow"
+	ElevationProp, Elevation, "box-shadow"
 );
-css_property!(OutlineWidth, Length, DocumentPath::This, "border-width");
-css_property!(OutlineOffset, Length, DocumentPath::This, "outline-offset");
-css_property!(FontSize, Length, DocumentPath::Ancestor, "font-size");
+css_property!(OutlineWidth, Length, "border-width");
+css_property!(OutlineOffset, Length, "outline-offset");
+css_property!(FontSize, Length, "font-size");
 css_property!(
 	/// Font weight property token, named to avoid conflict with the [`FontWeight`] type.
-	FontWeightProp, FontWeight, DocumentPath::Ancestor, "font-weight"
+	FontWeightProp, FontWeight, "font-weight"
 );
-css_property!(LineHeight, Length, DocumentPath::Ancestor, "line-height");
-css_property!(Tracking, Length, DocumentPath::Ancestor, "letter-spacing");
+css_property!(LineHeight, Length, "line-height");
+css_property!(Tracking, Length, "letter-spacing");

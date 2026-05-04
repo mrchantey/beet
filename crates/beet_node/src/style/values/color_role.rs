@@ -2,13 +2,7 @@ use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
 
-css_property!(
-	ColorRoleProps,
-	ColorRole,
-	DocumentPath::Ancestor,
-	"background-color",
-	"color"
-);
+css_property!(ColorRoleProps, ColorRole, "background-color", "color");
 
 
 #[derive(Reflect)]

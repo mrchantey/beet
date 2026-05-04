@@ -170,7 +170,6 @@ impl AsCssValue for Elevation {
 css_property!(
 	ShapeProps,
 	Shape,
-	DocumentPath::Ancestor,
 	"border-top-left-radius",
 	"border-top-right-radius",
 	"border-bottom-right-radius",

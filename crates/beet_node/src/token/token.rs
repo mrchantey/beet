@@ -3,41 +3,29 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 /// A token is like a typed pointer for the application layer.
-/// Its path will store the value of its type in a document.
+/// Its key addresses the value in a store, and schema identifies the value type.
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, SetWith, Get,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token {
-	/// Path to the value for this token
-	/// ie `io.crates/beet_net/style/material/colors/PrimaryColor`
+	/// Unique key for this token, ie `io.crates/beet_net/style/material/colors/Primary`
 	key: TokenKey,
-	/// Path to the token representing the value of this token,
-	/// ie `io.crates/bevy_math/Color`
-	schema: TokenKey,
-	/// The path to the document
-	document: DocumentPath,
+	/// Schema identifying the value type, ie `io.crates/bevy_color/color/Color`
+	schema: TokenSchema,
 }
 
 
 impl Token {
-	pub const fn new(
-		key: TokenKey,
-		schema: TokenKey,
-		document: DocumentPath,
-	) -> Self {
-		Self {
-			key,
-			schema,
-			document,
-		}
+	pub fn new(key: TokenKey, schema: TokenSchema) -> Self {
+		Self { key, schema }
 	}
+
 	#[track_caller]
-	pub fn new_inline(schema: TokenKey) -> Self {
+	pub fn new_inline(schema: TokenSchema) -> Self {
 		Self {
 			key: TokenKey::new_inline(),
 			schema,
-			document: DocumentPath::default(),
 		}
 	}
 }
@@ -53,16 +41,15 @@ impl std::fmt::Display for Token {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedValue {
 	value: Value,
-	/// Path to the token representing the type of this token,
-	/// ie `io.crates/bevy_math/Color`
-	schema: TokenKey,
+	/// Schema identifying the type, ie `io.crates/bevy_color/color/Color`
+	schema: TokenSchema,
 }
 
 impl TypedValue {
 	pub fn new<T: Typed + serde::Serialize>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_serde(&value)?,
-			schema: TokenKey::of::<T>(),
+			schema: TokenSchema::of::<T>(),
 		}
 		.xok()
 	}
@@ -82,7 +69,7 @@ pub enum TokenValue {
 }
 
 impl TokenValue {
-	pub fn schema(&self) -> &TokenKey {
+	pub fn schema(&self) -> &TokenSchema {
 		match self {
 			TokenValue::Value(value) => &value.schema,
 			TokenValue::Token(token) => &token.schema,
@@ -101,6 +88,36 @@ where
 }
 
 
+/// A component holding the set of tokens applied to an element.
+///
+/// Used by non-CSS renderers (like charcell) to resolve styles.
+///
+/// ## Example
+///
+/// ```rust
+/// # use beet_node::prelude::*;
+/// # use beet_core::prelude::*;
+/// // token!(MyToken, Color);
+/// // let set = tokens![MyToken];
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Reflect, Component)]
+#[reflect(Component)]
+pub struct TokenSet(HashSet<Token>);
+
+impl TokenSet {
+	pub fn new(items: impl IntoIterator<Item = Token>) -> Self {
+		Self(items.into_iter().collect())
+	}
+}
+
+/// Creates a [`TokenSet`], calling `.into()` for each item.
+#[macro_export]
+macro_rules! tokens {
+	[$($child:expr),*$(,)?] => {
+		$crate::prelude::TokenSet::new([$($child.into()),*])
+	};
+}
+
 
 #[macro_export]
 macro_rules! token {
@@ -109,18 +126,6 @@ macro_rules! token {
 		$new_ty:ident,
 		$schema_ty:ty
 	) => {
-		token!(
-			$(#[$meta])* $new_ty,
-			$schema_ty,
-			$crate::prelude::DocumentPath::default()
-		);
-	};
-	(
-		$(#[$meta:meta])*
-		$new_ty:ident,
-		$schema_ty:ty,
-		$doc_path: expr
-	) => {
 		#[derive(::bevy::reflect::TypePath)]
 		$(#[$meta])*
 		pub struct $new_ty;
@@ -128,8 +133,7 @@ macro_rules! token {
 			fn into(self) -> $crate::prelude::Token {
 				$crate::prelude::Token::new(
 					$crate::prelude::TokenKey::of::<Self>(),
-					$crate::prelude::TokenKey::of::<$schema_ty>(),
-					$doc_path
+					$crate::prelude::TokenSchema::of::<$schema_ty>(),
 				)
 			}
 		}
@@ -139,6 +143,7 @@ macro_rules! token {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
 	#[test]
 	fn test_name() {
 		Foo.xinto::<Token>()
@@ -148,15 +153,20 @@ mod tests {
 	}
 
 	token!(
-			/// Some cool type
-			#[derive(Debug, Clone)]
-			Foo,
-			Color,
-			DocumentPath::Ancestor
+		/// Some cool type
+		#[derive(Debug, Clone)]
+		Foo,
+		Color
 	);
 	token!(
 		#[allow(unused)]
 		Bar,
 		Color
 	);
+
+	#[test]
+	fn token_set_roundtrip() {
+		let set = tokens![Foo, Bar];
+		set.len().xpect_eq(2);
+	}
 }
