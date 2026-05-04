@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use crate::style::Spacing;
+use crate::style::StyledNodeQuery;
+use crate::style::StyledNodeView;
 use beet_core::prelude::*;
 
 pub struct TuiRenderContext<'a> {
@@ -60,9 +62,9 @@ impl<'a> TuiRenderContext<'a> {
 		// 1. apply box model (margin, border, padding)
 		content_box_layout(self)?;
 		// 2. render flex layout if present
-		flex_layout(self)?;
+		super::flex_layout(self)?;
 		// 3. render text content if present
-		text_layout(self)?;
+		super::text_layout(self)?;
 		Ok(())
 	}
 }
@@ -78,7 +80,7 @@ fn content_box_layout(cx: &mut TuiRenderContext) -> Result {
 	cx.rect = border_rect;
 
 	// 2. border
-	border_layout(cx);
+	super::border_layout(cx);
 
 	// 3. padding
 	let padding = cx.tui_spacing(&layout.padding);

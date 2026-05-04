@@ -3,82 +3,14 @@ use crate::style::AlignContent;
 use crate::style::AlignItems;
 use crate::style::AlignSelf;
 use crate::style::Direction;
+use crate::style::FlexBox;
 use crate::style::FlexWrap;
 use crate::style::JustifyContent;
-use crate::style::LayoutStyle;
+use crate::style::StyledNodeView;
 use beet_core::prelude::*;
-use bevy::ecs::component::Component;
 use bevy::math::URect;
 use bevy::math::UVec2;
 use bevy::prelude::Result;
-
-#[derive(Component)]
-pub struct FlexBox {
-	pub direction: Direction,
-	pub layout_style: LayoutStyle,
-	pub wrap: FlexWrap,
-	pub align_items: AlignItems,
-	pub align_content: AlignContent,
-	pub justify_content: JustifyContent,
-	pub row_gap: u32,
-	pub column_gap: u32,
-}
-
-impl FlexBox {
-	pub fn row() -> Self {
-		Self {
-			layout_style: LayoutStyle::default(),
-			direction: Direction::Horizontal,
-			wrap: FlexWrap::NoWrap,
-			align_items: AlignItems::default(),
-			align_content: AlignContent::default(),
-			justify_content: JustifyContent::default(),
-			row_gap: 0,
-			column_gap: 0,
-		}
-	}
-	pub fn col() -> Self {
-		Self {
-			layout_style: LayoutStyle::default(),
-			direction: Direction::Vertical,
-			wrap: FlexWrap::NoWrap,
-			align_items: AlignItems::default(),
-			align_content: AlignContent::default(),
-			justify_content: JustifyContent::default(),
-			row_gap: 0,
-			column_gap: 0,
-		}
-	}
-	pub fn wrap(mut self, wrap: FlexWrap) -> Self {
-		self.wrap = wrap;
-		self
-	}
-	pub fn align_items(mut self, align: AlignItems) -> Self {
-		self.align_items = align;
-		self
-	}
-	pub fn align_content(mut self, align: AlignContent) -> Self {
-		self.align_content = align;
-		self
-	}
-	pub fn justify_content(mut self, justify: JustifyContent) -> Self {
-		self.justify_content = justify;
-		self
-	}
-	pub fn row_gap(mut self, gap: u32) -> Self {
-		self.row_gap = gap;
-		self
-	}
-	pub fn column_gap(mut self, gap: u32) -> Self {
-		self.column_gap = gap;
-		self
-	}
-	pub fn gap(mut self, gap: u32) -> Self {
-		self.row_gap = gap;
-		self.column_gap = gap;
-		self
-	}
-}
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
@@ -478,7 +410,7 @@ fn measure_node(
 	let content_size = if node.flexbox.is_some() {
 		flex_measure(node, content_available, viewport)?
 	} else if node.value.is_some() {
-		text_measure(node, content_available)?
+		super::text_measure(node, content_available)?
 	} else {
 		UVec2::ZERO
 	};
