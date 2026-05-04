@@ -422,7 +422,7 @@ fn resolve_align(
 		AlignSelf::Center => AlignItems::Center,
 		AlignSelf::End => AlignItems::End,
 		AlignSelf::Stretch => AlignItems::Stretch,
-		AlignSelf::Baseline => todo!(),
+		AlignSelf::Baseline => unimplemented!(),
 	}
 }
 
@@ -437,7 +437,7 @@ fn cross_offset(
 		AlignItems::Start | AlignItems::Stretch => 0,
 		AlignItems::Center => line_cross.saturating_sub(child_cross) / 2,
 		AlignItems::End => line_cross.saturating_sub(child_cross),
-		AlignItems::Baseline => todo!(),
+		AlignItems::Baseline => unimplemented!(),
 	}
 }
 

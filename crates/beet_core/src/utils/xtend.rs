@@ -406,10 +406,14 @@ impl<T> XIntoIterator<Self, T> for T {
 #[extend::ext(name = XResult)]
 pub impl<T, E> Result<T, E> {
 	/// Display Unwrap: Unwraps the `Ok` value or panics with the `Err` value's display representation.
+	#[track_caller]
 	fn xunwrap(self) -> T
 	where
 		E: core::fmt::Display,
 	{
-		self.unwrap_or_else(|e| panic!("Error: {}", e))
+		match self {
+			Ok(val) => val,
+			Err(err) => panic!("Error: {}", err),
+		}
 	}
 }

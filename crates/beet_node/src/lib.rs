@@ -14,7 +14,6 @@ mod render;
 #[cfg(feature = "style")]
 pub mod style;
 mod token;
-mod token2;
 mod types;
 
 /// Exports the most commonly used items.
@@ -31,7 +30,6 @@ pub mod prelude {
 	pub use crate::style;
 	pub use crate::token;
 	pub use crate::token::*;
-	pub use crate::token2::*;
 
 	pub use crate::types::*;
 }

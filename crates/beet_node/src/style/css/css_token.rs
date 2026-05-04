@@ -32,7 +32,7 @@ impl CssToken {
 		_key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Self> {
-		// TODO key or schema?
+		// todo key or schema?
 		let schema = value.schema();
 		css_map.get(schema)?.as_css_token(&value)
 	}
@@ -127,7 +127,6 @@ impl CssToken {
 			}
 			Predicate::State(ElementState::Disabled) => ":disabled".to_string(),
 			Predicate::State(ElementState::Custom(val)) => {
-				// TODO needs design work
 				format!("[data-state-{}]", val)
 			}
 			Predicate::Attribute { key, value } => match value {
