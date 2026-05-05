@@ -1,4 +1,8 @@
-//! Character cell based layout and rendering engine.
+//! ECS Character cell layout and rendering engine.
+//! 
+//! Charcell represents each cell as an entity
+//! 
+//! 
 mod plugin;
 pub use buffer::*;
 pub use plugin::*;

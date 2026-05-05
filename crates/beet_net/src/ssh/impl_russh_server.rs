@@ -18,6 +18,7 @@ pub(crate) struct NewConnectionInfo {
 }
 
 /// Beet async fn: binds the SSH server and enters the accept loop.
+#[allow(unused)]
 pub(crate) async fn start_russh_server(entity: AsyncEntity) -> Result {
 	let addr = entity.get::<SshServer, _>(|s| s.local_address()).await?;
 	let listener = std::net::TcpListener::bind(&addr).map_err(|e| {

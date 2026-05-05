@@ -38,7 +38,7 @@ impl SshCredentials {
 /// Each accepted connection spawns a child entity with [`SshPeerInfo`] and
 /// bidirectional [`SshDataSend`]/[`SshDataRecv`] event flow.
 #[derive(Clone, Component)]
-#[component(on_add = on_ssh_server_add)]
+#[component(on_add = on_add)]
 pub struct SshServer {
 	/// The port to bind to. `None` means the OS will assign a port.
 	pub port: Option<u16>,
@@ -63,7 +63,7 @@ impl std::fmt::Debug for SshServer {
 }
 
 #[allow(unused)]
-fn on_ssh_server_add(mut world: DeferredWorld, cx: HookContext) {
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	cfg_if! {
 		if #[cfg(test)]{
 			return;
