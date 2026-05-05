@@ -5,26 +5,29 @@ use crate::style::StyledNodeView;
 use beet_core::prelude::*;
 use bevy::math::Vec2;
 
-#[derive(Get)]
+#[derive(Get, Deref)]
 pub struct RenderCharcell {
 	viewport: URect,
+	#[deref]
+	buffer: Buffer,
 }
 
 impl Default for RenderCharcell {
 	fn default() -> Self {
 		let size = Self::terminal_size();
-		Self {
-			viewport: URect::new(0, 0, size.x, size.y),
-		}
+		Self::new_size(size.x, size.y)
 	}
 }
 
 impl RenderCharcell {
-	pub fn new(viewport: URect) -> Self { Self { viewport } }
-	pub fn new_size(width: u32, height: u32) -> Self {
+	pub fn new(viewport: URect) -> Self {
 		Self {
-			viewport: URect::new(0, 0, width, height),
+			buffer: Buffer::new(viewport.size()),
+			viewport,
 		}
+	}
+	pub fn new_size(width: u32, height: u32) -> Self {
+		Self::new(URect::new(0, 0, width, height))
 	}
 
 	/// Half the viewport height for an easier read when testing
@@ -35,30 +38,30 @@ impl RenderCharcell {
 
 	/// Render into a buffer bounded by an explicit `rect`.
 	pub fn render_rect(
-		&self,
+		&mut self,
 		query: &StyledNodeQuery,
 		entity: Entity,
-	) -> Result<Buffer> {
-		let mut buffer = Buffer::new(self.viewport.size());
+	) -> Result<&mut Self> {
 		let node = query.get_view(entity);
 		let mut cx = CharcellRenderContext::new(
 			node,
 			self.viewport,
 			self.viewport,
-			&mut buffer,
+			&mut self.buffer,
 		);
 		cx.render()?;
-		buffer.xok()
+		self.xok()
 	}
 
 	/// Create a world, spawn the bundle and render to a buffer
-	pub fn render_oneshot(&self, bundle: impl Bundle) -> Result<Buffer> {
+	pub fn render_oneshot(&mut self, bundle: impl Bundle) -> Result<&mut Self> {
 		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
 			|entity, query| self.render_rect(&query, entity),
 		)
 	}
 
 	fn terminal_size() -> UVec2 {
+		// standard default terminal size
 		let default_size = UVec2::new(80, 24);
 		cfg_if! {
 			if #[cfg(feature = "crossterm")] {

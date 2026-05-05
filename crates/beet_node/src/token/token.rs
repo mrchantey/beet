@@ -46,6 +46,7 @@ pub struct TypedValue {
 }
 
 impl TypedValue {
+	#[cfg(feature = "serde")]
 	pub fn new<T: Typed + serde::Serialize>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_serde(&value)?,
@@ -53,6 +54,7 @@ impl TypedValue {
 		}
 		.xok()
 	}
+	#[cfg(feature = "serde")]
 	pub fn into_typed<T: Typed + serde::de::DeserializeOwned>(
 		&self,
 	) -> Result<T> {

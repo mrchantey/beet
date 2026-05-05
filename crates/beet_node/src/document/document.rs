@@ -32,7 +32,8 @@ impl Document {
 	/// ## Errors
 	///
 	/// Returns an error if serialization conversion fails.
-	pub fn from_reflect<T: serde::Serialize>(value: &T) -> Result<Self> {
+	#[cfg(feature = "serde")]
+	pub fn from_serde<T: serde::Serialize>(value: &T) -> Result<Self> {
 		Value::from_serde(value).map(Self)
 	}
 

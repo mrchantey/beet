@@ -18,7 +18,7 @@ required-features = ["crossterm"]
 
 
 [features]
-default = ["std","net", "html_parser","markdown_parser","ansi_paint", "action", "rsx","style", "json", "serde"]
+default = ["std","ansi_paint", "style"]
 std = []
 action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]
