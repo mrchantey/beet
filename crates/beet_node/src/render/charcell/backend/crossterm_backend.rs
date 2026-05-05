@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use crossterm::ExecutableCommand;
 use crossterm::cursor;
 use crossterm::queue;
 use crossterm::style::Attribute;
@@ -11,19 +12,59 @@ use crossterm::style::SetAttribute;
 use crossterm::style::SetAttributes;
 use crossterm::style::SetColors;
 use crossterm::terminal;
+use crossterm::terminal::EnterAlternateScreen;
+use crossterm::terminal::LeaveAlternateScreen;
+use std::io::Stdout;
 use std::io::Write;
+use std::io::stdout;
 
 /// Terminal backend that writes ANSI escape sequences via crossterm.
+#[derive(Get)]
 pub struct CrosstermBackend<W: Write> {
 	writer: W,
+	// enables AlternateScreen and raw_mode
+	fullscreen: bool,
+}
+
+impl CrosstermBackend<Stdout> {
+	pub fn new_fullscreen() -> Result<Self> { Self::new(stdout(), true) }
+}
+
+
+
+impl Default for CrosstermBackend<Stdout> {
+	fn default() -> Self { Self::new_fullscreen().unwrap() }
+}
+
+impl<W> Drop for CrosstermBackend<W>
+where
+	W: Write,
+{
+	fn drop(&mut self) {
+		if let Err(err) = self.restore() {
+			eprintln!("Failed to restore terminal: {}", err);
+		}
+	}
 }
 
 impl<W: Write> CrosstermBackend<W> {
-	pub fn new(writer: W) -> Self { Self { writer } }
-
-	pub fn writer(&self) -> &W { &self.writer }
-
+	pub fn new(mut writer: W, fullscreen: bool) -> Result<Self> {
+		if fullscreen {
+			writer.execute(EnterAlternateScreen)?;
+			terminal::enable_raw_mode()?;
+		}
+		Self { writer, fullscreen }.xok()
+	}
 	pub fn writer_mut(&mut self) -> &mut W { &mut self.writer }
+	pub fn restore(&mut self) -> Result {
+		if self.fullscreen {
+			self.writer
+				.execute(LeaveAlternateScreen)?
+				.execute(cursor::Show)?;
+			terminal::disable_raw_mode()?;
+		}
+		Ok(())
+	}
 }
 
 impl<W: Write> Backend for CrosstermBackend<W> {

@@ -11,27 +11,44 @@ impl<T: ratatui::backend::Backend> RatatuiBackend<T> {
 }
 
 impl<T: ratatui::backend::Backend> Backend for RatatuiBackend<T> {
-	fn hide_cursor(&mut self) -> Result { self.inner.hide_cursor()?.xok() }
+	fn hide_cursor(&mut self) -> Result {
+		self.inner
+			.hide_cursor()
+			.map_err(|err| err.to_string())?
+			.xok()
+	}
 
-	fn show_cursor(&mut self) -> Result { self.inner.show_cursor()?.xok() }
+	fn show_cursor(&mut self) -> Result {
+		self.inner
+			.show_cursor()
+			.map_err(|err| err.to_string())?
+			.xok()
+	}
 
 	fn get_cursor(&mut self) -> Result<UVec2> {
-		let pos = self.inner.get_cursor_position()?;
+		let pos = self
+			.inner
+			.get_cursor_position()
+			.map_err(|err| err.to_string())?;
 		UVec2::new(pos.x as u32, pos.y as u32).xok()
 	}
 
 	fn set_cursor(&mut self, position: UVec2) -> Result {
-		self.inner.set_cursor_position(ratatui::layout::Position {
-			x: position.x as u16,
-			y: position.y as u16,
-		})?;
+		self.inner
+			.set_cursor_position(ratatui::layout::Position {
+				x: position.x as u16,
+				y: position.y as u16,
+			})
+			.map_err(|err| err.to_string())?;
 		Ok(())
 	}
 
-	fn clear(&mut self) -> Result { self.inner.clear()?.xok() }
+	fn clear(&mut self) -> Result {
+		self.inner.clear().map_err(|err| err.to_string())?.xok()
+	}
 
 	fn window_size(&mut self) -> Result<WindowSize> {
-		let size = self.inner.window_size()?;
+		let size = self.inner.window_size().map_err(|err| err.to_string())?;
 		WindowSize {
 			chars: UVec2::new(
 				size.columns_rows.width as u32,
@@ -58,9 +75,12 @@ impl<T: ratatui::backend::Backend> Backend for RatatuiBackend<T> {
 			}
 		}
 		self.inner
-			.draw(cells.iter().map(|(x, y, cell)| (*x, *y, cell)))?
+			.draw(cells.iter().map(|(x, y, cell)| (*x, *y, cell)))
+			.map_err(|err| err.to_string())?
 			.xok()
 	}
 
-	fn flush(&mut self) -> Result { self.inner.flush()?.xok() }
+	fn flush(&mut self) -> Result {
+		self.inner.flush().map_err(|err| err.to_string())?.xok()
+	}
 }
