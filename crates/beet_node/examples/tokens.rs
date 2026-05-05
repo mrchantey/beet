@@ -5,7 +5,7 @@ use beet_node::*;
 
 
 fn main() {
-	RenderCharcell::new_size(50, 30)
+	CharcellRenderer::new_size(50, 30)
 		.render_oneshot(setup())
 		.unwrap()
 		.render()

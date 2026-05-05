@@ -680,7 +680,7 @@ mod tests {
 
 	fn render(bundle: impl Bundle) -> String {
 		// adjust if needed
-		RenderCharcell::new_size(40, 20)
+		CharcellRenderer::new_size(40, 20)
 			.render_oneshot(bundle)
 			.unwrap()
 			.render()

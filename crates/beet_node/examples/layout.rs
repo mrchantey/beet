@@ -43,7 +43,7 @@ fn main() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn render<B: Bundle>(name: &str, setup: fn() -> B) {
-	let out = RenderCharcell::default()
+	let out = CharcellRenderer::default()
 		.render_oneshot(setup())
 		.unwrap()
 		.render()

@@ -5,12 +5,14 @@
 //!
 mod backend;
 mod plugin;
+mod renderer;
 pub use backend::*;
 pub use buffer::*;
 pub use plugin::*;
+pub use renderer::*;
 mod buffer;
-mod render;
-pub use render::*;
+mod render_context;
+pub use render_context::*;
 mod box_model;
 mod flex;
 mod text;

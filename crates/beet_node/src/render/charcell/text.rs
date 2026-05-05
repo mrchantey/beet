@@ -116,7 +116,7 @@ mod tests {
 	/// with spaces replaced by `+` for readable diffs.
 	fn render(bundle: impl Bundle) -> String {
 		// adjust if needed
-		RenderCharcell::new_size(10, 1)
+		CharcellRenderer::new_size(10, 1)
 			.render_oneshot(bundle)
 			.unwrap()
 			.render()
