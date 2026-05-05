@@ -64,10 +64,11 @@ impl std::fmt::Debug for SshServer {
 
 #[allow(unused)]
 fn on_ssh_server_add(mut world: DeferredWorld, cx: HookContext) {
-	#[cfg(test)]
-	return;
 	cfg_if! {
-		if #[cfg(all(feature = "russh_server", not(target_arch = "wasm32")))] {
+		if #[cfg(test)]{
+			return;
+		}
+		else if #[cfg(all(feature = "russh_server", not(target_arch = "wasm32")))] {
 			world
 				.commands()
 				.entity(cx.entity)

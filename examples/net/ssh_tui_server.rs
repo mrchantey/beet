@@ -63,8 +63,9 @@ fn render_frame(count: i32) -> String {
 		"\x1b[H\x1b[2J{color}\
 		╔═══════════════════════════╗\r\n\
 		║   beet SSH TUI demo       ║\r\n\
-		║   Counter: {count:>6}          ║\r\n\
-		║  [+/=] inc  [-] dec  [r] reset  [q] quit  ║\r\n\
+		║   Counter: {count:<11}    ║\r\n\
+		║  [+/=] inc  [-] dec       ║\r\n\
+		║  [r] reset  [q] quit      ║\r\n\
 		╚═══════════════════════════╝\x1b[0m\r\n"
 	)
 }

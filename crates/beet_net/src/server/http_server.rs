@@ -85,26 +85,28 @@ impl HttpServer {
 // immediately and using the one inserted via Required.
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	#[cfg(test)]
-	return;
-	#[cfg(feature = "lambda")]
-	world
-		.commands()
-		.entity(cx.entity)
-		.queue_async_local(super::start_lambda_server);
-
-	#[cfg(all(feature = "hyper", not(feature = "lambda")))]
-	world
-		.commands()
-		.entity(cx.entity)
-		.queue_async_local(super::start_hyper_server);
-
-	#[cfg(all(not(feature = "hyper"), not(feature = "lambda")))]
-	world
-		.commands()
-		.entity(cx.entity)
-		.queue_async_local(super::start_mini_http_server);
+	cfg_if! {
+		if #[cfg(test)] {
+			return;
+		} else if #[cfg(feature = "lambda")] {
+			world
+				.commands()
+				.entity(cx.entity)
+				.queue_async_local(super::start_lambda_server);
+		} else if #[cfg(feature = "hyper")] {
+			world
+				.commands()
+				.entity(cx.entity)
+				.queue_async_local(super::start_hyper_server);
+		} else {
+			world
+				.commands()
+				.entity(cx.entity)
+				.queue_async_local(super::start_mini_http_server);
+		}
+	}
 }
+
 
 
 impl HttpServer {
