@@ -97,12 +97,13 @@ impl Document {
 	///
 	/// Returns an error if the path doesn't exist, the type is incorrect,
 	/// or conversion fails.
+	#[cfg(feature = "json")]
 	pub fn get_field<T>(
 		&self,
 		path: &[FieldSegment],
 	) -> Result<T, DocumentError>
 	where
-		T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
+		T: 'static + Send + Sync + DeserializeOwned + Typed,
 	{
 		let value = self.get_field_ref(path)?;
 		value.clone().into_serde().map_err(|err| {

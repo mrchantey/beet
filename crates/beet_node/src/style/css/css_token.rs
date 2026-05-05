@@ -95,11 +95,12 @@ impl CssToken {
 			.with_declarations(declarations.into_iter().zip(values).collect())
 			.xok()
 	}
+	#[cfg(feature = "serde")]
 	pub fn from_props_value<
 		V: 'static
 			+ Send
 			+ Sync
-			+ serde::de::DeserializeOwned
+			+ DeserializeOwned
 			+ Typed
 			+ TypedTokenKey
 			+ AsCssValues,

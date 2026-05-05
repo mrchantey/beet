@@ -87,6 +87,7 @@ impl NodeParser for MediaParser {
 				self.plain_text_parser.parse(cx)
 			}
 			other => {
+				#[allow(unused_mut)]
 				let mut supported = vec![MediaType::Text];
 				#[cfg(feature = "html_parser")]
 				supported.push(MediaType::Html);

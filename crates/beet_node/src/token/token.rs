@@ -46,18 +46,16 @@ pub struct TypedValue {
 }
 
 impl TypedValue {
-	#[cfg(feature = "serde")]
-	pub fn new<T: Typed + serde::Serialize>(value: T) -> Result<Self> {
+	#[cfg(feature = "json")]
+	pub fn new<T: Typed + Serialize>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_serde(&value)?,
 			schema: TokenSchema::of::<T>(),
 		}
 		.xok()
 	}
-	#[cfg(feature = "serde")]
-	pub fn into_typed<T: Typed + serde::de::DeserializeOwned>(
-		&self,
-	) -> Result<T> {
+	#[cfg(feature = "json")]
+	pub fn into_typed<T: Typed + DeserializeOwned>(&self) -> Result<T> {
 		self.schema.assert_eq_ty::<T>()?;
 		self.value.clone().into_serde::<T>()
 	}

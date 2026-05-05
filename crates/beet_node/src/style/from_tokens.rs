@@ -7,7 +7,6 @@ use bevy::reflect::Typed;
 /// other tokens (like typography referencing typeface and weight tokens).
 ///
 /// The `M` type parameter is a marker used to distinguish different impls.
-#[cfg(feature = "serde")]
 pub trait FromTokens<M>: Sized {
 	type Tokens: Typed + serde::de::DeserializeOwned;
 	fn from_value(
@@ -30,13 +29,11 @@ pub trait FromTokens<M>: Sized {
 
 /// Marker type for the blanket impl of `FromTokens` for types that don't
 /// reference other tokens.
-#[cfg(feature = "serde")]
 pub struct SelfFromTokensMarker;
 
 /// Blanket impl for types that represent themselves (no token references).
 /// This allows simple types like `Color`, `f32`, `Length` to be used directly
 /// without needing a separate Tokens struct.
-#[cfg(feature = "serde")]
 impl<T> FromTokens<SelfFromTokensMarker> for T
 where
 	T: Sized + Typed + serde::de::DeserializeOwned,
