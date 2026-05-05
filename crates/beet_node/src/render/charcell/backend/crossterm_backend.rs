@@ -18,8 +18,20 @@ use std::io::Stdout;
 use std::io::Write;
 use std::io::stdout;
 
+pub fn render_crossterm<W: 'static + Send + Sync + Write>(
+	mut query: Populated<
+		(&mut CrosstermBackend<W>, &CharcellRenderer),
+		Changed<CharcellRenderer>,
+	>,
+) {
+	for (_backend, _renderer) in query.iter_mut() {
+		todo!("render");
+	}
+}
+
+
 /// Terminal backend that writes ANSI escape sequences via crossterm.
-#[derive(Get, Resource)]
+#[derive(Get, Component)]
 pub struct CrosstermBackend<W: Write> {
 	writer: W,
 	// enables AlternateScreen and raw_mode
@@ -27,14 +39,17 @@ pub struct CrosstermBackend<W: Write> {
 }
 
 impl CrosstermBackend<Stdout> {
-	pub fn new_fullscreen() -> Result<Self> { Self::new(stdout(), true) }
+	pub fn new_stdout() -> Result<Self> { Self::new(stdout(), true) }
 }
 
 
-
-impl Default for CrosstermBackend<Stdout> {
-	fn default() -> Self { Self::new_fullscreen().unwrap() }
+impl<W: Write + Default> Default for CrosstermBackend<W> {
+	fn default() -> Self { Self::new(W::default(), false).unwrap() }
 }
+
+// impl Default for CrosstermBackend<Stdout> {
+// 	fn default() -> Self { Self::new_stdout().unwrap() }
+// }
 
 impl<W> Drop for CrosstermBackend<W>
 where

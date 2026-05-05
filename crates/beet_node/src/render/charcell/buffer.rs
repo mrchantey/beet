@@ -51,7 +51,7 @@ impl Buffer {
 		&mut self,
 		pos: UVec2,
 		text: &str,
-		style: impl Clone + Into<CharStyle>,
+		style: impl Clone + Into<CellStyle>,
 		entity: Entity,
 	) {
 		for (i, ch) in text.chars().enumerate() {
@@ -109,7 +109,7 @@ impl Buffer {
 			for x in 0..width {
 				let idx = y * width + x;
 				if let Some(cell) = &self.cells[idx] {
-					let ansi_style = char_style_to_ansi(&cell.style);
+					let ansi_style = cell_style_to_ansi(&cell.style);
 					result.push_str(
 						&ansi_style.paint(cell.symbol.as_str()).to_string(),
 					);
@@ -130,14 +130,14 @@ impl Buffer {
 pub struct Cell {
 	pub symbol: SmolStr,
 	#[set_with(into)]
-	pub style: CharStyle,
+	pub style: CellStyle,
 	pub entity: Entity,
 }
 
 impl Cell {
 	pub fn new(
 		symbol: impl Into<SmolStr>,
-		style: impl Into<CharStyle>,
+		style: impl Into<CellStyle>,
 		entity: Entity,
 	) -> Self {
 		Self {
@@ -149,7 +149,7 @@ impl Cell {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, SetWith)]
-pub struct CharStyle {
+pub struct CellStyle {
 	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
@@ -157,7 +157,7 @@ pub struct CharStyle {
 	pub text_style: TextStyle,
 }
 
-impl From<VisualStyle> for CharStyle {
+impl From<VisualStyle> for CellStyle {
 	fn from(style: VisualStyle) -> Self {
 		Self {
 			foreground: style.foreground,
@@ -175,7 +175,7 @@ fn color_to_ansi(color: Color) -> nu_ansi_term::Color {
 }
 
 #[cfg(feature = "ansi_paint")]
-fn char_style_to_ansi(style: &CharStyle) -> nu_ansi_term::Style {
+fn cell_style_to_ansi(style: &CellStyle) -> nu_ansi_term::Style {
 	let mut ansi_style = nu_ansi_term::Style::new();
 
 	if let Some(color) = style.foreground {
@@ -212,7 +212,7 @@ fn char_style_to_ansi(style: &CharStyle) -> nu_ansi_term::Style {
 
 /// Convert a bevy [`Color`] to a crossterm terminal color via RGB.
 #[cfg(feature = "crossterm")]
-pub fn color_to_crossterm(color: Color) -> crossterm::style::Color {
+fn color_to_crossterm(color: Color) -> crossterm::style::Color {
 	let s = color.to_srgba_u8();
 	crossterm::style::Color::Rgb {
 		r: s.red,
@@ -222,7 +222,7 @@ pub fn color_to_crossterm(color: Color) -> crossterm::style::Color {
 }
 
 #[cfg(feature = "crossterm")]
-impl CharStyle {
+impl CellStyle {
 	/// Converts to a crossterm [`ContentStyle`](crossterm::style::ContentStyle).
 	pub fn to_crossterm_content_style(&self) -> crossterm::style::ContentStyle {
 		use crossterm::style::Attribute;
@@ -280,13 +280,13 @@ impl CharStyle {
 
 /// Convert a bevy [`Color`] to a ratatui terminal color via RGB.
 #[cfg(feature = "tui")]
-pub fn color_to_ratatui(color: Color) -> ratatui::style::Color {
+fn color_to_ratatui(color: Color) -> ratatui::style::Color {
 	let s = color.to_srgba_u8();
 	ratatui::style::Color::Rgb(s.red, s.green, s.blue)
 }
 
 #[cfg(feature = "tui")]
-impl CharStyle {
+impl CellStyle {
 	/// Converts to a ratatui [`Style`](ratatui::style::Style).
 	pub fn to_ratatui_style(&self) -> ratatui::style::Style {
 		let mut modifier = ratatui::style::Modifier::empty();

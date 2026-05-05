@@ -13,6 +13,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
+		CrosstermBackend::new_stdout().unwrap(),
 		CharcellRenderer::default(),
 		FlexBox::row().column_gap(1),
 		children![(

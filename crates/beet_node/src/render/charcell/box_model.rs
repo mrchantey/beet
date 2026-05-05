@@ -98,7 +98,7 @@ pub(super) fn draw_margin(
 	buffer: &mut Buffer,
 	containing: URect,
 	border_rect: URect,
-	style: CharStyle,
+	style: CellStyle,
 	entity: Entity,
 ) {
 	fill_frame(buffer, containing, border_rect, style, entity);
@@ -178,7 +178,7 @@ pub(super) fn draw_padding(
 	buffer: &mut Buffer,
 	inner_rect: URect,
 	content_rect: URect,
-	style: CharStyle,
+	style: CellStyle,
 	entity: Entity,
 ) {
 	fill_frame(buffer, inner_rect, content_rect, style, entity);
@@ -191,7 +191,7 @@ fn fill_frame(
 	buffer: &mut Buffer,
 	outer: URect,
 	inner: URect,
-	style: CharStyle,
+	style: CellStyle,
 	entity: Entity,
 ) {
 	// clamp inner to outer so we never write outside it
@@ -216,10 +216,10 @@ fn fill_frame(
 	}
 }
 
-/// Build a [`CharStyle`] for one border side, using the provided color as
+/// Build a [`CellStyle`] for one border side, using the provided color as
 /// the foreground and inheriting the background from the visual style.
-fn side_style(border_color: Option<Color>, visual: &VisualStyle) -> CharStyle {
-	CharStyle {
+fn side_style(border_color: Option<Color>, visual: &VisualStyle) -> CellStyle {
+	CellStyle {
 		foreground: border_color,
 		background: visual.background,
 		decoration_color: None,
