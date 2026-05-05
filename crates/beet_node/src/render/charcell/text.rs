@@ -172,7 +172,7 @@ mod tests {
 	#[test]
 	fn text_underline() {
 		let visual = VisualStyle {
-			text_style: vec![TextStyle::Underline],
+			text_style: TextStyle::UNDERLINE,
 			..VisualStyle::default()
 		};
 		render((rsx! { "Hi" }, visual)).xpect_snapshot();

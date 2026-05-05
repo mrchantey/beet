@@ -48,15 +48,13 @@ impl<T: ratatui::backend::Backend> Backend for RatatuiBackend<T> {
 	fn draw(&mut self, buffer: &Buffer) -> Result {
 		let width = buffer.size().x;
 		let height = buffer.size().y;
-		// Build ratatui cells from our buffer, skipping empty cells
+		// build ratatui cells from our buffer
 		let mut cells: Vec<(u16, u16, ratatui::buffer::Cell)> = Vec::new();
 		for idx in 0..(width * height) {
 			let x = idx % width;
 			let y = idx / width;
 			if let Some(cell) = buffer.get(UVec2::new(x, y)) {
-				let mut ratatui_cell = ratatui::buffer::Cell::default();
-				ratatui_cell.set_symbol(cell.symbol.as_str());
-				cells.push((x as u16, y as u16, ratatui_cell));
+				cells.push((x as u16, y as u16, cell.to_ratatui_cell()));
 			}
 		}
 		self.inner

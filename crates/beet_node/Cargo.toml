@@ -24,7 +24,7 @@ action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
-style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck"]
+style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 crossterm = ["beet_core/crossterm", "dep:crossterm"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
@@ -51,6 +51,7 @@ serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 crossterm = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
+bitflags = { workspace = true, optional = true }
 thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true

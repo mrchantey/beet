@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
+use bitflags::bitflags;
 
 
 pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
@@ -14,7 +15,7 @@ pub struct VisualStyle {
 	pub background: Option<Color>,
 	/// Color of underlines, overlines etc
 	pub decoration_color: Option<Color>,
-	pub text_style: Vec<TextStyle>,
+	pub text_style: TextStyle,
 	pub border_left: Option<Color>,
 	pub border_right: Option<Color>,
 	pub border_top: Option<Color>,
@@ -26,7 +27,7 @@ impl VisualStyle {
 		foreground: None,
 		background: None,
 		decoration_color: None,
-		text_style: Vec::new(),
+		text_style: TextStyle::empty(),
 		border_left: None,
 		border_right: None,
 		border_top: None,
@@ -42,22 +43,42 @@ impl VisualStyle {
 	}
 }
 
-/// Bitflags describing text modifiers including bold, italic, underline etc
-#[derive(Debug, Clone, Copy, PartialEq, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum TextStyle {
-	/// `text-decoration-line: underline`
-	Underline,
-	/// `text-decoration-line: overline`
-	Overline,
-	/// `text-decoration-line: line-through`
-	LineThrough,
-	/// `text-decoration-style: double`
-	Double,
-	/// `text-decoration-style: wavy`
-	Wavy,
-	/// `text-decoration-style: dashed`
-	Dash,
+bitflags! {
+	/// Text styling modifiers combining CSS text-decoration and TUI modifier concepts.
+	#[repr(transparent)]
+	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+	#[reflect(opaque)]
+	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
+	#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
+	pub struct TextStyle: u16 {
+		/// Bold text
+		const BOLD = 1 << 0;
+		/// Italic text
+		const ITALIC = 1 << 1;
+		/// Dimmed text
+		const DIM = 1 << 2;
+		/// Slowly blinking text
+		const BLINK = 1 << 3;
+		/// Rapidly blinking text
+		const RAPID_BLINK = 1 << 4;
+		/// Reversed foreground and background colors
+		const REVERSED = 1 << 5;
+		/// Hidden text
+		const HIDDEN = 1 << 6;
+		/// `text-decoration-line: underline`
+		const UNDERLINE = 1 << 7;
+		/// `text-decoration-line: underline; text-decoration-style: double`
+		const UNDERLINE_DOUBLE = 1 << 8;
+		/// `text-decoration-line: underline; text-decoration-style: wavy`
+		const UNDERLINE_WAVY = 1 << 9;
+		/// `text-decoration-line: underline; text-decoration-style: dashed`
+		const UNDERLINE_DASH = 1 << 10;
+		/// `text-decoration-line: overline`
+		const OVERLINE = 1 << 11;
+		/// `text-decoration-line: line-through`
+		const LINE_THROUGH = 1 << 12;
+	}
 }
 
 impl AsCssValue for f32 {

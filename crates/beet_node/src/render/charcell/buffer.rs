@@ -154,7 +154,7 @@ pub struct CharStyle {
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
 	pub decoration_color: Option<Color>,
-	pub text_style: Vec<TextStyle>,
+	pub text_style: TextStyle,
 }
 
 impl From<VisualStyle> for CharStyle {
@@ -191,22 +191,156 @@ fn char_style_to_ansi(style: &CharStyle) -> nu_ansi_term::Style {
 		ansi_style = ansi_style.on(color_to_ansi(color));
 	}
 
-	for decoration in &style.text_style {
-		match decoration {
-			TextStyle::Underline
-			| TextStyle::UnderlineDouble
-			| TextStyle::UnderlineWavy
-			| TextStyle::UnderlinDash => {
-				ansi_style = ansi_style.underline();
-			}
-			TextStyle::Overline => {
-				// not supported in ANSI terminals, skip
-			}
-			TextStyle::LineThrough => {
-				ansi_style = ansi_style.strikethrough();
-			}
-		}
+	let text_style = style.text_style;
+	if text_style.intersects(
+		TextStyle::UNDERLINE
+			| TextStyle::UNDERLINE_DOUBLE
+			| TextStyle::UNDERLINE_WAVY
+			| TextStyle::UNDERLINE_DASH,
+	) {
+		ansi_style = ansi_style.underline();
 	}
+	if text_style.contains(TextStyle::LINE_THROUGH) {
+		ansi_style = ansi_style.strikethrough();
+	}
+	// TextStyle::OVERLINE: not supported in ANSI terminals, skip
 
 	ansi_style
+}
+
+// ── Crossterm conversions ────────────────────────────────────────────────────
+
+/// Convert a bevy [`Color`] to a crossterm terminal color via RGB.
+#[cfg(feature = "crossterm")]
+pub fn color_to_crossterm(color: Color) -> crossterm::style::Color {
+	let s = color.to_srgba_u8();
+	crossterm::style::Color::Rgb {
+		r: s.red,
+		g: s.green,
+		b: s.blue,
+	}
+}
+
+#[cfg(feature = "crossterm")]
+impl CharStyle {
+	/// Converts to a crossterm [`ContentStyle`](crossterm::style::ContentStyle).
+	pub fn to_crossterm_content_style(&self) -> crossterm::style::ContentStyle {
+		use crossterm::style::Attribute;
+		let mut attributes = crossterm::style::Attributes::default();
+		let s = self.text_style;
+		// text weight / presentation
+		if s.contains(TextStyle::BOLD) {
+			attributes.set(Attribute::Bold);
+		}
+		if s.contains(TextStyle::DIM) {
+			attributes.set(Attribute::Dim);
+		}
+		if s.contains(TextStyle::ITALIC) {
+			attributes.set(Attribute::Italic);
+		}
+		// underline variants
+		if s.intersects(
+			TextStyle::UNDERLINE
+				| TextStyle::UNDERLINE_WAVY
+				| TextStyle::UNDERLINE_DASH,
+		) {
+			attributes.set(Attribute::Underlined);
+		}
+		if s.contains(TextStyle::UNDERLINE_DOUBLE) {
+			attributes.set(Attribute::DoubleUnderlined);
+		}
+		if s.contains(TextStyle::OVERLINE) {
+			attributes.set(Attribute::OverLined);
+		}
+		if s.contains(TextStyle::LINE_THROUGH) {
+			attributes.set(Attribute::CrossedOut);
+		}
+		if s.contains(TextStyle::BLINK) {
+			attributes.set(Attribute::SlowBlink);
+		}
+		if s.contains(TextStyle::RAPID_BLINK) {
+			attributes.set(Attribute::RapidBlink);
+		}
+		if s.contains(TextStyle::REVERSED) {
+			attributes.set(Attribute::Reverse);
+		}
+		if s.contains(TextStyle::HIDDEN) {
+			attributes.set(Attribute::Hidden);
+		}
+		crossterm::style::ContentStyle {
+			foreground_color: self.foreground.map(color_to_crossterm),
+			background_color: self.background.map(color_to_crossterm),
+			underline_color: self.decoration_color.map(color_to_crossterm),
+			attributes,
+		}
+	}
+}
+
+// ── Ratatui conversions ───────────────────────────────────────────────────────
+
+/// Convert a bevy [`Color`] to a ratatui terminal color via RGB.
+#[cfg(feature = "tui")]
+pub fn color_to_ratatui(color: Color) -> ratatui::style::Color {
+	let s = color.to_srgba_u8();
+	ratatui::style::Color::Rgb(s.red, s.green, s.blue)
+}
+
+#[cfg(feature = "tui")]
+impl CharStyle {
+	/// Converts to a ratatui [`Style`](ratatui::style::Style).
+	pub fn to_ratatui_style(&self) -> ratatui::style::Style {
+		let mut modifier = ratatui::style::Modifier::empty();
+		let s = self.text_style;
+		if s.contains(TextStyle::BOLD) {
+			modifier |= ratatui::style::Modifier::BOLD;
+		}
+		if s.contains(TextStyle::ITALIC) {
+			modifier |= ratatui::style::Modifier::ITALIC;
+		}
+		if s.contains(TextStyle::DIM) {
+			modifier |= ratatui::style::Modifier::DIM;
+		}
+		if s.contains(TextStyle::BLINK) {
+			modifier |= ratatui::style::Modifier::SLOW_BLINK;
+		}
+		if s.contains(TextStyle::RAPID_BLINK) {
+			modifier |= ratatui::style::Modifier::RAPID_BLINK;
+		}
+		if s.contains(TextStyle::REVERSED) {
+			modifier |= ratatui::style::Modifier::REVERSED;
+		}
+		if s.contains(TextStyle::HIDDEN) {
+			modifier |= ratatui::style::Modifier::HIDDEN;
+		}
+		if s.intersects(
+			TextStyle::UNDERLINE
+				| TextStyle::UNDERLINE_DOUBLE
+				| TextStyle::UNDERLINE_WAVY
+				| TextStyle::UNDERLINE_DASH,
+		) {
+			modifier |= ratatui::style::Modifier::UNDERLINED;
+		}
+		if s.contains(TextStyle::LINE_THROUGH) {
+			modifier |= ratatui::style::Modifier::CROSSED_OUT;
+		}
+		// OVERLINE has no ratatui Modifier equivalent
+		ratatui::style::Style {
+			fg: self.foreground.map(color_to_ratatui),
+			bg: self.background.map(color_to_ratatui),
+			underline_color: self.decoration_color.map(color_to_ratatui),
+			add_modifier: modifier,
+			sub_modifier: ratatui::style::Modifier::empty(),
+		}
+	}
+}
+
+#[cfg(feature = "tui")]
+impl Cell {
+	/// Converts to a ratatui [`Cell`](ratatui::buffer::Cell).
+	pub fn to_ratatui_cell(&self) -> ratatui::buffer::Cell {
+		let mut cell = ratatui::buffer::Cell::default();
+		cell.set_symbol(self.symbol.as_str());
+		cell.set_style(self.style.to_ratatui_style());
+		cell
+	}
 }

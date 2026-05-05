@@ -6,6 +6,7 @@ use crate::prelude::*;
 use crate::render::Buffer;
 use crate::style::Spacing;
 use crate::style::StyledNodeView;
+use crate::style::TextStyle;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
@@ -222,7 +223,7 @@ fn side_style(border_color: Option<Color>, visual: &VisualStyle) -> CharStyle {
 		foreground: border_color,
 		background: visual.background,
 		decoration_color: None,
-		text_style: vec![],
+		text_style: TextStyle::empty(),
 	}
 }
 
