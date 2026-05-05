@@ -403,11 +403,11 @@ fn setup_border_color() -> impl Bundle {
 fn setup_text_underline() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(rsx! { "Underline" }, bordered(), VisualStyle {
-			decoration_line: vec![TextDecoration::Underline],
+			text_style: vec![TextStyle::Underline],
 			..VisualStyle::default()
 		},),
 		(rsx! { "Strike" }, bordered(), VisualStyle {
-			decoration_line: vec![TextDecoration::LineThrough],
+			text_style: vec![TextStyle::LineThrough],
 			..VisualStyle::default()
 		},),
 	])

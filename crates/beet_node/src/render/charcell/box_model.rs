@@ -222,7 +222,7 @@ fn side_style(border_color: Option<Color>, visual: &VisualStyle) -> CharStyle {
 		foreground: border_color,
 		background: visual.background,
 		decoration_color: None,
-		decoration_line: vec![],
+		text_style: vec![],
 	}
 }
 

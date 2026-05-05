@@ -4,7 +4,6 @@ use beet_core::prelude::*;
 /// An in-memory backend for use in tests and headless environments.
 #[derive(Get)]
 pub struct TestBackend {
-	size: UVec2,
 	buffer: Buffer,
 	cursor_position: UVec2,
 	cursor_hidden: bool,
@@ -14,12 +13,12 @@ impl TestBackend {
 	/// Create a new backend with a blank buffer of the given size.
 	pub fn new(size: UVec2) -> Self {
 		Self {
-			size,
 			buffer: Buffer::new(size),
 			cursor_position: UVec2::ZERO,
 			cursor_hidden: false,
 		}
 	}
+	pub fn size(&self) -> UVec2 { self.buffer.size() }
 }
 
 impl Backend for TestBackend {
@@ -41,13 +40,13 @@ impl Backend for TestBackend {
 	}
 
 	fn clear(&mut self) -> Result {
-		self.buffer = Buffer::new(self.size);
+		self.buffer.clear();
 		Ok(())
 	}
 
 	fn window_size(&mut self) -> Result<WindowSize> {
 		Ok(WindowSize {
-			chars: self.size,
+			chars: self.size(),
 			pixels: UVec2::ZERO,
 		})
 	}

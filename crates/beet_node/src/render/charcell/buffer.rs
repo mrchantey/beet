@@ -1,4 +1,4 @@
-use crate::style::TextDecoration;
+use crate::style::TextStyle;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
@@ -16,6 +16,11 @@ impl Buffer {
 		Self {
 			size,
 			cells: alloc::vec::from_elem(None, len),
+		}
+	}
+	pub fn clear(&mut self) {
+		for cell in &mut self.cells {
+			*cell = None;
 		}
 	}
 
@@ -149,7 +154,7 @@ pub struct CharStyle {
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
 	pub decoration_color: Option<Color>,
-	pub decoration_line: Vec<TextDecoration>,
+	pub text_style: Vec<TextStyle>,
 }
 
 impl From<VisualStyle> for CharStyle {
@@ -158,7 +163,7 @@ impl From<VisualStyle> for CharStyle {
 			foreground: style.foreground,
 			background: style.background,
 			decoration_color: style.decoration_color,
-			decoration_line: style.decoration_line,
+			text_style: style.text_style,
 		}
 	}
 }
@@ -186,18 +191,18 @@ fn char_style_to_ansi(style: &CharStyle) -> nu_ansi_term::Style {
 		ansi_style = ansi_style.on(color_to_ansi(color));
 	}
 
-	for decoration in &style.decoration_line {
+	for decoration in &style.text_style {
 		match decoration {
-			TextDecoration::Underline
-			| TextDecoration::UnderlineDouble
-			| TextDecoration::UnderlineWavy
-			| TextDecoration::UnderlinDash => {
+			TextStyle::Underline
+			| TextStyle::UnderlineDouble
+			| TextStyle::UnderlineWavy
+			| TextStyle::UnderlinDash => {
 				ansi_style = ansi_style.underline();
 			}
-			TextDecoration::Overline => {
+			TextStyle::Overline => {
 				// not supported in ANSI terminals, skip
 			}
-			TextDecoration::LineThrough => {
+			TextStyle::LineThrough => {
 				ansi_style = ansi_style.strikethrough();
 			}
 		}

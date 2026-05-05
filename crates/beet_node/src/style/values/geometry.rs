@@ -12,8 +12,9 @@ pub struct VisualStyle {
 	/// In ansi renderers an alpha channel of <50% will apply the `dim` attributes
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
+	/// Color of underlines, overlines etc
 	pub decoration_color: Option<Color>,
-	pub decoration_line: Vec<TextDecoration>,
+	pub text_style: Vec<TextStyle>,
 	pub border_left: Option<Color>,
 	pub border_right: Option<Color>,
 	pub border_top: Option<Color>,
@@ -25,7 +26,7 @@ impl VisualStyle {
 		foreground: None,
 		background: None,
 		decoration_color: None,
-		decoration_line: Vec::new(),
+		text_style: Vec::new(),
 		border_left: None,
 		border_right: None,
 		border_top: None,
@@ -41,21 +42,22 @@ impl VisualStyle {
 	}
 }
 
+/// Bitflags describing text modifiers including bold, italic, underline etc
 #[derive(Debug, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum TextDecoration {
-	/// `text-decoration: underline`
+pub enum TextStyle {
+	/// `text-decoration-line: underline`
 	Underline,
-	/// `text-decoration: underline double`
-	UnderlineDouble,
-	/// `text-decoration: underline wavy`
-	UnderlineWavy,
-	/// `text-decoration: underline dashed`
-	UnderlinDash,
-	/// `text-decoration: overline`
+	/// `text-decoration-line: overline`
 	Overline,
-	/// `text-decoration: line-through`
+	/// `text-decoration-line: line-through`
 	LineThrough,
+	/// `text-decoration-style: double`
+	Double,
+	/// `text-decoration-style: wavy`
+	Wavy,
+	/// `text-decoration-style: dashed`
+	Dash,
 }
 
 impl AsCssValue for f32 {

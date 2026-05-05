@@ -26,7 +26,7 @@ tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck"]
 serde = ["dep:serde"]
-crossterm = ["beet_core/crossterm"]
+crossterm = ["beet_core/crossterm", "dep:crossterm"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
@@ -49,6 +49,7 @@ pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 nu-ansi-term = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
+crossterm = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 thiserror.workspace = true
 variadics_please.workspace = true
