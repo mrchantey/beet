@@ -20,6 +20,8 @@ postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde"]
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
 markdown = ["dep:pulldown-cmark"]
+html_parser = ["beet_node/html_parser"]
+markdown_parser = ["html_parser", "beet_node/markdown_parser"]
 http = ["beet_net/server"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 

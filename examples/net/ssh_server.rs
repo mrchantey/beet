@@ -77,11 +77,12 @@ fn on_data_recv(
 		return;
 	};
 
-	// Ctrl+C — send bye and return (connection will close naturally)
+	// Ctrl+C — send bye and disconnect
 	if bytes.contains(&3u8) {
 		commands
 			.entity(conn)
 			.trigger_target(SshDataSend(SshData::text("\r\nBye!\r\n")));
+		commands.entity(conn).trigger_target(SshDisconnect);
 		return;
 	}
 
@@ -115,6 +116,7 @@ fn on_data_recv(
 					commands.entity(conn).trigger_target(SshDataSend(
 						SshData::text("Goodbye!\r\n"),
 					));
+					commands.entity(conn).trigger_target(SshDisconnect);
 					return;
 				}
 

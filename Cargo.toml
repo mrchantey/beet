@@ -294,7 +294,7 @@ action = ["dep:beet_action"]
 node = ["dep:beet_node"]
 style = ["node", "beet_node?/style"]
 tui = ["beet_node?/tui"]
-markdown = ["beet_router?/markdown", "beet_node?/markdown_parser"]
+markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]

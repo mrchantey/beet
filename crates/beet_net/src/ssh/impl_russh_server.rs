@@ -14,6 +14,8 @@ use std::time::Duration;
 pub(crate) struct NewConnectionInfo {
 	pub to_client: async_channel::Sender<SshData>,
 	pub from_client: async_channel::Receiver<SshData>,
+	/// Sending on this channel tells the forward task to close the SSH channel.
+	pub close_tx: async_channel::Sender<()>,
 	pub username: Option<String>,
 }
 
@@ -77,6 +79,7 @@ async fn handle_connection(
 	let server_id = server.id();
 	let to_client = info.to_client;
 	let from_client = info.from_client;
+	let close_tx = info.close_tx;
 	let username = info.username;
 
 	// Clone for the send observer (the recv loop takes the original).
@@ -105,6 +108,9 @@ async fn handle_connection(
 						Ok(())
 					},
 				)
+				.observe_any(move |_: On<SshDisconnect>| {
+					close_tx.try_send(()).ok();
+				})
 				.run_async_local(async move |child_entity| {
 					while let Ok(data) = from_client.recv().await {
 						child_entity
@@ -229,21 +235,36 @@ impl russh::server::Handler for BeetSshHandler {
 		self.from_client_tx = Some(from_client_tx);
 		self.channel_id = Some(channel.id());
 
+		let (close_tx, close_rx) = async_channel::bounded::<()>(1);
+
 		// Forward bevy → SSH client in a dedicated tokio task.
+		// Also monitors close_rx for server-initiated disconnect.
 		let handle = session.handle();
 		let channel_id = channel.id();
 		tokio::spawn(async move {
-			while let Ok(data) = to_client_rx.recv().await {
-				if let SshData::Bytes(bytes) = data {
-					handle.data(channel_id, bytes).await.ok();
+			loop {
+				tokio::select! {
+					result = to_client_rx.recv() => {
+						match result {
+							Ok(SshData::Bytes(bytes)) => {
+								if handle.data(channel_id, bytes).await.is_err() {
+									break;
+								}
+							}
+							Ok(SshData::Exit(_)) | Err(_) => break,
+						}
+					}
+					_ = close_rx.recv() => break,
 				}
 			}
+			handle.close(channel_id).await.ok();
 		});
 
 		self.new_conn_tx
 			.send(NewConnectionInfo {
 				to_client: to_client_tx,
 				from_client: from_client_rx,
+				close_tx,
 				username: self.authenticated_user.clone(),
 			})
 			.await
@@ -286,6 +307,18 @@ impl russh::server::Handler for BeetSshHandler {
 				partial_success: false,
 			})
 		}
+	}
+
+	async fn channel_close(
+		&mut self,
+		channel: ChannelId,
+		_session: &mut Session,
+	) -> std::result::Result<(), Self::Error> {
+		// Drop the sender so the beet recv loop gets the disconnect signal.
+		if self.channel_id == Some(channel) {
+			self.from_client_tx.take();
+		}
+		Ok(())
 	}
 
 	async fn data(

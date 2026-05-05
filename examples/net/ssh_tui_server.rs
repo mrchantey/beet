@@ -85,11 +85,12 @@ fn on_data(
 		Some(b"+" | b"=") => counter.0 += 1,
 		Some(b"-") => counter.0 -= 1,
 		Some(b"r") => counter.0 = 0,
-		// q or Ctrl+C: exit alternate screen and close
+		// q or Ctrl+C: exit alternate screen and disconnect
 		Some(b"q") | Some([3]) => {
 			commands
 				.entity(conn)
 				.trigger_target(SshDataSend(SshData::text("\x1b[?1049l")));
+			commands.entity(conn).trigger_target(SshDisconnect);
 			return;
 		}
 		_ => return,

@@ -23,16 +23,14 @@ pub async fn media_exchange(
 	// we want one that we can parse
 	request.headers.remove::<header::Accept>();
 
-	let res = request
-		// TODO prefer postcard
-		// TODO prefer json
-		// prefer markdown, far less to parse
-		.with_accept(MediaType::Markdown)
-		.with_accept(MediaType::Html)
-		.send()
-		.await?
-		.into_result()
-		.await?;
+	// TODO prefer postcard
+	// TODO prefer json
+	// prefer markdown, far less to parse
+	#[cfg(feature = "markdown_parser")]
+	let request = request.with_accept(MediaType::Markdown);
+	#[cfg(feature = "html_parser")]
+	let request = request.with_accept(MediaType::Html);
+	let res = request.send().await?.into_result().await?;
 	let content_type = res
 		.headers
 		.get::<header::ContentType>()
@@ -61,9 +59,11 @@ fn parse_body_to_render_target(
 		MediaType::Text => PlainTextParser::default()
 			.parse(cx)
 			.map_err(|err| bevyhow!("{err}")),
+		#[cfg(feature = "html_parser")]
 		MediaType::Html => HtmlParser::default()
 			.parse(cx)
 			.map_err(|err| bevyhow!("{err}")),
+		#[cfg(feature = "markdown_parser")]
 		MediaType::Markdown => MarkdownParser::default()
 			.parse(cx)
 			.map_err(|err| bevyhow!("{err}")),

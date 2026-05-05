@@ -57,6 +57,14 @@ impl SshDataRecv {
 	pub fn inner(&self) -> &SshData { &self.0 }
 }
 
+/// Triggered on a connection entity to close the SSH session from the server side.
+///
+/// Once triggered, the underlying SSH channel is closed and [`SshClientDisconnected`]
+/// fires when the peer acknowledges.
+#[derive(EntityTargetEvent)]
+#[event(auto_propagate)]
+pub struct SshDisconnect;
+
 /// Per-connection info inserted on each connection entity when a client opens a session.
 #[derive(Debug, Clone, Component)]
 pub struct SshPeerInfo {

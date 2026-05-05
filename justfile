@@ -168,6 +168,11 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
+# client for ssh server example,
+# avoids signature mismatch errors during development
+ssh-client:
+	ssh -p 2222 127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+
 snap:
 	cargo test -p beet_core 				--lib --all-features -- --snap
 	cargo test -p beet_core_macros 	--lib --all-features -- --snap
