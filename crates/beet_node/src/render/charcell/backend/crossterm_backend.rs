@@ -19,7 +19,7 @@ use std::io::Write;
 use std::io::stdout;
 
 /// Terminal backend that writes ANSI escape sequences via crossterm.
-#[derive(Get)]
+#[derive(Get, Resource)]
 pub struct CrosstermBackend<W: Write> {
 	writer: W,
 	// enables AlternateScreen and raw_mode
