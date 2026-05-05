@@ -44,8 +44,8 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	}
 }
 
-impl std::fmt::Display for FieldRef {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FieldRef {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}#{}", self.document, self.field_path)
 	}
 }
@@ -89,7 +89,7 @@ impl FieldRef {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::ops::Deref;
+	use core::ops::Deref;
 
 	#[test]
 	fn field_ref_new() {

@@ -45,6 +45,7 @@ impl TokenStore {
 	) -> Result<Self> {
 		self.with(key, value)
 	}
+	#[cfg(feature = "json")]
 	pub fn with_value(
 		self,
 		key: impl Into<Token>,
@@ -52,6 +53,7 @@ impl TokenStore {
 	) -> Result<Self> {
 		self.with(key, TypedValue::new(value)?)
 	}
+	#[cfg(feature = "json")]
 	#[track_caller]
 	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
 	where
@@ -100,7 +102,7 @@ impl IntoIterator for TokenStore {
 	fn into_iter(self) -> Self::IntoIter { self.tokens.into_iter() }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 mod tests {
 	use super::*;
 

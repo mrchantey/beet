@@ -4,6 +4,7 @@ use beet_core::prelude::*;
 use bevy::math::UVec2;
 
 /// A rectangular buffer of cells, indexed by position.
+#[derive(Clone)]
 pub struct Buffer {
 	size: UVec2,
 	cells: Vec<Option<Cell>>,

@@ -31,8 +31,8 @@ impl Token {
 }
 
 
-impl std::fmt::Display for Token {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Token {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		self.key.fmt(f)
 	}
 }
@@ -142,8 +142,24 @@ macro_rules! token {
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
 
+	#[cfg(feature = "style")]
+	token!(
+		/// Some cool type
+		#[derive(Debug, Clone)]
+		Foo,
+		Color
+	);
+	#[cfg(feature = "style")]
+	token!(
+		#[allow(unused)]
+		Bar,
+		Color
+	);
+
+	#[cfg(feature = "style")]
 	#[test]
 	fn test_name() {
 		Foo.xinto::<Token>()
@@ -152,18 +168,7 @@ mod tests {
 			.xpect_eq("io.crates/beet_node/token/token/tests/Foo");
 	}
 
-	token!(
-		/// Some cool type
-		#[derive(Debug, Clone)]
-		Foo,
-		Color
-	);
-	token!(
-		#[allow(unused)]
-		Bar,
-		Color
-	);
-
+	#[cfg(feature = "style")]
 	#[test]
 	fn token_set_roundtrip() {
 		let set = tokens![Foo, Bar];

@@ -344,7 +344,9 @@ fn default_element_map() -> Vec<(&'static str, Style)> {
 
 
 #[cfg(test)]
+#[cfg(feature = "markdown_parser")]
 mod test {
+	#[allow(unused_imports)]
 	use super::*;
 
 	/// Parse markdown then render via [`AnsiTermRenderer`].
@@ -517,6 +519,7 @@ mod test {
 			.xpect_contains("\n\n");
 	}
 
+	#[cfg(feature = "html_parser")]
 	#[test]
 	fn unescape_html_entities() {
 		let mut world = World::new();

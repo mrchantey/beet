@@ -2,7 +2,9 @@
 mod tui;
 #[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 pub use tui::*;
+#[cfg(feature = "style")]
 mod charcell;
+#[cfg(feature = "style")]
 pub use charcell::*;
 #[cfg(feature = "bevy_scene")]
 mod scene;

@@ -225,13 +225,14 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 						child_y + child_h,
 					);
 
-					// render child
+					// render child, passing this container as parent for margin
 					CharcellRenderContext::new(
 						child_node.clone(),
 						cx.viewport,
 						child_rect,
 						cx.buffer,
 					)
+					.with_parent(cx.node.entity, cx.node.visual_style().clone())
 					.render()?;
 				}
 			}
@@ -295,13 +296,14 @@ pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
 						child_y + fsize.y,
 					);
 
-					// render child
+					// render child, passing this container as parent for margin
 					CharcellRenderContext::new(
 						child_node.clone(),
 						cx.viewport,
 						child_rect,
 						cx.buffer,
 					)
+					.with_parent(cx.node.entity, cx.node.visual_style().clone())
 					.render()?;
 				}
 			}

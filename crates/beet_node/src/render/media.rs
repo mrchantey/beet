@@ -193,9 +193,12 @@ impl NodeRenderer for MediaRenderer {
 
 #[cfg(test)]
 mod test {
+	#[allow(unused)]
 	use crate::prelude::*;
+	#[allow(unused)]
 	use beet_core::prelude::*;
 
+	#[cfg(feature = "html_parser")]
 	fn render(
 		world: &mut World,
 		entity: Entity,

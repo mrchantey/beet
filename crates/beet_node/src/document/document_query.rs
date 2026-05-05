@@ -144,7 +144,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 
 
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
 

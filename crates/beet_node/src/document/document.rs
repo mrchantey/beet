@@ -287,8 +287,8 @@ pub enum DocumentPath {
 	// TODO url, perhaps with some automerge style synchronous system
 }
 
-impl std::fmt::Display for DocumentPath {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for DocumentPath {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			DocumentPath::Ancestor => write!(f, "Ancestor"),
 			DocumentPath::This => write!(f, "This"),
@@ -298,7 +298,7 @@ impl std::fmt::Display for DocumentPath {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
 

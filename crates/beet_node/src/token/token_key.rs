@@ -108,8 +108,8 @@ impl From<TokenKey> for FieldPath {
 	}
 }
 
-impl std::fmt::Display for TokenKey {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for TokenKey {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::RustType(s) | Self::Url(s) | Self::Inline(s) => s.fmt(f),
 		}
@@ -190,8 +190,8 @@ impl TokenSchema {
 	}
 }
 
-impl std::fmt::Display for TokenSchema {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for TokenSchema {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		self.0.fmt(f)
 	}
 }

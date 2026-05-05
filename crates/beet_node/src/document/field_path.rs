@@ -34,8 +34,8 @@ impl From<&[FieldSegment]> for FieldPath {
 	fn from(segments: &[FieldSegment]) -> Self { Self(segments.to_vec()) }
 }
 
-impl std::fmt::Display for FieldPath {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FieldPath {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		let segments = self
 			.0
 			.iter()
@@ -67,8 +67,8 @@ impl FieldSegment {
 	pub fn index(index: usize) -> Self { Self::ArrayIndex(index) }
 }
 
-impl std::fmt::Display for FieldSegment {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FieldSegment {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			FieldSegment::ArrayIndex(i) => write!(f, "{}", i),
 			FieldSegment::ObjectKey(k) => write!(f, "{}", k),
