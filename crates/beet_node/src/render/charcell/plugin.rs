@@ -9,29 +9,29 @@ impl Plugin for CharcellPlugin {
 			PostUpdate,
 			apply_node_changes.in_set(ApplyNodeChanges),
 		);
-		#[cfg(feature = "crossterm")]
+		#[cfg(feature = "termwiz")]
 		{
-			use bevy::ecs::schedule::common_conditions;
-
 			use crate::prelude::*;
+			use bevy::ecs::schedule::common_conditions;
+			app.add_systems(
+				PostUpdate,
+				render_terminal.after(ApplyNodeChanges),
+			);
 			app.add_systems(
 				PreUpdate,
 				enable_raw_mode
 					.run_if(common_conditions::resource_added::<RawMode>),
-			)
-			.add_systems(
+			);
+			app.add_systems(
 				PostUpdate,
 				(
+					flush_stdio_terminals.after(render_terminal),
 					disable_raw_mode
 						.run_if(common_conditions::resource_removed::<RawMode>),
 					try_disable_raw_mode
 						.run_if(common_conditions::on_message::<AppExit>),
-					(
-						render_crossterm::<std::io::Stdout>,
-						render_crossterm::<Vec<u8>>,
-					)
-						.after(ApplyNodeChanges),
-				),
+				)
+					.after(ApplyNodeChanges),
 			);
 		}
 		#[cfg(feature = "tui")]
@@ -44,7 +44,6 @@ impl Plugin for CharcellPlugin {
 		}
 	}
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ApplyNodeChanges;

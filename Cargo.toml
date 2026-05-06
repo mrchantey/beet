@@ -154,7 +154,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 nu-ansi-term = "0.50"
 pretty_env_logger = "0.4"
 
-
 #💡 async
 futures = "0.3"
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
@@ -295,6 +294,7 @@ action = ["dep:beet_action"]
 node = ["dep:beet_node"]
 style = ["node", "beet_node?/style"]
 tui = ["beet_node?/tui"]
+termwiz = ["node", "beet_node?/termwiz", "dep:termwiz"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
@@ -345,6 +345,7 @@ beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
+termwiz = { version = "0.23", optional = true }
 beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 
@@ -426,9 +427,9 @@ path = "examples/net/ssh_client.rs"
 required-features = ["ssh_client"]
 
 [[example]]
-name = "ssh_tui_server"
-path = "examples/net/ssh_tui_server.rs"
-required-features = ["ssh_server"]
+name = "ssh_tui"
+path = "examples/node/ssh_tui.rs"
+required-features = ["ssh_server", "ssh_client", "node", "termwiz"]
 
 # 💡 Examples - Node
 

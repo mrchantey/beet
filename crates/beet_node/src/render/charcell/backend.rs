@@ -8,10 +8,7 @@ pub use test_backend::*;
 mod ratatui_backend;
 #[cfg(feature = "tui")]
 pub use ratatui_backend::*;
-#[cfg(feature = "crossterm")]
-mod crossterm_backend;
-#[cfg(feature = "crossterm")]
-pub use crossterm_backend::*;
+
 
 /// The window size in characters (columns / rows) as well as pixels.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

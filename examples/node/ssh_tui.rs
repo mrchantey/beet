@@ -1,6 +1,7 @@
 //! SSH TUI demo — an ANSI interactive counter over SSH.
 //!
-//! Demonstrates serving a toy interactive UI to any SSH client.
+//! Demonstrates an interactive terminal UI served to SSH clients using the
+//! beet [`Terminal`] component for input parsing and output buffering.
 //!
 //! - Press `+` or `=` to increment the counter
 //! - Press `-` to decrement
@@ -9,7 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example ssh_tui_server --features ssh_server
+//! cargo run --example ssh_tui --features ssh_server,node,termwiz
 //! ```
 //! Connect:
 //! ```sh
@@ -18,6 +19,9 @@
 
 use beet::net::prelude::*;
 use beet::prelude::*;
+use termwiz::input::InputEvent;
+use termwiz::input::KeyCode;
+use termwiz::input::Modifiers;
 
 fn main() -> Result {
 	App::new()
@@ -53,49 +57,83 @@ fn render_frame(count: i32) -> String {
 	)
 }
 
-/// Handles all SSH events: connect, keyboard input, and disconnect.
+/// Handles all SSH events for a connection.
 fn on_recv(
 	ev: On<SshRecv>,
 	mut commands: Commands,
 	mut counters: Query<&mut Counter>,
+	mut terminals: Query<&mut Terminal>,
 ) {
 	let conn = ev.original_target();
 
 	match ev.event().inner() {
 		SshEvent::Connect => {
-			// Enter alternate screen and render initial frame.
+			// Set up a Terminal and send the initial frame.
+			let mut terminal = Terminal::new_ssh(UVec2::new(80, 24));
+			terminal.ensure_initialized();
+			terminal.write_str(&render_frame(0));
+			let output = terminal.take_output();
 			commands
 				.entity(conn)
-				.insert(Counter::default())
-				.trigger_target(SshSend(SshEvent::text(
-					"\x1b[?1049h\x1b[2J".to_owned() + &render_frame(0),
-				)));
+				.insert((terminal, Counter::default()))
+				.trigger_target(SshSend(SshEvent::bytes(output)));
+		}
+		SshEvent::RequestPty(pty) => {
+			// Update terminal size from the client's PTY request.
+			if let Ok(mut terminal) = terminals.get_mut(conn) {
+				terminal.set_size(pty.window.cells);
+			}
 		}
 		SshEvent::Data(bytes) => {
-			let Ok(mut counter) = counters.get_mut(conn) else {
-				return;
-			};
-			match bytes.as_ref() {
-				b"+" | b"=" => counter.0 += 1,
-				b"-" => counter.0 -= 1,
-				b"r" => counter.0 = 0,
-				// q or Ctrl+C: exit alternate screen and disconnect
-				b"q" | [3] => {
-					commands
-						.entity(conn)
-						.trigger_target(SshSend(SshEvent::text("\x1b[?1049l")))
-						.trigger_target(SshSend(SshEvent::Close(None)));
-					return;
+			// Parse incoming bytes into input events.
+			let input_events = terminals
+				.get_mut(conn)
+				.map(|mut t| t.feed_bytes(bytes))
+				.unwrap_or_default();
+
+			// Handle key events and update counter.
+			let mut quit = false;
+			if let Ok(mut counter) = counters.get_mut(conn) {
+				for input_ev in &input_events {
+					match input_ev {
+						InputEvent::Key(key) => match key.key {
+							KeyCode::Char('+') | KeyCode::Char('=') => {
+								counter.0 += 1
+							}
+							KeyCode::Char('-') => counter.0 -= 1,
+							KeyCode::Char('r') => counter.0 = 0,
+							KeyCode::Char('q') => quit = true,
+							KeyCode::Char('c')
+								if key.modifiers.contains(Modifiers::CTRL) =>
+							{
+								quit = true
+							}
+							_ => {}
+						},
+						_ => {}
+					}
 				}
-				_ => return,
 			}
-			let frame = render_frame(counter.0);
-			commands
-				.entity(conn)
-				.trigger_target(SshSend(SshEvent::text(frame)));
+
+			if quit {
+				commands
+					.entity(conn)
+					.trigger_target(SshSend(SshEvent::text("\x1b[?1049l")))
+					.trigger_target(SshSend(SshEvent::Close(None)));
+				return;
+			}
+
+			// Re-render and flush updated frame.
+			let count = counters.get(conn).map(|c| c.0).unwrap_or(0);
+			if let Ok(mut terminal) = terminals.get_mut(conn) {
+				terminal.write_str(&render_frame(count));
+				let output = terminal.take_output();
+				commands
+					.entity(conn)
+					.trigger_target(SshSend(SshEvent::bytes(output)));
+			}
 		}
 		SshEvent::Close(_) => {
-			// Clean up the connection entity on disconnect.
 			commands.entity(conn).despawn();
 		}
 		_ => {}
@@ -114,7 +152,7 @@ mod tests {
 	use beet::prelude::*;
 	use std::time::Duration;
 
-	/// Verifies that pressing '+' increments the TUI counter from 0 to 1.
+	/// Pressing '+' increments the TUI counter from 0 to 1.
 	#[test]
 	fn counter_increments() {
 		let (server, on_spawn) = SshServer::new_test();

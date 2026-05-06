@@ -12,7 +12,7 @@ use bevy_ratatui::RatatuiPlugins;
 /// and registers the input/draw systems.
 ///
 /// Only available on non-wasm targets since [`bevy_ratatui`] depends on
-/// a terminal backend (crossterm).
+/// a native terminal backend.
 ///
 /// Add this plugin when building a TUI app. For link navigation,
 /// also add `beet_router`'s `NavigatorPlugin`.

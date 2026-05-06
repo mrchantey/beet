@@ -15,8 +15,10 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
+	let (terminal, stdio) = Terminal::new_stdout().unwrap();
 	commands.spawn((
-		CrosstermBackend::new_stdout().unwrap(),
+		terminal,
+		stdio,
 		CharcellRenderer::default(),
 		FlexBox::row().column_gap(1),
 		children![(
