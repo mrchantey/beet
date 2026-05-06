@@ -6,10 +6,12 @@
 mod backend;
 mod plugin;
 mod renderer;
+mod terminal;
 pub use backend::*;
 pub use buffer::*;
 pub use plugin::*;
 pub use renderer::*;
+pub use terminal::*;
 mod buffer;
 mod render_context;
 pub use render_context::*;

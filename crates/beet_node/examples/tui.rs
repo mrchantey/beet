@@ -3,6 +3,7 @@ use beet_node::prelude::style::*;
 use beet_node::prelude::*;
 use beet_node::*;
 
+
 fn main() {
 	App::new()
 		.add_plugins((MinimalPlugins, CharcellPlugin))

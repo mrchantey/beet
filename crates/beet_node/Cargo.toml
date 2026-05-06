@@ -26,6 +26,7 @@ tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
+termwiz = ["dep:termwiz"]
 crossterm = ["beet_core/crossterm", "dep:crossterm"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -43,6 +44,7 @@ bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
 uuid.workspace = true
+termwiz = { version = "0.23", optional = true }
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
