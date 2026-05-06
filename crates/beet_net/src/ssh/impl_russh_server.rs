@@ -3,12 +3,14 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use russh::Channel;
 use russh::ChannelId;
+use russh::keys::PrivateKey;
 use russh::server::Auth;
 use russh::server::Msg;
 use russh::server::Server as RusshServer;
 use russh::server::Session;
 use std::sync::Arc;
 use std::time::Duration;
+
 
 /// Info passed from the russh tokio task to the beet accept loop per connection.
 pub(crate) struct NewConnectionInfo {
@@ -141,11 +143,15 @@ async fn run_russh_server_inner(
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
 	credentials: Option<SshCredentials>,
 ) {
-	let host_key = russh::keys::PrivateKey::random(
-		&mut rand::rng(),
-		russh::keys::Algorithm::Ed25519,
-	)
-	.expect("failed to generate SSH host key");
+	// In debug builds use a constant key so the fingerprint stays stable
+	// between restarts. In release builds generate a fresh random key.
+	#[cfg(debug_assertions)]
+	let host_key = PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)
+		.expect("failed to load debug SSH host key");
+	#[cfg(not(debug_assertions))]
+	let host_key =
+		PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519)
+			.expect("failed to generate SSH host key");
 
 	let config = Arc::new(russh::server::Config {
 		inactivity_timeout: Some(Duration::from_secs(3600)),
@@ -242,21 +248,24 @@ impl russh::server::Handler for BeetSshHandler {
 		let handle = session.handle();
 		let channel_id = channel.id();
 		tokio::spawn(async move {
-			loop {
+			let exit_code = loop {
 				tokio::select! {
 					result = to_client_rx.recv() => {
 						match result {
 							Ok(SshData::Bytes(bytes)) => {
 								if handle.data(channel_id, bytes).await.is_err() {
-									break;
+									break 0u32;
 								}
 							}
-							Ok(SshData::Exit(_)) | Err(_) => break,
+							Ok(SshData::Exit(code)) => break code,
+							Err(_) => break 0u32,
 						}
 					}
-					_ = close_rx.recv() => break,
+					_ = close_rx.recv() => break 0u32,
 				}
-			}
+			};
+			// Send exit status before closing so the SSH client exits cleanly (code 0).
+			handle.exit_status_request(channel_id, exit_code).await.ok();
 			handle.close(channel_id).await.ok();
 		});
 
@@ -271,6 +280,22 @@ impl russh::server::Handler for BeetSshHandler {
 			.map_err(|_| russh::Error::Disconnect)?;
 
 		Ok(true)
+	}
+
+	async fn auth_none(
+		&mut self,
+		user: &str,
+	) -> std::result::Result<Auth, Self::Error> {
+		// Accept anonymous login when no credentials are required.
+		if self.credentials.is_none() {
+			self.authenticated_user = Some(user.to_owned());
+			Ok(Auth::Accept)
+		} else {
+			Ok(Auth::Reject {
+				proceed_with_methods: None,
+				partial_success: false,
+			})
+		}
 	}
 
 	async fn auth_publickey(
@@ -335,3 +360,25 @@ impl russh::server::Handler for BeetSshHandler {
 		Ok(())
 	}
 }
+
+/// Constant Ed25519 host key used in debug builds so the fingerprint stays
+/// stable between server restarts, avoiding spurious "host key changed" errors.
+///
+/// Generated once and baked in — never use this in production.
+#[cfg(debug_assertions)]
+const DEBUG_HOST_KEY_BYTES: &[u8] = &[
+	111, 112, 101, 110, 115, 115, 104, 45, 107, 101, 121, 45, 118, 49, 0, 0, 0,
+	0, 4, 110, 111, 110, 101, 0, 0, 0, 4, 110, 111, 110, 101, 0, 0, 0, 0, 0, 0,
+	0, 1, 0, 0, 0, 51, 0, 0, 0, 11, 115, 115, 104, 45, 101, 100, 50, 53, 53,
+	49, 57, 0, 0, 0, 32, 84, 27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204,
+	55, 206, 162, 184, 249, 15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182,
+	181, 10, 210, 100, 0, 0, 0, 136, 221, 168, 235, 133, 221, 168, 235, 133, 0,
+	0, 0, 11, 115, 115, 104, 45, 101, 100, 50, 53, 53, 49, 57, 0, 0, 0, 32, 84,
+	27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204, 55, 206, 162, 184, 249,
+	15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182, 181, 10, 210, 100, 0,
+	0, 0, 64, 210, 4, 195, 187, 64, 1, 160, 227, 81, 37, 130, 221, 200, 21, 20,
+	6, 189, 46, 189, 110, 242, 46, 67, 183, 141, 49, 192, 198, 153, 195, 61,
+	43, 84, 27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204, 55, 206, 162,
+	184, 249, 15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182, 181, 10, 210,
+	100, 0, 0, 0, 0, 1, 2, 3, 4, 5,
+];

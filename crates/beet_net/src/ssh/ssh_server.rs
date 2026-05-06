@@ -1,3 +1,4 @@
+use crate::prelude::DEFAULT_SSH_PORT;
 use beet_core::prelude::*;
 
 /// Plugin for running bevy SSH servers.
@@ -132,7 +133,7 @@ impl SshServer {
 }
 
 impl Default for SshServer {
-	fn default() -> Self { Self::new(2222) }
+	fn default() -> Self { Self::new(DEFAULT_SSH_PORT) }
 }
 
 /// Triggered when a new SSH client opens a session.

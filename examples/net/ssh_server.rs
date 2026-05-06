@@ -8,7 +8,7 @@
 //! ```
 //! Connect with any SSH client:
 //! ```sh
-//! ssh -p 2222 127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+//! ssh -p 8322 127.0.0.1
 //! ```
 //! Or run the companion example:
 //! ```sh

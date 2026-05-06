@@ -168,10 +168,10 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
-# client for ssh server example,
-# avoids signature mismatch errors during development
+# client for the ssh_server example
+# the constant debug host key means fingerprints are stable between restarts
 ssh-client:
-	ssh -p 2222 127.0.0.1 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+	ssh -p 8322 127.0.0.1
 
 snap:
 	cargo test -p beet_core 				--lib --all-features -- --snap

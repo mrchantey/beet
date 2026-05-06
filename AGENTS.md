@@ -24,6 +24,7 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 
 ## Conventions
 
+- A rust module should read like a good book: high level structs at the top and implementation details below
 - Its perfectly acceptable for functions longer than ~20 lines to have brief comments describing each step
 - Never consider backward-compatibility. when asked to change something, remove the old implementation
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.

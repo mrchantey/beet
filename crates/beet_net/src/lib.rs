@@ -28,6 +28,8 @@ pub mod prelude {
 	pub const ANALYTICS_JS: &str = include_str!("buckets/analytics.js");
 	/// Default port for a beet server: `8337` (BEET).
 	pub const DEFAULT_SERVER_PORT: u16 = 8337;
+	/// Default port for SSH connections: `8322`.
+	pub const DEFAULT_SSH_PORT: u16 = 8322;
 	/// Default port for WebSocket connections.
 	pub const DEFAULT_SOCKET_PORT: u16 = 8339;
 	/// Default URL for local server connections.
