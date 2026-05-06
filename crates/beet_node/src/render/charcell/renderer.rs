@@ -3,6 +3,16 @@ use crate::style::StyledNodeQuery;
 use beet_core::prelude::*;
 
 
+pub fn apply_node_changes(
+	styled_query: StyledNodeQuery,
+	mut query: Query<(Entity, &mut CharcellRenderer)>,
+) -> Result {
+	for (entity, mut renderer) in query.iter_mut() {
+		renderer.render_node(&styled_query, entity)?;
+	}
+	Ok(())
+}
+
 #[derive(Get, Deref, Component)]
 pub struct CharcellRenderer {
 	viewport: URect,

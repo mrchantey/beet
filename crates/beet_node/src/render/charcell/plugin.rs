@@ -1,10 +1,14 @@
+use super::apply_node_changes;
 use beet_core::prelude::*;
 
 pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
-	#[allow(unused_variables)]
 	fn build(&self, app: &mut App) {
+		app.add_systems(
+			PostUpdate,
+			apply_node_changes.in_set(ApplyNodeChanges),
+		);
 		cfg_if! {
 			if #[cfg(feature = "tui")] {
 				app.add_plugins(bevy_ratatui::RatatuiPlugins {
@@ -18,8 +22,13 @@ impl Plugin for CharcellPlugin {
 					.add_systems(PostUpdate, (
 						render_crossterm::<std::io::Stdout>,
 						render_crossterm::<Vec<u8>>,
-					));
+						)
+						.after(ApplyNodeChanges));
 			}
 		}
 	}
 }
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ApplyNodeChanges;
