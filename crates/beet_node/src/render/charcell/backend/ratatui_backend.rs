@@ -62,9 +62,9 @@ impl<T: ratatui::backend::Backend> Backend for RatatuiBackend<T> {
 		.xok()
 	}
 
-	fn draw(
+	fn draw<'a>(
 		&mut self,
-		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+		cells: impl IntoIterator<Item = (UVec2, &'a Cell)>,
 	) -> Result {
 		// collect to own ratatui cells before passing to inner backend
 		let cells: Vec<_> = cells

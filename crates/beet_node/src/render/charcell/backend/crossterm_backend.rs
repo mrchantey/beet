@@ -26,9 +26,7 @@ pub fn render_crossterm<W: 'static + Send + Sync + Write>(
 	>,
 ) -> Result {
 	for (mut backend, renderer) in query.iter_mut() {
-		let cells =
-			renderer.iter_cells().map(|(pos, cell)| (pos, cell.clone()));
-		backend.draw(cells)?;
+		backend.draw(renderer.iter_cells())?;
 		backend.flush()?;
 	}
 	Ok(())
@@ -66,7 +64,9 @@ where
 impl<W: Write> CrosstermBackend<W> {
 	pub fn new(mut writer: W, fullscreen: bool) -> Result<Self> {
 		if fullscreen {
-			writer.execute(EnterAlternateScreen)?;
+			writer
+				.execute(EnterAlternateScreen)?
+				.execute(cursor::Hide)?;
 			terminal::enable_raw_mode()?;
 		}
 		Self { writer, fullscreen }.xok()
@@ -134,9 +134,9 @@ impl<W: Write> Backend for CrosstermBackend<W> {
 		.xok()
 	}
 
-	fn draw(
+	fn draw<'a>(
 		&mut self,
-		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+		cells: impl IntoIterator<Item = (UVec2, &'a Cell)>,
 	) -> Result {
 		let mut last_pos: Option<(u16, u16)> = None;
 		let mut cur_fg = CrosstermColor::Reset;

@@ -30,9 +30,9 @@ pub trait Backend {
 	fn clear(&mut self) -> Result;
 	fn window_size(&mut self) -> Result<WindowSize>;
 	/// Draw the provided cells at their given positions.
-	fn draw(
+	fn draw<'a>(
 		&mut self,
-		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+		cells: impl IntoIterator<Item = (UVec2, &'a Cell)>,
 	) -> Result;
 	fn flush(&mut self) -> Result;
 }
