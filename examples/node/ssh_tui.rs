@@ -1,7 +1,7 @@
 //! SSH TUI demo — an ANSI interactive counter over SSH.
 //!
 //! Demonstrates an interactive terminal UI served to SSH clients using the
-//! beet [`Terminal`] component for input parsing and output buffering.
+//! beet [`BufferedTerminal`] component for input parsing and output buffering.
 //!
 //! - Press `+` or `=` to increment the counter
 //! - Press `-` to decrement
@@ -10,7 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example ssh_tui --features ssh_server,node,termwiz
+//! cargo run --example ssh_tui --features ssh_server,node,termion
 //! ```
 //! Connect:
 //! ```sh
@@ -19,9 +19,9 @@
 
 use beet::net::prelude::*;
 use beet::prelude::*;
-use termwiz::input::InputEvent;
-use termwiz::input::KeyCode;
-use termwiz::input::Modifiers;
+use std::io::Write;
+use termion::event::Event;
+use termion::event::Key;
 
 fn main() -> Result {
 	App::new()
@@ -39,22 +39,32 @@ fn main() -> Result {
 #[derive(Component, Default)]
 struct Counter(i32);
 
-/// Renders a colour-cycling counter panel using ANSI escape codes.
-fn render_frame(count: i32) -> String {
-	let color = match count.rem_euclid(3) {
-		0 => "\x1b[31m", // red
-		1 => "\x1b[32m", // green
-		_ => "\x1b[34m", // blue
+/// Renders a colour-cycling counter panel.
+fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
+	use termion::clear;
+	use termion::color;
+	use termion::cursor;
+	let (r, g, b): (u8, u8, u8) = match count.rem_euclid(3) {
+		0 => (220, 50, 50),
+		1 => (50, 200, 50),
+		_ => (50, 100, 220),
 	};
-	format!(
-		"\x1b[H\x1b[2J{color}\
-		╔═══════════════════════════╗\r\n\
+	write!(
+		terminal.writer,
+		"{}{}{}{}╔═══════════════════════════╗\r\n\
 		║   beet SSH TUI demo       ║\r\n\
-		║   Counter: {count:<11}    ║\r\n\
+		║   Counter: {:<11}    ║\r\n\
 		║  [+/=] inc  [-] dec       ║\r\n\
 		║  [r] reset  [q] quit      ║\r\n\
-		╚═══════════════════════════╝\x1b[0m\r\n"
+		╚═══════════════════════════╝{}",
+		cursor::Goto(1, 1),
+		clear::All,
+		color::Fg(color::Rgb(r, g, b)),
+		color::Bg(color::Reset),
+		count,
+		color::Fg(color::Reset),
 	)
+	.map_err(|e| bevyhow!("{e}"))
 }
 
 /// Handles all SSH events for a connection.
@@ -62,54 +72,39 @@ fn on_recv(
 	ev: On<SshRecv>,
 	mut commands: Commands,
 	mut counters: Query<&mut Counter>,
-	mut terminals: Query<&mut Terminal>,
+	mut terminals: Query<&mut BufferedTerminal>,
 ) {
 	let conn = ev.original_target();
 
 	match ev.event().inner() {
-		SshEvent::Connect => {
-			// Set up a Terminal and send the initial frame.
-			let mut terminal = Terminal::new_ssh(UVec2::new(80, 24));
-			terminal.ensure_initialized();
-			terminal.write_str(&render_frame(0));
+		SshEvent::Connect => {}
+		SshEvent::RequestPty(pty) => {
+			// Insert the terminal now that we know the PTY size.
+			let size = pty.window.cells;
+			let mut terminal = BufferedTerminal::new_buffered(size);
+			// Send initial frame.
+			let _ = render_frame(0, &mut terminal);
 			let output = terminal.take_output();
 			commands
 				.entity(conn)
 				.insert((terminal, Counter::default()))
 				.trigger_target(SshSend(SshEvent::bytes(output)));
 		}
-		SshEvent::RequestPty(pty) => {
-			// Update terminal size from the client's PTY request.
-			if let Ok(mut terminal) = terminals.get_mut(conn) {
-				terminal.set_size(pty.window.cells);
-			}
-		}
 		SshEvent::Data(bytes) => {
-			// Parse incoming bytes into input events.
-			let input_events = terminals
-				.get_mut(conn)
-				.map(|mut t| t.feed_bytes(bytes))
-				.unwrap_or_default();
+			// Parse incoming bytes into termion events.
+			let events = BufferedTerminal::parse_bytes(bytes);
 
-			// Handle key events and update counter.
 			let mut quit = false;
 			if let Ok(mut counter) = counters.get_mut(conn) {
-				for input_ev in &input_events {
-					match input_ev {
-						InputEvent::Key(key) => match key.key {
-							KeyCode::Char('+') | KeyCode::Char('=') => {
-								counter.0 += 1
-							}
-							KeyCode::Char('-') => counter.0 -= 1,
-							KeyCode::Char('r') => counter.0 = 0,
-							KeyCode::Char('q') => quit = true,
-							KeyCode::Char('c')
-								if key.modifiers.contains(Modifiers::CTRL) =>
-							{
-								quit = true
-							}
-							_ => {}
-						},
+				for ev in &events {
+					match ev {
+						Event::Key(Key::Char('+') | Key::Char('=')) => {
+							counter.0 += 1
+						}
+						Event::Key(Key::Char('-')) => counter.0 -= 1,
+						Event::Key(Key::Char('r')) => counter.0 = 0,
+						Event::Key(Key::Char('q')) => quit = true,
+						Event::Key(Key::Ctrl('c')) => quit = true,
 						_ => {}
 					}
 				}
@@ -123,10 +118,10 @@ fn on_recv(
 				return;
 			}
 
-			// Re-render and flush updated frame.
+			// Re-render and send updated frame.
 			let count = counters.get(conn).map(|c| c.0).unwrap_or(0);
 			if let Ok(mut terminal) = terminals.get_mut(conn) {
-				terminal.write_str(&render_frame(count));
+				let _ = render_frame(count, &mut terminal);
 				let output = terminal.take_output();
 				commands
 					.entity(conn)

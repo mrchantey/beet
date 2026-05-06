@@ -188,6 +188,8 @@ strum_macros = "0.26"
 extend = "1"
 
 #💡 io
+bytes = "1"
+smol_str = { version = "0.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 postcard = { version = "1", features = ["alloc"] }
@@ -196,8 +198,6 @@ base64 = "0.22"
 sha2 = "0.10"
 ron = "0.8"
 toml = "0.8"
-bytes = "1"
-smol_str = { version = "0.2", default-features = false }
 
 #💡 http
 http = "1"
@@ -205,6 +205,7 @@ http-body-util = "0.1"
 url = "2"
 
 #💡 tui
+termion = { version = "4" }
 crossterm = { version = "0.29" }
 bevy_ratatui = { version = "0.11", default-features=false }
 # bevy_ratatui = { git = "https://github.com/ratatui/bevy_ratatui", branch = "main" }
@@ -294,7 +295,7 @@ action = ["dep:beet_action"]
 node = ["dep:beet_node"]
 style = ["node", "beet_node?/style"]
 tui = ["beet_node?/tui"]
-termwiz = ["node", "beet_node?/termwiz", "dep:termwiz"]
+termion = ["node", "beet_node?/termion", "dep:termion"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
@@ -345,7 +346,7 @@ beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
-termwiz = { version = "0.23", optional = true }
+termion = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 
@@ -429,7 +430,7 @@ required-features = ["ssh_client"]
 [[example]]
 name = "ssh_tui"
 path = "examples/node/ssh_tui.rs"
-required-features = ["ssh_server", "ssh_client", "node", "termwiz"]
+required-features = ["ssh_server", "node", "termion"]
 
 # 💡 Examples - Node
 

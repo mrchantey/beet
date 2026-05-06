@@ -15,7 +15,7 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	let (terminal, stdio) = Terminal::new_stdout().unwrap();
+	let (terminal, stdio) = StdoutTerminal::new_stdout().unwrap();
 	commands.spawn((
 		terminal,
 		stdio,

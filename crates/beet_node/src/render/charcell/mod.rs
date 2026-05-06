@@ -6,13 +6,13 @@
 mod backend;
 mod plugin;
 mod renderer;
-#[cfg(feature = "termwiz")]
+#[cfg(feature = "termion")]
 mod terminal;
 pub use backend::*;
 pub use buffer::*;
 pub use plugin::*;
 pub use renderer::*;
-#[cfg(feature = "termwiz")]
+#[cfg(feature = "termion")]
 pub use terminal::*;
 mod buffer;
 mod render_context;

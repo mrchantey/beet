@@ -19,7 +19,7 @@ required-features = ["style"]
 [[example]]
 name = "tui"
 path = "examples/tui.rs"
-required-features = ["termwiz", "style"]
+required-features = ["termion", "style"]
 
 
 [features]
@@ -31,7 +31,7 @@ tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
-termwiz = ["dep:termwiz", "dep:futures-io", "dep:libc"]
+termion = ["dep:termion"]
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -48,8 +48,7 @@ bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
 uuid.workspace = true
-termwiz = { version = "0.23", optional = true }
-futures-io = { workspace = true, optional = true }
+termion = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
@@ -66,6 +65,7 @@ material-colors = {version = "0.4.2", optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ratatui = {workspace = true, optional = true, features=["crossterm","unstable-rendered-line-info"]}
 bevy_ratatui = {workspace = true, optional = true, features = ["crossterm","keyboard", "mouse"] }
+
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

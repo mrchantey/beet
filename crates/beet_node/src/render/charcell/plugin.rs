@@ -9,13 +9,18 @@ impl Plugin for CharcellPlugin {
 			PostUpdate,
 			apply_node_changes.in_set(ApplyNodeChanges),
 		);
-		#[cfg(feature = "termwiz")]
+		#[cfg(feature = "termion")]
 		{
 			use crate::prelude::*;
 			use bevy::ecs::schedule::common_conditions;
+			use std::io::BufWriter;
+
+			type R = termion::AsyncReader;
+			type W = BufWriter<std::io::Stdout>;
+
 			app.add_systems(
 				PostUpdate,
-				render_terminal.after(ApplyNodeChanges),
+				render_terminal::<R, W>.after(ApplyNodeChanges),
 			);
 			app.add_systems(
 				PreUpdate,
@@ -25,9 +30,11 @@ impl Plugin for CharcellPlugin {
 			app.add_systems(
 				PostUpdate,
 				(
-					flush_stdio_terminals.after(render_terminal),
+					flush_terminals::<R, W>.after(render_terminal::<R, W>),
 					disable_raw_mode
 						.run_if(common_conditions::resource_removed::<RawMode>),
+					restore_terminals::<R, W>
+						.run_if(common_conditions::on_message::<AppExit>),
 					try_disable_raw_mode
 						.run_if(common_conditions::on_message::<AppExit>),
 				)
