@@ -277,7 +277,13 @@ impl russh::server::Handler for BeetSshHandler {
 				username: self.authenticated_user.clone(),
 			})
 			.await
-			.map_err(|_| russh::Error::Disconnect)?;
+			.map_err(|err| {
+				error!(
+					"Failed to send new connection info to accept loop: {:?}",
+					err
+				);
+				russh::Error::Disconnect
+			})?;
 
 		Ok(true)
 	}

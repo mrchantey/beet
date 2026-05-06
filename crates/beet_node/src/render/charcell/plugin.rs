@@ -9,22 +9,38 @@ impl Plugin for CharcellPlugin {
 			PostUpdate,
 			apply_node_changes.in_set(ApplyNodeChanges),
 		);
-		cfg_if! {
-			if #[cfg(feature = "tui")] {
-				app.add_plugins(bevy_ratatui::RatatuiPlugins {
-					enable_kitty_protocol: true,
-					enable_mouse_capture: true,
-					enable_input_forwarding: true,
-				});
-			} else if #[cfg(feature = "crossterm")] {
-				use crate::prelude::*;
-				app
-					.add_systems(PostUpdate, (
+		#[cfg(feature = "crossterm")]
+		{
+			use bevy::ecs::schedule::common_conditions;
+
+			use crate::prelude::*;
+			app.add_systems(
+				PreUpdate,
+				enable_raw_mode
+					.run_if(common_conditions::resource_added::<RawMode>),
+			)
+			.add_systems(
+				PostUpdate,
+				(
+					disable_raw_mode
+						.run_if(common_conditions::resource_removed::<RawMode>),
+					try_disable_raw_mode
+						.run_if(common_conditions::on_message::<AppExit>),
+					(
 						render_crossterm::<std::io::Stdout>,
 						render_crossterm::<Vec<u8>>,
-						)
-						.after(ApplyNodeChanges));
-			}
+					)
+						.after(ApplyNodeChanges),
+				),
+			);
+		}
+		#[cfg(feature = "tui")]
+		{
+			app.add_plugins(bevy_ratatui::RatatuiPlugins {
+				enable_kitty_protocol: true,
+				enable_mouse_capture: true,
+				enable_input_forwarding: true,
+			});
 		}
 	}
 }

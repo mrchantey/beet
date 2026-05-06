@@ -18,6 +18,20 @@ use std::io::Stdout;
 use std::io::Write;
 use std::io::stdout;
 
+/// Marker to enable or disable raw mode for the process terminal
+#[derive(Default, Resource)]
+pub struct RawMode;
+
+pub fn enable_raw_mode() -> Result { terminal::enable_raw_mode()?.xok() }
+pub fn disable_raw_mode() -> Result { terminal::disable_raw_mode()?.xok() }
+pub fn try_disable_raw_mode(res: Option<Res<RawMode>>) -> Result {
+	if res.is_some() {
+		terminal::disable_raw_mode()?;
+	}
+	Ok(())
+}
+
+
 /// Renders changed [`CharcellRenderer`] buffers to the terminal.
 pub fn render_crossterm<W: 'static + Send + Sync + Write>(
 	mut query: Populated<
@@ -67,7 +81,6 @@ impl<W: Write> CrosstermBackend<W> {
 			writer
 				.execute(EnterAlternateScreen)?
 				.execute(cursor::Hide)?;
-			terminal::enable_raw_mode()?;
 		}
 		Self { writer, fullscreen }.xok()
 	}
@@ -77,7 +90,6 @@ impl<W: Write> CrosstermBackend<W> {
 			self.writer
 				.execute(LeaveAlternateScreen)?
 				.execute(cursor::Show)?;
-			terminal::disable_raw_mode()?;
 		}
 		Ok(())
 	}

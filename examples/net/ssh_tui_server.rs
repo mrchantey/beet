@@ -89,8 +89,8 @@ fn on_data(
 		Some(b"q") | Some([3]) => {
 			commands
 				.entity(conn)
-				.trigger_target(SshDataSend(SshData::text("\x1b[?1049l")));
-			commands.entity(conn).trigger_target(SshDisconnect);
+				.trigger_target(SshDataSend(SshData::text("\x1b[?1049l")))
+				.trigger_target(SshDisconnect);
 			return;
 		}
 		_ => return,
