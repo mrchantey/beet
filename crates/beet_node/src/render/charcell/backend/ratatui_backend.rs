@@ -62,22 +62,21 @@ impl<T: ratatui::backend::Backend> Backend for RatatuiBackend<T> {
 		.xok()
 	}
 
-	fn draw(&mut self, buffer: &Buffer) -> Result {
-		let width = buffer.size().x;
-		let height = buffer.size().y;
-		// build ratatui cells from our buffer
-		let mut cells: Vec<(u16, u16, ratatui::buffer::Cell)> = Vec::new();
-		for idx in 0..(width * height) {
-			let x = idx % width;
-			let y = idx / width;
-			if let Some(cell) = buffer.get(UVec2::new(x, y)) {
-				cells.push((x as u16, y as u16, cell.to_ratatui_cell()));
-			}
-		}
+	fn draw(
+		&mut self,
+		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+	) -> Result {
+		// collect to own ratatui cells before passing to inner backend
+		let cells: Vec<_> = cells
+			.into_iter()
+			.map(|(pos, cell)| {
+				(pos.x as u16, pos.y as u16, cell.to_ratatui_cell())
+			})
+			.collect();
 		self.inner
 			.draw(cells.iter().map(|(x, y, cell)| (*x, *y, cell)))
-			.map_err(|err| err.to_string())?
-			.xok()
+			.map_err(|err| err.to_string())?;
+		().xok()
 	}
 
 	fn flush(&mut self) -> Result {

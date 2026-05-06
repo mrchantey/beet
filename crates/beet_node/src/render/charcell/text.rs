@@ -27,7 +27,7 @@ pub fn text_layout(cx: &mut CharcellRenderContext) -> Result {
 		}
 		let text_align = cx
 			.node
-			.layout
+			.visual
 			.map(|style| style.text_align)
 			.unwrap_or_default();
 		let aligned = align_line(line, cx.content_rect.width(), text_align);
@@ -133,7 +133,7 @@ mod tests {
 	fn text_align_left() {
 		render_pluses((
 			rsx! { "Hi" },
-			LayoutStyle::default().with_text_align(TextAlign::Left),
+			VisualStyle::default().with_text_align(TextAlign::Left),
 		))
 		.xpect_snapshot();
 	}
@@ -142,7 +142,7 @@ mod tests {
 	fn text_align_right() {
 		render_pluses((
 			rsx! { "Hi" },
-			LayoutStyle::default().with_text_align(TextAlign::Right),
+			VisualStyle::default().with_text_align(TextAlign::Right),
 		))
 		.xpect_snapshot();
 	}
@@ -151,7 +151,7 @@ mod tests {
 	fn text_align_center() {
 		render_pluses((
 			rsx! { "Hi" },
-			LayoutStyle::default().with_text_align(TextAlign::Center),
+			VisualStyle::default().with_text_align(TextAlign::Center),
 		))
 		.xpect_snapshot();
 	}

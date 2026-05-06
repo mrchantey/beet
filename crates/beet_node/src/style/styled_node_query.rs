@@ -10,6 +10,7 @@ pub struct StyledNodeView<'a> {
 	pub flexbox: Option<&'a FlexBox>,
 	pub visual: Option<&'a VisualStyle>,
 	pub layout: Option<&'a LayoutStyle>,
+	pub box_style: Option<&'a BoxStyle>,
 	pub children: Vec<StyledNodeView<'a>>,
 }
 
@@ -34,6 +35,7 @@ pub struct StyledNodeQuery<'w, 's> {
 			Option<&'static FlexBox>,
 			Option<&'static VisualStyle>,
 			Option<&'static LayoutStyle>,
+			Option<&'static BoxStyle>,
 		),
 	>,
 	children: Query<'w, 's, &'static Children>,
@@ -45,7 +47,7 @@ impl<'w, 's> StyledNodeQuery<'w, 's> {
 	/// recursively creating for children as well.
 	pub fn get_view(&self, entity: Entity) -> StyledNodeView<'_> {
 		let element = self.elements.get(entity).ok();
-		let (value, flexbox, visual, layout) =
+		let (value, flexbox, visual, layout, box_style) =
 			self.styled_nodes.get(entity).unwrap_or_default();
 		let children = self
 			.children
@@ -60,6 +62,7 @@ impl<'w, 's> StyledNodeQuery<'w, 's> {
 			flexbox,
 			visual,
 			layout,
+			box_style,
 			children,
 		}
 	}

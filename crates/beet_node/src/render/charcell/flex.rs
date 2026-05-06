@@ -690,8 +690,8 @@ mod tests {
 	}
 
 
-	fn bordered() -> LayoutStyle {
-		LayoutStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+	fn bordered() -> BoxStyle {
+		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
 	}
 
 	#[test]
@@ -752,7 +752,11 @@ mod tests {
 	fn flex_grow_distributes_space() {
 		let output = render((FlexBox::row().column_gap(1), children![
 			(rsx! {"A"}, bordered()),
-			(rsx! {"B"}, bordered().with_flex_grow(1)),
+			(
+				rsx! {"B"},
+				bordered(),
+				LayoutStyle::default().with_flex_grow(1)
+			),
 			(rsx! {"C"}, bordered()),
 		]));
 		output.xpect_snapshot();
@@ -845,7 +849,7 @@ mod tests {
 	fn padding_with_content() {
 		render((FlexBox::row(), children![(
 			rsx! {"X"},
-			LayoutStyle::default()
+			BoxStyle::default()
 				.with_border(Spacing::all(Length::Rem(1.)))
 				.with_padding(Spacing::all(Length::Rem(0.5)))
 		)]))

@@ -73,15 +73,12 @@ impl FlexBox {
 
 pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
+/// Flex layout properties for a node.
 #[derive(Debug, Default, Clone, SetWith, Component)]
 pub struct LayoutStyle {
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
-	pub padding: Spacing,
-	pub margin: Spacing,
-	pub border: Spacing,
-	pub text_align: TextAlign,
 }
 
 impl LayoutStyle {
@@ -89,10 +86,6 @@ impl LayoutStyle {
 		flex_order: 0,
 		flex_grow: 0,
 		align_self: AlignSelf::Auto,
-		padding: Spacing::DEFAULT,
-		margin: Spacing::DEFAULT,
-		border: Spacing::DEFAULT,
-		text_align: TextAlign::Left,
 	};
 }
 
@@ -218,14 +211,6 @@ impl AsCssValue for Direction {
 }
 
 
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub enum TextAlign {
-	#[default]
-	Left,
-	Center,
-	Right,
-}
 
 /// How to distribute lines along the cross axis when wrapping.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]

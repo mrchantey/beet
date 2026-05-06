@@ -46,12 +46,27 @@ impl Buffer {
 		self.index(pos).and_then(|idx| self.cells[idx].as_ref())
 	}
 
+	/// Iterate over all non-empty cells with their positions.
+	pub fn iter_cells(&self) -> impl Iterator<Item = (UVec2, &Cell)> + '_ {
+		let width = self.size.x;
+		self.cells
+			.iter()
+			.enumerate()
+			.filter_map(move |(idx, cell)| {
+				cell.as_ref().map(|c| {
+					let x = idx as u32 % width;
+					let y = idx as u32 / width;
+					(UVec2::new(x, y), c)
+				})
+			})
+	}
+
 	/// Write text starting at position, wrapping each character into a cell.
 	pub fn write_text(
 		&mut self,
 		pos: UVec2,
 		text: &str,
-		style: impl Clone + Into<CellStyle>,
+		style: VisualStyle,
 		entity: Entity,
 	) {
 		for (i, ch) in text.chars().enumerate() {
@@ -109,7 +124,7 @@ impl Buffer {
 			for x in 0..width {
 				let idx = y * width + x;
 				if let Some(cell) = &self.cells[idx] {
-					let ansi_style = cell_style_to_ansi(&cell.style);
+					let ansi_style = visual_style_to_ansi(&cell.style);
 					result.push_str(
 						&ansi_style.paint(cell.symbol.as_str()).to_string(),
 					);
@@ -129,15 +144,14 @@ impl Buffer {
 #[derive(Debug, Clone, SetWith)]
 pub struct Cell {
 	pub symbol: SmolStr,
-	#[set_with(into)]
-	pub style: CellStyle,
+	pub style: VisualStyle,
 	pub entity: Entity,
 }
 
 impl Cell {
 	pub fn new(
 		symbol: impl Into<SmolStr>,
-		style: impl Into<CellStyle>,
+		style: impl Into<VisualStyle>,
 		entity: Entity,
 	) -> Self {
 		Self {
@@ -148,25 +162,7 @@ impl Cell {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, SetWith)]
-pub struct CellStyle {
-	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
-	pub foreground: Option<Color>,
-	pub background: Option<Color>,
-	pub decoration_color: Option<Color>,
-	pub text_style: TextStyle,
-}
-
-impl From<VisualStyle> for CellStyle {
-	fn from(style: VisualStyle) -> Self {
-		Self {
-			foreground: style.foreground,
-			background: style.background,
-			decoration_color: style.decoration_color,
-			text_style: style.text_style,
-		}
-	}
-}
+// ── ANSI conversions ──────────────────────────────────────────────────────────
 
 #[cfg(feature = "ansi_paint")]
 fn color_to_ansi(color: Color) -> nu_ansi_term::Color {
@@ -174,8 +170,9 @@ fn color_to_ansi(color: Color) -> nu_ansi_term::Color {
 	nu_ansi_term::Color::Rgb(s.red, s.green, s.blue)
 }
 
+/// Convert a [`VisualStyle`] to a nu_ansi_term style for buffer rendering.
 #[cfg(feature = "ansi_paint")]
-fn cell_style_to_ansi(style: &CellStyle) -> nu_ansi_term::Style {
+fn visual_style_to_ansi(style: &VisualStyle) -> nu_ansi_term::Style {
 	let mut ansi_style = nu_ansi_term::Style::new();
 
 	if let Some(color) = style.foreground {
@@ -191,19 +188,14 @@ fn cell_style_to_ansi(style: &CellStyle) -> nu_ansi_term::Style {
 		ansi_style = ansi_style.on(color_to_ansi(color));
 	}
 
-	let text_style = style.text_style;
-	if text_style.intersects(
-		TextStyle::UNDERLINE
-			| TextStyle::UNDERLINE_DOUBLE
-			| TextStyle::UNDERLINE_WAVY
-			| TextStyle::UNDERLINE_DASH,
-	) {
+	let ts = style.text_style;
+	if ts.contains(TextStyle::UNDERLINE) {
 		ansi_style = ansi_style.underline();
 	}
-	if text_style.contains(TextStyle::LINE_THROUGH) {
+	if ts.contains(TextStyle::LINE_THROUGH) {
 		ansi_style = ansi_style.strikethrough();
 	}
-	// TextStyle::OVERLINE: not supported in ANSI terminals, skip
+	// TextStyle::OVERLINE: not supported in nu_ansi_term, skip
 
 	ansi_style
 }
@@ -222,7 +214,7 @@ fn color_to_crossterm(color: Color) -> crossterm::style::Color {
 }
 
 #[cfg(feature = "crossterm")]
-impl CellStyle {
+impl VisualStyle {
 	/// Converts to a crossterm [`ContentStyle`](crossterm::style::ContentStyle).
 	pub fn to_crossterm_content_style(&self) -> crossterm::style::ContentStyle {
 		use crossterm::style::Attribute;
@@ -232,22 +224,23 @@ impl CellStyle {
 		if s.contains(TextStyle::BOLD) {
 			attributes.set(Attribute::Bold);
 		}
-		if s.contains(TextStyle::DIM) {
-			attributes.set(Attribute::Dim);
-		}
 		if s.contains(TextStyle::ITALIC) {
 			attributes.set(Attribute::Italic);
 		}
-		// underline variants
-		if s.intersects(
-			TextStyle::UNDERLINE
-				| TextStyle::UNDERLINE_WAVY
-				| TextStyle::UNDERLINE_DASH,
-		) {
-			attributes.set(Attribute::Underlined);
+		// dim is derived from foreground alpha < 50%
+		if let Some(fg) = self.foreground {
+			if fg.to_srgba_u8().alpha < 128 {
+				attributes.set(Attribute::Dim);
+			}
 		}
-		if s.contains(TextStyle::UNDERLINE_DOUBLE) {
-			attributes.set(Attribute::DoubleUnderlined);
+		// underline variants: UNDERLINE + style modifier
+		if s.contains(TextStyle::UNDERLINE) {
+			if s.contains(TextStyle::DOUBLE) {
+				attributes.set(Attribute::DoubleUnderlined);
+			} else {
+				// WAVY and DASH both map to basic underline (ANSI undercurl not universal)
+				attributes.set(Attribute::Underlined);
+			}
 		}
 		if s.contains(TextStyle::OVERLINE) {
 			attributes.set(Attribute::OverLined);
@@ -286,7 +279,7 @@ fn color_to_ratatui(color: Color) -> ratatui::style::Color {
 }
 
 #[cfg(feature = "tui")]
-impl CellStyle {
+impl VisualStyle {
 	/// Converts to a ratatui [`Style`](ratatui::style::Style).
 	pub fn to_ratatui_style(&self) -> ratatui::style::Style {
 		let mut modifier = ratatui::style::Modifier::empty();
@@ -297,8 +290,11 @@ impl CellStyle {
 		if s.contains(TextStyle::ITALIC) {
 			modifier |= ratatui::style::Modifier::ITALIC;
 		}
-		if s.contains(TextStyle::DIM) {
-			modifier |= ratatui::style::Modifier::DIM;
+		// dim derived from foreground alpha
+		if let Some(fg) = self.foreground {
+			if fg.to_srgba_u8().alpha < 128 {
+				modifier |= ratatui::style::Modifier::DIM;
+			}
 		}
 		if s.contains(TextStyle::BLINK) {
 			modifier |= ratatui::style::Modifier::SLOW_BLINK;
@@ -312,12 +308,7 @@ impl CellStyle {
 		if s.contains(TextStyle::HIDDEN) {
 			modifier |= ratatui::style::Modifier::HIDDEN;
 		}
-		if s.intersects(
-			TextStyle::UNDERLINE
-				| TextStyle::UNDERLINE_DOUBLE
-				| TextStyle::UNDERLINE_WAVY
-				| TextStyle::UNDERLINE_DASH,
-		) {
+		if s.contains(TextStyle::UNDERLINE) {
 			modifier |= ratatui::style::Modifier::UNDERLINED;
 		}
 		if s.contains(TextStyle::LINE_THROUGH) {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::style::StyledNodeView;
+use crate::style::VisualStyle;
 use beet_core::prelude::*;
 
 
@@ -14,7 +15,7 @@ pub struct CharcellRenderContext<'a> {
 	pub(super) content_rect: URect,
 	pub(super) buffer: &'a mut Buffer,
 	/// The parent entity and visual style, used to fill margin cells.
-	parent: Option<(Entity, CellStyle)>,
+	parent: Option<(Entity, VisualStyle)>,
 }
 
 impl<'a> CharcellRenderContext<'a> {
@@ -43,7 +44,7 @@ impl<'a> CharcellRenderContext<'a> {
 	pub(super) fn with_parent(
 		mut self,
 		entity: Entity,
-		style: impl Into<CellStyle>,
+		style: impl Into<VisualStyle>,
 	) -> Self {
 		self.parent = Some((entity, style.into()));
 		self
@@ -81,7 +82,7 @@ impl<'a> CharcellRenderContext<'a> {
 				self.buffer,
 				inner_rect,
 				content_rect,
-				self.node.visual_style().clone().into(),
+				self.node.visual_style().clone(),
 				self.node.entity,
 			);
 		}

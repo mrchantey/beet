@@ -10,16 +10,13 @@ pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
 /// Visual styling for a cell.
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct VisualStyle {
-	/// In ansi renderers an alpha channel of <50% will apply the `dim` attributes
+	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
 	pub foreground: Option<Color>,
 	pub background: Option<Color>,
 	/// Color of underlines, overlines etc
 	pub decoration_color: Option<Color>,
 	pub text_style: TextStyle,
-	pub border_left: Option<Color>,
-	pub border_right: Option<Color>,
-	pub border_top: Option<Color>,
-	pub border_bottom: Option<Color>,
+	pub text_align: TextAlign,
 }
 
 impl VisualStyle {
@@ -28,12 +25,47 @@ impl VisualStyle {
 		background: None,
 		decoration_color: None,
 		text_style: TextStyle::empty(),
+		text_align: TextAlign::Left,
+	};
+}
+
+
+/// Text alignment within a cell's content area.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum TextAlign {
+	#[default]
+	Left,
+	Center,
+	Right,
+}
+
+
+/// Border and spacing styles for a node's box model.
+///
+/// Holds per-side border colors and margin/border/padding dimensions.
+#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
+pub struct BoxStyle {
+	pub border_left: Option<Color>,
+	pub border_right: Option<Color>,
+	pub border_top: Option<Color>,
+	pub border_bottom: Option<Color>,
+	pub border: Spacing,
+	pub margin: Spacing,
+	pub padding: Spacing,
+}
+
+impl BoxStyle {
+	pub const DEFAULT: Self = Self {
 		border_left: None,
 		border_right: None,
 		border_top: None,
 		border_bottom: None,
+		border: Spacing::DEFAULT,
+		margin: Spacing::DEFAULT,
+		padding: Spacing::DEFAULT,
 	};
-	pub fn with_border(mut self, color: impl Into<Color>) -> Self {
+	/// Set all four border colors at once.
+	pub fn with_border_color(mut self, color: impl Into<Color>) -> Self {
 		let color = Some(color.into());
 		self.border_left = color;
 		self.border_right = color;
@@ -56,28 +88,26 @@ bitflags! {
 		const BOLD = 1 << 0;
 		/// Italic text
 		const ITALIC = 1 << 1;
-		/// Dimmed text
-		const DIM = 1 << 2;
 		/// Slowly blinking text
-		const BLINK = 1 << 3;
+		const BLINK = 1 << 2;
 		/// Rapidly blinking text
-		const RAPID_BLINK = 1 << 4;
+		const RAPID_BLINK = 1 << 3;
 		/// Reversed foreground and background colors
-		const REVERSED = 1 << 5;
+		const REVERSED = 1 << 4;
 		/// Hidden text
-		const HIDDEN = 1 << 6;
+		const HIDDEN = 1 << 5;
 		/// `text-decoration-line: underline`
-		const UNDERLINE = 1 << 7;
-		/// `text-decoration-line: underline; text-decoration-style: double`
-		const UNDERLINE_DOUBLE = 1 << 8;
-		/// `text-decoration-line: underline; text-decoration-style: wavy`
-		const UNDERLINE_WAVY = 1 << 9;
-		/// `text-decoration-line: underline; text-decoration-style: dashed`
-		const UNDERLINE_DASH = 1 << 10;
+		const UNDERLINE = 1 << 6;
 		/// `text-decoration-line: overline`
-		const OVERLINE = 1 << 11;
+		const OVERLINE = 1 << 7;
 		/// `text-decoration-line: line-through`
-		const LINE_THROUGH = 1 << 12;
+		const LINE_THROUGH = 1 << 8;
+		/// `text-decoration-style: wavy` (combine with UNDERLINE/OVERLINE)
+		const WAVY = 1 << 9;
+		/// `text-decoration-style: double` (combine with UNDERLINE/OVERLINE)
+		const DOUBLE = 1 << 10;
+		/// `text-decoration-style: dashed` (combine with UNDERLINE/OVERLINE)
+		const DASH = 1 << 11;
 	}
 }
 

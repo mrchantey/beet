@@ -51,8 +51,13 @@ impl Backend for TestBackend {
 		})
 	}
 
-	fn draw(&mut self, buffer: &Buffer) -> Result {
-		self.buffer = buffer.clone();
+	fn draw(
+		&mut self,
+		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+	) -> Result {
+		for (pos, cell) in cells {
+			self.buffer.set(pos, cell);
+		}
 		Ok(())
 	}
 

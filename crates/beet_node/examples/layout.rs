@@ -51,12 +51,12 @@ fn render<B: Bundle>(name: &str, setup: fn() -> B) {
 	println!("\n{name}: \n{out}");
 }
 
-fn bordered() -> LayoutStyle {
-	LayoutStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+fn bordered() -> BoxStyle {
+	BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
 }
 
-fn margin() -> LayoutStyle {
-	LayoutStyle::default().with_margin(Spacing::all(Length::Rem(1.)))
+fn margin() -> BoxStyle {
+	BoxStyle::default().with_margin(Spacing::all(Length::Rem(1.)))
 }
 
 
@@ -241,8 +241,16 @@ fn setup_gaps() -> impl Bundle {
 fn setup_flex_grow() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(rsx! {"Fixed"}, bordered()),
-		(rsx! {"Grow 1"}, bordered().with_flex_grow(1)),
-		(rsx! {"Grow 2"}, bordered().with_flex_grow(2)),
+		(
+			rsx! {"Grow 1"},
+			bordered(),
+			LayoutStyle::default().with_flex_grow(1)
+		),
+		(
+			rsx! {"Grow 2"},
+			bordered(),
+			LayoutStyle::default().with_flex_grow(2)
+		),
 		(rsx! {"Fixed"}, bordered()),
 	])
 }
@@ -330,11 +338,10 @@ fn setup_padding_only() -> impl Bundle {
 }
 
 fn setup_all_spacing() -> impl Bundle {
-	let style = LayoutStyle::default()
+	let style = BoxStyle::default()
 		.with_margin(Spacing::all(Length::Rem(1.)))
 		.with_border(Spacing::all(Length::Rem(1.)))
 		.with_padding(Spacing::all(Length::Rem(1.)));
-
 
 	(FlexBox::row().column_gap(0), children![
 		(rsx! {"A"}, style.clone()),
@@ -343,7 +350,7 @@ fn setup_all_spacing() -> impl Bundle {
 	])
 }
 
-// ── Style / Color ────────────────────────────────────────────────────────────────────────────
+// ── Style / Color ─────────────────────────────────────────────────────────────
 
 fn setup_foreground_color() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
@@ -389,13 +396,13 @@ fn setup_border_color() -> impl Bundle {
 	// Each node gets per-side border colors: top=red, bottom=blue, left=green, right=yellow
 	(FlexBox::row().column_gap(1), children![(
 		rsx! { "Box" },
-		bordered(),
-		VisualStyle {
+		BoxStyle {
+			border: Spacing::all(Length::Rem(1.)),
 			border_top: Some(Color::srgb(1., 0., 0.)),
 			border_bottom: Some(Color::srgb(0., 0.4, 1.)),
 			border_left: Some(Color::srgb(0., 0.8, 0.)),
 			border_right: Some(Color::srgb(1., 0.8, 0.)),
-			..VisualStyle::default()
+			..BoxStyle::default()
 		},
 	),])
 }
@@ -417,21 +424,19 @@ fn setup_text_align_style() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(
 			rsx! { "Left" },
-			LayoutStyle::default()
-				.with_border(Spacing::all(Length::Rem(1.)))
-				.with_text_align(TextAlign::Left),
+			BoxStyle::default().with_border(Spacing::all(Length::Rem(1.))),
 			VisualStyle {
 				foreground: Some(Color::srgb(0.8, 0.4, 0.)),
+				text_align: TextAlign::Left,
 				..VisualStyle::default()
 			},
 		),
 		(
 			rsx! { "Center" },
-			LayoutStyle::default()
-				.with_border(Spacing::all(Length::Rem(1.)))
-				.with_text_align(TextAlign::Center),
+			BoxStyle::default().with_border(Spacing::all(Length::Rem(1.))),
 			VisualStyle {
 				foreground: Some(Color::srgb(0., 0.8, 0.8)),
+				text_align: TextAlign::Center,
 				..VisualStyle::default()
 			},
 		),

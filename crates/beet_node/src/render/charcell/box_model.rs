@@ -6,7 +6,6 @@ use crate::prelude::*;
 use crate::render::Buffer;
 use crate::style::Spacing;
 use crate::style::StyledNodeView;
-use crate::style::TextStyle;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
@@ -15,7 +14,7 @@ use bevy::math::Vec2;
 
 // ── BoxModel ─────────────────────────────────────────────────────────────────
 
-/// Pure-data box model computed from a node's layout style.
+/// Pure-data box model computed from a node's box style.
 ///
 /// Describes margin, border, and padding dimensions for a single node.
 /// All values are in terminal cells.
@@ -28,9 +27,9 @@ pub(super) struct BoxModel {
 impl BoxModel {
 	/// Compute the box model for `node` relative to `viewport`.
 	///
-	/// Returns zeroed/false defaults when the node has no layout style.
+	/// Returns zeroed/false defaults when the node has no box style.
 	pub fn from_node(node: &StyledNodeView, viewport: URect) -> Self {
-		let Some(layout) = node.layout else {
+		let Some(box_style) = node.box_style else {
 			return Self {
 				margin: URect::default(),
 				has_border: false,
@@ -39,9 +38,9 @@ impl BoxModel {
 		};
 
 		let vp = Vec2::new(viewport.width() as f32, viewport.height() as f32);
-		let margin = tui_inset(&layout.margin, vp);
-		let padding = tui_inset(&layout.padding, vp);
-		let has_border = layout.border != Spacing::DEFAULT;
+		let margin = tui_inset(&box_style.margin, vp);
+		let padding = tui_inset(&box_style.padding, vp);
+		let has_border = box_style.border != Spacing::DEFAULT;
 
 		Self {
 			margin,
@@ -98,7 +97,7 @@ pub(super) fn draw_margin(
 	buffer: &mut Buffer,
 	containing: URect,
 	border_rect: URect,
-	style: CellStyle,
+	style: VisualStyle,
 	entity: Entity,
 ) {
 	fill_frame(buffer, containing, border_rect, style, entity);
@@ -106,7 +105,7 @@ pub(super) fn draw_margin(
 
 /// Draw a single-line box border inside `rect` using box-drawing characters.
 ///
-/// Uses per-side colors from [`VisualStyle`]: top/bottom colors for horizontal
+/// Uses per-side colors from [`BoxStyle`]: top/bottom colors for horizontal
 /// segments and corners, left/right colors for vertical segments.
 /// No-ops when the rect is too small to hold a border (width or height < 2).
 pub(super) fn draw_border(
@@ -122,13 +121,16 @@ pub(super) fn draw_border(
 	}
 
 	let visual = node.visual_style();
+	let box_style = node.box_style;
 	let entity = node.entity;
 
 	// build per-side char styles
-	let top_style = side_style(visual.border_top, visual);
-	let bottom_style = side_style(visual.border_bottom, visual);
-	let left_style = side_style(visual.border_left, visual);
-	let right_style = side_style(visual.border_right, visual);
+	let top_style = side_style(box_style.and_then(|b| b.border_top), visual);
+	let bottom_style =
+		side_style(box_style.and_then(|b| b.border_bottom), visual);
+	let left_style = side_style(box_style.and_then(|b| b.border_left), visual);
+	let right_style =
+		side_style(box_style.and_then(|b| b.border_right), visual);
 
 	// top border — corners use the top border color
 	buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
@@ -178,7 +180,7 @@ pub(super) fn draw_padding(
 	buffer: &mut Buffer,
 	inner_rect: URect,
 	content_rect: URect,
-	style: CellStyle,
+	style: VisualStyle,
 	entity: Entity,
 ) {
 	fill_frame(buffer, inner_rect, content_rect, style, entity);
@@ -191,7 +193,7 @@ fn fill_frame(
 	buffer: &mut Buffer,
 	outer: URect,
 	inner: URect,
-	style: CellStyle,
+	style: VisualStyle,
 	entity: Entity,
 ) {
 	// clamp inner to outer so we never write outside it
@@ -216,14 +218,16 @@ fn fill_frame(
 	}
 }
 
-/// Build a [`CellStyle`] for one border side, using the provided color as
+/// Build a [`VisualStyle`] for one border side, using the provided color as
 /// the foreground and inheriting the background from the visual style.
-fn side_style(border_color: Option<Color>, visual: &VisualStyle) -> CellStyle {
-	CellStyle {
+fn side_style(
+	border_color: Option<Color>,
+	visual: &VisualStyle,
+) -> VisualStyle {
+	VisualStyle {
 		foreground: border_color,
 		background: visual.background,
-		decoration_color: None,
-		text_style: TextStyle::empty(),
+		..default()
 	}
 }
 

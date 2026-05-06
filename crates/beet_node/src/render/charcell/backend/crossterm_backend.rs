@@ -18,15 +18,20 @@ use std::io::Stdout;
 use std::io::Write;
 use std::io::stdout;
 
+/// Renders changed [`CharcellRenderer`] buffers to the terminal.
 pub fn render_crossterm<W: 'static + Send + Sync + Write>(
 	mut query: Populated<
 		(&mut CrosstermBackend<W>, &CharcellRenderer),
 		Changed<CharcellRenderer>,
 	>,
-) {
-	for (_backend, _renderer) in query.iter_mut() {
-		todo!("render");
+) -> Result {
+	for (mut backend, renderer) in query.iter_mut() {
+		let cells =
+			renderer.iter_cells().map(|(pos, cell)| (pos, cell.clone()));
+		backend.draw(cells)?;
+		backend.flush()?;
 	}
+	Ok(())
 }
 
 
@@ -46,10 +51,6 @@ impl CrosstermBackend<Stdout> {
 impl<W: Write + Default> Default for CrosstermBackend<W> {
 	fn default() -> Self { Self::new(W::default(), false).unwrap() }
 }
-
-// impl Default for CrosstermBackend<Stdout> {
-// 	fn default() -> Self { Self::new_stdout().unwrap() }
-// }
 
 impl<W> Drop for CrosstermBackend<W>
 where
@@ -133,59 +134,49 @@ impl<W: Write> Backend for CrosstermBackend<W> {
 		.xok()
 	}
 
-	fn draw(&mut self, buffer: &Buffer) -> Result {
-		let width = buffer.size().x;
-		let height = buffer.size().y;
+	fn draw(
+		&mut self,
+		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+	) -> Result {
 		let mut last_pos: Option<(u16, u16)> = None;
 		let mut cur_fg = CrosstermColor::Reset;
 		let mut cur_bg = CrosstermColor::Reset;
 		let mut cur_attrs = Attributes::default();
 
-		for y in 0..height {
-			for x in 0..width {
-				let Some(cell) = buffer.get(UVec2::new(x, y)) else {
-					// gap in the buffer; force a MoveTo on the next cell
-					last_pos = None;
-					continue;
-				};
-				let (cx, cy) = (x as u16, y as u16);
+		for (pos, cell) in cells {
+			let (cx, cy) = (pos.x as u16, pos.y as u16);
 
-				// skip MoveTo when directly following the previous cell
-				if !matches!(last_pos, Some((lx, ly)) if cx == lx + 1 && cy == ly)
-				{
-					queue!(self.writer, cursor::MoveTo(cx, cy))?;
-				}
-				last_pos = Some((cx, cy));
-
-				// apply color changes
-				let content_style = cell.style.to_crossterm_content_style();
-				let new_fg = content_style
-					.foreground_color
-					.unwrap_or(CrosstermColor::Reset);
-				let new_bg = content_style
-					.background_color
-					.unwrap_or(CrosstermColor::Reset);
-				if new_fg != cur_fg || new_bg != cur_bg {
-					queue!(
-						self.writer,
-						SetColors(Colors::new(new_fg, new_bg))
-					)?;
-					cur_fg = new_fg;
-					cur_bg = new_bg;
-				}
-
-				// apply attribute changes
-				let new_attrs = content_style.attributes;
-				if new_attrs != cur_attrs {
-					queue!(self.writer, SetAttribute(Attribute::Reset))?;
-					if !new_attrs.is_empty() {
-						queue!(self.writer, SetAttributes(new_attrs))?;
-					}
-					cur_attrs = new_attrs;
-				}
-
-				queue!(self.writer, Print(cell.symbol.as_str()))?;
+			// skip MoveTo when directly following the previous cell
+			if !matches!(last_pos, Some((lx, ly)) if cx == lx + 1 && cy == ly) {
+				queue!(self.writer, cursor::MoveTo(cx, cy))?;
 			}
+			last_pos = Some((cx, cy));
+
+			// apply color changes
+			let content_style = cell.style.to_crossterm_content_style();
+			let new_fg = content_style
+				.foreground_color
+				.unwrap_or(CrosstermColor::Reset);
+			let new_bg = content_style
+				.background_color
+				.unwrap_or(CrosstermColor::Reset);
+			if new_fg != cur_fg || new_bg != cur_bg {
+				queue!(self.writer, SetColors(Colors::new(new_fg, new_bg)))?;
+				cur_fg = new_fg;
+				cur_bg = new_bg;
+			}
+
+			// apply attribute changes
+			let new_attrs = content_style.attributes;
+			if new_attrs != cur_attrs {
+				queue!(self.writer, SetAttribute(Attribute::Reset))?;
+				if !new_attrs.is_empty() {
+					queue!(self.writer, SetAttributes(new_attrs))?;
+				}
+				cur_attrs = new_attrs;
+			}
+
+			queue!(self.writer, Print(cell.symbol.as_str()))?;
 		}
 
 		// reset terminal state after drawing

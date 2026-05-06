@@ -19,7 +19,7 @@ fn setup() -> impl Bundle {
 	(
 		rsx! {"hello world!"},
 		VisualStyle::default(),
-		LayoutStyle::default()
+		BoxStyle::default()
 			.with_margin(Spacing::all(Length::Rem(3.)))
 			.with_border(Spacing::all(Length::Rem(1.)))
 			.with_padding(Spacing::all(Length::Rem(3.))),

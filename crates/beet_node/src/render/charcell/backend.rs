@@ -1,6 +1,6 @@
 //! Charcell backends for interacting with the terminal,
 //! This is directly influenced by, and intended to be compatible with ratatui backends.
-use crate::render::Buffer;
+use super::Cell;
 use beet_core::prelude::*;
 mod test_backend;
 pub use test_backend::*;
@@ -29,6 +29,10 @@ pub trait Backend {
 	fn set_cursor(&mut self, position: UVec2) -> Result;
 	fn clear(&mut self) -> Result;
 	fn window_size(&mut self) -> Result<WindowSize>;
-	fn draw(&mut self, buffer: &Buffer) -> Result;
+	/// Draw the provided cells at their given positions.
+	fn draw(
+		&mut self,
+		cells: impl IntoIterator<Item = (UVec2, Cell)>,
+	) -> Result;
 	fn flush(&mut self) -> Result;
 }
