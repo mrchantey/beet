@@ -8,8 +8,8 @@ fn main() {
 		.add_plugins((MinimalPlugins, CharcellPlugin))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)
+		.init_resource::<RawMode>()
 		.run();
-
 }
 
 

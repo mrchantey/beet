@@ -18,6 +18,10 @@ use std::io::Stdout;
 use std::io::Write;
 use std::io::stdout;
 
+/// 
+#[derive(Default, Component)]
+pub struct CrosstermInput;
+
 /// Marker to enable or disable raw mode for the process terminal
 #[derive(Default, Resource)]
 pub struct RawMode;

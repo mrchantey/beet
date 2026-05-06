@@ -82,7 +82,7 @@ pub struct SshCloseFrame {
 	/// SSH process exit code (0 = success).
 	pub code: u32,
 	/// Human-readable reason for the closure.
-	pub reason: String,
+	pub reason: SmolStr,
 }
 
 impl SshCloseFrame {

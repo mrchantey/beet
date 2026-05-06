@@ -180,7 +180,7 @@ async fn run_data_loop(
 						from_server_tx
 							.send(SshEvent::Close(Some(SshCloseFrame {
 								code: exit_status,
-								reason: String::new(),
+								reason: default(),
 							})))
 							.await
 							.ok();
