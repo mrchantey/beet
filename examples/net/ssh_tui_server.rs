@@ -26,12 +26,7 @@ fn main() -> Result {
 			LogPlugin::default(),
 			SshServerPlugin::default(),
 		))
-		.spawn_then((
-			SshServer::default(),
-			OnSpawn::observe(on_connected),
-			OnSpawn::observe(on_data),
-			OnSpawn::observe(on_disconnected),
-		))
+		.spawn_then((SshServer::default(), OnSpawn::observe(on_recv)))
 		.run();
 	Ok(())
 }
@@ -39,18 +34,6 @@ fn main() -> Result {
 /// Per-connection counter state.
 #[derive(Component, Default)]
 struct Counter(i32);
-
-/// Sends the initial TUI frame and sets up connection state.
-fn on_connected(ev: On<SshClientConnected>, mut commands: Commands) {
-	let conn = ev.original_target();
-	// enter alternate screen and render initial frame
-	commands
-		.entity(conn)
-		.insert(Counter::default())
-		.trigger_target(SshDataSend(SshData::text(
-			"\x1b[?1049h\x1b[2J".to_owned() + &render_frame(0),
-		)));
-}
 
 /// Renders a colour-cycling counter panel using ANSI escape codes.
 fn render_frame(count: i32) -> String {
@@ -70,42 +53,53 @@ fn render_frame(count: i32) -> String {
 	)
 }
 
-/// Handles keyboard input and updates the counter.
-fn on_data(
-	ev: On<SshDataRecv>,
+/// Handles all SSH events: connect, keyboard input, and disconnect.
+fn on_recv(
+	ev: On<SshRecv>,
 	mut commands: Commands,
 	mut counters: Query<&mut Counter>,
 ) {
 	let conn = ev.original_target();
-	let Ok(mut counter) = counters.get_mut(conn) else {
-		return;
-	};
 
-	match ev.event().inner().as_bytes() {
-		Some(b"+" | b"=") => counter.0 += 1,
-		Some(b"-") => counter.0 -= 1,
-		Some(b"r") => counter.0 = 0,
-		// q or Ctrl+C: exit alternate screen and disconnect
-		Some(b"q") | Some([3]) => {
+	match ev.event().inner() {
+		SshEvent::Connect => {
+			// Enter alternate screen and render initial frame.
 			commands
 				.entity(conn)
-				.trigger_target(SshDataSend(SshData::text("\x1b[?1049l")))
-				.trigger_target(SshDisconnect);
-			return;
+				.insert(Counter::default())
+				.trigger_target(SshSend(SshEvent::text(
+					"\x1b[?1049h\x1b[2J".to_owned() + &render_frame(0),
+				)));
 		}
-		_ => return,
+		SshEvent::Data(bytes) => {
+			let Ok(mut counter) = counters.get_mut(conn) else {
+				return;
+			};
+			match bytes.as_ref() {
+				b"+" | b"=" => counter.0 += 1,
+				b"-" => counter.0 -= 1,
+				b"r" => counter.0 = 0,
+				// q or Ctrl+C: exit alternate screen and disconnect
+				b"q" | [3] => {
+					commands
+						.entity(conn)
+						.trigger_target(SshSend(SshEvent::text("\x1b[?1049l")))
+						.trigger_target(SshSend(SshEvent::Close(None)));
+					return;
+				}
+				_ => return,
+			}
+			let frame = render_frame(counter.0);
+			commands
+				.entity(conn)
+				.trigger_target(SshSend(SshEvent::text(frame)));
+		}
+		SshEvent::Close(_) => {
+			// Clean up the connection entity on disconnect.
+			commands.entity(conn).despawn();
+		}
+		_ => {}
 	}
-
-	let frame = render_frame(counter.0);
-	commands
-		.entity(conn)
-		.trigger_target(SshDataSend(SshData::text(frame)));
-}
-
-/// Cleans up the connection entity on disconnect.
-fn on_disconnected(ev: On<SshClientDisconnected>, mut commands: Commands) {
-	// original_target() is the connection entity (event propagated up from child)
-	commands.entity(ev.original_target()).despawn();
 }
 
 #[cfg(test)]
@@ -137,9 +131,7 @@ mod tests {
 			app.world_mut().spawn((
 				server,
 				on_spawn,
-				OnSpawn::observe(on_connected),
-				OnSpawn::observe(on_data),
-				OnSpawn::observe(on_disconnected),
+				OnSpawn::observe(on_recv),
 			));
 			app.run();
 		});
@@ -151,16 +143,16 @@ mod tests {
 		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
 		app.world_mut()
 			.spawn(SshSession::insert_on_connect(&addr, "guest", "beet"))
-			.observe_any(move |ev: On<SshDataRecv>, mut commands: Commands| {
+			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
 				match ev.event().inner() {
-					SshData::Bytes(_) => {
-						if let Some(text) = ev.event().inner().as_str() {
+					SshEvent::Data(_) => {
+						if let Some(text) = ev.event().as_str() {
 							if !initial_clone.get() && text.contains("Counter:")
 							{
-								// Initial frame received — Counter is now inserted, send '+'.
+								// Initial frame received — send '+'.
 								initial_clone.set(true);
 								commands.entity(ev.target()).trigger_target(
-									SshDataSend(SshData::text("+")),
+									SshSend(SshEvent::text("+")),
 								);
 							} else if initial_clone.get()
 								&& text.contains("Counter:")
@@ -172,9 +164,10 @@ mod tests {
 							}
 						}
 					}
-					SshData::Exit(_) => {
+					SshEvent::Close(_) => {
 						commands.write_message(AppExit::Success);
 					}
+					_ => {}
 				}
 			});
 		app.run();

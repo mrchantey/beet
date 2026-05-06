@@ -4,18 +4,18 @@
 //!
 //! - **Server**: [`SshServer`] accepts incoming connections. Each connection
 //!   spawns a child entity with [`SshPeerInfo`] and bidirectional
-//!   [`SshDataSend`]/[`SshDataRecv`] event flow.
+//!   [`SshSend`]/[`SshRecv`] event flow.
 //! - **Client**: [`SshSession::insert_on_connect`] establishes an outbound session.
 //!
 //! ## Features
 //!
 //! - `russh_server` — enables [`SshServer`] on native targets
 //! - `russh_client` — enables [`SshSession::insert_on_connect`] on native targets
-mod ssh_data;
+mod ssh_event;
 mod ssh_server;
 mod ssh_session;
 
-pub use ssh_data::*;
+pub use ssh_event::*;
 pub use ssh_server::*;
 pub use ssh_session::*;
 

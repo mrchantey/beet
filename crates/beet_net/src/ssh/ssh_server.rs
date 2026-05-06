@@ -37,7 +37,11 @@ impl SshCredentials {
 /// An SSH server that accepts incoming connections.
 ///
 /// Each accepted connection spawns a child entity with [`SshPeerInfo`] and
-/// bidirectional [`SshDataSend`]/[`SshDataRecv`] event flow.
+/// bidirectional [`SshSend`]/[`SshRecv`] event flow.
+///
+/// Lifecycle events are delivered as [`SshRecv`]:
+/// - [`SshEvent::Connect`] — a client opened a session (`original_target()` is the connection entity)
+/// - [`SshEvent::Close`] — the client disconnected (`original_target()` is the connection entity)
 #[derive(Clone, Component)]
 #[component(on_add = on_add)]
 pub struct SshServer {
@@ -136,24 +140,6 @@ impl Default for SshServer {
 	fn default() -> Self { Self::new(DEFAULT_SSH_PORT) }
 }
 
-/// Triggered when a new SSH client opens a session.
-///
-/// Propagates from the connection (child) entity up to the server entity,
-/// so observers on the server receive it with `ev.original_target()` pointing
-/// to the connection entity.
-#[derive(EntityTargetEvent)]
-#[event(auto_propagate)]
-pub struct SshClientConnected;
-
-/// Triggered when the SSH client disconnects.
-///
-/// Propagates from the connection (child) entity up to the server entity,
-/// so observers on the server receive it with `ev.original_target()` pointing
-/// to the connection entity.
-#[derive(EntityTargetEvent)]
-#[event(auto_propagate)]
-pub struct SshClientDisconnected;
-
 #[cfg(test)]
 #[cfg(all(
 	feature = "russh_server",
@@ -177,13 +163,10 @@ mod tests {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, SshServerPlugin));
 			app.world_mut().spawn(server).observe_any(
-				|ev: On<SshDataRecv>, mut commands: Commands| {
-					if let Some(text) = ev.event().inner().as_str() {
+				|ev: On<SshRecv>, mut commands: Commands| {
+					if let Some(text) = ev.event().as_str() {
 						commands.entity(ev.original_target()).trigger_target(
-							SshDataSend(SshData::text(format!(
-								"echo:{}",
-								text
-							))),
+							SshSend(SshEvent::text(format!("echo:{}", text))),
 						);
 					}
 				},
@@ -199,16 +182,18 @@ mod tests {
 		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
 		app.world_mut()
 			.spawn(SshSession::insert_on_connect(&addr, "guest", "beet"))
-			.observe_any(|ev: On<SshSessionReady>, mut commands: Commands| {
-				commands
-					.entity(ev.target())
-					.trigger_target(SshDataSend(SshData::text("hello")));
-			})
-			.observe_any(move |ev: On<SshDataRecv>, mut commands: Commands| {
-				if let Some(text) = ev.event().inner().as_str() {
-					store_inner.set(Some(text.to_owned()));
+			.observe_any(|ev: On<SshRecv>, mut commands: Commands| {
+				if matches!(**ev, SshEvent::Connect) {
+					commands
+						.entity(ev.target())
+						.trigger_target(SshSend(SshEvent::text("hello")));
 				}
-				commands.write_message(AppExit::Success);
+			})
+			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
+				if let Some(text) = ev.event().as_str() {
+					store_inner.set(Some(text.to_owned()));
+					commands.write_message(AppExit::Success);
+				}
 			});
 		app.run();
 

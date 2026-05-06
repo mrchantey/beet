@@ -1,19 +1,20 @@
 use crate::ssh::*;
 use beet_core::prelude::*;
+use bytes::Bytes;
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Connects to an SSH server, sets up the entity data flow, and triggers
-/// [`SshSessionReady`] when ready.
+/// [`SshRecv`]`(`[`SshEvent::Connect`]`)` when ready.
 pub(crate) async fn connect_and_setup_entity(
 	entity: AsyncEntity,
 	addr: String,
 	user: Option<String>,
 	password: Option<String>,
 ) -> Result {
-	let (to_server_tx, to_server_rx) = async_channel::unbounded::<SshData>();
+	let (to_server_tx, to_server_rx) = async_channel::unbounded::<SshEvent>();
 	let (from_server_tx, from_server_rx) =
-		async_channel::unbounded::<SshData>();
+		async_channel::unbounded::<SshEvent>();
 
 	// Phase 1: connect and authenticate on the shared tokio runtime.
 	async_ext::on_tokio(async move {
@@ -35,9 +36,7 @@ pub(crate) async fn connect_and_setup_entity(
 	entity.with(move |mut entity| {
 		entity
 			.observe_any(
-				move |ev: On<SshDataSend>,
-				      mut commands: AsyncCommands|
-				      -> Result {
+				move |ev: On<SshSend>, mut commands: AsyncCommands| -> Result {
 					let to_server = to_server_obs.clone();
 					let data = ev.event().clone();
 					commands.run_local(async move |_| {
@@ -50,12 +49,12 @@ pub(crate) async fn connect_and_setup_entity(
 				},
 			)
 			.run_async_local(async move |entity| {
-				while let Ok(data) = from_server_rx.recv().await {
-					entity.trigger_target_then(SshDataRecv(data)).await;
+				while let Ok(event) = from_server_rx.recv().await {
+					entity.trigger_target_then(SshRecv(event)).await;
 				}
-				// channel closed — session ended
+				// channel closed — session ended without an explicit Close event
 			})
-			.trigger_target(SshSessionReady);
+			.trigger_target(SshRecv(SshEvent::Connect));
 	});
 
 	Ok(())
@@ -130,18 +129,41 @@ async fn connect_inner(
 async fn run_data_loop(
 	session: russh::client::Handle<BeetClientHandler>,
 	mut channel: russh::Channel<russh::client::Msg>,
-	to_server_rx: async_channel::Receiver<SshData>,
-	from_server_tx: async_channel::Sender<SshData>,
+	to_server_rx: async_channel::Receiver<SshEvent>,
+	from_server_tx: async_channel::Sender<SshEvent>,
 ) {
 	loop {
 		tokio::select! {
 			// bevy → SSH server
 			result = to_server_rx.recv() => {
 				match result {
-					Ok(SshData::Bytes(bytes)) => {
+					Ok(SshEvent::Data(bytes)) => {
 						channel.data(bytes.as_ref()).await.ok();
 					}
-					Ok(SshData::Exit(_)) | Err(_) => break,
+					Ok(SshEvent::RequestPty(pty)) => {
+						channel.request_pty(
+							true,
+							&pty.terminal,
+							pty.window.cells.x,
+							pty.window.cells.y,
+							pty.window.pixels.x,
+							pty.window.pixels.y,
+							&[],
+						).await.ok();
+					}
+					Ok(SshEvent::Resize(size)) => {
+						channel.window_change(
+							size.cells.x,
+							size.cells.y,
+							size.pixels.x,
+							size.pixels.y,
+						).await.ok();
+					}
+					Ok(SshEvent::RequestShell) => {
+						channel.request_shell(true).await.ok();
+					}
+					Ok(SshEvent::Close(_)) | Err(_) => break,
+					_ => {}
 				}
 			},
 			// SSH server → bevy
@@ -150,20 +172,29 @@ async fn run_data_loop(
 				match msg {
 					Some(ChannelMsg::Data { data }) => {
 						from_server_tx
-							.send(SshData::bytes(data.clone()))
+							.send(SshEvent::Data(Bytes::copy_from_slice(&data)))
 							.await
 							.ok();
 					}
 					Some(ChannelMsg::ExitStatus { exit_status }) => {
 						from_server_tx
-							.send(SshData::Exit(exit_status))
+							.send(SshEvent::Close(Some(SshCloseFrame {
+								code: exit_status,
+								reason: String::new(),
+							})))
 							.await
 							.ok();
 						break;
 					}
 					Some(ChannelMsg::Eof)
 					| Some(ChannelMsg::Close)
-					| None => break,
+					| None => {
+						from_server_tx
+							.send(SshEvent::Close(None))
+							.await
+							.ok();
+						break;
+					}
 					_ => {}
 				}
 			},

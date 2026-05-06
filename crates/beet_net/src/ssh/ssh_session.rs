@@ -1,9 +1,5 @@
 use beet_core::prelude::*;
 
-/// Triggered after an SSH client session is connected and ready.
-#[derive(EntityTargetEvent)]
-pub struct SshSessionReady;
-
 /// Helpers for connecting to an SSH server.
 pub struct SshSession;
 
@@ -18,7 +14,8 @@ impl SshSession {
 		let user = user.as_ref().to_owned();
 		let password = password.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |_entity| -> Result {
-			#[cfg(all(feature = "russh_client", not(target_arch = "wasm32")))]
+			cfg_if! {
+				if #[cfg(all(feature = "russh_client", not(target_arch = "wasm32")))]
 			{
 				super::impl_russh_client::connect_and_setup_entity(
 					_entity,
@@ -27,16 +24,12 @@ impl SshSession {
 					Some(password),
 				)
 				.await
-			}
-			#[cfg(not(all(
-				feature = "russh_client",
-				not(target_arch = "wasm32")
-			)))]
-			{
+			} else {
 				let _ = (addr, user, password);
 				Err(bevyhow!(
 					"SSH client requires the 'russh_client' feature on non-wasm32 targets"
 				))
+			}
 			}
 		})
 	}
@@ -45,22 +38,19 @@ impl SshSession {
 	pub fn insert_anon(addr: impl AsRef<str>) -> OnSpawn {
 		let addr = addr.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |_entity| -> Result {
-			#[cfg(all(feature = "russh_client", not(target_arch = "wasm32")))]
+			cfg_if! {
+				if #[cfg(all(feature = "russh_client", not(target_arch = "wasm32")))]
 			{
 				super::impl_russh_client::connect_and_setup_entity(
 					_entity, addr, None, None,
 				)
 				.await
-			}
-			#[cfg(not(all(
-				feature = "russh_client",
-				not(target_arch = "wasm32")
-			)))]
-			{
+			} else {
 				let _ = addr;
 				Err(bevyhow!(
 					"SSH client requires the 'russh_client' feature on non-wasm32 targets"
 				))
+			}
 			}
 		})
 	}
@@ -73,7 +63,7 @@ impl SshSession {
 		addr: impl AsRef<str>,
 		user: Option<&str>,
 		password: Option<&str>,
-	) -> Result<()> {
+	) -> Result {
 		super::impl_russh_client::test_connect(addr, user, password).await
 	}
 }
