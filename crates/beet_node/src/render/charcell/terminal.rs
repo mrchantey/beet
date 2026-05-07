@@ -50,7 +50,7 @@ impl StdioTerminal {
 
 		let size = terminal_ext::size().unwrap_or(UVec2::new(80, 24));
 		let terminal = Terminal::new(
-			AsyncReader::default(),
+			AsyncReader::stdin(),
 			BufWriter::with_capacity(
 				TERMINAL_BUFFER_CAPACITY,
 				std::io::stdout(),
@@ -120,6 +120,47 @@ impl Default for TerminalConfig {
 	}
 }
 
+#[derive(Component)]
+pub struct ChannelTerminal {
+	write_recv: Receiver<Result<Vec<u8>>>,
+	read_send: Sender<io::Result<u8>>,
+}
+
+impl ChannelTerminal {
+	pub fn new(size: UVec2, config: TerminalConfig) -> (Self, Terminal) {
+		let (writer, write_recv) = AsyncWriter::new();
+		let (read_send, reader) = AsyncReader::new();
+		(
+			Self {
+				write_recv,
+				read_send,
+			},
+			Terminal::new(reader, writer, size, config),
+		)
+	}
+	/// Send input to the terminals Reader,
+	/// ie keyboard, mouse movements
+	// enforce mut for bevy change detection
+	pub fn send_input(&mut self, data: &[u8]) -> Result {
+		for byte in data {
+			self.read_send.try_send(Ok(*byte))?;
+		}
+		Ok(())
+	}
+
+	/// Receive output from the terminals Writer,
+	/// ie clear screen, write to cell
+	// enforce mut for bevy change detection
+	pub fn drain_write(&mut self) -> Vec<u8> {
+		let mut out = Vec::new();
+		while let Ok(Ok(items)) = self.write_recv.try_recv() {
+			out.extend(items);
+		}
+		out
+	}
+}
+
+
 // ── AsyncReader ───────────────────────────────────────────────────────────────
 
 /// Non-blocking reader that drains a background thread reading from `/dev/tty`.
@@ -127,8 +168,14 @@ pub struct AsyncReader {
 	recv: Receiver<io::Result<u8>>,
 }
 
-impl Default for AsyncReader {
-	fn default() -> Self {
+impl AsyncReader {
+	pub fn new() -> (Sender<io::Result<u8>>, Self) {
+		let (send, recv) = async_channel::unbounded();
+		(send, Self { recv })
+	}
+
+
+	pub fn stdin() -> Self {
 		let (send, recv) = async_channel::unbounded();
 		std::thread::spawn(move || {
 			use std::io::Read;
@@ -165,6 +212,31 @@ impl Read for AsyncReader {
 		}
 		Ok(total)
 	}
+}
+
+
+
+
+pub struct AsyncWriter {
+	send: Sender<Result<Vec<u8>>>,
+}
+
+impl AsyncWriter {
+	pub fn new() -> (Self, Receiver<Result<Vec<u8>>>) {
+		let (send, recv) = async_channel::unbounded();
+		(Self { send }, recv)
+	}
+}
+
+impl Write for AsyncWriter {
+	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+		self.send
+			.try_send(Ok(buf.to_vec()))
+			.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+		Ok(buf.len())
+	}
+
+	fn flush(&mut self) -> io::Result<()> { Ok(()) }
 }
 
 // ── Terminal ──────────────────────────────────────────────────────────────────

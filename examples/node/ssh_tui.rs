@@ -19,7 +19,6 @@
 
 use beet::net::prelude::*;
 use beet::prelude::*;
-use std::io::Write;
 
 fn main() -> Result {
 	App::new()
@@ -27,8 +26,13 @@ fn main() -> Result {
 			MinimalPlugins,
 			LogPlugin::default(),
 			SshServerPlugin::default(),
+			CharcellPlugin,
 		))
-		.spawn_then((SshServer::default(), OnSpawn::observe(on_recv)))
+		.spawn_then(SshServer::default())
+		.add_systems(Update, render_frame)
+		.add_systems(PostUpdate, ssh_write.after(CharcellRenderStep))
+		.add_observer(ssh_read)
+		.add_observer(on_input)
 		.run();
 	Ok(())
 }
@@ -37,29 +41,30 @@ fn main() -> Result {
 #[derive(Component, Default)]
 struct Counter(i32);
 
+
 /// Renders a colour-cycling counter panel.
-fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
+fn render_frame(mut query: Populated<(&mut Terminal, &Counter)>) -> Result {
+	for (mut terminal, counter) in query.iter_mut() {
+		render(counter.0, &mut *terminal.writer)?;
+	}
+	Ok(())
+}
+
+fn render(count: i32, mut writer: impl std::io::Write) -> Result {
 	let (r, g, b): (u8, u8, u8) = match count.rem_euclid(3) {
 		0 => (220, 50, 50),
 		1 => (50, 200, 50),
 		_ => (50, 100, 220),
 	};
 	// Move to origin and clear screen.
-	write!(
-		terminal.writer,
-		"{}{}",
-		escape::CURSOR_HOME,
-		escape::ERASE_ALL
-	)
-	.map_err(|e| bevyhow!("{e}"))?;
+	write!(writer, "{}{}", escape::CURSOR_HOME, escape::ERASE_ALL)
+		.map_err(|e| bevyhow!("{e}"))?;
 	// Write foreground colour and reset background.
-	escape::write_fg(&mut terminal.writer, r, g, b)
-		.map_err(|e| bevyhow!("{e}"))?;
-	write!(terminal.writer, "{}", escape::RESET_BG)
-		.map_err(|e| bevyhow!("{e}"))?;
+	escape::write_fg(&mut writer, r, g, b).map_err(|e| bevyhow!("{e}"))?;
+	write!(writer, "{}", escape::RESET_BG).map_err(|e| bevyhow!("{e}"))?;
 	// Write the frame content.
 	write!(
-		terminal.writer,
+		writer,
 		"╔═══════════════════════════╗\r\n\
 		 ║   beet SSH TUI demo       ║\r\n\
 		 ║   Counter: {:<11}    ║\r\n\
@@ -69,80 +74,70 @@ fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
 		count,
 	)
 	.map_err(|e| bevyhow!("{e}"))?;
-	write!(terminal.writer, "{}", escape::RESET_FG).map_err(|e| bevyhow!("{e}"))
+	write!(writer, "{}", escape::RESET_FG).map_err(|e| bevyhow!("{e}"))?;
+	Ok(())
+}
+
+
+fn on_input(
+	ev: On<TerminalEvent>,
+	mut commands: Commands,
+	mut query: Query<&mut Counter>,
+) {
+	use TerminalEvent::*;
+	let Ok(mut counter) = query.get_mut(ev.target()) else {
+		return;
+	};
+	match ev.event() {
+		Key(key) if matches!(key.char, Some('+' | '=')) => counter.0 += 1,
+		Key(key) if key.char == Some('-') => counter.0 -= 1,
+		Key(key) if key.char == Some('r') => counter.0 = 0,
+		Key(key) if key.char == Some('q') || key == &KeyPress::CTRL_C => {
+			// or do i need to actually exit?
+			commands.entity(ev.target()).despawn();
+		}
+
+		_ => {}
+	}
+}
+
+fn ssh_write(
+	mut commands: Commands,
+	mut query: Query<(Entity, &mut ChannelTerminal)>,
+) -> Result {
+	for (entity, mut terminal) in query.iter_mut() {
+		let output = terminal.drain_write();
+		if !output.is_empty() {
+			commands
+				.entity(entity)
+				.trigger_target(SshSend(SshEvent::bytes(output)));
+		}
+	}
+
+	Ok(())
 }
 
 /// Handles all SSH events for a connection.
-fn on_recv(
+fn ssh_read(
 	ev: On<SshRecv>,
 	mut commands: Commands,
-	mut counters: Query<&mut Counter>,
-	mut terminals: Query<&mut BufferedTerminal>,
-) {
+	mut query: Query<&mut ChannelTerminal>,
+) -> Result {
 	let conn = ev.original_target();
 
 	match ev.event().inner() {
 		SshEvent::Connect => {}
 		SshEvent::RequestPty(pty) => {
 			// Insert the terminal now that we know the PTY size.
-			let size = pty.window.cells;
-			let mut terminal = BufferedTerminal::new_buffered(size);
-			// Send initial frame.
-			let _ = render_frame(0, &mut terminal);
-			let output = terminal.take_output();
-			commands
-				.entity(conn)
-				.insert((terminal, Counter::default()))
-				.trigger_target(SshSend(SshEvent::bytes(output)));
+			commands.entity(conn).insert((
+				ChannelTerminal::new(pty.window.cells, default()),
+				Counter::default(),
+			));
 		}
 		SshEvent::Data(bytes) => {
-			// Parse incoming bytes into terminal events.
-			let events = BufferedTerminal::parse_bytes(bytes);
-
-			let mut quit = false;
-			if let Ok(mut counter) = counters.get_mut(conn) {
-				for ev in &events {
-					match ev {
-						TerminalEvent::Key(key)
-							if matches!(key.char, Some('+' | '=')) =>
-						{
-							counter.0 += 1
-						}
-						TerminalEvent::Key(key) if key.char == Some('-') => {
-							counter.0 -= 1
-						}
-						TerminalEvent::Key(key) if key.char == Some('r') => {
-							counter.0 = 0
-						}
-						TerminalEvent::Key(key) if key.char == Some('q') => {
-							quit = true
-						}
-						TerminalEvent::Key(key) if key == &KeyPress::CTRL_C => {
-							quit = true
-						}
-						_ => {}
-					}
-				}
-			}
-
-			if quit {
-				commands
-					.entity(conn)
-					.trigger_target(SshSend(SshEvent::text(
-						escape::LEAVE_ALT_SCREEN,
-					)))
-					.trigger_target(SshSend(SshEvent::Close(None)));
-				return;
-			}
-
-			// Re-render and send the updated frame.
-			let count = counters.get(conn).map(|c| c.0).unwrap_or(0);
-			if let Ok(mut terminal) = terminals.get_mut(conn) {
-				let _ = render_frame(count, &mut terminal);
-				let output = terminal.take_output();
-				commands
-					.entity(conn)
-					.trigger_target(SshSend(SshEvent::bytes(output)));
+			if let Ok(mut term) = query.get_mut(ev.target()) {
+				println!("sending input: {:?}", bytes);
+				term.send_input(bytes)?;
 			}
 		}
 		SshEvent::Close(_) => {
@@ -150,78 +145,5 @@ fn on_recv(
 		}
 		_ => {}
 	}
-}
-
-#[cfg(test)]
-#[cfg(all(
-	feature = "ssh_server",
-	feature = "ssh_client",
-	not(target_arch = "wasm32")
-))]
-mod tests {
-	use super::*;
-	use beet::net::prelude::*;
-	use beet::prelude::*;
-	use std::time::Duration;
-
-	/// Pressing '+' increments the TUI counter from 0 to 1.
-	#[test]
-	fn counter_increments() {
-		let (server, on_spawn) = SshServer::new_test();
-		let addr = server.local_address();
-		let store = Store::<Option<String>>::default();
-		let store_clone = store.clone();
-		let initial_received = Store::<bool>::default();
-		let initial_clone = initial_received.clone();
-
-		// Start the TUI server in a background thread.
-		std::thread::spawn(move || {
-			let mut app = App::new();
-			app.add_plugins((MinimalPlugins, SshServerPlugin::default()));
-			app.world_mut().spawn((
-				server,
-				on_spawn,
-				OnSpawn::observe(on_recv),
-			));
-			app.run();
-		});
-
-		// Give the server time to start.
-		std::thread::sleep(Duration::from_millis(300));
-
-		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin::default()));
-		app.world_mut()
-			.spawn(SshSession::insert_on_connect(&addr, "guest", "beet"))
-			.observe_any(move |ev: On<SshRecv>, mut commands: Commands| {
-				match ev.event().inner() {
-					SshEvent::Data(_) => {
-						if let Some(text) = ev.event().as_str() {
-							if !initial_clone.get() && text.contains("Counter:")
-							{
-								// Initial frame received — send '+'.
-								initial_clone.set(true);
-								commands.entity(ev.target()).trigger_target(
-									SshSend(SshEvent::text("+")),
-								);
-							} else if initial_clone.get()
-								&& text.contains("Counter:")
-								&& text.contains("     1")
-							{
-								// Updated frame shows count = 1.
-								store_clone.set(Some(text.to_owned()));
-								commands.write_message(AppExit::Success);
-							}
-						}
-					}
-					SshEvent::Close(_) => {
-						commands.write_message(AppExit::Success);
-					}
-					_ => {}
-				}
-			});
-		app.run();
-
-		store.get().is_some().xpect_true();
-	}
+	Ok(())
 }

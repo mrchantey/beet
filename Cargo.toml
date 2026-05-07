@@ -372,7 +372,7 @@ beet_action = { workspace = true, optional = true }
 uuid = { workspace = true, features = ["rng-getrandom"] }
 
 [dev-dependencies]
-beet = { path = ".", features = ["ansi_paint", "thread", "_mini_browser"] }
+beet = { path = "." }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
