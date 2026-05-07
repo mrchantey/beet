@@ -1,7 +1,5 @@
 use beet_core::prelude::*;
-use beet_node::prelude::style::*;
 use beet_node::prelude::*;
-use beet_node::*;
 
 
 fn main() {
@@ -14,25 +12,7 @@ fn main() {
 }
 
 
-fn setup(mut commands: Commands) {
-	commands.spawn((
-		StdioTerminal::default(),
-		CharcellRenderer::default(),
-		FlexBox::row().column_gap(1),
-		children![(
-			FlexBox::row(),
-			rsx! { <div>"Value: "{0}</div> },
-			BoxStyle {
-				border: Spacing::all(Length::Rem(1.)),
-				border_top: Some(Color::srgb(1., 0., 0.)),
-				border_bottom: Some(Color::srgb(0., 0.4, 1.)),
-				border_left: Some(Color::srgb(0., 0.8, 0.)),
-				border_right: Some(Color::srgb(1., 0.8, 0.)),
-				..BoxStyle::default()
-			},
-		),],
-	));
-}
+fn setup(mut commands: Commands) { commands.spawn(StdioTerminal::inline()); }
 
 
 fn update(nodes: Query<&mut Value>) {
@@ -43,13 +23,14 @@ fn update(nodes: Query<&mut Value>) {
 	}
 }
 fn on_input(ev: On<TerminalEvent>, mut commands: Commands) {
+	println!("Event: {ev:?}");
 	match ev.event() {
 		TerminalEvent::Key(key_press) => {
 			if key_press == &KeyPress::CTRL_C {
 				commands.write_message(AppExit::Success);
 			}
 		}
-		TerminalEvent::Mouse(mouse) => {}
+		TerminalEvent::Mouse(_mouse) => {}
 		_ => {}
 	}
 }

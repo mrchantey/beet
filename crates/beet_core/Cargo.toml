@@ -33,6 +33,7 @@ std = [
 	"dep:async-io",
 	"dep:async-task",
 ]
+ctrlc = ["dep:ctrlc"]
 tokio = ["dep:tokio"]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
@@ -41,7 +42,8 @@ http = ["dep:http"]
 crossterm = ["dep:crossterm"]
 bevy_default = ["bevy_scene", "bevy_multithreaded"]
 bevy_scene = ["bevy/bevy_scene", "serde"]
-bevy_keyboard = ["bevy/keyboard", "serde"]
+bevy_keyboard = ["bevy/keyboard"]
+bevy_mouse = ["bevy/mouse"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]
@@ -60,7 +62,6 @@ rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
 fs = [
 	"dep:notify",
 	"dep:notify-debouncer-full",
-	"dep:ctrlc",
 	"dep:async-fs",
 	"dep:async-process",
 ]

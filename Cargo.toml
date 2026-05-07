@@ -260,6 +260,7 @@ bevy_default = [
 bevy_scene = ["beet_core/bevy_scene", "beet_net?/bevy_scene","beet_thread?/bevy_scene"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
+bevy_mouse = ["beet_core/bevy_mouse"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithreaded"]
 
 # 💡 Net
@@ -295,7 +296,7 @@ action = ["dep:beet_action"]
 node = ["dep:beet_node"]
 style = ["node", "beet_node?/style"]
 tui = ["beet_node?/tui"]
-termion = ["node", "beet_node?/termion", "dep:termion"]
+terminal = ["node", "beet_node?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_node?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
@@ -346,7 +347,6 @@ beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_node = { workspace = true, optional = true }
-termion = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 
@@ -430,7 +430,7 @@ required-features = ["ssh_client"]
 [[example]]
 name = "ssh_tui"
 path = "examples/node/ssh_tui.rs"
-required-features = ["ssh_server", "node", "termion"]
+required-features = ["ssh_server", "node", "terminal"]
 
 # 💡 Examples - Node
 

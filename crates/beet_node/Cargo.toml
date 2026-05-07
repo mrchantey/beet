@@ -19,7 +19,7 @@ required-features = ["style"]
 [[example]]
 name = "tui"
 path = "examples/tui.rs"
-required-features = ["termion", "style"]
+required-features = ["terminal", "style"]
 
 
 [features]
@@ -31,8 +31,10 @@ tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
-termion = ["dep:termion"]
+
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
+terminal = ["dep:termion","beet_core/ctrlc","beet_core/bevy_keyboard","beet_core/bevy_mouse"]
+
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]

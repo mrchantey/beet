@@ -4,15 +4,18 @@
 //!
 //!
 mod backend;
+#[cfg(feature = "terminal")]
+mod input;
 mod plugin;
 mod renderer;
-#[cfg(feature = "termion")]
+#[cfg(feature = "terminal")]
 mod terminal;
 pub use backend::*;
 pub use buffer::*;
+pub use input::*;
 pub use plugin::*;
 pub use renderer::*;
-#[cfg(feature = "termion")]
+#[cfg(feature = "terminal")]
 pub use terminal::*;
 mod buffer;
 mod render_context;

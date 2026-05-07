@@ -1,6 +1,30 @@
 //! Unix terminal utilities
+#[allow(unused)]
+use crate::prelude::*;
 use std::io::Write;
 use std::io::stdout;
+
+/// Adds this handler to both the panic and ctrl+c hooks
+pub fn on_force_exit(
+	func: impl 'static + Send + Sync + Clone + Fn(),
+) -> Result {
+	#[cfg(feature = "ctrlc")]
+	{
+		let func2 = func.clone();
+		ctrlc::set_handler(move || {
+			func2();
+			std::process::exit(0);
+		})?;
+	}
+	// update_hook when stablizes
+	let prev = std::panic::take_hook();
+	std::panic::set_hook(Box::new(move |info| {
+		func();
+		prev(info);
+	}));
+	Ok(())
+}
+
 
 /// Shows the terminal cursor.
 ///
@@ -78,9 +102,6 @@ pub fn move_to(x: u16, y: u16) -> std::io::Result<()> {
 	stdout.flush()?;
 	Ok(())
 }
-
-#[cfg(feature = "crossterm")]
-use crate::prelude::*;
 
 /// Returns the terminal size.
 #[cfg(feature = "crossterm")]
