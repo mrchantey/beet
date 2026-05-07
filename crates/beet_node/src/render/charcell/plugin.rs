@@ -13,17 +13,19 @@ impl Plugin for CharcellPlugin {
 		{
 			use crate::prelude::*;
 			use bevy::ecs::schedule::common_conditions;
-			app.add_systems(PreUpdate, terminal_events).add_systems(
-				PostUpdate,
-				(
-					render_terminal,
-					flush_terminals,
-					restore_terminals
-						.run_if(common_conditions::on_message::<AppExit>),
-				)
-					.chain()
-					.after(ApplyNodeChanges),
-			);
+			app.add_observer(exit_ctrl_c)
+				.add_systems(PreUpdate, terminal_events)
+				.add_systems(
+					PostUpdate,
+					(
+						render_terminal,
+						flush_terminals,
+						restore_terminals
+							.run_if(common_conditions::on_message::<AppExit>),
+					)
+						.chain()
+						.after(ApplyNodeChanges),
+				);
 		}
 		#[cfg(feature = "tui")]
 		{

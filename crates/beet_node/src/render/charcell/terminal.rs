@@ -23,6 +23,10 @@ pub struct StdioTerminal {
 	/// Whether to run the terminal in raw mode,
 	/// defaults to true
 	raw_mode: bool,
+	/// In raw mode, listen for ctrl+c events and exit
+	/// the application. Does nothing in cooked mode, ctrl+c
+	/// would directly exit the application.
+	ctrl_c_exit: bool,
 	/// When enabled, applies a ctrl+c and panic hook
 	/// to ensure terminal state is restored
 	restore_hook: bool,
@@ -34,6 +38,7 @@ impl Default for StdioTerminal {
 		Self {
 			restore_hook: true,
 			raw_mode: true,
+			ctrl_c_exit: true,
 			config: default(),
 		}
 	}
@@ -447,4 +452,22 @@ pub fn restore_terminals(
 		commands.entity(entity).remove::<Terminal>();
 	}
 	Ok(())
+}
+
+/// Restore terminals (leave alternate screen, show cursor) on shutdown.
+pub fn exit_ctrl_c(
+	ev: On<TerminalEvent>,
+	mut commands: Commands,
+	query: Query<&StdioTerminal>,
+) {
+	if let Ok(term) = query.get(ev.target()) {
+		if term.ctrl_c_exit {
+			match ev.event() {
+				TerminalEvent::Key(key) if key == &KeyPress::CTRL_C => {
+					commands.write_message(AppExit::Success);
+				}
+				_ => {}
+			}
+		}
+	}
 }

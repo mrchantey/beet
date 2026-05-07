@@ -12,7 +12,12 @@ fn main() {
 }
 
 
-fn setup(mut commands: Commands) { commands.spawn(StdioTerminal::inline()); }
+fn setup(mut commands: Commands) {
+	commands.spawn(StdioTerminal::inline()
+		// .with_raw_mode(true)
+
+	);
+}
 
 
 fn update(nodes: Query<&mut Value>) {
@@ -22,15 +27,6 @@ fn update(nodes: Query<&mut Value>) {
 		}
 	}
 }
-fn on_input(ev: On<TerminalEvent>, mut commands: Commands) {
+fn on_input(ev: On<TerminalEvent>) {
 	println!("Event: {ev:?}");
-	match ev.event() {
-		TerminalEvent::Key(key_press) => {
-			if key_press == &KeyPress::CTRL_C {
-				commands.write_message(AppExit::Success);
-			}
-		}
-		TerminalEvent::Mouse(_mouse) => {}
-		_ => {}
-	}
 }
