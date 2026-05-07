@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::exports::async_channel;
 use beet_core::exports::async_channel::Receiver;
+use beet_core::exports::async_channel::Sender;
 use beet_core::prelude::*;
 use std::io;
 use std::io::BufWriter;
@@ -89,14 +90,16 @@ impl StdioTerminal {
 
 #[derive(Debug, Clone, SetWith)]
 pub struct TerminalConfig {
-	/// Whether to enable raw mode, this option applies for the terminal
-	/// of the current process, and should not be used for remote terminals.
+	/// Whether to enable raw mode; applies to the current process terminal only.
+	/// Do not use for remote terminals.
 	raw_mode: bool,
 	/// Whether to use the alternate screen buffer, defaults to true.
 	alternate_screen: bool,
 	/// Whether to hide the cursor when rendering, defaults to true.
 	hide_cursor: bool,
 	enable_mouse: bool,
+	/// Enable bracketed paste mode for structured [`TerminalEvent::Paste`] events.
+	bracketed_paste: bool,
 }
 
 impl TerminalConfig {
@@ -116,6 +119,7 @@ impl Default for TerminalConfig {
 			alternate_screen: true,
 			hide_cursor: true,
 			enable_mouse: true,
+			bracketed_paste: false,
 		}
 	}
 }
@@ -241,16 +245,18 @@ impl Write for AsyncWriter {
 
 // ── Terminal ──────────────────────────────────────────────────────────────────
 
-/// A terminal abstraction over a reader `R` and writer `W`.
+/// A terminal abstraction over a reader and writer.
 ///
-/// Writes ANSI escape sequences to `W` and reads input events via [`InputParser`].
-/// Use [`StdioTerminal`] for local stdio and [`BufferedTerminal`] for SSH/headless.
+/// Writes ANSI escape sequences via [`InputParser`] and reads input events.
+/// Use [`StdioTerminal`] for local stdio and [`ChannelTerminal`] for SSH/headless.
 #[derive(Component)]
 pub struct Terminal {
 	/// Input reader.
 	pub reader: Box<dyn 'static + Send + Sync + Read>,
 	/// Output writer — receives all ANSI escape sequences and cell data.
-	pub writer: Box<dyn 'static + Send + Sync + Write>,
+	writer: Box<dyn 'static + Send + Sync + Write>,
+	/// Tracks what is currently rendered on screen, used for draw diffing.
+	current_cells: Buffer,
 	size: UVec2,
 	/// Configuration applied on init and used to restore previous state on exit.
 	config: TerminalConfig,
@@ -275,6 +281,7 @@ impl Terminal {
 			writer: Box::new(writer),
 			config,
 			size,
+			current_cells: Buffer::new(size),
 			input_parser: InputParser::new(),
 		};
 		this.apply_config().unwrap();
@@ -294,10 +301,18 @@ impl Terminal {
 		if self.config.enable_mouse {
 			self.writer.write_all(escape::ENTER_MOUSE.as_bytes())?;
 		}
+		if self.config.bracketed_paste {
+			self.writer
+				.write_all(escape::ENTER_BRACKETED_PASTE.as_bytes())?;
+		}
 		Ok(())
 	}
 
 	pub fn restore_config(&mut self) -> Result {
+		if self.config.bracketed_paste {
+			self.writer
+				.write_all(escape::LEAVE_BRACKETED_PASTE.as_bytes())?;
+		}
 		if self.config.enable_mouse {
 			self.writer.write_all(escape::LEAVE_MOUSE.as_bytes())?;
 		}
@@ -316,8 +331,20 @@ impl Terminal {
 	/// Current terminal size.
 	pub fn size(&self) -> UVec2 { self.size }
 
-	/// Update the terminal size.
-	pub fn set_size(&mut self, size: UVec2) { self.size = size; }
+	/// Update the terminal size, recreating the cell-diff buffer.
+	pub fn set_size(&mut self, size: UVec2) {
+		self.size = size;
+		self.current_cells = Buffer::new(size);
+	}
+
+	/// Mutable access to the underlying writer.
+	///
+	/// Clears the internal diff buffer since writes bypassing [`Terminal::draw`]
+	/// leave the terminal in an unknown state.
+	pub fn writer_mut(&mut self) -> &mut dyn Write {
+		self.current_cells.clear();
+		&mut *self.writer
+	}
 
 	/// Read all pending input events without blocking.
 	pub fn read_events(&mut self) -> Result<Vec<TerminalEvent>> {
@@ -340,95 +367,61 @@ impl Terminal {
 		InputParser::new().parse(bytes).unwrap_or_default()
 	}
 
-	/// Move cursor to 0-indexed `(col, row)`.
-	pub fn goto(&mut self, col: u32, row: u32) -> Result {
-		escape::write_goto(&mut self.writer, col, row)?.xok()
-	}
-
-	/// Set foreground colour via 24-bit RGB.
-	pub fn set_fg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		escape::write_fg(&mut self.writer, r, g, b)?.xok()
-	}
-
-	/// Set background colour via 24-bit RGB.
-	pub fn set_bg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		escape::write_bg(&mut self.writer, r, g, b)?.xok()
-	}
-
 	/// Reset all SGR attributes.
 	pub fn reset_style(&mut self) -> Result {
-		write!(self.writer, "{}", escape::RESET)?.xok()
-	}
-
-	/// Write text attribute SGR codes from a [`VisualStyle`].
-	fn write_text_attrs(
-		&mut self,
-		vstyle: &crate::style::VisualStyle,
-	) -> Result {
-		use crate::style::TextStyle;
-		let ts = vstyle.text_style;
-		if vstyle.dim_foregeround() {
-			write!(self.writer, "{}", escape::FAINT)?;
-		}
-		if ts.contains(TextStyle::BOLD) {
-			write!(self.writer, "{}", escape::BOLD)?;
-		}
-		if ts.contains(TextStyle::ITALIC) {
-			write!(self.writer, "{}", escape::ITALIC)?;
-		}
-		if ts.contains(TextStyle::UNDERLINE) {
-			write!(self.writer, "{}", escape::UNDERLINE)?;
-		}
-		if ts.contains(TextStyle::BLINK) {
-			write!(self.writer, "{}", escape::BLINK)?;
-		}
-		if ts.contains(TextStyle::REVERSED) {
-			write!(self.writer, "{}", escape::INVERT)?;
-		}
-		if ts.contains(TextStyle::LINE_THROUGH) {
-			write!(self.writer, "{}", escape::CROSSED_OUT)?;
-		}
-		if ts.contains(TextStyle::RAPID_BLINK) {
-			write!(self.writer, "{}", escape::RAPID_BLINK)?;
-		}
-		if ts.contains(TextStyle::HIDDEN) {
-			write!(self.writer, "{}", escape::HIDDEN)?;
-		}
-		if ts.contains(TextStyle::OVERLINE) {
-			write!(self.writer, "{}", escape::OVERLINE)?;
-		}
-		Ok(())
+		self.writer.write_all(escape::RESET.as_bytes())?.xok()
 	}
 
 	/// Erase the screen and move the cursor to the home position.
 	pub fn clear(&mut self) -> Result {
-		write!(self.writer, "{}{}", escape::ERASE_ALL, escape::CURSOR_HOME)?
-			.xok()
+		// Invalidate diff buffer so everything is redrawn next frame.
+		self.current_cells.clear();
+		self.writer.write_all(escape::ERASE_ALL.as_bytes())?;
+		self.writer.write_all(escape::CURSOR_HOME.as_bytes())?.xok()
 	}
 
+	/// Draw an iterator of `(pos, cell)` pairs, only writing cells that have
+	/// changed since the last draw call.
+	///
+	/// Style changes are diffed per-cell to minimise escape sequence output.
+	/// A single [`escape::RESET`] is emitted at the end of the frame.
 	fn draw<'a>(
 		&mut self,
 		cells: impl IntoIterator<Item = (UVec2, &'a super::Cell)>,
 	) -> Result {
 		let mut last_pos: Option<UVec2> = None;
+		let mut last_style: Option<crate::style::VisualStyle> = None;
+
 		for (pos, cell) in cells {
-			// Skip goto when directly following the previous cell.
-			let skip = matches!(last_pos, Some(lp) if pos.x == lp.x + 1 && pos.y == lp.y);
-			if !skip {
-				self.goto(pos.x, pos.y)?;
+			// Skip cells that are already up to date on screen.
+			if self.current_cells.get(pos).map_or(false, |c| c == cell) {
+				continue;
+			}
+
+			// Skip goto when directly following the previous written cell.
+			let skip_goto = matches!(last_pos, Some(lp) if lp.x.checked_add(1) == Some(pos.x) && lp.y == pos.y);
+			if !skip_goto {
+				escape::cursor_goto(&mut self.writer, pos)?;
 			}
 			last_pos = Some(pos);
-			if let Some(fg) = cell.style.foreground {
-				let c = fg.to_srgba_u8();
-				self.set_fg(c.red, c.green, c.blue)?;
-			}
-			if let Some(bg) = cell.style.background {
-				let c = bg.to_srgba_u8();
-				self.set_bg(c.red, c.green, c.blue)?;
-			}
-			self.write_text_attrs(&cell.style)?;
-			write!(self.writer, "{}", cell.symbol)?;
-			self.reset_style()?;
+
+			// Write only the SGR changes since the last written cell.
+			escape::write_style(
+				&mut self.writer,
+				&cell.style,
+				last_style.as_ref(),
+			)?;
+			last_style = Some(cell.style.clone());
+
+			self.writer.write_all(cell.symbol.as_str().as_bytes())?;
+
+			// Record this cell as the current on-screen state.
+			self.current_cells.set(pos, cell.clone());
+		}
+
+		// Reset style once at the end of the frame.
+		if last_style.is_some() {
+			self.writer.write_all(escape::RESET.as_bytes())?;
 		}
 		Ok(())
 	}
@@ -507,6 +500,7 @@ pub fn restore_terminals(mut query: Query<&mut Terminal>) -> Result {
 
 #[cfg(target_arch = "wasm32")]
 mod raw_mode {
+	use beet_core::prelude::*;
 	pub(super) fn enable() -> Result {
 		bevybail!("raw mode not supported on this platform")
 	}
@@ -517,12 +511,50 @@ mod raw_mode {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod raw_mode {
-	use super::*;
-	pub(super) fn enable() -> Result {
-		crossterm::terminal::enable_raw_mode()?.xok()
+	use beet_core::prelude::*;
+	use std::io;
+	use std::sync::Mutex;
+	use std::sync::OnceLock;
+
+	/// Stored original termios, restored on [`disable`].
+	static PRIOR_MODE: OnceLock<Mutex<Option<libc::termios>>> = OnceLock::new();
+
+	fn prior_mode() -> &'static Mutex<Option<libc::termios>> {
+		PRIOR_MODE.get_or_init(|| Mutex::new(None))
 	}
+
+	/// Enable raw mode on stdin (fd 0).
+	pub(super) fn enable() -> Result {
+		let mut guard = prior_mode().lock().unwrap();
+		if guard.is_some() {
+			return Ok(()); // already in raw mode
+		}
+		let fd = libc::STDIN_FILENO;
+		// Read current terminal attributes.
+		let mut ios: libc::termios = unsafe { core::mem::zeroed() };
+		if unsafe { libc::tcgetattr(fd, &mut ios) } != 0 {
+			bevybail!("tcgetattr: {}", io::Error::last_os_error());
+		}
+		let orig = ios;
+		// Apply raw mode flags.
+		unsafe { libc::cfmakeraw(&mut ios) };
+		if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &ios) } != 0 {
+			bevybail!("tcsetattr: {}", io::Error::last_os_error());
+		}
+		*guard = Some(orig);
+		Ok(())
+	}
+
+	/// Disable raw mode, restoring the original terminal attributes.
 	pub(super) fn disable() -> Result {
-		crossterm::terminal::disable_raw_mode()?.xok()
+		let mut guard = prior_mode().lock().unwrap();
+		if let Some(orig) = guard.take() {
+			let fd = libc::STDIN_FILENO;
+			if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &orig) } != 0 {
+				bevybail!("tcsetattr: {}", io::Error::last_os_error());
+			}
+		}
+		Ok(())
 	}
 }
 

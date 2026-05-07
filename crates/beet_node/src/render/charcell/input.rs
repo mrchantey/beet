@@ -1,10 +1,10 @@
+use crate::render::Terminal;
 use beet_core::prelude::*;
 use bevy::input::keyboard::NativeKeyCode;
 use bevy::prelude::KeyCode;
 use bevy::prelude::MouseButton;
 use vte::Params;
 use vte::Perform;
-use crate::render::Terminal;
 
 // ── InputParser ───────────────────────────────────────────────────────────────
 
@@ -60,6 +60,10 @@ pub fn terminal_events(
 pub enum TerminalEvent {
 	Key(KeyPress),
 	Mouse(MouseEvent),
+	/// A bracketed paste payload, requires [`TerminalConfig::bracketed_paste`] to be enabled.
+	Paste(String),
+	/// Terminal was resized, ie via `SIGWINCH`.
+	Resize(UVec2),
 	Unsupported(Vec<u8>),
 }
 
@@ -169,6 +173,10 @@ struct Performer {
 	events: Vec<TerminalEvent>,
 	/// Set when `ESC O` is received; the next `print` completes an SS3 sequence.
 	ss3_pending: bool,
+	/// Set during a bracketed paste sequence (`CSI 200~` … `CSI 201~`).
+	in_paste: bool,
+	/// Accumulator for bracketed paste content.
+	paste_buf: String,
 }
 
 impl Performer {
@@ -228,6 +236,12 @@ impl Performer {
 impl Perform for Performer {
 	/// Handle printable characters and SS3 follow-up bytes.
 	fn print(&mut self, c: char) {
+		// Accumulate paste content when inside a bracketed paste sequence.
+		if self.in_paste {
+			self.paste_buf.push(c);
+			return;
+		}
+
 		// Complete a pending SS3 sequence (ESC O ...) for F1-F4 and cursor keys.
 		if self.ss3_pending {
 			self.ss3_pending = false;
@@ -266,6 +280,15 @@ impl Perform for Performer {
 
 	/// Handle C0 control characters (0x00–0x1F).
 	fn execute(&mut self, byte: u8) {
+		// Include newlines inside paste content.
+		if self.in_paste {
+			match byte {
+				0x0A | 0x0D => self.paste_buf.push('\n'),
+				_ => {}
+			}
+			return;
+		}
+
 		let key = match byte {
 			0x08 => KeyPress::unmodified(KeyCode::Backspace),
 			0x09 => KeyPress::with_char(
@@ -357,7 +380,19 @@ impl Perform for Performer {
 				self.push_key(KeyPress::new(KeyCode::Tab, KeyModifier::SHIFT))
 			}
 
-			// ── Tilde-terminated special keys and F-keys ──────────────────────
+			// ── Bracketed paste: CSI 200~ start, CSI 201~ end ────────────────────
+			(b"", '~') if p.first() == Some(&200) => {
+				self.in_paste = true;
+				self.paste_buf.clear();
+			}
+			(b"", '~') if p.first() == Some(&201) => {
+				self.in_paste = false;
+				self.events.push(TerminalEvent::Paste(core::mem::take(
+					&mut self.paste_buf,
+				)));
+			}
+
+			// ── Tilde-terminated special keys and F-keys ──────────────────────────
 			(b"", '~') if !p.is_empty() => {
 				let key = match (p[0], p.get(1).copied().unwrap_or(0)) {
 					(1 | 7, _) => KeyPress::unmodified(KeyCode::Home),

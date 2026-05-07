@@ -1391,7 +1391,6 @@ dependencies = [
  "bevy_ratatui",
  "bitflags 2.11.1",
  "bytes",
- "crossterm",
  "extend",
  "heck 0.4.1",
  "libc",

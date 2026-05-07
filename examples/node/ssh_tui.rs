@@ -19,6 +19,7 @@
 
 use beet::net::prelude::*;
 use beet::prelude::*;
+use bevy::color::Color;
 
 fn main() -> Result {
 	App::new()
@@ -45,23 +46,23 @@ struct Counter(i32);
 /// Renders a colour-cycling counter panel.
 fn render_frame(mut query: Populated<(&mut Terminal, &Counter)>) -> Result {
 	for (mut terminal, counter) in query.iter_mut() {
-		render(counter.0, &mut *terminal.writer)?;
+		render(counter.0, terminal.writer_mut())?;
 	}
 	Ok(())
 }
 
 fn render(count: i32, mut writer: impl std::io::Write) -> Result {
-	let (r, g, b): (u8, u8, u8) = match count.rem_euclid(3) {
-		0 => (220, 50, 50),
-		1 => (50, 200, 50),
-		_ => (50, 100, 220),
+	let color = match count.rem_euclid(3) {
+		0 => Color::srgb_u8(220, 50, 50),
+		1 => Color::srgb_u8(50, 200, 50),
+		_ => Color::srgb_u8(50, 100, 220),
 	};
 	// Move to origin and clear screen.
-	write!(writer, "{}{}", escape::CURSOR_HOME, escape::ERASE_ALL)
-		.map_err(|e| bevyhow!("{e}"))?;
+	writer.write_all(escape::CURSOR_HOME.as_bytes())?;
+	writer.write_all(escape::ERASE_ALL.as_bytes())?;
 	// Write foreground colour and reset background.
-	escape::write_fg(&mut writer, r, g, b).map_err(|e| bevyhow!("{e}"))?;
-	write!(writer, "{}", escape::RESET_BG).map_err(|e| bevyhow!("{e}"))?;
+	escape::foreground(&mut writer, color)?;
+	writer.write_all(escape::RESET_BG.as_bytes())?;
 	// Write the frame content.
 	write!(
 		writer,
@@ -72,9 +73,8 @@ fn render(count: i32, mut writer: impl std::io::Write) -> Result {
 		 ║  [r] reset  [q] quit      ║\r\n\
 		 ╚═══════════════════════════╝",
 		count,
-	)
-	.map_err(|e| bevyhow!("{e}"))?;
-	write!(writer, "{}", escape::RESET_FG).map_err(|e| bevyhow!("{e}"))?;
+	)?;
+	writer.write_all(escape::RESET_FG.as_bytes())?;
 	Ok(())
 }
 

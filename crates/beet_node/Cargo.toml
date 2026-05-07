@@ -33,7 +33,7 @@ style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep
 serde = ["dep:serde"]
 
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
-terminal = ["dep:vte","dep:crossterm","beet_core/ctrlc","beet_core/crossterm","beet_core/bevy_keyboard","beet_core/bevy_mouse"]
+terminal = ["style", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_keyboard", "beet_core/bevy_mouse"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -52,7 +52,6 @@ bytes.workspace = true
 uuid.workspace = true
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
-crossterm = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }

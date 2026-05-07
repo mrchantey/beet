@@ -6,31 +6,32 @@ pub struct CharcellPlugin;
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
 		use crate::prelude::*;
+
+		// Node layout always runs in PostUpdate.
+		app.add_systems(
+			PostUpdate,
+			apply_node_changes.in_set(CharcellRenderStep),
+		);
+
+		// Terminal-specific systems: input, render, flush.
+		#[cfg(feature = "terminal")]
 		app.add_observer(exit_ctrl_c)
 			.add_systems(PreUpdate, terminal_events)
 			.add_systems(
 				PostUpdate,
 				(
-					apply_node_changes,
 					render_terminal,
 					flush_terminals,
 					restore_terminals
 						.run_if(common_conditions::on_message::<AppExit>),
 				)
 					.chain()
+					.after(apply_node_changes)
 					.in_set(CharcellRenderStep),
 			);
-		// #[cfg(feature = "tui")]
-		// {
-		// 	app.add_plugins(bevy_ratatui::RatatuiPlugins {
-		// 		enable_kitty_protocol: true,
-		// 		enable_mouse_capture: true,
-		// 		enable_input_forwarding: true,
-		// 	});
-		// }
 	}
 }
 
-/// A PostUpdate step writing and flushing the terminals
+/// PostUpdate set containing node layout, terminal render, and flush.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct CharcellRenderStep;

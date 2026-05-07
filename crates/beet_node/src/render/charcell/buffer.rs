@@ -148,6 +148,14 @@ pub struct Cell {
 	pub entity: Entity,
 }
 
+impl PartialEq for Cell {
+	/// Two cells are visually equal if their symbol and style match.
+	/// Entity is excluded since rendering only cares about appearance.
+	fn eq(&self, other: &Self) -> bool {
+		self.symbol == other.symbol && self.style == other.style
+	}
+}
+
 impl Cell {
 	pub fn new(
 		symbol: impl Into<SmolStr>,

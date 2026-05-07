@@ -29,7 +29,7 @@ impl VisualStyle {
 	};
 
 	/// Returns true if the foreground color is set and has an alpha value of 0.5 or less.
-	pub fn dim_foregeround(&self) -> bool {
+	pub fn dim_foreground(&self) -> bool {
 		match self.foreground {
 			Some(color) => color.alpha() <= 0.5,
 			None => false,
