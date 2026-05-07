@@ -88,7 +88,7 @@
 	},
 	"file_scan_inclusions": ["agent/plan*"],
 	"file_scan_exclusions": [
-		"agent/*",
+		// "agent/*",
 		"crates/beet-cli",
 		// "crates/beet_build",
 		"crates/beet_examples",

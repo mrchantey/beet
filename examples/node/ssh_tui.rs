@@ -95,7 +95,7 @@ fn on_input(
 		Key(key) if key.char == Some('-') => counter.0 -= 1,
 		Key(key) if key.char == Some('r') => counter.0 = 0,
 		Key(key) if key.char == Some('q') || key == &KeyPress::CTRL_C => {
-			// perform a restore flush and despawn
+			// Flush terminal state before closing.
 			terminal.restore_config()?;
 			terminal.flush()?;
 			let output = channel_terminal.drain_write();
@@ -104,10 +104,11 @@ fn on_input(
 					.entity(ev.target())
 					.trigger_target(SshSend(SshEvent::bytes(output)));
 			}
-
-			// TODO this currently causes server to crash, despawned entity..
-			// possibly due to propagating events?
-			commands.entity(ev.target()).despawn();
+			// Send Close to initiate graceful shutdown; despawn happens
+			// in ssh_read when the resulting SshRecv(Close) arrives.
+			commands
+				.entity(ev.target())
+				.trigger_target(SshSend(SshEvent::Close(None)));
 		}
 
 		_ => {}
@@ -137,7 +138,7 @@ fn ssh_read(
 	mut commands: Commands,
 	mut query: Query<&mut ChannelTerminal>,
 ) -> Result {
-	let entity = ev.original_target();
+	let entity = ev.target();
 	match ev.event().inner() {
 		SshEvent::Connect => {}
 		SshEvent::RequestPty(pty) => {
@@ -148,7 +149,7 @@ fn ssh_read(
 			));
 		}
 		SshEvent::Data(bytes) => {
-			if let Ok(mut term) = query.get_mut(ev.target()) {
+			if let Ok(mut term) = query.get_mut(entity) {
 				term.send_input(bytes)?;
 			}
 		}

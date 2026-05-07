@@ -53,8 +53,10 @@ impl SshEvent {
 }
 
 /// A message to send to the SSH peer.
+///
+/// Trigger this on a connection entity to forward data to the peer.
+/// Listen for outgoing events by adding a global observer via [`App::add_observer`].
 #[derive(Debug, Clone, Deref, EntityTargetEvent)]
-#[event(auto_propagate)]
 pub struct SshSend(pub SshEvent);
 
 impl SshSend {
@@ -65,8 +67,11 @@ impl SshSend {
 }
 
 /// A message received from the SSH peer.
+///
+/// Triggered on the connection entity when data arrives from the peer.
+/// Listen for incoming events by adding a global observer via [`App::add_observer`].
+/// The server entity (if any) can be obtained via `ev.target()`'s parent.
 #[derive(Debug, Clone, Deref, EntityTargetEvent)]
-#[event(auto_propagate)]
 pub struct SshRecv(pub SshEvent);
 
 impl SshRecv {

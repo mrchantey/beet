@@ -394,7 +394,11 @@ impl Terminal {
 
 		for (pos, cell) in cells {
 			// Skip cells that are already up to date on screen.
-			if self.current_cells.get(pos).map_or(false, |c| c == cell) {
+			if self
+				.current_cells
+				.get(pos)
+				.map_or(false, |c| c.visual_eq(cell))
+			{
 				continue;
 			}
 

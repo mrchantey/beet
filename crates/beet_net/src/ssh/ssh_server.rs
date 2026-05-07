@@ -39,9 +39,14 @@ impl SshCredentials {
 /// Each accepted connection spawns a child entity with [`SshPeerInfo`] and
 /// bidirectional [`SshSend`]/[`SshRecv`] event flow.
 ///
-/// Lifecycle events are delivered as [`SshRecv`]:
-/// - [`SshEvent::Connect`] — a client opened a session (`original_target()` is the connection entity)
-/// - [`SshEvent::Close`] — the client disconnected (`original_target()` is the connection entity)
+/// Lifecycle events are delivered as [`SshRecv`] on the **connection entity**:
+/// - [`SshEvent::Connect`] — a client opened a session
+/// - [`SshEvent::Close`] — the client disconnected
+///
+/// Register handlers as global observers, not per-server observers:
+/// ```rust,ignore
+/// app.add_observer(my_listener).world_mut().spawn(SshServer::default());
+/// ```
 #[derive(Clone, Component)]
 #[component(on_add = on_add)]
 pub struct SshServer {
@@ -161,16 +166,16 @@ mod tests {
 		// start the bevy app with an echo server
 		std::thread::spawn(move || {
 			let mut app = App::new();
-			app.add_plugins((MinimalPlugins, SshServerPlugin));
-			app.world_mut().spawn(server).observe_any(
-				|ev: On<SshRecv>, mut commands: Commands| {
+			app.add_plugins((MinimalPlugins, SshServerPlugin))
+				.add_observer(|ev: On<SshRecv>, mut commands: Commands| {
 					if let Some(text) = ev.event().as_str() {
-						commands.entity(ev.original_target()).trigger_target(
-							SshSend(SshEvent::text(format!("echo:{}", text))),
-						);
+						commands.entity(ev.target()).trigger_target(SshSend(
+							SshEvent::text(format!("echo:{}", text)),
+						));
 					}
-				},
-			);
+				})
+				.world_mut()
+				.spawn(server);
 			app.run();
 		});
 

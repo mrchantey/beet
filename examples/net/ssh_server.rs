@@ -21,7 +21,8 @@ use beet::prelude::*;
 fn main() -> Result {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), SshServerPlugin))
-		.spawn_then((SshServer::default(), OnSpawn::observe(on_recv)))
+		.add_observer(on_recv)
+		.spawn_then(SshServer::default())
 		.run();
 	Ok(())
 }
@@ -37,7 +38,7 @@ fn on_recv(
 	peers: Query<&SshPeerInfo>,
 	mut buffers: Query<&mut InputBuffer>,
 ) {
-	let conn = ev.original_target();
+	let conn = ev.target();
 
 	match ev.event().inner() {
 		SshEvent::Connect => {
