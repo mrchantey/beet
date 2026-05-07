@@ -42,14 +42,10 @@ fn update(nodes: Query<&mut Value>) {
 		}
 	}
 }
-fn on_input(ev: On<TerminalEvent>, mut commands: Commands) {
+fn on_input(ev: On<TerminalEvent>, mut _commands: Commands) {
 	match ev.event() {
-		TerminalEvent::Key(key_press) => {
-			if key_press == &KeyPress::CTRL_C {
-				commands.write_message(AppExit::Success);
-			}
-		}
-		TerminalEvent::Mouse(mouse) => {}
+		TerminalEvent::Key(_key_press) => {}
+		TerminalEvent::Mouse(_mouse) => {}
 		_ => {}
 	}
 }

@@ -1,9 +1,9 @@
 //! ECS Character cell layout and rendering engine.
 //!
 //! Charcell represents each cell as an entity
-//!
-//!
 mod backend;
+#[cfg(feature = "terminal")]
+mod escape;
 #[cfg(feature = "terminal")]
 mod input;
 mod plugin;
@@ -12,6 +12,9 @@ mod renderer;
 mod terminal;
 pub use backend::*;
 pub use buffer::*;
+#[cfg(feature = "terminal")]
+pub use escape::*;
+#[cfg(feature = "terminal")]
 pub use input::*;
 pub use plugin::*;
 pub use renderer::*;

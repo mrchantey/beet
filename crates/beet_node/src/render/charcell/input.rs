@@ -1,14 +1,58 @@
 use beet_core::prelude::*;
-use bevy::input::ButtonState;
 use bevy::input::keyboard::NativeKeyCode;
 use bevy::prelude::KeyCode;
 use bevy::prelude::MouseButton;
-use termion::event::Event as TermionEvent;
-
+use vte::Params;
+use vte::Perform;
 use crate::render::Terminal;
 
+// ── InputParser ───────────────────────────────────────────────────────────────
+
+/// Stateful terminal input parser built on [`vte::Parser`].
+///
+/// The parser is stateful across calls so partial escape sequences
+/// spanning multiple reads are handled correctly.
+pub struct InputParser {
+	parser: vte::Parser,
+	performer: Performer,
+}
+
+impl Default for InputParser {
+	fn default() -> Self {
+		Self {
+			parser: vte::Parser::new(),
+			performer: Performer::default(),
+		}
+	}
+}
+
+impl InputParser {
+	pub fn new() -> Self { Self::default() }
+
+	/// Parse a byte slice and return all complete [`TerminalEvent`]s.
+	pub fn parse(&mut self, bytes: &[u8]) -> Result<Vec<TerminalEvent>> {
+		self.parser.advance(&mut self.performer, bytes);
+		Ok(core::mem::take(&mut self.performer.events))
+	}
+}
+
+// ── Bevy systems ──────────────────────────────────────────────────────────────
+
+/// Read input events from each [`Terminal`] and forward them as ECS events.
+pub fn terminal_events(
+	mut commands: Commands,
+	mut query: Populated<(Entity, &mut Terminal)>,
+) -> Result {
+	for (entity, mut terminal) in query.iter_mut() {
+		for event in terminal.read_events()? {
+			commands.entity(entity).trigger_target(event);
+		}
+	}
+	Ok(())
+}
 
 
+// ── Public types ──────────────────────────────────────────────────────────────
 
 /// Input event from the terminal, targeted at the terminal entity.
 #[derive(Debug, Clone, EntityTargetEvent)]
@@ -19,183 +63,382 @@ pub enum TerminalEvent {
 	Unsupported(Vec<u8>),
 }
 
-pub fn terminal_events(
-	mut commands: Commands,
-	mut query: Populated<(Entity, &mut Terminal)>,
-) -> Result {
-	for (entity, mut terminal) in query.iter_mut() {
-		for event in terminal.read_events()? {
-			let event: TerminalEvent = event.into();
-			commands.entity(entity).trigger_target(event);
-		}
-	}
-
-	Ok(())
-}
-
-impl From<TermionEvent> for TerminalEvent {
-	fn from(value: TermionEvent) -> Self {
-		match value {
-			TermionEvent::Key(key) => Self::Key(termion_to_key(key)),
-			TermionEvent::Mouse(mouse_event) => {
-				Self::Mouse(termion_to_mouse(mouse_event))
-			}
-			TermionEvent::Unsupported(items) => Self::Unsupported(items),
-		}
-	}
-}
-
-#[derive(Debug, Copy, Clone, Get)]
+/// A mouse input event.
+#[derive(Debug, Copy, Clone)]
 pub struct MouseEvent {
-	/// Zero-indexed charcell coordinates
-	position: UVec2,
-	button: MouseButton,
-	state: ButtonState,
+	/// Zero-indexed charcell coordinates.
+	pub position: UVec2,
+	/// The kind of event.
+	pub kind: MouseEventKind,
 }
 
-#[rustfmt::skip]
-fn termion_to_mouse(mouse_event: termion::event::MouseEvent) -> MouseEvent {
-	use termion::event::MouseEvent::*;
-	match mouse_event {
-		Press(button, x, y) => MouseEvent {
-			position: UVec2::new(x as u32 - 1, y as u32 - 1),
-			button: match button {
-				termion::event::MouseButton::Left => MouseButton::Left,
-				termion::event::MouseButton::Right => MouseButton::Right,
-				termion::event::MouseButton::Middle => MouseButton::Middle,
-				termion::event::MouseButton::WheelUp => MouseButton::Other(0),
-				termion::event::MouseButton::WheelDown => MouseButton::Other(1),
-				termion::event::MouseButton::WheelLeft => MouseButton::Other(2),
-				termion::event::MouseButton::WheelRight => MouseButton::Other(3),
-			},
-			state: ButtonState::Pressed,
-		},
-		Release(x, y) => MouseEvent {
-			position: UVec2::new(x as u32 - 1, y as u32 - 1),
-			button: MouseButton::Left, // TODO: Termion doesn't specify which button was released
-			state: ButtonState::Released,
-		},
-		Hold(x, y) => MouseEvent {
-			position: UVec2::new(x as u32 - 1, y as u32 - 1),
-			button: MouseButton::Left, // TODO: Termion doesn't specify which button is being held
-			state: ButtonState::Pressed,
-		},
-	}
+/// Kind of mouse event.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MouseEventKind {
+	/// A button was pressed.
+	Press(MouseButton),
+	/// A button was released.
+	Release(MouseButton),
+	/// Mouse moved without any button held (any-motion tracking).
+	Move,
+	/// Mouse moved while a button was held (drag).
+	Drag(MouseButton),
+	/// Scroll wheel event.
+	Scroll(ScrollDirection),
+}
+
+/// Scroll wheel direction.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ScrollDirection {
+	Up,
+	Down,
+	Left,
+	Right,
 }
 
 bitflags::bitflags! {
-	#[derive(Debug, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
+	/// Keyboard modifier keys.
+	#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 	pub struct KeyModifier: u8 {
-  const CTRL = 1 << 0;
-  const ALT = 1 << 1;
-  const SHIFT = 1 << 2;
- }
+		const CTRL  = 1 << 0;
+		const ALT   = 1 << 1;
+		const SHIFT = 1 << 2;
+	}
 }
 
+/// A keyboard press event.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Get)]
 pub struct KeyPress {
 	key: KeyCode,
 	modifier: KeyModifier,
+	/// Printed character for this key, ie `Some('a')` for the A key, `None` for F1.
+	pub char: Option<char>,
 }
+
 impl KeyPress {
+	/// Ctrl+C shortcut constant.
 	pub const CTRL_C: Self = Self {
 		key: KeyCode::KeyC,
 		modifier: KeyModifier::CTRL,
+		char: None,
 	};
 
-	pub fn with_modifier(mut self, modifier: KeyModifier) -> Self {
-		self.modifier |= modifier;
-		self
-	}
-}
-impl KeyPress {
+	/// Create a key press with a modifier.
 	pub fn new(key: KeyCode, modifier: KeyModifier) -> Self {
-		Self { key, modifier }
+		Self {
+			key,
+			modifier,
+			char: None,
+		}
 	}
+
+	/// Create a key press with no modifier.
 	pub fn unmodified(key: KeyCode) -> Self {
 		Self {
 			key,
 			modifier: KeyModifier::empty(),
+			char: None,
+		}
+	}
+
+	/// Add an additional modifier, preserving any already set.
+	pub fn with_modifier(mut self, modifier: KeyModifier) -> Self {
+		self.modifier |= modifier;
+		self
+	}
+
+	/// Create a key press with full field control.
+	pub fn with_char(
+		key: KeyCode,
+		modifier: KeyModifier,
+		char: Option<char>,
+	) -> Self {
+		Self {
+			key,
+			modifier,
+			char,
 		}
 	}
 }
 
-#[rustfmt::skip]
-fn termion_to_key(key: termion::event::Key) -> KeyPress {
-	use termion::event::Key::*;
-	match key {
-		Backspace => KeyPress::unmodified(KeyCode::Backspace),
-		Left => KeyPress::unmodified(KeyCode::ArrowLeft),
-		ShiftLeft => KeyPress::new(KeyCode::ShiftLeft, KeyModifier::SHIFT),
-		AltLeft => KeyPress::new(KeyCode::AltLeft, KeyModifier::ALT),
-		CtrlLeft => KeyPress::new(KeyCode::ControlLeft, KeyModifier::CTRL),
-		Right => KeyPress::unmodified(KeyCode::ArrowRight),
-		ShiftRight => KeyPress::new(KeyCode::ShiftRight, KeyModifier::SHIFT),
-		AltRight => KeyPress::new(KeyCode::AltRight, KeyModifier::ALT),
-		CtrlRight => KeyPress::new(KeyCode::ControlRight, KeyModifier::CTRL),
-		Up => KeyPress::unmodified(KeyCode::ArrowUp),
-		ShiftUp => KeyPress::new(KeyCode::ArrowUp, KeyModifier::SHIFT),
-		AltUp => KeyPress::new(KeyCode::ArrowUp, KeyModifier::ALT),
-		CtrlUp => KeyPress::new(KeyCode::ArrowUp, KeyModifier::CTRL),
-		Down => KeyPress::unmodified(KeyCode::ArrowDown),
-		ShiftDown => KeyPress::new(KeyCode::ArrowDown, KeyModifier::SHIFT),
-		AltDown => KeyPress::new(KeyCode::ArrowDown, KeyModifier::ALT),
-		CtrlDown => KeyPress::new(KeyCode::ArrowDown, KeyModifier::CTRL),
-		Home => KeyPress::unmodified(KeyCode::Home),
-		CtrlHome => KeyPress::new(KeyCode::Home, KeyModifier::CTRL),
-		End => KeyPress::unmodified(KeyCode::End),
-		CtrlEnd => KeyPress::new(KeyCode::End, KeyModifier::CTRL),
-		PageUp => KeyPress::unmodified(KeyCode::PageUp),
-		PageDown => KeyPress::unmodified(KeyCode::PageDown),
-		BackTab => KeyPress::new(KeyCode::Tab, KeyModifier::SHIFT),
-		Delete => KeyPress::unmodified(KeyCode::Delete),
-		Insert => KeyPress::unmodified(KeyCode::Insert),
-		F(n) => match n {
-			1 => KeyPress::unmodified(KeyCode::F1),
-			2 => KeyPress::unmodified(KeyCode::F2),
-			3 => KeyPress::unmodified(KeyCode::F3),
-			4 => KeyPress::unmodified(KeyCode::F4),
-			5 => KeyPress::unmodified(KeyCode::F5),
-			6 => KeyPress::unmodified(KeyCode::F6),
-			7 => KeyPress::unmodified(KeyCode::F7),
-			8 => KeyPress::unmodified(KeyCode::F8),
-			9 => KeyPress::unmodified(KeyCode::F9),
-			10 => KeyPress::unmodified(KeyCode::F10),
-			11 => KeyPress::unmodified(KeyCode::F11),
-			12 => KeyPress::unmodified(KeyCode::F12),
-			13 => KeyPress::unmodified(KeyCode::F13),
-			14 => KeyPress::unmodified(KeyCode::F14),
-			15 => KeyPress::unmodified(KeyCode::F15),
-			16 => KeyPress::unmodified(KeyCode::F16),
-			17 => KeyPress::unmodified(KeyCode::F17),
-			18 => KeyPress::unmodified(KeyCode::F18),
-			19 => KeyPress::unmodified(KeyCode::F19),
-			20 => KeyPress::unmodified(KeyCode::F20),
-			21 => KeyPress::unmodified(KeyCode::F21),
-			22 => KeyPress::unmodified(KeyCode::F22),
-			23 => KeyPress::unmodified(KeyCode::F23),
-			24 => KeyPress::unmodified(KeyCode::F24),
-			25 => KeyPress::unmodified(KeyCode::F25),
-			26 => KeyPress::unmodified(KeyCode::F26),
-			27 => KeyPress::unmodified(KeyCode::F27),
-			28 => KeyPress::unmodified(KeyCode::F28),
-			29 => KeyPress::unmodified(KeyCode::F29),
-			30 => KeyPress::unmodified(KeyCode::F30),
-			31 => KeyPress::unmodified(KeyCode::F31),
-			32 => KeyPress::unmodified(KeyCode::F32),
-			33 => KeyPress::unmodified(KeyCode::F33),
-			34 => KeyPress::unmodified(KeyCode::F34),
-			35 => KeyPress::unmodified(KeyCode::F35),
-			_ => KeyPress::unmodified(KeyCode::Unidentified(NativeKeyCode::Unidentified)),
-		},
+// ── VTE performer ─────────────────────────────────────────────────────────────
 
-		Char(c) => KeyPress::unmodified(char_to_keycode(c)),
-		Alt(c) => KeyPress::new(char_to_keycode(c), KeyModifier::ALT),
-		Ctrl(c) => KeyPress::new(char_to_keycode(c), KeyModifier::CTRL),
-		Null => KeyPress::unmodified(KeyCode::Unidentified(NativeKeyCode::Unidentified)),
-		Esc => KeyPress::unmodified(KeyCode::Escape),
-		_ => KeyPress::unmodified(KeyCode::Unidentified(NativeKeyCode::Unidentified)),
+/// Stateful VTE performer that accumulates [`TerminalEvent`]s.
+#[derive(Default)]
+struct Performer {
+	events: Vec<TerminalEvent>,
+	/// Set when `ESC O` is received; the next `print` completes an SS3 sequence.
+	ss3_pending: bool,
+}
+
+impl Performer {
+	fn push_key(&mut self, key: KeyPress) {
+		self.events.push(TerminalEvent::Key(key));
 	}
+
+	fn push_mouse(&mut self, event: MouseEvent) {
+		self.events.push(TerminalEvent::Mouse(event));
+	}
+
+	/// Parse an SGR mouse event: `ESC [ < cb ; cx ; cy M/m`.
+	///
+	/// `released` is true when the final character is `m`, false for `M`.
+	fn parse_sgr_mouse(&mut self, cb: u16, cx: u16, cy: u16, released: bool) {
+		// Convert from 1-indexed to 0-indexed coordinates.
+		let position = UVec2::new(
+			cx.saturating_sub(1) as u32,
+			cy.saturating_sub(1) as u32,
+		);
+
+		// Strip modifier bits (Shift=4, Alt=8, Ctrl=16) to get the base code.
+		let base = cb & !(4 | 8 | 16);
+
+		let kind = if released {
+			let button = match base {
+				0 => MouseButton::Left,
+				1 => MouseButton::Middle,
+				2 => MouseButton::Right,
+				_ => return,
+			};
+			MouseEventKind::Release(button)
+		} else {
+			match base {
+				64 => MouseEventKind::Scroll(ScrollDirection::Up),
+				65 => MouseEventKind::Scroll(ScrollDirection::Down),
+				66 => MouseEventKind::Scroll(ScrollDirection::Left),
+				67 => MouseEventKind::Scroll(ScrollDirection::Right),
+				// Any-motion without button held
+				35 => MouseEventKind::Move,
+				// Drag (motion with button held)
+				32 => MouseEventKind::Drag(MouseButton::Left),
+				33 => MouseEventKind::Drag(MouseButton::Middle),
+				34 => MouseEventKind::Drag(MouseButton::Right),
+				// Button press
+				0 => MouseEventKind::Press(MouseButton::Left),
+				1 => MouseEventKind::Press(MouseButton::Middle),
+				2 => MouseEventKind::Press(MouseButton::Right),
+				_ => return,
+			}
+		};
+
+		self.push_mouse(MouseEvent { position, kind });
+	}
+}
+
+impl Perform for Performer {
+	/// Handle printable characters and SS3 follow-up bytes.
+	fn print(&mut self, c: char) {
+		// Complete a pending SS3 sequence (ESC O ...) for F1-F4 and cursor keys.
+		if self.ss3_pending {
+			self.ss3_pending = false;
+			let key = match c {
+				'P' => KeyPress::unmodified(KeyCode::F1),
+				'Q' => KeyPress::unmodified(KeyCode::F2),
+				'R' => KeyPress::unmodified(KeyCode::F3),
+				'S' => KeyPress::unmodified(KeyCode::F4),
+				'H' => KeyPress::unmodified(KeyCode::Home),
+				'F' => KeyPress::unmodified(KeyCode::End),
+				'A' => KeyPress::unmodified(KeyCode::ArrowUp),
+				'B' => KeyPress::unmodified(KeyCode::ArrowDown),
+				'C' => KeyPress::unmodified(KeyCode::ArrowRight),
+				'D' => KeyPress::unmodified(KeyCode::ArrowLeft),
+				_ => {
+					self.events.push(TerminalEvent::Unsupported(vec![
+						0x1b, b'O', c as u8,
+					]));
+					return;
+				}
+			};
+			self.push_key(key);
+			return;
+		}
+
+		// DEL byte (0x7F) — sent by Backspace in most terminals.
+		if c == '\x7f' {
+			self.push_key(KeyPress::unmodified(KeyCode::Backspace));
+			return;
+		}
+
+		// Regular printable character.
+		let (key, modifier) = char_to_key(c);
+		self.push_key(KeyPress::with_char(key, modifier, Some(c)));
+	}
+
+	/// Handle C0 control characters (0x00–0x1F).
+	fn execute(&mut self, byte: u8) {
+		let key = match byte {
+			0x08 => KeyPress::unmodified(KeyCode::Backspace),
+			0x09 => KeyPress::with_char(
+				KeyCode::Tab,
+				KeyModifier::empty(),
+				Some('\t'),
+			),
+			0x0A | 0x0D => KeyPress::with_char(
+				KeyCode::Enter,
+				KeyModifier::empty(),
+				Some('\n'),
+			),
+			// Ctrl+A through Ctrl+Z (0x01–0x1A)
+			c @ 0x01..=0x1A => {
+				let ch = (c - 0x01 + b'a') as char;
+				let (key, _) = char_to_key(ch);
+				KeyPress::new(key, KeyModifier::CTRL)
+			}
+			// Ctrl+\ through Ctrl+_ (0x1C–0x1F)
+			c @ 0x1C..=0x1F => {
+				let ch = (c - 0x1C + b'4') as char;
+				let (key, _) = char_to_key(ch);
+				KeyPress::new(key, KeyModifier::CTRL)
+			}
+			_ => return,
+		};
+		self.push_key(key);
+	}
+
+	/// Handle CSI sequences: arrow keys, F-keys, mouse, special keys.
+	fn csi_dispatch(
+		&mut self,
+		params: &Params,
+		intermediates: &[u8],
+		_ignore: bool,
+		c: char,
+	) {
+		// Collect first sub-param from each `;`-separated group.
+		let p: Vec<u16> = params
+			.iter()
+			.map(|sub| sub.iter().next().copied().unwrap_or(0))
+			.collect();
+
+		match (intermediates, c) {
+			// ── SGR mouse: ESC [ < cb ; cx ; cy M/m ──────────────────────────
+			(b"<", 'M') | (b"<", 'm') if p.len() >= 3 => {
+				self.parse_sgr_mouse(p[0], p[1], p[2], c == 'm');
+			}
+
+			// ── Arrow keys (no modifier) ──────────────────────────────────────
+			(b"", 'A') if p.len() <= 1 => {
+				self.push_key(KeyPress::unmodified(KeyCode::ArrowUp))
+			}
+			(b"", 'B') if p.len() <= 1 => {
+				self.push_key(KeyPress::unmodified(KeyCode::ArrowDown))
+			}
+			(b"", 'C') if p.len() <= 1 => {
+				self.push_key(KeyPress::unmodified(KeyCode::ArrowRight))
+			}
+			(b"", 'D') if p.len() <= 1 => {
+				self.push_key(KeyPress::unmodified(KeyCode::ArrowLeft))
+			}
+			(b"", 'H') if p.is_empty() => {
+				self.push_key(KeyPress::unmodified(KeyCode::Home))
+			}
+			(b"", 'F') if p.is_empty() => {
+				self.push_key(KeyPress::unmodified(KeyCode::End))
+			}
+
+			// ── Arrow/nav keys with modifier: ESC [ 1 ; N X ──────────────────
+			(b"", dir @ ('A' | 'B' | 'C' | 'D' | 'H' | 'F'))
+				if p.len() == 2 =>
+			{
+				let modifier = decode_modifier(p[1]);
+				let key = match dir {
+					'A' => KeyCode::ArrowUp,
+					'B' => KeyCode::ArrowDown,
+					'C' => KeyCode::ArrowRight,
+					'D' => KeyCode::ArrowLeft,
+					'H' => KeyCode::Home,
+					'F' => KeyCode::End,
+					_ => unreachable!(),
+				};
+				self.push_key(KeyPress::new(key, modifier));
+			}
+
+			// ── Backward tab ─────────────────────────────────────────────────
+			(b"", 'Z') => {
+				self.push_key(KeyPress::new(KeyCode::Tab, KeyModifier::SHIFT))
+			}
+
+			// ── Tilde-terminated special keys and F-keys ──────────────────────
+			(b"", '~') if !p.is_empty() => {
+				let key = match (p[0], p.get(1).copied().unwrap_or(0)) {
+					(1 | 7, _) => KeyPress::unmodified(KeyCode::Home),
+					(2, _) => KeyPress::unmodified(KeyCode::Insert),
+					(3, _) => KeyPress::unmodified(KeyCode::Delete),
+					(4 | 8, _) => KeyPress::unmodified(KeyCode::End),
+					(5, _) => KeyPress::unmodified(KeyCode::PageUp),
+					(6, _) => KeyPress::unmodified(KeyCode::PageDown),
+					(11, _) => KeyPress::unmodified(KeyCode::F1),
+					(12, _) => KeyPress::unmodified(KeyCode::F2),
+					(13, _) => KeyPress::unmodified(KeyCode::F3),
+					(14, _) => KeyPress::unmodified(KeyCode::F4),
+					(15, _) => KeyPress::unmodified(KeyCode::F5),
+					(17, _) => KeyPress::unmodified(KeyCode::F6),
+					(18, _) => KeyPress::unmodified(KeyCode::F7),
+					(19, _) => KeyPress::unmodified(KeyCode::F8),
+					(20, _) => KeyPress::unmodified(KeyCode::F9),
+					(21, _) => KeyPress::unmodified(KeyCode::F10),
+					(23, _) => KeyPress::unmodified(KeyCode::F11),
+					(24, _) => KeyPress::unmodified(KeyCode::F12),
+					_ => return,
+				};
+				self.push_key(key);
+			}
+
+			_ => {} // Unknown CSI — ignore silently
+		}
+	}
+
+	/// Handle ESC sequences: Alt-key combos and SS3 prefix (F1-F4, cursor).
+	fn esc_dispatch(&mut self, intermediates: &[u8], _ignore: bool, byte: u8) {
+		if !intermediates.is_empty() {
+			return;
+		}
+		match byte {
+			// SS3 prefix — the next `print` call completes the sequence.
+			b'O' => self.ss3_pending = true,
+			// Alt+char: ESC followed by a printable byte.
+			c if c.is_ascii_graphic() || c == b' ' => {
+				let ch = c as char;
+				let (key, _) = char_to_key(ch);
+				self.push_key(KeyPress::with_char(
+					key,
+					KeyModifier::ALT,
+					Some(ch),
+				));
+			}
+			_ => {}
+		}
+	}
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Map a CSI modifier number to [`KeyModifier`] bitflags.
+///
+/// The encoding is `N - 1` where bit 0 = Shift, bit 1 = Alt, bit 2 = Ctrl.
+fn decode_modifier(code: u16) -> KeyModifier {
+	let bits = code.saturating_sub(1);
+	let mut m = KeyModifier::empty();
+	if bits & 1 != 0 {
+		m |= KeyModifier::SHIFT;
+	}
+	if bits & 2 != 0 {
+		m |= KeyModifier::ALT;
+	}
+	if bits & 4 != 0 {
+		m |= KeyModifier::CTRL;
+	}
+	m
+}
+
+/// Map a `char` to a [`KeyCode`] and infer a Shift modifier for uppercase.
+fn char_to_key(c: char) -> (KeyCode, KeyModifier) {
+	let modifier = if c.is_ascii_uppercase() {
+		KeyModifier::SHIFT
+	} else {
+		KeyModifier::empty()
+	};
+	let key = char_to_keycode(c.to_ascii_lowercase());
+	(key, modifier)
 }
 
 fn char_to_keycode(c: char) -> KeyCode {
@@ -237,8 +480,19 @@ fn char_to_keycode(c: char) -> KeyCode {
 		'8' => KeyCode::Digit8,
 		'9' => KeyCode::Digit9,
 		' ' => KeyCode::Space,
-		'\n' => KeyCode::Enter,
+		'\n' | '\r' => KeyCode::Enter,
 		'\t' => KeyCode::Tab,
+		'-' => KeyCode::Minus,
+		'=' => KeyCode::Equal,
+		'[' => KeyCode::BracketLeft,
+		']' => KeyCode::BracketRight,
+		'\\' => KeyCode::Backslash,
+		';' => KeyCode::Semicolon,
+		'\'' => KeyCode::Quote,
+		',' => KeyCode::Comma,
+		'.' => KeyCode::Period,
+		'/' => KeyCode::Slash,
+		'`' => KeyCode::Backquote,
 		_ => KeyCode::Unidentified(NativeKeyCode::Unidentified),
 	}
 }

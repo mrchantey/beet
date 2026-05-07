@@ -10,7 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example ssh_tui --features ssh_server,node,termion
+//! cargo run --example ssh_tui --features ssh_server,terminal
 //! ```
 //! Connect:
 //! ```sh
@@ -20,8 +20,6 @@
 use beet::net::prelude::*;
 use beet::prelude::*;
 use std::io::Write;
-use termion::event::Event;
-use termion::event::Key;
 
 fn main() -> Result {
 	App::new()
@@ -41,30 +39,30 @@ struct Counter(i32);
 
 /// Renders a colour-cycling counter panel.
 fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
-	use termion::clear;
-	use termion::color;
-	use termion::cursor;
 	let (r, g, b): (u8, u8, u8) = match count.rem_euclid(3) {
 		0 => (220, 50, 50),
 		1 => (50, 200, 50),
 		_ => (50, 100, 220),
 	};
+	// Move to origin and clear screen.
+	write!(terminal.writer, "{}{}", CURSOR_HOME, ERASE_ALL)
+		.map_err(|e| bevyhow!("{e}"))?;
+	// Write foreground colour and reset background.
+	write_fg(&mut terminal.writer, r, g, b).map_err(|e| bevyhow!("{e}"))?;
+	write!(terminal.writer, "{}", RESET_BG).map_err(|e| bevyhow!("{e}"))?;
+	// Write the frame content.
 	write!(
 		terminal.writer,
-		"{}{}{}{}╔═══════════════════════════╗\r\n\
-		║   beet SSH TUI demo       ║\r\n\
-		║   Counter: {:<11}    ║\r\n\
-		║  [+/=] inc  [-] dec       ║\r\n\
-		║  [r] reset  [q] quit      ║\r\n\
-		╚═══════════════════════════╝{}",
-		cursor::Goto(1, 1),
-		clear::All,
-		color::Fg(color::Rgb(r, g, b)),
-		color::Bg(color::Reset),
+		"╔═══════════════════════════╗\r\n\
+		 ║   beet SSH TUI demo       ║\r\n\
+		 ║   Counter: {:<11}    ║\r\n\
+		 ║  [+/=] inc  [-] dec       ║\r\n\
+		 ║  [r] reset  [q] quit      ║\r\n\
+		 ╚═══════════════════════════╝",
 		count,
-		color::Fg(color::Reset),
 	)
-	.map_err(|e| bevyhow!("{e}"))
+	.map_err(|e| bevyhow!("{e}"))?;
+	write!(terminal.writer, "{}", RESET_FG).map_err(|e| bevyhow!("{e}"))
 }
 
 /// Handles all SSH events for a connection.
@@ -91,20 +89,30 @@ fn on_recv(
 				.trigger_target(SshSend(SshEvent::bytes(output)));
 		}
 		SshEvent::Data(bytes) => {
-			// Parse incoming bytes into termion events.
+			// Parse incoming bytes into terminal events.
 			let events = BufferedTerminal::parse_bytes(bytes);
 
 			let mut quit = false;
 			if let Ok(mut counter) = counters.get_mut(conn) {
 				for ev in &events {
 					match ev {
-						Event::Key(Key::Char('+') | Key::Char('=')) => {
+						TerminalEvent::Key(key)
+							if matches!(key.char, Some('+' | '=')) =>
+						{
 							counter.0 += 1
 						}
-						Event::Key(Key::Char('-')) => counter.0 -= 1,
-						Event::Key(Key::Char('r')) => counter.0 = 0,
-						Event::Key(Key::Char('q')) => quit = true,
-						Event::Key(Key::Ctrl('c')) => quit = true,
+						TerminalEvent::Key(key) if key.char == Some('-') => {
+							counter.0 -= 1
+						}
+						TerminalEvent::Key(key) if key.char == Some('r') => {
+							counter.0 = 0
+						}
+						TerminalEvent::Key(key) if key.char == Some('q') => {
+							quit = true
+						}
+						TerminalEvent::Key(key) if key == &KeyPress::CTRL_C => {
+							quit = true
+						}
 						_ => {}
 					}
 				}
@@ -113,12 +121,12 @@ fn on_recv(
 			if quit {
 				commands
 					.entity(conn)
-					.trigger_target(SshSend(SshEvent::text("\x1b[?1049l")))
+					.trigger_target(SshSend(SshEvent::text(LEAVE_ALT_SCREEN)))
 					.trigger_target(SshSend(SshEvent::Close(None)));
 				return;
 			}
 
-			// Re-render and send updated frame.
+			// Re-render and send the updated frame.
 			let count = counters.get(conn).map(|c| c.0).unwrap_or(0);
 			if let Ok(mut terminal) = terminals.get_mut(conn) {
 				let _ = render_frame(count, &mut terminal);

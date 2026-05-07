@@ -1,34 +1,26 @@
 use crate::prelude::*;
 use beet_core::exports::async_channel;
+use beet_core::exports::async_channel::Receiver;
 use beet_core::prelude::*;
 use std::io;
 use std::io::BufWriter;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
-use termion::clear;
-use termion::color;
-use termion::cursor;
-use termion::event::Event as TermionEvent;
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use termion::screen;
-use termion::style;
 
+use super::escape;
 
+// ── StdioTerminal ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, SetWith, Component)]
 #[component(on_add=Self::on_add)]
 pub struct StdioTerminal {
-	/// Whether to run the terminal in raw mode,
-	/// defaults to true
+	/// Whether to run the terminal in raw mode, defaults to true.
 	raw_mode: bool,
-	/// In raw mode, listen for ctrl+c events and exit
-	/// the application. Does nothing in cooked mode, ctrl+c
-	/// would directly exit the application.
+	/// In raw mode, listen for ctrl+c events and exit the application.
+	/// Does nothing in cooked mode where ctrl+c directly exits the process.
 	ctrl_c_exit: bool,
-	/// When enabled, applies a ctrl+c and panic hook
-	/// to ensure terminal state is restored
+	/// When enabled, applies a ctrl+c and panic hook to restore terminal state.
 	restore_hook: bool,
 	config: TerminalConfig,
 }
@@ -44,7 +36,6 @@ impl Default for StdioTerminal {
 	}
 }
 
-
 impl StdioTerminal {
 	pub fn inline() -> Self {
 		Self {
@@ -57,19 +48,17 @@ impl StdioTerminal {
 	fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		let stdio = world.entity(cx.entity).get::<StdioTerminal>().unwrap();
 		stdio.register_restore_hook().unwrap();
-		/// Creates a [`BufWriter`] with [`TERMINAL_BUFFER_CAPACITY`], preventing mid-frame flushes and terminal flicker.
+		/// Large write buffer prevents mid-frame flushes and terminal flicker.
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
-		let size = termion::terminal_size()
-			.map(|(w, h)| UVec2::new(w as u32, h as u32))
-			.unwrap_or(UVec2::new(80, 24));
+		let size = terminal_ext::size().unwrap_or(UVec2::new(80, 24));
 		let terminal = if stdio.raw_mode {
+			crossterm::terminal::enable_raw_mode().unwrap();
 			Terminal::new(
 				AsyncReader::default(),
 				BufWriter::with_capacity(
 					TERMINAL_BUFFER_CAPACITY,
-					// RawMode struct will
-					std::io::stdout().into_raw_mode().unwrap(),
+					RawModeGuard(std::io::stdout()),
 				),
 				size,
 				stdio.config.clone(),
@@ -88,8 +77,7 @@ impl StdioTerminal {
 		world.commands().entity(cx.entity).insert(terminal);
 	}
 
-	/// Ensures Terminal::restore_config is called in the
-	/// event of a forced exit (ctrl+c or panic)
+	/// Registers a hook that restores the terminal on ctrl+c or panic.
 	fn register_restore_hook(&self) -> Result {
 		if !self.restore_hook {
 			return Ok(());
@@ -104,9 +92,7 @@ impl StdioTerminal {
 			)
 			.restore_config()
 			{
-				Ok(_) => {
-					// println!("terminal restored");
-				}
+				Ok(_) => {}
 				Err(err) => {
 					eprintln!("Error restoring terminal state: {err}");
 				}
@@ -115,16 +101,26 @@ impl StdioTerminal {
 	}
 }
 
-macro_rules! csi {
-    ($( $l:expr ),*) => { concat!("\x1B[", $( $l ),*) };
+// ── RawModeGuard ──────────────────────────────────────────────────────────────
+
+/// Wraps stdout and disables raw mode when dropped.
+struct RawModeGuard(std::io::Stdout);
+
+impl Write for RawModeGuard {
+	fn write(&mut self, buf: &[u8]) -> io::Result<usize> { self.0.write(buf) }
+	fn flush(&mut self) -> io::Result<()> { self.0.flush() }
 }
+impl Drop for RawModeGuard {
+	fn drop(&mut self) { crossterm::terminal::disable_raw_mode().ok(); }
+}
+
+// ── TerminalConfig ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, SetWith)]
 pub struct TerminalConfig {
-	/// Whether to use an alternate screen for the terminal,
-	/// defaults to true
+	/// Whether to use the alternate screen buffer, defaults to true.
 	alternate_screen: bool,
-	/// Whether to hide the cursor when rendering, defaults to true
+	/// Whether to hide the cursor when rendering, defaults to true.
 	hide_cursor: bool,
 	enable_mouse: bool,
 }
@@ -149,37 +145,29 @@ impl Default for TerminalConfig {
 	}
 }
 
+// ── AsyncReader ───────────────────────────────────────────────────────────────
 
-/// A terminal abstraction over a reader `R` and writer `W`.
-///
-/// Writes ANSI escape sequences via termion to `W`, reads input events from `R`.
-/// Use [`StdoutTerminal`] for local stdio and [`BufferedTerminal`] for SSH/headless.
-#[derive(Component)]
-pub struct Terminal {
-	/// Input reader.
-	pub reader: Box<dyn 'static + Send + Sync + Read>,
-	/// Output writer — receives all ANSI escape sequences and cell data.
-	pub writer: Box<dyn 'static + Send + Sync + Write>,
-	size: UVec2,
-	/// Terminal configuration options, applied on initialization and immutable,
-	/// also used on cleanup to restore previous state.
-	config: TerminalConfig,
-}
-
+/// Non-blocking reader that drains a background thread reading from `/dev/tty`.
 pub struct AsyncReader {
 	recv: Receiver<io::Result<u8>>,
 }
+
 impl Default for AsyncReader {
 	fn default() -> Self {
 		let (send, recv) = async_channel::unbounded();
 		std::thread::spawn(move || {
-			for i in termion::get_tty().unwrap().bytes() {
-				if send.try_send(i).is_err() {
+			use std::io::Read;
+			// Open /dev/tty directly so keyboard input is available
+			// even when stdin is redirected.
+			let Ok(tty) = std::fs::File::open("/dev/tty") else {
+				return;
+			};
+			for byte in tty.bytes() {
+				if send.try_send(byte).is_err() {
 					return;
 				}
 			}
 		});
-
 		Self { recv }
 	}
 }
@@ -187,12 +175,10 @@ impl Default for AsyncReader {
 impl Read for AsyncReader {
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		let mut total = 0;
-
 		loop {
 			if total >= buf.len() {
 				break;
 			}
-
 			match self.recv.try_recv() {
 				Ok(Ok(b)) => {
 					buf[total] = b;
@@ -202,18 +188,34 @@ impl Read for AsyncReader {
 				Err(_) => break,
 			}
 		}
-
 		Ok(total)
 	}
 }
 
+// ── Terminal ──────────────────────────────────────────────────────────────────
+
+/// A terminal abstraction over a reader `R` and writer `W`.
+///
+/// Writes ANSI escape sequences to `W` and reads input events via [`InputParser`].
+/// Use [`StdioTerminal`] for local stdio and [`BufferedTerminal`] for SSH/headless.
+#[derive(Component)]
+pub struct Terminal {
+	/// Input reader.
+	pub reader: Box<dyn 'static + Send + Sync + Read>,
+	/// Output writer — receives all ANSI escape sequences and cell data.
+	pub writer: Box<dyn 'static + Send + Sync + Write>,
+	size: UVec2,
+	/// Configuration applied on init and used to restore previous state on exit.
+	config: TerminalConfig,
+	input_parser: InputParser,
+}
+
 impl Terminal {
+	/// Create an in-memory [`Terminal`] backed by a [`Vec<u8>`] writer.
 	pub fn new_buffered(size: UVec2) -> Self {
 		Self::new(Cursor::new(Vec::new()), Vec::new(), size, default())
 	}
-	// pub fn take_output(&mut self) -> Vec<u8> {
-	// 	core::mem::take(&mut self.writer)
-	// }
+
 	/// Create a terminal with explicit reader, writer, and size.
 	pub fn new(
 		reader: impl 'static + Send + Sync + Read,
@@ -226,6 +228,7 @@ impl Terminal {
 			writer: Box::new(writer),
 			config,
 			size,
+			input_parser: InputParser::new(),
 		};
 		this.apply_config().unwrap();
 		this
@@ -233,32 +236,39 @@ impl Terminal {
 
 	fn apply_config(&mut self) -> Result {
 		if self.config.alternate_screen {
-			write!(self.writer, "{}", screen::ToAlternateScreen)?;
+			self.writer
+				.write_all(escape::ENTER_ALT_SCREEN.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if self.config.hide_cursor {
-			write!(self.writer, "{}", cursor::Hide)?;
+			self.writer
+				.write_all(escape::HIDE_CURSOR.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if self.config.enable_mouse {
-			const ENTER_MOUSE_SEQUENCE: &'static str =
-				csi!("?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h");
-			write!(self.writer, "{}", ENTER_MOUSE_SEQUENCE)?;
+			self.writer
+				.write_all(escape::ENTER_MOUSE.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		Ok(())
 	}
+
 	fn restore_config(&mut self) -> Result {
 		if self.config.alternate_screen {
-			write!(self.writer, "{}", screen::ToMainScreen)?;
+			self.writer
+				.write_all(escape::LEAVE_ALT_SCREEN.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if self.config.hide_cursor {
-			write!(self.writer, "{}", cursor::Show)?;
+			self.writer
+				.write_all(escape::SHOW_CURSOR.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if self.config.enable_mouse {
-			/// A sequence of escape codes to disable terminal mouse support.
-			const EXIT_MOUSE_SEQUENCE: &'static str =
-				csi!("?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l");
-			write!(self.writer, "{}", EXIT_MOUSE_SEQUENCE)?;
+			self.writer
+				.write_all(escape::LEAVE_MOUSE.as_bytes())
+				.map_err(|e| bevyhow!("{e}"))?;
 		}
-
 		Ok(())
 	}
 
@@ -266,49 +276,48 @@ impl Terminal {
 	pub fn size(&self) -> UVec2 { self.size }
 
 	/// Update the terminal size.
-	pub fn set_size(&mut self, size: UVec2) {
-		// wrong
-		self.size = size;
+	pub fn set_size(&mut self, size: UVec2) { self.size = size; }
+
+	/// Read all pending input events without blocking.
+	pub fn read_events(&mut self) -> Result<Vec<TerminalEvent>> {
+		let mut buf = [0u8; 4096];
+		let mut all_bytes = Vec::new();
+		// Drain all available bytes from the non-blocking reader.
+		loop {
+			let n = self.reader.read(&mut buf).map_err(|e| bevyhow!("{e}"))?;
+			if n == 0 {
+				break;
+			}
+			all_bytes.extend_from_slice(&buf[..n]);
+		}
+		self.input_parser.parse(&all_bytes)
 	}
 
-	/// Parse all pending input events from the reader without blocking.
-	pub fn read_events(&mut self) -> Result<Vec<TermionEvent>> {
-		self.reader
-			.as_mut()
-			.events()
-			.xtry_map(|e| e.map_err(|err| err.into()))
+	/// Parse raw bytes as terminal input events without retaining state.
+	// remove!
+	pub fn parse_bytes(bytes: &[u8]) -> Vec<TerminalEvent> {
+		InputParser::new().parse(bytes).unwrap_or_default()
 	}
 
-	/// Parse raw bytes as terminal input events.
-	pub fn parse_bytes(bytes: &[u8]) -> Vec<TermionEvent> {
-		bytes.events().filter_map(|e| e.ok()).collect()
-	}
-
-	/// Move cursor to (col, row), 0-indexed.
+	/// Move cursor to 0-indexed `(col, row)`.
 	pub fn goto(&mut self, col: u32, row: u32) -> Result {
-		write!(
-			self.writer,
-			"{}",
-			cursor::Goto((col + 1) as u16, (row + 1) as u16)
-		)
-		.map_err(|e| bevyhow!("{e}"))
+		escape::write_goto(&mut self.writer, col, row)
+			.map_err(|e| bevyhow!("{e}"))
 	}
 
 	/// Set foreground colour via 24-bit RGB.
 	pub fn set_fg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		write!(self.writer, "{}", color::Fg(color::Rgb(r, g, b)))
-			.map_err(|e| bevyhow!("{e}"))
+		escape::write_fg(&mut self.writer, r, g, b).map_err(|e| bevyhow!("{e}"))
 	}
 
 	/// Set background colour via 24-bit RGB.
 	pub fn set_bg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		write!(self.writer, "{}", color::Bg(color::Rgb(r, g, b)))
-			.map_err(|e| bevyhow!("{e}"))
+		escape::write_bg(&mut self.writer, r, g, b).map_err(|e| bevyhow!("{e}"))
 	}
 
 	/// Reset all SGR attributes.
 	pub fn reset_style(&mut self) -> Result {
-		write!(self.writer, "{}", style::Reset).map_err(|e| bevyhow!("{e}"))
+		write!(self.writer, "{}", escape::RESET).map_err(|e| bevyhow!("{e}"))
 	}
 
 	/// Write text attribute SGR codes from a [`VisualStyle`].
@@ -319,69 +328,53 @@ impl Terminal {
 		use crate::style::TextStyle;
 		let ts = vstyle.text_style;
 		if vstyle.dim_foregeround() {
-			write!(self.writer, "{}", style::Faint)
+			write!(self.writer, "{}", escape::FAINT)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::BOLD) {
-			write!(self.writer, "{}", style::Bold)
+			write!(self.writer, "{}", escape::BOLD)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::ITALIC) {
-			write!(self.writer, "{}", style::Italic)
+			write!(self.writer, "{}", escape::ITALIC)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::UNDERLINE) {
-			write!(self.writer, "{}", style::Underline)
+			write!(self.writer, "{}", escape::UNDERLINE)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::BLINK) {
-			write!(self.writer, "{}", style::Blink)
+			write!(self.writer, "{}", escape::BLINK)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::REVERSED) {
-			write!(self.writer, "{}", style::Invert)
+			write!(self.writer, "{}", escape::INVERT)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::LINE_THROUGH) {
-			write!(self.writer, "{}", style::CrossedOut)
+			write!(self.writer, "{}", escape::CROSSED_OUT)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
-		// RAPID_BLINK, HIDDEN, OVERLINE have no termion equivalents; use raw CSI
 		if ts.contains(TextStyle::RAPID_BLINK) {
-			self.writer
-				.write_all(b"\x1b[6m")
+			write!(self.writer, "{}", escape::RAPID_BLINK)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::HIDDEN) {
-			self.writer
-				.write_all(b"\x1b[8m")
+			write!(self.writer, "{}", escape::HIDDEN)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		if ts.contains(TextStyle::OVERLINE) {
-			self.writer
-				.write_all(b"\x1b[53m")
+			write!(self.writer, "{}", escape::OVERLINE)
 				.map_err(|e| bevyhow!("{e}"))?;
 		}
 		Ok(())
 	}
 
-	// fn get_cursor(&mut self) -> Result<UVec2> { Ok(UVec2::ZERO) }
-
-	// fn set_cursor(&mut self, position: UVec2) -> Result {
-	// 	self.goto(position.x, position.y)
-	// }
-
+	/// Erase the screen and move the cursor to the home position.
 	pub fn clear(&mut self) -> Result {
-		write!(self.writer, "{}{}", clear::All, cursor::Goto(1, 1))
+		write!(self.writer, "{}{}", escape::ERASE_ALL, escape::CURSOR_HOME)
 			.map_err(|e| bevyhow!("{e}"))
 	}
-
-	// fn window_size(&mut self) -> Result<super::WindowSize> {
-	// 	Ok(super::WindowSize {
-	// 		chars: self.size,
-	// 		pixels: UVec2::ZERO,
-	// 	})
-	// }
 
 	fn draw<'a>(
 		&mut self,
@@ -389,7 +382,7 @@ impl Terminal {
 	) -> Result {
 		let mut last_pos: Option<UVec2> = None;
 		for (pos, cell) in cells {
-			// skip Goto when directly following the previous cell
+			// Skip goto when directly following the previous cell.
 			let skip = matches!(last_pos, Some(lp) if pos.x == lp.x + 1 && pos.y == lp.y);
 			if !skip {
 				self.goto(pos.x, pos.y)?;
@@ -413,6 +406,43 @@ impl Terminal {
 
 	fn flush(&mut self) -> Result {
 		self.writer.flush().map_err(|e| bevyhow!("{e}"))
+	}
+}
+
+// ── BufferedTerminal ──────────────────────────────────────────────────────────
+
+/// In-memory terminal for SSH or headless rendering.
+///
+/// All writes go to an internal [`Vec<u8>`] buffer that can be drained with
+/// [`BufferedTerminal::take_output`]. Input bytes are parsed on demand via
+/// [`BufferedTerminal::parse_bytes`].
+#[derive(Component)]
+pub struct BufferedTerminal {
+	/// Direct access to the output buffer — write ANSI sequences here.
+	pub writer: Vec<u8>,
+	size: UVec2,
+}
+
+impl BufferedTerminal {
+	/// Create a new [`BufferedTerminal`] with the given size.
+	pub fn new_buffered(size: UVec2) -> Self {
+		Self {
+			writer: Vec::new(),
+			size,
+		}
+	}
+
+	/// Current terminal size.
+	pub fn size(&self) -> UVec2 { self.size }
+
+	/// Drain and return all buffered output bytes.
+	pub fn take_output(&mut self) -> Vec<u8> {
+		core::mem::take(&mut self.writer)
+	}
+
+	/// Parse raw bytes into [`TerminalEvent`]s without retaining state.
+	pub fn parse_bytes(bytes: &[u8]) -> Vec<TerminalEvent> {
+		Terminal::parse_bytes(bytes)
 	}
 }
 
@@ -447,14 +477,13 @@ pub fn restore_terminals(
 	for (entity, mut terminal) in query.iter_mut() {
 		terminal.restore_config()?;
 		terminal.flush()?;
-		// remove the terminal, running any drop steps like
-		// restoring RawMode
+		// Remove the terminal; its Drop runs RawModeGuard::drop to restore mode.
 		commands.entity(entity).remove::<Terminal>();
 	}
 	Ok(())
 }
 
-/// Restore terminals (leave alternate screen, show cursor) on shutdown.
+/// Exit on ctrl+c when [`StdioTerminal::ctrl_c_exit`] is set.
 pub fn exit_ctrl_c(
 	ev: On<TerminalEvent>,
 	mut commands: Commands,
@@ -462,11 +491,9 @@ pub fn exit_ctrl_c(
 ) {
 	if let Ok(term) = query.get(ev.target()) {
 		if term.ctrl_c_exit {
-			match ev.event() {
-				TerminalEvent::Key(key) if key == &KeyPress::CTRL_C => {
-					commands.write_message(AppExit::Success);
-				}
-				_ => {}
+			if matches!(ev.event(), TerminalEvent::Key(k) if k == &KeyPress::CTRL_C)
+			{
+				commands.write_message(AppExit::Success);
 			}
 		}
 	}

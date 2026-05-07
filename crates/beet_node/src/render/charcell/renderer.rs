@@ -73,9 +73,7 @@ impl CharcellRenderer {
 		let default_size = UVec2::new(80, 24);
 		cfg_if! {
 			if #[cfg(all(feature = "terminal", not(target_arch = "wasm32")))] {
-				termion::terminal_size()
-					.map(|(w, h)| UVec2::new(w as u32, h as u32))
-					.unwrap_or(default_size)
+				terminal_ext::size().unwrap_or(default_size)
 			} else {
 				default_size
 			}
