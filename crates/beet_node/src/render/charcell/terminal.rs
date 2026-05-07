@@ -297,7 +297,7 @@ impl Terminal {
 		Ok(())
 	}
 
-	fn restore_config(&mut self) -> Result {
+	pub fn restore_config(&mut self) -> Result {
 		if self.config.enable_mouse {
 			self.writer.write_all(escape::LEAVE_MOUSE.as_bytes())?;
 		}
@@ -433,7 +433,7 @@ impl Terminal {
 		Ok(())
 	}
 
-	fn flush(&mut self) -> Result { self.writer.flush()?.xok() }
+	pub fn flush(&mut self) -> Result { self.writer.flush()?.xok() }
 }
 
 // ── BufferedTerminal ──────────────────────────────────────────────────────────

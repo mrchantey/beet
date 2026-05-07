@@ -82,23 +82,37 @@ fn render(count: i32, mut writer: impl std::io::Write) -> Result {
 fn on_input(
 	ev: On<TerminalEvent>,
 	mut commands: Commands,
-	mut query: Query<&mut Counter>,
-) {
+	mut query: Query<(&mut Counter, &mut Terminal, &mut ChannelTerminal)>,
+) -> Result {
 	use TerminalEvent::*;
-	let Ok(mut counter) = query.get_mut(ev.target()) else {
-		return;
+	let Ok((mut counter, mut terminal, mut channel_terminal)) =
+		query.get_mut(ev.target())
+	else {
+		return Ok(());
 	};
 	match ev.event() {
 		Key(key) if matches!(key.char, Some('+' | '=')) => counter.0 += 1,
 		Key(key) if key.char == Some('-') => counter.0 -= 1,
 		Key(key) if key.char == Some('r') => counter.0 = 0,
 		Key(key) if key.char == Some('q') || key == &KeyPress::CTRL_C => {
-			// or do i need to actually exit?
+			// perform a restore flush and despawn
+			terminal.restore_config()?;
+			terminal.flush()?;
+			let output = channel_terminal.drain_write();
+			if !output.is_empty() {
+				commands
+					.entity(ev.target())
+					.trigger_target(SshSend(SshEvent::bytes(output)));
+			}
+
+			// TODO this currently causes server to crash, despawned entity..
+			// possibly due to propagating events?
 			commands.entity(ev.target()).despawn();
 		}
 
 		_ => {}
 	}
+	Ok(())
 }
 
 fn ssh_write(
@@ -123,25 +137,23 @@ fn ssh_read(
 	mut commands: Commands,
 	mut query: Query<&mut ChannelTerminal>,
 ) -> Result {
-	let conn = ev.original_target();
-
+	let entity = ev.original_target();
 	match ev.event().inner() {
 		SshEvent::Connect => {}
 		SshEvent::RequestPty(pty) => {
 			// Insert the terminal now that we know the PTY size.
-			commands.entity(conn).insert((
+			commands.entity(entity).insert((
 				ChannelTerminal::new(pty.window.cells, default()),
 				Counter::default(),
 			));
 		}
 		SshEvent::Data(bytes) => {
 			if let Ok(mut term) = query.get_mut(ev.target()) {
-				println!("sending input: {:?}", bytes);
 				term.send_input(bytes)?;
 			}
 		}
 		SshEvent::Close(_) => {
-			commands.entity(conn).despawn();
+			commands.entity(entity).despawn();
 		}
 		_ => {}
 	}
