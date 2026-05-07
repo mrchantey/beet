@@ -238,7 +238,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 # default = ["stack"]
-default = ["node"]
+default = ["ui"]
 
 # 💡 Top Level
 
@@ -271,7 +271,7 @@ net = ["dep:beet_net", "beet_router?/http"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-router = ["action", "node", "dep:beet_router"]
+router = ["action", "ui", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -282,7 +282,7 @@ tungstenite = ["net", "beet_net?/tungstenite"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
-_pretty_curl = ["net", "node", "ureq", "rustls-tls"]
+_pretty_curl = ["net", "ui", "ureq", "rustls-tls"]
 _mini_browser = ["_pretty_curl", "tui", "router"]
 ssh_server = ["net", "beet_net?/russh_server", "native-tls"]
 ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
@@ -295,10 +295,10 @@ thread = ["dep:beet_thread","net","action"]
 # 💡 Stack
 
 action = ["dep:beet_action"]
-node = ["dep:beet_ui"]
-style = ["node", "beet_ui?/style"]
+ui = ["dep:beet_ui"]
+style = ["ui", "beet_ui?/style"]
 tui = ["beet_ui?/tui"]
-terminal = ["node", "beet_ui?/terminal"]
+terminal = ["ui", "beet_ui?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
@@ -431,28 +431,28 @@ required-features = ["ssh_client"]
 
 [[example]]
 name = "ssh_tui"
-path = "examples/node/ssh_tui.rs"
+path = "examples/ui/ssh_tui.rs"
 required-features = ["ssh_server", "terminal"]
 
 # 💡 Examples - Node
 
 [[example]]
 name = "media_renderer"
-path = "examples/node/media_renderer.rs"
-required-features = ["node"]
+path = "examples/ui/media_renderer.rs"
+required-features = ["ui"]
 [[example]]
 name = "style"
-path = "examples/node/style.rs"
+path = "examples/ui/style.rs"
 required-features = ["http_server", "style"]
 
 [[example]]
 name = "pretty_curl"
-path = "examples/node/pretty_curl.rs"
+path = "examples/ui/pretty_curl.rs"
 required-features = ["_pretty_curl"]
 
 [[example]]
 name = "state"
-path = "examples/node/state.rs"
+path = "examples/ui/state.rs"
 required-features = ["tui"]
 
 # 💡 Examples - Router
