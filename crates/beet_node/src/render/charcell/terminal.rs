@@ -15,10 +15,9 @@ use super::escape;
 #[derive(Debug, Clone, SetWith, Component)]
 #[component(on_add=Self::on_add)]
 pub struct StdioTerminal {
-	/// Whether to run the terminal in raw mode, defaults to true.
-	raw_mode: bool,
 	/// In raw mode, listen for ctrl+c events and exit the application.
-	/// Does nothing in cooked mode where ctrl+c directly exits the process.
+	/// Does nothing in cooked mode, ctrl+c would directly exit the process or
+	/// be handled by the restore_hook
 	ctrl_c_exit: bool,
 	/// When enabled, applies a ctrl+c and panic hook to restore terminal state.
 	restore_hook: bool,
@@ -29,9 +28,8 @@ impl Default for StdioTerminal {
 	fn default() -> Self {
 		Self {
 			restore_hook: true,
-			raw_mode: true,
 			ctrl_c_exit: true,
-			config: default(),
+			config: TerminalConfig::default().with_raw_mode(true),
 		}
 	}
 }
@@ -39,7 +37,6 @@ impl Default for StdioTerminal {
 impl StdioTerminal {
 	pub fn inline() -> Self {
 		Self {
-			raw_mode: false,
 			config: TerminalConfig::inline(),
 			..default()
 		}
@@ -52,28 +49,15 @@ impl StdioTerminal {
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
 		let size = terminal_ext::size().unwrap_or(UVec2::new(80, 24));
-		let terminal = if stdio.raw_mode {
-			crossterm::terminal::enable_raw_mode().unwrap();
-			Terminal::new(
-				AsyncReader::default(),
-				BufWriter::with_capacity(
-					TERMINAL_BUFFER_CAPACITY,
-					RawModeGuard(std::io::stdout()),
-				),
-				size,
-				stdio.config.clone(),
-			)
-		} else {
-			Terminal::new(
-				AsyncReader::default(),
-				BufWriter::with_capacity(
-					TERMINAL_BUFFER_CAPACITY,
-					std::io::stdout(),
-				),
-				size,
-				stdio.config.clone(),
-			)
-		};
+		let terminal = Terminal::new(
+			AsyncReader::default(),
+			BufWriter::with_capacity(
+				TERMINAL_BUFFER_CAPACITY,
+				std::io::stdout(),
+			),
+			size,
+			stdio.config.clone(),
+		);
 		world.commands().entity(cx.entity).insert(terminal);
 	}
 
@@ -101,23 +85,13 @@ impl StdioTerminal {
 	}
 }
 
-// ── RawModeGuard ──────────────────────────────────────────────────────────────
-
-/// Wraps stdout and disables raw mode when dropped.
-struct RawModeGuard(std::io::Stdout);
-
-impl Write for RawModeGuard {
-	fn write(&mut self, buf: &[u8]) -> io::Result<usize> { self.0.write(buf) }
-	fn flush(&mut self) -> io::Result<()> { self.0.flush() }
-}
-impl Drop for RawModeGuard {
-	fn drop(&mut self) { crossterm::terminal::disable_raw_mode().ok(); }
-}
-
 // ── TerminalConfig ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, SetWith)]
 pub struct TerminalConfig {
+	/// Whether to enable raw mode, this option applies for the terminal
+	/// of the current process, and should not be used for remote terminals.
+	raw_mode: bool,
 	/// Whether to use the alternate screen buffer, defaults to true.
 	alternate_screen: bool,
 	/// Whether to hide the cursor when rendering, defaults to true.
@@ -138,6 +112,7 @@ impl TerminalConfig {
 impl Default for TerminalConfig {
 	fn default() -> Self {
 		Self {
+			raw_mode: false,
 			alternate_screen: true,
 			hide_cursor: true,
 			enable_mouse: true,
@@ -235,39 +210,33 @@ impl Terminal {
 	}
 
 	fn apply_config(&mut self) -> Result {
+		if self.config.raw_mode {
+			raw_mode::enable()?;
+		}
 		if self.config.alternate_screen {
-			self.writer
-				.write_all(escape::ENTER_ALT_SCREEN.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+			self.writer.write_all(escape::ENTER_ALT_SCREEN.as_bytes())?;
 		}
 		if self.config.hide_cursor {
-			self.writer
-				.write_all(escape::HIDE_CURSOR.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+			self.writer.write_all(escape::HIDE_CURSOR.as_bytes())?;
 		}
 		if self.config.enable_mouse {
-			self.writer
-				.write_all(escape::ENTER_MOUSE.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+			self.writer.write_all(escape::ENTER_MOUSE.as_bytes())?;
 		}
 		Ok(())
 	}
 
 	fn restore_config(&mut self) -> Result {
-		if self.config.alternate_screen {
-			self.writer
-				.write_all(escape::LEAVE_ALT_SCREEN.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+		if self.config.enable_mouse {
+			self.writer.write_all(escape::LEAVE_MOUSE.as_bytes())?;
 		}
 		if self.config.hide_cursor {
-			self.writer
-				.write_all(escape::SHOW_CURSOR.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+			self.writer.write_all(escape::SHOW_CURSOR.as_bytes())?;
 		}
-		if self.config.enable_mouse {
-			self.writer
-				.write_all(escape::LEAVE_MOUSE.as_bytes())
-				.map_err(|e| bevyhow!("{e}"))?;
+		if self.config.alternate_screen {
+			self.writer.write_all(escape::LEAVE_ALT_SCREEN.as_bytes())?;
+		}
+		if self.config.raw_mode {
+			raw_mode::disable()?;
 		}
 		Ok(())
 	}
@@ -284,7 +253,7 @@ impl Terminal {
 		let mut all_bytes = Vec::new();
 		// Drain all available bytes from the non-blocking reader.
 		loop {
-			let n = self.reader.read(&mut buf).map_err(|e| bevyhow!("{e}"))?;
+			let n = self.reader.read(&mut buf)?;
 			if n == 0 {
 				break;
 			}
@@ -301,23 +270,22 @@ impl Terminal {
 
 	/// Move cursor to 0-indexed `(col, row)`.
 	pub fn goto(&mut self, col: u32, row: u32) -> Result {
-		escape::write_goto(&mut self.writer, col, row)
-			.map_err(|e| bevyhow!("{e}"))
+		escape::write_goto(&mut self.writer, col, row)?.xok()
 	}
 
 	/// Set foreground colour via 24-bit RGB.
 	pub fn set_fg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		escape::write_fg(&mut self.writer, r, g, b).map_err(|e| bevyhow!("{e}"))
+		escape::write_fg(&mut self.writer, r, g, b)?.xok()
 	}
 
 	/// Set background colour via 24-bit RGB.
 	pub fn set_bg(&mut self, r: u8, g: u8, b: u8) -> Result {
-		escape::write_bg(&mut self.writer, r, g, b).map_err(|e| bevyhow!("{e}"))
+		escape::write_bg(&mut self.writer, r, g, b)?.xok()
 	}
 
 	/// Reset all SGR attributes.
 	pub fn reset_style(&mut self) -> Result {
-		write!(self.writer, "{}", escape::RESET).map_err(|e| bevyhow!("{e}"))
+		write!(self.writer, "{}", escape::RESET)?.xok()
 	}
 
 	/// Write text attribute SGR codes from a [`VisualStyle`].
@@ -328,52 +296,42 @@ impl Terminal {
 		use crate::style::TextStyle;
 		let ts = vstyle.text_style;
 		if vstyle.dim_foregeround() {
-			write!(self.writer, "{}", escape::FAINT)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::FAINT)?;
 		}
 		if ts.contains(TextStyle::BOLD) {
-			write!(self.writer, "{}", escape::BOLD)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::BOLD)?;
 		}
 		if ts.contains(TextStyle::ITALIC) {
-			write!(self.writer, "{}", escape::ITALIC)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::ITALIC)?;
 		}
 		if ts.contains(TextStyle::UNDERLINE) {
-			write!(self.writer, "{}", escape::UNDERLINE)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::UNDERLINE)?;
 		}
 		if ts.contains(TextStyle::BLINK) {
-			write!(self.writer, "{}", escape::BLINK)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::BLINK)?;
 		}
 		if ts.contains(TextStyle::REVERSED) {
-			write!(self.writer, "{}", escape::INVERT)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::INVERT)?;
 		}
 		if ts.contains(TextStyle::LINE_THROUGH) {
-			write!(self.writer, "{}", escape::CROSSED_OUT)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::CROSSED_OUT)?;
 		}
 		if ts.contains(TextStyle::RAPID_BLINK) {
-			write!(self.writer, "{}", escape::RAPID_BLINK)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::RAPID_BLINK)?;
 		}
 		if ts.contains(TextStyle::HIDDEN) {
-			write!(self.writer, "{}", escape::HIDDEN)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::HIDDEN)?;
 		}
 		if ts.contains(TextStyle::OVERLINE) {
-			write!(self.writer, "{}", escape::OVERLINE)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", escape::OVERLINE)?;
 		}
 		Ok(())
 	}
 
 	/// Erase the screen and move the cursor to the home position.
 	pub fn clear(&mut self) -> Result {
-		write!(self.writer, "{}{}", escape::ERASE_ALL, escape::CURSOR_HOME)
-			.map_err(|e| bevyhow!("{e}"))
+		write!(self.writer, "{}{}", escape::ERASE_ALL, escape::CURSOR_HOME)?
+			.xok()
 	}
 
 	fn draw<'a>(
@@ -397,16 +355,13 @@ impl Terminal {
 				self.set_bg(c.red, c.green, c.blue)?;
 			}
 			self.write_text_attrs(&cell.style)?;
-			write!(self.writer, "{}", cell.symbol)
-				.map_err(|e| bevyhow!("{e}"))?;
+			write!(self.writer, "{}", cell.symbol)?;
 			self.reset_style()?;
 		}
 		Ok(())
 	}
 
-	fn flush(&mut self) -> Result {
-		self.writer.flush().map_err(|e| bevyhow!("{e}"))
-	}
+	fn flush(&mut self) -> Result { self.writer.flush()?.xok() }
 }
 
 // ── BufferedTerminal ──────────────────────────────────────────────────────────
@@ -470,17 +425,33 @@ pub fn flush_terminals(mut query: Query<&mut Terminal>) -> Result {
 }
 
 /// Restore terminals (leave alternate screen, show cursor) on shutdown.
-pub fn restore_terminals(
-	mut commands: Commands,
-	mut query: Query<(Entity, &mut Terminal)>,
-) -> Result {
-	for (entity, mut terminal) in query.iter_mut() {
+pub fn restore_terminals(mut query: Query<&mut Terminal>) -> Result {
+	for mut terminal in query.iter_mut() {
 		terminal.restore_config()?;
 		terminal.flush()?;
-		// Remove the terminal; its Drop runs RawModeGuard::drop to restore mode.
-		commands.entity(entity).remove::<Terminal>();
 	}
 	Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+mod raw_mode {
+	pub(super) fn enable() -> Result {
+		bevybail!("raw mode not supported on this platform")
+	}
+	pub(super) fn disable() -> Result {
+		bevybail!("raw mode not supported on this platform")
+	}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+mod raw_mode {
+	use super::*;
+	pub(super) fn enable() -> Result {
+		crossterm::terminal::enable_raw_mode()?.xok()
+	}
+	pub(super) fn disable() -> Result {
+		crossterm::terminal::disable_raw_mode()?.xok()
+	}
 }
 
 /// Exit on ctrl+c when [`StdioTerminal::ctrl_c_exit`] is set.

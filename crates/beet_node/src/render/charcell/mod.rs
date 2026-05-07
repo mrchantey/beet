@@ -3,7 +3,7 @@
 //! Charcell represents each cell as an entity
 mod backend;
 #[cfg(feature = "terminal")]
-mod escape;
+pub mod escape;
 #[cfg(feature = "terminal")]
 mod input;
 mod plugin;
@@ -12,8 +12,6 @@ mod renderer;
 mod terminal;
 pub use backend::*;
 pub use buffer::*;
-#[cfg(feature = "terminal")]
-pub use escape::*;
 #[cfg(feature = "terminal")]
 pub use input::*;
 pub use plugin::*;

@@ -45,11 +45,18 @@ fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
 		_ => (50, 100, 220),
 	};
 	// Move to origin and clear screen.
-	write!(terminal.writer, "{}{}", CURSOR_HOME, ERASE_ALL)
-		.map_err(|e| bevyhow!("{e}"))?;
+	write!(
+		terminal.writer,
+		"{}{}",
+		escape::CURSOR_HOME,
+		escape::ERASE_ALL
+	)
+	.map_err(|e| bevyhow!("{e}"))?;
 	// Write foreground colour and reset background.
-	write_fg(&mut terminal.writer, r, g, b).map_err(|e| bevyhow!("{e}"))?;
-	write!(terminal.writer, "{}", RESET_BG).map_err(|e| bevyhow!("{e}"))?;
+	escape::write_fg(&mut terminal.writer, r, g, b)
+		.map_err(|e| bevyhow!("{e}"))?;
+	write!(terminal.writer, "{}", escape::RESET_BG)
+		.map_err(|e| bevyhow!("{e}"))?;
 	// Write the frame content.
 	write!(
 		terminal.writer,
@@ -62,7 +69,7 @@ fn render_frame(count: i32, terminal: &mut BufferedTerminal) -> Result {
 		count,
 	)
 	.map_err(|e| bevyhow!("{e}"))?;
-	write!(terminal.writer, "{}", RESET_FG).map_err(|e| bevyhow!("{e}"))
+	write!(terminal.writer, "{}", escape::RESET_FG).map_err(|e| bevyhow!("{e}"))
 }
 
 /// Handles all SSH events for a connection.
@@ -121,7 +128,9 @@ fn on_recv(
 			if quit {
 				commands
 					.entity(conn)
-					.trigger_target(SshSend(SshEvent::text(LEAVE_ALT_SCREEN)))
+					.trigger_target(SshSend(SshEvent::text(
+						escape::LEAVE_ALT_SCREEN,
+					)))
 					.trigger_target(SshSend(SshEvent::Close(None)));
 				return;
 			}

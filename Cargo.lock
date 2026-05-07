@@ -1394,6 +1394,7 @@ dependencies = [
  "crossterm",
  "extend",
  "heck 0.4.1",
+ "libc",
  "material-colors",
  "nu-ansi-term",
  "postcard",
