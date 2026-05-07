@@ -19,8 +19,8 @@ pub use beet_core::testing;
 pub use beet_infra as infra;
 #[cfg(feature = "net")]
 pub use beet_net as net;
-#[cfg(feature = "node")]
-pub use beet_node as node;
+#[cfg(feature = "ui")]
+pub use beet_ui as ui;
 #[cfg(feature = "router")]
 pub use beet_router as router;
 #[cfg(feature = "thread")]
@@ -53,8 +53,8 @@ pub mod prelude {
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
-	#[cfg(feature = "node")]
-	pub use crate::node::prelude::*;
+	#[cfg(feature = "ui")]
+	pub use crate::ui::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	pub use beet_core::val;
@@ -78,23 +78,23 @@ pub mod prelude {
 	// pub use crate::rsx::prelude::*;
 	// #[cfg(feature = "spatial")]
 	// pub use crate::spatial::prelude::*;
-	// 	/// NODE REEXPORTS
+	// 	/// UI REEXPORTS
 	#[cfg(all(
-		feature = "node",
+		feature = "ui",
 		feature = "tui",
 		not(target_arch = "wasm32")
 	))]
-	pub use crate::node::prelude::Justify;
+	pub use crate::ui::prelude::Justify;
 	cfg_if! {
-		if #[cfg(feature = "node")]{
-			pub use crate::node::prelude::Pointer;
-			pub use crate::node::prelude::style::*;
-			pub use crate::node::prelude::style::JustifyContent;
-			pub use crate::node::prelude::style::FontWeight;
-			pub use crate::node::prelude::style::AlignSelf;
-			pub use crate::node::prelude::style::AlignItems;
-			pub use crate::node::prelude::style::AlignContent;
-			pub use crate::node::prelude::style::FlexWrap;
+		if #[cfg(feature = "ui")]{
+			pub use crate::ui::prelude::Pointer;
+			pub use crate::ui::prelude::style::*;
+			pub use crate::ui::prelude::style::JustifyContent;
+			pub use crate::ui::prelude::style::FontWeight;
+			pub use crate::ui::prelude::style::AlignSelf;
+			pub use crate::ui::prelude::style::AlignItems;
+			pub use crate::ui::prelude::style::AlignContent;
+			pub use crate::ui::prelude::style::FlexWrap;
 		}
 	}
 }
@@ -103,8 +103,8 @@ pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "net")]
 	pub use beet_net::exports::*;
-	#[cfg(feature = "node")]
-	pub use beet_node::exports::*;
+	#[cfg(feature = "ui")]
+	pub use beet_ui::exports::*;
 	pub use bevy;
 }
 #[cfg(test)]

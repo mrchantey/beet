@@ -381,7 +381,7 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_node::prelude::*;
+	use beet_ui::prelude::*;
 
 	fn action_at(path: &str) -> impl Bundle {
 		(

@@ -1,11 +1,11 @@
 use beet_core::prelude::*;
-use beet_node::prelude::style::*;
-use beet_node::prelude::*;
-use beet_node::*;
+use beet_ui::prelude::style::*;
+use beet_ui::prelude::*;
+use beet_ui::*;
 
 
 fn main() {
-	CharcellRenderer::default()
+	CharcellRenderer::new_size(50, 30)
 		.render_oneshot(setup())
 		.unwrap()
 		.render()

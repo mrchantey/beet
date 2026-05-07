@@ -1190,9 +1190,9 @@ dependencies = [
  "beet_core",
  "beet_infra",
  "beet_net",
- "beet_node",
  "beet_router",
  "beet_thread",
+ "beet_ui",
  "bevy",
  "console_error_panic_hook",
  "futures",
@@ -1381,42 +1381,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_node"
-version = "0.0.9-dev.8"
-dependencies = [
- "beet_action",
- "beet_core",
- "beet_net",
- "bevy",
- "bevy_ratatui",
- "bitflags 2.11.1",
- "bytes",
- "extend",
- "heck 0.4.1",
- "libc",
- "material-colors",
- "nu-ansi-term",
- "postcard",
- "pulldown-cmark",
- "ratatui",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "uuid",
- "variadics_please",
- "vte",
- "webbrowser",
- "winnow 0.7.15",
-]
-
-[[package]]
 name = "beet_router"
 version = "0.0.9-dev.8"
 dependencies = [
  "beet_action",
  "beet_core",
  "beet_net",
- "beet_node",
+ "beet_ui",
  "bevy",
  "bevy_ratatui",
  "bitflags 2.11.1",
@@ -1453,6 +1424,35 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "beet_ui"
+version = "0.0.9-dev.8"
+dependencies = [
+ "beet_action",
+ "beet_core",
+ "beet_net",
+ "bevy",
+ "bevy_ratatui",
+ "bitflags 2.11.1",
+ "bytes",
+ "extend",
+ "heck 0.4.1",
+ "libc",
+ "material-colors",
+ "nu-ansi-term",
+ "postcard",
+ "pulldown-cmark",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "uuid",
+ "variadics_please",
+ "vte",
+ "webbrowser",
+ "winnow 0.7.15",
 ]
 
 [[package]]

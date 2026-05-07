@@ -192,7 +192,7 @@ test-core *args:
 		-p beet_core 				\
 		-p beet_infra 			\
 		-p beet_net 				\
-		-p beet_node 				\
+		-p beet_ui 				\
 		-p beet_router 			\
 		-p beet_thread 			\
 		-p beet_action 			\
@@ -200,7 +200,7 @@ test-core *args:
 	cargo test						\
 		-p beet_core  			\
 		-p beet_net  				\
-		-p beet_node 				\
+		-p beet_ui 				\
 		-p beet_router 			\
 		-p beet_thread 			\
 		-p beet_action 			\

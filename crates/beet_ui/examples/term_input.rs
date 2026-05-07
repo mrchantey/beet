@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 
 
 fn main() {

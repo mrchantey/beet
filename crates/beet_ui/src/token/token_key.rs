@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub enum TokenKey {
 	/// A Rust module path with `io.crates/` prefix and `/` delimiters,
-	/// ie `io.crates/beet_node/style/material/colors/Primary`.
+	/// ie `io.crates/beet_ui/style/material/colors/Primary`.
 	RustType(SmolStr),
 	/// A URL identifier, ie `http://example.com/color`.
 	Url(SmolStr),

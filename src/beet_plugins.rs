@@ -88,7 +88,7 @@ fn print_config(pkg_config: Res<PackageConfig>) {
 ///
 /// This plugin initializes:
 /// - [`AsyncPlugin`] — async command infrastructure
-/// - [`DocumentPlugin`] — document field sync (from beet_node)
+/// - [`DocumentPlugin`] — document field sync (from beet_ui)
 /// - [`RouterPlugin`] — route tree building observers
 /// - [`InterfacePlugin`] — single-active-scene enforcement
 /// - [`InputPlugin`] — link click navigation wiring

@@ -128,7 +128,7 @@ fn escape_char(ch: &str) -> Option<&'static str> {
 /// Replace HTML entities with their corresponding characters.
 ///
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// unescape_html_text("&lt;div&gt;").xpect_eq("<div>".to_string());
 /// unescape_html_text("&amp;amp;").xpect_eq("&amp;".to_string());
@@ -172,7 +172,7 @@ pub fn unescape_html_text(input: &str) -> String {
 /// `\u{2013}` are handled correctly.
 ///
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// escape_html_text("<div>").xpect_eq("&lt;div&gt;".to_string());
 /// escape_html_text("a & b").xpect_eq("a &amp; b".to_string());
@@ -202,7 +202,7 @@ pub fn escape_html_text(input: &str) -> String {
 /// leaving typographic entities untouched.
 ///
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// escape_html_attribute(r#"say "hello" & 'goodbye'"#)
 ///     .xpect_eq("say &quot;hello&quot; &amp; &apos;goodbye&apos;".to_string());
@@ -229,7 +229,7 @@ pub fn escape_html_attribute(input: &str) -> String {
 /// distinct function for clarity at call sites.
 ///
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// unescape_html_attribute("say &quot;hello&quot; &amp; &apos;goodbye&apos;")
 ///     .xpect_eq(r#"say "hello" & 'goodbye'"#.to_string());

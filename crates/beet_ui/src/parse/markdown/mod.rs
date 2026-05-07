@@ -27,7 +27,7 @@ use pulldown_cmark::Options;
 ///
 /// ## Example
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// let parser = MarkdownParser::new();
 /// ```
 #[derive(Debug, Default, Clone)]

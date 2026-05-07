@@ -95,7 +95,7 @@ where
 /// ## Example
 ///
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// // token!(MyToken, Color);
 /// // let set = tokens![MyToken];
@@ -165,7 +165,7 @@ mod tests {
 		Foo.xinto::<Token>()
 			.key()
 			.to_string()
-			.xpect_eq("io.crates/beet_node/token/token/tests/Foo");
+			.xpect_eq("io.crates/beet_ui/token/token/tests/Foo");
 	}
 
 	#[cfg(feature = "style")]

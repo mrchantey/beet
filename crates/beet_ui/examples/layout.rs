@@ -1,10 +1,10 @@
 use beet_core::prelude::*;
-use beet_node::prelude::style::AlignItems;
-use beet_node::prelude::style::FlexWrap;
-use beet_node::prelude::style::JustifyContent;
-use beet_node::prelude::style::*;
-use beet_node::prelude::*;
-use beet_node::*;
+use beet_ui::prelude::style::AlignItems;
+use beet_ui::prelude::style::FlexWrap;
+use beet_ui::prelude::style::JustifyContent;
+use beet_ui::prelude::style::*;
+use beet_ui::prelude::*;
+use beet_ui::*;
 
 fn main() {
 	println!("=== Beet Layout Engine Demo ===\n");

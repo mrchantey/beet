@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 use beet_action::prelude::*;
 
 /// Creates a render action that negotiates content type via the

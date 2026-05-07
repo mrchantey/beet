@@ -9,7 +9,7 @@
 //! # Usage
 //!
 //! ```ignore
-//! use beet_node::prelude::*;
+//! use beet_ui::prelude::*;
 //! use beet_core::prelude::*;
 //! use ratatui::prelude::Rect;
 //!

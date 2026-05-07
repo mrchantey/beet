@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 ///
 /// ## Example
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// let input = "hello\nworld\nfoo";
 /// let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -119,7 +119,7 @@ impl SpanLookup {
 ///
 /// ## Example
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// let mut tracker = SpanTracker::new(WsPathBuf::new("foo.txt"));
 /// let start = tracker.pos();

@@ -10,7 +10,7 @@
 //! ```rust,no_run
 //! # use beet_router::prelude::*;
 //! # use beet_core::prelude::*;
-//! # use beet_node::prelude::*;
+//! # use beet_ui::prelude::*;
 //! let state = SidebarState::new("docs/getting-started")
 //!     .with_node("docs", SidebarNode {
 //!         label: Some("Documentation".into()),
@@ -21,7 +21,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 
 /// Configuration for a single sidebar entry.
 #[derive(Debug, Default, Clone)]

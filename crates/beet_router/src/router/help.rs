@@ -1,4 +1,4 @@
-//! Help middleware that renders route documentation using beet_node.
+//! Help middleware that renders route documentation using beet_ui.
 //!
 //! When the `--help` param is present, renders a scene entity tree
 //! describing available routes, then converts it to a response
@@ -9,10 +9,10 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 
 /// Middleware that intercepts `--help` and renders scoped help
-/// as a beet_node scene entity tree.
+/// as a beet_ui scene entity tree.
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]

@@ -17,7 +17,7 @@ use bevy::reflect::Typed;
 ///
 /// ```no_run
 /// use beet_core::prelude::*;
-/// use beet_node::prelude::*;
+/// use beet_ui::prelude::*;
 ///
 /// let mut world = AsyncPlugin::world();
 /// let field = FieldRef::new("counter");

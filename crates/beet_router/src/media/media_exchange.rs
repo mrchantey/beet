@@ -1,6 +1,6 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 
 
 
@@ -67,9 +67,9 @@ fn parse_body_to_render_target(
 		MediaType::Markdown => MarkdownParser::default()
 			.parse(cx)
 			.map_err(|err| bevyhow!("{err}")),
-		MediaType::Json => todo!("beet_node json parser, SceneLoader?"),
+		MediaType::Json => todo!("beet_ui json parser, SceneLoader?"),
 		MediaType::Bytes | MediaType::Postcard => {
-			todo!("beet_node postcard parser, SceneLoader?")
+			todo!("beet_ui postcard parser, SceneLoader?")
 		}
 		unsupported => {
 			bevybail!("Unsupported Content-Type: {unsupported}")

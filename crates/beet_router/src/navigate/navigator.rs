@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
-// RenderMedia, RenderTargets, RenderedBy are defined in beet_node::input::render_media
+// RenderMedia, RenderTargets, RenderedBy are defined in beet_ui::input::render_media
 
 
 /// Maximum number of history entries to retain.

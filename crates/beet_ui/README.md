@@ -1,9 +1,9 @@
-# beet_node
+# beet_ui
 
 Agnostic structured data representations in Bevy ECS.
 
 
-beet_node borrows the concepts of `Nodes`, `Elements` and `Attributes` from xml, however beet prioritizes runtime behavior over static formats.
+beet_ui borrows the concepts of `Nodes`, `Elements` and `Attributes` from xml, however beet prioritizes runtime behavior over static formats.
 
 Unlike xml beet leans into the composable nature of ECS. 
 - A node may contain both an [`Element`] and a [`Value`].
@@ -12,7 +12,7 @@ Unlike xml beet leans into the composable nature of ECS.
 - Empty nodes are considered fragments
 
 ```rust
-# use beet_node::prelude::*;
+# use beet_ui::prelude::*;
 # use beet_core::prelude::*;
 
 let my_node = World::new().spawn((

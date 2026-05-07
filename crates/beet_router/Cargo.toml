@@ -20,14 +20,14 @@ postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde"]
 tui = ["dep:bevy_ratatui", "dep:ratatui"]
 markdown = ["dep:pulldown-cmark"]
-html_parser = ["beet_node/html_parser"]
-markdown_parser = ["html_parser", "beet_node/markdown_parser"]
+html_parser = ["beet_ui/html_parser"]
+markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["beet_net/server"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
 beet_core.workspace = true
-beet_node.workspace = true
+beet_ui.workspace = true
 beet_action.workspace = true
 beet_net.workspace = true
 bevy.workspace = true

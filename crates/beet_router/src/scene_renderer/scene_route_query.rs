@@ -13,7 +13,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 use std::collections::VecDeque;
 
 /// System parameter for traversing entities within scene route boundaries.

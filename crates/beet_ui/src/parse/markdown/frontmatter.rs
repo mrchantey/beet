@@ -17,7 +17,7 @@ use bevy::reflect::DynamicStruct;
 ///
 /// ## Example
 /// ```rust
-/// # use beet_node::prelude::*;
+/// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// let fm = Frontmatter::parse("title: Hello\nauthor: World", FrontmatterKind::Yaml).unwrap();
 /// fm.kind.xpect_eq(FrontmatterKind::Yaml);

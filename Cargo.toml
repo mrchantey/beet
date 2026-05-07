@@ -51,7 +51,7 @@ members = [
 	"crates/beet_core/shared",
 	"crates/beet_infra",
 	"crates/beet_net",
-	"crates/beet_node",
+	"crates/beet_ui",
 	"crates/beet_router",
 	"crates/beet_thread",
 	"crates/beet_action",
@@ -92,7 +92,7 @@ beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.8" }
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.8" }
 beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.8" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.8" }
-beet_node = { path = "crates/beet_node", version = "0.0.9-dev.8" }
+beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.8" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.8" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.8" }
 
@@ -244,7 +244,7 @@ default = ["node"]
 
 http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["tui","router", "markdown"]
-ansi_paint = ["beet_core/ansi_paint","beet_node?/ansi_paint"]
+ansi_paint = ["beet_core/ansi_paint","beet_ui?/ansi_paint"]
 
 # 💡 Core
 
@@ -295,11 +295,11 @@ thread = ["dep:beet_thread","net","action"]
 # 💡 Stack
 
 action = ["dep:beet_action"]
-node = ["dep:beet_node"]
-style = ["node", "beet_node?/style"]
-tui = ["beet_node?/tui"]
-terminal = ["node", "beet_node?/terminal"]
-markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_node?/markdown_parser"]
+node = ["dep:beet_ui"]
+style = ["node", "beet_ui?/style"]
+tui = ["beet_ui?/tui"]
+terminal = ["node", "beet_ui?/terminal"]
+markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
 
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
@@ -348,7 +348,7 @@ beet_core.workspace = true
 beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
-beet_node = { workspace = true, optional = true }
+beet_ui = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 

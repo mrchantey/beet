@@ -314,6 +314,6 @@ mod tests {
 		Bar.xinto::<Token>()
 			.key()
 			.to_string()
-			.xpect_eq("io.crates/beet_node/style/css/css_token/tests/Bar");
+			.xpect_eq("io.crates/beet_ui/style/css/css_token/tests/Bar");
 	}
 }

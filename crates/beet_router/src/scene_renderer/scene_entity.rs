@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_node::prelude::*;
+use beet_ui::prelude::*;
 
 /// A route output representing a scene entity to be rendered.
 /// Entities in `despawn` are cleaned up after rendering,
@@ -104,7 +104,7 @@ impl ExchangeRouteOut<Self> for SceneEntity {
 /// ```no_run
 /// use beet_router::prelude::*;
 /// use beet_core::prelude::*;
-/// use beet_node::prelude::*;
+/// use beet_ui::prelude::*;
 ///
 /// let bundle = fixed_scene("about",
 ///     Element::new("p").with_inner_text("About page")

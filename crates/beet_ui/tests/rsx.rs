@@ -3,7 +3,7 @@
 
 use beet_core::prelude::*;
 // resolve crate:: aliasing in macros
-use beet_node::*;
+use beet_ui::*;
 
 /// Verify the macro compiles by checking bundle validity.
 fn is_bundle(_: impl Bundle) {}

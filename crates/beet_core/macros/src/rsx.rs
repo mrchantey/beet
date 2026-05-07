@@ -51,10 +51,10 @@ pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 		let items: Vec<TokenStream> = nodes.iter().map(tokenize_node).collect();
 		quote! { children![#(#items),*] }
 	};
-	let beet_node = pkg_ext::internal_or_beet("beet_node");
+	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 
 	let output = quote! {{
-		use #beet_node::prelude::*;
+		use #beet_ui::prelude::*;
 		#(#error_tokens)*
 		#body
 	}};

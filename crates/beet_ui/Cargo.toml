@@ -1,5 +1,5 @@
 [package]
-name = "beet_node"
+name = "beet_ui"
 version.workspace = true
 edition.workspace = true
 description = "Agnostic structured data representations in Bevy ECS"
