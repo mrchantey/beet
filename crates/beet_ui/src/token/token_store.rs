@@ -23,9 +23,9 @@ impl TokenStore {
 	}
 
 	/// Inserts a token definition if it doesn't already exist.
-	pub fn insert_definition(
+	pub fn insert_definition<T>(
 		&mut self,
-		definition: TokenDefinition,
+		definition: TokenDefinition<T>,
 	) -> Result<&mut Self> {
 		if self.contains_key(definition.token.key()) {
 			return Ok(self);
@@ -60,9 +60,9 @@ impl TokenStore {
 		self.with(key, value)
 	}
 
-	pub fn with_definition(
+	pub fn with_definition<T>(
 		mut self,
-		definition: TokenDefinition,
+		definition: TokenDefinition<T>,
 	) -> Result<Self> {
 		self.insert_definition(definition)?;
 		self.xok()

@@ -69,18 +69,10 @@ impl StdioTerminal {
 		}
 		let config = self.config.clone();
 		terminal_ext::on_force_exit(move || {
-			match Terminal::new(
-				io::empty(),
-				io::stdout(),
-				default(),
-				config.clone(),
-			)
-			.restore_config()
+			if let Err(err) =
+				Terminal::restore_config_direct(&config, &mut io::stdout())
 			{
-				Ok(_) => {}
-				Err(err) => {
-					eprintln!("Error restoring terminal state: {err}");
-				}
+				eprintln!("Error restoring terminal state: {err}");
 			}
 		})
 	}
@@ -309,24 +301,33 @@ impl Terminal {
 	}
 
 	pub fn restore_config(&mut self) -> Result {
-		if self.config.bracketed_paste {
-			self.writer
-				.write_all(escape::LEAVE_BRACKETED_PASTE.as_bytes())?;
+		Self::restore_config_direct(&self.config, &mut self.writer)
+	}
+
+	/// Restore terminal state without initializing the terminal,
+	/// used in restore hooks in forced exits like ctrl+c or panic
+	pub fn restore_config_direct(
+		config: &TerminalConfig,
+		writer: &mut impl Write,
+	) -> Result {
+		if config.bracketed_paste {
+			writer.write_all(escape::LEAVE_BRACKETED_PASTE.as_bytes())?;
 		}
-		if self.config.enable_mouse {
-			self.writer.write_all(escape::LEAVE_MOUSE.as_bytes())?;
+		if config.enable_mouse {
+			writer.write_all(escape::LEAVE_MOUSE.as_bytes())?;
 		}
-		if self.config.hide_cursor {
-			self.writer.write_all(escape::SHOW_CURSOR.as_bytes())?;
+		if config.hide_cursor {
+			writer.write_all(escape::SHOW_CURSOR.as_bytes())?;
 		}
-		if self.config.alternate_screen {
-			self.writer.write_all(escape::LEAVE_ALT_SCREEN.as_bytes())?;
+		if config.alternate_screen {
+			writer.write_all(escape::LEAVE_ALT_SCREEN.as_bytes())?;
 		}
-		if self.config.raw_mode {
+		if config.raw_mode {
 			raw_mode::disable()?;
 		}
 		Ok(())
 	}
+
 
 	/// Current terminal size.
 	pub fn size(&self) -> UVec2 { self.size }

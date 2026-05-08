@@ -13,10 +13,10 @@ fn main() {
 		.run();
 }
 
-fn def_count() -> (TokenDefinition, SetToken<i32>) { token(0) }
+fn count_def() -> TokenDefinition<i32> { TokenDefinition::inline(0) }
 
 fn setup(mut commands: Commands) {
-	let (count, _set_cout) = def_count();
+	let count = count_def();
 
 	commands.spawn((
 		StdioTerminal::default(),
@@ -43,18 +43,12 @@ fn update(
 	query: Query<Entity, With<TokenStore>>,
 ) -> Result {
 	let entity = query.single()?;
-	let (_, set) = def_count();
-	commands.entity(entity).queue(set.set(2));
+	let count = count_def();
+	commands
+		.entity(entity)
+		.queue(count.update(|prev| *prev += 1));
 	Ok(())
 }
-// fn update(nodes: Query<&mut Value>) {
-// 	for mut node in nodes {
-// 		if let Value::Int(inner) = node.as_mut() {
-// 			*node = Value::Int(*inner + 1);
-// 		}
-// 	}
-// }
-
 
 fn on_input(ev: On<TerminalEvent>, mut _commands: Commands) {
 	match ev.event() {

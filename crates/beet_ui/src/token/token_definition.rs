@@ -7,95 +7,92 @@ use bevy::reflect::Typed;
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Reflect, Get,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenDefinition {
+pub struct TokenDefinition<T> {
 	#[deref]
 	pub(super) token: Token,
 	pub(super) initial: TokenValue,
+	phantom: PhantomData<T>,
 }
+// SAETY: T is only used for PhantomData
+unsafe impl<T> Send for TokenDefinition<T> {}
+// SAETY: T is only used for PhantomData
+unsafe impl<T> Sync for TokenDefinition<T> {}
 
-impl Into<Token> for TokenDefinition {
-	fn into(self) -> Token { self.token }
-}
+impl<T> TokenDefinition<T>
+where
+	T: Typed + Serialize + DeserializeOwned,
+{
+	/// Define a new inline token with an initial value.
+	#[track_caller]
+	pub fn inline(initial: T) -> Self {
+		Self {
+			token: Token::new(TokenKey::new_inline(), TokenSchema::of::<T>()),
+			initial: initial.into_token_value(),
+			phantom: default(),
+		}
+	}
 
-impl Into<Token> for &TokenDefinition {
-	fn into(self) -> Token { self.token.clone() }
-}
-
-impl IntoBundle<(NotBundleMarker, Self)> for TokenDefinition {
-	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
-			let mut store = entity.get_mut_or_default::<TokenStore>();
-			try_insert_value(&mut store, &self);
-			// avoid unnesecary change detection trigger
-			if store.contains_key(self.token.key()) {
-				store.insert_definition(self)?;
+	pub fn set(&self, new_val: T) -> TokenCommand {
+		TokenCommand::mutate_value(self.token.clone(), move |old_val| {
+			*old_val = TypedValue::new(new_val)?.into();
+			Ok(())
+		})
+	}
+	pub fn update(
+		&self,
+		func: impl 'static + Send + Sync + FnOnce(&mut T),
+	) -> TokenCommand {
+		TokenCommand::mutate_value(self.token.clone(), move |old_value| {
+			let old_val = match old_value {
+				TokenValue::Value(typed) => typed,
+				TokenValue::Token(token) => {
+					bevybail!("Expected a value, received token {:?}", token)
+				}
 			}
+			.value()
+			.clone();
+			let mut val = old_val.into_serde::<T>()?;
+			func(&mut val);
+			*old_value = TypedValue::new(val)?.into();
 			Ok(())
 		})
 	}
 }
 
-/// A token definition inserted as a bundle is a declaration that this
-/// entities `Value` should be mapped to this token
-fn try_insert_value(store: &mut Mut<TokenStore>, definition: &TokenDefinition) {
-	match definition.schema() {
-		schema if schema == &TokenSchema::of::<i32>() => {
-			store.insert(I32Value, definition).unwrap();
-		}
-		_ => {}
-	}
-}
-
-/// Define a new inline token with an initial value.
-pub fn token<T: Typed + Serialize>(
-	initial: T,
-) -> (TokenDefinition, SetToken<T>) {
-	let initial = initial.into_token_value();
-	let token = Token::new(TokenKey::new_inline(), initial.schema().clone());
-	(
-		TokenDefinition {
-			token: token.clone(),
-			initial,
-		},
-		SetToken::new(token),
-	)
-}
-
-pub struct SetToken<T> {
-	token: Token,
-	phantom: PhantomData<T>,
-}
-impl<T> SetToken<T> {
-	pub fn new(token: Token) -> Self {
-		Self {
-			token,
-			phantom: PhantomData,
+impl<T> TokenDefinition<T> {
+	/// A token definition inserted as a bundle is a declaration that this
+	/// entities `Value` should be mapped to this token
+	fn try_insert_value(&self, store: &mut Mut<TokenStore>) {
+		match self.schema() {
+			schema if schema == &TokenSchema::of::<i32>() => {
+				store.insert(I32Value, self).unwrap();
+			}
+			_ => {}
 		}
 	}
 }
 
-impl<T: Typed + Serialize> SetToken<T> {
-	pub fn set(&self, val: T) -> impl EntityCommand<Result> {
-		let token = self.token.clone();
-		move |entity: EntityWorldMut| -> Result {
-			let ev =
-				TokenEvent::mutate_value(entity.id(), token, move |value| {
-					let new_value = TypedValue::new(val)?;
-					*value = new_value.into();
-					Ok(())
-				});
-			entity
-				.into_world_mut()
-				.run_system_cached_with::<_, Result, _, _>(
-					handle_token_event,
-					ev,
-				)??;
+impl<T> Into<Token> for TokenDefinition<T> {
+	fn into(self) -> Token { self.token }
+}
+
+impl<T> Into<Token> for &TokenDefinition<T> {
+	fn into(self) -> Token { self.token.clone() }
+}
+
+impl<T: 'static> IntoBundle<(NotBundleMarker, Self)> for TokenDefinition<T> {
+	fn into_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |entity| {
+			let mut store = entity.get_mut_or_default::<TokenStore>();
+			self.try_insert_value(&mut store);
+			// avoid unnesecary change detection trigger
+			if !store.contains_key(self.token.key()) {
+				store.insert_definition(self)?;
+			}
+			// store.insert_definition(self)?;
 			Ok(())
-		}
+		})
 	}
-}
-fn handle_token_event(ev: In<TokenEvent>, mut query: TokenQuery) -> Result {
-	query.handle_token_event(ev.0)
 }
 
 

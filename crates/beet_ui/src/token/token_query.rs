@@ -26,8 +26,12 @@ pub struct TokenQuery<'w, 's> {
 }
 
 impl TokenQuery<'_, '_> {
-	pub fn handle_token_event(&mut self, ev: TokenEvent) -> Result {
-		for entity in self.ancestors.iter_ancestors_inclusive(ev.entity) {
+	pub fn handle_token_event(
+		&mut self,
+		ev_entity: Entity,
+		ev: TokenCommand,
+	) -> Result {
+		for entity in self.ancestors.iter_ancestors_inclusive(ev_entity) {
 			let Ok(mut store) = self.stores.get_mut(entity) else {
 				continue;
 			};
@@ -52,7 +56,7 @@ impl TokenQuery<'_, '_> {
 		bevybail!(
 			"Token not found in entity or ancestors\nkey: {}\nentity: {:?}",
 			ev.key(),
-			ev.entity
+			ev_entity
 		)
 	}
 
@@ -66,7 +70,7 @@ impl TokenQuery<'_, '_> {
 							if key == &I32Value::token_key() {
 								self.commands
 									.entity(child)
-								.insert(value.clone());
+									.insert(value.clone());
 							}
 						}
 					}
@@ -76,23 +80,33 @@ impl TokenQuery<'_, '_> {
 	}
 }
 
-
+/// An [`EntityCommand`] that mutates a token
 #[derive(Deref)]
-pub struct TokenEvent {
-	pub entity: Entity,
+pub struct TokenCommand {
 	#[deref]
 	pub token: Token,
 	pub handler: TokenEventHandler,
 }
 
-impl TokenEvent {
+impl EntityCommand<Result> for TokenCommand {
+	fn apply(self, entity: EntityWorldMut) -> Result {
+		let id = entity.id();
+		entity
+			.into_world_mut()
+			.run_system_cached_with::<_, Result, _, _>(
+				handle_token_event,
+				(id, self),
+			)??;
+		Ok(())
+	}
+}
+
+impl TokenCommand {
 	pub fn mutate_value(
-		entity: Entity,
 		token: Token,
 		handler: impl 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result,
 	) -> Self {
 		Self {
-			entity,
 			token,
 			handler: TokenEventHandler::MutateValue(Box::new(handler)),
 		}
@@ -103,4 +117,11 @@ pub enum TokenEventHandler {
 	MutateValue(
 		Box<dyn 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result>,
 	),
+}
+
+fn handle_token_event(
+	In((entity, ev)): In<(Entity, TokenCommand)>,
+	mut query: TokenQuery,
+) -> Result {
+	query.handle_token_event(entity, ev)
 }
