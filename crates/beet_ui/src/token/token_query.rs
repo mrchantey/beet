@@ -1,6 +1,15 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+
+pub struct TokenPlugin;
+
+impl Plugin for TokenPlugin {
+	fn build(&self, _app: &mut App) {
+		//TODO add any reactivity specific observers or systems here
+	}
+}
+
 #[derive(SystemParam, Get)]
 pub struct TokenQuery<'w, 's> {
 	commands: Commands<'w, 's>,

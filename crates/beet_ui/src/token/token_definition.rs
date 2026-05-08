@@ -59,19 +59,6 @@ where
 	}
 }
 
-impl<T> TokenDefinition<T> {
-	/// A token definition inserted as a bundle is a declaration that this
-	/// entities `Value` should be mapped to this token
-	fn try_insert_value(&self, store: &mut Mut<TokenStore>) {
-		match self.schema() {
-			schema if schema == &TokenSchema::of::<i32>() => {
-				store.insert(I32Value, self).unwrap();
-			}
-			_ => {}
-		}
-	}
-}
-
 impl<T> Into<Token> for TokenDefinition<T> {
 	fn into(self) -> Token { self.token }
 }
@@ -84,12 +71,16 @@ impl<T: 'static> IntoBundle<(NotBundleMarker, Self)> for TokenDefinition<T> {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
 			let mut store = entity.get_mut_or_default::<TokenStore>();
-			self.try_insert_value(&mut store);
+			match self.schema() {
+				schema if schema == &TokenSchema::of::<i32>() => {
+					store.insert(I32Value, &self)?;
+				}
+				_ => {}
+			}
 			// avoid unnesecary change detection trigger
 			if !store.contains_key(self.token.key()) {
 				store.insert_definition(self)?;
 			}
-			// store.insert_definition(self)?;
 			Ok(())
 		})
 	}
