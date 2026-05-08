@@ -5,7 +5,7 @@ use bevy::reflect::Reflect;
 /// A location in a source file, the line is 1 indexed and the column is 0 indexed,
 /// which follows the behavior of [`proc_macro2::Span`]
 /// The Default implementation is `1:0`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct LineCol {

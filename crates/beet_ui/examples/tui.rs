@@ -13,15 +13,18 @@ fn main() {
 		.run();
 }
 
+fn def_count() -> (TokenDefinition, SetToken<i32>) { token(0) }
 
 fn setup(mut commands: Commands) {
+	let (count, _set_cout) = def_count();
+
 	commands.spawn((
 		StdioTerminal::default(),
 		CharcellRenderer::default(),
 		FlexBox::row().column_gap(1),
 		children![(
 			FlexBox::row(),
-			rsx! { <div>"Value: "{0}</div> },
+			rsx! { <div>"Value: "{(0,count)}</div> },
 			BoxStyle {
 				border: Spacing::all(Length::Rem(1.)),
 				border_top: Some(Color::srgb(1., 0., 0.)),
@@ -35,13 +38,24 @@ fn setup(mut commands: Commands) {
 }
 
 
-fn update(nodes: Query<&mut Value>) {
-	for mut node in nodes {
-		if let Value::Int(inner) = node.as_mut() {
-			*node = Value::Int(*inner + 1);
-		}
-	}
+fn update(
+	mut commands: Commands,
+	query: Query<Entity, With<TokenStore>>,
+) -> Result {
+	let entity = query.single()?;
+	let (_, set) = def_count();
+	commands.entity(entity).queue(set.set(2));
+	Ok(())
 }
+// fn update(nodes: Query<&mut Value>) {
+// 	for mut node in nodes {
+// 		if let Value::Int(inner) = node.as_mut() {
+// 			*node = Value::Int(*inner + 1);
+// 		}
+// 	}
+// }
+
+
 fn on_input(ev: On<TerminalEvent>, mut _commands: Commands) {
 	match ev.event() {
 		TerminalEvent::Key(_key_press) => {}

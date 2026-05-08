@@ -159,7 +159,9 @@ impl<'de> serde::Deserialize<'de> for TokenKey {
 ///
 /// Stored as a slash-separated module path with `io.crates/` prefix,
 /// ie `io.crates/bevy_color/color/Color`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Reflect,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenSchema(SmolStr);
 

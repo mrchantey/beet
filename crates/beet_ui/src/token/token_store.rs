@@ -6,7 +6,9 @@ use bevy::reflect::Typed;
 /// are nested maps and leaf nodes are typed values.
 /// It is perhaps more akin to a filesystem where files are
 /// typed, than a freeform json value.
-#[derive(Debug, Default, Clone, Deref, Reflect, Resource, Component)]
+#[derive(
+	Debug, Default, Clone, Deref, DerefMut, Reflect, Resource, Component,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TokenStore {
 	tokens: HashMap<TokenKey, TokenValue>,
@@ -19,6 +21,18 @@ impl TokenStore {
 			tokens: HashMap::new(),
 		}
 	}
+
+	/// Inserts a token definition if it doesn't already exist.
+	pub fn insert_definition(
+		&mut self,
+		definition: TokenDefinition,
+	) -> Result<&mut Self> {
+		if self.contains_key(definition.token.key()) {
+			return Ok(self);
+		}
+		self.insert(definition.token, definition.initial)
+	}
+
 	pub fn insert(
 		&mut self,
 		key: impl Into<Token>,
@@ -45,6 +59,15 @@ impl TokenStore {
 	) -> Result<Self> {
 		self.with(key, value)
 	}
+
+	pub fn with_definition(
+		mut self,
+		definition: TokenDefinition,
+	) -> Result<Self> {
+		self.insert_definition(definition)?;
+		self.xok()
+	}
+
 	#[cfg(feature = "json")]
 	pub fn with_value(
 		self,
@@ -72,6 +95,15 @@ impl TokenStore {
 
 	pub fn get(&self, key: &Token) -> Result<&TokenValue> {
 		match self.tokens.get(key.key()) {
+			Some(value) => {
+				key.schema().assert_eq(value.schema())?;
+				Ok(value)
+			}
+			None => bevybail!("Token Not Found: `{key}`"),
+		}
+	}
+	pub fn get_mut(&mut self, key: &Token) -> Result<&mut TokenValue> {
+		match self.tokens.get_mut(key.key()) {
 			Some(value) => {
 				key.schema().assert_eq(value.schema())?;
 				Ok(value)

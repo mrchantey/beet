@@ -60,7 +60,7 @@ where
 	}
 }
 
-/// Vec
+/// Vecs are inserted as children
 impl<T, M> IntoBundle<(NotBundleMarker, (Self, M))> for Vec<T>
 where
 	T: 'static + Send + Sync + IntoBundle<M>,

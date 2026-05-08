@@ -23,7 +23,18 @@ use std::sync::Arc;
 /// let tree = rsx!{<div>hello</div>};
 /// //              ^ this location
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct FileSpan {
@@ -60,6 +71,14 @@ impl FileSpan {
 			start,
 			end,
 		}
+	}
+
+	/// Creates a new [`FileSpan`] from the caller's location.
+	/// Be sure to add `#[track_caller]` to your method if you want to propagate
+	/// an outer caller.
+	#[track_caller]
+	pub fn new_caller() -> Self {
+		Self::new_from_location(std::panic::Location::caller())
 	}
 
 	/// Creates a new [`FileSpan`] from a panic [`Location`](std::panic::Location).
