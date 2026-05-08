@@ -20,6 +20,10 @@ required-features = ["style"]
 name = "tui"
 path = "examples/tui.rs"
 required-features = ["terminal", "style"]
+[[example]]
+name = "term_input"
+path = "examples/term_input.rs"
+required-features = ["terminal"]
 
 
 [features]
