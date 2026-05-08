@@ -172,11 +172,6 @@ impl TokenSchema {
 		Self(path.into())
 	}
 
-	/// Returns the corresponding [`TokenKey`] for map lookups.
-	pub fn as_token_key(&self) -> TokenKey {
-		TokenKey::RustType(self.0.clone())
-	}
-
 	pub fn assert_eq(&self, other: &TokenSchema) -> Result<&Self> {
 		if self == other {
 			self.xok()

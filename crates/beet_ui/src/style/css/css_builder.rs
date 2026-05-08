@@ -46,7 +46,7 @@ impl CssBuilder {
 		tokens: &[(&TokenKey, &TokenValue)],
 	) -> Result<String> {
 		let css_rules = tokens
-			.xtry_map(|(key, value)| CssToken::resolve(&css_map, key, value))?;
+			.xtry_map(|(key, value)| CssRule::resolve(&css_map, key, value))?;
 
 		// iteration variables
 		let mut declared = HashMap::default();
@@ -87,11 +87,11 @@ impl CssBuilder {
 		&self,
 		format_variables: FormatVariables,
 		declared: &mut HashMap<CssVariable, CssVariable>,
-		css_token: &CssToken,
+		css_rule: &CssRule,
 	) -> Result<String, CollisionFound> {
-		let predicate = css_token.predicate_to_css();
+		let predicate = css_rule.predicate_to_css();
 		let mut declarations =
-			css_token.declarations().iter().xtry_map(|(key, value)| {
+			css_rule.declarations().iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
 			})?;
 
@@ -303,7 +303,6 @@ mod tests {
 
 		world.insert_resource(
 			CssTokenMap::default()
-				.insert_type::<Rule>()
 				.insert(colors::OnPrimary)
 				.insert(tones::Primary20)
 				.insert(common_props::ForegroundColor),
@@ -333,7 +332,8 @@ mod tests {
 			.with_state::<StyleQuery, _>(|entity, query| {
 				query.build_css(&test_builder(), entity)
 			})
-			.xunwrap().xpect_snapshot();
+			.xunwrap()
+			.xpect_snapshot();
 		// println!("{_css}");
 	}
 	#[test]
