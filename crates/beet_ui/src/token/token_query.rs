@@ -1,20 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-// #[derive(Default)]
-// pub struct TokenPlugin;
-
-// impl Plugin for TokenPlugin {
-// 	fn build(&self, app: &mut App) {
-// 		// app.add_observer(handle_token_event);
-// 		// app.add_systems(PostUpdate, apply_values);
-// 	}
-// }
-
-// fn handle_token_event(ev: On<TokenEvent>, mut query: TokenQuery) -> Result {
-// 	query.handle_token_event(&ev)
-// }
-
 #[derive(SystemParam, Get)]
 pub struct TokenQuery<'w, 's> {
 	commands: Commands<'w, 's>,
@@ -26,36 +12,54 @@ pub struct TokenQuery<'w, 's> {
 }
 
 impl TokenQuery<'_, '_> {
-	pub fn handle_token_event(
+	pub fn handle_token_command(
+		&mut self,
+		entity: Entity,
+		cmd: TokenCommand,
+	) -> Result {
+		// ideally we wouldnt need to clone, but need mutable access
+		// to other stores to apply
+		let value = self.with_value_mut(
+			entity,
+			&cmd.token,
+			move |value| -> Result<TokenValue> {
+				match cmd.handler {
+					TokenCommandHandler::MutateValue(handler) => {
+						handler(value)?;
+					}
+				}
+				value.clone().xok()
+			},
+		)??;
+		if let TokenValue::Value(value) = value {
+			let value = value.value().clone();
+			self.apply_value(entity, &cmd.token, value);
+		}
+		Ok(())
+	}
+
+	/// Walk up the entity tree to find the first TokenStore with the
+	/// provided Token. This resolution step is analagous to css variable inheritence
+	fn with_value_mut<O>(
 		&mut self,
 		ev_entity: Entity,
-		ev: TokenCommand,
-	) -> Result {
+		token: &Token,
+		func: impl FnOnce(&mut TokenValue) -> O,
+	) -> Result<O> {
 		for entity in self.ancestors.iter_ancestors_inclusive(ev_entity) {
 			let Ok(mut store) = self.stores.get_mut(entity) else {
 				continue;
 			};
 			// avoid triggering change detection
-			if !store.contains_key(ev.key()) {
+			if !store.contains_key(token.key()) {
 				continue;
 			}
-			let value = store.get_mut(&ev.token).unwrap();
-			match ev.handler {
-				TokenEventHandler::MutateValue(handler) => {
-					handler(value)?;
-				}
-			}
-			// ideally we wouldnt need to clone, but need mutable access
-			// to other stores to apply
-			if let TokenValue::Value(value) = value {
-				let value = value.value().clone();
-				self.apply_value(entity, &ev.token, value);
-			}
-			return Ok(());
+			let value = store.get_mut(&token).unwrap();
+			return func(value).xok();
 		}
 		bevybail!(
 			"Token not found in entity or ancestors\nkey: {}\nentity: {:?}",
-			ev.key(),
+			token.key(),
 			ev_entity
 		)
 	}
@@ -85,7 +89,7 @@ impl TokenQuery<'_, '_> {
 pub struct TokenCommand {
 	#[deref]
 	pub token: Token,
-	pub handler: TokenEventHandler,
+	pub handler: TokenCommandHandler,
 }
 
 impl EntityCommand<Result> for TokenCommand {
@@ -108,12 +112,13 @@ impl TokenCommand {
 	) -> Self {
 		Self {
 			token,
-			handler: TokenEventHandler::MutateValue(Box::new(handler)),
+			handler: TokenCommandHandler::MutateValue(Box::new(handler)),
 		}
 	}
 }
-
-pub enum TokenEventHandler {
+// In the future we may want to support 'heavier' operations like
+// arbitary systems
+pub enum TokenCommandHandler {
 	MutateValue(
 		Box<dyn 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result>,
 	),
@@ -123,5 +128,5 @@ fn handle_token_event(
 	In((entity, ev)): In<(Entity, TokenCommand)>,
 	mut query: TokenQuery,
 ) -> Result {
-	query.handle_token_event(entity, ev)
+	query.handle_token_command(entity, ev)
 }

@@ -1,4 +1,5 @@
 use beet_core::prelude::*;
+#[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
 
 pub struct CharcellPlugin;
