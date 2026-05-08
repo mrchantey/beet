@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
+	/// A predicate to determine if this store applies to the
 	predicate: Predicate,
 	declarations: TokenStore,
 }
@@ -69,7 +70,9 @@ impl Rule {
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
 /// A match rule
-#[derive(Debug, Default, Clone, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Predicate {
 	/// A global predicate, in css this will evaluate to `:root`,
