@@ -26,16 +26,14 @@ fn main() {
 			material::MaterialStylePlugin::new(palettes::basic::YELLOW),
 		))
 		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((
-				HttpServer::default(),
-				Action::<Request, Response>::new_system(handler),
-			));
+			commands.spawn((HttpServer::default(), Handler.into_action()));
 		})
 		.run();
 }
 
 /// Handler function that generates a Material Design 3 styled page.
-fn handler(
+#[action]
+fn Handler(
 	cx: In<ActionContext<Request>>,
 	query: StyleQuery,
 ) -> Result<Response> {
