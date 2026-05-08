@@ -73,16 +73,28 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn validate_rules() {
-		let mut world = MaterialStylePlugin::world();
-		let _css = world
+	fn material_token_store() {
+		MaterialStylePlugin::world()
+			.spawn_empty()
+			.with_state::<StyleQuery, _>(|entity, query| {
+				query
+					.collect_token_store(entity)
+					.into_iter()
+					.collect::<HashMap<_, _>>()
+					.xmap(|map| serde_json::to_string_pretty(&map).unwrap())
+			})
+			.xpect_snapshot();
+	}
+	#[test]
+	fn material_css() {
+		MaterialStylePlugin::world()
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
 			.with_state::<StyleQuery, _>(|entity, query| {
 				query.build_css(&default(), entity)
 			})
-			.xunwrap();
-		// println!("Generated CSS: \n{css}");
+			.xunwrap()
+			.xpect_snapshot();
 	}
 }
