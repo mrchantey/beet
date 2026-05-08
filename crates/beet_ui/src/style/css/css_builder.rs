@@ -326,21 +326,15 @@ mod tests {
 				)
 				.unwrap(),
 		);
-		let css = world
+		let _css = world
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
 			.with_state::<StyleQuery, _>(|entity, query| {
 				query.build_css(&test_builder(), entity)
 			})
-			.xunwrap();
-		println!("{css}");
-		// css
-		// 	.xpect_contains(".color-primary")
-		// 	.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-on-primary)")
-		// 	.xpect_contains(":root")
-		// 	.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)")
-		// 	.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 255, 0)");
+			.xunwrap().xpect_snapshot();
+		// println!("{_css}");
 	}
 	#[test]
 	fn test_color_role() {
@@ -379,25 +373,14 @@ mod tests {
 				)
 				.unwrap(),
 		);
-		let css = world
+		world
 			.spawn(rsx! {
 				<div class="text-primary">hello world!</div>
 			})
 			.with_state::<StyleQuery, _>(|entity, query| {
 				query.build_css(&test_builder(), entity)
 			})
-			.xunwrap();
-		// println!("{css}");
-		css
-			.xpect_contains(".primary-role")
-			.xpect_contains("background-color: var(--io-crates-beet-node-style-material-colors-primary-role-bg)")
-			.xpect_contains("color: var(--io-crates-beet-node-style-material-colors-primary-role-fg)")
-			.xpect_contains(":root")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-primary: var(--io-crates-beet-node-style-material-tones-primary80)")
-			.xpect_contains("--io-crates-beet-node-style-material-tones-primary20: rgb(0, 51, 0)")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-bg: var(--io-crates-beet-node-style-material-colors-primary)")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-primary-role-fg: var(--io-crates-beet-node-style-material-colors-on-primary)")
-			.xpect_contains("--io-crates-beet-node-style-material-tones-primary80: rgb(0, 204, 0)")
-			.xpect_contains("--io-crates-beet-node-style-material-colors-on-primary: var(--io-crates-beet-node-style-material-tones-primary20)");
+			.xunwrap()
+			.xpect_snapshot();
 	}
 }

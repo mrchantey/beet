@@ -1,0 +1,26 @@
+
+:root {
+  --io-crates-beet-ui-style-material-tones-primary80: rgb(0, 204, 0);
+}
+
+:root {
+  --io-crates-beet-ui-style-material-colors-on-primary: var(--io-crates-beet-ui-style-material-tones-primary20);
+}
+
+:root {
+  --io-crates-beet-ui-style-material-colors-primary: var(--io-crates-beet-ui-style-material-tones-primary80);
+}
+
+:root {
+  --io-crates-beet-ui-style-material-colors-primary-role-bg: var(--io-crates-beet-ui-style-material-colors-primary);
+  --io-crates-beet-ui-style-material-colors-primary-role-fg: var(--io-crates-beet-ui-style-material-colors-on-primary);
+}
+
+:root {
+  --io-crates-beet-ui-style-material-tones-primary20: rgb(0, 51, 0);
+}
+
+.primary-role {
+  background-color: var(--io-crates-beet-ui-style-material-colors-primary-role-bg);
+  color: var(--io-crates-beet-ui-style-material-colors-primary-role-fg);
+}
