@@ -3,12 +3,10 @@
 //! Provides CSS classes for common MD3 components like buttons, cards,
 //! and layout helpers. These rules reference the material design tokens
 //! defined in the parent module.
-
 #![cfg_attr(rustfmt, rustfmt_skip)]
-
-use crate::{style::*, token};
+use crate::style::*;
+use crate::prelude::*;
 use crate::style::material::*;
-use crate::token::TokenStore;
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -17,7 +15,7 @@ use crate::token::TokenStore;
 /// Uses primary color background with on-primary text.
 pub fn button_filled() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("btn-filled"))
+		.with_selector(Selector::class("btn-filled"))
 		.with_token(common_props::BackgroundColor,colors::Primary).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnPrimary).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
@@ -30,7 +28,7 @@ pub fn button_filled() -> Rule {
 /// Transparent background with outline border.
 pub fn button_outlined() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("btn-outlined"))
+		.with_selector(Selector::class("btn-outlined"))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
@@ -42,7 +40,7 @@ pub fn button_outlined() -> Rule {
 /// Transparent background, colored text only.
 pub fn button_text() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("btn-text"))
+		.with_selector(Selector::class("btn-text"))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
@@ -53,7 +51,7 @@ pub fn button_text() -> Rule {
 /// Uses secondary container for subtle emphasis.
 pub fn button_tonal() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("btn-tonal"))
+		.with_selector(Selector::class("btn-tonal"))
 		.with_token(common_props::BackgroundColor,colors::SecondaryContainer).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSecondaryContainer).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
@@ -66,7 +64,7 @@ pub fn button_tonal() -> Rule {
 /// Surface background with subtle elevation shadow.
 pub fn button_elevated() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("btn-elevated"))
+		.with_selector(Selector::class("btn-elevated"))
 		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
@@ -79,7 +77,7 @@ pub fn button_elevated() -> Rule {
 /// Applied to all `<button>` elements for consistent baseline styling.
 pub fn button_base() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::Tag("button".into()))
+		.with_selector(Selector::Tag("button".into()))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 }
@@ -91,7 +89,7 @@ pub fn button_base() -> Rule {
 /// Uses surface-container-highest background, no shadow.
 pub fn card_filled() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("card-filled"))
+		.with_selector(Selector::class("card-filled"))
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
@@ -103,7 +101,7 @@ pub fn card_filled() -> Rule {
 /// Surface container with level 1 shadow for subtle lift.
 pub fn card_elevated() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("card-elevated"))
+		.with_selector(Selector::class("card-elevated"))
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerLow).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
@@ -115,7 +113,7 @@ pub fn card_elevated() -> Rule {
 /// Surface background with outline border, no shadow.
 pub fn card_outlined() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("card-outlined"))
+		.with_selector(Selector::class("card-outlined"))
 		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
@@ -127,105 +125,105 @@ pub fn card_outlined() -> Rule {
 /// Display large - largest hero text.
 pub fn text_display_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-display-large"))
+		.with_selector(Selector::class("text-display-large"))
 		.with_token(TypographyProps,typography::DisplayLarge).unwrap()
 }
 
 /// Display medium - medium hero text.
 pub fn text_display_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-display-medium"))
+		.with_selector(Selector::class("text-display-medium"))
 		.with_token(TypographyProps,typography::DisplayMedium).unwrap()
 }
 
 /// Display small - small hero text.
 pub fn text_display_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-display-small"))
+		.with_selector(Selector::class("text-display-small"))
 		.with_token(TypographyProps,typography::DisplaySmall).unwrap()
 }
 
 /// Headline large - large section heading.
 pub fn text_headline_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-headline-large"))
+		.with_selector(Selector::class("text-headline-large"))
 		.with_token(TypographyProps,typography::HeadlineLarge).unwrap()
 }
 
 /// Headline medium - medium section heading.
 pub fn text_headline_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-headline-medium"))
+		.with_selector(Selector::class("text-headline-medium"))
 		.with_token(TypographyProps,typography::HeadlineMedium).unwrap()
 }
 
 /// Headline small - small section heading.
 pub fn text_headline_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-headline-small"))
+		.with_selector(Selector::class("text-headline-small"))
 		.with_token(TypographyProps,typography::HeadlineSmall).unwrap()
 }
 
 /// Title large - large title text.
 pub fn text_title_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-title-large"))
+		.with_selector(Selector::class("text-title-large"))
 		.with_token(TypographyProps,typography::TitleLarge).unwrap()
 }
 
 /// Title medium - medium title text.
 pub fn text_title_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-title-medium"))
+		.with_selector(Selector::class("text-title-medium"))
 		.with_token(TypographyProps,typography::TitleMedium).unwrap()
 }
 
 /// Title small - small title text.
 pub fn text_title_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-title-small"))
+		.with_selector(Selector::class("text-title-small"))
 		.with_token(TypographyProps,typography::TitleSmall).unwrap()
 }
 
 /// Body large - large body text.
 pub fn text_body_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-body-large"))
+		.with_selector(Selector::class("text-body-large"))
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
 }
 
 /// Body medium - medium body text (default).
 pub fn text_body_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-body-medium"))
+		.with_selector(Selector::class("text-body-medium"))
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 }
 
 /// Body small - small body text.
 pub fn text_body_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-body-small"))
+		.with_selector(Selector::class("text-body-small"))
 		.with_token(TypographyProps,typography::BodySmall).unwrap()
 }
 
 /// Label large - large label text.
 pub fn text_label_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-label-large"))
+		.with_selector(Selector::class("text-label-large"))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 }
 
 /// Label medium - medium label text.
 pub fn text_label_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-label-medium"))
+		.with_selector(Selector::class("text-label-medium"))
 		.with_token(TypographyProps,typography::LabelMedium).unwrap()
 }
 
 /// Label small - small label text.
 pub fn text_label_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("text-label-small"))
+		.with_selector(Selector::class("text-label-small"))
 		.with_token(TypographyProps,typography::LabelSmall).unwrap()
 }
 
@@ -234,7 +232,7 @@ pub fn text_label_small() -> Rule {
 /// Primary color scheme - primary background with on-primary text.
 pub fn color_primary() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("color-primary"))
+		.with_selector(Selector::class("color-primary"))
 		.with_token(ColorRoleProps,colors::PrimaryRole).unwrap()
 }
 
@@ -243,49 +241,49 @@ pub fn color_primary() -> Rule {
 /// No border radius.
 pub fn shape_none() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-none"))
+		.with_selector(Selector::class("shape-none"))
 		.with_token(ShapeProps,geometry::ShapeNone).unwrap()
 }
 
 /// Extra small border radius (4px).
 pub fn shape_extra_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-xs"))
+		.with_selector(Selector::class("shape-xs"))
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 }
 
 /// Small border radius (8px).
 pub fn shape_small() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-sm"))
+		.with_selector(Selector::class("shape-sm"))
 		.with_token(ShapeProps,geometry::ShapeSmall).unwrap()
 }
 
 /// Medium border radius (12px).
 pub fn shape_medium() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-md"))
+		.with_selector(Selector::class("shape-md"))
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 }
 
 /// Large border radius (16px).
 pub fn shape_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-lg"))
+		.with_selector(Selector::class("shape-lg"))
 		.with_token(ShapeProps,geometry::ShapeLarge).unwrap()
 }
 
 /// Extra large border radius (28px).
 pub fn shape_extra_large() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-xl"))
+		.with_selector(Selector::class("shape-xl"))
 		.with_token(ShapeProps,geometry::ShapeExtraLarge).unwrap()
 }
 
 /// Full border radius (pill/circular).
 pub fn shape_full() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("shape-full"))
+		.with_selector(Selector::class("shape-full"))
 		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
 }
 
@@ -294,42 +292,42 @@ pub fn shape_full() -> Rule {
 /// No elevation shadow.
 pub fn elevation_0() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-0"))
+		.with_selector(Selector::class("elevation-0"))
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
 }
 
 /// Level 1 elevation shadow.
 pub fn elevation_1() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-1"))
+		.with_selector(Selector::class("elevation-1"))
 		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
 }
 
 /// Level 2 elevation shadow.
 pub fn elevation_2() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-2"))
+		.with_selector(Selector::class("elevation-2"))
 		.with_token(common_props::ElevationProp,geometry::Elevation2).unwrap()
 }
 
 /// Level 3 elevation shadow.
 pub fn elevation_3() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-3"))
+		.with_selector(Selector::class("elevation-3"))
 		.with_token(common_props::ElevationProp,geometry::Elevation3).unwrap()
 }
 
 /// Level 4 elevation shadow.
 pub fn elevation_4() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-4"))
+		.with_selector(Selector::class("elevation-4"))
 		.with_token(common_props::ElevationProp,geometry::Elevation4).unwrap()
 }
 
 /// Level 5 elevation shadow.
 pub fn elevation_5() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("elevation-5"))
+		.with_selector(Selector::class("elevation-5"))
 		.with_token(common_props::ElevationProp,geometry::Elevation5).unwrap()
 }
 
@@ -340,7 +338,7 @@ pub fn elevation_5() -> Rule {
 /// 64px height with surface background and elevation for scrolled state.
 pub fn app_bar() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("app-bar"))
+		.with_selector(Selector::class("app-bar"))
 		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
@@ -349,7 +347,7 @@ pub fn app_bar() -> Rule {
 /// App bar in scrolled state - adds elevation shadow.
 pub fn app_bar_scrolled() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("app-bar-scrolled"))
+		.with_selector(Selector::class("app-bar-scrolled"))
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation2).unwrap()
 }
@@ -357,7 +355,7 @@ pub fn app_bar_scrolled() -> Rule {
 /// Container - basic surface container for grouping content.
 pub fn container() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("container"))
+		.with_selector(Selector::class("container"))
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 }
@@ -365,7 +363,7 @@ pub fn container() -> Rule {
 /// Page - full page background using the base surface color.
 pub fn page() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class("page"))
+		.with_selector(Selector::class("page"))
 		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()

@@ -14,7 +14,7 @@ const EXAMPLE_NAME: &str = "fargate_test";
 const SOURCE_PATH: &str = "crates/beet_infra/examples/fargate_test.rs";
 
 #[beet_core::test(timeout_ms = 1_800_000)]
-// #[ignore = "deploys resources and takes ten minutes"]
+#[ignore = "deploys resources and takes ten minutes"]
 async fn fargate_lifecycle() {
 	pretty_env_logger::init();
 	info!("==== STARTING FARGATE LIFECYCLE TEST ====");

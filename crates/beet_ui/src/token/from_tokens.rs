@@ -1,3 +1,4 @@
+use crate::style::StyleQuery;
 use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
@@ -12,7 +13,7 @@ pub trait FromTokens<M>: Sized {
 	fn from_value(
 		value: &Value,
 		entity: Entity,
-		query: &super::StyleQuery,
+		query: &StyleQuery,
 	) -> Result<Self>
 	where
 		Self::Tokens: Sized,
@@ -23,7 +24,7 @@ pub trait FromTokens<M>: Sized {
 	fn from_tokens(
 		tokens: Self::Tokens,
 		entity: Entity,
-		style_query: &super::StyleQuery,
+		style_query: &StyleQuery,
 	) -> Result<Self>;
 }
 
@@ -42,7 +43,7 @@ where
 	fn from_tokens(
 		this: Self::Tokens,
 		_entity: Entity,
-		_style_query: &super::StyleQuery,
+		_style_query: &StyleQuery,
 	) -> Result<Self> {
 		this.xok()
 	}

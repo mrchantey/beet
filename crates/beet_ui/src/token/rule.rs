@@ -7,8 +7,8 @@ use std::sync::Arc;
 #[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
-	/// A predicate to determine if this store applies to the
-	predicate: Predicate,
+	/// A predicate to determine which entities this rule applies to
+	selector: Selector,
 	declarations: TokenStore,
 }
 
@@ -56,7 +56,7 @@ impl Rule {
 		self.with(key, TypedValue::new(value)?)
 	}
 	pub fn merge_any(mut self, other: Self) -> Self {
-		self.predicate = self.predicate.clone().merge_any(other.predicate);
+		self.selector = self.selector.clone().merge_any(other.selector);
 		self.declarations = self.declarations.extend(other.declarations);
 		self
 	}
@@ -64,7 +64,7 @@ impl Rule {
 
 	/// Matches all rules, or `true` if empty
 	pub fn matches(&self, el: &ElementView) -> bool {
-		self.predicate.matches(el)
+		self.selector.matches(el)
 	}
 }
 
@@ -74,7 +74,7 @@ impl Rule {
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Predicate {
+pub enum Selector {
 	/// A global predicate, in css this will evaluate to `:root`,
 	/// and in bevy apps will always pass predicates
 	#[default]
@@ -83,9 +83,9 @@ pub enum Predicate {
 	/// and in bevy apps will always pass predicates
 	Any,
 	/// Match any of the rules, eg `div, .my-class` (note the comma) in css
-	AnyOf(Vec<Predicate>),
+	AnyOf(Vec<Selector>),
 	/// Match all of the rules, eg `div.my-class` (note no comma) in css
-	AllOf(Vec<Predicate>),
+	AllOf(Vec<Selector>),
 	/// Must have this tag, eg `div`
 	Tag(SmolStr),
 	/// Must have this class, eg `.my-class`
@@ -102,7 +102,7 @@ pub enum Predicate {
 	Not(Arc<Self>),
 }
 
-impl Predicate {
+impl Selector {
 	pub fn class(class: impl Into<SmolStr>) -> Self {
 		Self::Class(class.into())
 	}
@@ -115,7 +115,7 @@ impl Predicate {
 			value,
 		}
 	}
-	pub fn not(inner: Predicate) -> Self { Self::Not(Arc::new(inner)) }
+	pub fn not(inner: Selector) -> Self { Self::Not(Arc::new(inner)) }
 
 	/// Merge two rules, as an AnyOf,
 	/// collapsing global selectors like Root and Any
@@ -138,25 +138,21 @@ impl Predicate {
 
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
-			Predicate::Root => true,
-			Predicate::Any => true,
-			Predicate::AnyOf(rules) => {
-				rules.iter().any(|rule| rule.matches(el))
-			}
-			Predicate::AllOf(rules) => {
-				rules.iter().all(|rule| rule.matches(el))
-			}
-			Predicate::Tag(tag) => el.element.tag() == tag,
-			Predicate::Attribute { key, value } => match value {
+			Selector::Root => true,
+			Selector::Any => true,
+			Selector::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
+			Selector::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
+			Selector::Tag(tag) => el.element.tag() == tag,
+			Selector::Attribute { key, value } => match value {
 				Some(expected) => el
 					.attribute(key)
 					.map(|attr| attr.value == expected)
 					.unwrap_or(false),
 				None => el.attribute(key).is_some(),
 			},
-			Predicate::State(state) => el.contains_state(state),
-			Predicate::Class(class) => el.contains_class(class),
-			Predicate::Not(inner) => !inner.matches(el),
+			Selector::State(state) => el.contains_state(state),
+			Selector::Class(class) => el.contains_class(class),
+			Selector::Not(inner) => !inner.matches(el),
 		}
 	}
 }

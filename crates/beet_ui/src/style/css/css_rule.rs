@@ -8,21 +8,21 @@ use std::sync::Arc;
 /// property/value declarations, ready to be serialized to CSS text.
 #[derive(Default, Get, SetWith)]
 pub struct CssRule {
-	predicate: Predicate,
+	selector: Selector,
 	declarations: HashMap<CssKey, CssValue>,
 }
 
 impl CssRule {
 	/// Build a [`CssRule`] from a [`Rule`] by resolving each token declaration.
 	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
-		let predicate = rule.predicate().clone();
+		let selector = rule.selector().clone();
 		let mut declarations = HashMap::default();
 		for (key, value) in rule.declarations().iter() {
 			let css_rule = Self::resolve(token_map, key, value)?;
 			declarations.extend(css_rule.into_declarations());
 		}
 		Self::default()
-			.with_predicate(predicate)
+			.with_selector(selector)
 			.with_declarations(declarations)
 			.xok()
 	}
@@ -33,7 +33,7 @@ impl CssRule {
 	}
 
 	pub fn merge_any(&mut self, other: CssRule) {
-		self.predicate = self.predicate.clone().merge_any(other.predicate);
+		self.selector = self.selector.clone().merge_any(other.selector);
 		self.declarations.extend(other.declarations);
 	}
 
@@ -120,43 +120,43 @@ impl CssRule {
 			.xok()
 	}
 
-	pub fn predicate_to_css(&self) -> String {
-		Self::predicate_to_css_inner(&self.predicate)
+	pub fn selector_to_css(&self) -> String {
+		Self::selector_to_css_inner(&self.selector)
 	}
 
-	fn predicate_to_css_inner(rule: &Predicate) -> String {
+	fn selector_to_css_inner(rule: &Selector) -> String {
 		match rule {
-			Predicate::Any => "*".to_string(),
-			Predicate::Root => ":root".to_string(),
-			Predicate::AnyOf(rules) => rules
+			Selector::Any => "*".to_string(),
+			Selector::Root => ":root".to_string(),
+			Selector::AnyOf(rules) => rules
 				.iter()
-				.map(|rule| Self::predicate_to_css_inner(rule))
+				.map(|rule| Self::selector_to_css_inner(rule))
 				.collect::<Vec<_>>()
 				.join(", "),
-			Predicate::AllOf(_rules) => {
+			Selector::AllOf(_rules) => {
 				unimplemented!("how to do this properly?")
 			}
-			Predicate::Tag(tag) => tag.to_string(),
-			Predicate::Class(class) => format!(".{}", class),
-			Predicate::State(ElementState::Hovered) => ":hover".to_string(),
-			Predicate::State(ElementState::Focused) => ":focus".to_string(),
-			Predicate::State(ElementState::Pressed) => ":active".to_string(),
-			Predicate::State(ElementState::Selected) => {
+			Selector::Tag(tag) => tag.to_string(),
+			Selector::Class(class) => format!(".{}", class),
+			Selector::State(ElementState::Hovered) => ":hover".to_string(),
+			Selector::State(ElementState::Focused) => ":focus".to_string(),
+			Selector::State(ElementState::Pressed) => ":active".to_string(),
+			Selector::State(ElementState::Selected) => {
 				"[aria-selected=\"true\"]".to_string()
 			}
-			Predicate::State(ElementState::Dragged) => {
+			Selector::State(ElementState::Dragged) => {
 				"[data-dragging=\"true\"]".to_string()
 			}
-			Predicate::State(ElementState::Disabled) => ":disabled".to_string(),
-			Predicate::State(ElementState::Custom(val)) => {
+			Selector::State(ElementState::Disabled) => ":disabled".to_string(),
+			Selector::State(ElementState::Custom(val)) => {
 				format!("[data-state-{}]", val)
 			}
-			Predicate::Attribute { key, value } => match value {
+			Selector::Attribute { key, value } => match value {
 				Some(value) => format!("[{}=\"{}\"]", key, value),
 				None => format!("[{}]", key),
 			},
-			Predicate::Not(inner) => {
-				format!(":not({})", Self::predicate_to_css_inner(inner))
+			Selector::Not(inner) => {
+				format!(":not({})", Self::selector_to_css_inner(inner))
 			}
 		}
 	}

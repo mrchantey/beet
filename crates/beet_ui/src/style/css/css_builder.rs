@@ -89,7 +89,7 @@ impl CssBuilder {
 		declared: &mut HashMap<CssVariable, CssVariable>,
 		css_rule: &CssRule,
 	) -> Result<String, CollisionFound> {
-		let predicate = css_rule.predicate_to_css();
+		let selector = css_rule.selector_to_css();
 		let mut declarations =
 			css_rule.declarations().iter().xtry_map(|(key, value)| {
 				Self::format_declaration(format_variables, declared, key, value)
@@ -98,11 +98,11 @@ impl CssBuilder {
 		declarations.sort();
 
 		if self.minify {
-			format!("{} {{ {} }}", predicate, declarations.join(" "))
+			format!("{} {{ {} }}", selector, declarations.join(" "))
 		} else {
 			format!(
 				"{} {{\n{}\n}}",
-				predicate,
+				selector,
 				declarations
 					.into_iter()
 					.map(|dec| format!("  {dec}"))
@@ -316,7 +316,7 @@ mod tests {
 				.unwrap()
 				.with_inline_value(
 					Rule::new()
-						.with_predicate(Predicate::class("color-primary"))
+						.with_selector(Selector::class("color-primary"))
 						.with_token(
 							common_props::ForegroundColor,
 							colors::OnPrimary,
@@ -367,7 +367,7 @@ mod tests {
 				.unwrap()
 				.with_inline_value(
 					Rule::new()
-						.with_predicate(Predicate::class("primary-role"))
+						.with_selector(Selector::class("primary-role"))
 						.with_token(ColorRoleProps, colors::PrimaryRole)
 						.unwrap(),
 				)

@@ -1,5 +1,4 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
-use crate::style::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use material_colors::color::Argb;
@@ -30,7 +29,7 @@ token!(DarkScheme, Rule);
 /// Returns a [`Rule`] mapping semantic color tokens to their light-scheme tones.
 pub fn light_scheme() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class(LIGHT_SCHEME_CLASS))
+		.with_selector(Selector::class(LIGHT_SCHEME_CLASS))
 		.with_token(colors::Primary, tones::Primary40).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary100).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary90).unwrap()
@@ -65,7 +64,7 @@ pub fn light_scheme() -> Rule {
 /// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
 pub fn dark_scheme() -> Rule {
 	Rule::new()
-		.with_predicate(Predicate::class(DARK_SCHEME_CLASS))
+		.with_selector(Selector::class(DARK_SCHEME_CLASS))
 		.with_token(colors::Primary, tones::Primary80).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary20).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary30).unwrap()
