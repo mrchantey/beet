@@ -49,7 +49,7 @@ impl StdioTerminal {
 		/// Large write buffer prevents mid-frame flushes and terminal flicker.
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
-		let size = terminal_ext::size().unwrap_or(UVec2::new(80, 24));
+		let size = terminal_ext::size();
 		let terminal = Terminal::new(
 			AsyncReader::stdin(),
 			BufWriter::with_capacity(

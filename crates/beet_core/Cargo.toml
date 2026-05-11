@@ -137,11 +137,11 @@ thiserror.workspace = true
 extend.workspace = true
 glob = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
-crossterm = { workspace = true, optional = true }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ## async
+crossterm = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }

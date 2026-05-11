@@ -4,9 +4,9 @@ use super::Cell;
 use beet_core::prelude::*;
 mod test_backend;
 pub use test_backend::*;
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 mod ratatui_backend;
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 pub use ratatui_backend::*;
 
 

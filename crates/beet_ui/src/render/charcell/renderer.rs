@@ -23,7 +23,7 @@ pub struct CharcellRenderer {
 
 impl Default for CharcellRenderer {
 	fn default() -> Self {
-		let size = Self::terminal_size();
+		let size = terminal_ext::size();
 		Self::new_size(size.x, size.y)
 	}
 }
@@ -66,17 +66,5 @@ impl CharcellRenderer {
 		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
 			|entity, query| self.render_node(&query, entity),
 		)
-	}
-
-	fn terminal_size() -> UVec2 {
-		// standard default terminal size
-		let default_size = UVec2::new(80, 24);
-		cfg_if! {
-			if #[cfg(all(feature = "terminal", not(target_arch = "wasm32")))] {
-				terminal_ext::size().unwrap_or(default_size)
-			} else {
-				default_size
-			}
-		}
 	}
 }

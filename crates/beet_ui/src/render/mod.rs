@@ -1,6 +1,6 @@
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 mod tui;
-#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 pub use tui::*;
 #[cfg(feature = "style")]
 mod charcell;

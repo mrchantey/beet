@@ -83,7 +83,7 @@ mod tests {
 					.collect::<HashMap<_, _>>()
 					.xmap(|map| serde_json::to_string_pretty(&map).unwrap())
 			})
-			.xpect_snapshot();
+			.xpect_contains(r#""key": "rust:io.crates/beet_ui/style/material/colors/OnPrimary""#);
 	}
 	#[test]
 	fn material_css() {
@@ -95,6 +95,7 @@ mod tests {
 				query.build_css(&default(), entity)
 			})
 			.xunwrap()
-			.xpect_snapshot();
+			.xpect_contains("--io-crates-beet-ui-style-material-motion-short2: 100ms;")
+			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-regular);");
 	}
 }

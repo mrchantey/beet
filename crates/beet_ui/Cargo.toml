@@ -42,7 +42,7 @@ rsx = ["beet_core/rsx"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-tui = ["dep:bevy_ratatui", "dep:ratatui"]
+ratatui = ["dep:bevy_ratatui", "dep:ratatui"]
 terminal = ["style", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_keyboard", "beet_core/bevy_mouse"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
@@ -74,6 +74,7 @@ thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true
 material-colors = {version = "0.4.2", optional = true }
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 libc = {workspace = true, optional = true}

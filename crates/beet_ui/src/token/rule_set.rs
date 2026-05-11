@@ -1,18 +1,19 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::collections::VecDeque;
 
 
 #[derive(Resource)]
 pub struct RuleSet {
-	rules: Vec<Rule>,
+	rules: VecDeque<Rule>,
 }
 
 /// By default, the rule set is initialized with a single root rule
 impl Default for RuleSet {
 	fn default() -> Self {
-		Self {
-			rules: vec![Rule::default()],
-		}
+		let mut rules = VecDeque::with_capacity(1);
+		rules.push_back(Rule::default());
+		Self { rules }
 	}
 }
 
@@ -20,12 +21,12 @@ impl Default for RuleSet {
 impl RuleSet {
 	pub fn default_rule(&self) -> &Rule {
 		self.rules
-			.first()
+			.front()
 			.expect("RuleSet should always have at least one rule")
 	}
 	pub fn default_rule_mut(&mut self) -> &mut Rule {
 		self.rules
-			.first_mut()
+			.front_mut()
 			.expect("RuleSet should always have at least one rule")
 	}
 }

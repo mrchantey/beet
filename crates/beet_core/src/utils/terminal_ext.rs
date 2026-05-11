@@ -8,7 +8,7 @@ use std::io::stdout;
 pub fn on_force_exit(
 	func: impl 'static + Send + Sync + Clone + Fn(),
 ) -> Result {
-	#[cfg(feature = "ctrlc")]
+	#[cfg(all(not(target_arch = "wasm32"), feature = "ctrlc"))]
 	{
 		let func2 = func.clone();
 		ctrlc::set_handler(move || {
@@ -103,10 +103,19 @@ pub fn move_to(x: u16, y: u16) -> std::io::Result<()> {
 	Ok(())
 }
 
-/// Returns the terminal size.
-#[cfg(feature = "crossterm")]
-pub fn size() -> Result<UVec2> {
-	use crossterm::terminal::size;
-	let (cols, rows) = size()?;
-	UVec2::new(cols as u32, rows as u32).xok()
+
+
+
+/// Returns the terminal size, defaulting to 80,24 if it could not be determined.
+pub fn size() -> UVec2 {
+	let default_size = UVec2::new(80, 24);
+	cfg_if! {
+		if #[cfg(all(not(target_arch = "wasm32"), feature = "crossterm"))]{
+			crossterm::terminal::size()
+				.map(|(cols,rows)|UVec2::new(cols as u32, rows as u32))
+				.unwrap_or(default_size)
+		}else {
+			default_size
+		}
+	}
 }

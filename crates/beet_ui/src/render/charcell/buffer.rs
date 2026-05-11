@@ -208,13 +208,13 @@ fn visual_style_to_ansi(style: &VisualStyle) -> nu_ansi_term::Style {
 // ── Ratatui conversions ───────────────────────────────────────────────────────
 
 /// Convert a bevy [`Color`] to a ratatui terminal color via RGB.
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 fn color_to_ratatui(color: Color) -> ratatui::style::Color {
 	let s = color.to_srgba_u8();
 	ratatui::style::Color::Rgb(s.red, s.green, s.blue)
 }
 
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 impl VisualStyle {
 	/// Converts to a ratatui [`Style`](ratatui::style::Style).
 	pub fn to_ratatui_style(&self) -> ratatui::style::Style {
@@ -261,7 +261,7 @@ impl VisualStyle {
 	}
 }
 
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 impl Cell {
 	/// Converts to a ratatui [`Cell`](ratatui::buffer::Cell).
 	pub fn to_ratatui_cell(&self) -> ratatui::buffer::Cell {
