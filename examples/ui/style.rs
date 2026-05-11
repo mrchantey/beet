@@ -34,7 +34,7 @@ fn main() {
 /// Handler function that generates a Material Design 3 styled page.
 #[action]
 fn Handler(
-	cx: In<ActionContext<Request>>,
+	_cx: In<ActionContext<Request>>,
 	query: StyleQuery,
 ) -> Result<Response> {
 	let css = query.build_css(

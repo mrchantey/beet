@@ -119,6 +119,9 @@ impl CssRule {
 		match rule {
 			Selector::Any => "*".to_string(),
 			Selector::Root => ":root".to_string(),
+			Selector::Entity(_) => todo!(
+				"entities that use this should be assigned a special class, ie entity.to_bits"
+			),
 			Selector::AnyOf(rules) => rules
 				.iter()
 				.map(|rule| Self::selector_to_css_inner(rule))

@@ -4,15 +4,11 @@ use bevy::reflect::Typed;
 use std::sync::Arc;
 
 /// A set of declarations applied to elements matching the given selector.
-#[derive(
-	Debug, Default, Clone, Reflect, Component, Resource, Get, GetMut, SetWith,
-)]
+#[derive(Debug, Default, Clone, Reflect, Component, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
 	/// Predicate for which entities this rule applies to
-	#[set_with(skip)]
 	selector: Selector,
-	#[set_with(skip)]
 	declarations: HashMap<TokenKey, TokenValue>,
 }
 
@@ -33,12 +29,6 @@ impl Rule {
 			selector: Selector::Tag(tag.into()),
 			declarations: default(),
 		}
-	}
-
-	/// Set the selector.
-	pub fn with_selector(mut self, selector: Selector) -> Self {
-		self.selector = selector;
-		self
 	}
 
 	pub fn insert(
@@ -165,7 +155,10 @@ impl Rule {
 		definition: TokenDefinition<T>,
 	) -> Result<&mut Self> {
 		if self.contains_key(definition.token.key()) {
-			return Ok(self);
+			bevybail!(
+				"Token `{}` already exists in rule declarations",
+				definition.token
+			);
 		}
 		self.insert(definition.token.clone(), definition.initial.clone())
 	}
@@ -215,6 +208,8 @@ pub enum Selector {
 	/// and in bevy apps will always pass predicates
 	#[default]
 	Root,
+	/// Only match a specific entity
+	Entity(Entity),
 	/// Selects any element, in css this will evaluate to `*`,
 	/// and in bevy apps will always pass predicates
 	Any,
@@ -276,6 +271,7 @@ impl Selector {
 		match self {
 			Selector::Root => true,
 			Selector::Any => true,
+			Selector::Entity(entity) => el.entity == *entity,
 			Selector::AnyOf(rules) => rules.iter().any(|rule| rule.matches(el)),
 			Selector::AllOf(rules) => rules.iter().all(|rule| rule.matches(el)),
 			Selector::Tag(tag) => el.element.tag() == tag,

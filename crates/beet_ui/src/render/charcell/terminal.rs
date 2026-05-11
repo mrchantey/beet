@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::style::VisualStyle;
 use beet_core::exports::async_channel;
 use beet_core::exports::async_channel::Receiver;
 use beet_core::exports::async_channel::Sender;
@@ -391,7 +392,7 @@ impl Terminal {
 		cells: impl IntoIterator<Item = (UVec2, &'a super::Cell)>,
 	) -> Result {
 		let mut last_pos: Option<UVec2> = None;
-		let mut last_style: Option<crate::style::VisualStyle> = None;
+		let mut last_style: Option<VisualStyle> = None;
 
 		for (pos, cell) in cells {
 			// Skip cells that are already up to date on screen.
@@ -515,6 +516,7 @@ mod raw_mode {
 	}
 }
 
+/// Unix raw mode support
 #[cfg(not(target_arch = "wasm32"))]
 mod raw_mode {
 	use beet_core::prelude::*;

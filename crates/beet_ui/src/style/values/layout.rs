@@ -14,6 +14,10 @@ pub struct FlexBox {
 	pub column_gap: u32,
 }
 
+impl Default for FlexBox {
+	fn default() -> Self { Self::row() }
+}
+
 impl FlexBox {
 	pub fn row() -> Self {
 		Self {
@@ -73,7 +77,7 @@ impl FlexBox {
 
 pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
-/// Flex layout properties for a node.
+/// layout properties for a node.
 #[derive(Debug, Default, Clone, SetWith, Component)]
 pub struct LayoutStyle {
 	pub flex_order: i32,
