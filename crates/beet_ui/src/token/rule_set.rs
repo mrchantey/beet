@@ -19,6 +19,8 @@ impl Default for RuleSet {
 
 
 impl RuleSet {
+	/// Gets the oldest rule, by default this
+	/// is a rule with root
 	pub fn default_rule(&self) -> &Rule {
 		self.rules
 			.front()
@@ -28,5 +30,16 @@ impl RuleSet {
 		self.rules
 			.front_mut()
 			.expect("RuleSet should always have at least one rule")
+	}
+	pub fn insert_rule(&mut self, rule: Rule) {
+		if let Some(recent) = self.rules.back() {
+			if recent.selector  {
+				// If the most recent rule is a root, we can replace it with the new rule
+				*self.rules.back_mut().unwrap() = rule;
+				return;
+			}
+		}else{			
+		self.rules.push_back(rule);
+		}
 	}
 }

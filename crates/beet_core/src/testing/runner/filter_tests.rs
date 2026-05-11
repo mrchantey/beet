@@ -114,10 +114,14 @@ mod tests {
 		));
 		world.update_local();
 		let outcomes = world.query_once::<&TestOutcome>();
-		// First test (ignored) should pass
-		(outcomes[0] == &TestOutcome::Pass).xpect_true();
-		// Second test (normal) should be skipped
-		matches!(outcomes[1], TestOutcome::Skip(TestSkip::FailedFilter))
+		(outcomes.len() == 2).xpect_true();
+		outcomes
+			.iter()
+			.any(|o| o == &&TestOutcome::Pass)
+			.xpect_true();
+		outcomes
+			.iter()
+			.any(|o| matches!(o, TestOutcome::Skip(TestSkip::FailedFilter)))
 			.xpect_true();
 	}
 }

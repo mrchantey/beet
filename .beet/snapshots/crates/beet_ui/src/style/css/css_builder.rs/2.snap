@@ -1,9 +1,5 @@
 
 :root {
-  --io-crates-beet-ui-style-material-tones-primary80: rgb(0, 204, 0);
-}
-
-:root {
   --io-crates-beet-ui-style-material-colors-on-primary: var(--io-crates-beet-ui-style-material-tones-primary20);
 }
 
@@ -18,6 +14,10 @@
 
 :root {
   --io-crates-beet-ui-style-material-tones-primary20: rgb(0, 51, 0);
+}
+
+:root {
+  --io-crates-beet-ui-style-material-tones-primary80: rgb(0, 204, 0);
 }
 
 .primary-role {

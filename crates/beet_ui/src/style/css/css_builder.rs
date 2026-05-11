@@ -43,8 +43,9 @@ impl CssBuilder {
 	pub fn build(
 		&self,
 		css_map: &CssTokenMap,
-		tokens: &[(&TokenKey, &TokenValue)],
+		mut tokens: Vec<(&TokenKey, &TokenValue)>,
 	) -> Result<String> {
+		tokens.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 		let css_rules = tokens
 			.xtry_map(|(key, value)| CssRule::resolve(&css_map, key, value))?;
 
