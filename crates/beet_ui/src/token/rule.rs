@@ -70,7 +70,21 @@ impl Rule {
 		self.with(key, value)
 	}
 
-	pub fn with_value(
+	pub fn with_value<T>(self, key: T, value: impl Into<T::Value>) -> Self
+	where
+		T: TypedToken + Into<Token>,
+		T::Value: Typed + Serialize,
+	{
+		self.with(
+			key,
+			TypedValue::new(value.into())
+				.expect("failed to serialize typed value"),
+		)
+		.expect(
+			"Schema assertion failed for a typed value, this shouldnt be possible",
+		)
+	}
+	pub fn with_value_untyped(
 		self,
 		key: impl Into<Token>,
 		value: impl Typed + Serialize,

@@ -40,18 +40,15 @@ css_property!(Width, Length, "width");
 css_property!(Padding, Length, "padding");
 css_property!(Spacing, Length, "gap");
 css_property!(
-	/// Shape property token, named to avoid conflict with the [`Shape`] type.
 	ShapeProp, Shape, "border-radius"
 );
 css_property!(
-	/// Elevation property token, named to avoid conflict with the [`Elevation`] type.
 	ElevationProp, Elevation, "box-shadow"
 );
 css_property!(OutlineWidth, Length, "border-width");
 css_property!(OutlineOffset, Length, "outline-offset");
 css_property!(FontSize, Length, "font-size");
 css_property!(
-	/// Font weight property token, named to avoid conflict with the [`FontWeight`] type.
 	FontWeightProp, FontWeight, "font-weight"
 );
 css_property!(LineHeight, Length, "line-height");

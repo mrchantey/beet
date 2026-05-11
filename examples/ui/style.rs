@@ -42,7 +42,6 @@ fn Handler(
 			// .with_format_variables(FormatVariables::Full),
 			// .with_format_variables(FormatVariables::Hash { min_len: 1 }),
 			.with_format_variables(FormatVariables::short()),
-		cx.id(),
 	)?;
 
 	let html = format!(
