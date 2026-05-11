@@ -31,7 +31,7 @@ fn main() -> Result {
 		))
 		.spawn_then(SshServer::default())
 		.add_systems(Update, render_frame)
-		.add_systems(PostUpdate, ssh_write.after(CharcellRenderStep))
+		.add_systems(PostUpdate, ssh_write.after(CharcellRenderSet))
 		.add_observer(ssh_read)
 		.add_observer(on_input)
 		.run();

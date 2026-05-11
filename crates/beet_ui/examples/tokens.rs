@@ -1,27 +1,37 @@
 use beet_core::prelude::*;
-use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
+use beet_ui::style::common_props::ForegroundColor;
 use beet_ui::*;
 
 
 fn main() {
-	CharcellRenderer::new_size(50, 30)
-		.render_oneshot(setup())
-		.unwrap()
-		.render()
-		.trim_lines()
-		.xprint();
+	App::new()
+		.add_plugins(CharcellPlugin)
+		.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new_tag("h1")
+					.with_value(
+						ForegroundColor,
+						Color::from(palettes::basic::GREEN),
+					)
+					.unwrap(),
+			),
+		)
+		.add_systems(Startup, setup)
+		.add_systems(PostUpdate, render.after(CharcellRenderSet))
+		.run();
 }
 
 
 
-fn setup() -> impl Bundle {
-	(
+fn setup(mut commands: Commands) {
+	commands.spawn((
+		CharcellRenderer::default().halved().halved(),
 		rsx! {"hello world!"},
-		VisualStyle::default(),
-		BoxStyle::default()
-			.with_margin(Spacing::all(Length::Rem(3.)))
-			.with_border(Spacing::all(Length::Rem(1.)))
-			.with_padding(Spacing::all(Length::Rem(3.))),
-	)
+	));
+}
+
+fn render(query: Query<&CharcellRenderer>) -> Result {
+	query.single()?.render().xprint();
+	Ok(())
 }

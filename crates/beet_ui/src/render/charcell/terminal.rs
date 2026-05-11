@@ -481,6 +481,7 @@ pub fn render_terminal(
 	>,
 ) -> Result {
 	for (mut terminal, renderer) in query.iter_mut() {
+		// this looks like a symptom we have redundant buffers
 		terminal.draw(renderer.iter_cells())?;
 	}
 	Ok(())

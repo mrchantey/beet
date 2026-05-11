@@ -3,7 +3,7 @@ use crate::style::StyledNodeQuery;
 use beet_core::prelude::*;
 
 
-pub fn apply_node_changes(
+pub fn render_charcell(
 	styled_query: StyledNodeQuery,
 	mut query: Query<(Entity, &mut CharcellRenderer)>,
 ) -> Result {
@@ -15,7 +15,6 @@ pub fn apply_node_changes(
 
 #[derive(Get, Deref, Component)]
 pub struct CharcellRenderer {
-	viewport: URect,
 	/// A buffer whose size matches the `viewport::size`
 	#[deref]
 	buffer: Buffer,
@@ -32,7 +31,6 @@ impl CharcellRenderer {
 	pub fn new(viewport: URect) -> Self {
 		Self {
 			buffer: Buffer::new(viewport.size()),
-			viewport,
 		}
 	}
 	pub fn new_size(width: u32, height: u32) -> Self {
@@ -41,7 +39,9 @@ impl CharcellRenderer {
 
 	/// Half the viewport height for an easier read when testing
 	pub fn halved(mut self) -> Self {
-		self.viewport.max.y /= 2;
+		let mut size = self.size();
+		size.y /= 2;
+		self.buffer = Buffer::new(size);
 		self
 	}
 
@@ -51,10 +51,12 @@ impl CharcellRenderer {
 		entity: Entity,
 	) -> Result<&mut Self> {
 		let node = query.get_view(entity);
+		let size = self.size();
+		let viewport = URect::new(0, 0, size.x, size.y);
 		let mut cx = CharcellRenderContext::new(
 			node,
-			self.viewport,
-			self.viewport,
+			viewport,
+			viewport,
 			&mut self.buffer,
 		);
 		cx.render()?;

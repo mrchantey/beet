@@ -27,6 +27,10 @@ pub fn token_map()->CssTokenMap{
 
 css_property!(ForegroundColor, Color, "color");
 css_property!(BackgroundColor, Color, "background-color");
+css_property!(DecorationColor, Color, "text-decoration-color");
+css_property!(TextAlignProp, TextAlign, "text-align");
+css_property!(DecorationLineProp, DecorationLine, "text-decoration-line");
+css_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style");
 
 css_property!(Font, Typography, "font-family");
 

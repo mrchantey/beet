@@ -12,8 +12,8 @@ keywords.workspace = true
 categories.workspace = true
 
 [[example]]
-name = "simple"
-path = "examples/simple.rs"
+name = "render_simple"
+path = "examples/render_simple.rs"
 required-features = ["style"]
 
 [[example]]

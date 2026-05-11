@@ -12,3 +12,7 @@ impl ClassName {
 		//
 	}
 }
+
+
+#[derive(Default, Component, Deref, DerefMut)]
+pub struct ClassSet(HashSet<ClassName>);

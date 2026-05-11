@@ -1,9 +1,13 @@
 pub mod common_props;
 mod css;
 pub mod material;
+mod resolve_styles;
+mod style_plugin;
 mod style_query;
 mod values;
 pub use css::*;
+pub use resolve_styles::*;
+pub use style_plugin::*;
 pub use style_query::*;
 pub use values::*;
 mod styled_node_query;

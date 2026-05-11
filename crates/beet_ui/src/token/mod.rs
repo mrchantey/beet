@@ -12,10 +12,12 @@ mod rule;
 mod token;
 mod token_definition;
 mod token_key;
+mod token_plugin;
 mod token_query;
 mod token_store;
 mod token_value;
 pub use class::*;
+pub use token_plugin::*;
 mod rule_set;
 #[cfg(feature = "serde")]
 pub use from_tokens::*;

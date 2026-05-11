@@ -15,6 +15,18 @@ pub struct Rule {
 
 impl Rule {
 	pub fn new() -> Self { Self::default() }
+	pub fn new_tag(tag: &str) -> Self {
+		Self {
+			selector: Selector::Tag(tag.into()),
+			declarations: default(),
+		}
+	}
+	pub fn new_class(class: &str) -> Self {
+		Self {
+			selector: Selector::Class(class.into()),
+			declarations: default(),
+		}
+	}
 
 	pub fn insert(
 		&mut self,

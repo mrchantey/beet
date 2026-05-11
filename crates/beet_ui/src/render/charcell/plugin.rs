@@ -1,3 +1,5 @@
+use crate::prelude::*;
+use crate::style::ResolveStylesSet;
 use beet_core::prelude::*;
 #[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
@@ -6,13 +8,12 @@ pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
-		use crate::prelude::*;
-
 		// Node layout always runs in PostUpdate.
-		app.add_systems(
+		app.configure_sets(
 			PostUpdate,
-			apply_node_changes.in_set(CharcellRenderStep),
-		);
+			CharcellRenderSet.after(ResolveStylesSet),
+		)
+		.add_systems(PostUpdate, render_charcell.in_set(CharcellRenderSet));
 
 		// Terminal-specific systems: input, render, flush.
 		#[cfg(feature = "terminal")]
@@ -27,12 +28,12 @@ impl Plugin for CharcellPlugin {
 						.run_if(common_conditions::on_message::<AppExit>),
 				)
 					.chain()
-					.after(apply_node_changes)
-					.in_set(CharcellRenderStep),
+					.after(render_charcell)
+					.in_set(CharcellRenderSet),
 			);
 	}
 }
 
 /// PostUpdate set containing node layout, terminal render, and flush.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct CharcellRenderStep;
+pub struct CharcellRenderSet;

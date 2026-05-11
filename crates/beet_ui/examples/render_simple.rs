@@ -6,10 +6,11 @@ use beet_ui::*;
 
 fn main() {
 	CharcellRenderer::default()
+		.halved()
 		.render_oneshot(setup())
 		.unwrap()
 		.render()
-		.trim_lines()
+		// .trim_lines()
 		.xprint();
 }
 

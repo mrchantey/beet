@@ -36,8 +36,8 @@ fn main() {
 	render("Foreground Color", setup_foreground_color);
 	render("Background Color", setup_background_color);
 	render("Border Color (per-side)", setup_border_color);
-	render("Text Underline", setup_text_underline);
-	render("Text Align + Style", setup_text_align_style);
+	render("Text Formatting", setup_text_formatting);
+	render("Text Align", setup_text_align);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -356,15 +356,15 @@ fn setup_foreground_color() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(rsx! { "Red" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(1., 0., 0.)),
-			..VisualStyle::default()
+			..default()
 		},),
 		(rsx! { "Green" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0., 0.8, 0.)),
-			..VisualStyle::default()
+			..default()
 		},),
 		(rsx! { "Blue" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0.2, 0.4, 1.)),
-			..VisualStyle::default()
+			..default()
 		},),
 	])
 }
@@ -377,7 +377,7 @@ fn setup_background_color() -> impl Bundle {
 			VisualStyle {
 				background: Some(Color::srgb(0.5, 0., 0.5)),
 				foreground: Some(Color::WHITE),
-				..VisualStyle::default()
+				..default()
 			},
 		),
 		(
@@ -386,7 +386,7 @@ fn setup_background_color() -> impl Bundle {
 			VisualStyle {
 				background: Some(Color::srgb(0., 0.4, 0.6)),
 				foreground: Some(Color::WHITE),
-				..VisualStyle::default()
+				..default()
 			},
 		),
 	])
@@ -402,43 +402,48 @@ fn setup_border_color() -> impl Bundle {
 			border_bottom: Some(Color::srgb(0., 0.4, 1.)),
 			border_left: Some(Color::srgb(0., 0.8, 0.)),
 			border_right: Some(Color::srgb(1., 0.8, 0.)),
-			..BoxStyle::default()
+			..default()
 		},
 	),])
 }
 
-fn setup_text_underline() -> impl Bundle {
+fn setup_text_formatting() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(rsx! { "Underline" }, bordered(), VisualStyle {
 			text_style: TextStyle::UNDERLINE,
-			..VisualStyle::default()
+			..default()
 		},),
 		(rsx! { "Strike" }, bordered(), VisualStyle {
 			text_style: TextStyle::LINE_THROUGH,
-			..VisualStyle::default()
+			..default()
+		},),
+		(rsx! { "Bold" }, bordered(), VisualStyle {
+			text_style: TextStyle::BOLD,
+			..default()
 		},),
 	])
 }
 
-fn setup_text_align_style() -> impl Bundle {
+fn setup_text_align() -> impl Bundle {
+	let item_styles = (
+		BoxStyle::default()
+			.with_padding(Spacing::all(Length::Rem(2.)))
+			.with_border(Spacing::all(Length::Rem(1.))),
+		LayoutStyle::default().with_flex_grow(1),
+	);
+
 	(FlexBox::row().column_gap(1), children![
-		(
-			rsx! { "Left" },
-			BoxStyle::default().with_border(Spacing::all(Length::Rem(1.))),
-			VisualStyle {
-				foreground: Some(Color::srgb(0.8, 0.4, 0.)),
-				text_align: TextAlign::Left,
-				..VisualStyle::default()
-			},
-		),
-		(
-			rsx! { "Center" },
-			BoxStyle::default().with_border(Spacing::all(Length::Rem(1.))),
-			VisualStyle {
-				foreground: Some(Color::srgb(0., 0.8, 0.8)),
-				text_align: TextAlign::Center,
-				..VisualStyle::default()
-			},
-		),
+		(rsx! { "Left" }, item_styles.clone(), VisualStyle {
+			text_align: TextAlign::Left,
+			..default()
+		},),
+		(rsx! { "Center" }, item_styles.clone(), VisualStyle {
+			text_align: TextAlign::Center,
+			..default()
+		},),
+		(rsx! { "right" }, item_styles, VisualStyle {
+			text_align: TextAlign::Right,
+			..default()
+		},),
 	])
 }
