@@ -43,11 +43,10 @@ impl CssBuilder {
 	pub fn build(
 		&self,
 		css_map: &CssTokenMap,
-		mut tokens: Vec<(&TokenKey, &TokenValue)>,
+		rules: &[Rule],
 	) -> Result<String> {
-		tokens.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-		let css_rules = tokens
-			.xtry_map(|(key, value)| CssRule::resolve(&css_map, key, value))?;
+		let css_rules =
+			rules.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
 
 		// iteration variables
 		let mut declared = HashMap::default();
@@ -310,12 +309,12 @@ mod tests {
 		);
 
 		world.insert_resource(
-			TokenStore::default()
+			RuleSet::default()
 				.with_token(colors::OnPrimary, tones::Primary20)
 				.unwrap()
 				.with_value(tones::Primary20, Color::srgb(0., 1., 0.))
 				.unwrap()
-				.with_inline_value(
+				.with_rule(
 					Rule::new()
 						.with_selector(Selector::class("color-primary"))
 						.with_token(
@@ -323,8 +322,7 @@ mod tests {
 							colors::OnPrimary,
 						)
 						.unwrap(),
-				)
-				.unwrap(),
+				),
 		);
 		let _css = world
 			.spawn(rsx! {
@@ -352,7 +350,7 @@ mod tests {
 		);
 
 		world.insert_resource(
-			TokenStore::default()
+			RuleSet::default()
 				.with_token(colors::Primary, tones::Primary80)
 				.unwrap()
 				.with_token(colors::OnPrimary, tones::Primary20)
@@ -366,13 +364,12 @@ mod tests {
 				.unwrap()
 				.with_value(tones::Primary20, Color::srgb(0., 0.2, 0.))
 				.unwrap()
-				.with_inline_value(
+				.with_rule(
 					Rule::new()
 						.with_selector(Selector::class("primary-role"))
 						.with_token(ColorRoleProps, colors::PrimaryRole)
 						.unwrap(),
-				)
-				.unwrap(),
+				),
 		);
 		world
 			.spawn(rsx! {

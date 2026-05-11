@@ -2,6 +2,8 @@ use super::*;
 use crate::style::StyledNodeView;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
+use bevy::math::URect;
+use bevy::math::UVec2;
 
 
 /// Rendering context passed through the node tree during a TUI render pass.
@@ -95,6 +97,43 @@ impl<'a> CharcellRenderContext<'a> {
 
 		// 6. text content
 		super::text_layout(self)?;
+
+		// 7. render children without flexbox (block layout fallback)
+		if self.node.flexbox.is_none() && !self.node.children.is_empty() {
+			let children = self.node.children.clone();
+			let parent_entity = self.node.entity;
+			let parent_style = self.node.visual_style().clone();
+			let content_rect = self.content_rect;
+			let viewport = self.viewport;
+			let mut child_y = content_rect.min.y;
+			for child in children {
+				if child_y >= content_rect.max.y {
+					break;
+				}
+				let available_h = content_rect
+					.height()
+					.saturating_sub(child_y - content_rect.min.y);
+				let child_size = super::text_measure(
+					&child,
+					UVec2::new(content_rect.width(), available_h),
+				)?;
+				let child_rect = URect::new(
+					content_rect.min.x,
+					child_y,
+					content_rect.max.x,
+					content_rect.max.y,
+				);
+				CharcellRenderContext::new(
+					child,
+					viewport,
+					child_rect,
+					self.buffer,
+				)
+				.with_parent(parent_entity, parent_style.clone())
+				.render()?;
+				child_y += child_size.y.max(1);
+			}
+		}
 
 		Ok(())
 	}

@@ -1,7 +1,8 @@
+use crate::prelude::*;
 use crate::style::material::*;
 use crate::style::*;
-use crate::token::TokenStore;
 use beet_core::prelude::*;
+
 pub struct MaterialStylePlugin {
 	color: Color,
 }
@@ -25,15 +26,12 @@ impl Default for MaterialStylePlugin {
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<CssPlugin>()
-			.insert_resource(default_token_store(self.color.clone()));
+			.insert_resource(default_rule_set(self.color.clone()));
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
 	}
 }
-
-
-
 
 pub fn default_token_map() -> CssTokenMap {
 	CssTokenMap::default()
@@ -44,27 +42,28 @@ pub fn default_token_map() -> CssTokenMap {
 		.with_extend(typography::token_map())
 }
 
-/// All default material declarations and classes
-pub fn default_token_store(color: impl Into<Color>) -> TokenStore {
-	TokenStore::default()
-		.with_extend(default_declarations(color))
-		.with_extend(rules::all_rules())
-		.with_value(themes::LightScheme, themes::light_scheme())
-		.unwrap()
-		.with_value(themes::DarkScheme, themes::dark_scheme())
-		.unwrap()
+/// All default material declarations and component rules.
+pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
+	RuleSet::new(default_declarations(color))
+		.with_rules(rules::all_rules())
+		.with_rule(themes::light_scheme())
+		.with_rule(themes::dark_scheme())
 }
 
 /// Returns a [`Rule`] with all material design default values.
-pub fn default_declarations(color: impl Into<Color>) -> TokenStore {
-	TokenStore::default()
-		.with_extend(themes::from_color(color))
-		.with_extend(themes::default_opacities())
-		.with_extend(typography::default_typography())
-		.with_extend(geometry::default_shapes())
-		.with_extend(geometry::default_elevations())
-		.with_extend(motion::default_durations())
-		.with_extend(motion::default_motions())
+///
+/// Includes light-scheme semantic colors as the default, overrideable
+/// with `.dark-scheme` class.
+pub fn default_declarations(color: impl Into<Color>) -> Rule {
+	Rule::new()
+		.extend_declarations(themes::from_color(color))
+		.extend_declarations(themes::light_scheme())
+		.extend_declarations(themes::default_opacities())
+		.extend_declarations(typography::default_typography())
+		.extend_declarations(geometry::default_shapes())
+		.extend_declarations(geometry::default_elevations())
+		.extend_declarations(motion::default_durations())
+		.extend_declarations(motion::default_motions())
 }
 
 
@@ -73,17 +72,19 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn material_token_store() {
+	fn material_rule_set() {
 		MaterialStylePlugin::world()
 			.spawn_empty()
-			.with_state::<StyleQuery, _>(|entity, query| {
+			.with_state::<StyleQuery, _>(|_entity, query| {
+				// OnPrimary is in the light/dark scheme rules, not the root default rule
 				query
-					.collect_token_store(entity)
-					.into_iter()
-					.collect::<HashMap<_, _>>()
-					.xmap(|map| serde_json::to_string_pretty(&map).unwrap())
+					.rule_set()
+					.as_ref()
+					.unwrap()
+					.rules()
+					.any(|rule| rule.get(&colors::OnPrimary.into()).is_ok())
 			})
-			.xpect_contains(r#""key": "rust:io.crates/beet_ui/style/material/colors/OnPrimary""#);
+			.xpect_true();
 	}
 	#[test]
 	fn material_css() {
@@ -95,7 +96,9 @@ mod tests {
 				query.build_css(&default(), entity)
 			})
 			.xunwrap()
-			.xpect_contains("--io-crates-beet-ui-style-material-motion-short2: 100ms;")
+			.xpect_contains(
+				"--io-crates-beet-ui-style-material-motion-short2: 100ms;",
+			)
 			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-regular);");
 	}
 }

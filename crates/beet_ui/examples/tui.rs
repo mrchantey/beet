@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
 
 fn update(
 	mut commands: Commands,
-	query: Query<Entity, With<TokenStore>>,
+	query: Query<Entity, With<CharcellRenderer>>,
 ) -> Result {
 	let entity = query.single()?;
 	let count = count_def();

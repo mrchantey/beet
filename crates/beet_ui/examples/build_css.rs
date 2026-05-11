@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::style::*;
+use beet_ui::prelude::*;
 
 fn main() {
 	App::new()
@@ -10,21 +11,21 @@ fn main() {
 		.run();
 }
 
-fn setup(query: StyleQuery, mut commands: Commands) -> Result {
+fn setup(
+	ruleset: Res<RuleSet>,
+	query: StyleQuery,
+	mut commands: Commands,
+) -> Result {
 	let entity = commands.spawn_empty().id();
-	let store = query
-		.collect_token_store(entity)
-		.into_iter()
-		.collect::<HashMap<_, _>>();
 
-	let store_path =
-		AbsPathBuf::new_workspace_rel("target/examples/style/token_store.json")
+	let ruleset_path =
+		AbsPathBuf::new_workspace_rel("target/examples/style/ruleset.json")
 			.unwrap();
 
 	// write the store for inspection
-	let json = serde_json::to_string_pretty(&store).unwrap();
-	fs_ext::write(&store_path, json).unwrap();
-	println!("Token store written to: {}", store_path.display());
+	let json = serde_json::to_string_pretty(&*ruleset).unwrap();
+	fs_ext::write(&ruleset_path, json).unwrap();
+	println!("Ruleset written to: {}", ruleset_path.display());
 
 	let css = query.build_css(
 		&CssBuilder::default()

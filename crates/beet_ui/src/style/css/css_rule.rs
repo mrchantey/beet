@@ -39,21 +39,12 @@ impl CssRule {
 
 	/// Resolves a single token entry to a [`CssRule`].
 	///
-	/// [`Rule`] values are handled recursively via [`Self::from_rule`].
-	/// All other tokens are looked up by key in the [`CssTokenMap`].
+	/// Tokens are looked up by key in the [`CssTokenMap`].
 	pub fn resolve(
 		css_map: &CssTokenMap,
 		key: &TokenKey,
 		value: &TokenValue,
 	) -> Result<Self> {
-		// Rules are handled recursively, bypassing the map entirely.
-		if value.schema() == &TokenSchema::of::<Rule>() {
-			let rule: Rule = match value {
-				TokenValue::Value(tv) => tv.value().clone().into_serde()?,
-				TokenValue::Token(_) => bevybail!("Expected Rule value"),
-			};
-			return Self::from_rule(css_map, &rule);
-		}
 		css_map.get(key)?.as_css_rule(value)
 	}
 

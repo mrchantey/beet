@@ -49,7 +49,7 @@ json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
-ansi_paint = ["beet_core/ansi_paint", "dep:nu-ansi-term"]
+ansi_paint = ["beet_core/ansi_paint"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]
@@ -65,7 +65,6 @@ vte = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
-nu-ansi-term = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }

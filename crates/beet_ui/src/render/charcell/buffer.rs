@@ -117,25 +117,36 @@ impl Buffer {
 	pub fn render_ansi(&self) -> String {
 		let width = self.size.x as usize;
 		let height = self.size.y as usize;
-		let mut result = String::with_capacity(self.cells.len());
+		let mut out: Vec<u8> = Vec::with_capacity(self.cells.len() * 8);
+		let mut prev_style: Option<VisualStyle> = None;
 
 		for y in 0..height {
 			for x in 0..width {
 				let idx = y * width + x;
 				if let Some(cell) = &self.cells[idx] {
-					let ansi_style = visual_style_to_ansi(&cell.style);
-					result.push_str(
-						&ansi_style.paint(cell.symbol.as_str()).to_string(),
+					write_visual_style(
+						&mut out,
+						&cell.style,
+						prev_style.as_ref(),
 					);
+					out.extend_from_slice(cell.symbol.as_bytes());
+					prev_style = Some(cell.style.clone());
 				} else {
-					result.push(' ');
+					if prev_style.is_some() {
+						out.extend_from_slice(b"\x1b[0m");
+						prev_style = None;
+					}
+					out.push(b' ');
 				}
 			}
 			if y < height - 1 {
-				result.push('\n');
+				out.push(b'\n');
 			}
 		}
-		result
+		if prev_style.is_some() {
+			out.extend_from_slice(b"\x1b[0m");
+		}
+		String::from_utf8_lossy(&out).into_owned()
 	}
 }
 
@@ -168,38 +179,117 @@ impl Cell {
 
 // ── ANSI conversions ──────────────────────────────────────────────────────────
 
+/// Write ANSI escape sequences for `style`, diffing against `prev`.
 #[cfg(feature = "ansi_paint")]
-fn color_to_ansi(color: Color) -> nu_ansi_term::Color {
-	let s = color.to_srgba_u8();
-	nu_ansi_term::Color::Rgb(s.red, s.green, s.blue)
-}
+fn write_visual_style(
+	out: &mut Vec<u8>,
+	style: &VisualStyle,
+	prev: Option<&VisualStyle>,
+) {
+	use std::io::Write;
 
-/// Convert a [`VisualStyle`] to a nu_ansi_term style for buffer rendering.
-#[cfg(feature = "ansi_paint")]
-fn visual_style_to_ansi(style: &VisualStyle) -> nu_ansi_term::Style {
-	let mut ansi_style = nu_ansi_term::Style::new();
+	let is_dim = style.dim_foreground();
+	let prev_dim = prev.map_or(false, |p| p.dim_foreground());
 
-	if let Some(color) = style.foreground {
-		let s = color.to_srgba_u8();
-		ansi_style = ansi_style.fg(color_to_ansi(color));
-		// alpha < 50% maps to the terminal `dim` attribute
-		if s.alpha < 128 {
-			ansi_style = ansi_style.dimmed();
+	// check if the current style has any active attributes
+	let style_is_active = is_dim
+		|| style.foreground.is_some()
+		|| style.background.is_some()
+		|| style.text_style != TextStyle::empty()
+		|| style.decoration_line.underline
+		|| style.decoration_line.overline
+		|| style.decoration_line.line_through;
+
+	// check if prev had any active attributes (needed to know if we must reset)
+	let prev_is_active = prev.map_or(false, |p| {
+		p.dim_foreground()
+			|| p.foreground.is_some()
+			|| p.background.is_some()
+			|| p.text_style != TextStyle::empty()
+			|| p.decoration_line.underline
+			|| p.decoration_line.overline
+			|| p.decoration_line.line_through
+	});
+
+	// skip entirely if neither current nor prev has any styling
+	if !style_is_active && !prev_is_active {
+		return;
+	}
+
+	let text_changed = prev.map_or(true, |p| p.text_style != style.text_style)
+		|| is_dim != prev_dim;
+
+	// reset and rewrite all attributes when text style changes
+	if text_changed {
+		out.extend_from_slice(b"\x1b[0m");
+	}
+
+	let effective_prev = if text_changed { None } else { prev };
+
+	// foreground color
+	if style.foreground != effective_prev.and_then(|p| p.foreground) {
+		match style.foreground {
+			Some(color) => {
+				let c = color.to_srgba_u8();
+				write!(out, "\x1b[38;2;{};{};{}m", c.red, c.green, c.blue).ok();
+			}
+			None => out.extend_from_slice(b"\x1b[39m"),
 		}
 	}
 
-	if let Some(color) = style.background {
-		ansi_style = ansi_style.on(color_to_ansi(color));
+	// background color
+	if style.background != effective_prev.and_then(|p| p.background) {
+		match style.background {
+			Some(color) => {
+				let c = color.to_srgba_u8();
+				write!(out, "\x1b[48;2;{};{};{}m", c.red, c.green, c.blue).ok();
+			}
+			None => out.extend_from_slice(b"\x1b[49m"),
+		}
 	}
-	if style.decoration_line.underline {
-		ansi_style = ansi_style.underline();
-	}
-	if style.decoration_line.line_through {
-		ansi_style = ansi_style.strikethrough();
-	}
-	// TextStyle::OVERLINE: not supported in nu_ansi_term, skip
 
-	ansi_style
+	// decorations (always apply when text changed, otherwise check prev)
+	let prev_dec = effective_prev.map(|p| &p.decoration_line);
+	if style.decoration_line.underline
+		&& prev_dec.map_or(true, |d| !d.underline)
+	{
+		out.extend_from_slice(b"\x1b[4m");
+	}
+	if style.decoration_line.overline && prev_dec.map_or(true, |d| !d.overline)
+	{
+		out.extend_from_slice(b"\x1b[53m");
+	}
+	if style.decoration_line.line_through
+		&& prev_dec.map_or(true, |d| !d.line_through)
+	{
+		out.extend_from_slice(b"\x1b[9m");
+	}
+
+	// text attributes — only when text_changed
+	if text_changed {
+		if is_dim {
+			out.extend_from_slice(b"\x1b[2m");
+		}
+		let ts = style.text_style;
+		if ts.contains(TextStyle::BOLD) {
+			out.extend_from_slice(b"\x1b[1m");
+		}
+		if ts.contains(TextStyle::ITALIC) {
+			out.extend_from_slice(b"\x1b[3m");
+		}
+		if ts.contains(TextStyle::BLINK) {
+			out.extend_from_slice(b"\x1b[5m");
+		}
+		if ts.contains(TextStyle::RAPID_BLINK) {
+			out.extend_from_slice(b"\x1b[6m");
+		}
+		if ts.contains(TextStyle::REVERSED) {
+			out.extend_from_slice(b"\x1b[7m");
+		}
+		if ts.contains(TextStyle::HIDDEN) {
+			out.extend_from_slice(b"\x1b[8m");
+		}
+	}
 }
 
 // ── Ratatui conversions ───────────────────────────────────────────────────────

@@ -4,7 +4,8 @@ use bevy::reflect::Typed;
 use std::collections::VecDeque;
 
 
-#[derive(Resource)]
+#[derive(Debug, Clone, Reflect, Resource)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
 	rules: VecDeque<Rule>,
 }
@@ -35,6 +36,15 @@ impl RuleSet {
 		self.insert_rule(rule);
 		self
 	}
+	/// Inserts multiple rules.
+	pub fn with_rules(mut self, rules: impl IntoIterator<Item = Rule>) -> Self {
+		for rule in rules {
+			self.insert_rule(rule);
+		}
+		self
+	}
+	/// Iterates all rules in insertion order.
+	pub fn rules(&self) -> impl Iterator<Item = &Rule> { self.rules.iter() }
 
 	/// Gets the first added rule, by default this
 	/// is a rule with a root selector
@@ -90,11 +100,22 @@ impl RuleSet {
 		self.with(key, TypedValue::new(value)?)
 	}
 
+	/// Extend with multiple rules, inserting each (merging when selectors match).
+	pub fn extend_rules(
+		&mut self,
+		rules: impl IntoIterator<Item = Rule>,
+	) -> &mut Self {
+		for rule in rules {
+			self.insert_rule(rule);
+		}
+		self
+	}
+
 	fn cascade(&self, el: &ElementView, key: &Token) -> Result<&TokenValue> {
 		self.rules
 			.iter()
 			.filter(|rule| rule.selector().matches(el))
-			.xtry_find_map(|rule| rule.declarations().get(key))
+			.xtry_find_map(|rule| rule.get(key))
 	}
 }
 

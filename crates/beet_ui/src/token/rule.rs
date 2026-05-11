@@ -3,29 +3,42 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 use std::sync::Arc;
 
-/// A set of default properties applied to elements matching the given criteria.
-#[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
+/// A set of declarations applied to elements matching the given selector.
+#[derive(
+	Debug, Default, Clone, Reflect, Component, Resource, Get, GetMut, SetWith,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
-	/// A predicate to determine which entities this rule applies to
+	/// Predicate for which entities this rule applies to
+	#[set_with(skip)]
 	selector: Selector,
-	declarations: TokenStore,
+	#[set_with(skip)]
+	declarations: HashMap<TokenKey, TokenValue>,
 }
-
 
 impl Rule {
 	pub fn new() -> Self { Self::default() }
-	pub fn new_tag(tag: &str) -> Self {
+
+	/// Create a rule with a class selector, eg `Rule::class("btn-filled")`.
+	pub fn class(class: &str) -> Self {
+		Self {
+			selector: Selector::Class(class.into()),
+			declarations: default(),
+		}
+	}
+
+	/// Create a rule with a tag selector, eg `Rule::tag("button")`.
+	pub fn tag(tag: &str) -> Self {
 		Self {
 			selector: Selector::Tag(tag.into()),
 			declarations: default(),
 		}
 	}
-	pub fn new_class(class: &str) -> Self {
-		Self {
-			selector: Selector::Class(class.into()),
-			declarations: default(),
-		}
+
+	/// Set the selector.
+	pub fn with_selector(mut self, selector: Selector) -> Self {
+		self.selector = selector;
+		self
 	}
 
 	pub fn insert(
@@ -33,9 +46,13 @@ impl Rule {
 		key: impl Into<Token>,
 		value: impl Into<TokenValue>,
 	) -> Result<&mut Self> {
-		self.declarations.insert(key, value)?;
+		let value = value.into();
+		let key = key.into();
+		key.schema().assert_eq(value.schema())?;
+		self.declarations.insert(key.key().clone(), value);
 		self.xok()
 	}
+
 	fn with(
 		mut self,
 		key: impl Into<Token>,
@@ -52,6 +69,7 @@ impl Rule {
 	) -> Result<Self> {
 		self.with(key, value)
 	}
+
 	pub fn with_value(
 		self,
 		key: impl Into<Token>,
@@ -59,6 +77,7 @@ impl Rule {
 	) -> Result<Self> {
 		self.with(key, TypedValue::new(value)?)
 	}
+
 	#[track_caller]
 	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
 	where
@@ -67,22 +86,108 @@ impl Rule {
 		let key = Token::new_inline(TokenSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
+
+	/// Extend declarations from an iterator of `(TokenKey, TokenValue)` pairs.
+	pub fn with_extend(
+		mut self,
+		iter: impl IntoIterator<Item = (TokenKey, TokenValue)>,
+	) -> Self {
+		self.declarations.extend(iter);
+		self
+	}
+
+	/// Get a declaration value by token, performing schema validation.
+	pub fn get(&self, token: &Token) -> Result<&TokenValue> {
+		match self.declarations.get(token.key()) {
+			Some(value) => {
+				token.schema().assert_eq(value.schema())?;
+				Ok(value)
+			}
+			None => bevybail!("Token Not Found: `{token}`"),
+		}
+	}
+
+	pub fn get_mut(&mut self, token: &Token) -> Result<&mut TokenValue> {
+		match self.declarations.get_mut(token.key()) {
+			Some(value) => {
+				token.schema().assert_eq(value.schema())?;
+				Ok(value)
+			}
+			None => bevybail!("Token Not Found: `{token}`"),
+		}
+	}
+
+	pub fn contains_key(&self, key: &TokenKey) -> bool {
+		self.declarations.contains_key(key)
+	}
+
+	/// Iterate over all declarations.
+	pub fn iter(&self) -> impl Iterator<Item = (&TokenKey, &TokenValue)> {
+		self.declarations.iter()
+	}
+
+	/// Iterate mutably over all declarations.
+	pub fn iter_mut(
+		&mut self,
+	) -> impl Iterator<Item = (&TokenKey, &mut TokenValue)> {
+		self.declarations.iter_mut()
+	}
+
+	/// Merge another rule's declarations into this one (builder pattern).
+	pub fn extend_declarations(mut self, other: Self) -> Self {
+		self.declarations.extend(other.declarations);
+		self
+	}
+
+	/// Mutable: merge another rule's declarations into self.
 	pub fn push_declarations(&mut self, other: Self) -> &mut Self {
 		self.declarations.extend(other.declarations);
 		self
 	}
 
-	pub fn merge_any(mut self, other: Self) -> Self {
-		self.selector = self.selector.clone().merge_any(other.selector);
-		self.declarations = self.declarations.with_extend(other.declarations);
-		self
+	/// Insert a definition if it doesn't already exist.
+	pub fn insert_definition<T>(
+		&mut self,
+		definition: TokenDefinition<T>,
+	) -> Result<&mut Self> {
+		if self.contains_key(definition.token.key()) {
+			return Ok(self);
+		}
+		self.insert(definition.token.clone(), definition.initial.clone())
 	}
 
+	/// Get a typed value, performing schema and type validation.
+	#[cfg(feature = "serde")]
+	pub fn get_typed<T: Typed + serde::de::DeserializeOwned>(
+		&self,
+		key: &Token,
+	) -> Result<T> {
+		key.schema().assert_eq_ty::<T>()?;
+		match self.get(key)? {
+			TokenValue::Value(value) => value.into_typed::<T>(),
+			TokenValue::Token(_) => {
+				bevybail!("Expected Value, found Token: `{key}`")
+			}
+		}
+	}
+
+	pub fn merge_any(mut self, other: Self) -> Self {
+		self.selector = self.selector.clone().merge_any(other.selector);
+		self.declarations.extend(other.declarations);
+		self
+	}
 
 	/// Matches all rules, or `true` if empty
 	pub fn matches(&self, el: &ElementView) -> bool {
 		self.selector.matches(el)
 	}
+}
+
+impl IntoIterator for Rule {
+	type Item = (TokenKey, TokenValue);
+	type IntoIter =
+		bevy::platform::collections::hash_map::IntoIter<TokenKey, TokenValue>;
+	fn into_iter(self) -> Self::IntoIter { self.declarations.into_iter() }
 }
 
 // akin to a lightningcss Component, ie `/selectors/parser.rs#1392`
@@ -134,8 +239,7 @@ impl Selector {
 	}
 	pub fn not(inner: Selector) -> Self { Self::Not(Arc::new(inner)) }
 
-	/// Merge two rules, as an AnyOf,
-	/// collapsing global selectors like Root and Any
+	/// Merge two selectors as an AnyOf, collapsing global selectors
 	pub fn merge_any(self, other: Self) -> Self {
 		if self == other {
 			return self;

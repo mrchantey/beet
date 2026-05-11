@@ -6,11 +6,9 @@ use beet_core::prelude::*;
 #[derive(SystemParam, Get)]
 pub struct TokenQuery<'w, 's> {
 	commands: Commands<'w, 's>,
-	// entity_tokens: Query<'w, 's, (Entity, &'static TokenStore)>,
-	global_tokens: Option<Res<'w, TokenStore>>,
 	children: Query<'w, 's, &'static Children>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
-	stores: Query<'w, 's, &'static mut TokenStore>,
+	stores: Query<'w, 's, &'static mut Rule>,
 }
 
 impl TokenQuery<'_, '_> {
@@ -40,8 +38,8 @@ impl TokenQuery<'_, '_> {
 		Ok(())
 	}
 
-	/// Walk up the entity tree to find the first TokenStore with the
-	/// provided Token. This resolution step is analagous to css variable inheritence
+	/// Walk up the entity tree to find the first [`Rule`] component with the
+	/// provided token. Analogous to CSS variable inheritance.
 	fn with_value_mut<O>(
 		&mut self,
 		ev_entity: Entity,

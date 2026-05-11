@@ -1,7 +1,6 @@
 use crate::prelude::*;
+use crate::style::*;
 use beet_core::prelude::*;
-use nu_ansi_term::Color;
-use nu_ansi_term::Style;
 use std::borrow::Cow;
 
 /// Renders an entity tree to styled ANSI terminal output via [`NodeVisitor`].
@@ -14,9 +13,9 @@ use std::borrow::Cow;
 /// Block-level elements emit newlines following the same rules as HTML,
 /// while inline elements are rendered contiguously. Anchor tags render
 /// as [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
-	style_map: StyleMap<Style>,
+	style_map: StyleMap<VisualStyle>,
 	/// Whether to clear the terminal before rendering.
 	clear_on_render: bool,
 	/// A string prepended to the buffer, defaults to `\n`
@@ -36,7 +35,10 @@ impl Default for AnsiTermRenderer {
 impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
-			style_map: StyleMap::new(Style::default(), default_element_map()),
+			style_map: StyleMap::new(
+				VisualStyle::default(),
+				default_element_map(),
+			),
 			clear_on_render: true,
 			prefix: "\n".into(),
 			render_expressions: false,
@@ -46,7 +48,7 @@ impl AnsiTermRenderer {
 	}
 
 	/// Override the element → style mapping.
-	pub fn with_style_map(mut self, map: StyleMap<Style>) -> Self {
+	pub fn with_style_map(mut self, map: StyleMap<VisualStyle>) -> Self {
 		self.style_map = map;
 		self
 	}
@@ -80,10 +82,11 @@ impl AnsiTermRenderer {
 	/// Write styled text to the buffer.
 	fn push_styled(&mut self, text: &str) {
 		let style = self.style_map.current();
-		let painted = format!("{}", style.paint(text));
-		self.state.push_raw(&painted);
-		// push_raw tracks trailing_newline from the painted string, but the
-		// ANSI codes don't contain newlines so we can track from the source
+		let mut buf: Vec<u8> = Vec::new();
+		write_visual_style_ansi(&mut buf, style.as_ref(), None);
+		buf.extend_from_slice(text.as_bytes());
+		buf.extend_from_slice(b"\x1b[0m");
+		self.state.push_raw(&String::from_utf8_lossy(&buf));
 		self.state.trailing_newline = text.ends_with('\n');
 	}
 
@@ -181,7 +184,11 @@ impl NodeVisitor for AnsiTermRenderer {
 					format!("[{alt}]")
 				};
 				self.open_osc8_link(&src);
-				self.state.push_raw(&format!("{}", style.paint(&display)));
+				let mut buf: Vec<u8> = Vec::new();
+				write_visual_style_ansi(&mut buf, style.as_ref(), None);
+				buf.extend_from_slice(display.as_bytes());
+				buf.extend_from_slice(b"\x1b[0m");
+				self.state.push_raw(&String::from_utf8_lossy(&buf));
 				self.close_osc8_link();
 			}
 
@@ -278,19 +285,29 @@ impl NodeVisitor for AnsiTermRenderer {
 		expression: &Expression,
 	) {
 		if self.render_expressions {
-			let style = Style::new().italic();
-			let painted =
-				format!("{}", style.paint(format!("{{{}}}", expression.0)));
-			self.state.push_raw(&painted);
+			let style = VisualStyle {
+				text_style: TextStyle::ITALIC,
+				..VisualStyle::default()
+			};
+			let mut buf: Vec<u8> = Vec::new();
+			write_visual_style_ansi(&mut buf, &style, None);
+			buf.extend_from_slice(format!("{{{}}}", expression.0).as_bytes());
+			buf.extend_from_slice(b"\x1b[0m");
+			self.state.push_raw(&String::from_utf8_lossy(&buf));
 		}
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
 		self.state.ensure_block_separator();
-		let style = Style::new().dimmed();
-		let painted =
-			format!("{}", style.paint(format!("<!--{}-->", &**comment)));
-		self.state.push_raw(&painted);
+		let style = VisualStyle {
+			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
+			..VisualStyle::default()
+		};
+		let mut buf: Vec<u8> = Vec::new();
+		write_visual_style_ansi(&mut buf, &style, None);
+		buf.extend_from_slice(format!("<!--{}-->", &**comment).as_bytes());
+		buf.extend_from_slice(b"\x1b[0m");
+		self.state.push_raw(&String::from_utf8_lossy(&buf));
 		self.state.push_raw("\n");
 		self.state.trailing_newline = true;
 		self.state.needs_block_separator = true;
@@ -319,26 +336,128 @@ impl NodeRenderer for AnsiTermRenderer {
 }
 
 
-fn default_element_map() -> Vec<(&'static str, Style)> {
+fn default_element_map() -> Vec<(&'static str, VisualStyle)> {
 	vec![
-		("h1", Style::new().bold().fg(Color::Green)),
-		("h2", Style::new().bold().fg(Color::Cyan)),
-		("h3", Style::new().bold().fg(Color::Blue)),
-		("h4", Style::new().bold().fg(Color::Magenta)),
-		("h5", Style::new().bold()),
-		("h6", Style::new().bold().dimmed()),
-		("p", Style::default()),
-		("a", Style::new().fg(Color::Blue).underline()),
-		("strong", Style::new().bold()),
-		("em", Style::new().italic()),
-		("del", Style::new().strikethrough()),
-		("code", Style::new().fg(Color::Yellow)),
-		("pre", Style::new().fg(Color::Yellow).dimmed()),
-		("blockquote", Style::new().italic().dimmed()),
-		("hr", Style::new().dimmed()),
-		("img", Style::new().fg(Color::Magenta).underline()),
-		("li", Style::default()),
+		("h1", VisualStyle {
+			text_style: TextStyle::BOLD,
+			foreground: Some(Color::srgb(0., 0.502, 0.)),
+			..VisualStyle::default()
+		}),
+		("h2", VisualStyle {
+			text_style: TextStyle::BOLD,
+			foreground: Some(Color::srgb(0., 0.502, 0.502)),
+			..VisualStyle::default()
+		}),
+		("h3", VisualStyle {
+			text_style: TextStyle::BOLD,
+			foreground: Some(Color::srgb(0., 0., 0.502)),
+			..VisualStyle::default()
+		}),
+		("h4", VisualStyle {
+			text_style: TextStyle::BOLD,
+			foreground: Some(Color::srgb(0.502, 0., 0.502)),
+			..VisualStyle::default()
+		}),
+		("h5", VisualStyle {
+			text_style: TextStyle::BOLD,
+			..VisualStyle::default()
+		}),
+		("h6", VisualStyle {
+			text_style: TextStyle::BOLD,
+			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
+			..VisualStyle::default()
+		}),
+		("p", VisualStyle::default()),
+		("a", VisualStyle {
+			foreground: Some(Color::srgb(0., 0., 0.502)),
+			decoration_line: DecorationLine::underline(),
+			..VisualStyle::default()
+		}),
+		("strong", VisualStyle {
+			text_style: TextStyle::BOLD,
+			..VisualStyle::default()
+		}),
+		("em", VisualStyle {
+			text_style: TextStyle::ITALIC,
+			..VisualStyle::default()
+		}),
+		("del", VisualStyle {
+			decoration_line: DecorationLine::line_through(),
+			..VisualStyle::default()
+		}),
+		("code", VisualStyle {
+			foreground: Some(Color::srgb(0.502, 0.502, 0.)),
+			..VisualStyle::default()
+		}),
+		("pre", VisualStyle {
+			foreground: Some(Color::srgba(0.502, 0.502, 0., 0.4)),
+			..VisualStyle::default()
+		}),
+		("blockquote", VisualStyle {
+			text_style: TextStyle::ITALIC,
+			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
+			..VisualStyle::default()
+		}),
+		("hr", VisualStyle {
+			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
+			..VisualStyle::default()
+		}),
+		("img", VisualStyle {
+			foreground: Some(Color::srgb(0.502, 0., 0.502)),
+			decoration_line: DecorationLine::underline(),
+			..VisualStyle::default()
+		}),
+		("li", VisualStyle::default()),
 	]
+}
+
+/// Write ANSI escape sequences for `style` into `out`.
+fn write_visual_style_ansi(
+	out: &mut Vec<u8>,
+	style: &VisualStyle,
+	_prev: Option<&VisualStyle>,
+) {
+	use std::io::Write;
+	if let Some(color) = style.foreground {
+		let c = color.to_srgba_u8();
+		write!(out, "\x1b[38;2;{};{};{}m", c.red, c.green, c.blue).ok();
+		// alpha < 50% maps to the terminal `dim` attribute
+		if c.alpha < 128 {
+			out.extend_from_slice(b"\x1b[2m");
+		}
+	}
+	if let Some(color) = style.background {
+		let c = color.to_srgba_u8();
+		write!(out, "\x1b[48;2;{};{};{}m", c.red, c.green, c.blue).ok();
+	}
+	let ts = style.text_style;
+	if ts.contains(TextStyle::BOLD) {
+		out.extend_from_slice(b"\x1b[1m");
+	}
+	if ts.contains(TextStyle::ITALIC) {
+		out.extend_from_slice(b"\x1b[3m");
+	}
+	if ts.contains(TextStyle::BLINK) {
+		out.extend_from_slice(b"\x1b[5m");
+	}
+	if ts.contains(TextStyle::RAPID_BLINK) {
+		out.extend_from_slice(b"\x1b[6m");
+	}
+	if ts.contains(TextStyle::REVERSED) {
+		out.extend_from_slice(b"\x1b[7m");
+	}
+	if ts.contains(TextStyle::HIDDEN) {
+		out.extend_from_slice(b"\x1b[8m");
+	}
+	if style.decoration_line.underline {
+		out.extend_from_slice(b"\x1b[4m");
+	}
+	if style.decoration_line.overline {
+		out.extend_from_slice(b"\x1b[53m");
+	}
+	if style.decoration_line.line_through {
+		out.extend_from_slice(b"\x1b[9m");
+	}
 }
 
 
@@ -546,9 +665,12 @@ mod test {
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		AnsiTermRenderer::new()
-			.with_style_map(StyleMap::new(Style::default(), vec![(
+			.with_style_map(StyleMap::new(VisualStyle::default(), vec![(
 				"h1",
-				Style::new().fg(Color::Red),
+				VisualStyle {
+					foreground: Some(Color::srgb(0.502, 0., 0.)),
+					..VisualStyle::default()
+				},
 			)]))
 			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()

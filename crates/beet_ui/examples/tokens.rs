@@ -10,7 +10,7 @@ fn main() {
 		.add_plugins(CharcellPlugin)
 		.insert_resource(
 			RuleSet::default().with_rule(
-				Rule::new_tag("h1")
+				Rule::tag("h1")
 					.with_value(
 						ForegroundColor,
 						Color::from(palettes::basic::GREEN),
