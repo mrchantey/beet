@@ -1,4 +1,5 @@
-use crate::style::resolve_styles;
+use crate::prelude::*;
+use crate::style::*;
 use beet_core::prelude::*;
 
 #[derive(Default)]
@@ -6,7 +7,9 @@ pub struct StylePlugin;
 
 impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
+		app.init_resource::<RuleSet>()
+			.init_resource::<CssTokenMap>()
+			.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
 	}
 }
 

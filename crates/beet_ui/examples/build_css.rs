@@ -11,13 +11,7 @@ fn main() {
 		.run();
 }
 
-fn setup(
-	ruleset: Res<RuleSet>,
-	query: StyleQuery,
-	mut commands: Commands,
-) -> Result {
-	let entity = commands.spawn_empty().id();
-
+fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 	let ruleset_path =
 		AbsPathBuf::new_workspace_rel("target/examples/style/ruleset.json")
 			.unwrap();
@@ -32,7 +26,6 @@ fn setup(
 			// .with_format_variables(FormatVariables::Full),
 			// .with_format_variables(FormatVariables::Hash { min_len: 1 }),
 			.with_format_variables(FormatVariables::short()),
-		entity,
 	)?;
 
 	let html = format!(

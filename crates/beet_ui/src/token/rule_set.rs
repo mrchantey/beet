@@ -4,7 +4,7 @@ use bevy::reflect::Typed;
 use std::collections::VecDeque;
 
 
-#[derive(Debug, Clone, Reflect, Resource)]
+#[derive(Debug, Clone, Reflect, Deref, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
 	rules: VecDeque<Rule>,

@@ -43,10 +43,11 @@ impl CssBuilder {
 	pub fn build(
 		&self,
 		css_map: &CssTokenMap,
-		rules: &[Rule],
+		rule_set: &RuleSet,
 	) -> Result<String> {
-		let css_rules =
-			rules.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
+		let css_rules = rule_set
+			.iter()
+			.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
 
 		// iteration variables
 		let mut declared = HashMap::default();
@@ -325,11 +326,8 @@ mod tests {
 				),
 		);
 		let _css = world
-			.spawn(rsx! {
-				<div class="text-primary">hello world!</div>
-			})
-			.with_state::<StyleQuery, _>(|entity, query| {
-				query.build_css(&test_builder(), entity)
+			.with_state::<StyleQuery, _>(|query| {
+				query.build_css(&test_builder())
 			})
 			.xunwrap()
 			.xpect_snapshot();
@@ -372,11 +370,8 @@ mod tests {
 				),
 		);
 		world
-			.spawn(rsx! {
-				<div class="text-primary">hello world!</div>
-			})
-			.with_state::<StyleQuery, _>(|entity, query| {
-				query.build_css(&test_builder(), entity)
+			.with_state::<StyleQuery, _>(|query| {
+				query.build_css(&test_builder())
 			})
 			.xunwrap()
 			.xpect_snapshot();

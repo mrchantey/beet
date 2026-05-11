@@ -74,14 +74,10 @@ mod tests {
 	#[test]
 	fn material_rule_set() {
 		MaterialStylePlugin::world()
-			.spawn_empty()
-			.with_state::<StyleQuery, _>(|_entity, query| {
+			.with_state::<Res<RuleSet>, _>(|rules| {
 				// OnPrimary is in the light/dark scheme rules, not the root default rule
-				query
-					.rule_set()
-					.as_ref()
-					.unwrap()
-					.rules()
+				rules
+					.iter()
 					.any(|rule| rule.get(&colors::OnPrimary.into()).is_ok())
 			})
 			.xpect_true();
@@ -89,11 +85,8 @@ mod tests {
 	#[test]
 	fn material_css() {
 		MaterialStylePlugin::world()
-			.spawn(rsx! {
-				<div class="text-primary">hello world!</div>
-			})
-			.with_state::<StyleQuery, _>(|entity, query| {
-				query.build_css(&default(), entity)
+			.with_state::<StyleQuery, _>(|query| {
+				query.build_css(&default())
 			})
 			.xunwrap()
 			.xpect_contains(
