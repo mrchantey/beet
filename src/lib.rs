@@ -19,12 +19,12 @@ pub use beet_core::testing;
 pub use beet_infra as infra;
 #[cfg(feature = "net")]
 pub use beet_net as net;
-#[cfg(feature = "ui")]
-pub use beet_ui as ui;
 #[cfg(feature = "router")]
 pub use beet_router as router;
 #[cfg(feature = "thread")]
 pub use beet_thread as thread;
+#[cfg(feature = "ui")]
+pub use beet_ui as ui;
 // #[cfg(feature = "design")]
 // pub use beet_design as design;
 // #[cfg(feature = "dom")]
@@ -78,15 +78,10 @@ pub mod prelude {
 	// pub use crate::rsx::prelude::*;
 	// #[cfg(feature = "spatial")]
 	// pub use crate::spatial::prelude::*;
-	// 	/// UI REEXPORTS
-	#[cfg(all(
-		feature = "ui",
-		feature = "tui",
-		not(target_arch = "wasm32")
-	))]
-	pub use crate::ui::prelude::Justify;
 	cfg_if! {
+		// re-exports to disambiguate bevy ui
 		if #[cfg(feature = "ui")]{
+			pub use crate::ui::prelude::Justify;
 			pub use crate::ui::prelude::Pointer;
 			pub use crate::ui::prelude::style::*;
 			pub use crate::ui::prelude::style::JustifyContent;

@@ -32,7 +32,10 @@ impl RuleSet {
 			self.rules.push_back(rule);
 		}
 	}
-
+	pub fn with_rule(mut self, rule: Rule) -> Self {
+		self.insert_rule(rule);
+		self
+	}
 
 	/// Gets the first added rule, by default this
 	/// is a rule with a root selector
@@ -110,6 +113,10 @@ impl RuleSetQuery<'_, '_> {
 		match self.cascade(entity, token) {
 			Ok(TokenValue::Value(value)) => value.value().xok(),
 			Ok(TokenValue::Token(token)) => self.resolve(entity, &token),
+			Err(err) if !token.inherited() => {
+				// dont look in ancestors for non-inherited tokens
+				Err(err)
+			}
 			Err(err) => {
 				if let Ok(ancestor) =
 					self.ancestors.get(entity).map(|ancestor| ancestor.get())

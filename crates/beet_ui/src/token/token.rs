@@ -12,20 +12,33 @@ pub struct Token {
 	key: TokenKey,
 	/// Schema identifying the value type, ie `io.crates/bevy_color/color/Color`
 	schema: TokenSchema,
+	/// Whether the value for this token should be searched for in parent contexts
+	/// during RuleSet resolution, defaulting to true for regular tokens and false for property
+	/// tokens.
+	/// 
+	/// Note that if a non-inherited token points to an inherited token,
+	/// that token will be inherited. This is a common practice.
+	///
+	/// ```css
+	/// // backgroind-color is not inherited, but --primary is
+	/// background-color: var(--primary);
+	/// ```
+	inherited: bool,
 }
 
 
 impl Token {
 	pub fn new(key: TokenKey, schema: TokenSchema) -> Self {
-		Self { key, schema }
+		Self {
+			key,
+			schema,
+			inherited: true,
+		}
 	}
 
 	#[track_caller]
 	pub fn new_inline(schema: TokenSchema) -> Self {
-		Self {
-			key: TokenKey::new_inline(),
-			schema,
-		}
+		Self::new(TokenKey::new_inline(), schema)
 	}
 }
 
