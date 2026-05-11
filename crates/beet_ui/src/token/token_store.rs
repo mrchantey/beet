@@ -85,7 +85,7 @@ impl TokenStore {
 		let key = Token::new_inline(TokenSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
-	pub fn extend(
+	pub fn with_extend(
 		mut self,
 		rules: impl IntoIterator<Item = (TokenKey, TokenValue)>,
 	) -> Self {

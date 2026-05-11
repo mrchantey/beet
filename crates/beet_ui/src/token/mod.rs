@@ -16,7 +16,7 @@ mod token_query;
 mod token_store;
 mod token_value;
 pub use class::*;
-// mod rule_set;
-// pub use rule_set::*;
+mod rule_set;
 #[cfg(feature = "serde")]
 pub use from_tokens::*;
+pub use rule_set::*;

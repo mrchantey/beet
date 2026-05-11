@@ -47,8 +47,8 @@ pub fn default_token_map() -> CssTokenMap {
 /// All default material declarations and classes
 pub fn default_token_store(color: impl Into<Color>) -> TokenStore {
 	TokenStore::default()
-		.extend(default_declarations(color))
-		.extend(rules::all_rules())
+		.with_extend(default_declarations(color))
+		.with_extend(rules::all_rules())
 		.with_value(themes::LightScheme, themes::light_scheme())
 		.unwrap()
 		.with_value(themes::DarkScheme, themes::dark_scheme())
@@ -58,13 +58,13 @@ pub fn default_token_store(color: impl Into<Color>) -> TokenStore {
 /// Returns a [`Rule`] with all material design default values.
 pub fn default_declarations(color: impl Into<Color>) -> TokenStore {
 	TokenStore::default()
-		.extend(themes::from_color(color))
-		.extend(themes::default_opacities())
-		.extend(typography::default_typography())
-		.extend(geometry::default_shapes())
-		.extend(geometry::default_elevations())
-		.extend(motion::default_durations())
-		.extend(motion::default_motions())
+		.with_extend(themes::from_color(color))
+		.with_extend(themes::default_opacities())
+		.with_extend(typography::default_typography())
+		.with_extend(geometry::default_shapes())
+		.with_extend(geometry::default_elevations())
+		.with_extend(motion::default_durations())
+		.with_extend(motion::default_motions())
 }
 
 

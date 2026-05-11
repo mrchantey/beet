@@ -10,6 +10,14 @@ pub enum TokenValue {
 }
 
 impl TokenValue {
+	#[cfg(feature = "serde")]
+	pub fn value<T: Typed + Serialize>(value: T) -> Result<Self> {
+		Self::Value(TypedValue::new(value)?).xok()
+	}
+	pub fn token(token: impl Into<Token>) -> Self { Self::Token(token.into()) }
+}
+
+impl TokenValue {
 	pub fn schema(&self) -> &TokenSchema {
 		match self {
 			TokenValue::Value(value) => value.schema(),

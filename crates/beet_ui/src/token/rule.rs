@@ -4,7 +4,7 @@ use bevy::reflect::Typed;
 use std::sync::Arc;
 
 /// A set of default properties applied to elements matching the given criteria.
-#[derive(Debug, Default, Clone, Reflect, Get, SetWith)]
+#[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
 	/// A predicate to determine which entities this rule applies to
@@ -55,9 +55,14 @@ impl Rule {
 		let key = Token::new_inline(TokenSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
+	pub fn push_declarations(&mut self, other: Self) -> &mut Self {
+		self.declarations.extend(other.declarations);
+		self
+	}
+
 	pub fn merge_any(mut self, other: Self) -> Self {
 		self.selector = self.selector.clone().merge_any(other.selector);
-		self.declarations = self.declarations.extend(other.declarations);
+		self.declarations = self.declarations.with_extend(other.declarations);
 		self
 	}
 
@@ -120,9 +125,10 @@ impl Selector {
 	/// Merge two rules, as an AnyOf,
 	/// collapsing global selectors like Root and Any
 	pub fn merge_any(self, other: Self) -> Self {
+		if self == other {
+			return self;
+		}
 		match (self, other) {
-			(Self::Root, Self::Root) => Self::Root,
-			// (Self::Root, r) | (r, Self::Root) => r,
 			(Self::Any, _) | (_, Self::Any) => Self::Any,
 			(Self::AnyOf(mut rules), Self::AnyOf(other)) => {
 				rules.extend(other);
