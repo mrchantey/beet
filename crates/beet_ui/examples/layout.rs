@@ -410,11 +410,11 @@ fn setup_border_color() -> impl Bundle {
 fn setup_text_formatting() -> impl Bundle {
 	(FlexBox::row().column_gap(1), children![
 		(rsx! { "Underline" }, bordered(), VisualStyle {
-			text_style: TextStyle::UNDERLINE,
+			decoration_line: DecorationLine::underline(),
 			..default()
 		},),
 		(rsx! { "Strike" }, bordered(), VisualStyle {
-			text_style: TextStyle::LINE_THROUGH,
+			decoration_line: DecorationLine::line_through(),
 			..default()
 		},),
 		(rsx! { "Bold" }, bordered(), VisualStyle {

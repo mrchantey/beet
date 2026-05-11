@@ -1,7 +1,7 @@
 use crate::style::resolve_styles;
 use beet_core::prelude::*;
 
-
+#[derive(Default)]
 pub struct StylePlugin;
 
 impl Plugin for StylePlugin {

@@ -2,6 +2,8 @@ use beet_core::prelude::*;
 use bitflags::bitflags;
 
 use crate::style::AsCssValue;
+use crate::style::AsCssValues;
+use crate::style::CssKey;
 use crate::style::CssValue;
 
 pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
@@ -15,6 +17,8 @@ pub struct VisualStyle {
 	pub background: Option<Color>,
 	/// Color of underlines, overlines etc
 	pub decoration_color: Option<Color>,
+	pub decoration_line: DecorationLine,
+	pub decoration_style: DecorationStyle,
 	pub text_style: TextStyle,
 	pub text_align: TextAlign,
 }
@@ -24,7 +28,10 @@ impl VisualStyle {
 		foreground: None,
 		background: None,
 		decoration_color: None,
+		decoration_line: DecorationLine::DEFAULT,
+		decoration_style: DecorationStyle::Solid,
 		text_style: TextStyle::empty(),
+
 		text_align: TextAlign::Left,
 	};
 
@@ -67,9 +74,39 @@ impl AsCssValue for TextAlign {
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DecorationLine {
-	underline: bool,
-	overline: bool,
-	line_through: bool,
+	pub underline: bool,
+	pub overline: bool,
+	pub line_through: bool,
+}
+
+impl DecorationLine {
+	pub const DEFAULT: Self = Self {
+		underline: false,
+		overline: false,
+		line_through: false,
+	};
+
+	pub fn underline() -> Self {
+		Self {
+			underline: true,
+			overline: false,
+			line_through: false,
+		}
+	}
+	pub fn overline() -> Self {
+		Self {
+			underline: false,
+			overline: true,
+			line_through: false,
+		}
+	}
+	pub fn line_through() -> Self {
+		Self {
+			line_through: true,
+			underline: false,
+			overline: false,
+		}
+	}
 }
 
 impl AsCssValue for DecorationLine {
@@ -139,17 +176,48 @@ bitflags! {
 		const REVERSED = 1 << 4;
 		/// Hidden text
 		const HIDDEN = 1 << 5;
-		/// `text-decoration-line: underline`
-		const UNDERLINE = 1 << 6;
-		/// `text-decoration-line: overline`
-		const OVERLINE = 1 << 7;
-		/// `text-decoration-line: line-through`
-		const LINE_THROUGH = 1 << 8;
-		/// `text-decoration-style: wavy` (combine with UNDERLINE/OVERLINE)
-		const WAVY = 1 << 9;
-		/// `text-decoration-style: double` (combine with UNDERLINE/OVERLINE)
-		const DOUBLE = 1 << 10;
-		/// `text-decoration-style: dashed` (combine with UNDERLINE/OVERLINE)
-		const DASH = 1 << 11;
+	}
+}
+
+
+impl AsCssValues for TextStyle {
+	fn suffixes() -> Vec<CssKey> {
+		vec![
+			CssKey::static_property("bold"),
+			CssKey::static_property("italic"),
+			CssKey::static_property("blink"),
+			CssKey::static_property("rapidBlink"),
+			CssKey::static_property("reversed"),
+			CssKey::static_property("hidden"),
+		]
+	}
+
+	fn as_css_values(&self) -> Result<Vec<CssValue>> {
+		// TODO this is very incorrect,
+		// the type probs needs to be reworked, split
+		// based on css property mappings
+		let mut values = Vec::new();
+		if self.contains(Self::BOLD) {
+			values.push(CssValue::expression("bold"));
+		}
+		if self.contains(Self::ITALIC) {
+			values.push(CssValue::expression("italic"));
+		}
+		if self.contains(Self::BLINK) {
+			values.push(CssValue::expression("blink"));
+		}
+		if self.contains(Self::RAPID_BLINK) {
+			values.push(CssValue::expression("rapid-blink"));
+		}
+		if self.contains(Self::REVERSED) {
+			values.push(CssValue::expression("reversed"));
+		}
+		if self.contains(Self::HIDDEN) {
+			values.push(CssValue::expression("hidden"));
+		}
+		if values.is_empty() {
+			values.push(CssValue::expression("normal"));
+		}
+		values.xok()
 	}
 }

@@ -14,6 +14,7 @@ pub struct ElementQuery<'w, 's> {
 			Option<&'static ElementStateMap>,
 		),
 	>,
+	ancestors: Query<'w, 's, &'static ChildOf>,
 	attributes: Query<'w, 's, (Entity, &'static Attribute, &'static Value)>,
 }
 
@@ -55,6 +56,18 @@ impl ElementQuery<'_, '_> {
 				ElementView::new(entity, element, attributes, state)
 			})
 	}
+	pub fn get_in_ancestors(
+		&self,
+		entity: Entity,
+	) -> Result<ElementView<'_>, QueryEntityError> {
+		match self.get(entity) {
+			Ok(val) => val.xok(),
+			Err(_) if let Ok(parent) = self.ancestors.get(entity) => {
+				self.get_in_ancestors(parent.0)
+			}
+			Err(err) => Err(err),
+		}
+	}
 
 	pub fn get_as<'a, T>(&'a self, entity: Entity) -> Result<T>
 	where
@@ -75,10 +88,12 @@ mod tests {
 		let entity = world
 			.spawn((
 				Element::new("div"),
-				related!(Attributes[(
-					Attribute::new("class"),
-					Value::str("hero light-scheme")
-				)]),
+				related!(
+					Attributes[(
+						Attribute::new("class"),
+						Value::str("hero light-scheme")
+					)]
+				),
 			))
 			.id();
 
@@ -103,10 +118,12 @@ mod tests {
 		let entity = world
 			.spawn((
 				Element::new("button"),
-				related!(Attributes[(
-					Attribute::new("class"),
-					Value::str("primary filled")
-				)]),
+				related!(
+					Attributes[(
+						Attribute::new("class"),
+						Value::str("primary filled")
+					)]
+				),
 			))
 			.id();
 

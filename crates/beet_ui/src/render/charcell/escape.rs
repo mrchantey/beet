@@ -1,8 +1,7 @@
 //! ANSI/VT100 terminal escape sequences.
 //!
 //! Raw CSI and SGR sequences for controlling terminal display and input.
-use crate::style::TextStyle;
-use crate::style::VisualStyle;
+use crate::style::*;
 use beet_core::prelude::*;
 use std::io;
 use std::io::Write;
@@ -170,23 +169,42 @@ pub fn write_style(
 		prev
 	};
 
-	// Foreground colour
-	let prev_fg = effective_prev.and_then(|p| p.foreground);
-	if style.foreground != prev_fg {
+	if style.foreground != effective_prev.and_then(|p| p.foreground) {
 		match style.foreground {
 			Some(color) => foreground(w, color)?,
 			None => w.write_all(RESET_FG.as_bytes())?,
 		}
 	}
-
-	// Background colour
-	let prev_bg = effective_prev.and_then(|p| p.background);
-	if style.background != prev_bg {
+	if style.background != effective_prev.and_then(|p| p.background) {
 		match style.background {
 			Some(color) => background(w, color)?,
 			None => w.write_all(RESET_BG.as_bytes())?,
 		}
 	}
+
+	// TODO check against prev
+	if style.decoration_line.underline {
+		w.write_all(UNDERLINE.as_bytes())?;
+	}
+	if style.decoration_line.overline {
+		w.write_all(OVERLINE.as_bytes())?;
+	}
+	if style.decoration_line.line_through {
+		w.write_all(CROSSED_OUT.as_bytes())?;
+	}
+	match style.decoration_style {
+		DecorationStyle::Solid => {}
+		DecorationStyle::Double => {
+			unimplemented!()
+		}
+		DecorationStyle::Wavy => {
+			unimplemented!()
+		}
+		DecorationStyle::Dash => {
+			unimplemented!()
+		}
+	}
+
 
 	// Text attributes — only written when text_changed, applied in full
 	if text_changed {
@@ -200,9 +218,6 @@ pub fn write_style(
 		if ts.contains(TextStyle::ITALIC) {
 			w.write_all(ITALIC.as_bytes())?;
 		}
-		if ts.contains(TextStyle::UNDERLINE) {
-			w.write_all(UNDERLINE.as_bytes())?;
-		}
 		if ts.contains(TextStyle::BLINK) {
 			w.write_all(BLINK.as_bytes())?;
 		}
@@ -214,12 +229,6 @@ pub fn write_style(
 		}
 		if ts.contains(TextStyle::HIDDEN) {
 			w.write_all(HIDDEN.as_bytes())?;
-		}
-		if ts.contains(TextStyle::LINE_THROUGH) {
-			w.write_all(CROSSED_OUT.as_bytes())?;
-		}
-		if ts.contains(TextStyle::OVERLINE) {
-			w.write_all(OVERLINE.as_bytes())?;
 		}
 	}
 

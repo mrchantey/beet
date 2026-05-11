@@ -15,7 +15,7 @@ pub struct Token {
 	/// Whether the value for this token should be searched for in parent contexts
 	/// during RuleSet resolution, defaulting to true for regular tokens and false for property
 	/// tokens.
-	/// 
+	///
 	/// Note that if a non-inherited token points to an inherited token,
 	/// that token will be inherited. This is a common practice.
 	///
@@ -23,7 +23,17 @@ pub struct Token {
 	/// // backgroind-color is not inherited, but --primary is
 	/// background-color: var(--primary);
 	/// ```
-	inherited: bool,
+	inherited: TokenInheritance,
+}
+
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum TokenInheritance {
+	#[default]
+	Inherited,
+	NotInherited,
 }
 
 
@@ -32,8 +42,11 @@ impl Token {
 		Self {
 			key,
 			schema,
-			inherited: true,
+			inherited: default(),
 		}
+	}
+	pub fn is_inherited(&self) -> bool {
+		self.inherited == TokenInheritance::Inherited
 	}
 
 	#[track_caller]
@@ -49,6 +62,10 @@ impl core::fmt::Display for Token {
 	}
 }
 
+pub trait TypedToken: Into<Token> {
+	type Value;
+}
+
 
 #[macro_export]
 macro_rules! token {
@@ -57,19 +74,36 @@ macro_rules! token {
 		$new_ty:ident,
 		$schema_ty:ty
 	) => {
+		token!(
+			$(#[$meta])*
+			$new_ty,
+			$schema_ty,
+			Default::default()
+		);
+	};
+	(
+		$(#[$meta:meta])*
+		$new_ty:ident,
+		$schema_ty:ty,
+		$inherited:expr
+	) => {
 		#[derive(::bevy::reflect::TypePath)]
 		$(#[$meta])*
 		pub struct $new_ty;
+		impl $crate::prelude::TypedToken for $new_ty{
+			type Value = $schema_ty;
+		}
 		impl Into<$crate::prelude::Token> for $new_ty {
 			fn into(self) -> $crate::prelude::Token {
 				$crate::prelude::Token::new(
 					$crate::prelude::TokenKey::of::<Self>(),
 					$crate::prelude::TokenSchema::of::<$schema_ty>(),
-				)
+				).with_inherited($inherited)
 			}
 		}
 	};
 }
+
 
 
 #[cfg(test)]

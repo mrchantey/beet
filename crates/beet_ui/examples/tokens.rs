@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
+use beet_ui::style::common_props::BackgroundColor;
 use beet_ui::style::common_props::ForegroundColor;
 use beet_ui::*;
 
@@ -14,6 +15,11 @@ fn main() {
 						ForegroundColor,
 						Color::from(palettes::basic::GREEN),
 					)
+					.unwrap()
+					.with_value(
+						BackgroundColor,
+						Color::from(palettes::basic::YELLOW),
+					)
 					.unwrap(),
 			),
 		)
@@ -26,8 +32,8 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		CharcellRenderer::default().halved().halved(),
-		rsx! {"hello world!"},
+		CharcellRenderer::default().halved(),
+		rsx! {<h1>"hello world!"</h1>},
 	));
 }
 

@@ -218,20 +218,36 @@ macro_rules! css_property {
   $(#[$meta:meta])*
   $new_ty:ident,
   $schema_ty:ident,
-  $($property: expr),+
+  $($property:literal),+
+ ) => {
+  css_property!(
+	 $(#[$meta])*
+	 $new_ty,
+	 $schema_ty,
+	 Default::default(),
+	 $($property),+
+	);
+ };
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+	$inherited:expr,
+  $($property:literal),+
  ) => {
   $crate::token!(
    $(#[$meta])*
    $new_ty,
-   $schema_ty
+   $schema_ty,
+   $inherited
   );
   impl $crate::prelude::style::AsCssRule for $new_ty {
    fn as_css_rule(
     &self,
     value: &$crate::prelude::TokenValue,
    ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
-   	$crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
-   	vec![$($crate::prelude::style::CssKey::static_property($property)),+],
+    $crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
+    vec![$($crate::prelude::style::CssKey::static_property($property)),+],
     value
    )
    }

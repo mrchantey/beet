@@ -23,11 +23,10 @@ impl RuleSet {
 	}
 	/// Add a new rule, merging with the last added if selectors match
 	pub fn insert_rule(&mut self, rule: Rule) {
-		if let Some(last) = self.rules.back_mut() {
-			if last.selector() == rule.selector() {
-				last.push_declarations(rule);
-				return;
-			}
+		if let Some(last) = self.rules.back_mut()
+			&& last.selector() == rule.selector()
+		{
+			last.push_declarations(rule);
 		} else {
 			self.rules.push_back(rule);
 		}
@@ -109,11 +108,30 @@ pub struct RuleSetQuery<'w, 's> {
 }
 
 impl RuleSetQuery<'_, '_> {
-	pub fn resolve(&self, entity: Entity, token: &Token) -> Result<&Value> {
-		match self.cascade(entity, token) {
-			Ok(TokenValue::Value(value)) => value.value().xok(),
-			Ok(TokenValue::Token(token)) => self.resolve(entity, &token),
-			Err(err) if !token.inherited() => {
+	pub fn resolve<T>(&self, entity: Entity, token: T) -> Result<T::Value>
+	where
+		T: TypedToken + Into<Token>,
+		T::Value: DeserializeOwned,
+	{
+		self.resolve_untyped(entity, &token.into())
+			.and_then(|value| value.clone().into_serde::<T::Value>())
+	}
+	pub fn resolve_untyped(
+		&self,
+		entity: Entity,
+		token: &Token,
+	) -> Result<&Value> {
+		match self.cascade(entity, &token) {
+			Ok(TokenValue::Value(value)) =>
+			// mapped directly to value, ie background-color: green
+			{
+				value.value().xok()
+			}
+			Ok(TokenValue::Token(token)) => {
+				// points to another token ie background-color: primary
+				self.resolve_untyped(entity, &token)
+			}
+			Err(err) if !token.is_inherited() => {
 				// dont look in ancestors for non-inherited tokens
 				Err(err)
 			}
@@ -121,7 +139,7 @@ impl RuleSetQuery<'_, '_> {
 				if let Ok(ancestor) =
 					self.ancestors.get(entity).map(|ancestor| ancestor.get())
 				{
-					self.resolve(ancestor, token)
+					self.resolve_untyped(ancestor, token)
 				} else {
 					Err(err)
 				}
@@ -133,7 +151,9 @@ impl RuleSetQuery<'_, '_> {
 		entity: Entity,
 		token: &Token,
 	) -> Result<&TokenValue> {
-		let el = self.element_query.get(entity)?;
+		// get the nearest ancestor element, handling
+		// text and fragment nodes
+		let el = self.element_query.get_in_ancestors(entity)?;
 		let value = self.rule_set.cascade(&el, token)?;
 		Ok(value)
 	}
@@ -175,7 +195,7 @@ mod tests {
 			.xpect_eq(TokenValue::value(3u32).unwrap());
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.resolve(entity, &Bar.into()).cloned()
+				query.resolve_untyped(entity, &Bar.into()).cloned()
 			})
 			.unwrap()
 			.xpect_eq(3u32.into());

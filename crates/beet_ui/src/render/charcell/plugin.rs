@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::style::ResolveStylesSet;
+use crate::style::StylePlugin;
 use beet_core::prelude::*;
 #[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
@@ -8,12 +9,12 @@ pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
-		// Node layout always runs in PostUpdate.
-		app.configure_sets(
-			PostUpdate,
-			CharcellRenderSet.after(ResolveStylesSet),
-		)
-		.add_systems(PostUpdate, render_charcell.in_set(CharcellRenderSet));
+		app.init_plugin::<StylePlugin>()
+			.configure_sets(
+				PostUpdate,
+				CharcellRenderSet.after(ResolveStylesSet),
+			)
+			.add_systems(PostUpdate, render_charcell.in_set(CharcellRenderSet));
 
 		// Terminal-specific systems: input, render, flush.
 		#[cfg(feature = "terminal")]

@@ -18,7 +18,7 @@ fn main() {
 
 fn setup() -> impl Bundle {
 	(
-		rsx! {"hello world!"},
+		rsx! {<div>"hello world!"</div>},
 		VisualStyle::default(),
 		BoxStyle::default()
 			.with_margin(Spacing::all(Length::Rem(3.)))

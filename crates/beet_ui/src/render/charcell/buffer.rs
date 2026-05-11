@@ -1,5 +1,4 @@
-use crate::style::TextStyle;
-use crate::style::VisualStyle;
+use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 
@@ -192,12 +191,10 @@ fn visual_style_to_ansi(style: &VisualStyle) -> nu_ansi_term::Style {
 	if let Some(color) = style.background {
 		ansi_style = ansi_style.on(color_to_ansi(color));
 	}
-
-	let ts = style.text_style;
-	if ts.contains(TextStyle::UNDERLINE) {
+	if style.decoration_line.underline {
 		ansi_style = ansi_style.underline();
 	}
-	if ts.contains(TextStyle::LINE_THROUGH) {
+	if style.decoration_line.line_through {
 		ansi_style = ansi_style.strikethrough();
 	}
 	// TextStyle::OVERLINE: not supported in nu_ansi_term, skip
@@ -244,10 +241,10 @@ impl VisualStyle {
 		if s.contains(TextStyle::HIDDEN) {
 			modifier |= ratatui::style::Modifier::HIDDEN;
 		}
-		if s.contains(TextStyle::UNDERLINE) {
+		if self.decoration_line.underline {
 			modifier |= ratatui::style::Modifier::UNDERLINED;
 		}
-		if s.contains(TextStyle::LINE_THROUGH) {
+		if self.decoration_line.line_through {
 			modifier |= ratatui::style::Modifier::CROSSED_OUT;
 		}
 		// OVERLINE has no ratatui Modifier equivalent
