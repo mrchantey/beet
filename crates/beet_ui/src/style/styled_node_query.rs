@@ -23,10 +23,8 @@ impl<'a> StyledNodeView<'a> {
 		self.layout.unwrap_or(&LAYOUT_STYLE_DEFAULT)
 	}
 
-	/// Returns the [`FlexBox`] from the layout style, if display is Flex.
-	pub fn flexbox(&self) -> Option<&FlexBox> {
-		self.layout_style().flex_box.as_ref()
-	}
+	/// Returns the [`FlexBox`] from the layout style.
+	pub fn flexbox(&self) -> &FlexBox { &self.layout_style().flex_box }
 }
 
 #[derive(SystemParam)]

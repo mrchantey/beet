@@ -97,15 +97,10 @@ pub struct TokenCommand {
 }
 
 impl EntityCommand<Result> for TokenCommand {
-	fn apply(self, entity: EntityWorldMut) -> Result {
-		let id = entity.id();
-		entity
-			.into_world_mut()
-			.run_system_cached_with::<_, Result, _, _>(
-				handle_token_event,
-				(id, self),
-			)??;
-		Ok(())
+	fn apply(self, mut entity: EntityWorldMut) -> Result {
+		entity.with_state::<TokenQuery, _>(move |entity, mut query| {
+			query.handle_token_command(entity, self)
+		})
 	}
 }
 
@@ -120,17 +115,10 @@ impl TokenCommand {
 		}
 	}
 }
-// In the future we may want to support 'heavier' operations like
-// arbitary systems
+// In the future we may want to support heavier operations like
+// executing arbitary systems
 pub enum TokenCommandHandler {
 	MutateValue(
 		Box<dyn 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result>,
 	),
-}
-
-fn handle_token_event(
-	In((entity, ev)): In<(Entity, TokenCommand)>,
-	mut query: TokenQuery,
-) -> Result {
-	query.handle_token_command(entity, ev)
 }

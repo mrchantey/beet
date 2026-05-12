@@ -1,5 +1,6 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::style::AlignItems;
+use beet_ui::prelude::style::Display;
 use beet_ui::prelude::style::FlexWrap;
 use beet_ui::prelude::style::JustifyContent;
 use beet_ui::prelude::style::*;
@@ -37,6 +38,11 @@ fn main() {
 	render("Background Color", setup_background_color);
 	render("Border Color (per-side)", setup_border_color);
 	render("Text Formatting", setup_text_formatting);
+	render("Text Italic", setup_text_italic);
+	render("Text Blink", setup_text_blink);
+	render("Text Reversed", setup_text_reversed);
+	render("Inline Layout", setup_inline_basic);
+	render("Inline Wrap", setup_inline_wrap);
 	render("Text Align", setup_text_align);
 }
 
@@ -434,6 +440,79 @@ fn setup_text_formatting() -> impl Bundle {
 			..default()
 		},),
 	])
+}
+
+fn setup_text_italic() -> impl Bundle {
+	(LayoutStyle::flex_row().column_gap(1), children![
+		(rsx! { "Italic" }, bordered(), VisualStyle {
+			text_style: TextStyle::ITALIC,
+			..default()
+		}),
+		(rsx! { "Bold+Italic" }, bordered(), VisualStyle {
+			text_style: TextStyle::BOLD | TextStyle::ITALIC,
+			..default()
+		}),
+	])
+}
+
+fn setup_text_blink() -> impl Bundle {
+	(LayoutStyle::flex_row().column_gap(1), children![
+		(rsx! { "Blink" }, bordered(), VisualStyle {
+			text_style: TextStyle::BLINK,
+			..default()
+		}),
+		(rsx! { "RapidBlink" }, bordered(), VisualStyle {
+			text_style: TextStyle::RAPID_BLINK,
+			..default()
+		}),
+	])
+}
+
+fn setup_text_reversed() -> impl Bundle {
+	(LayoutStyle::flex_row().column_gap(1), children![
+		(rsx! { "Reversed" }, bordered(), VisualStyle {
+			text_style: TextStyle::REVERSED,
+			..default()
+		}),
+		(rsx! { "Hidden" }, bordered(), VisualStyle {
+			text_style: TextStyle::HIDDEN,
+			..default()
+		}),
+	])
+}
+
+fn setup_inline_basic() -> impl Bundle {
+	(
+		LayoutStyle {
+			display: Display::Inline,
+			..default()
+		},
+		children![
+			rsx! { "Hello" },
+			rsx! { " " },
+			rsx! { "World" },
+			rsx! { " " },
+			rsx! { "Inline!" },
+		],
+	)
+}
+
+fn setup_inline_wrap() -> impl Bundle {
+	// Items side-by-side, wrapping when overflow
+	(
+		LayoutStyle {
+			display: Display::Inline,
+			..default()
+		},
+		children![
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+		],
+	)
 }
 
 fn setup_text_align() -> impl Bundle {

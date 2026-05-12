@@ -2,7 +2,11 @@
 use crate::prelude::*;
 use crate::style::FontWeight;
 use crate::style::AlignSelf;
+use crate::style::AlignItems;
+use crate::style::JustifyContent;
 use crate::style::Display;
+use crate::style::Direction;
+use crate::style::FlexWrap;
 use crate::style::*;
 use beet_core::prelude::*;
 
@@ -15,7 +19,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(Height)
 		.insert(Width)
 		.insert(Padding)
-		.insert(Spacing)
+		.insert(GapProp)
 		.insert(ShapeProp)
 		.insert(ElevationProp)
 		.insert(OutlineWidth)
@@ -39,8 +43,8 @@ css_property!(Font, Typography, "font-family");
 
 css_property!(Height, Length, "height");
 css_property!(Width, Length, "width");
-css_property!(Padding, Length, "padding");
-css_property!(Spacing, Length, "gap");
+css_property!(Padding, Spacing, "padding");
+css_property!(GapProp, Length, "gap");
 css_property!(
 	ShapeProp, Shape, "border-radius"
 );
@@ -58,5 +62,13 @@ css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
 css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
 css_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
 css_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
-css_property!(MarginProp, Length, TokenInheritance::NotInherited, "margin");
+css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");
+
+css_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
+css_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");
+css_property!(FlexDirectionProp, Direction, TokenInheritance::NotInherited, "flex-direction");
+css_property!(FlexWrapProp, FlexWrap, TokenInheritance::NotInherited, "flex-wrap");
+css_property!(RowGapProp, u32, TokenInheritance::NotInherited, "row-gap");
+css_property!(ColumnGapProp, u32, TokenInheritance::NotInherited, "column-gap");
+

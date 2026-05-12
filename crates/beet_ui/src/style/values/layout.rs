@@ -32,7 +32,7 @@ pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct LayoutStyle {
 	pub display: Display,
-	pub flex_box: Option<FlexBox>,
+	pub flex_box: FlexBox,
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
@@ -41,7 +41,7 @@ pub struct LayoutStyle {
 impl LayoutStyle {
 	pub const DEFAULT: Self = Self {
 		display: Display::Block,
-		flex_box: None,
+		flex_box: FlexBox::row(),
 		flex_order: 0,
 		flex_grow: 0,
 		align_self: AlignSelf::Auto,
@@ -51,7 +51,7 @@ impl LayoutStyle {
 	pub fn flex_row() -> Self {
 		Self {
 			display: Display::Flex,
-			flex_box: Some(FlexBox::row()),
+			flex_box: FlexBox::row(),
 			..default()
 		}
 	}
@@ -60,58 +60,44 @@ impl LayoutStyle {
 	pub fn flex_col() -> Self {
 		Self {
 			display: Display::Flex,
-			flex_box: Some(FlexBox::col()),
+			flex_box: FlexBox::col(),
 			..default()
 		}
 	}
 
 	pub fn justify_content(mut self, justify: JustifyContent) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.justify_content = justify;
-		}
+		self.flex_box.justify_content = justify;
 		self
 	}
 
 	pub fn align_items(mut self, align: AlignItems) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.align_items = align;
-		}
+		self.flex_box.align_items = align;
 		self
 	}
 
 	pub fn align_content(mut self, align: AlignContent) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.align_content = align;
-		}
+		self.flex_box.align_content = align;
 		self
 	}
 
 	pub fn wrap(mut self, wrap: FlexWrap) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.wrap = wrap;
-		}
+		self.flex_box.wrap = wrap;
 		self
 	}
 
 	pub fn row_gap(mut self, gap: u32) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.row_gap = gap;
-		}
+		self.flex_box.row_gap = gap;
 		self
 	}
 
 	pub fn column_gap(mut self, gap: u32) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.column_gap = gap;
-		}
+		self.flex_box.column_gap = gap;
 		self
 	}
 
 	pub fn gap(mut self, gap: u32) -> Self {
-		if let Some(ref mut fb) = self.flex_box {
-			fb.row_gap = gap;
-			fb.column_gap = gap;
-		}
+		self.flex_box.row_gap = gap;
+		self.flex_box.column_gap = gap;
 		self
 	}
 }
@@ -133,25 +119,25 @@ impl Default for FlexBox {
 }
 
 impl FlexBox {
-	pub fn row() -> Self {
+	pub const fn row() -> Self {
 		Self {
 			direction: Direction::Horizontal,
 			wrap: FlexWrap::NoWrap,
-			align_items: AlignItems::default(),
-			align_content: AlignContent::default(),
-			justify_content: JustifyContent::default(),
+			align_items: AlignItems::Start,
+			align_content: AlignContent::Start,
+			justify_content: JustifyContent::Start,
 			row_gap: 0,
 			column_gap: 0,
 		}
 	}
 
-	pub fn col() -> Self {
+	pub const fn col() -> Self {
 		Self {
 			direction: Direction::Vertical,
 			wrap: FlexWrap::NoWrap,
-			align_items: AlignItems::default(),
-			align_content: AlignContent::default(),
-			justify_content: JustifyContent::default(),
+			align_items: AlignItems::Start,
+			align_content: AlignContent::Start,
+			justify_content: JustifyContent::Start,
 			row_gap: 0,
 			column_gap: 0,
 		}
@@ -196,6 +182,7 @@ impl FlexBox {
 
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum JustifyContent {
 	#[default]
 	Start,
@@ -222,6 +209,7 @@ impl AsCssValue for JustifyContent {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AlignItems {
 	#[default]
 	Start,
@@ -294,6 +282,7 @@ impl AsCssValue for FlexSize {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Direction {
 	#[default]
 	Horizontal,
@@ -328,15 +317,28 @@ pub enum AlignContent {
 	Stretch,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Default, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum FlexWrap {
 	#[default]
 	NoWrap,
 	Wrap,
 }
+impl AsCssValue for FlexWrap {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::NoWrap => "nowrap",
+			Self::Wrap => "wrap",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 
 /// Spacing around an element.
-#[derive(Debug, Default, Clone, Copy, PartialEq, SetWith)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, SetWith, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Spacing {
 	pub top: Length,
 	pub right: Length,
@@ -377,4 +379,12 @@ impl Spacing {
 
 	// pub fn horizontal(&self) -> Length { self.left + self.right }
 	// pub fn vertical(&self) -> Length { self.top + self.bottom }
+}
+
+impl AsCssValue for Spacing {
+	fn as_css_value(&self) -> Result<CssValue> {
+		format!("{} {} {} {}", self.top, self.right, self.bottom, self.left)
+			.xmap(CssValue::expression)
+			.xok()
+	}
 }

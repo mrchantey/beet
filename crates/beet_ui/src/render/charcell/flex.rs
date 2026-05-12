@@ -61,19 +61,12 @@ fn cross_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
 // ── Measure pass ──────────────────────────────────────────────────────────────
 
 /// Measure pass: compute the intrinsic size of this flexbox and its children.
-pub fn flex_measure(
+pub fn measure_flex(
 	node: &StyledNodeView,
 	available: UVec2,
 	viewport: URect,
 ) -> Result<UVec2> {
-	let owned_default;
-	let flexbox = match node.flexbox() {
-		Some(fb) => fb,
-		None => {
-			owned_default = FlexBox::default();
-			&owned_default
-		}
-	};
+	let flexbox = node.flexbox();
 
 	let lines = form_lines_ecs(node, flexbox, available, viewport)?;
 
@@ -148,14 +141,7 @@ pub fn flex_layout_rects(
 	intrinsic_sizes: &HashMap<Entity, UVec2>,
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
-	let owned_default;
-	let flexbox = match node.flexbox() {
-		Some(fb) => fb,
-		None => {
-			owned_default = FlexBox::default();
-			&owned_default
-		}
-	};
+	let flexbox = node.flexbox();
 
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
@@ -461,7 +447,7 @@ fn measure_node_ecs(
 		available.y.saturating_sub(overhead.y),
 	);
 	let content_size = if node.layout_style().display == Display::Flex {
-		flex_measure(node, content_available, viewport)?
+		measure_flex(node, content_available, viewport)?
 	} else if node.value.is_some() {
 		super::measure_text(node, content_available.x)
 	} else {

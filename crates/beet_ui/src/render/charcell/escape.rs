@@ -157,8 +157,10 @@ pub fn write_style(
 ) -> io::Result<()> {
 	let is_dim = style.dim_foreground();
 	let prev_dim = prev.map_or(false, |p| p.dim_foreground());
-	let text_changed = prev.map_or(true, |p| p.text_style != style.text_style)
-		|| is_dim != prev_dim;
+	let text_changed = prev.map_or(true, |p| {
+		p.text_style != style.text_style
+			|| p.decoration_line != style.decoration_line
+	}) || is_dim != prev_dim;
 
 	// When text attributes changed, reset everything and re-apply from scratch.
 	// This avoids the complexity of SGR-off codes interacting (eg BOLD_FAINT_OFF).
@@ -182,31 +184,15 @@ pub fn write_style(
 		}
 	}
 
-	// TODO check against prev
-	if style.decoration_line.underline {
-		w.write_all(UNDERLINE.as_bytes())?;
-	}
-	if style.decoration_line.overline {
-		w.write_all(OVERLINE.as_bytes())?;
-	}
-	if style.decoration_line.line_through {
-		w.write_all(CROSSED_OUT.as_bytes())?;
-	}
 	match style.decoration_style {
 		DecorationStyle::Solid => {}
-		DecorationStyle::Double => {
-			unimplemented!()
-		}
-		DecorationStyle::Wavy => {
-			unimplemented!()
-		}
-		DecorationStyle::Dash => {
-			unimplemented!()
-		}
+		DecorationStyle::Double => unimplemented!(),
+		DecorationStyle::Wavy => unimplemented!(),
+		DecorationStyle::Dash => unimplemented!(),
 	}
 
-
-	// Text attributes — only written when text_changed, applied in full
+	// Text attributes and decoration lines — only written when text_changed.
+	// RESET already cleared all attributes, so we re-apply only what is active.
 	if text_changed {
 		if is_dim {
 			w.write_all(FAINT.as_bytes())?;
@@ -230,7 +216,117 @@ pub fn write_style(
 		if ts.contains(TextStyle::HIDDEN) {
 			w.write_all(HIDDEN.as_bytes())?;
 		}
+		// Decoration lines: re-apply after reset; absence is the cleared state.
+		let dl = style.decoration_line;
+		if dl.underline {
+			w.write_all(UNDERLINE.as_bytes())?;
+		}
+		if dl.overline {
+			w.write_all(OVERLINE.as_bytes())?;
+		}
+		if dl.line_through {
+			w.write_all(CROSSED_OUT.as_bytes())?;
+		}
 	}
 
 	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::prelude::*;
+
+	/// Render a bundle to a 40×5 buffer and return the trimmed plain string.
+	fn render(bundle: impl Bundle) -> String {
+		CharcellRenderer::new_size(40, 5)
+			.render_oneshot(bundle)
+			.unwrap()
+			.render()
+			.trim_lines()
+	}
+
+	fn bordered() -> BoxStyle {
+		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+	}
+
+	#[test]
+	fn underline_does_not_bleed_into_border() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hello" },
+			bordered(),
+			VisualStyle {
+				decoration_line: DecorationLine::underline(),
+				..default()
+			}
+		)]));
+		out.as_str().xpect_contains("┌");
+		out.xpect_contains("Hello");
+	}
+
+	#[test]
+	fn strike_does_not_bleed_into_border() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hi" },
+			bordered(),
+			VisualStyle {
+				decoration_line: DecorationLine::line_through(),
+				..default()
+			}
+		)]));
+		out.as_str().xpect_contains("┌");
+		out.xpect_contains("Hi");
+	}
+
+	#[test]
+	fn italic_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Italic" },
+			VisualStyle {
+				text_style: TextStyle::ITALIC,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[3m");
+	}
+
+	#[test]
+	fn bold_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Bold" },
+			VisualStyle {
+				text_style: TextStyle::BOLD,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[1m");
+	}
+
+	#[test]
+	fn blink_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Blink" },
+			VisualStyle {
+				text_style: TextStyle::BLINK,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[5m");
+	}
+
+	#[test]
+	fn write_style_transitions_underline_off() {
+		// Transitioning from underline=true to underline=false must emit RESET
+		// and must NOT re-write UNDERLINE.
+		let style_with = VisualStyle {
+			decoration_line: DecorationLine::underline(),
+			..default()
+		};
+		let style_without = VisualStyle::default();
+		let mut buf: Vec<u8> = Vec::new();
+		write_style(&mut buf, &style_without, Some(&style_with)).unwrap();
+		let out = String::from_utf8(buf).unwrap();
+		out.as_str().xpect_contains("\x1b[0m");
+		out.xnot().xpect_contains("\x1b[4m");
+	}
 }

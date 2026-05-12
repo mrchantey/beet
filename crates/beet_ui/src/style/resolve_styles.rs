@@ -1,6 +1,7 @@
 use crate::prelude::*;
+use crate::style::AlignContent;
+use crate::style::FlexBox;
 use crate::style::LayoutStyle;
-use crate::style::Spacing as SpacingValue;
 use crate::style::VisualStyle;
 use crate::style::common_props::BackgroundColor;
 use crate::style::common_props::*;
@@ -95,19 +96,37 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	let flex_grow = query.resolve(entity, FlexGrowProp).unwrap_or_default();
 	let flex_order = query.resolve(entity, FlexOrderProp).unwrap_or_default();
 	let align_self = query.resolve(entity, AlignSelfProp).unwrap_or_default();
-	// display and flex_box are not resolved from CSS yet - use defaults
+	let display = query.resolve(entity, DisplayProp).unwrap_or_default();
+	let direction =
+		query.resolve(entity, FlexDirectionProp).unwrap_or_default();
+	let wrap = query.resolve(entity, FlexWrapProp).unwrap_or_default();
+	let justify_content = query
+		.resolve(entity, JustifyContentProp)
+		.unwrap_or_default();
+	let align_items = query.resolve(entity, AlignItemsProp).unwrap_or_default();
+	let row_gap = query.resolve(entity, RowGapProp).unwrap_or_default();
+	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
 	LayoutStyle {
+		display,
+		flex_box: FlexBox {
+			direction,
+			wrap,
+			justify_content,
+			align_items,
+			align_content: AlignContent::default(),
+			row_gap,
+			column_gap,
+		},
 		flex_grow,
 		flex_order,
 		align_self,
-		..default()
 	}
 	.xok()
 }
 
 fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
-	let padding_len = query.resolve(entity, Padding).ok();
-	let margin_len = query.resolve(entity, MarginProp).ok();
+	let padding = query.resolve(entity, Padding).unwrap_or_default();
+	let margin = query.resolve(entity, MarginProp).unwrap_or_default();
 	let border_width = query.resolve(entity, OutlineWidth).ok();
 	let border_color = query.resolve(entity, BorderColorProp).ok();
 	BoxStyle {
@@ -115,9 +134,9 @@ fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
 		border_right: border_color,
 		border_top: border_color,
 		border_bottom: border_color,
-		border: border_width.map(SpacingValue::all).unwrap_or_default(),
-		margin: margin_len.map(SpacingValue::all).unwrap_or_default(),
-		padding: padding_len.map(SpacingValue::all).unwrap_or_default(),
+		border: border_width.map(Spacing::all).unwrap_or_default(),
+		margin,
+		padding,
 	}
 	.xok()
 }

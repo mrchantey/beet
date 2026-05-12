@@ -213,15 +213,15 @@ pub enum Selector {
 	/// Selects any element, in css this will evaluate to `*`,
 	/// and in bevy apps will always pass predicates
 	Any,
-	/// Match any of the rules, eg `div, .my-class` (note the comma) in css
+	/// Match any of the rules, ie in css `div, .my-class` (note the comma) in css
 	AnyOf(Vec<Selector>),
-	/// Match all of the rules, eg `div.my-class` (note no comma) in css
+	/// Match all of the rules, ie in css `div.my-class` (note no comma) in css
 	AllOf(Vec<Selector>),
-	/// Must have this tag, eg `div`
+	/// Must have this tag, ie in css `div`
 	Tag(SmolStr),
-	/// Must have this class, eg `.my-class`
+	/// Must have this class, ie in css `.my-class`
 	Class(SmolStr),
-	/// Must be in this state, eg `:hover`
+	/// Must be in this state, ie in css `:hover`
 	State(ElementState),
 	/// Must have the attribute, ie 'display=flex'
 	Attribute {
