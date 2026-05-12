@@ -453,7 +453,7 @@ fn setup_text_align() -> impl Bundle {
 			text_align: TextAlign::Center,
 			..default()
 		},),
-		(rsx! { "right" }, item_styles, VisualStyle {
+		(rsx! { "Right" }, item_styles, VisualStyle {
 			text_align: TextAlign::Right,
 			..default()
 		},),
