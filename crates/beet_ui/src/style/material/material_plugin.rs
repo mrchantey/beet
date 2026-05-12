@@ -56,14 +56,14 @@ pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
 /// with `.dark-scheme` class.
 pub fn default_declarations(color: impl Into<Color>) -> Rule {
 	Rule::new()
-		.extend_declarations(themes::from_color(color))
-		.extend_declarations(themes::light_scheme())
-		.extend_declarations(themes::default_opacities())
-		.extend_declarations(typography::default_typography())
-		.extend_declarations(geometry::default_shapes())
-		.extend_declarations(geometry::default_elevations())
-		.extend_declarations(motion::default_durations())
-		.extend_declarations(motion::default_motions())
+		.with_extend(themes::from_color(color))
+		.with_extend(themes::light_scheme())
+		.with_extend(themes::default_opacities())
+		.with_extend(typography::default_typography())
+		.with_extend(geometry::default_shapes())
+		.with_extend(geometry::default_elevations())
+		.with_extend(motion::default_durations())
+		.with_extend(motion::default_motions())
 }
 
 

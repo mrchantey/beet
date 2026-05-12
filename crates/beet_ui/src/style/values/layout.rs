@@ -1,11 +1,125 @@
 use crate::style::*;
 use beet_core::prelude::*;
 
+/// Display algorithm for a node.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Display {
+	/// Standard block flow layout.
+	#[default]
+	Block,
+	/// Inline flow layout.
+	Inline,
+	/// Flexbox layout.
+	Flex,
+}
 
-#[derive(Component)]
+impl AsCssValue for Display {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Block => "block",
+			Self::Inline => "inline",
+			Self::Flex => "flex",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
+
+/// Layout properties for a node.
+#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
+pub struct LayoutStyle {
+	pub display: Display,
+	pub flex_box: Option<FlexBox>,
+	pub flex_order: i32,
+	pub flex_grow: u32,
+	pub align_self: AlignSelf,
+}
+
+impl LayoutStyle {
+	pub const DEFAULT: Self = Self {
+		display: Display::Block,
+		flex_box: None,
+		flex_order: 0,
+		flex_grow: 0,
+		align_self: AlignSelf::Auto,
+	};
+
+	/// Create a flex-row layout style.
+	pub fn flex_row() -> Self {
+		Self {
+			display: Display::Flex,
+			flex_box: Some(FlexBox::row()),
+			..default()
+		}
+	}
+
+	/// Create a flex-column layout style.
+	pub fn flex_col() -> Self {
+		Self {
+			display: Display::Flex,
+			flex_box: Some(FlexBox::col()),
+			..default()
+		}
+	}
+
+	pub fn justify_content(mut self, justify: JustifyContent) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.justify_content = justify;
+		}
+		self
+	}
+
+	pub fn align_items(mut self, align: AlignItems) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.align_items = align;
+		}
+		self
+	}
+
+	pub fn align_content(mut self, align: AlignContent) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.align_content = align;
+		}
+		self
+	}
+
+	pub fn wrap(mut self, wrap: FlexWrap) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.wrap = wrap;
+		}
+		self
+	}
+
+	pub fn row_gap(mut self, gap: u32) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.row_gap = gap;
+		}
+		self
+	}
+
+	pub fn column_gap(mut self, gap: u32) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.column_gap = gap;
+		}
+		self
+	}
+
+	pub fn gap(mut self, gap: u32) -> Self {
+		if let Some(ref mut fb) = self.flex_box {
+			fb.row_gap = gap;
+			fb.column_gap = gap;
+		}
+		self
+	}
+}
+
+/// Flexbox configuration for a node.
+#[derive(Debug, Clone, PartialEq)]
 pub struct FlexBox {
 	pub direction: Direction,
-	pub layout_style: LayoutStyle,
 	pub wrap: FlexWrap,
 	pub align_items: AlignItems,
 	pub align_content: AlignContent,
@@ -21,7 +135,6 @@ impl Default for FlexBox {
 impl FlexBox {
 	pub fn row() -> Self {
 		Self {
-			layout_style: LayoutStyle::default(),
 			direction: Direction::Horizontal,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
@@ -31,9 +144,9 @@ impl FlexBox {
 			column_gap: 0,
 		}
 	}
+
 	pub fn col() -> Self {
 		Self {
-			layout_style: LayoutStyle::default(),
 			direction: Direction::Vertical,
 			wrap: FlexWrap::NoWrap,
 			align_items: AlignItems::default(),
@@ -43,54 +156,42 @@ impl FlexBox {
 			column_gap: 0,
 		}
 	}
+
 	pub fn wrap(mut self, wrap: FlexWrap) -> Self {
 		self.wrap = wrap;
 		self
 	}
+
 	pub fn align_items(mut self, align: AlignItems) -> Self {
 		self.align_items = align;
 		self
 	}
+
 	pub fn align_content(mut self, align: AlignContent) -> Self {
 		self.align_content = align;
 		self
 	}
+
 	pub fn justify_content(mut self, justify: JustifyContent) -> Self {
 		self.justify_content = justify;
 		self
 	}
+
 	pub fn row_gap(mut self, gap: u32) -> Self {
 		self.row_gap = gap;
 		self
 	}
+
 	pub fn column_gap(mut self, gap: u32) -> Self {
 		self.column_gap = gap;
 		self
 	}
+
 	pub fn gap(mut self, gap: u32) -> Self {
 		self.row_gap = gap;
 		self.column_gap = gap;
 		self
 	}
-}
-
-
-pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
-
-/// layout properties for a node.
-#[derive(Debug, Default, Clone, SetWith, Component)]
-pub struct LayoutStyle {
-	pub flex_order: i32,
-	pub flex_grow: u32,
-	pub align_self: AlignSelf,
-}
-
-impl LayoutStyle {
-	pub const DEFAULT: Self = Self {
-		flex_order: 0,
-		flex_grow: 0,
-		align_self: AlignSelf::Auto,
-	};
 }
 
 
@@ -115,7 +216,6 @@ impl AsCssValue for JustifyContent {
 			Self::SpaceEvenly => "space-evenly",
 			Self::SpaceAround => "space-around",
 		}
-		.to_string()
 		.xmap(CssValue::expression)
 		.xok()
 	}
@@ -146,6 +246,7 @@ impl AsCssValue for AlignItems {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AlignSelf {
 	#[default]
 	Auto, // inherit from container's align_items
@@ -213,7 +314,6 @@ impl AsCssValue for Direction {
 		.xok()
 	}
 }
-
 
 
 /// How to distribute lines along the cross axis when wrapping.

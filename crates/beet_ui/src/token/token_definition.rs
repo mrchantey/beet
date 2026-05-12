@@ -70,17 +70,20 @@ impl<T> Into<Token> for &TokenDefinition<T> {
 impl<T: 'static> IntoBundle<(NotBundleMarker, Self)> for TokenDefinition<T> {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| {
-			let mut rule = entity.get_mut_or_default::<Rule>();
-			match self.schema() {
-				schema if schema == &TokenSchema::of::<i32>() => {
-					rule.insert(I32Value, &self)?;
-				}
-				_ => {}
+			let entity_id = entity.id();
+			let mut rule =
+				Rule::new().with_selector(Selector::Entity(entity_id));
+			if self.schema() == &TokenSchema::of::<i32>() {
+				rule.insert(I32Value, &self)?;
 			}
-			// avoid unnesecary change detection trigger
+			// avoid unnecessary change detection trigger
 			if !rule.contains_key(self.token.key()) {
 				rule.insert_definition(self)?;
 			}
+			// store in the global RuleSet resource
+			entity.world_scope(move |world| {
+				world.get_resource_or_init::<RuleSet>().insert_rule(rule);
+			});
 			Ok(())
 		})
 	}

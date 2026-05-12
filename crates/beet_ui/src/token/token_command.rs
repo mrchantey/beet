@@ -8,7 +8,7 @@ pub struct TokenQuery<'w, 's> {
 	commands: Commands<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
-	stores: Query<'w, 's, &'static mut Rule>,
+	rule_set: ResMut<'w, RuleSet>,
 }
 
 impl TokenQuery<'_, '_> {
@@ -38,24 +38,26 @@ impl TokenQuery<'_, '_> {
 		Ok(())
 	}
 
-	/// Walk up the entity tree to find the first [`Rule`] component with the
-	/// provided token. Analogous to CSS variable inheritance.
+	/// Walk up the entity tree to find the first [`RuleSet`] rule with
+	/// `Selector::Entity(entity)` that contains the provided token.
+	/// Analogous to CSS variable inheritance.
 	fn with_value_mut<O>(
 		&mut self,
 		ev_entity: Entity,
 		token: &Token,
 		func: impl FnOnce(&mut TokenValue) -> O,
 	) -> Result<O> {
-		for entity in self.ancestors.iter_ancestors_inclusive(ev_entity) {
-			let Ok(mut store) = self.stores.get_mut(entity) else {
-				continue;
-			};
-			// avoid triggering change detection
-			if !store.contains_key(token.key()) {
-				continue;
+		// collect first to avoid holding a borrow on self.ancestors
+		// while also borrowing self.rule_set
+		let ancestors: Vec<Entity> =
+			self.ancestors.iter_ancestors_inclusive(ev_entity).collect();
+		for entity in ancestors {
+			if let Some(rule) =
+				self.rule_set.find_entity_rule_mut(entity, token.key())
+			{
+				let value = rule.get_mut(token).unwrap();
+				return func(value).xok();
 			}
-			let value = store.get_mut(&token).unwrap();
-			return func(value).xok();
 		}
 		bevybail!(
 			"Token not found in entity or ancestors\nkey: {}\nentity: {:?}",
@@ -64,21 +66,23 @@ impl TokenQuery<'_, '_> {
 		)
 	}
 
-	// this is so stupid
 	pub fn apply_value(&mut self, entity: Entity, token: &Token, value: Value) {
-		for child in self.children.iter_descendants_inclusive(entity) {
-			if let Ok(mut store) = self.stores.get_mut(child) {
-				for (key, store_value) in store.iter_mut() {
-					if let TokenValue::Token(store_value) = store_value {
-						if store_value == token {
-							if key == &I32Value::token_key() {
-								self.commands
-									.entity(child)
-									.insert(value.clone());
-							}
-						}
-					}
-				}
+		// collect first to avoid holding borrows on self.children and
+		// self.rule_set simultaneously with self.commands
+		let children: Vec<Entity> =
+			self.children.iter_descendants_inclusive(entity).collect();
+		let token_key = I32Value::token_key();
+		for child in children {
+			let selector = Selector::Entity(child);
+			let should_insert = self.rule_set.rules().any(|rule| {
+				rule.selector() == &selector
+					&& rule.iter().any(|(key, val)| {
+						matches!(val, TokenValue::Token(t) if t == token)
+							&& key == &token_key
+					})
+			});
+			if should_insert {
+				self.commands.entity(child).insert(value.clone());
 			}
 		}
 	}

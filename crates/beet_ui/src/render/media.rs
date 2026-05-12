@@ -25,7 +25,7 @@ pub struct MediaRenderer {
 	#[cfg(feature = "bevy_scene")]
 	scene_renderer: SceneRenderer,
 	markdown_renderer: MarkdownRenderer,
-	#[cfg(feature = "ansi_paint")]
+	#[cfg(feature = "style")]
 	ansi_term_renderer: AnsiTermRenderer,
 }
 
@@ -50,7 +50,7 @@ impl MediaRenderer {
 			plain_text_renderer: default(),
 			html_renderer: default(),
 			markdown_renderer: default(),
-			#[cfg(feature = "ansi_paint")]
+			#[cfg(feature = "style")]
 			ansi_term_renderer: default(),
 			#[cfg(feature = "bevy_scene")]
 			scene_renderer: default(),
@@ -82,7 +82,7 @@ impl MediaRenderer {
 	}
 
 	/// Override the [`AnsiTermRenderer`] instance.
-	#[cfg(feature = "ansi_paint")]
+	#[cfg(feature = "style")]
 	pub fn with_ansi_term_renderer(
 		mut self,
 		renderer: AnsiTermRenderer,
@@ -129,7 +129,7 @@ impl MediaRenderer {
 			MediaType::Markdown => {
 				self.markdown_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(feature = "ansi_paint")]
+			#[cfg(feature = "style")]
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
@@ -145,7 +145,7 @@ impl MediaRenderer {
 	fn available_types(&self) -> Vec<MediaType> {
 		let mut available =
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
-		#[cfg(feature = "ansi_paint")]
+		#[cfg(feature = "style")]
 		available.push(MediaType::AnsiTerm);
 		#[cfg(all(feature = "bevy_scene", feature = "json"))]
 		available.push(MediaType::Json);

@@ -51,6 +51,16 @@ impl AsCssValue for u16 {
 		CssValue::expression(self.to_string()).xok()
 	}
 }
+impl AsCssValue for u32 {
+	fn as_css_value(&self) -> Result<CssValue> {
+		CssValue::expression(self.to_string()).xok()
+	}
+}
+impl AsCssValue for i32 {
+	fn as_css_value(&self) -> Result<CssValue> {
+		CssValue::expression(self.to_string()).xok()
+	}
+}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Reflect)]

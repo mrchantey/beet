@@ -7,7 +7,7 @@ pub struct StylePlugin;
 
 impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<RuleSet>()
+		app.init_plugin::<TokenPlugin>()
 			.init_resource::<CssTokenMap>()
 			.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
 	}

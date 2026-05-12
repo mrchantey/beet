@@ -4,7 +4,7 @@ use bevy::reflect::Typed;
 use std::sync::Arc;
 
 /// A set of declarations applied to elements matching the given selector.
-#[derive(Debug, Default, Clone, Reflect, Component, Get, GetMut, SetWith)]
+#[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
 	/// Predicate for which entities this rule applies to

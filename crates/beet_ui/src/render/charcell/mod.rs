@@ -2,7 +2,7 @@
 //!
 //! Charcell represents each cell as an entity
 mod backend;
-#[cfg(feature = "terminal")]
+// escape sequences are used by both terminal and ansi_term renderers
 pub mod escape;
 #[cfg(feature = "terminal")]
 mod input;
@@ -22,8 +22,10 @@ mod buffer;
 mod render_context;
 pub use render_context::*;
 mod box_model;
+mod display;
 mod flex;
 mod text;
 pub(self) use box_model::*;
+pub(self) use display::*;
 pub(self) use flex::*;
 pub(self) use text::*;

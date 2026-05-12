@@ -64,7 +64,7 @@ fn margin() -> BoxStyle {
 
 fn setup_justify_start() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::Start)
 			.column_gap(1),
 		children![
@@ -77,7 +77,7 @@ fn setup_justify_start() -> impl Bundle {
 
 fn setup_justify_center() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::Center)
 			.column_gap(1),
 		children![
@@ -90,7 +90,7 @@ fn setup_justify_center() -> impl Bundle {
 
 fn setup_justify_end() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::End)
 			.column_gap(1),
 		children![
@@ -103,7 +103,7 @@ fn setup_justify_end() -> impl Bundle {
 
 fn setup_justify_space_between() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::SpaceBetween)
 			.column_gap(1),
 		children![
@@ -116,7 +116,7 @@ fn setup_justify_space_between() -> impl Bundle {
 
 fn setup_justify_space_around() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::SpaceAround)
 			.column_gap(1),
 		children![
@@ -129,7 +129,7 @@ fn setup_justify_space_around() -> impl Bundle {
 
 fn setup_justify_space_evenly() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.justify_content(JustifyContent::SpaceEvenly)
 			.column_gap(1),
 		children![
@@ -144,10 +144,12 @@ fn setup_justify_space_evenly() -> impl Bundle {
 
 fn setup_align_start() -> impl Bundle {
 	(
-		FlexBox::row().align_items(AlignItems::Start).column_gap(1),
+		LayoutStyle::flex_row()
+			.align_items(AlignItems::Start)
+			.column_gap(1),
 		children![
 			(
-				FlexBox::col(),
+				LayoutStyle::flex_col(),
 				children![
 					(rsx! {"Very"}, bordered()),
 					(rsx! {"Tall"}, bordered()),
@@ -163,10 +165,12 @@ fn setup_align_start() -> impl Bundle {
 
 fn setup_align_center() -> impl Bundle {
 	(
-		FlexBox::row().align_items(AlignItems::Center).column_gap(1),
+		LayoutStyle::flex_row()
+			.align_items(AlignItems::Center)
+			.column_gap(1),
 		children![
 			(
-				FlexBox::col(),
+				LayoutStyle::flex_col(),
 				children![
 					(rsx! {"Very"}, bordered()),
 					(rsx! {"Tall"}, bordered()),
@@ -182,10 +186,12 @@ fn setup_align_center() -> impl Bundle {
 
 fn setup_align_end() -> impl Bundle {
 	(
-		FlexBox::row().align_items(AlignItems::End).column_gap(1),
+		LayoutStyle::flex_row()
+			.align_items(AlignItems::End)
+			.column_gap(1),
 		children![
 			(
-				FlexBox::col(),
+				LayoutStyle::flex_col(),
 				children![
 					(rsx! {"Very"}, bordered()),
 					(rsx! {"Tall"}, bordered()),
@@ -201,12 +207,12 @@ fn setup_align_end() -> impl Bundle {
 
 fn setup_align_stretch() -> impl Bundle {
 	(
-		FlexBox::row()
+		LayoutStyle::flex_row()
 			.align_items(AlignItems::Stretch)
 			.column_gap(1),
 		children![
 			(
-				FlexBox::col(),
+				LayoutStyle::flex_col(),
 				children![
 					(rsx! {"Very"}, bordered()),
 					(rsx! {"Tall"}, bordered()),
@@ -224,7 +230,10 @@ fn setup_align_stretch() -> impl Bundle {
 
 fn setup_gaps() -> impl Bundle {
 	(
-		FlexBox::row().wrap(FlexWrap::Wrap).row_gap(1).column_gap(2),
+		LayoutStyle::flex_row()
+			.wrap(FlexWrap::Wrap)
+			.row_gap(1)
+			.column_gap(2),
 		children![
 			(rsx! {"1"}, bordered()),
 			(rsx! {"2"}, bordered()),
@@ -239,7 +248,7 @@ fn setup_gaps() -> impl Bundle {
 // ── Flex Grow ─────────────────────────────────────────────────────────────────
 
 fn setup_flex_grow() -> impl Bundle {
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! {"Fixed"}, bordered()),
 		(
 			rsx! {"Grow 1"},
@@ -258,7 +267,7 @@ fn setup_flex_grow() -> impl Bundle {
 // ── Wrapping ──────────────────────────────────────────────────────────────────
 
 fn setup_no_wrap() -> impl Bundle {
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! {"Item 1"}, bordered()),
 		(rsx! {"Item 2"}, bordered()),
 		(rsx! {"Item 3"}, bordered()),
@@ -269,7 +278,10 @@ fn setup_no_wrap() -> impl Bundle {
 
 fn setup_wrap() -> impl Bundle {
 	(
-		FlexBox::row().wrap(FlexWrap::Wrap).column_gap(1).row_gap(1),
+		LayoutStyle::flex_row()
+			.wrap(FlexWrap::Wrap)
+			.column_gap(1)
+			.row_gap(1),
 		children![
 			(rsx! {"Item 1"}, bordered()),
 			(rsx! {"Item 2"}, bordered()),
@@ -283,9 +295,9 @@ fn setup_wrap() -> impl Bundle {
 // ── Nested Layouts ────────────────────────────────────────────────────────────
 
 fn setup_nested() -> impl Bundle {
-	(FlexBox::col().row_gap(1), children![
+	(LayoutStyle::flex_col().row_gap(1), children![
 		(
-			FlexBox::row().column_gap(1),
+			LayoutStyle::flex_row().column_gap(1),
 			children![
 				(rsx! {"Header L"}, bordered()),
 				(rsx! {"Header R"}, bordered()),
@@ -293,11 +305,11 @@ fn setup_nested() -> impl Bundle {
 			bordered()
 		),
 		(
-			FlexBox::row().column_gap(1),
+			LayoutStyle::flex_row().column_gap(1),
 			children![
 				(rsx! {"Sidebar"}, bordered()),
 				(
-					FlexBox::col().row_gap(1),
+					LayoutStyle::flex_col().row_gap(1),
 					children![
 						(rsx! {"Main"}, bordered()),
 						(rsx! {"Footer"}, bordered()),
@@ -313,7 +325,7 @@ fn setup_nested() -> impl Bundle {
 // ── Margins, Borders, Padding ─────────────────────────────────────────────────
 
 fn setup_margin_only() -> impl Bundle {
-	(FlexBox::row().column_gap(0), children![
+	(LayoutStyle::flex_row().column_gap(0), children![
 		(rsx! {"A"}, margin()),
 		(rsx! {"B"}, margin()),
 		(rsx! {"C"}, margin()),
@@ -321,7 +333,7 @@ fn setup_margin_only() -> impl Bundle {
 }
 
 fn setup_border_only() -> impl Bundle {
-	(FlexBox::row().column_gap(0), children![
+	(LayoutStyle::flex_row().column_gap(0), children![
 		(rsx! {"A"}, bordered()),
 		(rsx! {"B"}, bordered()),
 		(rsx! {"C"}, bordered()),
@@ -330,7 +342,7 @@ fn setup_border_only() -> impl Bundle {
 
 fn setup_padding_only() -> impl Bundle {
 	let style = bordered().with_padding(Spacing::all(Length::Rem(1.)));
-	(FlexBox::row().column_gap(0), children![
+	(LayoutStyle::flex_row().column_gap(0), children![
 		(rsx! {"A"}, style.clone()),
 		(rsx! {"B"}, style.clone()),
 		(rsx! {"C"}, style.clone()),
@@ -343,7 +355,7 @@ fn setup_all_spacing() -> impl Bundle {
 		.with_border(Spacing::all(Length::Rem(1.)))
 		.with_padding(Spacing::all(Length::Rem(1.)));
 
-	(FlexBox::row().column_gap(0), children![
+	(LayoutStyle::flex_row().column_gap(0), children![
 		(rsx! {"A"}, style.clone()),
 		(rsx! {"B"}, style.clone()),
 		(rsx! {"C"}, style.clone()),
@@ -353,7 +365,7 @@ fn setup_all_spacing() -> impl Bundle {
 // ── Style / Color ─────────────────────────────────────────────────────────────
 
 fn setup_foreground_color() -> impl Bundle {
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! { "Red" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(1., 0., 0.)),
 			..default()
@@ -370,7 +382,7 @@ fn setup_foreground_color() -> impl Bundle {
 }
 
 fn setup_background_color() -> impl Bundle {
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(
 			rsx! { "A" },
 			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
@@ -394,7 +406,7 @@ fn setup_background_color() -> impl Bundle {
 
 fn setup_border_color() -> impl Bundle {
 	// Each node gets per-side border colors: top=red, bottom=blue, left=green, right=yellow
-	(FlexBox::row().column_gap(1), children![(
+	(LayoutStyle::flex_row().column_gap(1), children![(
 		rsx! { "Box" },
 		BoxStyle {
 			border: Spacing::all(Length::Rem(1.)),
@@ -408,7 +420,7 @@ fn setup_border_color() -> impl Bundle {
 }
 
 fn setup_text_formatting() -> impl Bundle {
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! { "Underline" }, bordered(), VisualStyle {
 			decoration_line: DecorationLine::underline(),
 			..default()
@@ -432,7 +444,7 @@ fn setup_text_align() -> impl Bundle {
 		LayoutStyle::default().with_flex_grow(1),
 	);
 
-	(FlexBox::row().column_gap(1), children![
+	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! { "Left" }, item_styles.clone(), VisualStyle {
 			text_align: TextAlign::Left,
 			..default()

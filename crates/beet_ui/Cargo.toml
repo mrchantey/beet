@@ -33,7 +33,7 @@ required-features = ["style"]
 
 
 [features]
-default = ["std","rsx", "ansi_paint", "style"]
+default = ["std","rsx", "style"]
 std = []
 action = ["dep:beet_action"]
 net = ["std", "dep:beet_net"]
@@ -49,7 +49,7 @@ json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
-ansi_paint = ["beet_core/ansi_paint"]
+
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
 [dependencies]

@@ -244,7 +244,7 @@ default = ["ui"]
 
 http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["ratatui","router", "markdown"]
-ansi_paint = ["beet_core/ansi_paint","beet_ui?/ansi_paint"]
+ansi_paint = ["beet_core/ansi_paint"]
 
 # 💡 Core
 

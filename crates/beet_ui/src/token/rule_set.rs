@@ -4,7 +4,7 @@ use bevy::reflect::Typed;
 use std::collections::VecDeque;
 
 
-#[derive(Debug, Clone, Reflect, Deref, Resource)]
+#[derive(Debug, Clone, Reflect, Deref, DerefMut, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
 	rules: VecDeque<Rule>,
@@ -43,6 +43,18 @@ impl RuleSet {
 		}
 		self
 	}
+
+	/// Find the first rule matching `Selector::Entity(entity)` that contains `key`.
+	pub fn find_entity_rule_mut(
+		&mut self,
+		entity: Entity,
+		key: &TokenKey,
+	) -> Option<&mut Rule> {
+		self.rules.iter_mut().find(|r| {
+			r.selector() == &Selector::Entity(entity) && r.contains_key(key)
+		})
+	}
+
 	/// Iterates all rules in insertion order.
 	pub fn rules(&self) -> impl Iterator<Item = &Rule> { self.rules.iter() }
 

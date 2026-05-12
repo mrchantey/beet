@@ -4,6 +4,7 @@ use crate::style::AlignContent;
 use crate::style::AlignItems;
 use crate::style::AlignSelf;
 use crate::style::Direction;
+use crate::style::Display;
 use crate::style::FlexBox;
 use crate::style::FlexWrap;
 use crate::style::JustifyContent;
@@ -66,8 +67,14 @@ pub fn flex_measure(
 	available: UVec2,
 	viewport: URect,
 ) -> Result<UVec2> {
-	let Some(flexbox) = node.flexbox else {
-		return Ok(UVec2::ZERO);
+	// Use flex_box if set, or default if display is Flex
+	let owned_default;
+	let flexbox = match node.flexbox() {
+		Some(fb) => fb,
+		None => {
+			owned_default = FlexBox::default();
+			&owned_default
+		}
 	};
 
 	let lines = form_lines_ecs(node, flexbox, available, viewport)?;
@@ -132,8 +139,14 @@ pub fn flex_measure(
 
 /// Layout pass: position and render flexbox children.
 pub fn flex_layout(cx: &mut CharcellRenderContext) -> Result<()> {
-	let Some(flexbox) = cx.node.flexbox else {
-		return Ok(());
+	// Use flex_box if set, or default if display is Flex
+	let owned_default;
+	let flexbox = match cx.node.flexbox() {
+		Some(fb) => fb,
+		None => {
+			owned_default = FlexBox::default();
+			&owned_default
+		}
 	};
 
 	let available =
@@ -388,7 +401,7 @@ fn measure_node(
 		available.x.saturating_sub(overhead.x),
 		available.y.saturating_sub(overhead.y),
 	);
-	let content_size = if node.flexbox.is_some() {
+	let content_size = if node.layout_style().display == Display::Flex {
 		flex_measure(node, content_available, viewport)?
 	} else if node.value.is_some() {
 		super::text_measure(node, content_available)?
@@ -697,7 +710,7 @@ mod tests {
 	#[test]
 	fn justify_start() {
 		render((
-			FlexBox::row()
+			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::Start)
 				.column_gap(1),
 			children![
@@ -712,7 +725,7 @@ mod tests {
 	#[test]
 	fn justify_end() {
 		render((
-			FlexBox::row()
+			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::End)
 				.column_gap(1),
 			children![
@@ -727,7 +740,7 @@ mod tests {
 	#[test]
 	fn justify_center() {
 		render((
-			FlexBox::row()
+			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::Center)
 				.column_gap(1),
 			children![
@@ -741,7 +754,7 @@ mod tests {
 
 	#[test]
 	fn column_gap() {
-		render((FlexBox::row().column_gap(3), children![
+		render((LayoutStyle::flex_row().column_gap(3), children![
 			(rsx! {"A"}, bordered()),
 			(rsx! {"B"}, bordered()),
 		]))
@@ -750,15 +763,16 @@ mod tests {
 
 	#[test]
 	fn flex_grow_distributes_space() {
-		let output = render((FlexBox::row().column_gap(1), children![
-			(rsx! {"A"}, bordered()),
-			(
-				rsx! {"B"},
-				bordered(),
-				LayoutStyle::default().with_flex_grow(1)
-			),
-			(rsx! {"C"}, bordered()),
-		]));
+		let output =
+			render((LayoutStyle::flex_row().column_gap(1), children![
+				(rsx! {"A"}, bordered()),
+				(
+					rsx! {"B"},
+					bordered(),
+					LayoutStyle::default().with_flex_grow(1)
+				),
+				(rsx! {"C"}, bordered()),
+			]));
 		output.xpect_snapshot();
 		// B should be wider than A and C
 		let lines: Vec<&str> = output.lines().collect();
@@ -774,10 +788,12 @@ mod tests {
 	#[test]
 	fn align_items_center() {
 		render((
-			FlexBox::row().align_items(AlignItems::Center).column_gap(1),
+			LayoutStyle::flex_row()
+				.align_items(AlignItems::Center)
+				.column_gap(1),
 			children![
 				(
-					FlexBox::col(),
+					LayoutStyle::flex_col(),
 					children![
 						(rsx! {"Tall"}, bordered()),
 						(rsx! {"Item"}, bordered()),
@@ -793,10 +809,12 @@ mod tests {
 	#[test]
 	fn align_items_start() {
 		render((
-			FlexBox::row().align_items(AlignItems::Start).column_gap(1),
+			LayoutStyle::flex_row()
+				.align_items(AlignItems::Start)
+				.column_gap(1),
 			children![
 				(
-					FlexBox::col(),
+					LayoutStyle::flex_col(),
 					children![
 						(rsx! {"Tall"}, bordered()),
 						(rsx! {"Item"}, bordered()),
@@ -812,10 +830,12 @@ mod tests {
 	#[test]
 	fn align_items_end() {
 		render((
-			FlexBox::row().align_items(AlignItems::End).column_gap(1),
+			LayoutStyle::flex_row()
+				.align_items(AlignItems::End)
+				.column_gap(1),
 			children![
 				(
-					FlexBox::col(),
+					LayoutStyle::flex_col(),
 					children![
 						(rsx! {"Tall"}, bordered()),
 						(rsx! {"Item"}, bordered()),
@@ -830,14 +850,14 @@ mod tests {
 
 	#[test]
 	fn nested_flex() {
-		render((FlexBox::col().row_gap(1), children![
+		render((LayoutStyle::flex_col().row_gap(1), children![
 			(
-				FlexBox::row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(1),
 				children![(rsx! {"A"}, bordered()), (rsx! {"B"}, bordered()),],
 				bordered()
 			),
 			(
-				FlexBox::row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(1),
 				children![(rsx! {"C"}, bordered()), (rsx! {"D"}, bordered()),],
 				bordered()
 			),
@@ -847,7 +867,7 @@ mod tests {
 
 	#[test]
 	fn padding_with_content() {
-		render((FlexBox::row(), children![(
+		render((LayoutStyle::flex_row(), children![(
 			rsx! {"X"},
 			BoxStyle::default()
 				.with_border(Spacing::all(Length::Rem(1.)))
@@ -858,7 +878,7 @@ mod tests {
 
 	#[test]
 	fn column_with_multiple_items() {
-		render((FlexBox::col().row_gap(1), children![
+		render((LayoutStyle::flex_col().row_gap(1), children![
 			(rsx! {"First"}, bordered()),
 			(rsx! {"Second"}, bordered()),
 			(rsx! {"Third"}, bordered()),
@@ -868,8 +888,8 @@ mod tests {
 
 	#[test]
 	fn nested_column_in_row() {
-		render((FlexBox::row(), children![(
-			FlexBox::col(),
+		render((LayoutStyle::flex_row(), children![(
+			LayoutStyle::flex_col(),
 			children![
 				(rsx! {"A"}, bordered()),
 				(rsx! {"B"}, bordered()),
@@ -882,7 +902,7 @@ mod tests {
 
 	#[test]
 	fn column_without_gap() {
-		render((FlexBox::col(), children![
+		render((LayoutStyle::flex_col(), children![
 			(rsx! {"First"}, bordered()),
 			(rsx! {"Second"}, bordered()),
 			(rsx! {"Third"}, bordered()),

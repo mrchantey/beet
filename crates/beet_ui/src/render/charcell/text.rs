@@ -158,7 +158,6 @@ mod tests {
 
 	// ── Style ─────────────────────────────────────────────────────────────────
 
-	#[cfg(feature = "ansi_paint")]
 	#[test]
 	fn foreground_color() {
 		let visual = VisualStyle {
@@ -168,7 +167,6 @@ mod tests {
 		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 
-	#[cfg(feature = "ansi_paint")]
 	#[test]
 	fn text_underline() {
 		let visual = VisualStyle {

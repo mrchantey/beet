@@ -21,9 +21,9 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		StdioTerminal::default(),
 		CharcellRenderer::default(),
-		FlexBox::row().column_gap(1),
-		children![(
-			FlexBox::row(),
+		LayoutStyle::flex_row().column_gap(1),
+		children![((
+			LayoutStyle::flex_row(),
 			rsx! { <div>"Value: "{(0,count)}</div> },
 			BoxStyle {
 				border: Spacing::all(Length::Rem(1.)),
@@ -33,7 +33,7 @@ fn setup(mut commands: Commands) {
 				border_right: Some(Color::srgb(1., 0.8, 0.)),
 				..BoxStyle::default()
 			},
-		),],
+		),)],
 	));
 }
 

@@ -1,13 +1,11 @@
 use crate::prelude::*;
 use crate::style::LayoutStyle;
+use crate::style::Spacing as SpacingValue;
 use crate::style::VisualStyle;
 use crate::style::common_props::BackgroundColor;
 use crate::style::common_props::*;
 use crate::style::*;
 use beet_core::prelude::*;
-
-
-
 
 
 pub fn resolve_styles(
@@ -36,15 +34,32 @@ pub fn resolve_styles(
 	let mut queue = roots.into_iter().collect::<Vec<_>>();
 	while !queue.is_empty() {
 		for entity in queue.drain(..).collect::<Vec<_>>() {
+			// resolve visual style
 			let visual = resolve_visual(&ruleset_query, entity)?;
-			println!("here we are! {:#?}", visual);
 			if let Some(mut style) = styles.get_mut(entity)?.0 {
 				style.set_if_neq(visual);
 			} else {
 				commands.entity(entity).insert(visual);
 			}
-			if let Some(children) = children.get(entity).ok() {
-				queue.extend(children.into_iter().cloned());
+
+			// resolve layout style
+			let layout = resolve_layout(&ruleset_query, entity)?;
+			if let Some(mut style) = styles.get_mut(entity)?.1 {
+				style.set_if_neq(layout);
+			} else {
+				commands.entity(entity).insert(layout);
+			}
+
+			// resolve box style
+			let box_s = resolve_box(&ruleset_query, entity)?;
+			if let Some(mut style) = styles.get_mut(entity)?.2 {
+				style.set_if_neq(box_s);
+			} else {
+				commands.entity(entity).insert(box_s);
+			}
+
+			if let Some(children_list) = children.get(entity).ok() {
+				queue.extend(children_list.into_iter().cloned());
 			}
 		}
 	}
@@ -72,6 +87,37 @@ fn resolve_visual(query: &RuleSetQuery, entity: Entity) -> Result<VisualStyle> {
 		decoration_style,
 		text_align,
 		text_style,
+	}
+	.xok()
+}
+
+fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
+	let flex_grow = query.resolve(entity, FlexGrowProp).unwrap_or_default();
+	let flex_order = query.resolve(entity, FlexOrderProp).unwrap_or_default();
+	let align_self = query.resolve(entity, AlignSelfProp).unwrap_or_default();
+	// display and flex_box are not resolved from CSS yet - use defaults
+	LayoutStyle {
+		flex_grow,
+		flex_order,
+		align_self,
+		..default()
+	}
+	.xok()
+}
+
+fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
+	let padding_len = query.resolve(entity, Padding).ok();
+	let margin_len = query.resolve(entity, MarginProp).ok();
+	let border_width = query.resolve(entity, OutlineWidth).ok();
+	let border_color = query.resolve(entity, BorderColorProp).ok();
+	BoxStyle {
+		border_left: border_color,
+		border_right: border_color,
+		border_top: border_color,
+		border_bottom: border_color,
+		border: border_width.map(SpacingValue::all).unwrap_or_default(),
+		margin: margin_len.map(SpacingValue::all).unwrap_or_default(),
+		padding: padding_len.map(SpacingValue::all).unwrap_or_default(),
 	}
 	.xok()
 }

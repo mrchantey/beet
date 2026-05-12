@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::render::charcell::escape;
 use crate::style::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
@@ -83,9 +84,9 @@ impl AnsiTermRenderer {
 	fn push_styled(&mut self, text: &str) {
 		let style = self.style_map.current();
 		let mut buf: Vec<u8> = Vec::new();
-		write_visual_style_ansi(&mut buf, style.as_ref(), None);
+		escape::write_style(&mut buf, style.as_ref(), None).ok();
 		buf.extend_from_slice(text.as_bytes());
-		buf.extend_from_slice(b"\x1b[0m");
+		buf.extend_from_slice(escape::RESET.as_bytes());
 		self.state.push_raw(&String::from_utf8_lossy(&buf));
 		self.state.trailing_newline = text.ends_with('\n');
 	}
@@ -185,9 +186,9 @@ impl NodeVisitor for AnsiTermRenderer {
 				};
 				self.open_osc8_link(&src);
 				let mut buf: Vec<u8> = Vec::new();
-				write_visual_style_ansi(&mut buf, style.as_ref(), None);
+				escape::write_style(&mut buf, style.as_ref(), None).ok();
 				buf.extend_from_slice(display.as_bytes());
-				buf.extend_from_slice(b"\x1b[0m");
+				buf.extend_from_slice(escape::RESET.as_bytes());
 				self.state.push_raw(&String::from_utf8_lossy(&buf));
 				self.close_osc8_link();
 			}
@@ -290,9 +291,9 @@ impl NodeVisitor for AnsiTermRenderer {
 				..VisualStyle::default()
 			};
 			let mut buf: Vec<u8> = Vec::new();
-			write_visual_style_ansi(&mut buf, &style, None);
+			escape::write_style(&mut buf, &style, None).ok();
 			buf.extend_from_slice(format!("{{{}}}", expression.0).as_bytes());
-			buf.extend_from_slice(b"\x1b[0m");
+			buf.extend_from_slice(escape::RESET.as_bytes());
 			self.state.push_raw(&String::from_utf8_lossy(&buf));
 		}
 	}
@@ -304,9 +305,9 @@ impl NodeVisitor for AnsiTermRenderer {
 			..VisualStyle::default()
 		};
 		let mut buf: Vec<u8> = Vec::new();
-		write_visual_style_ansi(&mut buf, &style, None);
+		escape::write_style(&mut buf, &style, None).ok();
 		buf.extend_from_slice(format!("<!--{}-->", &**comment).as_bytes());
-		buf.extend_from_slice(b"\x1b[0m");
+		buf.extend_from_slice(escape::RESET.as_bytes());
 		self.state.push_raw(&String::from_utf8_lossy(&buf));
 		self.state.push_raw("\n");
 		self.state.trailing_newline = true;
@@ -411,54 +412,7 @@ fn default_element_map() -> Vec<(&'static str, VisualStyle)> {
 	]
 }
 
-/// Write ANSI escape sequences for `style` into `out`.
-fn write_visual_style_ansi(
-	out: &mut Vec<u8>,
-	style: &VisualStyle,
-	_prev: Option<&VisualStyle>,
-) {
-	use std::io::Write;
-	if let Some(color) = style.foreground {
-		let c = color.to_srgba_u8();
-		write!(out, "\x1b[38;2;{};{};{}m", c.red, c.green, c.blue).ok();
-		// alpha < 50% maps to the terminal `dim` attribute
-		if c.alpha < 128 {
-			out.extend_from_slice(b"\x1b[2m");
-		}
-	}
-	if let Some(color) = style.background {
-		let c = color.to_srgba_u8();
-		write!(out, "\x1b[48;2;{};{};{}m", c.red, c.green, c.blue).ok();
-	}
-	let ts = style.text_style;
-	if ts.contains(TextStyle::BOLD) {
-		out.extend_from_slice(b"\x1b[1m");
-	}
-	if ts.contains(TextStyle::ITALIC) {
-		out.extend_from_slice(b"\x1b[3m");
-	}
-	if ts.contains(TextStyle::BLINK) {
-		out.extend_from_slice(b"\x1b[5m");
-	}
-	if ts.contains(TextStyle::RAPID_BLINK) {
-		out.extend_from_slice(b"\x1b[6m");
-	}
-	if ts.contains(TextStyle::REVERSED) {
-		out.extend_from_slice(b"\x1b[7m");
-	}
-	if ts.contains(TextStyle::HIDDEN) {
-		out.extend_from_slice(b"\x1b[8m");
-	}
-	if style.decoration_line.underline {
-		out.extend_from_slice(b"\x1b[4m");
-	}
-	if style.decoration_line.overline {
-		out.extend_from_slice(b"\x1b[53m");
-	}
-	if style.decoration_line.line_through {
-		out.extend_from_slice(b"\x1b[9m");
-	}
-}
+
 
 
 

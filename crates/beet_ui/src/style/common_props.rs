@@ -1,6 +1,8 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 use crate::prelude::*;
 use crate::style::FontWeight;
+use crate::style::AlignSelf;
+use crate::style::Display;
 use crate::style::*;
 use beet_core::prelude::*;
 
@@ -48,8 +50,13 @@ css_property!(
 css_property!(OutlineWidth, Length, "border-width");
 css_property!(OutlineOffset, Length, "outline-offset");
 css_property!(FontSize, Length, "font-size");
-css_property!(
-	FontWeightProp, FontWeight, "font-weight"
-);
+css_property!(FontWeightProp, FontWeight, "font-weight");
 css_property!(LineHeight, Length, "line-height");
 css_property!(Tracking, Length, "letter-spacing");
+
+css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
+css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
+css_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
+css_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
+css_property!(MarginProp, Length, TokenInheritance::NotInherited, "margin");
+css_property!(BorderColorProp, Color, "border-color");
