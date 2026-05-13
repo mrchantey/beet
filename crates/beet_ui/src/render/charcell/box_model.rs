@@ -30,7 +30,7 @@ impl BoxModel {
 	///
 	/// Returns zeroed/false defaults when the node has no box style.
 	pub fn from_node(node: &CharcellNodeData, viewport: UVec2) -> Self {
-		let Some(box_style) = node.box_style else {
+		let Some(box_style) = node.box_style() else {
 			return Self {
 				margin: URect::default(),
 				has_border: false,
@@ -122,7 +122,7 @@ pub(super) fn draw_border(
 	}
 
 	let visual = node.visual_style();
-	let box_style = node.box_style;
+	let box_style = node.box_style();
 	let entity = node.entity;
 
 	// build per-side char styles

@@ -10,7 +10,7 @@ use super::query::CharcellNodeData;
 ///
 /// Wraps the text to `max_width` columns and returns `(max_line_width, line_count)`.
 pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
-	let Some(value) = node.value else {
+	let Some(value) = node.value() else {
 		return UVec2::ZERO;
 	};
 	let lines = word_wrap(&value.to_string(), max_width);
@@ -26,7 +26,7 @@ pub fn paint_text(
 	content_rect: URect,
 	buffer: &mut Buffer,
 ) -> Result {
-	let Some(value) = node.value else {
+	let Some(value) = node.value() else {
 		return Ok(());
 	};
 	let lines = word_wrap(&value.to_string(), content_rect.width());
@@ -35,10 +35,7 @@ pub fn paint_text(
 		if y >= content_rect.max.y {
 			break;
 		}
-		let text_align = node
-			.visual
-			.map(|style| style.text_align)
-			.unwrap_or_default();
+		let text_align = node.visual_style().text_align;
 		let aligned = align_line(line, content_rect.width(), text_align);
 		buffer.write_text(
 			UVec2::new(content_rect.min.x, y),
