@@ -45,9 +45,7 @@ fn measure_node(
 	);
 	let content_size = match node.layout_style().display {
 		Display::Flex => measure_flex(node, content_available, viewport)?,
-		Display::Inline => {
-			measure_inline(node, content_available, viewport, sizes)?
-		}
+		Display::Inline => measure_inline(node, content_available, sizes)?,
 		_ if node.value.is_some() => measure_text(node, content_available.x),
 		_ => UVec2::ZERO,
 	};
@@ -60,7 +58,6 @@ fn measure_node(
 fn measure_inline(
 	node: &StyledNodeView,
 	available: UVec2,
-	_viewport: URect,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> Result<UVec2> {
 	if node.children.is_empty() {

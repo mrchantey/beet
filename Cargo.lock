@@ -1182,7 +1182,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "async-executor",
  "beet",
@@ -1204,7 +1204,7 @@ dependencies = [
 
 [[package]]
 name = "beet_action"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "beet_action",
  "beet_core",
@@ -1217,7 +1217,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_macros"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "beet_core_shared",
  "heck 0.4.1",
@@ -1292,7 +1292,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core_shared"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1301,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "beet_infra"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "async-process",
  "base64 0.22.1",
@@ -1325,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "async-channel 2.5.0",
  "async-executor",
@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "beet_action",
  "beet_core",
@@ -1402,7 +1402,7 @@ dependencies = [
 
 [[package]]
 name = "beet_thread"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "async-lock",
  "async-openai",
@@ -1428,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ui"
-version = "0.0.9-dev.8"
+version = "0.0.9-dev.9"
 dependencies = [
  "beet_action",
  "beet_core",

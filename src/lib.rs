@@ -79,11 +79,19 @@ pub mod prelude {
 	// #[cfg(feature = "spatial")]
 	// pub use crate::spatial::prelude::*;
 	cfg_if! {
-		// re-exports to disambiguate bevy ui
-		if #[cfg(feature = "ui")]{
+		if #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]{
 			pub use crate::ui::prelude::Justify;
 			pub use crate::ui::prelude::Pointer;
+		}
+	}
+	cfg_if! {
+		// re-exports to disambiguate bevy ui
+		// overlaps here are a feature not a bug,
+		// we're aligned on layout design patterns, and not dependent on
+		// the bevy_ui pixel rendering specificities
+		if #[cfg(feature = "ui")]{
 			pub use crate::ui::prelude::style::*;
+			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;
 			pub use crate::ui::prelude::style::FontWeight;
 			pub use crate::ui::prelude::style::AlignSelf;
