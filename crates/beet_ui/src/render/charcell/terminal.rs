@@ -248,8 +248,6 @@ pub struct Terminal {
 	pub reader: Box<dyn 'static + Send + Sync + Read>,
 	/// Output writer — receives all ANSI escape sequences and cell data.
 	writer: Box<dyn 'static + Send + Sync + Write>,
-	/// Tracks what is currently rendered on screen, used for draw diffing.
-	current_cells: Buffer,
 	size: UVec2,
 	/// Configuration applied on init and used to restore previous state on exit.
 	config: TerminalConfig,
@@ -274,7 +272,6 @@ impl Terminal {
 			writer: Box::new(writer),
 			config,
 			size,
-			current_cells: Buffer::new(size),
 			input_parser: InputParser::new(),
 		};
 		this.apply_config().unwrap();
@@ -333,20 +330,11 @@ impl Terminal {
 	/// Current terminal size.
 	pub fn size(&self) -> UVec2 { self.size }
 
-	/// Update the terminal size, recreating the cell-diff buffer.
-	pub fn set_size(&mut self, size: UVec2) {
-		self.size = size;
-		self.current_cells = Buffer::new(size);
-	}
+	/// Update the terminal size.
+	pub fn set_size(&mut self, size: UVec2) { self.size = size; }
 
 	/// Mutable access to the underlying writer.
-	///
-	/// Clears the internal diff buffer since writes bypassing [`Terminal::draw`]
-	/// leave the terminal in an unknown state.
-	pub fn writer_mut(&mut self) -> &mut dyn Write {
-		self.current_cells.clear();
-		&mut *self.writer
-	}
+	pub fn writer_mut(&mut self) -> &mut dyn Write { &mut *self.writer }
 
 	/// Read all pending input events without blocking.
 	pub fn read_events(&mut self) -> Result<Vec<TerminalEvent>> {
@@ -376,17 +364,17 @@ impl Terminal {
 
 	/// Erase the screen and move the cursor to the home position.
 	pub fn clear(&mut self) -> Result {
-		// Invalidate diff buffer so everything is redrawn next frame.
-		self.current_cells.clear();
 		self.writer.write_all(escape::ERASE_ALL.as_bytes())?;
 		self.writer.write_all(escape::CURSOR_HOME.as_bytes())?.xok()
 	}
 
-	/// Draw an iterator of `(pos, cell)` pairs, only writing cells that have
-	/// changed since the last draw call.
+	/// Draw an iterator of `(pos, cell)` pairs to the terminal.
 	///
 	/// Style changes are diffed per-cell to minimise escape sequence output.
 	/// A single [`escape::RESET`] is emitted at the end of the frame.
+	///
+	/// Callers are expected to pre-filter cells (eg. via [`DoubleBuffer::diff`])
+	/// so that only changed cells are passed.
 	fn draw<'a>(
 		&mut self,
 		cells: impl IntoIterator<Item = (UVec2, &'a super::Cell)>,
@@ -395,15 +383,6 @@ impl Terminal {
 		let mut last_style: Option<VisualStyle> = None;
 
 		for (pos, cell) in cells {
-			// Skip cells that are already up to date on screen.
-			if self
-				.current_cells
-				.get(pos)
-				.map_or(false, |c| c.visual_eq(cell))
-			{
-				continue;
-			}
-
 			// Skip goto when directly following the previous written cell.
 			let skip_goto = matches!(last_pos, Some(lp) if lp.x.checked_add(1) == Some(pos.x) && lp.y == pos.y);
 			if !skip_goto {
@@ -419,10 +398,7 @@ impl Terminal {
 			)?;
 			last_style = Some(cell.style.clone());
 
-			self.writer.write_all(cell.symbol.as_str().as_bytes())?;
-
-			// Record this cell as the current on-screen state.
-			self.current_cells.set(pos, cell.clone());
+			self.writer.write_all(cell.symbol_str().as_bytes())?;
 		}
 
 		// Reset style once at the end of the frame.
@@ -474,16 +450,16 @@ impl BufferedTerminal {
 
 // ── Systems ───────────────────────────────────────────────────────────────────
 
-/// Render changed [`CharcellRenderer`] buffers into their terminal's writer.
+/// Render changed [`DoubleBuffer`]s into their terminal's writer.
 pub fn render_terminal(
 	mut query: Populated<
-		(&mut Terminal, &CharcellRenderer),
-		Changed<CharcellRenderer>,
+		(&mut Terminal, &mut DoubleBuffer),
+		Changed<DoubleBuffer>,
 	>,
 ) -> Result {
-	for (mut terminal, renderer) in query.iter_mut() {
-		// this looks like a symptom we have redundant buffers
-		terminal.draw(renderer.iter_cells())?;
+	for (mut terminal, mut double_buffer) in query.iter_mut() {
+		terminal.draw(double_buffer.diff())?;
+		double_buffer.swap_buffers();
 	}
 	Ok(())
 }

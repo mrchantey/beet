@@ -49,11 +49,7 @@ fn main() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn render<B: Bundle>(name: &str, setup: fn() -> B) {
-	let out = CharcellRenderer::default()
-		.render_oneshot(setup())
-		.unwrap()
-		.render()
-		.trim_lines();
+	let out = CharcellPlugin::render_oneshot(setup()).trim_lines();
 	println!("\n{name}: \n{out}");
 }
 

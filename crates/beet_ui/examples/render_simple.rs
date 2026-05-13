@@ -2,16 +2,15 @@ use beet_core::prelude::*;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
 use beet_ui::*;
-
+use bevy::math::UVec2;
 
 fn main() {
-	CharcellRenderer::default()
-		.halved()
-		.render_oneshot(setup())
-		.unwrap()
-		.render()
-		// .trim_lines()
-		.xprint();
+	let size = terminal_ext::size();
+	CharcellPlugin::render_oneshot_sized(
+		UVec2::new(size.x, size.y / 2),
+		setup(),
+	)
+	.xprint();
 }
 
 

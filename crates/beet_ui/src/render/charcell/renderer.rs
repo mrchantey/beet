@@ -1,84 +1,67 @@
 use super::*;
-use crate::style::StyledNodeQuery;
 use beet_core::prelude::*;
+use bevy::math::UVec2;
 
-
-pub fn render_charcell(
-	styled_query: StyledNodeQuery,
-	mut query: Query<(Entity, &mut CharcellRenderer)>,
-) -> Result {
-	for (entity, mut renderer) in query.iter_mut() {
-		renderer.render_node(&styled_query, entity)?;
+impl CharcellPlugin {
+	/// Render a bundle with the default terminal size, returning ANSI output.
+	pub fn render_oneshot(bundle: impl Bundle) -> String {
+		Self::render_impl(terminal_ext::size(), bundle, false)
 	}
-	Ok(())
-}
 
-#[derive(Get, Deref, Component)]
-pub struct CharcellRenderer {
-	/// A buffer whose size matches the `viewport::size`
-	#[deref]
-	buffer: Buffer,
-}
-
-impl Default for CharcellRenderer {
-	fn default() -> Self {
-		let size = terminal_ext::size();
-		Self::new_size(size.x, size.y)
+	/// Render a bundle with a custom size, returning ANSI output.
+	pub fn render_oneshot_sized(size: UVec2, bundle: impl Bundle) -> String {
+		Self::render_impl(size, bundle, false)
 	}
-}
 
-impl CharcellRenderer {
-	pub fn new(viewport: URect) -> Self {
-		Self {
-			buffer: Buffer::new(viewport.size()),
+	/// Render a bundle with a custom size, returning plain text output.
+	pub fn render_oneshot_plain_sized(
+		size: UVec2,
+		bundle: impl Bundle,
+	) -> String {
+		Self::render_impl(size, bundle, true)
+	}
+
+	fn render_impl(size: UVec2, bundle: impl Bundle, plain: bool) -> String {
+		let mut world = World::new();
+		let entity = world.spawn((DoubleBuffer::new(size), bundle)).id();
+
+		// Insert required layout components directly (avoids Commands flush)
+		let all_entities = {
+			let mut stack = vec![entity];
+			let mut all = Vec::new();
+			while let Some(e) = stack.pop() {
+				all.push(e);
+				if let Some(children) = world.get::<Children>(e) {
+					let kids: Vec<Entity> = children.iter().collect();
+					stack.extend(kids);
+				}
+			}
+			all
+		};
+		for e in all_entities {
+			if world.get::<IntrinsicSize>(e).is_none() {
+				world.entity_mut(e).insert(IntrinsicSize::default());
+			}
+			if world.get::<LayoutRect>(e).is_none() {
+				world.entity_mut(e).insert(LayoutRect::default());
+			}
 		}
-	}
-	pub fn new_size(width: u32, height: u32) -> Self {
-		Self::new(URect::new(0, 0, width, height))
-	}
 
-	/// Half the viewport height for an easier read when testing.
-	pub fn halved(mut self) -> Self {
-		let mut size = self.size();
-		size.y /= 2;
-		self.buffer = Buffer::new(size);
-		self
-	}
+		// Run the render systems in order
+		let _: Result<(), _> = world.run_system_once(measure_nodes);
+		let _: Result<(), _> = world.run_system_once(layout_nodes);
+		let _: Result<(), _> = world.run_system_once(paint_nodes);
 
-	pub fn render_node(
-		&mut self,
-		query: &StyledNodeQuery,
-		entity: Entity,
-	) -> Result<&mut Self> {
-		let node = query.get_view(entity);
-		let size = self.size();
-		let viewport = URect::new(0, 0, size.x, size.y);
-
-		// Phase 1: Measure — compute intrinsic sizes bottom-up (post-order)
-		let mut intrinsic_sizes = HashMap::new();
-		measure_tree(&node, viewport, &mut intrinsic_sizes)?;
-
-		// Phase 2: Layout — assign definite rects top-down (pre-order)
-		let mut layout_rects = HashMap::new();
-		layout_rects.insert(entity, viewport);
-		layout_tree(
-			&node,
-			viewport,
-			viewport,
-			&intrinsic_sizes,
-			&mut layout_rects,
-		)?;
-
-		// Phase 3: Paint — draw each node from its LayoutRect (independent per node)
-		paint_tree(&node, &layout_rects, None, viewport, &mut self.buffer)?;
-
-		self.xok()
-	}
-
-	/// Create a world, spawn the bundle and render to a buffer.
-	pub fn render_oneshot(&mut self, bundle: impl Bundle) -> Result<&mut Self> {
-		World::new().spawn(bundle).with_state::<StyledNodeQuery, _>(
-			|entity, query| self.render_node(&query, entity),
-		)
+		world
+			.entity(entity)
+			.get::<DoubleBuffer>()
+			.map(|db| {
+				if plain {
+					db.render_plain()
+				} else {
+					db.render()
+				}
+			})
+			.unwrap_or_default()
 	}
 }

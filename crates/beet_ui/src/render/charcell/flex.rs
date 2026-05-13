@@ -3,30 +3,30 @@ use crate::style::AlignContent;
 use crate::style::AlignItems;
 use crate::style::AlignSelf;
 use crate::style::Direction;
-use crate::style::Display;
 use crate::style::FlexBox;
 use crate::style::FlexWrap;
 use crate::style::JustifyContent;
-use crate::style::StyledNodeView;
 use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
-use bevy::prelude::Result;
+
+use super::query::CharcellNodeData;
+use super::query::StylesQuery;
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
 /// Resolve the effective direction based on viewport dimensions.
-fn resolve_direction(direction: Direction, viewport: URect) -> Direction {
+fn resolve_direction(direction: Direction, viewport: UVec2) -> Direction {
 	match direction {
 		Direction::ViewportMin => {
-			if viewport.width() <= viewport.height() {
+			if viewport.x <= viewport.y {
 				Direction::Horizontal
 			} else {
 				Direction::Vertical
 			}
 		}
 		Direction::ViewportMax => {
-			if viewport.width() >= viewport.height() {
+			if viewport.x >= viewport.y {
 				Direction::Horizontal
 			} else {
 				Direction::Vertical
@@ -36,7 +36,7 @@ fn resolve_direction(direction: Direction, viewport: URect) -> Direction {
 	}
 }
 
-fn main_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
+fn main_size(size: UVec2, direction: Direction, viewport: UVec2) -> u32 {
 	let dir = resolve_direction(direction, viewport);
 	match dir {
 		Direction::Horizontal => size.x,
@@ -47,7 +47,7 @@ fn main_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
 	}
 }
 
-fn cross_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
+fn cross_size(size: UVec2, direction: Direction, viewport: UVec2) -> u32 {
 	let dir = resolve_direction(direction, viewport);
 	match dir {
 		Direction::Horizontal => size.y,
@@ -61,14 +61,22 @@ fn cross_size(size: UVec2, direction: Direction, viewport: URect) -> u32 {
 // ── Measure pass ──────────────────────────────────────────────────────────────
 
 /// Measure pass: compute the intrinsic size of this flexbox and its children.
+///
+/// `sizes` contains pre-measured intrinsic sizes for all children (bottom-up).
+/// `styles` is used to look up flex-order for line formation.
 pub fn measure_flex(
-	node: &StyledNodeView,
+	node: &CharcellNodeData,
+	children: &[Entity],
+	sizes: &HashMap<Entity, UVec2>,
+	styles: &StylesQuery<'_, '_>,
 	available: UVec2,
-	viewport: URect,
+	viewport: UVec2,
 ) -> Result<UVec2> {
 	let flexbox = node.flexbox();
 
-	let lines = form_lines_ecs(node, flexbox, available, viewport)?;
+	let lines = form_lines_from_sizes(
+		children, styles, flexbox, available, viewport, sizes,
+	);
 
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
@@ -81,7 +89,7 @@ pub fn measure_flex(
 
 	match direction {
 		Direction::Horizontal => {
-			// lines stack vertically → total_h = sum of line heights, total_w = max of line widths
+			// Lines stack vertically: total_h = sum of line heights, total_w = max line width
 			let mut total_h = 0u32;
 			let mut max_w = 0u32;
 			for (i, line) in lines.iter().enumerate() {
@@ -102,7 +110,7 @@ pub fn measure_flex(
 			UVec2::new(max_w, total_h).xok()
 		}
 		Direction::Vertical => {
-			// lines (columns) sit side by side → total_w = sum of line widths, total_h = max of line heights
+			// Lines (columns) sit side-by-side: total_w = sum of line widths, total_h = max line height
 			let mut total_w = 0u32;
 			let mut max_h = 0u32;
 			for (i, line) in lines.iter().enumerate() {
@@ -132,12 +140,14 @@ pub fn measure_flex(
 
 /// Layout pass: assign a [`LayoutRect`] to each flex child.
 ///
-/// Reads pre-computed intrinsic sizes from `intrinsic_sizes` rather than
-/// re-measuring, keeping measure and layout strictly separate.
+/// Reads pre-computed intrinsic sizes from `intrinsic_sizes` and writes
+/// each child's rect into `layout_rects`.
 pub fn flex_layout_rects(
-	node: &StyledNodeView,
+	node: &CharcellNodeData,
+	children: &[Entity],
+	styles: &StylesQuery<'_, '_>,
 	container_rect: URect,
-	viewport: URect,
+	viewport: UVec2,
 	intrinsic_sizes: &HashMap<Entity, UVec2>,
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
@@ -148,14 +158,15 @@ pub fn flex_layout_rects(
 	let available = UVec2::new(content_rect.width(), content_rect.height());
 
 	let lines = form_lines_from_sizes(
-		node,
+		children,
+		styles,
 		flexbox,
 		available,
 		viewport,
 		intrinsic_sizes,
 	);
 
-	// collect line cross sizes
+	// Collect cross sizes per line
 	let line_cross_sizes: Vec<u32> = lines
 		.iter()
 		.map(|line| {
@@ -182,7 +193,6 @@ pub fn flex_layout_rects(
 
 	match direction {
 		// ── Row layout ──────────────────────────────────────────────────────
-		// Each line is a horizontal strip. Lines stack top-to-bottom.
 		Direction::Horizontal => {
 			for (line_idx, line) in lines.iter().enumerate() {
 				let line_y = content_rect.min.y + line_positions[line_idx];
@@ -205,9 +215,9 @@ pub fn flex_layout_rects(
 				}
 
 				let final_sizes = apply_flex_grow(
-					node,
 					flexbox,
 					line,
+					styles,
 					content_rect.width(),
 					viewport,
 				);
@@ -219,17 +229,20 @@ pub fn flex_layout_rects(
 					viewport,
 				);
 
-				for (item_idx, ((child_node, _), fsize)) in
+				for (item_idx, ((entity, _), fsize)) in
 					line.iter().zip(final_sizes.iter()).enumerate()
 				{
-					let align = resolve_align(child_node, flexbox.align_items);
-					// stretch overrides the child's natural cross size
+					let entity = *entity;
+					let align =
+						resolve_align(entity, styles, flexbox.align_items);
 					let child_h = match align {
 						AlignItems::Stretch => line_h,
 						_ => fsize.y.min(line_h),
 					};
 					let child_y = line_y
-						+ cross_offset(child_node, flexbox, child_h, line_h);
+						+ cross_offset(
+							entity, styles, flexbox, child_h, line_h,
+						);
 					let child_x = content_rect.min.x + main_positions[item_idx];
 					let child_rect = URect::new(
 						child_x,
@@ -237,13 +250,12 @@ pub fn flex_layout_rects(
 						child_x + fsize.x,
 						child_y + child_h,
 					);
-					layout_rects.insert(child_node.entity, child_rect);
+					layout_rects.insert(entity, child_rect);
 				}
 			}
 		}
 
 		// ── Col layout ──────────────────────────────────────────────────────
-		// Each "line" is a vertical column. Columns sit left-to-right.
 		Direction::Vertical => {
 			for (line_idx, line) in lines.iter().enumerate() {
 				let line_x = content_rect.min.x + line_positions[line_idx];
@@ -266,9 +278,9 @@ pub fn flex_layout_rects(
 				}
 
 				let final_sizes = apply_flex_grow(
-					node,
 					flexbox,
 					line,
+					styles,
 					content_rect.height(),
 					viewport,
 				);
@@ -280,16 +292,20 @@ pub fn flex_layout_rects(
 					viewport,
 				);
 
-				for (item_idx, ((child_node, _), fsize)) in
+				for (item_idx, ((entity, _), fsize)) in
 					line.iter().zip(final_sizes.iter()).enumerate()
 				{
-					let align = resolve_align(child_node, flexbox.align_items);
+					let entity = *entity;
+					let align =
+						resolve_align(entity, styles, flexbox.align_items);
 					let child_w = match align {
 						AlignItems::Stretch => line_w,
 						_ => fsize.x.min(line_w),
 					};
 					let child_x = line_x
-						+ cross_offset(child_node, flexbox, child_w, line_w);
+						+ cross_offset(
+							entity, styles, flexbox, child_w, line_w,
+						);
 					let child_y = content_rect.min.y + main_positions[item_idx];
 					let child_rect = URect::new(
 						child_x,
@@ -297,7 +313,7 @@ pub fn flex_layout_rects(
 						child_x + child_w,
 						child_y + fsize.y,
 					);
-					layout_rects.insert(child_node.entity, child_rect);
+					layout_rects.insert(entity, child_rect);
 				}
 			}
 		}
@@ -310,75 +326,17 @@ pub fn flex_layout_rects(
 
 // ── Line formation ────────────────────────────────────────────────────────────
 
-/// Form flex lines by measuring each child (used in the measure pass).
-fn form_lines_ecs<'a>(
-	node: &StyledNodeView<'a>,
+/// Form flex lines using pre-computed intrinsic sizes.
+///
+/// Children are sorted by `flex_order` before packing into lines.
+fn form_lines_from_sizes(
+	children: &[Entity],
+	styles: &StylesQuery<'_, '_>,
 	flexbox: &FlexBox,
 	available: UVec2,
-	viewport: URect,
-) -> Result<Vec<Vec<(StyledNodeView<'a>, UVec2)>>> {
-	let direction = resolve_direction(flexbox.direction, viewport);
-	let container_main = match direction {
-		Direction::Horizontal => available.x,
-		Direction::Vertical => available.y,
-		_ => {
-			unreachable!("resolve_direction should eliminate viewport variants")
-		}
-	};
-
-	let main_gap = match direction {
-		Direction::Horizontal => flexbox.column_gap,
-		Direction::Vertical => flexbox.row_gap,
-		_ => {
-			unreachable!("resolve_direction should eliminate viewport variants")
-		}
-	};
-
-	let mut lines: Vec<Vec<(StyledNodeView, UVec2)>> = vec![];
-	let mut current: Vec<(StyledNodeView, UVec2)> = vec![];
-	let mut main_used = 0u32;
-
-	let mut sorted = node.children.clone();
-	sorted.sort_by_key(|child| child.layout.map(|l| l.flex_order).unwrap_or(0));
-
-	for child in sorted {
-		let size = measure_node_ecs(&child, available, viewport)?;
-		let child_main = main_size(size, flexbox.direction, viewport);
-
-		let gap_cost = if current.is_empty() { 0 } else { main_gap };
-
-		// would adding this child overflow the current line?
-		let overflows = flexbox.wrap == FlexWrap::Wrap
-			&& !current.is_empty()
-			&& main_used
-				.saturating_add(gap_cost)
-				.saturating_add(child_main)
-				> container_main;
-
-		if overflows {
-			lines.push(std::mem::take(&mut current));
-			main_used = 0;
-		} else if !current.is_empty() {
-			main_used += gap_cost;
-		}
-
-		main_used += child_main;
-		current.push((child, size));
-	}
-	if !current.is_empty() {
-		lines.push(current);
-	}
-	lines.xok()
-}
-
-/// Form flex lines using pre-computed intrinsic sizes (used in the layout pass).
-fn form_lines_from_sizes<'a>(
-	node: &StyledNodeView<'a>,
-	flexbox: &FlexBox,
-	available: UVec2,
-	viewport: URect,
+	viewport: UVec2,
 	intrinsic_sizes: &HashMap<Entity, UVec2>,
-) -> Vec<Vec<(StyledNodeView<'a>, UVec2)>> {
+) -> Vec<Vec<(Entity, UVec2)>> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_main = match direction {
 		Direction::Horizontal => available.x,
@@ -396,18 +354,19 @@ fn form_lines_from_sizes<'a>(
 		}
 	};
 
-	let mut lines: Vec<Vec<(StyledNodeView, UVec2)>> = vec![];
-	let mut current: Vec<(StyledNodeView, UVec2)> = vec![];
+	// Sort by flex_order
+	let mut sorted: Vec<Entity> = children.to_vec();
+	sorted.sort_by_key(|&e| {
+		let (_, _, layout, _) = styles.get(e).unwrap_or_default();
+		layout.map(|l| l.flex_order).unwrap_or(0)
+	});
+
+	let mut lines: Vec<Vec<(Entity, UVec2)>> = vec![];
+	let mut current: Vec<(Entity, UVec2)> = vec![];
 	let mut main_used = 0u32;
 
-	let mut sorted = node.children.clone();
-	sorted.sort_by_key(|child| child.layout.map(|l| l.flex_order).unwrap_or(0));
-
-	for child in sorted {
-		let size = intrinsic_sizes
-			.get(&child.entity)
-			.copied()
-			.unwrap_or_default();
+	for entity in sorted {
+		let size = intrinsic_sizes.get(&entity).copied().unwrap_or_default();
 		let child_main = main_size(size, flexbox.direction, viewport);
 
 		let gap_cost = if current.is_empty() { 0 } else { main_gap };
@@ -427,7 +386,7 @@ fn form_lines_from_sizes<'a>(
 		}
 
 		main_used += child_main;
-		current.push((child, size));
+		current.push((entity, size));
 	}
 	if !current.is_empty() {
 		lines.push(current);
@@ -435,31 +394,10 @@ fn form_lines_from_sizes<'a>(
 	lines
 }
 
-/// Measure a single node (recursively measuring flex children if needed).
-fn measure_node_ecs(
-	node: &StyledNodeView,
-	available: UVec2,
-	viewport: URect,
-) -> Result<UVec2> {
-	let overhead = BoxModel::from_node(node, viewport).overhead();
-	let content_available = UVec2::new(
-		available.x.saturating_sub(overhead.x),
-		available.y.saturating_sub(overhead.y),
-	);
-	let content_size = if node.layout_style().display == Display::Flex {
-		measure_flex(node, content_available, viewport)?
-	} else if node.value.is_some() {
-		super::measure_text(node, content_available.x)
-	} else {
-		UVec2::ZERO
-	};
-	(content_size + overhead).xok()
-}
-
 fn line_cross_size_for(
 	sizes: &[UVec2],
 	direction: Direction,
-	viewport: URect,
+	viewport: UVec2,
 ) -> u32 {
 	sizes
 		.iter()
@@ -469,11 +407,12 @@ fn line_cross_size_for(
 }
 
 fn resolve_align(
-	node: &StyledNodeView,
+	entity: Entity,
+	styles: &StylesQuery<'_, '_>,
 	default_align: AlignItems,
 ) -> AlignItems {
-	let align_self = node
-		.layout
+	let (_, _, layout, _) = styles.get(entity).unwrap_or_default();
+	let align_self = layout
 		.map(|l| l.align_self.clone())
 		.unwrap_or(AlignSelf::Auto);
 	match align_self {
@@ -487,12 +426,13 @@ fn resolve_align(
 }
 
 fn cross_offset(
-	node: &StyledNodeView,
+	entity: Entity,
+	styles: &StylesQuery<'_, '_>,
 	flexbox: &FlexBox,
 	child_cross: u32,
 	line_cross: u32,
 ) -> u32 {
-	let align = resolve_align(node, flexbox.align_items);
+	let align = resolve_align(entity, styles, flexbox.align_items);
 	match align {
 		AlignItems::Start | AlignItems::Stretch => 0,
 		AlignItems::Center => line_cross.saturating_sub(child_cross) / 2,
@@ -502,11 +442,11 @@ fn cross_offset(
 }
 
 fn apply_flex_grow(
-	node: &StyledNodeView,
 	flexbox: &FlexBox,
-	line: &[(StyledNodeView, UVec2)],
+	line: &[(Entity, UVec2)],
+	styles: &StylesQuery<'_, '_>,
 	container_main: u32,
-	viewport: URect,
+	viewport: UVec2,
 ) -> Vec<UVec2> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let main_gap = match direction {
@@ -530,16 +470,12 @@ fn apply_flex_grow(
 
 	let free = container_main.saturating_sub(natural_total + gap_total);
 
-	// collect flex_grow values from children
+	// Collect flex_grow from each child's layout style
 	let grow_values: Vec<u32> = line
 		.iter()
-		.map(|(line_node, _)| {
-			let child = node
-				.children
-				.iter()
-				.find(|c| c.entity == line_node.entity)
-				.unwrap();
-			child.layout.map(|l| l.flex_grow).unwrap_or(0)
+		.map(|(entity, _)| {
+			let (_, _, layout, _) = styles.get(*entity).unwrap_or_default();
+			layout.map(|l| l.flex_grow).unwrap_or(0)
 		})
 		.collect();
 
@@ -567,10 +503,10 @@ fn apply_flex_grow(
 
 fn apply_justify(
 	flexbox: &FlexBox,
-	line: &[(StyledNodeView, UVec2)],
+	line: &[(Entity, UVec2)],
 	final_sizes: &[UVec2],
 	container_main: u32,
-	viewport: URect,
+	viewport: UVec2,
 ) -> Vec<u32> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let main_gap = match direction {
@@ -654,7 +590,7 @@ fn apply_align_content(
 	flexbox: &FlexBox,
 	line_cross_sizes: &[u32],
 	container_cross: u32,
-	viewport: URect,
+	viewport: UVec2,
 ) -> Vec<u32> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
@@ -737,10 +673,7 @@ mod tests {
 	use crate::style::*;
 
 	fn render(bundle: impl Bundle) -> String {
-		CharcellRenderer::new_size(40, 20)
-			.render_oneshot(bundle)
-			.unwrap()
-			.render()
+		CharcellPlugin::render_oneshot_sized(UVec2::new(40, 20), bundle)
 			.trim_lines()
 			.replace(" ", "+")
 	}

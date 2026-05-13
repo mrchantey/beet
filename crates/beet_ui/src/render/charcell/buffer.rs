@@ -3,28 +3,58 @@ use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 
+/// Returns the display width (in terminal columns) for a character.
+///
+/// Wide characters (CJK, fullwidth) return 2; everything else returns 1.
+fn char_width(c: char) -> u16 {
+	match c as u32 {
+		0x1100..=0x115F
+		| 0x2E80..=0x303E
+		| 0x3040..=0xA4CF
+		| 0xA960..=0xA97F
+		| 0xAC00..=0xD7FF
+		| 0xF900..=0xFAFF
+		| 0xFE10..=0xFE1F
+		| 0xFE30..=0xFE4F
+		| 0xFF01..=0xFF60
+		| 0xFFE0..=0xFFE6
+		| 0x1F300..=0x1FAFF => 2,
+		_ => 1,
+	}
+}
+
 /// A rectangular buffer of cells, indexed by position.
 #[derive(Clone)]
 pub struct Buffer {
 	size: UVec2,
-	cells: Vec<Option<Cell>>,
+	cells: Vec<Cell>,
 }
 
 impl Buffer {
+	/// Create a new buffer filled with blank cells.
 	pub fn new(size: UVec2) -> Self {
 		let len = (size.x * size.y) as usize;
 		Self {
 			size,
-			cells: alloc::vec::from_elem(None, len),
-		}
-	}
-	pub fn clear(&mut self) {
-		for cell in &mut self.cells {
-			*cell = None;
+			cells: alloc::vec::from_elem(Cell::BLANK, len),
 		}
 	}
 
+	/// Reset all cells to [`Cell::BLANK`].
+	pub fn clear(&mut self) {
+		for cell in &mut self.cells {
+			*cell = Cell::BLANK;
+		}
+	}
+
+	/// Alias for [`Buffer::clear`].
+	pub fn reset(&mut self) { self.clear(); }
+
+	/// Buffer dimensions.
 	pub fn size(&self) -> UVec2 { self.size }
+
+	/// Raw cell slice.
+	pub fn cells(&self) -> &[Cell] { &self.cells }
 
 	/// Convert position to buffer index.
 	fn index(&self, pos: UVec2) -> Option<usize> {
@@ -37,26 +67,28 @@ impl Buffer {
 	/// Set a cell at the given position.
 	pub fn set(&mut self, pos: UVec2, cell: Cell) {
 		if let Some(idx) = self.index(pos) {
-			self.cells[idx] = Some(cell);
+			self.cells[idx] = cell;
 		}
 	}
 
 	/// Get a cell at the given position.
+	///
+	/// Returns `Some` even for blank cells; `None` only for out-of-bounds.
 	pub fn get(&self, pos: UVec2) -> Option<&Cell> {
-		self.index(pos).and_then(|idx| self.cells[idx].as_ref())
+		self.index(pos).map(|idx| &self.cells[idx])
 	}
 
-	/// Iterate over all non-empty cells with their positions.
+	/// Iterate over all non-blank cells with their positions.
 	pub fn iter_cells(&self) -> impl Iterator<Item = (UVec2, &Cell)> + '_ {
 		let width = self.size.x;
 		self.cells
 			.iter()
 			.enumerate()
 			.filter_map(move |(idx, cell)| {
-				cell.as_ref().map(|c| {
+				cell.symbol.as_ref().map(|_| {
 					let x = idx as u32 % width;
 					let y = idx as u32 / width;
-					(UVec2::new(x, y), c)
+					(UVec2::new(x, y), cell)
 				})
 			})
 	}
@@ -81,7 +113,7 @@ impl Buffer {
 		}
 	}
 
-	/// Render the buffer to a string (plain text, no styling).
+	/// Render the buffer to plain text (no ANSI styling).
 	pub fn render_plain(&self) -> String {
 		let width = self.size.x as usize;
 		let height = self.size.y as usize;
@@ -90,11 +122,7 @@ impl Buffer {
 		for y in 0..height {
 			for x in 0..width {
 				let idx = y * width + x;
-				if let Some(cell) = &self.cells[idx] {
-					result.push_str(&cell.symbol);
-				} else {
-					result.push(' ');
-				}
+				result.push_str(self.cells[idx].symbol_str());
 			}
 			if y < height - 1 {
 				result.push('\n');
@@ -113,15 +141,16 @@ impl Buffer {
 		for y in 0..height {
 			for x in 0..width {
 				let idx = y * width + x;
-				if let Some(cell) = &self.cells[idx] {
+				let cell = &self.cells[idx];
+				if cell.symbol.is_some() {
 					escape::write_style(
 						&mut out,
 						&cell.style,
 						prev_style.as_ref(),
 					)
-					// writing to vec<u8>
+					// writing to vec<u8>, cannot fail
 					.ok();
-					out.extend_from_slice(cell.symbol.as_bytes());
+					out.extend_from_slice(cell.symbol_str().as_bytes());
 					prev_style = Some(cell.style.clone());
 				} else {
 					if prev_style.is_some() {
@@ -145,30 +174,53 @@ impl Buffer {
 /// A single terminal cell with text and styling.
 #[derive(Debug, Clone, SetWith)]
 pub struct Cell {
-	pub symbol: SmolStr,
+	/// Symbol to display. `None` represents a blank/placeholder cell
+	/// (eg. trailing cell of a wide unicode character), rendered as a space.
+	pub symbol: Option<SmolStr>,
 	pub style: VisualStyle,
 	pub entity: Entity,
 }
 
 impl Cell {
+	/// A blank cell with no symbol and default style.
+	pub const BLANK: Self = Self {
+		symbol: None,
+		style: VisualStyle::DEFAULT,
+		entity: Entity::PLACEHOLDER,
+	};
+
+	/// Create a cell with a symbol.
 	pub fn new(
 		symbol: impl Into<SmolStr>,
 		style: impl Into<VisualStyle>,
 		entity: Entity,
 	) -> Self {
 		Self {
-			symbol: symbol.into(),
+			symbol: Some(symbol.into()),
 			style: style.into(),
 			entity,
 		}
 	}
-	/// Two cells are visually equal if their symbol and style match.
-	/// The entity is disregarded
+
+	/// Display character, defaulting to a space for blank cells.
+	pub fn symbol_str(&self) -> &str { self.symbol.as_deref().unwrap_or(" ") }
+
+	/// Display width in terminal columns. Wide chars (CJK, fullwidth) = 2.
+	pub fn cell_width(&self) -> u16 {
+		self.symbol
+			.as_deref()
+			.and_then(|s| s.chars().next())
+			.map(char_width)
+			.unwrap_or(1)
+	}
+
+	/// Visual equality: same symbol (`None` == `" "`) and same style.
+	///
+	/// Entity is disregarded.
 	pub fn visual_eq(&self, other: &Self) -> bool {
-		self.symbol == other.symbol && self.style == other.style
+		self.symbol_str() == other.symbol_str() && self.style == other.style
 	}
 }
-
 
 
 // ── Ratatui conversions ───────────────────────────────────────────────────────
@@ -232,7 +284,7 @@ impl Cell {
 	/// Converts to a ratatui [`Cell`](ratatui::buffer::Cell).
 	pub fn to_ratatui_cell(&self) -> ratatui::buffer::Cell {
 		let mut cell = ratatui::buffer::Cell::default();
-		cell.set_symbol(self.symbol.as_str());
+		cell.set_symbol(self.symbol_str());
 		cell.set_style(self.style.to_ratatui_style());
 		cell
 	}

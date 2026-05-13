@@ -3,9 +3,7 @@
 //! Each node answers: *"If I had infinite space, how big would I want to be?"*
 use super::*;
 use crate::style::Display;
-use crate::style::StyledNodeView;
 use beet_core::prelude::*;
-use bevy::math::URect;
 use bevy::math::UVec2;
 
 /// The node's preferred size before parent constraints apply.
@@ -14,53 +12,95 @@ use bevy::math::UVec2;
 #[derive(Component, Copy, Clone, Debug, Default, PartialEq)]
 pub struct IntrinsicSize(pub UVec2);
 
-/// Traverses the subtree post-order, storing each node's intrinsic size in `sizes`.
-pub fn measure_tree(
-	node: &StyledNodeView,
-	viewport: URect,
-	sizes: &mut HashMap<Entity, UVec2>,
+/// ECS system: compute [`IntrinsicSize`] for all nodes bottom-up.
+pub fn measure_nodes(
+	query: CharcellQuery,
+	mut sizes_query: Query<&mut IntrinsicSize>,
 ) -> Result {
-	for child in &node.children {
-		measure_tree(child, viewport, sizes)?;
+	let root_viewports = query.root_viewports();
+	for (root, viewport_size) in root_viewports {
+		let ordered = collect_post_order(root, &query.children);
+		let mut sizes = HashMap::<Entity, UVec2>::new();
+
+		for &entity in &ordered {
+			// Access fields directly to allow partial borrows alongside sizes HashMap
+			let (value, visual, layout, box_style) =
+				query.styles.get(entity).unwrap_or_default();
+			let node = CharcellNodeData {
+				entity,
+				value,
+				visual,
+				layout,
+				box_style,
+			};
+
+			let children: Vec<Entity> = query
+				.children
+				.get(entity)
+				.map(|c| c.iter().collect())
+				.unwrap_or_default();
+
+			let size = measure_node(
+				&node,
+				&children,
+				viewport_size,
+				&sizes,
+				&query.styles,
+			)?;
+			sizes.insert(entity, size);
+		}
+
+		// Write sizes to ECS components
+		for (entity, size) in sizes {
+			if let Ok(mut intrinsic) = sizes_query.get_mut(entity) {
+				intrinsic.set_if_neq(IntrinsicSize(size));
+			}
+		}
 	}
-	let size = measure_node(node, viewport, sizes)?;
-	sizes.insert(node.entity, size);
 	Ok(())
 }
 
 /// Compute a single node's intrinsic size.
 ///
-/// Uses viewport dimensions as the unconstrained available space, per the
-/// measure phase contract: no parent narrowing, viewport is the only global constraint.
-fn measure_node(
-	node: &StyledNodeView,
-	viewport: URect,
+/// Uses viewport dimensions as the unconstrained available space.
+pub(super) fn measure_node(
+	node: &CharcellNodeData,
+	children: &[Entity],
+	viewport: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
+	styles: &StylesQuery<'_, '_>,
 ) -> Result<UVec2> {
 	let box_model = BoxModel::from_node(node, viewport);
 	let overhead = box_model.overhead();
 	let content_available = UVec2::new(
-		viewport.width().saturating_sub(overhead.x),
-		viewport.height().saturating_sub(overhead.y),
+		viewport.x.saturating_sub(overhead.x),
+		viewport.y.saturating_sub(overhead.y),
 	);
 	let content_size = match node.layout_style().display {
-		Display::Flex => measure_flex(node, content_available, viewport)?,
-		Display::Inline => measure_inline(node, content_available, sizes)?,
+		Display::Flex => measure_flex(
+			node,
+			children,
+			sizes,
+			styles,
+			content_available,
+			viewport,
+		)?,
+		Display::Inline => measure_inline(children, content_available, sizes)?,
 		_ if node.value.is_some() => measure_text(node, content_available.x),
 		_ => UVec2::ZERO,
 	};
 	(content_size + overhead).xok()
 }
 
-/// Measure inline container: width = sum of child widths (first-row), height = max child height.
+/// Measure inline container: width = max row width, height = sum of row heights.
 ///
 /// Children must already be measured (post-order traversal ensures this).
 fn measure_inline(
-	node: &StyledNodeView,
+	children: &[Entity],
 	available: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> Result<UVec2> {
-	if node.children.is_empty() {
+	if children.is_empty() {
 		return UVec2::ZERO.xok();
 	}
 	let mut max_w = 0u32;
@@ -68,8 +108,8 @@ fn measure_inline(
 	let mut row_w = 0u32;
 	let mut row_h = 0u32;
 
-	for child in &node.children {
-		let size = sizes.get(&child.entity).copied().unwrap_or_default();
+	for &entity in children {
+		let size = sizes.get(&entity).copied().unwrap_or_default();
 		if row_w > 0 && row_w + size.x > available.x {
 			max_w = max_w.max(row_w);
 			total_h += row_h.max(1);

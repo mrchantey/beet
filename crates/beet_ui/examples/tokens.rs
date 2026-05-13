@@ -33,12 +33,12 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	commands.spawn((
-		CharcellRenderer::default().halved(),
+		DoubleBuffer::new_half_terminal(),
 		rsx! {<h1>"hello world!"</h1>},
 	));
 }
 
-fn render(query: Query<&CharcellRenderer>) -> Result {
+fn render(query: Query<&DoubleBuffer>) -> Result {
 	query.single()?.render().xprint();
 	Ok(())
 }

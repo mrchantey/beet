@@ -20,7 +20,7 @@ fn setup(mut commands: Commands) {
 
 	commands.spawn((
 		StdioTerminal::default(),
-		CharcellRenderer::default(),
+		DoubleBuffer::default(),
 		LayoutStyle::flex_row().column_gap(1),
 		children![((
 			LayoutStyle::flex_row(),
@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
 
 fn update(
 	mut commands: Commands,
-	query: Query<Entity, With<CharcellRenderer>>,
+	query: Query<Entity, With<DoubleBuffer>>,
 ) -> Result {
 	let entity = query.single()?;
 	let count = count_def();

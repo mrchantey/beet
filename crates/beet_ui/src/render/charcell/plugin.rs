@@ -1,9 +1,11 @@
-use crate::prelude::*;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
 #[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
+use bevy::prelude::ApplyDeferred;
+
+use super::*;
 
 pub struct CharcellPlugin;
 
@@ -14,7 +16,18 @@ impl Plugin for CharcellPlugin {
 				PostUpdate,
 				CharcellRenderSet.after(ResolveStylesSet),
 			)
-			.add_systems(PostUpdate, render_charcell.in_set(CharcellRenderSet));
+			.add_systems(
+				PostUpdate,
+				(
+					prepare_charcell_tree,
+					ApplyDeferred,
+					measure_nodes,
+					layout_nodes,
+					paint_nodes,
+				)
+					.chain()
+					.in_set(CharcellRenderSet),
+			);
 
 		// Terminal-specific systems: input, render, flush.
 		#[cfg(feature = "terminal")]
@@ -29,7 +42,7 @@ impl Plugin for CharcellPlugin {
 						.run_if(common_conditions::on_message::<AppExit>),
 				)
 					.chain()
-					.after(render_charcell)
+					.after(paint_nodes)
 					.in_set(CharcellRenderSet),
 			);
 	}

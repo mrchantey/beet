@@ -10,5 +10,3 @@ pub use resolve_styles::*;
 pub use style_plugin::*;
 pub use style_query::*;
 pub use values::*;
-mod styled_node_query;
-pub use styled_node_query::*;

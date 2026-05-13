@@ -4,10 +4,12 @@ use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
+use super::query::CharcellNodeData;
+
 /// Compute the intrinsic size of a text node.
 ///
 /// Wraps the text to `max_width` columns and returns `(max_line_width, line_count)`.
-pub fn measure_text(node: &StyledNodeView, max_width: u32) -> UVec2 {
+pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	let Some(value) = node.value else {
 		return UVec2::ZERO;
 	};
@@ -20,7 +22,7 @@ pub fn measure_text(node: &StyledNodeView, max_width: u32) -> UVec2 {
 
 /// Paint the text content of a node into `buffer` within `content_rect`.
 pub fn paint_text(
-	node: &StyledNodeView,
+	node: &CharcellNodeData,
 	content_rect: URect,
 	buffer: &mut Buffer,
 ) -> Result {
@@ -119,12 +121,9 @@ fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 mod tests {
 	use super::*;
 
-	/// Render a bundle into a 10×1 buffer and return the plain output.
+	/// Render a bundle into a 10×1 buffer and return the ANSI output.
 	fn render(bundle: impl Bundle) -> String {
-		CharcellRenderer::new_size(10, 1)
-			.render_oneshot(bundle)
-			.unwrap()
-			.render()
+		CharcellPlugin::render_oneshot_sized(UVec2::new(10, 1), bundle)
 			.trim_lines()
 	}
 	fn render_pluses(bundle: impl Bundle) -> String {

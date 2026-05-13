@@ -5,12 +5,13 @@
 use crate::prelude::*;
 use crate::render::Buffer;
 use crate::style::Spacing;
-use crate::style::StyledNodeView;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 use bevy::math::Vec2;
+
+use super::query::CharcellNodeData;
 
 // ── BoxModel ─────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ impl BoxModel {
 	/// Compute the box model for `node` relative to `viewport`.
 	///
 	/// Returns zeroed/false defaults when the node has no box style.
-	pub fn from_node(node: &StyledNodeView, viewport: URect) -> Self {
+	pub fn from_node(node: &CharcellNodeData, viewport: UVec2) -> Self {
 		let Some(box_style) = node.box_style else {
 			return Self {
 				margin: URect::default(),
@@ -37,7 +38,7 @@ impl BoxModel {
 			};
 		};
 
-		let vp = Vec2::new(viewport.width() as f32, viewport.height() as f32);
+		let vp = Vec2::new(viewport.x as f32, viewport.y as f32);
 		let margin = tui_inset(&box_style.margin, vp);
 		let padding = tui_inset(&box_style.padding, vp);
 		let has_border = box_style.border != Spacing::DEFAULT;
@@ -111,7 +112,7 @@ pub(super) fn draw_margin(
 pub(super) fn draw_border(
 	buffer: &mut Buffer,
 	rect: URect,
-	node: &StyledNodeView,
+	node: &CharcellNodeData,
 ) {
 	let width = rect.width();
 	let height = rect.height();
