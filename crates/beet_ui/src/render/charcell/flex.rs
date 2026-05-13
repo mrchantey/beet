@@ -73,16 +73,16 @@ pub fn measure_flex(
 ) -> Result<UVec2> {
 	let flexbox = node.flexbox();
 	// Build (entity, size) pairs from child_nodes, using fresh sizes from HashMap
-	let mut child_sizes: Vec<(Entity, UVec2)> = node
+	let mut child_sizes = node
 		.child_nodes(query)
 		.map(|child| {
 			let size = sizes
 				.get(&child.entity)
 				.copied()
-				.unwrap_or_else(|| child.intrinsic_size());
+				.expect("unreachable, postorder populated sizes hashmap");
 			(child.entity, size)
 		})
-		.collect();
+		.collect::<Vec<_>>();
 	// Sort by flex_order
 	child_sizes.sort_by_key(|(e, _)| {
 		query
