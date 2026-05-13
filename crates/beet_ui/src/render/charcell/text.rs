@@ -20,15 +20,20 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	)
 }
 
-/// Paint text from raw components, without requiring a [`CharcellNodeData`].
-pub(super) fn paint_text_raw(
-	text: &str,
-	visual: &VisualStyle,
-	entity: Entity,
+/// Paint text into the buffer from a [`CharcellNodeData`].
+/// If the node has no [`Value`] this is a no-op.
+pub(super) fn paint_text(
+	node: &CharcellNodeData,
 	content_rect: URect,
 	buffer: &mut Buffer,
 ) -> Result {
-	let lines = word_wrap(text, content_rect.width());
+	let Some(value) = node.value() else {
+		return Ok(());
+	};
+	let text = value.to_string();
+	let visual = node.visual_style();
+	let entity = node.entity;
+	let lines = word_wrap(&text, content_rect.width());
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as u32;
 		if y >= content_rect.max.y {
@@ -48,7 +53,22 @@ pub(super) fn paint_text_raw(
 
 // ── Word wrap ─────────────────────────────────────────────────────────────────
 
-fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
+/// Split `text` at the first column boundary that reaches `max_cols`.
+fn split_at_display_width(text: &str, max_cols: usize) -> (&str, &str) {
+	let mut width = 0;
+	let mut byte_idx = text.len();
+	for (i, ch) in text.char_indices() {
+		let w = unicode_width(ch) as usize;
+		if width + w > max_cols {
+			byte_idx = i;
+			break;
+		}
+		width += w;
+	}
+	(&text[..byte_idx], &text[byte_idx..])
+}
+
+pub(super) fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 	let max_w = max_w as usize;
 	if max_w == 0 {
 		return vec![];
@@ -62,11 +82,13 @@ fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 				// hard-break words longer than the column
 				let mut w = word;
 				while display_width(w) > max_w {
-					lines.push(w[..max_w].to_string());
-					w = &w[max_w..];
+					let (head, tail) = split_at_display_width(w, max_w);
+					lines.push(head.to_string());
+					w = tail;
 				}
 				current = w.to_string();
-			} else if current.len() + 1 + word.len() <= max_w {
+			} else if display_width(&current) + 1 + display_width(word) <= max_w
+			{
 				current.push(' ');
 				current.push_str(word);
 			} else {
@@ -83,7 +105,9 @@ fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 	lines
 }
 
-/// Count visible characters, skipping ANSI escape sequences.
+/// Count visible columns, skipping ANSI escape sequences.
+///
+/// Wide (CJK/fullwidth) characters count as 2 columns.
 pub fn display_width(s: &str) -> usize {
 	let mut w = 0;
 	let mut in_esc = false;
@@ -91,14 +115,14 @@ pub fn display_width(s: &str) -> usize {
 		match ch {
 			'\x1b' => in_esc = true,
 			'm' if in_esc => in_esc = false,
-			_ if !in_esc => w += 1,
-			_ => {}
+			_ if in_esc => {}
+			_ => w += unicode_width(ch) as usize,
 		}
 	}
 	w
 }
 
-fn align_line(line: &str, width: u32, align: TextAlign) -> String {
+pub(super) fn align_line(line: &str, width: u32, align: TextAlign) -> String {
 	let w = width as usize;
 	let len = display_width(line);
 	if len >= w {
@@ -176,5 +200,17 @@ mod tests {
 			..VisualStyle::default()
 		};
 		render((rsx! { "Hi" }, visual)).xpect_snapshot();
+	}
+
+	// ── Wide character support ────────────────────────────────────────────────
+
+	#[test]
+	fn wide_char_display_width() {
+		// Each CJK character = 2 columns
+		display_width("中文").xpect_eq(4);
+		display_width("日本語").xpect_eq(6);
+		display_width("ＡＢＣ").xpect_eq(6);
+		// ASCII is 1 column each
+		display_width("abc").xpect_eq(3);
 	}
 }

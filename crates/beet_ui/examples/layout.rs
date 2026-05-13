@@ -298,24 +298,47 @@ fn setup_wrap() -> impl Bundle {
 // ── Nested Layouts ────────────────────────────────────────────────────────────
 
 fn setup_nested() -> impl Bundle {
+	// Each node gets a distinct background so background ordering is visible.
+	let header_style = VisualStyle {
+		background: Some(Color::srgb(0.2, 0.2, 0.5)),
+		foreground: Some(Color::WHITE),
+		..default()
+	};
+	let sidebar_style = VisualStyle {
+		background: Some(Color::srgb(0.2, 0.4, 0.2)),
+		foreground: Some(Color::WHITE),
+		..default()
+	};
+	let main_style = VisualStyle {
+		background: Some(Color::srgb(0.4, 0.2, 0.2)),
+		foreground: Some(Color::WHITE),
+		..default()
+	};
+	let footer_style = VisualStyle {
+		background: Some(Color::srgb(0.3, 0.3, 0.1)),
+		foreground: Some(Color::WHITE),
+		..default()
+	};
 	(LayoutStyle::flex_col().row_gap(1), children![
 		(
 			LayoutStyle::flex_row().column_gap(1),
 			children![
-				(rsx! {"Header L"}, bordered()),
-				(rsx! {"Header R"}, bordered()),
+				(rsx! {"Header L"}, bordered(), header_style.clone()),
+				(rsx! {"Header R"}, bordered(), header_style.clone()),
 			],
 			bordered()
 		),
 		(
 			LayoutStyle::flex_row().column_gap(1),
+			VisualStyle::default()
+				.with_background(palettes::tailwind::EMERALD_900),
 			children![
-				(rsx! {"Sidebar"}, bordered()),
+				(rsx! {"Sidebar"}, bordered(), sidebar_style),
 				(
 					LayoutStyle::flex_col().row_gap(1),
 					children![
-						(rsx! {"Main"}, bordered()),
-						(rsx! {"Footer"}, bordered()),
+						(rsx! {"Main"}, bordered(), main_style),
+						(rsx! {"Footer"}, bordered(), footer_style),
 					],
 					bordered()
 				),

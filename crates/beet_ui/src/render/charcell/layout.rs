@@ -22,9 +22,10 @@ pub struct LayoutRect(pub URect);
 pub fn layout_nodes(
 	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
 	children: Query<&Children>,
+	roots: Query<(Entity, &DoubleBuffer)>,
 ) -> Result {
-	let root_viewports = params.p0().root_viewports();
-	for (root, viewport_size) in root_viewports {
+	for (root, buffer) in roots {
+		let viewport_size = buffer.size();
 		let ordered = children.collect_pre_order(root);
 
 		// Root gets the full viewport rect

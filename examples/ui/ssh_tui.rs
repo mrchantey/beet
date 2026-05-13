@@ -144,7 +144,8 @@ fn ssh_read(
 		SshEvent::RequestPty(pty) => {
 			// Insert the terminal now that we know the PTY size.
 			commands.entity(entity).insert((
-				ChannelTerminal::new(pty.window.cells, default()),
+				ChannelTerminal::new(default()),
+				DoubleBuffer::new(pty.window.cells),
 				Counter::default(),
 			));
 		}

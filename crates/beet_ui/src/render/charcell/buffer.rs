@@ -7,7 +7,7 @@ use bevy::math::UVec2;
 /// Returns the display width (in terminal columns) for a character.
 ///
 /// Wide characters (CJK, fullwidth) return 2; everything else returns 1.
-fn char_width(c: char) -> u16 {
+pub(crate) fn unicode_width(c: char) -> u16 {
 	match c as u32 {
 		0x1100..=0x115F
 		| 0x2E80..=0x303E
@@ -107,7 +107,7 @@ impl Buffer {
 	) {
 		let mut col = 0u32;
 		for ch in text.chars() {
-			let w = char_width(ch) as u32;
+			let w = unicode_width(ch) as u32;
 			let cell_pos = UVec2::new(pos.x + col, pos.y);
 			if cell_pos.x >= self.size.x {
 				break;
@@ -131,19 +131,11 @@ impl Buffer {
 		}
 	}
 
-	/// Fill all cells in `rect` with a space cell using `style` and `entity`.
-	pub fn fill_rect(
-		&mut self,
-		rect: URect,
-		style: VisualStyle,
-		entity: Entity,
-	) {
+	/// Fill all cells in `rect` with the given `cell`.
+	pub fn fill_rect(&mut self, rect: URect, cell: Cell) {
 		for y in rect.min.y..rect.max.y {
 			for x in rect.min.x..rect.max.x {
-				self.set(
-					UVec2::new(x, y),
-					Cell::new(" ", style.clone(), entity),
-				);
+				self.set(UVec2::new(x, y), cell.clone());
 			}
 		}
 	}
@@ -263,7 +255,7 @@ impl Cell {
 		self.symbol
 			.as_deref()
 			.and_then(|s| s.chars().next())
-			.map(char_width)
+			.map(unicode_width)
 			.unwrap_or(1)
 	}
 

@@ -2,7 +2,7 @@
 //!
 //! Provides [`CharcellNodeData`] (a flat per-node style view without children),
 //! and [`CharcellQuery`] (the shared system parameter).
-use super::DoubleBuffer;
+
 use crate::prelude::*;
 use crate::style::*;
 use beet_core::prelude::*;
@@ -43,14 +43,13 @@ impl CharcellNodeData<'_> {
 	/// Flexbox config from the layout style.
 	pub fn flexbox(&self) -> &FlexBox { &self.layout_style().flex_box }
 
-	pub fn children(&self) -> impl Iterator<Item = Entity> {
-		self.children.iter().flat_map(|children| children.iter())
-	}
 	pub(super) fn child_nodes<'a>(
 		&'a self,
 		query: &'a CharcellQuery,
 	) -> impl 'a + Iterator<Item = CharcellNodeData<'a>> {
-		self.children()
+		self.children
+			.iter()
+			.flat_map(|children| children.iter())
 			.filter_map(move |child| query.node(child).ok())
 	}
 }
@@ -58,7 +57,6 @@ impl CharcellNodeData<'_> {
 /// System parameter shared by all charcell render systems.
 #[derive(SystemParam)]
 pub struct CharcellQuery<'w, 's> {
-	pub roots: Query<'w, 's, (Entity, &'static DoubleBuffer)>,
 	nodes: Query<
 		'w,
 		's,
@@ -75,14 +73,6 @@ pub struct CharcellQuery<'w, 's> {
 }
 
 impl CharcellQuery<'_, '_> {
-	/// Collect `(root_entity, viewport_size)` for all [`DoubleBuffer`] roots.
-	pub fn root_viewports(&self) -> Vec<(Entity, UVec2)> {
-		self.roots
-			.iter()
-			.map(|(entity, buffer)| (entity, buffer.size()))
-			.collect()
-	}
-
 	pub(super) fn node(&self, entity: Entity) -> Result<CharcellNodeData<'_>> {
 		let (
 			intrinsic_size,

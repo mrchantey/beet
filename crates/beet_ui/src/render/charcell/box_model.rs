@@ -111,10 +111,12 @@ impl BoxModel {
 pub(super) fn draw_border(
 	buffer: &mut Buffer,
 	rect: URect,
-	box_style: Option<&BoxStyle>,
-	visual: &VisualStyle,
-	entity: Entity,
+	node: &CharcellNodeData,
 ) {
+	let box_style = node.box_style();
+	let visual = node.visual_style();
+	let entity = node.entity;
+
 	let width = rect.width();
 	let height = rect.height();
 

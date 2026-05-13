@@ -16,9 +16,10 @@ pub struct IntrinsicSize(pub UVec2);
 pub fn measure_nodes(
 	mut params: ParamSet<(CharcellQuery, Query<&mut IntrinsicSize>)>,
 	children_query: Query<&Children>,
+	roots: Query<(Entity, &DoubleBuffer)>,
 ) -> Result {
-	let root_viewports = params.p0().root_viewports();
-	for (root, viewport_size) in root_viewports {
+	for (root, buffer) in roots {
+		let viewport_size = buffer.size();
 		let ordered = children_query.collect_post_order(root);
 		let mut sizes = HashMap::<Entity, UVec2>::new();
 
@@ -82,22 +83,21 @@ fn measure_inline(
 	available: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> Result<UVec2> {
-	let children: Vec<Entity> = node.children().collect();
-	if children.is_empty() {
-		return UVec2::ZERO.xok();
-	}
 	let mut max_w = 0u32;
 	let mut total_h = 0u32;
 	let mut row_w = 0u32;
 	let mut row_h = 0u32;
 
-	for entity in children {
+	let mut children = node.child_nodes(query).peekable();
+	if children.peek().is_some() {
+		return UVec2::ZERO.xok();
+	}
+	for child in children {
 		// Use freshly-computed sizes during this measure pass
 		let size = sizes
-			.get(&entity)
+			.get(&child.entity)
 			.copied()
-			.or_else(|| query.node(entity).ok().map(|n| n.intrinsic_size()))
-			.unwrap_or_default();
+			.unwrap_or_else(|| child.intrinsic_size());
 		if row_w > 0 && row_w + size.x > available.x {
 			max_w = max_w.max(row_w);
 			total_h += row_h.max(1);

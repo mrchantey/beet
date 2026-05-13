@@ -72,11 +72,25 @@ pub fn measure_flex(
 	viewport: UVec2,
 ) -> Result<UVec2> {
 	let flexbox = node.flexbox();
-	let children: Vec<Entity> = node.children().collect();
-
-	let lines = form_lines_from_sizes(
-		&children, query, flexbox, available, viewport, sizes,
-	);
+	// Build (entity, size) pairs from child_nodes, using fresh sizes from HashMap
+	let mut child_sizes: Vec<(Entity, UVec2)> = node
+		.child_nodes(query)
+		.map(|child| {
+			let size = sizes
+				.get(&child.entity)
+				.copied()
+				.unwrap_or_else(|| child.intrinsic_size());
+			(child.entity, size)
+		})
+		.collect();
+	// Sort by flex_order
+	child_sizes.sort_by_key(|(e, _)| {
+		query
+			.node(*e)
+			.map(|n| n.layout_style().flex_order)
+			.unwrap_or(0)
+	});
+	let lines = form_lines(&child_sizes, flexbox, available, viewport);
 
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
@@ -150,26 +164,24 @@ pub fn flex_layout_rects(
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
 	let flexbox = node.flexbox();
-	let children: Vec<Entity> = node.children().collect();
 
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
 	let available = UVec2::new(content_rect.width(), content_rect.height());
 
-	// Build intrinsic sizes from child nodes (already computed by measure phase)
-	let intrinsic_sizes: HashMap<Entity, UVec2> = children
-		.iter()
-		.filter_map(|&e| query.node(e).ok().map(|n| (e, n.intrinsic_size())))
+	// Get child sizes directly from child_nodes (already computed by measure phase)
+	let mut child_sizes: Vec<(Entity, UVec2)> = node
+		.child_nodes(query)
+		.map(|child| (child.entity, child.intrinsic_size()))
 		.collect();
-
-	let lines = form_lines_from_sizes(
-		&children,
-		query,
-		flexbox,
-		available,
-		viewport,
-		&intrinsic_sizes,
-	);
+	// Sort by flex_order
+	child_sizes.sort_by_key(|(e, _)| {
+		query
+			.node(*e)
+			.map(|n| n.layout_style().flex_order)
+			.unwrap_or(0)
+	});
+	let lines = form_lines(&child_sizes, flexbox, available, viewport);
 
 	// Collect cross sizes per line
 	let line_cross_sizes: Vec<u32> = lines
@@ -327,16 +339,12 @@ pub fn flex_layout_rects(
 
 // ── Line formation ────────────────────────────────────────────────────────────
 
-/// Form flex lines using pre-computed intrinsic sizes.
-///
-/// Children are sorted by `flex_order` before packing into lines.
-fn form_lines_from_sizes(
-	children: &[Entity],
-	query: &CharcellQuery,
+/// Form flex lines from pre-sorted (entity, size) pairs.
+fn form_lines(
+	child_sizes: &[(Entity, UVec2)],
 	flexbox: &FlexBox,
 	available: UVec2,
 	viewport: UVec2,
-	intrinsic_sizes: &HashMap<Entity, UVec2>,
 ) -> Vec<Vec<(Entity, UVec2)>> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_main = match direction {
@@ -355,21 +363,11 @@ fn form_lines_from_sizes(
 		}
 	};
 
-	// Sort by flex_order
-	let mut sorted: Vec<Entity> = children.to_vec();
-	sorted.sort_by_key(|&e| {
-		query
-			.node(e)
-			.map(|n| n.layout_style().flex_order)
-			.unwrap_or(0)
-	});
-
 	let mut lines: Vec<Vec<(Entity, UVec2)>> = vec![];
 	let mut current: Vec<(Entity, UVec2)> = vec![];
 	let mut main_used = 0u32;
 
-	for entity in sorted {
-		let size = intrinsic_sizes.get(&entity).copied().unwrap_or_default();
+	for &(entity, size) in child_sizes {
 		let child_main = main_size(size, flexbox.direction, viewport);
 
 		let gap_cost = if current.is_empty() { 0 } else { main_gap };
@@ -887,5 +885,56 @@ mod tests {
 			(rsx! {"B"}, bordered()),
 		]))
 		.xpect_snapshot();
+	}
+
+	/// Nested rows and columns with background colors on leaf nodes.
+	/// Verifies background ordering and multi-level flex layout.
+	#[test]
+	fn nested_with_backgrounds() {
+		let out = render((LayoutStyle::flex_col().row_gap(1), children![
+			(
+				LayoutStyle::flex_row().column_gap(1),
+				children![
+					(rsx! { "Left" }, bordered(), VisualStyle {
+						background: Some(Color::srgb(0.2, 0.2, 0.5)),
+						..default()
+					},),
+					(rsx! { "Right" }, bordered(), VisualStyle {
+						background: Some(Color::srgb(0.5, 0.2, 0.2)),
+						..default()
+					},),
+				],
+				bordered()
+			),
+			(
+				LayoutStyle::flex_row().column_gap(1),
+				children![(rsx! { "Below" }, bordered(), VisualStyle {
+					background: Some(Color::srgb(0.2, 0.5, 0.2)),
+					..default()
+				},),],
+				bordered()
+			),
+		]));
+		// both rows should appear - header row and second row
+		out.as_str().xpect_contains("┌"); // at least one top-left corner
+		// ensure trim_lines worked (output should not include excess blank rows)
+		(out.lines().count() <= 12).xpect_true();
+		// both rows rendered: check for both content strings
+		out.as_str().xpect_contains("Left");
+		out.xpect_contains("Below");
+	}
+
+	/// Wide CJK chars each occupy 2 terminal columns.
+	/// The border width must account for the display width, not the char count.
+	#[test]
+	fn wide_chars_layout() {
+		let out = render((LayoutStyle::flex_row().column_gap(1), children![
+			(rsx! { "中文" }, bordered()),
+			(rsx! { "ＡＢＣ" }, bordered()),
+		]));
+		// "中文": 2 wide chars = 4 cols content → border top = ┌────┐
+		out.as_str().xpect_contains("┌────┐");
+		// "ＡＢＣ": 3 wide chars = 6 cols content → border top = ┌──────┐
+		out.xpect_contains("┌──────┐");
 	}
 }

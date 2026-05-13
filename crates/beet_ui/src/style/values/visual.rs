@@ -13,7 +13,9 @@ pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct VisualStyle {
 	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
+	#[set_with(unwrap_option, into)]
 	pub foreground: Option<Color>,
+	#[set_with(unwrap_option, into)]
 	pub background: Option<Color>,
 	/// Color of underlines, overlines etc
 	pub decoration_color: Option<Color>,
