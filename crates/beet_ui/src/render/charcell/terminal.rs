@@ -50,14 +50,12 @@ impl StdioTerminal {
 		/// Large write buffer prevents mid-frame flushes and terminal flicker.
 		const TERMINAL_BUFFER_CAPACITY: usize = 4 * 1024 * 1024;
 
-		let size = terminal_ext::size();
 		let terminal = Terminal::new(
 			AsyncReader::stdin(),
 			BufWriter::with_capacity(
 				TERMINAL_BUFFER_CAPACITY,
 				std::io::stdout(),
 			),
-			size,
 			stdio.config.clone(),
 		);
 		world.commands().entity(cx.entity).insert(terminal);
@@ -124,7 +122,7 @@ pub struct ChannelTerminal {
 }
 
 impl ChannelTerminal {
-	pub fn new(size: UVec2, config: TerminalConfig) -> (Self, Terminal) {
+	pub fn new(config: TerminalConfig) -> (Self, Terminal) {
 		let (writer, write_recv) = AsyncWriter::new();
 		let (read_send, reader) = AsyncReader::new();
 		(
@@ -132,7 +130,7 @@ impl ChannelTerminal {
 				write_recv,
 				read_send,
 			},
-			Terminal::new(reader, writer, size, config),
+			Terminal::new(reader, writer, config),
 		)
 	}
 	/// Send input to the terminals Reader,
@@ -248,7 +246,6 @@ pub struct Terminal {
 	pub reader: Box<dyn 'static + Send + Sync + Read>,
 	/// Output writer — receives all ANSI escape sequences and cell data.
 	writer: Box<dyn 'static + Send + Sync + Write>,
-	size: UVec2,
 	/// Configuration applied on init and used to restore previous state on exit.
 	config: TerminalConfig,
 	input_parser: InputParser,
@@ -256,22 +253,20 @@ pub struct Terminal {
 
 impl Terminal {
 	/// Create an in-memory [`Terminal`] backed by a [`Vec<u8>`] writer.
-	pub fn new_buffered(size: UVec2) -> Self {
-		Self::new(Cursor::new(Vec::new()), Vec::new(), size, default())
+	pub fn new_buffered() -> Self {
+		Self::new(Cursor::new(Vec::new()), Vec::new(), default())
 	}
 
 	/// Create a terminal with explicit reader, writer, and size.
 	pub fn new(
 		reader: impl 'static + Send + Sync + Read,
 		writer: impl 'static + Send + Sync + Write,
-		size: UVec2,
 		config: TerminalConfig,
 	) -> Self {
 		let mut this = Self {
 			reader: Box::new(reader),
 			writer: Box::new(writer),
 			config,
-			size,
 			input_parser: InputParser::new(),
 		};
 		this.apply_config().unwrap();
@@ -325,13 +320,6 @@ impl Terminal {
 		}
 		Ok(())
 	}
-
-
-	/// Current terminal size.
-	pub fn size(&self) -> UVec2 { self.size }
-
-	/// Update the terminal size.
-	pub fn set_size(&mut self, size: UVec2) { self.size = size; }
 
 	/// Mutable access to the underlying writer.
 	pub fn writer_mut(&mut self) -> &mut dyn Write { &mut *self.writer }

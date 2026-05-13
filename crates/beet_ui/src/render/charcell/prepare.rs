@@ -14,26 +14,17 @@ use super::LayoutRect;
 pub fn prepare_charcell_tree(
 	mut commands: Commands,
 	roots: Query<Entity, With<DoubleBuffer>>,
-	children_query: Query<&Children>,
+	children: Query<&Children>,
 	has_intrinsic: Query<(), With<IntrinsicSize>>,
 	has_layout: Query<(), With<LayoutRect>>,
 ) {
 	for root in roots.iter() {
-		let mut to_visit = vec![root];
-		let mut visited = HashSet::<Entity>::default();
-		// BFS over the tree
-		while let Some(entity) = to_visit.pop() {
-			if !visited.insert(entity) {
-				continue;
-			}
+		for entity in children.iter_descendants_inclusive(root) {
 			if !has_intrinsic.contains(entity) {
 				commands.entity(entity).insert(IntrinsicSize::default());
 			}
 			if !has_layout.contains(entity) {
 				commands.entity(entity).insert(LayoutRect::default());
-			}
-			if let Ok(children) = children_query.get(entity) {
-				to_visit.extend(children.iter());
 			}
 		}
 	}

@@ -1,12 +1,11 @@
+use super::*;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
 #[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
-use bevy::prelude::ApplyDeferred;
 
-use super::*;
-
+#[derive(Default)]
 pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
@@ -20,7 +19,6 @@ impl Plugin for CharcellPlugin {
 				PostUpdate,
 				(
 					prepare_charcell_tree,
-					ApplyDeferred,
 					measure_nodes,
 					layout_nodes,
 					paint_nodes,
