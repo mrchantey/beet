@@ -4,6 +4,7 @@
 //! and three draw helpers that fill the corresponding terminal cells.
 use crate::prelude::*;
 use crate::render::Buffer;
+use crate::style::BoxStyle;
 use crate::style::Spacing;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
@@ -30,7 +31,17 @@ impl BoxModel {
 	///
 	/// Returns zeroed/false defaults when the node has no box style.
 	pub fn from_node(node: &CharcellNodeData, viewport: UVec2) -> Self {
-		let Some(box_style) = node.box_style() else {
+		Self::from_box_style(node.box_style(), viewport)
+	}
+
+	/// Compute the box model from an optional [`BoxStyle`] and `viewport`.
+	///
+	/// Returns zeroed/false defaults when `box_style` is `None`.
+	pub fn from_box_style(
+		box_style: Option<&BoxStyle>,
+		viewport: UVec2,
+	) -> Self {
+		let Some(box_style) = box_style else {
 			return Self {
 				margin: URect::default(),
 				has_border: false,
@@ -90,19 +101,7 @@ impl BoxModel {
 	}
 }
 
-// ── Drawing ───────────────────────────────────────────────────────────────────
-
-/// Fill margin cells — the area between `containing` and `border_rect` —
-/// with the parent entity and style. No-op when there is no margin.
-pub(super) fn draw_margin(
-	buffer: &mut Buffer,
-	containing: URect,
-	border_rect: URect,
-	style: VisualStyle,
-	entity: Entity,
-) {
-	fill_frame(buffer, containing, border_rect, style, entity);
-}
+// ── Drawing ─────────────────────────────────────────────────────────────────
 
 /// Draw a single-line box border inside `rect` using box-drawing characters.
 ///
@@ -112,7 +111,9 @@ pub(super) fn draw_margin(
 pub(super) fn draw_border(
 	buffer: &mut Buffer,
 	rect: URect,
-	node: &CharcellNodeData,
+	box_style: Option<&BoxStyle>,
+	visual: &VisualStyle,
+	entity: Entity,
 ) {
 	let width = rect.width();
 	let height = rect.height();
@@ -120,10 +121,6 @@ pub(super) fn draw_border(
 	if width < 2 || height < 2 {
 		return; // too small for a border
 	}
-
-	let visual = node.visual_style();
-	let box_style = node.box_style();
-	let entity = node.entity;
 
 	// build per-side char styles
 	let top_style = side_style(box_style.and_then(|b| b.border_top), visual);
@@ -175,53 +172,11 @@ pub(super) fn draw_border(
 	);
 }
 
-/// Fill padding cells — the area between `inner_rect` and `content_rect` —
-/// with the current node entity and style. No-op when there is no padding.
-pub(super) fn draw_padding(
-	buffer: &mut Buffer,
-	inner_rect: URect,
-	content_rect: URect,
-	style: VisualStyle,
-	entity: Entity,
-) {
-	fill_frame(buffer, inner_rect, content_rect, style, entity);
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Fill every cell in `outer` that lies outside `inner` with a space cell.
-fn fill_frame(
-	buffer: &mut Buffer,
-	outer: URect,
-	inner: URect,
-	style: VisualStyle,
-	entity: Entity,
-) {
-	// clamp inner to outer so we never write outside it
-	let inner_min_x = inner.min.x.max(outer.min.x);
-	let inner_min_y = inner.min.y.max(outer.min.y);
-	let inner_max_x = inner.max.x.min(outer.max.x);
-	let inner_max_y = inner.max.y.min(outer.max.y);
-
-	for y in outer.min.y..outer.max.y {
-		for x in outer.min.x..outer.max.x {
-			let inside = x >= inner_min_x
-				&& x < inner_max_x
-				&& y >= inner_min_y
-				&& y < inner_max_y;
-			if !inside {
-				buffer.set(
-					UVec2::new(x, y),
-					Cell::new(" ", style.clone(), entity),
-				);
-			}
-		}
-	}
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 /// Build a [`VisualStyle`] for one border side, using the provided color as
 /// the foreground and inheriting the background from the visual style.
-fn side_style(
+pub(super) fn side_style(
 	border_color: Option<Color>,
 	visual: &VisualStyle,
 ) -> VisualStyle {

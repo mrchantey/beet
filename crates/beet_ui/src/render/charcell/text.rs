@@ -20,28 +20,26 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	)
 }
 
-/// Paint the text content of a node into `buffer` within `content_rect`.
-pub fn paint_text(
-	node: &CharcellNodeData,
+/// Paint text from raw components, without requiring a [`CharcellNodeData`].
+pub(super) fn paint_text_raw(
+	text: &str,
+	visual: &VisualStyle,
+	entity: Entity,
 	content_rect: URect,
 	buffer: &mut Buffer,
 ) -> Result {
-	let Some(value) = node.value() else {
-		return Ok(());
-	};
-	let lines = word_wrap(&value.to_string(), content_rect.width());
+	let lines = word_wrap(text, content_rect.width());
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as u32;
 		if y >= content_rect.max.y {
 			break;
 		}
-		let text_align = node.visual_style().text_align;
-		let aligned = align_line(line, content_rect.width(), text_align);
+		let aligned = align_line(line, content_rect.width(), visual.text_align);
 		buffer.write_text(
 			UVec2::new(content_rect.min.x, y),
 			&aligned,
-			node.visual_style().clone(),
-			node.entity,
+			visual.clone(),
+			entity,
 		);
 	}
 	Ok(())
@@ -75,6 +73,10 @@ fn word_wrap(text: &str, max_w: u32) -> Vec<String> {
 				lines.push(std::mem::take(&mut current));
 				current = word.to_string();
 			}
+		}
+		// Preserve trailing whitespace from original paragraph
+		if para.ends_with(|c: char| c.is_whitespace()) && !current.is_empty() {
+			current.push(' ');
 		}
 		lines.push(current);
 	}

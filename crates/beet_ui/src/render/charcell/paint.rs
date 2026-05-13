@@ -3,106 +3,106 @@ use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
-use bevy::prelude::ChildOf;
+
+/// Snapshot of per-node paint data, cloned before the buffer is mutated.
+///
+/// All data is owned so the read and write phases of [`paint_nodes`] can
+/// operate independently without holding a borrow on [`CharcellQuery`].
+struct NodePaint {
+	entity: Entity,
+	layout_rect: URect,
+	visual: VisualStyle,
+	box_style: Option<BoxStyle>,
+	value: Option<Value>,
+}
 
 /// ECS system: paint all nodes in each [`DoubleBuffer`] tree.
 ///
-/// Traverses each tree pre-order, painting box model and text for every
-/// node that has a [`LayoutRect`]. Parent visual style is used to fill
-/// margin cells.
+/// Traverses each tree pre-order. Each node fills its own inner rect with its
+/// background, draws its border, then paints text. Since rendering is pre-order,
+/// a parent's fill naturally covers the child's margin area — no parent lookup
+/// is needed in the child.
 pub fn paint_nodes(
-	mut buffers: Query<(Entity, &mut DoubleBuffer)>,
+	mut params: ParamSet<(Query<(Entity, &mut DoubleBuffer)>, CharcellQuery)>,
 	children_query: Query<&Children>,
-	styles_query: StylesQuery,
-	layout_rects: Query<&LayoutRect>,
-	parent_query: Query<&ChildOf>,
 ) -> Result {
-	for (root, mut double_buffer) in buffers.iter_mut() {
-		// Reset the current frame buffer, then collect the ordered node list
+	let root_viewports = params.p1().root_viewports();
+
+	for (root, viewport_size) in root_viewports {
+		let ordered = children_query.collect_pre_order(root);
+
+		// Read phase: snapshot node data from CharcellQuery
+		let paint_items: Vec<NodePaint> = {
+			let charcell = params.p1();
+			ordered
+				.iter()
+				.filter_map(|&entity| {
+					let node = charcell.node(entity).ok()?;
+					Some(NodePaint {
+						entity,
+						layout_rect: node.layout_rect(),
+						visual: node.visual_style().clone(),
+						box_style: node.box_style().cloned(),
+						value: node.value().cloned(),
+					})
+				})
+				.collect()
+		};
+
+		// Write phase: reset and paint into the buffer
+		let mut buffers = params.p0();
+		let Ok((_, mut double_buffer)) = buffers.get_mut(root) else {
+			continue;
+		};
 		double_buffer.current_buffer_mut().reset();
-		let viewport_size = double_buffer.size();
-		let ordered = collect_pre_order(root, &children_query);
+		let buf = double_buffer.current_buffer_mut();
 
-		// Paint each node into the buffer
-		let buffer = double_buffer.current_buffer_mut();
-		for &entity in &ordered {
-			let Ok(&layout_rect) = layout_rects.get(entity) else {
-				continue;
-			};
-
-			// Look up parent visual style for margin filling
-			let parent_data: Option<(Entity, &VisualStyle)> =
-				parent_query.get(entity).ok().and_then(|child_of| {
-					let pe = child_of.parent();
-					let (_, pvisual, _, _) = styles_query.get(pe).ok()?;
-					Some((pe, pvisual.unwrap_or(&VISUAL_STYLE_DEFAULT)))
-				});
-
-			let (value, visual, layout, box_style) =
-				styles_query.get(entity).unwrap_or_default();
-			let node = CharcellNodeData {
-				entity,
-				value,
-				visual,
-				layout,
-				box_style,
-			};
-
-			paint_node(
-				&node,
-				layout_rect.0,
-				parent_data,
-				viewport_size,
-				buffer,
-			)?;
+		for item in &paint_items {
+			paint_node(item, viewport_size, buf)?;
 		}
 	}
 	Ok(())
 }
 
 fn paint_node(
-	node: &CharcellNodeData,
-	layout_rect: URect,
-	parent: Option<(Entity, &VisualStyle)>,
+	item: &NodePaint,
 	viewport: UVec2,
 	buffer: &mut Buffer,
 ) -> Result {
-	let box_model = BoxModel::from_node(node, viewport);
+	let box_model = BoxModel::from_box_style(item.box_style.as_ref(), viewport);
+	let layout_rect = item.layout_rect;
 	let border_rect = box_model.border_rect(layout_rect);
+	let inner_rect = box_model.inner_rect(layout_rect);
+	let content_rect = box_model.content_rect(layout_rect);
 
-	// 1. Fill margin cells with the parent entity/style
-	if let Some((parent_entity, parent_style)) = parent {
-		if border_rect != layout_rect {
-			draw_margin(
-				buffer,
-				layout_rect,
-				border_rect,
-				parent_style.clone(),
-				parent_entity,
-			);
-		}
+	// 1. Fill the inner rect (inside margin+border) with this node's background.
+	//    Pre-order traversal means the parent fills first, so a child's margin
+	//    area is covered by the parent's fill without any parent lookup.
+	if inner_rect.width() > 0 && inner_rect.height() > 0 {
+		buffer.fill_rect(inner_rect, item.visual.clone(), item.entity);
 	}
 
 	// 2. Draw border if present
 	if box_model.has_border {
-		draw_border(buffer, border_rect, node);
-	}
-
-	// 3. Fill padding cells with the current node entity/style
-	let inner_rect = box_model.inner_rect(layout_rect);
-	let content_rect = box_model.content_rect(layout_rect);
-	if content_rect != inner_rect {
-		draw_padding(
+		draw_border(
 			buffer,
-			inner_rect,
-			content_rect,
-			node.visual_style().clone(),
-			node.entity,
+			border_rect,
+			item.box_style.as_ref(),
+			&item.visual,
+			item.entity,
 		);
 	}
 
-	// 4. Paint text content
-	paint_text(node, content_rect, buffer)?;
+	// 3. Paint text content
+	if let Some(ref value) = item.value {
+		paint_text_raw(
+			&value.to_string(),
+			&item.visual,
+			item.entity,
+			content_rect,
+			buffer,
+		)?;
+	}
 
 	Ok(())
 }

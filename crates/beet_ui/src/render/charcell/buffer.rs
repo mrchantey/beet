@@ -1,6 +1,7 @@
 use super::escape;
 use crate::style::*;
 use beet_core::prelude::*;
+use bevy::math::URect;
 use bevy::math::UVec2;
 
 /// Returns the display width (in terminal columns) for a character.
@@ -93,7 +94,10 @@ impl Buffer {
 			})
 	}
 
-	/// Write text starting at position, wrapping each character into a cell.
+	/// Write text starting at position, advancing by each character's display width.
+	///
+	/// Wide (CJK/fullwidth) characters occupy 2 columns; the trailing column is
+	/// written as a `None`-symbol placeholder so the diff sees it as changed.
 	pub fn write_text(
 		&mut self,
 		pos: UVec2,
@@ -101,8 +105,10 @@ impl Buffer {
 		style: VisualStyle,
 		entity: Entity,
 	) {
-		for (i, ch) in text.chars().enumerate() {
-			let cell_pos = UVec2::new(pos.x + i as u32, pos.y);
+		let mut col = 0u32;
+		for ch in text.chars() {
+			let w = char_width(ch) as u32;
+			let cell_pos = UVec2::new(pos.x + col, pos.y);
 			if cell_pos.x >= self.size.x {
 				break;
 			}
@@ -110,6 +116,35 @@ impl Buffer {
 				cell_pos,
 				Cell::new(ch.to_string(), style.clone(), entity),
 			);
+			// placeholder for the trailing column of a wide character
+			if w == 2 {
+				let cont_pos = UVec2::new(pos.x + col + 1, pos.y);
+				if cont_pos.x < self.size.x {
+					self.set(cont_pos, Cell {
+						symbol: None,
+						style: style.clone(),
+						entity: Some(entity),
+					});
+				}
+			}
+			col += w;
+		}
+	}
+
+	/// Fill all cells in `rect` with a space cell using `style` and `entity`.
+	pub fn fill_rect(
+		&mut self,
+		rect: URect,
+		style: VisualStyle,
+		entity: Entity,
+	) {
+		for y in rect.min.y..rect.max.y {
+			for x in rect.min.x..rect.max.x {
+				self.set(
+					UVec2::new(x, y),
+					Cell::new(" ", style.clone(), entity),
+				);
+			}
 		}
 	}
 
@@ -122,7 +157,12 @@ impl Buffer {
 		for y in 0..height {
 			for x in 0..width {
 				let idx = y * width + x;
-				result.push_str(self.cells[idx].symbol_str());
+				let cell = &self.cells[idx];
+				// skip trailing columns of wide characters
+				if cell.is_wide_continuation() {
+					continue;
+				}
+				result.push_str(cell.symbol_str());
 			}
 			if y < height - 1 {
 				result.push('\n');
@@ -152,6 +192,9 @@ impl Buffer {
 					.ok();
 					out.extend_from_slice(cell.symbol_str().as_bytes());
 					prev_style = Some(cell.style.clone());
+				} else if cell.is_wide_continuation() {
+					// trailing column of a wide char — emit nothing, the wide char
+					// already advanced the cursor past this column.
 				} else {
 					if prev_style.is_some() {
 						out.extend_from_slice(escape::RESET.as_bytes());
@@ -178,7 +221,8 @@ pub struct Cell {
 	/// (eg. trailing cell of a wide unicode character), rendered as a space.
 	pub symbol: Option<SmolStr>,
 	pub style: VisualStyle,
-	pub entity: Entity,
+	/// The entity that last wrote this cell. `None` for truly blank cells.
+	pub entity: Option<Entity>,
 }
 
 impl Cell {
@@ -186,7 +230,7 @@ impl Cell {
 	pub const BLANK: Self = Self {
 		symbol: None,
 		style: VisualStyle::DEFAULT,
-		entity: Entity::PLACEHOLDER,
+		entity: None,
 	};
 
 	/// Create a cell with a symbol.
@@ -198,12 +242,21 @@ impl Cell {
 		Self {
 			symbol: Some(symbol.into()),
 			style: style.into(),
-			entity,
+			entity: Some(entity),
 		}
 	}
 
 	/// Display character, defaulting to a space for blank cells.
 	pub fn symbol_str(&self) -> &str { self.symbol.as_deref().unwrap_or(" ") }
+
+	/// Returns `true` if this cell is the trailing placeholder of a wide character.
+	///
+	/// Wide-char continuation cells have no symbol but retain the entity that
+	/// wrote them. Renderers should skip these cells entirely (the wide char
+	/// occupies both columns).
+	pub fn is_wide_continuation(&self) -> bool {
+		self.symbol.is_none() && self.entity.is_some()
+	}
 
 	/// Display width in terminal columns. Wide chars (CJK, fullwidth) = 2.
 	pub fn cell_width(&self) -> u16 {
@@ -214,11 +267,15 @@ impl Cell {
 			.unwrap_or(1)
 	}
 
-	/// Visual equality: same symbol (`None` == `" "`) and same style.
+	/// Visual equality: same symbol and same style. `None` != `Some(" ")`.
 	///
 	/// Entity is disregarded.
 	pub fn visual_eq(&self, other: &Self) -> bool {
-		self.symbol_str() == other.symbol_str() && self.style == other.style
+		match (&self.symbol, &other.symbol) {
+			(None, None) => true,
+			(Some(a), Some(b)) => a == b && self.style == other.style,
+			_ => false,
+		}
 	}
 }
 

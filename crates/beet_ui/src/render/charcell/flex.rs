@@ -11,7 +11,7 @@ use bevy::math::URect;
 use bevy::math::UVec2;
 
 use super::query::CharcellNodeData;
-use super::query::StylesQuery;
+use super::query::CharcellQuery;
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
@@ -66,16 +66,16 @@ fn cross_size(size: UVec2, direction: Direction, viewport: UVec2) -> u32 {
 /// `styles` is used to look up flex-order for line formation.
 pub fn measure_flex(
 	node: &CharcellNodeData,
-	children: &[Entity],
+	query: &CharcellQuery,
 	sizes: &HashMap<Entity, UVec2>,
-	styles: &StylesQuery<'_, '_>,
 	available: UVec2,
 	viewport: UVec2,
 ) -> Result<UVec2> {
 	let flexbox = node.flexbox();
+	let children: Vec<Entity> = node.children().collect();
 
 	let lines = form_lines_from_sizes(
-		children, styles, flexbox, available, viewport, sizes,
+		&children, query, flexbox, available, viewport, sizes,
 	);
 
 	let direction = resolve_direction(flexbox.direction, viewport);
@@ -140,30 +140,35 @@ pub fn measure_flex(
 
 /// Layout pass: assign a [`LayoutRect`] to each flex child.
 ///
-/// Reads pre-computed intrinsic sizes from `intrinsic_sizes` and writes
+/// Reads pre-computed [`IntrinsicSize`] from the query and writes
 /// each child's rect into `layout_rects`.
 pub fn flex_layout_rects(
 	node: &CharcellNodeData,
-	children: &[Entity],
-	styles: &StylesQuery<'_, '_>,
+	query: &CharcellQuery,
 	container_rect: URect,
 	viewport: UVec2,
-	intrinsic_sizes: &HashMap<Entity, UVec2>,
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
 	let flexbox = node.flexbox();
+	let children: Vec<Entity> = node.children().collect();
 
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
 	let available = UVec2::new(content_rect.width(), content_rect.height());
 
+	// Build intrinsic sizes from child nodes (already computed by measure phase)
+	let intrinsic_sizes: HashMap<Entity, UVec2> = children
+		.iter()
+		.filter_map(|&e| query.node(e).ok().map(|n| (e, n.intrinsic_size())))
+		.collect();
+
 	let lines = form_lines_from_sizes(
-		children,
-		styles,
+		&children,
+		query,
 		flexbox,
 		available,
 		viewport,
-		intrinsic_sizes,
+		&intrinsic_sizes,
 	);
 
 	// Collect cross sizes per line
@@ -217,7 +222,7 @@ pub fn flex_layout_rects(
 				let final_sizes = apply_flex_grow(
 					flexbox,
 					line,
-					styles,
+					query,
 					content_rect.width(),
 					viewport,
 				);
@@ -234,15 +239,13 @@ pub fn flex_layout_rects(
 				{
 					let entity = *entity;
 					let align =
-						resolve_align(entity, styles, flexbox.align_items);
+						resolve_align(entity, query, flexbox.align_items);
 					let child_h = match align {
 						AlignItems::Stretch => line_h,
 						_ => fsize.y.min(line_h),
 					};
 					let child_y = line_y
-						+ cross_offset(
-							entity, styles, flexbox, child_h, line_h,
-						);
+						+ cross_offset(entity, query, flexbox, child_h, line_h);
 					let child_x = content_rect.min.x + main_positions[item_idx];
 					let child_rect = URect::new(
 						child_x,
@@ -280,7 +283,7 @@ pub fn flex_layout_rects(
 				let final_sizes = apply_flex_grow(
 					flexbox,
 					line,
-					styles,
+					query,
 					content_rect.height(),
 					viewport,
 				);
@@ -297,15 +300,13 @@ pub fn flex_layout_rects(
 				{
 					let entity = *entity;
 					let align =
-						resolve_align(entity, styles, flexbox.align_items);
+						resolve_align(entity, query, flexbox.align_items);
 					let child_w = match align {
 						AlignItems::Stretch => line_w,
 						_ => fsize.x.min(line_w),
 					};
 					let child_x = line_x
-						+ cross_offset(
-							entity, styles, flexbox, child_w, line_w,
-						);
+						+ cross_offset(entity, query, flexbox, child_w, line_w);
 					let child_y = content_rect.min.y + main_positions[item_idx];
 					let child_rect = URect::new(
 						child_x,
@@ -331,7 +332,7 @@ pub fn flex_layout_rects(
 /// Children are sorted by `flex_order` before packing into lines.
 fn form_lines_from_sizes(
 	children: &[Entity],
-	styles: &StylesQuery<'_, '_>,
+	query: &CharcellQuery,
 	flexbox: &FlexBox,
 	available: UVec2,
 	viewport: UVec2,
@@ -357,8 +358,10 @@ fn form_lines_from_sizes(
 	// Sort by flex_order
 	let mut sorted: Vec<Entity> = children.to_vec();
 	sorted.sort_by_key(|&e| {
-		let (_, _, layout, _) = styles.get(e).unwrap_or_default();
-		layout.map(|l| l.flex_order).unwrap_or(0)
+		query
+			.node(e)
+			.map(|n| n.layout_style().flex_order)
+			.unwrap_or(0)
 	});
 
 	let mut lines: Vec<Vec<(Entity, UVec2)>> = vec![];
@@ -408,12 +411,12 @@ fn line_cross_size_for(
 
 fn resolve_align(
 	entity: Entity,
-	styles: &StylesQuery<'_, '_>,
+	query: &CharcellQuery,
 	default_align: AlignItems,
 ) -> AlignItems {
-	let (_, _, layout, _) = styles.get(entity).unwrap_or_default();
-	let align_self = layout
-		.map(|l| l.align_self.clone())
+	let align_self = query
+		.node(entity)
+		.map(|n| n.layout_style().align_self.clone())
 		.unwrap_or(AlignSelf::Auto);
 	match align_self {
 		AlignSelf::Auto => default_align,
@@ -427,12 +430,12 @@ fn resolve_align(
 
 fn cross_offset(
 	entity: Entity,
-	styles: &StylesQuery<'_, '_>,
+	query: &CharcellQuery,
 	flexbox: &FlexBox,
 	child_cross: u32,
 	line_cross: u32,
 ) -> u32 {
-	let align = resolve_align(entity, styles, flexbox.align_items);
+	let align = resolve_align(entity, query, flexbox.align_items);
 	match align {
 		AlignItems::Start | AlignItems::Stretch => 0,
 		AlignItems::Center => line_cross.saturating_sub(child_cross) / 2,
@@ -444,7 +447,7 @@ fn cross_offset(
 fn apply_flex_grow(
 	flexbox: &FlexBox,
 	line: &[(Entity, UVec2)],
-	styles: &StylesQuery<'_, '_>,
+	query: &CharcellQuery,
 	container_main: u32,
 	viewport: UVec2,
 ) -> Vec<UVec2> {
@@ -474,8 +477,10 @@ fn apply_flex_grow(
 	let grow_values: Vec<u32> = line
 		.iter()
 		.map(|(entity, _)| {
-			let (_, _, layout, _) = styles.get(*entity).unwrap_or_default();
-			layout.map(|l| l.flex_grow).unwrap_or(0)
+			query
+				.node(*entity)
+				.map(|n| n.layout_style().flex_grow)
+				.unwrap_or(0)
 		})
 		.collect();
 

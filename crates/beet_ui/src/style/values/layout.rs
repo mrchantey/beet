@@ -306,7 +306,8 @@ impl AsCssValue for Direction {
 
 
 /// How to distribute lines along the cross axis when wrapping.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AlignContent {
 	#[default]
 	Start,
@@ -315,6 +316,20 @@ pub enum AlignContent {
 	SpaceBetween,
 	SpaceAround,
 	Stretch,
+}
+impl AsCssValue for AlignContent {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Start => "start",
+			Self::Center => "center",
+			Self::End => "end",
+			Self::SpaceBetween => "space-between",
+			Self::SpaceAround => "space-around",
+			Self::Stretch => "stretch",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Reflect)]

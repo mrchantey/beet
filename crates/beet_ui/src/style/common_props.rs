@@ -6,6 +6,7 @@ use crate::style::AlignItems;
 use crate::style::JustifyContent;
 use crate::style::Display;
 use crate::style::Direction;
+use crate::style::AlignContent;
 use crate::style::FlexWrap;
 use crate::style::*;
 use beet_core::prelude::*;
@@ -67,8 +68,8 @@ css_property!(BorderColorProp, Color, "border-color");
 
 css_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
 css_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");
+css_property!(AlignContentProp, AlignContent, TokenInheritance::NotInherited, "align-content");
 css_property!(FlexDirectionProp, Direction, TokenInheritance::NotInherited, "flex-direction");
 css_property!(FlexWrapProp, FlexWrap, TokenInheritance::NotInherited, "flex-wrap");
 css_property!(RowGapProp, u32, TokenInheritance::NotInherited, "row-gap");
 css_property!(ColumnGapProp, u32, TokenInheritance::NotInherited, "column-gap");
-

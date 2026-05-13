@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::style::AlignContent;
+
 use crate::style::FlexBox;
 use crate::style::LayoutStyle;
 use crate::style::VisualStyle;
@@ -104,6 +104,8 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 		.resolve(entity, JustifyContentProp)
 		.unwrap_or_default();
 	let align_items = query.resolve(entity, AlignItemsProp).unwrap_or_default();
+	let align_content =
+		query.resolve(entity, AlignContentProp).unwrap_or_default();
 	let row_gap = query.resolve(entity, RowGapProp).unwrap_or_default();
 	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
 	LayoutStyle {
@@ -113,7 +115,7 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 			wrap,
 			justify_content,
 			align_items,
-			align_content: AlignContent::default(),
+			align_content,
 			row_gap,
 			column_gap,
 		},

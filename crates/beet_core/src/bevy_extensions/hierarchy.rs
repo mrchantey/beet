@@ -72,6 +72,44 @@ pub impl<
 			self.iter_descendants_depth_first(entity),
 		)
 	}
+
+	/// Collects entities in pre-order (root first, depth-first), including the root.
+	fn collect_pre_order(&'w self, entity: Entity) -> Vec<Entity>
+	where
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w Children>,
+	{
+		let mut result = Vec::new();
+		let mut stack = vec![entity];
+		while let Some(entity) = stack.pop() {
+			result.push(entity);
+			if let Ok(children) = self.get(entity) {
+				stack.extend(children.iter().rev());
+			}
+		}
+		result
+	}
+
+	/// Collects entities in post-order (leaves first, depth-first), including the root.
+	fn collect_post_order(&'w self, entity: Entity) -> Vec<Entity>
+	where
+		D::ReadOnly: QueryData<Item<'w, 's> = &'w Children>,
+	{
+		let mut result = Vec::new();
+		let mut stack = vec![(entity, false)];
+		while let Some((entity, visited)) = stack.pop() {
+			if visited {
+				result.push(entity);
+			} else {
+				stack.push((entity, true));
+				if let Ok(children) = self.get(entity) {
+					stack.extend(
+						children.iter().rev().map(|child| (child, false)),
+					);
+				}
+			}
+		}
+		result
+	}
 }
 
 

@@ -14,45 +14,30 @@ pub struct IntrinsicSize(pub UVec2);
 
 /// ECS system: compute [`IntrinsicSize`] for all nodes bottom-up.
 pub fn measure_nodes(
-	query: CharcellQuery,
-	mut sizes_query: Query<&mut IntrinsicSize>,
+	mut params: ParamSet<(CharcellQuery, Query<&mut IntrinsicSize>)>,
+	children_query: Query<&Children>,
 ) -> Result {
-	let root_viewports = query.root_viewports();
+	let root_viewports = params.p0().root_viewports();
 	for (root, viewport_size) in root_viewports {
-		let ordered = collect_post_order(root, &query.children);
+		let ordered = children_query.collect_post_order(root);
 		let mut sizes = HashMap::<Entity, UVec2>::new();
 
-		for &entity in &ordered {
-			// Access fields directly to allow partial borrows alongside sizes HashMap
-			let (value, visual, layout, box_style) =
-				query.styles.get(entity).unwrap_or_default();
-			let node = CharcellNodeData {
-				entity,
-				value,
-				visual,
-				layout,
-				box_style,
-			};
-
-			let children: Vec<Entity> = query
-				.children
-				.get(entity)
-				.map(|c| c.iter().collect())
-				.unwrap_or_default();
-
-			let size = measure_node(
-				&node,
-				&children,
-				viewport_size,
-				&sizes,
-				&query.styles,
-			)?;
-			sizes.insert(entity, size);
+		// Read phase: use CharcellQuery to measure each node bottom-up
+		{
+			let charcell = params.p0();
+			for &entity in &ordered {
+				let Ok(node) = charcell.node(entity) else {
+					continue;
+				};
+				let size =
+					measure_node(&node, &charcell, viewport_size, &sizes)?;
+				sizes.insert(entity, size);
+			}
 		}
 
-		// Write sizes to ECS components
+		// Write phase: flush computed sizes to ECS components
 		for (entity, size) in sizes {
-			if let Ok(mut intrinsic) = sizes_query.get_mut(entity) {
+			if let Ok(mut intrinsic) = params.p1().get_mut(entity) {
 				intrinsic.set_if_neq(IntrinsicSize(size));
 			}
 		}
@@ -65,10 +50,9 @@ pub fn measure_nodes(
 /// Uses viewport dimensions as the unconstrained available space.
 pub(super) fn measure_node(
 	node: &CharcellNodeData,
-	children: &[Entity],
+	query: &CharcellQuery,
 	viewport: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
-	styles: &StylesQuery<'_, '_>,
 ) -> Result<UVec2> {
 	let box_model = BoxModel::from_node(node, viewport);
 	let overhead = box_model.overhead();
@@ -77,16 +61,13 @@ pub(super) fn measure_node(
 		viewport.y.saturating_sub(overhead.y),
 	);
 	let content_size = match node.layout_style().display {
-		Display::Flex => measure_flex(
-			node,
-			children,
-			sizes,
-			styles,
-			content_available,
-			viewport,
-		)?,
-		Display::Inline => measure_inline(children, content_available, sizes)?,
-		_ if node.value.is_some() => measure_text(node, content_available.x),
+		Display::Flex => {
+			measure_flex(node, query, sizes, content_available, viewport)?
+		}
+		Display::Inline => {
+			measure_inline(node, query, content_available, sizes)?
+		}
+		_ if node.value().is_some() => measure_text(node, content_available.x),
 		_ => UVec2::ZERO,
 	};
 	(content_size + overhead).xok()
@@ -96,10 +77,12 @@ pub(super) fn measure_node(
 ///
 /// Children must already be measured (post-order traversal ensures this).
 fn measure_inline(
-	children: &[Entity],
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
 	available: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> Result<UVec2> {
+	let children: Vec<Entity> = node.children().collect();
 	if children.is_empty() {
 		return UVec2::ZERO.xok();
 	}
@@ -108,8 +91,13 @@ fn measure_inline(
 	let mut row_w = 0u32;
 	let mut row_h = 0u32;
 
-	for &entity in children {
-		let size = sizes.get(&entity).copied().unwrap_or_default();
+	for entity in children {
+		// Use freshly-computed sizes during this measure pass
+		let size = sizes
+			.get(&entity)
+			.copied()
+			.or_else(|| query.node(entity).ok().map(|n| n.intrinsic_size()))
+			.unwrap_or_default();
 		if row_w > 0 && row_w + size.x > available.x {
 			max_w = max_w.max(row_w);
 			total_h += row_h.max(1);

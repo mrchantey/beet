@@ -186,9 +186,11 @@ pub fn write_style(
 
 	match style.decoration_style {
 		DecorationStyle::Solid => {}
-		DecorationStyle::Double => unimplemented!(),
-		DecorationStyle::Wavy => unimplemented!(),
-		DecorationStyle::Dash => unimplemented!(),
+		// These styles have limited terminal support;
+		// rendered as plain underline when decoration_line.underline is set.
+		DecorationStyle::Double
+		| DecorationStyle::Wavy
+		| DecorationStyle::Dash => {}
 	}
 
 	// Text attributes and decoration lines — only written when text_changed.

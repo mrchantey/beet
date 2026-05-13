@@ -10,7 +10,6 @@ use bevy::math::UVec2;
 
 use super::query::CharcellNodeData;
 use super::query::CharcellQuery;
-use super::query::collect_pre_order;
 
 /// The definite screen rect a node occupies, including margin.
 ///
@@ -21,81 +20,58 @@ pub struct LayoutRect(pub URect);
 
 /// ECS system: assign [`LayoutRect`] to all nodes top-down.
 pub fn layout_nodes(
-	query: CharcellQuery,
-	sizes_query: Query<&IntrinsicSize>,
-	mut rects_query: Query<&mut LayoutRect>,
+	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
+	children: Query<&Children>,
 ) -> Result {
-	let root_viewports = query.root_viewports();
+	let root_viewports = params.p0().root_viewports();
 	for (root, viewport_size) in root_viewports {
-		let ordered = collect_pre_order(root, &query.children);
+		let ordered = children.collect_pre_order(root);
 
 		// Root gets the full viewport rect
 		let mut layout_rects = HashMap::<Entity, URect>::new();
 		layout_rects
 			.insert(root, URect::new(0, 0, viewport_size.x, viewport_size.y));
 
-		// Build intrinsic sizes map
-		let mut intrinsic_sizes = HashMap::<Entity, UVec2>::new();
-		for &entity in &ordered {
-			if let Ok(size) = sizes_query.get(entity) {
-				intrinsic_sizes.insert(entity, size.0);
+		// Read phase: use CharcellQuery to distribute rects to children
+		{
+			let charcell = params.p0();
+			for &entity in &ordered {
+				let Some(&node_rect) = layout_rects.get(&entity) else {
+					continue;
+				};
+				let Ok(node) = charcell.node(entity) else {
+					continue;
+				};
+
+				match node.layout_style().display {
+					Display::Flex => flex_layout_rects(
+						&node,
+						&charcell,
+						node_rect,
+						viewport_size,
+						&mut layout_rects,
+					)?,
+					Display::Block => block_layout_rects(
+						&node,
+						&charcell,
+						node_rect,
+						viewport_size,
+						&mut layout_rects,
+					)?,
+					Display::Inline => inline_layout_rects(
+						&node,
+						&charcell,
+						node_rect,
+						viewport_size,
+						&mut layout_rects,
+					)?,
+				}
 			}
 		}
 
-		// Pre-order: for each entity, assign rects to its children
-		for &entity in &ordered {
-			let Some(&node_rect) = layout_rects.get(&entity) else {
-				continue;
-			};
-
-			let (_, _, layout, box_style) =
-				query.styles.get(entity).unwrap_or_default();
-			let node = CharcellNodeData {
-				entity,
-				value: None,
-				visual: None,
-				layout,
-				box_style,
-			};
-
-			let children: Vec<Entity> = query
-				.children
-				.get(entity)
-				.map(|c| c.iter().collect())
-				.unwrap_or_default();
-
-			match node.layout_style().display {
-				Display::Flex => flex_layout_rects(
-					&node,
-					&children,
-					&query.styles,
-					node_rect,
-					viewport_size,
-					&intrinsic_sizes,
-					&mut layout_rects,
-				)?,
-				Display::Block => block_layout_rects(
-					&node,
-					&children,
-					node_rect,
-					viewport_size,
-					&intrinsic_sizes,
-					&mut layout_rects,
-				)?,
-				Display::Inline => inline_layout_rects(
-					&node,
-					&children,
-					node_rect,
-					viewport_size,
-					&intrinsic_sizes,
-					&mut layout_rects,
-				)?,
-			}
-		}
-
-		// Write layout rects to ECS components
+		// Write phase: flush computed rects to ECS components
 		for (entity, rect) in layout_rects {
-			if let Ok(mut layout_rect) = rects_query.get_mut(entity) {
+			if let Ok(mut layout_rect) = params.p1().get_mut(entity) {
 				layout_rect.set_if_neq(LayoutRect(rect));
 			}
 		}
@@ -106,31 +82,26 @@ pub fn layout_nodes(
 /// Block flow: stack children top-to-bottom, each taking full parent width.
 pub fn block_layout_rects(
 	node: &CharcellNodeData,
-	children: &[Entity],
+	query: &CharcellQuery,
 	container_rect: URect,
 	viewport: UVec2,
-	intrinsic_sizes: &HashMap<Entity, UVec2>,
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
-	if children.is_empty() {
-		return Ok(());
-	}
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
 	let mut child_y = content_rect.min.y;
-	for &entity in children {
+	for child in node.child_nodes(query) {
 		if child_y >= content_rect.max.y {
 			break;
 		}
-		let child_size =
-			intrinsic_sizes.get(&entity).copied().unwrap_or_default();
+		let child_size = child.intrinsic_size();
 		let child_rect = URect::new(
 			content_rect.min.x,
 			child_y,
 			content_rect.max.x,
 			(child_y + child_size.y).min(content_rect.max.y),
 		);
-		layout_rects.insert(entity, child_rect);
+		layout_rects.insert(child.entity, child_rect);
 		child_y += child_size.y.max(1);
 	}
 	Ok(())
@@ -141,15 +112,11 @@ pub fn block_layout_rects(
 /// Each row's height equals the tallest child in that row.
 pub fn inline_layout_rects(
 	node: &CharcellNodeData,
-	children: &[Entity],
+	query: &CharcellQuery,
 	container_rect: URect,
 	viewport: UVec2,
-	intrinsic_sizes: &HashMap<Entity, UVec2>,
 	layout_rects: &mut HashMap<Entity, URect>,
 ) -> Result {
-	if children.is_empty() {
-		return Ok(());
-	}
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
 	let max_width = content_rect.width();
@@ -159,14 +126,14 @@ pub fn inline_layout_rects(
 	let mut current_row: Vec<(Entity, UVec2)> = Vec::new();
 	let mut current_row_width = 0u32;
 
-	for &entity in children {
-		let size = intrinsic_sizes.get(&entity).copied().unwrap_or_default();
+	for child in node.child_nodes(query) {
+		let size = child.intrinsic_size();
 		if !current_row.is_empty() && current_row_width + size.x > max_width {
 			rows.push(std::mem::take(&mut current_row));
 			current_row_width = 0;
 		}
 		current_row_width += size.x;
-		current_row.push((entity, size));
+		current_row.push((child.entity, size));
 	}
 	if !current_row.is_empty() {
 		rows.push(current_row);

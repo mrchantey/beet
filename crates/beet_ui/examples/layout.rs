@@ -44,6 +44,7 @@ fn main() {
 	render("Inline Layout", setup_inline_basic);
 	render("Inline Wrap", setup_inline_wrap);
 	render("Text Align", setup_text_align);
+	render("Wide Characters (CJK)", setup_wide_chars);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -509,6 +510,24 @@ fn setup_inline_wrap() -> impl Bundle {
 			rsx! { "A Very Long Sentence " },
 		],
 	)
+}
+
+fn setup_wide_chars() -> impl Bundle {
+	// CJK and fullwidth characters occupy 2 terminal columns each
+	(LayoutStyle::flex_row().column_gap(1), children![
+		(rsx! { "中文" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(0.9, 0.5, 0.1)),
+			..default()
+		}),
+		(rsx! { "日本語" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(0.1, 0.7, 0.9)),
+			..default()
+		}),
+		(rsx! { "ＡＢＣ" }, bordered(), VisualStyle {
+			foreground: Some(Color::srgb(0.5, 0.9, 0.4)),
+			..default()
+		}),
+	])
 }
 
 fn setup_text_align() -> impl Bundle {
