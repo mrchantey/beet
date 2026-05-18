@@ -66,7 +66,7 @@ impl Plugin for DocumentPlugin {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn text_field_syncs_on_insert() {
 		let mut world = DocumentPlugin::world();
 
@@ -83,7 +83,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Str("Hello".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_field_syncs_on_document_change() {
 		let mut world = DocumentPlugin::world();
 
@@ -112,7 +112,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Int(42));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_field_with_nested_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -127,7 +127,7 @@ mod test {
 		(*value).clone().xpect_eq(Value::Str("Bob".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiple_text_fields_same_document() {
 		let mut world = DocumentPlugin::world();
 
@@ -154,7 +154,7 @@ mod test {
 		results.contains(&Value::Str("Bob".into())).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_block_with_field_ref() {
 		let mut world = DocumentPlugin::world();
 

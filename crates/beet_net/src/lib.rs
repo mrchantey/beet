@@ -1,6 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![deny(missing_docs)]
 
 mod actions;
@@ -69,3 +67,5 @@ pub mod exports {
 	#[cfg(all(feature = "hyper", not(target_arch = "wasm32")))]
 	pub use http_body_util;
 }
+
+beet_core::test_main!();

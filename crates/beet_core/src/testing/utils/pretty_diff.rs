@@ -342,7 +342,7 @@ mod test {
 		assert_eq!(actual, expected);
 	}
 
-	#[test]
+	#[crate::test]
 	fn write_inline_diff_empty() {
 		let left = "";
 		let right = "";
@@ -351,7 +351,7 @@ mod test {
 		check_printer(write_inline_diff, left, right, &expected);
 	}
 
-	#[test]
+	#[crate::test]
 	fn write_inline_diff_added() {
 		let left = "";
 		let right = "polymerase";
@@ -364,7 +364,7 @@ mod test {
 		check_printer(write_inline_diff, left, right, &expected);
 	}
 
-	#[test]
+	#[crate::test]
 	fn write_inline_diff_removed() {
 		let left = "polyacrylamide";
 		let right = "";
@@ -377,7 +377,7 @@ mod test {
 		check_printer(write_inline_diff, left, right, &expected);
 	}
 
-	#[test]
+	#[crate::test]
 	fn write_inline_diff_changed() {
 		let left = "polymerase";
 		let right = "polyacrylamide";

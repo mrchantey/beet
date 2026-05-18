@@ -1,11 +1,11 @@
 //! Not actually testing anything in beet_core but its very
 //! hard to remember bevy's lifecycle rules.
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 
 use beet_core::prelude::*;
 
-#[test]
+use beet_core::testing;
+
+#[beet_core::test]
 // #[ignore]
 fn works() {
 	App::new()
@@ -47,3 +47,5 @@ fn on_add_bazz(_world: DeferredWorld, _cx: HookContext) {
 	println!("Bazz: Hook")
 }
 fn on_insert_bazz(_: On<Insert, Bazz>) { println!("Bazz: Observer") }
+
+beet_core::test_main!();

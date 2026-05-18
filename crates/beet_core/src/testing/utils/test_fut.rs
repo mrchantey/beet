@@ -18,7 +18,8 @@ pub struct ReturnsStringResult;
 pub struct ReturnsBevyResult;
 /// Marker for futures that return `()`.
 pub struct ReturnsUnit;
-/// Marker for futures that return `!` (never type).
+/// Marker for futures that return `!` (never type). Nightly only.
+#[cfg(feature = "nightly")]
 pub struct ReturnsNever;
 
 impl<T> IntoFut<ReturnsStringResult> for T
@@ -46,6 +47,7 @@ where
 		}
 	}
 }
+#[cfg(feature = "nightly")]
 impl<T> IntoFut<ReturnsNever> for T
 where
 	T: 'static + Future<Output = !>,

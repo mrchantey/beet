@@ -477,22 +477,22 @@ mod test {
 	use super::*;
 
 
-	#[test]
+	#[beet_core::test]
 	fn response_ok() { Response::ok().status().xpect_eq(StatusCode::OK); }
 
-	#[test]
+	#[beet_core::test]
 	fn response_not_found() {
 		let response = Response::not_found();
 		response.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_from_status() {
 		let response = Response::from_status(StatusCode::CREATED);
 		response.status().xpect_eq(StatusCode::CREATED);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_with_body() {
 		let response = Response::ok().with_body("hello");
 		response
@@ -501,7 +501,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_from_status_body() {
 		let response = Response::from_status_body(
 			StatusCode::OK,
@@ -517,14 +517,14 @@ mod test {
 			.xpect_eq(MediaType::Text);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_deref_to_parts() {
 		let response = Response::ok();
 		response.status().xpect_eq(StatusCode::OK);
 	}
 
 
-	#[test]
+	#[beet_core::test]
 	fn response_temporary_redirect() {
 		let response = Response::temporary_redirect("/new-location");
 		response.status().xpect_eq(StatusCode::TEMPORARY_REDIRECT);
@@ -537,7 +537,7 @@ mod test {
 			.xpect_eq("/new-location");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_permanent_redirect() {
 		let response = Response::permanent_redirect("/new-location");
 		response.status().xpect_eq(StatusCode::MOVED_PERMANENTLY);
@@ -550,7 +550,7 @@ mod test {
 			.xpect_eq("/new-location");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_with_header() {
 		let response = Response::ok().with_header("x-custom", "value");
 		response
@@ -563,7 +563,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn response_with_json() {
 		use serde::Deserialize;
 		use serde::Serialize;
@@ -590,7 +590,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn response_with_json_str() {
 		let response = Response::with_json_str(r#"{"foo":42}"#);
 		response.status().xpect_eq(StatusCode::OK);
@@ -609,7 +609,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn response_with_media() {
 		let mb = MediaBytes::serialize(MediaType::Json, &42u32).unwrap();
 		let response = Response::ok().with_media(mb);
@@ -640,7 +640,7 @@ mod test {
 		roundtrip.xpect_eq(payload);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_into_parts() {
 		let response = Response::ok().with_body("data");
 		let (parts, body) = response.into_parts();
@@ -650,7 +650,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_partial_eq() {
 		let response1 = Response::ok().with_body("hello");
 		let response2 = Response::ok().with_body("hello");
@@ -660,7 +660,7 @@ mod test {
 		(response2 == response3).xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_display() {
 		let response = Response::ok().with_body("hello");
 		let display = format!("{}", response);
@@ -668,13 +668,13 @@ mod test {
 		display.xpect_contains("hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_response_unit() {
 		let response = ().into_response();
 		response.status().xpect_eq(StatusCode::OK);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_response_status_code() {
 		let response = StatusCode::CREATED.into_response();
 		response.status().xpect_eq(StatusCode::CREATED);

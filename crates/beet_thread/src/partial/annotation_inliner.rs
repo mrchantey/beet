@@ -236,7 +236,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn footnote_single_citation() {
 		let inliner = AnnotationInliner::new();
 		let text = "Check out this cool article for more details.";
@@ -248,7 +248,7 @@ mod test {
 		assert!(result.contains("[^1]: [Example](https://example.com)"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn footnote_multiple_citations() {
 		let inliner = AnnotationInliner::new();
 		let text = "First source and second source are both great.";
@@ -264,7 +264,7 @@ mod test {
 		assert!(result.contains("[^2]: [Source B](https://b.com)"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn inline_replace_single() {
 		let inliner = AnnotationInliner::new().with_footnote_style(false);
 		let text = "Visit example for info.";
@@ -278,7 +278,7 @@ mod test {
 		);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn empty_annotations_passthrough() {
 		let inliner = AnnotationInliner::new();
 		let text = "No annotations here.";
@@ -286,7 +286,7 @@ mod test {
 		assert_eq!(result, text);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn empty_title_uses_url() {
 		let inliner = AnnotationInliner::new();
 		let text = "Some text here.";
@@ -298,7 +298,7 @@ mod test {
 		);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn incremental_annotations_avoid_position_drift() {
 		let mut inliner = AnnotationInliner::new();
 		let key = make_key("resp1", 0);
@@ -338,7 +338,7 @@ mod test {
 		assert_eq!(result, oneshot);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_without_annotations() {
 		let mut inliner = AnnotationInliner::new();
 		let key = make_key("resp1", 0);
@@ -349,14 +349,14 @@ mod test {
 		assert_eq!(result, text);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_missing_key_returns_none() {
 		let inliner = AnnotationInliner::new();
 		let key = make_key("missing", 0);
 		assert!(inliner.render(&key).is_none());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn push_annotation_missing_key_returns_none() {
 		let mut inliner = AnnotationInliner::new();
 		let key = make_key("missing", 0);

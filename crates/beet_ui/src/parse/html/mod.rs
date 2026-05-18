@@ -248,7 +248,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_simple_element() {
 		World::new()
 			.spawn_empty()
@@ -258,7 +258,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_text_node() {
 		World::new()
 			.spawn_empty()
@@ -271,7 +271,7 @@ mod test {
 			.xpect_eq(Value::Str("hello world".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_nested_elements() {
 		World::new()
 			.spawn_empty()
@@ -288,7 +288,7 @@ mod test {
 			.xpect_eq("span".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_with_expressions() {
 		let bytes = MediaBytes::new_html("<p>hello {name}</p>");
 		World::new()
@@ -310,7 +310,7 @@ mod test {
 			.xpect_eq("name".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_void_element() {
 		World::new()
 			.spawn_empty()
@@ -327,7 +327,7 @@ mod test {
 			.xpect_eq("br".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_with_path_inserts_file_span() {
 		World::new()
 			.spawn_empty()
@@ -341,7 +341,7 @@ mod test {
 			.xpect_eq(WsPathBuf::new("test.html"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_comment() {
 		World::new()
 			.spawn_empty()
@@ -354,7 +354,7 @@ mod test {
 			.xpect_eq(Comment::new(" hello "));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_value_parsing_enabled() {
 		let mut parser = HtmlParser {
 			diff_config: HtmlDiffConfig {
@@ -380,7 +380,7 @@ mod test {
 			.xpect_eq(Value::Uint(42));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_attributes() {
 		let mut world = World::new();
 		let entity = world
@@ -409,7 +409,7 @@ mod test {
 			.xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_self_closing() {
 		World::new()
 			.spawn_empty()
@@ -419,7 +419,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn reparse_unchanged_no_change() {
 		let bytes = MediaBytes::new_html("<div>hello</div>");
 		World::new()
@@ -434,7 +434,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn reparse_changed_content() {
 		let bytes_a = MediaBytes::new_html("<div>hello</div>");
 		let bytes_b = MediaBytes::new_html("<div>world</div>");
@@ -456,7 +456,7 @@ mod test {
 			.xpect_eq(Value::Str("world".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn element_span_covers_opening_tag() {
 		World::new()
 			.spawn_empty()
@@ -475,7 +475,7 @@ mod test {
 			));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_node_span() {
 		World::new()
 			.spawn_empty()
@@ -497,7 +497,7 @@ mod test {
 			));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiline_spans() {
 		World::new()
 			.spawn_empty()
@@ -526,7 +526,7 @@ mod test {
 			));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attribute_entity_has_span() {
 		World::new()
 			.spawn_empty()
@@ -551,7 +551,7 @@ mod test {
 			));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn expression_node_span() {
 		let bytes = MediaBytes::new_html("<p>{name}</p>");
 		World::new()
@@ -581,7 +581,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn parse_markdown_text_nodes() {
 		// The div contains markdown text "**bold**" which should
 		// be re-parsed into <p><strong>bold</strong></p>
@@ -605,7 +605,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn parse_markdown_preserves_plain_text() {
 		// Plain text without markdown formatting should still
 		// get wrapped in a <p> element by the markdown parser.
@@ -630,7 +630,7 @@ mod test {
 
 	/// Root entity must not receive any content components after HTML parsing.
 	/// All parsed content lives in children.
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_element() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -642,7 +642,7 @@ mod test {
 		root.get::<Expression>().is_none().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_text() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -653,7 +653,7 @@ mod test {
 		world.entity_mut(entity).children().len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_multiple_elements() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

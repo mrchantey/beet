@@ -155,7 +155,7 @@ mod tests {
 
 	// ── Layout ────────────────────────────────────────────────────────────────
 
-	#[test]
+	#[beet_core::test]
 	fn text_align_left() {
 		render_pluses((
 			rsx! { "Hi" },
@@ -164,7 +164,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_align_right() {
 		render_pluses((
 			rsx! { "Hi" },
@@ -173,7 +173,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_align_center() {
 		render_pluses((
 			rsx! { "Hi" },
@@ -184,7 +184,7 @@ mod tests {
 
 	// ── Style ─────────────────────────────────────────────────────────────────
 
-	#[test]
+	#[beet_core::test]
 	fn foreground_color() {
 		let visual = VisualStyle {
 			foreground: Some(Color::srgb(1., 0., 0.)),
@@ -193,7 +193,7 @@ mod tests {
 		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_underline() {
 		let visual = VisualStyle {
 			decoration_line: DecorationLine::underline(),
@@ -204,7 +204,7 @@ mod tests {
 
 	// ── Wide character support ────────────────────────────────────────────────
 
-	#[test]
+	#[beet_core::test]
 	fn wide_char_display_width() {
 		// Each CJK character = 2 columns
 		display_width("中文").xpect_eq(4);

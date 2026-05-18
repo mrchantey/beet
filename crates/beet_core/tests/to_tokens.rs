@@ -1,11 +1,10 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::exports;
+use beet_core::testing;
 use beet_core::prelude;
 use beet_core::prelude::*;
 use quote::quote;
 
-#[test]
+#[beet_core::test]
 fn named() {
 	#[derive(ToTokens)]
 	struct Named {
@@ -29,7 +28,7 @@ fn named() {
 	);
 }
 
-#[test]
+#[beet_core::test]
 fn unnamed() {
 	#[derive(ToTokens)]
 	struct Unnamed(u32, String);
@@ -45,7 +44,7 @@ fn unnamed() {
 	);
 }
 
-#[test]
+#[beet_core::test]
 fn nested_struct() {
 	#[derive(ToTokens)]
 	struct Named1 {
@@ -83,7 +82,7 @@ fn nested_struct() {
 	);
 }
 
-#[test]
+#[beet_core::test]
 fn enum_variants() {
 	#[derive(ToTokens)]
 	enum TestEnum {
@@ -126,3 +125,5 @@ fn enum_variants() {
 		.to_string(),
 	);
 }
+
+beet_core::test_main!();

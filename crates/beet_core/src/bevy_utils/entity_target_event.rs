@@ -352,7 +352,7 @@ mod test {
 	struct MyEvent;
 
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

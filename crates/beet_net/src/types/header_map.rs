@@ -190,33 +190,33 @@ mod test {
 	use super::header as headers;
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn to_kebab_case_lowercase() {
 		to_kebab_case("content-type").xpect_eq("content-type");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn to_kebab_case_uppercase() {
 		to_kebab_case("Content-Type").xpect_eq("content-type");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn to_kebab_case_underscores() {
 		to_kebab_case("content_type").xpect_eq("content-type");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn to_kebab_case_mixed() {
 		to_kebab_case("X_Custom_Header").xpect_eq("x-custom-header");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn to_kebab_case_borrows_when_already_normalized() {
 		let result = to_kebab_case("content-type");
 		matches!(result, Cow::Borrowed(_)).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn insert_and_get_str() {
 		let mut headers = HeaderMap::new();
 		headers.set::<headers::ContentType>(MediaType::Json);
@@ -227,7 +227,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn case_insensitive_lookup() {
 		let mut headers = HeaderMap::new();
 		headers.set::<headers::ContentType>(MediaType::Html);
@@ -251,7 +251,7 @@ mod test {
 			.xpect_eq("text/html");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiple_values() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("set-cookie", "a=1");
@@ -262,7 +262,7 @@ mod test {
 		cookies[1].as_str().xpect_eq("b=2");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn contains_key_normalized() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
@@ -271,7 +271,7 @@ mod test {
 		headers.contains_raw("x-missing").xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn remove_header() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("x-custom", "value");
@@ -279,7 +279,7 @@ mod test {
 		headers.contains_raw("x-custom").xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn set_content_type_helper() {
 		let mut headers = HeaderMap::new();
 		headers.set_content_type(MediaType::Json);
@@ -290,7 +290,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_multimap() {
 		let mut raw = MultiMap::new();
 		raw.insert("Content_Type".to_string(), "text/html".to_string());
@@ -302,14 +302,14 @@ mod test {
 			.xpect_eq(MediaType::Html);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn header_map_empty() {
 		let headers = HeaderMap::new();
 		headers.is_empty().xpect_true();
 		headers.len().xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn header_map_len() {
 		let mut headers = HeaderMap::new();
 		headers.set_raw("a", "1");

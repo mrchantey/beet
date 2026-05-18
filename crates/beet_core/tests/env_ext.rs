@@ -1,15 +1,14 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::prelude::*;
+use beet_core::testing;
 
-#[test]
+#[beet_core::test]
 fn var() {
 	env_ext::var("WORKSPACE_ROOT")
 		.unwrap()
 		.xpect_ends_with("beet/");
 }
 
-#[test]
+#[beet_core::test]
 fn vars_filtered() {
 	// implicitly tests `vars()`
 	let filter = GlobFilter::default().with_include("WORKSPACE_ROOT");
@@ -18,3 +17,5 @@ fn vars_filtered() {
 	vars[0].0.xref().xpect_eq("WORKSPACE_ROOT");
 	vars[0].1.xref().xpect_ends_with("beet/");
 }
+
+beet_core::test_main!();

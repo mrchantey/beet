@@ -59,7 +59,7 @@ mod test {
 	use super::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn has_body_with_content_length() {
 		let parts = http::Request::builder()
 			.method(http::Method::POST)
@@ -73,7 +73,7 @@ mod test {
 		has_body(&parts).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn has_body_without_headers() {
 		let parts = http::Request::builder()
 			.method(http::Method::GET)
@@ -86,7 +86,7 @@ mod test {
 		has_body(&parts).xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn has_body_with_chunked_encoding() {
 		let parts = http::Request::builder()
 			.method(http::Method::POST)
@@ -100,7 +100,7 @@ mod test {
 		has_body(&parts).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn version_conversions() {
 		version_to_string(http::Version::HTTP_11).xpect_eq("1.1");
 		version_to_string(http::Version::HTTP_2).xpect_eq("2");

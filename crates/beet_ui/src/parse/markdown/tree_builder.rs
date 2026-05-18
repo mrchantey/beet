@@ -673,7 +673,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn paragraph() {
 		let nodes = build("Hello world");
 		nodes.len().xpect_eq(1);
@@ -683,7 +683,7 @@ mod test {
 		matches!(&children[0], HtmlNode::Text(_)).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn heading_levels() {
 		for (md, expected) in [
 			("# H1", "h1"),
@@ -699,7 +699,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn emphasis_and_strong() {
 		let nodes = build("*em* **strong**");
 		nodes.len().xpect_eq(1);
@@ -714,7 +714,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unordered_list() {
 		let nodes = build("- a\n- b");
 		nodes.len().xpect_eq(1);
@@ -725,14 +725,14 @@ mod test {
 		node_name(&items[1]).xpect_eq("li");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn ordered_list() {
 		let nodes = build("1. a\n2. b");
 		nodes.len().xpect_eq(1);
 		node_name(&nodes[0]).xpect_eq("ol");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn code_block() {
 		let nodes = build("```rust\nfn main() {}\n```");
 		nodes.len().xpect_eq(1);
@@ -742,7 +742,7 @@ mod test {
 		node_name(&pre_children[0]).xpect_eq("code");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn inline_code() {
 		let nodes = build("use `foo()` here");
 		let children = node_children(&nodes[0]);
@@ -752,14 +752,14 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn thematic_break() {
 		let nodes = build("---");
 		nodes.len().xpect_eq(1);
 		node_name(&nodes[0]).xpect_eq("hr");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn link() {
 		let nodes = build("[click](https://example.com)");
 		let children = node_children(&nodes[0]);
@@ -769,7 +769,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn image() {
 		let nodes = build("![alt](img.png)");
 		let children = node_children(&nodes[0]);
@@ -779,14 +779,14 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn blockquote() {
 		let nodes = build("> quoted");
 		nodes.len().xpect_eq(1);
 		node_name(&nodes[0]).xpect_eq("blockquote");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn strikethrough() {
 		let nodes = build("~~deleted~~");
 		let children = node_children(&nodes[0]);
@@ -796,14 +796,14 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn table() {
 		let nodes = build("| A | B |\n|---|---|\n| 1 | 2 |");
 		nodes.len().xpect_eq(1);
 		node_name(&nodes[0]).xpect_eq("table");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiple_blocks() {
 		let nodes = build("# Title\n\nParagraph");
 		nodes.len().xpect_eq(2);
@@ -811,7 +811,7 @@ mod test {
 		node_name(&nodes[1]).xpect_eq("p");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn nested_list() {
 		let nodes = build("- a\n  - b\n  - c\n- d");
 		nodes.len().xpect_eq(1);
@@ -820,7 +820,7 @@ mod test {
 		items.len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn frontmatter_parsed() {
 		let result = build_markdown_tree(
 			"---\ntitle: Hello\n---\n\n# Title",
@@ -839,7 +839,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_frontmatter() {
 		let result = build_markdown_tree(
 			"# Just a heading",
@@ -864,7 +864,7 @@ mod test {
 		.nodes
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn expression_in_paragraph() {
 		let nodes = build_with_expressions("hello {name} world");
 		nodes.len().xpect_eq(1);
@@ -878,7 +878,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn expression_only() {
 		let nodes = build_with_expressions("{greeting}");
 		let children = node_children(&nodes[0]);
@@ -887,7 +887,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn expression_nested_braces() {
 		let nodes = build_with_expressions("{a {b} c}");
 		let children = node_children(&nodes[0]);
@@ -899,7 +899,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_expressions_without_flag() {
 		// Without expression parsing, braces are plain text
 		let nodes = build("hello {name} world");
@@ -908,7 +908,7 @@ mod test {
 		matches!(&children[0], HtmlNode::Text(_)).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiple_expressions() {
 		let nodes = build_with_expressions("{a} and {b}");
 		let children = node_children(&nodes[0]);

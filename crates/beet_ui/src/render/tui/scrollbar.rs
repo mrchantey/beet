@@ -79,7 +79,7 @@ impl TuiScrollState {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn scrollbar_state_matches() {
 		let state = TuiScrollState {
 			offset: 5,

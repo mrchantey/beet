@@ -780,7 +780,7 @@ mod test {
 		verbose: bool,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_simple_struct() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -791,7 +791,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_bool_variants() {
 		// true variants
 		for val in ["true", "1", "yes", "on"] {
@@ -812,7 +812,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn missing_bool_defaults_false() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -828,7 +828,7 @@ mod test {
 		optional: Option<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_optional_present() {
 		let mut map = MultiMap::new();
 		map.insert("required".to_string(), "req".to_string());
@@ -839,7 +839,7 @@ mod test {
 		result.optional.xpect_eq(Some("opt".to_string()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_optional_missing() {
 		let mut map = MultiMap::new();
 		map.insert("required".to_string(), "req".to_string());
@@ -856,7 +856,7 @@ mod test {
 		tags: Vec<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_vec_multiple_values() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -873,7 +873,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_vec_empty() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -895,7 +895,7 @@ mod test {
 		nested: Inner,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_nested_struct_flattened() {
 		let mut map = MultiMap::new();
 		map.insert("outer_field".to_string(), "outer".to_string());
@@ -906,7 +906,7 @@ mod test {
 		result.nested.inner_field.xpect_eq("inner".to_string());
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_missing_required_field() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -920,7 +920,7 @@ mod test {
 		result.xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_invalid_bool() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -930,7 +930,7 @@ mod test {
 		result.xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn empty_string_bool_is_true() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -940,7 +940,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn empty_value_list_bool_is_true() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -950,7 +950,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_tuple() {
 		let mut map = MultiMap::new();
 		map.insert("0".to_string(), "first".to_string());
@@ -981,7 +981,7 @@ mod test {
 		level1: Level1,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_deeply_nested_struct() {
 		let mut map = MultiMap::new();
 		map.insert("top_field".to_string(), "top".to_string());
@@ -1003,7 +1003,7 @@ mod test {
 		vec_field: Vec<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_all_field_types_together() {
 		let mut map = MultiMap::new();
 		map.insert("string_field".to_string(), "hello".to_string());
@@ -1041,7 +1041,7 @@ mod test {
 		bazz: Bazz,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_newtype_tuple_struct_fields() {
 		let mut map = MultiMap::new();
 		map.insert("foo".to_string(), "hello".to_string());
@@ -1061,7 +1061,7 @@ mod test {
 			.xpect_eq(vec!["a".to_string(), "b".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_exact_user_example() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1105,7 +1105,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn insert_key_creates_empty_entry() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert_key("flag".to_string());
@@ -1114,7 +1114,7 @@ mod test {
 		map.get_vec("flag").xpect_eq(Some(&Vec::<String>::new()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn insert_key_noop_if_exists() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert("key".to_string(), "value".to_string());
@@ -1125,7 +1125,7 @@ mod test {
 			.xpect_eq(Some(&vec!["value".to_string()]));
 	}
 
-	#[test]
+	#[crate::test]
 	fn multimap_basic_operations() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert("a".to_string(), "1".to_string());
@@ -1147,7 +1147,7 @@ mod test {
 		map.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_signed_integers() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1182,7 +1182,7 @@ mod test {
 		result.isize_field.xpect_eq(-12345);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_unsigned_integers() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1217,7 +1217,7 @@ mod test {
 		result.usize_field.xpect_eq(99999);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_floats() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1235,7 +1235,7 @@ mod test {
 		result.f64_field.xpect_close(-2.718281828459045);
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_invalid_number() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1250,7 +1250,7 @@ mod test {
 		result.unwrap_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_missing_required_number() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1265,7 +1265,7 @@ mod test {
 		result.unwrap_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_mixed_types_with_numbers() {
 		#[derive(Debug, Reflect)]
 		#[reflect(Default)]
@@ -1310,7 +1310,7 @@ mod test {
 		result.enabled.xpect_false(); // default bool
 	}
 
-	#[test]
+	#[crate::test]
 	fn missing_optional_fields_use_defaults() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1332,7 +1332,7 @@ mod test {
 		result.tags.xpect_eq(Vec::<String>::new()); // default vec
 	}
 
-	#[test]
+	#[crate::test]
 	fn nested_struct_fields_use_defaults() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1360,7 +1360,7 @@ mod test {
 		result.database.port.xpect_eq(0); // default u16
 	}
 
-	#[test]
+	#[crate::test]
 	fn required_field_with_defaults() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1387,7 +1387,7 @@ mod test {
 		result.retries.xpect_eq(0); // default
 	}
 
-	#[test]
+	#[crate::test]
 	fn custom_defaults_are_respected() {
 		#[derive(Debug, Reflect, PartialEq)]
 		#[reflect(Default)]
@@ -1423,7 +1423,7 @@ mod test {
 		result.ratio.xpect_eq(0.5);
 	}
 
-	#[test]
+	#[crate::test]
 	fn kebab_case_keys_normalized_to_snake_case() {
 		#[derive(Debug, Reflect, PartialEq)]
 		#[reflect(Default)]
@@ -1456,7 +1456,7 @@ mod test {
 		result.max_retry_count.xpect_eq(5);
 	}
 
-	#[test]
+	#[crate::test]
 	fn mixed_case_keys_all_normalized() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]

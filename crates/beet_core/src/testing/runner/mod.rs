@@ -6,6 +6,8 @@
 mod exit_on_suite_outcome;
 mod insert_tests;
 mod register_test;
+mod test_desc;
+pub use test_desc::*;
 mod runner_args;
 mod suite_outcome;
 mod test_outcome;

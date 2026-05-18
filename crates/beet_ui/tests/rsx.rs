@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 
 use beet_core::prelude::*;
 // resolve crate:: aliasing in macros
@@ -8,21 +6,21 @@ use beet_ui::*;
 /// Verify the macro compiles by checking bundle validity.
 fn is_bundle(_: impl Bundle) {}
 
-#[test]
+#[beet_core::test]
 fn single_element() {
 	is_bundle(rsx! {
 		<div/>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_flag_attribute() {
 	is_bundle(rsx! {
 		<div my_flag/>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_key_value_attribute() {
 	let bar = 2;
 	is_bundle(rsx! {
@@ -30,21 +28,21 @@ fn element_with_key_value_attribute() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_string_attribute() {
 	is_bundle(rsx! {
 		<div bazz="boo"/>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_literal_attribute() {
 	is_bundle(rsx! {
 		<div bang=3/>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_block_spread() {
 	let foo = Name::new("foo");
 	let boo = Name::new("boo");
@@ -53,14 +51,14 @@ fn element_with_block_spread() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn element_with_children() {
 	is_bundle(rsx! {
 		<div>"hello"</div>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn multiple_root_elements() {
 	is_bundle(rsx! {
 		<div/>
@@ -68,7 +66,7 @@ fn multiple_root_elements() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn nested_elements() {
 	is_bundle(rsx! {
 		<div>
@@ -85,14 +83,14 @@ struct MyComponent {
 	bazz: u32,
 }
 
-#[test]
+#[beet_core::test]
 fn component_with_set_with() {
 	is_bundle(rsx! {
 		<MyComponent foo bar="hello"/>
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn mixed_elements_and_components() {
 	is_bundle(rsx! {
 		<div>
@@ -102,7 +100,7 @@ fn mixed_elements_and_components() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn combined_attributes() {
 	let bar = 2;
 	let foo = Name::new("test");
@@ -113,7 +111,7 @@ fn combined_attributes() {
 }
 
 
-#[test]
+#[beet_core::test]
 fn component_with_block_attr_inserts_additional_component() {
 	let extra = Name::new("extra");
 	is_bundle(rsx! {
@@ -121,7 +119,7 @@ fn component_with_block_attr_inserts_additional_component() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn component_with_children() {
 	is_bundle(rsx! {
 		<MyComponent foo>
@@ -130,9 +128,11 @@ fn component_with_children() {
 	});
 }
 
-#[test]
+#[beet_core::test]
 fn doctype_node() {
 	is_bundle(rsx! {
 		<!DOCTYPE html>
 	});
 }
+
+beet_core::test_main!();

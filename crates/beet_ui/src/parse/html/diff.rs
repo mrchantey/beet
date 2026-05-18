@@ -787,19 +787,19 @@ pub(crate) fn spawn_node(
 mod implicit_close_test {
 	use super::implicitly_closes;
 
-	#[test]
+	#[beet_core::test]
 	fn head_closes_on_body() {
 		assert!(implicitly_closes("head", "body"));
 		assert!(!implicitly_closes("head", "div"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn li_closes_on_li() {
 		assert!(implicitly_closes("li", "li"));
 		assert!(!implicitly_closes("li", "div"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn p_closes_on_block() {
 		assert!(implicitly_closes("p", "div"));
 		assert!(implicitly_closes("p", "p"));
@@ -808,14 +808,14 @@ mod implicit_close_test {
 		assert!(!implicitly_closes("p", "em"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn dt_dd_close_each_other() {
 		assert!(implicitly_closes("dt", "dd"));
 		assert!(implicitly_closes("dd", "dt"));
 		assert!(!implicitly_closes("dt", "li"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unrelated_tags_do_not_close() {
 		assert!(!implicitly_closes("div", "span"));
 		assert!(!implicitly_closes("body", "div"));
@@ -826,7 +826,7 @@ mod implicit_close_test {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_simple_element() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -857,7 +857,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_nested() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -895,7 +895,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_void_element() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -936,7 +936,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_self_closing() {
 		let tokens = vec![HtmlToken::OpenTag {
 			name: "img",
@@ -963,7 +963,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_head_body_implicit_close() {
 		// <head> has no close tag; <body> should implicitly close it,
 		// so body ends up as a sibling of head, not nested inside it.
@@ -999,7 +999,7 @@ mod test {
 		);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_li_implicit_close() {
 		// a second <li> should implicitly close the first
 		let config = HtmlParseConfig::default();
@@ -1022,7 +1022,7 @@ mod test {
 		assert_eq!(li_count, 2, "expected 2 li children, got {li_count}");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_p_implicit_close() {
 		// <div> should implicitly close <p>
 		let config = HtmlParseConfig::default();
@@ -1054,7 +1054,7 @@ mod test {
 		);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_malformed_fix() {
 		// missing close tag for <span>, should be implicitly closed
 		let tokens = vec![
@@ -1082,7 +1082,7 @@ mod test {
 		tree.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_malformed_error() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -1105,7 +1105,7 @@ mod test {
 			.xpect_contains("unclosed");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_mixed_content() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -1148,7 +1148,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn build_tree_expression() {
 		let tokens = vec![
 			HtmlToken::OpenTag {
@@ -1177,7 +1177,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn diff_config_is_void() {
 		let config = HtmlDiffConfig::default();
 		config.is_void_element("br").xpect_true();
@@ -1186,7 +1186,7 @@ mod test {
 		config.is_void_element("img").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn diff_config_text_value_parsing() {
 		let config = HtmlDiffConfig {
 			parse_text_nodes: true,
@@ -1203,7 +1203,7 @@ mod test {
 			.xpect_eq(Value::Str("42".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn diff_config_attribute_value_parsing() {
 		let config = HtmlDiffConfig {
 			parse_attribute_values: true,

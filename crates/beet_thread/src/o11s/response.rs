@@ -337,7 +337,7 @@ pub struct Reasoning {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_basic_response() {
 		let json = r#"{
 			"id": "resp_123",
@@ -377,7 +377,7 @@ mod test {
 		assert_eq!(response.first_text(), Some("Hello!"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_function_call_response() {
 		let json = r#"{
 			"id": "resp_456",

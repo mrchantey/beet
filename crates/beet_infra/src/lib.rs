@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Infrastructure as code for beet, built on OpenTofu.
 //!
 //! This crate provides typed Rust bindings for Terraform/OpenTofu
@@ -27,3 +25,5 @@ pub mod prelude {
 	pub use crate::terra::tofu;
 	pub use crate::types::*;
 }
+
+beet_core::test_main!();

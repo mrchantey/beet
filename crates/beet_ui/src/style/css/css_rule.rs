@@ -295,7 +295,7 @@ mod tests {
 		Color
 	);
 
-	#[test]
+	#[beet_core::test]
 	fn name() {
 		Bar.xinto::<Token>()
 			.key()

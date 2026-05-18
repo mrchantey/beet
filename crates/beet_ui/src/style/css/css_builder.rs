@@ -298,7 +298,7 @@ mod tests {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn test_color() {
 		let mut world = World::new();
 
@@ -333,7 +333,7 @@ mod tests {
 			.xpect_snapshot();
 		// println!("{_css}");
 	}
-	#[test]
+	#[beet_core::test]
 	fn test_color_role() {
 		let mut world = World::new();
 

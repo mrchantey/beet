@@ -1,6 +1,4 @@
 //!
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 
 pub mod o11s;
@@ -23,3 +21,5 @@ pub mod prelude {
 	pub use crate::tool::*;
 	pub use crate::types::*;
 }
+
+beet_core::test_main!();

@@ -96,7 +96,7 @@ mod test {
 	#[derive(Component, ToTokens)]
 	struct Bar;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let mut world = World::new();
 		let entity = world.spawn((Foo, Bar)).id();

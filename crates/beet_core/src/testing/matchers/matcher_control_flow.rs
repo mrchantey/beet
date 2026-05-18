@@ -64,7 +64,7 @@ mod test {
 
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		ControlFlow::<(), ()>::Continue(()).xpect_continue();
 		ControlFlow::<(), ()>::Break(()).xpect_break();

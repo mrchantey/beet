@@ -157,7 +157,7 @@ fn percent_encode(bytes: &[u8]) -> String {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn from_url_base64() {
 		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
 		let mb = MediaBytes::from_url(&url).unwrap();
@@ -165,7 +165,7 @@ mod test {
 		mb.as_utf8().unwrap().xpect_eq("Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_url_percent_encoded() {
 		let url = Url::parse("data:text/html,<h1>Hello</h1>");
 		let mb = MediaBytes::from_url(&url).unwrap();
@@ -173,7 +173,7 @@ mod test {
 		mb.as_utf8().unwrap().xpect_eq("<h1>Hello</h1>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_url_default_media_type() {
 		// RFC 2397: missing media type defaults to text/plain
 		let url = Url::parse("data:,Hello%20World");
@@ -183,14 +183,14 @@ mod test {
 		mb.as_utf8().unwrap().xpect_eq("Hello World");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_url_wrong_scheme() {
 		let url = Url::parse("https://example.com");
 		MediaBytes::from_url(&url).xpect_err();
 	}
 
 	#[cfg(feature = "serde")]
-	#[test]
+	#[beet_core::test]
 	fn into_url_base64() {
 		let mb = MediaBytes::new_text("Hello");
 		let url = mb.into_url();
@@ -201,7 +201,7 @@ mod test {
 	}
 
 	#[cfg(feature = "serde")]
-	#[test]
+	#[beet_core::test]
 	fn round_trip() {
 		let original = MediaBytes::new_html("<p>hi</p>");
 		let url = original.into_url();
@@ -211,7 +211,7 @@ mod test {
 	}
 
 	#[cfg(feature = "serde")]
-	#[test]
+	#[beet_core::test]
 	fn round_trip_display_reparse() {
 		let mb = MediaBytes::new_text("Hello");
 		let url = mb.into_url();

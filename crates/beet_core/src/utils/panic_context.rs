@@ -184,7 +184,7 @@ impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		PanicContext::catch(|| Ok(())).xpect_eq(PanicResult::Ok);
 		PanicContext::catch(|| Err("foobar".into()))

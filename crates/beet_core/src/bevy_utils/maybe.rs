@@ -138,7 +138,7 @@ mod tests {
 		maybe_a: Maybe<A>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn maybe_some() {
 		let mut world = World::new();
 		let entity = world
@@ -154,7 +154,7 @@ mod tests {
 		world.get::<Maybe<A>>(entity).is_none().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn maybe_none() {
 		let mut world = World::new();
 		let entity = world
@@ -170,7 +170,7 @@ mod tests {
 		world.get::<Maybe<A>>(entity).is_none().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn maybe_system() {
 		let mut world = World::new();
 

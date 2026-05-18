@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 // #![deny(missing_docs)]
 
 mod action_plugin;
@@ -17,3 +15,5 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
 }
+
+beet_core::test_main!();

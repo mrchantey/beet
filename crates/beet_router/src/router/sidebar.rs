@@ -361,13 +361,13 @@ mod test {
 			.unwrap()
 			.to_string()
 	}
-	#[test]
+	#[beet_core::test]
 	fn natural_compare() {
 		let mut v = vec!["page10", "page1", "page2"];
 		v.sort_by(|a, b| natural_cmp(a, b));
 		assert_eq!(v, vec!["page1", "page2", "page10"]);
 	}
-	#[test]
+	#[beet_core::test]
 	fn builds_basic_sidebar() {
 		let mut world = router_world();
 		let root = world
@@ -389,7 +389,7 @@ mod test {
 			.xpect_contains("<ul>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn marks_active_leaf() {
 		let mut world = router_world();
 		let root = world
@@ -407,7 +407,7 @@ mod test {
 		html.xpect_contains("aria-current");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
@@ -424,7 +424,7 @@ mod test {
 		html.xpect_contains("aria-current");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn builds_nested_branches() {
 		let mut world = router_world();
 		let root = world
@@ -450,7 +450,7 @@ mod test {
 			.xpect_contains("/docs/api");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn collapses_unrelated_branches() {
 		let mut world = router_world();
 		let root = world
@@ -477,7 +477,7 @@ mod test {
 		html.xpect_contains("<details open");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
@@ -497,7 +497,7 @@ mod test {
 			.xpect_contains(">about<");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn sort_by_order() {
 		let mut world = router_world();
 		let root = world
@@ -528,7 +528,7 @@ mod test {
 			.xpect_eq("alpha");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn is_ancestor_of_current() {
 		let state = SidebarState::new("docs/getting-started");
 		state
@@ -546,7 +546,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn forced_expansion() {
 		let mut world = router_world();
 		let root = world
@@ -567,7 +567,7 @@ mod test {
 		html.xpect_contains("<details open");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn branch_with_route_renders_link_in_summary() {
 		let mut world = router_world();
 		let root = world

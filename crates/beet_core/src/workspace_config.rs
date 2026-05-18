@@ -299,7 +299,7 @@ impl WorkspaceConfig {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		pkg_config!()
 			.resource_name("lambda")

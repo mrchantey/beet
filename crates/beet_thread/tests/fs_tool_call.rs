@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -88,3 +86,5 @@ fn main() {
 	let result = fs_ext::read_to_string(&verify_path).unwrap();
 	result.xpect_contains("hello world");
 }
+
+beet_core::test_main!();

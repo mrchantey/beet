@@ -173,7 +173,7 @@ mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		short_type_path::<Option<Vec<u32>>>()
 			.to_token_stream()

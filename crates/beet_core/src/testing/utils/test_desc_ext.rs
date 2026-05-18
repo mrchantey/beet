@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use test::ShouldPanic;
-use test::TestDesc;
-use test::TestDescAndFn;
-use test::TestType;
+use crate::testing::runner::ShouldPanic;
+use crate::testing::runner::TestDesc;
+use crate::testing::runner::TestDescAndFn;
+use crate::testing::runner::TestType;
 
 /// Extension trait for building and modifying TestDesc instances with a fluent API.
 ///

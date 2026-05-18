@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 // #![deny(missing_docs)]
@@ -43,3 +41,5 @@ pub mod exports {
 	#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 	pub use ratatui;
 }
+
+beet_core::test_main!();

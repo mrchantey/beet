@@ -179,7 +179,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_simple_paragraph() {
 		World::new()
 			.spawn_empty()
@@ -189,7 +189,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_paragraph_contains_text() {
 		World::new()
 			.spawn_empty()
@@ -203,7 +203,7 @@ mod test {
 			.xpect_eq("p".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_heading() {
 		World::new()
 			.spawn_empty()
@@ -217,7 +217,7 @@ mod test {
 			.xpect_eq("h1".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_multiple_blocks() {
 		World::new()
 			.spawn_empty()
@@ -227,7 +227,7 @@ mod test {
 			.xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_emphasis() {
 		// root -> p -> em
 		World::new()
@@ -244,7 +244,7 @@ mod test {
 			.xpect_eq("em".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_link() {
 		// root -> p -> a
 		World::new()
@@ -261,7 +261,7 @@ mod test {
 			.xpect_eq("a".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_code_block() {
 		World::new()
 			.spawn_empty()
@@ -275,7 +275,7 @@ mod test {
 			.xpect_eq("pre".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_unordered_list() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -290,7 +290,7 @@ mod test {
 		world.entity_mut(ul).children().len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_with_path_inserts_file_span() {
 		World::new()
 			.spawn_empty()
@@ -302,7 +302,7 @@ mod test {
 			.xpect_eq(WsPathBuf::new("test.md"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_yaml_frontmatter() {
 		World::new()
 			.spawn_empty()
@@ -317,7 +317,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_thematic_break() {
 		World::new()
 			.spawn_empty()
@@ -331,7 +331,7 @@ mod test {
 			.xpect_eq("hr".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_image() {
 		// root -> p -> img
 		World::new()
@@ -348,7 +348,7 @@ mod test {
 			.xpect_eq("img".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn reparse_unchanged_no_change() {
 		let bytes = MediaBytes::new_markdown("# Title\n\nParagraph");
 		World::new()
@@ -363,7 +363,7 @@ mod test {
 			.xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_table() {
 		World::new()
 			.spawn_empty()
@@ -388,28 +388,28 @@ mod test {
 			.to_string()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_paragraph() {
 		roundtrip("Hello world").xpect_eq("<p>Hello world</p>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_heading() {
 		roundtrip("# Title").xpect_eq("<h1>Title</h1>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_emphasis() {
 		roundtrip("*hello*").xpect_eq("<p><em>hello</em></p>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_strong() {
 		roundtrip("**hello**")
 			.xpect_eq("<p><strong>hello</strong></p>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_link() {
 		let html = roundtrip("[click](https://example.com)");
 		html.xpect_contains("<a")
@@ -418,7 +418,7 @@ mod test {
 			.xpect_contains("</a>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_unordered_list() {
 		let html = roundtrip("- a\n- b");
 		html.xpect_contains("<ul>")
@@ -427,7 +427,7 @@ mod test {
 			.xpect_contains("</ul>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_code_block() {
 		let html = roundtrip("```rust\nfn main() {}\n```");
 		html.xpect_contains("<pre>")
@@ -436,7 +436,7 @@ mod test {
 			.xpect_contains("</pre>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_blockquote() {
 		let html = roundtrip("> quoted text");
 		html.xpect_contains("<blockquote>")
@@ -444,22 +444,22 @@ mod test {
 			.xpect_contains("</blockquote>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_thematic_break() { roundtrip("---").xpect_contains("<hr />"); }
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_image() {
 		let html = roundtrip("![alt](image.png)");
 		html.xpect_contains("<img")
 			.xpect_contains("src=\"image.png\"");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_inline_code() {
 		roundtrip("use `foo()` here").xpect_contains("<code>foo()</code>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_embedded_html_block() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -480,7 +480,7 @@ mod test {
 			.xpect_eq("h1".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_inline_html_in_markdown() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -495,7 +495,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_tracking_heading() {
 		World::new()
 			.spawn_empty()
@@ -507,7 +507,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_tracking_text_node() {
 		World::new()
 			.spawn_empty()
@@ -521,7 +521,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_tracking_multiline() {
 		World::new()
 			.spawn_empty()
@@ -541,7 +541,7 @@ mod test {
 			.xpect_eq(3);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_tracking_root_full_span() {
 		let span = World::new()
 			.spawn_empty()
@@ -559,7 +559,7 @@ mod test {
 	/// Root entity must not receive any content components — only metadata
 	/// like [`Frontmatter`] and [`FileSpan`]. All parsed content lives in
 	/// children.
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_heading() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -571,7 +571,7 @@ mod test {
 		root.get::<Expression>().is_none().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_paragraph() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -583,7 +583,7 @@ mod test {
 		root.get::<Expression>().is_none().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn root_has_no_content_components_multiple_blocks() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

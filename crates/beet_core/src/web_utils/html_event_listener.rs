@@ -179,7 +179,7 @@ mod tests {
 	use web_sys::MouseEvent;
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = doc::document();

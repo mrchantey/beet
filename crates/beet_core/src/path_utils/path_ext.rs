@@ -164,7 +164,7 @@ mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		path_ext::create_relative("src", "src/lib.rs")
 			.unwrap()
@@ -174,7 +174,7 @@ mod test {
 			.xpect_eq(PathBuf::from("../Cargo.toml"));
 	}
 
-	#[test]
+	#[crate::test]
 	fn join_relative() {
 		path_ext::join_relative("foo/bar", "baz/style.css")
 			.xpect_eq(PathBuf::from("foo/bar/baz/style.css"));
@@ -182,7 +182,7 @@ mod test {
 			.xpect_eq(PathBuf::from("foo/bar/baz/style.css"));
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_relative() {
 		path_ext::is_relative_url("style.css").xpect_true();
 		path_ext::is_relative_url("../style.css").xpect_true();

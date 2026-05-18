@@ -102,7 +102,7 @@ mod test {
 
 	// todo js runtime set env var
 	#[cfg(not(target_arch = "wasm32"))]
-	#[test]
+	#[crate::test]
 	fn roundtrip_serde() {
 		// SAFETY: single-threaded test
 		unsafe { env_ext::set_var("BEET_TEST_ENV_VAR", "test_value") };
@@ -120,7 +120,7 @@ mod test {
 		roundtripped.value().xpect_eq("test_value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn deserialize_missing_var_errors() {
 		serde_json::from_str::<EnvVar>("\"BEET_NONEXISTENT_VAR_XYZ\"")
 			.unwrap_err();
@@ -146,7 +146,7 @@ mod reflect_test {
 	/// environment. The manual `FromReflect` impl then downcasts the
 	/// concrete [`EnvVar`] directly rather than reconstructing it from
 	/// struct fields (which would leave `value = ""`).
-	#[test]
+	#[crate::test]
 	fn roundtrip_reflect_serde() {
 		// SAFETY: single-threaded test
 		unsafe { env_ext::set_var("BEET_TEST_REFLECT_VAR", "reflect_value") };

@@ -341,46 +341,46 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_simple_element() {
 		roundtrip("<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_nested_elements() {
 		roundtrip("<div><span>inner</span></div>")
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_void_element() {
 		roundtrip("<div><br>text</div>")
 			.xpect_eq("<div><br />text</div>".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_text_only() {
 		roundtrip("hello world").xpect_eq("hello world".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_expression() {
 		roundtrip_expressions("<p>{name}</p>")
 			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_attributes() {
 		roundtrip("<div class=\"foo\" id=\"bar\"></div>")
 			.xpect_contains("class=\"foo\"")
@@ -388,7 +388,7 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_self_closing() {
 		roundtrip("<img src=\"foo.png\" />")
 			.xpect_contains("<img")
@@ -412,7 +412,7 @@ mod test {
 			.to_string()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn escape_text_content() {
 		// The HTML parser stores text verbatim (no entity decoding),
 		// so we manually build an entity tree with a raw `&` in the
@@ -430,7 +430,7 @@ mod test {
 			.xpect_contains("a &amp; b");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_escape_script_content() {
 		// Text inside <script> should not be HTML-escaped.
 		let mut world = World::new();
@@ -448,7 +448,7 @@ mod test {
 			.xpect_contains("&lt;");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_escape_style_content() {
 		// Text inside <style> should not be HTML-escaped.
 		let mut world = World::new();
@@ -469,14 +469,14 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn roundtrip_script_raw_text() {
 		// Parsing and re-rendering script content should preserve raw text.
 		roundtrip("<script>let x = 1 < 2;</script>")
 			.xpect_eq("<script>let x = 1 < 2;</script>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn escape_attribute_value() {
 		// Manually build an element with a raw `&` in an attribute
 		// value to verify the renderer escapes it in attribute context.

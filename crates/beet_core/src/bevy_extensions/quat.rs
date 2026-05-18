@@ -64,7 +64,7 @@ pub impl Quat {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let quat = Quat::from_right();
 		quat.forward().x.xpect_close(1.);

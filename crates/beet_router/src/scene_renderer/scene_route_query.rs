@@ -183,7 +183,7 @@ impl Iterator for SceneRouteBfsIter<'_, '_, '_> {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn scene_root_finds_scene() {
 		let mut world = World::new();
 
@@ -221,7 +221,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scene_root_falls_back_to_root() {
 		let mut world = World::new();
 
@@ -239,7 +239,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn dfs_traverses_children() {
 		let mut world = World::new();
 
@@ -265,7 +265,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn bfs_traverses_children() {
 		let mut world = World::new();
 
@@ -291,7 +291,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn stops_at_nested_scene() {
 		let mut world = World::new();
 
@@ -316,7 +316,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn stops_at_scene_boundary() {
 		let mut world = World::new();
 
@@ -340,7 +340,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn iter_from_child_finds_scene_root() {
 		let mut world = World::new();
 
@@ -363,7 +363,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn iter_dfs_from_starts_at_given_entity() {
 		let mut world = World::new();
 

@@ -184,7 +184,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_check() {
 		true.check(true).xpect_ok();
 		true.check(false).xpect_err();
@@ -195,13 +195,13 @@ mod test {
 		MaybeNot::Negated(false).check_untyped(true).xpect_ok();
 	}
 
-	#[test]
+	#[crate::test]
 	fn passes() {
 		MaybeNot::Verbatim(true).passes(&true).xpect_true();
 		MaybeNot::Verbatim(false).passes(&true).xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn into() {
 		let _val: MaybeNot<_> = true.into_maybe_not();
 		let _val: MaybeNot<bool> = MaybeNot::Negated(true).into();

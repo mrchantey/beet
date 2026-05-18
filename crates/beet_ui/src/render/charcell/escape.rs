@@ -249,7 +249,7 @@ mod tests {
 		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn underline_does_not_bleed_into_border() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Hello" },
@@ -263,7 +263,7 @@ mod tests {
 		out.xpect_contains("Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn strike_does_not_bleed_into_border() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Hi" },
@@ -277,7 +277,7 @@ mod tests {
 		out.xpect_contains("Hi");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn italic_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Italic" },
@@ -289,7 +289,7 @@ mod tests {
 		out.xpect_contains("\x1b[3m");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn bold_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Bold" },
@@ -301,7 +301,7 @@ mod tests {
 		out.xpect_contains("\x1b[1m");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn blink_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Blink" },
@@ -313,7 +313,7 @@ mod tests {
 		out.xpect_contains("\x1b[5m");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn write_style_transitions_underline_off() {
 		// Transitioning from underline=true to underline=false must emit RESET
 		// and must NOT re-write UNDERLINE.

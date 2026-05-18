@@ -23,8 +23,10 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(crate::test_runner))]
+// The lib itself always uses the stable `inventory` runner (`[lib]
+// harness = false`). The libtest / `custom_test_frameworks` path is only
+// exercised by `tests/test_test.rs`. See
+// `crates/beet_core/src/testing/runner/test_desc.rs`.
 #![cfg_attr(
 	feature = "nightly",
 	feature(
@@ -35,14 +37,9 @@
 		closure_track_caller
 	)
 )]
-// never_type is needed for IntoFut impl for Future<Output = !>
-// Only enable if nightly feature is not already enabling it
-#![cfg_attr(
-	all(feature = "testing", not(feature = "nightly")),
-	feature(never_type)
-)]
-// Enable test feature for non-test builds that use the testing feature (e.g., other crates)
-#![cfg_attr(all(feature = "testing", not(test)), feature(test))]
+// `extern crate test` (the libtest conversion shims) requires the unstable
+// `test` feature, on both test and non-test builds.
+#![cfg_attr(feature = "custom_test_frameworks", feature(test))]
 // allow name collision until exit_ok stablized
 #![allow(unstable_name_collisions)]
 
@@ -55,7 +52,7 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc as _alloc;
 
-#[cfg(feature = "testing")]
+#[cfg(feature = "custom_test_frameworks")]
 extern crate test;
 
 #[cfg(feature = "std")]
@@ -102,6 +99,32 @@ pub use web_utils::js_runtime;
 mod workspace_config;
 #[cfg(feature = "testing")]
 pub use crate::testing::test_runner;
+#[cfg(feature = "testing")]
+pub use crate::testing::test_main;
+#[cfg(feature = "custom_test_frameworks")]
+pub use crate::testing::libtest_runner;
+
+/// Entry point for a `harness = false` test target / lib.
+///
+/// Expands to a `#[cfg(test)] fn main` that runs every `#[beet_core::test]`
+/// registered via [`inventory`]. Place once per lib and integration test.
+///
+/// Always defined (independent of the `testing` feature) so non-test builds
+/// of downstream crates can still resolve the macro; the generated `fn main`
+/// is `#[cfg(test)]`-gated, and dev-dependencies enable `testing` for tests.
+#[macro_export]
+macro_rules! test_main {
+	() => {
+		#[cfg(test)]
+		fn main() { $crate::testing::test_main(); }
+	};
+}
+
+// beet_core's own `cargo test --lib` entry point (`[lib] harness = false`).
+// The lib always uses the inventory runner; the libtest path is only for
+// `tests/test_test.rs`.
+#[cfg(all(test, feature = "testing"))]
+fn main() { crate::testing::test_main(); }
 
 /// Re-exports of commonly used types and traits.
 ///

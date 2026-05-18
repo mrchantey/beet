@@ -450,6 +450,6 @@ impl CargoBuildCmd {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() { CargoBuildCmd::default().cmd.xpect_eq("build"); }
 }

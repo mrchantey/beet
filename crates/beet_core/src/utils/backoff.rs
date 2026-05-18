@@ -605,7 +605,7 @@ impl futures::Stream for BackoffStream {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn iter_without_rand_deterministic() {
 		let backoff = Backoff::new(
 			3,
@@ -628,7 +628,7 @@ mod tests {
 		it.next().xpect_none();
 	}
 
-	#[test]
+	#[crate::test]
 	fn clamps_to_max() {
 		let mut backoff = Backoff::new(
 			5,
@@ -662,7 +662,7 @@ mod tests {
 		it.next().xpect_eq(None);
 	}
 
-	#[test]
+	#[crate::test]
 	#[cfg(not(target_arch = "wasm32"))]
 	#[cfg(feature = "std")]
 	fn retry_succeeds_after_failures() {
@@ -732,7 +732,7 @@ mod tests {
 	}
 
 	#[cfg(feature = "rand")]
-	#[test]
+	#[crate::test]
 	fn iter_with_rand_in_range() {
 		let backoff = Backoff::new(
 			3,

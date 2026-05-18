@@ -1,8 +1,7 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::prelude::*;
+use beet_core::testing;
 
-#[test]
+#[beet_core::test]
 fn works() {
 	#[derive(Debug, Component)]
 	struct Bar;
@@ -19,3 +18,5 @@ fn works() {
 	let entity = world.spawn(Foo::<()>::default());
 	entity.get::<Bar>().xpect_some();
 }
+
+beet_core::test_main!();

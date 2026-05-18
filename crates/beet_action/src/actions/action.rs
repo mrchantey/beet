@@ -251,7 +251,7 @@ mod test {
 	#[derive(Reflect)]
 	fn add((a, b): (u32, u32)) -> u32 { a + b }
 
-	#[test]
+	#[beet_core::test]
 	fn bare_action_auto_inserts_basic_meta() {
 		let mut world = World::new();
 		let entity = world.spawn(add.into_action());
@@ -260,7 +260,7 @@ mod test {
 		meta.type_info().xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn macro_meta_takes_priority() {
 		let mut world = World::new();
 		let meta = ActionMeta::of_handler::<add, add>();
@@ -269,7 +269,7 @@ mod test {
 		entity.get::<ActionMeta>().unwrap().type_info().xpect_some();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn reflect_meta_has_type_info() {
 		let meta = ActionMeta::of_reflect::<add, add>();
 		meta.type_info().xpect_some();

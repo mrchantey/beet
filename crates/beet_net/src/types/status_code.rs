@@ -480,7 +480,7 @@ impl StatusCode {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn is_ok() {
 		StatusCode::OK.is_ok().xpect_true();
 		StatusCode::INTERNAL_SERVER_ERROR.is_ok().xpect_false();
@@ -488,7 +488,7 @@ mod test {
 		StatusCode::new(500).is_ok().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn http_ok() {
 		StatusCode::from(http::StatusCode::OK).is_ok().xpect_true();
@@ -497,7 +497,7 @@ mod test {
 			.xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn client_error() {
 		StatusCode::BAD_REQUEST.is_client_error().xpect_true();
 		StatusCode::INTERNAL_SERVER_ERROR
@@ -505,7 +505,7 @@ mod test {
 			.xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn server_error() {
 		StatusCode::INTERNAL_SERVER_ERROR
 			.is_server_error()
@@ -513,14 +513,14 @@ mod test {
 		StatusCode::BAD_REQUEST.is_server_error().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn informational() {
 		StatusCode::CONTINUE.is_informational().xpect_true();
 		StatusCode::EARLY_HINTS.is_informational().xpect_true();
 		StatusCode::OK.is_informational().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn from_http() {
 		StatusCode::from(http::StatusCode::OK).xpect_eq(StatusCode::OK);
@@ -530,7 +530,7 @@ mod test {
 			.xpect_eq(StatusCode::IM_A_TEAPOT);
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn to_http() {
 		let status: http::StatusCode = StatusCode::OK.into();
@@ -543,10 +543,10 @@ mod test {
 		status.xpect_eq(http::StatusCode::IM_A_TEAPOT);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn default_is_ok() { StatusCode::default().xpect_eq(StatusCode::OK); }
 
-	#[test]
+	#[beet_core::test]
 	fn to_exit_code() {
 		StatusCode::OK.to_exit_code().unwrap();
 		StatusCode::INTERNAL_SERVER_ERROR
@@ -561,7 +561,7 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn message() {
 		StatusCode::OK.message().xpect_eq("OK");
 		StatusCode::NOT_FOUND.message().xpect_eq("Not Found");
@@ -577,14 +577,14 @@ mod test {
 			.xpect_eq("Loop Detected");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display() {
 		format!("{}", StatusCode::OK).xpect_eq("200 OK");
 		format!("{}", StatusCode::NOT_FOUND).xpect_eq("404 Not Found");
 		format!("{}", StatusCode::CONTINUE).xpect_eq("100 Continue");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn as_u16() {
 		StatusCode::OK.as_u16().xpect_eq(200);
 		StatusCode::NOT_FOUND.as_u16().xpect_eq(404);
@@ -593,7 +593,7 @@ mod test {
 		StatusCode::LOOP_DETECTED.as_u16().xpect_eq(508);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn redirect_is_ok() {
 		StatusCode::MOVED_PERMANENTLY.is_ok().xpect_true();
 		StatusCode::TEMPORARY_REDIRECT.is_ok().xpect_true();

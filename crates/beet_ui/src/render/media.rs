@@ -214,7 +214,7 @@ mod test {
 
 	/// Parse HTML then render back via [`MediaRenderer`] targeting HTML.
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_html() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -228,7 +228,7 @@ mod test {
 
 	/// Parse HTML then render as plain text via [`MediaRenderer`].
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_plain_text() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -242,7 +242,7 @@ mod test {
 
 	/// Parse markdown then render back as markdown via [`MediaRenderer`].
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn render_markdown() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -258,7 +258,7 @@ mod test {
 	/// A text-based media type with no dedicated renderer falls back
 	/// to plain text when `plaintext_fallback` is enabled (default).
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn fallback_text_type() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -272,7 +272,7 @@ mod test {
 
 	/// `accepts` list is consulted in priority order.
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn accepts_priority() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -291,7 +291,7 @@ mod test {
 	/// When no type in `accepts` matches and fallback is disabled, errors
 	/// with [`RenderError::AcceptMismatch`].
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn no_match_errors() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

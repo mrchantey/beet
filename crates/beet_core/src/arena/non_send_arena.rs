@@ -340,7 +340,7 @@ mod tests {
 		fn get_name(&self) -> &str { &self.name }
 	}
 
-	#[test]
+	#[crate::test]
 	fn automatic_cleanup() {
 		NonSendArena::clear();
 
@@ -376,7 +376,7 @@ mod tests {
 		NonSendArena::len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn multiple_objects_cleanup() {
 		NonSendArena::clear();
 
@@ -404,7 +404,7 @@ mod tests {
 		NonSendArena::len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn manual_remove_with_clones() {
 		NonSendArena::clear();
 
@@ -420,7 +420,7 @@ mod tests {
 		NonSendArena::len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn basic_arena_operations() {
 		NonSendArena::clear();
 
@@ -463,7 +463,7 @@ mod tests {
 		NonSendArena::len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn forget_functionality() {
 		NonSendArena::clear();
 
@@ -507,7 +507,7 @@ mod tests {
 		NonSendArena::len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_access() {
 		NonSendArena::clear();
@@ -524,7 +524,7 @@ mod tests {
 		let _counter = handle2.get();
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_get_mut() {
 		NonSendArena::clear();
@@ -541,7 +541,7 @@ mod tests {
 		let _counter = handle2.get_mut();
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_remove() {
 		NonSendArena::clear();

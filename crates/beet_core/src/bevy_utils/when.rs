@@ -111,12 +111,12 @@ mod test {
 	#[derive(Default, Resource)]
 	struct Foo;
 
-	#[test]
+	#[crate::test]
 	#[ignore = "noisy"]
 	#[should_panic]
 	fn default() { App::new().add_systems(Update, |_res: Res<Foo>| {}).run(); }
 
-	#[test]
+	#[crate::test]
 	#[ignore = "noisy"]
 	#[should_panic]
 	fn panics() {
@@ -127,7 +127,7 @@ mod test {
 			})
 			.run();
 	}
-	#[test]
+	#[crate::test]
 	fn doesnt_panic() {
 		App::new()
 			.add_systems(Update, |_res: When<Res<Foo>>| {

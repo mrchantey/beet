@@ -91,7 +91,7 @@ mod tests {
 	use super::*;
 	use core::ops::Deref;
 
-	#[test]
+	#[beet_core::test]
 	fn field_ref_new() {
 		let field = FieldRef::new("field");
 

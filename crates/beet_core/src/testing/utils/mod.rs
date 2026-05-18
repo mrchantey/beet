@@ -1,6 +1,7 @@
 //! Testing utility types and functions.
 
-/// Pretty formatting for libtest output.
+/// Pretty formatting for libtest output (nightly `custom_test_frameworks`).
+#[cfg(feature = "custom_test_frameworks")]
 pub mod run_libtest_pretty;
 mod test_desc_ext;
 /// Helpers for creating and manipulating test descriptors.

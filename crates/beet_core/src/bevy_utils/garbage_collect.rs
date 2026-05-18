@@ -60,7 +60,7 @@ fn on_remove(mut world: DeferredWorld, cx: HookContext) {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	#[ignore = "needs investigation - despawn in hook API changed in 0.18"]
 	fn works() {
 		let mut world = World::new();

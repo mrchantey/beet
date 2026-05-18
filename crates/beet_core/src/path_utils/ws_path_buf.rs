@@ -144,7 +144,7 @@ mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		WsPathBuf::new("Cargo.toml")
 			.as_path()

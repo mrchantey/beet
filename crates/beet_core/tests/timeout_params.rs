@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration tests for per-test timeout parameters
 //!
 //! This demonstrates the `timeout_ms` parameter on `#[beet_core::test]` which allows
@@ -40,3 +38,5 @@ async fn timeout_param_longer_than_default() {
 	beet_core::time_ext::sleep_millis(50).await;
 	assert_eq!(1 + 1, 2);
 }
+
+beet_core::test_main!();

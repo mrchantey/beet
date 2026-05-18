@@ -256,7 +256,7 @@ impl ReasoningItem {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_message_item() {
 		let json = r#"{
 			"type": "message",
@@ -281,7 +281,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_function_call_item() {
 		let json = r#"{
 			"type": "function_call",
@@ -301,7 +301,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn message_all_text() {
 		let msg = Message {
 			id: "msg_1".to_string(),

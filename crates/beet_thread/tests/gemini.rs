@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
 
@@ -67,3 +65,5 @@ async fn multi_turn_conversation() {
 async fn image_roundtrip() {
 	post_streamer::image_roundtrip(completions_streamer_non_streaming()).await;
 }
+
+beet_core::test_main!();

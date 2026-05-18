@@ -109,7 +109,7 @@ mod test {
 		slot
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn finds_named_slot_at_root() {
 		let mut world = World::new();
 		let slot = spawn_named_slot(&mut world, "main");
@@ -118,7 +118,7 @@ mod test {
 			.xpect_eq(slot);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn finds_named_slot_in_children() {
 		let mut world = World::new();
 		let root = world.spawn(Element::new("div")).id();
@@ -131,7 +131,7 @@ mod test {
 		find_named_slot(&world, root, "nav").unwrap().xpect_eq(slot);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn returns_none_for_missing_slot() {
 		let mut world = World::new();
 		let root = world.spawn(Element::new("div")).id();
@@ -139,7 +139,7 @@ mod test {
 		find_named_slot(&world, root, "main").xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn ignores_non_slot_elements() {
 		let mut world = World::new();
 		// a <div name="main"> should NOT match
@@ -152,7 +152,7 @@ mod test {
 		find_named_slot(&world, div, "main").xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn relationship_adds_slot_content() {
 		let mut world = World::new();
 		let content = world.spawn_empty().id();
@@ -169,7 +169,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn walker_renders_slot_content() {
 		let mut world = World::new();
 
@@ -195,7 +195,7 @@ mod test {
 			.xpect_contains("<slot");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn walker_renders_default_content_without_slot_container() {
 		let mut world = World::new();
 

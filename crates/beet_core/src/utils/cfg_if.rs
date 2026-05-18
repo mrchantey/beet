@@ -161,7 +161,7 @@ mod tests {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn it_works() {
 		assert!(works1().is_some());
 		assert!(works2());
@@ -172,7 +172,7 @@ mod tests {
 		assert!(works6());
 	}
 
-	#[test]
+	#[crate::test]
 	#[allow(clippy::assertions_on_constants)]
 	fn test_usage_within_a_function() {
 		cfg_if! {

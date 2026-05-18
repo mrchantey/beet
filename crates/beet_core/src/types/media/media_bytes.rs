@@ -137,67 +137,67 @@ impl Into<bytes::Bytes> for MediaBytes {
 mod test {
 	use super::*;
 
-	#[test]
+	#[crate::test]
 	fn new_from_vec() {
 		let mb = MediaBytes::new(MediaType::Html, b"<p>hi</p>".to_vec());
 		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_from_slice() {
 		let mb = MediaBytes::new(MediaType::Text, b"hello".as_slice());
 		mb.bytes().xpect_eq(b"hello".as_slice());
 		mb.media_type().xpect_eq(MediaType::Text);
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_str_ctor() {
 		let mb = MediaBytes::new_str(MediaType::Text, "hello");
 		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_string_ctor() {
 		let mb =
 			MediaBytes::new_string(MediaType::Html, "<b>bold</b>".to_string());
 		mb.as_utf8().unwrap().xpect_eq("<b>bold</b>");
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_html_helper() {
 		let mb = MediaBytes::new_html("<p>hi</p>");
 		mb.media_type().xpect_eq(MediaType::Html);
 		mb.as_utf8().unwrap().xpect_eq("<p>hi</p>");
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_text_helper() {
 		let mb = MediaBytes::new_text("hello");
 		mb.media_type().xpect_eq(MediaType::Text);
 		mb.as_utf8().unwrap().xpect_eq("hello");
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_octet_helper() {
 		let mb = MediaBytes::new_octet(vec![0xFF, 0xFE]);
 		mb.media_type().xpect_eq(MediaType::Bytes);
 		mb.bytes().xpect_eq(&[0xFF, 0xFE]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn new_markdown_helper() {
 		let mb = MediaBytes::new_markdown("# Title");
 		mb.media_type().xpect_eq(MediaType::Markdown);
 		mb.as_utf8().unwrap().xpect_eq("# Title");
 	}
 
-	#[test]
+	#[crate::test]
 	fn as_utf8_invalid() {
 		let mb = MediaBytes::new(MediaType::Bytes, vec![0xFF, 0xFE]);
 		mb.as_utf8().xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn take_returns_parts() {
 		let mb = MediaBytes::new_text("data");
 		let (media_type, bytes) = mb.take();
@@ -205,14 +205,14 @@ mod test {
 		bytes.xpect_eq(b"data".to_vec());
 	}
 
-	#[test]
+	#[crate::test]
 	fn display_text() {
 		MediaBytes::new_str(MediaType::Text, "hello world")
 			.to_string()
 			.xpect_eq("hello world".to_string());
 	}
 
-	#[test]
+	#[crate::test]
 	fn display_binary() {
 		MediaBytes::new(MediaType::Bytes, vec![0xFF, 0xFE])
 			.to_string()
@@ -221,7 +221,7 @@ mod test {
 
 	#[cfg(feature = "serde")]
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn serialize_deserialize_roundtrip() {
 		#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 		struct Point {
@@ -234,7 +234,7 @@ mod test {
 		output.xpect_eq(input);
 	}
 
-	#[test]
+	#[crate::test]
 	fn default_is_empty() {
 		let mb = MediaBytes::default();
 		mb.media_type().xpect_eq(MediaType::Bytes);

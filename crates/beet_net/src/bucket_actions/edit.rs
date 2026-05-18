@@ -150,7 +150,7 @@ mod test {
 		result.xpect_eq("xxx bbb zzz".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn rejects_missing_old_text() {
 		let edits = vec![TextEdit {
 			old_text: "nonexistent".into(),
@@ -159,7 +159,7 @@ mod test {
 		validate_edits("some text", &edits).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn rejects_ambiguous_old_text() {
 		let edits = vec![TextEdit {
 			old_text: "ab".into(),
@@ -168,7 +168,7 @@ mod test {
 		validate_edits("ab cd ab", &edits).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn rejects_overlapping_edits() {
 		let edits = vec![
 			TextEdit {
@@ -183,7 +183,7 @@ mod test {
 		validate_edits("hello world", &edits).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn rejects_empty_old_text() {
 		let edits = vec![TextEdit {
 			old_text: "".into(),

@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 
 mod media;
 mod navigate;
@@ -13,3 +11,5 @@ pub mod prelude {
 	pub use crate::router::*;
 	pub use crate::scene_renderer::*;
 }
+
+beet_core::test_main!();

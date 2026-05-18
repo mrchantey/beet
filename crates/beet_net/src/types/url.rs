@@ -576,7 +576,7 @@ mod test {
 
 	// -- Scheme tests --
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_parsing() {
 		Scheme::from_str("http").xpect_eq(Scheme::Http);
 		Scheme::from_str("HTTPS").xpect_eq(Scheme::Https);
@@ -596,7 +596,7 @@ mod test {
 			.xpect_eq(Scheme::Other("custom".to_string()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_display() {
 		Scheme::Http.to_string().xpect_eq("http");
 		Scheme::About.to_string().xpect_eq("about");
@@ -604,28 +604,28 @@ mod test {
 		Scheme::None.to_string().xpect_eq("");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_is_http() {
 		Scheme::Http.is_http().xpect_true();
 		Scheme::Https.is_http().xpect_true();
 		Scheme::Ws.is_http().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_is_ws() {
 		Scheme::Ws.is_ws().xpect_true();
 		Scheme::Wss.is_ws().xpect_true();
 		Scheme::Http.is_ws().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_is_secure() {
 		Scheme::Https.is_secure().xpect_true();
 		Scheme::Wss.is_secure().xpect_true();
 		Scheme::Http.is_secure().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scheme_is_hierarchical() {
 		Scheme::Http.is_hierarchical().xpect_true();
 		Scheme::Https.is_hierarchical().xpect_true();
@@ -644,7 +644,7 @@ mod test {
 
 	// -- Url parsing tests --
 
-	#[test]
+	#[beet_core::test]
 	fn parse_full_url() {
 		let url = Url::parse("https://example.com/api/users?limit=10#results");
 		url.scheme().clone().xpect_eq(Scheme::Https);
@@ -656,7 +656,7 @@ mod test {
 		url.fragment().unwrap().xpect_eq("results");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_without_double_slash() {
 		let url = Url::parse("http:example.com/api/users");
 		url.scheme().clone().xpect_eq(Scheme::Http);
@@ -666,7 +666,7 @@ mod test {
 			.xpect_eq(vec!["api".to_string(), "users".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_bare_path() {
 		let url = Url::parse("/api/users?page=1");
 		url.scheme().clone().xpect_eq(Scheme::None);
@@ -677,7 +677,7 @@ mod test {
 		url.get_param("page").unwrap().xpect_eq("1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_authority_only() {
 		let url = Url::parse("https://example.com");
 		url.scheme().clone().xpect_eq(Scheme::Https);
@@ -685,14 +685,14 @@ mod test {
 		url.path().xpect_empty();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_with_port() {
 		let url = Url::parse("http://localhost:8080/api");
 		url.authority().unwrap().xpect_eq("localhost:8080");
 		url.path().clone().xpect_eq(vec!["api".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_file_scheme() {
 		let url = Url::parse("file:///home/user/doc.txt");
 		url.scheme().clone().xpect_eq(Scheme::File);
@@ -704,7 +704,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_empty_fragment() {
 		let url = Url::parse("/path#");
 		url.fragment().xpect_none();
@@ -712,7 +712,7 @@ mod test {
 
 	// -- Non-hierarchical scheme tests --
 
-	#[test]
+	#[beet_core::test]
 	fn parse_about_blank() {
 		let url = Url::parse("about:blank");
 		url.scheme().clone().xpect_eq(Scheme::About);
@@ -721,7 +721,7 @@ mod test {
 		url.to_string().xpect_eq("about:blank");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_mailto() {
 		let url = Url::parse("mailto:user@example.com");
 		url.scheme().clone().xpect_eq(Scheme::MailTo);
@@ -732,7 +732,7 @@ mod test {
 		url.to_string().xpect_eq("mailto:user@example.com");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_tel() {
 		let url = Url::parse("tel:+1-555-0100");
 		url.scheme().clone().xpect_eq(Scheme::Tel);
@@ -741,7 +741,7 @@ mod test {
 		url.to_string().xpect_eq("tel:+1-555-0100");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_javascript() {
 		let url = Url::parse("javascript:void(0)");
 		url.scheme().clone().xpect_eq(Scheme::JavaScript);
@@ -750,7 +750,7 @@ mod test {
 		url.to_string().xpect_eq("javascript:void(0)");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_data_uri() {
 		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
 		url.scheme().clone().xpect_eq(Scheme::Data);
@@ -761,7 +761,7 @@ mod test {
 			.xpect_eq(vec!["text/plain;base64,SGVsbG8=".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_data_uri_html() {
 		let raw = "data:text/html,<h1>Hello!</h1><p>not-query-param=no</p>";
 		let url = Url::parse(raw);
@@ -775,7 +775,7 @@ mod test {
 
 
 
-	#[test]
+	#[beet_core::test]
 	fn parse_blob() {
 		let url = Url::parse("blob:https://example.com/abc-123");
 		url.scheme().clone().xpect_eq(Scheme::Blob);
@@ -789,7 +789,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_cid() {
 		let url = Url::parse("cid:part1@example.com");
 		url.scheme().clone().xpect_eq(Scheme::Cid);
@@ -800,7 +800,7 @@ mod test {
 		url.to_string().xpect_eq("cid:part1@example.com");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_chrome() {
 		let url = Url::parse("chrome://settings/privacy");
 		url.scheme().clone().xpect_eq(Scheme::Chrome);
@@ -808,7 +808,7 @@ mod test {
 		url.path().clone().xpect_eq(vec!["privacy".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_mailto_with_query() {
 		let url = Url::parse("mailto:user@example.com?subject=Hello");
 		url.scheme().clone().xpect_eq(Scheme::MailTo);
@@ -818,7 +818,7 @@ mod test {
 			.xpect_eq("mailto:user@example.com?subject=Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_about_srcdoc() {
 		let url = Url::parse("about:srcdoc");
 		url.scheme().clone().xpect_eq(Scheme::About);
@@ -828,26 +828,26 @@ mod test {
 
 	// -- Display / roundtrip tests --
 
-	#[test]
+	#[beet_core::test]
 	fn display_full_url() {
 		let url = Url::parse("https://example.com/api/users?limit=10#results");
 		url.to_string()
 			.xpect_eq("https://example.com/api/users?limit=10#results");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_normalizes_double_slash() {
 		let url = Url::parse("http:example.com/path");
 		(&url.to_string()).xpect_starts_with("http://example.com/path");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_bare_path() {
 		let url = Url::parse("/api/users");
 		url.to_string().xpect_eq("/api/users");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_empty_path() {
 		let url = Url::default();
 		url.to_string().xpect_eq("/");
@@ -855,7 +855,7 @@ mod test {
 
 	// -- Builder tests --
 
-	#[test]
+	#[beet_core::test]
 	fn builder_chaining() {
 		let url = Url::default()
 			.with_scheme(Scheme::Https)
@@ -869,7 +869,7 @@ mod test {
 
 	// -- Helper tests --
 
-	#[test]
+	#[beet_core::test]
 	fn split_path_handles_edge_cases() {
 		split_path("").xpect_empty();
 		split_path("/").xpect_empty();
@@ -877,7 +877,7 @@ mod test {
 		split_path("/a//b/").xpect_eq(vec!["a".to_string(), "b".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn path_string() {
 		let url = Url::parse("/api/users/123");
 		url.path_string().xpect_eq("/api/users/123");
@@ -886,7 +886,7 @@ mod test {
 		empty.path_string().xpect_eq("/");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn query_string() {
 		let url = Url::parse("/?limit=10&offset=20");
 		let query = url.query_string();
@@ -894,7 +894,7 @@ mod test {
 		(&query).xpect_contains("offset=20");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn path_segments() {
 		let url = Url::parse("/api/users/123");
 		url.first_segment().unwrap().xpect_eq("api");
@@ -903,13 +903,13 @@ mod test {
 		url.path_from(10).len().xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn with_flag() {
 		let url = Url::default().with_flag("verbose");
 		url.has_param("verbose").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_str_impl() {
 		let url: Url = "https://example.com/path".into();
 		url.scheme().clone().xpect_eq(Scheme::Https);

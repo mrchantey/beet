@@ -215,3 +215,5 @@ pub async fn cleanup_prior_state(stack: &Stack, project: terra::Project) {
 	stack.artifacts_client().bucket().bucket_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }
+
+beet_core::test_main!();

@@ -71,7 +71,7 @@ pub fn default_declarations(color: impl Into<Color>) -> Rule {
 mod tests {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn material_rule_set() {
 		MaterialStylePlugin::world()
 			.with_state::<Res<RuleSet>, _>(|rules| {
@@ -82,7 +82,7 @@ mod tests {
 			})
 			.xpect_true();
 	}
-	#[test]
+	#[beet_core::test]
 	fn material_css() {
 		MaterialStylePlugin::world()
 			.with_state::<StyleQuery, _>(|query| {

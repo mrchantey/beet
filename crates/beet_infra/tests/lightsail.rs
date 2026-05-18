@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration test for Lightsail Block.
 //! Takes approx 10 mins.
 use beet_core::prelude::*;
@@ -161,3 +159,5 @@ async fn verify_live(address: &str, expected: &str) -> Result {
 	let url = format!("http://{address}/version");
 	runtime_utils::verify_live(&url, expected, 30, 10).await
 }
+
+beet_core::test_main!();

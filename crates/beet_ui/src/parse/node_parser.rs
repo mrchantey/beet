@@ -74,7 +74,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	/// Read a plain string and collect the result via [`PlainTextParser`].
-	#[test]
+	#[beet_core::test]
 	fn read_plain_text() {
 		let mut world = World::new();
 		let bytes = MediaBytes::new_text("hello world");
@@ -93,7 +93,7 @@ mod test {
 	}
 
 	/// Parsing the same content twice does not trigger change detection.
-	#[test]
+	#[beet_core::test]
 	fn parse_same_content_no_change() {
 		let mut world = World::new();
 		let mut parser = PlainTextParser::default();
@@ -124,7 +124,7 @@ mod test {
 	}
 
 	/// Parsing with a path attaches a [`FileSpan`] component to the child entity.
-	#[test]
+	#[beet_core::test]
 	fn parse_with_path_inserts_file_span() {
 		let bytes = MediaBytes::new_text("line1\nline2");
 		World::new()

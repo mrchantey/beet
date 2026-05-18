@@ -356,7 +356,7 @@ impl<'u, 't, 'w> PostViewMut<'u, 't, 'w> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	#[test]
+	#[beet_core::test]
 	fn compiles() {
 		let mut world = World::new();
 		world.spawn_empty();

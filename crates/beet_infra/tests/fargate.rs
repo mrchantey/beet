@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration test for Fargate Block.
 //! Takes approx 10 mins.
 use beet_core::prelude::*;
@@ -187,3 +185,5 @@ async fn verify_live(dns: &str, expected: &str) -> Result {
 	let url = format!("http://{dns}/version");
 	runtime_utils::verify_live(&url, expected, 40, 15).await
 }
+
+beet_core::test_main!();

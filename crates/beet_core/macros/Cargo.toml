@@ -18,6 +18,10 @@ proc-macro = true
 
 [features]
 rsx = ["dep:rstml"]
+# When enabled the `#[beet::test]` macro additionally emits a libtest
+# `#[test]` fn so the nightly `custom_test_frameworks` harness can collect
+# it. The `inventory` registration is always emitted regardless.
+custom_test_frameworks = []
 
 [dependencies]
 beet_core_shared.workspace = true

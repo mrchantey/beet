@@ -338,7 +338,7 @@ impl ParamOptions {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn pattern_deduplication() {
 		let metas = vec![
 			ParamMeta::new("foo", ParamValue::Flag),
@@ -355,7 +355,7 @@ mod test {
 		pattern.items[2].name().xpect_eq("foo");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn conflict_different_value_types() {
 		let metas = vec![
 			ParamMeta::new("foo", ParamValue::Flag),
@@ -365,7 +365,7 @@ mod test {
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn conflict_different_required() {
 		let metas = vec![
 			ParamMeta::new("bar", ParamValue::Single),
@@ -375,7 +375,7 @@ mod test {
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn conflict_different_short() {
 		let metas = vec![
 			ParamMeta::new("baz", ParamValue::Flag).with_short('b'),
@@ -385,7 +385,7 @@ mod test {
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn conflict_different_description() {
 		let metas = vec![
 			ParamMeta::new("qux", ParamValue::Multiple)
@@ -397,7 +397,7 @@ mod test {
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_conflict_identical_params() {
 		let metas = vec![
 			ParamMeta::new("same", ParamValue::Flag)
@@ -413,7 +413,7 @@ mod test {
 		pattern.items[0].name().xpect_eq("same");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn conflict_multiple_params() {
 		let metas = vec![
 			ParamMeta::new("alpha", ParamValue::Flag),
@@ -426,7 +426,7 @@ mod test {
 		ParamsPattern::from_metas(metas).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_reflect() {
 		#[derive(Reflect)]
 		struct MyParams {
@@ -452,7 +452,7 @@ mod test {
 		});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn snake_case_converts_to_kebab_case() {
 		#[derive(Reflect)]
 		struct SnakeCaseParams {

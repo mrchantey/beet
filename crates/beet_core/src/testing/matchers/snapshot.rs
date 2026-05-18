@@ -410,10 +410,10 @@ pub fn pretty_parse(tokens: TokenStream) -> String {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn once() { "foobar".xpect_snapshot(); }
 
-	#[test]
+	#[crate::test]
 	fn multiple_snapshots_in_one_test() {
 		"first".xpect_snapshot();
 		"second".xpect_snapshot();
@@ -421,7 +421,7 @@ mod test {
 	}
 
 	#[cfg(feature = "tokens")]
-	#[test]
+	#[crate::test]
 	fn prettyparse() {
 		use quote::quote;
 		// valid file

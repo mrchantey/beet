@@ -482,7 +482,7 @@ mod test {
 		result.xpect_eq("Alice");
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "bevy_scene")]
 	fn roundtrip_increment_scene() {
 		use bevy::ecs::entity::EntityHashMap;

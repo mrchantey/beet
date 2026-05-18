@@ -105,7 +105,7 @@ impl Variable {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn fixed_variable() {
 		let var = Variable::fixed("MY_KEY", "my_value");
 		let request = RequestParts::default();
@@ -115,7 +115,7 @@ mod test {
 			.xpect_eq("my_value");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn header_variable() {
 		let var = Variable::header("x-api-key");
 		let mut request = RequestParts::default();
@@ -126,7 +126,7 @@ mod test {
 			.xpect_eq("secret123");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn param_variable() {
 		let var = Variable::param("deploy_env");
 		let request =
@@ -137,21 +137,21 @@ mod test {
 			.xpect_eq("staging");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn missing_header_errors() {
 		let var = Variable::header("missing-key");
 		let request = RequestParts::default();
 		var.resolve_value(&request).unwrap_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn missing_param_errors() {
 		let var = Variable::param("missing-key");
 		let request = RequestParts::default();
 		var.resolve_value(&request).unwrap_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn tf_var_ref_format() {
 		let var = Variable::fixed("MY_KEY", "val");
 		var.tf_var_ref().as_str().xpect_eq("${var.MY_KEY}");

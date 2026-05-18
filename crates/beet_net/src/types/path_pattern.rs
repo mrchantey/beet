@@ -565,7 +565,7 @@ mod test {
 			.parse_path(&parts.path())
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn root() {
 		parse("/", "/").xpect_ok();
 		parse("", "").xpect_ok();
@@ -582,7 +582,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn static_path() {
 		parse("/foobar", "foobar")
 			.unwrap()
@@ -611,7 +611,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn dynamic_path() {
 		parse("/:foo", "bar").xpect_ok();
 		parse("/:foo", "/bar").xpect_ok();
@@ -644,7 +644,7 @@ mod test {
 		map.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn wildcard_path() {
 		// Using *foo syntax (shorthand for :foo+, OneOrMore)
 		parse("/*foo", "bar").xpect_ok();
@@ -679,7 +679,7 @@ mod test {
 		map.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn optional_wildcard_path() {
 		// Using *foo? syntax (shorthand for :foo*, ZeroOrMore)
 		parse("/*foo?", "bar").xpect_ok();
@@ -707,7 +707,7 @@ mod test {
 		map.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn optional_dynamic_path() {
 		// Using :foo? syntax (Optional)
 		parse("/:foo?", "bar").xpect_ok();
@@ -733,7 +733,7 @@ mod test {
 		map.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn explicit_modifier_syntax() {
 		// Test :foo+ syntax (explicit OneOrMore)
 		parse("/:foo+", "bar").xpect_ok();
@@ -754,7 +754,7 @@ mod test {
 		map.get_vec("foo").xpect_eq(Some(&Vec::<String>::new()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn adjacent_slashes() {
 		// greedy segments store each part separately
 		let map = parse("foo/*bar", "foo//bar/baz.rs").unwrap().dyn_map;
@@ -784,7 +784,7 @@ mod test {
 		map.len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn segment_parsing() {
 		// Static
 		let seg = PathPatternSegment::new("foo");
@@ -822,7 +822,7 @@ mod test {
 		seg.name().xpect_eq("foo");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn annotated_output() {
 		PathPatternSegment::new("foo")
 			.to_string_annotated()
@@ -847,7 +847,7 @@ mod test {
 			.xpect_eq("*foo?".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn greedy_must_be_last() {
 		// Greedy patterns must be last
 		PathPattern::new("*foo/bar").xpect_err();

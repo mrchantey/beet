@@ -226,7 +226,7 @@ mod test {
 	#[derive(Default, Resource)]
 	struct Foo(Vec<f32>);
 
-	#[test]
+	#[crate::test]
 	fn time() {
 		let mut app = App::new();
 		app.init_resource::<Foo>()

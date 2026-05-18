@@ -240,7 +240,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn exe_path_example_release() {
 		let build = CargoBuild::default()
 			.with_release(true)
@@ -251,7 +251,7 @@ mod test {
 		path.ends_with("release/examples/my-app").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn exe_path_zigbuild_example_release() {
 		let build = CargoBuild::default()
 			.with_release(true)
@@ -262,7 +262,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lambda_exe_path_example() {
 		let build = CargoBuild::default().with_example("router");
 		let path = build.lambda_exe_path();

@@ -735,7 +735,7 @@ mod test {
 	use super::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_response_created() {
 		let json = r#"{
 			"type": "response.created",
@@ -757,7 +757,7 @@ mod test {
 		event.event_type().xpect_eq("response.created");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_output_text_delta() {
 		let json = r#"{
 			"type": "response.output_text.delta",
@@ -778,7 +778,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_function_call_arguments_done() {
 		let json = r#"{
 			"type": "response.function_call_arguments.done",
@@ -796,7 +796,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_error_event() {
 		let json = r#"{
 			"type": "error",
@@ -818,7 +818,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_response_completed() {
 		let json = r#"{
 			"type": "response.completed",

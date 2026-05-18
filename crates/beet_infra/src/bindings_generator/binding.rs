@@ -600,7 +600,7 @@ mod test {
 		fs_ext::workspace_root().join("crates/beet_infra/tests/fixtures")
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserialize_example_tf_schema() {
 		let tf_schema = read_tf_schema_from_file(
 			fixtures_dir().join("test-provider-schema.json"),
@@ -632,7 +632,7 @@ mod test {
 			.xpect_eq(Some(false));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn generate_registry_from_schema() {
 		let tf_schema = read_tf_schema_from_file(
 			fixtures_dir().join("test-provider-schema.json"),
@@ -704,7 +704,7 @@ mod test {
 		output.status.success().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unmarshall_provider() {
 		let res: config = serde_json::from_str(include_str!(
 			"../../tests/fixtures/provider_test.json"
@@ -730,7 +730,7 @@ mod test {
 			.xpect_eq(Some("ABC12345".to_owned()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unmarshall_resource() {
 		let res: config = serde_json::from_str(include_str!(
 			"../../tests/fixtures/resource_test.json"
@@ -760,7 +760,7 @@ mod test {
 			.xpect_eq(Some("test_resource_a".to_owned()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unmarshall_datasource() {
 		let res: config = serde_json::from_str(include_str!(
 			"../../tests/fixtures/datasource_test.json"
@@ -790,7 +790,7 @@ mod test {
 			.xpect_eq(Some("test_datasource_b".to_owned()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unmarshall_block_type() {
 		let res: config = serde_json::from_str(include_str!(
 			"../../tests/fixtures/block_type_test.json"
@@ -843,7 +843,7 @@ mod test {
 			.xpect_eq(Some("REGEX".to_owned()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn handles_reserved_words_in_attributes() {
 		// Test that 'self' and 'Self' are renamed to avoid raw identifier issues
 		let mut attrs = BTreeMap::new();

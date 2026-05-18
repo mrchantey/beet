@@ -831,7 +831,7 @@ mod test {
 
 	// -- Basic rendering --
 
-	#[test]
+	#[beet_core::test]
 	fn heading_renders_text() {
 		let mut world = World::new();
 		let entity =
@@ -843,7 +843,7 @@ mod test {
 		buffer_to_text(&buf).as_str().xpect_contains("Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn paragraph_renders_text() {
 		let mut world = World::new();
 		let entity = world.spawn((Element::new("p"), Children::default())).id();
@@ -854,7 +854,7 @@ mod test {
 		buffer_to_text(&buf).as_str().xpect_contains("Body text");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn bold_text_has_bold_style() {
 		let mut world = World::new();
 		// <p><strong>bold</strong></p>
@@ -884,7 +884,7 @@ mod test {
 		found_bold.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn italic_text_has_italic_style() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("italic")).id();
@@ -910,7 +910,7 @@ mod test {
 		found_italic.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn heading_is_bold() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("Title")).id();
@@ -934,7 +934,7 @@ mod test {
 		found_bold.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn thematic_break_renders_line() {
 		let mut world = World::new();
 		// Build a root with: <p>above</p><hr><p>below</p>
@@ -957,7 +957,7 @@ mod test {
 		text.as_str().xpect_contains("below");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn code_has_background() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("code_text")).id();
@@ -985,7 +985,7 @@ mod test {
 		found_bg.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn link_text_is_underlined() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("click")).id();
@@ -1012,7 +1012,7 @@ mod test {
 
 	// -- Span map tests --
 
-	#[test]
+	#[beet_core::test]
 	fn span_map_populated_for_paragraph() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("hello")).id();
@@ -1024,7 +1024,7 @@ mod test {
 		span_map.get(TuiPos::new(0, 0)).xpect_some();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_map_maps_to_text_entity() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("body")).id();
@@ -1038,7 +1038,7 @@ mod test {
 		span_map.get(TuiPos::new(0, 0)).xpect_eq(Some(text_entity));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_map_resolves_inline_spans() {
 		let mut world = World::new();
 		// <p>this is some <strong>Bold Text</strong></p>
@@ -1065,7 +1065,7 @@ mod test {
 		span_map.get(TuiPos::new(0, 22)).xpect_eq(None);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_map_empty_for_no_content() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -1074,7 +1074,7 @@ mod test {
 		span_map.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn bare_text_node_is_flushed() {
 		let mut world = World::new();
 		// A bare Value node not wrapped in any element
@@ -1086,7 +1086,7 @@ mod test {
 			.xpect_contains("I should be visible");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn button_renders_brackets() {
 		let mut world = World::new();
 		let btn_text = world.spawn(Value::from("Click me")).id();
@@ -1102,7 +1102,7 @@ mod test {
 		text.as_str().xpect_contains("[Click me]");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn mixed_inline_styles() {
 		let mut world = World::new();
 		// <p>normal <strong>bold</strong> end</p>
@@ -1139,7 +1139,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn markdown_heading_renders() {
 		render_markdown("# Hello World", 40, 10)
 			.as_str()
@@ -1147,7 +1147,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn markdown_paragraph_renders() {
 		render_markdown("body text", 40, 10)
 			.as_str()
@@ -1155,7 +1155,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn markdown_bold_is_styled() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -1180,7 +1180,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn markdown_hr_renders() {
 		render_markdown("above\n\n---\n\nbelow", 40, 10)
 			.as_str()
@@ -1188,7 +1188,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn markdown_unordered_list() {
 		render_markdown("- alpha\n- beta", 40, 10)
 			.as_str()
@@ -1196,7 +1196,7 @@ mod test {
 			.xpect_contains("• beta");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn custom_style_map() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("Styled")).id();
@@ -1245,7 +1245,7 @@ mod test {
 	}
 
 	/// Verify h1 text is centered horizontally.
-	#[test]
+	#[beet_core::test]
 	fn h1_is_centered() {
 		let mut world = World::new();
 		let text_entity = world.spawn(Value::from("Hello")).id();
@@ -1276,7 +1276,7 @@ mod test {
 
 	// -- TuiScrollState --
 
-	#[test]
+	#[beet_core::test]
 	fn scroll_state_no_overflow() {
 		let state = TuiScrollState {
 			offset: 0,
@@ -1287,7 +1287,7 @@ mod test {
 		state.max_offset().xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scroll_state_overflow() {
 		let state = TuiScrollState {
 			offset: 0,
@@ -1298,7 +1298,7 @@ mod test {
 		state.max_offset().xpect_eq(20);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scroll_down_clamps_to_max() {
 		let mut state = TuiScrollState {
 			offset: 0,
@@ -1312,7 +1312,7 @@ mod test {
 		state.offset.xpect_eq(10);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scroll_up_clamps_to_zero() {
 		let mut state = TuiScrollState {
 			offset: 3,
@@ -1326,7 +1326,7 @@ mod test {
 		state.offset.xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn clamp_adjusts_after_content_shrink() {
 		let mut state = TuiScrollState {
 			offset: 15,
