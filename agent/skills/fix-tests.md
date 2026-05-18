@@ -8,7 +8,7 @@ Run all tests piping the entire output to `agent/scratch.txt`, use this for all 
 
 ## Hanging Tests
 
-Always use `timeout` when running tests to catch hanging tests.
+If instructed that some tests may hang, use `timeout` to catch these.
 Run an exponential backoff timeout, starting with two minutes, to catch hanging tests
 once you find a hanging test, shorten the timeout as much as possible to speed iteration cycles.
 When debugging hanging tests always pass the `log-runs` flag to detect the tests that dont finish, ie: `timeout 120 cargo test -p beet_core --lib -- --log-runs`. 
@@ -25,13 +25,13 @@ this can usually be fixed by running again
 
 The timeout provided is negotiable, adjust as needed.
 
-Run `timeout 300 just test-core`
+Run `just test-core`
 If you encounter an error, isolate it and run again, ie if the error is in beet_core lib:
-`timeout 120  cargo test -p beet_core --all-features --lib -- test_name`
+`cargo test -p beet_core --all-features --lib -- test_name`
 Fix the error using a subagent, then run the crate again:
-`timeout 120 cargo test -p beet_core --all-features`
+`cargo test -p beet_core --all-features`
 When thats clear, run the full suite again
-`timeout 300 just test-core | tail`
+`just test-core | tail`
 After the first complete pass, run fully again, checking for warnings. Fix any warnings encountered
 
 ## Success
