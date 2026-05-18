@@ -59,3 +59,6 @@ beet_core = { workspace = true, features = ["testing"] }
 # name = "interface"
 # path = "tests/interface.rs"
 # required-features = ["interface"]
+
+[lib]
+harness = false

@@ -90,7 +90,7 @@ mod test {
 	#[derive(Debug, Clone, Copy, PartialEq, Deref, Component)]
 	struct Foo(pub Vec3);
 
-	#[test]
+	#[crate::test]
 	fn vec3() {
 		Vec3::ZERO.xpect_close(Vec3::ZERO);
 		Vec3::ZERO.xnot().xpect_close(Vec3::ONE);

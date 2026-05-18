@@ -192,7 +192,7 @@ impl<T: fmt::Display> fmt::Display for Tree<T> {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let tree = Tree::new("root").with_children(vec![
 			Tree::new("child1"),

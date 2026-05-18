@@ -389,7 +389,7 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn dfs() {
 		let mut world = World::new();
 
@@ -409,7 +409,7 @@ mod test {
 
 		numbers.get().xpect_eq(&[1, 2, 3]);
 	}
-	#[test]
+	#[crate::test]
 	fn on_spawn_deferred() {
 		let mut world = World::new();
 
@@ -438,7 +438,7 @@ mod test {
 		numbers.get().xpect_eq(&[3, 1, 2]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn observe() {
 		#[derive(EntityEvent)]
 		struct Foo(Entity);

@@ -793,7 +793,7 @@ mod test {
 		field: bool,
 	}
 
-	#[test]
+	#[crate::test]
 	fn simple_struct_schema() {
 		let schema = Schema::new::<SimpleStruct>();
 
@@ -840,7 +840,7 @@ mod test {
 		required.len().xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn complex_struct_schema() {
 		let schema = Schema::new::<ComplexStruct>();
 
@@ -899,7 +899,7 @@ mod test {
 			.xpect_eq("boolean");
 	}
 
-	#[test]
+	#[crate::test]
 	fn nested_struct_schema() {
 		let schema = Schema::new::<WithNested>();
 
@@ -942,7 +942,7 @@ mod test {
 			.xpect_eq("integer");
 	}
 
-	#[test]
+	#[crate::test]
 	fn optional_fields_not_required() {
 		let schema = Schema::new::<WithOptional>();
 
@@ -955,7 +955,7 @@ mod test {
 		optional_schema.get("oneOf").is_some().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn vec_field_schema() {
 		let schema = Schema::new::<WithVec>();
 		let props = schema.get("properties").unwrap().as_map().unwrap();
@@ -977,7 +977,7 @@ mod test {
 			.xpect_eq("string");
 	}
 
-	#[test]
+	#[crate::test]
 	fn simple_enum_schema() {
 		let schema = Schema::new::<SimpleEnum>();
 
@@ -998,14 +998,14 @@ mod test {
 		variant_names.contains(&"Third").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn complex_enum_schema() {
 		let schema = Schema::new::<ComplexEnum>();
 		let one_of = schema.get("oneOf").unwrap().as_list().unwrap();
 		one_of.len().xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn tuple_struct_schema() {
 		let schema = Schema::new::<TupleStruct>();
 		schema
@@ -1019,7 +1019,7 @@ mod test {
 		prefix_items.len().xpect_eq(2);
 	}
 
-	#[test]
+	#[crate::test]
 	fn newtype_struct_unwraps() {
 		let schema = Schema::new::<NewtypeStruct>();
 		schema
@@ -1030,7 +1030,7 @@ mod test {
 			.xpect_eq("string");
 	}
 
-	#[test]
+	#[crate::test]
 	fn unit_type_schema() {
 		let schema = Schema::new::<()>();
 		schema
@@ -1041,7 +1041,7 @@ mod test {
 			.xpect_eq("null");
 	}
 
-	#[test]
+	#[crate::test]
 	fn extract_option_inner_works() {
 		extract_option_inner("core::option::Option<String>")
 			.unwrap()
@@ -1050,7 +1050,7 @@ mod test {
 		extract_option_inner("String").xpect_none();
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_required_field_works() {
 		is_required_field("String").xpect_true();
 		is_required_field("i32").xpect_true();
@@ -1058,7 +1058,7 @@ mod test {
 		is_required_field("Option<i32>").xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn primitive_type_mapping() {
 		map_primitive_type("alloc::string::String").xpect_eq("string");
 		map_primitive_type("String").xpect_eq("string");

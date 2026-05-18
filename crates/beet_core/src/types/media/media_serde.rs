@@ -246,7 +246,7 @@ mod test {
 	}
 
 
-	#[test]
+	#[crate::test]
 	fn roundtrip_plaintext() {
 		let input: u32 = 20;
 		let bytes = MediaType::Text.serialize(&input).unwrap();
@@ -255,7 +255,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn roundtrip_json() {
 		let input = Pair { a: 1, b: 2 };
 		let bytes = MediaType::Json.serialize(&input).unwrap();
@@ -264,7 +264,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn json_pretty() {
 		let input = Pair { a: 1, b: 2 };
 		let options = SerializeOptions { pretty: true };
@@ -279,13 +279,13 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn json_empty_bytes_null() {
 		let result: () = MediaType::Json.deserialize(b"").unwrap();
 		result.xpect_eq(());
 	}
 
-	#[test]
+	#[crate::test]
 	fn roundtrip_ron() {
 		let input = Pair { a: 7, b: 8 };
 		let bytes = MediaType::Ron.serialize(&input).unwrap();
@@ -293,7 +293,7 @@ mod test {
 		output.xpect_eq(input);
 	}
 
-	#[test]
+	#[crate::test]
 	fn ron_pretty() {
 		let input = Pair { a: 7, b: 8 };
 		let options = SerializeOptions { pretty: true };
@@ -308,7 +308,7 @@ mod test {
 	}
 
 	#[cfg(feature = "postcard")]
-	#[test]
+	#[crate::test]
 	fn roundtrip_postcard() {
 		let input = Pair { a: 3, b: 4 };
 		let bytes = MediaType::Postcard.serialize(&input).unwrap();
@@ -317,7 +317,7 @@ mod test {
 	}
 
 	#[cfg(feature = "postcard")]
-	#[test]
+	#[crate::test]
 	fn bytes_media_type_uses_postcard() {
 		let input = Pair { a: 5, b: 6 };
 		let bytes = MediaType::Bytes.serialize(&input).unwrap();
@@ -326,19 +326,19 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn unsupported_media_type_errors() {
 		MediaType::Html.serialize(&42u32).xpect_err();
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[crate::test]
 	fn serialize_accepts_fallback_json() {
 		let bytes = MediaType::serialize_accepts(&[], &42u32).unwrap();
 		bytes.media_type().xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[crate::test]
 	fn serialize_accepts_ron() {
 		#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 		struct Val {

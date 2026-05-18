@@ -251,7 +251,7 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	#[test]
+	#[beet_core::test]
 	fn navigate_to_from_str() {
 		NavigateTo::from_str_param("parent")
 			.unwrap()
@@ -268,7 +268,7 @@ mod test {
 		NavigateTo::from_str_param("bogus").unwrap_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn navigate_to_display() {
 		NavigateTo::Parent.to_string().xpect_eq("parent");
 		NavigateTo::FirstChild.to_string().xpect_eq("first-child");

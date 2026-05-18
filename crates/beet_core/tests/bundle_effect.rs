@@ -1,8 +1,9 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-use beet_core::prelude::*;
+beet_core::test_main!();
 
-#[test]
+use beet_core::prelude::*;
+use beet_core::testing;
+
+#[beet_core::test]
 fn works() {
 	#[derive(Debug, Component)]
 	struct Bar;

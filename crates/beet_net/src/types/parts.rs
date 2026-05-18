@@ -464,7 +464,7 @@ impl TryFrom<ResponseParts> for http::response::Parts {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_default() {
 		let parts = RequestParts::default();
 		parts.path().xpect_empty();
@@ -473,7 +473,7 @@ mod test {
 		parts.version().xpect_eq("1.1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_with_headers_and_params() {
 		let mut parts = RequestParts::new(
 			HttpMethod::Get,
@@ -497,7 +497,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_with_params() {
 		let parts = RequestParts::new(HttpMethod::Post, "/api/users?page=1");
 
@@ -508,7 +508,7 @@ mod test {
 		parts.get_param("page").unwrap().xpect_eq("1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_parts_with_headers() {
 		let mut parts = ResponseParts::new(StatusCode::OK);
 		parts.headers.set_content_type(MediaType::Html);
@@ -522,7 +522,7 @@ mod test {
 			.xpect_eq(MediaType::Html);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_new() {
 		let parts = RequestParts::get("/api/users");
 		(*parts.method()).xpect_eq(HttpMethod::Get);
@@ -531,25 +531,25 @@ mod test {
 			.xpect_eq(vec!["api".to_string(), "users".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_post() {
 		let parts = RequestParts::post("/api/users");
 		(*parts.method()).xpect_eq(HttpMethod::Post);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_parts_default() {
 		let parts = ResponseParts::default();
 		parts.status().xpect_eq(StatusCode::OK);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_parts_not_found() {
 		let parts = ResponseParts::not_found();
 		parts.status().xpect_eq(StatusCode::NOT_FOUND);
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn from_http_request_parts() {
 		let http_parts = http::Request::builder()
@@ -579,7 +579,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn from_http_response_parts() {
 		let http_parts = http::Response::builder()
@@ -601,7 +601,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_cli_args() {
 		let cli = CliArgs::parse("users list --limit 10 --verbose");
 		let parts = RequestParts::from(cli);
@@ -615,7 +615,7 @@ mod test {
 		parts.has_param("verbose").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_cli_args_flags_only() {
 		let cli = CliArgs::parse("--verbose --debug");
 		let parts = RequestParts::from(cli);
@@ -625,7 +625,7 @@ mod test {
 		parts.has_param("debug").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn path_string() {
 		let parts = RequestParts::get("/api/users/123");
 		parts.path_string().xpect_eq("/api/users/123");
@@ -634,7 +634,7 @@ mod test {
 		empty_parts.path_string().xpect_eq("/");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn query_string() {
 		let parts = RequestParts::get("/?limit=10&offset=20");
 		let query = parts.query_string();
@@ -643,7 +643,7 @@ mod test {
 		(&query).xpect_contains("offset=20");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn uri_construction() {
 		let parts = RequestParts::get("/api/users?page=1");
 		let uri = parts.uri();
@@ -651,7 +651,7 @@ mod test {
 		(&uri).xpect_contains("page=1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn path_segments() {
 		let parts = RequestParts::get("/api/users/123");
 
@@ -661,7 +661,7 @@ mod test {
 		parts.path_from(10).len().xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn request_parts_to_http() {
 		let mut parts = RequestParts::post("/api/users?limit=10");
@@ -673,7 +673,7 @@ mod test {
 		http_parts.uri.path().xpect_eq("/api/users");
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn response_parts_to_http() {
 		let mut parts = ResponseParts::new(StatusCode::CREATED);
@@ -684,7 +684,7 @@ mod test {
 		http_parts.status.xpect_eq(http::StatusCode::CREATED);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_parts_access() {
 		let parts = RequestParts::get("/api/users");
 		// Access RequestParts methods directly
@@ -692,7 +692,7 @@ mod test {
 		parts.path_string().xpect_eq("/api/users");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn response_parts_headers() {
 		let mut parts = ResponseParts::ok();
 		parts.headers.set_raw("x-custom", "value");
@@ -703,7 +703,7 @@ mod test {
 			.xpect_eq("value");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn has_body_detection() {
 		let mut parts = RequestParts::default();
 		parts.has_body().xpect_false();
@@ -718,7 +718,7 @@ mod test {
 		parts2.has_body().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn version_is_cow_static() {
 		// Default version uses borrowed static string
 		let parts = RequestParts::default();

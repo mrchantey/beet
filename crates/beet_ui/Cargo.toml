@@ -84,3 +84,11 @@ bevy_ratatui = {workspace = true, optional = true, features = ["crossterm","keyb
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
 beet_net.workspace = true
+
+[lib]
+harness = false
+
+[[test]]
+name = "rsx"
+path = "tests/rsx.rs"
+harness = false

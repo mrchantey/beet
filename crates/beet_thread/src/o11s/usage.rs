@@ -86,7 +86,7 @@ pub struct OutputTokensDetails {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_usage() {
 		let json = r#"{
 			"input_tokens": 15,
@@ -104,7 +104,7 @@ mod test {
 		assert_eq!(usage.output_tokens_details.unwrap().reasoning_tokens, 0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn creates_usage() {
 		let usage = Usage::new(100, 50);
 		assert_eq!(usage.total_tokens, 150);

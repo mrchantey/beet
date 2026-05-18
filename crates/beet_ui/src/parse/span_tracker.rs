@@ -183,7 +183,7 @@ mod test {
 
 	// -- SpanLookup tests --
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_single_line() {
 		let input = "hello";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -192,7 +192,7 @@ mod test {
 		lookup.line_col(5).xpect_eq(LineCol::new(1, 5));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_multi_line() {
 		let input = "hello\nworld\nfoo";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -204,14 +204,14 @@ mod test {
 		lookup.line_col(15).xpect_eq(LineCol::new(3, 3)); // end
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_trailing_newline() {
 		let input = "a\nb\n";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
 		lookup.line_col(4).xpect_eq(LineCol::new(3, 0));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_span_of_slice() {
 		let input = "hello\nworld";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -223,7 +223,7 @@ mod test {
 		span.path().xpect_eq(WsPathBuf::new("test.txt"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_full_span() {
 		let input = "line1\nline2";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -232,7 +232,7 @@ mod test {
 		span.end().xpect_eq(LineCol::new(2, 5));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn lookup_empty_input() {
 		let input = "";
 		let lookup = SpanLookup::new(input, WsPathBuf::new("test.txt"));
@@ -241,35 +241,35 @@ mod test {
 
 	// -- SpanTracker tests --
 
-	#[test]
+	#[beet_core::test]
 	fn empty_text_stays_at_default() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		tracker.extend("");
 		tracker.pos().xpect_eq(LineCol::default());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn single_line_no_newline() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		tracker.extend("hello");
 		tracker.pos().xpect_eq(LineCol::new(1, 5));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn newline_increments_line_resets_col() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		tracker.extend("hello\nworld");
 		tracker.pos().xpect_eq(LineCol::new(2, 5));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn multiple_lines() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		tracker.extend("a\nb\nc");
 		tracker.pos().xpect_eq(LineCol::new(3, 1));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn span_from_captures_range() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		let start = tracker.pos(); // 1:0
@@ -279,7 +279,7 @@ mod test {
 		span.end().xpect_eq(LineCol::new(2, 5));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn incremental_extend() {
 		let mut tracker = SpanTracker::new(WsPathBuf::new("test.txt"));
 		tracker.extend("foo");
@@ -287,7 +287,7 @@ mod test {
 		tracker.pos().xpect_eq(LineCol::new(2, 3));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_full_span() {
 		let tracker = {
 			let mut t = SpanTracker::new(WsPathBuf::new("test.txt"));

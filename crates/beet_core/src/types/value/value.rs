@@ -586,33 +586,33 @@ macro_rules! val {
 mod test {
 	use super::*;
 
-	#[test]
+	#[crate::test]
 	fn parse_string_bool() {
 		Value::parse_string("true").xpect_eq(Value::Bool(true));
 		Value::parse_string("false").xpect_eq(Value::Bool(false));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_string_uint() {
 		Value::parse_string("42").xpect_eq(Value::Uint(42));
 		Value::parse_string("0").xpect_eq(Value::Uint(0));
 		Value::parse_string("007").xpect_eq(Value::Uint(7));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_string_int() {
 		Value::parse_string("-7").xpect_eq(Value::Int(-7));
 		Value::parse_string("-383").xpect_eq(Value::Int(-383));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_string_float() {
 		Value::parse_string("3.14").xpect_eq(Value::Float(3.14));
 		Value::parse_string("-383.484").xpect_eq(Value::Float(-383.484));
 		Value::parse_string("0.0").xpect_eq(Value::Float(0.0));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_string_fallback() {
 		for test_case in [
 			"",
@@ -628,17 +628,17 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn value_null_default() { Value::default().xpect_eq(Value::Null); }
 
-	#[test]
+	#[crate::test]
 	fn value_is_methods() {
 		Value::Null.is_null().xpect_true();
 		Value::Map(Map::default()).is_map().xpect_true();
 		Value::List(Vec::new()).is_list().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn value_from_primitives() {
 		Value::from(true).xpect_eq(Value::Bool(true));
 		Value::from("hello").xpect_eq(Value::Str("hello".into()));
@@ -647,14 +647,14 @@ mod test {
 		Value::from(3.14f64).xpect_eq(Value::Float(3.14));
 	}
 
-	#[test]
+	#[crate::test]
 	fn value_map_operations() {
 		let mut val = Value::map();
 		val.insert("key", "value").unwrap();
 		val.get("key").unwrap().as_str().unwrap().xpect_eq("value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn value_list_operations() {
 		let mut val = Value::list();
 		val.push(1i64).unwrap();
@@ -663,7 +663,7 @@ mod test {
 		val.get_index(1).unwrap().as_i64().unwrap().xpect_eq(2);
 	}
 
-	#[test]
+	#[crate::test]
 	fn display_map() {
 		let mut val = Value::map();
 		val.insert("a", 1i64).unwrap();
@@ -671,7 +671,7 @@ mod test {
 		val.to_string().xpect_eq("{a: 1, b: 2}");
 	}
 
-	#[test]
+	#[crate::test]
 	fn display_list() {
 		let mut val = Value::list();
 		val.push(1i64).unwrap();
@@ -680,31 +680,31 @@ mod test {
 		val.to_string().xpect_eq("[1, 2, 3]");
 	}
 
-	#[test]
+	#[crate::test]
 	fn val_macro_null() { val!(null).xpect_eq(Value::Null); }
 
-	#[test]
+	#[crate::test]
 	fn val_macro_bool() {
 		val!(true).xpect_eq(Value::Bool(true));
 		val!(false).xpect_eq(Value::Bool(false));
 	}
 
-	#[test]
+	#[crate::test]
 	fn val_macro_string() {
 		val!("hello").xpect_eq(Value::Str("hello".into()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn val_macro_number() { val!(42).xpect_eq(Value::Int(42)); }
 
-	#[test]
+	#[crate::test]
 	fn val_macro_array() {
 		let value = val!([1, 2, 3]);
 		let list = value.as_list().unwrap();
 		list.len().xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn val_macro_object() {
 		let value = val!({
 			"name": "Alice",
@@ -715,7 +715,7 @@ mod test {
 		map.get("score").unwrap().as_i64().unwrap().xpect_eq(100);
 	}
 
-	#[test]
+	#[crate::test]
 	fn val_macro_nested() {
 		let value = val!({
 			"user": {
@@ -729,7 +729,7 @@ mod test {
 	}
 
 	#[cfg(feature = "std")]
-	#[test]
+	#[crate::test]
 	fn value_hash_consistency() {
 		use std::hash::DefaultHasher;
 		use std::hash::Hash;
@@ -763,13 +763,13 @@ mod test {
 		float_64: f64,
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_option_impls() {
 		Value::from(Some(42i64)).xpect_eq(Value::Int(42));
 		Value::from(None::<i64>).xpect_eq(Value::Null);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_hashmap_impl() {
 		let mut input: HashMap<String, i64> = HashMap::default();
 		input.insert("key".to_string(), 42i64);
@@ -797,7 +797,7 @@ mod test {
 			v.into_serde::<T>().unwrap().xpect_eq(val);
 		}
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_all_numeric_types() {
 			let original = AllNumericTypes {
 				signed_8: -8,
@@ -828,22 +828,22 @@ mod test {
 		}
 
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_string() { roundtrip_for("hello world".to_string()); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_u32() { roundtrip_for(389_u32); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_vec3() { roundtrip_for(Vec3::new(0., 1., 2.)); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_transform() {
 			roundtrip_for(Transform::from_translation(Vec3::new(1., 2., 3.)));
 		}
 
 		#[cfg(feature = "bevy_color")]
-		#[test]
+		#[crate::test]
 		fn roundtrip_color() {
 			use bevy::color::Color;
 			use bevy::color::palettes;
@@ -872,16 +872,16 @@ mod test {
 			},
 		}
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_enum_unit() { roundtrip_for(TestEnum::Unit); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_enum_newtype() { roundtrip_for(TestEnum::Newtype(42)); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_enum_tuple() { roundtrip_for(TestEnum::Tuple(1, 2)); }
 
-		#[test]
+		#[crate::test]
 		fn roundtrip_enum_struct() {
 			roundtrip_for(TestEnum::Struct { x: 3, y: 4 });
 		}

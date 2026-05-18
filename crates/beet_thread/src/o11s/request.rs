@@ -561,7 +561,7 @@ pub struct ReasoningParam {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_simple_request() {
 		let body = RequestBody::new("gpt-4o-mini").with_simple_input("Hello");
 		let json = serde_json::to_value(&body).unwrap();
@@ -569,7 +569,7 @@ mod test {
 		assert_eq!(json["input"], "Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_message_items() {
 		let body = RequestBody::new("gpt-4o-mini").with_input_items(vec![
 			InputItem::Message(MessageParam::system("You are helpful.")),
@@ -580,7 +580,7 @@ mod test {
 		assert_eq!(json["input"][1]["role"], "user");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_tool() {
 		let tool = FunctionToolParam::new("get_weather")
 			.with_description("Get the weather")
@@ -595,7 +595,7 @@ mod test {
 		assert_eq!(json["name"], "get_weather");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_image_input() {
 		let msg = MessageParam::with_parts(MessageRole::User, vec![
 			ContentPart::input_text("What's in this image?"),
@@ -608,7 +608,7 @@ mod test {
 		assert_eq!(json["content"][1]["type"], "input_image");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_function_call_output() {
 		let output =
 			FunctionCallOutputParam::text("call_123", r#"{"temp": 72}"#);

@@ -293,7 +293,7 @@ mod test {
 		app
 	}
 
-	#[test]
+	#[crate::test]
 	fn round_trip_ron() {
 		let mut app = scene_world();
 		let scene_bytes = SceneSaver::new_default(app.world_mut())
@@ -305,7 +305,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[crate::test]
 	fn entity_scope() {
 		let mut app = scene_world();
 		let entity = app.world_mut().spawn(Name::new("Root")).id();
@@ -322,7 +322,7 @@ mod test {
 		text.xref().xpect_contains("Child");
 	}
 
-	#[test]
+	#[crate::test]
 	fn custom_entity_map() {
 		let mut app = scene_world();
 		let scene_bytes = SceneSaver::new_default(app.world_mut())
@@ -335,7 +335,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[crate::test]
 	fn loads_into_entity_adds_spawned_by() {
 		let mut app = scene_world();
 		// Spawn a named entity to form a scene
@@ -368,7 +368,7 @@ mod test {
 			.xpect_eq("SceneChild");
 	}
 
-	#[test]
+	#[crate::test]
 	fn loads_into_entity_preserves_existing_children() {
 		let mut app = scene_world();
 		let child = app.world_mut().spawn(Name::new("SceneChild")).id();

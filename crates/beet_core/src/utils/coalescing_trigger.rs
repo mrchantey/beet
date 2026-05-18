@@ -119,20 +119,20 @@ impl CoalescingTrigger {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn starts_when_idle() {
 		let trigger = CoalescingTrigger::default();
 		trigger.start().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn second_start_is_deferred() {
 		let trigger = CoalescingTrigger::default();
 		trigger.start(); // in-flight
 		trigger.start().xpect_false(); // deferred, dirty set
 	}
 
-	#[test]
+	#[crate::test]
 	fn finish_without_dirty_clears_in_progress() {
 		let trigger = CoalescingTrigger::default();
 		trigger.start();
@@ -141,7 +141,7 @@ mod tests {
 		trigger.start().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn finish_with_dirty_signals_retry() {
 		let trigger = CoalescingTrigger::default();
 		trigger.start();
@@ -150,7 +150,7 @@ mod tests {
 		trigger.finish().xpect_false(); // no dirty -> done
 	}
 
-	#[test]
+	#[crate::test]
 	fn coalesces_many_requests_into_one_retry() {
 		let trigger = CoalescingTrigger::default();
 		trigger.start(); // in-flight
@@ -165,7 +165,7 @@ mod tests {
 		trigger.finish().xpect_false(); // done
 	}
 
-	#[test]
+	#[crate::test]
 	fn full_coalescing_loop() {
 		use std::sync::atomic::AtomicU32;
 		use std::sync::atomic::Ordering;

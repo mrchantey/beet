@@ -125,7 +125,7 @@ pub impl Vec3 {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	pub fn works() {
 		let mut rng = rand::rng();
 		for _ in 0..10 {

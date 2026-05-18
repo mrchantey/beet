@@ -370,7 +370,7 @@ mod test_request {
 		start.elapsed().as_secs().xpect_less_than(3);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn query_params() {
 		Request::get("http://localhost/get")
 			.parse_query_param("foo", &(1, 2))

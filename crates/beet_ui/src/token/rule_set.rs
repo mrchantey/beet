@@ -203,7 +203,7 @@ mod tests {
 	token!(Foo, u32);
 	token!(Bar, u32);
 
-	#[test]
+	#[beet_core::test]
 	fn cascade() {
 		let mut world = World::new();
 		world.insert_resource(

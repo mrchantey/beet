@@ -59,7 +59,7 @@ pub fn url_path_from_file_path(file_path: impl AsRef<Path>) -> Result<RelPath> {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn rel_path_routing() {
 		RelPath::new("hello").to_string().xpect_eq("hello");
 
@@ -82,7 +82,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn join() {
 		RelPath::new("foo")
 			.join(&RelPath::new("/"))
@@ -90,7 +90,7 @@ mod test {
 			.xpect_eq("foo");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_segments() {
 		let segments =
 			vec!["api".to_string(), "users".to_string(), "123".to_string()];
@@ -98,19 +98,19 @@ mod test {
 		path.to_string().xpect_eq("api/users/123");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_segments_empty() {
 		let path = RelPath::from_segments(&Vec::<String>::new());
 		path.to_string().xpect_eq("");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn segments() {
 		let path = RelPath::new("api/users/123");
 		path.segments().xpect_eq(vec!["api", "users", "123"]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn first_last_segment() {
 		let path = RelPath::new("api/users/123");
 		path.first_segment().unwrap().xpect_eq("api");
@@ -121,7 +121,7 @@ mod test {
 		empty_path.last_segment().xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn from_request_parts() {
 		let parts = RequestParts::get("/api/users/123");
 		let path = rel_path_from_parts(&parts);

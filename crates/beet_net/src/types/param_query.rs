@@ -59,7 +59,7 @@ impl<T: Clone + Component> ParamQuery<'_, '_, T> {
 mod tests {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		#[derive(Reflect, Component, Clone)]
 		struct Foo {

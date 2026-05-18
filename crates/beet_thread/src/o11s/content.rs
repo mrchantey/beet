@@ -297,7 +297,7 @@ impl ContentPart {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_output_text() {
 		let json = r#"{"type":"output_text","text":"Hello","annotations":[],"logprobs":[]}"#;
 		let content: ContentPart = serde_json::from_str(json).unwrap();
@@ -305,14 +305,14 @@ mod test {
 		assert_eq!(content.as_text(), Some("Hello"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn deserializes_input_image() {
 		let json = r#"{"type":"input_image","image_url":"https://example.com/img.png"}"#;
 		let content: ContentPart = serde_json::from_str(json).unwrap();
 		assert!(matches!(content, ContentPart::InputImage(_)));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn creates_base64_image() {
 		let image = InputImage::from_base64("image/png", "abc123");
 		assert_eq!(image.image_url, "data:image/png;base64,abc123");

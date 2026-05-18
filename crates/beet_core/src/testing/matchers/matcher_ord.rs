@@ -108,7 +108,7 @@ mod test {
 	use crate::prelude::*;
 
 
-	#[test]
+	#[crate::test]
 	fn order() {
 		0.xpect_greater_or_equal_to(0);
 		10.xpect_greater_than(-10);

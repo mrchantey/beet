@@ -1,8 +1,9 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 // #![deny(missing_docs)]
+
+beet_core::test_main!();
+
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;

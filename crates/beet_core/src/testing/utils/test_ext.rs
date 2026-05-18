@@ -1,9 +1,6 @@
-use std::panic::Location;
-
 use crate::prelude::*;
 use crate::testing::utils::*;
-use test::TestDescAndFn;
-use test::TestFn;
+use std::panic::Location;
 
 /// Uses [`Location::caller`] to propagate test location and name
 #[track_caller]
@@ -36,7 +33,7 @@ pub fn new_auto_desc() -> TestDesc {
 	let name = caller.file().split('/').last().unwrap_or("").to_string();
 
 	TestDesc {
-		name: test::TestName::DynTestName(format!(
+		name: TestName::Dyn(format!(
 			// approximate how a real test name would look
 			"libtest::test_ext::{}#{}",
 			name,
@@ -69,9 +66,8 @@ pub fn new(
 }
 
 
-/// copied from https://github.com/rust-lang/rust/blob/a25032cf444eeba7652ce5165a2be450430890ba/library/test/src/lib.rs#L223
-/// Clones static values for putting into a dynamic vector, which test_main()
-/// needs to hand out ownership of tests to parallel test runners.
+/// Clones a static test for handing out ownership of tests to parallel
+/// test runners.
 ///
 /// ## Panics
 /// This will panic when fed any dynamic tests, because they cannot be cloned.
@@ -81,52 +77,29 @@ pub fn clone_static(test: &TestDescAndFn) -> TestDescAndFn {
 			testfn: TestFn::StaticTestFn(f),
 			desc: test.desc.clone(),
 		},
-		TestFn::StaticBenchFn(f) => TestDescAndFn {
-			testfn: TestFn::StaticBenchFn(f),
-			desc: test.desc.clone(),
-		},
 		_ => panic!("non-static tests cannot be cloned"),
 	}
 }
 
-
-/// Extracts the static test function from a descriptor.
-#[deprecated]
-pub fn func(test: &TestDescAndFn) -> fn() -> Result<(), String> {
-	match test.testfn {
-		TestFn::StaticTestFn(func) => func,
-		_ => panic!("non-static tests are not supported"),
-	}
-}
 
 /// Runs a test function and returns its result.
 pub fn run(test: TestFn) -> Result<(), String> {
 	match test {
 		TestFn::StaticTestFn(func) => func(),
 		TestFn::DynTestFn(func) => func(),
-		_ => panic!("benches not yet supported"),
 	}
 }
-
-// 	// match test.testfn {
-// 	// 	TestFn::StaticTestFn(func) => func(),
-// 	// 	TestFn::StaticBenchFn(func) => func(&mut Bencher::()),
-// 	// 	_ => panic!("non-static tests are not supported"),
-// 	// }
-// }
-use test::ShouldPanic;
-use test::TestDesc;
-use test::TestType;
 
 /// Returns `true` if two test descriptors have the same source location.
 pub fn is_equal_location(a: &TestDesc, b: &TestDesc) -> bool {
 	a.source_file == b.source_file && a.start_line == b.start_line
 }
+
 /// Creates a new TestDesc with the given name and source file.
 /// Other fields are set to sensible default values for a unit test.
 pub fn new_desc(name: &str, file: &'static str) -> TestDesc {
 	TestDesc {
-		name: test::TestName::DynTestName(name.into()),
+		name: TestName::Dyn(name.into()),
 		ignore: false,
 		ignore_message: None,
 		source_file: file,
@@ -138,24 +111,5 @@ pub fn new_desc(name: &str, file: &'static str) -> TestDesc {
 		no_run: false,
 		should_panic: ShouldPanic::No,
 		test_type: TestType::UnitTest,
-	}
-}
-
-
-
-
-/// The `#[test]` macro replaces results with [useless error messages](https://github.com/rust-lang/rust/blob/a25032cf444eeba7652ce5165a2be450430890ba/library/test/src/lib.rs#L234)
-/// so we instead panic and instruct user to use `unwrap`.
-/// Also used by async wasm tests, we dont care what the result is, if ya
-/// want messages, panic! at the disco
-#[deprecated]
-pub fn result_to_panic<T, E>(result: Result<T, E>) {
-	match result {
-		Ok(_) => {}
-		Err(_) => {
-			panic!(
-				"test returned an Err(). Use `unwrap()` instead to see the contents of the error"
-			);
-		}
 	}
 }

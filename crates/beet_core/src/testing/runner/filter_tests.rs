@@ -65,7 +65,7 @@ mod tests {
 		world.query_once::<&TestOutcome>()[0] == &TestOutcome::Pass
 	}
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		passes_filter("--quiet").xpect_true();
 		passes_filter("filter_tests.rs --quiet").xpect_true();
@@ -74,7 +74,7 @@ mod tests {
 		passes_filter("--quiet --include *filter_tests.rs").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn ignored_flags() {
 		// Default: ignored tests are skipped
 		let mut world = TestPlugin::world();

@@ -422,7 +422,7 @@ pub fn test_dir() -> PathBuf {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn workspace_root() {
 		fs_ext::workspace_root()
 			.file_stem()
@@ -437,7 +437,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn to_string() {
 		let content =
 			fs_ext::read_to_string(fs_ext::test_dir().join("mod.rs")).unwrap();
@@ -446,7 +446,7 @@ mod test {
 		fs_ext::read_to_string(fs_ext::test_dir().join("foo.rs")).xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn to_bytes() {
 		let bytes = fs_ext::read(fs_ext::test_dir().join("mod.rs")).unwrap();
 		bytes.len().xpect_greater_than(10);
@@ -454,7 +454,7 @@ mod test {
 		fs_ext::read(fs_ext::test_dir().join("foo.rs")).xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn hash() {
 		let hash1 =
 			fs_ext::hash_file(fs_ext::test_dir().join("mod.rs")).unwrap();
@@ -512,7 +512,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn read_media() {
 		let mb = fs_ext::read_media(fs_ext::test_dir().join("mod.rs")).unwrap();
 		mb.media_type().xpect_eq(MediaType::Rust);

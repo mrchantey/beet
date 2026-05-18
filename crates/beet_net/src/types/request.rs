@@ -541,7 +541,7 @@ impl<T: Into<Bytes>> From<http::Request<T>> for Request {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn request_get() {
 		// basic smoke-test; header access goes through parts.headers
 		let request = Request::get("/api/users");
@@ -551,20 +551,20 @@ mod test {
 			.xpect_eq(vec!["api".to_string(), "users".to_string()]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_post() {
 		let request = Request::post("/api/users");
 		(*request.method()).xpect_eq(HttpMethod::Post);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_with_method() {
 		let request =
 			Request::get("/api/users").with_method(HttpMethod::Delete);
 		(*request.method()).xpect_eq(HttpMethod::Delete);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_with_body() {
 		let request = Request::post("/api/users").with_body(b"hello");
 		request
@@ -573,7 +573,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_deref_to_parts() {
 		let request = Request::get("/api/users");
 		// Should be able to call Parts methods via Deref
@@ -582,7 +582,7 @@ mod test {
 		request.scheme().clone().xpect_eq(Scheme::None);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_from_cli_args() {
 		let cli = CliArgs::parse("users list --limit 10");
 		let request = Request::from(cli);
@@ -595,7 +595,7 @@ mod test {
 		request.get_param("limit").unwrap().xpect_eq("10");
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "http")]
 	fn request_from_http() {
 		let http_request = http::Request::builder()
@@ -614,7 +614,7 @@ mod test {
 		request.get_param("page").unwrap().xpect_eq("1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_with_query_param() {
 		let request = Request::get("/api/users")
 			.with_param("limit", "10")
@@ -624,20 +624,20 @@ mod test {
 		request.get_param("offset").unwrap().xpect_eq("20");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_route_path() {
 		let request = Request::get("/api/users/123");
 		request.route_path().to_string().xpect_eq("api/users/123");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_from_str() {
 		let request: Request = "/api/users".into();
 		(*request.method()).xpect_eq(HttpMethod::Get);
 		request.path_string().xpect_eq("/api/users");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn request_into_parts() {
 		let request = Request::post("/api/users").with_body(b"data");
 		let (parts, body) = request.into_parts();
@@ -648,7 +648,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn request_with_json() {
 		// headers accessed directly on parts.headers
 		use serde::Deserialize;
@@ -677,7 +677,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn request_with_json_str() {
 		let request = Request::with_json_str("/api/users", r#"{"name":"Ada"}"#);
 		(*request.method()).xpect_eq(HttpMethod::Post);
@@ -695,7 +695,7 @@ mod test {
 	}
 
 	#[cfg(feature = "json")]
-	#[test]
+	#[beet_core::test]
 	fn request_with_media() {
 		let mb = MediaBytes::serialize(MediaType::Json, &42u32).unwrap();
 		let request = Request::with_media("/api/data", mb);

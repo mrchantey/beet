@@ -252,7 +252,7 @@ mod test {
 
 	// -- YAML parsing --
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_simple_string() {
 		let pairs = parse_yaml_kv("title: Hello World").unwrap();
 		pairs.len().xpect_eq(1);
@@ -260,44 +260,44 @@ mod test {
 		pairs[0].1.to_string().xpect_eq("Hello World");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_quoted_string() {
 		let pairs = parse_yaml_kv("title: \"Hello World\"").unwrap();
 		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_single_quoted_string() {
 		let pairs = parse_yaml_kv("title: 'Hello World'").unwrap();
 		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_boolean() {
 		let pairs = parse_yaml_kv("draft: true\npublished: false").unwrap();
 		pairs[0].1.xpect_eq(Value::Bool(true));
 		pairs[1].1.xpect_eq(Value::Bool(false));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_integer() {
 		let pairs = parse_yaml_kv("count: 42").unwrap();
 		pairs[0].1.xpect_eq(Value::Uint(42));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_negative_integer() {
 		let pairs = parse_yaml_kv("offset: -7").unwrap();
 		pairs[0].1.xpect_eq(Value::Int(-7));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_float() {
 		let pairs = parse_yaml_kv("weight: 3.14").unwrap();
 		pairs[0].1.xpect_eq(Value::Float(3.14));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_null_variants() {
 		for input in ["empty:", "tilde: ~", "null_word: null"] {
 			let pairs = parse_yaml_kv(input).unwrap();
@@ -305,7 +305,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_skips_comments_and_blanks() {
 		let content = "# comment\n\ntitle: Hello\n# another\nauthor: World";
 		let pairs = parse_yaml_kv(content).unwrap();
@@ -314,13 +314,13 @@ mod test {
 		pairs[1].0.as_str().xpect_eq("author");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_inline_comment() {
 		let pairs = parse_yaml_kv("title: Hello # a comment").unwrap();
 		pairs[0].1.to_string().xpect_eq("Hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn yaml_multiple_pairs() {
 		let content = "title: My Post\nauthor: Jane\ntags: rust, bevy";
 		let pairs = parse_yaml_kv(content).unwrap();
@@ -329,7 +329,7 @@ mod test {
 
 	// -- TOML parsing --
 
-	#[test]
+	#[beet_core::test]
 	fn toml_quoted_string() {
 		let pairs = parse_toml_kv("title = \"Hello World\"").unwrap();
 		pairs.len().xpect_eq(1);
@@ -337,32 +337,32 @@ mod test {
 		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn toml_boolean() {
 		let pairs = parse_toml_kv("draft = true").unwrap();
 		pairs[0].1.xpect_eq(Value::Bool(true));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn toml_integer() {
 		let pairs = parse_toml_kv("count = 42").unwrap();
 		pairs[0].1.xpect_eq(Value::Uint(42));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn toml_float() {
 		let pairs = parse_toml_kv("weight = 3.14").unwrap();
 		pairs[0].1.xpect_eq(Value::Float(3.14));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn toml_skips_sections() {
 		let content = "[meta]\ntitle = \"Hello\"\n[other]\ncount = 5";
 		let pairs = parse_toml_kv(content).unwrap();
 		pairs.len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn toml_skips_comments() {
 		let content = "# comment\ntitle = \"Hello\"";
 		let pairs = parse_toml_kv(content).unwrap();
@@ -371,7 +371,7 @@ mod test {
 
 	// -- Frontmatter component --
 
-	#[test]
+	#[beet_core::test]
 	fn frontmatter_yaml() {
 		let fm = Frontmatter::parse(
 			"title: Hello\nauthor: World",
@@ -382,7 +382,7 @@ mod test {
 		fm.value.field_len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn frontmatter_toml() {
 		let fm = Frontmatter::parse(
 			"title = \"Hello\"\ncount = 42",
@@ -393,13 +393,13 @@ mod test {
 		fm.value.field_len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn frontmatter_empty() {
 		let fm = Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
 		fm.value.field_len().xpect_eq(0);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn get_str_field() {
 		let fm = Frontmatter::parse(
 			"title: Hello\ncount: 42",
@@ -411,7 +411,7 @@ mod test {
 		fm.get_str("missing").is_none().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn dynamic_struct_fields_accessible() {
 		let fm = Frontmatter::parse(
 			"title: Hello\ncount: 42\ndraft: true",

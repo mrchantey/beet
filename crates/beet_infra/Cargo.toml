@@ -88,3 +88,26 @@ required-features = ["deploy", "aws_sdk", "lightsail_block"]
 name = "fargate_test"
 path = "examples/fargate_test.rs"
 required-features = ["deploy", "aws_sdk", "fargate_block"]
+
+[lib]
+harness = false
+
+[[test]]
+name = "fargate"
+path = "tests/fargate.rs"
+harness = false
+
+[[test]]
+name = "lambda"
+path = "tests/lambda.rs"
+harness = false
+
+[[test]]
+name = "lightsail"
+path = "tests/lightsail.rs"
+harness = false
+
+[[test]]
+name = "runtime_utils"
+path = "tests/runtime_utils.rs"
+harness = false

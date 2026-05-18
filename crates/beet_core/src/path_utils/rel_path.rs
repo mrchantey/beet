@@ -186,26 +186,26 @@ impl AsRef<str> for RelPath {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn strips_leading_slash() {
 		RelPath::new("/hello").to_string().xpect_eq("hello");
 		RelPath::new("hello").to_string().xpect_eq("hello");
 	}
 
-	#[test]
+	#[crate::test]
 	fn default_is_empty() {
 		RelPath::default().to_string().xpect_eq("");
 		RelPath::new("/").to_string().xpect_eq("");
 	}
 
-	#[test]
+	#[crate::test]
 	fn cleans_path() {
 		RelPath::new("foo/bar/../baz")
 			.to_string()
 			.xpect_eq("foo/baz");
 	}
 
-	#[test]
+	#[crate::test]
 	fn join_works() {
 		RelPath::new("foo")
 			.join("bar")
@@ -213,7 +213,7 @@ mod test {
 			.xpect_eq("foo/bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn join_strips_leading_slash() {
 		RelPath::new("foo")
 			.join("/bar")
@@ -221,12 +221,12 @@ mod test {
 			.xpect_eq("foo/bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn join_empty_is_identity() {
 		RelPath::new("foo").join("").to_string().xpect_eq("foo");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parent() {
 		RelPath::new("foo/bar")
 			.parent()
@@ -235,7 +235,7 @@ mod test {
 			.xpect_eq("foo");
 	}
 
-	#[test]
+	#[crate::test]
 	fn with_extension() {
 		RelPath::new("foo/bar")
 			.with_extension("txt")
@@ -243,7 +243,7 @@ mod test {
 			.xpect_eq("foo/bar.txt");
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_segments() {
 		let segments = vec!["api", "users", "123"];
 		RelPath::from_segments(&segments)
@@ -251,19 +251,19 @@ mod test {
 			.xpect_eq("api/users/123");
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_segments_empty() {
 		let segments: Vec<&str> = vec![];
 		RelPath::from_segments(&segments).to_string().xpect_eq("");
 	}
 
-	#[test]
+	#[crate::test]
 	fn segments() {
 		let path = RelPath::new("api/users/123");
 		path.segments().xpect_eq(vec!["api", "users", "123"]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn first_last_segment() {
 		let path = RelPath::new("api/users/123");
 		path.first_segment().unwrap().xpect_eq("api");
@@ -274,7 +274,7 @@ mod test {
 		empty_path.last_segment().xpect_none();
 	}
 
-	#[test]
+	#[crate::test]
 	fn with_leading_slash() {
 		RelPath::new("foo/bar")
 			.with_leading_slash()
@@ -282,10 +282,10 @@ mod test {
 		RelPath::default().with_leading_slash().xpect_eq("/");
 	}
 
-	#[test]
+	#[crate::test]
 	fn display() { RelPath::new("a/b/c").to_string().xpect_eq("a/b/c"); }
 
-	#[test]
+	#[crate::test]
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let original = RelPath::new("hello/world");

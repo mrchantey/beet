@@ -108,7 +108,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn parse_plain_text() {
 		let bytes = MediaBytes::new_text("hello");
 		World::new()
@@ -127,7 +127,7 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn parse_html() {
 		let bytes = MediaBytes::new_html("<div>hello</div>");
 		World::new()
@@ -143,7 +143,7 @@ mod test {
 	}
 
 	#[cfg(feature = "markdown_parser")]
-	#[test]
+	#[beet_core::test]
 	fn parse_markdown() {
 		let bytes = MediaBytes::new_markdown("# Title");
 		World::new()
@@ -162,7 +162,7 @@ mod test {
 			.xpect_eq("h1".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn fallback_text_type() {
 		// CSS has no dedicated parser but is a text type,
 		// so it should fall back to plain text.
@@ -182,7 +182,7 @@ mod test {
 			.xpect_eq(Value::Str("body { color: red; }".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn no_fallback_errors() {
 		let bytes = MediaBytes::new_css("body {}");
 		MediaParser::new()
@@ -191,7 +191,7 @@ mod test {
 			.xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn binary_type_errors() {
 		let bytes = MediaBytes::new(MediaType::Png, b"\x89PNG".as_slice());
 		MediaParser::new()

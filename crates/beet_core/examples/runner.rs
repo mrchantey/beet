@@ -33,6 +33,8 @@ fn returns_err_async() -> Result<(), String> {
 fn panics_async() -> Result<(), String> {
 	register_test(TestCaseParams::new(), async {
 		panic!("whoops");
+		#[allow(unreachable_code)]
+		Ok::<(), String>(())
 	});
 	Ok(())
 }

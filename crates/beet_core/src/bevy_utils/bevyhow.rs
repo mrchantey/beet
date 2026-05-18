@@ -111,7 +111,7 @@ mod test {
 	use bevy::ecs::error::BevyError;
 
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let foo = 1;
 		let bar = 2;

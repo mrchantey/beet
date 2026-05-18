@@ -76,7 +76,7 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let mut world = World::new();
 		let entity = world

@@ -182,7 +182,7 @@ mod tests {
 		(AsyncPlugin, RouterPlugin, InfraPlugin).into_world()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn routes_discoverable() {
 		let mut world = cli_world();
 		let root = world
@@ -204,7 +204,7 @@ mod tests {
 		tree.find(&["rollforward"]).xpect_some();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn destroy_has_force_param() {
 		let mut world = cli_world();
 		let root = world

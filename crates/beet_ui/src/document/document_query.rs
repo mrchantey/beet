@@ -148,7 +148,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn document_query_get_and_get_mut() {
 		let mut world = World::new();
 		let entity = world.spawn(Document::new(val!({ "value": 42i64 }))).id();
@@ -199,7 +199,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_query_with_field() {
 		let mut world = World::new();
 		let entity = world.spawn(Document::new(val!({ "count": 5i64 }))).id();
@@ -235,7 +235,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_query_with_field_initializes() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -270,7 +270,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_query_resolve_card() {
 		let mut world = World::new();
 		let card = world
@@ -292,7 +292,7 @@ mod test {
 			.unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_query_resolve_root() {
 		let mut world = World::new();
 		let root = world

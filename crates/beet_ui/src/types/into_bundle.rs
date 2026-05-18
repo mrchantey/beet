@@ -124,7 +124,7 @@ mod test {
 	use beet_core::prelude::*;
 	fn is_bundle<M>(_: impl IntoBundle<M>) {}
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		#[derive(Event)]
 		struct Foo;

@@ -1,5 +1,5 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+beet_core::test_main!();
+
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_thread::prelude::*;

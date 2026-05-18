@@ -1,7 +1,7 @@
 //! Not actually testing anything in beet_core but its very
 //! hard to remember bevy's lifecycle rules.
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+
+beet_core::test_main!();
 
 use beet_core::prelude::*;
 
@@ -51,7 +51,9 @@ fn removed2(ev: On<Remove, Comp2>) {
 }
 
 
-#[test]
+use beet_core::testing;
+
+#[beet_core::test]
 #[ignore]
 fn multi_component() {
 	let mut world = World::new();
@@ -70,7 +72,7 @@ fn multi_component() {
 	// 4v0: Comp2 Hook  - Remove
 }
 
-#[test]
+#[beet_core::test]
 #[ignore]
 fn child() {
 	let mut world = World::new();

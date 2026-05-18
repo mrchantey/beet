@@ -90,7 +90,7 @@ mod test {
 		text.xpect_eq("hello world");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn truncates_by_line_limit() {
 		let lines: Vec<&str> = (0..10).map(|_| "line").collect();
 		let text = lines.join("
@@ -104,7 +104,7 @@ mod test {
 		out.lines().count().xpect_eq(3);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn truncates_by_byte_limit() {
 		// each line is well within the default byte limit individually,
 		// but 2000+ lines of 30 chars each exceeds 50KB
@@ -125,7 +125,7 @@ mod test {
 		(out.lines().count() < 2500).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn offset_skips_lines() {
 		let text = "zero
 one

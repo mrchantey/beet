@@ -154,21 +154,21 @@ impl FileClient {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn resolve_strips_file_scheme() {
 		let client = FileClient::new().with_external_file_paths(true);
 		let path = client.resolve_path("file:///home/user/doc.txt").unwrap();
 		path.xpect_eq(PathBuf::from("/home/user/doc.txt"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resolve_cleans_traversal() {
 		let client = FileClient::new().with_external_file_paths(true);
 		let path = client.resolve_path("/home/user/../user/doc.txt").unwrap();
 		path.xpect_eq(PathBuf::from("/home/user/doc.txt"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn validate_rejects_dot_files() {
 		let client = FileClient::new().with_external_file_paths(true);
 		client
@@ -179,7 +179,7 @@ mod test {
 			.xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn validate_allows_dot_files_when_enabled() {
 		let client = FileClient::new()
 			.with_external_file_paths(true)
@@ -187,14 +187,14 @@ mod test {
 		client.validate_path(Path::new("/home/user/.env")).unwrap();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn validate_rejects_external_paths() {
 		let client = FileClient::new();
 		// An absolute path outside the cwd should fail
 		client.validate_path(Path::new("/etc/passwd")).xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn validate_allows_external_when_enabled() {
 		let client = FileClient::new()
 			.with_external_file_paths(true)
@@ -242,7 +242,7 @@ mod test {
 		client.send(".env").await.xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn media_type_inferred() {
 		let client = FileClient::new().with_external_file_paths(true);
 		let path = client.resolve_path("style.css").unwrap();

@@ -124,9 +124,6 @@ pub(crate) fn trigger_timeouts(
 
 #[cfg(test)]
 mod tests {
-	use test::TestDescAndFn;
-	use test::TestFn;
-
 	use super::*;
 
 
@@ -168,7 +165,8 @@ mod tests {
 		did_timeout(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new(), async {
 				time_ext::sleep_millis(100).await;
-				unreachable!("should timeout")
+				unreachable!("should timeout");
+				#[allow(unreachable_code)] Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -199,7 +197,8 @@ mod tests {
 		let test = test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(10), async {
 				time_ext::sleep_millis(100).await;
-				unreachable!("should timeout")
+				unreachable!("should timeout");
+				#[allow(unreachable_code)] Ok::<(), String>(())
 			});
 			Ok(())
 		});
@@ -218,7 +217,8 @@ mod tests {
 		let test = test_ext::new_auto(|| {
 			register_test(TestCaseParams::new().with_timeout_ms(10), async {
 				time_ext::sleep_millis(100).await;
-				unreachable!("should timeout")
+				unreachable!("should timeout");
+				#[allow(unreachable_code)] Ok::<(), String>(())
 			});
 			Ok(())
 		});

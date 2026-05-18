@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Infrastructure as code for beet, built on OpenTofu.
 //!
 //! This crate provides typed Rust bindings for Terraform/OpenTofu
@@ -7,6 +5,9 @@
 //! - [`terra`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`bindings`] for pre-generated bindings of commonly used providers
+
+beet_core::test_main!();
+
 #[cfg(feature = "deploy")]
 mod actions;
 pub mod bindings;

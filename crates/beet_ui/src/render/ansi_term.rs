@@ -486,7 +486,7 @@ mod test {
 		result
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_paragraph() {
 		render("Hello world")
 			.xmap(strip_ansi)
@@ -494,20 +494,20 @@ mod test {
 			.xpect_eq("Hello world");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_heading_h1() {
 		// heading_hashes is false by default; only the text is emitted
 		render("# Title").xmap(strip_ansi).trim().xpect_eq("Title");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_heading_styled() {
 		render("# Title")
 			.xpect_contains("\x1b[")
 			.xpect_contains("Title");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_link_has_osc8() {
 		render("[click](https://example.com)")
 			.xpect_contains("\x1b]8;;https://example.com\x1b\\")
@@ -515,7 +515,7 @@ mod test {
 			.xpect_contains("\x1b]8;;\x1b\\");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_link_text_stripped() {
 		render("[click](https://example.com)")
 			.xmap(strip_ansi)
@@ -523,14 +523,14 @@ mod test {
 			.xpect_eq("click");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_code_block() {
 		render("```rust\nfn main() {}\n```")
 			.xmap(strip_ansi)
 			.xpect_contains("fn main() {}");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_unordered_list() {
 		render("- alpha\n- beta")
 			.xmap(strip_ansi)
@@ -539,19 +539,19 @@ mod test {
 			.xpect_contains("• beta");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_image() {
 		render("![alt text](image.png)")
 			.xmap(strip_ansi)
 			.xpect_contains("[alt text]");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_image_has_osc8() {
 		render("![alt](image.png)").xpect_contains("\x1b]8;;image.png\x1b\\");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote() {
 		render("> quoted text")
 			.xmap(strip_ansi)
@@ -559,7 +559,7 @@ mod test {
 			.xpect_eq("▌ quoted text");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
 		render("> *notable remark*")
@@ -568,7 +568,7 @@ mod test {
 			.xpect_eq("▌ notable remark");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote_multiline() {
 		// a blockquote whose content spans multiple paragraphs should prefix
 		// every paragraph with ▌
@@ -578,12 +578,12 @@ mod test {
 			.xpect_eq("▌ first paragraph\n▌\n▌ second paragraph");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_thematic_break() {
 		render("---").xmap(strip_ansi).xpect_contains("────");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_multiple_blocks_separated() {
 		render("# Title\n\nParagraph")
 			.xmap(strip_ansi)
@@ -593,7 +593,7 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn unescape_html_entities() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -610,7 +610,7 @@ mod test {
 			.xpect_contains("a & b");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn custom_style_map() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

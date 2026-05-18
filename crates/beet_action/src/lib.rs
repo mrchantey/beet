@@ -1,6 +1,6 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 // #![deny(missing_docs)]
+
+beet_core::test_main!();
 
 mod action_plugin;
 mod actions;

@@ -144,7 +144,7 @@ mod test {
 	}
 
 
-	#[test]
+	#[beet_core::test]
 	fn not_allowed() {
 		AnalyticsEvent::parse(json!({
 			"event_data": { "id": "foo" }
@@ -160,7 +160,7 @@ mod test {
 		}))
 		.xpect_err();
 	}
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let ev = AnalyticsEvent::parse(event()).unwrap();
 		let json = serde_json::to_value(&ev).unwrap();

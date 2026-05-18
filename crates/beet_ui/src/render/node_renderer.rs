@@ -172,14 +172,14 @@ impl core::fmt::Display for RenderOutput {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn display_media_utf8() {
 		RenderOutput::media_string(MediaType::Html, "hello".into())
 			.to_string()
 			.xpect_eq("hello".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_media_binary() {
 		RenderOutput::Media(MediaBytes::new(MediaType::Bytes, vec![
 			0xFF, 0xFE,
@@ -188,21 +188,21 @@ mod test {
 		.xpect_eq("<2 bytes of application/octet-stream>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_stateful() {
 		RenderOutput::Stateful
 			.to_string()
 			.xpect_eq("Stateful".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn as_str_media() {
 		RenderOutput::media_string(MediaType::Text, "hello".into())
 			.to_string()
 			.xpect_eq("hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn media_bytes_accessor() {
 		let output =
 			RenderOutput::media_string(MediaType::Json, r#"{"a":1}"#.into());

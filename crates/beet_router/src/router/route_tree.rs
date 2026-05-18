@@ -393,7 +393,7 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	#[test]
+	#[beet_core::test]
 	fn builds_tree_on_spawn() {
 		let mut world = router_world();
 		let root = world
@@ -404,7 +404,7 @@ mod test {
 		tree.flatten_action_nodes().len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn nested_paths() {
 		let mut world = router_world();
 		let root = world
@@ -423,7 +423,7 @@ mod test {
 		paths.contains(&"api/posts".to_string()).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn find_by_path() {
 		let mut world = router_world();
 		let root = world
@@ -435,7 +435,7 @@ mod test {
 		tree.find(&["baz"]).xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn find_nested_path() {
 		let mut world = router_world();
 		let root = world
@@ -450,7 +450,7 @@ mod test {
 		tree.find(&["counter"]).xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn scene_routes_appear_in_route_tree() {
 		let mut world = router_world();
 		let root = world
@@ -464,7 +464,7 @@ mod test {
 		tree.flatten_action_nodes().len().xpect_eq(1);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn detects_duplicate_paths() {
 		let nodes = vec![
 			ActionNode {
@@ -489,7 +489,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn detects_dynamic_conflicts() {
 		let nodes = vec![
 			ActionNode {
@@ -514,7 +514,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn allows_different_static_paths() {
 		let nodes = vec![
 			ActionNode {
@@ -536,7 +536,7 @@ mod test {
 		tree.flatten().len().xpect_eq(2);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_format() {
 		let mut world = router_world();
 		let root = world
@@ -549,7 +549,7 @@ mod test {
 		output.contains("foo").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn flatten_nodes_returns_all_routes() {
 		let mut world = router_world();
 		let root = world
@@ -565,7 +565,7 @@ mod test {
 		tree.flatten_action_nodes().len().xpect_eq(3);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn tracks_action_entities() {
 		let mut world = router_world();
 		let root = world.spawn(children![action_at("tracked")]).flush();
@@ -578,7 +578,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn find_subtree_returns_scoped_nodes() {
 		let mut world = router_world();
 		let root = world
@@ -608,7 +608,7 @@ mod test {
 			.xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn find_subtree_returns_none_for_missing_prefix() {
 		let mut world = router_world();
 		let root = world.spawn(children![action_at("foo")]).flush();
@@ -616,7 +616,7 @@ mod test {
 		tree.find_subtree(&["nonexistent"]).xpect_none();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn find_subtree_falls_back_to_dynamic_segment() {
 		let mut world = router_world();
 		let root = world

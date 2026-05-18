@@ -10,6 +10,12 @@ description = "Core utilities and types for other beet crates"
 repository.workspace = true
 
 
+# Stable test runner uses `inventory` + a `beet_core::test_main!()` entry
+# point, so libtest's harness is disabled everywhere except `test_test`
+# (the nightly `custom_test_frameworks` demonstrator, default harness).
+[lib]
+harness = false
+
 [[example]]
 name = "to_tokens"
 path = "examples/to_tokens.rs"
@@ -19,6 +25,47 @@ required-features = ["tokens"]
 name = "to_tokens"
 path = "tests/to_tokens.rs"
 required-features = ["tokens"]
+harness = false
+
+[[test]]
+name = "bundle_effect"
+path = "tests/bundle_effect.rs"
+harness = false
+
+[[test]]
+name = "component_lifecycle"
+path = "tests/component_lifecycle.rs"
+harness = false
+
+[[test]]
+name = "component_lifecycle2"
+path = "tests/component_lifecycle2.rs"
+harness = false
+
+[[test]]
+name = "env_ext"
+path = "tests/env_ext.rs"
+harness = false
+
+[[test]]
+name = "no_tests"
+path = "tests/no_tests.rs"
+harness = false
+
+[[test]]
+name = "panic_location"
+path = "tests/panic_location.rs"
+harness = false
+
+[[test]]
+name = "stagger_output"
+path = "tests/stagger_output.rs"
+harness = false
+
+[[test]]
+name = "timeout_params"
+path = "tests/timeout_params.rs"
+harness = false
 
 
 [features]
@@ -37,7 +84,14 @@ ctrlc = ["dep:ctrlc"]
 tokio = ["dep:tokio"]
 nightly = []
 ansi_paint = ["dep:nu-ansi-term"]
-testing = ["ansi_paint"]
+testing = ["ansi_paint", "dep:inventory"]
+# Opt-in nightly path: the macro emits libtest `#[test]`s collected via
+# `custom_test_frameworks`. Default builds use `inventory` on stable.
+custom_test_frameworks = [
+	"beet_core_macros/custom_test_frameworks",
+	"testing",
+	"nightly",
+]
 http = ["dep:http"]
 crossterm = ["dep:crossterm"]
 bevy_default = ["bevy_scene", "bevy_multithreaded"]
@@ -81,6 +135,7 @@ rsx = ["beet_core_macros/rsx"]
 [dependencies]
 beet_core_macros.workspace = true
 beet_core_shared = { workspace = true, optional = true }
+inventory = { workspace = true, optional = true }
 bytes.workspace = true
 bevy.workspace = true
 bevy_reflect.workspace = true

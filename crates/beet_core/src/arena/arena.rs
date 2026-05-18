@@ -257,7 +257,7 @@ mod tests {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn handle_is_copy() {
 		fn assert_copy<T: Copy>() {}
 		fn assert_send<T: Send>() {}
@@ -265,7 +265,7 @@ mod tests {
 		assert_send::<ArenaHandle<i32>>();
 	}
 
-	#[test]
+	#[crate::test]
 	fn basic_arena_operations() {
 		let arena = Arena::new();
 
@@ -307,7 +307,7 @@ mod tests {
 		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn copy_handles() {
 		let arena = Arena::new();
 
@@ -336,7 +336,7 @@ mod tests {
 		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_access() {
 		let arena = Arena::new();
@@ -350,7 +350,7 @@ mod tests {
 		arena.with_ref(&handle1, |_| {});
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_with_mut() {
 		let arena = Arena::new();
@@ -365,7 +365,7 @@ mod tests {
 		arena.with_mut(&handle1, |_| {});
 	}
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn panic_on_invalid_handle_remove() {
 		let arena = Arena::new();
@@ -380,7 +380,7 @@ mod tests {
 		let _removed2 = arena.remove_impl(&handle1).expect(PANIC_MSG);
 	}
 
-	#[test]
+	#[crate::test]
 	fn multiple_objects() {
 		let arena = Arena::new();
 
@@ -412,7 +412,7 @@ mod tests {
 		arena.objects.lock().unwrap().len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn clear_functionality() {
 		let arena = Arena::new();
 

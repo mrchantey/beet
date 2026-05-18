@@ -59,7 +59,7 @@ mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn result() {
 		let ok = || -> Result { Ok(()) };
 		ok().xpect_ok();

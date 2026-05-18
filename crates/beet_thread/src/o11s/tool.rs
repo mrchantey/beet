@@ -189,7 +189,7 @@ pub struct AllowedToolsChoice {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_function_tool() {
 		let tool = FunctionToolParam::new("get_weather")
 			.with_description("Get weather info")
@@ -208,7 +208,7 @@ mod test {
 		assert!(json["parameters"]["properties"]["location"].is_object());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serializes_tool_choice() {
 		let choice = ToolChoice::auto();
 		let json = serde_json::to_value(&choice).unwrap();

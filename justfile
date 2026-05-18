@@ -185,31 +185,43 @@ snap:
 	cargo test -p beet_rsx 					--test css 		--all-features -- --snap
 	cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
+# The libtest path (`custom_test_frameworks`) and the `nightly` feature are
+# nightly-only. On nightly we use `--all-features`; on stable we enable every
+# feature *except* `nightly` / `custom_test_frameworks` so the stable
+# `inventory` runner is exercised. Validate the libtest path explicitly with:
+#   cargo +nightly test -p beet_core --test test_test --features custom_test_frameworks
+_core-crates := "-p beet_core_shared -p beet_core_macros -p beet_core -p beet_infra -p beet_net -p beet_ui -p beet_router -p beet_thread -p beet_action"
+
+# Computes the cargo feature flag for the in-scope crates on the current
+# toolchain channel (nightly => --all-features, else explicit exclude list).
+_core-features pkgs:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if rustc --version | grep -q nightly; then
+		echo "--all-features"
+	else
+		feats=$(for c in {{ pkgs }}; do
+			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' crates/$c/Cargo.toml
+		done | grep -vE '/(nightly|custom_test_frameworks|default)$' | paste -sd, -)
+		echo "--features $feats"
+	fi
+
 test-core *args:
-	cargo test 						\
-		-p beet_core_shared \
-		-p beet_core_macros \
-		-p beet_core 				\
-		-p beet_infra 			\
-		-p beet_net 				\
-		-p beet_ui 				\
-		-p beet_router 			\
-		-p beet_thread 			\
-		-p beet_action 			\
-		--all-features {{ args }} -- {{ test-threads }}
-	just test-core-wasm
+	#!/usr/bin/env bash
+	set -euo pipefail
+	feats=$(just _core-features "beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action")
+	cargo test {{ _core-crates }} $feats {{ args }} -- {{ test-threads }}
+	just test-core-wasm {{ args }}
 
 
 test-core-wasm *args:
-	cargo test						\
-		-p beet_core  			\
-		-p beet_net  				\
-		-p beet_ui 				\
-		-p beet_router 			\
-		-p beet_thread 			\
-		-p beet_action 			\
-		--lib --target wasm32-unknown-unknown  \
-		--all-features  {{ args }} -- {{ test-threads }}
+	#!/usr/bin/env bash
+	set -euo pipefail
+	feats=$(just _core-features "beet_core beet_net beet_ui beet_router beet_thread beet_action")
+	cargo test \
+		-p beet_core -p beet_net -p beet_ui -p beet_router -p beet_thread -p beet_action \
+		--lib --target wasm32-unknown-unknown \
+		$feats {{ args }} -- {{ test-threads }}
 
 test-flow *args:
 	cargo test -p beet_flow 		--all-features 																						{{ args }} -- {{ test-threads }}

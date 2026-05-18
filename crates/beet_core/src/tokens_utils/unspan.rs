@@ -58,7 +58,7 @@ mod test {
 	use quote::ToTokens;
 	use syn::Ident;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let foo: Ident = syn::parse_quote!(foo);
 		let val = Unspan::new(&foo);

@@ -28,3 +28,6 @@ serde_json = { workspace = true, optional = true }
 [dev-dependencies]
 beet_action = { path = ".", features= ["bevy_scene"] }
 beet_core = { workspace = true, features = ["testing"] }
+
+[lib]
+harness = false

@@ -74,7 +74,7 @@ mod test {
 	#[derive(Clone, Deref)]
 	struct NewType<T>(pub T);
 
-	#[test]
+	#[crate::test]
 	fn close_to_behavior() {
 		(0.0_f64).xpect_close(0.);
 		(0.0_f64).xnot().xpect_close(10.);

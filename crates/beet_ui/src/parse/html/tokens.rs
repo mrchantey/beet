@@ -159,7 +159,7 @@ mod test {
 	use super::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn display_open_tag_simple() {
 		HtmlToken::OpenTag {
 			name: "div",
@@ -171,7 +171,7 @@ mod test {
 		.xpect_eq("<div>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_open_tag_with_attrs() {
 		HtmlToken::OpenTag {
 			name: "input",
@@ -186,70 +186,70 @@ mod test {
 		.xpect_eq("<input type=\"text\" disabled />".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_close_tag() {
 		HtmlToken::CloseTag("div")
 			.to_string()
 			.xpect_eq("</div>".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_text() {
 		HtmlToken::Text("hello world")
 			.to_string()
 			.xpect_eq("hello world".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_comment() {
 		HtmlToken::Comment(" a comment ")
 			.to_string()
 			.xpect_eq("<!-- a comment -->".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_expression() {
 		HtmlToken::Expression("foo.bar")
 			.to_string()
 			.xpect_eq("{foo.bar}".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_keyless_expression_attr() {
 		HtmlAttribute::expression("foo")
 			.to_string()
 			.xpect_eq("{foo}".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn display_keyed_expression_attr() {
 		HtmlAttribute::keyed_expression("onclick", "handler")
 			.to_string()
 			.xpect_eq("onclick={handler}".to_string());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn effective_key_standard() {
 		HtmlAttribute::new("class", "foo")
 			.effective_key()
 			.xpect_eq("class");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn effective_key_boolean() {
 		HtmlAttribute::boolean("disabled")
 			.effective_key()
 			.xpect_eq("disabled");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn effective_key_keyless_expression() {
 		HtmlAttribute::expression("foo")
 			.effective_key()
 			.xpect_eq("foo");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn effective_key_keyed_expression() {
 		HtmlAttribute::keyed_expression("onclick", "handler")
 			.effective_key()

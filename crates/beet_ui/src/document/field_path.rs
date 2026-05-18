@@ -141,7 +141,7 @@ mod test {
 
 
 
-	#[test]
+	#[beet_core::test]
 	fn field_path_conversion() {
 		let string_vec =
 			vec!["a".to_string(), "b".to_string()].into_field_path();

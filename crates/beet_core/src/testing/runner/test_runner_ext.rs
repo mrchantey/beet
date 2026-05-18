@@ -3,7 +3,7 @@ use crate::testing::runner::*;
 
 
 /// Run a single test in an isolated Bevy app, returning the outcome
-pub async fn run(args: Option<&str>, test: test::TestDescAndFn) -> TestOutcome {
+pub async fn run(args: Option<&str>, test: TestDescAndFn) -> TestOutcome {
 	let mut app = App::new().with_plugins((MinimalPlugins, TestPlugin));
 
 	let args = if let Some(args) = args {

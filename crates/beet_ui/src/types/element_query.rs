@@ -82,7 +82,7 @@ impl ElementQuery<'_, '_> {
 mod tests {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn get_collects_class_attributes() {
 		let mut world = World::new();
 		let entity = world
@@ -112,7 +112,7 @@ mod tests {
 		});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn iter_preserves_class_attributes() {
 		let mut world = World::new();
 		let entity = world

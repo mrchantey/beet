@@ -410,7 +410,7 @@ mod test {
 			.xpect_eq(11);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn wrapper_scene_roundtrip() {
 		let mut app = scene_app();
 

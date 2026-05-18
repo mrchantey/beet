@@ -320,7 +320,7 @@ mod test {
 
 	// -- parse_http_request --
 
-	#[test]
+	#[beet_core::test]
 	fn parse_get_request() {
 		let raw = b"GET /hello HTTP/1.1\r\nHost: localhost\r\n\r\n";
 		let request = parse_http_request(raw).unwrap();
@@ -328,7 +328,7 @@ mod test {
 		request.path_string().as_str().xpect_eq("/hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_post_with_body() {
 		let raw =
 			b"POST /api HTTP/1.1\r\nContent-Type: text/plain\r\n\r\nhello body";
@@ -337,7 +337,7 @@ mod test {
 		request.path_string().as_str().xpect_eq("/api");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_with_accept_header() {
 		let raw =
 			b"GET / HTTP/1.1\r\nAccept: text/html\r\nHost: localhost\r\n\r\n";
@@ -348,19 +348,19 @@ mod test {
 		accepted[0].xpect_eq(MediaType::Html);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_query_string() {
 		let raw = b"GET /search?q=hello HTTP/1.1\r\n\r\n";
 		let request = parse_http_request(raw).unwrap();
 		request.path_string().as_str().xpect_eq("/search");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parse_empty_returns_error() { parse_http_request(b"").xpect_err(); }
 
 	// -- serialize_http_response --
 
-	#[test]
+	#[beet_core::test]
 	fn serialize_ok_response() {
 		let response = Response::ok_body("hello", MediaType::Text);
 		let raw =
@@ -371,7 +371,7 @@ mod test {
 		raw_str.as_str().xpect_contains("hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn serialize_empty_response() {
 		let response = Response::ok();
 		let raw =

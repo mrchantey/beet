@@ -112,14 +112,14 @@ impl RandomSource {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn seed() {
 		let mut source = RandomSource::from_seed(7);
 		let val = source.random_range(10..100);
 		val.xpect_eq(22);
 	}
 
-	#[test]
+	#[crate::test]
 	fn entropy() {
 		let mut source = RandomSource::default();
 		let val = source.random_range(10..100);

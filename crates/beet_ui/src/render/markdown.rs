@@ -410,66 +410,66 @@ mod test {
 			.to_string()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_paragraph() {
 		roundtrip("Hello world").trim().xpect_eq("Hello world");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_heading_h1() { roundtrip("# Title").trim().xpect_eq("# Title"); }
 
-	#[test]
+	#[beet_core::test]
 	fn render_heading_h2() {
 		roundtrip("## Subtitle").trim().xpect_eq("## Subtitle");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_emphasis() { roundtrip("*hello*").trim().xpect_eq("*hello*"); }
 
-	#[test]
+	#[beet_core::test]
 	fn render_strong() { roundtrip("**hello**").trim().xpect_eq("**hello**"); }
 
-	#[test]
+	#[beet_core::test]
 	fn render_link() {
 		roundtrip("[click](https://example.com)")
 			.trim()
 			.xpect_eq("[click](https://example.com)");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_image() {
 		roundtrip("![alt](image.png)")
 			.trim()
 			.xpect_eq("![alt](image.png)");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_unordered_list() {
 		roundtrip("- alpha\n- beta")
 			.trim()
 			.xpect_eq("- alpha\n- beta");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_code_block() {
 		roundtrip("```rust\nfn main() {}\n```")
 			.trim()
 			.xpect_eq("```rust\nfn main() {}\n```");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_inline_code() {
 		roundtrip("use `foo()` here")
 			.trim()
 			.xpect_eq("use `foo()` here");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote() {
 		roundtrip("> quoted text").trim().xpect_eq("> quoted text");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote_with_emphasis() {
 		// inline elements inside a blockquote must appear after the prefix
 		roundtrip("> *notable remark*")
@@ -477,23 +477,23 @@ mod test {
 			.xpect_eq("> *notable remark*");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_blockquote_multiline() {
 		let input = "> first paragraph\n>\n> second paragraph";
 		roundtrip(input).trim().xpect_eq(input);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_thematic_break() { roundtrip("---").trim().xpect_eq("---"); }
 
-	#[test]
+	#[beet_core::test]
 	fn render_multiple_blocks() {
 		roundtrip("# Title\n\nParagraph")
 			.trim()
 			.xpect_eq("# Title\n\nParagraph");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->")
 			.trim()
@@ -516,7 +516,7 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn unescape_html_entities_in_text() {
 		render_unescaped("<p>a &amp; b</p>")
 			.trim()
@@ -524,14 +524,14 @@ mod test {
 	}
 
 	#[cfg(feature = "html_parser")]
-	#[test]
+	#[beet_core::test]
 	fn unescape_angle_brackets_in_text() {
 		render_unescaped("<p>&lt;div&gt;</p>")
 			.trim()
 			.xpect_eq("<div>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn plain_text_passes_through() {
 		roundtrip("hello world").trim().xpect_eq("hello world");
 	}

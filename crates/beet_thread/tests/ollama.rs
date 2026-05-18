@@ -1,5 +1,5 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+beet_core::test_main!();
+
 use beet_thread::prelude::*;
 
 #[path = "utils/post_streamer.rs"]

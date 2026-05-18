@@ -166,7 +166,7 @@ impl CliArgs {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn parse_empty() {
 		let cli = CliArgs::parse("");
 
@@ -174,7 +174,7 @@ mod tests {
 		cli.params.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_single_path() {
 		let cli = CliArgs::parse("foo");
 
@@ -183,7 +183,7 @@ mod tests {
 		cli.params.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_multiple_paths() {
 		let cli = CliArgs::parse("foo bar baz");
 
@@ -195,7 +195,7 @@ mod tests {
 		cli.params.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_single_query_param() {
 		let cli = CliArgs::parse("--key=value");
 
@@ -204,7 +204,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_query_flag_without_value() {
 		let cli = CliArgs::parse("--verbose");
 
@@ -214,7 +214,7 @@ mod tests {
 		cli.params.get("verbose").xpect_none();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_multiple_query_params() {
 		let cli = CliArgs::parse("--a=1 --b=2 --c=3");
 
@@ -225,7 +225,7 @@ mod tests {
 		cli.params.get("c").unwrap().xpect_eq("3");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_duplicate_query_keys() {
 		let cli = CliArgs::parse("--key=val1 --key=val2 --key=val3");
 
@@ -238,7 +238,7 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_mixed_paths_and_query() {
 		let cli = CliArgs::parse("foo bar --key=value");
 
@@ -248,7 +248,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_interleaved_paths_and_query() {
 		let cli = CliArgs::parse(
 			"path1 --key=val1 path2 --key=val2 --key=val3 --other=one",
@@ -265,7 +265,7 @@ mod tests {
 		cli.params.get("other").unwrap().xpect_eq("one");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_empty_value() {
 		let cli = CliArgs::parse("--key=");
 
@@ -274,7 +274,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_value_with_equals() {
 		let cli = CliArgs::parse("--key=val=ue");
 
@@ -283,7 +283,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("val=ue");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_whitespace_separated_value() {
 		let cli = CliArgs::parse("--foo bar");
 
@@ -292,7 +292,7 @@ mod tests {
 		cli.params.get("foo").unwrap().xpect_eq("bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_single_dash_with_equals() {
 		let cli = CliArgs::parse("-f=bar");
 
@@ -301,7 +301,7 @@ mod tests {
 		cli.params.get("f").unwrap().xpect_eq("bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_single_dash_whitespace_separated() {
 		let cli = CliArgs::parse("-f bar");
 
@@ -310,7 +310,7 @@ mod tests {
 		cli.params.get("f").unwrap().xpect_eq("bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_mixed_whitespace_and_equals() {
 		let cli = CliArgs::parse("--foo bar --baz=qux");
 
@@ -320,7 +320,7 @@ mod tests {
 		cli.params.get("baz").unwrap().xpect_eq("qux");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_path_then_whitespace_separated_query() {
 		let cli = CliArgs::parse("path1 path2 --key value");
 
@@ -330,7 +330,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_flag_before_separator() {
 		let cli = CliArgs::parse("--verbose -- nested");
 
@@ -340,7 +340,7 @@ mod tests {
 		cli.params.get("nested-args").unwrap().xpect_eq("nested");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_multiple_flags_in_sequence() {
 		let cli = CliArgs::parse("--verbose --debug --trace");
 
@@ -351,7 +351,7 @@ mod tests {
 		cli.params.get("trace").xpect_none();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_flag_at_end() {
 		let cli = CliArgs::parse("path1 --key=value --flag");
 
@@ -361,7 +361,7 @@ mod tests {
 		cli.params.get_vec("flag").unwrap().xpect_empty();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_single_dash_flag() {
 		let cli = CliArgs::parse("-v");
 
@@ -370,7 +370,7 @@ mod tests {
 		cli.params.get_vec("v").unwrap().xpect_empty();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_mixed_single_double_dash() {
 		let cli = CliArgs::parse("-v --verbose -f bar --foo=baz");
 
@@ -382,7 +382,7 @@ mod tests {
 		cli.params.get("foo").unwrap().xpect_eq("baz");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_whitespace_value_looks_like_path() {
 		let cli = CliArgs::parse("path1 --key path2 path3");
 
@@ -392,7 +392,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("path2");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_nested_args_separator() {
 		let cli = CliArgs::parse("foo bar -- nested1 nested2 --flag");
 
@@ -406,7 +406,7 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_nested_args_with_query_before() {
 		let cli = CliArgs::parse("foo --name=bob -- arg1 arg2");
 
@@ -419,7 +419,7 @@ mod tests {
 			.xpect_eq(vec!["arg1".to_string(), "arg2".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_only_nested_args() {
 		let cli = CliArgs::parse("-- foo bar baz");
 
@@ -432,7 +432,7 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_empty() {
 		let cli = CliArgs::parse("");
 		let path_string = cli.into_path_string();
@@ -440,7 +440,7 @@ mod tests {
 		path_string.xpect_eq("/");
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_path_only() {
 		let cli = CliArgs::parse("foo bar");
 		let path_string = cli.into_path_string();
@@ -448,7 +448,7 @@ mod tests {
 		path_string.xpect_eq("/foo/bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_query_only() {
 		let cli = CliArgs::parse("--a=1 --b=2");
 		let path_string = cli.into_path_string();
@@ -459,7 +459,7 @@ mod tests {
 		path_string.contains('?').xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_path_and_query() {
 		let cli = CliArgs::parse("foo bar --a=1 --b=2");
 		let path_string = cli.into_path_string();
@@ -470,7 +470,7 @@ mod tests {
 		path_string.contains('?').xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_multiple_values_same_key() {
 		let cli = CliArgs::parse("foo --key=val1 --key=val2 --key=val3");
 		let path_string = cli.into_path_string();
@@ -483,7 +483,7 @@ mod tests {
 		path_string.contains('&').xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn into_path_string_preserves_empty_value() {
 		let cli = CliArgs::parse("foo --key=");
 		let path_string = cli.into_path_string();
@@ -492,7 +492,7 @@ mod tests {
 		path_string.contains("key=").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_with_string_from_vec() {
 		let cli = CliArgs::parse("foo bar --key=value");
 
@@ -501,7 +501,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("value");
 	}
 
-	#[test]
+	#[crate::test]
 	fn roundtrip_path_string() {
 		let original = "api users --limit=10 --offset=20";
 		let cli = CliArgs::parse(original);
@@ -514,13 +514,13 @@ mod tests {
 	}
 
 	// Tests for group_quotations
-	#[test]
+	#[crate::test]
 	fn group_quotations_empty() {
 		let result = CliArgs::group_quotations("");
 		result.xpect_empty();
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_no_quotes() {
 		let result = CliArgs::group_quotations("foo bar baz");
 		result.xpect_eq(vec![
@@ -530,7 +530,7 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_single_quotes() {
 		let result = CliArgs::group_quotations("foo bar 'bazz boo'");
 		result.xpect_eq(vec![
@@ -540,19 +540,19 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_double_quotes() {
 		let result = CliArgs::group_quotations("foo --bar=\"boo bong\"");
 		result.xpect_eq(vec!["foo".to_string(), "--bar=boo bong".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_single_quotes_multiword() {
 		let result = CliArgs::group_quotations("'hello world how are you'");
 		result.xpect_eq(vec!["hello world how are you".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_mixed_quotes() {
 		let result = CliArgs::group_quotations("foo 'bar baz' \"qux quux\"");
 		result.xpect_eq(vec![
@@ -562,26 +562,26 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_escaped_double_quote() {
 		let result = CliArgs::group_quotations("\"hello \\\"world\\\"\"");
 		result.xpect_eq(vec!["hello \"world\"".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_escaped_backslash() {
 		let result = CliArgs::group_quotations("\"path\\\\to\\\\file\"");
 		result.xpect_eq(vec!["path\\to\\file".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_single_quote_no_escaping() {
 		let result = CliArgs::group_quotations("'hello \\world'");
 		// Single quotes don't process escapes, backslashes are literal
 		result.xpect_eq(vec!["hello \\world".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_nested_different_quotes() {
 		let result = CliArgs::group_quotations("\"it's fine\"");
 		result.xpect_eq(vec!["it's fine".to_string()]);
@@ -590,38 +590,38 @@ mod tests {
 		result2.xpect_eq(vec!["say \"hello\"".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_unmatched_quote_continues() {
 		let result = CliArgs::group_quotations("'hello world");
 		// Unmatched quote continues to end
 		result.xpect_eq(vec!["hello world".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_multiple_spaces() {
 		let result = CliArgs::group_quotations("foo   bar");
 		result.xpect_eq(vec!["foo".to_string(), "bar".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_quotes_in_middle() {
 		let result = CliArgs::group_quotations("--name='John Doe'");
 		result.xpect_eq(vec!["--name=John Doe".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_empty_quotes() {
 		let result = CliArgs::group_quotations("'' \"\"");
 		result.xpect_empty();
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_escaped_outside_quotes() {
 		let result = CliArgs::group_quotations("foo\\ bar");
 		result.xpect_eq(vec!["foo bar".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_complex_command() {
 		let result = CliArgs::group_quotations(
 			"build --message='Initial commit' --author=\"John Doe\"",
@@ -634,14 +634,14 @@ mod tests {
 	}
 
 	// Integration tests with parse
-	#[test]
+	#[crate::test]
 	fn parse_with_quoted_path() {
 		let cli = CliArgs::parse("foo 'bar baz'");
 		cli.path
 			.xpect_eq(vec!["foo".to_string(), "bar baz".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_with_quoted_query_value() {
 		let cli = CliArgs::parse("--message='hello world'");
 		cli.params
@@ -650,7 +650,7 @@ mod tests {
 			.xpect_eq(vec!["hello world".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_with_quoted_equals_value() {
 		CliArgs::parse("--text=\"foo bar\"")
 			.params
@@ -659,7 +659,7 @@ mod tests {
 			.xpect_eq("foo bar");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_with_quoted_whitespace_value() {
 		CliArgs::parse("--name 'Jane Doe'")
 			.params
@@ -668,25 +668,25 @@ mod tests {
 			.xpect_eq("Jane Doe");
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_consecutive_quoted_args() {
 		let result = CliArgs::group_quotations("'foo bar' 'baz qux'");
 		result.xpect_eq(vec!["foo bar".to_string(), "baz qux".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_quote_then_unquoted() {
 		let result = CliArgs::group_quotations("'hello world' normal");
 		result.xpect_eq(vec!["hello world".to_string(), "normal".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_special_chars_in_quotes() {
 		let result = CliArgs::group_quotations("'foo=bar&baz=qux'");
 		result.xpect_eq(vec!["foo=bar&baz=qux".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_tab_and_newline() {
 		let result = CliArgs::group_quotations("foo\tbar baz\nqux");
 		// Tabs and newlines act as separators outside quotes
@@ -698,25 +698,25 @@ mod tests {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_preserve_whitespace_in_quotes() {
 		let result = CliArgs::group_quotations("'foo\tbar\nbaz'");
 		result.xpect_eq(vec!["foo\tbar\nbaz".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_escape_space() {
 		let result = CliArgs::group_quotations("foo\\ bar\\ baz");
 		result.xpect_eq(vec!["foo bar baz".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn group_quotations_mixed_escape_and_quotes() {
 		let result = CliArgs::group_quotations("foo\\ bar 'baz qux'");
 		result.xpect_eq(vec!["foo bar".to_string(), "baz qux".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_str_with_quotes() {
 		let cli = CliArgs::parse("foo 'bar baz' --key='value with spaces'");
 		cli.path
@@ -724,7 +724,7 @@ mod tests {
 		cli.params.get("key").unwrap().xpect_eq("value with spaces");
 	}
 
-	#[test]
+	#[crate::test]
 	fn parse_str_complex_quoted_command() {
 		let cli = CliArgs::parse(
 			r#"build --msg="Initial commit" --author='John Doe' src/main.rs"#,

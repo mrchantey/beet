@@ -64,7 +64,7 @@ fn run_test(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	entity: Entity,
-	should_panic: test::ShouldPanic,
+	should_panic: ShouldPanic,
 	func: impl FnOnce() -> Result<(), String>,
 ) -> Result {
 	let TestRunResult {
@@ -99,7 +99,6 @@ fn run_test(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use test::TestDescAndFn;
 
 	async fn run_test(test: TestDescAndFn) -> TestOutcome {
 		test_runner_ext::run(None, test).await
@@ -183,7 +182,8 @@ mod tests {
 			test_ext::new_auto(|| {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
-					panic!("expected")
+					panic!("expected");
+					#[allow(unreachable_code)] Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -209,7 +209,8 @@ mod tests {
 			test_ext::new_auto(|| {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
-					panic!("boom")
+					panic!("boom");
+					#[allow(unreachable_code)] Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -240,7 +241,8 @@ mod tests {
 		run_test(test_ext::new_auto(|| {
 			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
-				panic!("pizza")
+				panic!("pizza");
+				#[allow(unreachable_code)] Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -290,7 +292,8 @@ mod tests {
 			test_ext::new_auto(|| {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
-					panic!("expected panic")
+					panic!("expected panic");
+					#[allow(unreachable_code)] Ok::<(), String>(())
 				});
 				Ok(())
 			})

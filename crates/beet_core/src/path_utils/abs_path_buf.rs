@@ -228,10 +228,10 @@ mod test {
 
 
 
-	#[test]
+	#[crate::test]
 	fn canonicalizes() { let _buf = AbsPathBuf::new("Cargo.toml").unwrap(); }
 
-	#[test]
+	#[crate::test]
 	fn resolves_relative_non_exist() {
 		#[cfg(not(target_os = "windows"))]
 		let expected = "foo/bar/boo.rs";
@@ -244,14 +244,14 @@ mod test {
 			.ends_with(expected)
 			.xpect_true();
 	}
-	#[test]
+	#[crate::test]
 	fn abs_file() {
 		abs_file!()
 			.to_string_lossy()
 			.ends_with("abs_path_buf.rs")
 			.xpect_true();
 	}
-	#[test]
+	#[crate::test]
 	fn workspace_rel() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
@@ -259,7 +259,7 @@ mod test {
 		let workspace_rel = buf.into_ws_path().unwrap();
 		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
-	#[test]
+	#[crate::test]
 	fn workspace_rel_leading_slash() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(format!("/{file}")).unwrap();
@@ -267,7 +267,7 @@ mod test {
 		let workspace_rel = buf.into_ws_path().unwrap();
 		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
-	#[test]
+	#[crate::test]
 	fn manifest_rel() {
 		let buf =
 			AbsPathBuf::new_manifest_rel("src/path_utils/abs_path_buf.rs")
@@ -275,7 +275,7 @@ mod test {
 		buf.xpect_eq(abs_file!());
 	}
 
-	#[test]
+	#[crate::test]
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		// Create an AbsPathBuf instance

@@ -1,4 +1,7 @@
 //! Shared utilities for Lambda, Lightsail, and Fargate integration tests.
+
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;

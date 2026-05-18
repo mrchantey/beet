@@ -126,7 +126,7 @@ mod tests {
 	);
 
 	#[cfg(feature = "style")]
-	#[test]
+	#[beet_core::test]
 	fn test_name() {
 		Foo.xinto::<Token>()
 			.key()

@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs", "http", "nightly"]
+default = ["serde", "fs", "http"]
 nightly = []
 json = ["serde",	"dep:serde_json", "beet_core/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
@@ -219,3 +219,6 @@ futures-lite = { workspace = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+
+[lib]
+harness = false

@@ -249,13 +249,13 @@ pub struct ResourceMeta {
 mod tests {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn provider_local_name() {
 		Provider::AWS.local_name().xpect_eq("aws");
 		Provider::CLOUDFLARE.local_name().xpect_eq("cloudflare");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn provider_short_source() {
 		Provider::AWS.short_source().xpect_eq("hashicorp/aws");
 		Provider::CLOUDFLARE
@@ -263,7 +263,7 @@ mod tests {
 			.xpect_eq("cloudflare/cloudflare");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn custom_provider() {
 		let provider = Provider::new(
 			"My Provider",
@@ -274,14 +274,14 @@ mod tests {
 		provider.short_source().xpect_eq("acme/thing");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resource_filter_empty_allows_all() {
 		let filter = ResourceFilter::default();
 		filter.is_empty().xpect_true();
 		filter.allows("any_provider", "any_resource").xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resource_filter_restricts() {
 		let filter = ResourceFilter::default().with_resources(
 			"registry.opentofu.org/hashicorp/aws",
@@ -308,7 +308,7 @@ mod tests {
 			.xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resource_filter_accumulates() {
 		let filter = ResourceFilter::default()
 			.with_resources("p1", ["r1"])

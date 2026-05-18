@@ -104,7 +104,7 @@ mod tests {
 	use web_sys::HtmlDivElement;
 	use web_sys::HtmlParagraphElement;
 
-	#[test]
+	#[crate::test]
 	#[ignore = "requires dom"]
 	fn works() {
 		// Existence checks to confirm DOM access

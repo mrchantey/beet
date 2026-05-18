@@ -14,12 +14,10 @@
 //!
 //! ## Basic Tests
 //!
-//! ```rust
-//! #![cfg_attr(test, feature(custom_test_frameworks))]
-//! #![cfg_attr(test, test_runner(beet_core::test_runner))]
+//! ```rust,ignore
 //! use beet_core::prelude::*;
 //!
-//! #[test]
+//! #[beet_core::test]
 //! fn it_passes() {
 //!     // regular assertions work as expected
 //!     assert!(1 + 1 == 2);
@@ -30,7 +28,7 @@
 //!
 //! ## Async Tests
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[beet_core::test]
 //! async fn async_test() {
 //!     beet_core::time_ext::sleep_millis(10).await;
@@ -42,7 +40,7 @@
 //!
 //! Individual tests can specify custom timeout values:
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[beet_core::test(timeout_ms = 100)]
 //! async fn quick_test() {
 //!     // this test will timeout after 100ms instead of the default 5000ms
@@ -60,14 +58,20 @@
 //!    beet_core = { workspace = true, features = ["testing"] }
 //!    ```
 //!
-//! 2. Add the following attributes to your test files:
-//!    ```rust
-//!    #![cfg_attr(test, feature(custom_test_frameworks))]
-//!    #![cfg_attr(test, test_runner(beet_core::test_runner))]
+//! 2. Set `harness = false` for the lib and every integration test target
+//!    in `Cargo.toml`, e.g.:
+//!    ```toml
+//!    [lib]
+//!    harness = false
 //!    ```
 //!
-//! 3. Import the prelude:
-//!    ```rust
+//! 3. Add the runner entry point once per lib / test target:
+//!    ```rust,ignore
+//!    beet_core::test_main!();
+//!    ```
+//!
+//! 4. Import the prelude and write `#[beet_core::test]` tests:
+//!    ```rust,ignore
 //!    use beet_core::prelude::*;
 //!    ```
 
@@ -77,3 +81,9 @@ mod runner;
 mod utils;
 pub use runner::*;
 pub use utils::*;
+
+/// Re-export of [`inventory::submit`] so the `#[beet_core::test]` macro can
+/// register tests via the same `beet_core::testing` path it uses for
+/// everything else (works in integration tests via `use beet_core::testing;`).
+#[doc(hidden)]
+pub use inventory::submit;

@@ -259,14 +259,14 @@ mod test {
 	use std::sync::Arc;
 	use std::sync::Mutex;
 
-	#[test]
+	#[crate::test]
 	fn signals() {
 		let (get, set) = signal(7);
 		get.get().xpect_eq(7);
 		set.set(10);
 		get.get().xpect_eq(10);
 	}
-	#[test]
+	#[crate::test]
 	fn effects() {
 		let (get, set) = signal(0);
 		let effect_called = Arc::new(Mutex::new(0));

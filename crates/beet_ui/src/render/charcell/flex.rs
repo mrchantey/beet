@@ -685,7 +685,7 @@ mod tests {
 		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn justify_start() {
 		render((
 			LayoutStyle::flex_row()
@@ -700,7 +700,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn justify_end() {
 		render((
 			LayoutStyle::flex_row()
@@ -715,7 +715,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn justify_center() {
 		render((
 			LayoutStyle::flex_row()
@@ -730,7 +730,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn column_gap() {
 		render((LayoutStyle::flex_row().column_gap(3), children![
 			(rsx! {"A"}, bordered()),
@@ -739,7 +739,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn flex_grow_distributes_space() {
 		let output =
 			render((LayoutStyle::flex_row().column_gap(1), children![
@@ -763,7 +763,7 @@ mod tests {
 		(b_width > a_width).xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn align_items_center() {
 		render((
 			LayoutStyle::flex_row()
@@ -784,7 +784,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn align_items_start() {
 		render((
 			LayoutStyle::flex_row()
@@ -805,7 +805,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn align_items_end() {
 		render((
 			LayoutStyle::flex_row()
@@ -826,7 +826,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn nested_flex() {
 		render((LayoutStyle::flex_col().row_gap(1), children![
 			(
@@ -843,7 +843,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn padding_with_content() {
 		render((LayoutStyle::flex_row(), children![(
 			rsx! {"X"},
@@ -854,7 +854,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn column_with_multiple_items() {
 		render((LayoutStyle::flex_col().row_gap(1), children![
 			(rsx! {"First"}, bordered()),
@@ -864,7 +864,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn nested_column_in_row() {
 		render((LayoutStyle::flex_row(), children![(
 			LayoutStyle::flex_col(),
@@ -878,7 +878,7 @@ mod tests {
 		.xpect_snapshot();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn column_without_gap() {
 		render((LayoutStyle::flex_col(), children![
 			(rsx! {"A"}, bordered()),
@@ -889,7 +889,7 @@ mod tests {
 
 	/// Nested rows and columns with background colors on leaf nodes.
 	/// Verifies background ordering and multi-level flex layout.
-	#[test]
+	#[beet_core::test]
 	fn nested_with_backgrounds() {
 		let out = render((LayoutStyle::flex_col().row_gap(1), children![
 			(
@@ -926,7 +926,7 @@ mod tests {
 
 	/// Wide CJK chars each occupy 2 terminal columns.
 	/// The border width must account for the display width, not the char count.
-	#[test]
+	#[beet_core::test]
 	fn wide_chars_layout() {
 		let out = render((LayoutStyle::flex_row().column_gap(1), children![
 			(rsx! { "中文" }, bordered()),

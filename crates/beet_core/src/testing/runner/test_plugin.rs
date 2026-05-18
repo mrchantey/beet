@@ -5,8 +5,45 @@ use crate::prelude::*;
 use bevy::ecs::schedule::ExecutorKind;
 use bevy::time::TimePlugin;
 
-/// Entry point for the custom test runner, invoked by the test harness.
-pub fn test_runner(tests: &[&test::TestDescAndFn]) {
+/// Builds and runs the test app for the given owned tests.
+fn run_tests_app(tests: Vec<TestDescAndFn>) {
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
+		.spawn_then((TestRunnerConfig::from_env(), tests_bundle(tests)))
+		.run();
+}
+
+// On wasm the linker only calls `__wasm_call_ctors` from exported functions
+// under "command-style linkage" heuristics; calling it explicitly guarantees
+// `inventory`'s registration constructors have run before we collect. It is
+// idempotent for inventory-generated constructors. See the inventory docs.
+#[cfg(target_family = "wasm")]
+unsafe extern "C" {
+	fn __wasm_call_ctors();
+}
+
+/// Stable-Rust entry point: runs every [`BeetTestCase`] registered via
+/// [`inventory`]. Invoked by the `beet_core::test_main!()` macro.
+pub fn test_main() {
+	#[cfg(target_family = "wasm")]
+	unsafe {
+		__wasm_call_ctors();
+	}
+	run_tests_app(inventory_tests());
+}
+
+/// Runs an explicit set of beet tests, cloning static descriptors.
+///
+/// Used by the `examples/runner.rs` demo. The nightly
+/// `custom_test_frameworks` harness uses [`libtest_runner`] instead.
+pub fn test_runner(tests: &[&TestDescAndFn]) {
+	run_tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect());
+}
+
+/// Entry point for the nightly `custom_test_frameworks` test harness,
+/// invoked via `#![test_runner(beet_core::libtest_runner)]`.
+#[cfg(feature = "custom_test_frameworks")]
+pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
 		.spawn_then((

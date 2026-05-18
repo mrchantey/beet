@@ -136,7 +136,7 @@ impl Drop for TempDir {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_new_creates_and_cleans_up() {
 		let dir_path;
 		{
@@ -153,7 +153,7 @@ mod tests {
 		dir_path.exists().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_workspace_relative_creates_and_cleans_up() {
 		let dir_path;
 		{
@@ -175,7 +175,7 @@ mod tests {
 		dir_path.exists().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_unique_names() {
 		// Create multiple temp directories and verify they have unique names
 		let temp1 =
@@ -186,7 +186,7 @@ mod tests {
 		temp1.path().clone().xpect_not_eq(temp2.path().clone());
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_keep_prevents_cleanup() {
 		let dir_path;
 		{

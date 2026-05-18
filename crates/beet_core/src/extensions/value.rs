@@ -214,7 +214,7 @@ mod tests {
 	use serde_json::json;
 
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_success() {
 		json!({"name": "Alice"})
 			.field_str("name")
@@ -222,7 +222,7 @@ mod tests {
 			.xpect_eq("Alice");
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_missing_field() {
 		json!({"name": "Alice"})
 			.field_str("age")
@@ -232,7 +232,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_wrong_type() {
 		json!({"age": 30})
 			.field_str("age")
@@ -242,12 +242,12 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_i64_success() {
 		json!({"age": 42}).field_i64("age").unwrap().xpect_eq(42);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_i64_wrong_type() {
 		json!({"age": "not a number"})
 			.field_i64("age")
@@ -257,7 +257,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_u64_success() {
 		json!({"count": 123u64})
 			.field_u64("count")
@@ -265,7 +265,7 @@ mod tests {
 			.xpect_eq(123);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_f64_success() {
 		json!({"score": 3.14})
 			.field_f64("score")
@@ -273,7 +273,7 @@ mod tests {
 			.xpect_eq(3.14);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_bool_success() {
 		json!({"active": true})
 			.field_bool("active")
@@ -281,21 +281,21 @@ mod tests {
 			.xpect_eq(true);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_array_success() {
 		let value = json!({"items": [1, 2, 3]});
 		let arr = value.field_array("items").unwrap();
 		arr.len().xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_object_success() {
 		let value = json!({"meta": {"foo": 1}});
 		let obj = value.field_object("meta").unwrap();
 		obj.get("foo").unwrap().clone().xpect_eq(json!(1));
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_null_success() {
 		json!({"gone": null})
 			.field_null("gone")
@@ -303,7 +303,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_null_wrong_type() {
 		json!({"gone": 1})
 			.field_null("gone")

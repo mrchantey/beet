@@ -1,7 +1,8 @@
-#![cfg_attr(test, feature(custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
 //! Integration test for Lightsail Block.
 //! Takes approx 10 mins.
+
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;

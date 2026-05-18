@@ -226,13 +226,13 @@ mod tests {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn default_generator() {
 		let generator = BindingGenerator::default();
 		generator.filter.is_none().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn new_equals_default() {
 		let gen_a = BindingGenerator::new();
 		let gen_b = BindingGenerator::default();
@@ -242,7 +242,7 @@ mod tests {
 			.xpect_eq(gen_b.config.use_title_case);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn with_code_generator_config() {
 		let config = CodeGeneratorConfig::new()
 			.with_module_name("custom")
@@ -253,7 +253,7 @@ mod tests {
 		generator.config.use_title_case.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn convenience_forwards() {
 		let generator = BindingGenerator::new()
 			.with_title_case(true)
@@ -263,7 +263,7 @@ mod tests {
 		generator.config.generate_trait_impls.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn format_helpers_accessible_via_emit() {
 		// Verify the IR module's helpers work.
 		FieldType::Option(Box::new(FieldType::Str))
@@ -271,7 +271,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn generate_terra_impls() {
 		let meta = vec![terra::ResourceMeta {
 			resource_type: "aws_s3_bucket".to_string(),
@@ -306,7 +306,7 @@ mod tests {
 			.xpect_contains("terra::Provider::AWS");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn custom_preamble() {
 		let config = CodeGeneratorConfig::new()
 			.with_custom_preamble("// custom preamble\nuse custom::stuff;");
@@ -327,7 +327,7 @@ mod tests {
 			.xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn default_always_derived() {
 		let config = CodeGeneratorConfig::new();
 

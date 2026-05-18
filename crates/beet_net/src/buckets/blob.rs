@@ -336,28 +336,28 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn blob_from_bucket() {
 		let bucket = Bucket::temp();
 		let blob = bucket.blob(RelPath::new("test.txt"));
 		blob.path().to_string().xpect_eq("test.txt");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn clone_preserves_path() {
 		let blob = Bucket::temp().blob(RelPath::new("a/b/c.txt"));
 		let cloned = blob.clone();
 		cloned.path().xpect_eq(blob.path().clone());
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn blob_from_provider_trait() {
 		let provider = InMemoryBucket::new();
 		let blob = provider.erased_blob(RelPath::new("key.dat"));
 		blob.path().to_string().xpect_eq("key.dat");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn typed_blob_to_blob() {
 		let bucket = FsBucket::new(
 			AbsPathBuf::new_workspace_rel("target/tests/typed_blob").unwrap(),
@@ -368,7 +368,7 @@ mod test {
 		erased.path().to_string().xpect_eq("test.txt");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn insert_get_remove() {
 		async_ext::block_on(async {
 			let blob = Bucket::temp().blob(RelPath::new("hello.txt"));
@@ -384,7 +384,7 @@ mod test {
 		});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn get_media_infers_type() {
 		async_ext::block_on(async {
 			let blob = Bucket::temp().blob(RelPath::new("data.json"));
@@ -395,7 +395,7 @@ mod test {
 		});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn try_insert_fails_if_exists() {
 		async_ext::block_on(async {
 			let blob = Bucket::temp().blob(RelPath::new("once.txt"));

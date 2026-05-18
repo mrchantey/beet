@@ -173,7 +173,7 @@ mod tests {
 			.trim_lines()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn inline_places_children_side_by_side() {
 		let out = render((
 			LayoutStyle {
@@ -189,7 +189,7 @@ mod tests {
 		first_line.xpect_contains("C");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn inline_wraps_when_overflowing() {
 		let out = Buffer::render_oneshot_plain_sized(
 			UVec2::new(10, 10),

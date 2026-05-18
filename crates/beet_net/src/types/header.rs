@@ -624,7 +624,7 @@ impl Header for UserAgent {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn content_type_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<ContentType>(MediaType::Json);
@@ -634,7 +634,7 @@ mod test {
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn accept_quality_ordering() {
 		let mut map = HeaderMap::new();
 		map.set_raw("accept", "text/html;q=0.9, application/json");
@@ -643,7 +643,7 @@ mod test {
 		types[1].clone().xpect_eq(MediaType::Html);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn accept_equal_quality_preserves_order() {
 		let mut map = HeaderMap::new();
 		map.set_raw("accept", "text/html, application/json");
@@ -652,7 +652,7 @@ mod test {
 		types[1].clone().xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn location_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<Location>("/redirect".to_string());
@@ -662,7 +662,7 @@ mod test {
 			.xpect_eq("/redirect");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn authorization_bearer() {
 		let mut map = HeaderMap::new();
 		map.set::<Authorization>(Authorization::bearer("tok123"));
@@ -670,7 +670,7 @@ mod test {
 		auth.xpect_eq(Authorization::Bearer("tok123".to_string()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn authorization_basic() {
 		let mut map = HeaderMap::new();
 		map.set_raw("authorization", "Basic dXNlcjpwYXNz");
@@ -678,7 +678,7 @@ mod test {
 		auth.xpect_eq(Authorization::Basic("dXNlcjpwYXNz".to_string()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn authorization_other() {
 		let mut map = HeaderMap::new();
 		map.set_raw("authorization", "Digest realm=\"test\"");
@@ -688,7 +688,7 @@ mod test {
 		));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn content_length_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<ContentLength>(1024u64);
@@ -698,14 +698,14 @@ mod test {
 			.xpect_eq(1024u64);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn content_length_invalid() {
 		let mut map = HeaderMap::new();
 		map.set_raw("content-length", "not-a-number");
 		map.get::<ContentLength>().unwrap().xpect_err();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn origin_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<Origin>("https://example.com".to_string());
@@ -715,7 +715,7 @@ mod test {
 			.xpect_eq("https://example.com");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn access_control_allow_origin_wildcard() {
 		let mut map = HeaderMap::new();
 		map.set::<AccessControlAllowOrigin>("*".to_string());
@@ -725,7 +725,7 @@ mod test {
 			.xpect_eq("*");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn access_control_max_age_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<AccessControlMaxAge>(60u32);
@@ -735,7 +735,7 @@ mod test {
 			.xpect_eq(60u32);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn set_cookie_multi_value() {
 		let mut map = HeaderMap::new();
 		map.set_raw("set-cookie", "a=1");
@@ -746,7 +746,7 @@ mod test {
 		cookies[1].xpect_eq("b=2");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn cache_control_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<CacheControl>(
@@ -758,7 +758,7 @@ mod test {
 			.xpect_eq("no-cache, no-store, must-revalidate");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn transfer_encoding_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<TransferEncoding>(TransferEncodingValue::Chunked);
@@ -768,7 +768,7 @@ mod test {
 			.xpect_eq(TransferEncodingValue::Chunked);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn transfer_encoding_variants() {
 		for (raw, expected) in [
 			("chunked", TransferEncodingValue::Chunked),
@@ -786,7 +786,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn user_agent_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<UserAgent>("beet/0.1".to_string());
@@ -796,7 +796,7 @@ mod test {
 			.xpect_eq("beet/0.1");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn host_roundtrip() {
 		let mut map = HeaderMap::new();
 		map.set::<Host>("example.com:8080".to_string());
@@ -806,7 +806,7 @@ mod test {
 			.xpect_eq("example.com:8080");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn host_from_raw() {
 		let mut map = HeaderMap::new();
 		map.set_raw("host", "localhost:3000");
@@ -816,7 +816,7 @@ mod test {
 			.xpect_eq("localhost:3000");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn user_agent_from_raw() {
 		let mut map = HeaderMap::new();
 		map.set_raw("user-agent", "Mozilla/5.0");

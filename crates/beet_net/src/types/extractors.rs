@@ -284,7 +284,7 @@ impl Into<Response> for Png {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn request_response_cycle() {
 		let mut app = App::new();
 		let mut req = Request::post("/test").with_body(b"hello");
@@ -315,7 +315,7 @@ mod test {
 			.xpect_eq(5u64);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn parts_has_body() {
 		let mut parts = RequestParts::post("/test");
 		parts.headers.set::<header::ContentLength>(5u64);
@@ -326,7 +326,7 @@ mod test {
 		parts_without.has_body().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	#[cfg(feature = "json")]
 	fn json_query_params() {
 		#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]

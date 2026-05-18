@@ -608,66 +608,66 @@ pub type MimeType = MediaType;
 mod test {
 	use super::*;
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_json() {
 		MediaType::from_content_type("application/json")
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_json_with_charset() {
 		MediaType::from_content_type("application/json; charset=utf-8")
 			.xpect_eq(MediaType::Json);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_postcard() {
 		MediaType::from_content_type("application/x-postcard")
 			.xpect_eq(MediaType::Postcard);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_html() {
 		MediaType::from_content_type("text/html").xpect_eq(MediaType::Html);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_text() {
 		MediaType::from_content_type("text/plain").xpect_eq(MediaType::Text);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_xml() {
 		MediaType::from_content_type("application/xml")
 			.xpect_eq(MediaType::Xml);
 		MediaType::from_content_type("text/xml").xpect_eq(MediaType::Xml);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_markdown() {
 		MediaType::from_content_type("text/markdown")
 			.xpect_eq(MediaType::Markdown);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_bytes() {
 		MediaType::from_content_type("application/octet-stream")
 			.xpect_eq(MediaType::Bytes);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_event_stream() {
 		MediaType::from_content_type("text/event-stream")
 			.xpect_eq(MediaType::EventStream);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_unknown() {
 		MediaType::from_content_type("application/x-custom")
 			.xpect_eq(MediaType::Other("application/x-custom".to_string()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_image_types() {
 		MediaType::from_content_type("image/jpeg").xpect_eq(MediaType::Jpeg);
 		MediaType::from_content_type("image/gif").xpect_eq(MediaType::Gif);
@@ -677,14 +677,14 @@ mod test {
 		MediaType::from_content_type("image/avif").xpect_eq(MediaType::Avif);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_font_types() {
 		MediaType::from_content_type("font/woff2").xpect_eq(MediaType::Woff2);
 		MediaType::from_content_type("font/woff").xpect_eq(MediaType::Woff);
 		MediaType::from_content_type("font/ttf").xpect_eq(MediaType::Ttf);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_audio_video() {
 		MediaType::from_content_type("audio/mpeg").xpect_eq(MediaType::Mp3);
 		MediaType::from_content_type("video/mp4").xpect_eq(MediaType::Mp4);
@@ -692,14 +692,14 @@ mod test {
 			.xpect_eq(MediaType::VideoWebm);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_content_type_yaml() {
 		MediaType::from_content_type("application/x-yaml")
 			.xpect_eq(MediaType::Yaml);
 		MediaType::from_content_type("text/yaml").xpect_eq(MediaType::Yaml);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_common() {
 		MediaType::from_extension("html").xpect_eq(MediaType::Html);
 		MediaType::from_extension("htm").xpect_eq(MediaType::Html);
@@ -717,14 +717,14 @@ mod test {
 		MediaType::from_extension("md").xpect_eq(MediaType::Markdown);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_case_insensitive() {
 		MediaType::from_extension("HTML").xpect_eq(MediaType::Html);
 		MediaType::from_extension("Json").xpect_eq(MediaType::Json);
 		MediaType::from_extension("PNG").xpect_eq(MediaType::Png);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_fonts() {
 		MediaType::from_extension("woff").xpect_eq(MediaType::Woff);
 		MediaType::from_extension("woff2").xpect_eq(MediaType::Woff2);
@@ -732,7 +732,7 @@ mod test {
 		MediaType::from_extension("otf").xpect_eq(MediaType::Otf);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_audio_video() {
 		MediaType::from_extension("mp3").xpect_eq(MediaType::Mp3);
 		MediaType::from_extension("ogg").xpect_eq(MediaType::Ogg);
@@ -741,14 +741,14 @@ mod test {
 		MediaType::from_extension("webm").xpect_eq(MediaType::VideoWebm);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_archives() {
 		MediaType::from_extension("zip").xpect_eq(MediaType::Zip);
 		MediaType::from_extension("gz").xpect_eq(MediaType::Gzip);
 		MediaType::from_extension("tar").xpect_eq(MediaType::Tar);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_source() {
 		MediaType::from_extension("rs").xpect_eq(MediaType::Rust);
 		MediaType::from_extension("py").xpect_eq(MediaType::Python);
@@ -759,7 +759,7 @@ mod test {
 		MediaType::from_extension("sh").xpect_eq(MediaType::Shell);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_data() {
 		MediaType::from_extension("yaml").xpect_eq(MediaType::Yaml);
 		MediaType::from_extension("yml").xpect_eq(MediaType::Yaml);
@@ -768,13 +768,13 @@ mod test {
 		MediaType::from_extension("sql").xpect_eq(MediaType::Sql);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_extension_unknown() {
 		MediaType::from_extension("xyz").xpect_eq(MediaType::Bytes);
 		MediaType::from_extension("").xpect_eq(MediaType::Bytes);
 	}
 
-	#[test]
+	#[crate::test]
 	fn from_path_works() {
 		MediaType::from_path("index.html").xpect_eq(MediaType::Html);
 		MediaType::from_path("/assets/style.css").xpect_eq(MediaType::Css);
@@ -783,7 +783,7 @@ mod test {
 		MediaType::from_path("archive.tar").xpect_eq(MediaType::Tar);
 	}
 
-	#[test]
+	#[crate::test]
 	fn as_str_roundtrip() {
 		let types = vec![
 			MediaType::Bytes,
@@ -817,17 +817,17 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn default_is_bytes() { MediaType::default().xpect_eq(MediaType::Bytes); }
 
-	#[test]
+	#[crate::test]
 	fn display() {
 		format!("{}", MediaType::Json).xpect_eq("application/json");
 		format!("{}", MediaType::EventStream).xpect_eq("text/event-stream");
 		format!("{}", MediaType::Wasm).xpect_eq("application/wasm");
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_serializable() {
 		MediaType::Json.is_serializable().xpect_true();
 		MediaType::Postcard.is_serializable().xpect_true();
@@ -836,7 +836,7 @@ mod test {
 		MediaType::EventStream.is_serializable().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_text_types() {
 		MediaType::Html.is_text().xpect_true();
 		MediaType::Json.is_text().xpect_true();
@@ -847,7 +847,7 @@ mod test {
 		MediaType::Wasm.is_text().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_image_types() {
 		MediaType::Png.is_image().xpect_true();
 		MediaType::Jpeg.is_image().xpect_true();
@@ -862,7 +862,7 @@ mod test {
 		MediaType::Mp4.is_image().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn is_video_types() {
 		MediaType::Mp4.is_video().xpect_true();
 		MediaType::VideoWebm.is_video().xpect_true();

@@ -115,7 +115,7 @@ pub(super) fn update_text_fields(
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn link_creates_relationship() {
 		let mut world = DocumentPlugin::world();
 
@@ -139,7 +139,7 @@ mod test {
 			.xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unlink_removes_relationship() {
 		let mut world = DocumentPlugin::world();
 
@@ -161,7 +161,7 @@ mod test {
 		world.entity(text).contains::<FieldOf>().xpect_false();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resolves_root_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -188,7 +188,7 @@ mod test {
 		content.xpect_eq(Value::Str("from_root".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resolves_card_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -221,7 +221,7 @@ mod test {
 		content.xpect_eq(Value::Str("from_card".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn resolves_entity_document_path() {
 		let mut world = DocumentPlugin::world();
 
@@ -248,7 +248,7 @@ mod test {
 		content.xpect_eq(Value::Str("target_doc".into()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn handles_null_field_value() {
 		let mut world = DocumentPlugin::world();
 
@@ -267,7 +267,7 @@ mod test {
 		synced[0].xpect_eq(Value::Null);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn handles_array_field_value() {
 		let mut world = DocumentPlugin::world();
 
@@ -286,7 +286,7 @@ mod test {
 		synced[0].xpect_eq(Value::new_list([1, 2, 3]));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn handles_bool_field_value() {
 		let mut world = DocumentPlugin::world();
 

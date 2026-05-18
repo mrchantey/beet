@@ -595,19 +595,19 @@ mod test {
 
 	// -- tag name --
 
-	#[test]
+	#[beet_core::test]
 	fn tag_name_simple() {
 		let mut input = "div ";
 		parse_tag_name(&mut input).unwrap().xpect_eq("div");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn tag_name_custom_element() {
 		let mut input = "my-component>";
 		parse_tag_name(&mut input).unwrap().xpect_eq("my-component");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn tag_name_svg_namespace() {
 		let mut input = "svg:circle>";
 		parse_tag_name(&mut input).unwrap().xpect_eq("svg:circle");
@@ -615,7 +615,7 @@ mod test {
 
 	// -- attribute value --
 
-	#[test]
+	#[beet_core::test]
 	fn attr_value_double_quoted() {
 		let mut input = "\"hello world\"";
 		parse_attribute_value(&mut input)
@@ -623,13 +623,13 @@ mod test {
 			.xpect_eq("hello world");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attr_value_single_quoted() {
 		let mut input = "'hello'";
 		parse_attribute_value(&mut input).unwrap().xpect_eq("hello");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attr_value_unquoted() {
 		let mut input = "hello>";
 		parse_attribute_value(&mut input).unwrap().xpect_eq("hello");
@@ -637,7 +637,7 @@ mod test {
 
 	// -- attributes --
 
-	#[test]
+	#[beet_core::test]
 	fn attr_key_value() {
 		let mut input = "class=\"foo\"";
 		parse_attribute(&mut input)
@@ -645,7 +645,7 @@ mod test {
 			.xpect_eq(HtmlAttribute::new("class", "foo"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attr_boolean() {
 		let mut input = "disabled>";
 		parse_attribute(&mut input)
@@ -653,7 +653,7 @@ mod test {
 			.xpect_eq(HtmlAttribute::boolean("disabled"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attr_keyless_expression() {
 		let mut input = "{foo}";
 		parse_attribute(&mut input)
@@ -661,7 +661,7 @@ mod test {
 			.xpect_eq(HtmlAttribute::expression("foo"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn attr_keyed_expression() {
 		let mut input = "onclick={handler}>";
 		parse_attribute(&mut input)
@@ -671,7 +671,7 @@ mod test {
 
 	// -- comment --
 
-	#[test]
+	#[beet_core::test]
 	fn comment_simple() {
 		let mut input = "<!-- hello -->";
 		parse_comment(&mut input)
@@ -681,7 +681,7 @@ mod test {
 
 	// -- doctype --
 
-	#[test]
+	#[beet_core::test]
 	fn doctype_html() {
 		let mut input = "<!DOCTYPE html>";
 		parse_doctype(&mut input)
@@ -691,7 +691,7 @@ mod test {
 
 	// -- close tag --
 
-	#[test]
+	#[beet_core::test]
 	fn close_tag_simple() {
 		let mut input = "</div>";
 		parse_close_tag(&mut input)
@@ -699,7 +699,7 @@ mod test {
 			.xpect_eq(HtmlToken::CloseTag("div"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn close_tag_whitespace() {
 		let mut input = "</ div >";
 		parse_close_tag(&mut input)
@@ -709,7 +709,7 @@ mod test {
 
 	// -- open tag --
 
-	#[test]
+	#[beet_core::test]
 	fn open_tag_simple() {
 		let mut input = "<div>";
 		parse_open_tag(&mut input)
@@ -722,7 +722,7 @@ mod test {
 			});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn open_tag_self_closing() {
 		let mut input = "<br />";
 		parse_open_tag(&mut input)
@@ -735,7 +735,7 @@ mod test {
 			});
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn open_tag_with_attributes() {
 		let mut input = "<input type=\"text\" disabled />";
 		parse_open_tag(&mut input)
@@ -753,7 +753,7 @@ mod test {
 
 	// -- text --
 
-	#[test]
+	#[beet_core::test]
 	fn text_simple() {
 		let mut input = "hello world<";
 		parse_text(false)(&mut input)
@@ -761,7 +761,7 @@ mod test {
 			.xpect_eq(HtmlToken::Text("hello world"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn text_stops_at_brace_when_expressions_enabled() {
 		let mut input = "hello {world}";
 		parse_text(true)(&mut input)
@@ -771,7 +771,7 @@ mod test {
 
 	// -- expression --
 
-	#[test]
+	#[beet_core::test]
 	fn expression_simple() {
 		let mut input = "{foo}";
 		parse_expression(&mut input)
@@ -779,7 +779,7 @@ mod test {
 			.xpect_eq(HtmlToken::Expression("foo"));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn expression_nested_braces() {
 		let mut input = "{a {b} c}";
 		parse_expression(&mut input)
@@ -789,7 +789,7 @@ mod test {
 
 	// -- brace content --
 
-	#[test]
+	#[beet_core::test]
 	fn brace_content_deeply_nested() {
 		let mut input = "{a {b {c}} d}rest";
 		parse_brace_content(&mut input)
@@ -800,7 +800,7 @@ mod test {
 
 	// -- raw text --
 
-	#[test]
+	#[beet_core::test]
 	fn raw_text_script() {
 		let mut input = "let x = 1 < 2;</script>";
 		let tokens =
@@ -809,7 +809,7 @@ mod test {
 		input.xpect_eq("</script>");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn raw_text_with_expression() {
 		let mut input = "prefix {{expr}} suffix</style>";
 		let tokens = parse_raw_text_content("style", true)(&mut input).unwrap();
@@ -822,7 +822,7 @@ mod test {
 
 	// -- raw text in document --
 
-	#[test]
+	#[beet_core::test]
 	fn document_script_raw_text() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -839,7 +839,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_style_raw_text() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -857,7 +857,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_script_with_expressions() {
 		let config = HtmlParseConfig {
 			parse_raw_text_expressions: true,
@@ -880,7 +880,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_self_closing_script_no_raw() {
 		// self-closing script should NOT trigger raw text mode
 		let config = HtmlParseConfig::default();
@@ -891,7 +891,7 @@ mod test {
 
 	// -- document --
 
-	#[test]
+	#[beet_core::test]
 	fn document_simple() {
 		let config = HtmlParseConfig::default();
 		let tokens = parse_document("<div>hello</div>", &config).unwrap();
@@ -907,7 +907,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_nested() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -931,7 +931,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_with_expressions() {
 		let config = HtmlParseConfig {
 			parse_expressions: true,
@@ -951,7 +951,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_comment_and_doctype() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -969,7 +969,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_mixed_content() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -994,7 +994,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_whitespace_preserved() {
 		let config = HtmlParseConfig::default();
 		let tokens = parse_document("<div>  hello  </div>", &config).unwrap();
@@ -1010,7 +1010,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_multiple_attributes() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -1028,7 +1028,7 @@ mod test {
 		}]);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn starts_with_close_tag_check() {
 		starts_with_close_tag("</script>", "script").xpect_true();
 		starts_with_close_tag("</SCRIPT>", "script").xpect_true();
@@ -1039,7 +1039,7 @@ mod test {
 
 	// -- SVG --
 
-	#[test]
+	#[beet_core::test]
 	fn svg_basic_elements() {
 		let config = HtmlParseConfig::default();
 		let input = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" /></svg>";
@@ -1069,7 +1069,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn svg_path_data() {
 		let config = HtmlParseConfig::default();
 		let tokens = parse_document(
@@ -1097,7 +1097,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn svg_namespace_attribute() {
 		let config = HtmlParseConfig::default();
 		let tokens =
@@ -1111,7 +1111,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unquoted_attr_with_slashes() {
 		let config = HtmlParseConfig::default();
 		let tokens = parse_document(
@@ -1130,7 +1130,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unquoted_attr_simple() {
 		let config = HtmlParseConfig::default();
 		let tokens = parse_document("<html lang=en>", &config).unwrap();
@@ -1143,7 +1143,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn error_message_includes_context() {
 		let config = HtmlParseConfig::default();
 		let err = parse_document("<div <span>", &config).unwrap_err();
@@ -1152,7 +1152,7 @@ mod test {
 		err.xpect_contains("-->");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn self_closing_after_unquoted_slash() {
 		// ensure a trailing `/` right before `>` still self-closes
 		let config = HtmlParseConfig::default();
@@ -1165,7 +1165,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn unquoted_value_consumes_trailing_slash() {
 		// per HTML spec, `<img src=foo/>` is NOT self-closing;
 		// the unquoted value is `foo/` and `>` closes the tag.

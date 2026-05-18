@@ -56,7 +56,7 @@ impl TuiSpanMap {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn set_area_maps_all_cells() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -77,7 +77,7 @@ mod test {
 		map.get(TuiPos::new(3, 6)).xpect_eq(None);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn clear_removes_all_entries() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
@@ -89,7 +89,7 @@ mod test {
 		map.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn later_entity_overwrites_earlier() {
 		let mut world = World::new();
 		let first = world.spawn_empty().id();

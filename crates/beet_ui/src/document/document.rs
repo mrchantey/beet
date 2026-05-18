@@ -302,7 +302,7 @@ impl core::fmt::Display for DocumentPath {
 mod test {
 	use super::*;
 
-	#[test]
+	#[beet_core::test]
 	fn document_get_field_ref() {
 		let doc = Document::new(val!({
 			"name": "Test",
@@ -332,7 +332,7 @@ mod test {
 		.xpect_eq("deep");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_get_field() {
 		let doc = Document::new(val!({
 			"name": "Test",
@@ -348,7 +348,7 @@ mod test {
 			.xpect_eq(42);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_get_field_array() {
 		let doc = Document::new(val!({
 			"items": [1i64, 2i64, 3i64, 4i64, 5i64]
@@ -364,7 +364,7 @@ mod test {
 		.xpect_eq(3);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_get_field_mut() {
 		let mut doc = Document::new(val!({ "count": 10i64 }));
 
@@ -376,7 +376,7 @@ mod test {
 			.xpect_eq(20);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_try_init_field_object() {
 		let mut doc = Document::default();
 
@@ -397,7 +397,7 @@ mod test {
 		.xpect_eq("initialized");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn document_try_init_field_array() {
 		let mut doc = Document::default();
 

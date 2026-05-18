@@ -361,7 +361,6 @@ fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use test::TestDescAndFn;
 
 	fn run_tests(tests: Vec<TestDescAndFn>) {
 		let mut app = App::new().with_plugins((
@@ -376,7 +375,7 @@ mod tests {
 		app.run();
 	}
 
-	#[test]
+	#[crate::test]
 	fn works_sync() {
 		// panic!("foo");
 		run_tests(vec![
