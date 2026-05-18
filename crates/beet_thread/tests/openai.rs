@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
 
@@ -119,5 +121,3 @@ async fn image_roundtrip() {
 async fn cs_image_roundtrip() {
 	post_streamer::image_roundtrip(completions_streamer_non_streaming()).await;
 }
-
-beet_core::test_main!();

@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_core::testing;
 
@@ -17,5 +19,3 @@ fn vars_filtered() {
 	vars[0].0.xref().xpect_eq("WORKSPACE_ROOT");
 	vars[0].1.xref().xpect_ends_with("beet/");
 }
-
-beet_core::test_main!();

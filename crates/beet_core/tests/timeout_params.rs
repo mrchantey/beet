@@ -2,6 +2,9 @@
 //!
 //! This demonstrates the `timeout_ms` parameter on `#[beet_core::test]` which allows
 //! per-test timeout configuration, overriding the suite-level timeout.
+
+beet_core::test_main!();
+
 use beet_core::testing;
 
 
@@ -38,5 +41,3 @@ async fn timeout_param_longer_than_default() {
 	beet_core::time_ext::sleep_millis(50).await;
 	assert_eq!(1 + 1, 2);
 }
-
-beet_core::test_main!();

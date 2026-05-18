@@ -1,4 +1,6 @@
 
+beet_core::test_main!();
+
 mod media;
 mod navigate;
 mod router;
@@ -11,5 +13,3 @@ pub mod prelude {
 	pub use crate::router::*;
 	pub use crate::scene_renderer::*;
 }
-
-beet_core::test_main!();

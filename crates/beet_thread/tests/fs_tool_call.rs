@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -86,5 +88,3 @@ fn main() {
 	let result = fs_ext::read_to_string(&verify_path).unwrap();
 	result.xpect_contains("hello world");
 }
-
-beet_core::test_main!();

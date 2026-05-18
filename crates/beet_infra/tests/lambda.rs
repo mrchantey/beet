@@ -1,5 +1,8 @@
 //! Integration test for Lambda Block.
 //! Takes approx 5 mins.
+
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
@@ -162,5 +165,3 @@ async fn verify_live(url: &str, expected: &str) -> Result {
 	let full_url = format!("{url}version");
 	runtime_utils::verify_live(&full_url, expected, 10, 3).await
 }
-
-beet_core::test_main!();

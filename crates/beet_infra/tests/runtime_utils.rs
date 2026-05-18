@@ -1,4 +1,7 @@
 //! Shared utilities for Lambda, Lightsail, and Fargate integration tests.
+
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
@@ -215,5 +218,3 @@ pub async fn cleanup_prior_state(stack: &Stack, project: terra::Project) {
 	stack.artifacts_client().bucket().bucket_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }
-
-beet_core::test_main!();

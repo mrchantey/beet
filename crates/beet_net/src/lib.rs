@@ -1,6 +1,8 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 
+beet_core::test_main!();
+
 mod actions;
 mod client;
 mod types;
@@ -67,5 +69,3 @@ pub mod exports {
 	#[cfg(all(feature = "hyper", not(target_arch = "wasm32")))]
 	pub use http_body_util;
 }
-
-beet_core::test_main!();

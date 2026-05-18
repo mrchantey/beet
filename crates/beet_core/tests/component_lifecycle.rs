@@ -1,6 +1,8 @@
 //! Not actually testing anything in beet_core but its very
 //! hard to remember bevy's lifecycle rules.
 
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 
 
@@ -88,5 +90,3 @@ fn child() {
 	// 5v0: Comp1 Event - Remove
 	// 5v0: Comp1 Hook  - Remove
 }
-
-beet_core::test_main!();

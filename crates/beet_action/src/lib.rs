@@ -1,5 +1,7 @@
 // #![deny(missing_docs)]
 
+beet_core::test_main!();
+
 mod action_plugin;
 mod actions;
 mod control_flow;
@@ -15,5 +17,3 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
 }
-
-beet_core::test_main!();

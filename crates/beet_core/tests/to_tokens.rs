@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_core::exports;
 use beet_core::testing;
 use beet_core::prelude;
@@ -125,5 +127,3 @@ fn enum_variants() {
 		.to_string(),
 	);
 }
-
-beet_core::test_main!();

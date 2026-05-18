@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 // #![deny(missing_docs)]
+
+beet_core::test_main!();
+
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
@@ -41,5 +44,3 @@ pub mod exports {
 	#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 	pub use ratatui;
 }
-
-beet_core::test_main!();

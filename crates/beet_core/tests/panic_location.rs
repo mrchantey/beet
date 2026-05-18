@@ -1,5 +1,8 @@
 //! Tests to verify panic locations are correctly reported when panics
 //! occur in different files than the test file itself.
+
+beet_core::test_main!();
+
 use beet_core::testing::panic_in_other_file;
 
 /// This test panics in a different file, verifying that the error location
@@ -41,5 +44,3 @@ fn panic_location_in_different_file() {
 fn unwrap_location_in_different_file() {
 	panic_in_other_file::unwrap_error_in_this_file();
 }
-
-beet_core::test_main!();

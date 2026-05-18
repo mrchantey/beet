@@ -1,9 +1,9 @@
 //! Not actually testing anything in beet_core but its very
 //! hard to remember bevy's lifecycle rules.
-
 use beet_core::prelude::*;
-
 use beet_core::testing;
+
+beet_core::test_main!();
 
 #[beet_core::test]
 // #[ignore]
@@ -32,13 +32,19 @@ fn on_add_foo(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).insert(Bazz);
 }
 
-fn on_insert_foo(_: On<Insert, Foo>) { println!("Foo: Observer") }
+fn on_insert_foo(_: On<Insert, Foo>) {
+	println!("Foo: Observer")
+}
 
 #[derive(Component)]
 #[component(on_add=on_add_bar)]
 struct Bar;
-fn on_add_bar(_world: DeferredWorld, _cx: HookContext) { println!("Bar: Hook") }
-fn on_insert_bar(_: On<Insert, Bar>) { println!("Bar: Observer") }
+fn on_add_bar(_world: DeferredWorld, _cx: HookContext) {
+	println!("Bar: Hook")
+}
+fn on_insert_bar(_: On<Insert, Bar>) {
+	println!("Bar: Observer")
+}
 
 #[derive(Component)]
 #[component(on_add=on_add_bazz)]
@@ -46,6 +52,6 @@ struct Bazz;
 fn on_add_bazz(_world: DeferredWorld, _cx: HookContext) {
 	println!("Bazz: Hook")
 }
-fn on_insert_bazz(_: On<Insert, Bazz>) { println!("Bazz: Observer") }
-
-beet_core::test_main!();
+fn on_insert_bazz(_: On<Insert, Bazz>) {
+	println!("Bazz: Observer")
+}

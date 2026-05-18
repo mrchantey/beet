@@ -1,6 +1,8 @@
 //!
 #![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 
+beet_core::test_main!();
+
 pub mod o11s;
 mod partial;
 mod providers;
@@ -21,5 +23,3 @@ pub mod prelude {
 	pub use crate::tool::*;
 	pub use crate::types::*;
 }
-
-beet_core::test_main!();

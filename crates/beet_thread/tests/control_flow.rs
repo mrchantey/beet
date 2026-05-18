@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_thread::prelude::*;
@@ -56,5 +58,3 @@ fn assert_and_exit(
 	commands.write_message(AppExit::Success);
 	Ok(Pass(()))
 }
-
-beet_core::test_main!();

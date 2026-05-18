@@ -5,6 +5,9 @@
 //! - [`terra`] for building and exporting JSON configurations
 //! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
 //! - [`bindings`] for pre-generated bindings of commonly used providers
+
+beet_core::test_main!();
+
 #[cfg(feature = "deploy")]
 mod actions;
 pub mod bindings;
@@ -25,5 +28,3 @@ pub mod prelude {
 	pub use crate::terra::tofu;
 	pub use crate::types::*;
 }
-
-beet_core::test_main!();

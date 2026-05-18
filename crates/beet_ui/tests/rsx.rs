@@ -1,4 +1,6 @@
 
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 // resolve crate:: aliasing in macros
 use beet_ui::*;
@@ -134,5 +136,3 @@ fn doctype_node() {
 		<!DOCTYPE html>
 	});
 }
-
-beet_core::test_main!();

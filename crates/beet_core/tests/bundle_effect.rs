@@ -1,3 +1,5 @@
+beet_core::test_main!();
+
 use beet_core::prelude::*;
 use beet_core::testing;
 
@@ -18,5 +20,3 @@ fn works() {
 	let entity = world.spawn(Foo::<()>::default());
 	entity.get::<Bar>().xpect_some();
 }
-
-beet_core::test_main!();
