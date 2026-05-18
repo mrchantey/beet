@@ -20,7 +20,8 @@ pub struct Token {
 	/// that token will be inherited. This is a common practice.
 	///
 	/// ```css
-	/// // backgroind-color is not inherited, but --primary is
+	/// // background-color is not inherited, but --primary is,
+	/// // so may be inherited
 	/// background-color: var(--primary);
 	/// ```
 	inherited: TokenInheritance,

@@ -102,6 +102,8 @@ where
 /// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
 /// adds a unique inline class to the entity and registers the rule (only once)
 /// in the global [`RuleSet`].
+/// This pattern is somewhat analagous to Component Scoped Styles as seen in frameworks
+/// like Astro.
 #[track_caller]
 pub fn inline_class(
 	declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,
@@ -111,8 +113,9 @@ pub fn inline_class(
 	let declarations: Vec<(TokenKey, TokenValue)> =
 		declarations.into_iter().collect();
 	OnSpawn::new(move |entity| -> Result {
-		let rule =
-			Rule::new().with_selector(selector).with_extend(declarations);
+		let rule = Rule::new()
+			.with_selector(selector)
+			.with_extend(declarations);
 		entity.world_scope(move |world| {
 			world
 				.get_resource_or_init::<RuleSet>()

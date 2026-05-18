@@ -56,6 +56,7 @@ impl TypedValue {
 		self.schema.assert_eq_ty::<T>()?;
 		self.value.clone().into_serde::<T>()
 	}
+	pub fn take(self) -> Value { self.value }
 }
 
 

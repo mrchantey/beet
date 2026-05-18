@@ -3,7 +3,8 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 use std::collections::VecDeque;
 
-
+/// Global store of an ordered [`Rule`] list. Rules contain
+/// tokens that may or may not apply to an [`Element`].
 #[derive(Debug, Clone, Reflect, Deref, DerefMut, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
