@@ -1,4 +1,5 @@
 use super::escape;
+use crate::render::DoubleBuffer;
 use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::URect;
@@ -31,6 +32,10 @@ pub struct Buffer {
 	cells: Vec<Cell>,
 }
 
+impl Default for Buffer {
+	fn default() -> Self { Self::new(terminal_ext::size()) }
+}
+
 impl Buffer {
 	/// Create a new buffer filled with blank cells.
 	pub fn new(size: UVec2) -> Self {
@@ -39,6 +44,15 @@ impl Buffer {
 			size,
 			cells: alloc::vec::from_elem(Cell::BLANK, len),
 		}
+	}
+
+	pub fn new_half_terminal() -> Self {
+		let size = terminal_ext::size();
+		Self::new(UVec2::new(size.x, size.y / 2))
+	}
+
+	pub fn into_double_buffer(self) -> DoubleBuffer {
+		DoubleBuffer::from_buffer(self)
 	}
 
 	/// Reset all cells to [`Cell::BLANK`].

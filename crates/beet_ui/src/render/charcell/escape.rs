@@ -241,7 +241,7 @@ mod tests {
 
 	/// Render a bundle to a 40×5 buffer and return the trimmed plain string.
 	fn render(bundle: impl Bundle) -> String {
-		CharcellPlugin::render_oneshot_sized(UVec2::new(40, 5), bundle)
+		Buffer::render_oneshot_sized(UVec2::new(40, 5), bundle)
 			.trim_lines()
 	}
 

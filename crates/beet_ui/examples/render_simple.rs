@@ -6,7 +6,7 @@ use bevy::math::UVec2;
 
 fn main() {
 	let size = terminal_ext::size();
-	CharcellPlugin::render_oneshot_sized(
+	Buffer::render_oneshot_sized(
 		UVec2::new(size.x, size.y / 2),
 		setup(),
 	)

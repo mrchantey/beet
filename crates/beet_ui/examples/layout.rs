@@ -50,7 +50,7 @@ fn main() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn render<B: Bundle>(name: &str, setup: fn() -> B) {
-	let out = CharcellPlugin::render_oneshot(setup()).trim_lines();
+	let out = Buffer::render_oneshot(setup()).trim_lines();
 	println!("\n{name}: \n{out}");
 }
 

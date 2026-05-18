@@ -169,7 +169,7 @@ mod tests {
 	use crate::style::*;
 
 	fn render(bundle: impl Bundle) -> String {
-		CharcellPlugin::render_oneshot_plain_sized(UVec2::new(20, 10), bundle)
+		Buffer::render_oneshot_plain_sized(UVec2::new(20, 10), bundle)
 			.trim_lines()
 	}
 
@@ -191,7 +191,7 @@ mod tests {
 
 	#[test]
 	fn inline_wraps_when_overflowing() {
-		let out = CharcellPlugin::render_oneshot_plain_sized(
+		let out = Buffer::render_oneshot_plain_sized(
 			UVec2::new(10, 10),
 			(
 				LayoutStyle {

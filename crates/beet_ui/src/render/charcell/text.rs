@@ -146,7 +146,7 @@ mod tests {
 
 	/// Render a bundle into a 10×1 buffer and return the ANSI output.
 	fn render(bundle: impl Bundle) -> String {
-		CharcellPlugin::render_oneshot_sized(UVec2::new(10, 1), bundle)
+		Buffer::render_oneshot_sized(UVec2::new(10, 1), bundle)
 			.trim_lines()
 	}
 	fn render_pluses(bundle: impl Bundle) -> String {

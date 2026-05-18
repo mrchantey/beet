@@ -676,7 +676,7 @@ mod tests {
 	use crate::style::*;
 
 	fn render(bundle: impl Bundle) -> String {
-		CharcellPlugin::render_oneshot_sized(UVec2::new(40, 20), bundle)
+		Buffer::render_oneshot_sized(UVec2::new(40, 20), bundle)
 			.trim_lines()
 			.replace(" ", "+")
 	}

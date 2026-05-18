@@ -37,9 +37,16 @@ impl DoubleBuffer {
 		}
 	}
 
-	pub fn new_half_terminal() -> Self {
-		let size = terminal_ext::size();
-		Self::new(UVec2::new(size.x, size.y / 2))
+	pub fn from_buffer(buffer: Buffer) -> Self {
+		Self {
+			buffers: [buffer.clone(), buffer],
+			current: 0,
+		}
+	}
+
+
+	pub fn into_buffer(self) -> Buffer {
+		self.buffers.into_iter().nth(self.current).unwrap()
 	}
 
 	/// The buffer currently being drawn into.
@@ -78,4 +85,12 @@ impl DoubleBuffer {
 				}
 			})
 	}
+}
+
+
+impl From<Buffer> for DoubleBuffer {
+	fn from(buffer: Buffer) -> Self { Self::from_buffer(buffer) }
+}
+impl From<DoubleBuffer> for Buffer {
+	fn from(db: DoubleBuffer) -> Self { db.into_buffer() }
 }
