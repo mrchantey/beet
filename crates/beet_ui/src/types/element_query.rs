@@ -12,6 +12,7 @@ pub struct ElementQuery<'w, 's> {
 			&'static Element,
 			Option<&'static Attributes>,
 			Option<&'static ElementStateMap>,
+			Option<&'static Classes>,
 		),
 	>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
@@ -39,10 +40,12 @@ impl ElementQuery<'_, '_> {
 	}
 
 	pub fn iter(&self) -> impl Iterator<Item = ElementView<'_>> {
-		self.elements.iter().map(|(entity, element, attrs, state)| {
-			let attributes = self.collect_attributes(attrs);
-			ElementView::new(entity, element, attributes, state)
-		})
+		self.elements
+			.iter()
+			.map(|(entity, element, attrs, state, classes)| {
+				let attributes = self.collect_attributes(attrs);
+				ElementView::new(entity, element, attributes, state, classes)
+			})
 	}
 
 	pub fn get(
@@ -51,9 +54,9 @@ impl ElementQuery<'_, '_> {
 	) -> Result<ElementView<'_>, QueryEntityError> {
 		self.elements
 			.get(entity)
-			.map(|(entity, element, attrs, state)| {
+			.map(|(entity, element, attrs, state, classes)| {
 				let attributes = self.collect_attributes(attrs);
-				ElementView::new(entity, element, attributes, state)
+				ElementView::new(entity, element, attributes, state, classes)
 			})
 	}
 	pub fn get_in_ancestors(

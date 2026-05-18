@@ -69,21 +69,31 @@ impl<T> Into<Token> for &TokenDefinition<T> {
 
 impl<T: 'static> IntoBundle<(NotBundleMarker, Self)> for TokenDefinition<T> {
 	fn into_bundle(self) -> impl Bundle {
-		OnSpawn::new(move |entity| {
-			let entity_id = entity.id();
-			let mut rule =
-				Rule::new().with_selector(Selector::Entity(entity_id));
+		OnSpawn::new(move |entity| -> Result {
+			// The token carries a stable inline key per definition callsite,
+			// so derive a shared class from it. Multiple entities created
+			// from the same definition reuse a single registered rule.
+			let class = ClassName::String(self.token.key().as_str().into());
+			let selector = Selector::Class(class.as_selector());
+
+			let mut rule = Rule::new().with_selector(selector);
 			if self.schema() == &TokenSchema::of::<i32>() {
 				rule.insert(I32Value, &self)?;
 			}
-			// avoid unnecessary change detection trigger
-			if !rule.contains_key(self.token.key()) {
-				rule.insert_definition(self)?;
-			}
-			// store in the global RuleSet resource
+			rule.insert_definition(self)?;
+
+			// register the rule once in the global RuleSet resource
 			entity.world_scope(move |world| {
-				world.get_resource_or_init::<RuleSet>().insert_rule(rule);
+				world
+					.get_resource_or_init::<RuleSet>()
+					.try_insert_inline(rule);
 			});
+			// ensure the entity carries the class so the rule matches
+			if let Some(mut classes) = entity.get_mut::<Classes>() {
+				classes.insert_class(class);
+			} else {
+				entity.insert(Classes::from_iter([class]));
+			}
 			Ok(())
 		})
 	}

@@ -24,6 +24,7 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::css_variable;
 	pub use crate::document::*;
+	pub use crate::inline_class;
 	pub use crate::input::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;

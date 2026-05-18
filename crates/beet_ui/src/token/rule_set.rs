@@ -7,7 +7,13 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone, Reflect, Deref, DerefMut, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
+	#[deref]
 	rules: VecDeque<Rule>,
+	/// Inline rules are only declared once. Calling [`Self::try_insert_inline`]
+	/// with a rule whose selector matches one of these does nothing.
+	#[reflect(ignore)]
+	#[cfg_attr(feature = "serde", serde(skip))]
+	registered_inline: HashSet<Selector>,
 }
 
 /// By default, the rule set is initialized with a single root rule
@@ -20,7 +26,30 @@ impl RuleSet {
 	pub fn new(default_rule: Rule) -> Self {
 		let mut rules = VecDeque::with_capacity(1);
 		rules.push_back(default_rule);
-		Self { rules }
+		Self {
+			rules,
+			registered_inline: default(),
+		}
+	}
+
+	/// Attempt to register an inline rule. If a rule with the same selector
+	/// has already been registered this does nothing and returns `false`,
+	/// otherwise the rule is inserted and `true` is returned.
+	pub fn try_insert_inline(&mut self, rule: Rule) -> bool {
+		if self.registered_inline.contains(rule.selector()) {
+			return false;
+		}
+		self.registered_inline.insert(rule.selector().clone());
+		self.insert_rule(rule);
+		true
+	}
+
+	/// Find the first rule containing `key`, regardless of selector.
+	pub fn find_rule_mut_by_key(
+		&mut self,
+		key: &TokenKey,
+	) -> Option<&mut Rule> {
+		self.rules.iter_mut().find(|r| r.contains_key(key))
 	}
 	/// Add a new rule, merging with the last added if selectors match
 	pub fn insert_rule(&mut self, rule: Rule) {

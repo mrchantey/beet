@@ -8,6 +8,7 @@ pub struct TokenQuery<'w, 's> {
 	commands: Commands<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
+	classes: Query<'w, 's, &'static Classes>,
 	rule_set: ResMut<'w, RuleSet>,
 }
 
@@ -59,6 +60,12 @@ impl TokenQuery<'_, '_> {
 				return func(value).xok();
 			}
 		}
+		// fall back to a shared rule (eg. an inline class rule) that
+		// declares this token regardless of selector.
+		if let Some(rule) = self.rule_set.find_rule_mut_by_key(token.key()) {
+			let value = rule.get_mut(token)?;
+			return func(value).xok();
+		}
 		bevybail!(
 			"Token not found in entity or ancestors\nkey: {}\nentity: {:?}",
 			token.key(),
@@ -69,19 +76,34 @@ impl TokenQuery<'_, '_> {
 	pub fn apply_value(&mut self, entity: Entity, token: &Token, value: Value) {
 		// collect first to avoid holding borrows on self.children and
 		// self.rule_set simultaneously with self.commands
+		let token_key = I32Value::token_key();
+		// find the selector of the rule that maps I32Value -> token
+		let selector = self
+			.rule_set
+			.rules()
+			.find(|rule| {
+				rule.iter().any(|(key, val)| {
+					key == &token_key
+						&& matches!(val, TokenValue::Token(t) if t == token)
+				})
+			})
+			.map(|rule| rule.selector().clone());
+		let Some(selector) = selector else {
+			return;
+		};
 		let children: Vec<Entity> =
 			self.children.iter_descendants_inclusive(entity).collect();
-		let token_key = I32Value::token_key();
 		for child in children {
-			let selector = Selector::Entity(child);
-			let should_insert = self.rule_set.rules().any(|rule| {
-				rule.selector() == &selector
-					&& rule.iter().any(|(key, val)| {
-						matches!(val, TokenValue::Token(t) if t == token)
-							&& key == &token_key
-					})
-			});
-			if should_insert {
+			let matches = match &selector {
+				Selector::Entity(e) => *e == child,
+				Selector::Class(class) => self
+					.classes
+					.get(child)
+					.map(|c| c.contains_selector(class))
+					.unwrap_or(false),
+				_ => false,
+			};
+			if matches {
 				self.commands.entity(child).insert(value.clone());
 			}
 		}

@@ -12,8 +12,10 @@ pub struct ElementView<'a> {
 	/// Attributes for this element.
 	pub attributes: Vec<AttributeView<'a>>,
 	pub state: Option<&'a ElementStateMap>,
+	/// Classes assigned to the element entity, checked alongside the
+	/// `class` attribute by [`Self::contains_class`].
+	pub classes: Option<&'a Classes>,
 }
-
 
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
 	OrderedList(OrderedListView<'a>),
@@ -28,12 +30,14 @@ impl<'a> ElementView<'a> {
 		element: &'a Element,
 		attributes: Vec<AttributeView<'a>>,
 		state: Option<&'a ElementStateMap>,
+		classes: Option<&'a Classes>,
 	) -> Self {
 		Self {
 			entity,
 			element,
 			attributes,
 			state,
+			classes,
 		}
 	}
 
@@ -48,7 +52,9 @@ impl<'a> ElementView<'a> {
 	}
 
 	/// The tag name of this element, ie `div`, `span`, `p`.
-	pub fn tag(&self) -> &str { self.element.tag() }
+	pub fn tag(&self) -> &str {
+		self.element.tag()
+	}
 
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
@@ -62,7 +68,8 @@ impl<'a> ElementView<'a> {
 	}
 
 	pub fn contains_class(&self, class: &str) -> bool {
-		self.attribute("class")
+		let in_attr = self
+			.attribute("class")
 			.map(|attr| {
 				attr.value
 					.as_str()
@@ -71,7 +78,12 @@ impl<'a> ElementView<'a> {
 					})
 					.unwrap_or(false)
 			})
-			.unwrap_or(false)
+			.unwrap_or(false);
+		let in_component = self
+			.classes
+			.map(|c| c.contains_selector(class))
+			.unwrap_or(false);
+		in_attr || in_component
 	}
 
 	/// Look up the first attribute matching `key` and return its
@@ -165,7 +177,6 @@ impl<'a> TypedElementView<'a> for LinkView<'a> {
 	}
 }
 
-
 #[derive(Clone)]
 pub struct AttributeView<'a> {
 	/// The entity of this attribute.
@@ -176,7 +187,8 @@ pub struct AttributeView<'a> {
 	pub value: &'a Value,
 }
 
-
 impl<'a> AttributeView<'a> {
-	pub fn key(&self) -> &str { &self.attribute }
+	pub fn key(&self) -> &str {
+		&self.attribute
+	}
 }
