@@ -46,7 +46,11 @@ impl TypedValue {
 	#[cfg(feature = "json")]
 	pub fn new<T: Typed + Serialize>(value: T) -> Result<Self> {
 		Self {
-			value: Value::from_serde(&value)?,
+			// `Value::from_serde` round-trips through `serde_json`, which has no
+			// signed/unsigned distinction, so a positive `i32` would land as
+			// `Value::Uint`. We still know the Rust type here, so restore the
+			// signed variant when the schema is a signed integer.
+			value: coerce_signed::<T>(Value::from_serde(&value)?),
 			schema: TokenSchema::of::<T>(),
 		}
 		.xok()
@@ -59,6 +63,18 @@ impl TypedValue {
 	pub fn take(self) -> Value { self.value }
 }
 
+
+/// Restore the signed integer variant lost by the lossy `serde_json` hop in
+/// [`TypedValue::new`]. Only scalar signed integers need this; nested numbers
+/// are recovered on the way out via typed deserialization.
+fn coerce_signed<T: bevy::reflect::TypePath>(value: Value) -> Value {
+	match (T::type_path(), value) {
+		("i8" | "i16" | "i32" | "i64" | "isize", Value::Uint(u)) => {
+			Value::Int(u as i64)
+		}
+		(_, value) => value,
+	}
+}
 
 impl From<TypedValue> for TokenValue {
 	fn from(value: TypedValue) -> Self { Self::Value(value) }

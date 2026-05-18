@@ -14,11 +14,11 @@ fn count_def() -> TokenDefinition<i32> { TokenDefinition::inline(7) }
 
 fn setup(world: &mut World) {
 	let count = count_def();
-	world.spawn(count.into_bundle());
-	// TODO reactive graph Value should be resolve immediately?
-	// .get::<Value>()
-	// .unwrap()
-	// .xpect_eq(Value::Int(7));
+	world
+		.spawn(count.into_bundle())
+		.get::<Value>()
+		.unwrap()
+		.xpect_eq(Value::Int(7));
 }
 
 
@@ -32,7 +32,7 @@ fn update1(mut commands: Commands, query: Query<Entity>) -> Result {
 }
 // new value after command flushed
 fn update2(query: Query<&Value>) -> Result {
-	query.single()?.xpect_eq(Value::Uint(8));
+	query.single()?.xpect_eq(Value::Int(8));
 	println!("success");
 	Ok(())
 }

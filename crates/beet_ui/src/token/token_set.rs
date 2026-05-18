@@ -20,6 +20,15 @@ impl TokenSet {
 		self.tokens.insert(token.clone(), value);
 		self.listeners.entry(token).or_default().insert(entity);
 	}
+	/// The cached value for a token, if any entity has registered it.
+	pub fn value_mut(&mut self, token: &Token) -> Option<&mut TokenValue> {
+		self.tokens.get_mut(token)
+	}
+	/// Entities that should receive the resolved [`Value`] when this token
+	/// changes.
+	pub fn listeners(&self, token: &Token) -> Option<&HashSet<Entity>> {
+		self.listeners.get(token)
+	}
 	pub fn deregister(&mut self, entity: Entity, token: Token) {
 		if let Some(listeners) = self.listeners.get_mut(&token) {
 			listeners.remove(&entity);

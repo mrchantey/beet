@@ -67,39 +67,30 @@ impl<T> Into<Token> for &TokenDefinition<T> {
 	fn into(self) -> Token { self.token.clone() }
 }
 
+/// Registers
 impl<T: 'static> IntoBundle<(NotBundleMarker, Self)> for TokenDefinition<T> {
 	fn into_bundle(self) -> impl Bundle {
 		OnSpawn::new(move |entity| -> Result {
-			// The token carries a stable inline key per definition callsite,
-			// so derive a shared class from it. Multiple entities created
-			// from the same definition reuse a single registered rule.
-			let class = ClassName::String(self.token.key().as_str().into());
-			let selector = Selector::Class(class.as_selector());
-
-			let mut rule = Rule::new().with_selector(selector);
-			if self.schema() == &TokenSchema::of::<i32>() {
-				rule.insert(I32Value, &self)?;
-			}
-			rule.insert_definition(self)?;
-
-			// register the rule once in the global RuleSet resource
-			entity.world_scope(move |world| {
-				world
-					.get_resource_or_init::<RuleSet>()
-					.try_insert_inline(rule);
+			match &self.initial {
+				TokenValue::Value(value) => {
+					// resolve the initial value immediately so consumers can
+					// read it on the same frame the entity is spawned.
+					entity.insert(value.value().clone());
+				}
+				TokenValue::Token(_token) => {
+					// a ref token has no concrete value of its own; it is
+					// resolved through the token it points at.
+				}
+			};
+			let id = entity.id();
+			entity.world_scope(|world| {
+				world.get_resource_or_init::<TokenSet>().register(
+					id,
+					self.token,
+					self.initial,
+				)
 			});
-			// ensure the entity carries the class so the rule matches
-			if let Some(mut classes) = entity.get_mut::<Classes>() {
-				classes.insert_class(class);
-			} else {
-				entity.insert(Classes::from_iter([class]));
-			}
 			Ok(())
 		})
 	}
 }
-
-
-token!(
-	///An `i32` representation of the [`Value`] component.
-	I32Value, i32);
