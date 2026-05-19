@@ -334,21 +334,22 @@ impl Value {
 	}
 
 	/// Convert from any serializable type.
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub fn from_serde<T: serde::Serialize>(foo: T) -> Result<Self> {
-		// if need be we can write our own serde,
-		// delegate to serde_json for now
-		let json_val = serde_json::to_value(foo)?;
-		Self::from_json(json_val).xok()
+		serde::Serialize::serialize(
+			&foo,
+			crate::types::value::serde_ext::ValueSerializer,
+		)
+		.map_err(|e| bevyhow!("failed to serialize into Value: {e}"))
 	}
 
 	/// Convert into any deserializable type.
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub fn into_serde<T: serde::de::DeserializeOwned>(self) -> Result<T> {
-		// if need be we can write our own serde,
-		// delegate to serde_json for now
-		let json_val = self.into_json();
-		serde_json::from_value::<T>(json_val)?.xok()
+		<T as serde::Deserialize>::deserialize(
+			crate::types::value::serde_ext::ValueDeserializer::new(self),
+		)
+		.map_err(|e| bevyhow!("failed to deserialize from Value: {e}"))
 	}
 }
 
