@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 /// Spawning a `Script` inserts [`ScriptAction`] (and therefore an
 /// [`Action`]) via `#[require]`, mirroring how [`Sequence`] requires
 /// [`SequenceAction`](crate::prelude::SequenceAction).
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Component, Reflect)]
 #[require(ScriptAction<Input, Output>)]
 #[reflect(Component)]
 pub struct Script<Input = (), Output = ()>
@@ -28,6 +28,35 @@ where
 	pub content: String,
 	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
+}
+
+// Manual impls avoid spurious `Input: Clone/Debug` bounds the derives
+// would add — the phantom marker does not require them.
+impl<Input, Output> Clone for Script<Input, Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
+	fn clone(&self) -> Self {
+		Self {
+			language: self.language,
+			content: self.content.clone(),
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl<Input, Output> std::fmt::Debug for Script<Input, Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Script")
+			.field("language", &self.language)
+			.field("content", &self.content)
+			.finish()
+	}
 }
 
 /// The set of languages a [`Script`] may be written in.
@@ -66,5 +95,23 @@ where
 				crate::scripting::run_rhai(&self.content, input)
 			}
 		}
+	}
+}
+
+/// Marker for the [`IntoAction`] impl on [`Script`].
+pub struct ScriptIntoActionMarker;
+
+impl<Input, Output> IntoAction<ScriptIntoActionMarker> for Script<Input, Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
+	type In = Input;
+	type Out = Output;
+
+	fn into_action(self) -> Action<Input, Output> {
+		Action::new_pure(move |cx: ActionContext<Input>| -> Result<Output> {
+			self.run(cx.input)
+		})
 	}
 }

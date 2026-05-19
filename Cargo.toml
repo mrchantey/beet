@@ -472,7 +472,7 @@ required-features = ["router"]
 [[example]]
 name = "cli"
 path = "examples/router/cli.rs"
-required-features = ["router", "serde"]
+required-features = ["router", "serde", "rhai"]
 
 # 💡 Examples - Thread
 

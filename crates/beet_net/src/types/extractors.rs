@@ -220,6 +220,7 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 /// }
 /// ```
 #[derive(Debug, Clone, Deref)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct QueryParams<T>(pub T);
 
 #[cfg(feature = "serde")]
