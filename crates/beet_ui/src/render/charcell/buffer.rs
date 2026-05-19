@@ -1,4 +1,5 @@
 use crate::render::DoubleBuffer;
+use crate::style::TextStyle;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
