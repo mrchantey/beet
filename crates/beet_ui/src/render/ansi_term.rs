@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use crate::render::charcell::escape;
-use crate::style::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
 

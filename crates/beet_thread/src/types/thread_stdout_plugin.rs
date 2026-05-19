@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
-use beet_core::prelude::escape::Color;
-use beet_core::prelude::escape::Style;
 use beet_core::prelude::*;
 
 #[derive(Default)]
@@ -73,13 +71,13 @@ fn post_added(
 		}
 
 
-		let text = Style::new();
-		let primary = Style::new().fg(Color::Cyan);
-		let url = Style::new().fg(Color::Blue);
-		let error = Style::new().fg(Color::Red).bold();
-		let tool_call = Style::new().fg(Color::Yellow);
-		let tool_output = Style::new().fg(Color::Yellow);
-		let reasoning = Style::new().fg(Color::Green).dimmed();
+		let text = TermStyle::new();
+		let primary = TermStyle::new().fg(TermColor::Cyan);
+		let url = TermStyle::new().fg(TermColor::Blue);
+		let error = TermStyle::new().fg(TermColor::Red).bold();
+		let tool_call = TermStyle::new().fg(TermColor::Yellow);
+		let tool_output = TermStyle::new().fg(TermColor::Yellow);
+		let reasoning = TermStyle::new().fg(TermColor::Green).dimmed();
 		primary.paint(actor.name()).xprint();
 
 		// subheading
@@ -171,9 +169,9 @@ fn print_delta(post: &Post, cursor: &mut StdoutCursor) {
 
 	let style = match post.as_agent_post() {
 		AgentPost::ReasoningContent(_) | AgentPost::ReasoningSummary(_) => {
-			Style::default().dimmed()
+			TermStyle::new().dimmed()
 		}
-		_ => Style::default(),
+		_ => TermStyle::new(),
 	};
 
 	let new_content = &body[cursor.pos as usize..];
@@ -194,7 +192,9 @@ pub fn StdinPost(
 	actors: Query<&Actor>,
 ) -> Result<Outcome> {
 	let actor = actors.get(cx.id())?;
-	let heading = paint_ext::cyan_bold(format!("{} > ", actor.name()));
+	let heading = TermStyle::cyan()
+		.bold()
+		.paint(format!("{} > ", actor.name()));
 	print!("{heading}");
 	std::io::Write::flush(&mut std::io::stdout())?;
 	let mut input = String::new();

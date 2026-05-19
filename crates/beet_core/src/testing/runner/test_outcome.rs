@@ -19,16 +19,22 @@ pub enum TestOutcome {
 	Fail(TestFail),
 }
 impl TestOutcome {
-	/// Returns the colored or non-colored outcome prefix for the test:
+	/// Returns the outcome prefix for the test, coloured when `color` is set:
 	/// - pass: " PASS "
 	/// - skip: " SKIP "
 	/// - fail: " FAIL "
-	pub fn ansi_str(&self) -> String {
-		match self {
-			TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
-			TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
-			TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
-		}
+	pub fn ansi_str(&self, color: bool) -> String {
+		let (label, bg) = match self {
+			TestOutcome::Pass => (" PASS ", TermColor::Green),
+			TestOutcome::Skip(_) => (" SKIP ", TermColor::Yellow),
+			TestOutcome::Fail(_) => (" FAIL ", TermColor::Red),
+		};
+		TermStyle::new()
+			.fg(TermColor::Black)
+			.on(bg)
+			.bold()
+			.or_plain(color)
+			.paint(label)
 	}
 }
 

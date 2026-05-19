@@ -9,7 +9,6 @@ mod backend;
 mod box_model;
 mod buffer;
 mod double_buffer;
-pub mod escape;
 mod flex;
 #[cfg(feature = "terminal")]
 mod input;

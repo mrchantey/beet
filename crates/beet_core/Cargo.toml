@@ -71,6 +71,7 @@ harness = false
 [features]
 default = ["std"]
 std = [
+	"bevy_color",
 	"dep:path-clean",
 	"dep:pathdiff",
 	"dep:glob",
@@ -147,6 +148,7 @@ web-time.workspace = true
 dotenv.workspace = true
 smol_str = { workspace = true }
 heck.workspace = true
+bitflags = { workspace = true }
 
 #💡 http
 http = {workspace = true,optional=true}

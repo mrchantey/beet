@@ -1,15 +1,15 @@
 //! From `pretty_assertions` crate, with some modifications.
 //! https://github.com/rust-pretty-assertions/rust-pretty-assertions/blob/main/pretty_assertions/src/printer.rs
 use crate::prelude::*;
-use crate::prelude::escape::Color;
-use crate::prelude::escape::Style;
 use core::fmt;
 
 const SIGN_LEFT: &str = "Expected:\n";
 const SIGN_RIGHT: &str = "Received:\n";
 
-const GREEN_BACKGROUND: u8 = 22;
-const RED_BACKGROUND: u8 = 52;
+/// ANSI 256-colour 22 (`#005f00`).
+const GREEN_BACKGROUND: TermColor = TermColor::Fixed(22);
+/// ANSI 256-colour 52 (`#5f0000`).
+const RED_BACKGROUND: TermColor = TermColor::Fixed(52);
 
 /// Group character styling for an inline diff, to prevent wrapping each single
 /// character in terminal styling codes.
@@ -17,7 +17,7 @@ const RED_BACKGROUND: u8 = 52;
 /// Styles are applied automatically each time a new style is given in `write_with_style`.
 struct InlineWriter<'a, Writer> {
 	f: &'a mut Writer,
-	style: Option<Style>,
+	style: Option<TermStyle>,
 }
 
 impl<'a, Writer> InlineWriter<'a, Writer>
@@ -30,10 +30,10 @@ where
 	fn write_with_style(
 		&mut self,
 		c: &impl fmt::Display,
-		style: Style,
+		style: &TermStyle,
 	) -> fmt::Result {
 		// If the style is the same as previously, just write character
-		if self.style == Some(style) {
+		if self.style.as_ref() == Some(style) {
 			write!(self.f, "{}", c)?;
 		} else {
 			// Close out previous style
@@ -42,11 +42,9 @@ where
 			}
 
 			// Store new style and start writing it
-			if paint_ext::is_enabled() {
-				write!(self.f, "{}", style.prefix())?;
-			}
+			write!(self.f, "{}", style.prefix())?;
 			write!(self.f, "{}", c)?;
-			self.style = Some(style);
+			self.style = Some(style.clone());
 		}
 		Ok(())
 	}
@@ -54,7 +52,7 @@ where
 	/// Finish any existing style and reset to default state.
 	fn finish(&mut self) -> fmt::Result {
 		// Close out previous style
-		if self.style.is_some() && paint_ext::is_enabled() {
+		if self.style.is_some() {
 			write!(self.f, "\x1b[0m")?;
 		}
 		writeln!(self.f)?;
@@ -86,19 +84,19 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	let mut writer = InlineWriter::new(f);
 
 	// Print the left string on one line, with differences highlighted
-	let light = Style::new().fg(Color::Green);
-	let heavy = Style::new()
-		.fg(Color::Green)
-		.on(Color::Fixed(GREEN_BACKGROUND))
+	let light = TermStyle::new().fg(TermColor::Green);
+	let heavy = TermStyle::new()
+		.fg(TermColor::Green)
+		.on(GREEN_BACKGROUND)
 		.bold();
 	write!(writer.f, "{SIGN_LEFT}\n")?;
 	for change in diff.iter() {
 		match change {
 			diff::Result::Both(value, _) => {
-				writer.write_with_style(value, light)?
+				writer.write_with_style(value, &light)?
 			}
 			diff::Result::Left(value) => {
-				writer.write_with_style(value, heavy)?
+				writer.write_with_style(value, &heavy)?
 			}
 			_ => (),
 		}
@@ -106,19 +104,19 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	writer.finish()?;
 
 	// Print the right string on one line, with differences highlighted
-	let light = Style::new().fg(Color::Red);
-	let heavy = Style::new()
-		.fg(Color::Red)
-		.on(Color::Fixed(RED_BACKGROUND))
+	let light = TermStyle::new().fg(TermColor::Red);
+	let heavy = TermStyle::new()
+		.fg(TermColor::Red)
+		.on(RED_BACKGROUND)
 		.bold();
 	write!(writer.f, "\n{SIGN_RIGHT}\n")?;
 	for change in diff.iter() {
 		match change {
 			diff::Result::Both(value, _) => {
-				writer.write_with_style(value, light)?
+				writer.write_with_style(value, &light)?
 			}
 			diff::Result::Right(value) => {
-				writer.write_with_style(value, heavy)?
+				writer.write_with_style(value, &heavy)?
 			}
 			_ => (),
 		}
@@ -322,8 +320,8 @@ mod test {
 	// Interpolate these into test strings to make expected values easier to read.
 	const RED_LIGHT: &str = "\u{1b}[31m";
 	const GREEN_LIGHT: &str = "\u{1b}[32m";
-	const RED_HEAVY: &str = "\u{1b}[1;48;5;52;31m";
-	const GREEN_HEAVY: &str = "\u{1b}[1;48;5;22;32m";
+	const RED_HEAVY: &str = "\u{1b}[31m\u{1b}[48;5;52m\u{1b}[1m";
+	const GREEN_HEAVY: &str = "\u{1b}[32m\u{1b}[48;5;22m\u{1b}[1m";
 	const RESET: &str = "\u{1b}[0m";
 
 	/// Given that both of our diff printing functions have the same
@@ -336,7 +334,6 @@ mod test {
 	) where
 		TPrint: Fn(&mut String, &str, &str) -> fmt::Result,
 	{
-		paint_ext::set_enabled(true);
 		let mut actual = String::new();
 		printer(&mut actual, left, right).expect("printer function failed");
 		assert_eq!(actual, expected);

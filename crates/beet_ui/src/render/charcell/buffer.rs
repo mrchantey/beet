@@ -1,6 +1,4 @@
-use super::escape;
 use crate::render::DoubleBuffer;
-use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
@@ -350,5 +348,85 @@ impl Cell {
 		cell.set_symbol(self.symbol_str());
 		cell.set_style(self.style.to_ratatui_style());
 		cell
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::prelude::*;
+	use crate::style::*;
+
+	/// Render a bundle to a 40×5 buffer and return the trimmed plain string.
+	fn render(bundle: impl Bundle) -> String {
+		Buffer::render_oneshot_sized(UVec2::new(40, 5), bundle).trim_lines()
+	}
+
+	fn bordered() -> BoxStyle {
+		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+	}
+
+	#[beet_core::test]
+	fn underline_does_not_bleed_into_border() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hello" },
+			bordered(),
+			VisualStyle {
+				decoration_line: DecorationLine::underline(),
+				..default()
+			}
+		)]));
+		out.as_str().xpect_contains("┌");
+		out.xpect_contains("Hello");
+	}
+
+	#[beet_core::test]
+	fn strike_does_not_bleed_into_border() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Hi" },
+			bordered(),
+			VisualStyle {
+				decoration_line: DecorationLine::line_through(),
+				..default()
+			}
+		)]));
+		out.as_str().xpect_contains("┌");
+		out.xpect_contains("Hi");
+	}
+
+	#[beet_core::test]
+	fn italic_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Italic" },
+			VisualStyle {
+				text_style: TextStyle::ITALIC,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[3m");
+	}
+
+	#[beet_core::test]
+	fn bold_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Bold" },
+			VisualStyle {
+				text_style: TextStyle::BOLD,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[1m");
+	}
+
+	#[beet_core::test]
+	fn blink_renders() {
+		let out = render((LayoutStyle::flex_row(), children![(
+			rsx! { "Blink" },
+			VisualStyle {
+				text_style: TextStyle::BLINK,
+				..default()
+			}
+		)]));
+		out.xpect_contains("\x1b[5m");
 	}
 }

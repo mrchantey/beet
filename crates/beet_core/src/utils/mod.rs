@@ -36,10 +36,6 @@ mod into_option;
 mod lazy_pool;
 mod line_col;
 #[cfg(feature = "std")]
-pub mod escape;
-#[cfg(feature = "std")]
-pub mod paint_ext;
-#[cfg(feature = "std")]
 mod panic_context;
 /// Process and command execution utilities.
 #[cfg(feature = "std")]
@@ -54,8 +50,6 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
-#[cfg(feature = "std")]
-pub mod terminal_ext;
 /// Time and duration utilities.
 #[cfg(feature = "std")]
 pub mod time_ext;

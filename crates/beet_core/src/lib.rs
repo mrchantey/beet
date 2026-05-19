@@ -79,6 +79,8 @@ pub mod extensions;
 pub mod fs;
 #[cfg(feature = "std")]
 mod path_utils;
+#[cfg(feature = "std")]
+pub mod terminal;
 #[cfg(feature = "testing")]
 pub mod testing;
 #[cfg(feature = "tokens")]
@@ -169,6 +171,8 @@ pub mod prelude {
 	pub use crate::tokens_utils::*;
 	pub use crate::types::*;
 	pub use crate::utils::*;
+	#[cfg(feature = "std")]
+	pub use crate::terminal::*;
 	pub use either::Either;
 	#[cfg(feature = "serde")]
 	pub use serde::Deserialize;

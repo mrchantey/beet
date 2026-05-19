@@ -1,63 +1,19 @@
-use beet_core::prelude::*;
-use bitflags::bitflags;
-
+//! CSS-value bridges for the upstreamed [`VisualStyle`] family.
+//!
+//! The types themselves live in [`beet_core`]; this module re-exports them and
+//! adds the beet_ui-specific [`AsCssValue`]/[`AsCssValues`] implementations.
 use crate::style::AsCssValue;
 use crate::style::AsCssValues;
 use crate::style::CssKey;
 use crate::style::CssValue;
+use beet_core::prelude::*;
 
-pub static VISUAL_STYLE_DEFAULT: VisualStyle = VisualStyle::DEFAULT;
-
-
-/// Visual styling for a cell.
-#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
-pub struct VisualStyle {
-	/// In ansi renderers an alpha channel of <50% will apply the `dim` attribute
-	#[set_with(unwrap_option, into)]
-	pub foreground: Option<Color>,
-	#[set_with(unwrap_option, into)]
-	pub background: Option<Color>,
-	/// Color of underlines, overlines etc
-	pub decoration_color: Option<Color>,
-	pub decoration_line: DecorationLine,
-	pub decoration_style: DecorationStyle,
-	pub text_style: TextStyle,
-	pub text_align: TextAlign,
-}
-
-impl VisualStyle {
-	pub const DEFAULT: Self = Self {
-		foreground: None,
-		background: None,
-		decoration_color: None,
-		decoration_line: DecorationLine::DEFAULT,
-		decoration_style: DecorationStyle::Solid,
-		text_style: TextStyle::empty(),
-
-		text_align: TextAlign::Left,
-	};
-
-	/// Returns true if the foreground color is set and has an alpha value of 0.5 or less.
-	pub fn dim_foreground(&self) -> bool {
-		match self.foreground {
-			Some(color) => color.alpha() <= 0.5,
-			None => false,
-		}
-	}
-}
-
-
-/// Text alignment within a cell's content area.
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
-)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum TextAlign {
-	#[default]
-	Left,
-	Center,
-	Right,
-}
+pub use beet_core::prelude::DecorationLine;
+pub use beet_core::prelude::DecorationStyle;
+pub use beet_core::prelude::TextAlign;
+pub use beet_core::prelude::TextStyle;
+pub use beet_core::prelude::VISUAL_STYLE_DEFAULT;
+pub use beet_core::prelude::VisualStyle;
 
 impl AsCssValue for TextAlign {
 	fn as_css_value(&self) -> Result<CssValue> {
@@ -68,46 +24,6 @@ impl AsCssValue for TextAlign {
 		}
 		.xmap(CssValue::expression)
 		.xok()
-	}
-}
-
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
-)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct DecorationLine {
-	pub underline: bool,
-	pub overline: bool,
-	pub line_through: bool,
-}
-
-impl DecorationLine {
-	pub const DEFAULT: Self = Self {
-		underline: false,
-		overline: false,
-		line_through: false,
-	};
-
-	pub fn underline() -> Self {
-		Self {
-			underline: true,
-			overline: false,
-			line_through: false,
-		}
-	}
-	pub fn overline() -> Self {
-		Self {
-			underline: false,
-			overline: true,
-			line_through: false,
-		}
-	}
-	pub fn line_through() -> Self {
-		Self {
-			line_through: true,
-			underline: false,
-			overline: false,
-		}
 	}
 }
 
@@ -131,18 +47,6 @@ impl AsCssValue for DecorationLine {
 	}
 }
 
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
-)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum DecorationStyle {
-	#[default]
-	Solid,
-	Wavy,
-	Double,
-	Dash,
-}
-
 impl AsCssValue for DecorationStyle {
 	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
@@ -155,32 +59,6 @@ impl AsCssValue for DecorationStyle {
 		.xok()
 	}
 }
-
-
-bitflags! {
-	/// Text styling modifiers combining CSS text-decoration and TUI modifier concepts.
-	#[repr(transparent)]
-	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
-	#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-	#[reflect(opaque)]
-	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
-	#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-	pub struct TextStyle: u16 {
-		/// Bold text
-		const BOLD = 1 << 0;
-		/// Italic text
-		const ITALIC = 1 << 1;
-		/// Slowly blinking text
-		const BLINK = 1 << 2;
-		/// Rapidly blinking text
-		const RAPID_BLINK = 1 << 3;
-		/// Reversed foreground and background colors
-		const REVERSED = 1 << 4;
-		/// Hidden text
-		const HIDDEN = 1 << 5;
-	}
-}
-
 
 impl AsCssValues for TextStyle {
 	fn suffixes() -> Vec<CssKey> {

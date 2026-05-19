@@ -1233,6 +1233,7 @@ dependencies = [
  "beet_core_shared",
  "bevy",
  "bevy_reflect",
+ "bitflags 2.11.1",
  "bytes",
  "console_error_panic_hook",
  "crossterm",

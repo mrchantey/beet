@@ -51,7 +51,7 @@ impl core::fmt::Display for BevyhowError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		let location = format!("  at {}", self.location);
 		#[cfg(feature = "std")]
-		let location = paint_ext::dimmed(location);
+		let location = TermStyle::new().dimmed().paint(location);
 		write!(f, "{}\n{}", self.message, location)
 	}
 }

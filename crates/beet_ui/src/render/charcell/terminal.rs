@@ -10,8 +10,6 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-use super::escape;
-
 // ── StdioTerminal ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, SetWith, Component)]
