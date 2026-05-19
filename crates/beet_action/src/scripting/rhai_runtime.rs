@@ -53,6 +53,30 @@ mod test {
 			.xpect_eq("hello world".to_string());
 	}
 
+	#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+	struct Player {
+		name: String,
+		score: i64,
+	}
+
+	#[beet_core::test]
+	async fn mutates_a_struct_field() {
+		AsyncPlugin::world()
+			.spawn(Script::<Player, Player>::rhai(
+				"input.score += 10; input",
+			))
+			.call::<Player, Player>(Player {
+				name: "ada".to_string(),
+				score: 5,
+			})
+			.await
+			.unwrap()
+			.xpect_eq(Player {
+				name: "ada".to_string(),
+				score: 15,
+			});
+	}
+
 	#[beet_core::test]
 	async fn multi_statement_script() {
 		AsyncPlugin::world()

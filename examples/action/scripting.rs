@@ -10,6 +10,15 @@
 //! cargo run --example action_scripting --features rhai
 //! ```
 use beet::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
+
+/// An arbitrary struct passed through a script, which mutates one field.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Player {
+	name: String,
+	score: i64,
+}
 
 #[beet::main]
 async fn main() -> Result {
@@ -28,6 +37,16 @@ async fn main() -> Result {
 		.call::<String, String>("world".to_string())
 		.await?;
 	cross_log!("{greeting}");
+
+	// struct transform: mutate a single field, return the struct
+	let player = world
+		.spawn(Script::<Player, Player>::rhai("input.score += 100; input"))
+		.call::<Player, Player>(Player {
+			name: "ada".to_string(),
+			score: 1,
+		})
+		.await?;
+	cross_log!("{} now has score {}", player.name, player.score);
 
 	Ok(())
 }
