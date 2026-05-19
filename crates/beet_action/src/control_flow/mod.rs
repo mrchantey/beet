@@ -12,6 +12,8 @@ mod score;
 pub use score::*;
 mod repeat;
 pub use repeat::*;
+mod running;
+pub use running::*;
 mod sequence;
 pub use sequence::*;
 

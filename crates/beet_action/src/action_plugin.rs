@@ -33,6 +33,14 @@ impl Plugin for ActionPlugin {
 			.register_type::<Log>()
 			.register_type::<SucceedTimes>()
 			.register_type::<EndInDuration<Outcome>>()
-			.register_type::<RunNext>();
+			.register_type::<RunTimer>()
+			.register_type::<RunNext>()
+			// long-running action lifecycle
+			.add_systems(
+				Update,
+				(tick_run_timers, end_in_duration::<Outcome>).chain(),
+			)
+			.add_observer(reset_run_time_started::<Outcome>)
+			.add_observer(reset_run_timer_stopped::<Outcome>);
 	}
 }
