@@ -82,7 +82,7 @@ impl AnsiTermRenderer {
 	fn push_styled(&mut self, text: &str) {
 		let style = self.style_map.current();
 		let mut buf: Vec<u8> = Vec::new();
-		escape::write_style(&mut buf, style.as_ref(), None).ok();
+		style.write_style(&mut buf, None).ok();
 		buf.extend_from_slice(text.as_bytes());
 		buf.extend_from_slice(escape::RESET.as_bytes());
 		self.state.push_raw(&String::from_utf8_lossy(&buf));
@@ -184,7 +184,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				};
 				self.open_osc8_link(&src);
 				let mut buf: Vec<u8> = Vec::new();
-				escape::write_style(&mut buf, style.as_ref(), None).ok();
+				style.write_style(&mut buf, None).ok();
 				buf.extend_from_slice(display.as_bytes());
 				buf.extend_from_slice(escape::RESET.as_bytes());
 				self.state.push_raw(&String::from_utf8_lossy(&buf));
@@ -289,7 +289,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				..VisualStyle::default()
 			};
 			let mut buf: Vec<u8> = Vec::new();
-			escape::write_style(&mut buf, &style, None).ok();
+			style.write_style(&mut buf, None).ok();
 			buf.extend_from_slice(format!("{{{}}}", expression.0).as_bytes());
 			buf.extend_from_slice(escape::RESET.as_bytes());
 			self.state.push_raw(&String::from_utf8_lossy(&buf));
@@ -303,7 +303,7 @@ impl NodeVisitor for AnsiTermRenderer {
 			..VisualStyle::default()
 		};
 		let mut buf: Vec<u8> = Vec::new();
-		escape::write_style(&mut buf, &style, None).ok();
+		style.write_style(&mut buf, None).ok();
 		buf.extend_from_slice(format!("<!--{}-->", &**comment).as_bytes());
 		buf.extend_from_slice(escape::RESET.as_bytes());
 		self.state.push_raw(&String::from_utf8_lossy(&buf));

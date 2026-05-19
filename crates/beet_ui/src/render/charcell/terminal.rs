@@ -377,11 +377,8 @@ impl Terminal {
 			last_pos = Some(pos);
 
 			// Write only the SGR changes since the last written cell.
-			escape::write_style(
-				&mut self.writer,
-				&cell.style,
-				last_style.as_ref(),
-			)?;
+			cell.style
+				.write_style(&mut self.writer, last_style.as_ref())?;
 			last_style = Some(cell.style.clone());
 
 			self.writer.write_all(cell.symbol_str().as_bytes())?;

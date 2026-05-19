@@ -1,6 +1,6 @@
 //! Cross-platform terminal escape sequences, painting, and control.
 //!
-//! - [`escape`] - raw ANSI/VT100 sequences and the [`VisualStyle`] → SGR bridge
+//! - [`escape`] - raw ANSI/VT100 escape sequences
 //! - [`term_style`] - real terminal colours via [`TermStyle`](term_style::TermStyle)
 //! - [`terminal_ext`] - cursor, screen, and terminal-size control
 

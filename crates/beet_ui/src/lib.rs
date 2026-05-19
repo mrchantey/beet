@@ -30,6 +30,18 @@ pub mod prelude {
 	pub use crate::render::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
+	#[cfg(feature = "style")]
+	pub use crate::style::DecorationLine;
+	#[cfg(feature = "style")]
+	pub use crate::style::DecorationStyle;
+	#[cfg(feature = "style")]
+	pub use crate::style::TextAlign;
+	#[cfg(feature = "style")]
+	pub use crate::style::TextStyle;
+	#[cfg(feature = "style")]
+	pub use crate::style::VISUAL_STYLE_DEFAULT;
+	#[cfg(feature = "style")]
+	pub use crate::style::VisualStyle;
 	pub use crate::token;
 	pub use crate::token::*;
 

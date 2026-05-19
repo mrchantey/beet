@@ -1,4 +1,5 @@
 use crate::render::DoubleBuffer;
+use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
@@ -187,13 +188,10 @@ impl Buffer {
 				let idx = y * width + x;
 				let cell = &self.cells[idx];
 				if cell.symbol.is_some() {
-					escape::write_style(
-						&mut out,
-						&cell.style,
-						prev_style.as_ref(),
-					)
-					// writing to vec<u8>, cannot fail
-					.ok();
+					cell.style
+						.write_style(&mut out, prev_style.as_ref())
+						// writing to vec<u8>, cannot fail
+						.ok();
 					out.extend_from_slice(cell.symbol_str().as_bytes());
 					prev_style = Some(cell.style.clone());
 				} else if cell.is_wide_continuation() {
