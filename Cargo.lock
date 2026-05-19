@@ -1251,7 +1251,6 @@ dependencies = [
  "js-sys",
  "notify",
  "notify-debouncer-full",
- "nu-ansi-term",
  "path-clean",
  "pathdiff",
  "postcard",

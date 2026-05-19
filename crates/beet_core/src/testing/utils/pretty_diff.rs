@@ -1,9 +1,9 @@
 //! From `pretty_assertions` crate, with some modifications.
 //! https://github.com/rust-pretty-assertions/rust-pretty-assertions/blob/main/pretty_assertions/src/printer.rs
 use crate::prelude::*;
+use crate::prelude::escape::Color;
+use crate::prelude::escape::Style;
 use core::fmt;
-use nu_ansi_term::Color;
-use nu_ansi_term::Style;
 
 const SIGN_LEFT: &str = "Expected:\n";
 const SIGN_RIGHT: &str = "Received:\n";

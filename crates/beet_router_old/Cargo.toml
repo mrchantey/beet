@@ -30,7 +30,7 @@ serde = [
 ]
 
 [dependencies]
-beet_core = {workspace = true, features=["ansi_paint"]}
+beet_core = {workspace = true}
 beet_net.workspace = true
 beet_dom.workspace = true
 beet_rsx.workspace = true

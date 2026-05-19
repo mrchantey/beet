@@ -35,7 +35,9 @@ mod glob_filter;
 mod into_option;
 mod lazy_pool;
 mod line_col;
-#[cfg(feature = "ansi_paint")]
+#[cfg(feature = "std")]
+pub mod escape;
+#[cfg(feature = "std")]
 pub mod paint_ext;
 #[cfg(feature = "std")]
 mod panic_context;

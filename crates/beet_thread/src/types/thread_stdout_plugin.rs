@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
-use beet_core::exports::nu_ansi_term::Color;
-use beet_core::exports::nu_ansi_term::Style;
+use beet_core::prelude::escape::Color;
+use beet_core::prelude::escape::Style;
 use beet_core::prelude::*;
 
 #[derive(Default)]
@@ -85,7 +85,7 @@ fn post_added(
 		// subheading
 		match post.as_agent_post() {
 			AgentPost::Text(_) => {
-				primary.paint(" >").xprint();
+				primary.paint(" > ").xprint();
 			}
 			AgentPost::Refusal(_) => {
 				error.paint(" - refusal\n").xprint();
@@ -106,7 +106,7 @@ fn post_added(
 				tool_output.paint(" - function call output\n").xprint();
 			}
 			AgentPost::ReasoningContent(_) | AgentPost::ReasoningSummary(_) => {
-				reasoning.paint(" - reasoning..").xprint();
+				reasoning.paint(" - reasoning..\n").xprint();
 			}
 		};
 

@@ -11,10 +11,9 @@
 //! println!("{}", message);
 //! ```
 
+use crate::prelude::escape::Color;
+use crate::prelude::escape::Style;
 use std::fmt::Display;
-
-use nu_ansi_term::Color;
-use nu_ansi_term::Style;
 
 
 

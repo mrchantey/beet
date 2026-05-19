@@ -7,12 +7,14 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Reflect)]
 #[require(RepeatAction<Input>)]
+#[reflect(Component, Default)]
 pub struct Repeat<Input = ()>
 where
 	Input: 'static + Send + Sync + Clone,
 {
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> Input>,
 }
 
@@ -91,14 +93,16 @@ where
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Reflect)]
 #[require(RepeatTimesAction<Input>)]
+#[reflect(Component, Default)]
 pub struct RepeatTimes<Input = ()>
 where
 	Input: 'static + Send + Sync + Clone,
 {
 	/// Maximum number of iterations.
 	total_times: u32,
+	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> Input>,
 }
 
@@ -114,6 +118,15 @@ where
 	}
 }
 impl<Input> Copy for RepeatTimes<Input> where Input: 'static + Send + Sync + Clone {}
+
+impl<Input> Default for RepeatTimes<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	fn default() -> Self {
+		Self { total_times: 0, _marker: PhantomData }
+	}
+}
 
 impl<Input> RepeatTimes<Input>
 where

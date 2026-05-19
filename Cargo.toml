@@ -152,7 +152,6 @@ webbrowser = "1"
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-nu-ansi-term = "0.50"
 pretty_env_logger = "0.4"
 
 #💡 async
@@ -246,7 +245,6 @@ default = ["ui"]
 
 http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
 tui_server = ["ratatui","router", "markdown"]
-ansi_paint = ["beet_core/ansi_paint"]
 
 # 💡 Core
 
