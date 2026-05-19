@@ -20,7 +20,7 @@ impl Plugin for ActionPlugin {
 			.add_systems(Update, call_on_spawn::<(), Outcome>)
 			.register_type::<ExcludeErrors>()
 			.register_type::<Sequence<(), ()>>()
-			.register_type::<Infallible>()
+			.register_type::<InfallibleSequence<(), ()>>()
 			.register_type::<Parallel<(), ()>>()
 			.register_type::<HighestScore<(), ()>>()
 			.register_type::<Score>()

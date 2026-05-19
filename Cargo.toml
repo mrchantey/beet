@@ -543,42 +543,40 @@ name = "action_scripting"
 path = "examples/action/scripting.rs"
 required-features = ["rhai"]
 
-# 💡 Examples - flow
+[[example]]
+name = "action_behavior_tree"
+path = "examples/action/behavior_tree.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "hello_world"
-# path = "examples/flow/hello_world.rs"
-# required-features = ["flow"]
+[[example]]
+name = "action_simple_action"
+path = "examples/action/simple_action.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "long_running"
-# path = "examples/flow/long_running.rs"
-# required-features = ["flow"]
+[[example]]
+name = "action_long_running"
+path = "examples/action/long_running.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "malenia"
-# path = "examples/flow/malenia.rs"
-# required-features = ["flow", "rand"]
+[[example]]
+name = "action_repeat_while"
+path = "examples/action/repeat_while.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "repeat_while"
-# path = "examples/flow/repeat_while.rs"
-# required-features = ["flow"]
+[[example]]
+name = "action_state_machine"
+path = "examples/action/state_machine.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "simple_action"
-# path = "examples/flow/simple_action.rs"
-# required-features = ["flow"]
+[[example]]
+name = "action_utility_ai"
+path = "examples/action/utility_ai.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "state_machine"
-# path = "examples/flow/state_machine.rs"
-# required-features = ["flow"]
-
-# [[example]]
-# name = "utility_ai"
-# path = "examples/flow/utility_ai.rs"
-# required-features = ["flow"]
+[[example]]
+name = "action_malenia"
+path = "examples/action/malenia.rs"
+required-features = ["action", "rand"]
 
 # [[example]]
 # name = "app_ml"
