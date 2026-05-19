@@ -25,7 +25,19 @@ impl Default for SceneStore {
 }
 
 impl SceneStore {
-	pub async fn load_or_create<B: Bundle>(
+	pub async fn load_or_create<
+		T: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+		B: Bundle,
+	>(
+		world: AsyncWorld,
+		blob: TypedBlob<T>,
+		create: impl 'static + Send + Sync + AsyncFnOnce(AsyncEntity) -> Result<B>,
+	) -> Result<Vec<Entity>> {
+		let entity = world.spawn_then((blob, Self::default())).await;
+		Self::load_or_create_inner(entity, create).await
+	}
+
+	async fn load_or_create_inner<B: Bundle>(
 		entity: AsyncEntity,
 		create: impl 'static + Send + Sync + AsyncFnOnce(AsyncEntity) -> Result<B>,
 	) -> Result<Vec<Entity>> {

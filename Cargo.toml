@@ -250,7 +250,7 @@ ansi_paint = ["beet_core/ansi_paint"]
 
 # 💡 Core
 
-serde = ["beet_core/serde", "beet_net?/serde"]
+serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json"]
@@ -474,7 +474,7 @@ required-features = ["router"]
 [[example]]
 name = "cli"
 path = "examples/router/cli.rs"
-required-features = ["router"]
+required-features = ["router", "serde"]
 
 # 💡 Examples - Thread
 

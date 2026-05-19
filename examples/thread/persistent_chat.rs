@@ -44,10 +44,10 @@ fn setup(mut commands: Commands) {
 		if new_thread {
 			blob.remove().await.ok();
 		}
-		let store = world
-			.spawn_then((blob.clone(), SceneStore::default()))
-			.await;
-		SceneStore::load_or_create(store, async |_| scene().xok()).await?;
+		SceneStore::load_or_create(world, blob, async |_| {
+			scene().xok()
+		})
+		.await?;
 		Ok(())
 	});
 }
