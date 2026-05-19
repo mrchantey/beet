@@ -1,15 +1,18 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Sequence control-flow component.
+/// Parallel control-flow component.
 ///
-/// Runs child actions in order, threading `Input` through each child.
-/// Returns the first [`Outcome::Fail`] immediately, or [`Outcome::Pass`]
-/// with the final input if all compatible children pass.
+/// Runs all child actions concurrently with a clone of the same input.
+/// Returns the first [`Outcome::Fail`] if any child fails, otherwise
+/// [`Outcome::Pass`] with the original input once all children pass.
+///
+/// Children are awaited together; cancellation of in-flight siblings on
+/// the first failure is deferred to the async runtime overhaul.
 #[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(SequenceAction<Input,Output>)]
+#[require(ParallelAction<Input,Output>)]
 #[reflect(Component, Default)]
-pub struct Sequence<Input = (), Output = ()>
+pub struct Parallel<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync + Clone,
 	Output: 'static + Send + Sync,
@@ -18,7 +21,7 @@ where
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
-impl<Input, Output> Default for Sequence<Input, Output>
+impl<Input, Output> Default for Parallel<Input, Output>
 where
 	Input: 'static + Send + Sync + Clone,
 	Output: 'static + Send + Sync,
@@ -30,23 +33,14 @@ where
 	}
 }
 
-impl Sequence {
-	/// Create a default `Sequence<(), ()>`.
+impl Parallel {
+	/// Create a default `Parallel<(), ()>`.
 	pub fn new() -> Self { Self::default() }
 }
 
-/// Marker that makes a [`Sequence`] always [`Outcome::Pass`].
+/// Runs all children concurrently, failing fast if any child fails.
 ///
-/// Child failures are ignored and the sequence continues to the next child,
-/// returning [`Outcome::Pass`] once all children have run.
-#[derive(Debug, Default, Clone, Copy, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct Infallible;
-
-/// Runs children in order, returning the first [`Outcome::Fail`] immediately.
-/// Returns [`Outcome::Pass`] only if all compatible children pass.
-///
-/// Child error handling is controlled by [`Sequence::exclude_errors`].
+/// Child error handling is controlled by [`ExcludeErrors`].
 ///
 /// ## Errors
 ///
@@ -55,7 +49,7 @@ pub struct Infallible;
 /// - incompatible [`ActionMeta`] signature
 #[action(default)]
 #[derive(Component)]
-pub async fn SequenceAction<Input, Output>(
+pub async fn ParallelAction<Input, Output>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
@@ -68,9 +62,6 @@ where
 		.await
 		.unwrap_or_default();
 
-	let infallible =
-		cx.caller.get_cloned::<Infallible>().await.is_ok();
-
 	let children =
 		match cx.caller.get(|children: &Children| children.to_vec()).await {
 			Ok(children) => children,
@@ -81,8 +72,10 @@ where
 		};
 
 	let world = cx.world().clone();
-	let mut input = cx.input;
+	let input = cx.input;
 
+	// resolve valid children up-front, then run them concurrently
+	let mut calls = Vec::new();
 	for child in children {
 		let action_meta_result =
 			world.entity(child).get(|meta: &ActionMeta| *meta).await;
@@ -94,7 +87,7 @@ where
 					continue;
 				}
 				bevybail!(
-					"sequence child has no action: {child:?}, error: {child_error}"
+					"parallel child has no action: {child:?}, error: {child_error}"
 				);
 			}
 		};
@@ -106,24 +99,23 @@ where
 				continue;
 			}
 			bevybail!(
-				"sequence child wrong action signature: {child:?}, error: {mismatch_error}"
+				"parallel child wrong action signature: {child:?}, error: {mismatch_error}"
 			);
 		}
 
-		match world
-			.entity(child)
-			.call::<Input, Outcome<Input, Output>>(input.clone())
-			.await?
-		{
-			Outcome::Pass(next_input) => {
-				input = next_input;
-			}
-			Outcome::Fail(output) => {
-				// infallible sequences ignore failures and keep the input
-				if !infallible {
-					return Ok(Outcome::Fail(output));
-				}
-			}
+		let world = world.clone();
+		let input = input.clone();
+		calls.push(async move {
+			world
+				.entity(child)
+				.call::<Input, Outcome<Input, Output>>(input)
+				.await
+		});
+	}
+
+	for outcome in async_ext::try_join_all(calls).await? {
+		if let Outcome::Fail(output) = outcome {
+			return Ok(Outcome::Fail(output));
 		}
 	}
 
@@ -147,7 +139,7 @@ mod tests {
 	#[beet_core::test]
 	async fn no_children() {
 		AsyncPlugin::world()
-			.spawn(Sequence::new())
+			.spawn(Parallel::new())
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -157,7 +149,7 @@ mod tests {
 	#[beet_core::test]
 	async fn failing_child() {
 		AsyncPlugin::world()
-			.spawn((Sequence::new(), children![outcome_fail()]))
+			.spawn((Parallel::new(), children![outcome_fail()]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -165,9 +157,13 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn passing_child() {
+	async fn all_passing_children() {
 		AsyncPlugin::world()
-			.spawn((Sequence::new(), children![outcome_pass()]))
+			.spawn((Parallel::new(), children![
+				outcome_pass(),
+				outcome_pass(),
+				outcome_pass(),
+			]))
 			.call::<(), Outcome<(), ()>>(())
 			.await
 			.unwrap()
@@ -175,10 +171,9 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn failing_nth_child() {
+	async fn one_failing_child_fails() {
 		AsyncPlugin::world()
-			.spawn((Sequence::new(), children![
-				outcome_pass(),
+			.spawn((Parallel::new(), children![
 				outcome_pass(),
 				outcome_fail(),
 				outcome_pass(),
@@ -190,34 +185,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn all_passing_children() {
-		AsyncPlugin::world()
-			.spawn((Sequence::new(), children![
-				outcome_pass(),
-				outcome_pass(),
-				outcome_pass(),
-			]))
-			.call::<(), Outcome<(), ()>>(())
-			.await
-			.unwrap()
-			.xpect_eq(Outcome::Pass(()));
-	}
-
-	#[beet_core::test]
-	async fn default_exclude_errors_with_compatible_children() {
-		AsyncPlugin::world()
-			.spawn((Sequence::new(), children![outcome_pass(), outcome_pass()]))
-			.call::<(), Outcome<(), ()>>(())
-			.await
-			.unwrap()
-			.xpect_eq(Outcome::Pass(()));
-	}
-
-	#[beet_core::test]
 	async fn exclude_action_mismatch_ignores_wrong_signature() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new(),
+				Parallel::new(),
 				ExcludeErrors(ChildError::ACTION_MISMATCH),
 				children![wrong_signature_action(), outcome_pass()],
 			))
@@ -228,24 +199,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	async fn infallible_passes_despite_failures() {
-		AsyncPlugin::world()
-			.spawn((Sequence::new(), Infallible, children![
-				outcome_pass(),
-				outcome_fail(),
-				outcome_pass(),
-			]))
-			.call::<(), Outcome<(), ()>>(())
-			.await
-			.unwrap()
-			.xpect_eq(Outcome::Pass(()));
-	}
-
-	#[beet_core::test]
 	async fn exclude_no_action_ignores_missing() {
 		AsyncPlugin::world()
 			.spawn((
-				Sequence::new(),
+				Parallel::new(),
 				ExcludeErrors(ChildError::NO_ACTION),
 				children![(), outcome_pass()],
 			))

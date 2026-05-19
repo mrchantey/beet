@@ -19,6 +19,20 @@ impl Plugin for ActionPlugin {
 			.register_type::<CallOnSpawn<(), Outcome>>()
 			.add_systems(Update, call_on_spawn::<(), Outcome>)
 			.register_type::<ExcludeErrors>()
-			.register_type::<Sequence<(), ()>>();
+			.register_type::<Sequence<(), ()>>()
+			.register_type::<Infallible>()
+			.register_type::<Parallel<(), ()>>()
+			.register_type::<HighestScore<(), ()>>()
+			.register_type::<Score>()
+			// agent resolution types
+			.register_type::<ActionOf>()
+			.register_type::<Actions>()
+			.register_type::<TargetEntity>()
+			// leaf / util actions
+			.register_type::<EndWith<Outcome>>()
+			.register_type::<Log>()
+			.register_type::<SucceedTimes>()
+			.register_type::<EndInDuration<Outcome>>()
+			.register_type::<RunNext>();
 	}
 }
