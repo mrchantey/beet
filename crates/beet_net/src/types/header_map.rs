@@ -25,6 +25,11 @@ use std::borrow::Cow;
 /// All keys are normalized to lowercase with underscores replaced by hyphens
 /// on insertion and lookup, ensuring case-insensitive, canonical access.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(
+	feature = "serde",
+	derive(serde::Serialize, serde::Deserialize),
+	serde(transparent)
+)]
 pub struct HeaderMap(MultiMap<String, String>);
 
 /// Normalize a header key to lowercase kebab-case.

@@ -1,4 +1,5 @@
 use crate::render::DoubleBuffer;
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
 use crate::style::TextStyle;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;

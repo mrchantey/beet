@@ -1,8 +1,8 @@
 //! # CLI Router Example
 //!
 //! The simplest possible router: a CLI server with two text routes and
-//! a [`Script`]-backed route that transforms a request struct into a
-//! greeting.
+//! two [`Script`]-backed routes — one that extracts a typed query
+//! struct, and one that runs against the full [`RequestParts`].
 //!
 //! ## Running the Example
 //!
@@ -13,8 +13,11 @@
 //! # visit the /foo route
 //! cargo run --example cli -- foo
 //!
-//! # invoke the scripted greeter
+//! # invoke the scripted greeter via a typed query struct
 //! cargo run --example cli -- greet --name=world
+//!
+//! # invoke the scripted greeter via the raw request parts
+//! cargo run --example cli -- greet-request --name=world
 //! ```
 use beet::prelude::*;
 use serde::Deserialize;
@@ -42,6 +45,14 @@ fn setup(mut commands: Commands) {
 			"greet",
 			Script::<QueryParams<GreetRequest>, String>::rhai(
 				r#""hello " + input.name"#,
+			),
+		),
+		// same idea, but the script receives the full [`RequestParts`]
+		// and digs out the `name` query parameter itself.
+		exchange_route(
+			"greet-request",
+			Script::<RequestParts, String>::rhai(
+				r#""hello " + input.url.params.name[0]"#,
 			),
 		),
 	]));

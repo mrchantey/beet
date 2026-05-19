@@ -119,10 +119,13 @@ pub struct RequiredField;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
 	feature = "serde",
-	serde(bound(
-		serialize = "K: serde::Serialize + Eq + Hash, V: serde::Serialize, S: BuildHasher",
-		deserialize = "K: serde::Deserialize<'de> + Eq + Hash, V: serde::Deserialize<'de>, S: BuildHasher + Default"
-	))
+	serde(
+		transparent,
+		bound(
+			serialize = "K: serde::Serialize + Eq + Hash, V: serde::Serialize, S: BuildHasher",
+			deserialize = "K: serde::Deserialize<'de> + Eq + Hash, V: serde::Deserialize<'de>, S: BuildHasher + Default"
+		)
+	)
 )]
 pub struct MultiMap<K, V, S = FixedHasher> {
 	inner: HashMap<K, Vec<V>, S>,
