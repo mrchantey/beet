@@ -33,6 +33,8 @@ use async_channel::Receiver;
 use async_channel::Sender;
 use bevy::app::MainSchedulePlugin;
 use bevy::ecs::component::Mutable;
+use bevy::ecs::system::Command;
+use bevy::ecs::system::EntityCommand;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
@@ -497,6 +499,24 @@ impl AsyncWorld {
 		self.with_then(move |world| world.resource::<R>().clone())
 	}
 
+	/// Queues a [`Command`] on the world.
+	pub fn queue<O>(&self, command: impl 'static + Send + Command<O>) {
+		self.with(move |world| {
+			command.apply(world);
+		});
+	}
+
+	/// Queues a [`Command`] and waits for its output.
+	pub fn queue_then<O>(
+		&self,
+		command: impl 'static + Send + Command<O>,
+	) -> impl Future<Output = O>
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with_then(move |world| command.apply(world))
+	}
+
 	/// Triggers an event.
 	pub fn trigger<'a, E: Event<Trigger<'a>: Default>>(&self, event: E) {
 		self.with(move |world| {
@@ -829,6 +849,28 @@ impl AsyncEntity {
 		self.world
 			.with_then(move |world| world.spawn((bundle, ChildOf(id))).id())
 			.await
+	}
+
+	/// Queues an [`EntityCommand`] on the entity.
+	pub fn queue<O>(&self, command: impl 'static + Send + EntityCommand<O>) -> &Self
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with(move |entity| {
+			command.apply(entity);
+		});
+		self
+	}
+
+	/// Queues an [`EntityCommand`] and waits for its output.
+	pub async fn queue_then<O>(
+		&self,
+		command: impl 'static + Send + EntityCommand<O>,
+	) -> O
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with_then(move |entity| command.apply(entity)).await
 	}
 
 	/// Triggers an entity event.

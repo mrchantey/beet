@@ -21,7 +21,7 @@ pub async fn InterruptOnRun(
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
-	interrupt_descendants(&caller).await?;
+	caller.queue_then(InterruptRun::<Outcome>::new()).await?;
 	next.call(request).await
 }
 
@@ -36,16 +36,8 @@ pub async fn InterruptOnEnd(
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
 	let response = next.call(request).await;
-	interrupt_descendants(&caller).await?;
+	caller.queue_then(InterruptRun::<Outcome>::new()).await?;
 	response
-}
-
-/// Queues [`InterruptRun`] on the caller, resolving every [`Running`]
-/// descendant as interrupted.
-async fn interrupt_descendants(caller: &AsyncEntity) -> Result {
-	caller
-		.with_then(|entity| InterruptRun::<Outcome>::new().apply(entity))
-		.await
 }
 
 
