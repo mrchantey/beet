@@ -294,9 +294,10 @@ fn color_to_ratatui(color: Color) -> ratatui::style::Color {
 }
 
 #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
+#[extend::ext]
 impl VisualStyle {
 	/// Converts to a ratatui [`Style`](ratatui::style::Style).
-	pub fn to_ratatui_style(&self) -> ratatui::style::Style {
+	fn to_ratatui_style(&self) -> ratatui::style::Style {
 		let mut modifier = ratatui::style::Modifier::empty();
 		let s = self.text_style;
 		if s.contains(TextStyle::BOLD) {
@@ -354,7 +355,6 @@ impl Cell {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::prelude::*;
 	use crate::style::*;
 
 	/// Render a bundle to a 40×5 buffer and return the trimmed plain string.
