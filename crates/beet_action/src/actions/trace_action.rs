@@ -1,9 +1,8 @@
 //! Debug tracing for the action call model.
 //!
-//! Replaces `beet_flow`'s `DebugFlowPlugin`: instead of observing
-//! `GetOutcome`/`Outcome` lifecycle events, a [`TraceAction`] wraps an inner
-//! action and logs on call entry and exit. [`OnLogMessage`]/[`UserMessage`]
-//! are kept for log-UI consumers such as `beet_site`.
+//! A [`TraceAction`] wraps an inner action and logs on call entry and exit.
+//! [`OnLogMessage`]/[`UserMessage`] are kept for log-UI consumers such as
+//! `beet_site`.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
@@ -80,6 +79,9 @@ async fn emit(world: &AsyncWorld, msg: String) {
 }
 
 /// Registers [`OnLogMessage`] and logs [`UserMessage`] events.
+///
+/// Insert the [`DebugRunning`] resource to additionally log every
+/// [`Running`] entity each frame, useful for tracing long-running actions.
 #[derive(Debug, Default, Clone)]
 pub struct DebugActionPlugin;
 
@@ -87,9 +89,16 @@ impl Plugin for DebugActionPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_message::<OnLogMessage>()
 			.register_type::<UserMessage>()
-			.add_observer(log_user_message);
+			.register_type::<DebugRunning>()
+			.add_observer(log_user_message)
+			.add_systems(Update, log_running);
 	}
 }
+
+/// Opt-in resource enabling per-frame logging of [`Running`] entities.
+#[derive(Debug, Default, Clone, Resource, Reflect)]
+#[reflect(Resource)]
+pub struct DebugRunning;
 
 fn log_user_message(
 	ev: On<UserMessage>,
@@ -98,6 +107,22 @@ fn log_user_message(
 	let msg = format!("User: {}", ev.event().0);
 	cross_log!("{msg}");
 	out.write(OnLogMessage::new(msg));
+}
+
+/// Logs each [`Running`] entity every frame while [`DebugRunning`] exists.
+fn log_running(
+	_gate: When<Res<DebugRunning>>,
+	query: Populated<(Entity, Option<&Name>), With<Running>>,
+	mut out: MessageWriter<OnLogMessage>,
+) {
+	for (entity, name) in query.iter() {
+		let name = name
+			.map(|name| name.to_string())
+			.unwrap_or_else(|| entity.to_string());
+		let msg = format!("Running: {name}");
+		cross_log!("{msg}");
+		out.write(OnLogMessage::new(msg));
+	}
 }
 
 #[cfg(test)]
@@ -112,5 +137,35 @@ mod tests {
 			.await
 			.unwrap()
 			.xpect_eq(Outcome::PASS);
+	}
+
+	#[beet_core::test]
+	async fn logs_running_when_enabled() {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			AsyncPlugin,
+			ActionPlugin,
+			DebugActionPlugin,
+		));
+		app.insert_resource(DebugRunning);
+
+		let entity = app
+			.world_mut()
+			.spawn((Name::new("worker"), ContinueRun::<(), Outcome>::default()))
+			.id();
+		app.world_mut()
+			.entity_mut(entity)
+			.call_with((), OutHandler::<Outcome>::new(|_, _| Ok(())))
+			.unwrap();
+
+		app.update();
+
+		app.world_mut()
+			.run_system_once(|mut reader: MessageReader<OnLogMessage>| {
+				reader.read().any(|msg| msg.msg.contains("Running: worker"))
+			})
+			.unwrap()
+			.xpect_true();
 	}
 }

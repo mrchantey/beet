@@ -167,9 +167,8 @@ pub struct NoInterrupt;
 /// Interrupts every [`Running<T>`] descendant of an entity, resolving each
 /// with [`ControlFlowError::Interrupted`].
 ///
-/// Mirrors `beet_flow`'s `interrupt_on_run`: descendants carrying
-/// [`NoInterrupt`] are skipped, and the target entity itself is left alone
-/// (it has typically only just started).
+/// Descendants carrying [`NoInterrupt`] are skipped, and the target entity
+/// itself is left alone (it has typically only just started).
 ///
 /// Queue on an entity whose subtree should be cancelled, ie before re-running
 /// a parent or when a racing sibling has resolved first.
@@ -200,8 +199,15 @@ where
 		let target = entity.id();
 		let world = entity.into_world_mut();
 		let interruptible = world
-			.run_system_once_with(collect_interruptible::<T>, target)
-			.map_err(|err| bevyhow!("{err}"))?;
+			.with_state::<(
+				Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
+				Query<&Children>,
+			), _>(|(running, children)| {
+				children
+					.iter_descendants(target)
+					.filter(|child| running.contains(*child))
+					.collect::<Vec<_>>()
+			});
 		for child in interruptible {
 			if let Some(running) = world.entity_mut(child).take::<Running<T>>() {
 				running.interrupt(world)?;
@@ -209,22 +215,6 @@ where
 		}
 		Ok(())
 	}
-}
-
-/// Collects descendants of `target` that hold [`Running<T>`] and lack
-/// [`NoInterrupt`].
-fn collect_interruptible<T>(
-	target: In<Entity>,
-	running: Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
-	children: Query<&Children>,
-) -> Vec<Entity>
-where
-	T: 'static + Send + Sync,
-{
-	children
-		.iter_descendants(*target)
-		.filter(|child| running.contains(*child))
-		.collect()
 }
 
 /// Registers the long-running action lifecycle for an `In`/`Out` pair:

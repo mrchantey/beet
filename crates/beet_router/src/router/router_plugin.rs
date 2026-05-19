@@ -18,6 +18,8 @@ impl Plugin for RouterPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
+			.register_type::<InterruptOnRun>()
+			.register_type::<InterruptOnEnd>()
 			.register_type::<PathPartial>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_route_tree);

@@ -7,6 +7,8 @@ mod exchange_sequence;
 pub use exchange_sequence::*;
 pub use request_logger::*;
 mod help;
+mod interrupt;
+pub use interrupt::*;
 mod middleware;
 mod router;
 mod sidebar;
