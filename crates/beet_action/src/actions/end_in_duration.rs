@@ -1,6 +1,7 @@
 //! Duration-delayed return action.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::marker::PhantomData;
 
 /// Runs for a duration, then ends with the stored value.
 ///
@@ -18,36 +19,45 @@ use beet_core::prelude::*;
 /// world.spawn(EndInDuration::pass(Duration::from_secs(2)));
 /// ```
 #[derive(Debug, Clone, Component, Reflect)]
-#[require(ContinueRun<(), T>)]
+#[require(ContinueRun<In, Out>)]
 #[reflect(Component)]
-pub struct EndInDuration<T = Outcome>
+pub struct EndInDuration<In = (), Out = Outcome>
 where
-	T: 'static + Send + Sync + Clone,
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync + Clone,
 {
 	/// How long to run before ending.
 	pub duration: Duration,
 	/// The value to end with once the duration elapses.
-	pub value: T,
+	pub value: Out,
+	#[reflect(ignore)]
+	_marker: PhantomData<fn() -> In>,
 }
 
-impl<T> EndInDuration<T>
+impl<In, Out> EndInDuration<In, Out>
 where
-	T: 'static + Send + Sync + Clone,
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync + Clone,
 {
 	/// Run `duration`, then end with `value`.
-	pub fn new(value: T, duration: Duration) -> Self {
-		Self { value, duration }
+	pub fn new(value: Out, duration: Duration) -> Self {
+		Self {
+			value,
+			duration,
+			_marker: PhantomData,
+		}
 	}
 }
 
-impl<T> Default for EndInDuration<T>
+impl<In, Out> Default for EndInDuration<In, Out>
 where
-	T: 'static + Send + Sync + Clone + Default,
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync + Clone + Default,
 {
-	fn default() -> Self { Self::new(T::default(), Duration::from_secs(1)) }
+	fn default() -> Self { Self::new(Out::default(), Duration::from_secs(1)) }
 }
 
-impl EndInDuration<Outcome> {
+impl EndInDuration<(), Outcome> {
 	/// End with [`Outcome::PASS`] after `duration`.
 	pub fn pass(duration: Duration) -> Self {
 		Self::new(Outcome::PASS, duration)
@@ -60,14 +70,15 @@ impl EndInDuration<Outcome> {
 
 /// Ends any [`Running`] [`EndInDuration`] whose [`RunTimer`] has reached its
 /// configured duration.
-pub(crate) fn end_in_duration<T>(
+pub(crate) fn end_in_duration<In, Out>(
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &RunTimer, &EndInDuration<T>),
-		With<Running<T>>,
+		(Entity, &RunTimer, &EndInDuration<In, Out>),
+		With<Running<Out>>,
 	>,
 ) where
-	T: 'static + Send + Sync + Clone,
+	In: 'static + Send + Sync,
+	Out: 'static + Send + Sync + Clone,
 {
 	for (entity, timer, action) in query.iter() {
 		if timer.last_run.elapsed() >= action.duration {

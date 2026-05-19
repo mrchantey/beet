@@ -52,6 +52,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 	- Bad: `foo(bar(bazz))`
 	- Good: `bar(bazz).xmap(foo)`
 - Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
+- when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
 
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.

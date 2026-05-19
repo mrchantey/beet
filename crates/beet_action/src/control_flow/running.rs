@@ -8,6 +8,8 @@
 //! the stored handler with a value.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::GetTypeRegistration;
+use bevy::reflect::Typed;
 use std::marker::PhantomData;
 
 /// Marks an action as actively running, holding the deferred [`OutHandler`]
@@ -38,6 +40,26 @@ where
 	pub fn end(self, world: &mut World, value: T) -> Result {
 		self.0.call_world(world, Ok(value))
 	}
+
+	/// Resolve the deferred handler with [`ControlFlowError::Interrupted`],
+	/// completing the call as interrupted.
+	///
+	/// # Errors
+	/// Propagates any error from the [`OutHandler`].
+	pub fn interrupt(self, world: &mut World) -> Result {
+		self.0
+			.call_world(world, Err(ControlFlowError::Interrupted.into()))
+	}
+}
+
+/// Errors produced when a [`Running`] action is ended by control flow rather
+/// than completing normally.
+#[derive(Debug, thiserror::Error)]
+pub enum ControlFlowError {
+	/// A running action was interrupted before it could resolve, ie a sibling
+	/// failed or a parent was re-run.
+	#[error("the running action was interrupted")]
+	Interrupted,
 }
 
 /// Turns an action into a long-running one.
@@ -134,6 +156,101 @@ where
 }
 
 
+/// Prevents [`InterruptRun`] from interrupting this action.
+///
+/// Interruption only ever descends from an ancestor, so a direct
+/// [`EndRun`]/[`InterruptRun`] on the entity itself still resolves it.
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct NoInterrupt;
+
+/// Interrupts every [`Running<T>`] descendant of an entity, resolving each
+/// with [`ControlFlowError::Interrupted`].
+///
+/// Mirrors `beet_flow`'s `interrupt_on_run`: descendants carrying
+/// [`NoInterrupt`] are skipped, and the target entity itself is left alone
+/// (it has typically only just started).
+///
+/// Queue on an entity whose subtree should be cancelled, ie before re-running
+/// a parent or when a racing sibling has resolved first.
+pub struct InterruptRun<T = Outcome>(PhantomData<fn() -> T>)
+where
+	T: 'static + Send + Sync;
+
+impl<T> Default for InterruptRun<T>
+where
+	T: 'static + Send + Sync,
+{
+	fn default() -> Self { Self(PhantomData) }
+}
+
+impl<T> InterruptRun<T>
+where
+	T: 'static + Send + Sync,
+{
+	/// Create an [`InterruptRun`] for `Running<T>` descendants.
+	pub fn new() -> Self { Self::default() }
+}
+
+impl<T> EntityCommand<Result> for InterruptRun<T>
+where
+	T: 'static + Send + Sync,
+{
+	fn apply(self, entity: EntityWorldMut) -> Result {
+		let target = entity.id();
+		let world = entity.into_world_mut();
+		let interruptible = world
+			.run_system_once_with(collect_interruptible::<T>, target)
+			.map_err(|err| bevyhow!("{err}"))?;
+		for child in interruptible {
+			if let Some(running) = world.entity_mut(child).take::<Running<T>>() {
+				running.interrupt(world)?;
+			}
+		}
+		Ok(())
+	}
+}
+
+/// Collects descendants of `target` that hold [`Running<T>`] and lack
+/// [`NoInterrupt`].
+fn collect_interruptible<T>(
+	target: In<Entity>,
+	running: Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
+	children: Query<&Children>,
+) -> Vec<Entity>
+where
+	T: 'static + Send + Sync,
+{
+	children
+		.iter_descendants(*target)
+		.filter(|child| running.contains(*child))
+		.collect()
+}
+
+/// Registers the long-running action lifecycle for an `In`/`Out` pair:
+/// [`EndInDuration`] reflection and its tick system, plus the [`RunTimer`]
+/// reset observers keyed on [`Running<Out>`].
+///
+/// [`tick_run_timers`] and [`RunTimer`] itself are registered once by
+/// [`ActionPlugin`] since they are not generic.
+pub fn running_plugin<In, Out>(app: &mut App)
+where
+	In: 'static + Send + Sync + TypePath,
+	Out: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ FromReflect
+		+ Typed
+		+ GetTypeRegistration,
+{
+	app.register_type::<EndInDuration<In, Out>>()
+		.add_systems(Update, end_in_duration::<In, Out>.after(tick_run_timers))
+		.add_observer(reset_run_time_started::<Out>)
+		.add_observer(reset_run_timer_stopped::<Out>);
+}
+
+
 /// Tracks elapsed time since an action last started and last ended.
 ///
 /// Both timers tick continuously, even when the action is not [`Running`],
@@ -213,5 +330,58 @@ mod test {
 
 		world.get::<Running<Outcome>>(entity).xpect_none();
 		store.get().xpect_eq(Some(Outcome::PASS));
+	}
+
+	fn spawn_running_child(
+		world: &mut World,
+		store: Store<Option<bool>>,
+	) -> (Entity, Entity) {
+		let child = world.spawn(ContinueRun::<(), Outcome>::default()).id();
+		let parent = world.spawn(children![]).add_child(child).id();
+		world
+			.entity_mut(child)
+			.call_with(
+				(),
+				OutHandler::<Outcome>::new(move |_, result| {
+					store.set(Some(result.is_err()));
+					Ok(())
+				}),
+			)
+			.unwrap();
+		world.get::<Running<Outcome>>(child).xpect_some();
+		(parent, child)
+	}
+
+	#[beet_core::test]
+	async fn interrupts_running_descendants() {
+		let mut world = AsyncPlugin::world();
+		let store = Store::<Option<bool>>::default();
+		let (parent, child) = spawn_running_child(&mut world, store.clone());
+
+		world
+			.commands()
+			.entity(parent)
+			.queue(InterruptRun::<Outcome>::new());
+		world.flush();
+
+		world.get::<Running<Outcome>>(child).xpect_none();
+		store.get().xpect_eq(Some(true));
+	}
+
+	#[beet_core::test]
+	async fn no_interrupt_is_skipped() {
+		let mut world = AsyncPlugin::world();
+		let store = Store::<Option<bool>>::default();
+		let (parent, child) = spawn_running_child(&mut world, store.clone());
+		world.entity_mut(child).insert(NoInterrupt);
+
+		world
+			.commands()
+			.entity(parent)
+			.queue(InterruptRun::<Outcome>::new());
+		world.flush();
+
+		world.get::<Running<Outcome>>(child).xpect_some();
+		store.get().xpect_none();
 	}
 }
