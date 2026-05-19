@@ -22,6 +22,10 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
 
+## Memory
+
+Never use `.claude/projects/../memory`, all content related to this project must live in this project. The only place you are permitted to persist memory is in `./agent/memory`.
+
 ## Conventions
 
 - A rust module should read like a good book: public high level structs at the top and implementation details below

@@ -5,6 +5,8 @@ beet_core::test_main!();
 mod action_plugin;
 mod actions;
 mod control_flow;
+#[cfg(feature = "rhai")]
+mod scripting;
 
 /// Exports the most commonly used items.
 pub mod prelude {
@@ -16,4 +18,6 @@ pub mod prelude {
 	pub use crate::control_flow::Outcome::Fail;
 	pub use crate::control_flow::Outcome::Pass;
 	pub use crate::control_flow::*;
+	#[cfg(feature = "rhai")]
+	pub use crate::scripting::*;
 }

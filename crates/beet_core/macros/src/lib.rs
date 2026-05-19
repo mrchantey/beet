@@ -223,13 +223,13 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// ```ignore
 /// #[beet::main]
 /// async fn main() {
-///     // async code here
+///   // async code here
 /// }
 ///
 /// #[beet::main]
-/// async fn main() -> anyhow::Result<()> {
-///     // async code that returns a Result
-///     Ok(())
+/// async fn main() -> Result {
+///   // async code returning a Result
+///   Ok(())
 /// }
 /// ```
 #[proc_macro_attribute]
