@@ -1,52 +1,69 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use std::marker::PhantomData;
 
-/// A unit of source code paired with the language it is written in.
+/// A scripted, pure `Input -> Output` action.
 ///
-/// A [`Script`] is turned into an [`Action`](crate::prelude::Action) via
-/// [`Action::new_script`](crate::prelude::Action::new_script), letting
-/// user-authored code read and mutate the caller entity's reflected
-/// components at runtime.
-#[derive(Debug, Clone)]
-pub struct Script {
+/// The [`Script::content`] is evaluated with the action input bound to a
+/// variable named `input`; the value of the script's final expression
+/// becomes the action output. Scripts have no access to the [`World`],
+/// so they are deterministic transformations of their input.
+///
+/// Spawning a `Script` inserts [`ScriptAction`] (and therefore an
+/// [`Action`]) via `#[require]`, mirroring how [`Sequence`] requires
+/// [`SequenceAction`](crate::prelude::SequenceAction).
+#[derive(Debug, Clone, Component, Reflect)]
+#[require(ScriptAction<Input, Output>)]
+#[reflect(Component)]
+pub struct Script<Input = (), Output = ()>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
 	/// The language [`Script::content`] is written in.
 	pub language: ScriptLanguage,
-	/// The source code to execute.
+	/// The source code to evaluate.
 	pub content: String,
+	#[reflect(ignore)]
+	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
 /// The set of languages a [`Script`] may be written in.
 ///
-/// Each variant is gated behind the feature flag for its runtime, so the
-/// enum is empty when no scripting backend is enabled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Each variant is gated behind the feature flag for its runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum ScriptLanguage {
 	/// The [rhai](https://rhai.rs) embedded scripting language.
 	#[cfg(feature = "rhai")]
 	Rhai,
 }
 
-impl Script {
+impl<Input, Output> Script<Input, Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
 	/// Create a [`Script`] from rhai source.
 	#[cfg(feature = "rhai")]
 	pub fn rhai(content: impl Into<String>) -> Self {
 		Self {
 			language: ScriptLanguage::Rhai,
 			content: content.into(),
+			_marker: PhantomData,
 		}
 	}
 
-	/// Execute this script against the caller `entity` in `world`.
-	///
-	/// Reflected components on the entity are exposed to the script by
-	/// their short type name and written back after it runs.
+	/// Evaluate the script, transforming `input` into the output value.
 	///
 	/// # Errors
-	/// Propagates parse, evaluation, or reflection errors.
-	pub fn run(&self, world: &mut World, entity: Entity) -> Result {
+	/// Propagates parse, evaluation, or (de)serialization errors.
+	pub fn run(&self, input: Input) -> Result<Output> {
 		match self.language {
 			#[cfg(feature = "rhai")]
 			ScriptLanguage::Rhai => {
-				crate::scripting::run_rhai(world, entity, &self.content)
+				crate::scripting::run_rhai(&self.content, input)
 			}
 		}
 	}

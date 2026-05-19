@@ -1,37 +1,31 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
-impl Action<(), ()> {
-	/// Create an [`Action`] that runs a [`Script`] against the caller entity.
-	///
-	/// The script executes when the action is called, with the caller's
-	/// reflected components exposed for reading and mutation.
-	pub fn new_script(script: Script) -> Self {
-		Action::new(
-			TypeMeta::of::<Script>(),
-			move |ActionCall {
-			          mut commands,
-			          caller,
-			          input: (),
-			          out_handler,
-			      }| {
-				let script = script.clone();
-				commands.commands.queue(move |world: &mut World| -> Result {
-					let result = script.run(world, caller);
-					out_handler.call_world(world, result)
-				});
-				Ok(())
-			},
-		)
-	}
-}
-
-/// Marker for the [`IntoAction`] impl on [`Script`].
-pub struct ScriptActionMarker;
-
-impl IntoAction<ScriptActionMarker> for Script {
-	type In = ();
-	type Out = ();
-
-	fn into_action(self) -> Action<(), ()> { Action::new_script(self) }
+/// Runs the caller's [`Script`] component as a pure `Input -> Output`
+/// transformation.
+///
+/// Inserted automatically by [`Script`] via `#[require]`, so spawning a
+/// `Script` is enough to make the entity callable.
+///
+/// ## Errors
+///
+/// Errors if the caller has no matching [`Script`] component, or if the
+/// script fails to parse, evaluate, or (de)serialize its values.
+#[action]
+#[derive(Component)]
+pub fn ScriptAction<Input, Output>(
+	cx: In<ActionContext<Input>>,
+	scripts: Query<&Script<Input, Output>>,
+) -> Result<Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
+	let entity = cx.id();
+	let script = scripts.get(entity).map_err(|err| {
+		bevyhow!("ScriptAction caller {entity:?} has no Script: {err}")
+	})?;
+	script.run(cx.input)
 }

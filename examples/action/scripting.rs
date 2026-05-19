@@ -1,11 +1,9 @@
 //! # Scripting - User-Authored Behavior
 //!
-//! An [`Action`] can run a [`Script`] instead of compiled Rust. The
-//! script sees the caller entity's reflected components by their short
-//! type name, and any mutations it makes are written back.
-//!
-//! Here a rhai script increments a `Count` component, then a regular
-//! system reports the new value.
+//! A [`Script`] turns an entity into a pure `Input -> Output` action
+//! whose body is rhai source instead of compiled Rust. The action input
+//! is bound to a variable named `input`; the script's final expression
+//! is the output.
 //!
 //! Run with:
 //! ```sh
@@ -13,35 +11,23 @@
 //! ```
 use beet::prelude::*;
 
-/// A reflected component a script can read and mutate.
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-struct Count {
-	value: i64,
-}
-
 #[beet::main]
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
-	world
-		.resource_mut::<AppTypeRegistry>()
-		.write()
-		.register::<Count>();
 
-	let entity = world
-		.spawn((
-			Count { value: 0 },
-			Action::<(), ()>::new_script(Script::rhai("Count.value += 1")),
-		))
-		.id();
+	// numeric transform: increment the input
+	let count = world
+		.spawn(Script::<i64, i64>::rhai("input + 1"))
+		.call::<i64, i64>(41)
+		.await?;
+	cross_log!("count is now {count}");
 
-	// run the script three times
-	for _ in 0..3 {
-		world.entity_mut(entity).call::<(), ()>(()).await?;
-	}
+	// string transform: greet the input
+	let greeting = world
+		.spawn(Script::<String, String>::rhai(r#""hello " + input"#))
+		.call::<String, String>("world".to_string())
+		.await?;
+	cross_log!("{greeting}");
 
-	let value = world.entity(entity).get::<Count>().unwrap().value;
-	assert_eq!(value, 3);
-	println!("final count: {}", value);
 	Ok(())
 }
