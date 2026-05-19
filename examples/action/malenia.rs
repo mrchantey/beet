@@ -18,7 +18,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_malenia --features action
+//! cargo run --example malenia --features action
 //! ```
 use beet::prelude::*;
 

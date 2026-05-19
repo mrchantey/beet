@@ -13,7 +13,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_behavior_tree --features action
+//! cargo run --example behavior_tree --features action
 //! ```
 use beet::prelude::*;
 

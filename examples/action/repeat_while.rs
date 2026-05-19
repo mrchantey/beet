@@ -17,7 +17,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_repeat_while --features action
+//! cargo run --example repeat_while --features action
 //! ```
 use beet::prelude::*;
 

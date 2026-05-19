@@ -13,7 +13,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_state_machine --features action
+//! cargo run --example state_machine --features action
 //! ```
 use beet::prelude::*;
 

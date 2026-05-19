@@ -534,47 +534,47 @@ required-features = ["router", "infra"]
 # 💡 Examples - action
 
 [[example]]
-name = "action_hello_world"
+name = "hello_world"
 path = "examples/action/hello_world.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_scripting"
+name = "scripting"
 path = "examples/action/scripting.rs"
 required-features = ["rhai"]
 
 [[example]]
-name = "action_behavior_tree"
+name = "behavior_tree"
 path = "examples/action/behavior_tree.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_simple_action"
+name = "simple_action"
 path = "examples/action/simple_action.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_long_running"
+name = "long_running"
 path = "examples/action/long_running.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_repeat_while"
+name = "repeat_while"
 path = "examples/action/repeat_while.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_state_machine"
+name = "state_machine"
 path = "examples/action/state_machine.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_utility_ai"
+name = "utility_ai"
 path = "examples/action/utility_ai.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_malenia"
+name = "malenia"
 path = "examples/action/malenia.rs"
 required-features = ["action", "rand"]
 

@@ -10,7 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_long_running --features action
+//! cargo run --example long_running --features action
 //! ```
 use beet::prelude::*;
 use std::time::Duration;

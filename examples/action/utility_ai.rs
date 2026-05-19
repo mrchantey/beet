@@ -9,7 +9,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_utility_ai --features action
+//! cargo run --example utility_ai --features action
 //! ```
 use beet::prelude::*;
 
