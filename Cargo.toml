@@ -273,7 +273,8 @@ net = ["dep:beet_net", "beet_router?/http"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-router = ["action", "ui", "dep:beet_router"]
+# beet_net is a hard dependency of beet_router
+router = ["action", "ui", "net", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -468,6 +469,11 @@ required-features = ["_mini_browser","action"]
 [[example]]
 name = "router"
 path = "examples/router/router.rs"
+required-features = ["router"]
+
+[[example]]
+name = "cli"
+path = "examples/router/cli.rs"
 required-features = ["router"]
 
 # 💡 Examples - Thread
