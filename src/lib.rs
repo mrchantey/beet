@@ -29,8 +29,8 @@ pub use beet_ui as ui;
 // pub use beet_design as design;
 // #[cfg(feature = "dom")]
 // pub use beet_dom as dom;
-// #[cfg(feature = "examples")]
-// pub use beet_examples as examples;
+#[cfg(feature = "examples")]
+pub use beet_examples as examples;
 // #[cfg(feature = "flow")]
 // pub use beet_flow as flow;
 // #[cfg(feature = "ml")]
@@ -39,8 +39,8 @@ pub use beet_ui as ui;
 // pub use beet_parse as parse;
 // #[cfg(feature = "rsx")]
 // pub use beet_rsx as rsx;
-// #[cfg(feature = "spatial")]
-// pub use beet_spatial as spatial;
+#[cfg(feature = "spatial")]
+pub use beet_spatial as spatial;
 #[rustfmt::skip]
 pub mod prelude {
 	#[cfg(feature = "action")]
@@ -54,6 +54,8 @@ pub mod prelude {
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "ui")]
+	pub use crate::core::prelude::Pointer;
+	#[cfg(feature = "ui")]
 	pub use crate::ui::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
@@ -66,8 +68,8 @@ pub mod prelude {
 	// pub use crate::design::prelude::*;
 	// #[cfg(feature = "dom")]
 	// pub use crate::dom::prelude::*;
-	// #[cfg(feature = "examples")]
-	// pub use crate::examples::prelude::*;
+	#[cfg(feature = "examples")]
+	pub use crate::examples::prelude::*;
 	// #[cfg(feature = "flow")]
 	// pub use crate::flow::prelude::*;
 	// #[cfg(feature = "ml")]
@@ -76,8 +78,8 @@ pub mod prelude {
 	// pub use crate::parse::prelude::*;
 	// #[cfg(feature = "rsx")]
 	// pub use crate::rsx::prelude::*;
-	// #[cfg(feature = "spatial")]
-	// pub use crate::spatial::prelude::*;
+	#[cfg(feature = "spatial")]
+	pub use crate::spatial::prelude::*;
 	cfg_if! {
 		if #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]{
 			pub use crate::ui::prelude::Justify;

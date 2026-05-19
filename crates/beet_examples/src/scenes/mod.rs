@@ -16,11 +16,11 @@ pub fn ui_terminal(commands: Commands) { spawn_ui_terminal(commands, false); }
 pub fn hello_world(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Hello World Sequence"),
-		TriggerDeferred::get_outcome(),
-		Sequence::default(),
+		CallOnSpawn::<(), Outcome>::default(),
+		Sequence::new(),
 		children![
-			(Name::new("Hello"), EndWith(Outcome::Pass)),
-			(Name::new("World"), EndWith(Outcome::Pass))
+			(Name::new("Hello"), EndWith(Outcome::PASS)),
+			(Name::new("World"), EndWith(Outcome::PASS))
 		],
 	));
 }

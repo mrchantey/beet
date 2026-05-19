@@ -1,13 +1,12 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
-/// Encourages boids to move towards the average position of their neighbors, keeping the flock together.
-/// This is done by updating the [`Velocity`] component.
-/// ## Tags
-/// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateAgent](ActionTag::MutateAgent)
+/// Encourages boids to move towards the average position of their neighbors,
+/// keeping the flock together. This updates the [`Velocity`] component.
+///
+/// A long-running action: stays [`Running`] while active.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

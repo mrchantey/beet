@@ -40,6 +40,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 		SteerBundle::default().scaled_dist(500.),
 		SteerTarget::Entity(target),
 		Seek::default(),
-		TriggerDeferred::get_outcome(),
+		// keep Seek active for the lifetime of the agent
+		CallOnSpawn::<(), Outcome>::default(),
 	));
 }

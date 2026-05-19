@@ -42,9 +42,8 @@ pub fn beet_example_plugin(app: &mut App) {
 	assert_local_assets();
 
 	app.add_plugins((
-		ControlFlowPlugin::default(),
-		DebugFlowPlugin::default(),
-		BeetSpatialPlugins::default(),
+		ActionPlugin,
+		BeetSpatialPlugins,
 		plugin_2d,
 		plugin_3d,
 		UiTerminalPlugin,

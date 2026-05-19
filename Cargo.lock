@@ -1189,9 +1189,11 @@ dependencies = [
  "beet",
  "beet_action",
  "beet_core",
+ "beet_examples",
  "beet_infra",
  "beet_net",
  "beet_router",
+ "beet_spatial",
  "beet_thread",
  "beet_ui",
  "bevy",
@@ -1304,6 +1306,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_examples"
+version = "0.0.9-dev.10"
+dependencies = [
+ "beet_action",
+ "beet_core",
+ "beet_spatial",
+ "bevy",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "beet_infra"
 version = "0.0.9-dev.10"
 dependencies = [
@@ -1402,6 +1418,20 @@ dependencies = [
  "thiserror 2.0.18",
  "variadics_please",
  "webbrowser",
+]
+
+[[package]]
+name = "beet_spatial"
+version = "0.0.9-dev.10"
+dependencies = [
+ "beet_action",
+ "beet_core",
+ "bevy",
+ "extend",
+ "log",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
+ "web-sys",
 ]
 
 [[package]]

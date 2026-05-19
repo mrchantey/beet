@@ -12,16 +12,20 @@ use std::fmt::Debug;
 ///
 /// Uses the [`MessageReader`] pattern rather than observers so log lines stay
 /// in emission order. Rendering concerns (colors) belong to the UI consumer.
-#[derive(Debug, Message)]
+#[derive(Debug, Message, SetWith)]
 pub struct OnLogMessage {
 	/// The message text to display.
 	pub msg: Cow<'static, str>,
+	pub color: Color,
 }
 
 impl OnLogMessage {
 	/// Create a new log message.
 	pub fn new(msg: impl Into<Cow<'static, str>>) -> Self {
-		Self { msg: msg.into() }
+		Self {
+			msg: msg.into(),
+			color: Color::WHITE,
+		}
 	}
 }
 
@@ -100,10 +104,7 @@ impl Plugin for DebugActionPlugin {
 #[reflect(Resource)]
 pub struct DebugRunning;
 
-fn log_user_message(
-	ev: On<UserMessage>,
-	mut out: MessageWriter<OnLogMessage>,
-) {
+fn log_user_message(ev: On<UserMessage>, mut out: MessageWriter<OnLogMessage>) {
 	let msg = format!("User: {}", ev.event().0);
 	cross_log!("{msg}");
 	out.write(OnLogMessage::new(msg));
@@ -132,7 +133,11 @@ mod tests {
 	#[beet_core::test]
 	async fn traces_and_forwards() {
 		AsyncPlugin::world()
-			.spawn((Name::new("leaf"), trace_action.wrap(Action::<(), Outcome>::new_fixed(Outcome::PASS))))
+			.spawn((
+				Name::new("leaf"),
+				trace_action
+					.wrap(Action::<(), Outcome>::new_fixed(Outcome::PASS)),
+			))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()

@@ -70,7 +70,7 @@ pub enum ControlFlowError {
 #[derive(Component)]
 #[require(RunTimer)]
 #[require(Action<In, Out> = start_running::<In, Out>())]
-pub struct ContinueRun<In = (), Out = ()>
+pub struct ContinueRun<In = (), Out = Outcome>
 where
 	In: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
@@ -198,18 +198,18 @@ where
 	fn apply(self, entity: EntityWorldMut) -> Result {
 		let target = entity.id();
 		let world = entity.into_world_mut();
-		let interruptible = world
-			.with_state::<(
-				Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
-				Query<&Children>,
-			), _>(|(running, children)| {
-				children
-					.iter_descendants(target)
-					.filter(|child| running.contains(*child))
-					.collect::<Vec<_>>()
-			});
+		let interruptible = world.with_state::<(
+			Query<(), (With<Running<T>>, Without<NoInterrupt>)>,
+			Query<&Children>,
+		), _>(|(running, children)| {
+			children
+				.iter_descendants(target)
+				.filter(|child| running.contains(*child))
+				.collect::<Vec<_>>()
+		});
 		for child in interruptible {
-			if let Some(running) = world.entity_mut(child).take::<Running<T>>() {
+			if let Some(running) = world.entity_mut(child).take::<Running<T>>()
+			{
 				running.interrupt(world)?;
 			}
 		}

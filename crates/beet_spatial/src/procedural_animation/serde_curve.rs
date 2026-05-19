@@ -99,7 +99,7 @@ mod test {
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
 
-	#[test]
+	#[beet_core::test]
 	fn calculates_length() {
 		SerdeCurve::Circle.total_len().xpect_less_than(TAU);
 		SerdeCurve::Circle.total_len().xpect_greater_than(6.);
