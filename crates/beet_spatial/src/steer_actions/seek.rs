@@ -31,6 +31,10 @@ pub enum OnTargetNotFound {
 	Clear,
 	/// Do nothing
 	Ignore,
+	/// End the run with [`Outcome::FAIL`]
+	Fail,
+	/// End the run with [`Outcome::PASS`]
+	Succeed,
 }
 
 
@@ -75,6 +79,12 @@ pub(crate) fn seek(
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {
 				log::warn!("{}", msg);
+			}
+			(OnTargetNotFound::Fail, Err(_)) => {
+				commands.entity(action).queue(EndRun(Outcome::FAIL));
+			}
+			(OnTargetNotFound::Succeed, Err(_)) => {
+				commands.entity(action).queue(EndRun(Outcome::PASS));
 			}
 		}
 	}

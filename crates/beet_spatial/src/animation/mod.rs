@@ -26,7 +26,7 @@ impl Plugin for AnimationFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,
-			(init_animators, trigger_on_animation_ready).chain(),
+			(init_animators, trigger_on_animation_ready::<()>).chain(),
 		)
 		.add_systems(
 			Update,

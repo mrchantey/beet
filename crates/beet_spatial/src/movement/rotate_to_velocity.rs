@@ -21,8 +21,11 @@ pub(crate) fn rotate_to_velocity_2d(
 }
 
 
-/// Rotate an entity to face its [`Velocity`] in 3D space
-/// If the velocity is zero, this does nothing
+/// Rotate an entity to face its [`Velocity`] in 3D space, orienting the
+/// entity's local `+Z` (the conventional GLTF visual forward) toward the
+/// velocity direction. The inner `f32` is the slerp rate per second.
+///
+/// If the velocity is zero, this does nothing.
 #[derive(Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
 pub struct RotateToVelocity3d(pub f32);
@@ -39,8 +42,10 @@ pub(crate) fn rotate_to_velocity_3d(
 		let Some(dir) = velocity.0.try_normalize() else {
 			continue;
 		};
+		// `look_at` orients -Z toward `dir` (Bevy convention); `look_away`
+		// instead orients +Z toward `dir` to match GLTF's visual forward.
 		transform.rotation = transform
 			.rotation
-			.slerp(Quat::look_at(dir), **rotate * time.delta_secs());
+			.slerp(Quat::look_away(dir), **rotate * time.delta_secs());
 	}
 }

@@ -64,20 +64,19 @@ pub(crate) fn trigger_on_animation_end<P>(
 	clips: When<Res<Assets<AnimationClip>>>,
 	query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running<P>>>,
 	agents: AgentQuery<&AnimationPlayer>,
-) -> Result {
-	for (action, on_end) in query.iter_mut() {
+) -> Result
+where
+	P: 'static + Send + Sync + Clone,
+{
+	for (action, on_end) in query.iter() {
 		let player = agents.get_descendent(action)?;
-
 		let clip = clips
 			.get(&on_end.handle)
 			.ok_or_else(|| bevyhow!("clip not found"))?;
 
 		let Some(active_animation) = player.animation(on_end.animation_index)
 		else {
-			// animation not playing
-			warn!(
-				"animation is not playing, TriggerOnAnimationEnd will not be called"
-			);
+			// animation not playing yet
 			continue;
 		};
 
@@ -101,4 +100,5 @@ pub(crate) fn trigger_on_animation_end<P>(
 				.queue(EndRun(on_end.payload.clone()));
 		}
 	}
+	Ok(())
 }
