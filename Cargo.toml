@@ -474,6 +474,11 @@ name = "cli"
 path = "examples/router/cli.rs"
 required-features = ["router", "serde", "rhai"]
 
+[[example]]
+name = "router_serde"
+path = "examples/router/router_serde.rs"
+required-features = ["router", "serde", "rhai", "bevy_scene"]
+
 # 💡 Examples - Thread
 
 [[example]]

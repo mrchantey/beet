@@ -20,6 +20,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<NavigateHandler>()
 			.register_type::<PathPartial>()
 			.add_observer(insert_action_path_and_params)
+			.add_observer(insert_path_pattern_for_late_path_partial)
 			.add_observer(insert_route_tree);
 	}
 }
@@ -42,6 +43,27 @@ pub fn insert_action_path_and_params(
 	// only entities that have their own PathPartial become routes;
 	// children of a route (eg sequence steps) have no PathPartial themselves
 	if !paths.contains(ev.entity) {
+		return Ok(());
+	}
+	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
+	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
+	commands.entity(ev.entity).insert((path, params));
+	Ok(())
+}
+
+/// Observer that catches the scene-load case where [`PathPartial`] is
+/// inserted *after* [`ActionMeta`], so [`insert_action_path_and_params`]
+/// would have short-circuited. Re-runs the path/params collection here.
+pub fn insert_path_pattern_for_late_path_partial(
+	ev: On<Insert, PathPartial>,
+	ancestors: Query<&ChildOf>,
+	paths: Query<&PathPartial>,
+	params: Query<&ParamsPartial>,
+	actions: Query<(), (With<ActionMeta>, Without<PathPattern>)>,
+	mut commands: Commands,
+) -> Result {
+	// ActionMeta must already be present and PathPattern not yet computed
+	if !actions.contains(ev.entity) {
 		return Ok(());
 	}
 	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;

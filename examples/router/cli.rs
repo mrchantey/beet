@@ -40,7 +40,10 @@ struct GreetRequest {
 fn setup(mut commands: Commands) {
 	commands.spawn((CliServer::default(), router(), children![
 		exchange_route("", Action::<(), &str>::new_pure(|_| { "hello world" })),
-		exchange_route("foo", Action::<(), &str>::new_pure(|_| { "hello foo" })),
+		exchange_route(
+			"foo",
+			Action::<(), &str>::new_pure(|_| { "hello foo" })
+		),
 		exchange_route(
 			"greet",
 			Script::<QueryParams<GreetRequest>, String>::rhai(

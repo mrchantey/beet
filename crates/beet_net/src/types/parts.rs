@@ -46,7 +46,7 @@ const DEFAULT_CLI_VERSION: &str = "0.1.0";
 /// assert_eq!(parts.path(), &["api", "users"]);
 /// assert_eq!(parts.method(), &HttpMethod::Get);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, TypePath)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RequestParts {
 	/// The HTTP method (GET, POST, etc.),

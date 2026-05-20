@@ -17,6 +17,10 @@ use std::marker::PhantomData;
 #[derive(Component, Reflect)]
 #[require(ScriptAction<Input, Output>)]
 #[reflect(Component)]
+// `Input` and `Output` only appear in the ignored phantom marker, so an
+// empty `#[reflect(where)]` drops the default `Reflect`/`TypePath` bound
+// and lets us reflect [`Script`] for any compatible input/output pair.
+#[reflect(where)]
 pub struct Script<Input = (), Output = ()>
 where
 	Input: 'static + Send + Sync + Serialize,
