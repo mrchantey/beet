@@ -1,5 +1,6 @@
 assets
 agent/*
+.claude
 .beet/infra
 !agent/skills
 out.txt

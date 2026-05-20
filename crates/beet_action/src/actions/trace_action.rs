@@ -5,6 +5,7 @@
 //! `beet_site`.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::color::Color;
 use std::borrow::Cow;
 use std::fmt::Debug;
 

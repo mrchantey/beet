@@ -11,6 +11,9 @@ pub struct ActionPlugin;
 impl Plugin for ActionPlugin {
 	fn build(&self, app: &mut App) {
 		app
+			// async actions queue work onto the AsyncWorld; without this
+			// plugin the runtime never drives them
+			.init_plugin::<AsyncPlugin>()
 			// hierarchy types needed for scene serialization
 			.register_type::<ChildOf>()
 			.register_type::<Children>()
