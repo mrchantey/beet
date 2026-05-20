@@ -1,4 +1,8 @@
-use beet_core::prelude::*;
+//! A path for navigating nested [`Value`] structures by key or index.
+//!
+//! Used by [`ValueSchema`] validation, document field references, and any
+//! other code that needs to point at a specific location within a [`Value`].
+use crate::prelude::*;
 
 /// A path to a specific field within a [`Value`].
 #[derive(
@@ -18,13 +22,22 @@ use beet_core::prelude::*;
 pub struct FieldPath(Vec<FieldSegment>);
 
 impl FieldPath {
+	/// Build a path from any iterator of items convertible into [`FieldSegment`].
 	pub fn new<T>(segments: impl IntoIterator<Item = T>) -> Self
 	where
 		T: Into<FieldSegment>,
 	{
 		Self(segments.into_iter().map(Into::into).collect())
 	}
+	/// Consume into the underlying segment vector.
 	pub fn into_inner(self) -> Vec<FieldSegment> { self.0 }
+
+	/// Push a segment onto this path.
+	pub fn push(&mut self, segment: impl Into<FieldSegment>) {
+		self.0.push(segment.into());
+	}
+	/// Pop the last segment, if any.
+	pub fn pop(&mut self) -> Option<FieldSegment> { self.0.pop() }
 }
 
 impl From<Vec<FieldSegment>> for FieldPath {
@@ -85,6 +98,9 @@ impl From<&&str> for FieldSegment {
 impl From<String> for FieldSegment {
 	fn from(s: String) -> Self { Self::key(s) }
 }
+impl From<SmolStr> for FieldSegment {
+	fn from(s: SmolStr) -> Self { Self::ObjectKey(s) }
+}
 impl From<usize> for FieldSegment {
 	fn from(i: usize) -> Self { Self::index(i) }
 }
@@ -101,14 +117,15 @@ impl From<i64> for FieldSegment {
 	fn from(i: i64) -> Self { Self::index(i as usize) }
 }
 
-/// Convert various types into a field path vector for document navigation.
+/// Convert various types into a [`FieldPath`].
 pub trait IntoFieldPath<M> {
-	/// Convert this type into a vector of field path segments.
+	/// Convert this value into a [`FieldPath`].
 	fn into_field_path(self) -> FieldPath;
 }
 impl IntoFieldPath<Self> for FieldPath {
 	fn into_field_path(self) -> FieldPath { self }
 }
+/// Marker type for the iterator-based [`IntoFieldPath`] impl.
 pub struct IteratorIntoFieldPathMarker;
 
 impl<T, U> IntoFieldPath<IteratorIntoFieldPathMarker> for T
@@ -139,26 +156,34 @@ impl IntoFieldPath<Self> for String {
 mod test {
 	use super::*;
 
-
-
-	#[beet_core::test]
+	#[crate::test]
 	fn field_path_conversion() {
 		let string_vec =
 			vec!["a".to_string(), "b".to_string()].into_field_path();
 		string_vec
-			.0
+			.into_inner()
 			.xpect_eq(vec![FieldSegment::key("a"), FieldSegment::key("b")]);
 
 		let str_vec = vec!["x", "y"].into_field_path();
 		str_vec
-			.0
+			.into_inner()
 			.xpect_eq(vec![FieldSegment::key("x"), FieldSegment::key("y")]);
 
 		let index_vec = vec![0, 1, 2].into_field_path();
-		index_vec.0.xpect_eq(vec![
+		index_vec.into_inner().xpect_eq(vec![
 			FieldSegment::index(0),
 			FieldSegment::index(1),
 			FieldSegment::index(2),
 		]);
+	}
+
+	#[crate::test]
+	fn push_pop() {
+		let mut path = FieldPath::default();
+		path.push("foo");
+		path.push(2usize);
+		path.to_string().xpect_eq("foo.[2]");
+		path.pop().unwrap().xpect_eq(FieldSegment::index(2));
+		path.to_string().xpect_eq("foo");
 	}
 }

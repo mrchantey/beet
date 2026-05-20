@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Identifies a token instance.
@@ -155,23 +154,71 @@ impl<'de> serde::Deserialize<'de> for TokenKey {
 }
 
 
-/// Identifies a value type, always derived from a Rust [`TypePath`].
+/// Identifies the value type of a [`Token`](super::Token).
 ///
-/// Stored as a slash-separated module path with `io.crates/` prefix,
-/// ie `io.crates/bevy_color/color/Color`.
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Reflect,
-)]
+/// A token schema is either a reference to a Rust [`TypePath`] (resolved at
+/// runtime via the [`TypeRegistry`](bevy_reflect::TypeRegistry)), or a fully
+/// inlined [`ValueSchema`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TokenSchema(SmolStr);
+pub enum TokenSchema {
+	/// A slash-separated module path with `io.crates/` prefix,
+	/// ie `io.crates/bevy_color/color/Color`.
+	TypePath(SmolStr),
+	/// A schema defined inline, without a corresponding registered type.
+	Inline(ValueSchema),
+}
 
 impl TokenSchema {
 	/// Creates a schema from a Rust [`TypePath`].
 	pub fn of<T: TypePath>() -> Self {
 		let path = "io.crates/".xtend(T::type_path().replace("::", "/"));
-		Self(path.into())
+		Self::TypePath(path.into())
 	}
 
+	/// Creates a schema from an inline [`ValueSchema`].
+	pub fn inline(schema: ValueSchema) -> Self { Self::Inline(schema) }
+
+	/// Resolve to a [`ValueSchema`].
+	///
+	/// `TypePath` variants are looked up in the registry by their Rust type
+	/// path. `Inline` variants are returned as-is.
+	pub fn resolve(
+		&self,
+		registry: &bevy_reflect::TypeRegistry,
+	) -> Result<ValueSchema> {
+		match self {
+			Self::Inline(schema) => Ok(schema.clone()),
+			Self::TypePath(path) => {
+				let rust_path = path
+					.strip_prefix("io.crates/")
+					.unwrap_or(path.as_str())
+					.replace('/', "::");
+				let info = registry
+					.get_with_type_path(&rust_path)
+					.ok_or_else(|| {
+						bevyhow!(
+							"type `{}` is not registered (looked up `{}`)",
+							path,
+							rust_path
+						)
+					})?
+					.type_info();
+				Ok(ValueSchema::from_type_info(info))
+			}
+		}
+	}
+
+	/// Returns the schema's identifying path, or `"inline"` for inline schemas.
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::TypePath(path) => path.as_str(),
+			Self::Inline(_) => "inline",
+		}
+	}
+
+	/// Asserts that two schemas are equal.
 	pub fn assert_eq(&self, other: &TokenSchema) -> Result<&Self> {
 		if self == other {
 			self.xok()
@@ -182,6 +229,7 @@ impl TokenSchema {
 		}
 	}
 
+	/// Asserts that this schema's type path matches `T`.
 	pub fn assert_eq_ty<T: TypePath>(&self) -> Result<&Self> {
 		self.assert_eq(&Self::of::<T>())
 	}
@@ -189,6 +237,43 @@ impl TokenSchema {
 
 impl core::fmt::Display for TokenSchema {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		self.0.fmt(f)
+		match self {
+			Self::TypePath(s) => s.fmt(f),
+			Self::Inline(_) => write!(f, "inline"),
+		}
+	}
+}
+
+#[cfg(test)]
+mod schema_test {
+	use super::*;
+
+	#[derive(Reflect)]
+	struct ResolveTarget {
+		count: u32,
+	}
+
+	#[beet_core::test]
+	fn inline_resolves() {
+		let inline = ValueSchema::Bool(BoolSchema::default());
+		let schema = TokenSchema::inline(inline.clone());
+		let registry = bevy_reflect::TypeRegistry::default();
+		schema.resolve(&registry).unwrap().xpect_eq(inline);
+	}
+
+	#[beet_core::test]
+	fn type_path_resolves_from_registry() {
+		let schema = TokenSchema::of::<ResolveTarget>();
+		let mut registry = bevy_reflect::TypeRegistry::default();
+		registry.register::<ResolveTarget>();
+		let resolved = schema.resolve(&registry).unwrap();
+		matches!(resolved, ValueSchema::Struct(_)).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn type_path_missing_errors() {
+		let schema = TokenSchema::of::<ResolveTarget>();
+		let registry = bevy_reflect::TypeRegistry::default();
+		schema.resolve(&registry).is_err().xpect_true();
 	}
 }
