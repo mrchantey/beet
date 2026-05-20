@@ -81,7 +81,7 @@ mod test {
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates
 	/// that we can do realtime stuff and dont need to use an [`Environment`]
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut source = QTable::<GridPos, GridDirection>::default();
 		let params = QLearnParams::default();

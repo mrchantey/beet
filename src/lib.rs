@@ -33,8 +33,8 @@ pub use beet_ui as ui;
 pub use beet_examples as examples;
 // #[cfg(feature = "flow")]
 // pub use beet_flow as flow;
-// #[cfg(feature = "ml")]
-// pub use beet_ml as ml;
+#[cfg(feature = "ml")]
+pub use beet_ml as ml;
 // #[cfg(feature = "parse")]
 // pub use beet_parse as parse;
 // #[cfg(feature = "rsx")]
@@ -72,8 +72,8 @@ pub mod prelude {
 	pub use crate::examples::prelude::*;
 	// #[cfg(feature = "flow")]
 	// pub use crate::flow::prelude::*;
-	// #[cfg(feature = "ml")]
-	// pub use crate::ml::prelude::*;
+	#[cfg(feature = "ml")]
+	pub use crate::ml::prelude::*;
 	// #[cfg(feature = "parse")]
 	// pub use crate::parse::prelude::*;
 	// #[cfg(feature = "rsx")]

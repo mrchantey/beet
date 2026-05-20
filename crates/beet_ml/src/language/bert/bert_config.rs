@@ -1,63 +1,74 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-
+/// User-facing config: identifies which HuggingFace model to download
+/// and how the resulting embeddings should be post-processed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BertConfig {
-	pub model: BertModelConfig,
+	/// Repo identification and download URLs.
+	pub model: BertSourceConfig,
+	/// L2-normalise embeddings after pooling (matches sentence-transformers).
 	pub normalize_embeddings: bool,
-	pub approximate_gelu: bool,
 }
 
 impl Default for BertConfig {
 	fn default() -> Self {
-		Self{
-			model: BertModelConfig {
-					base_url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/refs%2Fpr%2F21/".into(),
-					search_prefix: "".into(),
-					document_prefix: "".into(),
-					model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
-					revision: "refs/pr/21".into(),
-		},
+		Self {
+			model: BertSourceConfig::default(),
 			normalize_embeddings: true,
-			approximate_gelu: false,
 		}
 	}
 }
 
 impl BertConfig {
-	pub fn new(model: BertModelConfig) -> Self {
+	/// Build a [`BertConfig`] from a [`BertSourceConfig`].
+	pub fn new(model: BertSourceConfig) -> Self {
 		Self {
 			model,
 			normalize_embeddings: true,
-			approximate_gelu: false,
 		}
 	}
 }
 
-
-/// Config containing both native and wasm urls for a model
+/// Identifies a remote bert model and the urls used to download its
+/// config, weights, and tokenizer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BertModelConfig {
+pub struct BertSourceConfig {
+	/// Base URL containing `config.json`, `model.safetensors`, etc.
 	pub base_url: String,
+	/// Query-time prefix (sentence-transformers convention).
 	pub search_prefix: String,
+	/// Document-time prefix (sentence-transformers convention).
 	pub document_prefix: String,
-	/// used with hf-hub
+	/// HuggingFace model id.
 	pub model_id: String,
+	/// HuggingFace revision (branch or commit).
 	pub revision: String,
 }
 
+impl Default for BertSourceConfig {
+	fn default() -> Self {
+		Self {
+			base_url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/refs%2Fpr%2F21/".into(),
+			search_prefix: "".into(),
+			document_prefix: "".into(),
+			model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
+			revision: "refs/pr/21".into(),
+		}
+	}
+}
 
-impl BertModelConfig {
+impl BertSourceConfig {
+	/// URL of `model.safetensors`.
 	pub fn model_url(&self) -> String {
 		self.base_url.clone() + "model.safetensors"
 	}
 
+	/// URL of `config.json`.
 	pub fn config_url(&self) -> String { self.base_url.clone() + "config.json" }
 
+	/// URL of `tokenizer.json`.
 	pub fn tokenizer_url(&self) -> String {
-		// rejected 403 in github actions, use s3 instead
-		// self.base_url.clone() + "tokenizer.json"
-		"https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/ml/tokenizer.json".into()
+		self.base_url.clone() + "tokenizer.json"
 	}
 }

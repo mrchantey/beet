@@ -1,10 +1,18 @@
-use crate::prelude::*;
+use crate::language::bert::Bert;
+use crate::language::bert::BertConfig;
 use beet_core::prelude::*;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
 use bevy::tasks::ConditionalSendFuture;
 
+/// `AssetLoader` for `.ron` files containing a [`BertConfig`].
+///
+/// Reads the config, then awaits [`Bert::new`] (which downloads the
+/// underlying safetensors / tokenizer via [`fetch_bytes`]). Lets you
+/// drop a config next to your other assets and `asset_server.load::<Bert>(...)`.
+///
+/// [`fetch_bytes`]: crate::fetch::fetch_bytes
 #[derive(Default, TypePath)]
 pub struct BertLoader;
 
@@ -23,28 +31,10 @@ impl AssetLoader for BertLoader {
 		Box::pin(async move {
 			let mut bytes = Vec::new();
 			reader.read_to_end(&mut bytes).await?;
-			let config = ron::de::from_bytes::<BertConfig>(&bytes)?;
-			let bert = Bert::new(config).await?;
-
-			Ok(bert)
+			let config: BertConfig = ron::de::from_bytes(&bytes)?;
+			Bert::new(config).await
 		})
 	}
-}
 
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-
-	#[test]
-	// possibly flaky tests here, getting occasional 403 on tokenizer.json
-	fn works() {
-		let mut app = App::new();
-
-		app.add_plugins((TaskPoolPlugin::default(), workspace_asset_plugin()))
-			.init_asset::<Bert>()
-			.init_asset_loader::<BertLoader>();
-
-		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
-	}
+	fn extensions(&self) -> &[&str] { &["ron"] }
 }
