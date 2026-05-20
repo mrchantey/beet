@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 pub struct Token {
 	/// Unique key for this token, ie `io.crates/beet_net/style/material/colors/Primary`
 	key: TokenKey,
-	/// Schema identifying the value type, ie `io.crates/bevy_color/color/Color`
+	/// Schema identifying the value type, ie `bevy_color::color::Color`.
 	schema: TokenSchema,
 	/// Whether the value for this token should be searched for in parent contexts
 	/// during RuleSet resolution, defaulting to true for regular tokens and false for property

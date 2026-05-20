@@ -38,6 +38,13 @@ impl FieldPath {
 	}
 	/// Pop the last segment, if any.
 	pub fn pop(&mut self) -> Option<FieldSegment> { self.0.pop() }
+
+	/// Clone this path with `segment` appended.
+	pub fn with_pushed(&self, segment: impl Into<FieldSegment>) -> Self {
+		let mut path = self.clone();
+		path.push(segment);
+		path
+	}
 }
 
 impl From<Vec<FieldSegment>> for FieldPath {

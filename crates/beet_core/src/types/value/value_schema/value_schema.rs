@@ -56,8 +56,8 @@ impl ValueSchema {
 	/// Returns the list of [`ValidationError`]s collected; an empty list means
 	/// the value is valid.
 	pub async fn validate(&self, value: &mut Value) -> Vec<ValidationError> {
-		let mut path = FieldPath::default();
-		self.apply(&mut path, value).await
+		let path = FieldPath::default();
+		self.apply(&path, value).await
 	}
 }
 
@@ -65,10 +65,10 @@ impl ApplyConstraints for ValueSchema {
 	type Value = Value;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			match self {
 				ValueSchema::Null => validate_null(path, value),
 				ValueSchema::Bool(_) => validate_bool(path, value),
@@ -136,7 +136,7 @@ fn validate_bool(path: &FieldPath, value: &Value) -> Vec<ValidationError> {
 
 async fn validate_i64(
 	schema: &I64Schema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Int(mut n) = *value else {
@@ -158,7 +158,7 @@ async fn validate_i64(
 
 async fn validate_u64(
 	schema: &U64Schema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Uint(mut n) = *value else {
@@ -179,7 +179,7 @@ async fn validate_u64(
 
 async fn validate_f64(
 	schema: &F64Schema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let mut n = match *value {
@@ -195,7 +195,7 @@ async fn validate_f64(
 
 async fn validate_string(
 	schema: &StringSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Str(s) = value else {
@@ -206,7 +206,7 @@ async fn validate_string(
 
 async fn validate_bytes(
 	schema: &BytesSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Bytes(b) = value else {
@@ -217,7 +217,7 @@ async fn validate_bytes(
 
 async fn validate_struct(
 	schema: &StructSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Map(map) = value else {
@@ -227,15 +227,12 @@ async fn validate_struct(
 	for field in &schema.fields {
 		match map.0.get_mut(field.key.as_str()) {
 			Some(child) => {
-				path.push(field.key.clone());
-				errors.extend(field.schema.apply(path, child).await);
-				path.pop();
+				let sub = path.with_pushed(field.key.clone());
+				errors.extend(field.schema.apply(&sub, child).await);
 			}
 			None if field.required => {
-				let mut field_path = path.clone();
-				field_path.push(field.key.clone());
 				errors.push(ValidationError::new(
-					field_path,
+					path.with_pushed(field.key.clone()),
 					format!("missing required field `{}`", field.key),
 				));
 			}
@@ -247,10 +244,8 @@ async fn validate_struct(
 			schema.fields.iter().map(|f| f.key.as_str()).collect();
 		for key in map.0.keys() {
 			if !allowed.contains(key.as_str()) {
-				let mut field_path = path.clone();
-				field_path.push(key.clone());
 				errors.push(ValidationError::new(
-					field_path,
+					path.with_pushed(key.clone()),
 					format!("unknown field `{}`", key),
 				));
 			}
@@ -261,7 +256,7 @@ async fn validate_struct(
 
 async fn validate_tuple(
 	schema: &TupleSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::List(list) = value else {
@@ -282,16 +277,15 @@ async fn validate_tuple(
 	for (idx, (field, child)) in
 		schema.fields.iter().zip(list.iter_mut()).enumerate()
 	{
-		path.push(idx);
-		errors.extend(field.schema.apply(path, child).await);
-		path.pop();
+		let sub = path.with_pushed(idx);
+		errors.extend(field.schema.apply(&sub, child).await);
 	}
 	errors
 }
 
 async fn validate_list(
 	schema: &ListSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::List(list) = value else {
@@ -327,16 +321,15 @@ async fn validate_list(
 		}
 	}
 	for (idx, child) in list.iter_mut().enumerate() {
-		path.push(idx);
-		errors.extend(schema.item.apply(path, child).await);
-		path.pop();
+		let sub = path.with_pushed(idx);
+		errors.extend(schema.item.apply(&sub, child).await);
 	}
 	errors
 }
 
 async fn validate_map(
 	schema: &MapSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	let Value::Map(map) = value else {
@@ -344,16 +337,15 @@ async fn validate_map(
 	};
 	let mut errors = Vec::new();
 	for (key, child) in map.0.iter_mut() {
-		path.push(key.clone());
-		errors.extend(schema.value.apply(path, child).await);
-		path.pop();
+		let sub = path.with_pushed(key.clone());
+		errors.extend(schema.value.apply(&sub, child).await);
 	}
 	errors
 }
 
 async fn validate_enum(
 	schema: &EnumSchema,
-	path: &mut FieldPath,
+	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	// Unit variant as bare string.
@@ -394,10 +386,8 @@ async fn validate_enum(
 			format!("variant `{}` has no payload", key),
 		)];
 	};
-	path.push(key.clone());
-	let errors = payload_schema.apply(path, payload).await;
-	path.pop();
-	errors
+	let sub = path.with_pushed(key.clone());
+	payload_schema.apply(&sub, payload).await
 }
 
 #[cfg(test)]

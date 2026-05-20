@@ -19,7 +19,7 @@ pub trait ApplyConstraints {
 	/// Apply this constraint at the given path, possibly mutating `value`.
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a>;
 }
@@ -65,13 +65,4 @@ impl core::fmt::Display for ValidationError {
 			write!(f, "{}: {}", self.path, self.message)
 		}
 	}
-}
-
-/// Helper that pins a future for use as an [`ApplyFuture`].
-#[inline]
-pub fn boxed_apply<'a, F>(fut: F) -> ApplyFuture<'a>
-where
-	F: 'a + Send + Future<Output = Vec<ValidationError>>,
-{
-	Box::pin(fut)
 }

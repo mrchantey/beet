@@ -38,7 +38,7 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedValue {
 	value: Value,
-	/// Schema identifying the type, ie `io.crates/bevy_color/color/Color`
+	/// Schema identifying the type, ie `bevy_color::color::Color`.
 	schema: TokenSchema,
 }
 

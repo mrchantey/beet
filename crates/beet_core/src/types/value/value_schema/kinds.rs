@@ -287,10 +287,10 @@ impl ApplyConstraints for StringSchema {
 	type Value = SmolStr;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			let mut errors = Vec::new();
 			for constraint in &self.constraints {
 				match constraint {
@@ -375,10 +375,10 @@ impl ApplyConstraints for BoolSchema {
 	type Value = bool;
 	fn apply<'a>(
 		&'a self,
-		_path: &'a mut FieldPath,
+		_path: &'a FieldPath,
 		_value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async { Vec::new() })
+		Box::pin(async { Vec::new() })
 	}
 }
 
@@ -396,10 +396,10 @@ impl ApplyConstraints for BytesSchema {
 	type Value = Vec<u8>;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			let mut errors = Vec::new();
 			if let Some(max) = self.max_len
 				&& value.len() > max
@@ -420,10 +420,10 @@ impl ApplyConstraints for I64Schema {
 	type Value = i64;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			let mut errors = Vec::new();
 			for c in &self.constraints {
 				match c {
@@ -450,10 +450,10 @@ impl ApplyConstraints for U64Schema {
 	type Value = u64;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			let mut errors = Vec::new();
 			for c in &self.constraints {
 				match c {
@@ -480,10 +480,10 @@ impl ApplyConstraints for F64Schema {
 	type Value = f64;
 	fn apply<'a>(
 		&'a self,
-		path: &'a mut FieldPath,
+		path: &'a FieldPath,
 		value: &'a mut Self::Value,
 	) -> ApplyFuture<'a> {
-		boxed_apply(async move {
+		Box::pin(async move {
 			let mut errors = Vec::new();
 			for c in &self.constraints {
 				match c {
