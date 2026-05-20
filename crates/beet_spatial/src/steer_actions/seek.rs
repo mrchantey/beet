@@ -29,10 +29,6 @@ pub enum OnTargetNotFound {
 	Warn,
 	/// Remove the [`SteerTarget`]
 	Clear,
-	/// Remove the [`SteerTarget`] and emit [`OnRunResult::failure()`]
-	Fail,
-	/// Remove the [`SteerTarget`] and emit [`OnRunResult::success()`]
-	Succeed,
 	/// Do nothing
 	Ignore,
 }
@@ -75,14 +71,6 @@ pub(crate) fn seek(
 			}
 			(OnTargetNotFound::Clear, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
-			}
-			(OnTargetNotFound::Fail, Err(_)) => {
-				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_target(Outcome::Fail);
-			}
-			(OnTargetNotFound::Succeed, Err(_)) => {
-				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_target(Outcome::Pass);
 			}
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {

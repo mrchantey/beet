@@ -8,8 +8,9 @@ pub use self::trigger_on_animation_end::*;
 mod play_animation;
 pub use self::play_animation::*;
 pub use self::trigger_on_animation_ready::*;
+use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
 
 /// A plugin containing systems required for animation actions:
@@ -25,16 +26,11 @@ impl Plugin for AnimationFlowPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,
-			(init_animators, trigger_on_animation_ready::<GetOutcome>).chain(),
+			(init_animators, trigger_on_animation_ready).chain(),
 		)
 		.add_systems(
 			Update,
-			(
-				// play_animation_on_load,
-				trigger_on_animation_end::<Outcome>,
-			)
-				.in_set(TickSet),
+			trigger_on_animation_end::<Outcome>.in_set(TickSet),
 		);
-		// .never_param_warn()
 	}
 }
