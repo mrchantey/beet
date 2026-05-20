@@ -23,12 +23,13 @@ pub fn impl_action(
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 1. Parse attributes ──
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out", "route", "pure", "default", "no_default", "no_clone"])?;
+	attrs.assert_types(&[], &["result_out", "route", "pure", "default", "no_default", "no_clone", "handler_only"])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
 	let has_route = attrs.contains_key("route");
 	let no_default = attrs.contains_key("no_default");
 	let no_clone = attrs.contains_key("no_clone");
+	let handler_only = attrs.contains_key("handler_only");
 	let route_expr: Option<&syn::Expr> = attrs.get("route");
 
 	// ── 2. Extract function data ──
@@ -80,7 +81,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		has_route,
 		&beet_action,
 	);
-	let is_middleware = has_next_type(&in_type);
+	let handler_meta = has_next_type(&in_type) || handler_only;
 	let struct_def = make_struct_def(
 		vis,
 		fn_name,
@@ -88,7 +89,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		fn_attrs,
 		Some(require_action),
 		route_expr,
-		is_middleware,
+		handler_meta,
 		no_clone,
 	);
 	let default_impl = if !no_default && !has_derive(fn_attrs, "Default") {
@@ -470,7 +471,7 @@ fn make_struct_def(
 	fn_attrs: &[syn::Attribute],
 	require_action: Option<TokenStream>,
 	route_expr: Option<&syn::Expr>,
-	is_middleware: bool,
+	handler_meta: bool,
 	no_clone: bool,
 ) -> TokenStream {
 	let has_component = has_derive(fn_attrs, "Component");
@@ -487,7 +488,7 @@ fn make_struct_def(
 	};
 
 	let beet_action = pkg_ext::internal_or_beet("beet_action");
-	let require_meta = if has_component && has_reflect && is_middleware {
+	let require_meta = if has_component && has_reflect && handler_meta {
 		quote! {
 			#[require(#beet_action::prelude::ActionMeta = #beet_action::prelude::ActionMeta::of_handler::<Self, _>())]
 		}

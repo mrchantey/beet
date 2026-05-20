@@ -67,6 +67,33 @@ where
 		});
 }
 
+/// Component on-add hook for a self-registering middleware action.
+///
+/// When `T` is added to an entity, its action is appended to the
+/// entity's [`MiddlewareList<In, Out>`]. This lets reflect-friendly
+/// middleware components (eg [`RequestLogger`], [`HelpHandler`])
+/// avoid the [`Middleware<T, _, _>`] wrapper, so they survive
+/// scene round-tripping unchanged.
+pub fn on_add_middleware<T, In, Out>(
+	mut world: DeferredWorld,
+	cx: HookContext,
+) where
+	In: 'static,
+	Out: 'static,
+	T: Component + Clone + IntoAction<T, In = (In, Next<In, Out>), Out = Out>,
+{
+	let action = world.entity(cx.entity).get::<T>().unwrap().clone();
+	world
+		.commands()
+		.entity(cx.entity)
+		.queue(move |mut entity: EntityWorldMut| {
+			entity
+				.get_mut_or_default::<MiddlewareList<In, Out>>()
+				.0
+				.push(action.into_action());
+		});
+}
+
 
 /// Type-erased collection of middleware actions declared on an ancestor.
 ///

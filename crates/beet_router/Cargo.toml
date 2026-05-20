@@ -24,6 +24,7 @@ html_parser = ["beet_ui/html_parser"]
 markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["beet_net/server"]
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
+rhai = ["beet_action/rhai", "serde"]
 
 [dependencies]
 beet_core.workspace = true

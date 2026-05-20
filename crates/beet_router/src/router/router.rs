@@ -11,12 +11,13 @@ use beet_net::prelude::*;
 /// - [`HelpHandler`] middleware for `--help` support
 /// - [`NavigateHandler`] middleware for `--navigate` support
 ///
+/// All components are [`Reflect`] so the bundle round-trips through a scene.
 pub fn router() -> impl Bundle {
 	(
 		Router,
-		Middleware::<RequestLogger, Request, Response>::default(),
-		Middleware::<HelpHandler, Request, Response>::default(),
-		Middleware::<NavigateHandler, Request, Response>::default(),
+		RequestLogger::default(),
+		HelpHandler::default(),
+		NavigateHandler::default(),
 	)
 }
 
@@ -26,8 +27,9 @@ pub fn router() -> impl Bundle {
 /// When no route matches, renders contextual not-found help.
 /// Middleware such as [`HelpHandler`] and [`NavigateHandler`] wrap
 /// the inner action so they can intercept before dispatch.
-#[action]
-#[derive(Debug, Clone, Component)]
+#[action(handler_only)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub async fn Router(cx: ActionContext<Request>) -> Response {
 	let caller = cx.caller.clone();
 	let world = cx.world();

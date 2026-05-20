@@ -101,6 +101,7 @@ impl Plugin for ClientAppPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<DocumentPlugin>()
 			.init_plugin::<RouterPlugin>()
+			.init_plugin::<ServerPlugin>()
 			.init_plugin::<NavigatorPlugin>();
 	}
 }

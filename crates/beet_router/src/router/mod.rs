@@ -1,8 +1,12 @@
 mod exchange_action;
 pub use exchange_action::*;
 mod exchange_fallback;
+#[cfg(feature = "rhai")]
+mod exchange_script;
 mod request_logger;
 pub use exchange_fallback::*;
+#[cfg(feature = "rhai")]
+pub use exchange_script::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;
 pub use request_logger::*;

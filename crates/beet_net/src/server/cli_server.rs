@@ -20,12 +20,24 @@ use beet_core::prelude::*;
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
-#[derive(Default, Component)]
-#[component(on_add=on_add)]
+///
+/// The `run_and_exit` task is launched on the next schedule tick via the
+/// [`launch_cli_servers`] system. Deferring to a system (instead of an
+/// `on_add` hook) avoids spawning a transient task when [`SceneStore`]
+/// briefly spawns a [`CliServer`] just to serialize it.
+#[derive(Default, Component, Reflect)]
+#[reflect(Component)]
 pub struct CliServer;
 
-fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).queue_async(run_and_exit);
+/// Startup-style system that launches [`run_and_exit`] on each newly
+/// added [`CliServer`] entity. Registered by [`ServerPlugin`].
+pub fn launch_cli_servers(
+	mut commands: Commands,
+	query: Populated<Entity, Added<CliServer>>,
+) {
+	for entity in query.iter() {
+		commands.entity(entity).queue_async(run_and_exit);
+	}
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {

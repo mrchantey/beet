@@ -116,6 +116,7 @@ impl ExchangeRouteOut<Self> for MediaBytes {
 
 /// Marker type for the [`Serialize`] blanket impl of [`ExchangeRouteOut`].
 #[cfg(feature = "serde")]
+#[derive(TypePath)]
 pub struct SerdeIntoResponseMarker;
 #[cfg(feature = "serde")]
 impl<T> ExchangeRouteOut<SerdeIntoResponseMarker> for T

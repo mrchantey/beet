@@ -34,8 +34,35 @@ where
 	_marker: PhantomData<fn() -> (Input, Output)>,
 }
 
-// Manual impls avoid spurious `Input: Clone/Debug` bounds the derives
-// would add — the phantom marker does not require them.
+/// The default [`ScriptLanguage`] when feature flags allow it.
+impl Default for ScriptLanguage {
+	fn default() -> Self {
+		cfg_if! {
+			if #[cfg(feature = "rhai")] {
+				return ScriptLanguage::Rhai;
+			} else {
+				compile_error!("ScriptLanguage requires at least one runtime feature");
+			}
+		}
+	}
+}
+
+// Manual impls avoid spurious `Input: Clone/Debug/Default` bounds the
+// derives would add — the phantom marker does not require them.
+impl<Input, Output> Default for Script<Input, Output>
+where
+	Input: 'static + Send + Sync + Serialize,
+	Output: 'static + Send + Sync + DeserializeOwned,
+{
+	fn default() -> Self {
+		Self {
+			language: ScriptLanguage::default(),
+			content: String::new(),
+			_marker: PhantomData,
+		}
+	}
+}
+
 impl<Input, Output> Clone for Script<Input, Output>
 where
 	Input: 'static + Send + Sync + Serialize,
@@ -78,14 +105,19 @@ where
 	Input: 'static + Send + Sync + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
-	/// Create a [`Script`] from rhai source.
-	#[cfg(feature = "rhai")]
-	pub fn rhai(content: impl Into<String>) -> Self {
+	/// Create a [`Script`] from an explicit language and source.
+	pub fn new(language: ScriptLanguage, content: impl Into<String>) -> Self {
 		Self {
-			language: ScriptLanguage::Rhai,
+			language,
 			content: content.into(),
 			_marker: PhantomData,
 		}
+	}
+
+	/// Create a [`Script`] from rhai source.
+	#[cfg(feature = "rhai")]
+	pub fn rhai(content: impl Into<String>) -> Self {
+		Self::new(ScriptLanguage::Rhai, content)
 	}
 
 	/// Evaluate the script, transforming `input` into the output value.
@@ -95,9 +127,7 @@ where
 	pub fn run(&self, input: Input) -> Result<Output> {
 		match self.language {
 			#[cfg(feature = "rhai")]
-			ScriptLanguage::Rhai => {
-				crate::scripting::run_rhai(&self.content, input)
-			}
+			ScriptLanguage::Rhai => crate::scripting::run_rhai(&self.content, input),
 		}
 	}
 }

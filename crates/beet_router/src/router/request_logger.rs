@@ -1,9 +1,12 @@
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 #[action]
-#[derive(Default, Component)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Component)]
+#[component(on_add = on_add_middleware::<Self, Request, Response>)]
 pub async fn RequestLogger(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {

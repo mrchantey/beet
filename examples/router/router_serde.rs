@@ -1,0 +1,110 @@
+//! # Router Serde Example
+//!
+//! Mirrors [`cli`](./cli.rs), but persists the entire route scene to
+//! disk via [`SceneStore`]. On first run the scene is written to
+//! `examples/router/router_serde.json`, and is loaded from that file
+//! on subsequent runs. Pass `--new` to overwrite the file with a
+//! fresh copy.
+//!
+//! Every runtime component — [`CliServer`], the [`router`] bundle, the
+//! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
+//! scene round-trips with no post-load patching.
+//!
+//! ## Running the Example
+//!
+//! ```sh
+//! # visit the home route (first run also writes the scene file)
+//! cargo run --example router_serde
+//!
+//! # visit the /foo route
+//! cargo run --example router_serde -- foo
+//!
+//! # invoke the scripted greeter via a typed query struct
+//! cargo run --example router_serde -- greet --name=world
+//!
+//! # invoke the scripted greeter via the raw request parts
+//! cargo run --example router_serde -- greet-request --name=world
+//!
+//! # delete and regenerate the scene file
+//! cargo run --example router_serde -- --new
+//! ```
+use beet::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
+
+const SCENE_FILE: &str = "examples/router/router_serde.json";
+
+fn main() -> AppExit {
+	App::new()
+		.add_plugins((MinimalPlugins, ClientAppPlugin))
+		// hierarchy types are required to round-trip the parent/child
+		// relationship between the scene root and its route children
+		.register_type::<ChildOf>()
+		.register_type::<Children>()
+		.register_type::<ScriptLanguage>()
+		.register_type::<Script<(), String>>()
+		.register_type::<Script<QueryParams<GreetRequest>, String>>()
+		.register_type::<Script<RequestParts, String>>()
+		.register_type::<ExchangeScript<(), String>>()
+		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>()
+		.register_type::<ExchangeScript<RequestParts, String, _, _>>()
+		.add_systems(Startup, setup)
+		.run()
+}
+
+/// Query params for the scripted greet route, exposed to the rhai
+/// script as `input.name`.
+#[derive(Serialize, Deserialize, TypePath)]
+struct GreetRequest {
+	name: String,
+}
+
+fn setup(mut commands: Commands) {
+	let blob =
+		FsBucket::new(WsPathBuf::default()).blob(RelPath::new(SCENE_FILE));
+	let new_scene = CliArgs::parse_env().params.contains_key("new");
+
+	commands.queue_async(async move |world: AsyncWorld| {
+		if new_scene {
+			blob.remove().await.ok();
+		}
+		SceneStore::load_or_create(world.clone(), blob, async |_| scene().xok())
+			.await?;
+		Ok(())
+	});
+}
+
+fn scene() -> impl Bundle {
+	(
+		CliServer::default(),
+		router(),
+		children![
+			(
+				Script::<(), String>::rhai(r#""hello world""#),
+				ExchangeScript::<(), String>::default(),
+				PathPartial::new(""),
+			),
+			(
+				Script::<(), String>::rhai(r#""hello foo""#),
+				ExchangeScript::<(), String>::default(),
+				PathPartial::new("foo"),
+			),
+			(
+				Script::<QueryParams<GreetRequest>, String>::rhai(
+					r#""hello " + input.name"#,
+				),
+				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
+				PathPartial::new("greet"),
+			),
+			// same idea, but the script receives the full [`RequestParts`]
+			// and digs out the `name` query parameter itself.
+			(
+				Script::<RequestParts, String>::rhai(
+					r#""hello " + input.url.params.name[0]"#,
+				),
+				ExchangeScript::<RequestParts, String, _, _>::default(),
+				PathPartial::new("greet-request"),
+			),
+		],
+	)
+}

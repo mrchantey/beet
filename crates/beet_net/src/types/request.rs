@@ -460,6 +460,7 @@ pub trait FromRequest<M>: Sized {
 
 /// Marker type for [`FromRequest`] implementations via [`serde::de::DeserializeOwned`].
 /// This type also matches primitives: `(), String, u32 etc`
+#[derive(TypePath)]
 pub struct SerdeFromRequestMarker;
 impl<T> FromRequest<SerdeFromRequestMarker> for T
 where
@@ -517,6 +518,7 @@ pub trait FromRequestMeta<M>: Sized {
 }
 
 /// Marker type for [`FromRequest`] implementations via [`FromRequestMeta`].
+#[derive(TypePath)]
 pub struct FromRequestMetaMarker;
 
 impl<T, M> FromRequest<(FromRequestMetaMarker, M)> for T

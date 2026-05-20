@@ -1,18 +1,20 @@
 //! Plugin and utilities for running Bevy-based HTTP servers.
-// use crate::prelude::*;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Plugin for running Bevy HTTP servers.
 ///
-/// Sets up the async runtime needed for action-based exchange handling.
+/// Sets up the async runtime needed for action-based exchange handling
+/// and the [`launch_cli_servers`] system that drives [`CliServer`] entities.
 #[derive(Default)]
 pub struct ServerPlugin;
 
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>();
-		// .add_observer(exchange_stats);
+		app.init_plugin::<AsyncPlugin>()
+			.register_type::<CliServer>()
+			.add_systems(Update, launch_cli_servers);
 	}
 }
 

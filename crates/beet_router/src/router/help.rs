@@ -16,6 +16,7 @@ use beet_ui::prelude::*;
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[component(on_add = on_add_middleware::<Self, Request, Response>)]
 pub async fn HelpHandler(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {

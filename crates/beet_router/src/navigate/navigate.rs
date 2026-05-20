@@ -62,6 +62,7 @@ impl std::fmt::Display for NavigateTo {
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
+#[component(on_add = on_add_middleware::<Self, Request, Response>)]
 pub async fn NavigateHandler(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
