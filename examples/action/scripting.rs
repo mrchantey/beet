@@ -7,7 +7,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_scripting --features rhai
+//! cargo run --example action_scripting --features scripting
 //! ```
 use beet::prelude::*;
 use serde::Deserialize;

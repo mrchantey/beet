@@ -32,6 +32,7 @@ mod entity;
 mod hierarchy;
 #[cfg(feature = "bevy_keyboard")]
 mod key;
+mod minimal_types_plugin;
 mod plugin;
 mod pose;
 mod quat;
@@ -51,6 +52,7 @@ pub use entity::*;
 pub use hierarchy::*;
 #[cfg(feature = "bevy_keyboard")]
 pub use key::*;
+pub use minimal_types_plugin::*;
 pub use plugin::*;
 pub use pose::*;
 pub use quat::*;

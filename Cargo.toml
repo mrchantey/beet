@@ -296,7 +296,8 @@ thread = ["dep:beet_thread","net","action"]
 # 💡 Stack
 
 action = ["dep:beet_action","beet_ui?/action"]
-rhai = ["action","beet_action/rhai", "beet_router?/rhai"]
+rhai = ["action","beet_action/rhai"]
+scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
@@ -472,12 +473,12 @@ required-features = ["router"]
 [[example]]
 name = "cli"
 path = "examples/router/cli.rs"
-required-features = ["router", "serde", "rhai"]
+required-features = ["router", "serde", "scripting"]
 
 [[example]]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
-required-features = ["router", "serde", "rhai", "bevy_scene"]
+required-features = ["router", "serde", "scripting", "bevy_scene"]
 
 # 💡 Examples - Thread
 
@@ -550,7 +551,7 @@ required-features = ["action"]
 [[example]]
 name = "action_scripting"
 path = "examples/action/scripting.rs"
-required-features = ["rhai"]
+required-features = ["scripting"]
 
 # 💡 Examples - flow
 

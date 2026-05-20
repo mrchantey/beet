@@ -17,6 +17,7 @@ serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde","dep:serde_json","beet_core/json"]
 bevy_scene = ["beet_core/bevy_scene"]
 reflect = ["beet_core/bevy_reflect_documentation"]
+scripting = ["rhai"]
 rhai = ["dep:rhai", "serde"]
 
 [dependencies]
@@ -28,7 +29,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 rhai = { workspace = true, optional = true }
 [dev-dependencies]
-beet_action = { path = ".", features= ["bevy_scene", "rhai"] }
+beet_action = { path = ".", features= ["bevy_scene", "scripting"] }
 beet_core = { workspace = true, features = ["testing"] }
 
 [lib]

@@ -37,17 +37,11 @@ const SCENE_FILE: &str = "examples/router/router_serde.json";
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, ClientAppPlugin))
-		// hierarchy types are required to round-trip the parent/child
-		// relationship between the scene root and its route children
-		.register_type::<ChildOf>()
-		.register_type::<Children>()
-		.register_type::<ScriptLanguage>()
-		.register_type::<Script<(), String>>()
+		// only the example-specific [`GreetRequest`] instantiations need
+		// registering — ClientAppPlugin's RouterPlugin / ActionPlugin
+		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<Script<RequestParts, String>>()
-		.register_type::<ExchangeScript<(), String>>()
 		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>()
-		.register_type::<ExchangeScript<RequestParts, String, _, _>>()
 		.add_systems(Startup, setup)
 		.run()
 }

@@ -1,11 +1,11 @@
 mod exchange_action;
 pub use exchange_action::*;
 mod exchange_fallback;
-#[cfg(feature = "rhai")]
+#[cfg(feature = "scripting")]
 mod exchange_script;
 mod request_logger;
 pub use exchange_fallback::*;
-#[cfg(feature = "rhai")]
+#[cfg(feature = "scripting")]
 pub use exchange_script::*;
 mod exchange_sequence;
 pub use exchange_sequence::*;

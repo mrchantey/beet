@@ -15,7 +15,8 @@ pub struct RouterPlugin;
 
 impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>()
+		app.init_plugin::<ActionPlugin>()
+			.init_plugin::<AsyncPlugin>()
 			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
 			.register_type::<PathPartial>()
@@ -25,6 +26,12 @@ impl Plugin for RouterPlugin {
 			.add_observer(insert_path_pattern_for_late_path_partial)
 			.add_observer(insert_route_tree)
 			.add_systems(Update, rebuild_route_trees_after_load);
+		#[cfg(feature = "scripting")]
+		app.register_type::<Script<RequestParts, String>>()
+			.register_type::<ExchangeScript<(), String>>()
+			.register_type::<
+				ExchangeScript<RequestParts, String, RequestParts, SerdeIntoResponseMarker>,
+			>();
 	}
 }
 

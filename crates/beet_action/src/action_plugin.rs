@@ -10,10 +10,7 @@ pub struct ActionPlugin;
 
 impl Plugin for ActionPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			// hierarchy types needed for scene serialization
-			.register_type::<ChildOf>()
-			.register_type::<Children>()
+		app.init_plugin::<MinimalTypesPlugin>()
 			// control-flow types
 			.register_type::<ChildError>()
 			.register_type::<CallOnSpawn<(), Outcome>>()
@@ -22,5 +19,8 @@ impl Plugin for ActionPlugin {
 			.register_type::<Sequence<(), ()>>()
 			.register_type::<Repeat<()>>()
 			.register_type::<RepeatTimes<()>>();
+		#[cfg(feature = "scripting")]
+		app.register_type::<ScriptLanguage>()
+			.register_type::<Script<(), String>>();
 	}
 }
