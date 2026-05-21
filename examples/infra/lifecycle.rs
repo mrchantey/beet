@@ -42,13 +42,13 @@ fn setup(mut commands: Commands) {
 				.with_state::<StackQuery, _>(|entity, query| {
 					query.build_project(entity)
 				})
-				.await?;
+				.await??;
 
 			let bucket = entity
 				.with_state::<StackQuery, _>(|entity, query| {
 					query.bucket(entity).cloned()
 				})
-				.await?;
+				.await??;
 
 			// Reset state in case of backend change
 			project.force_destroy().await;

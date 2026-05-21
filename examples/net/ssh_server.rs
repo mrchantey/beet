@@ -148,7 +148,7 @@ fn on_recv(
 									.trigger_target_then(SshSend(
 										SshEvent::text(response),
 									))
-									.await;
+									.await?;
 								Ok(())
 							},
 						);

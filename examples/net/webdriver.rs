@@ -22,7 +22,7 @@ fn main() {
 }
 
 fn run_webdriver(mut async_commands: AsyncCommands) {
-	async_commands.run(|world| async move {
+	async_commands.run_local(|world| async move {
 		ClientProcess::check_installed(Provider::Chromedriver).await?;
 
 		let (process, page) = Page::visit("https://example.com")

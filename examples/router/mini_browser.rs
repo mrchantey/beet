@@ -55,7 +55,7 @@ async fn ParseRequest(cx: ActionContext<Request>) -> Result<Response> {
 			entity.despawn_children();
 			MediaParser::new().parse(ParseContext::new(&mut entity, &media))
 		})
-		.await?;
+		.await??;
 
 	SceneEntity::new_fixed(caller_id)
 		.render_scene(&cx.caller, parts)
@@ -73,7 +73,7 @@ async fn RenderTui(
 		.with_then(move |mut entity| {
 			renderer.run(&mut entity, vec![MediaType::Ratatui])
 		})
-		.await?;
+		.await??;
 	Response::ok().xok()
 }
 
