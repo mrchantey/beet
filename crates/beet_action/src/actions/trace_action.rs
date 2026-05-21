@@ -6,6 +6,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::color::Color;
+use bevy::color::Srgba;
+use bevy::color::palettes::tailwind;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
@@ -21,12 +23,25 @@ pub struct OnLogMessage {
 }
 
 impl OnLogMessage {
-	/// Create a new log message.
+	/// Color for control flow state messages.
+	pub const FLOW_COLOR: Srgba = tailwind::NEUTRAL_200;
+	/// Color for user input messages.
+	pub const USER_COLOR: Srgba = tailwind::CYAN_200;
+	/// Color for game/AI agent messages.
+	pub const GAME_COLOR: Srgba = tailwind::YELLOW_200;
+
+	/// Create a new log message with optional color.
 	pub fn new(msg: impl Into<Cow<'static, str>>) -> Self {
 		Self {
 			msg: msg.into(),
 			color: Color::WHITE,
 		}
+	}
+
+	/// Immediately logs to stdout (cross-platform) and returns self for chaining.
+	pub fn and_log(self) -> Self {
+		cross_log!("{}", self.msg);
+		self
 	}
 }
 
