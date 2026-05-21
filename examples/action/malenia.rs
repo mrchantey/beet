@@ -37,9 +37,9 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 	world
 		.entity(agent)
 		.with_then(|mut agent| -> Outcome {
-			let potions = agent.get::<HealingPotions>().map(|p| p.0).unwrap_or(0);
-			let health =
-				agent.get::<Health>().map(|h| h.0).unwrap_or(f32::MAX);
+			let potions =
+				agent.get::<HealingPotions>().map(|p| p.0).unwrap_or(0);
+			let health = agent.get::<Health>().map(|h| h.0).unwrap_or(f32::MAX);
 			if potions == 0 || health >= 50.0 {
 				return Outcome::FAIL;
 			}
@@ -54,7 +54,7 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 			cross_log!("Malenia heals herself, health now {remaining}");
 			Outcome::PASS
 		})
-		.await
+		.await?
 		.xok()
 }
 
@@ -127,9 +127,9 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 /// A [`ScoreProvider`] returning a fresh random score on each evaluation.
 fn random_score() -> ScoreProvider<()> {
 	ScoreProvider(Action::<(), Score>::new_system(
-		|_: In<ActionContext>, mut rng: ResMut<RandomSource>| -> Result<Score> {
-			Score(rng.random::<f32>()).xok()
-		},
+		|_: In<ActionContext>,
+		 mut rng: ResMut<RandomSource>|
+		 -> Result<Score> { Score(rng.random::<f32>()).xok() },
 	))
 }
 
@@ -146,37 +146,29 @@ async fn main() -> Result {
 			Health(100.0),
 			HealingPotions(2),
 			Repeat::new(),
-			children![(
-				Name::new("round"),
-				Fallback::new(),
-				children![
-					(Name::new("Try Heal Self"), TryHealSelf),
+			children![(Name::new("round"), Fallback::new(), children![
+				(Name::new("Try Heal Self"), TryHealSelf),
+				(Name::new("Attack"), HighestScore::new(), children![
 					(
-						Name::new("Attack"),
-						HighestScore::new(),
-						children![
-							(
-								Name::new("Waterfoul Dance"),
-								random_score(),
-								AttackPlayer {
-									max_damage: 15.0,
-									max_recoil: 30.0,
-									player,
-								},
-							),
-							(
-								Name::new("Scarlet Aeonia"),
-								ScoreProvider::<()>::fixed(Score(0.05)),
-								AttackPlayer {
-									max_damage: 10_000.0,
-									max_recoil: 10.0,
-									player,
-								},
-							),
-						],
+						Name::new("Waterfoul Dance"),
+						random_score(),
+						AttackPlayer {
+							max_damage: 15.0,
+							max_recoil: 30.0,
+							player,
+						},
 					),
-				],
-			)],
+					(
+						Name::new("Scarlet Aeonia"),
+						ScoreProvider::<()>::fixed(Score(0.05)),
+						AttackPlayer {
+							max_damage: 10_000.0,
+							max_recoil: 10.0,
+							player,
+						},
+					),
+				],),
+			],)],
 		))
 		.call::<(), Outcome>(())
 		.await?;

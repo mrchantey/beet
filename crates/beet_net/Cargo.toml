@@ -56,7 +56,7 @@ http = [
 reqwest = ["dep:reqwest", "beet_core/tokio"]
 ureq = ["dep:ureq", "dep:blocking"]
 tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
-webdriver = ["tungstenite", "json", "dep:async-process"]
+webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",

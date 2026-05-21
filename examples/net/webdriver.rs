@@ -3,8 +3,7 @@
 //! This example spawns a chromedriver process, opens `example.com`,
 //! reads the heading text and clicks the anchor to follow a link.
 //!
-//! Prerequisites: `chromedriver` and `chromium` must be available on
-//! PATH (we shell out via `nix-shell` by default).
+//! Prerequisites: `chromedriver` and `chromium` must be available on `PATH`.
 //!
 //! Run with:
 //! ```sh
@@ -24,6 +23,8 @@ fn main() {
 
 fn run_webdriver(mut async_commands: AsyncCommands) {
 	async_commands.run(|world| async move {
+		ClientProcess::check_installed(Provider::Chromedriver).await?;
+
 		let (process, page) = Page::visit("https://example.com")
 			.await
 			.expect("failed to visit example.com");
@@ -66,5 +67,6 @@ fn run_webdriver(mut async_commands: AsyncCommands) {
 		process.kill().expect("driver kill failed");
 
 		world.write_message(AppExit::Success);
+		Ok(())
 	});
 }

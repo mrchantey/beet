@@ -7,6 +7,7 @@ use super::*;
 use crate::prelude::*;
 use async_process::Child;
 use async_process::Command;
+use async_process::Stdio;
 use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
@@ -55,7 +56,7 @@ impl Default for Client {
 }
 
 /// Specifies the browser driver process to use.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Provider {
 	/// Chrome/Chromium via chromedriver.
 	#[default]
@@ -192,7 +193,10 @@ impl Client {
 /// killing it when dropped.
 #[derive(Get)]
 pub struct ClientProcess {
+	/// The underlying webdriver client
 	client: Client,
+	/// The chromedriver or geckodriver process
+	/// driving the webdriver interaction
 	process: Child,
 }
 
@@ -218,42 +222,93 @@ impl ClientProcess {
 		.xok()
 	}
 
+	/// Verify that the driver and browser binaries for `provider` are
+	/// discoverable on `PATH`. Returns an error containing platform-specific
+	/// install instructions if either binary is missing.
+	pub async fn check_installed(provider: Provider) -> Result<()> {
+		let (driver, browser) = match provider {
+			Provider::Chromedriver => ("chromedriver", "chromium"),
+			Provider::Geckodriver => ("geckodriver", "firefox"),
+		};
+		let mut missing = Vec::new();
+		for binary in [driver, browser] {
+			if !Self::binary_available(binary).await {
+				missing.push(binary);
+			}
+		}
+		if missing.is_empty() {
+			return Ok(());
+		}
+		bevybail!(
+			"webdriver dependencies missing: {missing}\n{instructions}",
+			missing = missing.join(", "),
+			instructions = Self::install_instructions(provider)
+		);
+	}
+
+	/// Check whether `binary` can be invoked with `--version`.
+	async fn binary_available(binary: &str) -> bool {
+		Command::new(binary)
+			.arg("--version")
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.status()
+			.await
+			.map(|status| status.success())
+			.unwrap_or(false)
+	}
+
+	/// Per-platform install hints for the given provider.
+	fn install_instructions(provider: Provider) -> String {
+		let (linux_arch, linux_debian, macos, windows_url) = match provider {
+			Provider::Chromedriver => (
+				"sudo pacman -S chromium",
+				"sudo apt install chromium-browser chromium-chromedriver",
+				"brew install --cask chromium && brew install chromedriver",
+				"https://googlechromelabs.github.io/chrome-for-testing/",
+			),
+			Provider::Geckodriver => (
+				"sudo pacman -S firefox geckodriver",
+				"sudo apt install firefox-esr && cargo install geckodriver",
+				"brew install --cask firefox && brew install geckodriver",
+				"https://github.com/mozilla/geckodriver/releases",
+			),
+		};
+		format!(
+			"install with:\n  linux (arch):   {linux_arch}\n  \
+			 linux (debian): {linux_debian}\n  \
+			 macos:          {macos}\n  \
+			 windows:        see {windows_url}"
+		)
+	}
+
 	/// start the chromedriver and return the child process
 	fn spawn_chromedriver(opts: &Client) -> Result<Child> {
-		let run = vec![
-			"chromedriver".into(),
-			format!("--port={}", opts.driver_port),
-			format!("--log-level={}", match opts.log_level {
+		Command::new("chromedriver")
+			.arg(format!("--port={}", opts.driver_port))
+			.arg(format!("--log-level={}", match opts.log_level {
 				LogLevel::Info => "INFO",
 				LogLevel::Debug => "DEBUG",
 				LogLevel::Warn => "WARNING",
 				LogLevel::Error => "SEVERE",
 				LogLevel::Off => "OFF",
-			}),
-		];
-		Command::new("nix-shell")
-			.args(&["-p", "chromium", "chromedriver", "--run", &run.join(" ")])
+			}))
 			.kill_on_drop(true)
 			.spawn()?
 			.xok()
 	}
 	/// start geckodriver and return the child process
 	fn spawn_geckodriver(opts: &Client) -> Result<Child> {
-		let run = vec![
-			"geckodriver".into(),
-			format!("--port={}", opts.driver_port),
-			format!("--websocket-port={}", opts.websocket_port),
-			format!("--log={}", match opts.log_level {
+		Command::new("geckodriver")
+			.arg(format!("--port={}", opts.driver_port))
+			.arg(format!("--websocket-port={}", opts.websocket_port))
+			.arg(format!("--log={}", match opts.log_level {
 				LogLevel::Info => "info",
 				LogLevel::Debug => "debug",
 				LogLevel::Warn => "warn",
 				LogLevel::Error => "error",
 				LogLevel::Off => "fatal",
-			}),
-		];
-
-		Command::new("nix-shell")
-			.args(&["-p", "firefox", "geckodriver", "--run", &run.join(" ")])
+			}))
 			.kill_on_drop(true)
 			.spawn()?
 			.xok()
