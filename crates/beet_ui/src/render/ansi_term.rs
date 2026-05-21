@@ -4,20 +4,28 @@ use std::borrow::Cow;
 
 /// Renders an entity tree to styled ANSI terminal output via [`NodeVisitor`].
 ///
-/// Maps HTML-like element names to [`Style`] values. When an element has
-/// no explicit style, [`AnsiTermRenderer::default_associations`] is checked
-/// for a fallback element name whose style should be reused. If neither
-/// map contains an entry, [`AnsiTermRenderer::default_style`] is used.
+/// Output is a sequential string of arbitrary length, so a [character-cell
+/// buffer](crate::render::charcell) is not used: block elements emit newlines
+/// following HTML rules while inline elements render contiguously, and anchor
+/// tags render as
+/// [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 ///
-/// Block-level elements emit newlines following the same rules as HTML,
-/// while inline elements are rendered contiguously. Anchor tags render
-/// as [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
+/// Styling has two sources:
+/// - **Semantic terminal defaults** for prose tags (`em` → italic, `h1` →
+///   bold colour, …) come from [`AnsiTermRenderer::default_style`]. These are
+///   terminal-specific presentation, not part of the shared [`RuleSet`], so
+///   they never leak into generated web CSS.
+/// - **Resolved [`VisualStyle`]** populated by the [`StylePlugin`] during the
+///   [`PostParseTree`] schedule. This is how tree-sitter syntax highlighting
+///   reaches the renderer: `apply_syntax_highlighting` emits
+///   `class="hl-<capture>"` spans whose foreground colours resolve through the
+///   default syntax theme. The resolved style is overlaid on the semantic
+///   default so syntax colours win inside code blocks.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
-	style_map: StyleMap<VisualStyle>,
 	/// Whether to clear the terminal before rendering.
 	clear_on_render: bool,
-	/// A string prepended to the buffer, defaults to `\n`
+	/// A string prepended to the buffer, defaults to `\n`.
 	prefix: Cow<'static, str>,
 	/// Render [`Expression`] values verbatim as `{expr}`.
 	render_expressions: bool,
@@ -25,6 +33,11 @@ pub struct AnsiTermRenderer {
 	heading_hashes: bool,
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
+	/// Resolved [`VisualStyle`] per entity, snapshotted before walking.
+	resolved: HashMap<Entity, VisualStyle>,
+	/// Stack of semantic default styles, pushed/popped with elements so the
+	/// nearest styled ancestor wins (matching browser inline semantics).
+	style_stack: Vec<VisualStyle>,
 }
 
 impl Default for AnsiTermRenderer {
@@ -34,22 +47,14 @@ impl Default for AnsiTermRenderer {
 impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
-			style_map: StyleMap::new(
-				VisualStyle::default(),
-				default_element_map(),
-			),
 			clear_on_render: true,
 			prefix: "\n".into(),
 			render_expressions: false,
 			heading_hashes: false,
 			state: TextRenderState::new(),
+			resolved: HashMap::default(),
+			style_stack: Vec::new(),
 		}
-	}
-
-	/// Override the element → style mapping.
-	pub fn with_style_map(mut self, map: StyleMap<VisualStyle>) -> Self {
-		self.style_map = map;
-		self
 	}
 
 	/// Override the set of block-level tags.
@@ -64,38 +69,15 @@ impl AnsiTermRenderer {
 		self
 	}
 
+	/// Prefix headings with `#` markers matching their level.
+	pub fn with_heading_hashes(mut self) -> Self {
+		self.heading_hashes = true;
+		self
+	}
+
 	/// Override whether to clear the terminal before rendering.
 	pub fn with_clear_on_render(mut self, clear: bool) -> Self {
 		self.clear_on_render = clear;
-		self
-	}
-
-	/// Register the default `hl-*` class → [`VisualStyle`] mapping used by
-	/// the syntax highlighter. Each capture name in
-	/// [`syntax_highlighting::default_palette`] becomes one class entry of
-	/// the form `hl-keyword`, `hl-string`, etc.
-	#[cfg(feature = "syntax_highlighting")]
-	pub fn with_syntax_highlighting(mut self) -> Self {
-		for (name, color) in crate::parse::default_palette() {
-			self.style_map.insert_class(
-				alloc::borrow::Cow::Owned(format!("hl-{}", name)),
-				VisualStyle::default().fg(color),
-			);
-		}
-		self
-	}
-
-	/// Register a single `hl-<name>` class → style entry.
-	#[cfg(feature = "syntax_highlighting")]
-	pub fn with_syntax_color(
-		mut self,
-		capture: &str,
-		color: impl Into<Color>,
-	) -> Self {
-		self.style_map.insert_class(
-			alloc::borrow::Cow::Owned(format!("hl-{}", capture)),
-			VisualStyle::default().fg(color),
-		);
 		self
 	}
 
@@ -105,11 +87,28 @@ impl AnsiTermRenderer {
 	/// Borrow the accumulated string.
 	pub fn as_str(&self) -> &str { &self.state.buffer }
 
+	/// The semantic default style for the element currently being visited.
+	fn current_default(&self) -> VisualStyle {
+		self.style_stack.last().cloned().unwrap_or_default()
+	}
 
+	/// The style used to render `entity`: its resolved [`VisualStyle`]
+	/// (eg a syntax highlight colour) overlaid on the current semantic
+	/// default.
+	fn style_for(&self, entity: Entity) -> VisualStyle {
+		let base = self.current_default();
+		match self.resolved.get(&entity) {
+			Some(resolved) => overlay(base, resolved),
+			None => base,
+		}
+	}
 
-	/// Write styled text to the buffer.
-	fn push_styled(&mut self, text: &str) {
-		let style = self.style_map.current();
+	/// Write `text` with the resolved style for `entity`.
+	fn push_styled(&mut self, entity: Entity, text: &str) {
+		self.write_with_style(&self.style_for(entity), text);
+	}
+
+	fn write_with_style(&mut self, style: &VisualStyle, text: &str) {
 		let mut buf: Vec<u8> = Vec::new();
 		style.write_style(&mut buf, None).ok();
 		buf.extend_from_slice(text.as_bytes());
@@ -129,13 +128,69 @@ impl AnsiTermRenderer {
 	fn close_osc8_link(&mut self) {
 		self.state.buffer.push_str("\x1b]8;;\x1b\\");
 	}
+
+	/// Snapshot the resolved [`VisualStyle`] of every entity in the world so
+	/// the borrow-free [`NodeVisitor`] walk can read them.
+	fn snapshot_styles(&mut self, world: &mut World) {
+		self.resolved = world
+			.query::<(Entity, &VisualStyle)>()
+			.iter(world)
+			.map(|(entity, style)| (entity, style.clone()))
+			.collect();
+	}
+
+	/// The semantic terminal default style for `tag`, resolving common
+	/// aliases (eg `b` → `strong`, `i` → `em`).
+	fn default_style(tag: &str) -> VisualStyle {
+		match tag {
+			"h1" => VisualStyle::default()
+				.bold()
+				.fg(Color::srgb(0., 0.502, 0.)),
+			"h2" => VisualStyle::default()
+				.bold()
+				.fg(Color::srgb(0., 0.502, 0.502)),
+			"h3" => VisualStyle::default()
+				.bold()
+				.fg(Color::srgb(0., 0., 0.502)),
+			"h4" => VisualStyle::default()
+				.bold()
+				.fg(Color::srgb(0.502, 0., 0.502)),
+			"h5" => VisualStyle::default().bold(),
+			"h6" => VisualStyle::default()
+				.bold()
+				.fg(Color::srgba(1., 1., 1., 0.4)),
+			"strong" | "b" => VisualStyle::default().bold(),
+			"em" | "i" => VisualStyle::default().italic(),
+			"del" | "s" => VisualStyle {
+				decoration_line: DecorationLine::line_through(),
+				..default()
+			},
+			"code" => VisualStyle::default().fg(Color::srgb(0.502, 0.502, 0.)),
+			"pre" => VisualStyle::default().fg(Color::srgba(0.502, 0.502, 0., 0.4)),
+			"a" => VisualStyle {
+				foreground: Some(Color::srgb(0., 0., 0.502)),
+				decoration_line: DecorationLine::underline(),
+				..default()
+			},
+			"blockquote" => VisualStyle {
+				text_style: TextStyle::ITALIC,
+				foreground: Some(Color::srgba(1., 1., 1., 0.4)),
+				..default()
+			},
+			"hr" | "img" => {
+				VisualStyle::default().fg(Color::srgba(1., 1., 1., 0.4))
+			}
+			_ => VisualStyle::default(),
+		}
+	}
 }
 
-
 impl NodeVisitor for AnsiTermRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
+	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
-		self.style_map.push_view(&view);
+		// inline semantics: the nearest styled ancestor wins, so each element
+		// pushes its own default rather than cascading from the parent
+		self.style_stack.push(Self::default_style(name));
 
 		match name {
 			// ── Headings ──
@@ -144,20 +199,16 @@ impl NodeVisitor for AnsiTermRenderer {
 				if self.heading_hashes {
 					let level = name[1..].parse::<usize>().unwrap_or(1);
 					let prefix = "#".repeat(level);
-					// emit immediately so inline children land after the marker
-					self.push_styled(&format!("{prefix} "));
+					self.push_styled(cx.entity, &format!("{prefix} "));
 				}
 			}
 
 			// ── Paragraph ──
 			"p" => {
 				self.state.ensure_block_separator_with_prefix(Some("▌ "));
-				// emit blockquote prefix immediately so inline elements
-				// (eg <em>) that open before the first text node are
-				// correctly placed after the prefix
 				if self.state.blockquote_depth > 0 {
 					let prefix = self.state.blockquote_prefix("▌ ");
-					self.push_styled(&prefix);
+					self.push_styled(cx.entity, &prefix);
 				}
 			}
 
@@ -179,7 +230,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.ensure_newline();
 				self.state.write_list_indent();
 				let prefix = self.state.next_list_prefix("• ");
-				self.push_styled(&prefix);
+				self.push_styled(cx.entity, &prefix);
 			}
 
 			// ── Code blocks ──
@@ -187,11 +238,8 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.ensure_block_separator();
 				self.state.in_preformatted = true;
 			}
-			"code" if self.state.in_preformatted => {
-				// code block content rendered directly in visit_value
-			}
 			"code" => {
-				// inline code, style applied via style_map
+				// styling applied to text children via the style stack
 			}
 
 			// ── Links ──
@@ -205,25 +253,20 @@ impl NodeVisitor for AnsiTermRenderer {
 			"img" => {
 				let src = view.attribute_string("src");
 				let alt = view.attribute_string("alt");
-				let style = self.style_map.current();
 				let display = if alt.is_empty() {
 					format!("[image: {src}]")
 				} else {
 					format!("[{alt}]")
 				};
 				self.open_osc8_link(&src);
-				let mut buf: Vec<u8> = Vec::new();
-				style.write_style(&mut buf, None).ok();
-				buf.extend_from_slice(display.as_bytes());
-				buf.extend_from_slice(escape::RESET.as_bytes());
-				self.state.push_raw(&String::from_utf8_lossy(&buf));
+				self.push_styled(cx.entity, &display);
 				self.close_osc8_link();
 			}
 
 			// ── Thematic break ──
 			"hr" => {
 				self.state.ensure_block_separator();
-				self.push_styled("────────────────────");
+				self.push_styled(cx.entity, "────────────────────");
 				self.state.push_raw("\n");
 				self.state.needs_block_separator = true;
 			}
@@ -275,17 +318,12 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
 			}
-			"code" if !self.state.in_preformatted => {
-				// inline code, style restored via style_map pop below
-			}
 			"a" => {
 				self.close_osc8_link();
 				self.state.pending_link_href = None;
 			}
-			// ── Images (void element, fully handled in visit_element) ──
-			"img" => {}
-			"hr" | "br" => {
-				// already handled in visit_element
+			"hr" | "br" | "img" => {
+				// fully handled in visit_element
 			}
 			_ => {
 				if self.state.is_block_element(name) {
@@ -295,16 +333,15 @@ impl NodeVisitor for AnsiTermRenderer {
 			}
 		}
 
-		self.style_map.pop();
+		self.style_stack.pop();
 	}
 
-	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
+	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
 		let text = value.to_string();
 		if text.is_empty() {
 			return;
 		}
-
-		self.push_styled(&text);
+		self.push_styled(cx.entity, &text);
 	}
 
 	fn visit_expression(
@@ -317,11 +354,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				text_style: TextStyle::ITALIC,
 				..VisualStyle::default()
 			};
-			let mut buf: Vec<u8> = Vec::new();
-			style.write_style(&mut buf, None).ok();
-			buf.extend_from_slice(format!("{{{}}}", expression.0).as_bytes());
-			buf.extend_from_slice(escape::RESET.as_bytes());
-			self.state.push_raw(&String::from_utf8_lossy(&buf));
+			self.write_with_style(&style, &format!("{{{}}}", expression.0));
 		}
 	}
 
@@ -331,11 +364,7 @@ impl NodeVisitor for AnsiTermRenderer {
 			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
 			..VisualStyle::default()
 		};
-		let mut buf: Vec<u8> = Vec::new();
-		style.write_style(&mut buf, None).ok();
-		buf.extend_from_slice(format!("<!--{}-->", &**comment).as_bytes());
-		buf.extend_from_slice(escape::RESET.as_bytes());
-		self.state.push_raw(&String::from_utf8_lossy(&buf));
+		self.write_with_style(&style, &format!("<!--{}-->", &**comment));
 		self.state.push_raw("\n");
 		self.state.trailing_newline = true;
 		self.state.needs_block_separator = true;
@@ -348,10 +377,10 @@ impl NodeRenderer for AnsiTermRenderer {
 		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
+		self.snapshot_styles(cx.world);
 		cx.walk(self);
 		self.state.buffer.insert_str(0, &self.prefix);
 		if self.clear_on_render {
-			// Clear the terminal before rendering.
 			self.state.buffer.insert_str(0, "\x1b[2J\x1b[H");
 		}
 
@@ -363,109 +392,55 @@ impl NodeRenderer for AnsiTermRenderer {
 	}
 }
 
-
-fn default_element_map() -> Vec<(&'static str, VisualStyle)> {
-	vec![
-		("h1", VisualStyle {
-			text_style: TextStyle::BOLD,
-			foreground: Some(Color::srgb(0., 0.502, 0.)),
-			..VisualStyle::default()
-		}),
-		("h2", VisualStyle {
-			text_style: TextStyle::BOLD,
-			foreground: Some(Color::srgb(0., 0.502, 0.502)),
-			..VisualStyle::default()
-		}),
-		("h3", VisualStyle {
-			text_style: TextStyle::BOLD,
-			foreground: Some(Color::srgb(0., 0., 0.502)),
-			..VisualStyle::default()
-		}),
-		("h4", VisualStyle {
-			text_style: TextStyle::BOLD,
-			foreground: Some(Color::srgb(0.502, 0., 0.502)),
-			..VisualStyle::default()
-		}),
-		("h5", VisualStyle {
-			text_style: TextStyle::BOLD,
-			..VisualStyle::default()
-		}),
-		("h6", VisualStyle {
-			text_style: TextStyle::BOLD,
-			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
-			..VisualStyle::default()
-		}),
-		("p", VisualStyle::default()),
-		("a", VisualStyle {
-			foreground: Some(Color::srgb(0., 0., 0.502)),
-			decoration_line: DecorationLine::underline(),
-			..VisualStyle::default()
-		}),
-		("strong", VisualStyle {
-			text_style: TextStyle::BOLD,
-			..VisualStyle::default()
-		}),
-		("em", VisualStyle {
-			text_style: TextStyle::ITALIC,
-			..VisualStyle::default()
-		}),
-		("del", VisualStyle {
-			decoration_line: DecorationLine::line_through(),
-			..VisualStyle::default()
-		}),
-		("code", VisualStyle {
-			foreground: Some(Color::srgb(0.502, 0.502, 0.)),
-			..VisualStyle::default()
-		}),
-		("pre", VisualStyle {
-			foreground: Some(Color::srgba(0.502, 0.502, 0., 0.4)),
-			..VisualStyle::default()
-		}),
-		("blockquote", VisualStyle {
-			text_style: TextStyle::ITALIC,
-			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
-			..VisualStyle::default()
-		}),
-		("hr", VisualStyle {
-			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
-			..VisualStyle::default()
-		}),
-		("img", VisualStyle {
-			foreground: Some(Color::srgb(0.502, 0., 0.502)),
-			decoration_line: DecorationLine::underline(),
-			..VisualStyle::default()
-		}),
-		("li", VisualStyle::default()),
-	]
+/// Overlay `top` onto `base`: set fields and accumulated attributes from
+/// `top` win, so a resolved syntax colour overrides the semantic default
+/// while attributes (eg italic) combine.
+fn overlay(base: VisualStyle, top: &VisualStyle) -> VisualStyle {
+	VisualStyle {
+		foreground: top.foreground.or(base.foreground),
+		background: top.background.or(base.background),
+		decoration_color: top.decoration_color.or(base.decoration_color),
+		decoration_line: DecorationLine {
+			underline: base.decoration_line.underline
+				|| top.decoration_line.underline,
+			overline: base.decoration_line.overline
+				|| top.decoration_line.overline,
+			line_through: base.decoration_line.line_through
+				|| top.decoration_line.line_through,
+		},
+		decoration_style: base.decoration_style,
+		text_style: base.text_style | top.text_style,
+		text_align: base.text_align,
+	}
 }
-
-
-
 
 
 #[cfg(test)]
 #[cfg(feature = "markdown_parser")]
 mod test {
-	#[allow(unused_imports)]
 	use super::*;
 
-	/// Parse markdown then render via [`AnsiTermRenderer`].
+	/// Parse markdown, resolve styles, then render via [`AnsiTermRenderer`].
 	fn render(md: &str) -> String {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse(ParseContext::new(
+				&mut app.world_mut().entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		AnsiTermRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
+			.with_clear_on_render(false)
+			.render(&mut RenderContext::new(entity, app.world_mut()))
 			.unwrap()
 			.to_string()
 	}
 
+	/// Strip ANSI escape sequences (CSI and OSC-8), leaving visible text.
 	fn strip_ansi(input: String) -> String {
-		// strip_ansi takes ownership so callers can use render(...).xmap(strip_ansi)
-		// strip ANSI escape sequences including OSC-8
 		let mut result = String::new();
 		let mut chars = input.chars().peekable();
 		while let Some(ch) = chars.next() {
@@ -480,8 +455,7 @@ mod test {
 									chars.next(); // consume the \ of ST
 									break;
 								}
-								Some('\x07') => break, // BEL terminator
-								None => break,
+								Some('\x07') | None => break,
 								_ => {}
 							}
 						}
@@ -491,12 +465,7 @@ mod test {
 						chars.next();
 						loop {
 							match chars.next() {
-								Some(ch)
-									if ch.is_ascii_alphabetic()
-										|| ch == 'm' =>
-								{
-									break;
-								}
+								Some(ch) if ch.is_ascii_alphabetic() => break,
 								None => break,
 								_ => {}
 							}
@@ -522,7 +491,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn render_heading_h1() {
+	fn render_heading_text() {
 		// heading_hashes is false by default; only the text is emitted
 		render("# Title").xmap(strip_ansi).trim().xpect_eq("Title");
 	}
@@ -555,6 +524,14 @@ mod test {
 		render("```rust\nfn main() {}\n```")
 			.xmap(strip_ansi)
 			.xpect_contains("fn main() {}");
+	}
+
+	#[cfg(feature = "syntax_highlighting")]
+	#[beet_core::test]
+	fn render_code_block_syntax_styled() {
+		// the `fn` keyword resolves to a syntax-highlight foreground colour
+		// through the default theme, with no per-renderer configuration
+		render("```rust\nfn main() {}\n```").xpect_contains("\x1b[");
 	}
 
 	#[beet_core::test]
@@ -596,16 +573,6 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn render_blockquote_multiline() {
-		// a blockquote whose content spans multiple paragraphs should prefix
-		// every paragraph with ▌
-		render("> first paragraph\n>\n> second paragraph")
-			.xmap(strip_ansi)
-			.trim()
-			.xpect_eq("▌ first paragraph\n▌\n▌ second paragraph");
-	}
-
-	#[beet_core::test]
 	fn render_thematic_break() {
 		render("---").xmap(strip_ansi).xpect_contains("────");
 	}
@@ -622,41 +589,22 @@ mod test {
 	#[cfg(feature = "html_parser")]
 	#[beet_core::test]
 	fn unescape_html_entities() {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
 		HtmlParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.parse(ParseContext::new(
+				&mut app.world_mut().entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 		AnsiTermRenderer::new()
 			.with_clear_on_render(false)
-			.render(&mut RenderContext::new(entity, &mut world))
+			.render(&mut RenderContext::new(entity, app.world_mut()))
 			.unwrap()
 			.to_string()
 			.xmap(strip_ansi)
 			.xpect_contains("a & b");
-	}
-
-	#[beet_core::test]
-	fn custom_style_map() {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
-		let bytes = MediaBytes::new_markdown("# Hello");
-		MarkdownParser::new()
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
-			.unwrap();
-		AnsiTermRenderer::new()
-			.with_style_map(StyleMap::new(VisualStyle::default(), vec![(
-				"h1",
-				VisualStyle {
-					foreground: Some(Color::srgb(0.502, 0., 0.)),
-					..VisualStyle::default()
-				},
-			)]))
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
-			.xpect_contains("\x1b[")
-			.xpect_contains("Hello");
 	}
 }

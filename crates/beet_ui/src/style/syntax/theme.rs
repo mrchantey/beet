@@ -1,10 +1,15 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 //! Default colour schemes for syntax highlighting tokens.
 //!
-//! Provides one warm light scheme and one cool dark scheme. Use
-//! [`default_scheme`] for a colour set that adapts to both.
+//! [`default_scheme`] yields the token → colour declarations applied at
+//! the [`Selector::Root`] level. [`class_rules`] yields one rule per
+//! recognised capture name, binding `.hl-<name>` to the corresponding
+//! foreground colour token. Together they let any element matching
+//! `class="hl-<name>"` resolve [`ForegroundColor`] without bespoke
+//! per-renderer wiring.
 
 use crate::prelude::*;
+use crate::style::common_props::ForegroundColor;
 use crate::style::syntax::tokens as t;
 use beet_core::prelude::*;
 
@@ -60,4 +65,65 @@ pub fn default_scheme() -> Vec<(TokenKey, TokenValue)> {
 		.with_value(t::VariableParameter,    Color::srgb(0.85, 0.65, 0.30))
 		.into_iter()
 		.collect()
+}
+
+/// One [`Rule`] per syntax token, binding the `.hl-<name>` class to a
+/// [`ForegroundColor`] declaration that redirects to the matching token.
+///
+/// Capture names that contain a dot (eg `string.escape`) are written
+/// verbatim into the class name, matching the output of
+/// [`apply_syntax_highlighting`](crate::parse::apply_syntax_highlighting).
+pub fn class_rules() -> Vec<Rule> {
+	vec![
+		hl_rule("attribute",             t::Attribute),
+		hl_rule("boolean",               t::Boolean),
+		hl_rule("comment",               t::Comment),
+		hl_rule("comment.documentation", t::CommentDocumentation),
+		hl_rule("constant",              t::Constant),
+		hl_rule("constant.builtin",      t::ConstantBuiltin),
+		hl_rule("constructor",           t::Constructor),
+		hl_rule("embedded",              t::Embedded),
+		hl_rule("error",                 t::Error),
+		hl_rule("escape",                t::Escape),
+		hl_rule("function",              t::Function),
+		hl_rule("function.builtin",      t::FunctionBuiltin),
+		hl_rule("keyword",               t::Keyword),
+		hl_rule("markup",                t::Markup),
+		hl_rule("markup.bold",           t::MarkupBold),
+		hl_rule("markup.heading",        t::MarkupHeading),
+		hl_rule("markup.italic",         t::MarkupItalic),
+		hl_rule("markup.link",           t::MarkupLink),
+		hl_rule("markup.list",           t::MarkupList),
+		hl_rule("markup.quote",          t::MarkupQuote),
+		hl_rule("markup.raw",            t::MarkupRaw),
+		hl_rule("markup.strikethrough",  t::MarkupStrikethrough),
+		hl_rule("module",                t::Module),
+		hl_rule("number",                t::Number),
+		hl_rule("operator",              t::Operator),
+		hl_rule("property",              t::Property),
+		hl_rule("property.builtin",      t::PropertyBuiltin),
+		hl_rule("punctuation",           t::Punctuation),
+		hl_rule("punctuation.bracket",   t::PunctuationBracket),
+		hl_rule("punctuation.delimiter", t::PunctuationDelimiter),
+		hl_rule("punctuation.special",   t::PunctuationSpecial),
+		hl_rule("string",                t::String),
+		hl_rule("string.escape",         t::StringEscape),
+		hl_rule("string.regexp",         t::StringRegexp),
+		hl_rule("string.special",        t::StringSpecial),
+		hl_rule("string.special.symbol", t::StringSpecialSymbol),
+		hl_rule("tag",                   t::Tag),
+		hl_rule("type",                  t::Type),
+		hl_rule("type.builtin",          t::TypeBuiltin),
+		hl_rule("variable",              t::Variable),
+		hl_rule("variable.builtin",      t::VariableBuiltin),
+		hl_rule("variable.member",       t::VariableMember),
+		hl_rule("variable.parameter",    t::VariableParameter),
+	]
+}
+
+fn hl_rule(name: &str, token: impl Into<Token>) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(format!("hl-{name}")))
+		.with_token(ForegroundColor, token)
+		.expect("ForegroundColor schema matches syntax token schema")
 }

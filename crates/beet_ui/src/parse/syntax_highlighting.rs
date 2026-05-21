@@ -277,52 +277,6 @@ pub fn apply_syntax_highlighting(
 	}
 }
 
-/// The built-in colour palette, keyed by tree-sitter capture name.
-///
-/// Designed to be readable on both light and dark terminals. Renderers
-/// can register these via a class map like `hl-<capture>`.
-pub fn default_palette() -> Vec<(&'static str, Color)> {
-	vec![
-		("attribute", Color::srgb(0.85, 0.65, 0.30)),
-		("boolean", Color::srgb(0.95, 0.55, 0.20)),
-		("comment", Color::srgba(0.55, 0.60, 0.55, 0.85)),
-		(
-			"comment.documentation",
-			Color::srgba(0.55, 0.70, 0.55, 0.95),
-		),
-		("constant", Color::srgb(0.95, 0.55, 0.20)),
-		("constant.builtin", Color::srgb(0.95, 0.55, 0.20)),
-		("constructor", Color::srgb(0.40, 0.75, 0.95)),
-		("embedded", Color::srgb(0.75, 0.55, 0.95)),
-		("error", Color::srgb(0.95, 0.30, 0.30)),
-		("escape", Color::srgb(0.95, 0.55, 0.20)),
-		("function", Color::srgb(0.40, 0.75, 0.95)),
-		("function.builtin", Color::srgb(0.40, 0.85, 0.85)),
-		("keyword", Color::srgb(0.95, 0.45, 0.75)),
-		("number", Color::srgb(0.95, 0.55, 0.20)),
-		("operator", Color::srgb(0.90, 0.50, 0.70)),
-		("property", Color::srgb(0.40, 0.75, 0.95)),
-		("punctuation", Color::srgba(0.85, 0.85, 0.85, 0.85)),
-		("punctuation.bracket", Color::srgba(0.85, 0.85, 0.85, 0.85)),
-		(
-			"punctuation.delimiter",
-			Color::srgba(0.85, 0.85, 0.85, 0.85),
-		),
-		("punctuation.special", Color::srgb(0.95, 0.45, 0.75)),
-		("string", Color::srgb(0.60, 0.85, 0.55)),
-		("string.escape", Color::srgb(0.95, 0.85, 0.45)),
-		("string.regexp", Color::srgb(0.95, 0.55, 0.20)),
-		("string.special", Color::srgb(0.95, 0.55, 0.20)),
-		("tag", Color::srgb(0.40, 0.75, 0.95)),
-		("type", Color::srgb(0.40, 0.85, 0.85)),
-		("type.builtin", Color::srgb(0.40, 0.85, 0.85)),
-		("variable", Color::srgb(0.85, 0.85, 0.85)),
-		("variable.builtin", Color::srgb(0.95, 0.55, 0.20)),
-		("variable.member", Color::srgb(0.40, 0.75, 0.95)),
-		("variable.parameter", Color::srgb(0.85, 0.65, 0.30)),
-	]
-}
-
 /// The list of capture names this module recognises, matching
 /// [`tokens_mod::recognised_names`].
 pub fn recognised_names() -> &'static [&'static str] {

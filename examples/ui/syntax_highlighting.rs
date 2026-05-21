@@ -25,11 +25,12 @@ fn main() {
 		))
 		.unwrap();
 
-	// 3. Render. The ANSI renderer resolves each span's `hl-*` class to a
-	// styled foreground colour using the default syntax highlight palette.
+	// 3. Render. The charcell-backed ANSI renderer paints the resolved
+	// `VisualStyle` of each span; the `hl-*` classes emitted during parsing
+	// resolve to foreground colours via the default syntax theme registered
+	// by `StylePlugin`.
 	let output = AnsiTermRenderer::new()
 		.with_clear_on_render(false)
-		.with_syntax_highlighting()
 		.render(&mut RenderContext::new(entity, app.world_mut()))
 		.unwrap()
 		.to_string();

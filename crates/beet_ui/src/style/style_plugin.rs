@@ -13,10 +13,22 @@ impl Plugin for StylePlugin {
 			.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
 
 		#[cfg(feature = "syntax_highlighting")]
-		app.init_resource::<SyntaxHighlighting>().add_systems(
-			PostParseTree,
-			(apply_syntax_highlighting, resolve_styles).chain(),
-		);
+		{
+			app.init_resource::<SyntaxHighlighting>().add_systems(
+				PostParseTree,
+				(apply_syntax_highlighting, resolve_styles).chain(),
+			);
+			// register the default theme so `.hl-<capture>` classes emitted by
+			// `apply_syntax_highlighting` resolve to a foreground colour with no
+			// further setup: each class rule redirects `color` to a syntax
+			// token whose value lives in the root rule's declarations.
+			let mut rules =
+				app.world_mut().get_resource_or_init::<RuleSet>();
+			rules.default_rule_mut().push_declarations(
+				Rule::new().with_extend(syntax::default_scheme()),
+			);
+			rules.extend_rules(syntax::class_rules());
+		}
 		#[cfg(not(feature = "syntax_highlighting"))]
 		app.add_systems(PostParseTree, resolve_styles);
 	}
