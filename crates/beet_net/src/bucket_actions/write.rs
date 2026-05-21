@@ -19,7 +19,7 @@ pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
 		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 	bucket.insert(&cx.input.path, cx.input.bytes).await
 }
 

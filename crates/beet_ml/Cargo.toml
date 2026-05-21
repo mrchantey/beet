@@ -25,6 +25,7 @@ cuda = ["burn/cuda"]
 [dependencies]
 beet_action.workspace = true
 beet_core = { workspace = true, features = ["rand", "fs"] }
+beet_net = { workspace = true, features = ["fs", "ureq", "rustls-tls"] }
 beet_spatial = { workspace = true, optional = true }
 
 bevy = { workspace = true, features = ["bevy_asset"] }
@@ -42,32 +43,7 @@ strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-ureq = { version = "3.1", default-features = false, features = ["rustls"] }
-blocking = "1"
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys.workspace = true
-web-sys = { workspace = true, features = [
-	"Window",
-	"Request",
-	"RequestInit",
-	"RequestCache",
-	"Response",
-	"Cache",
-	"CacheStorage",
-	"IdbFactory",
-	"IdbOpenDbRequest",
-	"IdbDatabase",
-	"IdbObjectStore",
-	"IdbRequest",
-	"IdbTransaction",
-	"IdbTransactionMode",
-	"Event",
-	"EventTarget",
-] }
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]

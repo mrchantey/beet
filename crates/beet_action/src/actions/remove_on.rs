@@ -73,7 +73,7 @@ where
 		.with_then(|mut entity| {
 			entity.remove::<B>();
 		})
-		.await;
+		.await?;
 	Outcome::PASS.xok()
 }
 

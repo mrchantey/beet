@@ -680,41 +680,63 @@ impl AsyncEntity {
 	/// Returns a reference to the [`AsyncWorld`].
 	pub fn world(&self) -> &AsyncWorld { &self.world }
 
+	/// Returns `true` if the entity still exists in the world.
+	///
+	/// Useful in long-running async actions whose caller subtree may be
+	/// despawned between iterations — see [`Repeat`] for an example.
+	pub async fn is_alive(&self) -> bool {
+		let entity_id = self.entity;
+		self.world
+			.with_then(move |world: &mut World| {
+				world.get_entity(entity_id).is_ok()
+			})
+			.await
+	}
+
 	/// Runs a function with access to the entity.
+	///
+	/// Silently no-ops if the entity has been despawned, since the
+	/// callsite already discarded any return value.
 	pub fn with(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut),
 	) -> &Self {
 		let entity = self.entity;
 		self.world.with(move |world: &mut World| {
-			let entity = world.entity_mut(entity);
-			func(entity);
+			if let Ok(entity) = world.get_entity_mut(entity) {
+				func(entity);
+			}
 		});
 		self
 	}
 
 	/// Runs a function with access to the entity and returns the result.
+	///
+	/// Returns an error if the entity has been despawned between when this
+	/// handle was obtained and when the closure runs.
 	pub async fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
-	) -> O
+	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
-		let entity = self.entity;
+		let entity_id = self.entity;
 		self.world
-			.with_then(move |world: &mut World| {
-				let entity = world.entity_mut(entity);
-				func(entity)
+			.with_then(move |world: &mut World| -> Result<O> {
+				let entity = world.get_entity_mut(entity_id).map_err(|_| {
+					bevyhow!("Entity {entity_id:?} despawned")
+				})?;
+				func(entity).xok()
 			})
 			.await
 	}
 
 	/// Spawns an async task.
-	pub fn run_async<Func, Fut, Out>(
+	pub async fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> impl Future<Output = ()>
+	) -> Result<()>
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
@@ -723,13 +745,14 @@ impl AsyncEntity {
 		self.with_then(move |mut entity| {
 			entity.run_async(func);
 		})
+		.await
 	}
 
 	/// Spawns an async task on the local thread.
-	pub fn run_async_local<Func, Fut, Out>(
+	pub async fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> impl Future<Output = ()>
+	) -> Result<()>
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out>,
@@ -738,6 +761,7 @@ impl AsyncEntity {
 		self.with_then(move |mut entity| {
 			entity.run_async_local(func);
 		})
+		.await
 	}
 
 	/// Gets a component and runs a function with it.
@@ -748,29 +772,35 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(|entity| {
+		self.with_then(move |entity| -> Result<O> {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found: {}", std::any::type_name::<T>())
+				bevybail!(
+					"Component not found: {}",
+					std::any::type_name::<T>()
+				)
 			}
 		})
 		.await
+		.flatten()
 	}
 	/// Checks if the entity contains the component
 	pub async fn contains<T: Component>(&self) -> bool {
-		self.with_then(|entity| entity.contains::<T>()).await
+		self.with_then(|entity| entity.contains::<T>())
+			.await
+			.unwrap_or(false)
 	}
 
 	/// Runs a function with access to the entity id and system parameter state.
-	pub fn with_state<T: 'static + SystemParam, O>(
+	pub async fn with_state<T: 'static + SystemParam, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Entity, T::Item<'_, '_>) -> O,
-	) -> impl Future<Output = O>
+	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(|mut entity| entity.with_state(func))
+		self.with_then(|mut entity| entity.with_state(func)).await
 	}
 
 	/// Gets a mutable component and runs a function with it.
@@ -789,6 +819,7 @@ impl AsyncEntity {
 			}
 		})
 		.await
+		.flatten()
 	}
 
 	/// Gets a cloned component from an [`AncestorQuery`]
@@ -799,6 +830,7 @@ impl AsyncEntity {
 			query.get(entity).cloned().xok()
 		})
 		.await
+		.flatten()
 		.flatten()
 	}
 
@@ -818,11 +850,12 @@ impl AsyncEntity {
 				.xok()
 		})
 		.await
+		.flatten()
 	}
 
 
 	/// Takes a component from the entity.
-	pub async fn take<T: Component>(&self) -> Option<T> {
+	pub async fn take<T: Component>(&self) -> Result<Option<T>> {
 		self.with_then(|mut entity| entity.take()).await
 	}
 
@@ -835,12 +868,12 @@ impl AsyncEntity {
 	}
 
 	/// Inserts a bundle and waits for completion.
-	pub async fn insert_then<B: Bundle>(&self, bundle: B) -> &Self {
+	pub async fn insert_then<B: Bundle>(&self, bundle: B) -> Result<&Self> {
 		self.with_then(|mut entity| {
 			entity.insert(bundle);
 		})
-		.await;
-		self
+		.await?;
+		self.xok()
 	}
 
 	/// Spawns a child entity and returns its ID.
@@ -866,7 +899,7 @@ impl AsyncEntity {
 	pub async fn queue_then<O>(
 		&self,
 		command: impl 'static + Send + EntityCommand<O>,
-	) -> O
+	) -> Result<O>
 	where
 		O: 'static + Send + Sync,
 	{
@@ -888,48 +921,48 @@ impl AsyncEntity {
 	pub async fn trigger_then<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> &Self {
+	) -> Result<&Self> {
 		self.with_then(move |mut entity| {
 			entity.trigger(ev);
 		})
-		.await;
-		self
+		.await?;
+		self.xok()
 	}
 
 	/// Triggers an entity target event and waits for completion.
 	pub async fn trigger_target_then<M>(
 		&self,
 		event: impl IntoEntityTargetEvent<M>,
-	) -> &Self {
+	) -> Result<&Self> {
 		self.with_then(|mut entity| {
 			entity.trigger_target(event);
 		})
-		.await;
-		self
+		.await?;
+		self.xok()
 	}
 
 	/// Registers an observer on the entity.
 	pub async fn observe<E: Event, B: Bundle, M>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M>,
-	) -> &Self {
+	) -> Result<&Self> {
 		self.with_then(|mut entity| {
 			entity.observe_any(observer);
 		})
-		.await;
-		self
+		.await?;
+		self.xok()
 	}
 
 	/// Awaits a single event of type `E` for this entity, then despawns the observer.
-	pub async fn await_event<E: Event, B: Bundle>(&self) -> &Self {
+	pub async fn await_event<E: Event, B: Bundle>(&self) -> Result<&Self> {
 		let (send, recv) = async_channel::bounded(1);
 		self.observe(move |ev: On<E, B>, mut commands: Commands| {
 			send.try_send(()).ok();
 			commands.entity(ev.observer()).despawn();
 		})
-		.await;
+		.await?;
 		recv.recv().await.ok();
-		self
+		self.xok()
 	}
 
 	/// Despawns the entity.
@@ -937,7 +970,8 @@ impl AsyncEntity {
 		self.with_then(move |entity| {
 			entity.despawn();
 		})
-		.await;
+		.await
+		.ok();
 	}
 }
 

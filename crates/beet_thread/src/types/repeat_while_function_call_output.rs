@@ -19,6 +19,7 @@ async fn has_pending_function_call_output(
 				.xok()
 		})
 		.await
+		.flatten()
 }
 
 /// Repeat control-flow component for agent tool-call loops.

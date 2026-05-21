@@ -159,6 +159,7 @@ impl O11sStreamer {
 				},
 			)
 			.await
+			.flatten()
 	}
 }
 

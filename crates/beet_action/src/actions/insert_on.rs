@@ -53,7 +53,7 @@ where
 	let world = cx.world();
 	let insert_on = cx.caller.get_cloned::<InsertOn<B>>().await?;
 	let target = insert_on.target_entity.get_async(&world, action).await;
-	world.entity(target).insert_then(insert_on.bundle).await;
+	world.entity(target).insert_then(insert_on.bundle).await?;
 	Outcome::PASS.xok()
 }
 

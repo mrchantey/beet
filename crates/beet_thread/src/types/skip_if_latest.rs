@@ -64,7 +64,7 @@ where
 					}
 					.xok()
 				})
-				.await?;
+				.await??;
 
 			if should_skip {
 				Ok(PASS)

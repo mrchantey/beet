@@ -34,4 +34,5 @@ pub async fn default_scene_renderer(
 			.xok()
 		})
 		.await
+		.flatten()
 }

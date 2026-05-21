@@ -1451,14 +1451,13 @@ version = "0.0.9-dev.10"
 dependencies = [
  "beet_action",
  "beet_core",
+ "beet_net",
  "beet_spatial",
  "bevy",
- "blocking",
  "burn",
  "burn-store",
  "console_error_panic_hook",
  "futures",
- "js-sys",
  "log",
  "pretty_env_logger",
  "ron 0.8.1",
@@ -1468,10 +1467,6 @@ dependencies = [
  "strum_macros 0.26.4",
  "thiserror 2.0.18",
  "tokenizers",
- "ureq 3.3.0",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
@@ -11024,6 +11019,9 @@ name = "send_wrapper"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
+dependencies = [
+ "futures-core",
+]
 
 [[package]]
 name = "seq-macro"

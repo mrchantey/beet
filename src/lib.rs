@@ -54,8 +54,6 @@ pub mod prelude {
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "ui")]
-	pub use crate::core::prelude::Pointer;
-	#[cfg(feature = "ui")]
 	pub use crate::ui::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
@@ -83,7 +81,6 @@ pub mod prelude {
 	cfg_if! {
 		if #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]{
 			pub use crate::ui::prelude::Justify;
-			pub use crate::ui::prelude::Pointer;
 		}
 	}
 	cfg_if! {

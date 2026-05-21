@@ -64,7 +64,7 @@ impl SceneEntity {
 					)
 				},
 			)
-			.await;
+			.await?;
 
 		let scene_entity = caller.world().entity(scene.entity);
 		let result = scene_entity.call_detached(render_action, parts).await;
@@ -143,7 +143,7 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
 				.cloned()
 				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
 		})
-		.await;
+		.await?;
 
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
 	let bytes = bucket.get_media(&path).await?;
@@ -152,7 +152,7 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
 		.with_then(move |mut entity_mut| {
 			MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))
 		})
-		.await?;
+		.await??;
 	SceneEntity::new_fixed(cx.id()).xok()
 }
 

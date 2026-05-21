@@ -187,6 +187,7 @@ impl CompletionsStreamer {
 				},
 			)
 			.await
+			.flatten()
 	}
 }
 

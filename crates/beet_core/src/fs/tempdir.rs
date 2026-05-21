@@ -8,7 +8,7 @@ use uuid::Uuid;
 ///
 /// This struct provides a safe way to create temporary directories that are
 /// guaranteed to be cleaned up when they go out of scope. The directory name
-/// is generated using a UUID v4 to ensure uniqueness and avoid collisions.
+/// is generated using a UUID v7 to ensure uniqueness and avoid collisions.
 ///
 /// This type is not [`Clone`] as it removes the underlying directory on drop.
 ///
@@ -45,7 +45,7 @@ impl TempDir {
 	/// Creates a new temporary directory in the system's temporary directory.
 	///
 	/// The directory is created with a unique name in the format `beet_tmp_<uuid>`,
-	/// where `<uuid>` is a randomly generated UUID v4. The directory will be
+	/// where `<uuid>` is a randomly generated UUID v7. The directory will be
 	/// automatically deleted when the `TempDir` instance is dropped.
 	///
 	/// # Example
@@ -75,7 +75,7 @@ impl TempDir {
 	/// Creates a new temporary directory relative to the workspace root.
 	///
 	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp_<uuid>`,
-	/// where `<uuid>` is a randomly generated UUID v4. This is useful for keeping
+	/// where `<uuid>` is a randomly generated UUID v7. This is useful for keeping
 	/// temporary files within the project structure.
 	///
 	/// # Example

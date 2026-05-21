@@ -53,8 +53,12 @@ pub use in_memory_bucket::*;
 pub use scene_store::*;
 mod fs_bucket;
 #[cfg(target_arch = "wasm32")]
+mod indexed_db_bucket;
+#[cfg(target_arch = "wasm32")]
 mod local_storage_bucket;
 pub use fs_bucket::*;
+#[cfg(target_arch = "wasm32")]
+pub use indexed_db_bucket::*;
 #[cfg(target_arch = "wasm32")]
 pub use local_storage_bucket::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
@@ -88,7 +92,9 @@ impl Plugin for BucketPlugin {
 
 		#[cfg(target_arch = "wasm32")]
 		app.register_type::<LocalStorageBucket>()
-			.register_type::<TypedBlob<LocalStorageBucket>>();
+			.register_type::<TypedBlob<LocalStorageBucket>>()
+			.register_type::<IndexedDbBucket>()
+			.register_type::<TypedBlob<IndexedDbBucket>>();
 
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Bucket>()
