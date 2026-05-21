@@ -146,13 +146,11 @@ test-all *args:
 		echo "please download assets directory: just pull-assets"; \
 		exit 1; \
 	fi
-	# Run beet_spatial in its own cargo invocation: enabling its
-	# `bevy_default` feature alongside the core crates unifies bevy/default
-	# across the whole graph, which has tripped a mold linker bug.
-	just _test-pkgs "{{ _core-pkgs }}" {{ args }}
-	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
-	just _test-pkgs "beet_spatial" {{ args }}
-	just _test-pkgs-wasm "beet_spatial" {{ args }}
+	just test-core {{ args }}
+	# `bevy_default`-enabling crates each run in their own cargo invocation —
+	# unifying `bevy/default` across the whole graph has tripped a mold linker bug.
+	for pkg in {{ _extra-pkgs }}; do just _test-pkgs "$pkg" {{ args }}; done
+	for pkg in {{ _extra-pkgs-wasm }}; do just _test-pkgs-wasm "$pkg" {{ args }}; done
 	just test-rsx {{ args }}
 	# beet-cli is currently commented out of the workspace; re-add when restored.
 	# cargo test -p beet-cli --all-features {{ args }} -- {{ test-threads }}
@@ -203,8 +201,20 @@ _core-pkgs := "beet_core_shared beet_core_macros beet_core beet_infra beet_net b
 # Wasm test crate sets (skip crates that don't build for wasm).
 _core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_action"
 
+# Crates that enable `bevy_default` — each runs in its own cargo invocation
+# in `test-all` (see comment there). Excluded from `test-core`.
+_extra-pkgs := "beet_spatial beet_ml"
+
+# Subset of `_extra-pkgs` that builds for wasm (beet_ml doesn't — `getrandom`
+# needs the `wasm_js` feature).
+_extra-pkgs-wasm := "beet_spatial"
+
 # Computes the cargo feature flag for the in-scope crates on the current
 # toolchain channel (nightly => --all-features, else explicit exclude list).
+# Excludes:
+# - `nightly` / `custom_test_frameworks`: nightly-only test runner path
+# - `default`: redundant with explicit feature enumeration
+# - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (default)
 _core-features pkgs:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -213,7 +223,7 @@ _core-features pkgs:
 	else
 		feats=$(for c in {{ pkgs }}; do
 			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' crates/$c/Cargo.toml
-		done | grep -vE '/(nightly|custom_test_frameworks|default)$' | paste -sd, -)
+		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda)$' | paste -sd, -)
 		echo "--features $feats"
 	fi
 
