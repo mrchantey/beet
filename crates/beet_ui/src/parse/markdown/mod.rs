@@ -40,7 +40,7 @@ pub struct MarkdownParser {
 #[derive(Debug, Clone)]
 pub struct MarkdownParseConfig {
 	/// pulldown-cmark options controlling which extensions are enabled.
-	pub options: Options,
+	pub options: pulldown_cmark::Options,
 	/// Whether to parse frontmatter metadata blocks.
 	pub parse_frontmatter: bool,
 }

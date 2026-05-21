@@ -15,6 +15,7 @@ mod named_field;
 #[cfg(feature = "std")]
 pub mod pkg_ext;
 mod synhow;
+mod tokenize;
 
 
 
@@ -26,4 +27,5 @@ pub mod prelude {
 	pub use crate::pkg_ext;
 	pub use crate::synbail;
 	pub use crate::synhow;
+	pub use crate::tokenize::*;
 }

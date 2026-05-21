@@ -37,7 +37,6 @@ We will start from the basic dependencies and work upwards. Skip those marked co
 - [x] beet_flow
 - [x] beet_net
 - [x] beet_router
-- [x] beet_parse
 - [x] beet_build
 
 

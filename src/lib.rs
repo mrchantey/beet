@@ -33,8 +33,6 @@ pub use beet_examples as examples;
 // pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
-// #[cfg(feature = "parse")]
-// pub use beet_parse as parse;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 #[rustfmt::skip]

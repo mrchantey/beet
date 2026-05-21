@@ -42,7 +42,6 @@ pub fn is_internal() -> bool {
 		"beet_ml",
 		"beet_net",
 		"beet_ui",
-		"beet_parse",
 		"beet_router",
 		"beet_spatial",
 		"beet_action",
