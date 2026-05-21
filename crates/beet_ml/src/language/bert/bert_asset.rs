@@ -36,11 +36,11 @@ impl Bert {
 	/// see its docs for the currently supported targets.
 	pub async fn new(config: BertConfig) -> Result<Self> {
 		let model_config_bytes =
-			crate::fetch::fetch_bytes(&config.model.config_url()).await?;
+			crate::fetch_bytes::fetch_bytes(&config.model.config_url()).await?;
 		let weights_bytes =
-			crate::fetch::fetch_bytes(&config.model.model_url()).await?;
+			crate::fetch_bytes::fetch_bytes(&config.model.model_url()).await?;
 		let tokenizer_bytes =
-			crate::fetch::fetch_bytes(&config.model.tokenizer_url()).await?;
+			crate::fetch_bytes::fetch_bytes(&config.model.tokenizer_url()).await?;
 		Self::from_bytes(
 			config,
 			&model_config_bytes,
