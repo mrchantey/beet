@@ -125,12 +125,7 @@ impl MarkdownParser {
 		// tokenize fenced code blocks if a highlighter is configured
 		#[cfg(feature = "syntax_highlighting")]
 		if let Some(ref highlighter) = self.config.syntax_highlighting {
-			let mut highlighter = highlighter.clone();
-			crate::parse::apply_syntax_highlighting(
-				world,
-				entity,
-				&mut highlighter,
-			);
+			highlighter.apply(world, entity);
 		}
 
 		// insert frontmatter on root if present

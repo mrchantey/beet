@@ -131,12 +131,7 @@ impl HtmlParser {
 		// tokenize fenced code blocks if a highlighter is configured
 		#[cfg(feature = "syntax_highlighting")]
 		if let Some(ref highlighter) = self.syntax_highlighting {
-			let mut highlighter = highlighter.clone();
-			crate::parse::apply_syntax_highlighting(
-				world,
-				entity,
-				&mut highlighter,
-			);
+			highlighter.apply(world, entity);
 		}
 
 		// insert file span on the root entity if path provided

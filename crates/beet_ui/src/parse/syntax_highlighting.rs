@@ -1,14 +1,12 @@
 //! Tree-sitter based syntax highlighting for code blocks.
 //!
-//! [`SyntaxHighlighting`] holds a tree-sitter [`Parser`] plus a per-language
-//! [`Query`] and a colour palette mapping highlight capture names to
-//! [`Color`]s. Given a language identifier and a source slice, [`Self::highlight`]
-//! returns a sequence of [`HighlightSpan`]s covering every byte of the input
-//! exactly once.
+//! [`SyntaxHighlighting`] holds a per-language [`Language`] grammar and
+//! highlight query source. Given a language identifier and a source
+//! slice, [`Self::highlight`] returns a sequence of [`HighlightSpan`]s
+//! covering every byte of the input exactly once.
 //!
-//! Capture-name dispatch follows the same dot-separated longest-match rule as
-//! tree-sitter-highlight: `string.escape` wins over `string` when both are
-//! present in the palette.
+//! Capture names are emitted verbatim, with no colour resolution: the
+//! renderer is responsible for mapping `hl-<capture>` classes to styles.
 //!
 //! Only enabled with the `syntax_highlighting` feature.
 
@@ -19,78 +17,45 @@ use beet_core::prelude::*;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::Language;
 use tree_sitter::Parser;
-use tree_sitter::Query;
+use tree_sitter::Query as TsQuery;
 use tree_sitter::QueryCursor;
 
-/// Top-level config holding parser, per-language queries, and the
-/// capture-name → colour palette.
+/// Registry of tree-sitter grammars used to tokenize fenced code blocks.
+#[derive(Default, Clone)]
 pub struct SyntaxHighlighting {
-	parser: Parser,
-	languages: HashMap<String, LanguageEntry>,
-	palette: HashMap<String, Color>,
+	languages: HashMap<SmolStr, LanguageEntry>,
 }
 
 impl core::fmt::Debug for SyntaxHighlighting {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("SyntaxHighlighting")
 			.field("languages", &self.languages.keys().collect::<Vec<_>>())
-			.field("palette_len", &self.palette.len())
 			.finish()
 	}
 }
 
-impl Clone for SyntaxHighlighting {
-	fn clone(&self) -> Self {
-		let mut out = Self::empty();
-		out.palette = self.palette.clone();
-		for (name, entry) in &self.languages {
-			out.languages.insert(name.clone(), LanguageEntry {
-				language: entry.language.clone(),
-				query_source: entry.query_source.clone(),
-				aliases: entry.aliases.clone(),
-			});
-		}
-		out
-	}
-}
-
-impl Default for SyntaxHighlighting {
-	fn default() -> Self { Self::with_defaults() }
-}
-
+#[derive(Clone)]
 struct LanguageEntry {
 	language: Language,
-	query_source: String,
-	aliases: Vec<String>,
+	query_source: SmolStr,
+	aliases: Vec<SmolStr>,
 }
 
 /// A contiguous slice of highlighted source text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HighlightSpan {
 	/// Owned slice of the original source for this span.
-	pub text: String,
+	pub text: SmolStr,
 	/// Recognised capture name like `keyword`, or `None` for unstyled
 	/// regions between captures.
-	pub capture: Option<String>,
-	/// Resolved colour from the palette, when the capture matched a value.
-	pub color: Option<Color>,
+	pub capture: Option<SmolStr>,
 }
 
 impl SyntaxHighlighting {
-	/// A highlighter with no languages or palette entries.
-	pub fn empty() -> Self {
-		Self {
-			parser: Parser::new(),
-			languages: HashMap::default(),
-			palette: HashMap::default(),
-		}
-	}
-
 	/// A highlighter pre-registered with `rust`, `javascript`, `json`,
-	/// `html` (plus common aliases), and the default colour palette.
+	/// and `html` (plus common aliases).
 	pub fn with_defaults() -> Self {
-		let mut this = Self::empty();
-		this.set_default_palette();
+		let mut this = Self::default();
 		this.add_rust();
 		this.add_javascript();
 		this.add_json();
@@ -105,8 +70,7 @@ impl SyntaxHighlighting {
 			tree_sitter_rust::LANGUAGE.into(),
 			tree_sitter_rust::HIGHLIGHTS_QUERY,
 			&["rs"],
-		);
-		self
+		)
 	}
 
 	/// Register the javascript grammar.
@@ -116,8 +80,7 @@ impl SyntaxHighlighting {
 			tree_sitter_javascript::LANGUAGE.into(),
 			tree_sitter_javascript::HIGHLIGHT_QUERY,
 			&["js", "jsx", "mjs"],
-		);
-		self
+		)
 	}
 
 	/// Register the json grammar.
@@ -127,8 +90,7 @@ impl SyntaxHighlighting {
 			tree_sitter_json::LANGUAGE.into(),
 			tree_sitter_json::HIGHLIGHTS_QUERY,
 			&[],
-		);
-		self
+		)
 	}
 
 	/// Register the html grammar.
@@ -138,8 +100,7 @@ impl SyntaxHighlighting {
 			tree_sitter_html::LANGUAGE.into(),
 			tree_sitter_html::HIGHLIGHTS_QUERY,
 			&["htm"],
-		);
-		self
+		)
 	}
 
 	/// Register a tree-sitter [`Language`] under `name` with a highlight query.
@@ -148,17 +109,17 @@ impl SyntaxHighlighting {
 	/// Panics if the query fails to compile against the language.
 	pub fn add_language(
 		&mut self,
-		name: impl Into<String>,
+		name: impl Into<SmolStr>,
 		language: Language,
-		query: impl Into<String>,
+		query: impl Into<SmolStr>,
 		aliases: &[&str],
 	) -> &mut Self {
 		let name = name.into();
 		let query_source = query.into();
 		// validate up-front so a bad grammar fails registration, not highlight
-		Query::new(&language, &query_source).expect("query compiles");
-		let aliases = aliases.iter().map(|s| s.to_string()).collect();
-		self.languages.insert(name.clone(), LanguageEntry {
+		TsQuery::new(&language, &query_source).expect("query compiles");
+		let aliases = aliases.iter().map(|s| SmolStr::from(*s)).collect();
+		self.languages.insert(name, LanguageEntry {
 			language,
 			query_source,
 			aliases,
@@ -166,49 +127,16 @@ impl SyntaxHighlighting {
 		self
 	}
 
-	/// Reset the palette to the built-in default scheme.
-	pub fn set_default_palette(&mut self) -> &mut Self {
-		self.palette.clear();
-		self.palette
-			.extend(default_palette().into_iter().map(|(k, v)| (k.into(), v)));
-		self
-	}
-
-	/// Override the colour assigned to a single capture name.
-	pub fn set_color(
-		&mut self,
-		capture: impl Into<String>,
-		color: impl Into<Color>,
-	) -> &mut Self {
-		self.palette.insert(capture.into(), color.into());
-		self
-	}
-
-	/// Look up the colour for a capture name with dot-separated longest-match
-	/// fallback (`string.escape` first, then `string`).
-	pub fn color_for(&self, capture: &str) -> Option<Color> {
-		let mut key = capture;
-		loop {
-			if let Some(c) = self.palette.get(key) {
-				return Some(*c);
-			}
-			match key.rfind('.') {
-				Some(pos) => key = &key[..pos],
-				None => return None,
-			}
-		}
-	}
-
 	/// Resolve a code-block info string (eg `rust` or `rs`) to a registered
 	/// language entry.
 	fn resolve_language(&self, name: &str) -> Option<&LanguageEntry> {
 		let lower = name.to_ascii_lowercase();
-		if let Some(entry) = self.languages.get(&lower) {
+		if let Some(entry) = self.languages.get(lower.as_str()) {
 			return Some(entry);
 		}
 		self.languages
 			.values()
-			.find(|entry| entry.aliases.iter().any(|a| a == &lower))
+			.find(|entry| entry.aliases.iter().any(|a| a.as_str() == lower))
 	}
 
 	/// Tokenize `source` for `lang`, returning a complete cover of the input
@@ -216,40 +144,30 @@ impl SyntaxHighlighting {
 	///
 	/// Returns a single unstyled span if the language is unknown or parsing
 	/// produced no tree, so callers can always render the result.
-	pub fn highlight(
-		&mut self,
-		lang: &str,
-		source: &str,
-	) -> Vec<HighlightSpan> {
+	pub fn highlight(&self, lang: &str, source: &str) -> Vec<HighlightSpan> {
 		let Some(entry) = self.resolve_language(lang) else {
 			return vec![HighlightSpan {
-				text: source.to_string(),
+				text: source.into(),
 				capture: None,
-				color: None,
 			}];
 		};
-		let language = entry.language.clone();
-		let query_source = entry.query_source.clone();
 
-		if self.parser.set_language(&language).is_err() {
+		let mut parser = Parser::new();
+		if parser.set_language(&entry.language).is_err() {
 			return vec![HighlightSpan {
-				text: source.to_string(),
+				text: source.into(),
 				capture: None,
-				color: None,
 			}];
 		}
-		let Some(tree) = self.parser.parse(source.as_bytes(), None) else {
+		let Some(tree) = parser.parse(source.as_bytes(), None) else {
 			return vec![HighlightSpan {
-				text: source.to_string(),
+				text: source.into(),
 				capture: None,
-				color: None,
 			}];
 		};
 
-		// rebuild query so we can borrow capture_names() with a longer lifetime
-		// (Query stored on entry would force re-borrowing self).
-		let query =
-			Query::new(&language, &query_source).expect("query compiles");
+		let query = TsQuery::new(&entry.language, &entry.query_source)
+			.expect("query compiles");
 		let capture_names: Vec<&str> = query.capture_names().to_vec();
 
 		// 1. collect captures sorted by start byte (BTreeMap keeps order)
@@ -283,38 +201,87 @@ impl SyntaxHighlighting {
 			}
 			if start > cursor_byte {
 				spans.push(HighlightSpan {
-					text: source[cursor_byte..start].to_string(),
+					text: source[cursor_byte..start].into(),
 					capture: None,
-					color: None,
 				});
 			}
 			let name = capture_names
 				.get(capture_index as usize)
 				.copied()
 				.unwrap_or("");
-			let color = self.color_for(name);
 			spans.push(HighlightSpan {
-				text: source[start..end].to_string(),
-				capture: Some(name.to_string()),
-				color,
+				text: source[start..end].into(),
+				capture: Some(name.into()),
 			});
 			cursor_byte = end;
 		}
 		if cursor_byte < source.len() {
 			spans.push(HighlightSpan {
-				text: source[cursor_byte..].to_string(),
+				text: source[cursor_byte..].into(),
 				capture: None,
-				color: None,
 			});
 		}
 		spans
+	}
+
+	/// Walk descendants of `root`, find each `<code class="language-X">`
+	/// whose only child is a text node, and replace the text node with one
+	/// span element per highlight run.
+	///
+	/// Each emitted span has:
+	/// - tag `span`
+	/// - attribute `class="hl-<capture>"` for captured runs (omitted for plain runs)
+	/// - a single text child carrying the original slice of source
+	pub fn apply(&self, world: &mut World, root: Entity) {
+		let blocks = self.find_code_blocks(world, root);
+		for (code_entity, lang, text_entity, source) in blocks {
+			let spans = self.highlight(&lang, &source);
+			world.entity_mut(text_entity).despawn();
+			for span in spans {
+				spawn_highlight_span(world, code_entity, span);
+			}
+		}
+	}
+
+	/// Collect every fenced code block descended from `root` that is
+	/// eligible for syntax highlighting. Returns tuples of
+	/// `(code_entity, language, text_entity, source_text)`.
+	fn find_code_blocks(
+		&self,
+		world: &mut World,
+		root: Entity,
+	) -> Vec<(Entity, SmolStr, Entity, SmolStr)> {
+		world.with_state::<(Query<&Children>, ElementQuery), _>(
+			|(children, elements)| {
+				children
+					.iter_descendants_inclusive::<Children>(root)
+					.filter_map(|entity| elements.get(entity).ok())
+					.filter(|view| view.tag() == "code")
+					.filter_map(|view| {
+						let (text_entity, value) = view.inner_text?;
+						let source = value.as_str().ok()?;
+						let lang = view.iter_classes().find_map(|c| {
+							let name =
+								c.strip_prefix("language-").unwrap_or(&c);
+							(!name.is_empty()).then(|| SmolStr::from(name))
+						})?;
+						Some((
+							view.entity,
+							lang,
+							text_entity,
+							SmolStr::from(source),
+						))
+					})
+					.collect()
+			},
+		)
 	}
 }
 
 /// The built-in colour palette, keyed by tree-sitter capture name.
 ///
-/// Designed to be readable on both light and dark terminals. Override
-/// individual entries with [`SyntaxHighlighting::set_color`].
+/// Designed to be readable on both light and dark terminals. Renderers
+/// can register these via a class map like `hl-<capture>`.
 pub fn default_palette() -> Vec<(&'static str, Color)> {
 	vec![
 		("attribute", Color::srgb(0.85, 0.65, 0.30)),
@@ -363,107 +330,6 @@ pub fn recognised_names() -> &'static [&'static str] {
 	tokens_mod::recognised_names()
 }
 
-/// Walk descendants of `root`, find each `<pre><code class="language-X">`
-/// whose only child is a text node, and replace the text node with one
-/// span element per highlight run.
-///
-/// Each emitted span has:
-/// - tag `span`
-/// - attribute `class="hl-<capture>"` for captured runs (omitted for plain runs)
-/// - a single text child carrying the original slice of source
-pub fn apply_syntax_highlighting(
-	world: &mut World,
-	root: Entity,
-	highlighter: &mut SyntaxHighlighting,
-) {
-	let blocks = find_code_blocks(world, root);
-	for (code_entity, lang, text_entity, source) in blocks {
-		let spans = highlighter.highlight(&lang, &source);
-		// despawn the original single text child
-		world.entity_mut(text_entity).despawn();
-		for span in spans {
-			spawn_highlight_span(world, code_entity, span);
-		}
-	}
-}
-
-/// Walk descendants of `root` and collect every fenced code block that is
-/// eligible for syntax highlighting.
-///
-/// Returns tuples of (code_entity, language, text_entity, source_text).
-fn find_code_blocks(
-	world: &mut World,
-	root: Entity,
-) -> Vec<(Entity, String, Entity, String)> {
-	let mut out = Vec::new();
-	let mut stack = vec![root];
-	while let Some(current) = stack.pop() {
-		let Ok(entity_ref) = world.get_entity(current) else {
-			continue;
-		};
-		let is_code = entity_ref
-			.get::<Element>()
-			.map(|el| el.tag() == "code")
-			.unwrap_or(false);
-		let children: Vec<Entity> = entity_ref
-			.get::<Children>()
-			.map(|c| c.iter().collect())
-			.unwrap_or_default();
-		if is_code {
-			if let Some((lang, text_entity, text)) =
-				resolve_code_block(world, current, &children)
-			{
-				out.push((current, lang, text_entity, text));
-				continue; // do not recurse into a block we will replace
-			}
-		}
-		for child in children {
-			stack.push(child);
-		}
-	}
-	out
-}
-
-/// Resolve a `<code class="language-X">` entity to (language, text_entity, text)
-/// if its only child is a text node.
-fn resolve_code_block(
-	world: &World,
-	code: Entity,
-	children: &[Entity],
-) -> Option<(String, Entity, String)> {
-	let entity_ref = world.get_entity(code).ok()?;
-	let attributes = entity_ref.get::<Attributes>()?;
-	let mut lang = None;
-	for attr_entity in attributes.iter() {
-		let attr_ref = world.get_entity(attr_entity).ok()?;
-		if attr_ref.get::<Attribute>()?.as_str() == "class" {
-			let value = attr_ref.get::<Value>()?;
-			let class = value.as_str().ok()?;
-			for c in class.split_whitespace() {
-				// accept both `language-X` (HTML convention) and bare `X`
-				let name = c.strip_prefix("language-").unwrap_or(c);
-				if !name.is_empty() {
-					lang = Some(name.to_string());
-					break;
-				}
-			}
-		}
-	}
-	let lang = lang?;
-	if children.len() != 1 {
-		return None;
-	}
-	let text_entity = children[0];
-	let text = world
-		.get_entity(text_entity)
-		.ok()?
-		.get::<Value>()?
-		.as_str()
-		.ok()?
-		.to_string();
-	Some((lang, text_entity, text))
-}
-
 /// Spawn a single highlight span as a child of `parent`. When `span.capture`
 /// is set, an `Attribute("class") = "hl-<capture>"` entity is also spawned.
 fn spawn_highlight_span(
@@ -473,14 +339,14 @@ fn spawn_highlight_span(
 ) {
 	let element = world.spawn((Element::new("span"), ChildOf(parent))).id();
 	if let Some(capture) = &span.capture {
-		let class = format!("hl-{}", capture);
+		let class = format!("hl-{capture}");
 		world.spawn((
 			Attribute::new("class"),
 			Value::str(class),
 			AttributeOf::new(element),
 		));
 	}
-	world.spawn((Value::str(span.text), ChildOf(element)));
+	world.spawn((Value::Str(span.text), ChildOf(element)));
 }
 
 
@@ -490,7 +356,7 @@ mod test {
 
 	#[beet_core::test]
 	fn highlights_simple_rust() {
-		let mut hl = SyntaxHighlighting::with_defaults();
+		let hl = SyntaxHighlighting::with_defaults();
 		let spans = hl.highlight("rust", "fn main() {}");
 		// must cover entire source
 		spans
@@ -507,7 +373,7 @@ mod test {
 
 	#[beet_core::test]
 	fn highlights_unknown_lang_passthrough() {
-		let mut hl = SyntaxHighlighting::with_defaults();
+		let hl = SyntaxHighlighting::with_defaults();
 		let spans = hl.highlight("nonesuch", "abc");
 		spans.len().xpect_eq(1);
 		spans[0].text.as_str().xpect_eq("abc");
@@ -515,26 +381,8 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn longest_match_wins() {
-		let mut hl = SyntaxHighlighting::empty();
-		hl.set_color("string", Color::srgb(1.0, 0.0, 0.0));
-		hl.set_color("string.escape", Color::srgb(0.0, 1.0, 0.0));
-		hl.color_for("string.escape")
-			.unwrap()
-			.to_srgba()
-			.green
-			.xpect_close(1.0);
-		// fallback for unknown subkind
-		hl.color_for("string.regexp")
-			.unwrap()
-			.to_srgba()
-			.red
-			.xpect_close(1.0);
-	}
-
-	#[beet_core::test]
 	fn aliases_resolve() {
-		let mut hl = SyntaxHighlighting::with_defaults();
+		let hl = SyntaxHighlighting::with_defaults();
 		hl.highlight("rs", "fn main() {}")
 			.iter()
 			.any(|s| s.capture.as_deref() == Some("keyword"))
@@ -543,7 +391,7 @@ mod test {
 
 	#[beet_core::test]
 	fn spans_cover_source() {
-		let mut hl = SyntaxHighlighting::with_defaults();
+		let hl = SyntaxHighlighting::with_defaults();
 		let src = "let x = 42;\n// comment\n";
 		hl.highlight("rust", src)
 			.iter()
