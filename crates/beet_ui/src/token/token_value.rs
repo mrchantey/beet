@@ -65,6 +65,12 @@ impl TypedValue {
 		}
 		.xok()
 	}
+	/// Construct directly from a [`Value`] and its [`TokenSchema`]. No
+	/// type-check is performed, the caller is responsible for matching the
+	/// value to the schema.
+	pub fn from_value(value: Value, schema: TokenSchema) -> Self {
+		Self { value, schema }
+	}
 	#[cfg(feature = "json")]
 	pub fn into_typed<T: Typed + DeserializeOwned>(&self) -> Result<T> {
 		self.schema.assert_eq_ty::<T>()?;

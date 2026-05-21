@@ -24,6 +24,16 @@ impl TokenSet {
 	pub fn value_mut(&mut self, token: &Token) -> Option<&mut TokenValue> {
 		self.tokens.get_mut(token)
 	}
+
+	/// Set the cached value for a token, returning a mutable reference to the
+	/// inserted entry. Does not touch listeners.
+	pub fn insert_value(
+		&mut self,
+		token: Token,
+		value: TokenValue,
+	) -> &mut TokenValue {
+		self.tokens.entry(token).insert(value).into_mut()
+	}
 	/// Entities that should receive the resolved [`Value`] when this token
 	/// changes.
 	pub fn listeners(&self, token: &Token) -> Option<&HashSet<Entity>> {

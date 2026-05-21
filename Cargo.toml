@@ -458,6 +458,11 @@ name = "state"
 path = "examples/ui/state.rs"
 required-features = ["ratatui"]
 
+[[example]]
+name = "crud"
+path = "examples/ui/crud.rs"
+required-features = ["ui", "action"]
+
 # 💡 Examples - Router
 
 [[example]]

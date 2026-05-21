@@ -2,55 +2,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
-
-#[derive(SystemParam, Get)]
-pub struct TokenQuery<'w, 's> {
-	commands: Commands<'w, 's>,
-	token_set: ResMut<'w, TokenSet>,
-}
-
-impl TokenQuery<'_, '_> {
-	pub fn handle_token_command(
-		&mut self,
-		_entity: Entity,
-		cmd: TokenCommand,
-	) -> Result {
-		let TokenCommand { token, handler } = cmd;
-
-		// mutate the cached value in the TokenSet
-		let value = {
-			let token_value =
-				self.token_set.value_mut(&token).ok_or_else(|| {
-					bevyhow!(
-						"Token not registered in TokenSet\nkey: {}",
-						token.key()
-					)
-				})?;
-			match handler {
-				TokenCommandHandler::MutateValue(handler) => {
-					handler(token_value)?;
-				}
-			}
-			token_value.clone()
-		};
-
-		// notify every entity listening on this token with the resolved value
-		if let TokenValue::Value(value) = value {
-			let value = value.value().clone();
-			let listeners: Vec<Entity> = self
-				.token_set
-				.listeners(&token)
-				.map(|listeners| listeners.iter().copied().collect())
-				.unwrap_or_default();
-			for entity in listeners {
-				self.commands.entity(entity).insert(value.clone());
-			}
-		}
-		Ok(())
-	}
-}
-
-/// An [`EntityCommand`] that mutates a token
+/// An [`EntityCommand`] that mutates a token.
+///
+/// Prefer [`TokenQuery`] when calling from a system, this command is for
+/// contexts where direct system access is unavailable (queued from observers,
+/// hooks, async tasks, etc).
 #[derive(Deref)]
 pub struct TokenCommand {
 	#[deref]
@@ -67,20 +23,46 @@ impl EntityCommand<Result> for TokenCommand {
 }
 
 impl TokenCommand {
+	/// Mutate the token's value through a closure. Errors if no value is
+	/// cached, use [`Self::mutate_or_init`] to seed a value first.
 	pub fn mutate_value(
 		token: Token,
 		handler: impl 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result,
 	) -> Self {
 		Self {
 			token,
-			handler: TokenCommandHandler::MutateValue(Box::new(handler)),
+			handler: TokenCommandHandler::MutateValue {
+				init: None,
+				handler: Box::new(handler),
+			},
+		}
+	}
+
+	/// Like [`Self::mutate_value`], but uses `init` to seed the token's value
+	/// when it's not yet cached.
+	pub fn mutate_or_init(
+		token: Token,
+		init: impl 'static + Send + Sync + FnOnce() -> Value,
+		handler: impl 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result,
+	) -> Self {
+		Self {
+			token,
+			handler: TokenCommandHandler::MutateValue {
+				init: Some(Box::new(init)),
+				handler: Box::new(handler),
+			},
 		}
 	}
 }
+
 // In the future we may want to support heavier operations like
-// executing arbitary systems
+// executing arbitrary systems.
 pub enum TokenCommandHandler {
-	MutateValue(
-		Box<dyn 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result>,
-	),
+	MutateValue {
+		/// Seed value used when no entry exists for the token. Leave `None`
+		/// to error on missing.
+		init: Option<Box<dyn 'static + Send + Sync + FnOnce() -> Value>>,
+		handler:
+			Box<dyn 'static + Send + Sync + FnOnce(&mut TokenValue) -> Result>,
+	},
 }
