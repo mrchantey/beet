@@ -24,7 +24,7 @@ async fn project(caller: &AsyncEntity) -> Result<terra::Project> {
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)
 		})
-		.await
+		.await?
 }
 
 /// Build an [`ArtifactsClient`] from the nearest ancestor [`Stack`].
@@ -33,7 +33,7 @@ async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.artifacts_client(entity)
 		})
-		.await
+		.await?
 }
 
 /// Read the current ledger, update the stack's deploy_id to match,
@@ -43,7 +43,7 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 	let client = stack.artifacts_client();
 	let ledger = client
 		.current_ledger()
@@ -59,14 +59,14 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 				Ok(())
 			},
 		)
-		.await?;
+		.await??;
 
 	// rebuild and re-apply with the updated deploy_id
 	let proj = caller
 		.with_state::<StackQuery, _>(|entity, query| {
 			query.build_project(entity)
 		})
-		.await?;
+		.await??;
 	info!("re-applying with deploy_id: {target_id}");
 	proj.apply().await
 }

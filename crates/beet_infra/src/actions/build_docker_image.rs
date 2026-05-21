@@ -77,7 +77,7 @@ pub async fn BuildDockerImageAction(
 		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
 			query.get(entity).map(|s| s.clone())
 		})
-		.await?;
+		.await??;
 
 	// get siblings by querying the parent's children
 	let (block, artifact) = cx
@@ -125,7 +125,7 @@ pub async fn BuildDockerImageAction(
 				(block, artifact).xok()
 			},
 		)
-		.await?;
+		.await??;
 
 	let binary_path = AbsPathBuf::new(artifact.artifact_path())?;
 	if !binary_path.exists() {

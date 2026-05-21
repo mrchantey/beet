@@ -302,7 +302,10 @@ impl BucketProvider for IndexedDbBucket {
 mod test {
 	use crate::prelude::*;
 
+	// IndexedDB requires a browser environment; the beet wasm test runner
+	// uses Deno which has no `window.indexedDB`.
 	#[beet_core::test]
+	#[ignore = "requires browser environment"]
 	async fn works() {
 		let provider = IndexedDbBucket::new("test-bucket");
 		bucket_test::run(provider).await;

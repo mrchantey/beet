@@ -71,7 +71,7 @@ pub async fn call_functions(
 
 				Ok(())
 			})
-			.await?;
+			.await??;
 	}
 
 	Ok(())

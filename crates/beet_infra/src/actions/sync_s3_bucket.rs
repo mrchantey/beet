@@ -14,7 +14,7 @@ pub async fn SyncS3BucketAction(
 		.with_state::<AncestorQuery<&S3FsBucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 	let s3_uri = s3_fs_bucket.s3_bucket().s3_uri();
 	let local_dir = s3_fs_bucket.fs_bucket().effective_root();
 	trace!(

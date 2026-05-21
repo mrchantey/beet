@@ -1,6 +1,9 @@
 //! The [`MediaRenderer`] will select the best renderer based on a
 //! list of accepted [`MediaType`]. Use cli args to specify the output
 //!
+//! With the `markdown` feature the markdown is parsed into structured
+//! nodes; without it the [`MediaParser`] falls back to plain text.
+//!
 //! ```sh
 //! # ansi-term (default)
 //! cargo run --example media_renderer -- --media-type text/ansi-term
@@ -16,8 +19,9 @@ fn main() {
 	let mut entity = world.spawn_empty();
 	let md_bytes = MediaBytes::new_markdown(MARKDOWN);
 
-	// 1. Load the markdown into ecs
-	MarkdownParser::new()
+	// 1. Load the markdown into ecs — falls back to plain text without
+	// the `markdown_parser` feature.
+	MediaParser::new()
 		.parse(ParseContext::new(&mut entity, &md_bytes))
 		.unwrap();
 

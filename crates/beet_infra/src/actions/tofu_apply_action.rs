@@ -31,7 +31,7 @@ pub async fn TofuApplyAction(
 				(project, stack, artifacts, variables).xok()
 			},
 		)
-		.await?;
+		.await??;
 	trace!(
 		"TofuApplyAction: collected {} artifacts, {} variables",
 		artifacts.len(),

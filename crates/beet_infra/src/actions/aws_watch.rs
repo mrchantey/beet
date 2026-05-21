@@ -68,7 +68,7 @@ pub async fn AwsWatchAction(
 		.with_state::<AncestorQuery<&Stack>, _>(|entity, query| {
 			query.get(entity).map(|stack| stack.aws_region().clone())
 		})
-		.await?;
+		.await??;
 
 	info!(
 		"tailing CloudWatch log group: {} (region: {region})",

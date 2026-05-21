@@ -109,12 +109,16 @@ async fn handle_connection(
 				)
 				.run_async_local(async move |child_entity| {
 					while let Ok(event) = from_client.recv().await {
-						child_entity.trigger_target_then(SshRecv(event)).await;
+						child_entity
+							.trigger_target_then(SshRecv(event))
+							.await
+							.ok();
 					}
 					// Channel closed — fire a Close event so observers can clean up.
 					child_entity
 						.trigger_target_then(SshRecv(SshEvent::Close(None)))
-						.await;
+						.await
+						.ok();
 				});
 			child_id
 		})
@@ -126,7 +130,7 @@ async fn handle_connection(
 		.world()
 		.entity(child_id)
 		.trigger_target_then(SshRecv(SshEvent::Connect))
-		.await;
+		.await?;
 	Ok(())
 }
 

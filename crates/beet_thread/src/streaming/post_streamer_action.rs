@@ -76,7 +76,7 @@ where
 					Ok(())
 				},
 			)
-			.await?;
+			.await??;
 	}
 
 	call_functions(cx.caller, function_calls.into_values()).await?;
