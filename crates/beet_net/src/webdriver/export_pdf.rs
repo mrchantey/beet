@@ -3,7 +3,7 @@
 //! This module provides types and methods for exporting web pages
 //! as PDF documents with configurable options.
 
-use crate::prelude::*;
+use super::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
 use serde_json::json;
@@ -185,10 +185,10 @@ impl Page {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 
 	#[beet_core::test]
+	#[ignore = "smoketest"]
 	async fn export_pdf_generates_valid_pdf() {
 		App::default()
 			.run_io_task_local(async move {
@@ -211,6 +211,7 @@ mod test {
 	}
 
 	#[beet_core::test]
+	#[ignore = "smoketest"]
 	async fn export_pdf_with_custom_options() {
 		App::default()
 			.run_io_task_local(async move {

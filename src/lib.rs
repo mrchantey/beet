@@ -27,8 +27,6 @@ pub use beet_thread as thread;
 pub use beet_ui as ui;
 // #[cfg(feature = "design")]
 // pub use beet_design as design;
-// #[cfg(feature = "dom")]
-// pub use beet_dom as dom;
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;
 // #[cfg(feature = "flow")]
@@ -64,8 +62,6 @@ pub mod prelude {
 	pub use crate::thread::prelude::*;
 	// #[cfg(feature = "design")]
 	// pub use crate::design::prelude::*;
-	// #[cfg(feature = "dom")]
-	// pub use crate::dom::prelude::*;
 	#[cfg(feature = "examples")]
 	pub use crate::examples::prelude::*;
 	// #[cfg(feature = "flow")]

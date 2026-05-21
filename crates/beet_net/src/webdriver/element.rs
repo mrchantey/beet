@@ -256,10 +256,11 @@ impl Element {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::webdriver::*;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
+	#[ignore = "smoketest"]
 	async fn visit_and_read_title() {
 		App::default()
 			.run_io_task_local(async move {

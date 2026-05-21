@@ -1,8 +1,8 @@
+use crate::prelude::*;
+use crate::sockets::Message;
+use crate::sockets::*;
 use beet_core::exports::async_channel;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
-use beet_net::sockets::Message;
-use beet_net::sockets::*;
 use bevy::tasks::IoTaskPool;
 use serde_json::Value;
 use serde_json::json;
@@ -290,10 +290,11 @@ impl Session {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::webdriver::*;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
+	#[ignore = "smoketest"]
 	async fn works() {
 		App::default()
 			.run_io_task_local(async move {

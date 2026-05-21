@@ -241,7 +241,7 @@ test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
 
-# The rsx crates (beet_dom, beet_rsx, beet_parse, beet_build, beet_design,
+# The rsx crates (beet_rsx, beet_parse, beet_build, beet_design,
 # beet_site) are currently commented out of the workspace, and beet_router's
 # old `tokens`/`server` features no longer exist. beet_router is already
 # exercised by `test-core`. Re-add lines here as the rsx crates come back.

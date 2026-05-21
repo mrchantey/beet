@@ -39,7 +39,6 @@ We will start from the basic dependencies and work upwards. Skip those marked co
 - [x] beet_router
 - [x] beet_parse
 - [x] beet_build
-- [x] beet_dom
 
 
 Finally we can verify all changes by running: `just test-all`

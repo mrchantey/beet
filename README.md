@@ -93,7 +93,6 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                                          | Status | Description                                         |
 | -------------------------------------------------------------- | ------ | --------------------------------------------------- |
-| [`beet_dom`](crates/beet_dom/Cargo.toml)                       | 🐉      | Utilities for dom rendering and interaction         |
 | [`beet_parse`](crates/beet_parse/Cargo.toml)                   | 🐉      | Parsers for various text and token formats          |
 | [`beet_rsx`](crates/beet_rsx/Cargo.toml)                       | 🐉      | An Astro inspired templating system built with bevy |
 | [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🐉      | JSX-like parser combinator for Rust                 |

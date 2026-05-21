@@ -3,11 +3,11 @@
 //! This module provides the [`Client`] type for connecting to WebDriver
 //! instances and creating browser sessions.
 
+use super::*;
 use crate::prelude::*;
 use async_process::Child;
 use async_process::Command;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
@@ -190,6 +190,7 @@ impl Client {
 ///
 /// This struct manages the lifecycle of the WebDriver process,
 /// killing it when dropped.
+#[derive(Get)]
 pub struct ClientProcess {
 	client: Client,
 	process: Child,
@@ -268,8 +269,7 @@ impl ClientProcess {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 
 	#[beet_core::test]
 	#[ignore = "smoketest"]
@@ -281,7 +281,7 @@ mod test {
 		client.kill().unwrap();
 	}
 	#[beet_core::test]
-	// #[ignore = "smoketest"]
+	#[ignore = "smoketest"]
 	async fn chromium() {
 		let client = ClientProcess::new_with_opts(Client {
 			provider: Provider::Chromedriver,

@@ -3,7 +3,7 @@
 //! This module provides the [`Page`] type which wraps a browser session
 //! and provides high-level methods for navigation and interaction.
 
-use crate::prelude::*;
+use super::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
 use serde_json::Value;
@@ -56,9 +56,7 @@ impl Page {
 	/// navigate to `url` and return both process + page.
 	pub async fn visit(url: &str) -> Result<(ClientProcess, Self)> {
 		let process = ClientProcess::new()?;
-		let session = process.new_session().await?;
-		let mut page = Self::from_session(session).await?;
-		page.navigate(url).await?;
+		let page = Self::visit_with_client(&process.client(), url).await?;
 		Ok((process, page))
 	}
 
@@ -143,9 +141,9 @@ impl Page {
 		{
 			Ok(Some(el))
 		} else {
-			Err(bevyhow!(
+			bevybail!(
 				"query_selector: element present but missing BiDi handle/sharedId"
-			))
+			);
 		}
 	}
 
@@ -155,10 +153,10 @@ impl Page {
 
 #[cfg(test)]
 mod tests {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
+	use super::*;
 
 	#[beet_core::test]
+	#[ignore = "smoketest"]
 	async fn visit_and_read_title() {
 		App::default()
 			.run_io_task_local(async move {

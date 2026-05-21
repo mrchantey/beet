@@ -37,7 +37,6 @@ pub fn is_internal() -> bool {
 		"beet_core_macros",
 		"beet_core_shared",
 		"beet_design",
-		"beet_dom",
 		"beet_flow",
 		"beet_flow_macros",
 		"beet_ml",
