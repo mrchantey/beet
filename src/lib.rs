@@ -97,6 +97,7 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::AlignItems;
 			pub use crate::ui::prelude::style::AlignContent;
 			pub use crate::ui::prelude::style::FlexWrap;
+			pub use crate::ui::prelude::Pointer;
 		}
 	}
 }

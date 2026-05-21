@@ -58,9 +58,13 @@ fn sentence_steer_target<F: Component>(
 	let target_action = query.get(action)?;
 	let target_entity = target_action.target_entity.get(action, &agent_query);
 	let target_sentence = sentences.get(target_entity)?;
-	let bert = berts.get_mut(&target_action.bert).ok_or_else(|| {
-		bevyhow!("Bert asset not loaded for entity {action:?}")
-	})?;
+	// Asset is downloaded asynchronously by [`BertLoader`]; if the user
+	// triggers this action before the load finishes, soft-fail so the
+	// sequence stops without panicking the app.
+	let Some(bert) = berts.get_mut(&target_action.bert) else {
+		log::warn!("Bert asset not yet loaded, ignoring action call");
+		return Ok(Outcome::FAIL);
+	};
 	let agent = agent_query.entity(action);
 
 	let chosen = bert.closest_sentence_entity(
