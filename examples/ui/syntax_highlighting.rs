@@ -8,18 +8,21 @@
 use beet::prelude::*;
 
 fn main() {
-	let mut world = World::new();
-	let entity = world.spawn_empty().id();
+	// 1. Configure an app with `StylePlugin`, which registers the
+	// `SyntaxHighlighting` resource and the `apply_syntax_highlighting`
+	// system in the `PostParseTree` schedule.
+	let mut app = App::new();
+	app.add_plugins(StylePlugin);
+	let entity = app.world_mut().spawn_empty().id();
 
-	// 1. Configure a markdown parser with syntax highlighting enabled.
-	let mut parser = MarkdownParser::new();
-	parser.config.syntax_highlighting =
-		Some(SyntaxHighlighting::with_defaults());
-
-	// 2. Parse the markdown source into the entity tree.
+	// 2. Parse the markdown source into the entity tree. The parser runs
+	// `PostParseTree` automatically once the tree is built.
 	let bytes = MediaBytes::new_markdown(MARKDOWN);
-	parser
-		.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+	MarkdownParser::new()
+		.parse(ParseContext::new(
+			&mut app.world_mut().entity_mut(entity),
+			&bytes,
+		))
 		.unwrap();
 
 	// 3. Render. The ANSI renderer resolves each span's `hl-*` class to a
@@ -27,7 +30,7 @@ fn main() {
 	let output = AnsiTermRenderer::new()
 		.with_clear_on_render(false)
 		.with_syntax_highlighting()
-		.render(&mut RenderContext::new(entity, &mut world))
+		.render(&mut RenderContext::new(entity, app.world_mut()))
 		.unwrap()
 		.to_string();
 	println!("{output}");

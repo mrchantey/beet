@@ -8,6 +8,9 @@
 //! Capture names are emitted verbatim, with no colour resolution: the
 //! renderer is responsible for mapping `hl-<capture>` classes to styles.
 //!
+//! Registered as a [`Resource`] by [`StylePlugin`], and applied via the
+//! [`apply_syntax_highlighting`] system in the [`PostParseTree`] schedule.
+//!
 //! Only enabled with the `syntax_highlighting` feature.
 
 use crate::prelude::*;
@@ -21,9 +24,17 @@ use tree_sitter::Query as TsQuery;
 use tree_sitter::QueryCursor;
 
 /// Registry of tree-sitter grammars used to tokenize fenced code blocks.
-#[derive(Default, Clone)]
+///
+/// [`Default`] returns a registry pre-populated with rust, javascript,
+/// json, and html grammars; this is what [`StylePlugin`] inserts via
+/// `init_resource`.
+#[derive(Clone, Resource)]
 pub struct SyntaxHighlighting {
 	languages: HashMap<SmolStr, LanguageEntry>,
+}
+
+impl Default for SyntaxHighlighting {
+	fn default() -> Self { Self::with_defaults() }
 }
 
 impl core::fmt::Debug for SyntaxHighlighting {
@@ -55,7 +66,9 @@ impl SyntaxHighlighting {
 	/// A highlighter pre-registered with `rust`, `javascript`, `json`,
 	/// and `html` (plus common aliases).
 	pub fn with_defaults() -> Self {
-		let mut this = Self::default();
+		let mut this = Self {
+			languages: HashMap::default(),
+		};
 		this.add_rust();
 		this.add_javascript();
 		this.add_json();
@@ -224,57 +237,43 @@ impl SyntaxHighlighting {
 		spans
 	}
 
-	/// Walk descendants of `root`, find each `<code class="language-X">`
-	/// whose only child is a text node, and replace the text node with one
-	/// span element per highlight run.
-	///
-	/// Each emitted span has:
-	/// - tag `span`
-	/// - attribute `class="hl-<capture>"` for captured runs (omitted for plain runs)
-	/// - a single text child carrying the original slice of source
-	pub fn apply(&self, world: &mut World, root: Entity) {
-		let blocks = self.find_code_blocks(world, root);
-		for (code_entity, lang, text_entity, source) in blocks {
-			let spans = self.highlight(&lang, &source);
-			world.entity_mut(text_entity).despawn();
-			for span in spans {
-				spawn_highlight_span(world, code_entity, span);
-			}
-		}
-	}
+}
 
-	/// Collect every fenced code block descended from `root` that is
-	/// eligible for syntax highlighting. Returns tuples of
-	/// `(code_entity, language, text_entity, source_text)`.
-	fn find_code_blocks(
-		&self,
-		world: &mut World,
-		root: Entity,
-	) -> Vec<(Entity, SmolStr, Entity, SmolStr)> {
-		world.with_state::<(Query<&Children>, ElementQuery), _>(
-			|(children, elements)| {
-				children
-					.iter_descendants_inclusive::<Children>(root)
-					.filter_map(|entity| elements.get(entity).ok())
-					.filter(|view| view.tag() == "code")
-					.filter_map(|view| {
-						let (text_entity, value) = view.inner_text?;
-						let source = value.as_str().ok()?;
-						let lang = view.iter_classes().find_map(|c| {
-							let name =
-								c.strip_prefix("language-").unwrap_or(&c);
-							(!name.is_empty()).then(|| SmolStr::from(name))
-						})?;
-						Some((
-							view.entity,
-							lang,
-							text_entity,
-							SmolStr::from(source),
-						))
-					})
-					.collect()
-			},
-		)
+/// Walk every `<code class="language-X">` element in the world whose only
+/// child is a text node, and replace that text node with one span element
+/// per highlight run.
+///
+/// Each emitted span has:
+/// - tag `span`
+/// - attribute `class="hl-<capture>"` for captured runs (omitted for plain runs)
+/// - a single text child carrying the original slice of source
+///
+/// Idempotent: once a code element's text child has been replaced with
+/// span elements, [`ElementView::inner_text`] no longer matches, so the
+/// system skips it on subsequent runs.
+pub fn apply_syntax_highlighting(
+	mut commands: Commands,
+	highlighter: Res<SyntaxHighlighting>,
+	elements: ElementQuery,
+) {
+	for view in elements.iter() {
+		if view.tag() != "code" {
+			continue;
+		}
+		let Some((text_entity, value)) = view.inner_text else {
+			continue;
+		};
+		let Ok(source) = value.as_str() else { continue };
+		let Some(lang) = view.iter_classes().find_map(|c| {
+			let name = c.strip_prefix("language-").unwrap_or(&c);
+			(!name.is_empty()).then(|| SmolStr::from(name))
+		}) else {
+			continue;
+		};
+		commands.entity(text_entity).despawn();
+		for span in highlighter.highlight(&lang, source) {
+			spawn_highlight_span(&mut commands, view.entity, span);
+		}
 	}
 }
 
@@ -333,20 +332,20 @@ pub fn recognised_names() -> &'static [&'static str] {
 /// Spawn a single highlight span as a child of `parent`. When `span.capture`
 /// is set, an `Attribute("class") = "hl-<capture>"` entity is also spawned.
 fn spawn_highlight_span(
-	world: &mut World,
+	commands: &mut Commands,
 	parent: Entity,
 	span: HighlightSpan,
 ) {
-	let element = world.spawn((Element::new("span"), ChildOf(parent))).id();
+	let element = commands.spawn((Element::new("span"), ChildOf(parent))).id();
 	if let Some(capture) = &span.capture {
 		let class = format!("hl-{capture}");
-		world.spawn((
+		commands.spawn((
 			Attribute::new("class"),
 			Value::str(class),
 			AttributeOf::new(element),
 		));
 	}
-	world.spawn((Value::Str(span.text), ChildOf(element)));
+	commands.spawn((Value::Str(span.text), ChildOf(element)));
 }
 
 

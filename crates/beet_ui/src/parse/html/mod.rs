@@ -37,10 +37,6 @@ pub struct HtmlParser {
 	/// HTML tree is built. Requires the `markdown_parser` feature.
 	#[cfg(feature = "markdown_parser")]
 	pub parse_markdown: Option<MarkdownParseConfig>,
-	/// When set, fenced code blocks with a recognised language are
-	/// tokenized and their text replaced by styled spans.
-	#[cfg(feature = "syntax_highlighting")]
-	pub syntax_highlighting: Option<SyntaxHighlighting>,
 }
 
 impl Default for HtmlParser {
@@ -50,8 +46,6 @@ impl Default for HtmlParser {
 			diff_config: HtmlDiffConfig::default(),
 			#[cfg(feature = "markdown_parser")]
 			parse_markdown: None,
-			#[cfg(feature = "syntax_highlighting")]
-			syntax_highlighting: None,
 		}
 	}
 }
@@ -71,8 +65,6 @@ impl HtmlParser {
 			diff_config: default(),
 			#[cfg(feature = "markdown_parser")]
 			parse_markdown: None,
-			#[cfg(feature = "syntax_highlighting")]
-			syntax_highlighting: None,
 		}
 	}
 
@@ -128,11 +120,9 @@ impl HtmlParser {
 			)?;
 		}
 
-		// tokenize fenced code blocks if a highlighter is configured
-		#[cfg(feature = "syntax_highlighting")]
-		if let Some(ref highlighter) = self.syntax_highlighting {
-			highlighter.apply(world, entity);
-		}
+		// run post-parse systems (syntax highlighting, style resolution, ..)
+		// when registered, ie via `StylePlugin`.
+		let _ = world.try_run_schedule(PostParseTree);
 
 		// insert file span on the root entity if path provided
 		if let Some(ref lookup) = span_lookup {

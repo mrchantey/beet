@@ -43,12 +43,6 @@ pub struct MarkdownParseConfig {
 	pub options: pulldown_cmark::Options,
 	/// Whether to parse frontmatter metadata blocks.
 	pub parse_frontmatter: bool,
-	/// When `Some`, fenced code blocks with a recognised language are
-	/// tokenized and their text replaced by styled spans. Each span
-	/// carries a `class="hl-<capture>"` attribute and the highlighter's
-	/// resolved foreground colour.
-	#[cfg(feature = "syntax_highlighting")]
-	pub syntax_highlighting: Option<SyntaxHighlighting>,
 }
 
 impl Default for MarkdownParseConfig {
@@ -56,8 +50,6 @@ impl Default for MarkdownParseConfig {
 		Self {
 			options: Self::default_cmark_options(),
 			parse_frontmatter: true,
-			#[cfg(feature = "syntax_highlighting")]
-			syntax_highlighting: None,
 		}
 	}
 }
@@ -122,11 +114,9 @@ impl MarkdownParser {
 			span_lookup.as_ref(),
 		)?;
 
-		// tokenize fenced code blocks if a highlighter is configured
-		#[cfg(feature = "syntax_highlighting")]
-		if let Some(ref highlighter) = self.config.syntax_highlighting {
-			highlighter.apply(world, entity);
-		}
+		// run post-parse systems (syntax highlighting, style resolution, ..)
+		// when registered, ie via `StylePlugin`.
+		let _ = world.try_run_schedule(PostParseTree);
 
 		// insert frontmatter on root if present
 		if self.config.parse_frontmatter {
@@ -600,17 +590,19 @@ mod test {
 	#[cfg(feature = "syntax_highlighting")]
 	#[beet_core::test]
 	fn syntax_highlighting_replaces_text_with_spans() {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("```rust\nfn main() {}\n```");
-		let mut parser = MarkdownParser::new();
-		parser.config.syntax_highlighting =
-			Some(SyntaxHighlighting::with_defaults());
-		parser
-			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+		MarkdownParser::new()
+			.parse(ParseContext::new(
+				&mut app.world_mut().entity_mut(entity),
+				&bytes,
+			))
 			.unwrap();
 
 		// root -> pre -> code -> spans (no plain text child)
+		let world = app.world_mut();
 		let pre = world.entity_mut(entity).child(0).unwrap().id();
 		let code = world.entity_mut(pre).child(0).unwrap().id();
 		let code_children: Vec<_> = world
