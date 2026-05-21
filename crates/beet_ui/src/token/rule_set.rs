@@ -12,8 +12,6 @@ pub struct RuleSet {
 	rules: VecDeque<Rule>,
 	/// Inline rules are only declared once. Calling [`Self::try_insert_inline`]
 	/// with a rule whose selector matches one of these does nothing.
-	#[reflect(ignore)]
-	#[cfg_attr(feature = "serde", serde(skip))]
 	registered_inline: HashSet<Selector>,
 }
 
