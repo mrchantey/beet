@@ -19,7 +19,7 @@ pub async fn ListBlobs(cx: ActionContext<ListBlobsParams>) -> Result<Vec<RelPath
 		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 	let sub = bucket.with_subdir(cx.input.path);
 	// gracefully return empty list if bucket directory doesn't exist yet
 	match sub.bucket_exists().await {

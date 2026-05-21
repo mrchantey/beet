@@ -4,8 +4,16 @@ mod fallback;
 pub use call_on_spawn::*;
 pub use exclude_errors::*;
 pub use fallback::*;
+mod highest_score;
+pub use highest_score::*;
+mod parallel;
+pub use parallel::*;
+mod score;
+pub use score::*;
 mod repeat;
 pub use repeat::*;
+mod running;
+pub use running::*;
 mod sequence;
 pub use sequence::*;
 

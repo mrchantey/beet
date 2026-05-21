@@ -17,7 +17,7 @@ pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
 		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 	bucket.remove(&cx.input.path).await
 }
 

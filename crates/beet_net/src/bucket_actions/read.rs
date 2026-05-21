@@ -28,7 +28,7 @@ pub async fn ReadBlob(cx: ActionContext<ReadBlobParams>) -> Result<MediaBytes> {
 		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 
 	let media = bucket.get_media(&cx.input.path).await?;
 

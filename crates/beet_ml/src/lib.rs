@@ -1,11 +1,8 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-#![allow(incomplete_features)]
 #![doc = include_str!("../README.md")]
-#![feature(generic_const_exprs, const_trait_impl)]
 
-mod utils;
+beet_core::test_main!();
 
+pub mod fetch_bytes;
 #[cfg(feature = "bevy_default")]
 pub mod frozen_lake;
 pub mod language;
@@ -15,10 +12,17 @@ pub mod rl;
 pub mod rl_realtime;
 #[cfg(test)]
 pub mod test_utils;
-#[cfg(target_arch = "wasm32")]
-pub mod wasm;
 
+/// Re-exports of the most commonly used types and functions in `beet_ml`.
+///
+/// The schedule sets ([`PreTickSet`], [`TickSet`], [`PostTickSet`]) are
+/// intentionally **not** re-exported here — beet_spatial defines its own
+/// identically-named sets and re-exporting from both via wildcard imports
+/// creates an ambiguous-glob hard error. Refer to them by path:
+/// `beet_ml::TickSet`.
 pub mod prelude {
+	pub use super::BeetMlPlugins;
+	pub use crate::fetch_bytes::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::frozen_lake::*;
 	pub use crate::language::*;
@@ -28,7 +32,45 @@ pub mod prelude {
 	pub use crate::rl_realtime::*;
 	#[cfg(test)]
 	pub use crate::test_utils::*;
-	pub use crate::utils::*;
-	#[cfg(target_arch = "wasm32")]
-	pub use crate::wasm::*;
+}
+
+use beet_core::prelude::*;
+use bevy::app::PluginGroupBuilder;
+
+/// Runs before [`TickSet`], for systems that prepare state for the tick
+/// (ie spawning sessions or scoring inputs).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct PreTickSet;
+
+/// Per-frame ml systems run in this set: environment stepping, policy
+/// reads, sentence-similarity scoring.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct TickSet;
+
+/// Bookkeeping runs in this set, after [`TickSet`] (ie episode-end
+/// handling, despawn-on-end).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct PostTickSet;
+
+/// Plugins used for most beet ml apps.
+#[derive(Default, Clone)]
+pub struct BeetMlPlugins;
+
+impl PluginGroup for BeetMlPlugins {
+	fn build(self) -> PluginGroupBuilder {
+		#[allow(unused_mut)]
+		let mut builder = PluginGroupBuilder::start::<Self>().add(ml_set_plugin);
+
+		#[cfg(feature = "bevy_default")]
+		(builder = builder
+			.add(crate::prelude::language_plugin)
+			.add(crate::prelude::RlPlugin));
+		builder
+	}
+}
+
+/// Orders [`PreTickSet`] → [`TickSet`] → [`PostTickSet`] in [`Update`].
+fn ml_set_plugin(app: &mut App) {
+	app.configure_sets(Update, TickSet.after(PreTickSet))
+		.configure_sets(Update, PostTickSet.after(TickSet));
 }

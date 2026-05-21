@@ -132,6 +132,7 @@ where
 				this.call_world(entity, input, out_handler)
 			})
 			.await
+			.flatten()
 	}
 }
 

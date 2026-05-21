@@ -1,185 +1,118 @@
-//https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
+use crate::language::bert::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use candle_core::Tensor;
-use candle_nn::VarBuilder;
-use candle_transformers::models::bert::BertModel;
-use candle_transformers::models::bert::Config;
+use burn::tensor::Tensor;
+use burn_store::ModuleSnapshot;
+use burn_store::PyTorchToBurnAdapter;
+use burn_store::SafetensorsStore;
 use std::borrow::Cow;
-use tokenizers::PaddingParams;
 use tokenizers::Tokenizer;
 
+/// A loaded bert encoder + tokenizer bundled as a bevy [`Asset`].
+///
+/// Built via [`Bert::from_bytes`] when raw model bytes are already on
+/// hand (eg downloaded by [`fetch_bytes`](crate::fetch)) or via
+/// [`Bert::new`] which adds the fetch step.
+///
+/// The default backend is configurable via cargo features — see
+/// [`DefaultBackend`].
 #[derive(Asset, TypePath)]
 pub struct Bert {
-	config: BertConfig,
-	model: BertModel,
-	tokenizer: Tokenizer,
-}
-
-
-
-impl<T: Asset> Into<AssetId<T>> for HandleWrapper<T> {
-	fn into(self) -> AssetId<T> { self.id() }
-}
-impl<T: Asset> Into<AssetId<T>> for &HandleWrapper<T> {
-	fn into(self) -> AssetId<T> { self.id() }
+	/// User-facing options (eg `normalize_embeddings`).
+	pub config: BertConfig,
+	/// The encoder.
+	pub model: BertModel<DefaultBackend>,
+	/// The tokenizer, padded for batch encoding.
+	pub tokenizer: Tokenizer,
+	/// Device the model lives on.
+	pub device: DefaultDevice,
 }
 
 impl Bert {
-	/// When native we use the hf-hub which caches the models for use with this and other applications
-	#[cfg(not(target_arch = "wasm32"))]
+	/// Download the model + tokenizer from the urls in `config` and
+	/// return a fully-constructed [`Bert`].
+	///
+	/// The network/storage work is done by [`fetch_bytes`](crate::fetch::fetch_bytes);
+	/// see its docs for the currently supported targets.
 	pub async fn new(config: BertConfig) -> Result<Self> {
-		// use std::str::FromStr;
+		let model_config_bytes =
+			crate::fetch_bytes::fetch_bytes(&config.model.config_url()).await?;
+		let weights_bytes =
+			crate::fetch_bytes::fetch_bytes(&config.model.model_url()).await?;
+		let tokenizer_bytes =
+			crate::fetch_bytes::fetch_bytes(&config.model.tokenizer_url()).await?;
+		Self::from_bytes(
+			config,
+			&model_config_bytes,
+			weights_bytes,
+			&tokenizer_bytes,
+		)
+	}
 
-		// TODO more async stuff here
-		use candle_transformers::models::bert::DTYPE;
-		use candle_transformers::models::bert::HiddenAct;
-		use hf_hub::Repo;
-		use hf_hub::RepoType;
-		use hf_hub::api::sync::Api;
+	/// Construct a [`Bert`] from pre-loaded bytes.
+	///
+	/// * `model_config_bytes` — the HuggingFace `config.json` payload
+	/// * `weights_bytes` — the safetensors-encoded weights
+	/// * `tokenizer_bytes` — the tokenizer.json payload
+	pub fn from_bytes(
+		config: BertConfig,
+		model_config_bytes: &[u8],
+		weights_bytes: Vec<u8>,
+		tokenizer_bytes: &[u8],
+	) -> Result<Self> {
+		let device = default_device();
 
-		let device = candle_core::Device::Cpu;
+		let model_config: BertModelConfig =
+			serde_json::from_slice(model_config_bytes)?;
+		let mut model = model_config.init::<DefaultBackend>(&device);
+		load_safetensors(&mut model, weights_bytes)?;
 
-		let repo = Repo::with_revision(
-			config.model.model_id.clone(),
-			RepoType::Model,
-			config.model.revision.clone(),
-		);
-		let api = Api::new()?;
-		let api = api.repo(repo);
-		let tokenizer_filename = api.get("tokenizer.json")?;
-		let weights_filename = api.get("model.safetensors")?;
-		let config_filename = api.get("config.json")?;
-		let candle_config = std::fs::read_to_string(config_filename)?;
-		let mut candle_config: Config = serde_json::from_str(&candle_config)?;
-
-
-		// let tokenizer_url = config.model.tokenizer_url();
-
-		// let tokenizer_bytes = reqwest::get(tokenizer_url).await?.text().await?;
-		let tokenizer = Tokenizer::from_file(tokenizer_filename)?;
-
-		// let tokenizer =
-		// 	Tokenizer::from_str(&tokenizer_bytes)?;
-
-		let vb = unsafe {
-			VarBuilder::from_mmaped_safetensors(
-				&[weights_filename],
-				DTYPE,
-				&device,
-			)?
-		};
-		if config.approximate_gelu {
-			candle_config.hidden_act = HiddenAct::GeluApproximate;
+		let mut tokenizer = Tokenizer::from_bytes(tokenizer_bytes)
+			.map_err(|e| bevyhow!("tokenizer parse: {e}"))?;
+		// align padding behaviour with batch tokenisation
+		use tokenizers::PaddingParams;
+		use tokenizers::PaddingStrategy;
+		if let Some(pp) = tokenizer.get_padding_mut() {
+			pp.strategy = PaddingStrategy::BatchLongest;
+		} else {
+			tokenizer.with_padding(Some(PaddingParams {
+				strategy: PaddingStrategy::BatchLongest,
+				..Default::default()
+			}));
 		}
-		let model = BertModel::load(vb, &candle_config)?;
-		Ok(Self {
+
+		Self {
 			config,
 			model,
 			tokenizer,
-		})
-	}
-
-	#[cfg(target_arch = "wasm32")]
-	pub async fn new(config: BertConfig) -> Result<Self> {
-		// use super::bert_loader::BertAssetLoaderError;
-		use crate::wasm::open_or_fetch;
-
-		let config_url = config.model.config_url();
-		let model_url = config.model.model_url();
-		let tokenizer_url = config.model.tokenizer_url();
-
-		let model_config = open_or_fetch(&config_url).await;
-		let weights = open_or_fetch(&model_url).await;
-		let tokenizer = open_or_fetch(&tokenizer_url).await;
-
-		// let (model_config, weights, tokenizer) = futures::join!(
-		// 	open_or_fetch(&config_url),
-		// 	open_or_fetch(&model_url),
-		// 	open_or_fetch(&tokenizer_url)
-		// );
-
-		let model_config = model_config
-			.map_err(|e| bevyhow!("config fetch error: {:?}", e))?
-			.to_vec();
-		let model_config: Config = serde_json::from_slice(&model_config)?;
-
-		let weights = weights
-			.map_err(|e| bevyhow!("weights fetch error: {:?}", e))?
-			.to_vec();
-		let device = &candle_core::Device::Cpu;
-		let vb = VarBuilder::from_buffered_safetensors(
-			weights,
-			candle_transformers::models::bert::DTYPE,
 			device,
-		)?;
-		// VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
-
-
-		let tokenizer = tokenizer
-			.map_err(|e| bevyhow!("tokenizer fetch error: {:?}", e))?
-			.to_vec();
-		let tokenizer = Tokenizer::from_bytes(&tokenizer)
-			.map_err(|m| bevyhow!(m.to_string()))?;
-
-
-		let model = BertModel::load(vb, &model_config)?;
-
-		Ok(Self {
-			config,
-			model,
-			tokenizer,
-		})
+		}
+		.xok()
 	}
 
-	/// Calculate the embeddings for a list of sentences.
-	/// For a small example this may take 0.5 seconds on desktop targets
-	/// or 10 seconds on wasm32
+	/// Compute sentence embeddings for `options`.
+	///
+	/// This is the heavy bit — for the all-MiniLM-L6-v2 model on CPU it
+	/// is in the order of ~100ms per batch on desktop.
 	pub fn get_embeddings(
 		&mut self,
 		options: Vec<Cow<'static, str>>,
 	) -> Result<SentenceEmbeddings> {
-		if let Some(pp) = self.tokenizer.get_padding_mut() {
-			pp.strategy = tokenizers::PaddingStrategy::BatchLongest
+		let refs: Vec<&str> = options.iter().map(|s| s.as_ref()).collect();
+		let (input_ids, attention_mask) =
+			tokenize_batch::<DefaultBackend>(&self.tokenizer, &refs, &self.device);
+		let output = self.model.forward(input_ids, attention_mask.clone(), None);
+		let pooled = mean_pool(output.hidden_states, attention_mask);
+		let pooled = if self.config.normalize_embeddings {
+			normalize_l2(pooled)
 		} else {
-			let pp = PaddingParams {
-				strategy: tokenizers::PaddingStrategy::BatchLongest,
-				..Default::default()
-			};
-			self.tokenizer.with_padding(Some(pp));
-		}
-		let tokens = self.tokenizer.encode_batch(options.clone(), true)?;
-		let token_ids = tokens
-			.iter()
-			.map(|tokens| {
-				let tokens = tokens.get_ids().to_vec();
-				Ok(Tensor::new(tokens.as_slice(), &self.model.device)?)
-			})
-			.collect::<Result<Vec<_>>>()?;
-
-		let token_ids = Tensor::stack(&token_ids, 0)?;
-		let token_type_ids = token_ids.zeros_like()?;
-		let embeddings =
-			self.model.forward(&token_ids, &token_type_ids, None)?;
-		// Apply some avg-pooling by taking the mean embedding value for all tokens (including padding)
-		let (_n_sentence, n_tokens, _hidden_size) = embeddings.dims3()?;
-		let embeddings = (embeddings.sum(1)? / (n_tokens as f64))?;
-		let embeddings = if self.config.normalize_embeddings {
-			normalize_l2(&embeddings)?
-		} else {
-			embeddings
+			pooled
 		};
-
-		Ok(SentenceEmbeddings::new(options, embeddings))
+		SentenceEmbeddings::new(options, pooled).xok()
 	}
-	/// **Very expensive!**
-	/// Returns the option with a [`Sentence`] that is closest
-	/// Scores are in a range of `0..1`, higher means more similar, the list is sorted in descending order.
-	/// This calls [`Bert::get_embeddings`] and has the associated performance implications.
-	/// If options are missing a [`Sentence`] they will be ignored.
-	/// The root is filtered out of the options.
-	/// # Errors
-	/// Will return an error if the embeddings are not calculated correctly.
+
+	/// Returns the entity from `options` whose [`Sentence`] is closest to
+	/// `target`. Entities lacking a [`Sentence`] are skipped.
 	pub fn closest_sentence_entity(
 		&mut self,
 		target: impl Into<Cow<'static, str>>,
@@ -190,13 +123,12 @@ impl Bert {
 			.into_iter()
 			.filter_map(|e| sentences.get(e).ok().map(|s| (e, s)))
 			.collect::<Vec<_>>();
-		//todo: async
 
 		self.closest_option_index(target, options.iter().map(|c| c.1.0.clone()))
 			.map(|i| options[i].0)
 	}
 
-	/// Returns the index of the option that is closest to the target.
+	/// Returns the index of the option whose sentence is closest to `target`.
 	pub fn closest_option_index(
 		&mut self,
 		target: impl Into<Cow<'static, str>>,
@@ -206,45 +138,76 @@ impl Bert {
 		all_sentences.extend(options);
 		let embeddings = self.get_embeddings(all_sentences)?;
 		let scores = embeddings.scores_from_first()?;
-
-		let highest_index = scores
+		scores
 			.iter()
 			.enumerate()
 			.max_by(|a, b| {
 				a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
 			})
-			.ok_or_else(|| bevyhow!("No scores returned"))?
-			.0;
-
-		Ok(highest_index)
-	}
-
-
-	pub fn prompt_tensor(
-		&mut self,
-		prompt: &str,
-		iterations: usize,
-	) -> Result<Vec<Tensor>> {
-		let tokenizer =
-			self.tokenizer.with_padding(None).with_truncation(None)?;
-		let tokens = tokenizer.encode(prompt, true)?.get_ids().to_vec();
-		let token_ids =
-			Tensor::new(&tokens[..], &self.model.device)?.unsqueeze(0)?;
-		let token_type_ids = token_ids.zeros_like()?;
-
-		let tensors = (0..iterations)
-			.map(|_| self.model.forward(&token_ids, &token_type_ids, None))
-			.collect::<Result<Vec<_>, candle_core::Error>>()?;
-
-		Ok(tensors)
+			.ok_or_else(|| bevyhow!("No scores returned"))
+			.map(|(i, _)| i)
 	}
 }
 
-fn normalize_l2(v: &Tensor) -> Result<Tensor> {
-	Ok(v.broadcast_div(&v.sqr()?.sum_keepdim(1)?.sqrt()?)?)
+/// Container for a batch of sentence embeddings plus the input strings.
+pub struct SentenceEmbeddings {
+	/// One entry per input sentence, in input order.
+	pub sentences: Vec<Cow<'static, str>>,
+	/// Pooled (and optionally normalised) embeddings, shape
+	/// `[n_sentences, hidden]`.
+	pub embeddings: Tensor<DefaultBackend, 2>,
 }
 
+impl SentenceEmbeddings {
+	pub(crate) fn new(
+		sentences: Vec<Cow<'static, str>>,
+		embeddings: Tensor<DefaultBackend, 2>,
+	) -> Self {
+		Self {
+			sentences,
+			embeddings,
+		}
+	}
 
+	/// Cosine similarity of every sentence against the first sentence
+	/// (the "target" in [`Bert::closest_option_index`]). Returns `n - 1`
+	/// scores, sentence-1 vs all others.
+	pub fn scores_from_first(&self) -> Result<Vec<f32>> {
+		let [n, _hidden] = self.embeddings.dims();
+		if n < 2 {
+			bevybail!("scores_from_first requires at least 2 sentences");
+		}
+		let target = self.embeddings.clone().narrow(0, 0, 1);
+		let others = self.embeddings.clone().narrow(0, 1, n - 1);
+		// rows are L2-normalised, so cosine sim is just the dot product
+		let scores = (others * target).sum_dim(1).reshape([n - 1]);
+		scores.into_data().to_vec::<f32>().map_err(|e| {
+			bevyhow!("failed to extract embedding scores: {e:?}")
+		})
+	}
+
+	/// Same as [`scores_from_first`](Self::scores_from_first) but returns
+	/// `(sentence_index, score)` sorted by score descending.
+	pub fn scores_sorted(&self, target_idx: usize) -> Result<Vec<(usize, f32)>> {
+		if target_idx != 0 {
+			bevybail!(
+				"scores_sorted currently only supports target_idx = 0 \
+				(MiniLM helper)"
+			);
+		}
+		let mut pairs: Vec<(usize, f32)> = self
+			.scores_from_first()?
+			.into_iter()
+			.enumerate()
+			// indices in `pairs` correspond to options[1..], so shift back
+			.map(|(i, s)| (i + 1, s))
+			.collect();
+		pairs.sort_by(|a, b| {
+			b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+		});
+		Ok(pairs)
+	}
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -252,11 +215,18 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[beet_core::test]
-	// possibly flaky tests here, getting occasional 403 on tokenizer.json
+	/// End-to-end sentence-similarity check. Downloads the all-MiniLM-L6-v2
+	/// model on first run (cached under the system temp dir afterwards),
+	/// runs the bert forward pass, and verifies cosine similarity ranks
+	/// the obvious match first.
+	///
+	/// Network-bound (~90MB download on first run) — `#[ignore]` so test
+	/// runs stay fast. Run explicitly via:
+	/// `cargo test -p beet_ml --features bevy_default works -- --ignored`.
+	#[beet_core::test(timeout_ms = 600_000)]
+	#[ignore = "downloads ~90MB of model weights; run with --ignored"]
 	async fn works() {
 		pretty_env_logger::try_init().ok();
-
 		let mut bert = Bert::new(BertConfig::default()).await.unwrap();
 		let embeddings = bert
 			.get_embeddings(vec![
@@ -270,10 +240,49 @@ mod test {
 				"Do you like pizza?".into(),
 			])
 			.unwrap();
-
 		let results = embeddings.scores_sorted(0).unwrap();
 		embeddings.sentences[results[0].0]
 			.as_ref()
 			.xpect_eq("The cat plays in the garden");
 	}
+}
+
+/// Loads HuggingFace bert safetensors into a fresh [`BertModel`].
+///
+/// The HuggingFace key naming differs from burn's `TransformerEncoder`;
+/// the remap below mirrors the one in `minilm-burn::loader`.
+fn load_safetensors(
+	model: &mut BertModel<DefaultBackend>,
+	bytes: Vec<u8>,
+) -> Result<()> {
+	use burn_store::KeyRemapper;
+
+	let key_mappings: Vec<(&str, &str)> = vec![
+		// strip the `bert.` prefix
+		("^bert\\.(.+)", "$1"),
+		// `encoder.layer.N` → `encoder.layers.N`
+		("encoder\\.layer\\.([0-9]+)", "encoder.layers.$1"),
+		// attention
+		("attention\\.self\\.query", "mha.query"),
+		("attention\\.self\\.key", "mha.key"),
+		("attention\\.self\\.value", "mha.value"),
+		("attention\\.output\\.dense", "mha.output"),
+		("attention\\.output\\.LayerNorm", "norm_1"),
+		// feed-forward
+		("intermediate\\.dense", "pwff.linear_inner"),
+		("(layers\\.[0-9]+)\\.output\\.dense", "$1.pwff.linear_outer"),
+		("(layers\\.[0-9]+)\\.output\\.LayerNorm", "$1.norm_2"),
+		// embeddings
+		("embeddings\\.LayerNorm", "embeddings.layer_norm"),
+	];
+
+	let remapper = KeyRemapper::from_patterns(key_mappings)
+		.map_err(|e| bevyhow!("KeyRemapper: {e}"))?;
+	let mut store = SafetensorsStore::from_bytes(Some(bytes))
+		.with_from_adapter(PyTorchToBurnAdapter)
+		.remap(remapper);
+	model
+		.load_from(&mut store)
+		.map_err(|e| bevyhow!("load_from: {e}"))?;
+	Ok(())
 }

@@ -65,7 +65,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	pub fn works() {
 		let mut app = App::new();
 

@@ -16,21 +16,18 @@ categories.workspace = true
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default",
-	"beet_flow/bevy_default",
-	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
+	"beet_ml?/bevy_default",
 	# "beet_bevy/bevy_default",
 ]
+# enable beet_ml integration; pulled in by the top-level `ml` feature
 ml = ["dep:beet_ml"]
 
 [dependencies]
-beet_flow = { workspace = true }
-beet_ml = { workspace = true, features = [
-	"candle",
-	"spatial",
-], optional = true }
+beet_action = { workspace = true }
+beet_ml = { workspace = true, features = ["spatial"], optional = true }
 beet_spatial = { workspace = true, features = [] }
-beet_core = { workspace = true, features = ["rand"] }
+beet_core = { workspace = true, features = ["rand","bevy_keyboard"] }
 
 
 serde.workspace = true
@@ -41,6 +38,9 @@ bevy = { workspace = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+
+[lib]
+harness = false
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

@@ -22,9 +22,10 @@ rhai = ["dep:rhai", "serde"]
 
 [dependencies]
 beet_core = { workspace = true }
-bevy.workspace = true
+bevy = { workspace = true, features = ["bevy_color"] }
 bitflags.workspace = true
 extend.workspace = true
+thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 rhai = { workspace = true, optional = true }

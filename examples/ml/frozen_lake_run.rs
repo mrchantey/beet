@@ -1,6 +1,11 @@
+//! Inference for the frozen-lake task: loads a pre-trained Q-table asset
+//! and steers an agent across the grid using a greedy policy.
+//!
+//! Run `frozen_lake_train` first to generate `assets/ml/frozen_lake_qtable.ron`.
 use beet::examples::scenes;
 use beet::examples::scenes::ml::FROZEN_LAKE_SCENE_SCALE;
 use beet::prelude::*;
+use std::time::Duration;
 
 pub fn main() {
 	App::new()
@@ -26,7 +31,6 @@ fn setup(
 	let grid_to_world =
 		GridToWorld::from_frozen_lake_map(&map, FROZEN_LAKE_SCENE_SCALE);
 
-	// agent
 	let agent_grid_pos = map.agent_position();
 	let agent_pos = grid_to_world.world_pos(*agent_grid_pos);
 	let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
@@ -34,6 +38,11 @@ fn setup(
 	let qtable =
 		asset_server.load::<FrozenLakeQTable>("ml/frozen_lake_qtable.ron");
 
+	// Action tree (mirrors `spawn_frozen_lake_episode`):
+	//   Repeat
+	//     Sequence "Run Frozen Lake Agent"
+	//       ReadQPolicy   — greedy action lookup from the trained Q-table
+	//       TranslateGrid — animate the move
 	commands.spawn((
 		Name::new("Inference Agent"),
 		SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
@@ -41,16 +50,15 @@ fn setup(
 		grid_to_world.clone(),
 		agent_grid_pos,
 		GridDirection::sample(&mut rng.0),
+		Repeat::<()>::default(),
+		CallOnSpawn::<(), Outcome>::default(),
 		children![(
-			RunOnAssetReady::new(qtable.clone()),
-			Sequence::new(),
-			Retrigger::default(),
 			Name::new("Run Frozen Lake Agent"),
+			Sequence::<(), ()>::default(),
 			children![
 				(
 					Name::new("Get next action"),
-					HandleWrapper(qtable),
-					ReadQPolicy::<FrozenLakeQTable>::default(),
+					ReadQPolicy::<FrozenLakeQTable>::new(qtable),
 				),
 				(
 					Name::new("Perform action"),

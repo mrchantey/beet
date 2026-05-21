@@ -93,7 +93,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn algo() {
 		seek_impulse(
 			&Vec3::default(),

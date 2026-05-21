@@ -1,22 +1,28 @@
 use super::*;
-use beet_flow::prelude::*;
-use bevy::asset::LoadState;
-// use bevy::asset::LoadState;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
+use bevy::asset::LoadState;
 
 /// Inserts the given component when a matching asset event is received.
-/// This requires the entity to have a Handle<T>.
-/// For each type the [insert_on_asset_event_plugin] must be registered.
+/// This requires the entity to have a `Handle<A>`.
+///
+/// A long-running action: while [`Running`] the [`insert_on_asset_event`]
+/// system listens for matching [`AssetEvent`]s (or matching initial load
+/// state) and ends the run with [`Outcome::PASS`] once the event fires,
+/// inserting `value` on the entity.
+///
+/// For each type the [`insert_on_asset_event_plugin`] must be registered.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[require(ContinueRun<(), Outcome>)]
 #[reflect(Component)]
-pub struct InsertOnAssetEvent<T, A: Asset> {
+pub struct InsertOnAssetEvent<T: Component + Clone, A: Asset> {
 	/// The component to insert.
 	pub value: T,
 	/// The asset event to match.
 	pub asset_event: ReflectedAssetEvent<A>,
 }
 
-impl<T, A: Asset> InsertOnAssetEvent<T, A> {
+impl<T: Component + Clone, A: Asset> InsertOnAssetEvent<T, A> {
 	/// Creates a new InsertOnAssetEvent.
 	pub fn new(value: T, asset_event: AssetEvent<A>) -> Self {
 		Self {
@@ -45,24 +51,36 @@ impl<T, A: Asset> InsertOnAssetEvent<T, A> {
 	}
 }
 
+/// Ends any [`Running`] [`InsertOnAssetEvent`] whose matching [`AssetEvent`]
+/// has fired, inserting the stored value on the entity.
 pub(crate) fn insert_on_asset_event<T: Component + Clone, A: Asset>(
 	mut commands: Commands,
 	mut asset_events: MessageReader<AssetEvent<A>>,
-	query: Query<(Entity, &InsertOnAssetEvent<T, A>), With<Running>>,
+	query: Populated<
+		(Entity, &InsertOnAssetEvent<T, A>),
+		With<Running<Outcome>>,
+	>,
 ) {
 	for ev in asset_events.read() {
 		for (entity, action) in query.iter() {
 			let action_event: AssetEvent<A> = action.asset_event.into();
 			if action_event == *ev {
-				commands.entity(entity).insert(action.value.clone());
+				commands
+					.entity(entity)
+					.insert(action.value.clone())
+					.queue(EndRun(Outcome::PASS));
 			}
 		}
 	}
 }
+
+/// On entering the [`Running`] state, ends the run immediately if the
+/// asset is already in a state matching `asset_event` (i.e. it loaded
+/// before the action started).
 pub(crate) fn insert_on_asset_status<T: Component + Clone, A: Asset>(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
-	query: Query<(Entity, &InsertOnAssetEvent<T, A>), Added<Running>>,
+	query: Query<(Entity, &InsertOnAssetEvent<T, A>), Added<Running<Outcome>>>,
 ) {
 	for (entity, action) in query.iter() {
 		let id = asset_event_id(action.asset_event.into());
@@ -70,7 +88,10 @@ pub(crate) fn insert_on_asset_status<T: Component + Clone, A: Asset>(
 			continue;
 		};
 		if action.matches_load_state(state) {
-			commands.entity(entity).insert(action.value.clone());
+			commands
+				.entity(entity)
+				.insert(action.value.clone())
+				.queue(EndRun(Outcome::PASS));
 		}
 	}
 }

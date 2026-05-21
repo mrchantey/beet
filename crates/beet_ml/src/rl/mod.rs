@@ -1,8 +1,9 @@
 mod environment;
 pub use self::environment::*;
+mod episode_params;
+pub use self::episode_params::*;
 mod evaluation;
 pub use self::evaluation::*;
-mod hash_q_table;
 mod q_learn_params;
 pub use self::q_learn_params::*;
 mod q_policy;

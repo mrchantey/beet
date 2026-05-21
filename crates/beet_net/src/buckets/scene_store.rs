@@ -61,6 +61,7 @@ impl SceneStore {
 				SceneLoader::new_entity(entity).load(&media)
 			})
 			.await
+			.flatten()
 	}
 	/// Writes all [`SceneEntities`] and their created descendents to the associated [`Blob`]
 	///
@@ -94,7 +95,7 @@ impl SceneStore {
 						)?;
 						(blob, scene_media).xok()
 					})
-					.await?;
+					.await??;
 				blob.insert(bytes).await?;
 
 				Ok(())

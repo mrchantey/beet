@@ -90,9 +90,9 @@ fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {
 		// Create a streaming body for SSE/chunked responses
 		create_streaming_body(res.into_body())
 	} else {
-		// Read the whole body into bytes for regular responses
-		let bytes_vec =
-			res.into_body().read_to_vec().map_err(BevyError::from)?;
+		// `Body::read_to_vec` caps at 10MB; bypass via the unlimited reader.
+		let mut bytes_vec = Vec::new();
+		res.into_body().into_reader().read_to_end(&mut bytes_vec)?;
 		Body::Bytes(Bytes::from(bytes_vec))
 	};
 

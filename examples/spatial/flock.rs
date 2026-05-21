@@ -41,11 +41,12 @@ fn setup(
 			SteerBundle::default().scaled_dist(SCALE),
 			VelocityScalar(Vec3::new(1., 1., 0.)),
 			GroupSteerAgent,
-			TriggerDeferred::get_outcome(),
 			Separate::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Align::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Cohere::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 			Wander::new(1.).scaled_dist(SCALE),
+			// keep the steering behaviors active for the lifetime of the boid
+			CallOnSpawn::<(), Outcome>::default(),
 		));
 	}
 }

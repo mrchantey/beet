@@ -28,7 +28,7 @@ scripting = ["beet_action/scripting", "serde"]
 
 [dependencies]
 beet_core.workspace = true
-beet_ui.workspace = true
+beet_ui = { workspace = true, features = ["action"] }
 beet_action.workspace = true
 beet_net.workspace = true
 bevy.workspace = true

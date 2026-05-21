@@ -1,23 +1,20 @@
-//! Fetch is an example that uses sentence similarity to decide what to do next, demonstrating the following behaviors:
-//! - Machine Learning
-//! - Animation
-//! - UI
+//! Fetch uses sentence similarity to decide what to do next, demonstrating:
+//! - Machine Learning (Bert embeddings select the closest item)
+//! - Animation (idle / walk Foxie animations)
+//! - UI (terminal input drives the behavior)
 //!
 //! Unlike [`hello_ml`], this example performs a search for any sentence with
 //! the [`Collectable`] component.
 //!
-//! Please wait for the status to change to `Idle` before issuing commands.
-//!
+//! On first run the bert model (~90MB) is downloaded via [`fetch_bytes`]
+//! and cached locally; subsequent runs hit the cache. Please wait for the
+//! status to change to `Idle` before issuing commands.
 use beet::examples::scenes;
 use beet::prelude::*;
 
-#[rustfmt::skip]
 pub fn main() {
 	App::new()
-		.add_plugins((
-			running_beet_example_plugin,
-			plugin_ml
-		))
+		.add_plugins((running_beet_example_plugin, plugin_ml))
 		.add_systems(
 			Startup,
 			(
@@ -34,11 +31,11 @@ pub fn main() {
 
 #[rustfmt::skip]
 fn setup(mut ev: MessageWriter<OnLogMessage>) {
-	ev.write(OnLogMessage::new("Foxie: woof woof! I can fetch the following items:",OnLogMessage::GAME_COLOR).and_log());
-	ev.write(OnLogMessage::new("       - Red healing potion",OnLogMessage::GAME_COLOR).and_log());
-	ev.write(OnLogMessage::new("       - Gold coin",OnLogMessage::GAME_COLOR).and_log());
-	ev.write(OnLogMessage::new("       - Silver sword",OnLogMessage::GAME_COLOR).and_log());
-	ev.write(OnLogMessage::new("       - Tasty cheese",OnLogMessage::GAME_COLOR).and_log());
+	ev.write(OnLogMessage::new("Foxie: woof woof! I can fetch the following items:").with_color(OnLogMessage::GAME_COLOR.into()).and_log());
+	ev.write(OnLogMessage::new("       - Red healing potion").with_color(OnLogMessage::GAME_COLOR.into()).and_log());
+	ev.write(OnLogMessage::new("       - Gold coin").with_color(OnLogMessage::GAME_COLOR.into()).and_log());
+	ev.write(OnLogMessage::new("       - Silver sword").with_color(OnLogMessage::GAME_COLOR.into()).and_log());
+	ev.write(OnLogMessage::new("       - Tasty cheese").with_color(OnLogMessage::GAME_COLOR.into()).and_log());
 }
 
 pub fn fetch_npc(
@@ -80,72 +77,88 @@ pub fn fetch_npc(
 				{
 					if let Ok(sentence) = sentences.get(*steer_target) {
 						log.write(
-							OnLogMessage::new(
-								format!(
-									"Foxie: woof woof! fetching {}",
-									sentence.0
-								),
-								OnLogMessage::GAME_COLOR,
-							)
+							OnLogMessage::new(format!(
+								"Foxie: woof woof! fetching {}",
+								sentence.0
+							))
+							.with_color(OnLogMessage::GAME_COLOR.into())
 							.and_log(),
 						);
 					}
 				}
 			},
 		),
-		children![(
-			Name::new("Fetch Behavior"),
-			TriggerWithUserSentence::default(),
-			Sequence::new(),
-			children![
-				(
-					Name::new("Apply Sentence Steer Target"),
-					OnSpawn::new(|entity| {
-						let id = entity.id();
-						entity.world_scope(|world| {
-							let parent = world
-								.entity(id)
-								.get::<ChildOf>()
-								.unwrap()
-								.parent();
-							world.entity_mut(id).insert(SentenceSteerTarget::<
-								Collectable,
-							>::new(
-								TargetEntity::Other(parent),
-							));
-						})
-					}),
-					HandleWrapper(bert),
-					EndWith(Outcome::Pass),
-				),
-				(
-					Name::new("Fetch"),
-					SteerTargetScoreProvider {
-						min_radius: 1.,
-						max_radius: 10.,
-					},
-					Seek::default(),
-					PlayAnimation::new(walk_index).repeat_forever(),
-					InsertOn::<GetOutcome, _>::new_with_target(
-						Velocity::default(),
-						TargetEntity::Agent,
+		children![
+			// Plays idle once the [`AnimationPlayer`] is ready so the fox
+			// has a resting pose before the user types a command.
+			(
+				Name::new("Initial Idle"),
+				TriggerOnAnimationReady::run(),
+				PlayAnimation::new(idle_index).repeat_forever(),
+			),
+			// User-driven fetch behavior: a sentence is converted to a
+			// [`SteerTarget`], the fox walks to it, then returns to idle.
+			(
+				Name::new("Fetch Behavior"),
+				TriggerWithUserSentence,
+				Sequence::new(),
+				children![
+					(
+						Name::new("Apply Sentence Steer Target"),
+						OnSpawn::new(move |entity| {
+							let id = entity.id();
+							entity.world_scope(move |world| {
+								let parent = world
+									.entity(id)
+									.get::<ChildOf>()
+									.unwrap()
+									.parent();
+								world.entity_mut(id).insert(SentenceSteerTarget::<
+									Collectable,
+								>::new(
+									bert,
+									TargetEntity::Other(parent),
+								));
+							})
+						}),
 					),
-					EndOnArrive::new(1.),
-				),
-				(
-					Name::new("Idle"),
-					TriggerOnAnimationReady::run(),
-					RemoveOn::<GetOutcome, Velocity>::new_with_target(
-						TargetEntity::Agent,
+					(
+						Name::new("Fetch"),
+						Sequence::new(),
+						children![
+							(
+								Name::new("Play Walk"),
+								PlayAnimation::new(walk_index).repeat_forever(),
+							),
+							(
+								Name::new("Seek to Arrive"),
+								Seek::default(),
+								EndOnArrive::new(1.),
+							),
+						],
 					),
-					PlayAnimation::new(idle_index).repeat_forever(),
-				)
-			]
-		)],
+					(
+						Name::new("Return to Idle"),
+						Sequence::new(),
+						children![
+							(
+								Name::new("Stop Moving"),
+								InsertOn::new_with_target(
+									Velocity::default(),
+									TargetEntity::Agent,
+								),
+							),
+							(
+								Name::new("Play Idle"),
+								PlayAnimation::new(idle_index).repeat_forever(),
+							),
+						],
+					),
+				],
+			),
+		],
 	));
 }
-
-
 
 pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 	const ITEM_OFFSET: f32 = 2.;

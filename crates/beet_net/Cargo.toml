@@ -200,6 +200,16 @@ web-sys = { workspace = true, features = [
 	'BinaryType',
 	# localstorage
 	"Storage",
+	# indexeddb
+	"IdbFactory",
+	"IdbOpenDbRequest",
+	"IdbDatabase",
+	"IdbObjectStore",
+	"IdbRequest",
+	"IdbTransaction",
+	"IdbTransactionMode",
+	"Event",
+	"EventTarget",
 	# sockets
 	"WebSocket",
 	"ErrorEvent",

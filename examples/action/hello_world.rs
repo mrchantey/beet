@@ -12,7 +12,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example action_hello_world --features action
+//! cargo run --example hello_world --features action
 //! ```
 use beet::prelude::*;
 

@@ -190,15 +190,14 @@ pub impl AsyncEntity {
 		&self,
 		input: Input,
 	) -> impl Future<Output = Result<Out>> {
+		let async_entity = self.clone();
 		async move {
-			let recv = self
-				.with_then(
-					// #[track_caller]
-					move |mut entity| {
-						call_with_channel::<Input, Out>(&mut entity, input)
-					},
-				)
-				.await?;
+			let recv = async_entity
+				.with_then(move |mut entity_mut| {
+					call_with_channel::<Input, Out>(&mut entity_mut, input)
+				})
+				.await
+				.flatten()?;
 			unwrap_channel_result(recv.recv().await)
 		}
 	}

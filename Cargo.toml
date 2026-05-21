@@ -67,10 +67,10 @@ members = [
 
 
 	## 💡 Flow
-	# "crates/beet_examples",
+	"crates/beet_examples",
 	# "crates/beet_flow",
-	# "crates/beet_ml",
-	# "crates/beet_spatial",
+	"crates/beet_ml",
+	"crates/beet_spatial",
 
 	## 💡 RSX
 	# "crates/beet_build",
@@ -105,9 +105,9 @@ beet_action = { path = "crates/beet_action", version = "0.0.9-dev.10" }
 
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.10" }
-# beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.10" }
-# beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.10" }
-# beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.10" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.10" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.10" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.10" }
 
 
 # beet_build = { path = "crates/beet_build", version = "0.0.9-dev.10" }
@@ -135,7 +135,7 @@ thiserror = "2"
 heck = "0.4"
 glob = "0.3"
 dotenv = "0.15"
-send_wrapper = "0.6"
+send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
 web-time = "1"
 itertools = "0.14"
@@ -216,7 +216,7 @@ ratatui = { version = "0.30", default-features = false }
 
 #💡 web
 js-sys = "0.3"
-wasm-bindgen = "=0.2.106"
+wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 # https://github.com/wasm-bindgen/wasm-bindgen/blob/215b914c739c598e5c076f8ed22df20d2c77a3dd/crates/web-sys/Cargo.toml#L45
@@ -257,7 +257,9 @@ testing = ["beet_core/testing"]
 fs = ["beet_core/fs","beet_net?/fs"]
 bevy_default = [
 	"bevy/default",
-	"beet_core/bevy_default"
+	"beet_core/bevy_default",
+	"beet_examples?/bevy_default",
+	"beet_spatial?/bevy_default",
 ]
 bevy_scene = ["beet_core/bevy_scene", "beet_net?/bevy_scene","beet_thread?/bevy_scene"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
@@ -313,30 +315,20 @@ bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
 
 
-# examples = ["bevy_default", "spatial", "dep:beet_examples"]
+examples = ["bevy_default", "spatial", "dep:beet_examples"]
+ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
+cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]
 # css = ["beet_parse?/css", "beet_rsx?/css"]
 # design = ["rsx", "dep:beet_design"]
 # webdriver = ["dom","beet_dom?/webdriver"]
 # parse = ["dep:beet_parse"]
 # rsx = ["dep:beet_rsx"]
-# ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-# cuda = ["ml","beet_ml/cuda"]
 # 💡 Server
 
-# spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
+spatial = ["action", "dep:beet_spatial"]
 # build = ["parse", "dep:beet_build"]
 # bevy_scene = ["beet_core/bevy_scene"]
-# bevy_default = [
-# 	"bevy/default",
-# 	"beet_core/bevy_default",
-	# "beet_dom/bevy_scene",
-	# "beet_dom/bevy_text",
-	# "beet_examples?/bevy_default",
-	# "beet_flow?/bevy_default",
-	# "beet_ml?/bevy_default",
-	# "beet_spatial?/bevy_default",
-# ]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -364,10 +356,10 @@ beet_action = { workspace = true, optional = true }
 
 #💡 flow
 # beet_flow = { workspace = true, optional = true }
-# beet_ml = { workspace = true, optional = true }
-# beet_spatial = { workspace = true, optional = true }
+beet_ml = { workspace = true, optional = true }
+beet_spatial = { workspace = true, optional = true }
 
-# beet_examples = { workspace = true, optional = true }
+beet_examples = { workspace = true, optional = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -549,51 +541,49 @@ required-features = ["router", "infra"]
 # 💡 Examples - action
 
 [[example]]
-name = "action_hello_world"
+name = "hello_world"
 path = "examples/action/hello_world.rs"
 required-features = ["action"]
 
 [[example]]
-name = "action_scripting"
+name = "scripting"
 path = "examples/action/scripting.rs"
 required-features = ["scripting"]
 
-# 💡 Examples - flow
+[[example]]
+name = "behavior_tree"
+path = "examples/action/behavior_tree.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "hello_world"
-# path = "examples/flow/hello_world.rs"
-# required-features = ["flow"]
+[[example]]
+name = "simple_action"
+path = "examples/action/simple_action.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "long_running"
-# path = "examples/flow/long_running.rs"
-# required-features = ["flow"]
+[[example]]
+name = "long_running"
+path = "examples/action/long_running.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "malenia"
-# path = "examples/flow/malenia.rs"
-# required-features = ["flow", "rand"]
+[[example]]
+name = "repeat_while"
+path = "examples/action/repeat_while.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "repeat_while"
-# path = "examples/flow/repeat_while.rs"
-# required-features = ["flow"]
+[[example]]
+name = "state_machine"
+path = "examples/action/state_machine.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "simple_action"
-# path = "examples/flow/simple_action.rs"
-# required-features = ["flow"]
+[[example]]
+name = "utility_ai"
+path = "examples/action/utility_ai.rs"
+required-features = ["action"]
 
-# [[example]]
-# name = "state_machine"
-# path = "examples/flow/state_machine.rs"
-# required-features = ["flow"]
-
-# [[example]]
-# name = "utility_ai"
-# path = "examples/flow/utility_ai.rs"
-# required-features = ["flow"]
+[[example]]
+name = "malenia"
+path = "examples/action/malenia.rs"
+required-features = ["action", "rand"]
 
 # [[example]]
 # name = "app_ml"
@@ -603,30 +593,30 @@ required-features = ["scripting"]
 # name = "app"
 # path = "examples/app.rs"
 
-# [[example]]
-# name = "fetch"
-# path = "examples/ml/fetch.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "fetch"
+path = "examples/ml/fetch.rs"
+required-features = ["examples", "ml"]
 
-# [[example]]
-# name = "frozen_lake_train"
-# path = "examples/ml/frozen_lake_train.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "frozen_lake_train"
+path = "examples/ml/frozen_lake_train.rs"
+required-features = ["examples", "ml"]
 
-# [[example]]
-# name = "frozen_lake_run"
-# path = "examples/ml/frozen_lake_run.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "frozen_lake_run"
+path = "examples/ml/frozen_lake_run.rs"
+required-features = ["examples", "ml"]
 
 # [[example]]
 # name = "hello_ml_chat"
 # path = "examples/ml/hello_ml_chat.rs"
 # required-features = ["examples", "ml"]
 
-# [[example]]
-# name = "hello_ml"
-# path = "examples/ml/hello_ml.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "hello_ml"
+path = "examples/ml/hello_ml.rs"
+required-features = ["examples", "ml"]
 
 # [[package.metadata.scene]]
 # name = "hello-ml"
@@ -637,10 +627,10 @@ required-features = ["scripting"]
 
 # 💡 Examples - Spatial
 
-# [[example]]
-# name = "flock"
-# path = "examples/spatial/flock.rs"
-# required-features = ["examples", "spatial"]
+[[example]]
+name = "flock"
+path = "examples/spatial/flock.rs"
+required-features = ["examples", "spatial"]
 
 # Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]
@@ -651,10 +641,10 @@ required-features = ["scripting"]
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
-# [[example]]
-# name = "hello_animation"
-# path = "examples/spatial/hello_animation.rs"
-# required-features = ["examples", "spatial"]
+[[example]]
+name = "hello_animation"
+path = "examples/spatial/hello_animation.rs"
+required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "hello-animation"
@@ -669,20 +659,20 @@ required-features = ["scripting"]
 # 	"beet-debug",
 # ]
 
-# [[example]]
-# name = "inverse_kinematics"
-# path = "examples/spatial/inverse_kinematics.rs"
-# required-features = ["examples", "spatial"]
+[[example]]
+name = "inverse_kinematics"
+path = "examples/spatial/inverse_kinematics.rs"
+required-features = ["examples", "spatial"]
 
-# [[example]]
-# name = "seek"
-# path = "examples/spatial/seek.rs"
-# required-features = ["examples", "spatial"]
+[[example]]
+name = "seek"
+path = "examples/spatial/seek.rs"
+required-features = ["examples", "spatial"]
 
-# [[example]]
-# name = "seek_3d"
-# path = "examples/spatial/seek_3d.rs"
-# required-features = ["examples", "spatial"]
+[[example]]
+name = "seek_3d"
+path = "examples/spatial/seek_3d.rs"
+required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "seek"

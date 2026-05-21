@@ -42,9 +42,8 @@ pub fn beet_example_plugin(app: &mut App) {
 	assert_local_assets();
 
 	app.add_plugins((
-		ControlFlowPlugin::default(),
-		DebugFlowPlugin::default(),
-		BeetSpatialPlugins::default(),
+		ActionPlugin,
+		BeetSpatialPlugins,
 		plugin_2d,
 		plugin_3d,
 		UiTerminalPlugin,
@@ -57,13 +56,7 @@ pub fn beet_example_plugin(app: &mut App) {
 
 #[cfg(feature = "ml")]
 pub fn plugin_ml(app: &mut App) {
-	app.add_plugins((
-		FrozenLakePlugin,
-		RunOnAssetReadyPlugin::<Bert>::default(),
-		RunOnAssetReadyPlugin::<FrozenLakeQTable>::default(),
-		// sentence selector
-		LanguagePlugin::default(),
-	));
+	app.add_plugins((BeetMlPlugins, FrozenLakePlugin));
 }
 
 fn plugin_2d(app: &mut App) {

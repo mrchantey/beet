@@ -32,7 +32,7 @@ pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
 		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
-		.await?;
+		.await??;
 
 	let content = bucket.get(&cx.input.path).await?;
 	let mut text = String::from_utf8(content.to_vec())

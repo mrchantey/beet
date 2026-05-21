@@ -1,12 +1,12 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
 /// Random walk that uses a pair of circles
-/// to create somewhat cohesive movement, see [wander_impulse]
-/// ## Tags
-/// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateAgent](ActionTag::MutateAgent)
+/// to create somewhat cohesive movement, see [wander_impulse].
+///
+/// A long-running action: stays [`Running`] while active, applying a
+/// wander impulse to the agent every frame.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
@@ -90,18 +90,14 @@ pub(crate) fn wander(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((
-			ControlFlowPlugin::default(),
-			BeetSpatialPlugins::default(),
-		))
-		.init_resource::<Time>();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
 
 		let agent = app
 			.world_mut()
@@ -109,14 +105,11 @@ mod test {
 				Transform::default(),
 				ForceBundle::default(),
 				SteerBundle::default(),
-			))
-			.with_children(|parent| {
-				parent.spawn((
-					OnSpawn::trigger(GetOutcome),
-					ContinueRun,
+				children![(
 					Wander::default(),
-				));
-			})
+					Running::<Outcome>::new(OutHandler::default())
+				)],
+			))
 			.id();
 
 		app.update();

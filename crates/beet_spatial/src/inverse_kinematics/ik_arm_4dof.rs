@@ -138,7 +138,7 @@ mod test {
 	use beet_core::prelude::*;
 	use std::f32::consts::PI;
 
-	#[test]
+	#[beet_core::test]
 	fn test_reachable_target() {
 		let ik_solver = IkArm4Dof::default();
 
@@ -150,7 +150,7 @@ mod test {
 		assert!((angle2).abs() <= PI);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn test_unreachable_target_too_far() {
 		let ik_solver = IkArm4Dof::default();
 

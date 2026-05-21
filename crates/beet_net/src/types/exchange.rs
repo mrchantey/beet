@@ -47,7 +47,8 @@ pub impl EntityWorldMut<'_> {
 						start_time,
 						status,
 					})
-					.await;
+					.await
+					.ok();
 				res
 			})
 			.await

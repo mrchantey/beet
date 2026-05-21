@@ -42,7 +42,7 @@ mod test {
 			.id()
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn aligns() {
 		let mut world = World::new();
 

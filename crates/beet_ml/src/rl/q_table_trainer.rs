@@ -126,7 +126,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut policy_rng = RandomSource::from_seed(0);
 		let map = FrozenLakeMap::default_four_by_four();

@@ -19,6 +19,8 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<AsyncPlugin>()
 			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
+			.register_type::<InterruptOnRun>()
+			.register_type::<InterruptOnEnd>()
 			.register_type::<PathPartial>()
 			.register_type::<RequestLogger>()
 			.register_type::<Router>()

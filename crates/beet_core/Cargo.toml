@@ -185,7 +185,7 @@ prettyplease = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true, features = ["v4"] }
+uuid = { workspace = true, optional = true, features = ["v4", "v7"] }
 
 ## utils
 thiserror.workspace = true

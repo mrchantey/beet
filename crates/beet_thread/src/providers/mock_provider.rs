@@ -139,7 +139,7 @@ impl PostStreamer for MockPostStreamer {
 						(agent.id(), thread.id(), last_text, first_tool).xok()
 					},
 				)
-				.await?;
+				.await??;
 
 			let response_id = next_id("mock-resp");
 

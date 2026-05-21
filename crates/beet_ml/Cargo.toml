@@ -3,7 +3,7 @@ name = "beet_ml"
 version.workspace = true
 edition.workspace = true
 readme = "README.md"
-description = "Machine Learning actions built upon beet_flow"
+description = "Machine Learning actions built upon beet_action"
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,68 +12,52 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-# default = ["cuda"]
-# requires cuda to be installed
-# arch linux: pacman -S cuda
-# other: https://developer.nvidia.com/cuda-downloads
-cuda = ["candle", "candle-transformers/cuda"]
-candle = [
-	"dep:candle-core",
-	"dep:candle-transformers",
-	"dep:candle-nn",
-	"dep:tokenizers",
-]
+default = ["wgpu", "spatial"]
+bevy_default = ["bevy/default", "beet_core/bevy_default"]
 spatial = ["dep:beet_spatial"]
-bevy_default = ["bevy/default","beet_core/bevy_default"]
+
+# burn backends — exactly one should be active for the host target.
+wgpu = ["burn/wgpu"]
+ndarray = ["burn/ndarray"]
+# cuda requires a system cuda install (arch linux: pacman -S cuda)
+cuda = ["burn/cuda"]
 
 [dependencies]
-beet_flow.workspace = true
-beet_core = { workspace = true, features = ["rand"] }
-bevy = { workspace = true, features = ["bevy_asset"] }
+beet_action.workspace = true
+beet_core = { workspace = true, features = ["rand", "fs"] }
+beet_net = { workspace = true, features = ["fs", "ureq", "rustls-tls"] }
 beet_spatial = { workspace = true, optional = true }
 
+bevy = { workspace = true, features = ["bevy_asset"] }
+
+burn = { version = "0.21.0-pre.4", default-features = false, features = ["std"] }
+burn-store = { version = "0.21.0-pre.4", default-features = false, features = ["std", "safetensors"] }
+tokenizers = { version = "0.22", default-features = false, features = ["unstable_wasm"] }
+
 futures.workspace = true
-thiserror.workspace = true
 log.workspace = true
 ron.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
+thiserror.workspace = true
 
-#💡 huggingface
-# use git until candle supports cudarc 0.17 (for cuda 13.0)
-candle-core = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
-candle-transformers = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
-candle-nn = { git = "https://github.com/huggingface/candle", version = "0.9", optional = true }
-tokenizers = { version = "0.22", optional = true, default-features = false, features = [
-	"unstable_wasm",
-] }
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-hf-hub = "0.4"
-
-#💡 web
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys.workspace = true
-web-sys.workspace = true
-wasm-bindgen.workspace = true
-wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-# beet_ml = { path = "", features = ["bevy_default", "spatial"] }
-
 pretty_env_logger.workspace = true
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 
+[lib]
+harness = false
 
 [[example]]
 name = "hello_rl_basic"
 path = "examples/hello_rl_basic.rs"
-required-features = ["candle", "bevy_default"]
+required-features = ["bevy_default"]
 
 [[example]]
 name = "hello_ml_basic"
 path = "examples/hello_ml_basic.rs"
-required-features = ["candle"]

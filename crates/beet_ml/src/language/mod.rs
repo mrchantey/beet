@@ -1,36 +1,32 @@
-#[cfg(feature = "candle")]
 mod bert;
-#[cfg(feature = "candle")]
 pub use self::bert::*;
 mod trigger_with_user_sentence;
 pub use self::trigger_with_user_sentence::*;
 
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use std::borrow::Cow;
 
-#[derive(Default)]
-pub struct LanguagePlugin;
-
-impl Plugin for LanguagePlugin {
-	fn build(&self, app: &mut App) {
-		app.register_type::<Sentence>()
-			.add_observer(trigger_with_user_sentence::<GetOutcome>);
-
-		#[cfg(feature = "candle")]
-		app.init_asset::<Bert>().init_asset_loader::<BertLoader>();
-
-		let world = app.world_mut();
-		world.register_component::<Sentence>();
-	}
+/// Registers [`Sentence`] and the [`Bert`] asset (+ `.ron` loader) for
+/// embedding-driven actions like [`NearestSentence`] and (with the
+/// `spatial` feature) [`SentenceSteerTarget`]. Also wires the
+/// [`trigger_with_user_sentence`] observer so [`TriggerWithUserSentence`]
+/// entities respond to [`UserMessage`].
+pub fn language_plugin(app: &mut App) {
+	app.register_type::<Sentence>()
+		.init_asset::<Bert>()
+		.init_asset_loader::<BertLoader>()
+		.add_observer(trigger_with_user_sentence);
+	app.world_mut().register_component::<Sentence>();
 }
 
-
-/// This component is for use with [`SentenceFlow`]. Add to either the agent or a child behavior.
+/// A natural-language label attached to either an agent (the prompt) or a
+/// child behavior (a candidate). Used by sentence-similarity selectors.
 #[derive(Debug, Clone, Component, PartialEq, Reflect)]
 #[reflect(Component)]
 pub struct Sentence(pub Cow<'static, str>);
+
 impl Sentence {
+	/// Create a [`Sentence`] from any string-like type.
 	pub fn new(s: impl Into<Cow<'static, str>>) -> Self { Self(s.into()) }
 }
 

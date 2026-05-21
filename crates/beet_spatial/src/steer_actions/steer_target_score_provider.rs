@@ -1,13 +1,10 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
-/// Provides a [`Score`] based on distance to the [`SteerTarget`],
-/// This scorer is binary, if the distance is within the min and max radius, the score is 1,
-/// otherwise it is 0.
-/// ## Tags
-/// - [ControlFlow](ActionTag::ControlFlow)
-#[action(provide_score)]
+/// Provides a [`Score`] based on distance to the [`SteerTarget`].
+/// This scorer is binary: if the distance is within the min and max radius
+/// the score is `1`, otherwise `0`.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct SteerTargetScoreProvider {
@@ -26,29 +23,47 @@ impl Default for SteerTargetScoreProvider {
 	}
 }
 
-fn provide_score(
-	ev: On<GetScore>,
-	mut commands: Commands,
+impl SteerTargetScoreProvider {
+	/// Build a [`ScoreProvider`] that scores by distance to the agent's
+	/// [`SteerTarget`].
+	pub fn provider(self) -> ScoreProvider<()> {
+		ScoreProvider(Action::<(), Score>::new_async(
+			move |cx: ActionContext| {
+				let Self {
+					min_radius,
+					max_radius,
+				} = self.clone();
+				async move {
+					cx.world()
+						.run_system_cached_with(
+							score_steer_target,
+							(cx.id(), min_radius, max_radius),
+						)
+						.await?
+						.xok()
+				}
+			},
+		))
+	}
+}
+
+fn score_steer_target(
+	In((action, min_radius, max_radius)): In<(Entity, f32, f32)>,
 	transforms: Query<&GlobalTransform>,
 	agents: AgentQuery<(&GlobalTransform, &SteerTarget)>,
-	query: Query<&SteerTargetScoreProvider>,
-) -> Result {
-	let action = query.get(ev.target())?;
-	let (transform, target) = agents.get(ev.target())?;
-	let score = if let Ok(target) = target.get_position(&transforms) {
-		let dist = transform.translation().distance_squared(target);
-		if dist >= action.min_radius.powi(2)
-			&& dist <= action.max_radius.powi(2)
-		{
-			1.
-		} else {
-			0.
-		}
-	} else {
-		0.
+) -> Score {
+	let Ok((transform, target)) = agents.get(action) else {
+		return Score::FAIL;
 	};
-	commands
-		.entity(ev.target())
-		.trigger_target(Score::new(score));
-	Ok(())
+	match target.get_position(&transforms) {
+		Ok(target) => {
+			let dist = transform.translation().distance_squared(target);
+			if dist >= min_radius.powi(2) && dist <= max_radius.powi(2) {
+				Score::PASS
+			} else {
+				Score::FAIL
+			}
+		}
+		Err(_) => Score::FAIL,
+	}
 }

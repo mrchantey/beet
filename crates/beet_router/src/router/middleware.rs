@@ -206,7 +206,7 @@ pub impl AsyncEntity {
 				.with_state::<MiddlewareQuery<In, Out>, _>(
 					move |entity, query| query.resolve_action(entity, action),
 				)
-				.await;
+				.await?;
 			self.call_detached(action, input).await
 		})
 	}

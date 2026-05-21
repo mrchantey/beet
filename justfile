@@ -141,15 +141,21 @@ deploy-site *args:
 
 #💡 Test
 
-test-all:
+test-all *args:
 	@if [ ! -d assets ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then \
 		echo "please download assets directory: just pull-assets"; \
 		exit 1; \
 	fi
-	just test-core
-	just test-flow
-	just test-rsx
-	cargo test -p beet-cli  --all-features -- {{ test-threads }}
+	# Run beet_spatial in its own cargo invocation: enabling its
+	# `bevy_default` feature alongside the core crates unifies bevy/default
+	# across the whole graph, which has tripped a mold linker bug.
+	just _test-pkgs "{{ _core-pkgs }}" {{ args }}
+	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
+	just _test-pkgs "beet_spatial" {{ args }}
+	just _test-pkgs-wasm "beet_spatial" {{ args }}
+	just test-rsx {{ args }}
+	# beet-cli is currently commented out of the workspace; re-add when restored.
+	# cargo test -p beet-cli --all-features {{ args }} -- {{ test-threads }}
 
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
@@ -190,7 +196,12 @@ snap:
 # feature *except* `nightly` / `custom_test_frameworks` so the stable
 # `inventory` runner is exercised. Validate the libtest path explicitly with:
 #   cargo +nightly test -p beet_core --test test_test --features custom_test_frameworks
-_core-crates := "-p beet_core_shared -p beet_core_macros -p beet_core -p beet_infra -p beet_net -p beet_ui -p beet_router -p beet_thread -p beet_action"
+
+# Native test crate sets.
+_core-pkgs := "beet_core_shared beet_core_macros beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
+
+# Wasm test crate sets (skip crates that don't build for wasm).
+_core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_action"
 
 # Computes the cargo feature flag for the in-scope crates on the current
 # toolchain channel (nightly => --all-features, else explicit exclude list).
@@ -206,42 +217,36 @@ _core-features pkgs:
 		echo "--features $feats"
 	fi
 
-test-core *args:
+# Shared native cargo test runner over a space-separated list of crates.
+_test-pkgs pkgs *args:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	feats=$(just _core-features "beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action")
-	cargo test {{ _core-crates }} $feats {{ args }} -- {{ test-threads }}
-	just test-core-wasm {{ args }}
+	feats=$(just _core-features "{{ pkgs }}")
+	crates=$(printf -- "-p %s " {{ pkgs }})
+	cargo test $crates $feats {{ args }} -- {{ test-threads }}
 
+# Shared wasm cargo test runner over a space-separated list of crates.
+_test-pkgs-wasm pkgs *args:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	feats=$(just _core-features "{{ pkgs }}")
+	crates=$(printf -- "-p %s " {{ pkgs }})
+	cargo test $crates --lib --target wasm32-unknown-unknown $feats {{ args }} -- {{ test-threads }}
+
+test-core *args:
+	just _test-pkgs "{{ _core-pkgs }}" {{ args }}
+	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
 test-core-wasm *args:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	feats=$(just _core-features "beet_core beet_net beet_ui beet_router beet_thread beet_action")
-	cargo test \
-		-p beet_core -p beet_net -p beet_ui -p beet_router -p beet_thread -p beet_action \
-		--lib --target wasm32-unknown-unknown \
-		$feats {{ args }} -- {{ test-threads }}
+	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
-test-flow *args:
-	cargo test -p beet_flow 		--all-features 																						{{ args }} -- {{ test-threads }}
-	cargo test -p beet_spatial																														{{ args }} -- {{ test-threads }}
-	cargo test -p beet_flow 		--lib 										--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
-	cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
+# The rsx crates (beet_dom, beet_rsx, beet_parse, beet_build, beet_design,
+# beet_site) are currently commented out of the workspace, and beet_router's
+# old `tokens`/`server` features no longer exist. beet_router is already
+# exercised by `test-core`. Re-add lines here as the rsx crates come back.
 test-rsx *args:
-	cargo test -p beet_dom						 	--features=tokens  																	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_dom 	--lib 			--target wasm32-unknown-unknown											{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx_combinator 	--all-features																			{{ args }} -- {{ test-threads }}
-	cargo test -p beet_parse 						--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx_macros 			--all-features 	 	 																	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx   						--all-features   																		{{ args }} -- {{ test-threads }}
-	cargo test -p beet_rsx 	--lib 			--target wasm32-unknown-unknown 										{{ args }} -- {{ test-threads }}
-	cargo test -p beet_router						--features=tokens,server														{{ args }} -- {{ test-threads }}
-	cargo test -p beet_router						--lib --features=tokens	--target wasm32-unknown-unknown	 	{{ args }} -- {{ test-threads }}
-	cargo test -p beet_build 						--all-features																			{{ args }} -- {{ test-threads }}
-	cargo test -p beet_design 					--all-features																			{{ args }} -- {{ test-threads }}
-	cargo test -p beet_site							--no-default-features --features=server 						{{ args }} -- {{ test-threads }}
+	@echo "test-rsx is a no-op while rsx crates are out of the workspace"
 
 test crate *args:
 	just watch cargo test -p {{ crate }} --lib -- --watch=true {{ args }}

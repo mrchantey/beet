@@ -54,7 +54,7 @@ pub async fn HelpHandler(
 					.xok()
 			},
 		)
-		.await?;
+		.await??;
 
 	let scene = spawn_help_scene(&caller, &nodes).await;
 	scene.render_scene(&caller, parts).await
@@ -78,7 +78,7 @@ pub(crate) async fn ContextualNotFound(
 				(info, help_nodes).xok()
 			},
 		)
-		.await?;
+		.await??;
 
 	let scene = spawn_not_found_scene(&cx.caller, info, &nodes).await;
 	let mut response = scene
@@ -175,7 +175,8 @@ async fn spawn_help_scene(
 				}
 			});
 		})
-		.await;
+		.await
+		.ok();
 	SceneEntity::new_ephemeral(entity.id())
 }
 
@@ -245,7 +246,8 @@ async fn spawn_not_found_scene(
 				}
 			});
 		})
-		.await;
+		.await
+		.ok();
 	SceneEntity::new_ephemeral(entity.id())
 }
 
