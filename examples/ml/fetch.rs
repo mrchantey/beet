@@ -88,52 +88,75 @@ pub fn fetch_npc(
 				}
 			},
 		),
-		children![(
-			Name::new("Fetch Behavior"),
-			TriggerWithUserSentence,
-			Sequence::new(),
-			children![
-				(
-					Name::new("Apply Sentence Steer Target"),
-					OnSpawn::new(move |entity| {
-						let id = entity.id();
-						entity.world_scope(move |world| {
-							let parent = world
-								.entity(id)
-								.get::<ChildOf>()
-								.unwrap()
-								.parent();
-							world.entity_mut(id).insert(
-								SentenceSteerTarget::<Collectable>::new(
+		children![
+			// Plays idle once the [`AnimationPlayer`] is ready so the fox
+			// has a resting pose before the user types a command.
+			(
+				Name::new("Initial Idle"),
+				TriggerOnAnimationReady::run(),
+				PlayAnimation::new(idle_index).repeat_forever(),
+			),
+			// User-driven fetch behavior: a sentence is converted to a
+			// [`SteerTarget`], the fox walks to it, then returns to idle.
+			(
+				Name::new("Fetch Behavior"),
+				TriggerWithUserSentence,
+				Sequence::new(),
+				children![
+					(
+						Name::new("Apply Sentence Steer Target"),
+						OnSpawn::new(move |entity| {
+							let id = entity.id();
+							entity.world_scope(move |world| {
+								let parent = world
+									.entity(id)
+									.get::<ChildOf>()
+									.unwrap()
+									.parent();
+								world.entity_mut(id).insert(SentenceSteerTarget::<
+									Collectable,
+								>::new(
 									bert,
 									TargetEntity::Other(parent),
-								),
-							);
-						})
-					}),
-				),
-				(
-					Name::new("Fetch"),
-					SteerTargetScoreProvider {
-						min_radius: 1.,
-						max_radius: 10.,
-					},
-					Seek::default(),
-					PlayAnimation::new(walk_index).repeat_forever(),
-					InsertOn::new_with_target(
-						Velocity::default(),
-						TargetEntity::Agent,
+								));
+							})
+						}),
 					),
-					EndOnArrive::new(1.),
-				),
-				(
-					Name::new("Idle"),
-					TriggerOnAnimationReady::run(),
-					RemoveOn::<Velocity>::new_with_target(TargetEntity::Agent),
-					PlayAnimation::new(idle_index).repeat_forever(),
-				)
-			]
-		)],
+					(
+						Name::new("Fetch"),
+						Sequence::new(),
+						children![
+							(
+								Name::new("Play Walk"),
+								PlayAnimation::new(walk_index).repeat_forever(),
+							),
+							(
+								Name::new("Seek to Arrive"),
+								Seek::default(),
+								EndOnArrive::new(1.),
+							),
+						],
+					),
+					(
+						Name::new("Return to Idle"),
+						Sequence::new(),
+						children![
+							(
+								Name::new("Stop Moving"),
+								InsertOn::new_with_target(
+									Velocity::default(),
+									TargetEntity::Agent,
+								),
+							),
+							(
+								Name::new("Play Idle"),
+								PlayAnimation::new(idle_index).repeat_forever(),
+							),
+						],
+					),
+				],
+			),
+		],
 	));
 }
 
