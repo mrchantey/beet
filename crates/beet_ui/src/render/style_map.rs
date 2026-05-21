@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use alloc::borrow::Cow;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
@@ -15,6 +16,9 @@ pub struct StyleMap<S> {
 	nesting_stack: Vec<Arc<S>>,
 	/// Explicit element-name → style mapping.
 	element_map: HashMap<Cow<'static, str>, Arc<S>>,
+	/// CSS class → style mapping. Checked before `element_map` when a
+	/// caller pushes via [`StyleMap::push_view`].
+	class_map: HashMap<Cow<'static, str>, Arc<S>>,
 	/// Fallback mapping: if an element is missing from `element_map`,
 	/// look up its association here and use that element's style instead.
 	default_associations: HashMap<Cow<'static, str>, Cow<'static, str>>,
@@ -32,10 +36,33 @@ impl<S> StyleMap<S> {
 				.into_iter()
 				.map(|(k, v)| (k.into(), Arc::new(v)))
 				.collect(),
+			class_map: HashMap::default(),
 			default_associations: default_associations(),
 		}
 	}
 
+	/// Override the class → style mapping. Used by [`Self::push_view`] to
+	/// resolve elements whose class takes precedence over their tag.
+	pub fn with_class_map(
+		mut self,
+		map: Vec<(impl Into<Cow<'static, str>>, S)>,
+	) -> Self {
+		self.class_map = map
+			.into_iter()
+			.map(|(k, v)| (k.into(), Arc::new(v)))
+			.collect();
+		self
+	}
+
+	/// Insert or overwrite a single class → style entry.
+	pub fn insert_class(
+		&mut self,
+		class: impl Into<Cow<'static, str>>,
+		style: S,
+	) -> &mut Self {
+		self.class_map.insert(class.into(), Arc::new(style));
+		self
+	}
 
 	/// Override the fallback association mapping.
 	pub fn with_default_associations(
@@ -66,6 +93,23 @@ impl<S> StyleMap<S> {
 		let style = self.resolve_style(name);
 		self.nesting_stack.push(Arc::clone(&style));
 		style
+	}
+
+	/// Push by element view: any matching class in `class_map` wins
+	/// over the tag-based lookup. Falls back to [`Self::push`] otherwise.
+	pub fn push_view(&mut self, view: &ElementView<'_>) -> Arc<S> {
+		if let Some(attr) = view.attribute("class") {
+			if let Ok(classes) = attr.value.as_str() {
+				for class in classes.split_whitespace() {
+					if let Some(style) = self.class_map.get(class) {
+						let style = style.clone();
+						self.nesting_stack.push(Arc::clone(&style));
+						return style;
+					}
+				}
+			}
+		}
+		self.push(view.tag())
 	}
 
 	pub fn pop(&mut self) -> Option<Arc<S>> { self.nesting_stack.pop() }

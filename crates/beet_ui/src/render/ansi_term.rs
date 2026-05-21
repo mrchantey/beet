@@ -70,6 +70,35 @@ impl AnsiTermRenderer {
 		self
 	}
 
+	/// Register the default `hl-*` class → [`VisualStyle`] mapping used by
+	/// the syntax highlighter. Each capture name in
+	/// [`syntax_highlighting::default_palette`] becomes one class entry of
+	/// the form `hl-keyword`, `hl-string`, etc.
+	#[cfg(feature = "syntax_highlighting")]
+	pub fn with_syntax_highlighting(mut self) -> Self {
+		for (name, color) in crate::parse::default_palette() {
+			self.style_map.insert_class(
+				alloc::borrow::Cow::Owned(format!("hl-{}", name)),
+				VisualStyle::default().fg(color),
+			);
+		}
+		self
+	}
+
+	/// Register a single `hl-<name>` class → style entry.
+	#[cfg(feature = "syntax_highlighting")]
+	pub fn with_syntax_color(
+		mut self,
+		capture: &str,
+		color: impl Into<Color>,
+	) -> Self {
+		self.style_map.insert_class(
+			alloc::borrow::Cow::Owned(format!("hl-{}", capture)),
+			VisualStyle::default().fg(color),
+		);
+		self
+	}
+
 	/// Consume the renderer and return the accumulated string.
 	pub fn into_string(self) -> String { self.state.buffer }
 
@@ -106,7 +135,7 @@ impl AnsiTermRenderer {
 impl NodeVisitor for AnsiTermRenderer {
 	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
-		self.style_map.push(name);
+		self.style_map.push_view(&view);
 
 		match name {
 			// ── Headings ──

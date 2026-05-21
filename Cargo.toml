@@ -288,6 +288,7 @@ style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
+syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
@@ -434,6 +435,11 @@ required-features = ["ratatui"]
 name = "crud"
 path = "examples/ui/crud.rs"
 required-features = ["ui", "action"]
+
+[[example]]
+name = "syntax_highlighting"
+path = "examples/ui/syntax_highlighting.rs"
+required-features = ["syntax_highlighting", "markdown"]
 
 # 💡 Examples - Router
 

@@ -301,7 +301,9 @@ impl<'a> MdTreeBuilder<'a> {
 				self.push(StackFrame::new("blockquote", source));
 			}
 			Tag::CodeBlock(kind) => {
-				// <pre><code class="language-{lang}">
+				// <pre><code class="{lang}"> — class is the bare language
+				// name (borrowed from source) rather than "language-X",
+				// since attributes must be zero-copy slices.
 				self.push(StackFrame::new("pre", source));
 				let attrs = match kind {
 					pulldown_cmark::CodeBlockKind::Fenced(info) => {
