@@ -55,7 +55,7 @@ bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 [dependencies]
 beet_core = { workspace = true }
 beet_net = { workspace = true, optional = true }
-beet_action = {workspace = true,optional = true }
+beet_action = { workspace = true, optional = true }
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true

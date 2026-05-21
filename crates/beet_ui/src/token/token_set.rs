@@ -29,6 +29,13 @@ impl TokenSet {
 	pub fn listeners(&self, token: &Token) -> Option<&HashSet<Entity>> {
 		self.listeners.get(token)
 	}
+	pub fn iter_listeners(
+		&self,
+		token: &Token,
+	) -> impl Iterator<Item = &Entity> {
+		self.listeners(token).into_iter().flatten()
+	}
+
 	pub fn deregister(&mut self, entity: Entity, token: Token) {
 		if let Some(listeners) = self.listeners.get_mut(&token) {
 			listeners.remove(&entity);

@@ -34,11 +34,25 @@ where
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Get)]
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Get,
+	GetMut,
+	Deref,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedValue {
+	#[deref]
 	value: Value,
 	/// Schema identifying the type, ie `bevy_color::color::Color`.
+	#[get_mut(skip)]
 	schema: TokenSchema,
 }
 
