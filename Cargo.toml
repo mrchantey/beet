@@ -59,9 +59,6 @@ members = [
 
 	## TODO
 	# "crates/beet_parse",
-	# "crates/beet_rsx_combinator",
-	# "crates/beet_rsx/macros",
-	# "crates/beet_rsx",
 
 
 
@@ -97,9 +94,6 @@ beet_action = { path = "crates/beet_action", version = "0.0.9-dev.10" }
 
 ## TODO
 # beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.10" }
-# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.10" }
-# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.10" }
-# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.10" }
 
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.10" }
@@ -317,10 +311,9 @@ examples = ["bevy_default", "spatial", "dep:beet_examples"]
 ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]
-# css = ["beet_parse?/css", "beet_rsx?/css"]
-# design = ["rsx", "dep:beet_design"]
+# css = ["beet_parse?/css"]
+# design = ["dep:beet_design"]
 # parse = ["dep:beet_parse"]
-# rsx = ["dep:beet_rsx"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
@@ -346,7 +339,6 @@ beet_action = { workspace = true, optional = true }
 
 #💡 web
 # beet_parse = { workspace = true, optional = true }
-# beet_rsx = { workspace = true, optional = true }
 # beet_build = { workspace = true, optional = true }
 # beet_design = { workspace = true, optional = true }
 
