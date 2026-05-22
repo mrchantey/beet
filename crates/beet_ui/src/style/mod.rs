@@ -5,7 +5,7 @@ pub mod material;
 mod resolve_styles;
 mod style_plugin;
 mod style_query;
-#[cfg(feature = "syntax_highlighting")]
+#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 pub mod syntax;
 mod values;
 pub use css::*;

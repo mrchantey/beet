@@ -17,7 +17,7 @@ impl Plugin for StylePlugin {
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(default_element_rules());
 
-		#[cfg(feature = "syntax_highlighting")]
+		#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 		{
 			// highlight code blocks into styled spans, then resolve styles
 			app.init_resource::<SyntaxHighlighting>().add_systems(
@@ -39,7 +39,7 @@ impl Plugin for StylePlugin {
 			);
 			rules.extend_rules(syntax::class_rules());
 		}
-		#[cfg(not(feature = "syntax_highlighting"))]
+		#[cfg(any(not(feature = "syntax_highlighting"), target_arch = "wasm32"))]
 		app.add_systems(
 			PostParseTree,
 			resolve_styles.in_set(ResolveStylesSet),

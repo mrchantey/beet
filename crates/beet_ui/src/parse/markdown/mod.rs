@@ -587,7 +587,7 @@ mod test {
 		root.get::<Expression>().is_none().xpect_true();
 	}
 
-	#[cfg(feature = "syntax_highlighting")]
+	#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn syntax_highlighting_replaces_text_with_spans() {
 		let mut app = App::new();

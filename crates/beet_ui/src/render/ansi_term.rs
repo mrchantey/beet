@@ -196,7 +196,7 @@ mod test {
 			.xpect_contains("fn main() {}");
 	}
 
-	#[cfg(feature = "syntax_highlighting")]
+	#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn render_code_block_syntax_styled() {
 		// the `fn` keyword resolves to a syntax-highlight foreground colour

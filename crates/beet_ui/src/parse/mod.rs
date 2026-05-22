@@ -12,13 +12,13 @@ mod parse_plugin;
 mod plaintext;
 mod span_tracker;
 pub use parse_plugin::*;
-#[cfg(feature = "syntax_highlighting")]
+#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 mod syntax_highlighting;
 pub use media::*;
 pub use node_parser::*;
 pub use plaintext::*;
 pub use span_tracker::*;
-#[cfg(feature = "syntax_highlighting")]
+#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 pub use syntax_highlighting::*;
 
 
