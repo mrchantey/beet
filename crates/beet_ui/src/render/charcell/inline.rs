@@ -59,6 +59,29 @@ pub(super) fn is_preformatted(node: &CharcellNodeData) -> bool {
 	node.layout_style().white_space == WhiteSpace::Pre
 }
 
+/// Cell width reserved on the left for a block list item's [`Marker`].
+///
+/// Non-zero only for a marker-bearing block container — an `<li>` that holds a
+/// nested list, so it cannot flow inline. The marker paints in this gutter and
+/// the item's children (label text and the nested list) are inset past it, so
+/// nested lists indent one marker-width per level. Inline list items emit their
+/// marker through the inline flow instead, and generated leaves like `<hr>`
+/// paint it as their whole content, so both return `0`.
+pub(super) fn marker_gutter(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+) -> u32 {
+	if establishes_inline_flow(node, query) {
+		return 0;
+	}
+	match node.marker() {
+		Some(marker) if node.has_child_nodes(query) => {
+			display_width(marker) as u32
+		}
+		_ => 0,
+	}
+}
+
 /// Measure an inline formatting context: returns `(max_line_width, line_count)`.
 pub(super) fn measure_inline_flow(
 	node: &CharcellNodeData,

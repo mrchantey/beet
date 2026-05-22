@@ -31,8 +31,6 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style;
 	#[cfg(feature = "style")]
-	pub use crate::style::PostParseTree;
-	#[cfg(feature = "style")]
 	pub use crate::style::ResolveStylesSet;
 	#[cfg(feature = "style")]
 	pub use crate::style::StylePlugin;

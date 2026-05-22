@@ -90,6 +90,10 @@ pub fn block_layout_rects(
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
+	// a list item's marker occupies a left gutter; its children are inset past
+	// it (the marker itself paints into the gutter in the paint phase).
+	let gutter = marker_gutter(node, query);
+	let child_min_x = (content_rect.min.x + gutter).min(content_rect.max.x);
 	let mut child_y = content_rect.min.y;
 	for child in node.child_nodes(query) {
 		if child_y >= content_rect.max.y {
@@ -97,7 +101,7 @@ pub fn block_layout_rects(
 		}
 		let child_size = child.intrinsic_size();
 		let child_rect = URect::new(
-			content_rect.min.x,
+			child_min_x,
 			child_y,
 			content_rect.max.x,
 			(child_y + child_size.y).min(content_rect.max.y),

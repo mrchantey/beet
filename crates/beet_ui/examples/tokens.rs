@@ -25,7 +25,7 @@ fn main() {
 			),
 		)
 		.add_systems(Startup, setup)
-		.add_systems(PostUpdate, render.after(CharcellRenderSet))
+		.add_systems(PostParseTree, render.after(CharcellRenderSet))
 		.run();
 }
 

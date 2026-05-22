@@ -122,7 +122,7 @@ pub fn display_width(s: &str) -> usize {
 	let mut in_esc = false;
 	for ch in s.chars() {
 		match ch {
-			'\x1b' => in_esc = true,
+			escape::ESC => in_esc = true,
 			'm' if in_esc => in_esc = false,
 			_ if in_esc => {}
 			_ => w += unicode_width(ch) as usize,

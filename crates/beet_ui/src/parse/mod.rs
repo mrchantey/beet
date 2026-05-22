@@ -8,8 +8,10 @@ mod markdown;
 pub use markdown::*;
 mod media;
 mod node_parser;
+mod parse_plugin;
 mod plaintext;
 mod span_tracker;
+pub use parse_plugin::*;
 #[cfg(feature = "syntax_highlighting")]
 mod syntax_highlighting;
 pub use media::*;

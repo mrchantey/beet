@@ -1,25 +1,7 @@
 use super::*;
-use crate::style::PostParseTree;
+use crate::parse::PostParseTree;
 use beet_core::prelude::*;
-use bevy::ecs::component::Mutable;
 use bevy::math::UVec2;
-
-/// Run the charcell pipeline once over every `B` buffer tree in `world`.
-///
-/// Drives `prepare → measure → layout → paint` directly via
-/// [`run_system_cached`](World::run_system_cached), for renderers that own the
-/// pipeline manually instead of relying on [`CharcellPlugin`]'s `PostUpdate`
-/// schedule. Styles must already be resolved (eg via the [`PostParseTree`]
-/// schedule); this only lays out and paints.
-pub fn paint_charcell_trees<B: Component<Mutability = Mutable> + AsBuffer>(
-	world: &mut World,
-) -> Result {
-	world.run_system_cached::<(), _, _>(prepare_charcell_tree::<B>)?;
-	world.run_system_cached::<(), _, _>(measure_nodes::<B>)?;
-	world.run_system_cached::<(), _, _>(layout_nodes::<B>)?;
-	world.run_system_cached::<(), _, _>(paint_nodes::<B>)?;
-	Ok(())
-}
 
 impl Buffer {
 	/// Render a bundle with the default terminal size, returning ANSI output.
@@ -41,7 +23,8 @@ impl Buffer {
 	pub fn populate(self, bundle: impl Bundle) -> Self {
 		let mut world = CharcellPlugin::world();
 		let entity = world.spawn((self.into_double_buffer(), bundle)).id();
-		world.run_schedule(PostUpdate);
+		// resolve styles + decorations and drive the layout/paint pipeline
+		world.run_schedule(PostParseTree);
 		world
 			.entity_mut(entity)
 			.take::<DoubleBuffer>()
@@ -62,15 +45,12 @@ impl FlexBuffer {
 		Self::populate(width, bundle).render_plain()
 	}
 
-	/// Spawn `bundle` under a fresh flex buffer, resolve styles + decorations,
-	/// then drive the charcell pipeline and return the painted buffer.
+	/// Spawn `bundle` under a fresh flex buffer, then run the [`PostParseTree`]
+	/// pipeline to resolve styles, decorate, lay out, and paint the tree.
 	fn populate(width: u32, bundle: impl Bundle) -> Self {
 		let mut world = CharcellPlugin::world();
 		let entity = world.spawn((FlexBuffer::new(width), bundle)).id();
-		// resolve styles (display rules, syntax highlighting) and decorations
-		// before manually driving the layout/paint pipeline over the flex tree.
 		world.run_schedule(PostParseTree);
-		paint_charcell_trees::<FlexBuffer>(&mut world).unwrap();
 		world.entity_mut(entity).take::<FlexBuffer>().unwrap()
 	}
 }
@@ -81,7 +61,7 @@ mod tests {
 	use crate::prelude::*;
 
 	#[beet_core::test]
-	fn paint_charcell_trees_drives_pipeline() {
+	fn post_parse_tree_drives_pipeline() {
 		let mut world = CharcellPlugin::world();
 		let root = world
 			.spawn((
@@ -89,9 +69,8 @@ mod tests {
 				rsx! { <div><h1>"Title"</h1><p>"Body"</p></div> },
 			))
 			.id();
-		// resolve styles (display rules) before manually driving layout/paint
+		// the schedule resolves styles, decorates, lays out, and paints
 		world.run_schedule(PostParseTree);
-		paint_charcell_trees::<DoubleBuffer>(&mut world).unwrap();
 
 		let out = world
 			.get::<DoubleBuffer>(root)

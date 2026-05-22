@@ -4,6 +4,7 @@
 //! and [`CharcellQuery`] (the shared system parameter).
 
 use crate::prelude::*;
+use crate::style::Display;
 use crate::style::*;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
@@ -59,8 +60,7 @@ impl CharcellNodeData<'_> {
 	/// element with `display: inline`. Inline-level children cause their
 	/// container to establish an inline formatting context.
 	pub fn is_inline_level(&self) -> bool {
-		self.value().is_some()
-			|| self.layout_style().display == Display::Inline
+		self.value().is_some() || self.layout_style().display == Display::Inline
 	}
 
 	pub(super) fn child_nodes<'a>(
@@ -71,6 +71,11 @@ impl CharcellNodeData<'_> {
 			.iter()
 			.flat_map(|children| children.iter())
 			.filter_map(move |child| query.node(child).ok())
+	}
+
+	/// Whether this node has any renderable child nodes.
+	pub(super) fn has_child_nodes(&self, query: &CharcellQuery) -> bool {
+		self.child_nodes(query).next().is_some()
 	}
 }
 

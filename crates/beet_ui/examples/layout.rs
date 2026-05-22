@@ -2,6 +2,7 @@ use beet_core::prelude::*;
 use beet_ui::prelude::style::AlignItems;
 use beet_ui::prelude::style::Display;
 use beet_ui::prelude::style::FlexWrap;
+use beet_ui::prelude::style::FontWeight;
 use beet_ui::prelude::style::JustifyContent;
 use beet_ui::prelude::style::Visibility;
 use beet_ui::prelude::style::*;

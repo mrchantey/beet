@@ -39,7 +39,6 @@ pub use measure::IntrinsicSize;
 pub use paint::*;
 pub use plugin::*;
 pub use prepare::*;
-pub use renderer::*;
 #[cfg(feature = "terminal")]
 pub use terminal::*;
 

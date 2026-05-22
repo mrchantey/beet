@@ -11,22 +11,21 @@ use std::borrow::Cow;
 /// [`Marker`] generated content, and `<a>`/`<img>` links emit
 /// [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 ///
-/// All styling comes from the resolved [`VisualStyle`] components populated by
-/// the [`StylePlugin`] during the [`PostParseTree`] schedule: prose defaults
-/// (`em` → italic, `h1` → bold colour) come from
+/// The world must have a [`CharcellPlugin`] (which pulls in [`StylePlugin`]):
+/// rendering re-runs the [`PostParseTree`] schedule to decorate and paint the
+/// flex buffer, so without those systems registered the buffer stays blank.
+/// All styling comes from the resolved [`VisualStyle`] components: prose
+/// defaults (`em` → italic, `h1` → bold colour) come from
 /// [`default_element_rules`](crate::style::default_element_rules) and
 /// tree-sitter syntax highlighting from `apply_syntax_highlighting`'s
 /// `class="hl-<capture>"` spans. The renderer holds no style table of its own —
-/// it simply paints the style resolved for each entity. Without a
-/// [`StylePlugin`] the structure is still rendered, just unstyled.
+/// it simply paints the style resolved for each entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
 	/// Whether to clear the terminal before rendering.
 	clear_on_render: bool,
 	/// A string prepended to the output, defaults to `\n`.
 	prefix: Cow<'static, str>,
-	/// Whether to prefix headings with `#` markers.
-	heading_hashes: bool,
 }
 
 impl Default for AnsiTermRenderer {
@@ -38,14 +37,7 @@ impl AnsiTermRenderer {
 		Self {
 			clear_on_render: true,
 			prefix: "\n".into(),
-			heading_hashes: false,
 		}
-	}
-
-	/// Prefix headings with `#` markers matching their level.
-	pub fn with_heading_hashes(mut self) -> Self {
-		self.heading_hashes = true;
-		self
 	}
 
 	/// Override whether to clear the terminal before rendering.
@@ -60,15 +52,10 @@ impl AnsiTermRenderer {
 		let width = terminal_ext::size().x.max(1);
 		world.entity_mut(entity).insert(FlexBuffer::new(width));
 
-		// `#`-prefix headings as generated content when requested
-		if self.heading_hashes {
-			insert_heading_hashes(world);
-		}
-		// promote `<a>`/`<img>` links and list/quote/rule/image markers, then
-		// drive the charcell pipeline (styles already resolved at parse time).
-		world.run_system_cached::<(), _, _>(apply_hyperlinks)?;
-		world.run_system_cached::<(), _, _>(apply_markers)?;
-		paint_charcell_trees::<FlexBuffer>(world)?;
+		// styles were resolved when the tree was parsed; re-run the post-parse
+		// pipeline to decorate and paint the freshly-inserted flex buffer. A
+		// no-op when the world has no `CharcellPlugin` (structure stays unstyled).
+		let _ = world.try_run_schedule(PostParseTree);
 
 		let body = world
 			.entity_mut(entity)
@@ -78,36 +65,11 @@ impl AnsiTermRenderer {
 
 		let mut out = String::new();
 		if self.clear_on_render {
-			out.push_str("\x1b[2J\x1b[H");
+			out.push_str(escape::CLEAR_ALL);
 		}
 		out.push_str(&self.prefix);
 		out.push_str(&body);
 		out.xok()
-	}
-}
-
-/// Attach a `#`-per-level [`Marker`] to every heading element.
-fn insert_heading_hashes(world: &mut World) {
-	let headings: Vec<(Entity, usize)> = world
-		.query::<(Entity, &Element)>()
-		.iter(world)
-		.filter_map(|(entity, element)| {
-			heading_level(element.tag()).map(|level| (entity, level))
-		})
-		.collect();
-	for (entity, level) in headings {
-		let marker = format!("{} ", "#".repeat(level));
-		world.entity_mut(entity).insert(Marker(marker.into()));
-	}
-}
-
-/// The level of a heading tag (`h1`..`h6`), or `None` for any other tag.
-fn heading_level(tag: &str) -> Option<usize> {
-	match tag {
-		"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-			tag[1..].parse::<usize>().ok()
-		}
-		_ => None,
 	}
 }
 
@@ -131,7 +93,7 @@ mod test {
 	/// Parse markdown, resolve styles, then render via [`AnsiTermRenderer`].
 	fn render(md: &str) -> String {
 		let mut app = App::new();
-		app.add_plugins(StylePlugin);
+		app.add_plugins(CharcellPlugin);
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
@@ -200,7 +162,7 @@ mod test {
 
 	#[beet_core::test]
 	fn render_heading_text() {
-		// heading_hashes is false by default; only the text is emitted
+		// headings carry no `#` markers by default; only the text is emitted
 		render("# Title").xmap(strip_ansi).trim().xpect_eq("Title");
 	}
 
@@ -298,7 +260,7 @@ mod test {
 	#[beet_core::test]
 	fn unescape_html_entities() {
 		let mut app = App::new();
-		app.add_plugins(StylePlugin);
+		app.add_plugins(CharcellPlugin);
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
 		HtmlParser::new()

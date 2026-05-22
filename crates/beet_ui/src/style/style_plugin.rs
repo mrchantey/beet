@@ -8,9 +8,8 @@ pub struct StylePlugin;
 impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<TokenPlugin>()
-			.init_resource::<CssTokenMap>()
-			.init_schedule(PostParseTree)
-			.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
+			.init_plugin::<ParsePlugin>()
+			.init_resource::<CssTokenMap>();
 
 		// terminal/char-cell defaults for prose elements (em → italic,
 		// h1 → bold colour, …), expressed as ordinary tag rules.
@@ -20,9 +19,14 @@ impl Plugin for StylePlugin {
 
 		#[cfg(feature = "syntax_highlighting")]
 		{
+			// highlight code blocks into styled spans, then resolve styles
 			app.init_resource::<SyntaxHighlighting>().add_systems(
 				PostParseTree,
-				(apply_syntax_highlighting, resolve_styles).chain(),
+				(
+					apply_syntax_highlighting,
+					resolve_styles.in_set(ResolveStylesSet),
+				)
+					.chain(),
 			);
 			// register the default theme so `.hl-<capture>` classes emitted by
 			// `apply_syntax_highlighting` resolve to a foreground colour with no
@@ -36,18 +40,17 @@ impl Plugin for StylePlugin {
 			rules.extend_rules(syntax::class_rules());
 		}
 		#[cfg(not(feature = "syntax_highlighting"))]
-		app.add_systems(PostParseTree, resolve_styles);
+		app.add_systems(
+			PostParseTree,
+			resolve_styles.in_set(ResolveStylesSet),
+		);
 	}
 }
 
 
-/// A set configured in PostUpdate that applies styles to
-/// realtime applications like a tui or gui
+/// The [`PostParseTree`] set that resolves [`VisualStyle`](crate::style::VisualStyle),
+/// [`LayoutStyle`](crate::style::LayoutStyle), and [`BoxStyle`](crate::style::BoxStyle)
+/// from the [`RuleSet`] cascade. Charcell decorations and the paint pipeline
+/// run after it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ResolveStylesSet;
-
-
-/// Ran in non-realtime environments like http servers with
-/// html and markdown parsers, that need to run the schedule as a one-off
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct PostParseTree;

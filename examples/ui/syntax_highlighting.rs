@@ -8,11 +8,11 @@
 use beet::prelude::*;
 
 fn main() {
-	// 1. Configure an app with `StylePlugin`, which registers the
-	// `SyntaxHighlighting` resource and the `apply_syntax_highlighting`
-	// system in the `PostParseTree` schedule.
+	// 1. Configure an app with `CharcellPlugin`, which pulls in `StylePlugin`
+	// (the `SyntaxHighlighting` resource and `apply_syntax_highlighting`) plus
+	// the charcell decorate + layout/paint pipeline, all in `PostParseTree`.
 	let mut app = App::new();
-	app.add_plugins(StylePlugin);
+	app.add_plugins(CharcellPlugin);
 	let entity = app.world_mut().spawn_empty().id();
 
 	// 2. Parse the markdown source into the entity tree. The parser runs

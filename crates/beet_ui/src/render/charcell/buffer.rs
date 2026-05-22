@@ -82,7 +82,10 @@ pub trait AsBuffer {
 			if cell_pos.x >= self.size().x {
 				break;
 			}
-			self.set(cell_pos, Cell::new(ch.to_string(), style.clone(), entity));
+			self.set(
+				cell_pos,
+				Cell::new(ch.to_string(), style.clone(), entity),
+			);
 			// placeholder for the trailing column of a wide character
 			if w == 2 {
 				let cont_pos = UVec2::new(pos.x + col + 1, pos.y);
@@ -174,7 +177,11 @@ impl Buffer {
 
 	/// Render the buffer to plain text (no ANSI styling).
 	pub fn render_plain(&self) -> String {
-		render_cells_plain(&self.cells, self.size.x as usize, self.size.y as usize)
+		render_cells_plain(
+			&self.cells,
+			self.size.x as usize,
+			self.size.y as usize,
+		)
 	}
 
 	/// Render the buffer to a string with ANSI styling.
@@ -315,11 +322,11 @@ pub(crate) fn trim_line_trailing(rendered: &str) -> String {
 
 /// Write an OSC-8 hyperlink sequence: opening with `url`, or closing for `None`.
 fn write_osc8(out: &mut Vec<u8>, url: Option<&str>) {
-	out.extend_from_slice(b"\x1b]8;;");
+	out.extend_from_slice(escape::OSC8_LINK.as_bytes());
 	if let Some(url) = url {
 		out.extend_from_slice(url.as_bytes());
 	}
-	out.extend_from_slice(b"\x1b\\");
+	out.extend_from_slice(escape::ST.as_bytes());
 }
 
 /// A single terminal cell with text and styling.
@@ -417,7 +424,9 @@ impl VisualStyle {
 		}
 		match self.blink {
 			BlinkStyle::None => {}
-			BlinkStyle::Blink => modifier |= ratatui::style::Modifier::SLOW_BLINK,
+			BlinkStyle::Blink => {
+				modifier |= ratatui::style::Modifier::SLOW_BLINK
+			}
 			BlinkStyle::RapidBlink => {
 				modifier |= ratatui::style::Modifier::RAPID_BLINK
 			}
@@ -456,6 +465,7 @@ impl Cell {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::style::FontWeight;
 	use crate::style::*;
 
 	/// Render a bundle to a 40×5 buffer and return the trimmed plain string.

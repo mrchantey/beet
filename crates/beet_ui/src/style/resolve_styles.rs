@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 use crate::style::FlexBox;
 use crate::style::LayoutStyle;
 use crate::style::VisualStyle;
@@ -103,8 +102,7 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	let flex_order = query.resolve(entity, FlexOrderProp).unwrap_or_default();
 	let align_self = query.resolve(entity, AlignSelfProp).unwrap_or_default();
 	let display = query.resolve(entity, DisplayProp).unwrap_or_default();
-	let white_space =
-		query.resolve(entity, WhiteSpaceProp).unwrap_or_default();
+	let white_space = query.resolve(entity, WhiteSpaceProp).unwrap_or_default();
 	let direction =
 		query.resolve(entity, FlexDirectionProp).unwrap_or_default();
 	let wrap = query.resolve(entity, FlexWrapProp).unwrap_or_default();

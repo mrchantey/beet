@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 
 /// An OSC-8 hyperlink target attached to an `<a>` or `<img>` element.
 ///
-/// Populated by [`apply_hyperlinks`] in the [`PostParseTree`](crate::style::PostParseTree)
+/// Populated by [`apply_hyperlinks`] in the [`PostParseTree`](crate::prelude::PostParseTree)
 /// schedule and threaded through the inline flow so the stdout [`FlexBuffer`]
 /// wraps the element's run in an OSC-8 sequence. The TUI ignores it.
 #[derive(Debug, Clone, Component)]
@@ -21,6 +21,10 @@ pub struct Hyperlink(pub SmolStr);
 /// Computed by [`apply_markers`] from the element's structural context without
 /// mutating the parsed document. The inline flow emits it as the element's
 /// first run; a block leaf like `<hr>` paints it as its sole text.
+///
+/// Markers are a general extension point: any system in the
+/// [`DecorateSet`](crate::prelude::DecorateSet) may insert a [`Marker`] to add
+/// generated content. See [`heading_hash_markers`] for an opt-in example.
 #[derive(Debug, Clone, Component)]
 pub struct Marker(pub SmolStr);
 
@@ -129,6 +133,37 @@ fn img_marker(view: &ElementView) -> SmolStr {
 	}
 }
 
+/// Prefix every heading (`<h1>`..`<h6>`) with a `#`-per-level [`Marker`],
+/// echoing markdown source. Not registered by default; opt in by adding it to
+/// the [`DecorateSet`](crate::prelude::DecorateSet):
+///
+/// ```
+/// # use beet_ui::prelude::*;
+/// # use beet_core::prelude::*;
+/// App::new()
+/// 	.add_plugins(CharcellPlugin)
+/// 	.add_systems(PostParseTree, heading_hash_markers.in_set(DecorateSet));
+/// ```
+pub fn heading_hash_markers(
+	mut commands: Commands,
+	headings: Query<(Entity, &Element)>,
+) {
+	for (entity, element) in &headings {
+		if let Some(level) = heading_level(element.tag()) {
+			let marker = format!("{} ", "#".repeat(level));
+			commands.entity(entity).insert(Marker(marker.into()));
+		}
+	}
+}
+
+/// The level of a heading tag (`h1`..`h6`), or `None` for any other tag.
+fn heading_level(tag: &str) -> Option<usize> {
+	match tag {
+		"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => tag[1..].parse().ok(),
+		_ => None,
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
@@ -168,5 +203,19 @@ mod tests {
 	fn image_alt_text() {
 		render(rsx! { <img src="image.png" alt="alt text"/> })
 			.xpect_contains("[alt text]");
+	}
+
+	#[beet_core::test]
+	fn nested_list_indented() {
+		// the outer item's marker sits in a left gutter, so its nested list is
+		// inset one marker-width, indenting the nested bullet under the label.
+		let out = FlexBuffer::render_oneshot_plain(40, rsx! {
+			<ul><li>"top"<ul><li>"nested"</li></ul></li></ul>
+		});
+		out.lines()
+			.map(|line| line.trim_end())
+			.filter(|line| !line.is_empty())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["• top", "  • nested"]);
 	}
 }

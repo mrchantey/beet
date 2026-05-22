@@ -71,8 +71,10 @@ pub(super) fn measure_node(
 		_ if establishes_inline_flow(node, query) => {
 			measure_inline_flow(node, query, content_available.x)
 		}
-		// block leaf whose content is generated (eg the `<hr>` rule)
-		_ if let Some(marker) = node.marker() => {
+		// block leaf whose content is generated (eg the `<hr>` rule, `<img>` alt)
+		_ if let Some(marker) =
+			node.marker().filter(|_| !node.has_child_nodes(query)) =>
+		{
 			measure_str(marker, content_available.x)
 		}
 		// block container: stack children vertically
@@ -93,6 +95,8 @@ fn measure_block(
 	available: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> UVec2 {
+	// a list item holding a nested list reserves a left gutter for its marker
+	let gutter = marker_gutter(node, query);
 	let mut max_w = 0u32;
 	let mut total_h = 0u32;
 	for child in node.child_nodes(query) {
@@ -103,7 +107,7 @@ fn measure_block(
 		max_w = max_w.max(size.x);
 		total_h += size.y.max(1);
 	}
-	UVec2::new(max_w.min(available.x), total_h)
+	UVec2::new((gutter + max_w).min(available.x), total_h)
 }
 
 #[cfg(test)]

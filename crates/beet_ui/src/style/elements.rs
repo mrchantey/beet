@@ -21,6 +21,11 @@ use beet_core::prelude::*;
 /// Faint grey used for de-emphasised elements (quotes, rules, h6).
 fn faint() -> Color { Color::srgba(1., 1., 1., 0.4) }
 
+/// Neutral soft white for code text with no syntax highlight, matching the
+/// default syntax theme's plain-token colour. Uncaptured runs inside a code
+/// block (eg JSON keys, HTML text) inherit this rather than a tinted hue.
+fn code_fg() -> Color { Color::srgb(0.85, 0.85, 0.85) }
+
 /// One blank row below a block, separating it from the next (the `\n\n` between
 /// markdown blocks). `li` items stay tight, so they opt out.
 fn block_gap() -> Spacing {
@@ -49,30 +54,22 @@ pub fn default_element_rules() -> Vec<Rule> {
 		blockquote(),
 		block_spaced(&["pre"])
 			.with_value(WhiteSpaceProp, WhiteSpace::Pre)
-			.with_value(ForegroundColor, Color::srgba(0.502, 0.502, 0., 0.4)),
+			.with_value(ForegroundColor, code_fg()),
 		block_spaced(&["hr"]).with_value(ForegroundColor, faint()),
 		// ── Inline formatting ──
 		bold(&["strong", "b"]),
 		italic(&["em", "i"]),
 		strikethrough(&["del", "s"]),
-		inline(&["code"]).with_value(ForegroundColor, Color::srgb(0.502, 0.502, 0.)),
+		inline(&["code"]).with_value(ForegroundColor, code_fg()),
 		inline(&["span"]),
 		link(),
 		inline(&["img"]).with_value(ForegroundColor, faint()),
 	]
 }
 
-fn tag_rule(tags: &[&str]) -> Rule {
-	let selector = match tags {
-		[tag] => Selector::tag(*tag),
-		_ => Selector::AnyOf(tags.iter().map(|t| Selector::tag(*t)).collect()),
-	};
-	Rule::new().with_selector(selector)
-}
-
 /// A rule forcing `display: block` on the given tags.
 fn block(tags: &[&str]) -> Rule {
-	tag_rule(tags).with_value(DisplayProp, Display::Block)
+	Rule::tags(tags).with_value(DisplayProp, Display::Block)
 }
 
 /// A `display: block` rule that also reserves a [`block_gap`] below, separating
@@ -83,7 +80,7 @@ fn block_spaced(tags: &[&str]) -> Rule {
 
 /// A rule forcing `display: inline` on the given tags.
 fn inline(tags: &[&str]) -> Rule {
-	tag_rule(tags).with_value(DisplayProp, Display::Inline)
+	Rule::tags(tags).with_value(DisplayProp, Display::Inline)
 }
 
 fn heading(tag: &str, color: Color) -> Rule {
