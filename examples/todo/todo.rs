@@ -66,15 +66,7 @@ async fn main() -> Result {
 		.call::<Request, Response>(request)
 		.await?;
 
-	if let Some(Ok(MediaType::Json)) =
-		response.headers().get::<headers::ContentType>()
-	{
-		let value = response.json::<Value>().await?;
-		let value = serde_json::to_string_pretty(&value)?;
-		cross_log!("{}", value);
-	} else {
-		cross_log!("{}", response.text().await?);
-	}
+	cross_log!("{}", response.pretty_text().await?);
 
 	// persist only when a command actually changed the list
 	let after = world.entity(root).get::<Document>().unwrap().0.clone();

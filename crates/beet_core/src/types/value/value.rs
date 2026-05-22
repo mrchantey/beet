@@ -332,6 +332,12 @@ impl Value {
 	pub fn into_json(self) -> serde_json::Value {
 		crate::types::value::serde_ext::value_to_json(self)
 	}
+	/// Convert into a JSON string.
+	#[cfg(feature = "json")]
+	pub fn to_string_pretty(&self) -> Result<String> {
+		// TODO our own pretty printer
+		serde_json::to_string_pretty(self)?.xok()
+	}
 
 	/// Convert from any serializable type.
 	#[cfg(feature = "serde")]

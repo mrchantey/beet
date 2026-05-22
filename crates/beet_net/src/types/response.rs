@@ -302,6 +302,21 @@ impl Response {
 	/// Consumes the response body and returns it as a string
 	pub async fn text(self) -> Result<String> { self.body.into_string().await }
 
+	/// Consumes the response body and returns it as a pretty-printed string if it's JSON,
+	/// otherwise as plain text.
+	#[cfg(feature = "json")]
+	pub async fn pretty_text(self) -> Result<String> {
+		if let Some(Ok(MediaType::Json)) =
+			self.headers().get::<headers::ContentType>()
+		{
+			let value =
+				self.json::<serde_json::Value>().await?.to_string_pretty()?;
+			Ok(value)
+		} else {
+			self.text().await
+		}
+	}
+
 	/// Consumes the response body and parses it as JSON
 	#[cfg(feature = "json")]
 	pub async fn json<T: serde::de::DeserializeOwned>(self) -> Result<T> {
