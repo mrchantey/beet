@@ -65,7 +65,16 @@ async fn main() -> Result {
 		.entity_mut(root)
 		.call::<Request, Response>(request)
 		.await?;
-	cross_log!("{}", response.text().await?);
+
+	if let Some(Ok(MediaType::Json)) =
+		response.headers().get::<headers::ContentType>()
+	{
+		let value = response.json::<Value>().await?;
+		let value = serde_json::to_string_pretty(&value)?;
+		cross_log!("{}", value);
+	} else {
+		cross_log!("{}", response.text().await?);
+	}
 
 	// persist only when a command actually changed the list
 	let after = world.entity(root).get::<Document>().unwrap().0.clone();
@@ -90,7 +99,10 @@ fn todos() -> FieldRef {
 
 /// `create --body='{..}'` — append a todo to the list.
 fn create() -> impl Bundle {
-	(todos(), exchange_route("create", PushField::<Todo>::default()))
+	(
+		todos(),
+		exchange_route("create", PushField::<Todo>::default()),
+	)
 }
 
 /// `read --body=<index>` — return a single todo by its index.
@@ -100,7 +112,9 @@ fn read() -> impl Bundle { (todos(), exchange_route("read", ReadTodo)) }
 fn update() -> impl Bundle { (todos(), exchange_route("update", UpdateTodo)) }
 
 /// `delete --body=<index>` — remove the todo at an index.
-fn delete() -> impl Bundle { (todos(), exchange_route("delete", RemoveAtField)) }
+fn delete() -> impl Bundle {
+	(todos(), exchange_route("delete", RemoveAtField))
+}
 
 /// `list` — return the entire list.
 fn list() -> impl Bundle { (todos(), exchange_route("list", ReadField)) }
