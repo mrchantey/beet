@@ -85,9 +85,11 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;
 			pub use crate::ui::prelude::style::FontWeight;
+			pub use crate::ui::prelude::style::FontStyle;
 			pub use crate::ui::prelude::style::AlignSelf;
 			pub use crate::ui::prelude::style::AlignItems;
 			pub use crate::ui::prelude::style::AlignContent;
+			pub use crate::ui::prelude::style::Visibility;
 			pub use crate::ui::prelude::style::FlexWrap;
 			pub use crate::ui::prelude::Pointer;
 		}
