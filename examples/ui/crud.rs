@@ -1,8 +1,9 @@
-//! # CRUD - Token list operations
+//! # CRUD - document list operations
 //!
-//! Demonstrates the [`Push`], [`InsertAt`], [`RemoveAt`] and [`Set`] actions on a
-//! [`Token`] holding a `Vec<String>`. The host entity listens on the token,
-//! so its [`Value`] component is rebuilt after every mutation.
+//! Demonstrates the [`PushField`], [`InsertAtField`], [`RemoveAtField`] and
+//! [`SetFieldTyped`] actions on a document field holding a `Vec<String>`. The
+//! actor entity references the field on its host document, so the host's list
+//! is rebuilt after every mutation.
 //!
 //! Run with:
 //! ```sh
@@ -10,25 +11,26 @@
 //! ```
 use beet::prelude::*;
 
-fn todos() -> TokenDefinition<Vec<String>> {
-	TokenDefinition::inline(Vec::new())
+fn todos_field() -> FieldRef {
+	FieldRef::new("todos").with_init(Value::List(Vec::new()))
 }
 
 #[beet::main]
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
-	let token = todos();
-	let token_ref = TokenRef::new(&token);
-	let host = world.spawn(token.into_bundle()).id();
 
-	// the actor entity drives mutations on the token
+	// the host owns the document the actor mutates
+	let host = world.spawn(Document::default()).id();
+
+	// the actor drives mutations on the host's `todos` field
 	let actor = world
 		.spawn((
-			token_ref,
-			Push::<String>::default(),
-			InsertAt::<String>::default(),
-			RemoveAt,
-			Set::<Vec<String>>::default(),
+			ChildOf(host),
+			todos_field(),
+			PushField::<String>::default(),
+			InsertAtField::<String>::default(),
+			RemoveAtField,
+			SetFieldTyped::<Vec<String>>::default(),
 		))
 		.id();
 
@@ -68,8 +70,9 @@ async fn main() -> Result {
 fn log_state(label: &str, world: &World, host: Entity) -> Result {
 	let value = world
 		.entity(host)
-		.get::<Value>()
-		.ok_or_else(|| bevyhow!("missing Value on host"))?;
+		.get::<Document>()
+		.ok_or_else(|| bevyhow!("missing Document on host"))?
+		.get_field_ref(&[FieldSegment::key("todos")])?;
 	cross_log!("{label}: {value}");
 	Ok(())
 }

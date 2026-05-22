@@ -46,6 +46,9 @@ pub mod prelude {
 	pub use crate::token::*;
 
 	pub use crate::types::*;
+
+	// re-exported so the `token!` macro can resolve `$crate::prelude::FieldSchema`
+	pub use beet_core::prelude::FieldSchema;
 }
 
 

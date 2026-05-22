@@ -18,7 +18,7 @@ impl TokenValue {
 }
 
 impl TokenValue {
-	pub fn schema(&self) -> &TokenSchema {
+	pub fn schema(&self) -> &FieldSchema {
 		match self {
 			TokenValue::Value(value) => value.schema(),
 			TokenValue::Token(token) => token.schema(),
@@ -53,7 +53,7 @@ pub struct TypedValue {
 	value: Value,
 	/// Schema identifying the type, ie `bevy_color::color::Color`.
 	#[get_mut(skip)]
-	schema: TokenSchema,
+	schema: FieldSchema,
 }
 
 impl TypedValue {
@@ -61,14 +61,14 @@ impl TypedValue {
 	pub fn new<T: Typed + Serialize>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_serde(&value)?,
-			schema: TokenSchema::of::<T>(),
+			schema: FieldSchema::of::<T>(),
 		}
 		.xok()
 	}
-	/// Construct directly from a [`Value`] and its [`TokenSchema`]. No
+	/// Construct directly from a [`Value`] and its [`FieldSchema`]. No
 	/// type-check is performed, the caller is responsible for matching the
 	/// value to the schema.
-	pub fn from_value(value: Value, schema: TokenSchema) -> Self {
+	pub fn from_value(value: Value, schema: FieldSchema) -> Self {
 		Self { value, schema }
 	}
 	#[cfg(feature = "json")]

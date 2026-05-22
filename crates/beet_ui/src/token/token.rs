@@ -11,7 +11,7 @@ pub struct Token {
 	/// Unique key for this token, ie `io.crates/beet_net/style/material/colors/Primary`
 	key: TokenKey,
 	/// Schema identifying the value type, ie `bevy_color::color::Color`.
-	schema: TokenSchema,
+	schema: FieldSchema,
 	/// Whether the value for this token should be searched for in parent contexts
 	/// during RuleSet resolution, defaulting to true for regular tokens and false for property
 	/// tokens.
@@ -39,7 +39,7 @@ pub enum TokenInheritance {
 
 
 impl Token {
-	pub fn new(key: TokenKey, schema: TokenSchema) -> Self {
+	pub fn new(key: TokenKey, schema: FieldSchema) -> Self {
 		Self {
 			key,
 			schema,
@@ -51,7 +51,7 @@ impl Token {
 	}
 
 	#[track_caller]
-	pub fn new_inline(schema: TokenSchema) -> Self {
+	pub fn new_inline(schema: FieldSchema) -> Self {
 		Self::new(TokenKey::new_inline(), schema)
 	}
 }
@@ -98,7 +98,7 @@ macro_rules! token {
 			fn into(self) -> $crate::prelude::Token {
 				$crate::prelude::Token::new(
 					$crate::prelude::TokenKey::of::<Self>(),
-					$crate::prelude::TokenSchema::of::<$schema_ty>(),
+					$crate::prelude::FieldSchema::of::<$schema_ty>(),
 				).with_inherited($inherited)
 			}
 		}

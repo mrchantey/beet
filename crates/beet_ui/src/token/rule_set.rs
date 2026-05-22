@@ -136,7 +136,7 @@ impl RuleSet {
 	where
 		T: Typed + Serialize,
 	{
-		let key = Token::new_inline(TokenSchema::of::<T>());
+		let key = Token::new_inline(FieldSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 

@@ -1,38 +1,45 @@
+//! Reactive document fields: a child [`Value`] mirrors a [`Document`] field
+//! and stays in sync as the document changes.
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
-
-fn main() {
-	App::new()
-		.add_plugins(TokenPlugin)
-		.add_systems(Startup, setup)
-		.add_systems(Update, (update1, update2).chain())
-		.run();
+/// Schema describing the document, enabling typed field writes.
+#[derive(Reflect)]
+#[allow(dead_code)]
+struct CountDoc {
+	count: i64,
 }
 
-fn count_def() -> TokenDefinition<i32> { TokenDefinition::inline(7) }
+fn main() -> Result {
+	let mut world = DocumentPlugin::world();
+	let doc = world
+		.spawn((
+			Document::new(val!({ "count": 7i64 })),
+			DocumentSchema::of::<CountDoc>(),
+			children![(Value::default(), FieldRef::new("count"))],
+		))
+		.id();
 
-fn setup(world: &mut World) {
-	let count = count_def();
-	world
-		.spawn(count.into_bundle())
-		.get::<Value>()
-		.unwrap()
-		.xpect_eq(Value::Int(7));
-}
+	// mirror the document field onto the child Value
+	world.update_local();
+	mirrored(&mut world).xpect_eq(Value::Int(7));
 
+	// mutate the document; the change propagates on the next update
+	{
+		let mut entity = world.entity_mut(doc);
+		let mut document = entity.get_mut::<Document>().unwrap();
+		let count = document.get_field_mut(&[FieldSegment::key("count")])?;
+		*count = Value::Int(count.as_i64().unwrap_or(0) + 1);
+	}
 
-fn update1(mut commands: Commands, query: Query<Entity>) -> Result {
-	let entity = query.single()?;
-	let count = count_def();
-	commands
-		.entity(entity)
-		.queue(count.update(|prev| *prev += 1));
-	Ok(())
-}
-// new value after command flushed
-fn update2(query: Query<&Value>) -> Result {
-	query.single()?.xpect_eq(Value::Int(8));
+	world.update_local();
+	mirrored(&mut world).xpect_eq(Value::Int(8));
+
 	println!("success");
 	Ok(())
+}
+
+/// The current value mirrored onto the field's [`Value`] component.
+fn mirrored(world: &mut World) -> Value {
+	world.query_once::<(&Value, &FieldRef)>()[0].0.clone()
 }

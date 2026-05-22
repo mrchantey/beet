@@ -12,6 +12,9 @@ use bevy::reflect::Typed;
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValueSchema {
+	/// Matches any value. An escape hatch that disables validation and
+	/// type-checking for this field.
+	Any,
 	/// Always [`Value::Null`].
 	Null,
 	/// A boolean value.
@@ -59,6 +62,53 @@ impl ValueSchema {
 		let path = FieldPath::default();
 		self.apply(&path, value).await
 	}
+
+	/// Resolve the schema of a nested field by `path`.
+	///
+	/// The dual of [`Document::get_field_ref`](crate::prelude::Document):
+	/// descends into struct fields, map values, list items and tuple elements.
+	/// [`ValueSchema::Any`] swallows the remaining path and matches anything.
+	pub fn get_field_schema(
+		&self,
+		path: &[FieldSegment],
+	) -> Result<&ValueSchema> {
+		let mut current = self;
+		for segment in path {
+			current = match (current, segment) {
+				// Any matches the rest of the path
+				(ValueSchema::Any, _) => return Ok(current),
+				(ValueSchema::Struct(schema), FieldSegment::ObjectKey(key)) => {
+					&schema
+						.fields
+						.iter()
+						.find(|field| field.key == *key)
+						.ok_or_else(|| {
+							bevyhow!("schema has no field `{key}`")
+						})?
+						.schema
+				}
+				(ValueSchema::Map(schema), FieldSegment::ObjectKey(_)) => {
+					schema.value.as_ref()
+				}
+				(ValueSchema::List(schema), FieldSegment::ArrayIndex(_)) => {
+					schema.item.as_ref()
+				}
+				(ValueSchema::Tuple(schema), FieldSegment::ArrayIndex(idx)) => {
+					&schema
+						.fields
+						.get(*idx)
+						.ok_or_else(|| {
+							bevyhow!("tuple schema has no element {idx}")
+						})?
+						.schema
+				}
+				(schema, segment) => bevybail!(
+					"cannot resolve segment `{segment}` against schema `{schema:?}`"
+				),
+			};
+		}
+		Ok(current)
+	}
 }
 
 impl ApplyConstraints for ValueSchema {
@@ -70,6 +120,7 @@ impl ApplyConstraints for ValueSchema {
 	) -> ApplyFuture<'a> {
 		Box::pin(async move {
 			match self {
+				ValueSchema::Any => Vec::new(),
 				ValueSchema::Null => validate_null(path, value),
 				ValueSchema::Bool(_) => validate_bool(path, value),
 				ValueSchema::I64(schema) => {
@@ -551,6 +602,57 @@ mod test {
 		let mut value = val!("Nope");
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
+	}
+
+	#[crate::test]
+	async fn any_matches_everything() {
+		let schema = ValueSchema::Any;
+		schema.validate(&mut val!("anything")).await.is_empty().xpect_true();
+		schema.validate(&mut val!(42)).await.is_empty().xpect_true();
+	}
+
+	#[crate::test]
+	fn get_field_schema_walks_struct() {
+		let schema = ValueSchema::of::<UserProfile>();
+		matches!(
+			schema.get_field_schema(&[FieldSegment::key("name")]).unwrap(),
+			ValueSchema::String(_)
+		)
+		.xpect_true();
+		matches!(
+			schema.get_field_schema(&[FieldSegment::key("age")]).unwrap(),
+			ValueSchema::U64(_)
+		)
+		.xpect_true();
+		schema
+			.get_field_schema(&[FieldSegment::key("missing")])
+			.is_err()
+			.xpect_true();
+	}
+
+	#[crate::test]
+	fn get_field_schema_walks_list() {
+		let schema = ValueSchema::of::<Vec<i64>>();
+		matches!(
+			schema.get_field_schema(&[FieldSegment::index(0)]).unwrap(),
+			ValueSchema::I64(_)
+		)
+		.xpect_true();
+	}
+
+	#[crate::test]
+	fn get_field_schema_any_swallows_path() {
+		let schema = ValueSchema::Any;
+		matches!(
+			schema
+				.get_field_schema(&[
+					FieldSegment::key("a"),
+					FieldSegment::index(2)
+				])
+				.unwrap(),
+			ValueSchema::Any
+		)
+		.xpect_true();
 	}
 }
 

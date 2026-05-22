@@ -7,6 +7,6 @@ pub struct TokenPlugin;
 
 impl Plugin for TokenPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<RuleSet>().init_resource::<TokenSet>();
+		app.init_resource::<RuleSet>();
 	}
 }

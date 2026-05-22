@@ -75,26 +75,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			.await?
 	}
 
-	pub fn try_get_field(
-		&self,
-		entity: Entity,
-		path: &FieldPath,
-	) -> Result<&Value, DocumentError> {
-		self.doc_query
-			.get(entity)
-			.map_err(|_| DocumentError::DocumentNotFound { entity })?
-			.get_field_ref(&path)
-	}
-
-	pub fn get_token(&self, entity: Entity, token: &Token) -> Result<&Value> {
-		let key = token.key().clone().xinto::<FieldPath>();
-		// Traverse ancestors to find the token value
-		self.ancestors
-			.iter_ancestors_inclusive(entity)
-			.xtry_find_map(|entity| self.try_get_field(entity, &key))?
-			.xok()
-	}
-
 	/// Execute a function with a mutable reference to a field.
 	///
 	/// If the document or field doesn't exist and [`FieldRef::on_missing`] is set to initialize,

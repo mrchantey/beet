@@ -39,6 +39,7 @@ impl Plugin for DocumentPlugin {
 		app
 			// Register document types
 			.register_type::<Document>()
+			.register_type::<DocumentSchema>()
 			.register_type::<DocumentPath>()
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
@@ -51,6 +52,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<common_actions::Decrement>()
 			.register_type::<common_actions::AddField>()
 			.register_type::<common_actions::SetField>()
+			.register_type::<common_actions::RemoveAtField>()
 			.register_type::<common_actions::ReadField>();
 
 		app

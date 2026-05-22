@@ -6,25 +6,24 @@ use beet_ui::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, CharcellPlugin))
+		.add_plugins((MinimalPlugins, CharcellPlugin, DocumentPlugin))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)
 		.add_observer(on_input)
 		.run();
 }
 
-fn count_def() -> TokenDefinition<i32> { TokenDefinition::inline(0) }
+fn count_field() -> FieldRef { FieldRef::new("count") }
 
 fn setup(mut commands: Commands) {
-	let count = count_def();
-
 	commands.spawn((
 		StdioTerminal::default(),
 		DoubleBuffer::default(),
+		Document::new(val!({ "count": 0i64 })),
 		LayoutStyle::flex_row().column_gap(1),
 		children![((
 			LayoutStyle::flex_row(),
-			rsx! { <div>"Value: "{(0,count)}</div> },
+			rsx! { <div>"Value: "{(Value::default(), count_field())}</div> },
 			BoxStyle {
 				border: Spacing::all(Length::Rem(1.)),
 				border_top: Some(Color::srgb(1., 0., 0.)),
@@ -39,15 +38,13 @@ fn setup(mut commands: Commands) {
 
 
 fn update(
-	mut commands: Commands,
-	query: Query<Entity, With<DoubleBuffer>>,
+	terminals: Query<Entity, With<DoubleBuffer>>,
+	mut query: DocumentQuery,
 ) -> Result {
-	let entity = query.single()?;
-	let count = count_def();
-	commands
-		.entity(entity)
-		.queue(count.update(|prev| *prev += 1));
-	Ok(())
+	let entity = terminals.single()?;
+	query.with_field(entity, &count_field(), |value| {
+		*value = Value::Int(value.as_i64().unwrap_or(0) + 1);
+	})
 }
 
 fn on_input(ev: On<TerminalEvent>, mut _commands: Commands) {

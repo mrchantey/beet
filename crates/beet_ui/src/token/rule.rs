@@ -87,7 +87,7 @@ impl Rule {
 	where
 		T: Typed + Serialize,
 	{
-		let key = Token::new_inline(TokenSchema::of::<T>());
+		let key = Token::new_inline(FieldSchema::of::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 
@@ -147,20 +147,6 @@ impl Rule {
 	pub fn push_declarations(&mut self, other: Self) -> &mut Self {
 		self.declarations.extend(other.declarations);
 		self
-	}
-
-	/// Insert a definition if it doesn't already exist.
-	pub fn insert_definition<T>(
-		&mut self,
-		definition: TokenDefinition<T>,
-	) -> Result<&mut Self> {
-		if self.contains_key(definition.token.key()) {
-			bevybail!(
-				"Token `{}` already exists in rule declarations",
-				definition.token
-			);
-		}
-		self.insert(definition.token.clone(), definition.initial.clone())
 	}
 
 	/// Get a typed value, performing schema and type validation.

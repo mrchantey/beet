@@ -7,9 +7,11 @@
 //! Run validation with [`ValueSchema::validate`].
 
 mod constraint;
+mod field_schema;
 mod from_type_info;
 mod kinds;
 mod value_schema;
 pub use constraint::*;
+pub use field_schema::*;
 pub use kinds::*;
 pub use value_schema::*;

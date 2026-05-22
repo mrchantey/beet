@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::Typed;
 
 /// An action that increments a numeric field in a document, returning the new value.
@@ -134,11 +135,16 @@ pub fn SetFieldTyped<T>(
 	cx: In<ActionContext<T>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
+	schemas: Query<&DocumentSchema>,
 ) -> Result<()>
 where
 	T: 'static + Send + Sync + serde::Serialize + Typed,
 {
 	let field = fields.get(cx.id())?;
+	let doc_entity = query.entity(cx.id(), &field.document);
+	if let Ok(schema) = schemas.get(doc_entity) {
+		schema.assert_field_type::<T>(&field.field_path)?;
+	}
 	let new_value = Value::from_serde(&cx.input)?;
 	query.with_field(cx.id(), field, move |value| {
 		*value = new_value;
@@ -155,6 +161,128 @@ where
 		PathPartial::new("set-field-typed"),
 		SetFieldTyped::<T>(core::marker::PhantomData),
 	)
+}
+
+/// An action that appends a value to a list-typed field.
+///
+/// Coerces a missing or null field into an empty list first. When the document
+/// carries a [`DocumentSchema`], the list's item type is checked against `T`.
+#[action]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn PushField<T>(
+	cx: In<ActionContext<T>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+	schemas: Query<&DocumentSchema>,
+) -> Result
+where
+	T: 'static + Send + Sync + Serialize + Typed,
+{
+	let entity = cx.id();
+	let field = fields.get(entity)?.clone();
+	let doc_entity = query.entity(entity, &field.document);
+	if let Ok(schema) = schemas.get(doc_entity) {
+		schema.assert_list_item_type::<T>(&field.field_path)?;
+	}
+	query.with_field(entity, &field, move |value| -> Result {
+		as_list_mut(value)?.push(Value::from_serde(&cx.input)?);
+		Ok(())
+	})?
+}
+
+/// Convenience constructor for [`PushField`].
+pub fn push_field<T>(field: FieldRef) -> impl Bundle
+where
+	T: 'static + Send + Sync + Serialize + Typed,
+{
+	(
+		field,
+		PathPartial::new("push-field"),
+		PushField::<T>(core::marker::PhantomData),
+	)
+}
+
+/// An action that inserts a value at an index of a list-typed field.
+///
+/// The input is `(index, value)`; out-of-range indices are clamped to the list
+/// length. Coerces a missing or null field into an empty list first.
+#[action]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn InsertAtField<T>(
+	cx: In<ActionContext<(usize, T)>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+	schemas: Query<&DocumentSchema>,
+) -> Result
+where
+	T: 'static + Send + Sync + Serialize + Typed + GetTypeRegistration,
+{
+	let entity = cx.id();
+	let field = fields.get(entity)?.clone();
+	let doc_entity = query.entity(entity, &field.document);
+	if let Ok(schema) = schemas.get(doc_entity) {
+		schema.assert_list_item_type::<T>(&field.field_path)?;
+	}
+	let (index, value) = cx.take();
+	query.with_field(entity, &field, move |list_value| -> Result {
+		let list = as_list_mut(list_value)?;
+		let index = index.min(list.len());
+		list.insert(index, Value::from_serde(&value)?);
+		Ok(())
+	})?
+}
+
+/// Convenience constructor for [`InsertAtField`].
+pub fn insert_at_field<T>(field: FieldRef) -> impl Bundle
+where
+	T: 'static + Send + Sync + Serialize + Typed + GetTypeRegistration,
+{
+	(
+		field,
+		PathPartial::new("insert-at-field"),
+		InsertAtField::<T>(core::marker::PhantomData),
+	)
+}
+
+/// An action that removes the value at an index of a list-typed field,
+/// returning the removed [`Value`] if the index was in bounds.
+#[action]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub fn RemoveAtField(
+	cx: In<ActionContext<usize>>,
+	mut query: DocumentQuery,
+	fields: Query<&FieldRef>,
+) -> Result<Option<Value>> {
+	let entity = cx.id();
+	let field = fields.get(entity)?.clone();
+	let index = cx.input;
+	query.with_field(entity, &field, move |value| -> Result<Option<Value>> {
+		let list = as_list_mut(value)?;
+		if index < list.len() {
+			Ok(Some(list.remove(index)))
+		} else {
+			Ok(None)
+		}
+	})?
+}
+
+/// Convenience constructor for [`RemoveAtField`].
+pub fn remove_at_field(field: FieldRef) -> impl Bundle {
+	(field, PathPartial::new("remove-at-field"), RemoveAtField)
+}
+
+/// Coerce a field [`Value`] into a mutable list, treating null as empty.
+fn as_list_mut(value: &mut Value) -> Result<&mut Vec<Value>> {
+	if value.is_null() {
+		*value = Value::List(Vec::new());
+	}
+	match value {
+		Value::List(list) => Ok(list),
+		other => bevybail!("expected list, received {}", other.kind()),
+	}
 }
 
 /// An action that retrieves a field value from a document.
@@ -521,5 +649,120 @@ mod test {
 		let loaded = *entity_map.values().next().unwrap();
 		app.world().entity(loaded).get::<Increment>().xpect_some();
 		app.world().entity(loaded).get::<ActionMeta>().xpect_some();
+	}
+
+	fn todos_field() -> FieldRef {
+		FieldRef::new("todos").with_init(Value::List(Vec::new()))
+	}
+
+	fn host_list(world: &World, host: Entity) -> Value {
+		world
+			.entity(host)
+			.get::<Document>()
+			.unwrap()
+			.get_field_ref(&[FieldSegment::key("todos")])
+			.unwrap()
+			.clone()
+	}
+
+	#[beet_core::test]
+	async fn push_appends() {
+		let mut world = AsyncPlugin::world();
+		let host = world.spawn(Document::default()).id();
+		let actor = world
+			.spawn((ChildOf(host), todos_field(), PushField::<i32>::default()))
+			.id();
+
+		world.entity_mut(actor).call::<i32, ()>(7).await.unwrap();
+		world.entity_mut(actor).call::<i32, ()>(8).await.unwrap();
+
+		host_list(&world, host).xpect_eq(val!([7i64, 8i64]));
+	}
+
+	#[beet_core::test]
+	async fn insert_and_remove() {
+		let mut world = AsyncPlugin::world();
+		let host = world.spawn(Document::default()).id();
+		let actor = world
+			.spawn((
+				ChildOf(host),
+				todos_field(),
+				PushField::<i32>::default(),
+				InsertAtField::<i32>::default(),
+				RemoveAtField,
+			))
+			.id();
+
+		for value in [1i32, 2, 3] {
+			world.entity_mut(actor).call::<i32, ()>(value).await.unwrap();
+		}
+		// list is now [1, 2, 3]
+		world
+			.entity_mut(actor)
+			.call::<(usize, i32), ()>((1, 99))
+			.await
+			.unwrap();
+		// list is now [1, 99, 2, 3]
+		world
+			.entity_mut(actor)
+			.call::<usize, Option<Value>>(0)
+			.await
+			.unwrap()
+			.unwrap()
+			.xpect_eq(val!(1i64));
+
+		host_list(&world, host).xpect_eq(val!([99i64, 2i64, 3i64]));
+	}
+
+	#[beet_core::test]
+	async fn push_rejects_wrong_type() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct TodoDoc {
+			todos: Vec<String>,
+		}
+
+		let mut world = AsyncPlugin::world();
+		let host = world
+			.spawn((Document::default(), DocumentSchema::of::<TodoDoc>()))
+			.id();
+		let actor = world
+			.spawn((ChildOf(host), todos_field(), PushField::<i64>::default()))
+			.id();
+
+		world
+			.entity_mut(actor)
+			.call::<i64, ()>(7)
+			.await
+			.is_err()
+			.xpect_true();
+	}
+
+	#[beet_core::test]
+	async fn set_field_typed_rejects_wrong_type() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct CountDoc {
+			count: i64,
+		}
+
+		let mut world = AsyncPlugin::world();
+		let host = world
+			.spawn((Document::default(), DocumentSchema::of::<CountDoc>()))
+			.id();
+		let actor = world
+			.spawn((
+				ChildOf(host),
+				FieldRef::new("count"),
+				SetFieldTyped::<String>::default(),
+			))
+			.id();
+
+		world
+			.entity_mut(actor)
+			.call::<String, ()>("oops".to_string())
+			.await
+			.is_err()
+			.xpect_true();
 	}
 }

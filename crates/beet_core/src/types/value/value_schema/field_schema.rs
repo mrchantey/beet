@@ -1,21 +1,21 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 
-/// Identifies the value type of a [`Token`](super::Token).
+/// Identifies the value type of a field or token.
 ///
-/// A token schema is either a reference to a Rust [`TypePath`] (resolved at
+/// A field schema is either a reference to a Rust [`TypePath`] (resolved at
 /// runtime via the [`TypeRegistry`](bevy_reflect::TypeRegistry)), or a fully
 /// inlined [`ValueSchema`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum TokenSchema {
+pub enum FieldSchema {
 	/// A Rust [`TypePath`], ie `bevy_color::color::Color`.
 	TypePath(SmolStr),
 	/// A schema defined inline, without a corresponding registered type.
 	Inline(ValueSchema),
 }
 
-impl TokenSchema {
+impl FieldSchema {
 	/// Creates a schema from a Rust [`TypePath`].
 	pub fn of<T: TypePath>() -> Self {
 		Self::TypePath(SmolStr::new_static(T::type_path()))
@@ -52,12 +52,12 @@ impl TokenSchema {
 	}
 
 	/// Asserts that two schemas are equal.
-	pub fn assert_eq(&self, other: &TokenSchema) -> Result<&Self> {
+	pub fn assert_eq(&self, other: &FieldSchema) -> Result<&Self> {
 		if self == other {
 			self.xok()
 		} else {
 			bevybail!(
-				"Token Schema Mismatch\nExpected: `{other}`\nReceived: `{self}`"
+				"Field Schema Mismatch\nExpected: `{other}`\nReceived: `{self}`"
 			)
 		}
 	}
@@ -68,7 +68,7 @@ impl TokenSchema {
 	}
 }
 
-impl core::fmt::Display for TokenSchema {
+impl core::fmt::Display for FieldSchema {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::TypePath(s) => s.fmt(f),
@@ -87,26 +87,26 @@ mod test {
 		count: u32,
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn inline_resolves() {
 		let inline = ValueSchema::Bool(BoolSchema::default());
-		let schema = TokenSchema::inline(inline.clone());
+		let schema = FieldSchema::inline(inline.clone());
 		let registry = bevy_reflect::TypeRegistry::default();
 		schema.resolve(&registry).unwrap().xpect_eq(inline);
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn type_path_resolves_from_registry() {
-		let schema = TokenSchema::of::<ResolveTarget>();
+		let schema = FieldSchema::of::<ResolveTarget>();
 		let mut registry = bevy_reflect::TypeRegistry::default();
 		registry.register::<ResolveTarget>();
 		let resolved = schema.resolve(&registry).unwrap();
 		matches!(resolved, ValueSchema::Struct(_)).xpect_true();
 	}
 
-	#[beet_core::test]
+	#[crate::test]
 	fn type_path_missing_errors() {
-		let schema = TokenSchema::of::<ResolveTarget>();
+		let schema = FieldSchema::of::<ResolveTarget>();
 		let registry = bevy_reflect::TypeRegistry::default();
 		schema.resolve(&registry).is_err().xpect_true();
 	}
