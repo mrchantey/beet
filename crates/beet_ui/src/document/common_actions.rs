@@ -135,26 +135,18 @@ pub fn SetFieldTyped<T>(
 	cx: In<ActionContext<T>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
-	schemas: Query<&DocumentSchema>,
 ) -> Result<()>
 where
-	T: 'static + Send + Sync + serde::Serialize + Typed,
+	T: 'static + Send + Sync + Serialize + Typed,
 {
 	let field = fields.get(cx.id())?;
-	let doc_entity = query.entity(cx.id(), &field.document);
-	if let Ok(schema) = schemas.get(doc_entity) {
-		schema.assert_field_type::<T>(&field.field_path)?;
-	}
-	let new_value = Value::from_serde(&cx.input)?;
-	query.with_field(cx.id(), field, move |value| {
-		*value = new_value;
-	})
+	query.set_field_typed(cx.id(), field, &cx.input)
 }
 
 /// Convenience constructor for set_field_typed with a field reference and path.
 pub fn set_field_typed<T>(field: FieldRef) -> impl Bundle
 where
-	T: 'static + Send + Sync + serde::Serialize + Typed,
+	T: 'static + Send + Sync + Serialize + Typed,
 {
 	(
 		field,
@@ -174,21 +166,12 @@ pub fn PushField<T>(
 	cx: In<ActionContext<T>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
-	schemas: Query<&DocumentSchema>,
 ) -> Result
 where
 	T: 'static + Send + Sync + Serialize + Typed,
 {
-	let entity = cx.id();
-	let field = fields.get(entity)?.clone();
-	let doc_entity = query.entity(entity, &field.document);
-	if let Ok(schema) = schemas.get(doc_entity) {
-		schema.assert_list_item_type::<T>(&field.field_path)?;
-	}
-	query.with_field(entity, &field, move |value| -> Result {
-		as_list_mut(value)?.push(Value::from_serde(&cx.input)?);
-		Ok(())
-	})?
+	let field = fields.get(cx.id())?;
+	query.push_field(cx.id(), field, &cx.input)
 }
 
 /// Convenience constructor for [`PushField`].
@@ -214,24 +197,14 @@ pub fn InsertAtField<T>(
 	cx: In<ActionContext<(usize, T)>>,
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
-	schemas: Query<&DocumentSchema>,
 ) -> Result
 where
 	T: 'static + Send + Sync + Serialize + Typed + GetTypeRegistration,
 {
 	let entity = cx.id();
-	let field = fields.get(entity)?.clone();
-	let doc_entity = query.entity(entity, &field.document);
-	if let Ok(schema) = schemas.get(doc_entity) {
-		schema.assert_list_item_type::<T>(&field.field_path)?;
-	}
+	let field = fields.get(entity)?;
 	let (index, value) = cx.take();
-	query.with_field(entity, &field, move |list_value| -> Result {
-		let list = as_list_mut(list_value)?;
-		let index = index.min(list.len());
-		list.insert(index, Value::from_serde(&value)?);
-		Ok(())
-	})?
+	query.insert_at_field(entity, field, index, &value)
 }
 
 /// Convenience constructor for [`InsertAtField`].
@@ -256,33 +229,13 @@ pub fn RemoveAtField(
 	mut query: DocumentQuery,
 	fields: Query<&FieldRef>,
 ) -> Result<Option<Value>> {
-	let entity = cx.id();
-	let field = fields.get(entity)?.clone();
-	let index = cx.input;
-	query.with_field(entity, &field, move |value| -> Result<Option<Value>> {
-		let list = as_list_mut(value)?;
-		if index < list.len() {
-			Ok(Some(list.remove(index)))
-		} else {
-			Ok(None)
-		}
-	})?
+	let field = fields.get(cx.id())?;
+	query.remove_at_field(cx.id(), field, cx.input)
 }
 
 /// Convenience constructor for [`RemoveAtField`].
 pub fn remove_at_field(field: FieldRef) -> impl Bundle {
 	(field, PathPartial::new("remove-at-field"), RemoveAtField)
-}
-
-/// Coerce a field [`Value`] into a mutable list, treating null as empty.
-fn as_list_mut(value: &mut Value) -> Result<&mut Vec<Value>> {
-	if value.is_null() {
-		*value = Value::List(Vec::new());
-	}
-	match value {
-		Value::List(list) => Ok(list),
-		other => bevybail!("expected list, received {}", other.kind()),
-	}
 }
 
 /// An action that retrieves a field value from a document.
@@ -320,7 +273,7 @@ pub fn ReadFieldTyped<T>(
 	fields: Query<&FieldRef>,
 ) -> Result<T>
 where
-	T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
+	T: 'static + Send + Sync + DeserializeOwned + Typed,
 {
 	let field = fields.get(cx.id())?;
 	let doc = query.get(cx.id(), &field.document)?;
@@ -330,7 +283,7 @@ where
 /// Convenience constructor for get_field_typed with a field reference and path.
 pub fn get_field_typed<T>(field: FieldRef) -> impl Bundle
 where
-	T: 'static + Send + Sync + serde::de::DeserializeOwned + Typed,
+	T: 'static + Send + Sync + DeserializeOwned + Typed,
 {
 	(
 		field,

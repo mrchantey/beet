@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::Typed;
 
 /// System parameter for working with documents.
 ///
@@ -9,6 +10,7 @@ use beet_core::prelude::*;
 pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	doc_query: Query<'w, 's, &'static mut Document>,
+	schemas: Query<'w, 's, &'static DocumentSchema>,
 	commands: Commands<'w, 's>,
 }
 
@@ -46,33 +48,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	) -> Result<Mut<'_, Document>> {
 		let doc_entity = self.entity(subject, path);
 		self.doc_query.get_mut(doc_entity)?.xok()
-	}
-
-	/// Execute a function on a document asynchronously.
-	pub async fn with_async<O>(
-		&mut self,
-		entity: AsyncEntity,
-		path: &DocumentPath,
-		func: impl 'static + Send + Sync + Fn(&mut Document) -> O,
-	) -> Result<O>
-	where
-		O: 'static + Send + Sync,
-	{
-		let id = entity.id();
-		let path = path.clone();
-		entity
-			.world()
-			.with_then(move |world| {
-				world.run_system_cached_with(
-					move |In((entity, path)): In<(Entity, DocumentPath)>,
-					      mut query: DocumentQuery| {
-						let mut doc = query.get_mut(entity, &path)?;
-						func(&mut doc).xok()
-					},
-					(id, path),
-				)
-			})
-			.await?
 	}
 
 	/// Execute a function with a mutable reference to a field.
@@ -119,6 +94,121 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			}
 			.into())
 		}
+	}
+
+	/// Type-check a write of `T` against the document's [`DocumentSchema`].
+	///
+	/// Passes silently when the document has no schema.
+	fn assert_field_type<T: Typed>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+	) -> Result {
+		let doc_entity = self.entity(subject, &field.document);
+		if let Ok(schema) = self.schemas.get(doc_entity) {
+			schema.assert_field_type::<T>(&field.field_path)?;
+		}
+		Ok(())
+	}
+
+	/// Type-check a list-item write of `T` against the document's
+	/// [`DocumentSchema`]. Passes silently when the document has no schema.
+	fn assert_list_item_type<T: Typed>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+	) -> Result {
+		let doc_entity = self.entity(subject, &field.document);
+		if let Ok(schema) = self.schemas.get(doc_entity) {
+			schema.assert_list_item_type::<T>(&field.field_path)?;
+		}
+		Ok(())
+	}
+
+	/// Set a field to a typed value, type-checked against the document schema.
+	pub fn set_field_typed<T>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+		value: &T,
+	) -> Result
+	where
+		T: Serialize + Typed,
+	{
+		self.assert_field_type::<T>(subject, field)?;
+		let new_value = Value::from_serde(value)?;
+		self.with_field(subject, field, move |slot| *slot = new_value)
+	}
+
+	/// Append a typed value to a list field, type-checked against the document
+	/// schema. Coerces a missing or null field into an empty list first.
+	pub fn push_field<T>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+		value: &T,
+	) -> Result
+	where
+		T: Serialize + Typed,
+	{
+		self.assert_list_item_type::<T>(subject, field)?;
+		let value = Value::from_serde(value)?;
+		self.with_field(subject, field, move |slot| -> Result {
+			as_list_mut(slot)?.push(value);
+			Ok(())
+		})?
+	}
+
+	/// Insert a typed value at an index of a list field, clamping out-of-range
+	/// indices to the list length. Type-checked against the document schema and
+	/// coerces a missing or null field into an empty list first.
+	pub fn insert_at_field<T>(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+		index: usize,
+		value: &T,
+	) -> Result
+	where
+		T: Serialize + Typed,
+	{
+		self.assert_list_item_type::<T>(subject, field)?;
+		let value = Value::from_serde(value)?;
+		self.with_field(subject, field, move |slot| -> Result {
+			let list = as_list_mut(slot)?;
+			let index = index.min(list.len());
+			list.insert(index, value);
+			Ok(())
+		})?
+	}
+
+	/// Remove the value at an index of a list field, returning it when the index
+	/// was in bounds.
+	pub fn remove_at_field(
+		&mut self,
+		subject: Entity,
+		field: &FieldRef,
+		index: usize,
+	) -> Result<Option<Value>> {
+		self.with_field(subject, field, move |slot| -> Result<Option<Value>> {
+			let list = as_list_mut(slot)?;
+			if index < list.len() {
+				Ok(Some(list.remove(index)))
+			} else {
+				Ok(None)
+			}
+		})?
+	}
+}
+
+/// Coerce a field [`Value`] into a mutable list, treating null as empty.
+fn as_list_mut(value: &mut Value) -> Result<&mut Vec<Value>> {
+	if value.is_null() {
+		*value = Value::List(Vec::new());
+	}
+	match value {
+		Value::List(list) => Ok(list),
+		other => bevybail!("expected list, received {}", other.kind()),
 	}
 }
 
