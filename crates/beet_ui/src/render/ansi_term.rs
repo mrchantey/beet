@@ -10,17 +10,14 @@ use std::borrow::Cow;
 /// tags render as
 /// [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 ///
-/// Styling has two sources:
-/// - **Semantic terminal defaults** for prose tags (`em` → italic, `h1` →
-///   bold colour, …) come from [`AnsiTermRenderer::default_style`]. These are
-///   terminal-specific presentation, not part of the shared [`RuleSet`], so
-///   they never leak into generated web CSS.
-/// - **Resolved [`VisualStyle`]** populated by the [`StylePlugin`] during the
-///   [`PostParseTree`] schedule. This is how tree-sitter syntax highlighting
-///   reaches the renderer: `apply_syntax_highlighting` emits
-///   `class="hl-<capture>"` spans whose foreground colours resolve through the
-///   default syntax theme. The resolved style is overlaid on the semantic
-///   default so syntax colours win inside code blocks.
+/// All styling comes from the resolved [`VisualStyle`] components populated by
+/// the [`StylePlugin`] during the [`PostParseTree`] schedule: prose defaults
+/// (`em` → italic, `h1` → bold colour) come from
+/// [`default_element_rules`](crate::style::default_element_rules) and
+/// tree-sitter syntax highlighting from `apply_syntax_highlighting`'s
+/// `class="hl-<capture>"` spans. The renderer holds no style table of its own —
+/// it simply reads the style resolved for each entity. Without a
+/// [`StylePlugin`] the structure is still rendered, just unstyled.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
 	/// Whether to clear the terminal before rendering.
@@ -35,9 +32,6 @@ pub struct AnsiTermRenderer {
 	state: TextRenderState,
 	/// Resolved [`VisualStyle`] per entity, snapshotted before walking.
 	resolved: HashMap<Entity, VisualStyle>,
-	/// Stack of semantic default styles, pushed/popped with elements so the
-	/// nearest styled ancestor wins (matching browser inline semantics).
-	style_stack: Vec<VisualStyle>,
 }
 
 impl Default for AnsiTermRenderer {
@@ -53,7 +47,6 @@ impl AnsiTermRenderer {
 			heading_hashes: false,
 			state: TextRenderState::new(),
 			resolved: HashMap::default(),
-			style_stack: Vec::new(),
 		}
 	}
 
@@ -87,20 +80,10 @@ impl AnsiTermRenderer {
 	/// Borrow the accumulated string.
 	pub fn as_str(&self) -> &str { &self.state.buffer }
 
-	/// The semantic default style for the element currently being visited.
-	fn current_default(&self) -> VisualStyle {
-		self.style_stack.last().cloned().unwrap_or_default()
-	}
-
-	/// The style used to render `entity`: its resolved [`VisualStyle`]
-	/// (eg a syntax highlight colour) overlaid on the current semantic
-	/// default.
+	/// The resolved [`VisualStyle`] for `entity`, or the default when no
+	/// styles were resolved (eg no [`StylePlugin`]).
 	fn style_for(&self, entity: Entity) -> VisualStyle {
-		let base = self.current_default();
-		match self.resolved.get(&entity) {
-			Some(resolved) => overlay(base, resolved),
-			None => base,
-		}
+		self.resolved.get(&entity).cloned().unwrap_or_default()
 	}
 
 	/// Write `text` with the resolved style for `entity`.
@@ -138,59 +121,11 @@ impl AnsiTermRenderer {
 			.map(|(entity, style)| (entity, style.clone()))
 			.collect();
 	}
-
-	/// The semantic terminal default style for `tag`, resolving common
-	/// aliases (eg `b` → `strong`, `i` → `em`).
-	fn default_style(tag: &str) -> VisualStyle {
-		match tag {
-			"h1" => VisualStyle::default()
-				.bold()
-				.fg(Color::srgb(0., 0.502, 0.)),
-			"h2" => VisualStyle::default()
-				.bold()
-				.fg(Color::srgb(0., 0.502, 0.502)),
-			"h3" => VisualStyle::default()
-				.bold()
-				.fg(Color::srgb(0., 0., 0.502)),
-			"h4" => VisualStyle::default()
-				.bold()
-				.fg(Color::srgb(0.502, 0., 0.502)),
-			"h5" => VisualStyle::default().bold(),
-			"h6" => VisualStyle::default()
-				.bold()
-				.fg(Color::srgba(1., 1., 1., 0.4)),
-			"strong" | "b" => VisualStyle::default().bold(),
-			"em" | "i" => VisualStyle::default().italic(),
-			"del" | "s" => VisualStyle {
-				decoration_line: DecorationLine::line_through(),
-				..default()
-			},
-			"code" => VisualStyle::default().fg(Color::srgb(0.502, 0.502, 0.)),
-			"pre" => VisualStyle::default().fg(Color::srgba(0.502, 0.502, 0., 0.4)),
-			"a" => VisualStyle {
-				foreground: Some(Color::srgb(0., 0., 0.502)),
-				decoration_line: DecorationLine::underline(),
-				..default()
-			},
-			"blockquote" => VisualStyle {
-				text_style: TextStyle::ITALIC,
-				foreground: Some(Color::srgba(1., 1., 1., 0.4)),
-				..default()
-			},
-			"hr" | "img" => {
-				VisualStyle::default().fg(Color::srgba(1., 1., 1., 0.4))
-			}
-			_ => VisualStyle::default(),
-		}
-	}
 }
 
 impl NodeVisitor for AnsiTermRenderer {
 	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
-		// inline semantics: the nearest styled ancestor wins, so each element
-		// pushes its own default rather than cascading from the parent
-		self.style_stack.push(Self::default_style(name));
 
 		match name {
 			// ── Headings ──
@@ -239,7 +174,7 @@ impl NodeVisitor for AnsiTermRenderer {
 				self.state.in_preformatted = true;
 			}
 			"code" => {
-				// styling applied to text children via the style stack
+				// styling resolved per text child via the RuleSet
 			}
 
 			// ── Links ──
@@ -332,8 +267,6 @@ impl NodeVisitor for AnsiTermRenderer {
 				}
 			}
 		}
-
-		self.style_stack.pop();
 	}
 
 	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
@@ -389,28 +322,6 @@ impl NodeRenderer for AnsiTermRenderer {
 			std::mem::take(&mut self.state.buffer),
 		)
 		.xok()
-	}
-}
-
-/// Overlay `top` onto `base`: set fields and accumulated attributes from
-/// `top` win, so a resolved syntax colour overrides the semantic default
-/// while attributes (eg italic) combine.
-fn overlay(base: VisualStyle, top: &VisualStyle) -> VisualStyle {
-	VisualStyle {
-		foreground: top.foreground.or(base.foreground),
-		background: top.background.or(base.background),
-		decoration_color: top.decoration_color.or(base.decoration_color),
-		decoration_line: DecorationLine {
-			underline: base.decoration_line.underline
-				|| top.decoration_line.underline,
-			overline: base.decoration_line.overline
-				|| top.decoration_line.overline,
-			line_through: base.decoration_line.line_through
-				|| top.decoration_line.line_through,
-		},
-		decoration_style: base.decoration_style,
-		text_style: base.text_style | top.text_style,
-		text_align: base.text_align,
 	}
 }
 

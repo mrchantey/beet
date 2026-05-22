@@ -12,6 +12,12 @@ impl Plugin for StylePlugin {
 			.init_schedule(PostParseTree)
 			.add_systems(PostUpdate, resolve_styles.in_set(ResolveStylesSet));
 
+		// terminal/char-cell defaults for prose elements (em → italic,
+		// h1 → bold colour, …), expressed as ordinary tag rules.
+		app.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(default_element_rules());
+
 		#[cfg(feature = "syntax_highlighting")]
 		{
 			app.init_resource::<SyntaxHighlighting>().add_systems(
