@@ -9,6 +9,12 @@ use crate::terminal::term_style::TermColor;
 use std::io;
 use std::io::Write;
 
+/// The ESC control character (`0x1b`) that introduces every escape sequence.
+///
+/// Useful when scanning text for escape sequences; the `*_str` constants below
+/// embed it as the first byte of each stored sequence.
+pub const ESC: char = '\u{1b}';
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 /// Switch to the alternate screen buffer.
@@ -54,6 +60,17 @@ pub const LEAVE_BRACKETED_PASTE: &str = "\x1b[?2004l";
 pub const ERASE_ALL: &str = "\x1b[2J";
 /// Erase from cursor to end of line.
 pub const ERASE_LINE: &str = "\x1b[K";
+/// Clear the display: erase the whole screen then move the cursor home.
+/// Equivalent to [`ERASE_ALL`] followed by [`CURSOR_HOME`].
+pub const CLEAR_ALL: &str = "\x1b[2J\x1b[H";
+
+// ── Hyperlinks (OSC-8) ──────────────────────────────────────────────────────────
+
+/// OSC-8 hyperlink introducer (`ESC ] 8 ; ;`). Follow with the target URI and
+/// [`ST`] to open a link, or with [`ST`] alone (empty URI) to close it.
+pub const OSC8_LINK: &str = "\x1b]8;;";
+/// String Terminator (`ESC \`), ending an OSC sequence.
+pub const ST: &str = "\x1b\\";
 
 // ── SGR attributes ────────────────────────────────────────────────────────────
 

@@ -5,8 +5,8 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_parse::prelude::unbounded_related;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 use syn::parse_quote;
 
@@ -101,7 +101,7 @@ pub(crate) fn collect_route_files(
 
 		let collection_name = codegen_file.name();
 		let collection_ident = quote::format_ident!("{collection_name}_routes");
-		let bundle = unbounded_related::<Children>(children)?;
+		let bundle = unbounded_related(&format_ident!("Children"), children);
 
 		codegen_file.add_item::<syn::ItemFn>(parse_quote! {
 			#[cfg(feature = "server")]

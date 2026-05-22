@@ -8,8 +8,11 @@
 mod backend;
 mod box_model;
 mod buffer;
+mod decorate;
 mod double_buffer;
 mod flex;
+mod flex_buffer;
+mod inline;
 #[cfg(feature = "terminal")]
 mod input;
 mod layout;
@@ -26,7 +29,9 @@ mod text;
 
 pub use backend::*;
 pub use buffer::*;
+pub use decorate::*;
 pub use double_buffer::*;
+pub use flex_buffer::*;
 #[cfg(feature = "terminal")]
 pub use input::*;
 pub use layout::LayoutRect;
@@ -39,6 +44,7 @@ pub use terminal::*;
 
 pub(self) use box_model::*;
 pub(self) use flex::*;
+pub(self) use inline::*;
 pub(self) use layout::*;
 pub(self) use measure::*;
 pub(self) use text::*;

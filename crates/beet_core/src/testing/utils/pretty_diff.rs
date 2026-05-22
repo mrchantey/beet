@@ -38,7 +38,7 @@ where
 		} else {
 			// Close out previous style
 			if self.style.is_some() {
-				write!(self.f, "\x1b[0m")?;
+				write!(self.f, "{}", escape::RESET)?;
 			}
 
 			// Store new style and start writing it

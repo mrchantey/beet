@@ -3,7 +3,6 @@
 //! Provides [`BoxModel`] for computing margin/border/padding dimensions,
 //! and three draw helpers that fill the corresponding terminal cells.
 use crate::prelude::*;
-use crate::render::Buffer;
 use crate::style::BoxStyle;
 use crate::style::Spacing;
 use crate::style::VisualStyle;
@@ -109,7 +108,7 @@ impl BoxModel {
 /// segments and corners, left/right colors for vertical segments.
 /// No-ops when the rect is too small to hold a border (width or height < 2).
 pub(super) fn draw_border(
-	buffer: &mut Buffer,
+	buffer: &mut impl AsBuffer,
 	rect: URect,
 	node: &CharcellNodeData,
 ) {

@@ -27,18 +27,12 @@ pub use beet_thread as thread;
 pub use beet_ui as ui;
 // #[cfg(feature = "design")]
 // pub use beet_design as design;
-// #[cfg(feature = "dom")]
-// pub use beet_dom as dom;
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;
 // #[cfg(feature = "flow")]
 // pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
-// #[cfg(feature = "parse")]
-// pub use beet_parse as parse;
-// #[cfg(feature = "rsx")]
-// pub use beet_rsx as rsx;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 #[rustfmt::skip]
@@ -64,8 +58,6 @@ pub mod prelude {
 	pub use crate::thread::prelude::*;
 	// #[cfg(feature = "design")]
 	// pub use crate::design::prelude::*;
-	// #[cfg(feature = "dom")]
-	// pub use crate::dom::prelude::*;
 	#[cfg(feature = "examples")]
 	pub use crate::examples::prelude::*;
 	// #[cfg(feature = "flow")]
@@ -93,9 +85,11 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;
 			pub use crate::ui::prelude::style::FontWeight;
+			pub use crate::ui::prelude::style::FontStyle;
 			pub use crate::ui::prelude::style::AlignSelf;
 			pub use crate::ui::prelude::style::AlignItems;
 			pub use crate::ui::prelude::style::AlignContent;
+			pub use crate::ui::prelude::style::Visibility;
 			pub use crate::ui::prelude::style::FlexWrap;
 			pub use crate::ui::prelude::Pointer;
 		}

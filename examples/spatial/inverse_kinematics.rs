@@ -170,6 +170,7 @@ fn ik_segment(
 	arm_width: f32,
 	color: Srgba,
 ) -> Entity {
+	use beet::exports::bevy::prelude::Visibility;
 	commands
 		.insert((Name::new("Segment"), transform, Visibility::Visible))
 		.with_children(|parent| {

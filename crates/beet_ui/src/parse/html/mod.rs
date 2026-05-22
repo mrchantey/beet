@@ -120,6 +120,10 @@ impl HtmlParser {
 			)?;
 		}
 
+		// run post-parse systems (syntax highlighting, style resolution, ..)
+		// when registered, ie via `StylePlugin`.
+		let _ = world.try_run_schedule(PostParseTree);
+
 		// insert file span on the root entity if path provided
 		if let Some(ref lookup) = span_lookup {
 			let span = lookup.full_span();

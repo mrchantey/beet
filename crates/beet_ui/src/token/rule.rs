@@ -31,6 +31,20 @@ impl Rule {
 		}
 	}
 
+	/// Create a rule matching any of the given tags, eg
+	/// `Rule::tags(&["strong", "b"])`. A single tag yields a plain
+	/// [`Selector::Tag`]; multiple tags an [`Selector::AnyOf`].
+	pub fn tags(tags: &[&str]) -> Self {
+		let selector = match tags {
+			[tag] => Selector::tag(*tag),
+			_ => Selector::AnyOf(tags.iter().map(|t| Selector::tag(*t)).collect()),
+		};
+		Self {
+			selector,
+			declarations: default(),
+		}
+	}
+
 	pub fn insert(
 		&mut self,
 		key: impl Into<Token>,

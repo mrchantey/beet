@@ -40,7 +40,7 @@ pub struct MarkdownParser {
 #[derive(Debug, Clone)]
 pub struct MarkdownParseConfig {
 	/// pulldown-cmark options controlling which extensions are enabled.
-	pub options: Options,
+	pub options: pulldown_cmark::Options,
 	/// Whether to parse frontmatter metadata blocks.
 	pub parse_frontmatter: bool,
 }
@@ -113,6 +113,10 @@ impl MarkdownParser {
 			&self.html_diff_config,
 			span_lookup.as_ref(),
 		)?;
+
+		// run post-parse systems (syntax highlighting, style resolution, ..)
+		// when registered, ie via `StylePlugin`.
+		let _ = world.try_run_schedule(PostParseTree);
 
 		// insert frontmatter on root if present
 		if self.config.parse_frontmatter {
@@ -581,6 +585,41 @@ mod test {
 		root.get::<Value>().is_none().xpect_true();
 		root.get::<Comment>().is_none().xpect_true();
 		root.get::<Expression>().is_none().xpect_true();
+	}
+
+	#[cfg(feature = "syntax_highlighting")]
+	#[beet_core::test]
+	fn syntax_highlighting_replaces_text_with_spans() {
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let entity = app.world_mut().spawn_empty().id();
+		let bytes = MediaBytes::new_markdown("```rust\nfn main() {}\n```");
+		MarkdownParser::new()
+			.parse(ParseContext::new(
+				&mut app.world_mut().entity_mut(entity),
+				&bytes,
+			))
+			.unwrap();
+
+		// root -> pre -> code -> spans (no plain text child)
+		let world = app.world_mut();
+		let pre = world.entity_mut(entity).child(0).unwrap().id();
+		let code = world.entity_mut(pre).child(0).unwrap().id();
+		let code_children: Vec<_> = world
+			.entity(code)
+			.get::<Children>()
+			.map(|c| c.iter().collect())
+			.unwrap_or_default();
+		(code_children.len() >= 2).xpect_true();
+		// every direct child of the code element is a span element
+		for child in code_children {
+			world
+				.entity(child)
+				.get::<Element>()
+				.unwrap()
+				.tag()
+				.xpect_eq("span");
+		}
 	}
 
 	#[beet_core::test]

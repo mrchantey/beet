@@ -49,6 +49,15 @@ json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
+syntax_highlighting = [
+	"style",
+	"dep:tree-sitter",
+	"dep:tree-sitter-rust",
+	"dep:tree-sitter-javascript",
+	"dep:tree-sitter-json",
+	"dep:tree-sitter-html",
+	"dep:streaming-iterator"
+]
 
 bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
 
@@ -73,6 +82,12 @@ thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true
 material-colors = {version = "0.4.2", optional = true }
+tree-sitter = { version = "0.26", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-json = { version = "0.24", optional = true }
+tree-sitter-html = { version = "0.23", optional = true }
+streaming-iterator = { version = "0.1", optional = true }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -6,11 +6,9 @@
 //! module also adds the beet_ui-specific [`AsCssValue`]/[`AsCssValues`]
 //! implementations for the style sub-types.
 use crate::style::AsCssValue;
-use crate::style::AsCssValues;
-use crate::style::CssKey;
 use crate::style::CssValue;
+use crate::style::FontWeight;
 use beet_core::prelude::*;
-use bitflags::bitflags;
 use std::io;
 use std::io::Write;
 
@@ -32,8 +30,14 @@ pub struct VisualStyle {
 	pub decoration_line: DecorationLine,
 	/// Visual style of the decoration lines.
 	pub decoration_style: DecorationStyle,
-	/// Text attribute flags (bold, italic, blink, etc).
-	pub text_style: TextStyle,
+	/// Weight of the text, eg bold.
+	pub font_weight: FontWeight,
+	/// Slant of the text, eg italic.
+	pub font_style: FontStyle,
+	/// Blink attribute (terminal only).
+	pub blink: BlinkStyle,
+	/// Whether the text is visible or hidden.
+	pub visibility: Visibility,
 	/// Horizontal alignment of text within its content area.
 	pub text_align: TextAlign,
 }
@@ -46,7 +50,10 @@ impl VisualStyle {
 		decoration_color: None,
 		decoration_line: DecorationLine::DEFAULT,
 		decoration_style: DecorationStyle::Solid,
-		text_style: TextStyle::empty(),
+		font_weight: FontWeight::Normal,
+		font_style: FontStyle::Normal,
+		blink: BlinkStyle::None,
+		visibility: Visibility::Visible,
 		text_align: TextAlign::Left,
 	};
 
@@ -67,13 +74,13 @@ impl VisualStyle {
 
 	/// Enable the bold attribute.
 	pub fn bold(mut self) -> Self {
-		self.text_style |= TextStyle::BOLD;
+		self.font_weight = FontWeight::Bold;
 		self
 	}
 
 	/// Enable the italic attribute.
 	pub fn italic(mut self) -> Self {
-		self.text_style |= TextStyle::ITALIC;
+		self.font_style = FontStyle::Italic;
 		self
 	}
 
@@ -102,7 +109,10 @@ impl VisualStyle {
 			&& self.background.is_none()
 			&& self.decoration_color.is_none()
 			&& self.decoration_line == DecorationLine::DEFAULT
-			&& self.text_style.is_empty()
+			&& self.font_weight == FontWeight::Normal
+			&& self.font_style == FontStyle::Normal
+			&& self.blink == BlinkStyle::None
+			&& self.visibility == Visibility::Visible
 	}
 
 	/// Write only the SGR changes needed to transition from `prev` to `self`.
@@ -119,7 +129,10 @@ impl VisualStyle {
 		let is_dim = self.dim_foreground();
 		let prev_dim = prev.map_or(false, |p| p.dim_foreground());
 		let text_changed = prev.map_or(true, |p| {
-			p.text_style != self.text_style
+			p.font_weight != self.font_weight
+				|| p.font_style != self.font_style
+				|| p.blink != self.blink
+				|| p.visibility != self.visibility
 				|| p.decoration_line != self.decoration_line
 		}) || is_dim != prev_dim;
 
@@ -152,23 +165,20 @@ impl VisualStyle {
 			if is_dim {
 				w.write_all(escape::FAINT.as_bytes())?;
 			}
-			let ts = self.text_style;
-			if ts.contains(TextStyle::BOLD) {
+			if self.font_weight.is_bold() {
 				w.write_all(escape::BOLD.as_bytes())?;
 			}
-			if ts.contains(TextStyle::ITALIC) {
+			if self.font_style == FontStyle::Italic {
 				w.write_all(escape::ITALIC.as_bytes())?;
 			}
-			if ts.contains(TextStyle::BLINK) {
-				w.write_all(escape::BLINK.as_bytes())?;
+			match self.blink {
+				BlinkStyle::None => {}
+				BlinkStyle::Blink => w.write_all(escape::BLINK.as_bytes())?,
+				BlinkStyle::RapidBlink => {
+					w.write_all(escape::RAPID_BLINK.as_bytes())?
+				}
 			}
-			if ts.contains(TextStyle::RAPID_BLINK) {
-				w.write_all(escape::RAPID_BLINK.as_bytes())?;
-			}
-			if ts.contains(TextStyle::REVERSED) {
-				w.write_all(escape::INVERT.as_bytes())?;
-			}
-			if ts.contains(TextStyle::HIDDEN) {
+			if self.visibility == Visibility::Hidden {
 				w.write_all(escape::HIDDEN.as_bytes())?;
 			}
 			// Decoration lines: re-apply after reset; absence is the cleared state.
@@ -269,27 +279,78 @@ pub enum DecorationStyle {
 	Dash,
 }
 
-bitflags! {
-	/// Text styling modifiers combining CSS text-decoration and TUI modifier concepts.
-	#[repr(transparent)]
-	#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Reflect)]
-	#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-	#[reflect(opaque)]
-	#[reflect(Hash, Clone, PartialEq, Debug, Default)]
-	#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-	pub struct TextStyle: u16 {
-		/// Bold text
-		const BOLD = 1 << 0;
-		/// Italic text
-		const ITALIC = 1 << 1;
-		/// Slowly blinking text
-		const BLINK = 1 << 2;
-		/// Rapidly blinking text
-		const RAPID_BLINK = 1 << 3;
-		/// Reversed foreground and background colors
-		const REVERSED = 1 << 4;
-		/// Hidden text
-		const HIDDEN = 1 << 5;
+/// Slant of a run of text, mapping to the CSS `font-style` property.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum FontStyle {
+	/// Upright text.
+	#[default]
+	Normal,
+	/// Italic (slanted) text.
+	Italic,
+}
+
+impl AsCssValue for FontStyle {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Normal => "normal",
+			Self::Italic => "italic",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// Terminal blink attribute. No CSS equivalent; renders only in terminals.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum BlinkStyle {
+	/// No blinking.
+	#[default]
+	None,
+	/// Slowly blinking text.
+	Blink,
+	/// Rapidly blinking text.
+	RapidBlink,
+}
+
+impl AsCssValue for BlinkStyle {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::None => "none",
+			Self::Blink => "blink",
+			Self::RapidBlink => "rapid-blink",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// Whether a run of text is visible, mapping to the CSS `visibility` property.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Visibility {
+	/// Text is drawn normally.
+	#[default]
+	Visible,
+	/// Text occupies space but is not drawn.
+	Hidden,
+}
+
+impl AsCssValue for Visibility {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Visible => "visible",
+			Self::Hidden => "hidden",
+		}
+		.xmap(CssValue::expression)
+		.xok()
 	}
 }
 
@@ -335,48 +396,6 @@ impl AsCssValue for DecorationStyle {
 		}
 		.xmap(CssValue::expression)
 		.xok()
-	}
-}
-
-impl AsCssValues for TextStyle {
-	fn suffixes() -> Vec<CssKey> {
-		vec![
-			CssKey::static_property("bold"),
-			CssKey::static_property("italic"),
-			CssKey::static_property("blink"),
-			CssKey::static_property("rapidBlink"),
-			CssKey::static_property("reversed"),
-			CssKey::static_property("hidden"),
-		]
-	}
-
-	fn as_css_values(&self) -> Result<Vec<CssValue>> {
-		// TODO this is very incorrect,
-		// the type probs needs to be reworked, split
-		// based on css property mappings
-		let mut values = Vec::new();
-		if self.contains(Self::BOLD) {
-			values.push(CssValue::expression("bold"));
-		}
-		if self.contains(Self::ITALIC) {
-			values.push(CssValue::expression("italic"));
-		}
-		if self.contains(Self::BLINK) {
-			values.push(CssValue::expression("blink"));
-		}
-		if self.contains(Self::RAPID_BLINK) {
-			values.push(CssValue::expression("rapid-blink"));
-		}
-		if self.contains(Self::REVERSED) {
-			values.push(CssValue::expression("reversed"));
-		}
-		if self.contains(Self::HIDDEN) {
-			values.push(CssValue::expression("hidden"));
-		}
-		if values.is_empty() {
-			values.push(CssValue::expression("normal"));
-		}
-		values.xok()
 	}
 }
 

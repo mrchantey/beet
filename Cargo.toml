@@ -57,15 +57,6 @@ members = [
 	"crates/beet_action",
 	"examples/infra/extra-types",
 
-	## TODO
-	# "crates/beet_dom",
-	# "crates/beet_parse",
-	# "crates/beet_rsx_combinator",
-	# "crates/beet_rsx/macros",
-	# "crates/beet_rsx",
-
-
-
 	## 💡 Flow
 	"crates/beet_examples",
 	# "crates/beet_flow",
@@ -95,14 +86,6 @@ beet_net = { path = "crates/beet_net", version = "0.0.9-dev.10" }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.10" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.10" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.10" }
-
-## TODO
-# beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.10" }
-# beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.10" }
-# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.10" }
-# beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.10" }
-# beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.10" }
-
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.10" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.10" }
@@ -283,6 +266,7 @@ lambda = ["rustls-tls", "beet_net?/lambda"]
 aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk"]
 deploy = ["infra", "beet_infra?/deploy"]
 tungstenite = ["net", "beet_net?/tungstenite"]
+webdriver = ["net", "beet_net?/webdriver"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
 hyper = ["net", "beet_net?/hyper"]
@@ -293,7 +277,6 @@ ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
 
 
 thread = ["dep:beet_thread","net","action"]
-# dom = ["css", "dep:beet_dom"]
 
 
 # 💡 Stack
@@ -306,6 +289,7 @@ style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
+syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 
 infra = ["dep:beet_infra"]
 lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
@@ -320,15 +304,11 @@ examples = ["bevy_default", "spatial", "dep:beet_examples"]
 ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]
-# css = ["beet_parse?/css", "beet_rsx?/css"]
-# design = ["rsx", "dep:beet_design"]
-# webdriver = ["dom","beet_dom?/webdriver"]
-# parse = ["dep:beet_parse"]
-# rsx = ["dep:beet_rsx"]
+# design = ["dep:beet_design"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
-# build = ["parse", "dep:beet_build"]
+# build = ["dep:beet_build"]
 # bevy_scene = ["beet_core/bevy_scene"]
 
 # animation = ["beet_spatial?/animation"]
@@ -349,9 +329,6 @@ beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 
 #💡 web
-# beet_dom = { workspace = true, optional = true }
-# beet_parse = { workspace = true, optional = true }
-# beet_rsx = { workspace = true, optional = true }
 # beet_build = { workspace = true, optional = true }
 # beet_design = { workspace = true, optional = true }
 
@@ -361,7 +338,6 @@ beet_ml = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
 beet_examples = { workspace = true, optional = true }
-
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
@@ -416,6 +392,11 @@ path = "examples/net/templating.rs"
 required-features = ["http_server"]
 
 [[example]]
+name = "webdriver"
+path = "examples/net/webdriver.rs"
+required-features = ["webdriver"]
+
+[[example]]
 name = "ssh_server"
 path = "examples/net/ssh_server.rs"
 required-features = ["ssh_server"]
@@ -460,6 +441,11 @@ required-features = ["ui", "action"]
 name = "todo"
 path = "examples/todo/todo.rs"
 required-features = ["router", "json"]
+
+[[example]]
+name = "syntax_highlighting"
+path = "examples/ui/syntax_highlighting.rs"
+required-features = ["syntax_highlighting", "markdown"]
 
 # 💡 Examples - Router
 

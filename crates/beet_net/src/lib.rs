@@ -20,6 +20,9 @@ pub mod sockets;
 /// SSH client and server implementations.
 #[cfg(any(feature = "russh_server", feature = "russh_client"))]
 pub mod ssh;
+/// WebDriver BiDi client for automated browser testing.
+#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
+pub mod webdriver;
 
 /// Prelude module re-exporting commonly used items.
 pub mod prelude {
@@ -49,6 +52,8 @@ pub mod prelude {
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]
 	pub use crate::ssh::*;
 	pub use crate::types::*;
+	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
+	pub use crate::webdriver;
 	// Re-export core types used in beet_net's public API
 	pub use beet_core::prelude::MediaBytes;
 	pub use beet_core::prelude::MediaType;

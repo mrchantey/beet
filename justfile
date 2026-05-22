@@ -108,9 +108,6 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates/beet_rsx/**/*.rs 					\
-	crates/beet_rsx/**/**/*.rs 				\
-	crates/beet_rsx/**/**/**/*.rs 		\
 	crates/beet_design/**/*.rs 				\
 	crates/beet_design/**/**/*.rs 		\
 	crates/beet_design/**/**/**/*.rs 	\
@@ -183,11 +180,7 @@ snap:
 	cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
 	cargo test -p beet_build 				--lib --all-features -- --snap
 	cargo test -p beet_design 			--lib --all-features -- --snap
-	cargo test -p beet_parse 				--lib --all-features -- --snap
 	cargo test -p beet_router 			--lib --all-features -- --snap
-	cargo test -p beet_rsx 					--lib --all-features -- --snap
-	cargo test -p beet_rsx 					--test css 		--all-features -- --snap
-	cargo test -p beet_rsx 					--test props 	--all-features -- --snap
 
 # The libtest path (`custom_test_frameworks`) and the `nightly` feature are
 # nightly-only. On nightly we use `--all-features`; on stable we enable every
@@ -251,9 +244,9 @@ test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
 
-# The rsx crates (beet_dom, beet_rsx, beet_parse, beet_build, beet_design,
-# beet_site) are currently commented out of the workspace, and beet_router's
-# old `tokens`/`server` features no longer exist. beet_router is already
+# The rsx crates (beet_build, beet_design, beet_site) are
+# currently commented out of the workspace, and beet_router's old
+# `tokens`/`server` features no longer exist. beet_router is already
 # exercised by `test-core`. Re-add lines here as the rsx crates come back.
 test-rsx *args:
 	@echo "test-rsx is a no-op while rsx crates are out of the workspace"
@@ -278,9 +271,6 @@ test-wasm-feat crate *args:
 
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{ crate }} --test {{ test_name }} --target wasm32-unknown-unknown -- 	--watch {{ args }}
-
-test-rsx-macro *args:
-	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{ args }}
 
 test-clanker:
 	just cli clanker 										\

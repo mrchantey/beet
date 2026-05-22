@@ -31,13 +31,19 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style;
 	#[cfg(feature = "style")]
+	pub use crate::style::ResolveStylesSet;
+	#[cfg(feature = "style")]
+	pub use crate::style::StylePlugin;
+	#[cfg(feature = "style")]
 	pub use crate::style::DecorationLine;
 	#[cfg(feature = "style")]
 	pub use crate::style::DecorationStyle;
 	#[cfg(feature = "style")]
 	pub use crate::style::TextAlign;
 	#[cfg(feature = "style")]
-	pub use crate::style::TextStyle;
+	pub use crate::style::BlinkStyle;
+	#[cfg(feature = "style")]
+	pub use crate::style::FontStyle;
 	#[cfg(feature = "style")]
 	pub use crate::style::VISUAL_STYLE_DEFAULT;
 	#[cfg(feature = "style")]

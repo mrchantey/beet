@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 use crate::style::FlexBox;
 use crate::style::LayoutStyle;
 use crate::style::VisualStyle;
@@ -78,7 +77,10 @@ fn resolve_visual(query: &RuleSetQuery, entity: Entity) -> Result<VisualStyle> {
 		.resolve(entity, DecorationStyleProp)
 		.unwrap_or_default();
 	let text_align = query.resolve(entity, TextAlignProp).unwrap_or_default();
-	let text_style = query.resolve(entity, TextStyleProp).unwrap_or_default();
+	let font_weight = query.resolve(entity, FontWeightProp).unwrap_or_default();
+	let font_style = query.resolve(entity, FontStyleProp).unwrap_or_default();
+	let blink = query.resolve(entity, BlinkStyleProp).unwrap_or_default();
+	let visibility = query.resolve(entity, VisibilityProp).unwrap_or_default();
 
 	VisualStyle {
 		foreground,
@@ -86,8 +88,11 @@ fn resolve_visual(query: &RuleSetQuery, entity: Entity) -> Result<VisualStyle> {
 		decoration_color,
 		decoration_line,
 		decoration_style,
+		font_weight,
+		font_style,
+		blink,
+		visibility,
 		text_align,
-		text_style,
 	}
 	.xok()
 }
@@ -97,6 +102,7 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	let flex_order = query.resolve(entity, FlexOrderProp).unwrap_or_default();
 	let align_self = query.resolve(entity, AlignSelfProp).unwrap_or_default();
 	let display = query.resolve(entity, DisplayProp).unwrap_or_default();
+	let white_space = query.resolve(entity, WhiteSpaceProp).unwrap_or_default();
 	let direction =
 		query.resolve(entity, FlexDirectionProp).unwrap_or_default();
 	let wrap = query.resolve(entity, FlexWrapProp).unwrap_or_default();
@@ -110,6 +116,7 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
 	LayoutStyle {
 		display,
+		white_space,
 		flex_box: FlexBox {
 			direction,
 			wrap,

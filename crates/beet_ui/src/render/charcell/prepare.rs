@@ -1,19 +1,18 @@
-//! Prepare phase: ensure all nodes in a [`DoubleBuffer`] tree have the
-//! required layout components before measure and layout systems run.
+//! Prepare phase: ensure all nodes in a buffer tree have the required layout
+//! components before measure and layout systems run.
 use beet_core::prelude::*;
 
-use super::DoubleBuffer;
 use super::IntrinsicSize;
 use super::LayoutRect;
 
-/// Insert [`IntrinsicSize`] and [`LayoutRect`] on every node in a
-/// [`DoubleBuffer`] tree that is missing them.
+/// Insert [`IntrinsicSize`] and [`LayoutRect`] on every node in a buffer tree
+/// (rooted at a `B` component) that is missing them.
 ///
 /// Structural mutations are isolated to this step so the measure, layout,
 /// and paint phases can run pure query access without command buffering.
-pub fn prepare_charcell_tree(
+pub fn prepare_charcell_tree<B: Component>(
 	mut commands: Commands,
-	roots: Query<Entity, With<DoubleBuffer>>,
+	roots: Populated<Entity, With<B>>,
 	children: Query<&Children>,
 	has_intrinsic: Query<(), With<IntrinsicSize>>,
 	has_layout: Query<(), With<LayoutRect>>,

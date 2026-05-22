@@ -1,6 +1,7 @@
 use super::*;
 
 use beet_core::prelude::*;
+use bevy::ecs::component::Mutable;
 use bevy::math::UVec2;
 
 /// ECS system: paint all nodes in each [`DoubleBuffer`] tree.
@@ -8,8 +9,11 @@ use bevy::math::UVec2;
 /// Traverses each tree pre-order. Each node fills its background (if set),
 /// draws its border, then paints text. Pre-order ensures parents fill first so
 /// children naturally overlay their margin area without any parent lookup.
-pub fn paint_nodes(
-	mut roots: Query<(Entity, &mut DoubleBuffer)>,
+///
+/// Nodes inside an [inline formatting context](inline) are painted by their
+/// container, so the whole subtree below an IFC owner is skipped here.
+pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
+	mut roots: Populated<(Entity, &mut B)>,
 	charcell: CharcellQuery,
 	children_query: Query<&Children>,
 ) -> Result {
@@ -17,16 +21,32 @@ pub fn paint_nodes(
 		let viewport_size = buffer.size();
 		let ordered = children_query.collect_pre_order(root);
 
-		// full reset may become a problematic pattern if we want to do
-		// partial paints
-		buffer.current_buffer_mut().reset();
-		let buf = buffer.current_buffer_mut();
-
+		// descendants of an IFC owner are painted by the owner, not themselves
+		let mut managed = HashSet::<Entity>::default();
 		for &entity in &ordered {
+			if managed.contains(&entity) {
+				continue;
+			}
 			let Ok(node) = charcell.node(entity) else {
 				continue;
 			};
-			paint_node(&node, viewport_size, buf)?;
+			if establishes_inline_flow(&node, &charcell) {
+				managed.extend(children_query.iter_descendants(entity));
+			}
+		}
+
+		// full reset may become a problematic pattern if we want to do
+		// partial paints
+		buffer.reset();
+
+		for &entity in &ordered {
+			if managed.contains(&entity) {
+				continue;
+			}
+			let Ok(node) = charcell.node(entity) else {
+				continue;
+			};
+			paint_node(&node, &charcell, viewport_size, &mut *buffer)?;
 		}
 	}
 	Ok(())
@@ -34,8 +54,9 @@ pub fn paint_nodes(
 
 fn paint_node(
 	node: &CharcellNodeData,
+	query: &CharcellQuery,
 	viewport: UVec2,
-	buffer: &mut Buffer,
+	buffer: &mut impl AsBuffer,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	let layout_rect = node.layout_rect();
@@ -58,12 +79,17 @@ fn paint_node(
 
 	// 2. Draw border if present
 	if box_model.has_border {
-		draw_border(buffer, border_rect, node);
+		draw_border(&mut *buffer, border_rect, node);
 	}
 
-	// 3. Paint text content
-	// this is a no-op if no Value
-	paint_text(node, content_rect, buffer)?;
+	// 3. Paint content: flow inline descendants if this owns an inline
+	//    formatting context, otherwise paint this node's own text (a no-op
+	//    when it has no value).
+	if establishes_inline_flow(node, query) {
+		paint_inline_flow(node, query, content_rect, &mut *buffer);
+	} else {
+		paint_text(node, content_rect, &mut *buffer)?;
+	}
 
 	Ok(())
 }

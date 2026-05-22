@@ -15,6 +15,9 @@ pub struct ElementView<'a> {
 	/// Classes assigned to the element entity, checked alongside the
 	/// `class` attribute by [`Self::contains_class`].
 	pub classes: Option<&'a Classes>,
+	/// The [`Value`] of the sole child entity when present, ie the text
+	/// content of an element whose only child is a text node.
+	pub inner_text: Option<(Entity, &'a Value)>,
 }
 
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
@@ -31,6 +34,7 @@ impl<'a> ElementView<'a> {
 		attributes: Vec<AttributeView<'a>>,
 		state: Option<&'a ElementStateMap>,
 		classes: Option<&'a Classes>,
+		inner_text: Option<(Entity, &'a Value)>,
 	) -> Self {
 		Self {
 			entity,
@@ -38,6 +42,7 @@ impl<'a> ElementView<'a> {
 			attributes,
 			state,
 			classes,
+			inner_text,
 		}
 	}
 
@@ -68,22 +73,25 @@ impl<'a> ElementView<'a> {
 	}
 
 	pub fn contains_class(&self, class: &str) -> bool {
-		let in_attr = self
+		self.iter_classes().any(|c| c == class)
+	}
+
+	/// Iterate every class name visible to selector matching, combining
+	/// whitespace-separated values from the `class` attribute with names
+	/// stored in the [`Classes`] component.
+	pub fn iter_classes(&self) -> impl Iterator<Item = SmolStr> + '_ {
+		let attr_classes = self
 			.attribute("class")
-			.map(|attr| {
-				attr.value
-					.as_str()
-					.map(|classes| {
-						classes.split_whitespace().any(|c| c == class)
-					})
-					.unwrap_or(false)
+			.and_then(|attr| attr.value.as_str().ok())
+			.map(|s| {
+				s.split_whitespace().map(SmolStr::from).collect::<Vec<_>>()
 			})
-			.unwrap_or(false);
-		let in_component = self
+			.unwrap_or_default();
+		let entity_classes = self
 			.classes
-			.map(|c| c.contains_selector(class))
-			.unwrap_or(false);
-		in_attr || in_component
+			.map(|c| c.iter().map(|n| n.as_selector()).collect::<Vec<_>>())
+			.unwrap_or_default();
+		attr_classes.into_iter().chain(entity_classes)
 	}
 
 	/// Look up the first attribute matching `key` and return its
