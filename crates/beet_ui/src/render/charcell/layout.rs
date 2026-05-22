@@ -22,7 +22,7 @@ pub struct LayoutRect(pub URect);
 pub fn layout_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
 	children: Query<&Children>,
-	roots: Query<(Entity, &B)>,
+	roots: Populated<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();

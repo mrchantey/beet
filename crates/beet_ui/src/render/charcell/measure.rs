@@ -16,7 +16,7 @@ pub struct IntrinsicSize(pub UVec2);
 pub fn measure_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut IntrinsicSize>)>,
 	children_query: Query<&Children>,
-	roots: Query<(Entity, &B)>,
+	roots: Populated<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();

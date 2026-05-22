@@ -13,7 +13,7 @@ use bevy::math::UVec2;
 /// Nodes inside an [inline formatting context](inline) are painted by their
 /// container, so the whole subtree below an IFC owner is skipped here.
 pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
-	mut roots: Query<(Entity, &mut B)>,
+	mut roots: Populated<(Entity, &mut B)>,
 	charcell: CharcellQuery,
 	children_query: Query<&Children>,
 ) -> Result {

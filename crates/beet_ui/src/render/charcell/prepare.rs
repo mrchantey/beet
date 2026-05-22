@@ -12,7 +12,7 @@ use super::LayoutRect;
 /// and paint phases can run pure query access without command buffering.
 pub fn prepare_charcell_tree<B: Component>(
 	mut commands: Commands,
-	roots: Query<Entity, With<B>>,
+	roots: Populated<Entity, With<B>>,
 	children: Query<&Children>,
 	has_intrinsic: Query<(), With<IntrinsicSize>>,
 	has_layout: Query<(), With<LayoutRect>>,
