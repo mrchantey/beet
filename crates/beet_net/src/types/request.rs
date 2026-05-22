@@ -383,12 +383,24 @@ impl Request {
 	}
 
 	/// Creates a request from CLI arguments.
-	/// Returns a Result for API compatibility, though parsing always succeeds.
-	pub fn from_cli_args(args: CliArgs) -> Result<Self> {
-		Ok(Self {
+	///
+	/// A `--body=<value>` argument is lifted out of the query parameters and
+	/// set as the request body with a JSON `content-type`, mirroring an HTTP
+	/// request carrying a payload. Returns a Result for API symmetry, though
+	/// parsing always succeeds.
+	pub fn from_cli_args(mut args: CliArgs) -> Result<Self> {
+		let body = args.params.remove("body");
+		let request = Self {
 			parts: RequestParts::from(args),
 			body: default(),
-		})
+		};
+		match body.and_then(|values| values.into_iter().next()) {
+			Some(body) => request
+				.with_body(body.as_bytes())
+				.with_content_type(MediaType::Json),
+			None => request,
+		}
+		.xok()
 	}
 
 	/// Creates a request by parsing a CLI-style string.
@@ -439,10 +451,8 @@ impl From<&str> for Request {
 
 impl From<CliArgs> for Request {
 	fn from(args: CliArgs) -> Self {
-		Self {
-			parts: RequestParts::from(args),
-			body: default(),
-		}
+		// infallible, see [`Request::from_cli_args`]
+		Self::from_cli_args(args).unwrap()
 	}
 }
 
@@ -595,6 +605,26 @@ mod test {
 			.path()
 			.xpect_eq(vec!["users".to_string(), "list".to_string()]);
 		request.get_param("limit").unwrap().xpect_eq("10");
+	}
+
+	#[beet_core::test]
+	fn from_cli_args_body() {
+		// a shell would single-quote the json, preserving its inner quotes
+		let request =
+			Request::from_cli_str(r#"create --body='{"done":false}'"#).unwrap();
+
+		request.path_string().xpect_eq("/create");
+		// the body arg is lifted out of the query params
+		request.get_param("body").xpect_none();
+		request
+			.headers
+			.get::<header::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::Json);
+		String::from_utf8(request.body.try_into_bytes().unwrap().to_vec())
+			.unwrap()
+			.xpect_eq(r#"{"done":false}"#);
 	}
 
 	#[beet_core::test]

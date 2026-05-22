@@ -198,7 +198,7 @@ async fn LayoutTemplate(
 				.cloned()
 				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
 		})
-		.await;
+		.await?;
 	let layout_bytes =
 		bucket.get(&"layouts/default-layout.html".into()).await?;
 	let layout_html = String::from_utf8(layout_bytes.to_vec())?;

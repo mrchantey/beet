@@ -456,6 +456,11 @@ name = "crud"
 path = "examples/ui/crud.rs"
 required-features = ["ui", "action"]
 
+[[example]]
+name = "todo"
+path = "examples/todo/todo.rs"
+required-features = ["router", "json"]
+
 # 💡 Examples - Router
 
 [[example]]

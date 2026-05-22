@@ -120,11 +120,6 @@ pub fn SetField(
 	})
 }
 
-/// Convenience constructor for set_field with a field reference and path.
-pub fn set_field(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("set-field"), SetField)
-}
-
 /// An action that sets a field to a specific typed value.
 ///
 /// Takes a generic type `T` that can be converted to/from reflection.
@@ -141,18 +136,6 @@ where
 {
 	let field = fields.get(cx.id())?;
 	query.set_field_typed(cx.id(), field, &cx.input)
-}
-
-/// Convenience constructor for set_field_typed with a field reference and path.
-pub fn set_field_typed<T>(field: FieldRef) -> impl Bundle
-where
-	T: 'static + Send + Sync + Serialize + Typed,
-{
-	(
-		field,
-		PathPartial::new("set-field-typed"),
-		SetFieldTyped::<T>(core::marker::PhantomData),
-	)
 }
 
 /// An action that appends a value to a list-typed field.
@@ -172,18 +155,6 @@ where
 {
 	let field = fields.get(cx.id())?;
 	query.push_field(cx.id(), field, &cx.input)
-}
-
-/// Convenience constructor for [`PushField`].
-pub fn push_field<T>(field: FieldRef) -> impl Bundle
-where
-	T: 'static + Send + Sync + Serialize + Typed,
-{
-	(
-		field,
-		PathPartial::new("push-field"),
-		PushField::<T>(core::marker::PhantomData),
-	)
 }
 
 /// An action that inserts a value at an index of a list-typed field.
@@ -207,18 +178,6 @@ where
 	query.insert_at_field(entity, field, index, &value)
 }
 
-/// Convenience constructor for [`InsertAtField`].
-pub fn insert_at_field<T>(field: FieldRef) -> impl Bundle
-where
-	T: 'static + Send + Sync + Serialize + Typed + GetTypeRegistration,
-{
-	(
-		field,
-		PathPartial::new("insert-at-field"),
-		InsertAtField::<T>(core::marker::PhantomData),
-	)
-}
-
 /// An action that removes the value at an index of a list-typed field,
 /// returning the removed [`Value`] if the index was in bounds.
 #[action]
@@ -231,11 +190,6 @@ pub fn RemoveAtField(
 ) -> Result<Option<Value>> {
 	let field = fields.get(cx.id())?;
 	query.remove_at_field(cx.id(), field, cx.input)
-}
-
-/// Convenience constructor for [`RemoveAtField`].
-pub fn remove_at_field(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("remove-at-field"), RemoveAtField)
 }
 
 /// An action that retrieves a field value from a document.
@@ -256,11 +210,6 @@ pub fn ReadField(
 		.xok()
 }
 
-/// Convenience constructor for get_field with a field reference and path.
-pub fn get_field(field: FieldRef) -> impl Bundle {
-	(field, PathPartial::new("get-field"), ReadField)
-}
-
 /// An action that retrieves a field value from a document with type conversion.
 ///
 /// Returns the value as a typed `T`.
@@ -279,19 +228,6 @@ where
 	let doc = query.get(cx.id(), &field.document)?;
 	doc.get_field::<T>(&field.field_path)?.xok()
 }
-
-/// Convenience constructor for get_field_typed with a field reference and path.
-pub fn get_field_typed<T>(field: FieldRef) -> impl Bundle
-where
-	T: 'static + Send + Sync + DeserializeOwned + Typed,
-{
-	(
-		field,
-		PathPartial::new("get-field-typed"),
-		ReadFieldTyped::<T>(core::marker::PhantomData),
-	)
-}
-
 
 
 #[cfg(test)]
@@ -401,7 +337,7 @@ mod test {
 	async fn set_field_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn(set_field(field)).id();
+		let entity = world.spawn((field, SetField)).id();
 
 		world
 			.entity_mut(entity)
@@ -423,10 +359,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("status");
 		let entity = world
-			.spawn((
-				Document::new(val!({ "status": "pending" })),
-				set_field(field),
-			))
+			.spawn((Document::new(val!({ "status": "pending" })), field, SetField))
 			.id();
 
 		world
@@ -448,7 +381,8 @@ mod test {
 	async fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity = world.spawn(set_field_typed::<String>(field)).id();
+		let entity =
+			world.spawn((field, SetFieldTyped::<String>::default())).id();
 
 		world
 			.entity_mut(entity)
@@ -472,7 +406,8 @@ mod test {
 		let entity = world
 			.spawn((
 				Document::new(val!({ "status": "pending" })),
-				set_field_typed::<String>(field),
+				field,
+				SetFieldTyped::<String>::default(),
 			))
 			.id();
 
@@ -496,7 +431,7 @@ mod test {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("data");
 		let entity = world
-			.spawn((Document::new(val!({ "data": 42i64 })), get_field(field)))
+			.spawn((Document::new(val!({ "data": 42i64 })), field, ReadField))
 			.id();
 
 		let result = world
@@ -515,7 +450,8 @@ mod test {
 		let entity = world
 			.spawn((
 				Document::new(val!({ "user": { "name": "Alice" } })),
-				get_field(field),
+				field,
+				ReadField,
 			))
 			.id();
 
@@ -535,7 +471,8 @@ mod test {
 		world
 			.spawn((
 				Document::new(val!({ "data": 42i64 })),
-				get_field_typed::<i64>(field),
+				field,
+				ReadFieldTyped::<i64>::default(),
 			))
 			.call::<(), i64>(())
 			.await
@@ -550,7 +487,8 @@ mod test {
 		let entity = world
 			.spawn((
 				Document::new(val!({ "user": { "name": "Alice" } })),
-				get_field_typed::<String>(field),
+				field,
+				ReadFieldTyped::<String>::default(),
 			))
 			.id();
 

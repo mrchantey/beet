@@ -43,13 +43,6 @@ impl RuleSet {
 		true
 	}
 
-	/// Find the first rule containing `key`, regardless of selector.
-	pub fn find_rule_mut_by_key(
-		&mut self,
-		key: &TokenKey,
-	) -> Option<&mut Rule> {
-		self.rules.iter_mut().find(|r| r.contains_key(key))
-	}
 	/// Add a new rule, merging with the last added if selectors match
 	pub fn insert_rule(&mut self, rule: Rule) {
 		if let Some(last) = self.rules.back_mut()

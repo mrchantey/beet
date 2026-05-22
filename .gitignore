@@ -6,6 +6,7 @@ agent/*
 out.txt
 examples/thread/persistent_chat.json
 examples/router/router_serde.json
+examples/todo/todos.json
 
 !examples/assets
 Cargo.toml.full

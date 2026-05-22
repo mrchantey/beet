@@ -71,7 +71,9 @@ Never use `.claude/projects/../memory`, all content related to this project must
 
 ## Testing
 
+
 - We use the custom `beet_core::testing` test runner and matchers in all crates.
+- All tests must use the beet core test attribute ie `#[beet_core::test]`
 - wasm tests: beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
 - for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare

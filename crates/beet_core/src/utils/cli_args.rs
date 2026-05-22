@@ -13,20 +13,29 @@ pub struct CliArgs {
 
 
 impl CliArgs {
-	/// Parses the CLI args from the environment, excluding program name
-	pub fn parse_env() -> Self {
-		env_ext::args().join(" ").xmap(|val| Self::parse(&val))
+	/// Parses the CLI args from the environment, excluding program name.
+	///
+	/// The arguments arrive already tokenized by the shell, so they are fed
+	/// straight to [`parse_tokens`](Self::parse_tokens) without re-grouping.
+	/// This preserves quotes within a value, eg a JSON `--body`.
+	pub fn parse_env() -> Self { Self::parse_tokens(env_ext::args()) }
+
+	/// Parses CLI arguments from a string, grouping quoted sections into
+	/// single tokens before parsing.
+	pub fn parse(args: &str) -> Self {
+		Self::parse_tokens(Self::group_quotations(args))
 	}
 
-	/// Parses CLI arguments from a string.
-	pub fn parse(args: &str) -> Self {
-		let args = Self::group_quotations(args);
+	/// Parses pre-tokenized CLI arguments into path and query parameters.
+	///
+	/// Tokens are taken verbatim, so any quoting must already be resolved.
+	pub fn parse_tokens(tokens: Vec<String>) -> Self {
 		let mut path = Vec::new();
 		let mut params = MultiMap::new();
 		let mut collecting_nested = false;
 		let mut pending_key: Option<String> = None;
 
-		let mut args_iter = args.into_iter();
+		let mut args_iter = tokens.into_iter();
 		while let Some(arg) = args_iter.next() {
 			if collecting_nested {
 				// After seeing `--`, everything goes into 'nested-args'
@@ -236,6 +245,23 @@ mod tests {
 			"val2".to_string(),
 			"val3".to_string(),
 		]);
+	}
+
+	#[crate::test]
+	fn parse_tokens_preserves_quoted_value() {
+		// shell-resolved argv: quotes are already stripped from the wrapper,
+		// but inner json quotes must survive verbatim
+		let cli = CliArgs::parse_tokens(vec![
+			"create".to_string(),
+			r#"--body={"description":"take out garbage","done":false}"#
+				.to_string(),
+		]);
+
+		cli.path.xpect_eq(vec!["create".to_string()]);
+		cli.params
+			.get("body")
+			.unwrap()
+			.xpect_eq(r#"{"description":"take out garbage","done":false}"#);
 	}
 
 	#[crate::test]
