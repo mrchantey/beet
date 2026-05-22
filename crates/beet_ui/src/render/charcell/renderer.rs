@@ -54,13 +54,24 @@ impl FlexBuffer {
 	/// Render a bundle into an auto-growing buffer of fixed `width`, returning
 	/// ANSI output of unbounded height (the stdout rendering path).
 	pub fn render_oneshot(width: u32, bundle: impl Bundle) -> String {
+		Self::populate(width, bundle).render()
+	}
+
+	/// As [`render_oneshot`](Self::render_oneshot) but plain text, no styling.
+	pub fn render_oneshot_plain(width: u32, bundle: impl Bundle) -> String {
+		Self::populate(width, bundle).render_plain()
+	}
+
+	/// Spawn `bundle` under a fresh flex buffer, resolve styles + decorations,
+	/// then drive the charcell pipeline and return the painted buffer.
+	fn populate(width: u32, bundle: impl Bundle) -> Self {
 		let mut world = CharcellPlugin::world();
 		let entity = world.spawn((FlexBuffer::new(width), bundle)).id();
-		// resolve styles (display rules, syntax highlighting) before manually
-		// driving the layout/paint pipeline over the flex tree.
+		// resolve styles (display rules, syntax highlighting) and decorations
+		// before manually driving the layout/paint pipeline over the flex tree.
 		world.run_schedule(PostParseTree);
 		paint_charcell_trees::<FlexBuffer>(&mut world).unwrap();
-		world.entity_mut(entity).take::<FlexBuffer>().unwrap().render()
+		world.entity_mut(entity).take::<FlexBuffer>().unwrap()
 	}
 }
 
@@ -103,5 +114,19 @@ mod tests {
 			(0..30).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
 		let out = FlexBuffer::render_oneshot(20, rsx! { <pre>{text}</pre> });
 		out.lines().count().xpect_eq(30);
+	}
+
+	#[beet_core::test]
+	fn anchor_emits_osc8_link() {
+		// `apply_hyperlinks` promotes the `<a href>` to a `Hyperlink`, which the
+		// inline flow wraps around the link's painted columns as OSC-8.
+		let out = FlexBuffer::render_oneshot(
+			40,
+			rsx! { <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
+		);
+		out.as_str()
+			.xpect_contains("\x1b]8;;https://beet.org\x1b\\")
+			.xpect_contains("the docs")
+			.xpect_contains("\x1b]8;;\x1b\\");
 	}
 }

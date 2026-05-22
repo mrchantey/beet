@@ -2,11 +2,11 @@ use crate::prelude::*;
 use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
-/// Shared rendering state used by both [`MarkdownRenderer`] and [`AnsiTermRenderer`].
+/// Sequential block/inline rendering state used by the [`MarkdownRenderer`].
 ///
 /// Tracks block/inline structure, list nesting, blockquote depth, image
-/// capture, and the output buffer. Renderers that need styled output (eg ANSI)
-/// wrap the push methods and apply colour before delegating to [`push_raw`].
+/// capture, and the output buffer. (The ANSI terminal renderer instead paints
+/// through the [`charcell`](crate::render::charcell) layout engine.)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextRenderState {
 	/// Output buffer.

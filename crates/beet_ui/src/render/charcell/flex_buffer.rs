@@ -36,11 +36,6 @@ impl FlexBuffer {
 		}
 	}
 
-	/// Attach an OSC-8 hyperlink target to the cell at `pos`.
-	pub fn set_link(&mut self, pos: UVec2, url: impl Into<SmolStr>) {
-		self.links.insert(pos, url.into());
-	}
-
 	/// Raw cell slice.
 	pub fn cells(&self) -> &[Cell] { &self.cells }
 
@@ -81,24 +76,26 @@ impl FlexBuffer {
 		0
 	}
 
-	/// Render to plain text (no ANSI styling), trimming trailing blank rows.
+	/// Render to plain text (no ANSI styling), trimming trailing blank rows and
+	/// per-line trailing spaces.
 	pub fn render_plain(&self) -> String {
-		render_cells_plain(
+		trim_line_trailing(&render_cells_plain(
 			&self.cells,
 			self.width as usize,
 			self.render_height() as usize,
-		)
+		))
 	}
 
-	/// Render to a string with ANSI styling and OSC-8 hyperlinks.
+	/// Render to a string with ANSI styling and OSC-8 hyperlinks, trimming
+	/// trailing blank rows and per-line trailing spaces.
 	pub fn render(&self) -> String {
 		let links = &self.links;
-		render_cells_ansi(
+		trim_line_trailing(&render_cells_ansi(
 			&self.cells,
 			self.width as usize,
 			self.render_height() as usize,
 			|pos| links.get(&pos).cloned(),
-		)
+		))
 	}
 }
 
@@ -130,6 +127,10 @@ impl AsBuffer for FlexBuffer {
 	fn clear(&mut self) {
 		self.cells.clear();
 		self.links.clear();
+	}
+
+	fn set_link(&mut self, pos: UVec2, url: &str) {
+		self.links.insert(pos, url.into());
 	}
 }
 

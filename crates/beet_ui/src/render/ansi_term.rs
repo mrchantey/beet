@@ -2,12 +2,13 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::borrow::Cow;
 
-/// Renders an entity tree to styled ANSI terminal output via [`NodeVisitor`].
+/// Renders an entity tree to styled ANSI terminal output via the
+/// [`charcell`](crate::render::charcell) layout engine.
 ///
-/// Output is a sequential string of arbitrary length, so a [character-cell
-/// buffer](crate::render::charcell) is not used: block elements emit newlines
-/// following HTML rules while inline elements render contiguously, and anchor
-/// tags render as
+/// The tree is painted into an auto-growing [`FlexBuffer`] — block elements
+/// stack with a blank-row gap, inline elements flow and wrap at the terminal
+/// width, list bullets / quote bars / rules / image alt text arrive as
+/// [`Marker`] generated content, and `<a>`/`<img>` links emit
 /// [OSC-8 hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda).
 ///
 /// All styling comes from the resolved [`VisualStyle`] components populated by
@@ -16,22 +17,16 @@ use std::borrow::Cow;
 /// [`default_element_rules`](crate::style::default_element_rules) and
 /// tree-sitter syntax highlighting from `apply_syntax_highlighting`'s
 /// `class="hl-<capture>"` spans. The renderer holds no style table of its own —
-/// it simply reads the style resolved for each entity. Without a
+/// it simply paints the style resolved for each entity. Without a
 /// [`StylePlugin`] the structure is still rendered, just unstyled.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
 	/// Whether to clear the terminal before rendering.
 	clear_on_render: bool,
-	/// A string prepended to the buffer, defaults to `\n`.
+	/// A string prepended to the output, defaults to `\n`.
 	prefix: Cow<'static, str>,
-	/// Render [`Expression`] values verbatim as `{expr}`.
-	render_expressions: bool,
 	/// Whether to prefix headings with `#` markers.
 	heading_hashes: bool,
-	/// Shared block/inline tracking state and output buffer.
-	state: TextRenderState,
-	/// Resolved [`VisualStyle`] per entity, snapshotted before walking.
-	resolved: HashMap<Entity, VisualStyle>,
 }
 
 impl Default for AnsiTermRenderer {
@@ -43,23 +38,8 @@ impl AnsiTermRenderer {
 		Self {
 			clear_on_render: true,
 			prefix: "\n".into(),
-			render_expressions: false,
 			heading_hashes: false,
-			state: TextRenderState::new(),
-			resolved: HashMap::default(),
 		}
-	}
-
-	/// Override the set of block-level tags.
-	pub fn with_block_tags(mut self, tags: Vec<Cow<'static, str>>) -> Self {
-		self.state = self.state.with_block_elements(tags);
-		self
-	}
-
-	/// Enable rendering of [`Expression`] nodes as `{expr}`.
-	pub fn with_expressions(mut self) -> Self {
-		self.render_expressions = true;
-		self
 	}
 
 	/// Prefix headings with `#` markers matching their level.
@@ -74,233 +54,60 @@ impl AnsiTermRenderer {
 		self
 	}
 
-	/// Consume the renderer and return the accumulated string.
-	pub fn into_string(self) -> String { self.state.buffer }
+	/// Paint the tree rooted at `entity` into a [`FlexBuffer`] and return the
+	/// assembled ANSI string (clear + prefix + body).
+	fn render_to_string(&self, entity: Entity, world: &mut World) -> Result<String> {
+		let width = terminal_ext::size().x.max(1);
+		world.entity_mut(entity).insert(FlexBuffer::new(width));
 
-	/// Borrow the accumulated string.
-	pub fn as_str(&self) -> &str { &self.state.buffer }
+		// `#`-prefix headings as generated content when requested
+		if self.heading_hashes {
+			insert_heading_hashes(world);
+		}
+		// promote `<a>`/`<img>` links and list/quote/rule/image markers, then
+		// drive the charcell pipeline (styles already resolved at parse time).
+		world.run_system_cached::<(), _, _>(apply_hyperlinks)?;
+		world.run_system_cached::<(), _, _>(apply_markers)?;
+		paint_charcell_trees::<FlexBuffer>(world)?;
 
-	/// The resolved [`VisualStyle`] for `entity`, or the default when no
-	/// styles were resolved (eg no [`StylePlugin`]).
-	fn style_for(&self, entity: Entity) -> VisualStyle {
-		self.resolved.get(&entity).cloned().unwrap_or_default()
-	}
+		let body = world
+			.entity_mut(entity)
+			.take::<FlexBuffer>()
+			.unwrap()
+			.render();
 
-	/// Write `text` with the resolved style for `entity`.
-	fn push_styled(&mut self, entity: Entity, text: &str) {
-		self.write_with_style(&self.style_for(entity), text);
-	}
-
-	fn write_with_style(&mut self, style: &VisualStyle, text: &str) {
-		let mut buf: Vec<u8> = Vec::new();
-		style.write_style(&mut buf, None).ok();
-		buf.extend_from_slice(text.as_bytes());
-		buf.extend_from_slice(escape::RESET.as_bytes());
-		self.state.push_raw(&String::from_utf8_lossy(&buf));
-		self.state.trailing_newline = text.ends_with('\n');
-	}
-
-	/// Write an OSC-8 hyperlink opening sequence.
-	fn open_osc8_link(&mut self, href: &str) {
-		self.state.buffer.push_str("\x1b]8;;");
-		self.state.buffer.push_str(href);
-		self.state.buffer.push_str("\x1b\\");
-	}
-
-	/// Write an OSC-8 hyperlink closing sequence.
-	fn close_osc8_link(&mut self) {
-		self.state.buffer.push_str("\x1b]8;;\x1b\\");
-	}
-
-	/// Snapshot the resolved [`VisualStyle`] of every entity in the world so
-	/// the borrow-free [`NodeVisitor`] walk can read them.
-	fn snapshot_styles(&mut self, world: &mut World) {
-		self.resolved = world
-			.query::<(Entity, &VisualStyle)>()
-			.iter(world)
-			.map(|(entity, style)| (entity, style.clone()))
-			.collect();
+		let mut out = String::new();
+		if self.clear_on_render {
+			out.push_str("\x1b[2J\x1b[H");
+		}
+		out.push_str(&self.prefix);
+		out.push_str(&body);
+		out.xok()
 	}
 }
 
-impl NodeVisitor for AnsiTermRenderer {
-	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
-		let name = view.tag();
-
-		match name {
-			// ── Headings ──
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.state.ensure_block_separator();
-				if self.heading_hashes {
-					let level = name[1..].parse::<usize>().unwrap_or(1);
-					let prefix = "#".repeat(level);
-					self.push_styled(cx.entity, &format!("{prefix} "));
-				}
-			}
-
-			// ── Paragraph ──
-			"p" => {
-				self.state.ensure_block_separator_with_prefix(Some("▌ "));
-				if self.state.blockquote_depth > 0 {
-					let prefix = self.state.blockquote_prefix("▌ ");
-					self.push_styled(cx.entity, &prefix);
-				}
-			}
-
-			// ── Blockquote ──
-			"blockquote" => {
-				self.state.ensure_block_separator_with_prefix(Some("▌ "));
-				self.state.blockquote_depth += 1;
-			}
-
-			// ── Lists ──
-			"ul" => {
-				self.state.enter_ul();
-			}
-			"ol" => {
-				let start = view.try_as::<OrderedListView>().unwrap().start;
-				self.state.enter_ol(start);
-			}
-			"li" => {
-				self.state.ensure_newline();
-				self.state.write_list_indent();
-				let prefix = self.state.next_list_prefix("• ");
-				self.push_styled(cx.entity, &prefix);
-			}
-
-			// ── Code blocks ──
-			"pre" => {
-				self.state.ensure_block_separator();
-				self.state.in_preformatted = true;
-			}
-			"code" => {
-				// styling resolved per text child via the RuleSet
-			}
-
-			// ── Links ──
-			"a" => {
-				let href = view.attribute_string("href");
-				self.state.pending_link_href = Some(href.clone());
-				self.open_osc8_link(&href);
-			}
-
-			// ── Images (void element) ──
-			"img" => {
-				let src = view.attribute_string("src");
-				let alt = view.attribute_string("alt");
-				let display = if alt.is_empty() {
-					format!("[image: {src}]")
-				} else {
-					format!("[{alt}]")
-				};
-				self.open_osc8_link(&src);
-				self.push_styled(cx.entity, &display);
-				self.close_osc8_link();
-			}
-
-			// ── Thematic break ──
-			"hr" => {
-				self.state.ensure_block_separator();
-				self.push_styled(cx.entity, "────────────────────");
-				self.state.push_raw("\n");
-				self.state.needs_block_separator = true;
-			}
-
-			// ── Line break ──
-			"br" => {
-				self.state.push_raw("\n");
-			}
-
-			// ── Generic block handling ──
-			_ => {
-				if self.state.is_block_element(name) {
-					self.state.ensure_block_separator();
-				}
-			}
-		}
+/// Attach a `#`-per-level [`Marker`] to every heading element.
+fn insert_heading_hashes(world: &mut World) {
+	let headings: Vec<(Entity, usize)> = world
+		.query::<(Entity, &Element)>()
+		.iter(world)
+		.filter_map(|(entity, element)| {
+			heading_level(element.tag()).map(|level| (entity, level))
+		})
+		.collect();
+	for (entity, level) in headings {
+		let marker = format!("{} ", "#".repeat(level));
+		world.entity_mut(entity).insert(Marker(marker.into()));
 	}
+}
 
-	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		let name = element.tag();
-
-		match name {
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-				self.state.ensure_newline();
-				self.state.needs_block_separator = true;
-			}
-			"p" => {
-				self.state.ensure_newline();
-				self.state.needs_block_separator = true;
-			}
-			"blockquote" => {
-				self.state.blockquote_depth =
-					self.state.blockquote_depth.saturating_sub(1);
-				self.state.ensure_newline();
-				self.state.needs_block_separator = true;
-			}
-			"ul" | "ol" => {
-				self.state.leave_list();
-				if self.state.list_depth == 0 {
-					self.state.ensure_newline();
-					self.state.needs_block_separator = true;
-				}
-			}
-			"li" => {
-				self.state.ensure_newline();
-			}
-			"pre" => {
-				self.state.in_preformatted = false;
-				self.state.ensure_newline();
-				self.state.needs_block_separator = true;
-			}
-			"a" => {
-				self.close_osc8_link();
-				self.state.pending_link_href = None;
-			}
-			"hr" | "br" | "img" => {
-				// fully handled in visit_element
-			}
-			_ => {
-				if self.state.is_block_element(name) {
-					self.state.ensure_newline();
-					self.state.needs_block_separator = true;
-				}
-			}
+/// The level of a heading tag (`h1`..`h6`), or `None` for any other tag.
+fn heading_level(tag: &str) -> Option<usize> {
+	match tag {
+		"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+			tag[1..].parse::<usize>().ok()
 		}
-	}
-
-	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
-		let text = value.to_string();
-		if text.is_empty() {
-			return;
-		}
-		self.push_styled(cx.entity, &text);
-	}
-
-	fn visit_expression(
-		&mut self,
-		_cx: &VisitContext,
-		expression: &Expression,
-	) {
-		if self.render_expressions {
-			let style = VisualStyle {
-				font_style: FontStyle::Italic,
-				..VisualStyle::default()
-			};
-			self.write_with_style(&style, &format!("{{{}}}", expression.0));
-		}
-	}
-
-	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
-		self.state.ensure_block_separator();
-		let style = VisualStyle {
-			foreground: Some(Color::srgba(1., 1., 1., 0.4)),
-			..VisualStyle::default()
-		};
-		self.write_with_style(&style, &format!("<!--{}-->", &**comment));
-		self.state.push_raw("\n");
-		self.state.trailing_newline = true;
-		self.state.needs_block_separator = true;
+		_ => None,
 	}
 }
 
@@ -310,18 +117,8 @@ impl NodeRenderer for AnsiTermRenderer {
 		cx: &mut RenderContext,
 	) -> Result<RenderOutput, RenderError> {
 		cx.check_accepts(&[MediaType::AnsiTerm, MediaType::Text])?;
-		self.snapshot_styles(cx.world);
-		cx.walk(self);
-		self.state.buffer.insert_str(0, &self.prefix);
-		if self.clear_on_render {
-			self.state.buffer.insert_str(0, "\x1b[2J\x1b[H");
-		}
-
-		RenderOutput::media_string(
-			MediaType::AnsiTerm,
-			std::mem::take(&mut self.state.buffer),
-		)
-		.xok()
+		let output = self.render_to_string(cx.entity, cx.world)?;
+		RenderOutput::media_string(MediaType::AnsiTerm, output).xok()
 	}
 }
 

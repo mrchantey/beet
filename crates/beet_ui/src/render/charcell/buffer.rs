@@ -57,6 +57,13 @@ pub trait AsBuffer {
 	/// Alias for [`clear`](Self::clear).
 	fn reset(&mut self) { self.clear(); }
 
+	/// Attach an OSC-8 hyperlink target to the cell at `pos`.
+	///
+	/// A no-op for backings that don't carry links — the fixed [`Buffer`] and
+	/// the TUI [`DoubleBuffer`], which route clicks through their own handlers.
+	/// Only the stdout [`FlexBuffer`] records and emits links.
+	fn set_link(&mut self, _pos: UVec2, _url: &str) {}
+
 	/// Write text starting at `pos`, advancing by each character's display width.
 	///
 	/// Wide (CJK/fullwidth) characters occupy 2 columns; the trailing column is
@@ -289,6 +296,21 @@ pub(crate) fn render_cells_ansi(
 		write_osc8(&mut out, None);
 	}
 	String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Trim trailing spaces from each line, leaving escape sequences intact.
+///
+/// Used by the stdout [`FlexBuffer`] so width-padded rows render ragged (and
+/// blank rows become truly empty), matching terminal text conventions.
+pub(crate) fn trim_line_trailing(rendered: &str) -> String {
+	let mut out = String::with_capacity(rendered.len());
+	for (idx, line) in rendered.split('\n').enumerate() {
+		if idx > 0 {
+			out.push('\n');
+		}
+		out.push_str(line.trim_end_matches(' '));
+	}
+	out
 }
 
 /// Write an OSC-8 hyperlink sequence: opening with `url`, or closing for `None`.

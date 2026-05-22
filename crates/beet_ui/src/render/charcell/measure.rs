@@ -71,6 +71,10 @@ pub(super) fn measure_node(
 		_ if establishes_inline_flow(node, query) => {
 			measure_inline_flow(node, query, content_available.x)
 		}
+		// block leaf whose content is generated (eg the `<hr>` rule)
+		_ if let Some(marker) = node.marker() => {
+			measure_str(marker, content_available.x)
+		}
 		// block container: stack children vertically
 		_ => measure_block(node, query, content_available, sizes),
 	};
@@ -120,20 +124,22 @@ mod tests {
 	#[beet_core::test]
 	fn block_stacks_children_vertically() {
 		// a heading and a paragraph are both block: each on its own line(s),
-		// stacked top-to-bottom, with trailing blank rows trimmed away.
+		// stacked top-to-bottom and separated by the block gap (the heading's
+		// bottom margin), with trailing blank rows trimmed away.
 		render(rsx! {
 			<div>
 				<h1>"Title"</h1>
 				<p>"Body"</p>
 			</div>
 		})
-		.xpect_eq("Title\nBody");
+		.xpect_eq("Title\n\nBody");
 	}
 
 	#[beet_core::test]
 	fn block_child_text_wraps_and_reserves_height() {
 		// a paragraph wider than the viewport wraps to two rows; the block
-		// container must reserve both so the following block is not clipped.
+		// container must reserve both (plus the block gap) so the following
+		// block is not clipped: two wrapped rows, a blank gap, then the heading.
 		render(rsx! {
 			<div>
 				<p>"one two three four five six"</p>
@@ -142,6 +148,6 @@ mod tests {
 		})
 		.lines()
 		.count()
-		.xpect_eq(3);
+		.xpect_eq(4);
 	}
 }

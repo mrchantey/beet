@@ -8,6 +8,7 @@
 mod backend;
 mod box_model;
 mod buffer;
+mod decorate;
 mod double_buffer;
 mod flex;
 mod flex_buffer;
@@ -28,6 +29,7 @@ mod text;
 
 pub use backend::*;
 pub use buffer::*;
+pub use decorate::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;
 #[cfg(feature = "terminal")]
@@ -37,6 +39,7 @@ pub use measure::IntrinsicSize;
 pub use paint::*;
 pub use plugin::*;
 pub use prepare::*;
+pub use renderer::*;
 #[cfg(feature = "terminal")]
 pub use terminal::*;
 

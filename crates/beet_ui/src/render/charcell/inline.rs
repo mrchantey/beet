@@ -23,6 +23,8 @@ struct InlineRun {
 	text: String,
 	style: VisualStyle,
 	entity: Entity,
+	/// OSC-8 hyperlink inherited from the nearest `<a>`/`<img>` ancestor.
+	link: Option<SmolStr>,
 }
 
 /// A styled segment of a single flowed line, ready to paint.
@@ -30,6 +32,7 @@ struct InlineSpan {
 	text: String,
 	style: VisualStyle,
 	entity: Entity,
+	link: Option<SmolStr>,
 }
 
 /// Whether `node` establishes an inline formatting context: a non-flex
@@ -99,7 +102,14 @@ pub(super) fn paint_inline_flow(
 				span.style.clone(),
 				span.entity,
 			);
-			x += display_width(text) as u32;
+			let span_width = display_width(text) as u32;
+			// wrap the painted columns in this run's OSC-8 link (stdout only)
+			if let Some(link) = &span.link {
+				for col in x..x + span_width {
+					buffer.set_link(UVec2::new(col, y), link);
+				}
+			}
+			x += span_width;
 		}
 	}
 }
@@ -111,15 +121,27 @@ fn collect_inline_runs(
 	query: &CharcellQuery,
 ) -> Vec<InlineRun> {
 	let mut runs = Vec::new();
-	collect_runs_inner(node, query, &mut runs);
+	collect_runs_inner(node, query, None, &mut runs);
 	runs
 }
 
 fn collect_runs_inner(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
+	link: Option<&str>,
 	runs: &mut Vec<InlineRun>,
 ) {
+	// an `<a>`/`<img>` descendant supplies the link for everything beneath it
+	let link = node.hyperlink().or(link);
+	// generated content (bullet, quote bar, alt text) leads the node's runs
+	if let Some(marker) = node.marker().filter(|marker| !marker.is_empty()) {
+		runs.push(InlineRun {
+			text: marker.to_string(),
+			style: node.visual_style().clone(),
+			entity: node.entity,
+			link: link.map(SmolStr::from),
+		});
+	}
 	if let Some(value) = node.value() {
 		let text = value.to_string();
 		if !text.is_empty() {
@@ -127,11 +149,12 @@ fn collect_runs_inner(
 				text,
 				style: node.visual_style().clone(),
 				entity: node.entity,
+				link: link.map(SmolStr::from),
 			});
 		}
 	}
 	for child in node.child_nodes(query) {
-		collect_runs_inner(&child, query, runs);
+		collect_runs_inner(&child, query, link, runs);
 	}
 }
 
@@ -261,6 +284,7 @@ fn group_spans(line: &[(char, usize)], runs: &[InlineRun]) -> Vec<InlineSpan> {
 				text: ch.to_string(),
 				style: runs[idx].style.clone(),
 				entity: runs[idx].entity,
+				link: runs[idx].link.clone(),
 			});
 			last_idx = Some(idx);
 		}
@@ -305,6 +329,7 @@ mod tests {
 			text: text.to_string(),
 			style: VisualStyle::default(),
 			entity: Entity::PLACEHOLDER,
+			link: None,
 		}
 	}
 
@@ -378,6 +403,7 @@ mod tests {
 				text: "fancy".to_string(),
 				style: italic.clone(),
 				entity: Entity::PLACEHOLDER,
+				link: None,
 			},
 		];
 		let lines = flow_inline(&runs, 40, false);

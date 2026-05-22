@@ -12,7 +12,12 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	let Some(value) = node.value() else {
 		return UVec2::ZERO;
 	};
-	let lines = word_wrap(&value.to_string(), max_width);
+	measure_str(&value.to_string(), max_width)
+}
+
+/// Wrap `text` to `max_width` columns and return `(max_line_width, line_count)`.
+pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
+	let lines = word_wrap(text, max_width);
 	UVec2::new(
 		lines.iter().map(|l| display_width(l)).max().unwrap_or(0) as u32,
 		lines.len() as u32,
@@ -20,16 +25,21 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 }
 
 /// Paint text into the buffer from a [`CharcellNodeData`].
-/// If the node has no [`Value`] this is a no-op.
+///
+/// Uses the node's [`Value`], falling back to its generated [`Marker`] (eg the
+/// `<hr>` rule); a no-op when it has neither.
 pub(super) fn paint_text(
 	node: &CharcellNodeData,
 	content_rect: URect,
 	buffer: &mut impl AsBuffer,
 ) -> Result {
-	let Some(value) = node.value() else {
-		return Ok(());
+	let text = match node.value() {
+		Some(value) => value.to_string(),
+		None => match node.marker() {
+			Some(marker) => marker.to_string(),
+			None => return Ok(()),
+		},
 	};
-	let text = value.to_string();
 	let visual = node.visual_style();
 	let entity = node.entity;
 	let lines = word_wrap(&text, content_rect.width());

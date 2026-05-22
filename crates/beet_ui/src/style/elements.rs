@@ -12,12 +12,23 @@ use crate::prelude::*;
 use crate::style::Display;
 use crate::style::FontStyle;
 use crate::style::FontWeight;
+use crate::style::Length;
+use crate::style::Spacing;
 use crate::style::WhiteSpace;
 use crate::style::common_props::*;
 use beet_core::prelude::*;
 
 /// Faint grey used for de-emphasised elements (quotes, rules, h6).
 fn faint() -> Color { Color::srgba(1., 1., 1., 0.4) }
+
+/// One blank row below a block, separating it from the next (the `\n\n` between
+/// markdown blocks). `li` items stay tight, so they opt out.
+fn block_gap() -> Spacing {
+	Spacing {
+		bottom: Length::Rem(1.),
+		..Spacing::DEFAULT
+	}
+}
 
 /// All default prose element rules, in cascade order.
 ///
@@ -27,18 +38,19 @@ fn faint() -> Color { Color::srgba(1., 1., 1., 0.4) }
 pub fn default_element_rules() -> Vec<Rule> {
 	vec![
 		// ── Block structure ──
-		block(&["p", "ul", "ol", "li", "div"]),
+		block_spaced(&["p", "ul", "ol"]),
+		block(&["li", "div"]),
 		heading("h1", Color::srgb(0.,    0.502, 0.   )),
 		heading("h2", Color::srgb(0.,    0.502, 0.502)),
 		heading("h3", Color::srgb(0.,    0.,    0.502)),
 		heading("h4", Color::srgb(0.502, 0.,    0.502)),
-		block(&["h5"]).with_value(FontWeightProp, FontWeight::Bold),
+		block_spaced(&["h5"]).with_value(FontWeightProp, FontWeight::Bold),
 		heading("h6", faint()),
 		blockquote(),
-		block(&["pre"])
+		block_spaced(&["pre"])
 			.with_value(WhiteSpaceProp, WhiteSpace::Pre)
 			.with_value(ForegroundColor, Color::srgba(0.502, 0.502, 0., 0.4)),
-		block(&["hr"]).with_value(ForegroundColor, faint()),
+		block_spaced(&["hr"]).with_value(ForegroundColor, faint()),
 		// ── Inline formatting ──
 		bold(&["strong", "b"]),
 		italic(&["em", "i"]),
@@ -63,13 +75,19 @@ fn block(tags: &[&str]) -> Rule {
 	tag_rule(tags).with_value(DisplayProp, Display::Block)
 }
 
+/// A `display: block` rule that also reserves a [`block_gap`] below, separating
+/// the element from the following block.
+fn block_spaced(tags: &[&str]) -> Rule {
+	block(tags).with_value(MarginProp, block_gap())
+}
+
 /// A rule forcing `display: inline` on the given tags.
 fn inline(tags: &[&str]) -> Rule {
 	tag_rule(tags).with_value(DisplayProp, Display::Inline)
 }
 
 fn heading(tag: &str, color: Color) -> Rule {
-	block(&[tag])
+	block_spaced(&[tag])
 		.with_value(ForegroundColor, color)
 		.with_value(FontWeightProp, FontWeight::Bold)
 }
@@ -93,7 +111,7 @@ fn link() -> Rule {
 }
 
 fn blockquote() -> Rule {
-	block(&["blockquote"])
+	block_spaced(&["blockquote"])
 		.with_value(ForegroundColor, faint())
 		.with_value(FontStyleProp, FontStyle::Italic)
 }

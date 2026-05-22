@@ -1,4 +1,5 @@
 use super::*;
+use crate::style::PostParseTree;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
@@ -15,6 +16,8 @@ impl Plugin for CharcellPlugin {
 				PostUpdate,
 				CharcellRenderSet.after(ResolveStylesSet),
 			)
+			// post-parse decorations consumed by the charcell paint pipeline
+			.add_systems(PostParseTree, (apply_hyperlinks, apply_markers))
 			.add_systems(
 				PostUpdate,
 				(
