@@ -24,7 +24,7 @@ pub fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 pub(super) fn paint_text(
 	node: &CharcellNodeData,
 	content_rect: URect,
-	buffer: &mut Buffer,
+	buffer: &mut impl AsBuffer,
 ) -> Result {
 	let Some(value) = node.value() else {
 		return Ok(());

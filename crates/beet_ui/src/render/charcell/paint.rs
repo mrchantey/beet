@@ -1,6 +1,7 @@
 use super::*;
 
 use beet_core::prelude::*;
+use bevy::ecs::component::Mutable;
 use bevy::math::UVec2;
 
 /// ECS system: paint all nodes in each [`DoubleBuffer`] tree.
@@ -11,8 +12,8 @@ use bevy::math::UVec2;
 ///
 /// Nodes inside an [inline formatting context](inline) are painted by their
 /// container, so the whole subtree below an IFC owner is skipped here.
-pub fn paint_nodes(
-	mut roots: Query<(Entity, &mut DoubleBuffer)>,
+pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
+	mut roots: Query<(Entity, &mut B)>,
 	charcell: CharcellQuery,
 	children_query: Query<&Children>,
 ) -> Result {
@@ -36,8 +37,7 @@ pub fn paint_nodes(
 
 		// full reset may become a problematic pattern if we want to do
 		// partial paints
-		buffer.current_buffer_mut().reset();
-		let buf = buffer.current_buffer_mut();
+		buffer.reset();
 
 		for &entity in &ordered {
 			if managed.contains(&entity) {
@@ -46,7 +46,7 @@ pub fn paint_nodes(
 			let Ok(node) = charcell.node(entity) else {
 				continue;
 			};
-			paint_node(&node, &charcell, viewport_size, buf)?;
+			paint_node(&node, &charcell, viewport_size, &mut *buffer)?;
 		}
 	}
 	Ok(())
@@ -56,7 +56,7 @@ fn paint_node(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	viewport: UVec2,
-	buffer: &mut Buffer,
+	buffer: &mut impl AsBuffer,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	let layout_rect = node.layout_rect();
@@ -79,16 +79,16 @@ fn paint_node(
 
 	// 2. Draw border if present
 	if box_model.has_border {
-		draw_border(buffer, border_rect, node);
+		draw_border(&mut *buffer, border_rect, node);
 	}
 
 	// 3. Paint content: flow inline descendants if this owns an inline
 	//    formatting context, otherwise paint this node's own text (a no-op
 	//    when it has no value).
 	if establishes_inline_flow(node, query) {
-		paint_inline_flow(node, query, content_rect, buffer);
+		paint_inline_flow(node, query, content_rect, &mut *buffer);
 	} else {
-		paint_text(node, content_rect, buffer)?;
+		paint_text(node, content_rect, &mut *buffer)?;
 	}
 
 	Ok(())

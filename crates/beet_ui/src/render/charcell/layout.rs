@@ -19,10 +19,10 @@ use super::query::CharcellQuery;
 pub struct LayoutRect(pub URect);
 
 /// ECS system: assign [`LayoutRect`] to all nodes top-down.
-pub fn layout_nodes(
+pub fn layout_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
 	children: Query<&Children>,
-	roots: Query<(Entity, &DoubleBuffer)>,
+	roots: Query<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();

@@ -94,3 +94,16 @@ impl From<Buffer> for DoubleBuffer {
 impl From<DoubleBuffer> for Buffer {
 	fn from(db: DoubleBuffer) -> Self { db.into_buffer() }
 }
+
+/// Reads and writes target the buffer currently being drawn into.
+impl AsBuffer for DoubleBuffer {
+	fn size(&self) -> UVec2 { self.current_buffer().size() }
+	fn allocated_rows(&self) -> u32 { self.current_buffer().allocated_rows() }
+	fn get(&self, pos: UVec2) -> Option<&Cell> {
+		self.current_buffer().get(pos)
+	}
+	fn set(&mut self, pos: UVec2, cell: Cell) {
+		self.current_buffer_mut().set(pos, cell);
+	}
+	fn clear(&mut self) { self.current_buffer_mut().clear(); }
+}

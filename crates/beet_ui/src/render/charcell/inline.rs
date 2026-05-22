@@ -74,7 +74,7 @@ pub(super) fn paint_inline_flow(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	content_rect: URect,
-	buffer: &mut Buffer,
+	buffer: &mut impl AsBuffer,
 ) {
 	let runs = collect_inline_runs(node, query);
 	let width = content_rect.width();

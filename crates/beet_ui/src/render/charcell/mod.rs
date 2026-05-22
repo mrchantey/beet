@@ -10,6 +10,7 @@ mod box_model;
 mod buffer;
 mod double_buffer;
 mod flex;
+mod flex_buffer;
 mod inline;
 #[cfg(feature = "terminal")]
 mod input;
@@ -28,6 +29,7 @@ mod text;
 pub use backend::*;
 pub use buffer::*;
 pub use double_buffer::*;
+pub use flex_buffer::*;
 #[cfg(feature = "terminal")]
 pub use input::*;
 pub use layout::LayoutRect;

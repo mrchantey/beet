@@ -13,10 +13,10 @@ use bevy::math::UVec2;
 pub struct IntrinsicSize(pub UVec2);
 
 /// ECS system: compute [`IntrinsicSize`] for all nodes bottom-up.
-pub fn measure_nodes(
+pub fn measure_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut IntrinsicSize>)>,
 	children_query: Query<&Children>,
-	roots: Query<(Entity, &DoubleBuffer)>,
+	roots: Query<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();

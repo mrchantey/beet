@@ -18,10 +18,10 @@ impl Plugin for CharcellPlugin {
 			.add_systems(
 				PostUpdate,
 				(
-					prepare_charcell_tree,
-					measure_nodes,
-					layout_nodes,
-					paint_nodes,
+					prepare_charcell_tree::<DoubleBuffer>,
+					measure_nodes::<DoubleBuffer>,
+					layout_nodes::<DoubleBuffer>,
+					paint_nodes::<DoubleBuffer>,
 				)
 					.chain()
 					.in_set(CharcellRenderSet),
@@ -40,7 +40,7 @@ impl Plugin for CharcellPlugin {
 						.run_if(common_conditions::on_message::<AppExit>),
 				)
 					.chain()
-					.after(paint_nodes)
+					.after(paint_nodes::<DoubleBuffer>)
 					.in_set(CharcellRenderSet),
 			);
 	}

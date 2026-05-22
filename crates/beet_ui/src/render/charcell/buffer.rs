@@ -1,6 +1,10 @@
 use crate::render::DoubleBuffer;
 #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-use crate::style::TextStyle;
+use crate::style::BlinkStyle;
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
+use crate::style::FontStyle;
+#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
+use crate::style::Visibility;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
 use bevy::math::URect;
@@ -26,7 +30,86 @@ pub(crate) fn unicode_width(c: char) -> u16 {
 	}
 }
 
-/// A rectangular buffer of cells, indexed by position.
+/// Shared interface over the fixed [`Buffer`], the auto-growing [`FlexBuffer`],
+/// and [`DoubleBuffer`].
+///
+/// Paint helpers take `&mut impl AsBuffer` so the same box-model and text-flow
+/// code drives any backing store. Implementors provide cell storage; the text
+/// and rectangle writers are derived from it.
+pub trait AsBuffer {
+	/// Logical size available to layout. For a [`FlexBuffer`] the height is a
+	/// sentinel rather than the allocated row count.
+	fn size(&self) -> UVec2;
+
+	/// Number of rows currently backed by cells. Equals `size().y` for fixed
+	/// buffers; grows with paints for a [`FlexBuffer`].
+	fn allocated_rows(&self) -> u32;
+
+	/// Cell at `pos`, or `None` when out of the allocated bounds.
+	fn get(&self, pos: UVec2) -> Option<&Cell>;
+
+	/// Write a cell at `pos`. Out-of-bounds writes are dropped.
+	fn set(&mut self, pos: UVec2, cell: Cell);
+
+	/// Reset all cells to [`Cell::BLANK`].
+	fn clear(&mut self);
+
+	/// Alias for [`clear`](Self::clear).
+	fn reset(&mut self) { self.clear(); }
+
+	/// Write text starting at `pos`, advancing by each character's display width.
+	///
+	/// Wide (CJK/fullwidth) characters occupy 2 columns; the trailing column is
+	/// written as a `None`-symbol placeholder so the diff sees it as changed.
+	fn write_text(
+		&mut self,
+		pos: UVec2,
+		text: &str,
+		style: VisualStyle,
+		entity: Entity,
+	) {
+		let mut col = 0u32;
+		for ch in text.chars() {
+			let w = unicode_width(ch) as u32;
+			let cell_pos = UVec2::new(pos.x + col, pos.y);
+			if cell_pos.x >= self.size().x {
+				break;
+			}
+			self.set(cell_pos, Cell::new(ch.to_string(), style.clone(), entity));
+			// placeholder for the trailing column of a wide character
+			if w == 2 {
+				let cont_pos = UVec2::new(pos.x + col + 1, pos.y);
+				if cont_pos.x < self.size().x {
+					self.set(cont_pos, Cell {
+						symbol: None,
+						style: style.clone(),
+						entity: Some(entity),
+					});
+				}
+			}
+			col += w;
+		}
+	}
+
+	/// Fill all cells in `rect` with `cell`.
+	///
+	/// Clamped to the [allocated rows](Self::allocated_rows) so a sentinel-tall
+	/// background can't explode a [`FlexBuffer`] allocation; only painted rows
+	/// are filled.
+	fn fill_rect(&mut self, rect: URect, cell: Cell) {
+		let max_y = rect.max.y.min(self.allocated_rows());
+		for y in rect.min.y..max_y {
+			for x in rect.min.x..rect.max.x {
+				self.set(UVec2::new(x, y), cell.clone());
+			}
+		}
+	}
+}
+
+/// A fixed `width × height` rectangular grid of cells, indexed by position.
+///
+/// The terminal-sized buffer used by the TUI path (via [`DoubleBuffer`]) and by
+/// fixed-size one-shot rendering. For unbounded stdout output see [`FlexBuffer`].
 #[derive(Clone)]
 pub struct Buffer {
 	size: UVec2,
@@ -56,42 +139,15 @@ impl Buffer {
 		DoubleBuffer::from_buffer(self)
 	}
 
-	/// Reset all cells to [`Cell::BLANK`].
-	pub fn clear(&mut self) {
-		for cell in &mut self.cells {
-			*cell = Cell::BLANK;
-		}
-	}
-
-	/// Alias for [`Buffer::clear`].
-	pub fn reset(&mut self) { self.clear(); }
-
-	/// Buffer dimensions.
-	pub fn size(&self) -> UVec2 { self.size }
-
 	/// Raw cell slice.
 	pub fn cells(&self) -> &[Cell] { &self.cells }
 
-	/// Convert position to buffer index.
+	/// Convert position to buffer index, or `None` when out of bounds.
 	fn index(&self, pos: UVec2) -> Option<usize> {
 		if pos.x >= self.size.x || pos.y >= self.size.y {
 			return None;
 		}
 		Some((pos.y * self.size.x + pos.x) as usize)
-	}
-
-	/// Set a cell at the given position.
-	pub fn set(&mut self, pos: UVec2, cell: Cell) {
-		if let Some(idx) = self.index(pos) {
-			self.cells[idx] = cell;
-		}
-	}
-
-	/// Get a cell at the given position.
-	///
-	/// Returns `Some` even for blank cells; `None` only for out-of-bounds.
-	pub fn get(&self, pos: UVec2) -> Option<&Cell> {
-		self.index(pos).map(|idx| &self.cells[idx])
 	}
 
 	/// Iterate over all non-blank cells with their positions.
@@ -109,113 +165,139 @@ impl Buffer {
 			})
 	}
 
-	/// Write text starting at position, advancing by each character's display width.
-	///
-	/// Wide (CJK/fullwidth) characters occupy 2 columns; the trailing column is
-	/// written as a `None`-symbol placeholder so the diff sees it as changed.
-	pub fn write_text(
-		&mut self,
-		pos: UVec2,
-		text: &str,
-		style: VisualStyle,
-		entity: Entity,
-	) {
-		let mut col = 0u32;
-		for ch in text.chars() {
-			let w = unicode_width(ch) as u32;
-			let cell_pos = UVec2::new(pos.x + col, pos.y);
-			if cell_pos.x >= self.size.x {
-				break;
-			}
-			self.set(
-				cell_pos,
-				Cell::new(ch.to_string(), style.clone(), entity),
-			);
-			// placeholder for the trailing column of a wide character
-			if w == 2 {
-				let cont_pos = UVec2::new(pos.x + col + 1, pos.y);
-				if cont_pos.x < self.size.x {
-					self.set(cont_pos, Cell {
-						symbol: None,
-						style: style.clone(),
-						entity: Some(entity),
-					});
-				}
-			}
-			col += w;
-		}
-	}
-
-	/// Fill all cells in `rect` with the given `cell`.
-	pub fn fill_rect(&mut self, rect: URect, cell: Cell) {
-		for y in rect.min.y..rect.max.y {
-			for x in rect.min.x..rect.max.x {
-				self.set(UVec2::new(x, y), cell.clone());
-			}
-		}
-	}
-
 	/// Render the buffer to plain text (no ANSI styling).
 	pub fn render_plain(&self) -> String {
-		let width = self.size.x as usize;
-		let height = self.size.y as usize;
-		let mut result = String::with_capacity(self.cells.len());
-
-		for y in 0..height {
-			for x in 0..width {
-				let idx = y * width + x;
-				let cell = &self.cells[idx];
-				// skip trailing columns of wide characters
-				if cell.is_wide_continuation() {
-					continue;
-				}
-				result.push_str(cell.symbol_str());
-			}
-			if y < height - 1 {
-				result.push('\n');
-			}
-		}
-		result
+		render_cells_plain(&self.cells, self.size.x as usize, self.size.y as usize)
 	}
 
 	/// Render the buffer to a string with ANSI styling.
 	pub fn render(&self) -> String {
-		let width = self.size.x as usize;
-		let height = self.size.y as usize;
-		let mut out: Vec<u8> = Vec::with_capacity(self.cells.len() * 8);
-		let mut prev_style: Option<VisualStyle> = None;
-
-		for y in 0..height {
-			for x in 0..width {
-				let idx = y * width + x;
-				let cell = &self.cells[idx];
-				if cell.symbol.is_some() {
-					cell.style
-						.write_style(&mut out, prev_style.as_ref())
-						// writing to vec<u8>, cannot fail
-						.ok();
-					out.extend_from_slice(cell.symbol_str().as_bytes());
-					prev_style = Some(cell.style.clone());
-				} else if cell.is_wide_continuation() {
-					// trailing column of a wide char — emit nothing, the wide char
-					// already advanced the cursor past this column.
-				} else {
-					if prev_style.is_some() {
-						out.extend_from_slice(escape::RESET.as_bytes());
-						prev_style = None;
-					}
-					out.push(b' ');
-				}
-			}
-			if y < height - 1 {
-				out.push(b'\n');
-			}
-		}
-		if prev_style.is_some() {
-			out.extend_from_slice(escape::RESET.as_bytes());
-		}
-		String::from_utf8_lossy(&out).into_owned()
+		render_cells_ansi(
+			&self.cells,
+			self.size.x as usize,
+			self.size.y as usize,
+			|_| None,
+		)
 	}
+}
+
+impl AsBuffer for Buffer {
+	fn size(&self) -> UVec2 { self.size }
+
+	fn allocated_rows(&self) -> u32 { self.size.y }
+
+	fn get(&self, pos: UVec2) -> Option<&Cell> {
+		self.index(pos).map(|idx| &self.cells[idx])
+	}
+
+	fn set(&mut self, pos: UVec2, cell: Cell) {
+		if let Some(idx) = self.index(pos) {
+			self.cells[idx] = cell;
+		}
+	}
+
+	fn clear(&mut self) {
+		for cell in &mut self.cells {
+			*cell = Cell::BLANK;
+		}
+	}
+}
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+
+/// Render a row-major cell grid (`width × height`) to plain text.
+pub(crate) fn render_cells_plain(
+	cells: &[Cell],
+	width: usize,
+	height: usize,
+) -> String {
+	let mut result = String::with_capacity(cells.len());
+	for y in 0..height {
+		for x in 0..width {
+			let cell = &cells[y * width + x];
+			// skip trailing columns of wide characters
+			if cell.is_wide_continuation() {
+				continue;
+			}
+			result.push_str(cell.symbol_str());
+		}
+		if y + 1 < height {
+			result.push('\n');
+		}
+	}
+	result
+}
+
+/// Render a row-major cell grid to a string with ANSI styling.
+///
+/// `link_at` supplies an optional [OSC-8 hyperlink](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda)
+/// target per position — always `None` for the fixed [`Buffer`], the links map
+/// for a [`FlexBuffer`]. Links are emitted only by this stdout backend, not the
+/// ratatui/TUI path which routes clicks through its own handlers.
+pub(crate) fn render_cells_ansi(
+	cells: &[Cell],
+	width: usize,
+	height: usize,
+	mut link_at: impl FnMut(UVec2) -> Option<SmolStr>,
+) -> String {
+	let mut out: Vec<u8> = Vec::with_capacity(cells.len() * 8);
+	let mut prev_style: Option<VisualStyle> = None;
+	let mut prev_link: Option<SmolStr> = None;
+
+	for y in 0..height {
+		for x in 0..width {
+			let cell = &cells[y * width + x];
+			// trailing column of a wide char emits nothing and keeps the
+			// current link/style state intact.
+			if cell.is_wide_continuation() {
+				continue;
+			}
+			// open/close OSC-8 hyperlinks as the active link changes
+			let link = if cell.symbol.is_some() {
+				link_at(UVec2::new(x as u32, y as u32))
+			} else {
+				None
+			};
+			if link != prev_link {
+				write_osc8(&mut out, link.as_deref());
+				prev_link = link;
+			}
+
+			if cell.symbol.is_some() {
+				cell.style
+					.write_style(&mut out, prev_style.as_ref())
+					// writing to vec<u8>, cannot fail
+					.ok();
+				out.extend_from_slice(cell.symbol_str().as_bytes());
+				prev_style = Some(cell.style.clone());
+			} else {
+				if prev_style.is_some() {
+					out.extend_from_slice(escape::RESET.as_bytes());
+					prev_style = None;
+				}
+				out.push(b' ');
+			}
+		}
+		if y + 1 < height {
+			out.push(b'\n');
+		}
+	}
+	if prev_style.is_some() {
+		out.extend_from_slice(escape::RESET.as_bytes());
+	}
+	if prev_link.is_some() {
+		write_osc8(&mut out, None);
+	}
+	String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Write an OSC-8 hyperlink sequence: opening with `url`, or closing for `None`.
+fn write_osc8(out: &mut Vec<u8>, url: Option<&str>) {
+	out.extend_from_slice(b"\x1b]8;;");
+	if let Some(url) = url {
+		out.extend_from_slice(url.as_bytes());
+	}
+	out.extend_from_slice(b"\x1b\\");
 }
 
 /// A single terminal cell with text and styling.
@@ -299,11 +381,10 @@ impl VisualStyle {
 	/// Converts to a ratatui [`Style`](ratatui::style::Style).
 	fn to_ratatui_style(&self) -> ratatui::style::Style {
 		let mut modifier = ratatui::style::Modifier::empty();
-		let s = self.text_style;
-		if s.contains(TextStyle::BOLD) {
+		if self.font_weight.is_bold() {
 			modifier |= ratatui::style::Modifier::BOLD;
 		}
-		if s.contains(TextStyle::ITALIC) {
+		if self.font_style == FontStyle::Italic {
 			modifier |= ratatui::style::Modifier::ITALIC;
 		}
 		// dim derived from foreground alpha
@@ -312,16 +393,14 @@ impl VisualStyle {
 				modifier |= ratatui::style::Modifier::DIM;
 			}
 		}
-		if s.contains(TextStyle::BLINK) {
-			modifier |= ratatui::style::Modifier::SLOW_BLINK;
+		match self.blink {
+			BlinkStyle::None => {}
+			BlinkStyle::Blink => modifier |= ratatui::style::Modifier::SLOW_BLINK,
+			BlinkStyle::RapidBlink => {
+				modifier |= ratatui::style::Modifier::RAPID_BLINK
+			}
 		}
-		if s.contains(TextStyle::RAPID_BLINK) {
-			modifier |= ratatui::style::Modifier::RAPID_BLINK;
-		}
-		if s.contains(TextStyle::REVERSED) {
-			modifier |= ratatui::style::Modifier::REVERSED;
-		}
-		if s.contains(TextStyle::HIDDEN) {
+		if self.visibility == Visibility::Hidden {
 			modifier |= ratatui::style::Modifier::HIDDEN;
 		}
 		if self.decoration_line.underline {
@@ -399,7 +478,7 @@ mod tests {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Italic" },
 			VisualStyle {
-				text_style: TextStyle::ITALIC,
+				font_style: FontStyle::Italic,
 				..default()
 			}
 		)]));
@@ -411,7 +490,7 @@ mod tests {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Bold" },
 			VisualStyle {
-				text_style: TextStyle::BOLD,
+				font_weight: FontWeight::Bold,
 				..default()
 			}
 		)]));
@@ -423,7 +502,7 @@ mod tests {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx! { "Blink" },
 			VisualStyle {
-				text_style: TextStyle::BLINK,
+				blink: BlinkStyle::Blink,
 				..default()
 			}
 		)]));
