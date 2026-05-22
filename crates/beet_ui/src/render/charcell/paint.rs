@@ -8,6 +8,9 @@ use bevy::math::UVec2;
 /// Traverses each tree pre-order. Each node fills its background (if set),
 /// draws its border, then paints text. Pre-order ensures parents fill first so
 /// children naturally overlay their margin area without any parent lookup.
+///
+/// Nodes inside an [inline formatting context](inline) are painted by their
+/// container, so the whole subtree below an IFC owner is skipped here.
 pub fn paint_nodes(
 	mut roots: Query<(Entity, &mut DoubleBuffer)>,
 	charcell: CharcellQuery,
@@ -17,16 +20,33 @@ pub fn paint_nodes(
 		let viewport_size = buffer.size();
 		let ordered = children_query.collect_pre_order(root);
 
+		// descendants of an IFC owner are painted by the owner, not themselves
+		let mut managed = HashSet::<Entity>::default();
+		for &entity in &ordered {
+			if managed.contains(&entity) {
+				continue;
+			}
+			let Ok(node) = charcell.node(entity) else {
+				continue;
+			};
+			if establishes_inline_flow(&node, &charcell) {
+				managed.extend(children_query.iter_descendants(entity));
+			}
+		}
+
 		// full reset may become a problematic pattern if we want to do
 		// partial paints
 		buffer.current_buffer_mut().reset();
 		let buf = buffer.current_buffer_mut();
 
 		for &entity in &ordered {
+			if managed.contains(&entity) {
+				continue;
+			}
 			let Ok(node) = charcell.node(entity) else {
 				continue;
 			};
-			paint_node(&node, viewport_size, buf)?;
+			paint_node(&node, &charcell, viewport_size, buf)?;
 		}
 	}
 	Ok(())
@@ -34,6 +54,7 @@ pub fn paint_nodes(
 
 fn paint_node(
 	node: &CharcellNodeData,
+	query: &CharcellQuery,
 	viewport: UVec2,
 	buffer: &mut Buffer,
 ) -> Result {
@@ -61,9 +82,14 @@ fn paint_node(
 		draw_border(buffer, border_rect, node);
 	}
 
-	// 3. Paint text content
-	// this is a no-op if no Value
-	paint_text(node, content_rect, buffer)?;
+	// 3. Paint content: flow inline descendants if this owns an inline
+	//    formatting context, otherwise paint this node's own text (a no-op
+	//    when it has no value).
+	if establishes_inline_flow(node, query) {
+		paint_inline_flow(node, query, content_rect, buffer);
+	} else {
+		paint_text(node, content_rect, buffer)?;
+	}
 
 	Ok(())
 }

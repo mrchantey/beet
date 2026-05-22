@@ -1,0 +1,449 @@
+//! Inline formatting context: flow a container's inline descendants as a
+//! continuous run of styled text.
+//!
+//! A block-level container whose children are all inline-level (text [`Value`]
+//! nodes or `display: inline` elements) establishes an *inline formatting
+//! context* (IFC). Rather than each descendant painting itself, the container
+//! collects them into ordered `(text, style)` runs, flows the runs into lines
+//! — wrapping at the content width and breaking on `\n` — and paints each
+//! run's characters with that run's style. This is what lets a paragraph mix
+//! plain text, emphasis, links and inline code on the same wrapped line.
+use super::*;
+use crate::style::Display;
+use crate::style::TextAlign;
+use crate::style::VisualStyle;
+use crate::style::WhiteSpace;
+use beet_core::prelude::*;
+use bevy::math::URect;
+use bevy::math::UVec2;
+
+/// A contiguous run of text sharing one resolved [`VisualStyle`], sourced from
+/// a single descendant node.
+struct InlineRun {
+	text: String,
+	style: VisualStyle,
+	entity: Entity,
+}
+
+/// A styled segment of a single flowed line, ready to paint.
+struct InlineSpan {
+	text: String,
+	style: VisualStyle,
+	entity: Entity,
+}
+
+/// Whether `node` establishes an inline formatting context: a non-flex
+/// container all of whose children are [inline-level](CharcellNodeData::is_inline_level).
+pub(super) fn establishes_inline_flow(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+) -> bool {
+	if node.layout_style().display == Display::Flex {
+		return false;
+	}
+	let mut any = false;
+	for child in node.child_nodes(query) {
+		any = true;
+		if !child.is_inline_level() {
+			return false;
+		}
+	}
+	any
+}
+
+/// Whether the container preserves whitespace and newlines (`white-space: pre`).
+pub(super) fn is_preformatted(node: &CharcellNodeData) -> bool {
+	node.layout_style().white_space == WhiteSpace::Pre
+}
+
+/// Measure an inline formatting context: returns `(max_line_width, line_count)`.
+pub(super) fn measure_inline_flow(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	available_width: u32,
+) -> UVec2 {
+	let runs = collect_inline_runs(node, query);
+	let lines = flow_inline(&runs, available_width, is_preformatted(node));
+	let max_w = lines.iter().map(line_width).max().unwrap_or(0);
+	UVec2::new(max_w, lines.len() as u32)
+}
+
+/// Paint an inline formatting context into `content_rect`, flowing the
+/// container's descendant runs into wrapped, aligned lines.
+pub(super) fn paint_inline_flow(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	content_rect: URect,
+	buffer: &mut Buffer,
+) {
+	let runs = collect_inline_runs(node, query);
+	let width = content_rect.width();
+	let lines = flow_inline(&runs, width, is_preformatted(node));
+	let align = node.visual_style().text_align;
+
+	for (row, line) in lines.iter().enumerate() {
+		let y = content_rect.min.y + row as u32;
+		if y >= content_rect.max.y {
+			break;
+		}
+		let mut x = content_rect.min.x + align_offset(line_width(line), width, align);
+		for span in line {
+			if x >= content_rect.max.x {
+				break;
+			}
+			let avail = (content_rect.max.x - x) as usize;
+			let text = truncate_to_width(&span.text, avail);
+			buffer.write_text(
+				UVec2::new(x, y),
+				text,
+				span.style.clone(),
+				span.entity,
+			);
+			x += display_width(text) as u32;
+		}
+	}
+}
+
+/// Depth-first collect every descendant text [`Value`] as a styled run, in
+/// document order. Each run carries its own resolved style and source entity.
+fn collect_inline_runs(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+) -> Vec<InlineRun> {
+	let mut runs = Vec::new();
+	collect_runs_inner(node, query, &mut runs);
+	runs
+}
+
+fn collect_runs_inner(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	runs: &mut Vec<InlineRun>,
+) {
+	if let Some(value) = node.value() {
+		let text = value.to_string();
+		if !text.is_empty() {
+			runs.push(InlineRun {
+				text,
+				style: node.visual_style().clone(),
+				entity: node.entity,
+			});
+		}
+	}
+	for child in node.child_nodes(query) {
+		collect_runs_inner(&child, query, runs);
+	}
+}
+
+/// Flow `runs` into lines of styled spans, wrapping at `max_w` columns.
+///
+/// In preformatted mode whitespace and newlines are preserved verbatim;
+/// otherwise whitespace is collapsed, lines wrap on word boundaries (hard
+/// breaking words longer than the column), and `\n` forces a line break.
+fn flow_inline(
+	runs: &[InlineRun],
+	max_w: u32,
+	preformatted: bool,
+) -> Vec<Vec<InlineSpan>> {
+	// flatten into a (char, run index) stream so styles are cloned per span,
+	// not per character.
+	let mut chars: Vec<(char, usize)> = Vec::new();
+	for (idx, run) in runs.iter().enumerate() {
+		for ch in run.text.chars() {
+			chars.push((ch, idx));
+		}
+	}
+
+	let line_chars = if preformatted {
+		split_pre_lines(&chars)
+	} else {
+		wrap_lines(&chars, max_w)
+	};
+
+	line_chars
+		.iter()
+		.map(|line| group_spans(line, runs))
+		.collect()
+}
+
+/// Split the char stream into lines on `\n`, preserving everything else.
+fn split_pre_lines(chars: &[(char, usize)]) -> Vec<Vec<(char, usize)>> {
+	let mut lines = Vec::new();
+	let mut current = Vec::new();
+	for &(ch, idx) in chars {
+		if ch == '\n' {
+			lines.push(core::mem::take(&mut current));
+		} else {
+			current.push((ch, idx));
+		}
+	}
+	lines.push(current);
+	lines
+}
+
+/// Greedy word-wrap of the styled char stream at `max_w` columns, collapsing
+/// whitespace and breaking on `\n`.
+fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
+	let max_w = max_w as usize;
+	if max_w == 0 {
+		return vec![chars.iter().filter(|(c, _)| *c != '\n').copied().collect()];
+	}
+	let mut lines = Vec::new();
+	let mut cur: Vec<(char, usize)> = Vec::new();
+	let mut cur_w = 0usize;
+	// style index of a collapsed-whitespace gap awaiting the next word
+	let mut pending_space: Option<usize> = None;
+
+	let mut i = 0;
+	while i < chars.len() {
+		let (ch, idx) = chars[i];
+		// in normal flow all whitespace (including newlines) collapses to a
+		// single inter-word gap; only `white-space: pre` preserves newlines.
+		if ch.is_whitespace() {
+			if !cur.is_empty() {
+				pending_space = Some(idx);
+			}
+			i += 1;
+			continue;
+		}
+		// gather a word: a maximal run of non-whitespace characters
+		let start = i;
+		let mut word_w = 0usize;
+		while i < chars.len() && !chars[i].0.is_whitespace() {
+			word_w += unicode_width(chars[i].0) as usize;
+			i += 1;
+		}
+		let word = &chars[start..i];
+		let space_w = pending_space.map_or(0, |_| 1);
+
+		// wrap before the word if it would overflow the current line
+		if !cur.is_empty() && cur_w + space_w + word_w > max_w {
+			lines.push(core::mem::take(&mut cur));
+			cur_w = 0;
+			pending_space = None;
+		}
+		if let Some(space_idx) = pending_space.take() {
+			if !cur.is_empty() {
+				cur.push((' ', space_idx));
+				cur_w += 1;
+			}
+		}
+		if word_w > max_w {
+			// hard-break a word longer than the whole column
+			for &(c, ci) in word {
+				let cw = unicode_width(c) as usize;
+				if !cur.is_empty() && cur_w + cw > max_w {
+					lines.push(core::mem::take(&mut cur));
+					cur_w = 0;
+				}
+				cur.push((c, ci));
+				cur_w += cw;
+			}
+		} else {
+			cur.extend_from_slice(word);
+			cur_w += word_w;
+		}
+	}
+	lines.push(cur);
+	lines
+}
+
+/// Coalesce a line's `(char, run index)` pairs into [`InlineSpan`]s, merging
+/// adjacent characters that share a run.
+fn group_spans(line: &[(char, usize)], runs: &[InlineRun]) -> Vec<InlineSpan> {
+	let mut spans: Vec<InlineSpan> = Vec::new();
+	let mut last_idx: Option<usize> = None;
+	for &(ch, idx) in line {
+		if last_idx == Some(idx) {
+			spans.last_mut().unwrap().text.push(ch);
+		} else {
+			spans.push(InlineSpan {
+				text: ch.to_string(),
+				style: runs[idx].style.clone(),
+				entity: runs[idx].entity,
+			});
+			last_idx = Some(idx);
+		}
+	}
+	spans
+}
+
+/// Total display width of a flowed line.
+fn line_width(line: &Vec<InlineSpan>) -> u32 {
+	line.iter().map(|span| display_width(&span.text) as u32).sum()
+}
+
+/// Leading-column offset for a line of `line_w` columns within `width`.
+fn align_offset(line_w: u32, width: u32, align: TextAlign) -> u32 {
+	let pad = width.saturating_sub(line_w);
+	match align {
+		TextAlign::Left => 0,
+		TextAlign::Right => pad,
+		TextAlign::Center => pad / 2,
+	}
+}
+
+/// Truncate `text` to at most `max_cols` display columns.
+fn truncate_to_width(text: &str, max_cols: usize) -> &str {
+	let mut width = 0;
+	for (i, ch) in text.char_indices() {
+		let w = unicode_width(ch) as usize;
+		if width + w > max_cols {
+			return &text[..i];
+		}
+		width += w;
+	}
+	text
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn run(text: &str) -> InlineRun {
+		InlineRun {
+			text: text.to_string(),
+			style: VisualStyle::default(),
+			entity: Entity::PLACEHOLDER,
+		}
+	}
+
+	/// Flatten flowed lines back to plain strings for assertions.
+	fn lines_text(lines: &[Vec<InlineSpan>]) -> Vec<String> {
+		lines
+			.iter()
+			.map(|line| {
+				line.iter().map(|span| span.text.as_str()).collect::<String>()
+			})
+			.collect()
+	}
+
+	#[beet_core::test]
+	fn flows_runs_onto_one_line() {
+		let runs = [run("Hello "), run("world"), run("!")];
+		lines_text(&flow_inline(&runs, 40, false))
+			.xpect_eq(vec!["Hello world!".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn wraps_at_column_width() {
+		let runs = [run("one two three four")];
+		// width 7 wraps after each ~word
+		lines_text(&flow_inline(&runs, 7, false)).xpect_eq(vec![
+			"one two".to_string(),
+			"three".to_string(),
+			"four".to_string(),
+		]);
+	}
+
+	#[beet_core::test]
+	fn collapses_whitespace_across_runs() {
+		// trailing space in one run + leading space in next collapse to one
+		let runs = [run("foo   "), run("   bar")];
+		lines_text(&flow_inline(&runs, 40, false))
+			.xpect_eq(vec!["foo bar".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn hard_breaks_overlong_word() {
+		let runs = [run("abcdefghij")];
+		lines_text(&flow_inline(&runs, 4, false)).xpect_eq(vec![
+			"abcd".to_string(),
+			"efgh".to_string(),
+			"ij".to_string(),
+		]);
+	}
+
+	#[beet_core::test]
+	fn newline_collapses_to_space_in_normal_mode() {
+		let runs = [run("a\nb")];
+		lines_text(&flow_inline(&runs, 40, false))
+			.xpect_eq(vec!["a b".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn preformatted_preserves_whitespace_and_newlines() {
+		let runs = [run("fn  main()\n    body")];
+		lines_text(&flow_inline(&runs, 4, true))
+			.xpect_eq(vec!["fn  main()".to_string(), "    body".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn spans_keep_their_run_style() {
+		let mut italic = VisualStyle::default();
+		italic = italic.italic();
+		let runs = [
+			run("plain "),
+			InlineRun {
+				text: "fancy".to_string(),
+				style: italic.clone(),
+				entity: Entity::PLACEHOLDER,
+			},
+		];
+		let lines = flow_inline(&runs, 40, false);
+		// one line, two spans: "plain " (default) and "fancy" (italic)
+		let line = &lines[0];
+		line.len().xpect_eq(2);
+		line[1].text.as_str().xpect_eq("fancy");
+		line[1].style.clone().xpect_eq(italic);
+	}
+}
+
+/// End-to-end pipeline tests: parse a tree, run the full charcell pipeline,
+/// and assert the flowed plain-text output.
+#[cfg(test)]
+mod pipeline_tests {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use bevy::math::UVec2;
+
+	fn render(size: UVec2, bundle: impl Bundle) -> String {
+		Buffer::render_oneshot_plain_sized(size, bundle)
+			.trim_lines()
+			.lines()
+			.map(|line| line.trim_end())
+			.collect::<Vec<_>>()
+			.join("\n")
+	}
+
+	#[beet_core::test]
+	fn paragraph_flows_mixed_inline_children() {
+		// text, emphasis and trailing text flow onto one continuous line
+		render(
+			UVec2::new(40, 5),
+			rsx! { <p>"Hello "<em>"world"</em>"!"</p> },
+		)
+		.xpect_eq("Hello world!");
+	}
+
+	#[beet_core::test]
+	fn paragraph_wraps_at_content_width() {
+		render(UVec2::new(9, 5), rsx! { <p>"one two three four"</p> })
+			.xpect_eq("one two\nthree\nfour");
+	}
+
+	#[beet_core::test]
+	fn preformatted_preserves_newlines_and_spaces() {
+		render(UVec2::new(20, 5), rsx! { <pre>"fn  main()\n    body"</pre> })
+			.xpect_eq("fn  main()\n    body");
+	}
+
+	#[beet_core::test]
+	fn normal_paragraph_collapses_newlines() {
+		// outside <pre>, an embedded newline collapses to a space in the flow
+		render(UVec2::new(40, 5), rsx! { <p>"alpha\nbeta"</p> })
+			.xpect_eq("alpha beta");
+	}
+
+	#[beet_core::test]
+	fn nested_emphasis_combines_bold_and_italic() {
+		// `<em><strong>` must resolve to both italic and bold via the
+		// independently-inheriting font-style and font-weight cascades.
+		Buffer::render_oneshot_sized(
+			UVec2::new(40, 3),
+			rsx! { <p><em><strong>"x"</strong></em></p> },
+		)
+		.xpect_contains("\x1b[1m")
+		.xpect_contains("\x1b[3m");
+	}
+}

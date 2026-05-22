@@ -78,12 +78,24 @@ impl AsCssValue for Typeface {
 }
 
 /// Font weight token, mapping semantic names to numeric CSS values.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FontWeight {
+	#[default]
 	Normal,
 	Bold,
 	Absolute(u16),
+}
+
+impl FontWeight {
+	/// Whether this weight renders as bold (`Bold`, or `Absolute(>= 700)`).
+	pub fn is_bold(&self) -> bool {
+		match self {
+			Self::Normal => false,
+			Self::Bold => true,
+			Self::Absolute(value) => *value >= 700,
+		}
+	}
 }
 
 impl AsCssValue for FontWeight {

@@ -1,11 +1,11 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
+use beet_ui::style::FontWeight;
 use beet_ui::style::TextAlign;
-use beet_ui::style::TextStyle;
 use beet_ui::style::common_props::BackgroundColor;
+use beet_ui::style::common_props::FontWeightProp;
 use beet_ui::style::common_props::ForegroundColor;
 use beet_ui::style::common_props::TextAlignProp;
-use beet_ui::style::common_props::TextStyleProp;
 use beet_ui::*;
 
 
@@ -16,7 +16,7 @@ fn main() {
 			RuleSet::default().with_rule(
 				Rule::tag("h1")
 					.with_value(TextAlignProp, TextAlign::Center)
-					.with_value(TextStyleProp, TextStyle::BOLD)
+					.with_value(FontWeightProp, FontWeight::Bold)
 					.with_value(
 						ForegroundColor,
 						palettes::tailwind::FUCHSIA_400,

@@ -26,12 +26,35 @@ impl AsCssValue for Display {
 	}
 }
 
+/// How whitespace and line breaks inside a node are handled during text flow.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum WhiteSpace {
+	/// Collapse runs of whitespace and wrap lines at the content width.
+	#[default]
+	Normal,
+	/// Preserve whitespace and newlines verbatim, breaking only on `\n`.
+	Pre,
+}
+
+impl AsCssValue for WhiteSpace {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Normal => "normal",
+			Self::Pre => "pre",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
 /// Layout properties for a node.
 #[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
 pub struct LayoutStyle {
 	pub display: Display,
+	pub white_space: WhiteSpace,
 	pub flex_box: FlexBox,
 	pub flex_order: i32,
 	pub flex_grow: u32,
@@ -41,6 +64,7 @@ pub struct LayoutStyle {
 impl LayoutStyle {
 	pub const DEFAULT: Self = Self {
 		display: Display::Block,
+		white_space: WhiteSpace::Normal,
 		flex_box: FlexBox::row(),
 		flex_order: 0,
 		flex_grow: 0,

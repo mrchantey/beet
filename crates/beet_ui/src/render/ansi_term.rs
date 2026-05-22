@@ -284,7 +284,7 @@ impl NodeVisitor for AnsiTermRenderer {
 	) {
 		if self.render_expressions {
 			let style = VisualStyle {
-				text_style: TextStyle::ITALIC,
+				font_style: FontStyle::Italic,
 				..VisualStyle::default()
 			};
 			self.write_with_style(&style, &format!("{{{}}}", expression.0));

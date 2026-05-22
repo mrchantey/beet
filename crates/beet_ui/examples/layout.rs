@@ -3,6 +3,7 @@ use beet_ui::prelude::style::AlignItems;
 use beet_ui::prelude::style::Display;
 use beet_ui::prelude::style::FlexWrap;
 use beet_ui::prelude::style::JustifyContent;
+use beet_ui::prelude::style::Visibility;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
 use beet_ui::*;
@@ -40,7 +41,7 @@ fn main() {
 	render("Text Formatting", setup_text_formatting);
 	render("Text Italic", setup_text_italic);
 	render("Text Blink", setup_text_blink);
-	render("Text Reversed", setup_text_reversed);
+	render("Text Hidden", setup_text_hidden);
 	render("Inline Layout", setup_inline_basic);
 	render("Inline Wrap", setup_inline_wrap);
 	render("Text Align", setup_text_align);
@@ -456,7 +457,7 @@ fn setup_text_formatting() -> impl Bundle {
 			..default()
 		},),
 		(rsx! { "Bold" }, bordered(), VisualStyle {
-			text_style: TextStyle::BOLD,
+			font_weight: FontWeight::Bold,
 			..default()
 		},),
 	])
@@ -465,11 +466,12 @@ fn setup_text_formatting() -> impl Bundle {
 fn setup_text_italic() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! { "Italic" }, bordered(), VisualStyle {
-			text_style: TextStyle::ITALIC,
+			font_style: FontStyle::Italic,
 			..default()
 		}),
 		(rsx! { "Bold+Italic" }, bordered(), VisualStyle {
-			text_style: TextStyle::BOLD | TextStyle::ITALIC,
+			font_weight: FontWeight::Bold,
+			font_style: FontStyle::Italic,
 			..default()
 		}),
 	])
@@ -478,24 +480,24 @@ fn setup_text_italic() -> impl Bundle {
 fn setup_text_blink() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(1), children![
 		(rsx! { "Blink" }, bordered(), VisualStyle {
-			text_style: TextStyle::BLINK,
+			blink: BlinkStyle::Blink,
 			..default()
 		}),
 		(rsx! { "RapidBlink" }, bordered(), VisualStyle {
-			text_style: TextStyle::RAPID_BLINK,
+			blink: BlinkStyle::RapidBlink,
 			..default()
 		}),
 	])
 }
 
-fn setup_text_reversed() -> impl Bundle {
+fn setup_text_hidden() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(1), children![
-		(rsx! { "Reversed" }, bordered(), VisualStyle {
-			text_style: TextStyle::REVERSED,
+		(rsx! { "Visible" }, bordered(), VisualStyle {
+			visibility: Visibility::Visible,
 			..default()
 		}),
 		(rsx! { "Hidden" }, bordered(), VisualStyle {
-			text_style: TextStyle::HIDDEN,
+			visibility: Visibility::Hidden,
 			..default()
 		}),
 	])

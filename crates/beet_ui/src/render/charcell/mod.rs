@@ -10,6 +10,7 @@ mod box_model;
 mod buffer;
 mod double_buffer;
 mod flex;
+mod inline;
 #[cfg(feature = "terminal")]
 mod input;
 mod layout;
@@ -39,6 +40,7 @@ pub use terminal::*;
 
 pub(self) use box_model::*;
 pub(self) use flex::*;
+pub(self) use inline::*;
 pub(self) use layout::*;
 pub(self) use measure::*;
 pub(self) use text::*;

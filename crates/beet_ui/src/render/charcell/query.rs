@@ -43,6 +43,14 @@ impl CharcellNodeData<'_> {
 	/// Flexbox config from the layout style.
 	pub fn flexbox(&self) -> &FlexBox { &self.layout_style().flex_box }
 
+	/// Whether this node is inline-level content: a text [`Value`] leaf or an
+	/// element with `display: inline`. Inline-level children cause their
+	/// container to establish an inline formatting context.
+	pub fn is_inline_level(&self) -> bool {
+		self.value().is_some()
+			|| self.layout_style().display == Display::Inline
+	}
+
 	pub(super) fn child_nodes<'a>(
 		&'a self,
 		query: &'a CharcellQuery,

@@ -36,7 +36,9 @@ css_property!(ForegroundColor, Color, "color");
 css_property!(BackgroundColor, Color, TokenInheritance::NotInherited, "background-color");
 css_property!(DecorationColor, Color, "text-decoration-color");
 css_property!(TextAlignProp, TextAlign, "text-align");
-css_property!(TextStyleProp, TextStyle, "text-style");
+css_property!(FontStyleProp, FontStyle, "font-style");
+css_property!(BlinkStyleProp, BlinkStyle, "blink");
+css_property!(VisibilityProp, Visibility, "visibility");
 css_property!(DecorationLineProp, DecorationLine, "text-decoration-line");
 css_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style");
 
@@ -63,6 +65,7 @@ css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
 css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
 css_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
 css_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
+css_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");
 
