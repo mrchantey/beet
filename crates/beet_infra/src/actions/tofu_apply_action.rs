@@ -41,7 +41,7 @@ pub async fn TofuApplyAction(
 	// step 2: build ledger, upload artifacts to S3
 	trace!("TofuApplyAction: step 2 - ensuring artifacts bucket exists");
 	let mut client = stack.artifacts_client();
-	client.ensure_bucket().await?;
+	client.ensure_store().await?;
 	trace!("TofuApplyAction: artifacts bucket ready");
 
 	trace!("TofuApplyAction: uploading {} artifacts", artifacts.len());

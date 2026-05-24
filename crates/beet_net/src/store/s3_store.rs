@@ -7,29 +7,29 @@ use aws_sdk_s3::operation::head_object::HeadObjectError;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// AWS S3 bucket provider storing its configuration as serializable fields.
+/// AWS S3-backed store, holding its configuration as serializable fields.
 /// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
 #[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
-#[component(on_add = Bucket::on_add::<Self>)]
-pub struct S3Bucket {
+#[component(on_add = BlobStore::on_add::<Self>)]
+pub struct S3Store {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,
-	/// The AWS region for this bucket.
+	/// The AWS region for this store.
 	region: SmolStr,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<RelPath>,
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for S3Bucket {
+impl<T: TableStoreRow> TableProvider<T> for S3Store {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl S3Bucket {
-	/// Create a new S3 bucket for the given bucket name and region.
+impl S3Store {
+	/// Create a new S3 store for the given bucket name and region.
 	pub fn new(
 		bucket_name: impl Into<SmolStr>,
 		region: impl Into<SmolStr>,
@@ -55,7 +55,7 @@ impl S3Bucket {
 		}
 	}
 
-	/// Get or create an S3 client for this bucket's region.
+	/// Get or create an S3 client for this store's region.
 	async fn client(&self) -> Client {
 		static POOL: LazyPool<SmolStr, Client, Client> =
 			LazyPool::new(|region| {
@@ -77,17 +77,17 @@ impl S3Bucket {
 		}
 	}
 
-	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	/// Create a [`TypedBlob`] handle for a single object in this store.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
 
-impl BucketProvider for S3Bucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for S3Store {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(S3Bucket {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(S3Store {
 			bucket_name: self.bucket_name.clone(),
 			region: self.region.clone(),
 			subdir: Some(match &self.subdir {
@@ -99,7 +99,7 @@ impl BucketProvider for S3Bucket {
 
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -122,7 +122,7 @@ impl BucketProvider for S3Bucket {
 		})
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -143,7 +143,7 @@ impl BucketProvider for S3Bucket {
 		})
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -337,19 +337,19 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn works() {
-		let provider = S3Bucket::new("beet-test-bucket", "us-west-2");
-		bucket_test::run(provider).await;
+		let provider = S3Store::new("beet-test-bucket", "us-west-2");
+		store_test::run(provider).await;
 	}
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
-	async fn infra_bucket() {
-		let provider = S3Bucket::new("beet-site-bucket-dev", "us-west-2");
-		let bucket = Bucket::new(provider);
-		bucket.bucket_try_create().await.unwrap();
-		bucket.bucket_exists().await.xpect_ok();
+	async fn infra_store() {
+		let provider = S3Store::new("beet-site-bucket-dev", "us-west-2");
+		let store = BlobStore::new(provider);
+		store.store_try_create().await.unwrap();
+		store.store_exists().await.xpect_ok();
 
-		bucket
+		store
 			.get(&RelPath::new("index.html"))
 			.await
 			.unwrap()
@@ -360,9 +360,9 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
-		let provider = S3Bucket::new("beet-test", "us-west-2");
+		let provider = S3Store::new("beet-test", "us-west-2");
 		let test_key = RelPath::from("test-file.txt");
-		Bucket::new(provider)
+		BlobStore::new(provider)
 			.public_url(&test_key)
 			.await
 			.unwrap()

@@ -27,14 +27,14 @@ pub struct EditTextParams {
 #[action]
 #[derive(Component, Reflect)]
 pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
-	let bucket = cx
+	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
+		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
 		.await??;
 
-	let content = bucket.get(&cx.input.path).await?;
+	let content = store.get(&cx.input.path).await?;
 	let mut text = String::from_utf8(content.to_vec())
 		.map_err(|err| bevyhow!("file is not valid UTF-8: {err}"))?;
 
@@ -46,7 +46,7 @@ pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
 		text = text.replacen(&edit.old_text, &edit.new_text, 1);
 	}
 
-	bucket
+	store
 		.insert(&cx.input.path, text.into_bytes())
 		.await
 }
@@ -100,10 +100,10 @@ mod test {
 
 	/// Shared helper: write content, apply edits, return resulting text.
 	async fn apply_edits(original: &str, edits: Vec<TextEdit>) -> String {
-		let bucket = Bucket::temp();
+		let store = BlobStore::temp();
 		let path = RelPath::from("file.txt");
 		let original = original.to_owned();
-		bucket
+		store
 			.insert(&path, original.clone())
 			.await
 			.unwrap();
@@ -113,8 +113,8 @@ mod test {
 		for edit in &edits {
 			text = text.replacen(&edit.old_text, &edit.new_text, 1);
 		}
-		bucket.insert(&path, text.clone().into_bytes()).await.unwrap();
-		let got = bucket.get(&path).await.unwrap();
+		store.insert(&path, text.clone().into_bytes()).await.unwrap();
+		let got = store.get(&path).await.unwrap();
 		String::from_utf8(got.to_vec()).unwrap()
 	}
 

@@ -135,18 +135,18 @@ impl BlobScene {
 #[action(route)]
 #[derive(Default, Component)]
 async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<SceneEntity> {
-	let bucket = cx
+	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&Bucket>, Bucket>(|entity, query| {
+		.with_state::<AncestorQuery<&BlobStore>, BlobStore>(|entity, query| {
 			query
 				.get(entity)
 				.cloned()
-				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
+				.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
 		})
 		.await?;
 
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
-	let bytes = bucket.get_media(&path).await?;
+	let bytes = store.get_media(&path).await?;
 
 	cx.caller
 		.with_then(move |mut entity_mut| {

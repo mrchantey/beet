@@ -16,7 +16,7 @@ use uuid::Uuid;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
 /// let table = temp_table::<TableItem<String>>();
-/// table.bucket_try_create().await?;
+/// table.store_try_create().await?;
 ///
 /// let item = TableItem::new("Hello, world!".to_string());
 /// let id = item.id();
@@ -57,30 +57,30 @@ impl<T: TableStoreRow> TableStore<T> {
 		}
 	}
 
-	/// Create bucket (may take 10+ seconds for cloud providers).
+	/// Create store (may take 10+ seconds for cloud providers).
 	///
 	/// # Errors
-	/// Fails if bucket already exists.
-	pub async fn bucket_create(&self) -> Result {
-		BucketProvider::bucket_create(self.provider.as_ref()).await
+	/// Fails if store already exists.
+	pub async fn store_create(&self) -> Result {
+		BlobStoreProvider::store_create(self.provider.as_ref()).await
 	}
 
-	/// Ensure bucket exists, creating if needed.
-	pub async fn bucket_try_create(&self) -> Result {
-		BucketProvider::bucket_try_create(self.provider.as_ref()).await
+	/// Ensure store exists, creating if needed.
+	pub async fn store_try_create(&self) -> Result {
+		BlobStoreProvider::store_try_create(self.provider.as_ref()).await
 	}
 
-	/// Check if bucket exists.
-	pub async fn bucket_exists(&self) -> Result<bool> {
-		BucketProvider::bucket_exists(self.provider.as_ref()).await
+	/// Check if store exists.
+	pub async fn store_exists(&self) -> Result<bool> {
+		BlobStoreProvider::store_exists(self.provider.as_ref()).await
 	}
 
-	/// Remove bucket.
+	/// Remove store.
 	///
 	/// # Errors
-	/// Fails if bucket doesn't exist.
-	pub async fn bucket_remove(&self) -> Result {
-		BucketProvider::bucket_remove(self.provider.as_ref()).await
+	/// Fails if store doesn't exist.
+	pub async fn store_remove(&self) -> Result {
+		BlobStoreProvider::store_remove(self.provider.as_ref()).await
 	}
 
 	/// Insert typed object into table.
@@ -141,7 +141,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// ```
 	pub async fn exists(&self, id: Uuid) -> Result<bool> {
 		let path = RelPath::new(id.to_string());
-		BucketProvider::exists(self.provider.as_ref(), &path).await
+		BlobStoreProvider::exists(self.provider.as_ref(), &path).await
 	}
 
 	/// List all object paths in table.
@@ -157,7 +157,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # }
 	/// ```
 	pub async fn list(&self) -> Result<Vec<RelPath>> {
-		BucketProvider::list(self.provider.as_ref()).await
+		BlobStoreProvider::list(self.provider.as_ref()).await
 	}
 
 	/// Get typed object data by id.
@@ -233,7 +233,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// Returns error if object doesn't exist.
 	pub async fn remove(&self, id: Uuid) -> Result {
 		let path = RelPath::new(id.to_string());
-		BucketProvider::remove(self.provider.as_ref(), &path).await
+		BlobStoreProvider::remove(self.provider.as_ref(), &path).await
 	}
 
 	/// Get public URL for object (if supported by provider).
@@ -254,12 +254,12 @@ impl<T: TableStoreRow> TableStore<T> {
 	///
 	/// Returns `None` if provider doesn't support public URLs.
 	pub async fn public_url(&self, path: &RelPath) -> Result<Option<String>> {
-		BucketProvider::public_url(self.provider.as_ref(), path).await
+		BlobStoreProvider::public_url(self.provider.as_ref(), path).await
 	}
 
 	/// Get provider region.
 	pub fn region(&self) -> Option<String> {
-		BucketProvider::region(self.provider.as_ref())
+		BlobStoreProvider::region(self.provider.as_ref())
 	}
 }
 
@@ -324,12 +324,12 @@ impl<T: TableContent> TableStoreRow for TableItem<T> {
 
 /// Storage provider for typed table operations.
 ///
-/// This trait extends [`BucketProvider`] with type-safe operations for storing
+/// This trait extends [`BlobStoreProvider`] with type-safe operations for storing
 /// and retrieving serializable objects. Implementors only need to provide
 /// [`box_clone_table`](TableProvider::box_clone_table), as the default
-/// implementations use the [`BucketProvider`] api to store data as JSON.
+/// implementations use the [`BlobStoreProvider`] api to store data as JSON.
 pub trait TableProvider<T: TableStoreRow>:
-	BucketProvider + 'static + Send + Sync
+	BlobStoreProvider + 'static + Send + Sync
 {
 	/// Returns a boxed clone of this provider for type erasure.
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
@@ -337,7 +337,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
 		let path = RelPath::new(body.id().to_string());
 		match serde_json::to_vec(&body) {
-			Ok(vec) => BucketProvider::insert(self, &path, vec.into()),
+			Ok(vec) => BlobStoreProvider::insert(self, &path, vec.into()),
 			Err(e) => {
 				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
 			}
@@ -346,7 +346,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	/// Retrieves a row by its UUID, deserializing from JSON.
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
 		let path = RelPath::new(id.to_string());
-		let fut = BucketProvider::get(self, &path);
+		let fut = BlobStoreProvider::get(self, &path);
 		Box::pin(async move {
 			let bytes = fut.await?;
 			serde_json::from_slice(&bytes)
@@ -358,7 +358,7 @@ pub trait TableProvider<T: TableStoreRow>:
 /// Create temporary in-memory table for testing.
 /// The returned table is pre-created and ready for immediate use.
 pub fn temp_table<T: TableStoreRow>() -> TableStore<T> {
-	TableStore::new(InMemoryBucket::new())
+	TableStore::new(InMemoryStore::new())
 }
 
 /// Select filesystem or DynamoDB [`TableProvider`] based on [`ServiceAccess`]
@@ -373,17 +373,17 @@ pub async fn dynamo_fs_selector<T: TableStoreRow>(
 	match access {
 		ServiceAccess::Local => {
 			debug!("Table Selector - FS: {fs_path}");
-			TableStore::new(FsBucket::new(fs_path.clone()))
+			TableStore::new(FsStore::new(fs_path.clone()))
 		}
 		#[cfg(not(all(feature = "aws_sdk", not(target_arch = "wasm32"))))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - FS (no aws_sdk feature): {fs_path}");
-			TableStore::new(FsBucket::new(fs_path.clone()))
+			TableStore::new(FsStore::new(fs_path.clone()))
 		}
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		ServiceAccess::Remote => {
 			debug!("Table Selector - Dynamo: {table_name}");
-			TableStore::new(DynamoBucket::new(table_name, region))
+			TableStore::new(DynamoStore::new(table_name, region))
 		}
 	}
 }
@@ -415,13 +415,13 @@ pub mod table_test {
 		});
 		let id = body.id();
 		let path = RelPath::new(id.to_string());
-		table.bucket_remove().await.ok();
-		table.bucket_exists().await.unwrap().xpect_false();
-		table.bucket_try_create().await.unwrap();
+		table.store_remove().await.ok();
+		table.store_exists().await.unwrap().xpect_false();
+		table.store_try_create().await.unwrap();
 		table.exists(id).await.unwrap().xpect_false();
 		table.remove(id).await.xpect_err();
 		table.push(body.clone()).await.unwrap();
-		table.bucket_exists().await.unwrap().xpect_true();
+		table.store_exists().await.unwrap().xpect_true();
 		table.exists(id).await.unwrap().xpect_true();
 		table.list().await.unwrap().xpect_eq(vec![path.clone()]);
 		table.get(id).await.unwrap().xpect_eq(body.clone());
@@ -430,7 +430,7 @@ pub mod table_test {
 		table.remove(id).await.unwrap();
 		table.get(id).await.xpect_err();
 
-		table.bucket_remove().await.unwrap();
-		table.bucket_exists().await.unwrap().xpect_false();
+		table.store_remove().await.unwrap();
+		table.store_exists().await.unwrap().xpect_false();
 	}
 }

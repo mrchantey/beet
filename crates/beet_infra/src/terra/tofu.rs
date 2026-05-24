@@ -23,7 +23,7 @@ pub async fn dangerously_destroy_backend(backend: &StackBackend) -> Result {
 			cfg_if! {
 				if #[cfg(feature = "aws_sdk")] {
 					s3.provider()
-						.bucket_remove().await?;
+						.store_remove().await?;
 				} else {
 					bevybail!("S3 backend support requires the `aws` feature flag")
 				}

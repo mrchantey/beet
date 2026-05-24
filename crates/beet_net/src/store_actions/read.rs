@@ -4,7 +4,7 @@ use beet_core::prelude::*;
 const DEFAULT_MAX_LINES: usize = 2000;
 const DEFAULT_MAX_BYTES: usize = 50 * 1024; // 50KB
 
-/// Parameters for reading a blob from a bucket.
+/// Parameters for reading a blob from a store.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct ReadBlobParams {
 	/// Path to the blob to read.
@@ -15,7 +15,7 @@ pub struct ReadBlobParams {
 	pub limit: Option<usize>,
 }
 
-/// Read a blob from the nearest ancestor [`Bucket`].
+/// Read a blob from the nearest ancestor [`BlobStore`].
 ///
 /// For text content, output is truncated based on whichever limit is hit first:
 /// - Line limit (default: 2000 lines)
@@ -23,14 +23,14 @@ pub struct ReadBlobParams {
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ReadBlob(cx: ActionContext<ReadBlobParams>) -> Result<MediaBytes> {
-	let bucket = cx
+	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
+		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
 		.await??;
 
-	let media = bucket.get_media(&cx.input.path).await?;
+	let media = store.get_media(&cx.input.path).await?;
 
 	if media.media_type().is_text() {
 		truncate_text(media, cx.input.offset, cx.input.limit)
@@ -72,20 +72,20 @@ fn truncate_text(
 mod test {
 	use super::*;
 
-	/// Shared helper: create bucket with a text file at the given path.
-	async fn bucket_with_text(path: &str, text: &str) -> Bucket {
-		let bucket = Bucket::temp();
-		bucket
+	/// Shared helper: create store with a text file at the given path.
+	async fn store_with_text(path: &str, text: &str) -> BlobStore {
+		let store = BlobStore::temp();
+		store
 			.insert(&RelPath::from(path), text.to_owned())
 			.await
 			.unwrap();
-		bucket
+		store
 	}
 
 	#[beet_core::test]
 	async fn reads_text_blob() {
-		let bucket = bucket_with_text("hello.txt", "hello world").await;
-		let media = bucket.get_media(&RelPath::from("hello.txt")).await.unwrap();
+		let store = store_with_text("hello.txt", "hello world").await;
+		let media = store.get_media(&RelPath::from("hello.txt")).await.unwrap();
 		let text = media.as_utf8().unwrap();
 		text.xpect_eq("hello world");
 	}

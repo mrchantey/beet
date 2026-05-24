@@ -46,7 +46,7 @@ fn main() -> AppExit {
 
 fn setup(mut commands: Commands) -> Result {
 	commands.spawn((
-		FsBucket::new(WsPathBuf::new("examples/assets")),
+		FsStore::new(WsPathBuf::new("examples/assets")),
 		router_scene()?,
 	));
 	Ok(())
@@ -57,7 +57,7 @@ fn setup(mut commands: Commands) -> Result {
 #[allow(unused, reason = "module not used when deploying infra")]
 pub fn router_scene() -> Result<impl Bundle> {
 	(
-		// declare the bucket used by the blob scenes
+		// declare the store used by the blob scenes
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
 		server_from_cli()?,
@@ -175,7 +175,7 @@ fn sequence() -> impl Bundle {
 /// and wires up named [`SlotContainer`] for head, nav, and main content.
 /// Non-scene middleware (ie `Request/Response`) is unaffected.
 ///
-/// Loads assets from the nearest ancestor [`Bucket`] on each request,
+/// Loads assets from the nearest ancestor [`BlobStore`] on each request,
 /// supporting both local filesystem and S3 backends.
 #[action]
 #[derive(Default, Clone, Component)]
@@ -190,19 +190,19 @@ async fn LayoutTemplate(
 	let content = next.call(parts).await?;
 	let content_id = content.entity;
 
-	// read layout and slot content from the assets Bucket
-	let bucket = caller
-		.with_state::<AncestorQuery<&Bucket>, Bucket>(|entity, query| {
+	// read layout and slot content from the assets BlobStore
+	let store = caller
+		.with_state::<AncestorQuery<&BlobStore>, BlobStore>(|entity, query| {
 			query
 				.get(entity)
 				.cloned()
-				.unwrap_or_else(|_| Bucket::new(FsBucket::default()))
+				.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
 		})
 		.await?;
 	let layout_bytes =
-		bucket.get(&"layouts/default-layout.html".into()).await?;
+		store.get(&"layouts/default-layout.html".into()).await?;
 	let layout_html = String::from_utf8(layout_bytes.to_vec())?;
-	let head_html = head_content(&bucket).await?;
+	let head_html = head_content(&store).await?;
 	let nav_html = nav_content();
 
 	let caller_entity = caller.id();
@@ -293,9 +293,9 @@ fn parse_html_entity(
 }
 
 /// Generates `<head>` content including the theme switcher script.
-async fn head_content(bucket: &Bucket) -> Result<String> {
+async fn head_content(store: &BlobStore) -> Result<String> {
 	let theme_bytes =
-		bucket.get(&"js/minimal-theme-switcher.js".into()).await?;
+		store.get(&"js/minimal-theme-switcher.js".into()).await?;
 	let theme_switcher = String::from_utf8(theme_bytes.to_vec())?;
 	Ok(format!(r#"<script>{theme_switcher}</script>"#))
 }

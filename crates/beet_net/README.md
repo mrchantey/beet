@@ -8,7 +8,7 @@ The `Request` / `Response` pattern is generalized and not tied to any transport,
 
 - **Transport agnostic servers**: server implementations for cli arguments or http requests
 - **Cross-platform clients**: HTTP clients for sending requests (ureq, reqwest and WASM backends)
-- **Object storage**: Bucket-based storage abstraction (filesystem, S3, etc.)
+- **Object storage**: Store-based storage abstraction (filesystem, S3, etc.)
 - **Sockets**: WebSocket client and server
 - **Action-based exchanges**: Request/response handling via `Action<Request, Response>` from `beet_action`
 

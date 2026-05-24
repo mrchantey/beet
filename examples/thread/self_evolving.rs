@@ -15,12 +15,12 @@ async fn main() {
 }
 
 fn setup(mut commands: Commands) {
-	let bucket_path = WsPathBuf::new("target/examples/self_evolving");
-	fs_ext::remove(&bucket_path).ok();
-	let bucket = FsBucket::new(bucket_path);
+	let store_path = WsPathBuf::new("target/examples/self_evolving");
+	fs_ext::remove(&store_path).ok();
+	let store = FsStore::new(store_path);
 
 	commands
-		.spawn((RepeatTimes::new(10), bucket, children![(
+		.spawn((RepeatTimes::new(10), store, children![(
 			Thread::default(),
 			Sequence::new(),
 			ExcludeErrors(ChildError::NO_ACTION),

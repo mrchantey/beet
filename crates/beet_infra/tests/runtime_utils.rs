@@ -32,7 +32,7 @@ pub struct IsolatedTestGuards {
 	pub source: AbsPathBuf,
 	/// Path to `index.html` inside the isolated temp assets dir.
 	pub assets_file: AbsPathBuf,
-	/// Isolated temp assets directory used by `assets_s3_fs_bucket`.
+	/// Isolated temp assets directory used by `assets_s3_fs_store`.
 	pub assets_dir: AbsPathBuf,
 	// reverts first
 	_source_guard: SourceRevert,
@@ -85,26 +85,26 @@ pub fn setup_isolated_test_guards(
 	})
 }
 
-/// Create the assets bucket block used across all tests.
+/// Create the assets store block used across all tests.
 pub fn assets_bucket_block() -> S3BucketBlock {
 	S3BucketBlock::new("assets").with_deploy_versioned(true)
 }
 
-/// Create the S3FsBucket for syncing local assets to S3.
+/// Create the S3FsStore for syncing local assets to S3.
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
-pub fn assets_s3_fs_bucket(
+pub fn assets_s3_fs_store(
 	stack: &Stack,
 	assets_dir: &AbsPathBuf,
-) -> S3FsBucket {
-	S3FsBucket::new(
-		FsBucket::new(assets_dir.clone()),
+) -> S3FsStore {
+	S3FsStore::new(
+		FsStore::new(assets_dir.clone()),
 		assets_bucket_block().provider(stack),
 	)
 }
 
-/// Get the deploy-versioned assets bucket for verification.
-pub fn assets_bucket(stack: &Stack) -> Bucket {
-	Bucket::new(assets_bucket_block().provider(stack))
+/// Get the deploy-versioned assets store for verification.
+pub fn assets_store(stack: &Stack) -> BlobStore {
+	BlobStore::new(assets_bucket_block().provider(stack))
 }
 
 /// Re-apply terraform with the current ledger deploy_id.
@@ -126,16 +126,16 @@ where
 	project.apply().await
 }
 
-/// Verify the assets bucket contains the expected version marker.
+/// Verify the assets store contains the expected version marker.
 pub async fn verify_assets(stack: &Stack, expected: &str) -> Result {
-	let bucket = assets_bucket(stack);
-	let files = bucket.list().await?;
+	let store = assets_store(stack);
+	let files = store.list().await?;
 	info!("assets at deploy {}: {:?}", stack.deploy_id(), files);
 	files
 		.iter()
 		.any(|path| path.to_string_lossy().contains("index.html"))
 		.xpect_true();
-	let bytes = bucket.get(&RelPath::new("index.html")).await?;
+	let bytes = store.get(&RelPath::new("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
 	info!(
@@ -210,11 +210,11 @@ pub async fn verify_dead(
 
 /// Clean up any prior state before test starts.
 /// Terraform should handle all infrastructure cleanup, we only need to clean
-/// the artifacts bucket which is not managed by terraform.
+/// the artifacts store which is not managed by terraform.
 pub async fn cleanup_prior_state(stack: &Stack, project: terra::Project) {
 	info!("cleanup_prior_state: calling force_destroy");
 	project.force_destroy().await;
-	info!("cleanup_prior_state: removing artifacts bucket");
-	stack.artifacts_client().bucket().bucket_remove().await.ok();
+	info!("cleanup_prior_state: removing artifacts store");
+	stack.artifacts_client().store().store_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }

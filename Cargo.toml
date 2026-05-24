@@ -14,7 +14,7 @@ split-debuginfo = "unpacked"
 opt-level = 3
 
 [workspace.package]
-version = "0.0.9-dev.10"
+version = "0.0.9-dev.11"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A personal application framework"
@@ -76,26 +76,26 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet = { path = "", version = "0.0.9-dev.10" }
-beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.10" }
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.10" }
-beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.10" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-dev.10" }
-beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.10" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-dev.10" }
-beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.10" }
-beet_router = { path = "crates/beet_router", version = "0.0.9-dev.10" }
-beet_action = { path = "crates/beet_action", version = "0.0.9-dev.10" }
+beet = { path = "", version = "0.0.9-dev.11" }
+beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.11" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.11" }
+beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.11" }
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11" }
+beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
+beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
+beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11" }
 
-# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.10" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.10" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.10" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.10" }
+# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.11" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
 
-# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.10" }
-# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.10" }
-# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.10" }
+# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.11" }
+# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.11" }
+# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
 
 #💡 local
 # bevy_ecs = {version = "0.18", default-features = false, features = ["backtrace"]}

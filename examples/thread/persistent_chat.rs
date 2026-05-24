@@ -28,16 +28,16 @@ fn main() {
 fn setup(mut commands: Commands) {
 	cfg_if! {
 		if #[cfg(feature="aws_sdk")]{
-			// swap out for s3 storage by changing the bucket
-			// see infra examples for configuring buckets
-			let bucket = S3Bucket::new("some-bucket","some-region");
+			// swap out for s3 storage by changing the store
+			// see infra examples for configuring stores
+			let store = S3Store::new("some-bucket","some-region");
 		}else{
-			let bucket = FsBucket::new(WsPathBuf::default());
+			let store = FsStore::new(WsPathBuf::default());
 		}
 	}
 
 
-	let blob = bucket.blob(RelPath::new(SCENE_FILE));
+	let blob = store.blob(RelPath::new(SCENE_FILE));
 	let new_thread = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {

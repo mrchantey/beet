@@ -8,7 +8,7 @@ readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["router", "request", "buckets", "key-value-store", "action"]
+keywords = ["router", "request", "blob-store", "key-value-store", "action"]
 categories.workspace = true
 publish = true
 

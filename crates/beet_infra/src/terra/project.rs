@@ -1,7 +1,7 @@
 use crate::prelude::terra::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::BucketProvider;
+use beet_net::prelude::BlobStoreProvider;
 
 
 
@@ -139,8 +139,8 @@ impl Project {
 		// TODO should be possible to just include artifacts client in the project
 		self.stack
 			.artifacts_client()
-			.bucket()
-			.bucket_remove()
+			.store()
+			.store_remove()
 			.await
 			.ok();
 		fs_ext::remove_async(&self.dir()).await.ok();

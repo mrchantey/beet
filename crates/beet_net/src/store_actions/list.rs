@@ -1,28 +1,28 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Parameters for listing blobs in a bucket subdirectory.
+/// Parameters for listing blobs in a store subdirectory.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct ListBlobsParams {
-	/// Subdirectory path to list relative to the bucket root.
+	/// Subdirectory path to list relative to the store root.
 	pub path: RelPath,
 }
 
-/// List all blobs in the given subdirectory of the nearest ancestor [`Bucket`].
+/// List all blobs in the given subdirectory of the nearest ancestor [`BlobStore`].
 ///
 /// Outputs a [`Vec<RelPath>`] of blob paths relative to the given subdirectory.
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ListBlobs(cx: ActionContext<ListBlobsParams>) -> Result<Vec<RelPath>> {
-	let bucket = cx
+	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
+		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
 		.await??;
-	let sub = bucket.with_subdir(cx.input.path);
-	// gracefully return empty list if bucket directory doesn't exist yet
-	match sub.bucket_exists().await {
+	let sub = store.with_subdir(cx.input.path);
+	// gracefully return empty list if store directory doesn't exist yet
+	match sub.store_exists().await {
 		Ok(true) => sub.list().await,
 		_ => Ok(vec![]),
 	}
@@ -36,8 +36,8 @@ mod test {
 
 	#[beet_core::test]
 	async fn lists_empty_subdir() {
-		let bucket = Bucket::temp();
-		let result = bucket
+		let store = BlobStore::temp();
+		let result = store
 			.with_subdir(RelPath::from("empty"))
 			.list()
 			.await
@@ -47,21 +47,21 @@ mod test {
 
 	#[beet_core::test]
 	async fn lists_blobs_in_subdir() {
-		let bucket = Bucket::temp();
-		bucket
+		let store = BlobStore::temp();
+		store
 			.insert(&RelPath::from("subdir/a.txt"), "aaa")
 			.await
 			.unwrap();
-		bucket
+		store
 			.insert(&RelPath::from("subdir/b.txt"), "bbb")
 			.await
 			.unwrap();
-		bucket
+		store
 			.insert(&RelPath::from("other/c.txt"), "ccc")
 			.await
 			.unwrap();
 
-		let mut result = bucket
+		let mut result = store
 			.with_subdir(RelPath::from("subdir"))
 			.list()
 			.await

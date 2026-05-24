@@ -26,7 +26,7 @@ impl Default for SceneStore {
 
 impl SceneStore {
 	pub async fn load_or_create<
-		T: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+		T: 'static + Send + Sync + Clone + Reflect + BlobStoreProvider,
 		B: Bundle,
 	>(
 		world: AsyncWorld,

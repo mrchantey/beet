@@ -8,15 +8,15 @@ use wasm_bindgen::prelude::*;
 use web_sys::IdbDatabase;
 use web_sys::IdbTransactionMode;
 
-/// A bucket provider backed by browser IndexedDB.
+/// A store provider backed by browser IndexedDB.
 ///
 /// Suited to large binary payloads (ie ML model weights) that exceed the
-/// per-origin `localStorage` quota. Each bucket uses a dedicated database
+/// per-origin `localStorage` quota. Each store uses a dedicated database
 /// with a single object store keyed by [`RelPath`] strings.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = Bucket::on_add::<Self>)]
-pub struct IndexedDbBucket {
+#[component(on_add = BlobStore::on_add::<Self>)]
+pub struct IndexedDbStore {
 	/// The IndexedDB database name.
 	db_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
@@ -25,8 +25,8 @@ pub struct IndexedDbBucket {
 
 const STORE_NAME: &str = "blobs";
 
-impl IndexedDbBucket {
-	/// Creates a new IndexedDB-backed bucket provider.
+impl IndexedDbStore {
+	/// Creates a new IndexedDB-backed store provider.
 	pub fn new(db_name: impl Into<SmolStr>) -> Self {
 		Self {
 			db_name: db_name.into(),
@@ -110,11 +110,11 @@ async fn await_idb_request(req: web_sys::IdbRequest) -> Result<JsValue> {
 		.map_jserr()
 }
 
-impl BucketProvider for IndexedDbBucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for IndexedDbStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(IndexedDbBucket {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(IndexedDbStore {
 			db_name: self.db_name.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -125,14 +125,14 @@ impl BucketProvider for IndexedDbBucket {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let db_name = self.db_name.clone();
 		Box::pin(SendWrapper::new(async move {
 			open_db(&db_name).await.map(|_| true)
 		}))
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		Box::pin(SendWrapper::new(async move {
 			open_db(&db_name).await?;
@@ -140,7 +140,7 @@ impl BucketProvider for IndexedDbBucket {
 		}))
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		Box::pin(SendWrapper::new(async move {
 			let factory = web_sys::window()
@@ -307,7 +307,7 @@ mod test {
 	#[beet_core::test]
 	#[ignore = "requires browser environment"]
 	async fn works() {
-		let provider = IndexedDbBucket::new("test-bucket");
-		bucket_test::run(provider).await;
+		let provider = IndexedDbStore::new("test-store");
+		store_test::run(provider).await;
 	}
 }

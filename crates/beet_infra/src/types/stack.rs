@@ -133,12 +133,12 @@ impl Stack {
 		cfg_if! {
 			if #[cfg(feature = "aws_sdk")] {
 				// TODO provider agnostic, perhaps something similar to the state_backend.rs pattern
-				let provider = beet_net::prelude::S3Bucket::new(
+				let provider = beet_net::prelude::S3Store::new(
 					self.artifact_bucket_name(),
 					self.aws_region().clone(),
 				);
 				ArtifactsClient::new(
-					Bucket::new(provider),
+					BlobStore::new(provider),
 					ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone())
 				)
 			} else {
@@ -164,7 +164,7 @@ pub struct StackQuery<'w, 's> {
 	stacks: AncestorQuery<'w, 's, (Entity, &'static Stack)>,
 	blocks: Query<'w, 's, (EntityRef<'static>, &'static ErasedBlock)>,
 	children: Query<'w, 's, &'static Children>,
-	buckets: Query<'w, 's, &'static Bucket>,
+	stores: Query<'w, 's, &'static BlobStore>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -234,8 +234,8 @@ impl<'w, 's> StackQuery<'w, 's> {
 		Ok(variables)
 	}
 
-	/// Get the [`Bucket`] component from this entity.
-	pub fn bucket(&self, entity: Entity) -> Result<&Bucket> {
-		self.buckets.get(entity)?.xok()
+	/// Get the [`BlobStore`] component from this entity.
+	pub fn store(&self, entity: Entity) -> Result<&BlobStore> {
+		self.stores.get(entity)?.xok()
 	}
 }

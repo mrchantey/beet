@@ -1,4 +1,4 @@
-//! Actions for operating on [`Bucket`] storage.
+//! Actions for operating on [`BlobStore`] storage.
 mod edit;
 mod list;
 mod read;

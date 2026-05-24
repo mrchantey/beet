@@ -1,4 +1,4 @@
-//! Reactive bucket item for UI-driven storage access.
+//! Reactive store item for UI-driven storage access.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -6,15 +6,15 @@ use beet_core::prelude::*;
 
 
 
-/// A reactive wrapper around a bucket path for UI-driven storage access.
+/// A reactive wrapper around a store path for UI-driven storage access.
 ///
 /// Provides signal-based getters and setters that automatically sync with
-/// the underlying bucket storage via effects.
+/// the underlying store storage via effects.
 #[derive(Clone)]
-pub struct BucketItem {
-	/// The bucket containing this item.
-	pub bucket: Bucket,
-	/// The path to this item within the bucket.
+pub struct StoreItem {
+	/// The store containing this item.
+	pub store: BlobStore,
+	/// The path to this item within the store.
 	pub path: RelPath,
 	/// Getter for the item's data content.
 	pub get_data: Getter<Option<String>>,
@@ -26,13 +26,13 @@ pub struct BucketItem {
 	pub set_err: Setter<Option<String>>,
 }
 
-impl BucketItem {
-	/// Creates a new bucket item and initializes reactive effects.
-	pub fn new(bucket: Bucket, path: RelPath) -> Self {
+impl StoreItem {
+	/// Creates a new store item and initializes reactive effects.
+	pub fn new(store: BlobStore, path: RelPath) -> Self {
 		let (get_data, set_data) = signal::<Option<String>>(None);
 		let (get_err, set_err) = signal::<Option<String>>(None);
 		let this = Self {
-			bucket,
+			store,
 			path,
 			get_data,
 			set_data,
@@ -47,7 +47,7 @@ impl BucketItem {
 	}
 	/// Returns the current data content, if loaded.
 	pub fn data(&self) -> Option<String> { self.get_data.get() }
-	/// Sets the data content, triggering a bucket insert.
+	/// Sets the data content, triggering a store insert.
 	pub fn set_data(&self, data: Option<String>) { self.set_data.set(data) }
 	/// Returns any error that occurred during the last operation.
 	pub fn err(&self) -> Option<String> { self.get_err.get() }
@@ -63,7 +63,7 @@ impl BucketItem {
 		effect(move || {
 			let this = this.clone();
 			async_ext::spawn_local(async move {
-				match this.bucket.get(&this.path).await {
+				match this.store.get(&this.path).await {
 					Ok(data) => {
 						let data = String::from_utf8_lossy(&data).to_string();
 						this.set_data(Some(data))
@@ -80,7 +80,7 @@ impl BucketItem {
 			let this = this.clone();
 			if let Some(data) = this.data() {
 				async_ext::spawn_local(async move {
-					match this.bucket.insert(&this.path, data).await {
+					match this.store.insert(&this.path, data).await {
 						Ok(()) => {}
 						Err(err) => this.set_err(Some(err.to_string())),
 					}

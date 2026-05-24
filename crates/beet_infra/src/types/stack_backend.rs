@@ -41,7 +41,7 @@ impl StackBackend {
 		}
 	}
 
-	pub fn provider(&self) -> Box<dyn BucketProvider> {
+	pub fn provider(&self) -> Box<dyn BlobStoreProvider> {
 		match self {
 			#[allow(unused)]
 			Self::S3(s3) => {
@@ -59,7 +59,7 @@ impl StackBackend {
 
 	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
 	pub async fn ensure_exists(&self) -> Result {
-		self.provider().bucket_try_create().await
+		self.provider().store_try_create().await
 	}
 
 	/// Clear stale lock files if the backend supports it.
@@ -75,8 +75,8 @@ impl StackBackend {
 	/// Remove this backend bucket if its empty
 	pub async fn remove_if_empty(&self) -> Result {
 		let provider = self.provider();
-		if provider.bucket_is_empty().await? {
-			provider.bucket_remove().await?;
+		if provider.store_is_empty().await? {
+			provider.store_remove().await?;
 		}
 		Ok(())
 	}
@@ -106,7 +106,7 @@ impl LocalBackend {
 		let state_path = self.path.join(key).to_string();
 		json!({"local":{ "path": state_path }})
 	}
-	pub fn provider(&self) -> FsBucket { FsBucket::new(self.path.clone()) }
+	pub fn provider(&self) -> FsStore { FsStore::new(self.path.clone()) }
 	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
 	pub fn clear_stale_locks(&self) {
 		if let Ok(entries) =
@@ -139,8 +139,8 @@ pub struct S3Backend {
 
 impl S3Backend {
 	#[cfg(feature = "aws_sdk")]
-	pub fn provider(&self) -> beet_net::prelude::S3Bucket {
-		beet_net::prelude::S3Bucket::new(
+	pub fn provider(&self) -> beet_net::prelude::S3Store {
+		beet_net::prelude::S3Store::new(
 			self.bucket.clone(),
 			self.region.clone(),
 		)

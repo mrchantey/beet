@@ -76,21 +76,21 @@ impl ArtifactEntry {
 	}
 }
 
-/// Runtime client for artifact operations on a provisioned bucket.
+/// Runtime client for artifact operations on a provisioned store.
 #[derive(Debug, Clone, Get)]
 pub struct ArtifactsClient {
-	bucket: Bucket,
+	store: BlobStore,
 	ledger: ArtifactLedger,
 }
 
 impl ArtifactsClient {
-	pub fn new(bucket: Bucket, ledger: ArtifactLedger) -> Self {
-		Self { bucket, ledger }
+	pub fn new(store: BlobStore, ledger: ArtifactLedger) -> Self {
+		Self { store, ledger }
 	}
 
-	/// Ensure the artifacts bucket exists, creating if needed.
-	pub async fn ensure_bucket(&self) -> Result {
-		self.bucket.bucket_try_create().await
+	/// Ensure the artifacts store exists, creating if needed.
+	pub async fn ensure_store(&self) -> Result {
+		self.store.store_try_create().await
 	}
 
 	pub fn deploy_id(&self) -> &Uuid { &self.ledger.deploy_id }
@@ -104,7 +104,7 @@ impl ArtifactsClient {
 	) -> Result {
 		self.ledger.push_artifact(artifact_name, entry)?;
 		let key = self.ledger.current_artifact_key(artifact_name);
-		self.bucket.insert(&key, bytes).await
+		self.store.insert(&key, bytes).await
 	}
 
 	/// Upload the version ledger and set it as current.
@@ -112,18 +112,18 @@ impl ArtifactsClient {
 		let bytes = serde_json::to_vec_pretty(&self.ledger)?;
 		let ledger_key = self.ledger.current_ledger_key();
 		// store version ledger
-		self.bucket.insert(&ledger_key, bytes.clone()).await?;
+		self.store.insert(&ledger_key, bytes.clone()).await?;
 		// set as current
-		self.bucket.insert(&current_ledger_key(), bytes).await
+		self.store.insert(&current_ledger_key(), bytes).await
 	}
 
 	/// Read the current ledger.
 	pub async fn current_ledger(&self) -> Result<Option<ArtifactLedger>> {
 		let key = current_ledger_key();
-		if !self.bucket.exists(&key).await? {
+		if !self.store.exists(&key).await? {
 			return Ok(None);
 		}
-		let bytes = self.bucket.get(&key).await?;
+		let bytes = self.store.get(&key).await?;
 		serde_json::from_slice(&bytes).map(Some).map_err(Into::into)
 	}
 
@@ -134,14 +134,14 @@ impl ArtifactsClient {
 		version: &Uuid,
 	) -> Result<Bytes> {
 		let key = ArtifactLedger::version_artifact_key(version, artifact_name);
-		self.bucket.get(&key).await
+		self.store.get(&key).await
 	}
 
 	/// Set a specific version as the current version.
 	pub async fn set_current(&self, version: &Uuid) -> Result {
 		let key = ArtifactLedger::version_ledger_key(version);
-		let ledger_bytes = self.bucket.get(&key).await?;
-		self.bucket
+		let ledger_bytes = self.store.get(&key).await?;
+		self.store
 			.insert(&current_ledger_key(), ledger_bytes)
 			.await
 	}
@@ -149,7 +149,7 @@ impl ArtifactsClient {
 	/// List all deployed versions, sorted chronologically.
 	/// Only collects versioned ledger entries, excluding the current pointer.
 	pub async fn list_versions(&self) -> Result<Vec<Uuid>> {
-		let all_keys = self.bucket.list().await?;
+		let all_keys = self.store.list().await?;
 		let mut versions: Vec<Uuid> = all_keys
 			.iter()
 			.filter_map(|key| {
@@ -233,7 +233,7 @@ mod tests {
 	#[beet_core::test]
 	async fn upload_and_download() {
 		let mut client =
-			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
+			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
 		let bytes = b"hello world".to_vec();
 		client
 			.upload_artifact(
@@ -252,7 +252,7 @@ mod tests {
 	async fn publish_and_read_ledger() {
 		let ledger =
 			test_ledger(vec![("app.zip", "versions/x/app.zip", "abc123")]);
-		let client = ArtifactsClient::new(Bucket::temp(), ledger.clone());
+		let client = ArtifactsClient::new(BlobStore::temp(), ledger.clone());
 		client.current_ledger().await.unwrap().xpect_eq(None);
 		client.publish_ledger().await.unwrap();
 		let current = client.current_ledger().await.unwrap().unwrap();
@@ -262,13 +262,13 @@ mod tests {
 
 	#[beet_core::test]
 	async fn list_versions_sorted() {
-		let bucket = Bucket::temp();
+		let store = BlobStore::temp();
 		let client1 = ArtifactsClient::new(
-			bucket.clone(),
+			store.clone(),
 			test_ledger(vec![("app.zip", "v1", "h1")]),
 		);
 		let client2 = ArtifactsClient::new(
-			bucket.clone(),
+			store.clone(),
 			test_ledger(vec![("app.zip", "v2", "h2")]),
 		);
 		client1.publish_ledger().await.unwrap();
@@ -283,7 +283,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_and_rollforward() {
 		let mut client =
-			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
+			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
 		let ledger1 = test_ledger(vec![("app.zip", "v1", "h1")]);
 		let ledger2 = test_ledger(vec![("app.zip", "v2", "h2")]);
 		let ledger3 = test_ledger(vec![("app.zip", "v3", "h3")]);
@@ -306,7 +306,7 @@ mod tests {
 	#[beet_core::test]
 	async fn rollback_too_far_fails() {
 		let mut client =
-			ArtifactsClient::new(Bucket::temp(), ArtifactLedger::default_test());
+			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
 		let ledger = test_ledger(vec![("app.zip", "v1", "h1")]);
 		client.ledger = ledger.clone();
 		client.publish_ledger().await.unwrap();

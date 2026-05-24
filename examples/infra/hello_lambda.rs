@@ -39,7 +39,7 @@ fn setup(mut commands: Commands) -> Result {
 			commands.spawn(infra_scene()?);
 		}else{
 			commands.spawn((
-				Bucket::new(assets_bucket()),
+				BlobStore::new(assets_store()),
 				router::router_scene()?
 			));
 		}
@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) -> Result {
 #[cfg(feature = "deploy")]
 fn infra_scene() -> Result<impl Bundle> {
 	let block = LambdaBlock::default();
-	(stack(), stack_cli(), assets_s3_fs_bucket(), children![
+	(stack(), stack_cli(), assets_s3_fs_store(), children![
 		route(
 			"watch",
 			(exchange_sequence(), children![
@@ -91,22 +91,22 @@ fn assets_bucket_block() -> S3BucketBlock {
 }
 
 #[cfg(feature = "deploy")]
-fn assets_s3_fs_bucket() -> S3FsBucket {
+fn assets_s3_fs_store() -> S3FsStore {
 	let stk = stack();
-	S3FsBucket::new(
-		FsBucket::new(WsPathBuf::new("examples/assets")),
+	S3FsStore::new(
+		FsStore::new(WsPathBuf::new("examples/assets")),
 		assets_bucket_block().provider(&stk),
 	)
 }
 
 #[allow(unused)]
-fn assets_bucket() -> impl BucketProvider {
+fn assets_store() -> impl BlobStoreProvider {
 	cfg_if! {
 		if #[cfg(all(feature = "aws_sdk", feature = "bindings_aws_common"))]{
 			let stk = stack();
 			assets_bucket_block().provider(&stk)
 		}else{
-			FsBucket::new(WsPathBuf::new("examples/assets"))
+			FsStore::new(WsPathBuf::new("examples/assets"))
 		}
 	}
 }

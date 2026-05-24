@@ -1,4 +1,4 @@
-//! Mini coding agent that creates HTML files in a local bucket.
+//! Mini coding agent that creates HTML files in a local store.
 //!
 //! Run with:
 //! ```sh
@@ -20,13 +20,13 @@ async fn main() {
 }
 
 fn setup(mut commands: Commands) {
-	let bucket = FsBucket::new(
+	let store = FsStore::new(
 		AbsPathBuf::new_workspace_rel(".beet/coding_agent").unwrap(),
 	);
 
 	commands
 		.spawn((
-			bucket,
+			store,
 			RepeatWhileFunctionCallOutput,
 			children![(
 				Thread::default(),
@@ -52,13 +52,13 @@ fn setup(mut commands: Commands) {
 }
 
 const PROMPT: &str = r#"
-You are a coding agent with access to a file bucket.
+You are a coding agent with access to a file store.
 Your available tools are: list-blobs, read-blob, write-blob, edit-text, remove-blob.
 
 We are testing that your tool calls work correctly.
 Please perform the following steps in order:
 
-1. Use list-blobs (path: "") to see what's in the bucket
+1. Use list-blobs (path: "") to see what's in the store
 2. Use write-blob to create a file called "hello.txt" with the content "Hello, Beet!"
    (pass the text as UTF-8 bytes)
 3. Use read-blob to verify the file was written correctly

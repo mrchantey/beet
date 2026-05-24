@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Parameters for writing a blob to a bucket.
+/// Parameters for writing a blob to a store.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct WriteBlobParams {
 	/// Path to write the blob to.
@@ -10,17 +10,17 @@ pub struct WriteBlobParams {
 	pub bytes: Vec<u8>,
 }
 
-/// Completely replace a blob in the nearest ancestor [`Bucket`].
+/// Completely replace a blob in the nearest ancestor [`BlobStore`].
 #[action]
 #[derive(Component, Reflect)]
 pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
-	let bucket = cx
+	let store = cx
 		.caller
-		.with_state::<AncestorQuery<&Bucket>, _>(|entity, query| {
+		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
 		.await??;
-	bucket.insert(&cx.input.path, cx.input.bytes).await
+	store.insert(&cx.input.path, cx.input.bytes).await
 }
 
 
@@ -31,21 +31,21 @@ mod test {
 
 	#[beet_core::test]
 	async fn writes_and_reads_back() {
-		let bucket = Bucket::temp();
+		let store = BlobStore::temp();
 		let path = RelPath::from("file.bin");
 		let data: Vec<u8> = vec![1, 2, 3, 4, 5];
-		bucket.insert(&path, data.clone()).await.unwrap();
-		let got = bucket.get(&path).await.unwrap();
+		store.insert(&path, data.clone()).await.unwrap();
+		let got = store.get(&path).await.unwrap();
 		got.to_vec().xpect_eq(data);
 	}
 
 	#[beet_core::test]
 	async fn overwrites_existing() {
-		let bucket = Bucket::temp();
+		let store = BlobStore::temp();
 		let path = RelPath::from("file.txt");
-		bucket.insert(&path, "first").await.unwrap();
-		bucket.insert(&path, "second").await.unwrap();
-		let got = bucket.get(&path).await.unwrap();
+		store.insert(&path, "first").await.unwrap();
+		store.insert(&path, "second").await.unwrap();
+		let got = store.get(&path).await.unwrap();
 		got.to_vec().xpect_eq(b"second".to_vec());
 	}
 }

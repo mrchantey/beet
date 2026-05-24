@@ -143,7 +143,7 @@ async fn deploy(stack: &Stack, assets_dir: &AbsPathBuf) -> Result {
 	let _response = AsyncPlugin::world()
 		.spawn((
 			stack.clone(),
-			assets_s3_fs_bucket(stack, assets_dir),
+			assets_s3_fs_store(stack, assets_dir),
 			assets_bucket_block(),
 			exchange_sequence(),
 			children![(block, cargo), TofuApplyAction, SyncS3BucketAction,],

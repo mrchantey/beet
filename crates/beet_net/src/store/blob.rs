@@ -2,9 +2,9 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// A handle to a single object in a bucket, identified by its [`RelPath`].
+/// A handle to a single object in a store, identified by its [`RelPath`].
 ///
-/// Unlike [`Bucket`] methods which require passing a path for every operation,
+/// Unlike [`BlobStore`] methods which require passing a path for every operation,
 /// a [`Blob`] captures the path once and exposes the same per-object operations
 /// without repeating it. The underlying provider can change (S3, filesystem,
 /// memory, etc.) while the blob's path stays fixed.
@@ -15,8 +15,8 @@ use bytes::Bytes;
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # async fn run() -> Result<()> {
-/// let bucket = Bucket::temp();
-/// let blob = bucket.blob(RelPath::new("my-file.txt"));
+/// let store = BlobStore::temp();
+/// let blob = store.blob(RelPath::new("my-file.txt"));
 /// blob.insert("hello world").await?;
 /// let data = blob.get().await?;
 /// # Ok(())
@@ -24,16 +24,16 @@ use bytes::Bytes;
 /// ```
 #[derive(Debug, Clone, Component, Get, Deref)]
 pub struct Blob {
-	/// Path to the blob within the bucket.
+	/// Path to the blob within the store.
 	#[deref]
 	path: RelPath,
 	/// Provider that handles storage operations.
-	bucket: Bucket,
+	store: BlobStore,
 }
 
 impl Blob {
 	/// Create a new [`Blob`] from a provider and path.
-	pub fn new(bucket: Bucket, path: RelPath) -> Self { Self { path, bucket } }
+	pub fn new(store: BlobStore, path: RelPath) -> Self { Self { path, store } }
 
 	/// Insert (or overwrite) the blob's content.
 	///
@@ -43,13 +43,13 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(&self, body: impl Into<Bytes>) -> Result {
-		self.bucket.insert(&self.path, body.into()).await
+		self.store.insert(&self.path, body.into()).await
 	}
 
 	/// Insert the blob's content, failing if it already exists.
@@ -69,14 +69,14 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("hello").await?;
 	/// let data = blob.get().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn get(&self) -> Result<Bytes> {
-		self.bucket.get(&self.path).await
+		self.store.get(&self.path).await
 	}
 
 	/// Retrieve the blob's content as [`MediaBytes`], inferring the
@@ -87,7 +87,7 @@ impl Blob {
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
 
-	/// Check whether the blob exists in the bucket.
+	/// Check whether the blob exists in the store.
 	///
 	/// # Example
 	///
@@ -95,16 +95,16 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// let exists = blob.exists().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn exists(&self) -> Result<bool> {
-		self.bucket.exists(&self.path).await
+		self.store.exists(&self.path).await
 	}
 
-	/// Remove the blob from the bucket.
+	/// Remove the blob from the store.
 	///
 	/// # Example
 	///
@@ -112,14 +112,14 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("temp").await?;
 	/// blob.remove().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn remove(&self) -> Result {
-		self.bucket.remove(&self.path).await
+		self.store.remove(&self.path).await
 	}
 
 	/// Get the public URL of the blob, if the provider supports it.
@@ -130,7 +130,7 @@ impl Blob {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// if let Some(url) = blob.public_url().await? {
 	///     println!("Public URL: {url}");
 	/// }
@@ -138,7 +138,7 @@ impl Blob {
 	/// # }
 	/// ```
 	pub async fn public_url(&self) -> Result<Option<String>> {
-		self.bucket.public_url(&self.path).await
+		self.store.public_url(&self.path).await
 	}
 }
 
@@ -155,28 +155,28 @@ impl Blob {
 /// ```no_run
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
-/// let typed = FsBucket::new(
+/// let typed = FsStore::new(
 ///     AbsPathBuf::new_workspace_rel("my_dir").unwrap()
 /// ).blob(RelPath::new("file.txt"));
-/// // `typed` is a `TypedBlob<FsBucket>` — reflectable and serializable.
+/// // `typed` is a `TypedBlob<FsStore>` — reflectable and serializable.
 /// ```
 #[derive(Clone, Component, Reflect, Get)]
 #[reflect(Component)]
 #[component(on_add = on_add_typed_blob::<B>)]
 pub struct TypedBlob<B>
 where
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+	B: 'static + Send + Sync + Clone + Reflect + BlobStoreProvider,
 {
-	/// Path to the blob within the bucket.
+	/// Path to the blob within the store.
 	path: RelPath,
-	/// Typed bucket that owns this blob.
+	/// Typed store that owns this blob.
 	#[get(skip)]
-	bucket: B,
+	store: B,
 }
 
 fn on_add_typed_blob<B>(mut world: DeferredWorld, cx: HookContext)
 where
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+	B: 'static + Send + Sync + Clone + Reflect + BlobStoreProvider,
 {
 	let blob = world
 		.entity(cx.entity)
@@ -189,21 +189,21 @@ where
 
 impl<B> TypedBlob<B>
 where
-	B: 'static + Send + Sync + Clone + Reflect + BucketProvider,
+	B: 'static + Send + Sync + Clone + Reflect + BlobStoreProvider,
 {
-	/// Create a new [`TypedBlob`] from a [`TypedBucket`] and path.
-	pub fn new(bucket: B, path: RelPath) -> Self { Self { path, bucket } }
+	/// Create a new [`TypedBlob`] from a typed store and path.
+	pub fn new(store: B, path: RelPath) -> Self { Self { path, store } }
 
 	/// Convert to an erased [`Blob`].
 	pub fn to_blob(&self) -> Blob {
-		Blob::new(Bucket::new(self.bucket.clone()), self.path.clone())
+		Blob::new(BlobStore::new(self.store.clone()), self.path.clone())
 	}
 
-	/// Get the underlying [`TypedBucket`].
-	pub fn bucket(&self) -> &B { &self.bucket }
+	/// Get the underlying typed store.
+	pub fn store(&self) -> &B { &self.store }
 
-	/// Get the underlying [`Bucket`] (type-erased).
-	pub fn erased_bucket(&self) -> Bucket { Bucket::new(self.bucket.clone()) }
+	/// Get the underlying [`BlobStore`] (type-erased).
+	pub fn erased_store(&self) -> BlobStore { BlobStore::new(self.store.clone()) }
 
 	/// Insert (or overwrite) the blob's content.
 	///
@@ -213,13 +213,13 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(&self, body: impl Into<Bytes>) -> Result {
-		self.bucket.insert(&self.path, body.into()).await
+		self.store.insert(&self.path, body.into()).await
 	}
 
 	/// Insert the blob's content, failing if it already exists.
@@ -239,14 +239,14 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("hello").await?;
 	/// let data = blob.get().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn get(&self) -> Result<Bytes> {
-		self.bucket.get(&self.path).await
+		self.store.get(&self.path).await
 	}
 
 	/// Retrieve the blob's content as [`MediaBytes`], inferring the
@@ -257,7 +257,7 @@ where
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
 
-	/// Check whether the blob exists in the bucket.
+	/// Check whether the blob exists in the store.
 	///
 	/// # Example
 	///
@@ -265,16 +265,16 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// let exists = blob.exists().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn exists(&self) -> Result<bool> {
-		self.bucket.exists(&self.path).await
+		self.store.exists(&self.path).await
 	}
 
-	/// Remove the blob from the bucket.
+	/// Remove the blob from the store.
 	///
 	/// # Example
 	///
@@ -282,14 +282,14 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// blob.insert("temp").await?;
 	/// blob.remove().await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn remove(&self) -> Result {
-		self.bucket.remove(&self.path).await
+		self.store.remove(&self.path).await
 	}
 
 	/// Get the public URL of the blob, if the provider supports it.
@@ -300,7 +300,7 @@ where
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
-	/// let blob = Bucket::temp().blob(RelPath::new("doc.txt"));
+	/// let blob = BlobStore::temp().blob(RelPath::new("doc.txt"));
 	/// if let Some(url) = blob.public_url().await? {
 	///     println!("Public URL: {url}");
 	/// }
@@ -308,7 +308,7 @@ where
 	/// # }
 	/// ```
 	pub async fn public_url(&self) -> Result<Option<String>> {
-		self.bucket.public_url(&self.path).await
+		self.store.public_url(&self.path).await
 	}
 }
 
@@ -319,13 +319,13 @@ where
 		+ Sync
 		+ Clone
 		+ Reflect
-		+ BucketProvider
+		+ BlobStoreProvider
 		+ std::fmt::Debug,
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("TypedBlob")
 			.field("path", &self.path)
-			.field("bucket", &self.bucket)
+			.field("store", &self.store)
 			.finish()
 	}
 }
@@ -337,32 +337,32 @@ mod test {
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
-	fn blob_from_bucket() {
-		let bucket = Bucket::temp();
-		let blob = bucket.blob(RelPath::new("test.txt"));
+	fn blob_from_store() {
+		let store = BlobStore::temp();
+		let blob = store.blob(RelPath::new("test.txt"));
 		blob.path().to_string().xpect_eq("test.txt");
 	}
 
 	#[beet_core::test]
 	fn clone_preserves_path() {
-		let blob = Bucket::temp().blob(RelPath::new("a/b/c.txt"));
+		let blob = BlobStore::temp().blob(RelPath::new("a/b/c.txt"));
 		let cloned = blob.clone();
 		cloned.path().xpect_eq(blob.path().clone());
 	}
 
 	#[beet_core::test]
 	fn blob_from_provider_trait() {
-		let provider = InMemoryBucket::new();
+		let provider = InMemoryStore::new();
 		let blob = provider.erased_blob(RelPath::new("key.dat"));
 		blob.path().to_string().xpect_eq("key.dat");
 	}
 
 	#[beet_core::test]
 	fn typed_blob_to_blob() {
-		let bucket = FsBucket::new(
+		let store = FsStore::new(
 			AbsPathBuf::new_workspace_rel("target/tests/typed_blob").unwrap(),
 		);
-		let typed = bucket.blob(RelPath::new("test.txt"));
+		let typed = store.blob(RelPath::new("test.txt"));
 		typed.path().to_string().xpect_eq("test.txt");
 		let erased = typed.to_blob();
 		erased.path().to_string().xpect_eq("test.txt");
@@ -371,7 +371,7 @@ mod test {
 	#[beet_core::test]
 	fn insert_get_remove() {
 		async_ext::block_on(async {
-			let blob = Bucket::temp().blob(RelPath::new("hello.txt"));
+			let blob = BlobStore::temp().blob(RelPath::new("hello.txt"));
 			blob.exists().await.unwrap().xpect_false();
 			blob.insert("world").await.unwrap();
 			blob.exists().await.unwrap().xpect_true();
@@ -387,7 +387,7 @@ mod test {
 	#[beet_core::test]
 	fn get_media_infers_type() {
 		async_ext::block_on(async {
-			let blob = Bucket::temp().blob(RelPath::new("data.json"));
+			let blob = BlobStore::temp().blob(RelPath::new("data.json"));
 			blob.insert(r#"{"key":"value"}"#).await.unwrap();
 			let media = blob.get_media().await.unwrap();
 			media.media_type().xpect_eq(MediaType::Json);
@@ -398,7 +398,7 @@ mod test {
 	#[beet_core::test]
 	fn try_insert_fails_if_exists() {
 		async_ext::block_on(async {
-			let blob = Bucket::temp().blob(RelPath::new("once.txt"));
+			let blob = BlobStore::temp().blob(RelPath::new("once.txt"));
 			blob.insert("first").await.unwrap();
 			blob.try_insert("second").await.xpect_err();
 		});

@@ -55,7 +55,7 @@ struct GreetRequest {
 
 fn setup(mut commands: Commands) {
 	let blob =
-		FsBucket::new(WsPathBuf::default()).blob(RelPath::new(SCENE_FILE));
+		FsStore::new(WsPathBuf::default()).blob(RelPath::new(SCENE_FILE));
 	let new_scene = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {

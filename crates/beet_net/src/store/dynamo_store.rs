@@ -13,9 +13,9 @@ use bytes::Bytes;
 /// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = Bucket::on_add::<Self>)]
-pub struct DynamoBucket {
-	/// The DynamoDB table name (maps to "bucket name" in the storage abstraction).
+#[component(on_add = BlobStore::on_add::<Self>)]
+pub struct DynamoStore {
+	/// The DynamoDB table name (maps to "store name" in the storage abstraction).
 	table_name: SmolStr,
 	/// The AWS region for this table.
 	region: SmolStr,
@@ -23,7 +23,7 @@ pub struct DynamoBucket {
 	subdir: Option<RelPath>,
 }
 
-impl DynamoBucket {
+impl DynamoStore {
 	/// Creates a new provider for the given table name and region.
 	pub fn new(
 		table_name: impl Into<SmolStr>,
@@ -133,17 +133,17 @@ impl DynamoBucket {
 		bevybail!("Table did not delete in time");
 	}
 
-	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	/// Create a [`TypedBlob`] handle for a single object in this store.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
 
-impl BucketProvider for DynamoBucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for DynamoStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(DynamoBucket {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(DynamoStore {
 			table_name: self.table_name.clone(),
 			region: self.region.clone(),
 			subdir: Some(match &self.subdir {
@@ -155,7 +155,7 @@ impl BucketProvider for DynamoBucket {
 
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			match this.table_status().await {
@@ -166,7 +166,7 @@ impl BucketProvider for DynamoBucket {
 		})
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -206,7 +206,7 @@ impl BucketProvider for DynamoBucket {
 		})
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -345,7 +345,7 @@ impl BucketProvider for DynamoBucket {
 
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for DynamoBucket {
+impl<T: TableStoreRow> TableProvider<T> for DynamoStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
@@ -394,15 +394,15 @@ mod test {
 
 	#[beet_core::test]
 	#[ignore = "takes ages"]
-	async fn bucket() {
-		let provider = DynamoBucket::new("beet-test-table", "us-west-2");
-		bucket_test::run(provider).await;
+	async fn store() {
+		let provider = DynamoStore::new("beet-test-table", "us-west-2");
+		store_test::run(provider).await;
 	}
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	#[ignore = "takes ages"]
 	async fn table() {
-		let provider = DynamoBucket::new("beet-test-table", "us-west-2");
+		let provider = DynamoStore::new("beet-test-table", "us-west-2");
 		table_test::run(provider).await;
 	}
 }

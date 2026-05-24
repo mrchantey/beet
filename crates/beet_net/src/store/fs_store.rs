@@ -3,24 +3,24 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 
 
-/// Filesystem-backed bucket for local storage.
+/// Filesystem-backed store for local storage.
 ///
 /// Stores objects as files on the local filesystem, with the configured
-/// path representing the full bucket directory.
+/// path representing the full store directory.
 ///
 /// ## Default
-/// The default bucket is relative to the workspace root.
+/// The default store is relative to the workspace root.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = Bucket::on_add::<Self>)]
-pub struct FsBucket {
-	/// The full path to the bucket directory.
+#[component(on_add = BlobStore::on_add::<Self>)]
+pub struct FsStore {
+	/// The full path to the store directory.
 	path: AbsPathBuf,
 	/// Optional subdirectory from which all paths are resolved.
 	subdir: Option<RelPath>,
 }
 
-impl Default for FsBucket {
+impl Default for FsStore {
 	fn default() -> Self {
 		Self {
 			path: WsPathBuf::default().into(),
@@ -29,8 +29,8 @@ impl Default for FsBucket {
 	}
 }
 
-impl FsBucket {
-	/// Create a new filesystem bucket with the given bucket path.
+impl FsStore {
+	/// Create a new filesystem store with the given store path.
 	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
 		Self {
 			path: path.into(),
@@ -53,25 +53,25 @@ impl FsBucket {
 	fn resolve_path(&self, route: &RelPath) -> AbsPathBuf {
 		self.effective_root().join(route.to_string())
 	}
-	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	/// Create a [`TypedBlob`] handle for a single object in this store.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for FsBucket {
+impl<T: TableStoreRow> TableProvider<T> for FsStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
 
-impl BucketProvider for FsBucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for FsStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(FsBucket {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(FsStore {
 			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -82,12 +82,12 @@ impl BucketProvider for FsBucket {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let root = self.effective_root();
 		Box::pin(async move { fs_ext::exists_async(root).await?.xok() })
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let root = self.effective_root();
 		Box::pin(async move {
 			fs_ext::create_dir_all_async(root).await?;
@@ -95,7 +95,7 @@ impl BucketProvider for FsBucket {
 		})
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let root = self.effective_root();
 		Box::pin(async move {
 			fs_ext::remove_async(root).await?;
@@ -167,9 +167,9 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let dir = "target/tests/beet_net/test-bucket-001";
+		let dir = "target/tests/beet_net/test-store-001";
 		let provider =
-			FsBucket::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
-		bucket_test::run(provider).await;
+			FsStore::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
+		store_test::run(provider).await;
 	}
 }

@@ -10,8 +10,8 @@ mod types;
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
-mod bucket_actions;
-mod buckets;
+mod store;
+mod store_actions;
 /// Re-export media-type-driven serialization at crate level.
 mod net_plugin;
 mod server;
@@ -28,7 +28,7 @@ pub mod webdriver;
 pub mod prelude {
 	/// JavaScript analytics snippet for client-side tracking.
 	#[cfg(feature = "json")]
-	pub const ANALYTICS_JS: &str = include_str!("buckets/analytics.js");
+	pub const ANALYTICS_JS: &str = include_str!("store/analytics.js");
 	/// Default port for a beet server: `8337` (BEET).
 	pub const DEFAULT_SERVER_PORT: u16 = 8337;
 	/// Default port for SSH connections: `8322`.
@@ -43,8 +43,8 @@ pub mod prelude {
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
 	pub use crate::actions::*;
-	pub use crate::bucket_actions::*;
-	pub use crate::buckets::*;
+	pub use crate::store::*;
+	pub use crate::store_actions::*;
 	pub use crate::client::*;
 	pub use crate::net_plugin::*;
 	pub use crate::server::*;

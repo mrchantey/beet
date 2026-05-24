@@ -44,17 +44,17 @@ fn setup(mut commands: Commands) {
 				})
 				.await??;
 
-			let bucket = entity
+			let store = entity
 				.with_state::<StackQuery, _>(|entity, query| {
-					query.bucket(entity).cloned()
+					query.store(entity).cloned()
 				})
 				.await??;
 
 			// Reset state in case of backend change
 			project.force_destroy().await;
-			if bucket.bucket_exists().await.unwrap_or(false) {
-				println!("🧹 Cleaning up stale bucket..");
-				bucket.bucket_remove().await.ok();
+			if store.store_exists().await.unwrap_or(false) {
+				println!("🧹 Cleaning up stale store..");
+				store.store_remove().await.ok();
 			}
 
 			println!("🔨 Validating..");
@@ -69,7 +69,7 @@ fn setup(mut commands: Commands) {
 				"📦 State file exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 Bucket Exists: {}", bucket.bucket_exists().await?);
+			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
 			println!("🔨 Applying..");
 			project.apply().await?;
@@ -78,20 +78,20 @@ fn setup(mut commands: Commands) {
 				"📦 State File exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 Bucket Exists: {}", bucket.bucket_exists().await?);
+			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
 			let path = RelPath::new("foo.md");
 			let content = "bar";
 
 			println!(
-				"📄 Bucket File Exists: {}",
-				bucket.get(&path).await.is_ok()
+				"📄 BlobStore File Exists: {}",
+				store.get(&path).await.is_ok()
 			);
 
 			println!("🔨 Inserting File..");
-			bucket.insert(&path, content).await?;
-			let bytes = bucket.get(&path).await?;
-			println!("📄 Bucket File Matches: {}", bytes == content.as_bytes());
+			store.insert(&path, content).await?;
+			let bytes = store.get(&path).await?;
+			println!("📄 BlobStore File Matches: {}", bytes == content.as_bytes());
 
 			println!("🔨 Destroying..");
 			project.destroy().await?;
@@ -100,7 +100,7 @@ fn setup(mut commands: Commands) {
 				"📦 State file exists: {}",
 				project.state_file().exists().await?
 			);
-			println!("🪣 Bucket Exists: {}", bucket.bucket_exists().await?);
+			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
 			entity.world().write_message(AppExit::Success);
 			Ok(())

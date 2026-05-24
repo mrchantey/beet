@@ -11,12 +11,12 @@ use beet_net::prelude::*;
 /// Cache lookups happen first; on a miss the bytes are downloaded over
 /// HTTP and written back to the cache before returning.
 pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
-	let bucket = cache_bucket();
+	let store = cache_store();
 	let key = cache_key(url);
 
-	if bucket.exists(&key).await.unwrap_or(false) {
+	if store.exists(&key).await.unwrap_or(false) {
 		log::info!("fetch_bytes: cache hit ({url})");
-		return bucket.get(&key).await.map(|b| b.to_vec());
+		return store.get(&key).await.map(|b| b.to_vec());
 	}
 
 	log::info!("fetch_bytes: cache miss, downloading ({url})");
@@ -28,20 +28,20 @@ pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
 		.bytes_vec()
 		.await?;
 
-	if let Err(err) = bucket.insert(&key, bytes.clone()).await {
+	if let Err(err) = store.insert(&key, bytes.clone()).await {
 		log::warn!("fetch_bytes: cache write failed: {err}");
 	}
 	Ok(bytes)
 }
 
-const BUCKET_NAME: &str = "beet_ml_cache";
+const STORE_NAME: &str = "beet_ml_cache";
 
-fn cache_bucket() -> Bucket {
+fn cache_store() -> BlobStore {
 	cfg_if! {
 		if #[cfg(not(target_arch = "wasm32"))] {
-			Bucket::new(FsBucket::new(AbsPathBuf::new_workspace_rel(format!("target/{BUCKET_NAME}")).unwrap()))
+			BlobStore::new(FsStore::new(AbsPathBuf::new_workspace_rel(format!("target/{STORE_NAME}")).unwrap()))
 		} else if #[cfg(target_arch = "wasm32")] {
-			Bucket::new(IndexedDbBucket::new(BUCKET_NAME))
+			BlobStore::new(IndexedDbStore::new(STORE_NAME))
 		}
 	}
 }

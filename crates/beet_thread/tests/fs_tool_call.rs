@@ -26,17 +26,17 @@ Do NOT delete any files.
 fn main() {
 	env_ext::load_dotenv();
 	let dir = TempDir::new_ws().unwrap();
-	let bucket_path = dir.path().clone();
-	let verify_path = bucket_path.join("result.txt");
+	let store_path = dir.path().clone();
+	let verify_path = store_path.join("result.txt");
 
 	App::new()
 		.add_plugins((MinimalPlugins, ThreadPlugin::default()))
 		.add_systems(Startup, move |mut commands: Commands| {
-			let bucket = FsBucket::new(bucket_path.clone());
+			let store = FsStore::new(store_path.clone());
 
 			commands
 				.spawn((
-					bucket,
+					store,
 					RepeatWhileFunctionCallOutput,
 					children![(
 						Thread::default(),

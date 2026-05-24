@@ -127,9 +127,9 @@ async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
 	}
 	// tear down the artifacts bucket (not managed by terraform)
 	let client = artifacts_client(&cx.caller).await?;
-	if client.bucket().bucket_exists().await.unwrap_or(false) {
+	if client.store().store_exists().await.unwrap_or(false) {
 		info!("removing artifacts bucket");
-		client.bucket().bucket_remove().await?;
+		client.store().store_remove().await?;
 	}
 	"Destroy complete".to_string().xok()
 }

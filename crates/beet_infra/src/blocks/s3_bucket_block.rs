@@ -49,28 +49,28 @@ impl S3BucketBlock {
 	pub fn output_label(&self) -> String { format!("{}_bucket", self.label) }
 
 	#[cfg(feature = "aws_sdk")]
-	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Bucket {
+	pub fn provider(&self, stack: &Stack) -> beet_net::prelude::S3Store {
 		let region = self.region.as_ref().unwrap_or(stack.aws_region());
 		let bucket_name = stack.resource_ident(self.label.clone());
-		let mut bucket = beet_net::prelude::S3Bucket::new(
+		let mut store = beet_net::prelude::S3Store::new(
 			bucket_name.primary_identifier().clone(),
 			region.clone(),
 		);
 		if self.deploy_versioned {
-			bucket =
-				bucket.with_subdir(RelPath::new(stack.deploy_id().to_string()));
+			store =
+				store.with_subdir(RelPath::new(stack.deploy_id().to_string()));
 		}
-		bucket
+		store
 	}
 }
 
 /// Inserts an [`ErasedBlock`] and, when the `aws_sdk` feature is enabled,
-/// also inserts an [`S3Bucket`] (which in turn inserts a [`Bucket`]).
+/// also inserts an [`S3Store`] (which in turn inserts a [`BlobStore`]).
 fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
 	// always insert ErasedBlock
 	ErasedBlock::on_add::<S3BucketBlock>(world.reborrow(), cx);
 
-	// when aws_sdk is available, insert S3Bucket
+	// when aws_sdk is available, insert S3Store
 	#[cfg(feature = "aws_sdk")]
 	{
 		world.commands().entity(cx.entity).queue(
@@ -80,8 +80,8 @@ fn on_add_s3_bucket_block(mut world: DeferredWorld, cx: HookContext) {
 						query.get(entity).cloned()
 					}) {
 					let block = entity.get_or_else::<S3BucketBlock>()?;
-					let s3_bucket = block.provider(&stack);
-					entity.insert(s3_bucket);
+					let s3_store = block.provider(&stack);
+					entity.insert(s3_store);
 				}
 				Ok(())
 			},

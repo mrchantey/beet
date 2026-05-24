@@ -4,24 +4,24 @@ use beet_core::prelude::*;
 use bytes::Bytes;
 use js_sys::wasm_bindgen::JsCast;
 
-/// A bucket provider backed by browser localStorage.
+/// A store provider backed by browser localStorage.
 ///
-/// Uses `bucket:<bucket_name>:<path>` as the localStorage key prefix.
+/// Uses `store:<store_name>:<path>` as the localStorage key prefix.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = Bucket::on_add::<Self>)]
-pub struct LocalStorageBucket {
-	/// The bucket name used as part of the localStorage key prefix.
-	bucket_name: SmolStr,
+#[component(on_add = BlobStore::on_add::<Self>)]
+pub struct LocalStorageStore {
+	/// The store name used as part of the localStorage key prefix.
+	store_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<RelPath>,
 }
 
-impl LocalStorageBucket {
-	/// Creates a new localStorage-backed bucket provider for the given bucket.
-	pub fn new(bucket_name: impl Into<SmolStr>) -> Self {
+impl LocalStorageStore {
+	/// Creates a new localStorage-backed store provider for the given store.
+	pub fn new(store_name: impl Into<SmolStr>) -> Self {
 		Self {
-			bucket_name: bucket_name.into(),
+			store_name: store_name.into(),
 			subdir: None,
 		}
 	}
@@ -32,17 +32,17 @@ impl LocalStorageBucket {
 		self
 	}
 
-	fn bucket_prefix(&self) -> String {
-		format!("bucket:{}:", self.bucket_name)
+	fn store_prefix(&self) -> String {
+		format!("store:{}:", self.store_name)
 	}
 
-	/// Compose the localStorage key for the bucket and path.
+	/// Compose the localStorage key for the store and path.
 	fn storage_key(&self, path: &RelPath) -> String {
 		let effective = match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
 		};
-		self.bucket_prefix().xtend(&effective)
+		self.store_prefix().xtend(&effective)
 	}
 
 	fn local_storage() -> web_sys::Storage {
@@ -54,25 +54,25 @@ impl LocalStorageBucket {
 			.expect("Failed to access localStorage")
 	}
 
-	/// Create a [`TypedBlob`] handle for a single object in this bucket.
+	/// Create a [`TypedBlob`] handle for a single object in this store.
 	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for LocalStorageBucket {
+impl<T: TableStoreRow> TableProvider<T> for LocalStorageStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl BucketProvider for LocalStorageBucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for LocalStorageStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(LocalStorageBucket {
-			bucket_name: self.bucket_name.clone(),
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(LocalStorageStore {
+			store_name: self.store_name.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
 				None => path,
@@ -82,8 +82,8 @@ impl BucketProvider for LocalStorageBucket {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
-		let prefix = self.bucket_prefix();
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
+		let prefix = self.store_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			for i in 0..storage.length().unwrap_or(0) {
@@ -97,13 +97,13 @@ impl BucketProvider for LocalStorageBucket {
 		})
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		// No-op for localStorage
 		Box::pin(async { ().xok() })
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
-		let prefix = self.bucket_prefix();
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
+		let prefix = self.store_prefix();
 		Box::pin(async move {
 			let storage = Self::local_storage();
 			let keys: Vec<String> = (0..storage.length().unwrap_or(0))
@@ -136,7 +136,7 @@ impl BucketProvider for LocalStorageBucket {
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
-		let prefix = self.bucket_prefix();
+		let prefix = self.store_prefix();
 		let subdir_prefix = self.subdir.as_ref().map(|s| format!("{}/", s));
 		Box::pin(async move {
 			let storage = Self::local_storage();
@@ -200,7 +200,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = LocalStorageBucket::new("test-bucket");
-		bucket_test::run(provider).await;
+		let provider = LocalStorageStore::new("test-store");
+		store_test::run(provider).await;
 	}
 }

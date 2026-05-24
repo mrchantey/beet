@@ -5,30 +5,30 @@ use bytes::Bytes;
 use std::sync::Arc;
 
 
-impl Bucket {
-	/// Create a pre-created [`InMemoryBucket`] bucket for testing.
-	pub fn new_test() -> Self { Self::new(InMemoryBucket::new()) }
+impl BlobStore {
+	/// Create a pre-created [`InMemoryStore`] store for testing.
+	pub fn new_test() -> Self { Self::new(InMemoryStore::new()) }
 }
 
 
-/// A bucket provider using an in-memory hashmap.
+/// A store provider using an in-memory hashmap.
 ///
-/// Inner state is `None` when the bucket has not been created,
+/// Inner state is `None` when the store has not been created,
 /// and `Some(map)` when it exists. An optional `subdir` scopes
 /// all operations to a key prefix.
 #[derive(Debug, Clone)]
-pub struct InMemoryBucket {
+pub struct InMemoryStore {
 	/// Shared storage state.
 	inner: Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>,
 	/// Optional subdirectory prefix for all keys.
 	subdir: Option<RelPath>,
 }
 
-impl Default for InMemoryBucket {
+impl Default for InMemoryStore {
 	fn default() -> Self { Self::new() }
 }
 
-impl InMemoryBucket {
+impl InMemoryStore {
 	/// Creates a new already-created (empty) in-memory provider.
 	pub fn new() -> Self {
 		Self {
@@ -54,17 +54,17 @@ impl InMemoryBucket {
 }
 
 #[cfg(feature = "json")]
-impl<T: TableStoreRow> TableProvider<T> for InMemoryBucket {
+impl<T: TableStoreRow> TableProvider<T> for InMemoryStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
 	}
 }
 
-impl BucketProvider for InMemoryBucket {
-	fn box_clone(&self) -> Box<dyn BucketProvider> { Box::new(self.clone()) }
+impl BlobStoreProvider for InMemoryStore {
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BucketProvider> {
-		Box::new(InMemoryBucket {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+		Box::new(InMemoryStore {
 			inner: self.inner.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -75,29 +75,29 @@ impl BucketProvider for InMemoryBucket {
 
 	fn region(&self) -> Option<String> { None }
 
-	fn bucket_exists(&self) -> SendBoxedFuture<Result<bool>> {
+	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		Box::pin(async move { this.inner.read().await.is_some().xok() })
 	}
 
-	fn bucket_create(&self) -> SendBoxedFuture<Result> {
+	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
 			let mut guard = this.inner.write().await;
 			if guard.is_some() {
-				bevybail!("bucket already exists")
+				bevybail!("store already exists")
 			}
 			*guard = Some(HashMap::new());
 			Ok(())
 		})
 	}
 
-	fn bucket_remove(&self) -> SendBoxedFuture<Result> {
+	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
 			let mut guard = this.inner.write().await;
 			if guard.is_none() {
-				bevybail!("bucket does not exist")
+				bevybail!("store does not exist")
 			}
 			*guard = None;
 			Ok(())
@@ -111,7 +111,7 @@ impl BucketProvider for InMemoryBucket {
 			let mut guard = this.inner.write().await;
 			let map = guard
 				.as_mut()
-				.ok_or_else(|| bevyhow!("bucket not created"))?;
+				.ok_or_else(|| bevyhow!("store not created"))?;
 			map.insert(key, body);
 			Ok(())
 		})
@@ -124,7 +124,7 @@ impl BucketProvider for InMemoryBucket {
 			let guard = this.inner.read().await;
 			let map = guard
 				.as_ref()
-				.ok_or_else(|| bevyhow!("bucket not created"))?;
+				.ok_or_else(|| bevyhow!("store not created"))?;
 			map.contains_key(&key).xok()
 		})
 	}
@@ -135,7 +135,7 @@ impl BucketProvider for InMemoryBucket {
 			let guard = this.inner.read().await;
 			let map = guard
 				.as_ref()
-				.ok_or_else(|| bevyhow!("bucket not created"))?;
+				.ok_or_else(|| bevyhow!("store not created"))?;
 			match &this.subdir {
 				Some(sub) => {
 					// filter keys by prefix and strip it
@@ -160,7 +160,7 @@ impl BucketProvider for InMemoryBucket {
 			let guard = this.inner.read().await;
 			let map = guard
 				.as_ref()
-				.ok_or_else(|| bevyhow!("bucket not created"))?;
+				.ok_or_else(|| bevyhow!("store not created"))?;
 			map.get(&key)
 				.cloned()
 				.ok_or_else(|| bevyhow!("object not found: {key}"))
@@ -174,7 +174,7 @@ impl BucketProvider for InMemoryBucket {
 			let mut guard = this.inner.write().await;
 			let map = guard
 				.as_mut()
-				.ok_or_else(|| bevyhow!("bucket not created"))?;
+				.ok_or_else(|| bevyhow!("store not created"))?;
 			map.remove(&key)
 				.map(|_| ())
 				.ok_or_else(|| bevyhow!("object not found: {key}"))
@@ -195,7 +195,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn works() {
-		let provider = InMemoryBucket::new_empty();
-		bucket_test::run(provider).await;
+		let provider = InMemoryStore::new_empty();
+		store_test::run(provider).await;
 	}
 }

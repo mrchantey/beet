@@ -97,7 +97,10 @@
 		"rustfmt.toml",
 		"CHANGELOG.md",
 		"Cargo.lock",
-
+		"crates/beet_build",
+		"crates/beet_design",
+		"crates/beet_router_old",
+		"crates/beet_site",
 		// ".beet",
 		"**/.git",
 		".gitattributes",
