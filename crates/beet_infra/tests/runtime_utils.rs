@@ -11,6 +11,11 @@ pub const ASSETS_PATH: &str = "examples/infra/assets";
 pub const MARKER_V1: &str = "test-v1";
 pub const MARKER_V2: &str = "test-v2";
 
+/// Initialize the test logger, ignoring the error if already set.
+/// Multiple ignored tests can share a process (eg `--ignored`), so the
+/// global logger may already be initialized by a prior test.
+pub fn init_logger() { pretty_env_logger::try_init().ok(); }
+
 /// Guard that reverts source file changes on drop.
 pub struct SourceRevert {
 	pub path: AbsPathBuf,

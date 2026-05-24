@@ -17,7 +17,7 @@ const SOURCE_PATH: &str = "crates/beet_infra/examples/lightsail_test.rs";
 #[beet_core::test(timeout_ms = 900_000)]
 #[ignore = "deploys resources and takes ten minutes"]
 async fn lightsail_lifecycle() {
-	pretty_env_logger::init();
+	init_logger();
 
 	// resolve source paths and create isolated temp assets to prevent
 	// interference with concurrent tests
