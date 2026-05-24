@@ -45,7 +45,7 @@ impl MediaType {
 			}
 		}
 		// last resort fallback
-		if accept.is_empty() {
+		if accept.is_empty() || MediaType::any_wildcard(accept) {
 			cfg_if! {
 				if #[cfg(feature = "json")]{
 					let value = if options.pretty {

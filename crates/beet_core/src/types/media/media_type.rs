@@ -520,6 +520,11 @@ impl MediaType {
 		matches!(self, MediaType::Other(s) if s == "*/*" || s == "text/*")
 	}
 
+	/// Whether any of the given media types is a wildcard.
+	pub fn any_wildcard(types: &[MediaType]) -> bool {
+		types.iter().any(|t| t.is_wildcard())
+	}
+
 	/// Whether this is a text-based format that can be displayed as a string.
 	pub fn is_text(&self) -> bool {
 		matches!(

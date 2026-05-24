@@ -39,7 +39,6 @@ resolver = "2"
 
 exclude = [
 	"infra",
-	"crates/beet_build/tests/pipeline_test_crate",
 	"bevy"
 ]
 
@@ -64,13 +63,11 @@ members = [
 	"crates/beet_spatial",
 
 	## 💡 RSX
-	# "crates/beet_build",
 	# "crates/beet_design",
-	# "crates/beet_router",
 
 	## 💡 Beet
 	# "crates/beet_site",
-	# "crates/beet-cli",
+	"crates/beet-cli",
 ]
 
 [workspace.dependencies]
@@ -93,9 +90,7 @@ beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
 
-# beet_build = { path = "crates/beet_build", version = "0.0.9-dev.11" }
 # beet_design = { path = "crates/beet_design", version = "0.0.9-dev.11" }
-# beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
 
 #💡 local
 # bevy_ecs = {version = "0.18", default-features = false, features = ["backtrace"]}
@@ -289,6 +284,8 @@ style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
+# Build-time route code generation (route tree, server/client actions, typed links).
+codegen = ["router", "beet_router?/codegen"]
 syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 
 infra = ["dep:beet_infra"]
@@ -308,7 +305,6 @@ cuda = ["ml", "beet_ml/cuda"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
-# build = ["dep:beet_build"]
 # bevy_scene = ["beet_core/bevy_scene"]
 
 # animation = ["beet_spatial?/animation"]
@@ -329,7 +325,6 @@ beet_router = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 
 #💡 web
-# beet_build = { workspace = true, optional = true }
 # beet_design = { workspace = true, optional = true }
 
 #💡 flow
@@ -468,6 +463,11 @@ required-features = ["router", "serde", "scripting"]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
 required-features = ["router", "serde", "scripting", "bevy_scene"]
+
+[[example]]
+name = "file_based_routes"
+path = "examples/file_based_routes/main.rs"
+required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
 
 # 💡 Examples - Thread
 

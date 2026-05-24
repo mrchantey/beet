@@ -1,7 +1,4 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-#![feature(exit_status_error)]
-pub mod commands;
-pub mod prelude {
-	pub use crate::commands::*;
-}
+//! The `beet` CLI: build, serve, and run-wasm helpers for beet apps.
+//!
+//! The command surface lives in `main.rs`, built on the router's
+//! [`CliServer`](beet::prelude::CliServer).

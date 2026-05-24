@@ -17,3 +17,4 @@ let out = World::new().spawn(Add)
 
 assert_eq!(out, 3);
 ```
+

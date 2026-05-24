@@ -14,6 +14,7 @@ pub mod bindings;
 mod blocks;
 pub mod terra;
 mod types;
+mod wasm;
 
 #[cfg(feature = "bindings_generator")]
 pub mod bindings_generator;
@@ -27,4 +28,5 @@ pub mod prelude {
 	pub use crate::terra;
 	pub use crate::terra::tofu;
 	pub use crate::types::*;
+		pub use crate::wasm::*;
 }

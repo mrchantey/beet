@@ -1,4 +1,0 @@
-#[allow(unused, missing_docs)]
-pub mod routes {
-    use super::*;
-}

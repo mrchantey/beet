@@ -22,5 +22,7 @@ pub use router::*;
 pub use sidebar::*;
 mod route_tree;
 mod router_plugin;
+mod server_action_client;
 pub use route_tree::*;
 pub use router_plugin::*;
+pub use server_action_client::*;

@@ -1307,6 +1307,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet-cli"
+version = "0.0.9-dev.11"
+dependencies = [
+ "beet",
+ "beet_core",
+]
+
+[[package]]
 name = "beet_action"
 version = "0.0.9-dev.11"
 dependencies = [
@@ -1538,9 +1546,14 @@ dependencies = [
  "bevy_ratatui",
  "bitflags 2.11.1",
  "extend",
+ "heck 0.4.1",
+ "prettyplease",
+ "proc-macro2",
  "pulldown-cmark",
+ "quote",
  "ratatui",
  "serde",
+ "syn",
  "thiserror 2.0.18",
  "variadics_please",
  "webbrowser",
