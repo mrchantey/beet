@@ -20,6 +20,7 @@ async fn main() -> Result {
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_common.rs")
 				.with_resources(terra::Provider::AWS, [
+					"aws_cloudwatch_log_group",
 					"aws_iam_access_key",
 					"aws_iam_role",
 					"aws_iam_role_policy_attachment",
@@ -58,7 +59,6 @@ async fn main() -> Result {
 		.with_file(
 			BindingFile::new("crates/beet_infra/src/bindings/aws_fargate.rs")
 				.with_resources(terra::Provider::AWS, [
-					"aws_cloudwatch_log_group",
 					"aws_ecr_repository",
 					"aws_ecs_cluster",
 					"aws_ecs_service",
