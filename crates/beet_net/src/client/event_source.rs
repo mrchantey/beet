@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
+use bytes::Bytes;
 use eventsource_stream::Event;
 use eventsource_stream::EventStream;
 use eventsource_stream::Eventsource;
@@ -44,6 +45,40 @@ impl<T> SseBody<T> {
 			data,
 		}
 	}
+
+	/// Creates a `message` event with the given data.
+	pub fn message(data: T) -> Self { Self::new("message", data) }
+}
+
+#[cfg(feature = "json")]
+impl<T: serde::Serialize> SseBody<T> {
+	/// Serializes this event into an SSE wire chunk
+	/// `event: <event>\ndata: <json>\n\n`.
+	///
+	/// The inverse of the client-side
+	/// [`event_source_typed`](ResponseSseExt::event_source_typed).
+	pub fn to_chunk(&self) -> Result<Bytes> {
+		let data = serde_json::to_string(&self.data)?;
+		Bytes::from(format!("event: {}\ndata: {}\n\n", self.event, data)).xok()
+	}
+}
+
+/// Builds a `text/event-stream` [`Response`] from a stream of typed SSE events.
+///
+/// Each [`SseBody`] is serialized to an `event: <event>\ndata: <json>\n\n`
+/// chunk via [`SseBody::to_chunk`]. This is the server-side counterpart to the
+/// client's [`event_source_typed`](ResponseSseExt::event_source_typed): a route
+/// or handler returns it directly as a streaming response.
+#[cfg(feature = "json")]
+pub fn sse_response<S, T>(events: S) -> Response
+where
+	S: 'static + Send + Sync + Stream<Item = Result<SseBody<T>>>,
+	T: 'static + serde::Serialize,
+{
+	let bytes = events.map(|event| event.and_then(|body| body.to_chunk()));
+	Response::ok()
+		.with_content_type(MediaType::EventStream)
+		.with_body(Body::stream(bytes))
 }
 
 /// A stream of mapped SSE events.
@@ -176,6 +211,40 @@ pub impl Response {
 	}
 }
 
+
+#[cfg(test)]
+#[cfg(feature = "json")]
+mod sse_builder_test {
+	use super::*;
+
+	#[derive(serde::Serialize)]
+	struct Tick {
+		index: u32,
+	}
+
+	#[beet_core::test]
+	async fn formats_event_stream() {
+		let response = sse_response(futures::stream::iter(
+			(0..2).map(|index| Ok(SseBody::message(Tick { index }))),
+		));
+
+		response
+			.headers
+			.get::<header::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::EventStream);
+
+		response
+			.text()
+			.await
+			.unwrap()
+			.xpect_eq(
+				"event: message\ndata: {\"index\":0}\n\n\
+				 event: message\ndata: {\"index\":1}\n\n",
+			);
+	}
+}
 
 #[cfg(test)]
 #[cfg(all(
