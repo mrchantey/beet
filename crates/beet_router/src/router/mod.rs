@@ -1,5 +1,3 @@
-mod body_type;
-pub use body_type::*;
 mod cors;
 pub use cors::*;
 mod no_cache;

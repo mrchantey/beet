@@ -2,15 +2,13 @@
 //!
 //! Unlike the generic middleware and dispatch in [`router`](crate::router),
 //! these are opinionated, ready-made building blocks: package-info and
-//! analytics routes, static-asset buckets, the [`RenderMode`] gate, and a
+//! analytics routes, the [`HtmlStore`] prebuilt-HTML gate, and a
 //! batteries-included [`default_router`].
 
 mod app_info;
 pub use app_info::*;
-mod buckets;
-pub use buckets::*;
-mod render_mode;
-pub use render_mode::*;
+mod html_store;
+pub use html_store::*;
 
 #[cfg(feature = "json")]
 mod analytics;

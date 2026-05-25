@@ -1,3 +1,5 @@
+mod blob_store;
+pub use blob_store::*;
 mod default_scene_renderer;
 pub use default_scene_renderer::*;
 mod scene_entity;

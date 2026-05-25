@@ -7,7 +7,6 @@ use beet_site::prelude::*;
 async fn home() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
 		.exchange_str("/")
 		.await
@@ -16,19 +15,8 @@ async fn home() {
 }
 #[beet::test]
 async fn help() {
-	// test with ssr
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
-		.spawn(beet_site_router())
-		.exchange_str("/?help")
-		.await
-		.xnot()
-		.xpect_contains("Welcome to Beet!");
-	// test with ssg
-	RouterPlugin::world()
-		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssg)
 		.spawn(beet_site_router())
 		.exchange_str("/?help")
 		.await
@@ -40,7 +28,6 @@ async fn help() {
 async fn docs() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
 		.exchange_str("/docs")
 		.await
@@ -55,7 +42,6 @@ async fn docs() {
 async fn article_layout() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
 		.exchange_str("/blog/post-1")
 		.await
@@ -66,7 +52,6 @@ async fn multiple_calls() {
 	let mut world = RouterPlugin::world();
 	let mut entity = world
 		.with_resource(pkg_config!())
-		// .with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router());
 	entity
 		.exchange_str("/")
@@ -121,7 +106,6 @@ async fn multiple_calls() {
 async fn correct_title() {
 	RouterPlugin::world()
 		.with_resource(pkg_config!())
-		.with_resource(RenderMode::Ssr)
 		.spawn(beet_site_router())
 		.exchange_str("/blog/post-1")
 		.await
