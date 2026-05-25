@@ -22,7 +22,8 @@
 //! cargo run --example file_based_routes -- about
 //!
 //! # call the `add` server action in-process through the router
-//! cargo run --example file_based_routes -- call-add
+//! # (defaults to --a=2 --b=3)
+//! cargo run --example file_based_routes -- call-add --a=10 --b=20
 //!
 //! # static export to examples/file_based_routes/dist
 //! cargo run --example file_based_routes -- export
@@ -129,10 +130,23 @@ async fn Export(cx: ActionContext) -> Result<String> {
 	Ok(format!("exported {} routes to dist", written.len()))
 }
 
-/// Calls the `add` server action in-process through the router.
+/// Request params for the `call-add` command.
+#[derive(Reflect)]
+struct CallAddParams {
+	/// First addend, defaults to 2.
+	a: Option<i32>,
+	/// Second addend, defaults to 3.
+	b: Option<i32>,
+}
+
+/// Calls the `add` server action in-process through the router, with the
+/// addends taken from `--a`/`--b` (defaulting to 2 and 3).
 #[action]
 #[derive(Component)]
-async fn CallAdd(cx: ActionContext) -> Result<String> {
+#[require(ParamsPartial = ParamsPartial::new::<CallAddParams>())]
+async fn CallAdd(cx: ActionContext<Request>) -> Result<String> {
+	let a = cx.get_param("a").and_then(|val| val.parse().ok()).unwrap_or(2);
+	let b = cx.get_param("b").and_then(|val| val.parse().ok()).unwrap_or(3);
 	let caller = cx.caller.clone();
 	let world = cx.world();
 	let router = caller
@@ -142,7 +156,7 @@ async fn CallAdd(cx: ActionContext) -> Result<String> {
 		.await?;
 	let request = Request::post("add")
 		.with_accept(MediaType::Json)
-		.with_json_body(&AddArgs { a: 2, b: 3 })?;
+		.with_json_body(&AddArgs { a, b })?;
 	let sum: i32 = world
 		.entity(router)
 		.call::<Request, Response>(request)
@@ -151,7 +165,7 @@ async fn CallAdd(cx: ActionContext) -> Result<String> {
 		.await?
 		.json()
 		.await?;
-	Ok(format!("add(2, 3) = {sum}"))
+	Ok(format!("add({a}, {b}) = {sum}"))
 }
 
 /// Regenerates the `generated/` files from the route sources.

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// Compiles a package to wasm and prepares it for the browser.
 ///
@@ -7,8 +8,7 @@ use beet_core::prelude::*;
 /// --no-default-features --features client`, then `wasm-bindgen` into
 /// `<out_dir>/<wasm_dir>`, and in release mode `wasm-opt -Oz` over the result,
 /// returning the artifact size.
-#[derive(Debug, Clone, Component, SetWith)]
-#[require(BuildWasmAction)]
+#[derive(Debug, Clone, SetWith)]
 pub struct BuildWasm {
 	/// The cargo build configuration. The wasm target and `client` feature are
 	/// applied when the build runs.
@@ -21,6 +21,17 @@ pub struct BuildWasm {
 	pub wasm_name: String,
 }
 
+/// Request params for the [`BuildWasm`] command, surfaced in `--help`.
+#[derive(Reflect)]
+struct BuildWasmParams {
+	/// Build in release mode and optimize the artifact with `wasm-opt -Oz`.
+	release: bool,
+	/// The cargo package to build, ie `--package my-app`.
+	package: Option<String>,
+	/// Directory the `wasm-bindgen` output is written under, defaults to `dist`.
+	out_dir: Option<String>,
+}
+
 impl BuildWasm {
 	/// Creates a build writing to `out_dir`, with the default `wasm`/`main`
 	/// artifact location.
@@ -31,6 +42,20 @@ impl BuildWasm {
 			wasm_dir: RelPath::new("wasm"),
 			wasm_name: "main".into(),
 		}
+	}
+
+	/// Builds a config from CLI/request params: `--release`, `--package`, and
+	/// `--out-dir` (defaulting to `dist`).
+	pub fn from_request_parts(parts: &RequestParts) -> Self {
+		let mut cargo =
+			CargoBuild::default().with_release(parts.has_param("release"));
+		if let Some(package) = parts.get_param("package") {
+			cargo = cargo.with_package(package);
+		}
+		let raw = parts.get_param("out-dir").unwrap_or("dist");
+		let out_dir = AbsPathBuf::new(raw)
+			.unwrap_or_else(|_| AbsPathBuf::new_unchecked(raw));
+		Self::new(out_dir).with_cargo(cargo)
 	}
 
 	/// Runs the cargo → wasm-bindgen → wasm-opt pipeline, returning a size report.
@@ -87,12 +112,11 @@ impl BuildWasm {
 	}
 }
 
-/// Reads the [`BuildWasm`] state from the caller and runs the build.
-///
-/// ## Errors
-/// Errors if the caller has no [`BuildWasm`] component.
+/// Builds a [`BuildWasm`] config from the request params and runs the build,
+/// returning a size report.
 #[action]
 #[derive(Component)]
-pub async fn BuildWasmAction(cx: ActionContext) -> Result<String> {
-	cx.caller.get_cloned::<BuildWasm>().await?.run().await
+#[require(ParamsPartial = ParamsPartial::new::<BuildWasmParams>())]
+pub async fn BuildWasmAction(parts: RequestParts) -> Result<String> {
+	BuildWasm::from_request_parts(&parts).run().await
 }

@@ -2,14 +2,28 @@ use beet::prelude::*;
 use image::Rgb;
 use qrcode::QrCode as QrCodeGenerator;
 
+/// Request params for the [`QrCode`] command, surfaced in `--help`.
+#[derive(Reflect)]
+struct QrCodeParams {
+	/// The text/url to encode.
+	input: String,
+	/// The output file path, defaults to `qrcode.png`.
+	output: Option<String>,
+	/// Light module color as `r,g,b`, defaults to `255,255,255`.
+	light: Option<String>,
+	/// Dark module color as `r,g,b`, defaults to `0,0,0`.
+	dark: Option<String>,
+}
+
 /// Generates a QR code PNG.
 ///
 /// `--input` is the encoded text/url, `--output` the file (default
 /// `qrcode.png`), and `--light`/`--dark` set the colors as `r,g,b`.
 #[action]
 #[derive(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
 pub async fn QrCode(parts: RequestParts) -> Result<String> {
-	let input = parts
+	let input = parts.params().parse_reflect::<QrCodeParams>()?
 		.get_param("input")
 		.ok_or_else(|| bevyhow!("qrcode requires --input"))?;
 	let output = parts.get_param("output").unwrap_or("qrcode.png");

@@ -1,4 +1,5 @@
 use beet::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 
 /// The bundled Deno wasm runner script, written alongside the `wasm-bindgen`
@@ -14,99 +15,97 @@ const DENO_TS: &str = include_str!("deno.ts");
 /// runner = "beet run-wasm"
 /// ```
 ///
-/// [`RunWasm::args`] are forwarded verbatim to the running module, which is why
-/// `main` dispatches this before the router (the router would parse them as
-/// request params).
-#[derive(Debug, Clone, Component)]
-#[require(RunWasmAction)]
-pub struct RunWasm {
-	/// Path to the compiled `wasm32-unknown-unknown` binary.
-	pub exe_path: PathBuf,
-	/// Arguments forwarded to the running module.
-	pub args: Vec<String>,
-}
-
-impl RunWasm {
-	/// Creates a runner for `exe_path` with no forwarded arguments.
-	pub fn new(exe_path: impl Into<PathBuf>) -> Self {
-		Self {
-			exe_path: exe_path.into(),
-			args: Vec::new(),
-		}
-	}
-
-	/// Sets the arguments forwarded to the running module.
-	pub fn with_args(mut self, args: Vec<String>) -> Self {
-		self.args = args;
-		self
-	}
-
-	/// The directory the runner artifacts (`bindgen*.js`, `deno.ts`) are written to.
-	fn runner_dir() -> PathBuf {
-		fs_ext::workspace_root().join("target/wasm-runner")
-	}
-
-	/// Runs `wasm-bindgen`, writes the Deno runner, then executes the module.
-	async fn run(&self) -> Result {
-		if !fs_ext::exists(&self.exe_path)? {
-			bevybail!("wasm binary does not exist: {}", self.exe_path.display());
-		}
-		let runner_dir = Self::runner_dir();
-
-		// 1. wasm-bindgen → target/wasm-runner/bindgen*.js + *_bg.wasm
-		ChildProcess::new("wasm-bindgen")
-			.with_args([
-				"--out-dir".to_string(),
-				runner_dir.to_string_lossy().to_string(),
-				"--out-name".to_string(),
-				"bindgen".to_string(),
-				"--target".to_string(),
-				"web".to_string(),
-				"--no-typescript".to_string(),
-				self.exe_path.to_string_lossy().to_string(),
-			])
-			.run_async()
-			.await?;
-
-		// 2. write the bundled Deno runner next to the bindgen output
-		assert_deno_installed().await?;
-		fs_ext::create_dir_all_async(&runner_dir).await?;
-		fs_ext::write_async(runner_dir.join("deno.ts"), DENO_TS).await?;
-
-		// 3. deno run <runner> <args>, inheriting stdio so the module's output
-		// (test results, panics, logs) streams to the terminal live and its exit
-		// code propagates — essential for a cargo runner.
-		let mut deno_args = vec![
-			"--allow-read".to_string(),
-			"--allow-net".to_string(),
-			"--allow-env".to_string(),
-			runner_dir.join("deno.ts").to_string_lossy().to_string(),
-		];
-		deno_args.extend(self.args.iter().cloned());
-		let status = ChildProcess::new("deno")
-			.with_envs([(
-				"WORKSPACE_ROOT",
-				fs_ext::workspace_root().to_string_lossy().to_string(),
-			)])
-			.with_args(deno_args)
-			.spawn()?
-			.status()
-			.await?;
-		if !status.success() {
-			bevybail!("wasm module exited with {status}");
-		}
-		Ok(())
-	}
-}
-
-/// Reads the [`RunWasm`] state from the caller and runs the module.
-///
-/// ## Errors
-/// Errors if the caller has no [`RunWasm`] component.
+/// As a route it is served greedily (`run-wasm/*args`): the first segment after
+/// `run-wasm` is the binary, and the remaining positional segments and query
+/// params are forwarded to the running module — the beet wasm test runner reads
+/// them back via `Deno.args`.
 #[action]
 #[derive(Component)]
-pub async fn RunWasmAction(cx: ActionContext) -> Result {
-	cx.caller.get_cloned::<RunWasm>().await?.run().await
+pub async fn RunWasm(parts: RequestParts) -> Result<String> {
+	let exe_path = parts
+		.path()
+		.get(1)
+		.ok_or_else(|| bevyhow!("usage: beet run-wasm <binary-path> [args..]"))?;
+	run_wasm(Path::new(exe_path), forwarded_args(&parts)).await?;
+	// the module's output already streamed via inherited stdio
+	Ok(String::new())
+}
+
+/// Reconstructs the args forwarded to the wasm module: positional segments after
+/// the binary, then query params as `--key` flags or `--key=value` pairs.
+///
+/// The beet wasm test runner re-parses these with [`CliArgs`], so ordering
+/// between positionals and flags is irrelevant.
+fn forwarded_args(parts: &RequestParts) -> Vec<String> {
+	let mut args: Vec<String> = parts.path_from(2).to_vec();
+	for (key, values) in parts.params().iter_all() {
+		if values.is_empty() {
+			args.push(format!("--{key}"));
+		} else {
+			for value in values {
+				args.push(format!("--{key}={value}"));
+			}
+		}
+	}
+	args
+}
+
+/// The directory the runner artifacts (`bindgen*.js`, `deno.ts`) are written to.
+fn runner_dir() -> PathBuf {
+	fs_ext::workspace_root().join("target/wasm-runner")
+}
+
+/// Runs `wasm-bindgen`, writes the Deno runner, then executes the module,
+/// forwarding `args` and inheriting stdio so the module's output streams live.
+async fn run_wasm(exe_path: &Path, args: Vec<String>) -> Result {
+	if !fs_ext::exists(exe_path)? {
+		bevybail!("wasm binary does not exist: {}", exe_path.display());
+	}
+	let runner_dir = runner_dir();
+
+	// 1. wasm-bindgen → target/wasm-runner/bindgen*.js + *_bg.wasm
+	ChildProcess::new("wasm-bindgen")
+		.with_args([
+			"--out-dir".to_string(),
+			runner_dir.to_string_lossy().to_string(),
+			"--out-name".to_string(),
+			"bindgen".to_string(),
+			"--target".to_string(),
+			"web".to_string(),
+			"--no-typescript".to_string(),
+			exe_path.to_string_lossy().to_string(),
+		])
+		.run_async()
+		.await?;
+
+	// 2. write the bundled Deno runner next to the bindgen output
+	assert_deno_installed().await?;
+	fs_ext::create_dir_all_async(&runner_dir).await?;
+	fs_ext::write_async(runner_dir.join("deno.ts"), DENO_TS).await?;
+
+	// 3. deno run <runner> <args>, inheriting stdio so the module's output
+	// (test results, panics, logs) streams to the terminal live and its exit
+	// code propagates — essential for a cargo runner.
+	let mut deno_args = vec![
+		"--allow-read".to_string(),
+		"--allow-net".to_string(),
+		"--allow-env".to_string(),
+		runner_dir.join("deno.ts").to_string_lossy().to_string(),
+	];
+	deno_args.extend(args);
+	let status = ChildProcess::new("deno")
+		.with_envs([(
+			"WORKSPACE_ROOT",
+			fs_ext::workspace_root().to_string_lossy().to_string(),
+		)])
+		.with_args(deno_args)
+		.spawn()?
+		.status()
+		.await?;
+	if !status.success() {
+		bevybail!("wasm module exited with {status}");
+	}
+	Ok(())
 }
 
 /// Errors with install instructions if Deno is not available.
