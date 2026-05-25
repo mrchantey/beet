@@ -67,7 +67,7 @@ pub async fn NavigateHandler(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
-	let (request, next) = cx.take();
+	let (mut request, next) = cx.take();
 
 	let Some(value) = request.get_param("navigate").map(|val| val.to_string())
 	else {
@@ -98,6 +98,7 @@ pub async fn NavigateHandler(
 	};
 
 	// Dispatch through the route's ExchangeAction
+	node.merge_path_params(&mut request);
 	let entity = world.entity(node.entity);
 	let exchange = entity.clone().get_cloned::<ExchangeAction>().await?;
 	let response = exchange.call(entity, request).await?;

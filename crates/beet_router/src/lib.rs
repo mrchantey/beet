@@ -3,6 +3,7 @@ beet_core::test_main!();
 
 #[cfg(feature = "codegen")]
 mod route_codegen;
+mod extra;
 mod media;
 mod navigate;
 mod router;
@@ -13,6 +14,7 @@ mod static_export;
 pub mod prelude {
 	#[cfg(feature = "codegen")]
 	pub use crate::route_codegen::*;
+	pub use crate::extra::*;
 	pub use crate::media::*;
 	pub use crate::navigate::*;
 	pub use crate::router::*;

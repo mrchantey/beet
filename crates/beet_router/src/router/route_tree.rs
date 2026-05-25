@@ -348,6 +348,28 @@ impl ActionNode {
 
 	/// The action's description from doc comments, if available.
 	pub fn description(&self) -> Option<&str> { self.meta.description() }
+
+	/// Merge the dynamic path segments matched by this node's [`PathPattern`]
+	/// into the request params, so handlers can read a `:id` value via
+	/// [`RequestParts::get_param`] or the [`QueryParams`] extractor.
+	///
+	/// Path params take precedence over query params on key collision.
+	/// A no-op when the request path does not match this node's pattern.
+	pub fn merge_path_params(&self, request: &mut Request) {
+		let Ok(path_match) = self.path.parse_path(request.path()) else {
+			return;
+		};
+		let params = request.params_mut();
+		for (key, values) in path_match.dyn_map.into_iter_all() {
+			// path params win over query params on collision
+			params.remove(&key);
+			if values.is_empty() {
+				params.insert_key(key);
+			} else {
+				params.insert_vec(key, values);
+			}
+		}
+	}
 }
 
 /// The query tuple type used to collect action components for [`ActionNode::from_query`].
@@ -497,6 +519,31 @@ mod test {
 				meta: ActionMeta::of::<(), (), ()>(),
 				params: ParamsPattern::default(),
 				path: PathPattern::new(":foo").unwrap(),
+				method: None,
+			},
+			ActionNode {
+				entity: Entity::PLACEHOLDER,
+				meta: ActionMeta::of::<(), (), ()>(),
+				params: ParamsPattern::default(),
+				path: PathPattern::new(":bar").unwrap(),
+				method: None,
+			},
+		];
+		RouteTree::from_nodes(nodes)
+			.unwrap_err()
+			.to_string()
+			.contains("Path conflict")
+			.xpect_true();
+	}
+
+	#[beet_core::test]
+	fn detects_static_dynamic_mix() {
+		let nodes = vec![
+			ActionNode {
+				entity: Entity::PLACEHOLDER,
+				meta: ActionMeta::of::<(), (), ()>(),
+				params: ParamsPattern::default(),
+				path: PathPattern::new("foo").unwrap(),
 				method: None,
 			},
 			ActionNode {

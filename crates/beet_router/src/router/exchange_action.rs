@@ -102,6 +102,18 @@ where
 }
 
 
+/// Concrete impl for [`Response`] — an action that already produced a
+/// fully-formed response (eg a redirect) passes it through unchanged.
+impl ExchangeRouteOut<Self> for Response {
+	fn into_route_response(
+		self,
+		_caller: AsyncEntity,
+		_parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move { Ok(self) })
+	}
+}
+
 /// Concrete impl for [`MediaBytes`] — wraps the bytes directly
 /// into a response without content negotiation.
 impl ExchangeRouteOut<Self> for MediaBytes {

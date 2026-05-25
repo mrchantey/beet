@@ -33,7 +33,7 @@ pub fn router() -> impl Bundle {
 pub async fn Router(cx: ActionContext<Request>) -> Response {
 	let caller = cx.caller.clone();
 	let world = cx.world();
-	let request = cx.input;
+	let mut request = cx.input;
 	let path = request.path().clone();
 
 	// find the matching route in the tree
@@ -48,6 +48,8 @@ pub async fn Router(cx: ActionContext<Request>) -> Response {
 	// resolve the inner action and dispatch entity from the matched route
 	let (inner_action, dispatch_entity) = match &node {
 		Ok(Some(node)) => {
+			// surface matched dynamic segments (`:id`) to the handler
+			node.merge_path_params(&mut request);
 			let entity = world.entity(node.entity);
 			match entity.clone().get_cloned::<ExchangeAction>().await {
 				Ok(action) => (action.into_action(), entity),
@@ -78,6 +80,69 @@ mod test {
 	use beet_ui::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
+
+	/// Test handler that echoes all request params as `key=v1/v2` pairs,
+	/// sorted for deterministic output.
+	#[action(handler_only)]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn EchoParams(cx: ActionContext<RequestParts>) -> MediaBytes {
+		let mut pairs = cx
+			.input
+			.params()
+			.iter_all()
+			.map(|(key, values)| format!("{key}={}", values.join("/")))
+			.collect::<Vec<_>>();
+		pairs.sort();
+		MediaBytes::new_text(pairs.join("&"))
+	}
+
+	#[beet_core::test]
+	async fn dynamic_segment_reaches_handler() {
+		router_world()
+			.spawn((router(), children![exchange_route(
+				"users/:id",
+				EchoParams
+			)]))
+			.call::<Request, Response>(Request::get("users/42"))
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("id=42");
+	}
+
+	#[beet_core::test]
+	async fn greedy_segment_reaches_handler() {
+		router_world()
+			.spawn((router(), children![exchange_route(
+				"files/*path",
+				EchoParams
+			)]))
+			.call::<Request, Response>(Request::get("files/a/b/c.txt"))
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("path=a/b/c.txt");
+	}
+
+	#[beet_core::test]
+	async fn path_param_wins_over_query_param() {
+		router_world()
+			.spawn((router(), children![exchange_route(
+				"users/:id",
+				EchoParams
+			)]))
+			.call::<Request, Response>(Request::get("users/42?id=99"))
+			.await
+			.unwrap()
+			.unwrap_str()
+			.await
+			.xpect_contains("id=42")
+			.xnot()
+			.xpect_contains("99");
+	}
 
 	#[beet_core::test]
 	async fn route_renders_scene() {
