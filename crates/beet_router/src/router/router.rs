@@ -327,4 +327,35 @@ mod test {
 			.xnot()
 			.xpect_contains("about");
 	}
+
+	/// A route can stream Server-Sent Events by returning a streaming
+	/// [`Response`] via [`sse_response`] — no special router needed.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn sse_route_streams_events() {
+		#[derive(serde::Serialize)]
+		struct Tick {
+			index: u32,
+		}
+
+		#[action(handler_only)]
+		#[derive(Default, Clone, Component, Reflect)]
+		#[reflect(Component)]
+		async fn Ticks(_cx: ActionContext<RequestParts>) -> Response {
+			sse_response(bevy::tasks::futures_lite::stream::iter(
+				(0..3).map(|index| Ok(SseBody::message(Tick { index }))),
+			))
+		}
+
+		router_world()
+			.spawn((router(), children![exchange_route("ticks", Ticks)]))
+			.call::<Request, Response>(Request::get("ticks"))
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("data: {\"index\":0}")
+			.xpect_contains("data: {\"index\":2}");
+	}
 }
