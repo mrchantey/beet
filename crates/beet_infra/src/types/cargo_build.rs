@@ -53,6 +53,10 @@ pub struct CargoBuild {
 	/// Root package used to resolve the binary name for a non-workspace main.rs.
 	#[set_with(unwrap_option, into)]
 	pub root_crate_name: Option<SmolStr>,
+	/// Do not activate the `default` feature.
+	pub no_default_features: bool,
+	/// Features to activate, ie `--features client`.
+	pub features: Vec<SmolStr>,
 	/// Additional arguments passed to cargo.
 	pub additional_args: Vec<SmolStr>,
 }
@@ -112,9 +116,8 @@ impl CargoBuild {
 	pub fn lambda_exe_path(&self) -> PathBuf {
 		self.lambda_dir().join("bootstrap")
 	}
-	/// Build the cargo command arguments.
-	#[cfg(feature = "deploy")]
-	fn cargo_args(&self) -> Vec<SmolStr> {
+	/// Build the cargo command arguments, beginning with the `build` subcommand.
+	pub fn cargo_args(&self) -> Vec<SmolStr> {
 		let mut args: Vec<SmolStr> = vec!["build".into()];
 		if let Some(pkg) = &self.package {
 			args.push("--package".into());
@@ -134,6 +137,13 @@ impl CargoBuild {
 		if let Some(triple) = self.target.target_triple() {
 			args.push("--target".into());
 			args.push(triple.into());
+		}
+		if self.no_default_features {
+			args.push("--no-default-features".into());
+		}
+		if !self.features.is_empty() {
+			args.push("--features".into());
+			args.push(self.features.join(",").into());
 		}
 		for arg in &self.additional_args {
 			args.push(arg.clone());
@@ -267,5 +277,20 @@ mod test {
 		let build = CargoBuild::default().with_example("router");
 		let path = build.lambda_exe_path();
 		path.ends_with("lambda/router/bootstrap").xpect_true();
+	}
+
+	#[beet_core::test]
+	fn cargo_args_wasm_features() {
+		CargoBuild::default()
+			.with_target(BuildTarget::Wasm)
+			.with_package("my-app")
+			.with_no_default_features(true)
+			.with_features(vec!["client".into()])
+			.cargo_args()
+			.join(" ")
+			.xpect_eq(
+				"build --package my-app --target wasm32-unknown-unknown \
+				 --no-default-features --features client",
+			);
 	}
 }

@@ -1,48 +1,35 @@
 use beet::prelude::*;
+use beet::prelude::webdriver::*;
+use std::path::PathBuf;
 
-/// Build the project
-#[derive(Debug, Clone)]
-pub struct ExportPdf {
-	/// Input url (positional)
-	/// Disable margins
-	pub no_margin: bool,
-	pub input: String,
-	/// Output file (-o, --output)
-	pub output: std::path::PathBuf,
-	/// Page ranges to export, e.g. "1-5, 8, 11-13", or leave empty to export all
-	pub page_ranges: Vec<String>,
-}
+/// Exports a URL to a PDF via a headless browser (webdriver).
+///
+/// `--input` is the URL, `--output` the file (default `file.pdf`),
+/// `--no-margin` disables margins, and `--page-ranges` limits the pages, ie
+/// `--page-ranges=1-5,8`.
+#[action]
+#[derive(Component)]
+pub async fn ExportPdf(parts: RequestParts) -> Result<String> {
+	let input = parts
+		.get_param("input")
+		.ok_or_else(|| bevyhow!("export-pdf requires --input"))?
+		.to_string();
+	let output = parts
+		.get_param("output")
+		.map(PathBuf::from)
+		.unwrap_or_else(|| "file.pdf".into());
 
-impl Default for ExportPdf {
-	fn default() -> Self {
-		Self {
-			no_margin: false,
-			input: String::new(),
-			output: "file.pdf".into(),
-			page_ranges: Vec::new(),
-		}
+	let mut options = PdfOptions::default();
+	if parts.has_param("no-margin") {
+		options.margin = PdfMargin::none();
 	}
-}
-
-impl ExportPdf {
-	#[allow(unused)]
-	pub async fn run(self) -> Result {
-		App::default()
-			.run_io_task_local(async move {
-				let mut opts = PdfOptions {
-					page_ranges: self.page_ranges,
-					..default()
-				};
-				if self.no_margin {
-					opts.margin = PdfMargin::none();
-				}
-
-
-				let (proc, page) = Page::visit(&self.input).await?;
-				let bytes = page.export_pdf_with_options(&opts).await?;
-				fs_ext::write_async(self.output, bytes).await?;
-				Ok(())
-			})
-			.await
+	if let Some(ranges) = parts.get_param("page-ranges") {
+		options.page_ranges =
+			ranges.split(',').map(|range| range.trim().to_string()).collect();
 	}
+
+	let (_process, page) = Page::visit(&input).await?;
+	let bytes = page.export_pdf_with_options(&options).await?;
+	fs_ext::write_async(&output, bytes).await?;
+	Ok(format!("wrote pdf to {}", output.display()))
 }

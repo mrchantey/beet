@@ -105,7 +105,9 @@ impl RouteCodegen {
 }
 
 
-#[cfg(test)]
+// Codegen scans directories and writes files, so its end-to-end test only
+// runs natively (wasm has no directory enumeration).
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

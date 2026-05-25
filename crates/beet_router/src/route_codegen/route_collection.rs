@@ -34,6 +34,7 @@ impl RouteCollectionCategory {
 }
 
 /// A directory of route files scanned into a collection bundle and typed links.
+#[derive(Debug, Clone, Component)]
 pub struct RouteCollection {
 	/// Source directory containing the route files.
 	pub src: AbsPathBuf,
@@ -99,7 +100,7 @@ impl RouteCollection {
 	}
 
 	/// The snake_case name of this collection, derived from its codegen file.
-	pub fn name(&self) -> String { self.codegen.name() }
+	pub fn name(&self) -> Result<String> { self.codegen.name() }
 
 	/// A [`BlobStore`] over the source directory, used for scanning.
 	pub fn store(&self) -> BlobStore {

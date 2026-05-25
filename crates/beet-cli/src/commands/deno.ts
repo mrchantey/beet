@@ -6,8 +6,7 @@
 //
 // Includes utilty methods akin to `std::fs`
 //
-// This file is cached and will be replaced on hash change
-// For more info see [js_runtime.rs](crates/beet_core/src/wasm_utils/js_runtime.rs)
+// For more info see [js_runtime.rs](crates/beet_core/src/web_utils/js_runtime.rs)
 // for context see how the wasm-bindgen deno runner works
 // https://github.com/wasm-bindgen/wasm-bindgen/blob/main/crates/cli/src/wasm_bindgen_test_runner/deno.rs
 import init from "./bindgen.js";
@@ -69,7 +68,8 @@ globalThis.env_all = () => {
 	return do_try(() => Object.entries(Deno.env.toObject()), []);
 };
 
-// Test mode aliases (when running cargo test -p beet_core)
+// Test-mode aliases. `beet_core`'s wasm `--lib` tests import these under
+// `test_*` names to avoid duplicate wasm-bindgen symbols (see js_runtime.rs).
 globalThis.test_cwd = globalThis.cwd;
 globalThis.test_exit = globalThis.exit;
 globalThis.test_exists = globalThis.exists;

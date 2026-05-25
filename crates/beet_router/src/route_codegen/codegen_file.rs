@@ -37,7 +37,7 @@ pub struct CodegenFile {
 	/// [`TemplateSerde`]), we need to alias the current crate to match any
 	/// internal types. Setting this option adds `use crate as pkg_name;`
 	/// to the top of the file.
-	pkg_name: Option<String>,
+	pkg_name: Option<SmolStr>,
 	/// Imports to include at the top of the file.
 	///
 	/// These will not be erased when the file is regenerated.
@@ -84,31 +84,34 @@ impl CodegenFile {
 	pub fn output(&self) -> &AbsPathBuf { &self.output }
 
 	/// Returns the package name alias, if set.
-	pub fn pkg_name(&self) -> Option<&String> { self.pkg_name.as_ref() }
+	pub fn pkg_name(&self) -> Option<&SmolStr> { self.pkg_name.as_ref() }
 
 	/// Returns the snake_case name of this codegen file.
 	///
 	/// If the file is a `mod.rs`, returns the parent directory name instead.
-	pub fn name(&self) -> String {
-		match self
+	pub fn name(&self) -> Result<String> {
+		let stem = self
 			.output
 			.file_stem()
-			.expect("codegen output must have a file stem")
-			.to_str()
-			.expect("file stem must be valid UTF-8")
-		{
-			"mod" => self
-				.output
-				.parent()
-				.expect("mod files must have a parent")
-				.file_name()
-				.expect("parent must have a file name")
-				.to_str()
-				.expect("file name must be valid UTF-8")
-				.to_owned(),
-			other => other.to_owned(),
+			.and_then(|stem| stem.to_str())
+			.ok_or_else(|| {
+				bevyhow!("codegen output must have a file stem: {}", self.output)
+			})?;
+		if stem != "mod" {
+			return Ok(stem.to_snake_case());
 		}
-		.to_snake_case()
+		// mod files take their name from the parent directory
+		let parent = self.output.parent().ok_or_else(|| {
+			bevyhow!("mod files must have a parent: {}", self.output)
+		})?;
+		parent
+			.file_name()
+			.and_then(|name| name.to_str())
+			.ok_or_else(|| {
+				bevyhow!("mod files must have a named parent: {}", self.output)
+			})?
+			.to_snake_case()
+			.xok()
 	}
 
 	/// Clones the metadata of this codegen file with a new output path.
@@ -124,7 +127,7 @@ impl CodegenFile {
 	}
 
 	/// Sets the package name alias for this codegen file.
-	pub fn with_pkg_name(mut self, pkg_name: impl Into<String>) -> Self {
+	pub fn with_pkg_name(mut self, pkg_name: impl Into<SmolStr>) -> Self {
 		self.pkg_name = Some(pkg_name.into());
 		self
 	}
@@ -205,11 +208,9 @@ impl CodegenFile {
 	}
 
 	/// Generates the crate alias item if a package name is set.
-	// This is legacy from when client islands use `std::any::type_name`.
-	// Can be removed after scenes-as-islands.
 	fn crate_alias(&self) -> Result<Option<syn::Item>> {
 		if let Some(pkg_name) = &self.pkg_name {
-			let pkg_name: Expr = syn::parse_str(pkg_name)?;
+			let pkg_name: Expr = syn::parse_str(pkg_name.as_str())?;
 			Ok(Some(syn::parse_quote! {
 				#[allow(unused_imports)]
 				use crate as #pkg_name;

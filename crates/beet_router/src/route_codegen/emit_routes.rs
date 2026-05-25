@@ -87,7 +87,7 @@ pub(crate) fn emit_collection(
 		}
 	}
 
-	let collection_ident = format_ident!("{}_routes", collection.name());
+	let collection_ident = format_ident!("{}_routes", collection.name()?);
 	// A uniquely-typed `OnSpawnTyped` effect that appends each route as a child.
 	// Multiple collections compose onto one `router()` entity this way without
 	// clobbering each other, and without the duplicate-`Children` error that a

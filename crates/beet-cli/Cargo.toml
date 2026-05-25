@@ -16,8 +16,20 @@ keywords.workspace = true
 name = "beet"
 path = "src/main.rs"
 
+[features]
+default = ["qrcode"]
+qrcode = ["dep:qrcode", "dep:image"]
+
 [dependencies]
-beet = { workspace = true, features = ["router", "fs", "infra", "json"] }
+beet = { workspace = true, features = [
+	"router",
+	"fs",
+	"infra",
+	"json",
+	"webdriver",
+] }
+qrcode = { version = "0.14", optional = true }
+image = { version = "0.25", optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

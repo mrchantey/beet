@@ -59,7 +59,13 @@ unsafe extern "C" {
 	pub fn env_all() -> js_sys::Array;
 }
 
-// TODO this is just to get it to compile, we need a better solution
+// The `test_*` js names are load-bearing, not cosmetic: `beet_core` has a
+// dev-dependency on itself (for the `testing` feature), so a `--lib` wasm test
+// links beet_core twice — once compiled with `cfg(test)` and once as a plain
+// rlib. wasm-bindgen derives its `__wbindgen_describe___wbg_<name>` symbols from
+// the js name, so identical names across the two builds collide as duplicate
+// symbols. Giving the test build distinct js names avoids the collision. The
+// matching `globalThis.test_*` aliases live in `deno.ts`.
 #[cfg(test)]
 #[wasm_bindgen]
 unsafe extern "C" {

@@ -1,71 +1,39 @@
 use beet::prelude::*;
 use image::Rgb;
-use qrcode::QrCode;
+use qrcode::QrCode as QrCodeGenerator;
 
+/// Generates a QR code PNG.
+///
+/// `--input` is the encoded text/url, `--output` the file (default
+/// `qrcode.png`), and `--light`/`--dark` set the colors as `r,g,b`.
+#[action]
+#[derive(Component)]
+pub async fn QrCode(parts: RequestParts) -> Result<String> {
+	let input = parts
+		.get_param("input")
+		.ok_or_else(|| bevyhow!("qrcode requires --input"))?;
+	let output = parts.get_param("output").unwrap_or("qrcode.png");
+	let light = parse_rgb(parts.get_param("light").unwrap_or("255,255,255"))?;
+	let dark = parse_rgb(parts.get_param("dark").unwrap_or("0,0,0"))?;
 
-
-/// Build the project
-#[derive(Debug, Clone)]
-pub struct QrCodeCmd {
-	/// Input url (positional)
-	pub input: Vec<String>,
-	/// Output file (-o, --output)
-	pub output: std::path::PathBuf,
-	/// Light color (--light)
-	pub light: String,
-	/// Dark color (--dark)
-	pub dark: String,
+	let image = QrCodeGenerator::new(input)?
+		.render::<Rgb<u8>>()
+		.dark_color(Rgb(dark))
+		.light_color(Rgb(light))
+		.build();
+	image.save(output)?;
+	Ok(format!("wrote qr code to {output}"))
 }
 
-impl Default for QrCodeCmd {
-	fn default() -> Self {
-		Self {
-			input: Vec::new(),
-			output: "qrcode.png".into(),
-			light: "255,255,255".to_string(),
-			dark: "0,0,0".to_string(),
-		}
+/// Parses an `r,g,b` triple into an RGB byte array.
+fn parse_rgb(value: &str) -> Result<[u8; 3]> {
+	let parts: Vec<&str> = value.split(',').collect();
+	if parts.len() != 3 {
+		bevybail!("expected color as `r,g,b`, got `{value}`");
 	}
-}
-
-
-
-impl QrCodeCmd {
-	pub async fn run(self) -> Result {
-		let Self {
-			input,
-			output,
-			light,
-			dark,
-		} = self;
-		let input = input.join(" ");
-
-		// Parse light color
-		let light_parts: Vec<&str> = light.split(',').collect();
-		let light_rgb = [
-			light_parts[0].parse::<u8>()?,
-			light_parts[1].parse::<u8>()?,
-			light_parts[2].parse::<u8>()?,
-		];
-
-		// Parse dark color
-		let dark_parts: Vec<&str> = dark.split(',').collect();
-		let dark_rgb = [
-			dark_parts[0].parse::<u8>()?,
-			dark_parts[1].parse::<u8>()?,
-			dark_parts[2].parse::<u8>()?,
-		];
-
-		let code = QrCode::new(input)?;
-		let image = code
-			.render::<Rgb<u8>>()
-			.dark_color(Rgb(dark_rgb))
-			.light_color(Rgb(light_rgb))
-			.build();
-
-		// Save the image.
-		image.save(output)?;
-
-		Ok(())
-	}
+	Ok([
+		parts[0].trim().parse()?,
+		parts[1].trim().parse()?,
+		parts[2].trim().parse()?,
+	])
 }

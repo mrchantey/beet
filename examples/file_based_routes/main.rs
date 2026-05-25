@@ -5,7 +5,11 @@
 //! - `.rs` page handlers + `.md` content, scanned into route bundles
 //! - a server action invoked through a generated, typed client caller
 //! - compile-time-checked links via the generated `routes::` module
-//! - serving over CLI/HTTP and static-site export
+//! - serving over CLI/HTTP, plus dev commands wired as routes
+//!
+//! The whole app is a single router: pages, content, and the `add` server
+//! action are routes, and so are the `codegen`, `export`, and `call-add` dev
+//! commands. The server backend is chosen with `--server` (`cli` or `http`).
 //!
 //! ## Running
 //!
@@ -17,14 +21,14 @@
 //! cargo run --example file_based_routes
 //! cargo run --example file_based_routes -- about
 //!
-//! # HTTP mode
-//! cargo run --example file_based_routes -- serve
-//!
-//! # call the server action through the generated client caller
+//! # call the `add` server action in-process through the router
 //! cargo run --example file_based_routes -- call-add
 //!
 //! # static export to examples/file_based_routes/dist
 //! cargo run --example file_based_routes -- export
+//!
+//! # HTTP mode (then curl the routes, eg the `add` server action)
+//! cargo run --example file_based_routes -- --server=http
 //! ```
 use beet::prelude::*;
 
@@ -71,105 +75,93 @@ fn site() -> impl Bundle {
 }
 
 fn main() -> AppExit {
-	let arg = std::env::args().nth(1);
-	match arg.as_deref() {
-		#[cfg(feature = "codegen")]
-		Some("codegen") => {
-			async_ext::block_on(run_codegen()).unwrap();
-			AppExit::Success
-		}
-		Some("export") => run_export(),
-		Some("call-add") => run_call_add(),
-		Some("serve") => run_http(),
-		// default: CLI server (also handles `-- about`, `-- --help`, etc.)
-		_ => run_cli(),
-	}
-}
-
-/// Runs the router as a CLI server, navigating to the requested route.
-fn run_cli() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), ClientAppPlugin))
-		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((CliServer::default(), site()));
-		})
+		.add_systems(Startup, setup)
 		.run()
 }
 
-/// Runs the router as an HTTP server on the default port.
-fn run_http() -> AppExit {
-	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), ClientAppPlugin))
-		.add_systems(Startup, |mut commands: Commands| {
-			commands.spawn((HttpServer::default(), site()));
-		})
-		.run()
+/// Spawns the server (`--server=cli|http`) with the site and the dev-command
+/// routes layered on the same router.
+fn setup(mut commands: Commands) -> Result {
+	commands.spawn((server_from_cli()?, site())).with_children(
+		|parent| {
+			#[cfg(feature = "codegen")]
+			parent.spawn(exchange_route("codegen", Codegen));
+			parent.spawn(exchange_route("export", Export));
+			parent.spawn(exchange_route("call-add", CallAdd));
+		},
+	);
+	Ok(())
 }
 
-/// Starts an HTTP server in the background and calls the `add` server action
-/// through its generated client caller.
-fn run_call_add() -> AppExit {
-	std::thread::spawn(|| {
-		App::new()
-			.add_plugins((MinimalPlugins, ClientAppPlugin))
-			.add_systems(Startup, |mut commands: Commands| {
-				commands.spawn((HttpServer::default(), site()));
-			})
-			.run();
-	});
-
-	let result = async_ext::block_on(async {
-		// give the background server a moment to bind
-		time_ext::sleep_millis(500).await;
-		generated::client_actions::add::post(AddArgs { a: 2, b: 3 }).await
-	});
-
-	match result {
-		Ok(sum) => {
-			println!("client called add(2, 3) = {sum}");
-			AppExit::Success
-		}
-		Err(err) => {
-			eprintln!("call-add failed: {err}");
-			AppExit::error()
+/// Selects the server backend from `--server`, defaulting to `cli`.
+fn server_from_cli() -> Result<OnSpawn> {
+	match CliArgs::parse_env()
+		.params
+		.get("server")
+		.map(|server| server.to_lowercase())
+		.as_deref()
+	{
+		None | Some("cli") => CliServer::default().any_bundle().xok(),
+		Some("http") => HttpServer::default().any_bundle().xok(),
+		Some(other) => {
+			bevybail!("invalid --server '{other}', expected 'cli' or 'http'")
 		}
 	}
 }
 
 /// Statically exports every static route to `examples/file_based_routes/dist`.
-fn run_export() -> AppExit {
-	let mut world = (AsyncPlugin, ClientAppPlugin).into_world();
-	let router = world.spawn(site()).flush();
+#[action]
+#[derive(Component)]
+async fn Export(cx: ActionContext) -> Result<String> {
+	let caller = cx.caller.clone();
+	let world = cx.world();
+	let router = caller
+		.with_state::<AncestorQuery, Entity>(|entity, query| {
+			query.root_ancestor(entity)
+		})
+		.await?;
 	let out = BlobStore::new(FsStore::new(WsPathBuf::new(
 		"examples/file_based_routes/dist",
 	)));
+	let written = export_static(&world, router, &out).await?;
+	Ok(format!("exported {} routes to dist", written.len()))
+}
 
-	let written = async_ext::block_on(world.run_async_then(
-		async move |world| export_static(&world, router, &out).await,
-	));
-
-	match written {
-		Ok(paths) => {
-			for path in paths {
-				println!("exported {path}");
-			}
-			AppExit::Success
-		}
-		Err(err) => {
-			eprintln!("export failed: {err}");
-			AppExit::error()
-		}
-	}
+/// Calls the `add` server action in-process through the router.
+#[action]
+#[derive(Component)]
+async fn CallAdd(cx: ActionContext) -> Result<String> {
+	let caller = cx.caller.clone();
+	let world = cx.world();
+	let router = caller
+		.with_state::<AncestorQuery, Entity>(|entity, query| {
+			query.root_ancestor(entity)
+		})
+		.await?;
+	let request = Request::post("add")
+		.with_accept(MediaType::Json)
+		.with_json_body(&AddArgs { a: 2, b: 3 })?;
+	let sum: i32 = world
+		.entity(router)
+		.call::<Request, Response>(request)
+		.await?
+		.into_result()
+		.await?
+		.json()
+		.await?;
+	Ok(format!("add(2, 3) = {sum}"))
 }
 
 /// Regenerates the `generated/` files from the route sources.
 #[cfg(feature = "codegen")]
-async fn run_codegen() -> Result<()> {
+#[action]
+#[derive(Component)]
+async fn Codegen(_: ActionContext) -> Result<String> {
 	fn dir(sub: &str) -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel(format!(
-			"examples/file_based_routes/{sub}"
-		))
-		.unwrap()
+		AbsPathBuf::new_workspace_rel(format!("examples/file_based_routes/{sub}"))
+			.unwrap()
 	}
 	fn cg(name: &str) -> CodegenFile {
 		CodegenFile::new(dir(&format!("generated/{name}")))
@@ -186,5 +178,6 @@ async fn run_codegen() -> Result<()> {
 		.with_route_tree(cg("route_tree.rs"))
 		.with_client_actions(cg("client_actions.rs"))
 		.export()
-		.await
+		.await?;
+	Ok("regenerated codegen files".into())
 }
