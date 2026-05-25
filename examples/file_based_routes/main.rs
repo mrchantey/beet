@@ -173,8 +173,10 @@ async fn CallAdd(cx: ActionContext<Request>) -> Result<String> {
 }
 
 /// Regenerates the `generated/` files from the route sources.
+///
+/// Local because codegen holds `!Send` `syn`/`proc_macro2` values across awaits.
 #[cfg(feature = "codegen")]
-#[action]
+#[action(local)]
 #[derive(Component)]
 async fn Codegen(_: ActionContext) -> Result<String> {
 	fn dir(sub: &str) -> AbsPathBuf {

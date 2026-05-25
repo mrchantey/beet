@@ -23,9 +23,10 @@ pub fn impl_action(
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 1. Parse attributes ──
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out", "route", "pure", "default", "no_default", "no_clone", "handler_only"])?;
+	attrs.assert_types(&[], &["result_out", "route", "pure", "local", "default", "no_default", "no_clone", "handler_only"])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
+	let is_local = attrs.contains_key("local");
 	let has_route = attrs.contains_key("route");
 	let no_default = attrs.contains_key("no_default");
 	let no_clone = attrs.contains_key("no_clone");
@@ -45,10 +46,19 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let action_fn_name = action_fn_name(fn_name);
 	let turbofish = make_turbofish(generics);
 
+	if is_local && !is_async {
+		synbail!(&item.sig, "`local` is only valid on async actions");
+	}
+
 	// ── 3. Determine action kind ──
-	// async → async action, pure → func action, otherwise system action
+	// async → async action (local → single-threaded), pure → func action,
+	// otherwise system action
 	let action_factory = if is_async {
-		quote! { #beet_action::prelude::Action::new_async }
+		if is_local {
+			quote! { #beet_action::prelude::Action::new_async_local }
+		} else {
+			quote! { #beet_action::prelude::Action::new_async }
+		}
 	} else if is_pure {
 		quote! { #beet_action::prelude::Action::new_pure }
 	} else {
@@ -664,6 +674,25 @@ mod test {
 		);
 		assert!(result.contains("Action :: new_async"));
 		assert!(result.contains("async fn my_action_action"));
+	}
+
+	#[test]
+	fn async_local_uses_new_async_local() {
+		let result = parse_str(
+			quote!(local),
+			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
+		);
+		assert!(result.contains("Action :: new_async_local"));
+		assert!(result.contains("async fn my_action_action"));
+	}
+
+	#[test]
+	fn local_without_async_errors() {
+		let err = parse_err(
+			quote!(local),
+			syn::parse_quote! { fn my_action() -> i32 { 42 } },
+		);
+		assert!(err.contains("only valid on async"));
 	}
 
 	#[test]

@@ -38,6 +38,41 @@ where
 			},
 		)
 	}
+
+	/// Like [`Self::new_async`], but the action future runs on the local thread
+	/// and so is not required to be [`Send`].
+	///
+	/// Use this for handlers that hold `!Send` values across an await, such as
+	/// codegen actions working with `syn`/`proc_macro2`. The future is pinned to
+	/// one thread and cannot be load-balanced across the task pool.
+	pub fn new_async_local<Func, Fut, RawOut>(func: Func) -> Self
+	where
+		Func: 'static + Send + Sync + Clone + FnOnce(ActionContext<In>) -> Fut,
+		Fut: 'static + Future<Output = RawOut>,
+		RawOut: IntoResult<Out>,
+	{
+		Action::new(
+			TypeMeta::of::<Func>(),
+			move |ActionCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let async_entity = commands.world().entity(caller);
+				let arg = ActionContext {
+					caller: async_entity,
+					input,
+				};
+				let func = func.clone();
+				commands.run_local(async move |world: AsyncWorld| -> Result {
+					let result: Result<Out> = func(arg).await.into_result();
+					out_handler.call_async(world, result).await
+				});
+				Ok(())
+			},
+		)
+	}
 }
 
 
@@ -258,5 +293,43 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(entity);
+	}
+
+	// -----------------------------------------------------------------------
+	// local actions — futures that hold `!Send` values across an await
+	// -----------------------------------------------------------------------
+
+	#[beet_core::test]
+	async fn new_async_local_allows_non_send_future() {
+		AsyncPlugin::world()
+			.spawn(Action::<i32, i32>::new_async_local(
+				async |cx: ActionContext<i32>| -> Result<i32> {
+					// Rc is `!Send`, held live across the await below.
+					let rc = std::rc::Rc::new(*cx);
+					async_ext::yield_now().await;
+					Ok(*rc * 2)
+				},
+			))
+			.call::<i32, i32>(21)
+			.await
+			.unwrap()
+			.xpect_eq(42);
+	}
+
+	#[action(local)]
+	async fn async_local_double(val: i32) -> i32 {
+		let rc = std::rc::Rc::new(val);
+		async_ext::yield_now().await;
+		*rc * 2
+	}
+
+	#[beet_core::test]
+	async fn action_macro_local() {
+		AsyncPlugin::world()
+			.spawn(async_local_double.into_action())
+			.call::<i32, i32>(21)
+			.await
+			.unwrap()
+			.xpect_eq(42);
 	}
 }
