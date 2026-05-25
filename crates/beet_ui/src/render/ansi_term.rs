@@ -22,7 +22,11 @@ use std::borrow::Cow;
 /// it simply paints the style resolved for each entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnsiTermRenderer {
-	/// Whether to clear the terminal before rendering.
+	/// Whether to erase the screen before rendering, defaults to `false`.
+	///
+	/// Off by default so one-shot output (`beet --help`) prints inline and
+	/// stays in the scrollback. An interactive loop that repaints in place
+	/// opts in via [`Self::with_clear_on_render`].
 	clear_on_render: bool,
 	/// A string prepended to the output, defaults to `\n`.
 	prefix: Cow<'static, str>,
@@ -35,12 +39,12 @@ impl Default for AnsiTermRenderer {
 impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
-			clear_on_render: true,
+			clear_on_render: false,
 			prefix: "\n".into(),
 		}
 	}
 
-	/// Override whether to clear the terminal before rendering.
+	/// Override whether to erase the screen before rendering.
 	pub fn with_clear_on_render(mut self, clear: bool) -> Self {
 		self.clear_on_render = clear;
 		self

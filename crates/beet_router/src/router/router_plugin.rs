@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::*;
 
 
 /// Plugin that registers route-building observers for actions.
@@ -17,6 +18,10 @@ impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<ActionPlugin>()
 			.init_plugin::<AsyncPlugin>()
+			// scene routes render through the charcell layout/paint pipeline
+			// (help pages, markdown/html scenes → ANSI/text); without it the
+			// `PostParseTree` schedule has no systems and ANSI output is blank.
+			.init_plugin::<CharcellPlugin>()
 			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
 			.register_type::<InterruptOnRun>()

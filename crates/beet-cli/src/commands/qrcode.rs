@@ -3,9 +3,11 @@ use image::Rgb;
 use qrcode::QrCode as QrCodeGenerator;
 
 /// Request params for the [`QrCode`] command, surfaced in `--help`.
-#[derive(Reflect)]
+#[derive(Reflect, Default)]
+#[reflect(Default)]
 struct QrCodeParams {
 	/// The text/url to encode.
+	#[reflect(@RequiredField)]
 	input: String,
 	/// The output file path, defaults to `qrcode.png`.
 	output: Option<String>,
@@ -23,14 +25,12 @@ struct QrCodeParams {
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
 pub async fn QrCode(parts: RequestParts) -> Result<String> {
-	let input = parts.params().parse_reflect::<QrCodeParams>()?
-		.get_param("input")
-		.ok_or_else(|| bevyhow!("qrcode requires --input"))?;
-	let output = parts.get_param("output").unwrap_or("qrcode.png");
-	let light = parse_rgb(parts.get_param("light").unwrap_or("255,255,255"))?;
-	let dark = parse_rgb(parts.get_param("dark").unwrap_or("0,0,0"))?;
+	let params = parts.params().parse_reflect::<QrCodeParams>()?;
+	let output = params.output.as_deref().unwrap_or("qrcode.png");
+	let light = parse_rgb(params.light.as_deref().unwrap_or("255,255,255"))?;
+	let dark = parse_rgb(params.dark.as_deref().unwrap_or("0,0,0"))?;
 
-	let image = QrCodeGenerator::new(input)?
+	let image = QrCodeGenerator::new(&params.input)?
 		.render::<Rgb<u8>>()
 		.dark_color(Rgb(dark))
 		.light_color(Rgb(light))

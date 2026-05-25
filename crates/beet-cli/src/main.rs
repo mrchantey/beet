@@ -20,12 +20,8 @@ fn setup(mut commands: Commands) {
 	commands
 		.spawn((CliServer::default(), router()))
 		.with_children(|parent| {
-			parent.spawn(exchange_route(
-				"",
-				Action::<(), &str>::new_pure(|_| "🫖 the beet cli"),
-			));
 			parent.spawn(exchange_route("run-wasm/*args", RunWasm));
-			parent.spawn(exchange_route("build-wasm", BuildWasmAction));
+			parent.spawn(exchange_route("build-wasm", BuildWasm));
 			parent.spawn(exchange_route("export-pdf", ExportPdf));
 			#[cfg(feature = "qrcode")]
 			parent.spawn(exchange_route("qrcode", QrCode));

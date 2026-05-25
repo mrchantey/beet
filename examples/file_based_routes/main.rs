@@ -132,11 +132,16 @@ async fn Export(cx: ActionContext) -> Result<String> {
 
 /// Request params for the `call-add` command.
 #[derive(Reflect)]
+#[reflect(Default)]
 struct CallAddParams {
 	/// First addend, defaults to 2.
-	a: Option<i32>,
+	a: i32,
 	/// Second addend, defaults to 3.
-	b: Option<i32>,
+	b: i32,
+}
+
+impl Default for CallAddParams {
+	fn default() -> Self { Self { a: 2, b: 3 } }
 }
 
 /// Calls the `add` server action in-process through the router, with the
@@ -145,8 +150,7 @@ struct CallAddParams {
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<CallAddParams>())]
 async fn CallAdd(cx: ActionContext<Request>) -> Result<String> {
-	let a = cx.get_param("a").and_then(|val| val.parse().ok()).unwrap_or(2);
-	let b = cx.get_param("b").and_then(|val| val.parse().ok()).unwrap_or(3);
+	let CallAddParams { a, b } = cx.params().parse_reflect::<CallAddParams>()?;
 	let caller = cx.caller.clone();
 	let world = cx.world();
 	let router = caller

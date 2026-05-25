@@ -3,9 +3,11 @@ use beet::prelude::webdriver::*;
 use std::path::PathBuf;
 
 /// Request params for the [`ExportPdf`] command, surfaced in `--help`.
-#[derive(Reflect)]
+#[derive(Reflect, Default)]
+#[reflect(Default)]
 struct ExportPdfParams {
 	/// The URL to export to PDF.
+	#[reflect(@RequiredField)]
 	input: String,
 	/// The output file path, defaults to `file.pdf`.
 	output: Option<String>,
@@ -24,25 +26,23 @@ struct ExportPdfParams {
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<ExportPdfParams>())]
 pub async fn ExportPdf(parts: RequestParts) -> Result<String> {
-	let input = parts
-		.get_param("input")
-		.ok_or_else(|| bevyhow!("export-pdf requires --input"))?
-		.to_string();
-	let output = parts
-		.get_param("output")
+	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
+	let output = params
+		.output
+		.as_deref()
 		.map(PathBuf::from)
 		.unwrap_or_else(|| "file.pdf".into());
 
 	let mut options = PdfOptions::default();
-	if parts.has_param("no-margin") {
+	if params.no_margin {
 		options.margin = PdfMargin::none();
 	}
-	if let Some(ranges) = parts.get_param("page-ranges") {
+	if let Some(ranges) = &params.page_ranges {
 		options.page_ranges =
 			ranges.split(',').map(|range| range.trim().to_string()).collect();
 	}
 
-	let (_process, page) = Page::visit(&input).await?;
+	let (_process, page) = Page::visit(&params.input).await?;
 	let bytes = page.export_pdf_with_options(&options).await?;
 	fs_ext::write_async(&output, bytes).await?;
 	Ok(format!("wrote pdf to {}", output.display()))

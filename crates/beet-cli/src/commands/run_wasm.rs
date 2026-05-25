@@ -22,32 +22,15 @@ const DENO_TS: &str = include_str!("deno.ts");
 #[action]
 #[derive(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
-	let exe_path = parts
-		.path()
-		.get(1)
+	// rebuilds `[run-wasm, <binary>, ..forwarded]`; skip the `run-wasm`
+	// command consumed by the route, pop the binary path, forward the rest.
+	let mut args = parts.unparse_cli_args().into_iter().skip(1);
+	let exe_path = args
+		.next()
 		.ok_or_else(|| bevyhow!("usage: beet run-wasm <binary-path> [args..]"))?;
-	run_wasm(Path::new(exe_path), forwarded_args(&parts)).await?;
+	run_wasm(Path::new(&exe_path), args.collect()).await?;
 	// the module's output already streamed via inherited stdio
 	Ok(String::new())
-}
-
-/// Reconstructs the args forwarded to the wasm module: positional segments after
-/// the binary, then query params as `--key` flags or `--key=value` pairs.
-///
-/// The beet wasm test runner re-parses these with [`CliArgs`], so ordering
-/// between positionals and flags is irrelevant.
-fn forwarded_args(parts: &RequestParts) -> Vec<String> {
-	let mut args: Vec<String> = parts.path_from(2).to_vec();
-	for (key, values) in parts.params().iter_all() {
-		if values.is_empty() {
-			args.push(format!("--{key}"));
-		} else {
-			for value in values {
-				args.push(format!("--{key}={value}"));
-			}
-		}
-	}
-	args
 }
 
 /// The directory the runner artifacts (`bindgen*.js`, `deno.ts`) are written to.
