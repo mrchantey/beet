@@ -57,7 +57,9 @@ impl core::fmt::Display for ClassName {
 pub struct Classes(HashSet<ClassName>);
 
 impl Classes {
-	pub fn new() -> Self { Self::default() }
+	pub fn new(classes: impl IntoIterator<Item: Into<SmolStr>>) -> Self {
+		Self(classes.into_iter().map(|c| ClassName::string(c)).collect())
+	}
 
 	pub fn insert_class(&mut self, class: ClassName) -> &mut Self {
 		self.0.insert(class);
