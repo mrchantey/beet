@@ -33,6 +33,8 @@ mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
 mod into_option;
+// LazyPool is built on async_lock (std-only).
+#[cfg(feature = "std")]
 mod lazy_pool;
 mod line_col;
 #[cfg(feature = "std")]
@@ -53,6 +55,7 @@ pub use stream_ext::TextStream;
 /// Time and duration utilities.
 #[cfg(feature = "std")]
 pub mod time_ext;
+#[cfg(feature = "std")]
 pub use lazy_pool::*;
 mod tree;
 /// Timer utilities for WebAssembly environments.

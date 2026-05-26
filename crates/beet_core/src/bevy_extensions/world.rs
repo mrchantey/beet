@@ -16,7 +16,7 @@ use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use core::marker::PhantomData;
 use extend::ext;
-use std::panic::Location;
+use core::panic::Location;
 
 /// System that logs component names for an entity.
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {
@@ -66,7 +66,7 @@ pub impl World {
 		location: &'static Location<'static>,
 	) {
 		self.fallback_error_handler()(err.into(), ErrorContext::Command {
-			name: format!("{}\nat {:?}", std::any::type_name::<F>(), location)
+			name: format!("{}\nat {:?}", core::any::type_name::<F>(), location)
 				.into(),
 		});
 	}

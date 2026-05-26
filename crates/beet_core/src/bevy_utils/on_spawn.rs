@@ -49,7 +49,7 @@ impl OnSpawn {
 		F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> O,
 		O: IntoResult,
 	{
-		let location = std::panic::Location::caller();
+		let location = core::panic::Location::caller();
 		Self(Box::new(move |entity| {
 			if let Err(err) = func(entity).into_result() {
 				entity.world_scope(move |world| {
@@ -339,8 +339,8 @@ impl OnSpawnDeferred {
 #[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
 
-impl std::fmt::Debug for OnSpawnClone {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for OnSpawnClone {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_tuple("OnSpawnClone").finish()
 	}
 }

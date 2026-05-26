@@ -17,6 +17,7 @@ mod duration;
 mod exit_status;
 mod multimap;
 mod option;
+#[cfg(feature = "std")]
 mod path;
 mod result_x;
 mod str;
@@ -29,6 +30,7 @@ pub use duration::*;
 pub use exit_status::*;
 pub use multimap::*;
 pub use option::*;
+#[cfg(feature = "std")]
 pub use path::*;
 pub use result_x::*;
 pub use str::*;
