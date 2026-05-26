@@ -24,7 +24,7 @@ agent = ["dep:async-openai"]
 
 [dependencies]
 beet_net = { workspace = true, features = ["ureq","json"] }
-beet_core = { workspace = true, features = ["serde","bevy_reflect_documentation"] }
+beet_core = { workspace = true, features = ["std", "serde","bevy_reflect_documentation"] }
 beet_router = { workspace = true, features = ["json"] }
 beet_action = { workspace = true, optional = true, features=["json"] }
 bevy.workspace = true

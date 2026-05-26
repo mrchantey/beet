@@ -16,7 +16,7 @@ bevy_default = ["bevy/default","beet_core/bevy_default"]
 
 [dependencies]
 beet_action.workspace = true
-beet_core = { workspace = true, features = ["rand"] }
+beet_core = { workspace = true, features = ["std", "rand"] }
 
 bevy.workspace = true
 

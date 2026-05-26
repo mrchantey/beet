@@ -77,7 +77,8 @@ beet = { path = "", version = "0.0.9-dev.11" }
 beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.11" }
 beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.11" }
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.11" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11" }
+# no_std by default; std-only consumers add `features = ["std"]`.
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11", default-features = false }
 beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
@@ -94,10 +95,10 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
 #💡 local
 # bevy_ecs = {version = "0.19", default-features = false, features = ["backtrace"]}
+# std / bevy_log / debug are NOT forced here so that no_std consumers (e.g. the
+# esp32 firmware) can depend on a bare bevy. They are re-enabled for normal
+# builds via `beet_core/std`, which every std beet crate pulls transitively.
 bevy = { version = "0.19.0-rc.2", default-features = false, features = [
-	"std", # std for reflect PathBuf
-	"debug",
-	"bevy_log",
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
@@ -108,15 +109,17 @@ bevy = { version = "0.19.0-rc.2", default-features = false, features = [
 bevy_reflect = { version = "0.19.0-rc.2", default-features = false, features = ["smol_str"] }
 
 #💡 utility
+# default-features disabled so beet_core can build no_std; std consumers get the
+# std bits back transitively via `beet_core/std`.
 bitflags = "2"
-thiserror = "2"
-heck = "0.4"
+thiserror = { version = "2", default-features = false }
+heck = "0.5"
 glob = "0.3"
 dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
 web-time = "1"
-itertools = "0.14"
+itertools = { version = "0.14", default-features = false }
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
 rand = "0.9"
@@ -128,7 +131,7 @@ webbrowser = "1"
 
 #💡 logging
 log = "0.4"
-tracing = "0.1"
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_env_logger = "0.4"
 
@@ -167,7 +170,7 @@ extend = "1"
 
 #💡 io
 libc = "0.2"
-bytes = "1"
+bytes = { version = "1", default-features = false }
 smol_str = { version = "0.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -218,7 +221,16 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 # default = ["stack"]
-default = ["ui"]
+default = ["std", "ui"]
+
+# Standard library support (enabled by default). no_std consumers depend on beet
+# with `default-features = false`.
+std = ["beet_core/std"]
+# Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
+# critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
+embedded = ["beet_core/embedded"]
+# Bevy colour types (`Color`, `Srgba`, …) plus beet's `ColorExt`.
+bevy_color = ["beet_core/bevy_color"]
 
 # 💡 Top Level
 
@@ -316,7 +328,7 @@ spatial = ["action", "dep:beet_spatial"]
 [dependencies]
 bevy = { workspace = true }
 
-beet_core.workspace = true
+beet_core = { workspace = true }
 beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }

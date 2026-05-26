@@ -72,6 +72,19 @@ harness = false
 default = ["std"]
 std = [
 	"bevy_color",
+	"bevy/std",
+	"bevy/bevy_log",
+	"bevy/debug",
+	"bytes/std",
+	"either/use_std",
+	"itertools/use_std",
+	"thiserror/std",
+	"tracing/std",
+	"futures-lite/race",
+	"dep:send_wrapper",
+	"dep:dotenv",
+	"dep:web-time",
+	"dep:async-lock",
 	"dep:path-clean",
 	"dep:pathdiff",
 	"dep:glob",
@@ -81,6 +94,9 @@ std = [
 	"dep:async-io",
 	"dep:async-task",
 ]
+# no_std build for bare-metal targets (e.g. esp32): the libm / critical-section
+# shims bevy needs without std. Capabilities like `bevy_color` are opt-in.
+embedded = ["bevy/libm", "bevy/critical-section"]
 ctrlc = ["dep:ctrlc"]
 tokio = ["dep:tokio"]
 nightly = []
@@ -142,10 +158,10 @@ bevy_reflect.workspace = true
 
 #💡 utils
 tracing.workspace = true
-itertools.workspace = true
-send_wrapper.workspace = true
-web-time.workspace = true
-dotenv.workspace = true
+itertools = { workspace = true, features = ["use_alloc"] }
+send_wrapper = { workspace = true, optional = true }
+web-time = { workspace = true, optional = true }
+dotenv = { workspace = true, optional = true }
 smol_str = { workspace = true }
 heck.workspace = true
 bitflags = { workspace = true }
@@ -158,7 +174,7 @@ serde_urlencoded = { version = "0.7", optional = true }
 #💡 path
 path-clean = { version = "1", optional = true }
 pathdiff = { version = "0.2", optional = true }
-either = "1"
+either = { version = "1", default-features = false }
 
 #💡 serde
 serde = { workspace = true, optional = true, features=["rc"] }
@@ -169,9 +185,9 @@ ron = { workspace = true, optional = true }
 
 
 #💡 async
-futures-lite = { workspace = true, features = ["race"] }
+futures-lite = { workspace = true }
 async-channel = { workspace = true, optional = true }
-async-lock.workspace = true
+async-lock = { workspace = true, optional = true }
 
 # tokens dependencies
 syn = { workspace = true, optional = true }

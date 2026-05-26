@@ -39,7 +39,7 @@ path = "src/bin/bindings.rs"
 required-features = ["bindings_generator"]
 
 [dependencies]
-beet_core = { workspace = true, features = ["json", "rand", "fs"] }
+beet_core = { workspace = true, features = ["std", "json", "rand", "fs"] }
 beet_net.workspace = true
 bytes.workspace = true
 beet_action = { workspace = true, features = ["json"] }
