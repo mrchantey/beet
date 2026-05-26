@@ -380,7 +380,7 @@ impl AsyncWorld {
 	}
 
 	/// Queues a command to be executed on the world.
-	pub fn with(&self, func: impl Command + FnOnce(&mut World)) {
+	pub fn with(&self, func: impl Command<Out = ()> + FnOnce(&mut World)) {
 		let mut queue = CommandQueue::default();
 		queue.push(func);
 		self.send(queue);
@@ -460,7 +460,7 @@ impl AsyncWorld {
 	}
 
 	/// Accesses a resource mutably.
-	pub fn with_resource<R: Resource>(
+	pub fn with_resource<R: Resource<Mutability = Mutable>>(
 		&self,
 		func: impl FnOnce(Mut<R>) + Send + 'static,
 	) {
@@ -475,7 +475,7 @@ impl AsyncWorld {
 		func: impl 'static + Send + FnOnce(Mut<R>) -> O,
 	) -> impl Future<Output = O>
 	where
-		R: Resource,
+		R: Resource<Mutability = Mutable>,
 		O: 'static + Send + Sync,
 	{
 		self.with_then(move |world| func(world.resource_mut::<R>()))
@@ -500,7 +500,7 @@ impl AsyncWorld {
 	}
 
 	/// Queues a [`Command`] on the world.
-	pub fn queue<O>(&self, command: impl 'static + Send + Command<O>) {
+	pub fn queue(&self, command: impl 'static + Send + Command) {
 		self.with(move |world| {
 			command.apply(world);
 		});
@@ -509,7 +509,7 @@ impl AsyncWorld {
 	/// Queues a [`Command`] and waits for its output.
 	pub fn queue_then<O>(
 		&self,
-		command: impl 'static + Send + Command<O>,
+		command: impl 'static + Send + Command<Out = O>,
 	) -> impl Future<Output = O>
 	where
 		O: 'static + Send + Sync,
@@ -885,10 +885,7 @@ impl AsyncEntity {
 	}
 
 	/// Queues an [`EntityCommand`] on the entity.
-	pub fn queue<O>(&self, command: impl 'static + Send + EntityCommand<O>) -> &Self
-	where
-		O: 'static + Send + Sync,
-	{
+	pub fn queue(&self, command: impl 'static + Send + EntityCommand) -> &Self {
 		self.with(move |entity| {
 			command.apply(entity);
 		});
@@ -898,7 +895,7 @@ impl AsyncEntity {
 	/// Queues an [`EntityCommand`] and waits for its output.
 	pub async fn queue_then<O>(
 		&self,
-		command: impl 'static + Send + EntityCommand<O>,
+		command: impl 'static + Send + EntityCommand<Out = O>,
 	) -> Result<O>
 	where
 		O: 'static + Send + Sync,

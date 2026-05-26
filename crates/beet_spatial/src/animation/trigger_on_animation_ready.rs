@@ -1,7 +1,7 @@
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Attach as a descendent of a parent with a [`SceneRoot`] and the
+/// Attach as a descendent of a parent with a [`WorldAssetRoot`] and the
 /// entity's action will be called with the stored payload once the
 /// [`AnimationPlayer`] is ready.
 ///
@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 /// ## How it works
 /// The [`AnimationPlayer`] api is a bit awkward to work with:
 /// 1. Listen for an [`AnimationPlayer`] to be added.
-/// 2. Find the parent [`SceneRoot`].
+/// 2. Find the parent [`WorldAssetRoot`].
 /// 3. Find all descendants with a [`TriggerOnAnimationReady`] component.
 /// 4. Call the action on those entities with the stored payload.
 #[derive(Component)]
@@ -37,11 +37,11 @@ impl TriggerOnAnimationReady<()> {
 }
 
 /// Calls the action of any [`TriggerOnAnimationReady<P>`] entity under a
-/// [`SceneRoot`] once its [`AnimationPlayer`] has loaded, passing a clone
+/// [`WorldAssetRoot`] once its [`AnimationPlayer`] has loaded, passing a clone
 /// of the stored payload as input.
 pub fn trigger_on_animation_ready<P>(
 	mut commands: Commands,
-	scene_roots: Query<Entity, With<SceneRoot>>,
+	scene_roots: Query<Entity, With<WorldAssetRoot>>,
 	parents: Query<&ChildOf>,
 	children: Query<&Children>,
 	actions: Query<(Entity, &TriggerOnAnimationReady<P>)>,

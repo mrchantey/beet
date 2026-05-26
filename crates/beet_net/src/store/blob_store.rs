@@ -106,7 +106,7 @@ impl BlobStore {
 					.insert(BlobStore::new(provider));
 			}
 			Err(err) => {
-				world.default_error_handler()(err, ErrorContext::Command {
+				world.fallback_error_handler()(err, ErrorContext::Command {
 					name: std::any::type_name_of_val(&BlobStore::on_add::<T>)
 						.into(),
 				});

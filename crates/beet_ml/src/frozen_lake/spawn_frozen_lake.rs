@@ -46,7 +46,7 @@ pub fn spawn_frozen_lake_episode(
 		// the old beet_flow trick of stacking Repeat + Sequence on one entity no
 		// longer works, so Sequence becomes Repeat's only child.
 		commands.spawn((
-			SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
+			WorldAssetRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
 			Transform::from_translation(agent_pos).with_scale(object_scale),
 			grid_to_world.clone(),
 			RlAgentBundle {

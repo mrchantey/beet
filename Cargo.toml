@@ -93,8 +93,8 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 # beet_design = { path = "crates/beet_design", version = "0.0.9-dev.11" }
 
 #💡 local
-# bevy_ecs = {version = "0.18", default-features = false, features = ["backtrace"]}
-bevy = { version = "0.18", default-features = false, features = [
+# bevy_ecs = {version = "0.19", default-features = false, features = ["backtrace"]}
+bevy = { version = "0.19.0-rc.2", default-features = false, features = [
 	"std", # std for reflect PathBuf
 	"debug",
 	"bevy_log",
@@ -105,7 +105,7 @@ bevy = { version = "0.18", default-features = false, features = [
 	# "track_location",
 	# "keyboard",
 ] }
-bevy_reflect = { version = "0.18", default-features = false, features = ["smol_str"] }
+bevy_reflect = { version = "0.19.0-rc.2", default-features = false, features = ["smol_str"] }
 
 #💡 utility
 bitflags = "2"

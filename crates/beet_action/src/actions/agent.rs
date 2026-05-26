@@ -194,7 +194,7 @@ mod test {
 		let action = world.spawn_empty().id();
 
 		let mut state = SystemState::<AgentQuery>::from_world(&mut world);
-		let agent_query = state.get(&world);
+		let agent_query = state.get(&world).unwrap();
 
 		agent_query.entity(action).xpect_eq(action);
 		state.apply(&mut world);
@@ -214,7 +214,7 @@ mod test {
 			.unwrap();
 
 		let mut state = SystemState::<AgentQuery>::from_world(&mut world);
-		let agent_query = state.get(&world);
+		let agent_query = state.get(&world).unwrap();
 
 		agent_query.entity(child).xpect_eq(root);
 		state.apply(&mut world);
@@ -227,7 +227,7 @@ mod test {
 		let action = world.spawn(ActionOf(agent)).id();
 
 		let mut state = SystemState::<AgentQuery>::from_world(&mut world);
-		let agent_query = state.get(&world);
+		let agent_query = state.get(&world).unwrap();
 
 		agent_query.entity(action).xpect_eq(agent);
 		state.apply(&mut world);
@@ -248,7 +248,7 @@ mod test {
 			.unwrap();
 
 		let mut state = SystemState::<AgentQuery>::from_world(&mut world);
-		let agent_query = state.get(&world);
+		let agent_query = state.get(&world).unwrap();
 
 		// child's agent should be the ActionOf target, not the root
 		agent_query.entity(child).xpect_eq(agent);

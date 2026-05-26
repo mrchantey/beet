@@ -6,10 +6,11 @@ use bevy::ecs::change_detection::MaybeLocation;
 use bevy::ecs::component::ComponentInfo;
 use bevy::ecs::error::ErrorContext;
 use bevy::ecs::message::MessageCursor;
+use bevy::ecs::query::IterQueryData;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 #[cfg(feature = "bevy_multithreaded")]
-use bevy::ecs::schedule::ExecutorKind;
+use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
@@ -52,7 +53,7 @@ pub impl World {
 		func: impl FnOnce(T::Item<'_, '_>) -> O,
 	) -> O {
 		let mut state = self.state::<T>();
-		let item = state.get_mut(self);
+		let item = state.get_mut(self).unwrap();
 		let result = func(item);
 		state.apply(self);
 		result
@@ -64,7 +65,7 @@ pub impl World {
 		err: BevyError,
 		location: &'static Location<'static>,
 	) {
-		self.default_error_handler()(err.into(), ErrorContext::Command {
+		self.fallback_error_handler()(err.into(), ErrorContext::Command {
 			name: format!("{}\nat {:?}", std::any::type_name::<F>(), location)
 				.into(),
 		});
@@ -98,9 +99,7 @@ pub impl World {
 	fn force_single_threaded_schedules(&mut self) {
 		self.resource_scope(|_world, mut schedules: Mut<Schedules>| {
 			for (_label, schedule) in schedules.iter_mut() {
-				if schedule.get_executor_kind() == ExecutorKind::MultiThreaded {
-					schedule.set_executor_kind(ExecutorKind::SingleThreaded);
-				}
+				schedule.set_executor(SingleThreadedExecutor::new());
 			}
 		});
 	}
@@ -146,7 +145,7 @@ impl<D: QueryData, F: QueryFilter> core::ops::DerefMut for QueryOnce<D, F> {
 	}
 }
 
-impl<D: QueryData, F: QueryFilter> QueryOnce<D, F> {
+impl<D: IterQueryData, F: QueryFilter> QueryOnce<D, F> {
 	/// Creates a new [`QueryOnce`] by running a query and collecting the results.
 	pub fn new(world: &mut World) -> Self {
 		let mut query = world.query_filtered::<D, F>();
@@ -280,7 +279,7 @@ pub impl World {
 	///
 	/// Less efficient than caching [`QueryState`], so prefer [`World::query`]
 	/// for repeated queries.
-	fn query_once<D: QueryData>(&mut self) -> QueryOnce<D, ()> {
+	fn query_once<D: IterQueryData>(&mut self) -> QueryOnce<D, ()> {
 		QueryOnce::new(self)
 	}
 
@@ -288,7 +287,7 @@ pub impl World {
 	///
 	/// Less efficient than caching [`QueryState`], so prefer [`World::query_filtered`]
 	/// for repeated queries.
-	fn query_filtered_once<D: QueryData, F: QueryFilter>(
+	fn query_filtered_once<D: IterQueryData, F: QueryFilter>(
 		&mut self,
 	) -> QueryOnce<D, F> {
 		QueryOnce::new(self)

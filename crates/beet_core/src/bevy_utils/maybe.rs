@@ -101,6 +101,8 @@ struct MaybeCommand<B> {
 }
 
 impl<B: Bundle> Command for MaybeCommand<B> {
+	type Out = ();
+
 	fn apply(self, world: &mut World) {
 		let Ok(mut entity_mut) = world.get_entity_mut(self.entity) else {
 			#[cfg(debug_assertions)]

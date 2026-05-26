@@ -57,7 +57,7 @@ pub fn fetch_npc(
 	commands.spawn((
 		Name::new("Fox"),
 		Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
-		SceneRoot(foxie.clone()),
+		WorldAssetRoot(foxie.clone()),
 		graph_handle,
 		AnimationTransitions::new(),
 		RotateToVelocity3d::default(),
@@ -181,7 +181,7 @@ pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 		Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
 		children![(
 			Transform::from_xyz(0., 0., 0.).with_scale(scale),
-			SceneRoot(asset_server.load("kaykit/potion.glb#Scene0")),
+			WorldAssetRoot(asset_server.load("kaykit/potion.glb#Scene0")),
 		)],
 	));
 	commands.spawn((
@@ -191,7 +191,7 @@ pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 		Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
 		children![(
 			Transform::from_xyz(0., 0.2, 0.).with_scale(scale),
-			SceneRoot(asset_server.load("kaykit/coin.glb#Scene0")),
+			WorldAssetRoot(asset_server.load("kaykit/coin.glb#Scene0")),
 		)],
 	));
 	commands.spawn((
@@ -201,7 +201,7 @@ pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 		Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
 		children![(
 			Transform::from_xyz(0., 0.15, 0.).with_scale(scale),
-			SceneRoot(asset_server.load("kaykit/sword.glb#Scene0")),
+			WorldAssetRoot(asset_server.load("kaykit/sword.glb#Scene0")),
 		)],
 	));
 	commands.spawn((
@@ -211,7 +211,7 @@ pub fn fetch_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 		Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
 		children![(
 			Transform::from_xyz(0., 0., 0.).with_scale(scale),
-			SceneRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
+			WorldAssetRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
 		)],
 	));
 }

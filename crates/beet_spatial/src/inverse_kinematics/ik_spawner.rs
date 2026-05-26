@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use bevy::scene::SceneInstanceReady;
+use bevy::world_serialization::WorldInstanceReady;
 use std::f32::consts::FRAC_PI_2;
 
 /// Hooks up the parts of the robot arm gltf scene
@@ -25,7 +25,7 @@ pub fn ik_spawner_plugin(app: &mut App) {
 }
 
 fn ik_spawner(
-	trigger: On<SceneInstanceReady>,
+	trigger: On<WorldInstanceReady>,
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,

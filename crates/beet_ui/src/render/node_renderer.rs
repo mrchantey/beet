@@ -69,7 +69,7 @@ impl<'a> RenderContext<'a> {
 	/// node with the provided [`NodeVisitor`].
 	pub fn walk(&mut self, visitor: &mut impl NodeVisitor) {
 		let mut state = SystemState::<NodeWalker>::new(self.world);
-		let walker = state.get(self.world);
+		let walker = state.get(self.world).expect("infallible node query");
 		walker.walk(visitor, self.entity);
 	}
 

@@ -37,7 +37,7 @@ fn setup(
 			Name::new("Cheese"),
 			FollowCursor3d::default(),
 			Transform::from_xyz(20., 0., 40.).with_scale(Vec3::splat(3.)),
-			SceneRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
+			WorldAssetRoot(asset_server.load("kaykit/cheese.glb#Scene0")),
 		))
 		.id();
 
@@ -54,7 +54,7 @@ fn setup(
 	commands.spawn((
 		Name::new("Foxie"),
 		Transform::from_scale(Vec3::splat(0.1)),
-		SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
+		WorldAssetRoot(asset_server.load("misc/fox.glb#Scene0")),
 		graph_handle,
 		AnimationTransitions::new(),
 		RotateToVelocity3d::default(),

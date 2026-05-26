@@ -61,27 +61,18 @@ unsafe impl<T: SystemParam> SystemParam for When<T> {
 	}
 
 	#[inline]
-	unsafe fn validate_param(
-		state: &mut Self::State,
-		system_meta: &SystemMeta,
-		world: UnsafeWorldCell,
-	) -> Result<(), SystemParamValidationError> {
-		unsafe {
-			T::validate_param(state, system_meta, world).map_err(|mut e| {
-				e.skipped = true;
-				e
-			})
-		}
-	}
-
-	#[inline]
 	unsafe fn get_param<'world, 'state>(
 		state: &'state mut Self::State,
 		system_meta: &SystemMeta,
 		world: UnsafeWorldCell<'world>,
 		change_tick: Tick,
-	) -> Self::Item<'world, 'state> {
-		When(unsafe { T::get_param(state, system_meta, world, change_tick) })
+	) -> Result<Self::Item<'world, 'state>, SystemParamValidationError> {
+		unsafe { T::get_param(state, system_meta, world, change_tick) }
+			.map(When)
+			.map_err(|mut e| {
+				e.skipped = true;
+				e
+			})
 	}
 
 	fn apply(

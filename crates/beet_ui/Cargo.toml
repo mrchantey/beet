@@ -59,7 +59,7 @@ syntax_highlighting = [
 	"dep:streaming-iterator"
 ]
 
-bevy_scene = ["beet_core/bevy_scene","bevy/bevy_scene", "serde"]
+bevy_scene = ["beet_core/bevy_scene","bevy/bevy_world_serialization", "serde"]
 
 [dependencies]
 beet_core = { workspace = true }

@@ -43,7 +43,7 @@ pub impl<'a> EntityWorldMut<'a> {
 		let id = self.id();
 		self.world_scope(|world| {
 			let mut state = world.state::<T>();
-			let item = state.get_mut(world);
+			let item = state.get_mut(world).unwrap();
 			let result = func(id, item);
 			state.apply(world);
 			result
@@ -73,7 +73,7 @@ pub impl<'a> EntityWorldMut<'a> {
 		let id = self.id();
 		self.world_scope(|world| {
 			let mut state = world.state::<Query<T>>();
-			let mut query = state.get_mut(world);
+			let mut query = state.get_mut(world).unwrap();
 			let result = query.get_mut(id).map(func);
 			state.apply(world);
 			result

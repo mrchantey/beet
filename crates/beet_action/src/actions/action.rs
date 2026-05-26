@@ -105,7 +105,7 @@ where
 		let id = entity.id();
 		let world = entity.into_world_mut();
 		let mut state = SystemState::<AsyncCommands>::new(world);
-		let commands = state.get_mut(world);
+		let commands = state.get_mut(world)?;
 		let result = self.call_with(id, input, commands, out_handler);
 		state.apply(world);
 		world.flush();
@@ -212,7 +212,7 @@ impl<Out> OutHandler<Out> {
 
 	pub fn call_world(self, world: &mut World, result: Result<Out>) -> Result {
 		let mut state = SystemState::<AsyncCommands>::new(world);
-		let commands = state.get_mut(world);
+		let commands = state.get_mut(world)?;
 		let result = (self.func)(commands, result);
 		state.apply(world);
 		world.flush();

@@ -45,7 +45,7 @@ fn setup(
 	//       TranslateGrid — animate the move
 	commands.spawn((
 		Name::new("Inference Agent"),
-		SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
+		WorldAssetRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
 		Transform::from_translation(agent_pos).with_scale(object_scale),
 		grid_to_world.clone(),
 		agent_grid_pos,

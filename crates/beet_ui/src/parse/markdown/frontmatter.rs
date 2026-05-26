@@ -6,7 +6,7 @@
 //! into a `bevy::reflect::DynamicStruct`.
 
 use beet_core::prelude::*;
-use bevy::reflect::DynamicStruct;
+use bevy::reflect::structs::DynamicStruct;
 
 /// Parsed frontmatter metadata from a YAML or TOML block.
 ///

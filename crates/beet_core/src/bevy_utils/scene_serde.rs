@@ -4,24 +4,44 @@
 //! to and from various formats.
 
 use crate::prelude::*;
+use bevy::asset::AssetPath;
+use bevy::asset::AssetServer;
+use bevy::asset::LoadFromPath;
+use bevy::asset::UntypedHandle;
 use bevy::ecs::entity::EntityHashMap;
 use bevy::prelude::*;
-use bevy::scene::serde::SceneSerializer;
+use bevy::world_serialization::DynamicWorld;
+use bevy::world_serialization::DynamicWorldBuilder;
+use bevy::world_serialization::WorldFilter;
+use bevy::world_serialization::serde::DynamicWorldSerializer;
+use bevy::world_serialization::serde::WorldDeserializer;
+use core::any::TypeId;
 
 /// Serializes world state or a subtree to various formats.
 ///
 /// Use [`SceneSaver::new`] for the full world, or [`SceneSaver::new`] followed
 /// by [`SceneSaver::with_entity_tree`] to serialize only an entity and its descendants.
+///
+/// Extraction is deferred until [`SceneSaver::save`], as the underlying
+/// [`DynamicWorldBuilder`] borrows the [`AppTypeRegistry`] for its lifetime.
 pub struct SceneSaver<'a> {
 	world: &'a World,
-	builder: DynamicSceneBuilder<'a>,
+	component_filter: WorldFilter,
+	resource_filter: WorldFilter,
+	entities: Vec<Entity>,
+	extract_resources: bool,
 }
 
 impl<'a> SceneSaver<'a> {
 	/// Creates a saver for the entire world.
 	pub fn new(world: &'a mut World) -> Self {
-		let builder = DynamicSceneBuilder::from_world(world);
-		Self { world, builder }
+		Self {
+			world,
+			component_filter: WorldFilter::default(),
+			resource_filter: WorldFilter::default(),
+			entities: Vec::new(),
+			extract_resources: false,
+		}
 	}
 
 	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
@@ -30,20 +50,17 @@ impl<'a> SceneSaver<'a> {
 	pub fn new_default(world: &'a mut World) -> Self {
 		let all_entities: Vec<Entity> =
 			world.query::<Entity>().iter(world).collect();
-		let mut saver = Self::new(world);
-		saver.builder = saver
-			.builder
-			.extract_entities(all_entities.into_iter())
+		Self::new(world)
+			.with_entities(all_entities)
 			.deny_resource::<Time<Real>>()
-			.extract_resources();
-		saver
+			.extract_resources()
 	}
 
 	/// Scopes serialization to an entity and its descendants.
 	pub fn with_entity_tree(mut self, entity: Entity) -> Self {
 		let mut entities = Vec::new();
 		self.collect_descendants(entity, &mut entities);
-		self.builder = self.builder.extract_entities(entities.into_iter());
+		self.entities.extend(entities);
 		self
 	}
 
@@ -52,25 +69,25 @@ impl<'a> SceneSaver<'a> {
 		mut self,
 		entities: impl IntoIterator<Item = Entity>,
 	) -> Self {
-		self.builder = self.builder.extract_entities(entities.into_iter());
+		self.entities.extend(entities);
 		self
 	}
 
 	/// Extracts all resources into the scene.
 	pub fn extract_resources(mut self) -> Self {
-		self.builder = self.builder.extract_resources();
+		self.extract_resources = true;
 		self
 	}
 
 	/// Denies a resource type from being included in the scene.
 	pub fn deny_resource<T: Resource>(mut self) -> Self {
-		self.builder = self.builder.deny_resource::<T>();
+		self.resource_filter = self.resource_filter.deny::<T>();
 		self
 	}
 
 	/// Denies a component type from being included in the scene.
 	pub fn deny_component<T: Component>(mut self) -> Self {
-		self.builder = self.builder.deny_component::<T>();
+		self.component_filter = self.component_filter.deny::<T>();
 		self
 	}
 
@@ -87,8 +104,16 @@ impl<'a> SceneSaver<'a> {
 	) -> Result<MediaBytes> {
 		let registry = self.world.resource::<AppTypeRegistry>();
 		let registry = registry.read();
-		let dyn_scene = self.builder.build();
-		let serializer = SceneSerializer::new(&dyn_scene, &registry);
+		let mut builder =
+			DynamicWorldBuilder::from_world(self.world, &registry)
+				.with_component_filter(self.component_filter)
+				.with_resource_filter(self.resource_filter)
+				.extract_entities(self.entities.into_iter());
+		if self.extract_resources {
+			builder = builder.extract_resources();
+		}
+		let dyn_world = builder.build();
+		let serializer = DynamicWorldSerializer::new(&dyn_world, &registry);
 		MediaBytes::serialize_with_options(media_type, &serializer, options)
 	}
 
@@ -100,6 +125,24 @@ impl<'a> SceneSaver<'a> {
 				self.collect_descendants(child, entities);
 			}
 		}
+	}
+}
+
+/// A no-op [`LoadFromPath`] used when deserializing scenes in a world that has
+/// no [`AssetServer`]. Beet scenes do not currently serialize asset handles, so
+/// this should never be invoked; if it is, an [`AssetServer`] is required.
+struct NoAssetLoader;
+
+impl LoadFromPath for NoAssetLoader {
+	fn load_from_path_erased(
+		&mut self,
+		_type_id: TypeId,
+		path: AssetPath<'static>,
+	) -> UntypedHandle {
+		panic!(
+			"cannot deserialize asset handle for {path:?}: \
+			 the world has no AssetServer"
+		)
 	}
 }
 
@@ -158,36 +201,38 @@ impl<'a> SceneLoader<'a> {
 	/// Deserializes a scene from [`MediaBytes`] into the world,
 	/// dispatching by media type.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
-		match bytes.media_type() {
+		use serde::de::DeserializeSeed;
+		// `AssetServer` is cloned (cheap arc) out so the deserializer can hold a
+		// `LoadFromPath` without borrowing the world for the read lock. Beet
+		// scenes don't currently serialize asset handles, so a no-op loader
+		// suffices when no server is present.
+		let mut loader: Box<dyn LoadFromPath> =
+			match self.world.get_resource::<AssetServer>() {
+				Some(server) => Box::new(server.clone()),
+				None => Box::new(NoAssetLoader),
+			};
+		let type_registry = self.world.resource::<AppTypeRegistry>().clone();
+		let registry = type_registry.read();
+		let dynamic_world = match bytes.media_type() {
 			MediaType::Ron => {
-				use serde::de::DeserializeSeed;
 				let text = bytes.as_utf8()?;
 				let mut de = ron::de::Deserializer::from_str(text)?;
-				let dynamic_scene = {
-					let type_registry =
-						self.world.resource::<AppTypeRegistry>();
-					let scene_de = bevy::scene::serde::SceneDeserializer {
-						type_registry: &type_registry.read(),
-					};
-					scene_de.deserialize(&mut de)?
-				};
-				self.write(dynamic_scene)
+				WorldDeserializer {
+					type_registry: &registry,
+					load_from_path: &mut *loader,
+				}
+				.deserialize(&mut de)?
 			}
 			MediaType::Json => {
 				cfg_if! {
 					if #[cfg(feature = "json")] {
-						use serde::de::DeserializeSeed;
 						let mut de =
 							serde_json::Deserializer::from_slice(bytes.bytes());
-						let dynamic_scene = {
-							let type_registry =
-								self.world.resource::<AppTypeRegistry>();
-							let scene_de = bevy::scene::serde::SceneDeserializer {
-								type_registry: &type_registry.read(),
-							};
-							scene_de.deserialize(&mut de)?
-						};
-						self.write(dynamic_scene)
+						WorldDeserializer {
+							type_registry: &registry,
+							load_from_path: &mut *loader,
+						}
+						.deserialize(&mut de)?
 					} else {
 						bevybail!(
 							"The `json` feature is required for JSON scene loading"
@@ -198,19 +243,13 @@ impl<'a> SceneLoader<'a> {
 			MediaType::Postcard | MediaType::Bytes => {
 				cfg_if! {
 					if #[cfg(feature = "postcard")] {
-						use serde::de::DeserializeSeed;
 						let mut de =
 							postcard::Deserializer::from_bytes(bytes.bytes());
-						let dynamic_scene = {
-							let type_registry =
-								self.world.resource::<AppTypeRegistry>();
-							let registry_read = type_registry.read();
-							let scene_de = bevy::scene::serde::SceneDeserializer {
-								type_registry: &registry_read,
-							};
-							scene_de.deserialize(&mut de)?
-						};
-						self.write(dynamic_scene)
+						WorldDeserializer {
+							type_registry: &registry,
+							load_from_path: &mut *loader,
+						}
+						.deserialize(&mut de)?
 					} else {
 						bevybail!(
 							"The `postcard` feature is required for postcard scene loading"
@@ -221,17 +260,16 @@ impl<'a> SceneLoader<'a> {
 			other => {
 				bevybail!("Unsupported media type for scene loading: {other}")
 			}
-		}
+		};
+		drop(registry);
+		self.write(dynamic_world)
 	}
 
-	fn write(
-		self,
-		dynamic_scene: bevy::scene::DynamicScene,
-	) -> Result<Vec<Entity>> {
+	fn write(self, dynamic_world: DynamicWorld) -> Result<Vec<Entity>> {
 		let entity = self.entity;
 		let mut default_map = EntityHashMap::default();
 		let entity_map = self.entity_map.unwrap_or(&mut default_map);
-		dynamic_scene.write_to_world(self.world, entity_map)?;
+		dynamic_world.write_to_world(self.world, entity_map)?;
 
 		let spawned: Vec<Entity> = entity_map.values().copied().collect();
 		if let Some(parent) = entity {

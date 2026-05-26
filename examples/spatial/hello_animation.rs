@@ -44,7 +44,7 @@ fn setup(
 	commands.spawn((
 		Name::new("Foxie"),
 		Transform::from_scale(Vec3::splat(0.1)),
-		SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
+		WorldAssetRoot(asset_server.load("misc/fox.glb#Scene0")),
 		graph_handle,
 		// AnimationTransitions::default(),
 		children![(

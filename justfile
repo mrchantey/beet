@@ -208,6 +208,8 @@ _extra-pkgs-wasm := "beet_spatial"
 # - `nightly` / `custom_test_frameworks`: nightly-only test runner path
 # - `default`: redundant with explicit feature enumeration
 # - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (default)
+# - `ratatui` / `tui`: pull in `bevy_ratatui`, which has no `bevy 0.19` release
+#   yet. Re-enable once a `bevy 0.19`-compatible `bevy_ratatui` is published.
 _core-features pkgs:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -216,7 +218,7 @@ _core-features pkgs:
 	else
 		feats=$(for c in {{ pkgs }}; do
 			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' crates/$c/Cargo.toml
-		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda)$' | paste -sd, -)
+		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda|ratatui|tui)$' | paste -sd, -)
 		echo "--features $feats"
 	fi
 

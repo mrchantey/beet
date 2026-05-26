@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::prelude::*;
-use bevy::ecs::schedule::ExecutorKind;
+use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::time::TimePlugin;
 
 /// Builds and runs the test app for the given owned tests.
@@ -76,7 +76,7 @@ impl Plugin for TestPlugin {
 			// We could alternatively just mark run_tests_series with NonSendMarker,
 			// but thats more error-prone
 			.edit_schedule(RunTests, |schedule| {
-				schedule.set_executor_kind(ExecutorKind::SingleThreaded);
+				schedule.set_executor(SingleThreadedExecutor::new());
 			})
 			.add_systems(
 				RunTests,

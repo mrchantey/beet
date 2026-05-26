@@ -140,10 +140,12 @@ pub struct EndRun<T = Outcome>(pub T)
 where
 	T: 'static + Send + Sync;
 
-impl<T> EntityCommand<Result> for EndRun<T>
+impl<T> EntityCommand for EndRun<T>
 where
 	T: 'static + Send + Sync,
 {
+	type Out = Result;
+
 	fn apply(self, mut entity: EntityWorldMut) -> Result {
 		let running = entity.take::<Running<T>>().ok_or_else(|| {
 			bevyhow!(
@@ -191,10 +193,12 @@ where
 	pub fn new() -> Self { Self::default() }
 }
 
-impl<T> EntityCommand<Result> for InterruptRun<T>
+impl<T> EntityCommand for InterruptRun<T>
 where
 	T: 'static + Send + Sync,
 {
+	type Out = Result;
+
 	fn apply(self, entity: EntityWorldMut) -> Result {
 		let target = entity.id();
 		let world = entity.into_world_mut();

@@ -33,7 +33,7 @@ fn nearest_sentence_system(
 ) -> Result<Entity> {
 	let action_entity = cx.caller.id();
 	let near = query.get(action_entity)?;
-	let bert = berts.get_mut(&near.bert).ok_or_else(|| {
+	let mut bert = berts.get_mut(&near.bert).ok_or_else(|| {
 		bevyhow!("Bert asset not loaded for entity {action_entity:?}")
 	})?;
 	let prompt = agents.get(action_entity)?;

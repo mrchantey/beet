@@ -43,7 +43,7 @@ pub struct OutputContainer;
 
 fn font() -> TextFont {
 	TextFont {
-		font_size: 32.,
+		font_size: FontSize::Px(32.),
 		..default()
 	}
 }

@@ -50,7 +50,7 @@ impl ErasedBlock {
 					.insert(ErasedBlock::new(block));
 			}
 			Err(err) => {
-				world.default_error_handler()(err, ErrorContext::Command {
+				world.fallback_error_handler()(err, ErrorContext::Command {
 					name: std::any::type_name_of_val(&ErasedBlock::on_add::<T>)
 						.into(),
 				});

@@ -20,18 +20,18 @@
 //! let schema = Schema::new::<MyRequest>();
 //! ```
 use crate::prelude::*;
-use bevy::reflect::ArrayInfo;
-use bevy::reflect::EnumInfo;
-use bevy::reflect::ListInfo;
-use bevy::reflect::MapInfo;
 use bevy::reflect::NamedField;
-use bevy::reflect::SetInfo;
-use bevy::reflect::StructInfo;
-use bevy::reflect::TupleInfo;
-use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
-use bevy::reflect::VariantInfo;
+use bevy::reflect::array::ArrayInfo;
+use bevy::reflect::enums::EnumInfo;
+use bevy::reflect::enums::VariantInfo;
+use bevy::reflect::list::ListInfo;
+use bevy::reflect::map::MapInfo;
+use bevy::reflect::set::SetInfo;
+use bevy::reflect::structs::StructInfo;
+use bevy::reflect::tuple::TupleInfo;
+use bevy::reflect::tuple_struct::TupleStructInfo;
 
 /// A JSON Schema represented as a [`Value`].
 #[derive(

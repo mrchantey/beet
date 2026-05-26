@@ -61,7 +61,7 @@ fn sentence_steer_target<F: Component>(
 	// Asset is downloaded asynchronously by [`BertLoader`]; if the user
 	// triggers this action before the load finishes, soft-fail so the
 	// sequence stops without panicking the app.
-	let Some(bert) = berts.get_mut(&target_action.bert) else {
+	let Some(mut bert) = berts.get_mut(&target_action.bert) else {
 		log::warn!("Bert asset not yet loaded, ignoring action call");
 		return Ok(Outcome::FAIL);
 	};

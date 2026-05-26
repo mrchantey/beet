@@ -72,15 +72,15 @@
 //! ```
 
 use crate::prelude::*;
-use bevy::reflect::DynamicStruct;
-use bevy::reflect::DynamicTuple;
-use bevy::reflect::DynamicTupleStruct;
 use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
-use bevy::reflect::StructInfo;
-use bevy::reflect::TupleInfo;
-use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
+use bevy::reflect::structs::DynamicStruct;
+use bevy::reflect::structs::StructInfo;
+use bevy::reflect::tuple::DynamicTuple;
+use bevy::reflect::tuple::TupleInfo;
+use bevy::reflect::tuple_struct::DynamicTupleStruct;
+use bevy::reflect::tuple_struct::TupleStructInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
 use core::any::TypeId;
@@ -754,7 +754,7 @@ fn parse_vec_newtype_field(
 	values: &Vec<String>,
 	item_type_info: &TypeInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	use bevy::reflect::DynamicList;
+	use bevy::reflect::list::DynamicList;
 
 	let mut dynamic_list = DynamicList::default();
 
