@@ -27,7 +27,7 @@ ml = ["dep:beet_ml"]
 beet_action = { workspace = true }
 beet_ml = { workspace = true, features = ["spatial"], optional = true }
 beet_spatial = { workspace = true, features = [] }
-beet_core = { workspace = true, features = ["rand","bevy_keyboard"] }
+beet_core = { workspace = true, features = ["std", "rand","bevy_keyboard"] }
 
 
 serde.workspace = true

@@ -21,7 +21,7 @@ scripting = ["rhai"]
 rhai = ["dep:rhai", "serde"]
 
 [dependencies]
-beet_core = { workspace = true }
+beet_core = { workspace = true, features = ["std"] }
 bevy = { workspace = true, features = ["bevy_color"] }
 bitflags.workspace = true
 extend.workspace = true

@@ -40,6 +40,8 @@
 mod ancestor_query;
 #[cfg(feature = "std")]
 mod async_commands;
+// async init builds on AsyncEntity / futures (std-only)
+#[cfg(feature = "std")]
 mod async_init;
 #[cfg(feature = "std")]
 mod async_runner;
@@ -52,6 +54,7 @@ mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
 
+#[cfg(feature = "std")]
 pub use async_init::*;
 pub use bevyhow::*;
 mod observer_adder;

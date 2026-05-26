@@ -151,7 +151,7 @@ pub mod prelude {
 	pub use core::marker::PhantomData;
 	/// Shorthand for `Ok(())`
 	pub const OK: Result<(), BevyError> = Ok(());
-	pub use std::ops::ControlFlow;
+	pub use core::ops::ControlFlow;
 
 	#[cfg(feature = "std")]
 	pub use crate::arena::*;
@@ -196,6 +196,8 @@ pub mod prelude {
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
+	// bevy_log is std-only and only enabled via the `std` feature.
+	#[cfg(feature = "std")]
 	pub use bevy::log::LogPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
@@ -223,8 +225,12 @@ pub mod prelude {
 	pub use beet_core_macros::*;
 	pub use futures_lite::StreamExt;
 	pub use smol_str::SmolStr;
-	pub use web_time::Duration;
+	pub use core::time::Duration;
+	// web_time provides Instant/SystemTime by wrapping std (or JS on wasm);
+	// neither has a core-only equivalent, so they are std-gated.
+	#[cfg(feature = "std")]
 	pub use web_time::Instant;
+	#[cfg(feature = "std")]
 	pub use web_time::SystemTime;
 
 	#[cfg(feature = "std")]
@@ -254,9 +260,11 @@ pub mod exports {
 	pub use quote;
 	#[cfg(feature = "serde")]
 	pub use ron;
+	#[cfg(feature = "std")]
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;
+	#[cfg(feature = "std")]
 	pub use web_time;
 
 	// merged-in exports

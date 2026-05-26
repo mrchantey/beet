@@ -62,7 +62,7 @@ syntax_highlighting = [
 world_serde = ["beet_core/world_serde","bevy/bevy_world_serialization", "serde"]
 
 [dependencies]
-beet_core = { workspace = true }
+beet_core = { workspace = true, features = ["std"] }
 beet_net = { workspace = true, optional = true }
 beet_action = { workspace = true, optional = true }
 bevy.workspace = true

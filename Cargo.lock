@@ -1369,7 +1369,7 @@ dependencies = [
  "futures-lite",
  "getrandom 0.3.4",
  "glob",
- "heck 0.4.1",
+ "heck",
  "http 1.4.0",
  "inventory",
  "itertools 0.14.0",
@@ -1409,7 +1409,7 @@ name = "beet_core_macros"
 version = "0.0.9-dev.11"
 dependencies = [
  "beet_core_shared",
- "heck 0.4.1",
+ "heck",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -1453,7 +1453,7 @@ dependencies = [
  "beet_net",
  "beet_router",
  "bytes",
- "heck 0.4.1",
+ "heck",
  "pretty_env_logger",
  "prettyplease",
  "proc-macro2",
@@ -1516,7 +1516,7 @@ dependencies = [
  "futures",
  "futures-lite",
  "futures-rustls",
- "heck 0.4.1",
+ "heck",
  "http 1.4.0",
  "http-body-util",
  "hyper 1.9.0",
@@ -1557,7 +1557,7 @@ dependencies = [
  "bevy 0.19.0-rc.2",
  "bitflags 2.11.1",
  "extend",
- "heck 0.4.1",
+ "heck",
  "prettyplease",
  "proc-macro2",
  "pulldown-cmark",
@@ -1622,7 +1622,7 @@ dependencies = [
  "bitflags 2.11.1",
  "bytes",
  "extend",
- "heck 0.4.1",
+ "heck",
  "libc",
  "material-colors",
  "postcard",
@@ -6079,7 +6079,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1e6a265c649f3f5979b601d26f1d05ada116434c87741c9493cb56218f76cbc"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "syn",
@@ -7212,12 +7212,6 @@ dependencies = [
  "portable-atomic",
  "stable_deref_trait",
 ]
-
-[[package]]
-name = "heck"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "heck"
@@ -9954,6 +9948,7 @@ version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
 dependencies = [
+ "critical-section",
  "serde",
 ]
 
@@ -12010,7 +12005,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "rustversion",
@@ -12023,7 +12018,7 @@ version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "syn",
@@ -14259,7 +14254,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea61de684c3ea68cb082b7a88508a8b27fcc8b797d738bfc99a82facf1d752dc"
 dependencies = [
  "anyhow",
- "heck 0.5.0",
+ "heck",
  "wit-parser",
 ]
 
@@ -14270,7 +14265,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7c566e0f4b284dd6561c786d9cb0142da491f46a9fbed79ea69cdad5db17f21"
 dependencies = [
  "anyhow",
- "heck 0.5.0",
+ "heck",
  "indexmap 2.14.0",
  "prettyplease",
  "syn",

@@ -71,6 +71,7 @@ pub impl<T: Sized> T {
 	}
 
 	/// Calls `print!` on the display-formatted value and returns `self`.
+	#[cfg(feature = "std")]
 	fn xprint(self) -> Self
 	where
 		Self: core::fmt::Display,
@@ -79,6 +80,7 @@ pub impl<T: Sized> T {
 		self
 	}
 	/// Calls `println!` on the display-formatted value and returns `self`.
+	#[cfg(feature = "std")]
 	fn xprintln(self) -> Self
 	where
 		Self: core::fmt::Display,
@@ -236,7 +238,7 @@ pub impl<T, I: IntoIterator<Item = T>> I {
 	/// Adds the provided item to the end of the iterator,
 	/// using std::iter::once, returning another iterator.
 	fn xpush(self, item: T) -> impl IntoIterator<Item = T> {
-		self.into_iter().chain(std::iter::once(item))
+		self.into_iter().chain(core::iter::once(item))
 	}
 
 	/// Maps each item and collects into a [`Vec`].

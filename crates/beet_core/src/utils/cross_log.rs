@@ -6,6 +6,7 @@
 /// is a declared feature, so it is never evaluated in downstream crates.
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
+#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_native(msg: &str) {
 	#[cfg(feature = "std")]
 	println!("{}", msg);
@@ -14,6 +15,7 @@ pub fn _cross_log_native(msg: &str) {
 /// Internal helper: log without a newline to native stdout, flushing after.
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
+#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_native_noline(msg: &str) {
 	#[cfg(feature = "std")]
 	{
@@ -26,6 +28,7 @@ pub fn _cross_log_native_noline(msg: &str) {
 /// Internal helper: log a line to native stderr.
 #[cfg(not(target_arch = "wasm32"))]
 #[doc(hidden)]
+#[cfg_attr(not(feature = "std"), allow(unused_variables))]
 pub fn _cross_log_error_native(msg: &str) {
 	#[cfg(feature = "std")]
 	eprintln!("{}", msg);

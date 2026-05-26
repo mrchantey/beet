@@ -435,6 +435,7 @@ impl MediaType {
 	/// assert_eq!(MediaType::from_path("/assets/style.css"), MediaType::Css);
 	/// assert_eq!(MediaType::from_path("no_extension"), MediaType::Bytes);
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn from_path(path: impl AsRef<std::path::Path>) -> Self {
 		path.as_ref()
 			.extension()

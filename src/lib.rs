@@ -1,4 +1,11 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+// BeetPlugins pulls in std-only infrastructure (tracing-subscriber, package
+// config), so the whole module is std-gated.
+#[cfg(feature = "std")]
 mod beet_plugins;
 
 // #[cfg(feature = "build")]
@@ -39,6 +46,7 @@ pub use beet_spatial as spatial;
 pub mod prelude {
 	#[cfg(feature = "action")]
 	pub use crate::action::prelude::*;
+	#[cfg(feature = "std")]
 	pub use crate::beet_plugins::*;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]

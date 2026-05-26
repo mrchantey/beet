@@ -147,13 +147,13 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
 
-impl<K, V, S> std::hash::Hash for MultiMap<K, V, S>
+impl<K, V, S> core::hash::Hash for MultiMap<K, V, S>
 where
 	K: Eq + Ord + Hash,
 	V: Eq + Hash,
 	S: BuildHasher,
 {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		// order of keys doesn't matter, but order of values per key does
 		let mut entries: Vec<_> = self.inner.iter().collect();
 		entries.sort_by(|a, b| a.0.cmp(b.0)); // sort by key for consistent hashing
@@ -170,7 +170,7 @@ where
 	V: Ord,
 	S: BuildHasher,
 {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
 		let mut a: Vec<_> = self.inner.iter().collect();
 		let mut b: Vec<_> = other.inner.iter().collect();
 
@@ -186,7 +186,7 @@ where
 	V: Ord,
 	S: BuildHasher,
 {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }

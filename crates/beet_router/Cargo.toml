@@ -37,7 +37,7 @@ codegen = [
 ]
 
 [dependencies]
-beet_core.workspace = true
+beet_core = { workspace = true, features = ["std"] }
 beet_ui = { workspace = true, features = ["action"] }
 beet_action.workspace = true
 beet_net.workspace = true
