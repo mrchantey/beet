@@ -70,7 +70,6 @@ fn plugin_2d(app: &mut App) {
 			.chain()
 			.in_set(PostTickSet),
 		)
-		.register_type::<AutoSpawn>()
 		.register_type::<RandomizePosition>()
 		.register_type::<WrapAround>()
 		.register_type::<FollowCursor2d>()

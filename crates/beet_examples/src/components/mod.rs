@@ -1,7 +1,5 @@
 mod foxie;
 pub use self::foxie::*;
-mod auto_spawn;
-pub use self::auto_spawn::*;
 mod camera_distance;
 pub use self::camera_distance::*;
 mod collectable;
