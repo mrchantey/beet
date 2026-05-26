@@ -20,6 +20,98 @@ use std::collections::BTreeMap as Map;
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsCloudwatchLogGroupDetails {
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub deletion_protection_enabled: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub kms_key_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub log_group_class: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub name: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub name_prefix: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub retention_in_days: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub skip_destroy: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+}
+impl terra::ToJson for AwsCloudwatchLogGroupDetails {
+	fn to_json(&self) -> serde_json::Value {
+		serde_json::to_value(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsCloudwatchLogGroupDetails {
+	fn resource_type(&self) -> &'static str { "aws_cloudwatch_log_group" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsIamAccessKeyDetails {
 	/// ## Attribute
 	/// `optional`

@@ -17,7 +17,7 @@ const SOURCE_PATH: &str = "crates/beet_infra/examples/fargate_test.rs";
 #[beet_core::test(timeout_ms = 1_800_000)]
 #[ignore = "deploys resources and takes ten minutes"]
 async fn fargate_lifecycle() {
-	pretty_env_logger::init();
+	init_logger();
 	info!("==== STARTING FARGATE LIFECYCLE TEST ====");
 
 	// resolve source paths and create isolated temp assets to prevent
@@ -115,6 +115,18 @@ async fn fargate_lifecycle() {
 
 	// revert source file (guard handles assets)
 	swap_version(source, MARKER_V2, MARKER_V1).ok();
+}
+
+/// Manual teardown utility: destroys any live `fargate-test` stack using the
+/// terraform state in the state bucket. Run when a prior lifecycle run was
+/// interrupted and left resources (ALB, ECS service, VPC) billing.
+#[beet_core::test(timeout_ms = 900_000)]
+#[ignore = "manual teardown of the fargate-test stack"]
+async fn fargate_force_destroy() {
+	init_logger();
+	let stack = Stack::new("fargate-test").with_aws_region("us-west-2");
+	let project = build_project(&stack).unwrap();
+	cleanup_prior_state(&stack, project).await;
 }
 
 /// Build the terraform project for the Fargate test stack.

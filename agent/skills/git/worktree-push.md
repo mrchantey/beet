@@ -1,4 +1,4 @@
-# Upstream Worktree
+# Worktree Push
 
 Time to merge this worktree upstream. 
 - The repo lives at `~/me/beet`.

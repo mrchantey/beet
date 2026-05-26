@@ -286,7 +286,7 @@ impl Block for LambdaBlock {
 							name: authority.clone(),
 							ttl: 1,
 							r#type: "CNAME".into(),
-							zone_id: "CLOUDFLARE_ZONE_ID".into(),
+							zone_id: Some("CLOUDFLARE_ZONE_ID".into()),
 							content: Some(
 								gateway.field_ref("api_endpoint").into(),
 							),

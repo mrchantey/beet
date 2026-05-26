@@ -83,6 +83,11 @@ pub struct CloudflareDnsRecordDetails {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub priority: Option<i64>,
+	/// Enables private network routing to the origin.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub private_routing: Option<bool>,
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -120,9 +125,9 @@ pub struct CloudflareDnsRecordDetails {
 	pub r#type: SmolStr,
 	/// Identifier.
 	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub zone_id: SmolStr,
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub zone_id: Option<SmolStr>,
 }
 impl terra::ToJson for CloudflareDnsRecordDetails {
 	fn to_json(&self) -> serde_json::Value {
@@ -203,12 +208,6 @@ impl terra::Resource for CloudflareDnsRecordDetails {
 			return Err(terra::ResourceValidationError::MissingRequiredField {
 				resource_type: self.resource_type(),
 				field_name: "type",
-			});
-		}
-		if self.zone_id.is_empty() {
-			return Err(terra::ResourceValidationError::MissingRequiredField {
-				resource_type: self.resource_type(),
-				field_name: "zone_id",
 			});
 		}
 		Ok(())
