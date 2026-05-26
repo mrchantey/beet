@@ -236,7 +236,7 @@ mod test {
 
 	/// Serializable wrapper component, generic over the inner action `T`.
 	/// Uses `#[require]` to provide the wrapped action at bundle-resolution
-	/// time, avoiding timing issues during scene deserialization.
+	/// time, avoiding timing issues during world serde deserialization.
 	#[derive(Debug, Clone, Component, Reflect)]
 	#[reflect(Component, Default)]
 	#[require(Action<i32, i32> = AddOneWrapper::<T>::make_action())]
@@ -380,7 +380,7 @@ mod test {
 
 	// -- serde roundtrip tests --------------------------------------------
 
-	fn scene_app() -> App {
+	fn serde_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, AsyncPlugin));
 		app.register_type::<AddOneWrapper<Doubler>>();
@@ -392,7 +392,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn wrapper_works_directly() {
-		let mut app = scene_app();
+		let mut app = serde_app();
 		// Only AddOneWrapper is needed — its #[require] provides the
 		// wrapped action, constructing the inner Doubler action statically.
 		let entity = app
@@ -411,8 +411,8 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn wrapper_scene_roundtrip() {
-		let mut app = scene_app();
+	fn wrapper_world_serde_roundtrip() {
+		let mut app = serde_app();
 
 		let entity = app
 			.world_mut()
@@ -428,11 +428,11 @@ mod test {
 		app.world().entity(entity).get::<ActionMeta>().xpect_some();
 
 		// Serialize
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entities([entity])
 			.save(MediaType::Ron)
 			.unwrap();
-		scene_bytes
+		world_serde_bytes
 			.as_utf8()
 			.unwrap()
 			.xref()
@@ -444,9 +444,9 @@ mod test {
 
 		// Deserialize
 		let mut entity_map = EntityHashMap::default();
-		SceneLoader::new(app.world_mut())
+		WorldSerdeLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 		app.update();
 
@@ -462,7 +462,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn wrapper_works_after_roundtrip() {
-		let mut app = scene_app();
+		let mut app = serde_app();
 
 		let entity = app
 			.world_mut()
@@ -471,7 +471,7 @@ mod test {
 		app.update();
 
 		// Serialize then despawn
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entities([entity])
 			.save(MediaType::Ron)
 			.unwrap();
@@ -480,9 +480,9 @@ mod test {
 
 		// Deserialize
 		let mut entity_map = EntityHashMap::default();
-		SceneLoader::new(app.world_mut())
+		WorldSerdeLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 		app.update();
 

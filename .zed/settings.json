@@ -22,7 +22,7 @@
 					// [
 					// "all",
 					// "tui",
-					// "bevy_scene",
+					// "bevy_world_serde",
 					// "json",
 					// "_pretty_curl",
 					// "_mini_browser",

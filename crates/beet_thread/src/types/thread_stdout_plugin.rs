@@ -52,7 +52,7 @@ fn post_added(
 	thread_query: ThreadQuery,
 ) -> Result {
 	// handle multiple simultaneously created posts,
-	// ie scene load
+	// ie world serde load
 	let mut posts: Vec<_> = query.iter().collect();
 	posts.sort_by_key(|(_, post)| *post);
 

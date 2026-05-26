@@ -146,7 +146,7 @@ impl Blob {
 /// Serializable blob handle that inserts an erased [`Blob`] on add.
 ///
 /// Unlike [`Blob`], this type is fully reflectable and can be used in
-/// Bevy scenes. When added to an entity the `on_add` hook automatically
+/// world serialization. When added to an entity the `on_add` hook automatically
 /// inserts a [`Blob`] component so that systems reading [`Blob`] continue
 /// to work unchanged.
 ///

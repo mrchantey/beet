@@ -1,10 +1,10 @@
-//! Plugin registering the hierarchy relationship types required for scene
+//! Plugin registering the hierarchy relationship types required for world
 //! serialization to round-trip parent/child links.
 
 use crate::prelude::*;
 
 /// Registers the minimal Bevy hierarchy types ([`ChildOf`], [`Children`])
-/// so scenes can serialize parent/child relationships without each
+/// so world serde can serialize parent/child relationships without each
 /// downstream plugin re-registering them.
 ///
 /// Use [`App::init_plugin::<MinimalTypesPlugin>`](BeetCoreAppExt::init_plugin)

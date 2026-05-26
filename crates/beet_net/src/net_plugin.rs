@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Plugin that registers all beet_net types for scene serialization.
+/// Plugin that registers all beet_net types for world serialization.
 ///
 /// Includes [`StorePlugin`] for typed store and blob registration.
 #[derive(Default)]

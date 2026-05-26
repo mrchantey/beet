@@ -16,7 +16,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 
 	/// Create a type-erased [`Blob`] handle for a single object managed by
 	/// this provider. Prefer the typed [`FsStore::blob`], [`S3Store::blob`]
-	/// etc. when you need scene serialization.
+	/// etc. when you need world serialization.
 	fn erased_blob(&self, path: RelPath) -> Blob {
 		Blob::new(BlobStore::new(self.box_clone()), path)
 	}

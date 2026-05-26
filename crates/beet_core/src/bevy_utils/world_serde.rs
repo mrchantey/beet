@@ -1,7 +1,7 @@
-//! Scene serialization and deserialization utilities.
+//! World serialization and deserialization utilities.
 //!
-//! Provides [`SceneSaver`] and [`SceneLoader`] for converting world state
-//! to and from various formats.
+//! Provides [`WorldSerdeSaver`] and [`WorldSerdeLoader`] for converting world
+//! state to and from various formats.
 
 use crate::prelude::*;
 use bevy::asset::AssetPath;
@@ -19,12 +19,13 @@ use core::any::TypeId;
 
 /// Serializes world state or a subtree to various formats.
 ///
-/// Use [`SceneSaver::new`] for the full world, or [`SceneSaver::new`] followed
-/// by [`SceneSaver::with_entity_tree`] to serialize only an entity and its descendants.
+/// Use [`WorldSerdeSaver::new`] for the full world, or [`WorldSerdeSaver::new`]
+/// followed by [`WorldSerdeSaver::with_entity_tree`] to serialize only an entity
+/// and its descendants.
 ///
-/// Extraction is deferred until [`SceneSaver::save`], as the underlying
+/// Extraction is deferred until [`WorldSerdeSaver::save`], as the underlying
 /// [`DynamicWorldBuilder`] borrows the [`AppTypeRegistry`] for its lifetime.
-pub struct SceneSaver<'a> {
+pub struct WorldSerdeSaver<'a> {
 	world: &'a World,
 	component_filter: WorldFilter,
 	resource_filter: WorldFilter,
@@ -32,7 +33,7 @@ pub struct SceneSaver<'a> {
 	extract_resources: bool,
 }
 
-impl<'a> SceneSaver<'a> {
+impl<'a> WorldSerdeSaver<'a> {
 	/// Creates a saver for the entire world.
 	pub fn new(world: &'a mut World) -> Self {
 		Self {
@@ -45,8 +46,6 @@ impl<'a> SceneSaver<'a> {
 	}
 
 	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
-	///
-	/// Equivalent to the old `world.build_scene()` behavior.
 	pub fn new_default(world: &'a mut World) -> Self {
 		let all_entities: Vec<Entity> =
 			world.query::<Entity>().iter(world).collect();
@@ -73,19 +72,19 @@ impl<'a> SceneSaver<'a> {
 		self
 	}
 
-	/// Extracts all resources into the scene.
+	/// Extracts all resources.
 	pub fn extract_resources(mut self) -> Self {
 		self.extract_resources = true;
 		self
 	}
 
-	/// Denies a resource type from being included in the scene.
+	/// Denies a resource type from being serialized.
 	pub fn deny_resource<T: Resource>(mut self) -> Self {
 		self.resource_filter = self.resource_filter.deny::<T>();
 		self
 	}
 
-	/// Denies a component type from being included in the scene.
+	/// Denies a component type from being serialized.
 	pub fn deny_component<T: Component>(mut self) -> Self {
 		self.component_filter = self.component_filter.deny::<T>();
 		self
@@ -128,9 +127,9 @@ impl<'a> SceneSaver<'a> {
 	}
 }
 
-/// A no-op [`LoadFromPath`] used when deserializing scenes in a world that has
-/// no [`AssetServer`]. Beet scenes do not currently serialize asset handles, so
-/// this should never be invoked; if it is, an [`AssetServer`] is required.
+/// A no-op [`LoadFromPath`] used when deserializing in a world that has no
+/// [`AssetServer`]. Beet world serde does not currently serialize asset handles,
+/// so this should never be invoked; if it is, an [`AssetServer`] is required.
 struct NoAssetLoader;
 
 impl LoadFromPath for NoAssetLoader {
@@ -148,20 +147,20 @@ impl LoadFromPath for NoAssetLoader {
 
 /// Deserializes world state from various formats.
 ///
-/// An optional [`EntityHashMap`] can be provided via [`SceneLoader::with_entity_map`]
+/// An optional [`EntityHashMap`] can be provided via [`WorldSerdeLoader::with_entity_map`]
 /// to remap entity identifiers on load. If none is provided, a default map is used.
 ///
-/// If an entity is provided via [`SceneLoader::with_entity`], all spawned root
+/// If an entity is provided via [`WorldSerdeLoader::with_entity`], all spawned root
 /// entities (those without a [`ChildOf`] relationship) will be reparented as
 /// children of that entity.
-pub struct SceneLoader<'a> {
+pub struct WorldSerdeLoader<'a> {
 	world: &'a mut World,
 	entity_map: Option<&'a mut EntityHashMap<Entity>>,
 	/// If set, all spawned root entities are reparented as children of this entity.
 	entity: Option<Entity>,
 }
 
-impl<'a> SceneLoader<'a> {
+impl<'a> WorldSerdeLoader<'a> {
 	/// Creates a loader for the given world.
 	pub fn new(world: &'a mut World) -> Self {
 		Self {
@@ -191,21 +190,20 @@ impl<'a> SceneLoader<'a> {
 
 	/// Reparents all spawned root entities as children of the given entity.
 	///
-	/// Any existing children of the entity are removed before the scene
+	/// Any existing children of the entity are removed before the deserialized
 	/// roots are attached.
 	pub fn with_entity(mut self, entity: Entity) -> Self {
 		self.entity = Some(entity);
 		self
 	}
 
-	/// Deserializes a scene from [`MediaBytes`] into the world,
-	/// dispatching by media type.
+	/// Deserializes from [`MediaBytes`] into the world, dispatching by media type.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
 		use serde::de::DeserializeSeed;
 		// `AssetServer` is cloned (cheap arc) out so the deserializer can hold a
 		// `LoadFromPath` without borrowing the world for the read lock. Beet
-		// scenes don't currently serialize asset handles, so a no-op loader
-		// suffices when no server is present.
+		// world serde doesn't currently serialize asset handles, so a no-op
+		// loader suffices when no server is present.
 		let mut loader: Box<dyn LoadFromPath> =
 			match self.world.get_resource::<AssetServer>() {
 				Some(server) => Box::new(server.clone()),
@@ -235,7 +233,7 @@ impl<'a> SceneLoader<'a> {
 						.deserialize(&mut de)?
 					} else {
 						bevybail!(
-							"The `json` feature is required for JSON scene loading"
+							"The `json` feature is required for JSON loading"
 						)
 					}
 				}
@@ -252,13 +250,13 @@ impl<'a> SceneLoader<'a> {
 						.deserialize(&mut de)?
 					} else {
 						bevybail!(
-							"The `postcard` feature is required for postcard scene loading"
+							"The `postcard` feature is required for postcard loading"
 						)
 					}
 				}
 			}
 			other => {
-				bevybail!("Unsupported media type for scene loading: {other}")
+				bevybail!("Unsupported media type for world serde loading: {other}")
 			}
 		};
 		drop(registry);
@@ -274,7 +272,7 @@ impl<'a> SceneLoader<'a> {
 		let spawned: Vec<Entity> = entity_map.values().copied().collect();
 		if let Some(parent) = entity {
 			for entity in spawned.iter() {
-				self.world.entity_mut(*entity).insert(SceneOf(parent));
+				self.world.entity_mut(*entity).insert(WorldSerdeOf(parent));
 			}
 		}
 
@@ -282,7 +280,8 @@ impl<'a> SceneLoader<'a> {
 	}
 }
 
-/// Added to entities spawned by the scene loader to track their source entity in the scene file.
+/// Added to entities spawned by the loader to track their source entity in the
+/// serialized data.
 #[derive(
 	Debug,
 	Clone,
@@ -296,10 +295,10 @@ impl<'a> SceneLoader<'a> {
 	Component,
 )]
 #[reflect(Component)]
-#[relationship(relationship_target = SceneEntities)]
-pub struct SceneOf(pub Entity);
+#[relationship(relationship_target = WorldSerdeEntities)]
+pub struct WorldSerdeOf(pub Entity);
 
-/// Added to the [`SceneLoader::Entity`]
+/// Added to the [`WorldSerdeLoader::Entity`]
 #[derive(
 	Debug,
 	Clone,
@@ -313,8 +312,8 @@ pub struct SceneOf(pub Entity);
 	Component,
 )]
 #[reflect(Component)]
-#[relationship_target(relationship = SceneOf,linked_spawn)]
-pub struct SceneEntities(Vec<Entity>);
+#[relationship_target(relationship = WorldSerdeOf,linked_spawn)]
+pub struct WorldSerdeEntities(Vec<Entity>);
 
 
 
@@ -322,7 +321,7 @@ pub struct SceneEntities(Vec<Entity>);
 mod test {
 	use crate::prelude::*;
 
-	fn scene_world() -> App {
+	fn serde_world() -> App {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.register_type::<Name>();
@@ -333,68 +332,68 @@ mod test {
 
 	#[crate::test]
 	fn round_trip_ron() {
-		let mut app = scene_world();
-		let scene_bytes = SceneSaver::new_default(app.world_mut())
+		let mut app = serde_world();
+		let world_serde_bytes = WorldSerdeSaver::new_default(app.world_mut())
 			.save(MediaType::Ron)
 			.unwrap();
-		scene_bytes.as_utf8().unwrap().xref().xpect_contains("Time");
-		SceneLoader::new(app.world_mut())
-			.load(&scene_bytes)
+		world_serde_bytes.as_utf8().unwrap().xref().xpect_contains("Time");
+		WorldSerdeLoader::new(app.world_mut())
+			.load(&world_serde_bytes)
 			.unwrap();
 	}
 
 	#[crate::test]
 	fn entity_scope() {
-		let mut app = scene_world();
+		let mut app = serde_world();
 		let entity = app.world_mut().spawn(Name::new("Root")).id();
 		app.world_mut()
 			.entity_mut(entity)
 			.with_child(Name::new("Child"));
 
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entity_tree(entity)
 			.save(MediaType::Ron)
 			.unwrap();
-		let text = scene_bytes.as_utf8().unwrap();
+		let text = world_serde_bytes.as_utf8().unwrap();
 		text.xref().xpect_contains("Root");
 		text.xref().xpect_contains("Child");
 	}
 
 	#[crate::test]
 	fn custom_entity_map() {
-		let mut app = scene_world();
-		let scene_bytes = SceneSaver::new_default(app.world_mut())
+		let mut app = serde_world();
+		let world_serde_bytes = WorldSerdeSaver::new_default(app.world_mut())
 			.save(MediaType::Ron)
 			.unwrap();
 		let mut entity_map = Default::default();
-		SceneLoader::new(app.world_mut())
+		WorldSerdeLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 	}
 
 	#[crate::test]
 	fn loads_into_entity_adds_spawned_by() {
-		let mut app = scene_world();
-		// Spawn a named entity to form a scene
-		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let mut app = serde_world();
+		// spawn a named entity to serialize
+		let child = app.world_mut().spawn(Name::new("WorldSerdeChild")).id();
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entities([child])
 			.save(MediaType::Ron)
 			.unwrap();
 
-		// Load the scene into a target entity
+		// load into a target entity
 		let target = app.world_mut().spawn(Name::new("Target")).id();
-		let spawned = SceneLoader::new(app.world_mut())
+		let spawned = WorldSerdeLoader::new(app.world_mut())
 			.with_entity(target)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 
-		// Spawned entities should have SceneOf pointing to target
+		// Spawned entities should have WorldSerdeOf pointing to target
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<SceneOf>()
+			.get::<WorldSerdeOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);
@@ -403,14 +402,14 @@ mod test {
 			.get::<Name>()
 			.unwrap()
 			.as_str()
-			.xpect_eq("SceneChild");
+			.xpect_eq("WorldSerdeChild");
 	}
 
 	#[crate::test]
 	fn loads_into_entity_preserves_existing_children() {
-		let mut app = scene_world();
-		let child = app.world_mut().spawn(Name::new("SceneChild")).id();
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let mut app = serde_world();
+		let child = app.world_mut().spawn(Name::new("WorldSerdeChild")).id();
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entities([child])
 			.save(MediaType::Ron)
 			.unwrap();
@@ -427,9 +426,9 @@ mod test {
 			.len()
 			.xpect_eq(1);
 
-		let spawned = SceneLoader::new(app.world_mut())
+		let spawned = WorldSerdeLoader::new(app.world_mut())
 			.with_entity(target)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 
 		// Existing children should be preserved
@@ -448,11 +447,11 @@ mod test {
 			.as_str()
 			.xpect_eq("OldChild");
 
-		// Spawned entities have SceneOf, not ChildOf
+		// Spawned entities have WorldSerdeOf, not ChildOf
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<SceneOf>()
+			.get::<WorldSerdeOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);

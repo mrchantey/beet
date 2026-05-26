@@ -13,12 +13,12 @@ pub impl Commands<'_, '_> {
 		});
 	}
 
-	/// Loads a scene from [`MediaBytes`].
-	#[cfg(feature = "bevy_scene")]
-	fn load_scene(&mut self, bytes: impl Into<MediaBytes>) {
+	/// Loads world serde data from [`MediaBytes`].
+	#[cfg(feature = "bevy_world_serde")]
+	fn load_world_serde(&mut self, bytes: impl Into<MediaBytes>) {
 		let bytes = bytes.into();
 		self.queue(move |world: &mut World| -> Result {
-			SceneLoader::new(world).load(&bytes)?;
+			WorldSerdeLoader::new(world).load(&bytes)?;
 			Ok(())
 		});
 	}

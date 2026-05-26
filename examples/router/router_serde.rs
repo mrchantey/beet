@@ -1,19 +1,19 @@
 //! # Router Serde Example
 //!
-//! Mirrors [`cli`](./cli.rs), but persists the entire route scene to
-//! disk via [`SceneStore`]. On first run the scene is written to
+//! Mirrors [`cli`](./cli.rs), but persists the entire route world to
+//! disk via [`WorldSerdeStore`]. On first run the world is written to
 //! `examples/router/router_serde.json`, and is loaded from that file
 //! on subsequent runs. Pass `--new` to overwrite the file with a
 //! fresh copy.
 //!
 //! Every runtime component — [`CliServer`], the [`router`] bundle, the
 //! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the
-//! scene round-trips with no post-load patching.
+//! world round-trips with no post-load patching.
 //!
 //! ## Running the Example
 //!
 //! ```sh
-//! # visit the home route (first run also writes the scene file)
+//! # visit the home route (first run also writes the serde file)
 //! cargo run --example router_serde
 //!
 //! # visit the /foo route
@@ -25,14 +25,14 @@
 //! # invoke the scripted greeter via the raw request parts
 //! cargo run --example router_serde -- greet-request --name=world
 //!
-//! # delete and regenerate the scene file
+//! # delete and regenerate the serde file
 //! cargo run --example router_serde -- --new
 //! ```
 use beet::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-const SCENE_FILE: &str = "examples/router/router_serde.json";
+const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
 
 fn main() -> AppExit {
 	App::new()
@@ -55,20 +55,22 @@ struct GreetRequest {
 
 fn setup(mut commands: Commands) {
 	let blob =
-		FsStore::new(WsPathBuf::default()).blob(RelPath::new(SCENE_FILE));
-	let new_scene = CliArgs::parse_env().params.contains_key("new");
+		FsStore::new(WsPathBuf::default()).blob(RelPath::new(WORLD_SERDE_FILE));
+	let new_world = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {
-		if new_scene {
+		if new_world {
 			blob.remove().await.ok();
 		}
-		SceneStore::load_or_create(world.clone(), blob, async |_| scene().xok())
-			.await?;
+		WorldSerdeStore::load_or_create(world.clone(), blob, async |_| {
+			route_bundle().xok()
+		})
+		.await?;
 		Ok(())
 	});
 }
 
-fn scene() -> impl Bundle {
+fn route_bundle() -> impl Bundle {
 	(
 		CliServer::default(),
 		router(),

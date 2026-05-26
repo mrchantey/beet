@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 /// Call the entity on spawn with the provided input,
 /// discarding the outcome.
 /// This component causes a tool call on the entity every
-/// time it is inserted, including spawned from a scene file.
+/// time it is inserted, including spawned from a world serde file.
 ///
 /// The call is made by a system, to ensure all components and
 /// children have been added before calling.

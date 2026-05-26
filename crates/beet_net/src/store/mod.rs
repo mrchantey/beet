@@ -9,7 +9,7 @@
 //! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //!
-//! Use [`StorePlugin`] to register store types for scene serialization.
+//! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components
 //! that auto-insert a type-erased [`BlobStore`] via on_add hooks.
 //!
@@ -33,8 +33,8 @@ mod blob;
 mod blob_store_provider;
 pub use blob_store_provider::*;
 mod blob_store;
-#[cfg(feature = "bevy_scene")]
-mod scene_store;
+#[cfg(feature = "bevy_world_serde")]
+mod world_serde_store;
 #[cfg(feature = "json")]
 mod table;
 #[cfg(feature = "json")]
@@ -49,8 +49,8 @@ pub use blob::*;
 pub use blob_store::*;
 pub use store_item::*;
 pub use in_memory_store::*;
-#[cfg(feature = "bevy_scene")]
-pub use scene_store::*;
+#[cfg(feature = "bevy_world_serde")]
+pub use world_serde_store::*;
 mod fs_store;
 #[cfg(target_arch = "wasm32")]
 mod indexed_db_store;
@@ -76,7 +76,7 @@ mod dynamo_store;
 
 use beet_core::prelude::*;
 
-/// Plugin that registers store types for scene serialization.
+/// Plugin that registers store types for world serialization.
 #[derive(Default)]
 pub struct StorePlugin;
 
@@ -85,8 +85,8 @@ impl Plugin for StorePlugin {
 		app.register_type::<FsStore>()
 			.register_type::<TypedBlob<FsStore>>();
 
-		#[cfg(feature = "bevy_scene")]
-		app.add_systems(PostUpdate, load_scenes_on_insert);
+		#[cfg(feature = "bevy_world_serde")]
+		app.add_systems(PostUpdate, load_world_serde_on_insert);
 
 		#[cfg(target_arch = "wasm32")]
 		app.register_type::<LocalStorageStore>()

@@ -22,8 +22,8 @@ pub struct MediaRenderer {
 	default_media_type: MediaType,
 	plain_text_renderer: PlainTextRenderer,
 	html_renderer: HtmlRenderer,
-	#[cfg(feature = "bevy_scene")]
-	scene_renderer: SceneRenderer,
+	#[cfg(feature = "bevy_world_serde")]
+	world_serde_renderer: WorldSerdeRenderer,
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "style")]
 	ansi_term_renderer: AnsiTermRenderer,
@@ -52,8 +52,8 @@ impl MediaRenderer {
 			markdown_renderer: default(),
 			#[cfg(feature = "style")]
 			ansi_term_renderer: default(),
-			#[cfg(feature = "bevy_scene")]
-			scene_renderer: default(),
+			#[cfg(feature = "bevy_world_serde")]
+			world_serde_renderer: default(),
 		}
 	}
 
@@ -91,9 +91,9 @@ impl MediaRenderer {
 		self
 	}
 
-	#[cfg(feature = "bevy_scene")]
-	pub fn with_scene_renderer(mut self, renderer: SceneRenderer) -> Self {
-		self.scene_renderer = renderer;
+	#[cfg(feature = "bevy_world_serde")]
+	pub fn with_world_serde_renderer(mut self, renderer: WorldSerdeRenderer) -> Self {
+		self.world_serde_renderer = renderer;
 		self
 	}
 
@@ -133,10 +133,10 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
-			MediaType::Postcard => self.scene_renderer.render(&mut inner_cx).map(Some),
-			#[cfg(all(feature = "bevy_scene", feature = "json"))]
-			MediaType::Json => self.scene_renderer.render(&mut inner_cx).map(Some),
+			#[cfg(all(feature = "bevy_world_serde", feature = "postcard"))]
+			MediaType::Postcard => self.world_serde_renderer.render(&mut inner_cx).map(Some),
+			#[cfg(all(feature = "bevy_world_serde", feature = "json"))]
+			MediaType::Json => self.world_serde_renderer.render(&mut inner_cx).map(Some),
 			_ => Ok(None),
 		}
 	}
@@ -147,9 +147,9 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "style")]
 		available.push(MediaType::AnsiTerm);
-		#[cfg(all(feature = "bevy_scene", feature = "json"))]
+		#[cfg(all(feature = "bevy_world_serde", feature = "json"))]
 		available.push(MediaType::Json);
-		#[cfg(all(feature = "bevy_scene", feature = "postcard"))]
+		#[cfg(all(feature = "bevy_world_serde", feature = "postcard"))]
 		available.push(MediaType::Postcard);
 		available
 	}

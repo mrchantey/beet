@@ -23,7 +23,7 @@ use beet_core::prelude::*;
 ///
 /// The `run_and_exit` task is launched on the next schedule tick via the
 /// [`launch_cli_servers`] system. Deferring to a system (instead of an
-/// `on_add` hook) avoids spawning a transient task when [`SceneStore`]
+/// `on_add` hook) avoids spawning a transient task when [`WorldSerdeStore`]
 /// briefly spawns a [`CliServer`] just to serialize it.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]

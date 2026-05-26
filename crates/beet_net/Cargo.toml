@@ -74,7 +74,7 @@ rustls-tls = [
 	"dep:webpki-roots",
 	"russh?/aws-lc-rs",
 ]
-bevy_scene = ["beet_core/bevy_scene"]
+bevy_world_serde = ["beet_core/bevy_world_serde"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 russh_server = [
@@ -221,7 +221,7 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = {path = ".", features = ["bevy_scene"] }
+beet_net = {path = ".", features = ["bevy_world_serde"] }
 # beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

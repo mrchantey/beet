@@ -3,18 +3,18 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 
-/// Store and load scenes as needed
+/// Store and load serialized world data as needed
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct SceneStore {
+pub struct WorldSerdeStore {
 	#[reflect(ignore)]
 	trigger: CoalescingTrigger,
-	/// Load the scene on spawn, defaults to false
+	/// Load the serialized data on spawn, defaults to false
 	load_on_spawn: bool,
-	/// Error when saving an empty scene, defaults to true
+	/// Error when saving empty data, defaults to true
 	error_on_empty: bool,
 }
-impl Default for SceneStore {
+impl Default for WorldSerdeStore {
 	fn default() -> Self {
 		Self {
 			trigger: default(),
@@ -24,7 +24,7 @@ impl Default for SceneStore {
 	}
 }
 
-impl SceneStore {
+impl WorldSerdeStore {
 	pub async fn load_or_create<
 		T: 'static + Send + Sync + Clone + Reflect + BlobStoreProvider,
 		B: Bundle,
@@ -49,24 +49,24 @@ impl SceneStore {
 	}
 
 
-	/// Loads the associated [`Blob`], adding to this entities [`SceneEntities`].
+	/// Loads the associated [`Blob`], adding to this entities [`WorldSerdeEntities`].
 	/// ## Errors
-	/// - Errors if this entity has no [`Blob`] or [`SceneStore`]
+	/// - Errors if this entity has no [`Blob`] or [`WorldSerdeStore`]
 	pub async fn load(entity: AsyncEntity) -> Result<Vec<Entity>> {
 		// store is required for writing
-		entity.get::<SceneStore, _>(|_| {}).await?;
+		entity.get::<WorldSerdeStore, _>(|_| {}).await?;
 		let media = entity.get_cloned::<Blob>().await?.get_media().await?;
 		entity
 			.with_then(move |entity| -> Result<_> {
-				SceneLoader::new_entity(entity).load(&media)
+				WorldSerdeLoader::new_entity(entity).load(&media)
 			})
 			.await
 			.flatten()
 	}
-	/// Writes all [`SceneEntities`] and their created descendents to the associated [`Blob`]
+	/// Writes all [`WorldSerdeEntities`] and their created descendents to the associated [`Blob`]
 	///
 	/// ## Errors
-	/// - Errors if this entity has no [`Blob`] or [`SceneStore`]
+	/// - Errors if this entity has no [`Blob`] or [`WorldSerdeStore`]
 	pub async fn save(entity: AsyncEntity) -> Result {
 		let this = entity.get_cloned::<Self>().await?;
 		let error_on_empty = this.error_on_empty;
@@ -77,23 +77,23 @@ impl SceneStore {
 						let blob = entity.get_or_else_mut::<Blob>()?.clone();
 
 						let spawned_entities =
-							entity.try_get::<SceneEntities>()?.to_vec();
+							entity.try_get::<WorldSerdeEntities>()?.to_vec();
 
 						if error_on_empty && spawned_entities.is_empty() {
-							bevybail!("cannot save empty scene");
+							bevybail!("cannot save empty world serde data");
 						}
 
 						let world = entity.into_world_mut();
-						let mut saver = SceneSaver::new(world);
+						let mut saver = WorldSerdeSaver::new(world);
 
 						for entity in spawned_entities {
 							// add all and their descendents to save
 							saver = saver.with_entity_tree(entity);
 						}
-						let scene_media = saver.save(
+						let world_serde_media = saver.save(
 							blob.media_type().unwrap_or(MediaType::Json),
 						)?;
-						(blob, scene_media).xok()
+						(blob, world_serde_media).xok()
 					})
 					.await??;
 				blob.insert(bytes).await?;
@@ -119,7 +119,7 @@ impl SceneStore {
 			.world()
 			.with_then(move |world| {
 				let entity = world.spawn(bundle).id();
-				let bytes = SceneSaver::new(world)
+				let bytes = WorldSerdeSaver::new(world)
 					.with_entity_tree(entity)
 					.save(media_type);
 				world.entity_mut(entity).despawn();
@@ -132,14 +132,14 @@ impl SceneStore {
 }
 
 
-pub fn load_scenes_on_insert(
+pub fn load_world_serde_on_insert(
 	mut commands: Commands,
-	query: Populated<(Entity, &SceneStore), Added<SceneStore>>,
+	query: Populated<(Entity, &WorldSerdeStore), Added<WorldSerdeStore>>,
 ) {
 	for (entity, store) in query.iter() {
 		if store.load_on_spawn {
 			commands.entity(entity).queue_async(async |entity| {
-				SceneStore::load(entity).await?;
+				WorldSerdeStore::load(entity).await?;
 				Ok(())
 			});
 		}

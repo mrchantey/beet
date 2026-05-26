@@ -502,8 +502,8 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(feature = "bevy_scene")]
-	fn roundtrip_increment_scene() {
+	#[cfg(feature = "bevy_world_serde")]
+	fn roundtrip_increment_world_serde() {
 		use bevy::ecs::entity::EntityHashMap;
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
@@ -514,11 +514,11 @@ mod test {
 		let entity = app.world_mut().spawn(increment(count_field())).id();
 
 		// Serialize
-		let scene_bytes = SceneSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entity_tree(entity)
 			.save(MediaType::Ron)
 			.unwrap();
-		scene_bytes
+		world_serde_bytes
 			.as_utf8()
 			.unwrap()
 			.xref()
@@ -529,9 +529,9 @@ mod test {
 
 		// Load
 		let mut entity_map = EntityHashMap::default();
-		SceneLoader::new(app.world_mut())
+		WorldSerdeLoader::new(app.world_mut())
 			.with_entity_map(&mut entity_map)
-			.load(&scene_bytes)
+			.load(&world_serde_bytes)
 			.unwrap();
 		app.update();
 

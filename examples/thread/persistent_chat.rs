@@ -1,12 +1,12 @@
 //! Demostrates persisting chat to the filesystem
 //!
 //! ```sh
-//! cargo run --example persistent_chat --features=thread,bevy_scene
-//! cargo run --example persistent_chat --features=thread,bevy_scene -- --new
+//! cargo run --example persistent_chat --features=thread,bevy_world_serde
+//! cargo run --example persistent_chat --features=thread,bevy_world_serde -- --new
 //! ```
 use beet::prelude::*;
 
-const SCENE_FILE: &str = "examples/thread/persistent_chat.json";
+const WORLD_SERDE_FILE: &str = "examples/thread/persistent_chat.json";
 
 fn main() {
 	env_ext::load_dotenv();
@@ -37,28 +37,28 @@ fn setup(mut commands: Commands) {
 	}
 
 
-	let blob = store.blob(RelPath::new(SCENE_FILE));
+	let blob = store.blob(RelPath::new(WORLD_SERDE_FILE));
 	let new_thread = CliArgs::parse_env().params.contains_key("new");
 
 	commands.queue_async(async move |world: AsyncWorld| {
 		if new_thread {
 			blob.remove().await.ok();
 		}
-		SceneStore::load_or_create(world, blob, async |_| {
-			scene().xok()
+		WorldSerdeStore::load_or_create(world, blob, async |_| {
+			chat_bundle().xok()
 		})
 		.await?;
 		Ok(())
 	});
 }
 
-fn scene() -> impl Bundle {
+fn chat_bundle() -> impl Bundle {
 	(
 		Thread::default(),
 		// adding a blob to a thread indicates it should be persisted
 		Repeat::new(),
 		// this control flow will be triggered on spawn,
-		// including after scene reload
+		// including after reload
 		CallOnSpawn::<(), Outcome>::default(),
 		children![(
 			Sequence::new(),

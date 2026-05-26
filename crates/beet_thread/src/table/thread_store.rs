@@ -6,7 +6,7 @@ use beet_net::prelude::*;
 pub fn store_thread_on_post(
 	mut commands: Commands,
 	changed: Query<(Entity, &Post), Changed<Post>>,
-	stores: AncestorQuery<&SceneOf>,
+	stores: AncestorQuery<&WorldSerdeOf>,
 ) -> Result {
 	for (entity, post) in changed.iter() {
 		if post.in_progress() {
@@ -14,13 +14,13 @@ pub fn store_thread_on_post(
 			continue;
 		}
 		let Ok(store) = stores.get(entity) else {
-			// this post is not in a scene spawned hierarchy
+			// this post is not in a world serde spawned hierarchy
 			continue;
 		};
 		commands
 			.entity(**store)
 			.queue_async(move |entity| async move {
-				SceneStore::save(entity).await
+				WorldSerdeStore::save(entity).await
 			});
 	}
 

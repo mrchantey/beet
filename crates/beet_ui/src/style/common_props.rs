@@ -1,5 +1,6 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 use crate::prelude::*;
+use crate::style::FontStyle;
 use crate::style::FontWeight;
 use crate::style::AlignSelf;
 use crate::style::AlignItems;

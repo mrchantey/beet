@@ -2,7 +2,7 @@ mod actor;
 mod document;
 mod thread;
 mod thread_query;
-#[cfg(feature = "bevy_scene")]
+#[cfg(feature = "bevy_world_serde")]
 pub mod thread_store;
 pub use document::*;
 mod agent_post;

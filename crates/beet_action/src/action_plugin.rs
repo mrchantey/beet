@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Plugin that registers action control-flow types for scene serialization.
+/// Plugin that registers action control-flow types for world serialization.
 ///
 /// Registers the unit-input instantiations of control-flow components
-/// so that scenes containing action trees can be serialized and deserialized.
+/// so that action trees can be serialized and deserialized.
 #[derive(Default)]
 pub struct ActionPlugin;
 

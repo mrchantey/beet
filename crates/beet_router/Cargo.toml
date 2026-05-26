@@ -18,12 +18,11 @@ interface = ["serde"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde"]
-tui = ["dep:bevy_ratatui", "dep:ratatui"]
 markdown = ["dep:pulldown-cmark"]
 html_parser = ["beet_ui/html_parser"]
 markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["beet_net/server"]
-bevy_scene = ["beet_core/bevy_scene","bevy/bevy_world_serialization", "serde"]
+bevy_world_serde = ["beet_core/bevy_world_serde","bevy/bevy_world_serialization", "serde"]
 scripting = ["beet_action/scripting", "serde"]
 # Build-time code generation: route tree, server/client actions, typed links.
 codegen = [
@@ -61,10 +60,6 @@ prettyplease = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 
 webbrowser.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-bevy_ratatui = {workspace = true, optional=true,features=["crossterm"]}
-ratatui = {workspace = true, optional=true, features=["crossterm", "unstable-rendered-line-info"]}
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

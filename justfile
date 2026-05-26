@@ -218,7 +218,7 @@ _core-features pkgs:
 	else
 		feats=$(for c in {{ pkgs }}; do
 			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' crates/$c/Cargo.toml
-		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda|ratatui|tui)$' | paste -sd, -)
+		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda|ratatui)$' | paste -sd, -)
 		echo "--features $feats"
 	fi
 

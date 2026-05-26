@@ -52,7 +52,7 @@ fn choose_when_loaded(
 	>,
 ) -> Result {
 	for (entity, prompt, near, children) in pending.iter_mut() {
-		let Some(bert) = berts.get_mut(&near.bert) else {
+		let Some(mut bert) = berts.get_mut(&near.bert) else {
 			continue;
 		};
 		let chosen = bert.closest_sentence_entity(

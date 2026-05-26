@@ -126,9 +126,9 @@ fn render(main_content: &str) -> String {
 
 	read_to_string("examples/assets/layouts/default-layout.html")
 		.unwrap()
-		.replace("{{ head }}", &head())
-		.replace("{{ nav }}", &nav())
-		.replace("{{ main }}", &main_content)
+		.replace(r#"<slot name="head" />"#, &head())
+		.replace(r#"<slot name="nav" />"#, &nav())
+		.replace(r#"<slot name="main" />"#, &main_content)
 }
 
 /// Generates the `<head>` content for pages.

@@ -55,7 +55,7 @@ impl Plugin for ThreadPlugin {
 			// _
 			;
 
-		#[cfg(feature = "bevy_scene")]
+		#[cfg(feature = "bevy_world_serde")]
 		app.add_systems(PostUpdate, thread_store::store_thread_on_post);
 	}
 }

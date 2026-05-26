@@ -240,7 +240,7 @@ bevy_default = [
 	"beet_examples?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
-bevy_scene = ["beet_core/bevy_scene", "beet_net?/bevy_scene","beet_thread?/bevy_scene"]
+bevy_world_serde = ["beet_core/bevy_world_serde", "beet_net?/bevy_world_serde","beet_thread?/bevy_world_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]
@@ -305,7 +305,7 @@ cuda = ["ml", "beet_ml/cuda"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
-# bevy_scene = ["beet_core/bevy_scene"]
+# bevy_world_serde = ["beet_core/bevy_world_serde"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -374,7 +374,7 @@ required-features = ["http_server"]
 [[example]]
 name = "socket_client"
 path = "examples/net/socket_client.rs"
-required-features = ["tungstenite"]
+required-features = ["tungstenite", "json"]
 
 [[example]]
 name = "socket_server"
@@ -462,7 +462,7 @@ required-features = ["router", "serde", "scripting"]
 [[example]]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
-required-features = ["router", "serde", "scripting", "bevy_scene"]
+required-features = ["router", "serde", "scripting", "bevy_world_serde"]
 
 [[example]]
 name = "file_based_routes"
@@ -489,7 +489,7 @@ required-features = ["thread"]
 [[example]]
 name = "tool_call"
 path = "examples/thread/tool_call.rs"
-required-features = ["thread"]
+required-features = ["thread", "router"]
 
 [[example]]
 name = "self_evolving"
@@ -504,7 +504,7 @@ required-features = ["thread", "fs", "router"]
 [[example]]
 name = "persistent_chat"
 path = "examples/thread/persistent_chat.rs"
-required-features = ["thread","bevy_scene"]
+required-features = ["thread","bevy_world_serde"]
 
 
 
