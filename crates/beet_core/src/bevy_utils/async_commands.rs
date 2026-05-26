@@ -481,6 +481,11 @@ impl AsyncWorld {
 		self.with_then(move |world| func(world.resource_mut::<R>()))
 	}
 	/// Runs a function with access to a system parameter state.
+	///
+	/// # Panics
+	///
+	/// The spawned task panics if the system parameter fails validation, ie a
+	/// required resource is missing, as it defers to [`WorldExt::with_state`].
 	pub fn with_state<T: 'static + SystemParam, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(T::Item<'_, '_>) -> O,
@@ -724,19 +729,16 @@ impl AsyncEntity {
 		let entity_id = self.entity;
 		self.world
 			.with_then(move |world: &mut World| -> Result<O> {
-				let entity = world.get_entity_mut(entity_id).map_err(|_| {
-					bevyhow!("Entity {entity_id:?} despawned")
-				})?;
+				let entity = world
+					.get_entity_mut(entity_id)
+					.map_err(|_| bevyhow!("Entity {entity_id:?} despawned"))?;
 				func(entity).xok()
 			})
 			.await
 	}
 
 	/// Spawns an async task.
-	pub async fn run_async<Func, Fut, Out>(
-		&self,
-		func: Func,
-	) -> Result<()>
+	pub async fn run_async<Func, Fut, Out>(&self, func: Func) -> Result<()>
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out> + Send,
@@ -776,10 +778,7 @@ impl AsyncEntity {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!(
-					"Component not found: {}",
-					std::any::type_name::<T>()
-				)
+				bevybail!("Component not found: {}", std::any::type_name::<T>())
 			}
 		})
 		.await
@@ -793,6 +792,12 @@ impl AsyncEntity {
 	}
 
 	/// Runs a function with access to the entity id and system parameter state.
+	///
+	/// # Panics
+	///
+	/// The spawned task panics if the system parameter fails validation, ie a
+	/// required resource is missing, as it defers to
+	/// [`EntityWorldMutExt::with_state`].
 	pub async fn with_state<T: 'static + SystemParam, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Entity, T::Item<'_, '_>) -> O,
@@ -826,6 +831,7 @@ impl AsyncEntity {
 	pub async fn get_in_acestors_cloned<T: Component + Clone>(
 		&self,
 	) -> Result<T> {
+		// AncestorQuery is infallible, with_state will not panic
 		self.with_state::<AncestorQuery<&T>, _>(|entity, query| {
 			query.get(entity).cloned().xok()
 		})

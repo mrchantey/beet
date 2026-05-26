@@ -2,6 +2,7 @@
 
 use bevy::ecs::component::Mutable;
 use bevy::ecs::query::QueryEntityError;
+use bevy::ecs::system::SystemParamValidationError;
 
 use crate::prelude::*;
 
@@ -35,18 +36,32 @@ pub impl<'a> EntityWorldMut<'a> {
 			.collect()
 	}
 
-	/// Runs a function with access to a system parameter state.
+	/// Runs a function with access to the entity id and a system parameter state.
+	///
+	/// # Panics
+	///
+	/// Panics if the system parameter fails validation, ie a required resource
+	/// is missing. Use [`Self::try_with_state`] to propagate the error instead.
 	fn with_state<T: 'static + SystemParam, O>(
 		&mut self,
 		func: impl FnOnce(Entity, T::Item<'_, '_>) -> O,
 	) -> O {
+		self.try_with_state::<T, O>(func).unwrap()
+	}
+
+	/// Like [`Self::with_state`], but propagates a [`SystemParamValidationError`]
+	/// instead of panicking.
+	fn try_with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl FnOnce(Entity, T::Item<'_, '_>) -> O,
+	) -> Result<O, SystemParamValidationError> {
 		let id = self.id();
 		self.world_scope(|world| {
 			let mut state = world.state::<T>();
-			let item = state.get_mut(world).unwrap();
+			let item = state.get_mut(world)?;
 			let result = func(id, item);
 			state.apply(world);
-			result
+			Ok(result)
 		})
 	}
 
@@ -65,7 +80,12 @@ pub impl<'a> EntityWorldMut<'a> {
 		})
 	}
 
-	/// Runs a function with access to a system parameter state.
+	/// Runs a function with this entity's data from a query.
+	///
+	/// # Panics
+	///
+	/// Panics if the query fails validation. Use [`Self::try_with_query`] to
+	/// propagate the error instead.
 	fn with_query<T: 'static + QueryData, O>(
 		&mut self,
 		func: impl FnOnce(T::Item<'_, '_>) -> O,
@@ -77,6 +97,24 @@ pub impl<'a> EntityWorldMut<'a> {
 			let result = query.get_mut(id).map(func);
 			state.apply(world);
 			result
+		})
+	}
+
+	/// Like [`Self::with_query`], but propagates errors as a [`BevyError`]
+	/// instead of panicking: a [`SystemParamValidationError`] if the query
+	/// fails validation, or a [`QueryEntityError`] if this entity is missing
+	/// from the query.
+	fn try_with_query<T: 'static + QueryData, O>(
+		&mut self,
+		func: impl FnOnce(T::Item<'_, '_>) -> O,
+	) -> Result<O> {
+		let id = self.id();
+		self.world_scope(|world| {
+			let mut state = world.state::<Query<T>>();
+			let mut query = state.get_mut(world)?;
+			let result = query.get_mut(id).map(func)?;
+			state.apply(world);
+			Ok(result)
 		})
 	}
 

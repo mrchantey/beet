@@ -12,6 +12,7 @@ use bevy::ecs::query::QueryFilter;
 #[cfg(feature = "bevy_multithreaded")]
 use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::ecs::system::SystemParamValidationError;
 use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use core::marker::PhantomData;
@@ -48,15 +49,55 @@ pub impl World {
 	}
 
 	/// Runs a function with access to a system parameter state.
+	///
+	/// # Panics
+	///
+	/// Panics if the system parameter fails validation, ie a required resource
+	/// is missing. Use [`Self::try_with_state`] to propagate the error instead.
 	fn with_state<T: 'static + SystemParam, O>(
 		&mut self,
 		func: impl FnOnce(T::Item<'_, '_>) -> O,
 	) -> O {
+		self.try_with_state::<T, O>(func).unwrap()
+	}
+
+	/// Like [`Self::with_state`], but propagates a [`SystemParamValidationError`]
+	/// instead of panicking.
+	fn try_with_state<T: 'static + SystemParam, O>(
+		&mut self,
+		func: impl FnOnce(T::Item<'_, '_>) -> O,
+	) -> Result<O, SystemParamValidationError> {
 		let mut state = self.state::<T>();
-		let item = state.get_mut(self).unwrap();
+		let item = state.get_mut(self)?;
 		let result = func(item);
 		state.apply(self);
-		result
+		Ok(result)
+	}
+
+	/// Runs a function with access to a query.
+	///
+	/// # Panics
+	///
+	/// Panics if the query fails validation. Use [`Self::try_with_query`] to
+	/// propagate the error instead.
+	fn with_query<D: 'static + QueryData, O>(
+		&mut self,
+		func: impl FnOnce(Query<D>) -> O,
+	) -> O {
+		self.try_with_query::<D, O>(func).unwrap()
+	}
+
+	/// Like [`Self::with_query`], but propagates a [`SystemParamValidationError`]
+	/// instead of panicking.
+	fn try_with_query<D: 'static + QueryData, O>(
+		&mut self,
+		func: impl FnOnce(Query<D>) -> O,
+	) -> Result<O, SystemParamValidationError> {
+		let mut state = self.state::<Query<D>>();
+		let query = state.get_mut(self)?;
+		let result = func(query);
+		state.apply(self);
+		Ok(result)
 	}
 
 	/// Handle a command error, printing with a location.
