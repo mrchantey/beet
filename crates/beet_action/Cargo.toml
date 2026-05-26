@@ -15,7 +15,7 @@ categories.workspace = true
 default = ["reflect"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde","dep:serde_json","beet_core/json"]
-bevy_world_serde = ["beet_core/bevy_world_serde"]
+world_serde = ["beet_core/world_serde"]
 reflect = ["beet_core/bevy_reflect_documentation"]
 scripting = ["rhai"]
 rhai = ["dep:rhai", "serde"]
@@ -30,7 +30,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 rhai = { workspace = true, optional = true }
 [dev-dependencies]
-beet_action = { path = ".", features= ["bevy_world_serde", "scripting"] }
+beet_action = { path = ".", features= ["world_serde", "scripting"] }
 beet_core = { workspace = true, features = ["testing"] }
 
 [lib]

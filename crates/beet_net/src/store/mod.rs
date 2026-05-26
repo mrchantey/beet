@@ -33,7 +33,7 @@ mod blob;
 mod blob_store_provider;
 pub use blob_store_provider::*;
 mod blob_store;
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 mod world_serde_store;
 #[cfg(feature = "json")]
 mod table;
@@ -49,7 +49,7 @@ pub use blob::*;
 pub use blob_store::*;
 pub use store_item::*;
 pub use in_memory_store::*;
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 pub use world_serde_store::*;
 mod fs_store;
 #[cfg(target_arch = "wasm32")]
@@ -85,7 +85,7 @@ impl Plugin for StorePlugin {
 		app.register_type::<FsStore>()
 			.register_type::<TypedBlob<FsStore>>();
 
-		#[cfg(feature = "bevy_world_serde")]
+		#[cfg(feature = "world_serde")]
 		app.add_systems(PostUpdate, load_world_serde_on_insert);
 
 		#[cfg(target_arch = "wasm32")]

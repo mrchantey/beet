@@ -1,8 +1,8 @@
 //! Demostrates persisting chat to the filesystem
 //!
 //! ```sh
-//! cargo run --example persistent_chat --features=thread,bevy_world_serde
-//! cargo run --example persistent_chat --features=thread,bevy_world_serde -- --new
+//! cargo run --example persistent_chat --features=thread,world_serde
+//! cargo run --example persistent_chat --features=thread,world_serde -- --new
 //! ```
 use beet::prelude::*;
 

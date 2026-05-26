@@ -61,7 +61,7 @@ mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 pub mod world_serde;
 mod when;
 
@@ -80,6 +80,6 @@ pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 pub use world_serde::*;
 pub use when::*;

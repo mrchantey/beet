@@ -6,9 +6,9 @@ pub use tui::*;
 mod charcell;
 #[cfg(feature = "style")]
 pub use charcell::*;
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 mod world_serde;
-#[cfg(feature = "bevy_world_serde")]
+#[cfg(feature = "world_serde")]
 pub use world_serde::*;
 mod html;
 pub use html::*;

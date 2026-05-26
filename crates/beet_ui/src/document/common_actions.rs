@@ -502,7 +502,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(feature = "bevy_world_serde")]
+	#[cfg(feature = "world_serde")]
 	fn roundtrip_increment_world_serde() {
 		use bevy::ecs::entity::EntityHashMap;
 		let mut app = App::new();

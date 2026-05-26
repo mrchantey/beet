@@ -14,7 +14,7 @@ pub impl Commands<'_, '_> {
 	}
 
 	/// Loads world serde data from [`MediaBytes`].
-	#[cfg(feature = "bevy_world_serde")]
+	#[cfg(feature = "world_serde")]
 	fn load_world_serde(&mut self, bytes: impl Into<MediaBytes>) {
 		let bytes = bytes.into();
 		self.queue(move |world: &mut World| -> Result {
