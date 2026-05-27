@@ -181,10 +181,9 @@ pathdiff = { version = "0.2", optional = true }
 either = { version = "1", default-features = false }
 
 #💡 serde
-# Declared directly (not via workspace) so default features stay off and the
-# `serde` feature is no_std. `std` builds re-enable `serde/std` (see `std`
-# feature); the wider workspace's std serde is unaffected via feature unification.
-serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive", "rc"] }
+# Workspace serde is no_std (default-features off); `std` builds re-enable
+# `serde/std` via the `std` feature. `alloc`/`rc` add the no_std collection impls.
+serde = { workspace = true, optional = true, features = ["alloc", "rc"] }
 serde_plain = {workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }

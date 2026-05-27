@@ -104,82 +104,78 @@ impl MediaType {
 	) -> Result<Vec<u8>> {
 		match self {
 			MediaType::Text => {
-				#[cfg(feature = "serde_plain")]
-				{
-					let value = serde_plain::to_string(value)?;
-					Ok(value.into_bytes())
-				}
-				#[cfg(not(feature = "serde_plain"))]
-				{
-					let _ = value;
-					bevybail!(
-						"The `serde_plain` feature is required for plaintext serialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "serde_plain")] {
+						let value = serde_plain::to_string(value)?;
+						Ok(value.into_bytes())
+					} else {
+						let _ = value;
+						bevybail!(
+							"The `serde_plain` feature is required for plaintext serialization"
+						)
+					}
 				}
 			}
 			MediaType::Json => {
-				#[cfg(feature = "json")]
-				{
-					if options.pretty {
-						serde_json::to_vec_pretty(value).map_err(|err| {
-							bevyhow!("Failed to serialize JSON: {err}")
-						})
+				cfg_if! {
+					if #[cfg(feature = "json")] {
+						if options.pretty {
+							serde_json::to_vec_pretty(value).map_err(|err| {
+								bevyhow!("Failed to serialize JSON: {err}")
+							})
+						} else {
+							serde_json::to_vec(value).map_err(|err| {
+								bevyhow!("Failed to serialize JSON: {err}")
+							})
+						}
 					} else {
-						serde_json::to_vec(value).map_err(|err| {
-							bevyhow!("Failed to serialize JSON: {err}")
-						})
+						let _ = (value, options);
+						bevybail!(
+							"The `json` feature is required for JSON serialization"
+						)
 					}
-				}
-				#[cfg(not(feature = "json"))]
-				{
-					let _ = (value, options);
-					bevybail!(
-						"The `json` feature is required for JSON serialization"
-					)
 				}
 			}
 			MediaType::Ron => {
-				#[cfg(feature = "ron")]
-				{
-					if options.pretty {
-						let pretty_config = ron::ser::PrettyConfig::default()
-							.indentor("  ".to_string())
-							.new_line("\n".to_string());
-						ron::ser::to_string_pretty(value, pretty_config)
-							.map(|s| s.into_bytes())
-							.map_err(|err| {
-								bevyhow!("Failed to serialize RON: {err}")
-							})
+				cfg_if! {
+					if #[cfg(feature = "ron")] {
+						if options.pretty {
+							let pretty_config = ron::ser::PrettyConfig::default()
+								.indentor("  ".to_string())
+								.new_line("\n".to_string());
+							ron::ser::to_string_pretty(value, pretty_config)
+								.map(|s| s.into_bytes())
+								.map_err(|err| {
+									bevyhow!("Failed to serialize RON: {err}")
+								})
+						} else {
+							ron::ser::to_string(value)
+								.map(|s| s.into_bytes())
+								.map_err(|err| {
+									bevyhow!("Failed to serialize RON: {err}")
+								})
+						}
 					} else {
-						ron::ser::to_string(value)
-							.map(|s| s.into_bytes())
-							.map_err(|err| {
-								bevyhow!("Failed to serialize RON: {err}")
-							})
+						let _ = (value, options);
+						bevybail!(
+							"The `ron` feature is required for RON serialization"
+						)
 					}
-				}
-				#[cfg(not(feature = "ron"))]
-				{
-					let _ = (value, options);
-					bevybail!(
-						"The `ron` feature is required for RON serialization"
-					)
 				}
 			}
 			MediaType::Postcard | MediaType::Bytes => {
-				#[cfg(feature = "postcard")]
-				{
-					let _ = options;
-					postcard::to_allocvec(value).map_err(|err| {
-						bevyhow!("Failed to serialize postcard: {err}")
-					})
-				}
-				#[cfg(not(feature = "postcard"))]
-				{
-					let _ = (value, options);
-					bevybail!(
-						"The `postcard` feature is required for postcard serialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "postcard")] {
+						let _ = options;
+						postcard::to_allocvec(value).map_err(|err| {
+							bevyhow!("Failed to serialize postcard: {err}")
+						})
+					} else {
+						let _ = (value, options);
+						bevybail!(
+							"The `postcard` feature is required for postcard serialization"
+						)
+					}
 				}
 			}
 			other => bevybail!("Cannot serialize to media type {other}"),
@@ -212,68 +208,64 @@ impl MediaType {
 	) -> Result<T> {
 		match self {
 			MediaType::Text => {
-				let string = core::str::from_utf8(bytes)?;
-				#[cfg(feature = "serde_plain")]
-				{
-					serde_plain::from_str(string).map_err(|err| {
-						bevyhow!("Failed to deserialize plaintext body: {err}")
-					})
-				}
-				#[cfg(not(feature = "serde_plain"))]
-				{
-					let _ = string;
-					bevybail!(
-						"The `serde_plain` feature is required for plaintext deserialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "serde_plain")] {
+						let string = core::str::from_utf8(bytes)?;
+						serde_plain::from_str(string).map_err(|err| {
+							bevyhow!("Failed to deserialize plaintext body: {err}")
+						})
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `serde_plain` feature is required for plaintext deserialization"
+						)
+					}
 				}
 			}
 			MediaType::Json => {
-				#[cfg(feature = "json")]
-				{
-					let slice = if bytes.is_empty() { b"null" } else { bytes };
-					serde_json::from_slice(slice).map_err(|err| {
-						bevyhow!("Failed to deserialize JSON body: {err}")
-					})
-				}
-				#[cfg(not(feature = "json"))]
-				{
-					let _ = bytes;
-					bevybail!(
-						"The `json` feature is required for JSON deserialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "json")] {
+						let slice = if bytes.is_empty() { b"null" } else { bytes };
+						serde_json::from_slice(slice).map_err(|err| {
+							bevyhow!("Failed to deserialize JSON body: {err}")
+						})
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `json` feature is required for JSON deserialization"
+						)
+					}
 				}
 			}
 			MediaType::Ron => {
-				let string = core::str::from_utf8(bytes).map_err(|err| {
-					bevyhow!("RON data is not valid UTF-8: {err}")
-				})?;
-				#[cfg(feature = "ron")]
-				{
-					ron::de::from_str(string).map_err(|err| {
-						bevyhow!("Failed to deserialize RON body: {err}")
-					})
-				}
-				#[cfg(not(feature = "ron"))]
-				{
-					let _ = string;
-					bevybail!(
-						"The `ron` feature is required for RON deserialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "ron")] {
+						let string = core::str::from_utf8(bytes).map_err(|err| {
+							bevyhow!("RON data is not valid UTF-8: {err}")
+						})?;
+						ron::de::from_str(string).map_err(|err| {
+							bevyhow!("Failed to deserialize RON body: {err}")
+						})
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `ron` feature is required for RON deserialization"
+						)
+					}
 				}
 			}
 			MediaType::Postcard | MediaType::Bytes => {
-				#[cfg(feature = "postcard")]
-				{
-					postcard::from_bytes(bytes).map_err(|err| {
-						bevyhow!("Failed to deserialize postcard body: {err}")
-					})
-				}
-				#[cfg(not(feature = "postcard"))]
-				{
-					let _ = bytes;
-					bevybail!(
-						"The `postcard` feature is required for postcard deserialization"
-					)
+				cfg_if! {
+					if #[cfg(feature = "postcard")] {
+						postcard::from_bytes(bytes).map_err(|err| {
+							bevyhow!("Failed to deserialize postcard body: {err}")
+						})
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `postcard` feature is required for postcard deserialization"
+						)
+					}
 				}
 			}
 			other => bevybail!("Cannot deserialize from media type {other}"),
