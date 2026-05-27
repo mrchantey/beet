@@ -81,6 +81,7 @@ std = [
 	"thiserror/std",
 	"tracing/std",
 	"serde?/std",
+	"serde_json?/std",
 	"futures-lite/race",
 	"dep:send_wrapper",
 	"dep:dotenv",
