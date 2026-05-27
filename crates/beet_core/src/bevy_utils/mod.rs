@@ -27,11 +27,6 @@
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
 //! - [`IdCounter`] - Unique ID generation
 //!
-//! # World Serde Utilities
-//!
-//! - [`WorldSerdeSaver`] - Serialize world or entity subtrees to RON, JSON, or postcard
-//! - [`WorldSerdeLoader`] - Deserialize back into a world
-//!
 //! # Macros
 //!
 //! - [`bevyhow!`](crate::bevyhow) - Create a [`BevyError`](bevy::ecs::error::BevyError) with formatting
@@ -64,8 +59,6 @@ mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
 
-#[cfg(feature = "world_serde")]
-pub mod world_serde;
 mod when;
 
 pub use ancestor_query::*;
@@ -83,6 +76,4 @@ pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
-#[cfg(feature = "world_serde")]
-pub use world_serde::*;
 pub use when::*;

@@ -87,6 +87,8 @@ pub mod testing;
 pub mod tokens_utils;
 pub mod types;
 pub mod utils;
+#[cfg(feature = "world_serde")]
+pub mod world_serde;
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_utils;
@@ -171,6 +173,18 @@ pub mod prelude {
 	pub use crate::tokens_utils::*;
 	pub use crate::types::*;
 	pub use crate::utils::*;
+	#[cfg(feature = "world_serde")]
+	pub use crate::world_serde::*;
+	// `DynamicWorld`, `DynamicWorldBuilder` and `WorldFilter` also exist in
+	// `bevy::prelude` when `bevy_world_serialization` is enabled (eg via
+	// `bevy/default`). Re-export ours explicitly so they shadow bevy's globs,
+	// keeping beet's fork canonical and avoiding ambiguous glob re-exports.
+	#[cfg(feature = "world_serde")]
+	pub use crate::world_serde::DynamicWorld;
+	#[cfg(feature = "world_serde")]
+	pub use crate::world_serde::DynamicWorldBuilder;
+	#[cfg(feature = "world_serde")]
+	pub use crate::world_serde::WorldFilter;
 	#[cfg(feature = "std")]
 	pub use crate::terminal::*;
 	pub use either::Either;

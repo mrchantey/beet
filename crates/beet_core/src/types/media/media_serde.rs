@@ -185,7 +185,7 @@ impl MediaType {
 	) -> Result<T> {
 		match self {
 			MediaType::Text => {
-				let string = std::str::from_utf8(bytes)?;
+				let string = core::str::from_utf8(bytes)?;
 				serde_plain::from_str(string).map_err(|err| {
 					bevyhow!("Failed to deserialize plaintext body: {err}")
 				})
@@ -207,7 +207,7 @@ impl MediaType {
 				}
 			}
 			MediaType::Ron => {
-				let string = std::str::from_utf8(bytes).map_err(|err| {
+				let string = core::str::from_utf8(bytes).map_err(|err| {
 					bevyhow!("RON data is not valid UTF-8: {err}")
 				})?;
 				ron::de::from_str(string).map_err(|err| {

@@ -183,7 +183,7 @@ mod ser {
 			f.write_str(&self.0)
 		}
 	}
-	impl std::error::Error for SerError {}
+	impl core::error::Error for SerError {}
 	impl ser::Error for SerError {
 		fn custom<T: core::fmt::Display>(msg: T) -> Self {
 			SerError(msg.to_string())
@@ -483,7 +483,7 @@ mod de {
 			f.write_str(&self.0)
 		}
 	}
-	impl std::error::Error for DeError {}
+	impl core::error::Error for DeError {}
 	impl de::Error for DeError {
 		fn custom<T: core::fmt::Display>(msg: T) -> Self {
 			DeError(msg.to_string())

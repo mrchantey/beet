@@ -1,11 +1,12 @@
 //! Utilities for serde serialization and deserialization.
+use alloc::vec::Vec;
+use core::fmt;
 use serde::Deserializer;
 use serde::Serializer;
 use serde::de::Visitor;
 use serde::de::{
 	self,
 };
-use std::fmt;
 
 /// Serialize a byte array as either a UTF-8 string (if valid) or as raw bytes.
 pub fn serialize_bytes_or_string<S>(
@@ -15,7 +16,7 @@ pub fn serialize_bytes_or_string<S>(
 where
 	S: Serializer,
 {
-	match std::str::from_utf8(bytes) {
+	match core::str::from_utf8(bytes) {
 		Ok(s) => serializer.serialize_str(s),
 		Err(_) => serializer.serialize_bytes(bytes),
 	}
