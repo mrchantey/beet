@@ -1,6 +1,10 @@
 //! Extension trait for [`serde_json::Value`] with ergonomic accessors.
 
 use crate::bevybail;
+use alloc::format;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use bevy::ecs::error::BevyError;
 use bevy::ecs::error::Result;
 use extend::ext;
