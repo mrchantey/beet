@@ -372,8 +372,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("about", rsx! { <p>"about"</p> }),
-				fixed_scene("docs", rsx! { <p>"docs"</p> }),
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
+				render_action::fixed_route("docs", rsx! { <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -394,8 +394,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("about", rsx! { <p>"about"</p> }),
-				fixed_scene("docs", rsx! { <p>"docs"</p> }),
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
+				render_action::fixed_route("docs", rsx! { <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -411,7 +411,7 @@ mod test {
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![fixed_scene("about", rsx! { <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route("about", rsx! { <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -429,10 +429,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("about", rsx! { <p>"about"</p> }),
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
 				(PathPartial::new("docs"), children![
-					fixed_scene("intro", rsx! { <p>"intro"</p> }),
-					fixed_scene("api", rsx! { <p>"api"</p> }),
+					render_action::fixed_route("intro", rsx! { <p>"intro"</p> }),
+					render_action::fixed_route("api", rsx! { <p>"api"</p> }),
 				]),
 			])
 			.flush();
@@ -455,11 +455,11 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(PathPartial::new("docs"), children![fixed_scene(
+				(PathPartial::new("docs"), children![render_action::fixed_route(
 					"intro",
 					rsx! { <p>"intro"</p> }
 				),]),
-				(PathPartial::new("blog"), children![fixed_scene(
+				(PathPartial::new("blog"), children![render_action::fixed_route(
 					"post1",
 					rsx! { <p>"post1"</p> }
 				),]),
@@ -481,7 +481,7 @@ mod test {
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![fixed_scene("about", rsx! { <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route("about", rsx! { <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -502,8 +502,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("zulu", rsx! { <p>"zulu"</p> }),
-				fixed_scene("alpha", rsx! { <p>"alpha"</p> }),
+				render_action::fixed_route("zulu", rsx! { <p>"zulu"</p> }),
+				render_action::fixed_route("alpha", rsx! { <p>"alpha"</p> }),
 			])
 			.flush();
 
@@ -551,7 +551,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("docs"), children![
-				fixed_scene("intro", rsx! { <p>"intro"</p> }),
+				render_action::fixed_route("intro", rsx! { <p>"intro"</p> }),
 			])])
 			.flush();
 
@@ -572,13 +572,13 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(
-				fixed_scene(
+				render_action::fixed_route(
 					"docs",
 					// Use with_inner_text here because rsx! produces
 					// a children![] that conflicts with the outer children![]
 					Element::new("p").with_inner_text("docs index")
 				),
-				children![fixed_scene("intro", rsx! { <p>"intro"</p> })],
+				children![render_action::fixed_route("intro", rsx! { <p>"intro"</p> })],
 			)])
 			.flush();
 

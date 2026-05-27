@@ -101,8 +101,14 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let router = world
 			.spawn((router(), children![
-				(fixed_scene("about", rsx! { <p>"About"</p> }), HttpMethod::Get),
-				(fixed_scene("", rsx! { <h1>"Home"</h1> }), HttpMethod::Get),
+				(
+					render_action::fixed_route("about", rsx! { <p>"About"</p> }),
+					HttpMethod::Get
+				),
+				(
+					render_action::fixed_route("", rsx! { <h1>"Home"</h1> }),
+					HttpMethod::Get
+				),
 			]))
 			.flush();
 

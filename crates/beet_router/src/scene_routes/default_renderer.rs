@@ -5,7 +5,7 @@ use beet_action::prelude::*;
 
 /// Creates a render action that negotiates content type via the
 /// `Accept` header and delegates to [`MediaRenderer`].
-pub async fn default_scene_renderer(
+pub async fn default_renderer(
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	let accepts: Vec<MediaType> = cx

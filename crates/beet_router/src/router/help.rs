@@ -56,11 +56,11 @@ pub async fn HelpHandler(
 		)
 		.await??;
 
-	let scene = spawn_help_scene(&caller, &nodes).await;
-	scene.render_scene(&caller, parts).await
+	let root = spawn_help_scene(&caller, &nodes).await;
+	RenderRoot::render(root, &caller, parts).await
 }
 
-/// Fallback handler that shows help scoped to the nearest ancestor scene
+/// Fallback handler that shows help scoped to the nearest ancestor scene route
 /// of an unmatched path. Returns a NOT_FOUND status with the help scene.
 #[action]
 pub(crate) async fn ContextualNotFound(
@@ -80,10 +80,9 @@ pub(crate) async fn ContextualNotFound(
 		)
 		.await??;
 
-	let scene = spawn_not_found_scene(&cx.caller, info, &nodes).await;
-	let mut response = scene
-		.render_scene(&cx.caller, cx.input.parts().clone())
-		.await?;
+	let root = spawn_not_found_scene(&cx.caller, info, &nodes).await;
+	let mut response =
+		RenderRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
@@ -92,12 +91,12 @@ pub(crate) async fn ContextualNotFound(
 struct NotFoundInfo {
 	/// The path that was not found.
 	not_found_path: String,
-	/// The nearest ancestor scene path, if any.
+	/// The nearest ancestor scene-route path, if any.
 	ancestor_path: Option<String>,
 }
 
 /// Walks path segments from longest to shortest prefix, returning
-/// help nodes for the first ancestor that matches a scene.
+/// help nodes for the first ancestor that matches a scene route.
 fn nearest_ancestor_help_nodes(
 	tree: &RouteTree,
 	segments: &[String],
@@ -140,11 +139,9 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
 		.cloned()
 		.collect()
 }
-/// Spawns a help scene entity tree with route documentation.
-async fn spawn_help_scene(
-	caller: &AsyncEntity,
-	nodes: &[ActionNode],
-) -> SceneEntity {
+/// Spawns a help scene entity tree with route documentation, returning the
+/// render-root entity.
+async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ActionNode]) -> Entity {
 	let children: Vec<OnSpawn> = nodes
 		.iter()
 		.map(|node| format_action_node_bundle(node).any_bundle())
@@ -165,7 +162,7 @@ async fn spawn_help_scene(
 			</div>
 		})
 		.await;
-	// add pre-spawned children to parent
+	// add pre-spawned children to parent, then mark it an ephemeral render root
 	let parent_id = entity.id();
 	entity
 		.with_then(move |mut entity| {
@@ -174,10 +171,11 @@ async fn spawn_help_scene(
 					world.entity_mut(parent_id).add_child(child_id);
 				}
 			});
+			RenderRoot::insert(&mut entity, vec![parent_id]);
 		})
 		.await
 		.ok();
-	SceneEntity::new_ephemeral(entity.id())
+	parent_id
 }
 
 /// Builds the not-found preamble with anchor tags for the missing route
@@ -216,12 +214,13 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 	}
 }
 
-/// Spawns a not-found scene entity tree with anchor-tagged preamble and help.
+/// Spawns a not-found scene entity tree with anchor-tagged preamble and help,
+/// returning the render-root entity.
 async fn spawn_not_found_scene(
 	caller: &AsyncEntity,
 	info: NotFoundInfo,
 	nodes: &[ActionNode],
-) -> SceneEntity {
+) -> Entity {
 	let children: Vec<OnSpawn> = nodes
 		.iter()
 		.map(|node| format_action_node_bundle(node).any_bundle())
@@ -236,7 +235,7 @@ async fn spawn_not_found_scene(
 	}
 	// build parent from preamble
 	let entity = world.spawn_then(not_found_preamble(info)).await;
-	// add pre-spawned children to parent
+	// add pre-spawned children to parent, then mark it an ephemeral render root
 	let parent_id = entity.id();
 	entity
 		.with_then(move |mut entity| {
@@ -245,10 +244,11 @@ async fn spawn_not_found_scene(
 					world.entity_mut(parent_id).add_child(child_id);
 				}
 			});
+			RenderRoot::insert(&mut entity, vec![parent_id]);
 		})
 		.await
 		.ok();
-	SceneEntity::new_ephemeral(entity.id())
+	parent_id
 }
 
 /// Creates an element bundle describing a single route node.
@@ -322,7 +322,8 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 	)
 }
 
-/// Format a [`RouteTree`] as a help string, listing both scenes and actions.
+/// Format a [`RouteTree`] as a help string, listing both scene routes and
+/// actions.
 ///
 /// The help action itself is excluded from the listing.
 /// Retained for backward compatibility with tests and plaintext rendering.
@@ -532,7 +533,7 @@ mod test {
 		let root = world
 			.spawn(children![
 				help(),
-				fixed_scene("about", rsx! { <p>"about"</p> }),
+				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
 				increment(FieldRef::new("count")),
 			])
 			.flush();
@@ -551,7 +552,7 @@ mod test {
 			.await
 			.unwrap();
 
-		// scenes should appear with a [scene] marker
+		// scene routes should appear with a [scene] marker
 		output.contains("about").xpect_true();
 		output.contains("[scene]").xpect_true();
 		// actions should still appear

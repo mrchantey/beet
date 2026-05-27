@@ -15,7 +15,7 @@ use quote::quote;
 use syn::ItemFn;
 
 /// Classification of a handler function signature, mirroring the `#[action]`
-/// macro and the runtime `scene_*` adapters.
+/// macro and the runtime `render_action::*_route` constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HandlerKind {
 	/// `fn get() -> impl Bundle` — no context, rendered once.
@@ -127,16 +127,16 @@ fn emit_rust_route(
 		RouteCollectionCategory::Pages => {
 			let route = match kind {
 				HandlerKind::Static => {
-					quote! { fixed_scene(#path, #mod_ident::#func()) }
+					quote! { render_action::fixed_route(#path, #mod_ident::#func()) }
 				}
 				HandlerKind::Pure => {
-					quote! { exchange_route(#path, scene_pure(#mod_ident::#func)) }
+					quote! { render_action::pure_route(#path, #mod_ident::#func) }
 				}
 				HandlerKind::Async => {
-					quote! { exchange_route(#path, scene_async(#mod_ident::#func)) }
+					quote! { render_action::async_route(#path, #mod_ident::#func) }
 				}
 				HandlerKind::System => {
-					quote! { exchange_route(#path, scene_system(#mod_ident::#func)) }
+					quote! { render_action::system_route(#path, #mod_ident::#func) }
 				}
 			};
 			let cache = match kind {

@@ -49,17 +49,18 @@ async fn ParseRequest(cx: ActionContext<Request>) -> Result<Response> {
 	let caller_id = cx.id();
 	let media = cx.input.into_media_bytes().await?;
 	cx.caller
-		.with_then(move |mut entity| {
+		.with_then(move |mut entity| -> Result {
 			// ideally we wouldnt need to despawn children,
 			// parser should be diffing
 			entity.despawn_children();
-			MediaParser::new().parse(ParseContext::new(&mut entity, &media))
+			MediaParser::new().parse(ParseContext::new(&mut entity, &media))?;
+			// the caller is a fixed (non-ephemeral) render root
+			RenderRoot::insert(&mut entity, default());
+			Ok(())
 		})
 		.await??;
 
-	SceneEntity::new_fixed(caller_id)
-		.render_scene(&cx.caller, parts)
-		.await
+	RenderRoot::render(caller_id, &cx.caller, parts).await
 }
 
 // apply the element tree to the tui

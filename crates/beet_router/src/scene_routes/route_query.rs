@@ -1,31 +1,31 @@
-//! Scoped entity traversal within scene route boundaries.
+//! Scoped entity traversal within render-root boundaries.
 //!
 //! This module provides [`RouteQuery`], a system parameter for iterating
-//! entities within the scope of a [`Document`]. Many systems, ie markdown
-//! rendering, must only operate on entities belonging to a specific scene.
+//! entities within the scope of a [`RenderRoot`]. Many systems, ie markdown
+//! rendering, must only operate on entities belonging to a specific render
+//! root.
 //!
 //! # Traversal Rules
 //!
 //! Given an entity, RouteQuery:
-//! 1. Traverses up to find the containing [`Document`], or root if no scene exists
-//! 2. Iterates descendants within that scene, stopping at and excluding
-//! [`Document`] boundaries (unless it's the scene root itself)
+//! 1. Traverses up to find the containing [`RenderRoot`], or root if none exists
+//! 2. Iterates descendants within that render root, stopping at and excluding
+//!    [`RenderRoot`] boundaries (unless it's the render root itself)
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_ui::prelude::*;
 use std::collections::VecDeque;
 
-/// System parameter for traversing entities within scene route boundaries.
+/// System parameter for traversing entities within render-root boundaries.
 ///
-/// Provides DFS and BFS iterators that respect scene route boundaries,
-/// ensuring systems only process entities belonging to a specific scene.
+/// Provides DFS and BFS iterators that respect render-root boundaries,
+/// ensuring systems only process entities belonging to a specific render root.
 #[derive(SystemParam)]
 pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	scenes: Query<'w, 's, (), With<Document>>,
+	render_roots: Query<'w, 's, (), With<RenderRoot>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
@@ -37,32 +37,31 @@ impl<'w, 's> RouteQuery<'w, 's> {
 		Ok(self.route_trees.get(root)?)
 	}
 
-	/// Finds the scene root for the given entity.
+	/// Finds the render root for the given entity.
 	///
-	/// Traverses ancestors to find the nearest [`Document`], or returns
-	/// the root ancestor if no scene is found.
-	pub fn scene_root(&self, entity: Entity) -> Entity {
+	/// Traverses [`ChildOf`] ancestors to find the nearest [`RenderRoot`], or
+	/// returns the root ancestor if none is found. The `ChildOf` walk is
+	/// acyclic — descendants are not tagged with `RenderRootOf` — so this is
+	/// loop-safe.
+	pub fn render_root(&self, entity: Entity) -> Entity {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
-			.find(|&entity| self.scenes.contains(entity))
+			.find(|&entity| self.render_roots.contains(entity))
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity has a [`Document`].
-	pub fn is_scene(&self, entity: Entity) -> bool {
-		self.scenes.contains(entity)
+	/// Returns true if the entity has a [`RenderRoot`].
+	pub fn is_render_root(&self, entity: Entity) -> bool {
+		self.render_roots.contains(entity)
 	}
 
-	/// Returns true if the entity is a [`Document`] boundary.
-	fn is_boundary(&self, entity: Entity) -> bool { self.is_scene(entity) }
-
-	/// Creates a depth-first iterator over entities within the scene.
+	/// Creates a depth-first iterator over entities within the render.
 	///
-	/// Starts from the given entity's scene root and traverses descendants,
-	/// stopping at Document boundaries.
-	pub fn iter_dfs(&self, entity: Entity) -> SceneRouteDfsIter<'_, 'w, 's> {
-		let root = self.scene_root(entity);
-		SceneRouteDfsIter {
+	/// Starts from the given entity's render root and traverses descendants,
+	/// stopping at [`RenderRoot`] boundaries.
+	pub fn iter_dfs(&self, entity: Entity) -> RenderDfsIter<'_, 'w, 's> {
+		let root = self.render_root(entity);
+		RenderDfsIter {
 			query: self,
 			stack: vec![root],
 			root,
@@ -84,13 +83,13 @@ impl<'w, 's> RouteQuery<'w, 's> {
 			.unwrap()
 	}
 
-	/// Creates a breadth-first iterator over entities within the scene.
+	/// Creates a breadth-first iterator over entities within the render.
 	///
-	/// Starts from the given entity's scene root and traverses descendants,
-	/// stopping at Document boundaries.
-	pub fn iter_bfs(&self, entity: Entity) -> SceneRouteBfsIter<'_, 'w, 's> {
-		let root = self.scene_root(entity);
-		SceneRouteBfsIter {
+	/// Starts from the given entity's render root and traverses descendants,
+	/// stopping at [`RenderRoot`] boundaries.
+	pub fn iter_bfs(&self, entity: Entity) -> RenderBfsIter<'_, 'w, 's> {
+		let root = self.render_root(entity);
+		RenderBfsIter {
 			query: self,
 			queue: VecDeque::from([root]),
 			root,
@@ -99,10 +98,10 @@ impl<'w, 's> RouteQuery<'w, 's> {
 
 	/// Creates a depth-first iterator starting from a specific root entity.
 	///
-	/// Unlike [`iter_dfs`](Self::iter_dfs), this does not resolve the scene root
-	/// first - it uses the provided entity as the root directly.
-	pub fn iter_dfs_from(&self, root: Entity) -> SceneRouteDfsIter<'_, 'w, 's> {
-		SceneRouteDfsIter {
+	/// Unlike [`iter_dfs`](Self::iter_dfs), this does not resolve the render
+	/// root first - it uses the provided entity as the root directly.
+	pub fn iter_dfs_from(&self, root: Entity) -> RenderDfsIter<'_, 'w, 's> {
+		RenderDfsIter {
 			query: self,
 			stack: vec![root],
 			root,
@@ -111,10 +110,10 @@ impl<'w, 's> RouteQuery<'w, 's> {
 
 	/// Creates a breadth-first iterator starting from a specific root entity.
 	///
-	/// Unlike [`iter_bfs`](Self::iter_bfs), this does not resolve the scene root
-	/// first - it uses the provided entity as the root directly.
-	pub fn iter_bfs_from(&self, root: Entity) -> SceneRouteBfsIter<'_, 'w, 's> {
-		SceneRouteBfsIter {
+	/// Unlike [`iter_bfs`](Self::iter_bfs), this does not resolve the render
+	/// root first - it uses the provided entity as the root directly.
+	pub fn iter_bfs_from(&self, root: Entity) -> RenderBfsIter<'_, 'w, 's> {
+		RenderBfsIter {
 			query: self,
 			queue: VecDeque::from([root]),
 			root,
@@ -122,14 +121,14 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	}
 }
 
-/// Depth-first iterator over entities within a scene route boundary.
-pub struct SceneRouteDfsIter<'a, 'w, 's> {
+/// Depth-first iterator over entities within a render-route boundary.
+pub struct RenderDfsIter<'a, 'w, 's> {
 	query: &'a RouteQuery<'w, 's>,
 	stack: Vec<Entity>,
 	root: Entity,
 }
 
-impl Iterator for SceneRouteDfsIter<'_, '_, '_> {
+impl Iterator for RenderDfsIter<'_, '_, '_> {
 	type Item = Entity;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -138,8 +137,8 @@ impl Iterator for SceneRouteDfsIter<'_, '_, '_> {
 		// Add children in reverse order for correct DFS traversal
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter().rev() {
-				// Stop at boundaries (Document), unless the child is the root itself
-				if child != self.root && self.query.is_boundary(child) {
+				// Stop at render-root boundaries, unless the child is the root
+				if child != self.root && self.query.is_render_root(child) {
 					continue;
 				}
 				self.stack.push(child);
@@ -150,14 +149,14 @@ impl Iterator for SceneRouteDfsIter<'_, '_, '_> {
 	}
 }
 
-/// Breadth-first iterator over entities within a scene route boundary.
-pub struct SceneRouteBfsIter<'a, 'w, 's> {
+/// Breadth-first iterator over entities within a render-route boundary.
+pub struct RenderBfsIter<'a, 'w, 's> {
 	query: &'a RouteQuery<'w, 's>,
 	queue: VecDeque<Entity>,
 	root: Entity,
 }
 
-impl Iterator for SceneRouteBfsIter<'_, '_, '_> {
+impl Iterator for RenderBfsIter<'_, '_, '_> {
 	type Item = Entity;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -166,8 +165,8 @@ impl Iterator for SceneRouteBfsIter<'_, '_, '_> {
 		// Add children to queue
 		if let Ok(children) = self.query.children.get(entity) {
 			for child in children.iter() {
-				// Stop at boundaries (Document), unless the child is the root itself
-				if child != self.root && self.query.is_boundary(child) {
+				// Stop at render-root boundaries, unless the child is the root
+				if child != self.root && self.query.is_render_root(child) {
 					continue;
 				}
 				self.queue.push_back(child);
@@ -183,20 +182,34 @@ impl Iterator for SceneRouteBfsIter<'_, '_, '_> {
 mod test {
 	use super::*;
 
+	/// Spawns a self-referential [`RenderRoot`] boundary entity.
+	fn render_root(world: &mut World) -> Entity {
+		let entity = world.spawn_empty().id();
+		world.entity_mut(entity).insert(RenderRootOf(entity));
+		entity
+	}
+
+	/// Spawns a self-referential [`RenderRoot`] boundary entity as a child.
+	fn render_root_child(world: &mut World, parent: Entity) -> Entity {
+		let entity = world.spawn(ChildOf(parent)).id();
+		world.entity_mut(entity).insert(RenderRootOf(entity));
+		entity
+	}
+
 	#[beet_core::test]
-	fn scene_root_finds_scene() {
+	fn render_root_finds_render() {
 		let mut world = World::new();
 
-		let scene = world.spawn(Document::default()).id();
-		let child = world.spawn(ChildOf(scene)).id();
+		let render = render_root(&mut world);
+		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
 		world
 			.run_system_cached_with(
 				|In(entity): In<Entity>, query: RouteQuery| {
-					query.scene_root(entity).xpect_eq(entity);
+					query.render_root(entity).xpect_eq(entity);
 				},
-				scene,
+				render,
 			)
 			.unwrap();
 
@@ -204,9 +217,9 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.scene_root(entity).xpect_eq(expected);
+					query.render_root(entity).xpect_eq(expected);
 				},
-				(child, scene),
+				(child, render),
 			)
 			.unwrap();
 
@@ -214,15 +227,15 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.scene_root(entity).xpect_eq(expected);
+					query.render_root(entity).xpect_eq(expected);
 				},
-				(grandchild, scene),
+				(grandchild, render),
 			)
 			.unwrap();
 	}
 
 	#[beet_core::test]
-	fn scene_root_falls_back_to_root() {
+	fn render_root_falls_back_to_root() {
 		let mut world = World::new();
 
 		let root = world.spawn_empty().id();
@@ -232,7 +245,7 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Entity)>,
 				 query: RouteQuery| {
-					query.scene_root(entity).xpect_eq(expected);
+					query.render_root(entity).xpect_eq(expected);
 				},
 				(child, root),
 			)
@@ -244,7 +257,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(Document::default()).id();
+		let root = render_root(&mut world);
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -270,7 +283,7 @@ mod test {
 		let mut world = World::new();
 
 		// Build: root -> [a, b -> [c, d]]
-		let root = world.spawn(Document::default()).id();
+		let root = render_root(&mut world);
 		let child_a = world.spawn(ChildOf(root)).id();
 		let child_b = world.spawn(ChildOf(root)).id();
 		let grandchild_c = world.spawn(ChildOf(child_b)).id();
@@ -292,40 +305,39 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn stops_at_nested_scene() {
+	fn stops_at_nested_render() {
 		let mut world = World::new();
 
-		let scene = world.spawn(Document::default()).id();
-		let child = world.spawn(ChildOf(scene)).id();
-		let nested_scene =
-			world.spawn((Document::default(), ChildOf(child))).id();
-		let _nested_child = world.spawn(ChildOf(nested_scene)).id();
+		let render = render_root(&mut world);
+		let child = world.spawn(ChildOf(render)).id();
+		let nested_render = render_root_child(&mut world, child);
+		let _nested_child = world.spawn(ChildOf(nested_render)).id();
 
-		let expected = vec![scene, child];
+		let expected = vec![render, child];
 
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
 				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
-					// Should not include nested_scene or its children
+					// Should not include nested_render or its children
 					entities.xpect_eq(expected);
 				},
-				(scene, expected),
+				(render, expected),
 			)
 			.unwrap();
 	}
 
 	#[beet_core::test]
-	fn stops_at_scene_boundary() {
+	fn stops_at_render_boundary() {
 		let mut world = World::new();
 
-		let scene = world.spawn(Document::default()).id();
-		let child = world.spawn(ChildOf(scene)).id();
-		let boundary = world.spawn((Document::default(), ChildOf(child))).id();
+		let render = render_root(&mut world);
+		let child = world.spawn(ChildOf(render)).id();
+		let boundary = render_root_child(&mut world, child);
 		let _boundary_child = world.spawn(ChildOf(boundary)).id();
 
-		let expected = vec![scene, child];
+		let expected = vec![render, child];
 
 		world
 			.run_system_cached_with(
@@ -335,27 +347,27 @@ mod test {
 					// Should not include boundary or its children
 					entities.xpect_eq(expected);
 				},
-				(scene, expected),
+				(render, expected),
 			)
 			.unwrap();
 	}
 
 	#[beet_core::test]
-	fn iter_from_child_finds_scene_root() {
+	fn iter_from_child_finds_render_root() {
 		let mut world = World::new();
 
-		let scene = world.spawn(Document::default()).id();
-		let child = world.spawn(ChildOf(scene)).id();
+		let render = render_root(&mut world);
+		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
-		let expected = vec![scene, child, grandchild];
+		let expected = vec![render, child, grandchild];
 
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
 				 query: RouteQuery| {
 					let entities: Vec<_> = query.iter_dfs(entity).collect();
-					// Starting from grandchild should still traverse from scene root
+					// Starting from grandchild should still traverse from root
 					entities.xpect_eq(expected);
 				},
 				(grandchild, expected),
@@ -367,21 +379,20 @@ mod test {
 	fn iter_dfs_from_starts_at_given_entity() {
 		let mut world = World::new();
 
-		let scene = world.spawn(Document::default()).id();
-		let child = world.spawn(ChildOf(scene)).id();
+		let render = render_root(&mut world);
+		let child = world.spawn(ChildOf(render)).id();
 		let grandchild = world.spawn(ChildOf(child)).id();
 
 		let expected = vec![child, grandchild];
 		// suppress unused warning
-		let _ = scene;
+		let _ = render;
 
 		world
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
 				 query: RouteQuery| {
-					let entities: Vec<_> =
-						query.iter_dfs_from(entity).collect();
-					// Should start from child, not scene root
+					let entities: Vec<_> = query.iter_dfs_from(entity).collect();
+					// Should start from child, not render root
 					entities.xpect_eq(expected);
 				},
 				(child, expected),

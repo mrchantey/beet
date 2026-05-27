@@ -88,7 +88,7 @@ impl IntoAction<Self> for ExchangeAction {
 /// Blanket impls cover the main cases:
 /// - Types implementing [`Serialize`] (serde content negotiation)
 ///
-/// Concrete impls exist for [`MediaBytes`] and [`SceneEntity`].
+/// Concrete impls exist for [`MediaBytes`] and [`RenderRequest`] (a render root).
 pub trait ExchangeRouteOut<M>
 where
 	Self: Sized,
@@ -159,6 +159,11 @@ where
 	}
 }
 
+
+/// Creates a route from a path and bundle, the simplest route constructor.
+pub fn route<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
+	(PathPartial::new(path), bundle)
+}
 
 /// Creates a route bundle from a path and action, including the
 /// [`ExchangeAction`] for type-erased dispatch.

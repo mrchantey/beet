@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 ///
 /// Requires a [`PackageConfig`] resource (eg via `pkg_config!()`).
 pub fn app_info() -> impl Bundle {
-	exchange_route("app-info", scene_async(app_info_scene))
+	render_action::async_route("app-info", app_info_scene)
 }
 
 async fn app_info_scene(cx: ActionContext<Request>) -> impl Bundle {

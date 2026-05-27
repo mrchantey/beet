@@ -9,7 +9,7 @@ use beet_ui::prelude::*;
 ///
 /// Automatically constructs a [`RouteTree`] on the root ancestor
 /// whenever actions are spawned in an entity hierarchy. Scene routes
-/// register as actions (via [`Document`] + [`ActionMeta`]), so there
+/// register as actions (via [`RenderRoot`] + [`ActionMeta`]), so there
 /// is no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
@@ -99,7 +99,7 @@ pub fn insert_path_pattern_for_late_path_partial(
 /// Collects all entities with action components ([`ActionMeta`], [`PathPattern`],
 /// [`ParamsPattern`]) from the root's descendants and constructs a validated
 /// tree. Scene routes are distinguished from regular actions by their output
-/// type being [`SceneEntity`], detected vian [`ActionMeta::output_is`].
+/// type being [`RenderRequest`], detected via [`ActionMeta::output_is`].
 // TODO this is a bit wasteful, if we used change detection could deduplicate added,
 // and only generate once, but we'd still want a guanratee the system runs immediately
 pub fn insert_route_tree(

@@ -327,7 +327,7 @@ impl std::fmt::Display for RouteTree {
 }
 
 /// An action route node, representing a callable action at a specific path.
-/// Scene routes are identified by their output type being [`SceneEntity`].
+/// Scene routes are identified by their output type being [`RenderRequest`].
 #[derive(Debug, Clone)]
 pub struct ActionNode {
 	/// The entity containing this action.
@@ -343,8 +343,8 @@ pub struct ActionNode {
 }
 
 impl ActionNode {
-	/// Whether this action is a scene route (output type is [`SceneEntity`]).
-	pub fn is_scene(&self) -> bool { self.meta.output_is::<SceneEntity>() }
+	/// Whether this action is a scene route (output type is [`RenderRequest`]).
+	pub fn is_scene(&self) -> bool { self.meta.output_is::<RenderRequest>() }
 
 	/// The action's description from doc comments, if available.
 	pub fn description(&self) -> Option<&str> { self.meta.description() }
@@ -477,7 +477,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				fixed_scene("about", rsx!{ <p>"about"</p> }),
+				render_action::fixed_route("about", rsx!{ <p>"about"</p> }),
 				action_at("action"),
 			])
 			.flush();
@@ -631,7 +631,7 @@ mod test {
 		let root = world
 			.spawn(children![
 				(
-					fixed_scene(
+					render_action::fixed_route(
 						"counter",
 						Element::new("p").with_inner_text("counter")
 					),

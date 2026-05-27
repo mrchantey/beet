@@ -140,8 +140,8 @@ pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 ## 6. Output and content negotiation
 
 The body is rendered per the `--accept` header (default: ansi-term, then text,
-markdown, json). A plain `Ok(String)` prints as text; a route returning a
-[`SceneEntity`] renders through the beet_ui pipeline, so `--accept=text/html`
+markdown, json). A plain `Ok(String)` prints as text; a scene route (eg
+`render_action::async_route`) renders through the beet_ui pipeline, so `--accept=text/html`
 yields HTML and the default yields styled terminal output. Rendering requires
 `RouterPlugin` (pulled in by `ClientAppPlugin`), which registers the charcell
 render pipeline.
