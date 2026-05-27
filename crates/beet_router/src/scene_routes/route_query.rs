@@ -1,16 +1,22 @@
 //! Scoped entity traversal within render-root boundaries.
 //!
 //! This module provides [`RouteQuery`], a system parameter for iterating
-//! entities within the scope of a [`RenderRoot`]. Many systems, ie markdown
+//! entities within the scope of a render root. Many systems, ie markdown
 //! rendering, must only operate on entities belonging to a specific render
 //! root.
+//!
+//! The boundary is the *rendered content* entity — the one tagged
+//! [`RenderRootOf`] and walked by the `NodeRenderer` — not the [`RenderRoot`]
+//! handle that names it. The two coincide for self-referential roots, but an
+//! ephemeral coordinator route points its handle at separate content, and only
+//! the content lives in the traversed tree.
 //!
 //! # Traversal Rules
 //!
 //! Given an entity, RouteQuery:
-//! 1. Traverses up to find the containing [`RenderRoot`], or root if none exists
+//! 1. Traverses up to find the containing [`RenderRootOf`], or root if none exists
 //! 2. Iterates descendants within that render root, stopping at and excluding
-//!    [`RenderRoot`] boundaries (unless it's the render root itself)
+//!    nested [`RenderRootOf`] boundaries (unless it's the render root itself)
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -25,7 +31,7 @@ pub struct RouteQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	children: Query<'w, 's, &'static Children>,
 	route_trees: Query<'w, 's, &'static RouteTree>,
-	render_roots: Query<'w, 's, (), With<RenderRoot>>,
+	render_roots: Query<'w, 's, (), With<RenderRootOf>>,
 }
 
 impl<'w, 's> RouteQuery<'w, 's> {
@@ -39,10 +45,10 @@ impl<'w, 's> RouteQuery<'w, 's> {
 
 	/// Finds the render root for the given entity.
 	///
-	/// Traverses [`ChildOf`] ancestors to find the nearest [`RenderRoot`], or
-	/// returns the root ancestor if none is found. The `ChildOf` walk is
-	/// acyclic — descendants are not tagged with `RenderRootOf` — so this is
-	/// loop-safe.
+	/// Traverses [`ChildOf`] ancestors to find the nearest rendered-content root
+	/// ([`RenderRootOf`]), or returns the root ancestor if none is found. The
+	/// `ChildOf` walk is acyclic — descendants are not tagged with `RenderRootOf`
+	/// — so this is loop-safe.
 	pub fn render_root(&self, entity: Entity) -> Entity {
 		self.ancestors
 			.iter_ancestors_inclusive(entity)
@@ -50,7 +56,8 @@ impl<'w, 's> RouteQuery<'w, 's> {
 			.unwrap_or_else(|| self.ancestors.root_ancestor(entity))
 	}
 
-	/// Returns true if the entity has a [`RenderRoot`].
+	/// Returns true if the entity is a rendered-content root ([`RenderRootOf`]),
+	/// ie a boundary the traversal stops at.
 	pub fn is_render_root(&self, entity: Entity) -> bool {
 		self.render_roots.contains(entity)
 	}

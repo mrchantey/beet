@@ -4,27 +4,32 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// On the rendered content entity → its render root (often itself).
+/// On the rendered content entity: its [`RenderRoot`] handle (often itself).
 ///
-/// The source side of the one-to-one [`RenderRoot`] relationship. A fixed or
-/// per-request route points only its rendered entity at the root, so the
-/// relationship stays singular; the root is usually its own rendered entity,
-/// hence `allow_self_referential`.
+/// The source side of the one-to-one [`RenderRoot`] relationship, the entity
+/// whose tree the [`NodeRenderer`] walks, and the boundary at which in-tree
+/// traversal stops (see [`RouteQuery`]). A fixed or per-request route is
+/// self-referential — the content is its own handle — hence
+/// `allow_self_referential`. An ephemeral coordinator route instead points a
+/// persistent handle at a separately spawned content entity (see
+/// [`RenderRoot::insert_rendered`]).
 #[derive(Component)]
 #[relationship(relationship_target = RenderRoot, allow_self_referential)]
 pub struct RenderRootOf(pub Entity);
 
-/// On the render root: the entity whose tree the [`NodeRenderer`] walks.
+/// The handle of a render tree: names the content entity to walk and serialize.
 ///
-/// Marks the boundary of a render tree (where in-tree traversal stops) and
-/// names the entity to serialize. The ephemeral entities to clean up after
-/// render live separately on [`DespawnAfterRender`], since cleanup is *not*
-/// derived from tree membership: a shared/cached fragment can be slotted into a
-/// render without being owned by it.
+/// The target side of the one-to-one relationship. [`RenderRoot::rendered`] is
+/// the content entity (the [`RenderRootOf`] holder) the [`NodeRenderer`] walks;
+/// it equals the handle itself for self-referential roots. The ephemeral
+/// entities to clean up after render live separately on [`DespawnAfterRender`],
+/// since cleanup is *not* derived from tree membership: a shared/cached fragment
+/// can be slotted into a render without being owned by it.
 #[derive(Component)]
 #[relationship_target(relationship = RenderRootOf)]
 pub struct RenderRoot {
-	/// The entity whose tree the [`NodeRenderer`] walks (the one-to-one source).
+	/// The content entity whose tree the [`NodeRenderer`] walks (the one-to-one
+	/// source), equal to the handle for self-referential roots.
 	#[relationship]
 	rendered: Entity,
 }
@@ -40,9 +45,33 @@ impl RenderRoot {
 
 	/// Marks `entity` as a self-referential render root, recording the
 	/// ephemeral entities cleaned up after render in [`DespawnAfterRender`].
+	///
+	/// The common case: the entity is both handle and content. For an ephemeral
+	/// coordinator that outlives the content it renders, see
+	/// [`RenderRoot::insert_rendered`].
 	pub fn insert(entity: &mut EntityWorldMut, to_despawn: Vec<Entity>) {
 		let id = entity.id();
 		entity.insert((RenderRootOf(id), DespawnAfterRender(to_despawn)));
+	}
+
+	/// Points render root `handle` at a separately spawned `rendered` content
+	/// entity, recording the ephemerals cleaned up after render in `handle`'s
+	/// [`DespawnAfterRender`].
+	///
+	/// The path for ephemeral coordinator routes, where a persistent handle (in
+	/// the route tree) renders per-request content spawned elsewhere. The
+	/// [`NodeRenderer`] walks `rendered`, not `handle`. For the common
+	/// self-referential case see [`RenderRoot::insert`].
+	pub fn insert_rendered(
+		world: &mut World,
+		handle: Entity,
+		rendered: Entity,
+		to_despawn: Vec<Entity>,
+	) {
+		world.entity_mut(rendered).insert(RenderRootOf(handle));
+		world
+			.entity_mut(handle)
+			.insert(DespawnAfterRender(to_despawn));
 	}
 
 	/// Renders a render-root entity through the full pipeline:
