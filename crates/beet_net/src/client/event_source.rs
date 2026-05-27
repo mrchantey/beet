@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
+#[cfg(feature = "json")]
 use bytes::Bytes;
 use eventsource_stream::Event;
 use eventsource_stream::EventStream;
@@ -235,14 +236,10 @@ mod sse_builder_test {
 			.unwrap()
 			.xpect_eq(MediaType::EventStream);
 
-		response
-			.text()
-			.await
-			.unwrap()
-			.xpect_eq(
-				"event: message\ndata: {\"index\":0}\n\n\
+		response.text().await.unwrap().xpect_eq(
+			"event: message\ndata: {\"index\":0}\n\n\
 				 event: message\ndata: {\"index\":1}\n\n",
-			);
+		);
 	}
 }
 
