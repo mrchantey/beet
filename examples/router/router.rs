@@ -109,7 +109,7 @@ fn server_from_cli() -> Result<OnSpawn> {
 
 fn routes() -> impl Bundle {
 	(
-		// SceneEntity middleware can intercept a scene route before render,
+		// scene middleware can intercept a scene route before render,
 		// useful for applying a layout
 		Middleware::<LayoutTemplate, _, _>::default(),
 		children![
@@ -133,7 +133,7 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		fixed_scene("counter", rsx! {
+		render_action::fixed_route("counter", rsx! {
 			<div>
 				<h1>"Cookie Counter"</h1>
 				<p>"Value: "{field_ref.clone()}</p>
@@ -168,11 +168,13 @@ fn sequence() -> impl Bundle {
 // ║   Layout Template Middleware              ║
 // ╚═══════════════════════════════════════════╝
 
-/// Scene middleware that wraps a [`SceneEntity`] in a layout template.
+/// Scene middleware that wraps a content render root in a layout template.
 ///
-/// Calls the inner handler via [`Next`] to obtain the content scene,
-/// then parses `default-layout.html` into an ephemeral entity tree
-/// and wires up named [`SlotContainer`] for head, nav, and main content.
+/// Calls the inner handler via [`Next`] to obtain the content render root,
+/// then parses `default-layout.html` into an ephemeral entity tree and wires
+/// up named [`SlotContainer`] for head, nav, and main content. The layout
+/// entity becomes the coordination [`RenderRoot`], cleaning up the layout,
+/// head, nav and article-header entities plus the content's own ephemerals.
 /// Non-scene middleware (ie `Request/Response`) is unaffected.
 ///
 /// Loads assets from the nearest ancestor [`BlobStore`] on each request,
@@ -180,15 +182,14 @@ fn sequence() -> impl Bundle {
 #[action]
 #[derive(Default, Clone, Component)]
 async fn LayoutTemplate(
-	cx: ActionContext<(RequestParts, Next<RequestParts, SceneEntity>)>,
-) -> Result<SceneEntity> {
+	cx: ActionContext<(RequestParts, Next<RequestParts, Entity>)>,
+) -> Result<Entity> {
 	let caller = cx.caller.clone();
 	let (parts, next) = cx.take();
 	let path: RelPath = parts.path().into();
 
-	// get the content scene from the inner handler
-	let content = next.call(parts).await?;
-	let content_id = content.entity;
+	// get the content render root from the inner handler
+	let content_root = next.call(parts).await?;
 
 	// read layout and slot content from the assets BlobStore
 	let store = caller
@@ -208,84 +209,86 @@ async fn LayoutTemplate(
 	let caller_entity = caller.id();
 	let world = caller.world();
 
-	// parse layout, head, and nav into entities, then wire up slots
-	let (layout_id, head_id, nav_id, article_header_id) = world
-		.with_then(
-			move |world: &mut World| -> Result<(Entity, Entity, Entity, Option<Entity>)> {
-				let layout_id = parse_html_entity(world, &layout_html, true)?;
-				let head_id = parse_html_entity(world, &head_html, false)?;
-				let nav_id = parse_html_entity(world, &nav_html, false)?;
+	// parse layout, head, and nav into entities, wire up slots, then make the
+	// layout the coordination render root
+	let layout_id = world
+		.with_then(move |world: &mut World| -> Result<Entity> {
+			// the content render root names what to slot in and what to clean up
+			let (content_id, content_despawn) = {
+				let entity = world.entity(content_root);
+				let rendered = entity
+					.get::<RenderRoot>()
+					.ok_or_else(|| {
+						bevyhow!("inner handler did not yield a render root")
+					})?
+					.rendered();
+				let despawn = entity
+					.get::<DespawnAfterRender>()
+					.map(|despawn| despawn.0.clone())
+					.unwrap_or_default();
+				(rendered, despawn)
+			};
 
-				// find named <slot> elements and wire up SlotContainer
-				if let Some(slot) = find_named_slot(world, layout_id, "head") {
-					world.entity_mut(slot).insert(SlotContainer::new(head_id));
-				}
-				if let Some(slot) = find_named_slot(world, layout_id, "nav") {
-					world.entity_mut(slot).insert(SlotContainer::new(nav_id));
-				}
-				if let Some(slot) = find_named_slot(world, layout_id, "sidebar")
-				{
-					let sidebar_state = SidebarState::new(path);
-					let bundle = world.with_state::<RouteQuery, Result<_>>(
-						move |query| {
-							let tree = query.route_tree(caller_entity)?;
-							let bundle = sidebar_state.build(&tree);
-							bundle.xok()
-						},
-					)?;
-					world.entity_mut(slot).insert(bundle);
-				}
-				// build article header from frontmatter if present
-				let article_header_id = world
-					.entity(content_id)
-					.get::<Frontmatter>()
-					.map(|fm| article_header_html(fm))
-					.filter(|html| !html.is_empty())
-					.map(|html| parse_html_entity(world, &html, false))
-					.transpose()?;
+			let layout_id = parse_html_entity(world, &layout_html)?;
+			let head_id = parse_html_entity(world, &head_html)?;
+			let nav_id = parse_html_entity(world, &nav_html)?;
 
-				if let Some(slot) =
-					find_named_slot(world, layout_id, "article-header")
-				{
-					if let Some(header_id) = article_header_id {
-						world
-							.entity_mut(slot)
-							.insert(SlotContainer::new(header_id));
-					}
-				}
-				if let Some(slot) = find_named_slot(world, layout_id, "main") {
-					world
-						.entity_mut(slot)
-						.insert(SlotContainer::new(content_id));
-				}
+			// find named <slot> elements and wire up SlotContainer
+			if let Some(slot) = find_named_slot(world, layout_id, "head") {
+				world.entity_mut(slot).insert(SlotContainer::new(head_id));
+			}
+			if let Some(slot) = find_named_slot(world, layout_id, "nav") {
+				world.entity_mut(slot).insert(SlotContainer::new(nav_id));
+			}
+			if let Some(slot) = find_named_slot(world, layout_id, "sidebar") {
+				let sidebar_state = SidebarState::new(path);
+				let bundle =
+					world.with_state::<RouteQuery, Result<_>>(move |query| {
+						let tree = query.route_tree(caller_entity)?;
+						let bundle = sidebar_state.build(&tree);
+						bundle.xok()
+					})?;
+				world.entity_mut(slot).insert(bundle);
+			}
+			// build article header from frontmatter if present
+			let article_header_id = world
+				.entity(content_id)
+				.get::<Frontmatter>()
+				.map(|fm| article_header_html(fm))
+				.filter(|html| !html.is_empty())
+				.map(|html| parse_html_entity(world, &html))
+				.transpose()?;
 
-				Ok((layout_id, head_id, nav_id, article_header_id))
-			},
-		)
+			if let Some(slot) =
+				find_named_slot(world, layout_id, "article-header")
+			{
+				if let Some(header_id) = article_header_id {
+					world.entity_mut(slot).insert(SlotContainer::new(header_id));
+				}
+			}
+			if let Some(slot) = find_named_slot(world, layout_id, "main") {
+				world.entity_mut(slot).insert(SlotContainer::new(content_id));
+			}
+
+			// assemble the ephemeral cleanup list, extending the content's own
+			let mut to_despawn = vec![layout_id, head_id, nav_id];
+			if let Some(header_id) = article_header_id {
+				to_despawn.push(header_id);
+			}
+			to_despawn.extend(content_despawn);
+
+			let mut layout = world.entity_mut(layout_id);
+			RenderRoot::insert(&mut layout, to_despawn);
+			Ok(layout_id)
+		})
 		.await?;
 
-	// build scene entity with all ephemeral entities for cleanup
-	let mut scene = SceneEntity::new_ephemeral(layout_id)
-		.push_despawn(head_id)
-		.push_despawn(nav_id);
-	if let Some(header_id) = article_header_id {
-		scene = scene.push_despawn(header_id);
-	}
-	scene.with_join(content).xok()
+	layout_id.xok()
 }
 
-/// Parses an HTML string into a new entity. If `scope` is true, the
-/// entity gets a [`Document`] component as a boundary marker.
-fn parse_html_entity(
-	world: &mut World,
-	html: &str,
-	scope: bool,
-) -> Result<Entity> {
-	let entity = if scope {
-		world.spawn(Document::default()).id()
-	} else {
-		world.spawn_empty().id()
-	};
+/// Parses an HTML string into a new entity.
+fn parse_html_entity(world: &mut World, html: &str) -> Result<Entity> {
+	let entity = world.spawn_empty().id();
 	let bytes = MediaBytes::new_html(html);
 	let mut entity_mut = world.entity_mut(entity);
 	MediaParser::new().parse(ParseContext::new(&mut entity_mut, &bytes))?;
