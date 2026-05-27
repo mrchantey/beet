@@ -54,9 +54,14 @@ impl MediaType {
 						serde_json::to_string(value)?
 					};
 					Ok(MediaBytes::new(MediaType::Json, value.into_bytes()))
-				}else {
+				} else if #[cfg(feature = "serde_plain")] {
 					let value = serde_plain::to_string(value)?;
 					Ok(MediaBytes::new(MediaType::Text, value.into_bytes()))
+				} else {
+					let _ = (value, options);
+					bevybail!(
+						"No fallback serialization format; enable the `json` or `serde_plain` feature"
+					)
 				}
 			}
 		} else {
@@ -80,9 +85,9 @@ impl MediaType {
 	///
 	/// | [`MediaType`]        | Format   | Required feature |
 	/// |----------------------|----------|-----------------|
-	/// | `Text`               | plain    | always          |
+	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
-	/// | `Ron`                | RON      | `serde` (includes `ron`) |
+	/// | `Ron`                | RON      | `ron`           |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
@@ -99,8 +104,18 @@ impl MediaType {
 	) -> Result<Vec<u8>> {
 		match self {
 			MediaType::Text => {
-				let value = serde_plain::to_string(value)?;
-				Ok(value.into_bytes())
+				#[cfg(feature = "serde_plain")]
+				{
+					let value = serde_plain::to_string(value)?;
+					Ok(value.into_bytes())
+				}
+				#[cfg(not(feature = "serde_plain"))]
+				{
+					let _ = value;
+					bevybail!(
+						"The `serde_plain` feature is required for plaintext serialization"
+					)
+				}
 			}
 			MediaType::Json => {
 				#[cfg(feature = "json")]
@@ -124,18 +139,30 @@ impl MediaType {
 				}
 			}
 			MediaType::Ron => {
-				if options.pretty {
-					let pretty_config = ron::ser::PrettyConfig::default()
-						.indentor("  ".to_string())
-						.new_line("\n".to_string());
-					ron::ser::to_string_pretty(value, pretty_config)
-						.map(|s| s.into_bytes())
-						.map_err(|err| {
-							bevyhow!("Failed to serialize RON: {err}")
-						})
-				} else {
-					ron::ser::to_string(value).map(|s| s.into_bytes()).map_err(
-						|err| bevyhow!("Failed to serialize RON: {err}"),
+				#[cfg(feature = "ron")]
+				{
+					if options.pretty {
+						let pretty_config = ron::ser::PrettyConfig::default()
+							.indentor("  ".to_string())
+							.new_line("\n".to_string());
+						ron::ser::to_string_pretty(value, pretty_config)
+							.map(|s| s.into_bytes())
+							.map_err(|err| {
+								bevyhow!("Failed to serialize RON: {err}")
+							})
+					} else {
+						ron::ser::to_string(value)
+							.map(|s| s.into_bytes())
+							.map_err(|err| {
+								bevyhow!("Failed to serialize RON: {err}")
+							})
+					}
+				}
+				#[cfg(not(feature = "ron"))]
+				{
+					let _ = (value, options);
+					bevybail!(
+						"The `ron` feature is required for RON serialization"
 					)
 				}
 			}
@@ -174,9 +201,9 @@ impl MediaType {
 	///
 	/// | [`MediaType`]        | Format   | Required feature |
 	/// |----------------------|----------|-----------------|
-	/// | `Text`               | plain    | always          |
+	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
-	/// | `Ron`                | RON      | `serde` (includes `ron`) |
+	/// | `Ron`                | RON      | `ron`           |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn deserialize<T: serde::de::DeserializeOwned>(
@@ -186,9 +213,19 @@ impl MediaType {
 		match self {
 			MediaType::Text => {
 				let string = core::str::from_utf8(bytes)?;
-				serde_plain::from_str(string).map_err(|err| {
-					bevyhow!("Failed to deserialize plaintext body: {err}")
-				})
+				#[cfg(feature = "serde_plain")]
+				{
+					serde_plain::from_str(string).map_err(|err| {
+						bevyhow!("Failed to deserialize plaintext body: {err}")
+					})
+				}
+				#[cfg(not(feature = "serde_plain"))]
+				{
+					let _ = string;
+					bevybail!(
+						"The `serde_plain` feature is required for plaintext deserialization"
+					)
+				}
 			}
 			MediaType::Json => {
 				#[cfg(feature = "json")]
@@ -210,9 +247,19 @@ impl MediaType {
 				let string = core::str::from_utf8(bytes).map_err(|err| {
 					bevyhow!("RON data is not valid UTF-8: {err}")
 				})?;
-				ron::de::from_str(string).map_err(|err| {
-					bevyhow!("Failed to deserialize RON body: {err}")
-				})
+				#[cfg(feature = "ron")]
+				{
+					ron::de::from_str(string).map_err(|err| {
+						bevyhow!("Failed to deserialize RON body: {err}")
+					})
+				}
+				#[cfg(not(feature = "ron"))]
+				{
+					let _ = string;
+					bevybail!(
+						"The `ron` feature is required for RON deserialization"
+					)
+				}
 			}
 			MediaType::Postcard | MediaType::Bytes => {
 				#[cfg(feature = "postcard")]
@@ -246,6 +293,7 @@ mod test {
 	}
 
 
+	#[cfg(feature = "serde_plain")]
 	#[crate::test]
 	fn roundtrip_plaintext() {
 		let input: u32 = 20;
@@ -285,6 +333,7 @@ mod test {
 		result.xpect_eq(());
 	}
 
+	#[cfg(feature = "ron")]
 	#[crate::test]
 	fn roundtrip_ron() {
 		let input = Pair { a: 7, b: 8 };
@@ -293,6 +342,7 @@ mod test {
 		output.xpect_eq(input);
 	}
 
+	#[cfg(feature = "ron")]
 	#[crate::test]
 	fn ron_pretty() {
 		let input = Pair { a: 7, b: 8 };
@@ -338,6 +388,7 @@ mod test {
 		bytes.media_type().xpect_eq(MediaType::Json);
 	}
 
+	#[cfg(feature = "ron")]
 	#[crate::test]
 	fn serialize_accepts_ron() {
 		#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -272,7 +272,7 @@ pub mod exports {
 	pub use proc_macro2;
 	#[cfg(feature = "tokens")]
 	pub use quote;
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "ron")]
 	pub use ron;
 	#[cfg(feature = "std")]
 	pub use send_wrapper::SendWrapper;

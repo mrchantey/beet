@@ -58,12 +58,16 @@ impl<'a> WorldSerdeLoader<'a> {
 		let registry = type_registry.read();
 		let dynamic_world = match bytes.media_type() {
 			MediaType::Ron => {
-				let text = bytes.as_utf8()?;
-				let mut de = ron::de::Deserializer::from_str(text)?;
-				WorldDeserializer {
-					type_registry: &registry,
+				cfg_if! {
+					if #[cfg(feature = "ron")] {
+						let text = bytes.as_utf8()?;
+						let mut de = ron::de::Deserializer::from_str(text)?;
+						WorldDeserializer { type_registry: &registry }
+							.deserialize(&mut de)?
+					} else {
+						bevybail!("The `ron` feature is required for RON loading")
+					}
 				}
-				.deserialize(&mut de)?
 			}
 			MediaType::Json => {
 				cfg_if! {
@@ -149,7 +153,7 @@ pub struct WorldSerdeOf(pub Entity);
 #[relationship_target(relationship = WorldSerdeOf, linked_spawn)]
 pub struct WorldSerdeEntities(Vec<Entity>);
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ron"))]
 mod test {
 	use crate::prelude::*;
 

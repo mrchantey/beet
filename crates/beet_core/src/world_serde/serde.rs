@@ -566,6 +566,7 @@ mod test {
 	}
 
 	/// Serialize then deserialize the world, returning the deserialized [`DynamicWorld`].
+	#[cfg(feature = "ron")]
 	fn roundtrip_ron(world: &World) -> DynamicWorld {
 		let dynamic_world = DynamicWorld::from_world(world);
 		let registry = world.resource::<AppTypeRegistry>().read();
@@ -581,6 +582,7 @@ mod test {
 		.unwrap()
 	}
 
+	#[cfg(feature = "ron")]
 	#[crate::test]
 	fn roundtrips_custom_serialization() {
 		let mut world = create_world();

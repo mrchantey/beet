@@ -243,6 +243,10 @@ nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
+# RON text format for `MediaType::Ron` and `world_serde` loading.
+ron = ["serde", "beet_core/ron"]
+# Plaintext (de)serialization for `MediaType::Text`.
+serde_plain = ["serde", "beet_core/serde_plain"]
 testing = ["beet_core/testing"]
 fs = ["beet_core/fs","beet_net?/fs"]
 bevy_default = [

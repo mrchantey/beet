@@ -127,7 +127,7 @@ mod test {
 	}
 }
 
-#[cfg(all(test, feature = "serde"))]
+#[cfg(all(test, feature = "ron"))]
 #[cfg(not(target_arch = "wasm32"))]
 mod reflect_test {
 	use super::*;

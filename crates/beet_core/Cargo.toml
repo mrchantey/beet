@@ -80,6 +80,7 @@ std = [
 	"itertools/use_std",
 	"thiserror/std",
 	"tracing/std",
+	"serde?/std",
 	"futures-lite/race",
 	"dep:send_wrapper",
 	"dep:dotenv",
@@ -118,14 +119,17 @@ bevy_mouse = ["bevy/mouse"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]
+# no_std base serialization support. Heavier format crates (`ron`,
+# `serde_plain`, json, postcard) are opt-in via their own features.
 serde = [
 	"bevy/serialize",
 	"dep:serde",
-	"dep:serde_plain",
-	"dep:ron",
-	"dep:serde_urlencoded",
 	"smol_str/serde"
 ]
+# RON text format, used by `MediaType::Ron` and `world_serde` loading.
+ron = ["serde", "dep:ron"]
+# Plaintext (de)serialization for `MediaType::Text` via serde_plain.
+serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
@@ -169,7 +173,6 @@ bitflags = { workspace = true }
 
 #💡 http
 http = {workspace = true,optional=true}
-serde_urlencoded = { version = "0.7", optional = true }
 
 
 #💡 path
@@ -178,7 +181,10 @@ pathdiff = { version = "0.2", optional = true }
 either = { version = "1", default-features = false }
 
 #💡 serde
-serde = { workspace = true, optional = true, features=["rc"] }
+# Declared directly (not via workspace) so default features stay off and the
+# `serde` feature is no_std. `std` builds re-enable `serde/std` (see `std`
+# feature); the wider workspace's std serde is unaffected via feature unification.
+serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive", "rc"] }
 serde_plain = {workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
