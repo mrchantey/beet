@@ -36,8 +36,8 @@ impl TextFieldVariant {
 #[scene]
 pub fn TextField(
 	variant: TextFieldVariant,
-	#[prop(into)] name: String,
-	#[prop(into)] placeholder: String,
+	name: String,
+	placeholder: String,
 ) -> impl Scene {
 	let class = variant.class();
 	rsx! {
@@ -54,8 +54,8 @@ pub fn TextField(
 #[scene]
 pub fn TextArea(
 	variant: TextFieldVariant,
-	#[prop(into)] name: String,
-	#[prop(into)] placeholder: String,
+	name: String,
+	placeholder: String,
 ) -> impl Scene {
 	let class = variant.class();
 	rsx! {
@@ -89,10 +89,7 @@ impl SelectVariant {
 /// A styled `<select>` element. The options are supplied via the default
 /// slot (typically `<option>` children).
 #[scene]
-pub fn Select(
-	variant: SelectVariant,
-	#[prop(into)] name: String,
-) -> impl Scene {
+pub fn Select(variant: SelectVariant, name: String) -> impl Scene {
 	let class = variant.class();
 	rsx! {
 		<select {Classes::new(["select", class])} name={name}>
@@ -105,7 +102,7 @@ pub fn Select(
 /// [`Document`] via [`FieldRef`]; submitting the form is handled by the
 /// document module (the legacy WASM `FormData → DynamicStruct` is gone).
 #[scene]
-pub fn Form(#[prop(into)] name: String) -> impl Scene {
+pub fn Form(name: String) -> impl Scene {
 	rsx! {
 		<form name={name}>
 			<slot/>

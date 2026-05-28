@@ -1,0 +1,64 @@
+//! Page-layout widgets composing [`Head`], [`Header`], and [`Footer`] into
+//! whole HTML pages.
+//!
+//! `<head>` is intentionally separate from the body chrome — these layouts
+//! glue them together at the call site, and each layer only adds what it owns.
+use beet_core::prelude::*;
+
+/// Wraps an entire page, including `<head>` and `<body>`.
+///
+/// Slots: `head` (extra `<head>` content), default (page `<body>`).
+#[scene]
+pub fn DocumentLayout() -> impl Scene {
+	rsx! {
+		<html lang="en">
+			<Head>
+				<slot name="head"/>
+			</Head>
+			<body>
+				<slot/>
+			</body>
+		</html>
+	}
+}
+
+/// A standard HTML page: a [`DocumentLayout`] with a [`Header`] and [`Footer`]
+/// around a body slot.
+///
+/// Slots: `head`, `header`, `header-nav`, `footer`, default (page body).
+#[scene]
+pub fn PageLayout() -> impl Scene {
+	rsx! {
+		<DocumentLayout>
+			<slot name="head" slot="head"/>
+			<div {Classes::new(["page"])}>
+				<Header>
+					<slot name="header"/>
+					<slot name="header-nav" slot="nav"/>
+				</Header>
+				<slot/>
+				<Footer>
+					<slot name="footer"/>
+				</Footer>
+			</div>
+		</DocumentLayout>
+	}
+}
+
+/// A [`PageLayout`] with a `<main>` content area for article-style pages.
+///
+/// Slots: `head`, `header`, `header-nav`, `footer`, default (main content).
+#[scene]
+pub fn ContentLayout() -> impl Scene {
+	rsx! {
+		<PageLayout>
+			<slot name="head" slot="head"/>
+			<slot name="header" slot="header"/>
+			<slot name="header-nav" slot="header-nav"/>
+			<slot name="footer" slot="footer"/>
+			<main {Classes::new(["content-main"])}>
+				<slot/>
+			</main>
+		</PageLayout>
+	}
+}

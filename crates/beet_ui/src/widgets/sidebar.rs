@@ -5,6 +5,7 @@
 //! The data type [`SidebarNode`] is a minimal tree shape with `String` paths;
 //! Phase 4 of `agent/plans/beet_design.md` upgrades this to a `RoutePath`-aware
 //! tree and moves it to `beet_router`.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Per-route metadata that flows from frontmatter into the sidebar.
@@ -68,26 +69,29 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 /// helper used by [`Sidebar`]; not its own `#[scene]` widget because the
 /// recursion reads the parent's `root` context.
 ///
-/// Returns a [`Box<dyn Scene>`] because each branch of the match builds a
-/// differently-shaped tree and `impl Trait` cannot unify across arms.
+/// Returns a [`Box<dyn Scene>`] (via `.any_scene()`) because each branch of the
+/// match builds a differently-shaped tree and `impl Trait` cannot unify across
+/// arms.
 fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 	let SidebarNode { display_name, path, children, expanded } = node;
 	let root_class = if root { "sidebar-item-root" } else { "sidebar-item" };
 
 	if children.is_empty() {
 		match path {
-			Some(path) => Box::new(rsx! {
+			Some(path) => rsx! {
 				<li {Classes::new([root_class])}>
 					<a {Classes::new(["sidebar-link", "leaf"])} href=path>
 						{display_name}
 					</a>
 				</li>
-			}),
-			None => Box::new(rsx! {
+			}
+			.any_scene(),
+			None => rsx! {
 				<li {Classes::new([root_class])}>
 					<span {Classes::new(["sidebar-label"])}>{display_name}</span>
 				</li>
-			}),
+			}
+			.any_scene(),
 		}
 	} else {
 		let child_items: Vec<_> = children
@@ -95,34 +99,38 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			.map(|child| sidebar_item(child, false))
 			.collect();
 		// build summary content separately so the `<details>` arm doesn't fork.
-		let summary: Box<dyn Scene> = match path {
-			Some(path) => Box::new(rsx! {
+		let summary = match path {
+			Some(path) => rsx! {
 				<a {Classes::new(["sidebar-link", "branch"])} href=path>
 					{display_name}
 				</a>
-			}),
-			None => Box::new(rsx! {
+			}
+			.any_scene(),
+			None => rsx! {
 				<span {Classes::new(["sidebar-label", "branch"])}>{display_name}</span>
-			}),
+			}
+			.any_scene(),
 		};
 		if expanded {
-			Box::new(rsx! {
+			rsx! {
 				<li {Classes::new([root_class])}>
 					<details {Classes::new(["sidebar-group"])} open>
 						<summary>{summary}</summary>
 						<ul>{child_items}</ul>
 					</details>
 				</li>
-			})
+			}
+			.any_scene()
 		} else {
-			Box::new(rsx! {
+			rsx! {
 				<li {Classes::new([root_class])}>
 					<details {Classes::new(["sidebar-group"])}>
 						<summary>{summary}</summary>
 						<ul>{child_items}</ul>
 					</details>
 				</li>
-			})
+			}
+			.any_scene()
 		}
 	}
 }

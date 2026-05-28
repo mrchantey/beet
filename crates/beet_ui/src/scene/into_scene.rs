@@ -18,6 +18,18 @@ pub trait IntoScene<M> {
 	fn into_scene(self) -> impl Scene;
 }
 
+/// Erase any [`Scene`] into a [`Box<dyn Scene>`] via method chain.
+///
+/// Useful where match arms produce differently-shaped trees and `impl Trait`
+/// cannot unify — `rsx!{ <a/> }.any_scene()` reads more naturally than
+/// `Box::new(rsx!{ <a/> }) as Box<dyn Scene>`. [`Box<dyn Scene>`] itself
+/// implements [`Scene`] via `bevy_scene`'s `SceneBox` machinery.
+#[extend::ext(name = SceneExt)]
+pub impl<S: Scene> S {
+	fn any_scene(self) -> Box<dyn Scene> { Box::new(self) }
+}
+
+
 /// Marker for the pass-through impl on existing [`Scene`] values.
 pub struct SceneMarker;
 /// All non-scene impls begin with this to distinguish from scene markers in

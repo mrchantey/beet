@@ -27,7 +27,6 @@ pub mod webdriver;
 /// Prelude module re-exporting commonly used items.
 pub mod prelude {
 	/// JavaScript analytics snippet for client-side tracking.
-	#[cfg(feature = "json")]
 	pub const ANALYTICS_JS: &str = include_str!("store/analytics.js");
 	/// Default port for a beet server: `8337` (BEET).
 	pub const DEFAULT_SERVER_PORT: u16 = 8337;

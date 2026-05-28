@@ -14,6 +14,7 @@ impl TokenValue {
 	pub fn value<T: Typed + Serialize>(value: T) -> Result<Self> {
 		Self::Value(TypedValue::new(value)?).xok()
 	}
+
 	pub fn token(token: impl Into<Token>) -> Self { Self::Token(token.into()) }
 }
 
@@ -57,7 +58,7 @@ pub struct TypedValue {
 }
 
 impl TypedValue {
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub fn new<T: Typed + Serialize>(value: T) -> Result<Self> {
 		Self {
 			value: Value::from_serde(&value)?,
@@ -71,7 +72,7 @@ impl TypedValue {
 	pub fn from_value(value: Value, schema: FieldSchema) -> Self {
 		Self { value, schema }
 	}
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	pub fn into_typed<T: Typed + DeserializeOwned>(&self) -> Result<T> {
 		self.schema.assert_eq_ty::<T>()?;
 		self.value.clone().into_serde::<T>()
@@ -108,6 +109,7 @@ where
 	fn into_token_value(self) -> TokenValue { self.into() }
 }
 
+#[cfg(feature = "serde")]
 impl<T: Typed + Serialize> IntoTokenValue<Self> for T {
 	fn into_token_value(self) -> TokenValue {
 		TokenValue::Value(

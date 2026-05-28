@@ -74,6 +74,7 @@ impl Rule {
 		self.with(key, value)
 	}
 
+	#[cfg(feature = "serde")]
 	pub fn with_value<T>(self, key: T, value: impl Into<T::Value>) -> Self
 	where
 		T: TypedToken + Into<Token>,
@@ -88,6 +89,7 @@ impl Rule {
 			"Schema assertion failed for a typed value, this shouldnt be possible",
 		)
 	}
+	#[cfg(feature = "serde")]
 	pub fn with_value_untyped(
 		self,
 		key: impl Into<Token>,
@@ -96,6 +98,7 @@ impl Rule {
 		self.with(key, TypedValue::new(value)?)
 	}
 
+	#[cfg(feature = "serde")]
 	#[track_caller]
 	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
 	where

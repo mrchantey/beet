@@ -85,6 +85,7 @@ pub trait IntoDeclaration {
 	fn into_declaration(self) -> (TokenKey, TokenValue);
 }
 
+#[cfg(feature = "serde")]
 impl<T, V> IntoDeclaration for (T, V)
 where
 	T: TypedToken + Into<Token>,

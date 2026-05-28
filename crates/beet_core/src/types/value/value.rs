@@ -484,6 +484,9 @@ impl From<&str> for Value {
 impl From<String> for Value {
 	fn from(value: String) -> Self { Value::str(value) }
 }
+impl From<&String> for Value {
+	fn from(value: &String) -> Self { Value::str(value.as_str()) }
+}
 impl From<SmolStr> for Value {
 	fn from(value: SmolStr) -> Self { Value::Str(value) }
 }

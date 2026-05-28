@@ -17,16 +17,22 @@
 
 #[cfg(feature = "net")]
 mod analytics;
-mod document_shell;
 mod error_text;
+mod footer;
 mod form_controls;
+mod head;
+mod header;
+mod layout;
 mod sidebar;
 mod table;
 
 #[cfg(feature = "net")]
 pub use analytics::*;
-pub use document_shell::*;
 pub use error_text::*;
+pub use footer::*;
 pub use form_controls::*;
+pub use head::*;
+pub use header::*;
+pub use layout::*;
 pub use sidebar::*;
 pub use table::*;

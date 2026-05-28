@@ -117,6 +117,7 @@ impl RuleSet {
 	) -> Result<Self> {
 		self.with(key, value)
 	}
+	#[cfg(feature = "serde")]
 	pub fn with_value(
 		self,
 		key: impl Into<Token>,
@@ -124,6 +125,7 @@ impl RuleSet {
 	) -> Result<Self> {
 		self.with(key, TypedValue::new(value)?)
 	}
+	#[cfg(feature = "serde")]
 	#[track_caller]
 	pub fn with_inline_value<T>(self, value: T) -> Result<Self>
 	where
