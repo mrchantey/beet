@@ -32,6 +32,21 @@ fn tick_task_pools() {
 	super::tick_bridge_executor();
 }
 
+/// Yields control to the host executor.
+///
+/// On native this is a single-poll yield; on wasm we go through `setTimeout(0)`
+/// because the JS event loop won't fire pending callbacks (timers, fetches)
+/// until we hand control back to it.
+async fn yield_to_executor() {
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			time_ext::sleep_millis(0).await;
+		} else {
+			async_ext::yield_now().await;
+		}
+	}
+}
+
 impl AsyncRunner {
 	/// Runs an app asynchronously until an [`AppExit`] is triggered.
 	pub(crate) async fn run(mut app: App) -> AppExit {
@@ -46,8 +61,8 @@ impl AsyncRunner {
 			if let Some(exit) = app.should_exit() {
 				return exit;
 			}
-			// 3. delay next update
-			time_ext::sleep_millis(1).await;
+			// 3. yield before the next update
+			yield_to_executor().await;
 		}
 	}
 
@@ -72,8 +87,8 @@ impl AsyncRunner {
 			if world.resource::<AsyncSpawner>().in_flight() == 0 {
 				return None;
 			}
-			// 5. short delay
-			time_ext::sleep_millis(1).await;
+			// 5. yield to the executor
+			yield_to_executor().await;
 		}
 	}
 
@@ -102,15 +117,7 @@ impl AsyncRunner {
 				return out;
 			}
 			// Yield to let the executor poll other tasks.
-			// On WASM we need to actually sleep to return control to
-			// the JS event loop, otherwise setTimeout callbacks never fire.
-			cfg_if! {
-				if #[cfg(target_arch = "wasm32")] {
-					time_ext::sleep_millis(1).await;
-				} else {
-					async_ext::yield_now().await;
-				}
-			}
+			yield_to_executor().await;
 			// Tick again after yielding to progress any tasks that were
 			// waiting on this task to yield.
 			tick_task_pools();

@@ -29,7 +29,7 @@ fn main() -> Result {
 			SshServerPlugin::default(),
 			CharcellPlugin,
 		))
-		.spawn_then(SshServer::default())
+		.spawn(SshServer::default())
 		.add_systems(Update, render_frame)
 		.add_systems(PostUpdate, ssh_write.after(CharcellRenderSet))
 		.add_observer(ssh_read)

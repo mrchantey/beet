@@ -21,7 +21,7 @@ fn main() {
 			LogPlugin::default(),
 			AsyncPlugin::default(),
 		))
-		.spawn_then((
+		.spawn((
 			SshSession::insert_on_connect("127.0.0.1:8322", "guest", "beet"),
 			OnSpawn::observe(on_recv),
 		))

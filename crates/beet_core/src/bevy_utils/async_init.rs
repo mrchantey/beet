@@ -64,7 +64,7 @@ impl AsyncInit {
 	/// allowing each to add more async init functions to the entity.
 	pub async fn run_recursive(entity: AsyncEntity) -> Result {
 		let inits = entity
-			.with_then(|mut entity| entity.take_recursive::<AsyncInit>())
+			.with(|mut entity| entity.take_recursive::<AsyncInit>())
 			.await?;
 
 		futures::future::try_join_all(

@@ -51,13 +51,13 @@ pub(crate) async fn connect_and_setup_entity(
 				)
 				.run_async_local(async move |entity| {
 					while let Ok(event) = from_server_rx.recv().await {
-						entity.trigger_target_then(SshRecv(event)).await.ok();
+						entity.trigger_target(SshRecv(event)).await.ok();
 					}
 					// channel closed — session ended without an explicit Close event
 				})
 				.trigger_target(SshRecv(SshEvent::Connect));
 		})
-		.await;
+		.await?;
 
 	Ok(())
 }

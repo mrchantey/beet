@@ -89,14 +89,14 @@ fn run_test(
 				// Don't clobber a `TestOutcome` already set this frame (eg a
 				// timeout); a test that finishes after timing out stays a timeout.
 				world
-					.with(move |world: &mut World| {
-						if let Ok(mut entity) = world.get_entity_mut(entity) {
-							if !entity.contains::<TestOutcome>() {
-								entity.insert(outcome);
-							}
+					.entity(entity)
+					.with(move |mut entity| {
+						if !entity.contains::<TestOutcome>() {
+							entity.insert(outcome);
 						}
 					})
-					.await;
+					.await
+					.ok();
 			});
 		}
 	}

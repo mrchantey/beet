@@ -299,37 +299,38 @@ where
 
 /// Extension methods on the bridged [`AsyncWorld`] handle.
 ///
-/// `with`/`with_then` run on the *exclusive* bridge (raw `&mut World`);
-/// `with_state` runs on the `SystemParam` bridge. All methods are `async`.
+/// [`with`](AsyncWorldExt::with) runs on the *exclusive* bridge (raw `&mut World`);
+/// [`with_state`](AsyncWorldExt::with_state) runs on the `SystemParam` bridge.
+/// All methods are `async`.
 #[extend::ext(name=AsyncWorldExt)]
 pub impl AsyncWorld {
-	/// Runs a function with exclusive `&mut World` access.
-	fn with(
-		&self,
-		func: impl 'static + Send + FnOnce(&mut World),
-	) -> impl Future<Output = ()> + Send {
-		let fut = self.with_then(func);
-		async move {
-			fut.await;
-		}
-	}
-
 	/// Runs a function with exclusive `&mut World` access, returning its output.
 	///
-	/// If the world has been dropped the returned future never resolves (the
-	/// runtime cleans it up).
-	fn with_then<O>(
+	/// If the world has been dropped the returned future logs a warning and
+	/// never resolves — the spawned task is left for the runtime to clean up.
+	#[track_caller]
+	fn with<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&mut World) -> O,
 	) -> impl Future<Output = O> + Send
 	where
 		O: 'static + Send + Sync,
 	{
+		let location = Location::caller();
 		let fut = self.exclusive(BeetAsyncSyncPoint, func);
 		async move {
 			match fut.await {
 				Ok(out) => out,
-				Err(_) => core::future::pending().await,
+				Err(BridgeError::WorldDropped) => {
+					warn!(
+						"AsyncWorld::with: world dropped before bridge completed (at {location}); task will not resume"
+					);
+					core::future::pending().await
+				}
+				Err(BridgeError::SystemParamValidation(err)) => {
+					// exclusive bridge never validates params; defensive only
+					panic!("unexpected SystemParam validation failure: {err}")
+				}
 			}
 		}
 	}
@@ -339,10 +340,14 @@ pub impl AsyncWorld {
 	/// Unlike [`with`](AsyncWorldExt::with), this exposes typed params (queries,
 	/// resources, ...) rather than raw `&mut World`.
 	///
+	/// If the world has been dropped the returned future logs a warning and
+	/// never resolves.
+	///
 	/// # Panics
 	///
 	/// Panics if the system parameter fails validation, ie a required resource
 	/// is missing.
+	#[track_caller]
 	fn with_state<P: 'static + SystemParam, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(P::Item<'_, '_>) -> O,
@@ -350,11 +355,17 @@ pub impl AsyncWorld {
 	where
 		O: 'static + Send + Sync,
 	{
+		let location = Location::caller();
 		let state = self.system_state::<P>();
 		async move {
 			match state.bridge(BeetAsyncSyncPoint, func).await {
 				Ok(out) => out,
-				Err(BridgeError::WorldDropped) => core::future::pending().await,
+				Err(BridgeError::WorldDropped) => {
+					warn!(
+						"AsyncWorld::with_state: world dropped before bridge completed (at {location}); task will not resume"
+					);
+					core::future::pending().await
+				}
 				Err(BridgeError::SystemParamValidation(err)) => {
 					panic!("system parameter validation failed: {err}")
 				}
@@ -370,22 +381,15 @@ pub impl AsyncWorld {
 		}
 	}
 
-	/// Spawns an entity with the given bundle.
-	fn spawn<B: Bundle>(&self, bundle: B) -> impl Future<Output = ()> + Send {
-		self.with(move |world: &mut World| {
-			world.spawn(bundle);
-		})
-	}
-
 	/// Spawns an entity and returns its [`AsyncEntity`] handle.
-	fn spawn_then<B: Bundle>(
+	fn spawn<B: Bundle>(
 		&self,
 		bundle: B,
 	) -> impl Future<Output = AsyncEntity> + Send {
 		let world = self.clone();
 		async move {
 			let entity = world
-				.with_then(move |world: &mut World| world.spawn(bundle).id())
+				.with(move |world: &mut World| world.spawn(bundle).id())
 				.await;
 			world.entity(entity)
 		}
@@ -401,18 +405,8 @@ pub impl AsyncWorld {
 		})
 	}
 
-	/// Accesses a resource mutably.
-	fn with_resource<R: Resource<Mutability = Mutable>>(
-		&self,
-		func: impl 'static + Send + FnOnce(Mut<R>),
-	) -> impl Future<Output = ()> + Send {
-		self.with(move |world| {
-			func(world.resource_mut::<R>());
-		})
-	}
-
-	/// Accesses a resource mutably and returns the result.
-	fn with_resource_then<R, O>(
+	/// Accesses a resource mutably and returns the function's output.
+	fn with_resource<R, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<R>) -> O,
 	) -> impl Future<Output = O> + Send
@@ -420,33 +414,23 @@ pub impl AsyncWorld {
 		R: Resource<Mutability = Mutable>,
 		O: 'static + Send + Sync,
 	{
-		self.with_then(move |world| func(world.resource_mut::<R>()))
+		self.with(move |world| func(world.resource_mut::<R>()))
 	}
 
 	/// Clones a resource and returns it.
 	fn resource<R: Resource + Clone>(&self) -> impl Future<Output = R> + Send {
-		self.with_then(move |world| world.resource::<R>().clone())
+		self.with(move |world| world.resource::<R>().clone())
 	}
 
-	/// Queues a [`Command`] on the world.
-	fn queue(
-		&self,
-		command: impl 'static + Send + Command,
-	) -> impl Future<Output = ()> + Send {
-		self.with(move |world| {
-			command.apply(world);
-		})
-	}
-
-	/// Queues a [`Command`] and returns its output.
-	fn queue_then<O>(
+	/// Queues a [`Command`] on the world, returning its output.
+	fn queue<O>(
 		&self,
 		command: impl 'static + Send + Command<Out = O>,
 	) -> impl Future<Output = O> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(move |world| command.apply(world))
+		self.with(move |world| command.apply(world))
 	}
 
 	/// Triggers an event.
@@ -488,7 +472,7 @@ pub impl AsyncWorld {
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<(), O, M>,
 	{
-		self.with_then(move |world| world.run_system_cached(system))
+		self.with(move |world| world.run_system_cached(system))
 	}
 
 	/// Runs a cached system with input and returns its output.
@@ -503,7 +487,7 @@ pub impl AsyncWorld {
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
-		self.with_then(move |world| world.run_system_cached_with(system, input))
+		self.with(move |world| world.run_system_cached_with(system, input))
 	}
 
 	/// Runs a system once and returns its output.
@@ -515,7 +499,7 @@ pub impl AsyncWorld {
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<(), O, M>,
 	{
-		self.with_then(move |world| world.run_system_once(system))
+		self.with(move |world| world.run_system_once(system))
 	}
 
 	/// Runs a system once with input and returns its output.
@@ -530,7 +514,7 @@ pub impl AsyncWorld {
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
-		self.with_then(move |world| world.run_system_once_with(system, input))
+		self.with(move |world| world.run_system_once_with(system, input))
 	}
 
 	/// Spawns an async task.
@@ -628,28 +612,14 @@ impl AsyncEntity {
 	/// Returns `true` if the entity still exists in the world.
 	pub fn is_alive(&self) -> impl Future<Output = bool> + Send {
 		let entity = self.entity;
-		self.world.with_then(move |world: &mut World| {
-			world.get_entity(entity).is_ok()
-		})
+		self.world
+			.with(move |world: &mut World| world.get_entity(entity).is_ok())
 	}
 
-	/// Runs a function with access to the entity, no-op if it has been despawned.
-	pub fn with(
-		&self,
-		func: impl 'static + Send + FnOnce(EntityWorldMut),
-	) -> impl Future<Output = ()> + Send {
-		let entity = self.entity;
-		self.world.with(move |world: &mut World| {
-			if let Ok(entity) = world.get_entity_mut(entity) {
-				func(entity);
-			}
-		})
-	}
-
-	/// Runs a function with access to the entity and returns the result.
+	/// Runs a function with access to the entity, returning its output.
 	///
 	/// Errors if the entity has been despawned.
-	pub fn with_then<O>(
+	pub fn with<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
 	) -> impl Future<Output = Result<O>> + Send
@@ -657,7 +627,7 @@ impl AsyncEntity {
 		O: 'static + Send + Sync,
 	{
 		let entity = self.entity;
-		self.world.with_then(move |world: &mut World| -> Result<O> {
+		self.world.with(move |world: &mut World| -> Result<O> {
 			let entity = world
 				.get_entity_mut(entity)
 				.map_err(|_| bevyhow!("Entity {entity:?} despawned"))?;
@@ -675,10 +645,10 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(|mut entity| entity.with_state(func))
+		self.with(|mut entity| entity.with_state(func))
 	}
 
-	/// Spawns an async task for this entity.
+	/// Spawns an async task for this entity, erroring if the entity has been despawned.
 	pub fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -688,12 +658,12 @@ impl AsyncEntity {
 		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.with_then(move |mut entity| {
+		self.with(move |mut entity| {
 			entity.run_async(func);
 		})
 	}
 
-	/// Spawns an async task on the local thread for this entity.
+	/// Spawns an async task on the local thread for this entity, erroring if the entity has been despawned.
 	pub fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -703,7 +673,7 @@ impl AsyncEntity {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.with_then(move |mut entity| {
+		self.with(move |mut entity| {
 			entity.run_async_local(func);
 		})
 	}
@@ -716,7 +686,7 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		let fut = self.with_then(move |entity| -> Result<O> {
+		let fut = self.with(move |entity| -> Result<O> {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
@@ -731,7 +701,7 @@ impl AsyncEntity {
 
 	/// Checks if the entity contains the component.
 	pub fn contains<T: Component>(&self) -> impl Future<Output = bool> + Send {
-		let fut = self.with_then(|entity| entity.contains::<T>());
+		let fut = self.with(|entity| entity.contains::<T>());
 		async move { fut.await.unwrap_or(false) }
 	}
 
@@ -743,7 +713,7 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		let fut = self.with_then(|mut entity| {
+		let fut = self.with(|mut entity| {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
@@ -778,7 +748,7 @@ impl AsyncEntity {
 	pub fn get_cloned2<T1: Component + Clone, T2: Component + Clone>(
 		&self,
 	) -> impl Future<Output = Result<(T1, T2)>> + Send {
-		let fut = self.with_then(|entity| {
+		let fut = self.with(|entity| {
 			(
 				entity.try_get::<T1>()?.clone(),
 				entity.try_get::<T2>()?.clone(),
@@ -792,28 +762,17 @@ impl AsyncEntity {
 	pub fn take<T: Component>(
 		&self,
 	) -> impl Future<Output = Result<Option<T>>> + Send {
-		self.with_then(|mut entity| entity.take())
+		self.with(|mut entity| entity.take())
 	}
 
-	/// Inserts a bundle into the entity.
+	/// Inserts a bundle into the entity, erroring if the entity has been despawned.
 	pub fn insert<B: Bundle>(
 		&self,
 		bundle: B,
-	) -> impl Future<Output = ()> + Send {
+	) -> impl Future<Output = Result<()>> + Send {
 		self.with(|mut entity| {
 			entity.insert(bundle);
 		})
-	}
-
-	/// Inserts a bundle, erroring if the entity has been despawned.
-	pub fn insert_then<B: Bundle>(
-		&self,
-		bundle: B,
-	) -> impl Future<Output = Result<()>> + Send {
-		let fut = self.with_then(|mut entity| {
-			entity.insert(bundle);
-		});
-		async move { fut.await }
 	}
 
 	/// Spawns a child entity and returns its ID.
@@ -823,59 +782,39 @@ impl AsyncEntity {
 	) -> impl Future<Output = Entity> + Send {
 		let id = self.entity;
 		self.world
-			.with_then(move |world| world.spawn((bundle, ChildOf(id))).id())
+			.with(move |world| world.spawn((bundle, ChildOf(id))).id())
 	}
 
-	/// Queues an [`EntityCommand`] on the entity.
-	pub fn queue(
-		&self,
-		command: impl 'static + Send + EntityCommand,
-	) -> impl Future<Output = ()> + Send {
-		self.with(move |entity| {
-			command.apply(entity);
-		})
-	}
-
-	/// Queues an [`EntityCommand`] and returns its output.
-	pub fn queue_then<O>(
+	/// Queues an [`EntityCommand`] on the entity, returning its output.
+	pub fn queue<O>(
 		&self,
 		command: impl 'static + Send + EntityCommand<Out = O>,
 	) -> impl Future<Output = Result<O>> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(move |entity| command.apply(entity))
+		self.with(move |entity| command.apply(entity))
 	}
 
-	/// Triggers an entity event.
+	/// Triggers an entity event, erroring if the entity has been despawned.
 	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> impl Future<Output = ()> + Send {
+	) -> impl Future<Output = Result<()>> + Send {
 		self.with(move |mut entity| {
 			entity.trigger(ev);
 		})
 	}
 
-	/// Triggers an entity event, erroring if the entity has been despawned.
-	pub fn trigger_then<'t, E: EntityEvent<Trigger<'t>: Default>>(
-		&self,
-		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> impl Future<Output = Result<()>> + Send {
-		self.with_then(move |mut entity| {
-			entity.trigger(ev);
-		})
-	}
-
 	/// Triggers an entity target event, erroring if the entity has been despawned.
-	pub fn trigger_target_then<M>(
+	pub fn trigger_target<M>(
 		&self,
 		event: impl 'static + Send + IntoEntityTargetEvent<M>,
 	) -> impl Future<Output = Result<()>> + Send
 	where
 		M: 'static,
 	{
-		self.with_then(|mut entity| {
+		self.with(|mut entity| {
 			entity.trigger_target(event);
 		})
 	}
@@ -885,7 +824,7 @@ impl AsyncEntity {
 		&self,
 		observer: impl IntoObserverSystem<E, B, M>,
 	) -> impl Future<Output = Result<()>> + Send {
-		self.with_then(|mut entity| {
+		self.with(|mut entity| {
 			entity.observe_any(observer);
 		})
 	}
@@ -909,7 +848,7 @@ impl AsyncEntity {
 	}
 
 	/// Despawns the entity.
-	pub fn despawn(&self) -> impl Future<Output = ()> + Send {
+	pub fn despawn(&self) -> impl Future<Output = Result<()>> + Send {
 		self.with(move |entity| {
 			entity.despawn();
 		})
@@ -1252,7 +1191,7 @@ mod test {
 			.run_async_then(|world| async move {
 				world.insert_resource(Count(0)).await;
 				world
-					.with_resource_then::<Count, _>(|mut count| {
+					.with_resource::<Count, _>(|mut count| {
 						count.0 += 1;
 					})
 					.await;
@@ -1275,7 +1214,7 @@ mod test {
 		world
 			.run_async_then(|world| async move {
 				world
-					.with_resource_then::<Count, _>(|mut count| {
+					.with_resource::<Count, _>(|mut count| {
 						count.0 += 1;
 					})
 					.await;
@@ -1284,7 +1223,7 @@ mod test {
 		world
 			.run_async_then(|world| async move {
 				world
-					.with_resource_then::<Count, _>(|mut count| {
+					.with_resource::<Count, _>(|mut count| {
 						count.0 += 1;
 					})
 					.await;

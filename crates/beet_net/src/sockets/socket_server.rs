@@ -113,7 +113,7 @@ mod tests {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
-				.spawn_then(server)
+				.spawn(server)
 				.run();
 		});
 		time_ext::sleep_millis(200).await;
@@ -131,7 +131,7 @@ mod tests {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
-				.spawn_then(server)
+				.spawn(server)
 				.run();
 		});
 		time_ext::sleep_millis(200).await;

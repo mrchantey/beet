@@ -21,7 +21,7 @@ pub async fn InterruptOnRun(
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
-	caller.queue_then(InterruptRun::<Outcome>::new()).await??;
+	caller.queue(InterruptRun::<Outcome>::new()).await??;
 	next.call(request).await
 }
 
@@ -36,7 +36,7 @@ pub async fn InterruptOnEnd(
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
 	let response = next.call(request).await;
-	caller.queue_then(InterruptRun::<Outcome>::new()).await??;
+	caller.queue(InterruptRun::<Outcome>::new()).await??;
 	response
 }
 

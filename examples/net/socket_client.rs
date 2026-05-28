@@ -26,7 +26,7 @@ fn main() {
 			LogPlugin::default(),
 			AsyncPlugin::default(),
 		))
-		.spawn_then((
+		.spawn((
 			Socket::insert_on_connect("ws://127.0.0.1:9000"),
 			OnSpawn::observe(on_ready),
 			OnSpawn::observe(my_handler),

@@ -36,7 +36,7 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 	let agent = AgentQuery::entity_async(&world, cx.caller.id()).await;
 	world
 		.entity(agent)
-		.with_then(|mut agent| -> Outcome {
+		.with(|mut agent| -> Outcome {
 			let potions =
 				agent.get::<HealingPotions>().map(|p| p.0).unwrap_or(0);
 			let health = agent.get::<Health>().map(|h| h.0).unwrap_or(f32::MAX);
@@ -80,7 +80,7 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 	let malenia = AgentQuery::entity_async(&world, cx.caller.id()).await;
 
 	world
-		.with_then(move |world: &mut World| -> Result<Outcome> {
+		.with(move |world: &mut World| -> Result<Outcome> {
 			let damage: f32 = world
 				.resource_mut::<RandomSource>()
 				.random_range(0.0..attack.max_damage)

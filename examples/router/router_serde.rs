@@ -53,12 +53,12 @@ struct GreetRequest {
 	name: String,
 }
 
-fn setup(mut commands: Commands) {
+fn setup(async_commands: AsyncCommands) {
 	let blob =
 		FsStore::new(WsPathBuf::default()).blob(RelPath::new(WORLD_SERDE_FILE));
 	let new_world = CliArgs::parse_env().params.contains_key("new");
 
-	commands.queue_async(async move |world: AsyncWorld| {
+	async_commands.run(async move |world: AsyncWorld| {
 		if new_world {
 			blob.remove().await.ok();
 		}

@@ -128,7 +128,7 @@ where
 	{
 		let this = self.clone();
 		entity
-			.with_then(move |entity| {
+			.with(move |entity| {
 				this.call_world(entity, input, out_handler)
 			})
 			.await
@@ -228,7 +228,7 @@ impl<Out> OutHandler<Out> {
 		Out: 'static + Send,
 	{
 		world
-			.with_then(move |world| self.call_world(world, result))
+			.with(move |world| self.call_world(world, result))
 			.await
 	}
 }

@@ -22,7 +22,7 @@ fn main() -> Result {
 	App::new()
 		.add_plugins((MinimalPlugins, LogPlugin::default(), SshServerPlugin))
 		.add_observer(on_recv)
-		.spawn_then(SshServer::default())
+		.spawn(SshServer::default())
 		.run();
 	Ok(())
 }
@@ -145,7 +145,7 @@ fn on_recv(
 									}
 								};
 								entity
-									.trigger_target_then(SshSend(
+									.trigger_target(SshSend(
 										SshEvent::text(response),
 									))
 									.await?;

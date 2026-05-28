@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 
 
 pub fn store_thread_on_post(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	changed: Query<(Entity, &Post), Changed<Post>>,
 	stores: AncestorQuery<&WorldSerdeOf>,
 ) -> Result {

@@ -9,7 +9,7 @@ use bevy::time::TimePlugin;
 fn run_tests_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((TestRunnerConfig::from_env(), tests_bundle(tests)))
+		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)))
 		.run();
 }
 
@@ -46,7 +46,7 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((
+		.spawn((
 			TestRunnerConfig::from_env(),
 			tests_bundle_borrowed(tests),
 		))

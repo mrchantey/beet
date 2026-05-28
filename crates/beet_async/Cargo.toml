@@ -19,8 +19,9 @@ std = [
 
 [dependencies]
 bevy = { workspace = true }
-scoped_static_storage = { workspace = true }
-keyed_concurrent_queue = { workspace = true }
+# bridge primitives; std re-enabled under this crate's `std` feature.
+scoped_static_storage = { version = "0.1.2", default-features = false }
+keyed_concurrent_queue = { version = "0.1.3", default-features = false }
 thiserror = { workspace = true }
 
 [dev-dependencies]

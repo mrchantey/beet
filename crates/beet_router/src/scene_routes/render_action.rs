@@ -102,7 +102,7 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 		let (caller, bundle) = (cx.caller, cx.input);
 		caller
 			.world()
-			.with_then(move |world: &mut World| {
+			.with(move |world: &mut World| {
 				let mut entity = world.spawn(bundle);
 				let id = entity.id();
 				RenderRoot::insert(&mut entity, vec![id]);

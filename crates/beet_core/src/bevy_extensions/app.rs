@@ -29,12 +29,6 @@ pub impl App {
 		}
 		self
 	}
-	/// Spawns an entity with the given bundle, returning self for chaining.
-	fn spawn_then(&mut self, bundle: impl Bundle) -> &mut Self {
-		self.world_mut().spawn(bundle);
-		self
-	}
-
 	/// Sets the error handler if one hasn't been set yet,
 	/// otherwise does nothing.
 	fn try_set_error_handler(

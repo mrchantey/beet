@@ -53,7 +53,7 @@ impl Socket {
 					match message {
 						Ok(msg) => {
 							entity
-								.trigger_target_then(MessageRecv(msg))
+								.trigger_target(MessageRecv(msg))
 								.await
 								.ok();
 						}
@@ -90,7 +90,7 @@ impl Socket {
 		let url = url.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |entity| -> Result {
 			let socket = Socket::connect(url).await?;
-			entity.insert_then(socket).await?;
+			entity.insert(socket).await?;
 			Ok(())
 		})
 	}

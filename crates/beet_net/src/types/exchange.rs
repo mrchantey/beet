@@ -42,7 +42,7 @@ pub impl EntityWorldMut<'_> {
 				);
 				let status = res.status();
 				entity
-					.trigger_then(move |entity| ExchangeEnd {
+					.trigger(move |entity| ExchangeEnd {
 						entity,
 						start_time,
 						status,
