@@ -34,7 +34,7 @@ fn main() {
 fn setup(mut commands: Commands) {
 	commands.spawn((
 		Buffer::new_half_terminal().into_double_buffer(),
-		rsx! {<h1>"hello world!"</h1>},
+		rsx_direct!{<h1>"hello world!"</h1>},
 	));
 }
 

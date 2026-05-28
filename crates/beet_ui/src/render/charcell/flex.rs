@@ -692,9 +692,9 @@ mod tests {
 				.justify_content(JustifyContent::Start)
 				.column_gap(1),
 			children![
-				(rsx! {"A"}, bordered()),
-				(rsx! {"B"}, bordered()),
-				(rsx! {"C"}, bordered()),
+				(rsx_direct!{"A"}, bordered()),
+				(rsx_direct!{"B"}, bordered()),
+				(rsx_direct!{"C"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -707,9 +707,9 @@ mod tests {
 				.justify_content(JustifyContent::End)
 				.column_gap(1),
 			children![
-				(rsx! {"A"}, bordered()),
-				(rsx! {"B"}, bordered()),
-				(rsx! {"C"}, bordered()),
+				(rsx_direct!{"A"}, bordered()),
+				(rsx_direct!{"B"}, bordered()),
+				(rsx_direct!{"C"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -722,9 +722,9 @@ mod tests {
 				.justify_content(JustifyContent::Center)
 				.column_gap(1),
 			children![
-				(rsx! {"A"}, bordered()),
-				(rsx! {"B"}, bordered()),
-				(rsx! {"C"}, bordered()),
+				(rsx_direct!{"A"}, bordered()),
+				(rsx_direct!{"B"}, bordered()),
+				(rsx_direct!{"C"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -733,8 +733,8 @@ mod tests {
 	#[beet_core::test]
 	fn column_gap() {
 		render((LayoutStyle::flex_row().column_gap(3), children![
-			(rsx! {"A"}, bordered()),
-			(rsx! {"B"}, bordered()),
+			(rsx_direct!{"A"}, bordered()),
+			(rsx_direct!{"B"}, bordered()),
 		]))
 		.xpect_snapshot();
 	}
@@ -743,13 +743,13 @@ mod tests {
 	fn flex_grow_distributes_space() {
 		let output =
 			render((LayoutStyle::flex_row().column_gap(1), children![
-				(rsx! {"A"}, bordered()),
+				(rsx_direct!{"A"}, bordered()),
 				(
-					rsx! {"B"},
+					rsx_direct!{"B"},
 					bordered(),
 					LayoutStyle::default().with_flex_grow(1)
 				),
-				(rsx! {"C"}, bordered()),
+				(rsx_direct!{"C"}, bordered()),
 			]));
 		output.xpect_snapshot();
 		// B should be wider than A and C
@@ -773,12 +773,12 @@ mod tests {
 				(
 					LayoutStyle::flex_col(),
 					children![
-						(rsx! {"Tall"}, bordered()),
-						(rsx! {"Item"}, bordered()),
+						(rsx_direct!{"Tall"}, bordered()),
+						(rsx_direct!{"Item"}, bordered()),
 					],
 					bordered()
 				),
-				(rsx! {"Short"}, bordered()),
+				(rsx_direct!{"Short"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -794,12 +794,12 @@ mod tests {
 				(
 					LayoutStyle::flex_col(),
 					children![
-						(rsx! {"Tall"}, bordered()),
-						(rsx! {"Item"}, bordered()),
+						(rsx_direct!{"Tall"}, bordered()),
+						(rsx_direct!{"Item"}, bordered()),
 					],
 					bordered()
 				),
-				(rsx! {"Short"}, bordered()),
+				(rsx_direct!{"Short"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -815,12 +815,12 @@ mod tests {
 				(
 					LayoutStyle::flex_col(),
 					children![
-						(rsx! {"Tall"}, bordered()),
-						(rsx! {"Item"}, bordered()),
+						(rsx_direct!{"Tall"}, bordered()),
+						(rsx_direct!{"Item"}, bordered()),
 					],
 					bordered()
 				),
-				(rsx! {"Short"}, bordered()),
+				(rsx_direct!{"Short"}, bordered()),
 			],
 		))
 		.xpect_snapshot();
@@ -831,12 +831,12 @@ mod tests {
 		render((LayoutStyle::flex_col().row_gap(1), children![
 			(
 				LayoutStyle::flex_row().column_gap(1),
-				children![(rsx! {"A"}, bordered()), (rsx! {"B"}, bordered()),],
+				children![(rsx_direct!{"A"}, bordered()), (rsx_direct!{"B"}, bordered()),],
 				bordered()
 			),
 			(
 				LayoutStyle::flex_row().column_gap(1),
-				children![(rsx! {"C"}, bordered()), (rsx! {"D"}, bordered()),],
+				children![(rsx_direct!{"C"}, bordered()), (rsx_direct!{"D"}, bordered()),],
 				bordered()
 			),
 		]))
@@ -846,7 +846,7 @@ mod tests {
 	#[beet_core::test]
 	fn padding_with_content() {
 		render((LayoutStyle::flex_row(), children![(
-			rsx! {"X"},
+			rsx_direct!{"X"},
 			BoxStyle::default()
 				.with_border(Spacing::all(Length::Rem(1.)))
 				.with_padding(Spacing::all(Length::Rem(0.5)))
@@ -857,9 +857,9 @@ mod tests {
 	#[beet_core::test]
 	fn column_with_multiple_items() {
 		render((LayoutStyle::flex_col().row_gap(1), children![
-			(rsx! {"First"}, bordered()),
-			(rsx! {"Second"}, bordered()),
-			(rsx! {"Third"}, bordered()),
+			(rsx_direct!{"First"}, bordered()),
+			(rsx_direct!{"Second"}, bordered()),
+			(rsx_direct!{"Third"}, bordered()),
 		]))
 		.xpect_snapshot();
 	}
@@ -869,9 +869,9 @@ mod tests {
 		render((LayoutStyle::flex_row(), children![(
 			LayoutStyle::flex_col(),
 			children![
-				(rsx! {"A"}, bordered()),
-				(rsx! {"B"}, bordered()),
-				(rsx! {"C"}, bordered()),
+				(rsx_direct!{"A"}, bordered()),
+				(rsx_direct!{"B"}, bordered()),
+				(rsx_direct!{"C"}, bordered()),
 			],
 			bordered()
 		)]))
@@ -881,8 +881,8 @@ mod tests {
 	#[beet_core::test]
 	fn column_without_gap() {
 		render((LayoutStyle::flex_col(), children![
-			(rsx! {"A"}, bordered()),
-			(rsx! {"B"}, bordered()),
+			(rsx_direct!{"A"}, bordered()),
+			(rsx_direct!{"B"}, bordered()),
 		]))
 		.xpect_snapshot();
 	}
@@ -895,11 +895,11 @@ mod tests {
 			(
 				LayoutStyle::flex_row().column_gap(1),
 				children![
-					(rsx! { "Left" }, bordered(), VisualStyle {
+					(rsx_direct!{ "Left" }, bordered(), VisualStyle {
 						background: Some(Color::srgb(0.2, 0.2, 0.5)),
 						..default()
 					},),
-					(rsx! { "Right" }, bordered(), VisualStyle {
+					(rsx_direct!{ "Right" }, bordered(), VisualStyle {
 						background: Some(Color::srgb(0.5, 0.2, 0.2)),
 						..default()
 					},),
@@ -908,7 +908,7 @@ mod tests {
 			),
 			(
 				LayoutStyle::flex_row().column_gap(1),
-				children![(rsx! { "Below" }, bordered(), VisualStyle {
+				children![(rsx_direct!{ "Below" }, bordered(), VisualStyle {
 					background: Some(Color::srgb(0.2, 0.5, 0.2)),
 					..default()
 				},),],
@@ -929,8 +929,8 @@ mod tests {
 	#[beet_core::test]
 	fn wide_chars_layout() {
 		let out = render((LayoutStyle::flex_row().column_gap(1), children![
-			(rsx! { "中文" }, bordered()),
-			(rsx! { "ＡＢＣ" }, bordered()),
+			(rsx_direct!{ "中文" }, bordered()),
+			(rsx_direct!{ "ＡＢＣ" }, bordered()),
 		]));
 		// "中文": 2 wide chars = 4 cols content → border top = ┌────┐
 		out.as_str().xpect_contains("┌────┐");

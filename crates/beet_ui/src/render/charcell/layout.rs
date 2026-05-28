@@ -184,7 +184,7 @@ mod tests {
 				display: Display::Inline,
 				..default()
 			},
-			children![rsx! {"A"}, rsx! {"B"}, rsx! {"C"}],
+			children![rsx_direct!{"A"}, rsx_direct!{"B"}, rsx_direct!{"C"}],
 		));
 		// All three children should appear on the same line
 		let first_line = out.lines().next().unwrap_or("");
@@ -202,7 +202,7 @@ mod tests {
 					display: Display::Inline,
 					..default()
 				},
-				children![rsx! {"Hello"}, rsx! {"World"}, rsx! {"Foo"},],
+				children![rsx_direct!{"Hello"}, rsx_direct!{"World"}, rsx_direct!{"Foo"},],
 			),
 		)
 		.trim_lines();

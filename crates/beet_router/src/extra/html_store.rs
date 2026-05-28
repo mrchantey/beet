@@ -93,7 +93,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((router(), HtmlStore::ssg(html_store().await), children![
-				render_action::fixed_route("about", rsx! { <p>"live about"</p> })
+				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
 			]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -110,7 +110,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((router(), HtmlStore::ssr(html_store().await), children![
-				render_action::fixed_route("about", rsx! { <p>"live about"</p> })
+				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
 			]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -125,7 +125,7 @@ mod test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((router(), HtmlStore::ssg(html_store().await), children![
-				render_action::fixed_route("contact", rsx! { <p>"live contact"</p> })
+				render_action::fixed_route("contact", rsx_direct!{ <p>"live contact"</p> })
 			]))
 			.call::<Request, Response>(Request::get("contact"))
 			.await

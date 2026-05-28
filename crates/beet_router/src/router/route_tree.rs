@@ -477,7 +477,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx!{ <p>"about"</p> }),
+				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 				action_at("action"),
 			])
 			.flush();

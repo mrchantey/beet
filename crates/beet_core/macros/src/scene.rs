@@ -7,7 +7,7 @@
 //! - a callable function `Name(props: NameProps) -> impl Scene` whose body is
 //!   the original body with the props destructured into the named params.
 //!
-//! Capitalized tags in `rsx_scene!` lower to `Name(NameProps::default()
+//! Capitalized tags in `rsx!` lower to `Name(NameProps::default()
 //! .with_p1(..))`, so omitted attributes fall back to `Default`.
 extern crate alloc;
 use alloc::vec::Vec;

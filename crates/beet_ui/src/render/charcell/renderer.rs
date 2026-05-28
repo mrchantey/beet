@@ -66,7 +66,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Buffer::new(UVec2::new(20, 5)).into_double_buffer(),
-				rsx! { <div><h1>"Title"</h1><p>"Body"</p></div> },
+				rsx_direct!{ <div><h1>"Title"</h1><p>"Body"</p></div> },
 			))
 			.id();
 		// the schedule resolves styles, decorates, lays out, and paints
@@ -91,7 +91,7 @@ mod tests {
 		// them all instead of clipping to a fixed height.
 		let text =
 			(0..30).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
-		let out = FlexBuffer::render_oneshot(20, rsx! { <pre>{text}</pre> });
+		let out = FlexBuffer::render_oneshot(20, rsx_direct!{ <pre>{text}</pre> });
 		out.lines().count().xpect_eq(30);
 	}
 
@@ -101,7 +101,7 @@ mod tests {
 		// inline flow wraps around the link's painted columns as OSC-8.
 		let out = FlexBuffer::render_oneshot(
 			40,
-			rsx! { <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
+			rsx_direct!{ <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
 		);
 		out.as_str()
 			.xpect_contains("\x1b]8;;https://beet.org\x1b\\")

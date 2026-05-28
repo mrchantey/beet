@@ -176,32 +176,32 @@ mod tests {
 
 	#[beet_core::test]
 	fn unordered_list_bullets() {
-		render(rsx! { <ul><li>"alpha"</li><li>"beta"</li></ul> })
+		render(rsx_direct!{ <ul><li>"alpha"</li><li>"beta"</li></ul> })
 			.xpect_contains("• alpha")
 			.xpect_contains("• beta");
 	}
 
 	#[beet_core::test]
 	fn ordered_list_numbers() {
-		render(rsx! { <ol><li>"first"</li><li>"second"</li></ol> })
+		render(rsx_direct!{ <ol><li>"first"</li><li>"second"</li></ol> })
 			.xpect_contains("1. first")
 			.xpect_contains("2. second");
 	}
 
 	#[beet_core::test]
 	fn blockquote_bar() {
-		render(rsx! { <blockquote><p>"quoted text"</p></blockquote> })
+		render(rsx_direct!{ <blockquote><p>"quoted text"</p></blockquote> })
 			.xpect_contains("▌ quoted text");
 	}
 
 	#[beet_core::test]
 	fn thematic_break_rule() {
-		render(rsx! { <hr/> }).xpect_contains("────");
+		render(rsx_direct!{ <hr/> }).xpect_contains("────");
 	}
 
 	#[beet_core::test]
 	fn image_alt_text() {
-		render(rsx! { <img src="image.png" alt="alt text"/> })
+		render(rsx_direct!{ <img src="image.png" alt="alt text"/> })
 			.xpect_contains("[alt text]");
 	}
 
@@ -209,7 +209,7 @@ mod tests {
 	fn nested_list_indented() {
 		// the outer item's marker sits in a left gutter, so its nested list is
 		// inset one marker-width, indenting the nested bullet under the label.
-		let out = FlexBuffer::render_oneshot_plain(40, rsx! {
+		let out = FlexBuffer::render_oneshot_plain(40, rsx_direct!{
 			<ul><li>"top"<ul><li>"nested"</li></ul></li></ul>
 		});
 		out.lines()

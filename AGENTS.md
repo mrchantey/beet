@@ -90,7 +90,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 	- `some().long().chain().xpect_close(0.300001);`
 	- `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar");`
 - Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
-- scene tests: get a world from `scene_ext::test_world()` (the minimal scene plugin set), insert any required resources, then `world.spawn_scene(rsx_scene!{ <div/> }).unwrap()`
+- scene tests: get a world from `scene_ext::test_world()` (the minimal scene plugin set), insert any required resources, then `world.spawn_scene(rsx!{ <div/> }).unwrap()`
 - by default only test files are logged, use `--log-cases` to see individual cases, and 
 
 ## Debugging

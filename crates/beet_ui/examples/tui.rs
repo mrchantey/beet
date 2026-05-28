@@ -23,7 +23,7 @@ fn setup(mut commands: Commands) {
 		LayoutStyle::flex_row().column_gap(1),
 		children![((
 			LayoutStyle::flex_row(),
-			rsx! { <div>"Value: "{(Value::default(), count_field())}</div> },
+			rsx_direct!{ <div>"Value: "{(Value::default(), count_field())}</div> },
 			BoxStyle {
 				border: Spacing::all(Length::Rem(1.)),
 				border_top: Some(Color::srgb(1., 0., 0.)),

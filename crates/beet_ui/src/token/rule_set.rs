@@ -234,7 +234,7 @@ mod tests {
 				.with_value(Bar, 3u32)
 				.unwrap(),
 		);
-		let mut entity = world.spawn(rsx! {<div/>});
+		let mut entity = world.spawn(rsx_direct!{<div/>});
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
 				query.cascade(entity, &Foo.into()).cloned()

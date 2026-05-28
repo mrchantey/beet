@@ -1,5 +1,5 @@
 //! Direct RSX lowering: tokenizes JSX-like syntax straight into Bevy ECS
-//! bundles, spawning entities eagerly. Backs both `rsx!` and `rsx_direct!`.
+//! bundles, spawning entities eagerly. Backs the `rsx_direct!` proc macro.
 //!
 //! - Lowercase tags become `Element::new("tag")`
 //! - Capitalized tags become `TagName::default().with_field(val)...`
@@ -37,7 +37,7 @@ pub fn impl_rsx_direct(
 	let parser = Parser::new(
 		ParserConfig::new()
 			.recover_block(true)
-			.macro_call_pattern(quote!(rsx! {%%})),
+			.macro_call_pattern(quote!(rsx_direct! {%%})),
 	);
 
 	let (nodes, errors) = parser

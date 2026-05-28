@@ -20,7 +20,7 @@ use std::sync::Arc;
 /// # Example
 ///
 /// ```rust,ignore
-/// let tree = rsx!{<div>hello</div>};
+/// let tree = rsx_direct!{<div>hello</div>};
 /// //              ^ this location
 /// ```
 #[derive(

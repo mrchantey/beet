@@ -1,11 +1,12 @@
 //! Scene-route constructors — turn a path + handler into a complete route.
 //!
-//! The four public constructors are the intended downstream surface:
+//! The public constructors are the intended downstream surface:
 //!
 //! - [`fixed_route`] — `fn() -> impl Bundle`, a static page spawned once.
 //! - [`pure_route`] — `fn(cx: ActionContext<In>) -> impl Bundle`.
 //! - [`async_route`] — `async fn(cx: ActionContext<In>) -> impl Bundle`.
 //! - [`system_route`] — `fn(cx: In<ActionContext<In>>, ..system params) -> impl Bundle`.
+//! - [`scene_route`] — `fn(cx: ActionContext<In>) -> impl Scene`.
 //!
 //! File-based page handlers return content as an `impl Bundle`, but the router
 //! dispatches actions whose output must be [`ExchangeRouteOut`]. The per-request
@@ -22,6 +23,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::Scene;
+use beet_ui::prelude::WorldSceneExt;
 use bevy::ecs::system::In;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
@@ -113,6 +116,39 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 	})
 }
 
+/// A per-request scene route from a sync handler returning an [`impl Scene`].
+///
+/// Like [`pure_route`] but uses Bevy's scene system instead of bundle spawning:
+/// the handler returns an `impl Scene` (typically from a `#[scene]` /
+/// `#[scene(system)]` function or `rsx!`), which is resolved and spawned
+/// per request as an ephemeral render root.
+pub fn scene_route<Func, Input, S, M1>(path: &str, handler: Func) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> S,
+	Input: 'static + Send + Sync + FromRequest<M1>,
+	S: 'static + Send + Sync + Scene,
+{
+	exchange_route(path, Action::new_pure(handler).chain(spawn_scene_step::<S>()))
+}
+
+/// The scene equivalent of [`spawn_render_step`]: resolves and spawns the
+/// scene as an ephemeral render root.
+fn spawn_scene_step<S: 'static + Send + Sync + Scene>()
+-> Action<S, RenderRequest> {
+	Action::new_async(|cx: ActionContext<S>| async move {
+		let (caller, scene) = (cx.caller, cx.input);
+		caller
+			.world()
+			.with_then(move |world: &mut World| -> Result<RenderRequest> {
+				let mut entity = world.spawn_scene(scene)?;
+				let id = entity.id();
+				RenderRoot::insert(&mut entity, vec![id]);
+				RenderRequest(id).xok()
+			})
+			.await
+	})
+}
+
 
 #[cfg(test)]
 mod test {
@@ -127,7 +163,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_async_handler() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx! { <p>"async home"</p> }
+			rsx_direct!{ <p>"async home"</p> }
 		}
 		router_world()
 			.spawn((router(), children![render_action::async_route(
@@ -144,7 +180,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_system_handler() {
 		fn home(_cx: In<ActionContext<Request>>) -> impl Bundle {
-			rsx! { <p>"system home"</p> }
+			rsx_direct!{ <p>"system home"</p> }
 		}
 		router_world()
 			.spawn((router(), children![render_action::system_route(
@@ -161,7 +197,7 @@ mod test {
 	#[beet_core::test]
 	async fn rebuilds_per_request() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx! { <p>"home"</p> }
+			rsx_direct!{ <p>"home"</p> }
 		}
 		let mut world = router_world();
 		let root = world

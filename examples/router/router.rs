@@ -133,7 +133,7 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		render_action::fixed_route("counter", rsx! {
+		render_action::fixed_route("counter", rsx_direct!{
 			<div>
 				<h1>"Cookie Counter"</h1>
 				<p>"Value: "{field_ref.clone()}</p>

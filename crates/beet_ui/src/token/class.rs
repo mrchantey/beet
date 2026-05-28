@@ -135,7 +135,7 @@ pub fn inline_class(
 /// Declare a [`RuleSet`] rule inline on an element.
 ///
 /// ```ignore
-/// rsx!{<div {inline_class![
+/// rsx_direct!{<div {inline_class![
 /// 	(ForegroundColor, Color::BLUE),
 /// 	(BackgroundColor, Color::RED),
 /// ]} />}

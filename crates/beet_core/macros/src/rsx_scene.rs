@@ -37,7 +37,7 @@ pub fn impl_rsx_scene(
 	let parser = Parser::new(
 		ParserConfig::new()
 			.recover_block(true)
-			.macro_call_pattern(quote!(rsx_scene! {%%})),
+			.macro_call_pattern(quote!(rsx! {%%})),
 	);
 
 	let (nodes, errors) = parser
@@ -55,7 +55,7 @@ pub fn impl_rsx_scene(
 		[] => quote! { () },
 		_ => syn::Error::new(
 			Span::call_site(),
-			"rsx_scene! expects a single root node (a Scene is one root entity)",
+			"rsx! expects a single root node (a Scene is one root entity)",
 		)
 		.into_compile_error(),
 	};
@@ -93,13 +93,13 @@ fn tokenize_node_scene(node: &Node<CustomNode>) -> TokenStream {
 			[child] => tokenize_node_scene(child),
 			_ => syn::Error::new(
 				Span::call_site(),
-				"rsx_scene! fragments must contain a single root node",
+				"rsx! fragments must contain a single root node",
 			)
 			.into_compile_error(),
 		},
 		other => syn::Error::new(
 			other.span(),
-			"this node kind is not yet supported by rsx_scene!",
+			"this node kind is not yet supported by rsx!",
 		)
 		.into_compile_error(),
 	}

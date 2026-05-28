@@ -102,11 +102,11 @@ mod test {
 		let router = world
 			.spawn((router(), children![
 				(
-					render_action::fixed_route("about", rsx! { <p>"About"</p> }),
+					render_action::fixed_route("about", rsx_direct!{ <p>"About"</p> }),
 					HttpMethod::Get
 				),
 				(
-					render_action::fixed_route("", rsx! { <h1>"Home"</h1> }),
+					render_action::fixed_route("", rsx_direct!{ <h1>"Home"</h1> }),
 					HttpMethod::Get
 				),
 			]))

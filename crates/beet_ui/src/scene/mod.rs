@@ -17,5 +17,5 @@ pub use bevy::scene::ScenePlugin;
 pub use bevy::scene::WorldSceneExt;
 pub use bevy::scene::on;
 pub use bevy::scene::template_value;
-// re-exported so `rsx_scene!` output can name the child relationship
+// re-exported so `rsx!` output can name the child relationship
 pub use bevy::prelude::ChildOf;

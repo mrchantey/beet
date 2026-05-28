@@ -190,16 +190,19 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	mdx::impl_mdx(input)
 }
 
-/// JSX-like macro for constructing Bevy ECS bundles from HTML-like syntax.
+/// JSX-like macro that lowers HTML-like markup to an `impl Scene`, flowing
+/// through Bevy's `bevy_scene` resolve→build→spawn pipeline.
 ///
-/// Lowercase tags become [`Element`] bundles, capitalized tags become
-/// component constructors using `Default + SetWith` patterns.
+/// Requires the consuming crate to enable the `scene` feature (which provides
+/// `template_value`, `RelatedScenes`, `EntityScene`, etc. via its prelude). For
+/// the no_std-friendly, dependency-light variant that produces an `impl Bundle`
+/// directly, use [`rsx_direct`].
 ///
 /// ## Example
 ///
 /// ```rust ignore
-/// fn my_ui() -> impl Bundle {
-///     rsx!{
+/// fn my_ui() -> impl Scene {
+///     rsx! {
 ///         <div class="container">
 ///             <span>"hello"</span>
 ///         </div>
@@ -209,7 +212,7 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[cfg(feature = "rsx")]
 #[proc_macro]
 pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	rsx_direct::impl_rsx_direct(input)
+	rsx_scene::impl_rsx_scene(input)
 }
 
 /// Direct, immediate variant of [`rsx`]: lowers HTML-like markup straight to an
@@ -224,30 +227,19 @@ pub fn rsx_direct(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	rsx_direct::impl_rsx_direct(input)
 }
 
-/// Scene-producing variant: lowers the same HTML-like syntax to an `impl Scene`
-/// that flows through Bevy's `bevy_scene` resolve→build→spawn pipeline.
-///
-/// Requires the consuming crate to enable the `scene` feature (which provides
-/// `template_value`, `RelatedScenes`, `EntityScene`, etc. via its prelude).
-#[cfg(feature = "rsx")]
-#[proc_macro]
-pub fn rsx_scene(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	rsx_scene::impl_rsx_scene(input)
-}
-
 /// Authors a Leptos/Solid-style function component that lowers to an
 /// `impl Scene`.
 ///
 /// From `fn Name(p1: T1, p2: T2, ..) -> impl Scene` it generates a props
 /// struct `NameProps` (`Default` + `SetWith`, with per-param `#[prop(into)]`
 /// becoming `#[set_with(into)]`) and rewrites the function to take that props
-/// struct. Capitalized tags in [`rsx_scene`] map attributes to the props
-/// setters by name, so omitted attributes fall back to `Default`.
+/// struct. Capitalized tags in [`rsx`] map attributes to the props setters by
+/// name, so omitted attributes fall back to `Default`.
 ///
 /// ```rust ignore
 /// #[scene]
 /// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Scene {
-///     rsx_scene! { <button>{label}</button> }
+///     rsx! { <button>{label}</button> }
 /// }
 /// ```
 #[cfg(feature = "rsx")]

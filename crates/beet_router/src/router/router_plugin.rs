@@ -3,6 +3,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
+use bevy::asset::AssetPlugin;
 
 
 /// Plugin that registers route-building observers for actions.
@@ -22,6 +23,10 @@ impl Plugin for RouterPlugin {
 			// (help pages, markdown/html scenes → ANSI/text); without it the
 			// `PostParseTree` schedule has no systems and ANSI output is blank.
 			.init_plugin::<CharcellPlugin>()
+			// `scene_route` spawns Bevy scenes per request; needs the
+			// AssetServer and ScenePatch asset machinery.
+			.init_plugin::<AssetPlugin>()
+			.init_plugin::<ScenePlugin>()
 			.register_type::<HelpHandler>()
 			.register_type::<NavigateHandler>()
 			.register_type::<InterruptOnRun>()

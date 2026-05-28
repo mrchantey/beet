@@ -92,7 +92,7 @@ impl SidebarState {
 					}
 					// build ul with children, attach to nav
 					let ul = world
-						.spawn(rsx! { <ul>{all_children}</ul> })
+						.spawn(rsx_direct!{ <ul>{all_children}</ul> })
 						.flush();
 					world.entity_mut(nav_id).add_child(ul);
 				});
@@ -103,10 +103,10 @@ impl SidebarState {
 	/// Spawn a "Home" `<li>` and return its entity.
 	fn spawn_home(&self, world: &mut World) -> Entity {
 		let bundle = if self.current_path.segments().is_empty() {
-			rsx! { <li><a href="/" aria-current="page">"Home"</a></li> }
+			rsx_direct!{ <li><a href="/" aria-current="page">"Home"</a></li> }
 				.any_bundle()
 		} else {
-			rsx! { <li><a href="/">"Home"</a></li> }.any_bundle()
+			rsx_direct!{ <li><a href="/">"Home"</a></li> }.any_bundle()
 		};
 		world.spawn(bundle).flush()
 	}
@@ -151,12 +151,12 @@ impl SidebarState {
 		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls
 		let text = (Value::Str(label.into()),);
 		let bundle = if is_active {
-			rsx! {
+			rsx_direct!{
 				<li><a href=href aria-current="page">{text}</a></li>
 			}
 			.any_bundle()
 		} else {
-			rsx! {
+			rsx_direct!{
 				<li><a href=href>{text}</a></li>
 			}
 			.any_bundle()
@@ -195,23 +195,23 @@ impl SidebarState {
 		let summary = if tree.node().is_some() {
 			let href = path.with_leading_slash();
 			if path == &self.current_path {
-				rsx! { <summary><a href=href aria-current="page">{text}</a></summary> }
+				rsx_direct!{ <summary><a href=href aria-current="page">{text}</a></summary> }
 					.any_bundle()
 			} else {
-				rsx! { <summary><a href=href>{text}</a></summary> }
+				rsx_direct!{ <summary><a href=href>{text}</a></summary> }
 					.any_bundle()
 			}
 		} else {
-			rsx! { <summary>{text}</summary> }.any_bundle()
+			rsx_direct!{ <summary>{text}</summary> }.any_bundle()
 		};
 		let summary = world.spawn(summary).flush();
 
 		// build nested ul with children
-		let ul = world.spawn(rsx! { <ul>{child_entities}</ul> }).flush();
+		let ul = world.spawn(rsx_direct!{ <ul>{child_entities}</ul> }).flush();
 
 		// build details containing summary and ul
 		let details =
-			world.spawn(rsx! { <details>{summary}{ul}</details> }).flush();
+			world.spawn(rsx_direct!{ <details>{summary}{ul}</details> }).flush();
 
 		// add open attribute
 		if is_expanded {
@@ -228,7 +228,7 @@ impl SidebarState {
 		}
 
 		// wrap in li
-		world.spawn(rsx! { <li>{details}</li> }).flush()
+		world.spawn(rsx_direct!{ <li>{details}</li> }).flush()
 	}
 
 	/// Spawn custom attributes from config onto an element.
@@ -372,8 +372,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
-				render_action::fixed_route("docs", rsx! { <p>"docs"</p> }),
+				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -394,8 +394,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
-				render_action::fixed_route("docs", rsx! { <p>"docs"</p> }),
+				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
 			])
 			.flush();
 
@@ -411,7 +411,7 @@ mod test {
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route("about", rsx! { <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -429,10 +429,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx! { <p>"about"</p> }),
+				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route("intro", rsx! { <p>"intro"</p> }),
-					render_action::fixed_route("api", rsx! { <p>"api"</p> }),
+					render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
+					render_action::fixed_route("api", rsx_direct!{ <p>"api"</p> }),
 				]),
 			])
 			.flush();
@@ -457,11 +457,11 @@ mod test {
 			.spawn(children![
 				(PathPartial::new("docs"), children![render_action::fixed_route(
 					"intro",
-					rsx! { <p>"intro"</p> }
+					rsx_direct!{ <p>"intro"</p> }
 				),]),
 				(PathPartial::new("blog"), children![render_action::fixed_route(
 					"post1",
-					rsx! { <p>"post1"</p> }
+					rsx_direct!{ <p>"post1"</p> }
 				),]),
 			])
 			.flush();
@@ -481,7 +481,7 @@ mod test {
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route("about", rsx! { <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
 			.flush();
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
@@ -502,8 +502,8 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("zulu", rsx! { <p>"zulu"</p> }),
-				render_action::fixed_route("alpha", rsx! { <p>"alpha"</p> }),
+				render_action::fixed_route("zulu", rsx_direct!{ <p>"zulu"</p> }),
+				render_action::fixed_route("alpha", rsx_direct!{ <p>"alpha"</p> }),
 			])
 			.flush();
 
@@ -551,7 +551,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("docs"), children![
-				render_action::fixed_route("intro", rsx! { <p>"intro"</p> }),
+				render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
 			])])
 			.flush();
 
@@ -578,7 +578,7 @@ mod test {
 					// a children![] that conflicts with the outer children![]
 					Element::new("p").with_inner_text("docs index")
 				),
-				children![render_action::fixed_route("intro", rsx! { <p>"intro"</p> })],
+				children![render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> })],
 			)])
 			.flush();
 
