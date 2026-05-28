@@ -59,8 +59,8 @@ pub async fn start_hyper_server_with_tcp(
 		let io = BevyIo::new(tcp);
 
 		let entity = entity.clone();
-		entity
-			.world()
+		let world = entity.world().clone();
+		world
 			.run_async_local(async move |world| {
 				let entity = world.entity(entity.id());
 				// pass an AsyncEntity to the service_fn

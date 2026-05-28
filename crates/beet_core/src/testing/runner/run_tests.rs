@@ -9,7 +9,7 @@ use bevy::ecs::system::NonSendMarker;
 #[track_caller]
 pub(super) fn run_tests_series(
 	mut commands: Commands,
-	mut async_commands: AsyncCommands,
+	async_commands: AsyncCommands,
 	query: Populated<
 		(Entity, &Test, &TestFunc),
 		(Added<TestFunc>, Without<TestOutcome>),
@@ -18,7 +18,7 @@ pub(super) fn run_tests_series(
 	for (entity, test, func) in query.iter() {
 		run_test(
 			commands.reborrow(),
-			async_commands.reborrow(),
+			&async_commands,
 			entity,
 			test.should_panic,
 			move || func.run(),
@@ -34,7 +34,7 @@ pub(super) fn run_tests_series(
 pub(super) fn run_non_send_tests_series(
 	_: NonSendMarker,
 	mut commands: Commands,
-	mut async_commands: AsyncCommands,
+	async_commands: AsyncCommands,
 	mut query: Populated<
 		(Entity, &Test, &mut NonSendTestFunc),
 		(Added<NonSendTestFunc>, Without<TestOutcome>),
@@ -49,7 +49,7 @@ pub(super) fn run_non_send_tests_series(
 		);
 		run_test(
 			commands.reborrow(),
-			async_commands.reborrow(),
+			&async_commands,
 			entity,
 			test.should_panic,
 			move || func.run(),
@@ -62,7 +62,7 @@ pub(super) fn run_non_send_tests_series(
 #[track_caller]
 fn run_test(
 	mut commands: Commands,
-	mut async_commands: AsyncCommands,
+	async_commands: &AsyncCommands,
 	entity: Entity,
 	should_panic: ShouldPanic,
 	func: impl FnOnce() -> Result<(), String>,
@@ -86,7 +86,17 @@ fn run_test(
 				let result = panic_result_fut.await;
 				let outcome =
 					TestOutcome::from_panic_result(result, should_panic);
-				world.entity(entity).insert(outcome);
+				// Don't clobber a `TestOutcome` already set this frame (eg a
+				// timeout); a test that finishes after timing out stays a timeout.
+				world
+					.with(move |world: &mut World| {
+						if let Ok(mut entity) = world.get_entity_mut(entity) {
+							if !entity.contains::<TestOutcome>() {
+								entity.insert(outcome);
+							}
+						}
+					})
+					.await;
 			});
 		}
 	}

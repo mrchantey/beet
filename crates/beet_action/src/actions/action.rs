@@ -179,10 +179,10 @@ impl<Out> OutHandler<Out> {
 	/// discarding the [`Out`] value.
 	pub fn exit() -> Self {
 		OutHandler {
-			func: Box::new(|mut commands, result| {
+			func: Box::new(|commands, result| {
 				result?;
 				commands.run(async |world| {
-					world.write_message(AppExit::Success);
+					world.write_message(AppExit::Success).await;
 				});
 				Ok(())
 			}),

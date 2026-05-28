@@ -43,7 +43,7 @@ impl WorldSerdeStore {
 	) -> Result<Vec<Entity>> {
 		if !entity.get_cloned::<Blob>().await?.exists().await? {
 			let bundle = create(entity.clone()).await?;
-			Self::save_bundle(entity, bundle).await?;
+			Self::save_bundle(entity.clone(), bundle).await?;
 		}
 		Self::load(entity).await
 	}

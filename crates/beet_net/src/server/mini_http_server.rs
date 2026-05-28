@@ -59,8 +59,8 @@ pub async fn start_mini_http_server_with_tcp(
 		};
 
 		let entity = entity.clone();
-		entity
-			.world()
+		let world = entity.world().clone();
+		world
 			.run_async(async move |world| {
 				if let Err(err) = handle_connection(
 					world.entity(entity.id()),

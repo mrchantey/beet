@@ -1,14 +1,18 @@
-//! Async command execution for Bevy.
+//! High-level async world access, built on the [`beet_async`] bridge.
 //!
-//! This module provides infrastructure for running async tasks that can interact
-//! with the Bevy [`World`] through a channel-based command queue system.
+//! Async tasks interact with the Bevy [`World`] by *bridging* at a
+//! [`BeetAsyncSyncPoint`]: a future enqueues a request, the sync-point driver
+//! system publishes `&mut World`, the future runs synchronously and returns its
+//! output directly. There is no command channel — every world-accessing method
+//! is `async` and must be `.await`ed (an un-awaited bridge future never runs).
 //!
 //! # Core Types
 //!
-//! - [`AsyncCommands`] - System parameter for spawning async tasks
-//! - [`AsyncWorld`] - Handle for sending commands from async contexts
-//! - [`AsyncEntity`] - Handle for operating on a specific entity from async contexts
-//! - [`AsyncChannel`] - Resource managing the command queue channel
+//! - [`AsyncWorld`] - handle for accessing the world from async contexts
+//!   (re-exported from [`beet_async`]; extension methods live on [`AsyncWorldExt`])
+//! - [`AsyncEntity`] - handle for operating on a specific entity
+//! - [`AsyncCommands`] - system parameter for spawning async tasks from a system
+//! - [`AsyncSpawner`] - runtime-agnostic task spawner + in-flight counter
 //!
 //! # Example
 //!
@@ -20,7 +24,7 @@
 //!
 //! fn my_system(mut commands: AsyncCommands) {
 //!     commands.run(async |world| {
-//!         world.insert_resource(MyResource(2));
+//!         world.insert_resource(MyResource(2)).await;
 //!         let value = world.resource::<MyResource>().await.0;
 //!         assert_eq!(value, 2);
 //!     });
@@ -28,9 +32,9 @@
 //! ```
 
 use crate::prelude::*;
-use async_channel;
-use async_channel::Receiver;
-use async_channel::Sender;
+pub use beet_async::AsyncWorld;
+use beet_async::BridgeError;
+pub use beet_async::async_world_sync_point;
 use bevy::app::MainSchedulePlugin;
 use bevy::ecs::component::Mutable;
 use bevy::ecs::system::Command;
@@ -39,11 +43,16 @@ use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::SystemParam;
-use bevy::ecs::world::CommandQueue;
-use bevy::ecs::world::WorldId;
-use bevy::tasks::IoTaskPool;
-use std::future::Future;
-use std::panic::Location;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Mutex;
+use core::future::Future;
+use core::panic::Location;
+use core::pin::Pin;
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering;
+use core::task::Poll;
+use core::task::Waker;
 
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
@@ -91,333 +100,270 @@ impl<T> MaybeSync for T where T: Sync {}
 #[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
 impl<T> MaybeSync for T {}
 
-
-/// Plugin that polls background async work and applies produced [`CommandQueue`]s
-/// to the main Bevy world.
+/// The [`SyncPoint`](beet_async) at which beet drives all async world access.
 ///
-/// This plugin initializes [`TaskPoolPlugin`] and [`MainSchedulePlugin`] if not present,
-/// so it must be added after [`DefaultPlugins`] / [`MinimalPlugins`].
+/// Registered as an exclusive driver system by [`AsyncPlugin`]. A single sync
+/// point is sufficient for beet's needs.
+pub struct BeetAsyncSyncPoint;
+
+/// Plugin installing the [`beet_async`] bridge, the [`BeetAsyncSyncPoint`]
+/// driver, and the default [`AsyncSpawner`].
+///
+/// Initializes [`MainSchedulePlugin`] and [`TaskPoolPlugin`] if not present, so
+/// it must be added after [`DefaultPlugins`] / [`MinimalPlugins`].
 #[derive(Default)]
 pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		AsyncWorld::register(app.world_mut());
+		// on wasm the bridge drives our tickable executor instead of bevy's
+		// JS-event-loop `spawn_local`.
+		#[cfg(target_arch = "wasm32")]
+		beet_async::set_wasm_tick_hook(tick_bridge_executor);
+
 		app.init_plugin_with(MainSchedulePlugin)
-			// this will add the system to tick_global_task_pools_on_main_thread() in the Last schedule
+			// drives `tick_global_task_pools_on_main_thread()` in the Last schedule
 			.init_plugin::<TaskPoolPlugin>()
-			.add_systems(PreUpdate, append_async_queues);
+			.init_plugin::<beet_async::AsyncPlugin>()
+			.init_resource::<AsyncSpawner>()
+			.add_systems(
+				PreUpdate,
+				beet_async::async_world_sync_point::<BeetAsyncSyncPoint>,
+			);
 	}
 }
 
-/// Appends all [`AsyncChannel::rx`] command queues directly to the world.
-fn append_async_queues(world: &mut World) -> Result {
-	// Clone the receiver to avoid borrow conflict
-	let rx = world.get_resource::<AsyncChannel>().map(|c| c.rx.clone());
-	let Some(rx) = rx else {
-		return Ok(());
-	};
+/// A `'static` future suitable for spawning. `Send` is required only in
+/// multi-threaded native builds (matching [`MaybeSend`]).
+#[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))]
+type SpawnFut = Pin<Box<dyn 'static + Send + Future<Output = ()>>>;
+/// A `'static` future suitable for spawning. `Send` is required only in
+/// multi-threaded native builds (matching [`MaybeSend`]).
+#[cfg(not(all(feature = "bevy_multithreaded", not(target_arch = "wasm32"))))]
+type SpawnFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
+/// A `'static` future spawned on the local thread, never required to be `Send`.
+type SpawnLocalFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
 
-	while let Ok(mut queue) = rx.try_recv() {
-		queue.apply(world);
-	}
-	Ok(())
+/// Runtime-agnostic task spawner plus an in-flight task counter.
+///
+/// Spawning is pluggable so a future `tokio` / `embassy` backend can be selected;
+/// the default uses [`IoTaskPool`](bevy::tasks::IoTaskPool). The in-flight
+/// counter is the idle signal used by [`AsyncRunner`].
+#[derive(Resource, Clone)]
+pub struct AsyncSpawner(Arc<AsyncSpawnerInner>);
+
+struct AsyncSpawnerInner {
+	in_flight: AtomicUsize,
+	spawn: Box<dyn Fn(SpawnFut) + Send + Sync>,
+	spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>,
 }
 
-#[cfg_attr(feature = "nightly", track_caller)]
-async fn run_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func) -> Result
-where
-	Func: 'static + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + Future<Output = Out>,
-	Out: 'static + Send + Sync + IntoResult,
-{
-	use futures_lite::future::FutureExt;
+impl Default for AsyncSpawner {
+	fn default() -> Self {
+		Self(Arc::new(AsyncSpawnerInner {
+			in_flight: AtomicUsize::new(0),
+			// wasm: bevy `spawn_local` uses the JS event loop, which the
+			// synchronous bridge driver cannot tick. Use our own tickable
+			// executor instead (see `tick_bridge_executor`).
+			#[cfg(target_arch = "wasm32")]
+			spawn: Box::new(|fut| {
+				BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+			}),
+			#[cfg(target_arch = "wasm32")]
+			spawn_local: Box::new(|fut| {
+				BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+			}),
+			#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+			spawn: Box::new(|fut| {
+				bevy::tasks::IoTaskPool::get().spawn(fut).detach();
+			}),
+			#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+			spawn_local: Box::new(|fut| {
+				bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
+			}),
+			#[cfg(not(feature = "std"))]
+			spawn: Box::new(|_| {
+				panic!("no default AsyncSpawner on no_std; insert one manually")
+			}),
+			#[cfg(not(feature = "std"))]
+			spawn_local: Box::new(|_| {
+				panic!("no default AsyncSpawner on no_std; insert one manually")
+			}),
+		}))
+	}
+}
 
-	let world3 = world.clone();
-	// 1. increment task count
-	world3
-		.with_resource_then::<AsyncChannel, _>(|mut channel| {
-			channel.increment_tasks();
-		})
-		.await;
-	// 2. run the function, catching panics
-	let result = std::panic::AssertUnwindSafe(func(world))
-		.catch_unwind()
-		.await;
-	// 3. decrement task count
-	world3
-		.with_resource_then::<AsyncChannel, _>(|mut channel| {
-			channel.decrement_tasks();
-		})
-		.await;
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+	/// Tickable executor for bridged async tasks on wasm.
+	static BRIDGE_EXECUTOR: async_executor::LocalExecutor<'static> =
+		async_executor::LocalExecutor::new();
+}
 
-	// 4. handle result
-	match result {
-		Ok(output) => {
-			if let Err(err) = output.into_result() {
-				let location = std::panic::Location::caller();
-				world.handle_command_error::<Func>(err, location).await;
+/// Ticks the wasm bridge executor so woken futures can poll while the sync-point
+/// driver has `&mut World` published. Registered with [`beet_async`] as its
+/// wasm tick hook.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn tick_bridge_executor() {
+	BRIDGE_EXECUTOR.with(|exec| {
+		for _ in 0..100 {
+			if !exec.try_tick() {
+				break;
 			}
 		}
-		Err(panic) => {
-			let msg = display_ext::try_downcast_str(&panic)
-				.unwrap_or_else(|| "unknown panic".to_string());
-			cross_log!("Async task panicked: {}", msg);
-		}
-	}
-
-	Ok(())
-}
-
-#[track_caller]
-fn spawn_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
-where
-	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + MaybeSend + Future<Output = Out>,
-	Out: 'static + Send + Sync + IntoResult,
-{
-	IoTaskPool::get()
-		.spawn(run_async_task(world, func))
-		// TODO this means we cant clean tasks up, instead they should be stored
-		// in world so when world is dropped so are tasks
-		.detach();
-}
-
-#[track_caller]
-fn spawn_async_task_local<Func, Fut, Out>(world: AsyncWorld, func: Func)
-where
-	Func: 'static + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + Future<Output = Out>,
-	Out: 'static + Send + Sync + IntoResult,
-{
-	IoTaskPool::get()
-		.spawn_local(run_async_task(world, func))
-		// TODO this means we cant clean tasks up, instead they should be stored
-		// in world so when world is dropped so are tasks
-		.detach();
-}
-
-/// Spawns the async task, flushes all async tasks and returns the output.
-async fn spawn_async_task_then<Func, Fut, Out>(
-	world: AsyncWorld,
-	update: impl FnMut(),
-	func: Func,
-) -> Out
-where
-	Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + MaybeSend + Future<Output = Out>,
-	Out: 'static + Send + Sync,
-{
-	let (send, recv) = async_channel::bounded(1);
-	spawn_async_task(world, async move |world| {
-		let out = func(world).await;
-		// allowed to drop recv
-		send.try_send(out).ok();
 	});
-	AsyncRunner::poll_and_update(update, recv)
-		.await
-		.expect("spawn_async_task_then channel closed: task likely panicked")
 }
 
-/// Spawns the async local task, flushes all async tasks and returns the output.
-async fn spawn_async_task_local_then<Func, Fut, Out>(
-	world: AsyncWorld,
-	update: impl FnMut(),
-	func: Func,
-) -> Out
-where
-	Func: 'static + FnOnce(AsyncWorld) -> Fut,
-	Fut: 'static + Future<Output = Out>,
-	Out: 'static,
-{
-	let (send, recv) = async_channel::bounded(1);
-	spawn_async_task_local(world, async move |world| {
-		let out = func(world).await;
-		// allowed to drop recv
-		send.try_send(out).ok();
-	});
-	AsyncRunner::poll_and_update(update, recv).await.expect(
-		"spawn_async_task_local_then channel closed: task likely panicked",
-	)
-}
-
-
-/// System parameter for running async functions that can interact with the [`World`].
-///
-/// Provides an [`AsyncWorld`] handle to the async function, which can be used to
-/// send commands back to the main world.
-///
-/// # Example
-///
-/// ```
-/// # use beet_core::prelude::*;
-///
-/// #[derive(Clone, Resource)]
-/// struct MyResource(u32);
-///
-/// fn my_system(mut commands: AsyncCommands) {
-///     commands.run(async |world| {
-///         world.insert_resource(MyResource(2));
-///         let value = world.resource::<MyResource>().await.0;
-///         assert_eq!(value, 2);
-///     });
-/// }
-/// ```
-#[derive(SystemParam)]
-pub struct AsyncCommands<'w, 's> {
-	/// The commands used for spawning entities.
-	pub commands: Commands<'w, 's>,
-	/// The channel used to create an [`AsyncWorld`] passed to the async function.
-	pub world_id: WorldId,
-}
-
-
-impl<'w, 's> AsyncCommands<'w, 's> {
-	/// Reborrows the commands with a shorter lifetime.
-	pub fn reborrow(&mut self) -> AsyncCommands<'w, '_> {
-		AsyncCommands {
-			commands: self.commands.reborrow(),
-			world_id: self.world_id,
-		}
+impl AsyncSpawner {
+	/// Build a spawner from custom spawn functions (eg `tokio` / `embassy`).
+	pub fn new(
+		spawn: impl 'static + Send + Sync + Fn(SpawnFut),
+		spawn_local: impl 'static + Send + Sync + Fn(SpawnLocalFut),
+	) -> Self {
+		Self(Arc::new(AsyncSpawnerInner {
+			in_flight: AtomicUsize::new(0),
+			spawn: Box::new(spawn),
+			spawn_local: Box::new(spawn_local),
+		}))
 	}
 
-	/// Creates an [`AsyncWorld`] handle for sending commands.
-	pub fn world(&self) -> AsyncWorld { AsyncWorld::new(self.world_id) }
-
-	/// Spawns an async task that can send commands to the world.
-	pub fn run<Func, Fut, Out>(&mut self, func: Func)
-	where
-		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + MaybeSend + Future<Output = Out>,
-		Out: 'static + Send + Sync + IntoResult,
-	{
-		spawn_async_task(self.world(), func);
-	}
-
-	/// Spawns an async task on the local thread.
-	pub fn run_local<Func, Fut, Out>(&mut self, func: Func)
-	where
-		Func: 'static + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + Future<Output = Out>,
-		Out: 'static + Send + Sync + IntoResult,
-	{
-		spawn_async_task_local(self.world(), func);
-	}
-}
-
-/// Resource containing the channel used by async functions to send [`CommandQueue`]s.
-#[derive(Clone, Resource)]
-pub struct AsyncChannel {
 	/// The number of tasks currently in flight.
-	task_count: usize,
-	/// The receiver for the async channel.
-	rx: Receiver<CommandQueue>,
+	pub fn in_flight(&self) -> usize { self.0.in_flight.load(Ordering::SeqCst) }
+
+	/// Spawns a task, incrementing the in-flight counter until it completes.
+	pub fn spawn<Fut>(&self, fut: Fut)
+	where
+		Fut: 'static + MaybeSend + Future<Output = ()>,
+	{
+		self.0.in_flight.fetch_add(1, Ordering::SeqCst);
+		let this = self.clone();
+		(self.0.spawn)(Box::pin(async move {
+			fut.await;
+			this.0.in_flight.fetch_sub(1, Ordering::SeqCst);
+		}));
+	}
+
+	/// Spawns a task on the local thread, incrementing the in-flight counter
+	/// until it completes.
+	pub fn spawn_local<Fut>(&self, fut: Fut)
+	where
+		Fut: 'static + Future<Output = ()>,
+	{
+		self.0.in_flight.fetch_add(1, Ordering::SeqCst);
+		let this = self.clone();
+		(self.0.spawn_local)(Box::pin(async move {
+			fut.await;
+			this.0.in_flight.fetch_sub(1, Ordering::SeqCst);
+		}));
+	}
 }
 
-impl AsyncChannel {
-	fn new(recv: Receiver<CommandQueue>) -> Self {
-		Self {
-			rx: recv,
-			task_count: 0,
+/// Runs an async task, catching panics (under `std`) and routing any error
+/// through the world's error handler.
+#[cfg_attr(feature = "nightly", track_caller)]
+async fn run_async_task<Func, Fut, Out>(world: AsyncWorld, func: Func)
+where
+	Func: 'static + FnOnce(AsyncWorld) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: 'static + IntoResult,
+{
+	#[cfg(feature = "std")]
+	{
+		use futures_lite::future::FutureExt;
+		let result = std::panic::AssertUnwindSafe(func(world.clone()))
+			.catch_unwind()
+			.await;
+		match result {
+			Ok(output) => {
+				if let Err(err) = output.into_result() {
+					let location = Location::caller();
+					world.handle_command_error::<Func>(err, location).await;
+				}
+			}
+			Err(panic) => {
+				let msg = display_ext::try_downcast_str(&panic)
+					.unwrap_or_else(|| "unknown panic".to_string());
+				cross_log!("Async task panicked: {}", msg);
+			}
 		}
 	}
-
-	/// Returns the number of tasks currently in flight.
-	pub fn task_count(&self) -> usize { self.task_count }
-
-	fn increment_tasks(&mut self) -> &mut Self {
-		self.task_count += 1;
-		self
-	}
-
-	fn decrement_tasks(&mut self) -> &mut Self {
-		self.task_count = self.task_count.saturating_sub(1);
-		self
+	#[cfg(not(feature = "std"))]
+	{
+		// no unwinding to catch under `panic=abort`
+		if let Err(err) = func(world.clone()).await.into_result() {
+			let location = Location::caller();
+			world.handle_command_error::<Func>(err, location).await;
+		}
 	}
 }
 
-/// A portable handle for sending [`CommandQueue`]s to the world from async contexts.
+/// Extension methods on the bridged [`AsyncWorld`] handle.
 ///
-/// Any async function that accepts a single [`AsyncWorld`] argument is an async system.
-/// This type is [`Copy`] as it only stores a [`WorldId`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct AsyncWorld {
-	world_id: WorldId,
-}
-
-impl From<WorldId> for AsyncWorld {
-	fn from(world_id: WorldId) -> Self { Self::new(world_id) }
-}
-
-static WORLD_SENDERS: std::sync::LazyLock<
-	std::sync::Mutex<HashMap<WorldId, Sender<CommandQueue>>>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
-
-
-impl AsyncWorld {
-	/// Creates a new [`AsyncWorld`] from a command queue sender.
-	pub fn new(world_id: WorldId) -> Self { Self { world_id } }
-
-	fn register(world: &mut World) {
-		let mut senders = WORLD_SENDERS.lock().unwrap();
-		if !senders.contains_key(&world.id()) {
-			let (send, recv) = async_channel::unbounded();
-			senders.insert(world.id(), send);
-			world.insert_resource(AsyncChannel::new(recv));
+/// `with`/`with_then` run on the *exclusive* bridge (raw `&mut World`);
+/// `with_state` runs on the `SystemParam` bridge. All methods are `async`.
+#[extend::ext(name=AsyncWorldExt)]
+pub impl AsyncWorld {
+	/// Runs a function with exclusive `&mut World` access.
+	fn with(
+		&self,
+		func: impl 'static + Send + FnOnce(&mut World),
+	) -> impl Future<Output = ()> + Send {
+		let fut = self.with_then(func);
+		async move {
+			fut.await;
 		}
 	}
 
-	fn send(&self, queue: CommandQueue) {
-		let senders = WORLD_SENDERS.lock().unwrap();
-		let sender = senders.get(&self.world_id).expect(
-			"AsyncWorld sender not found for world, please add the AsyncPlugin",
-		);
-
-		if let Err(err) = sender.try_send(queue) {
-			// we dont unwrap here, its common for this to happen
-			warn!("Failed to send command queue: {}", err);
-		}
-	}
-
-	/// Queues a command to be executed on the world.
-	pub fn with(&self, func: impl Command<Out = ()> + FnOnce(&mut World)) {
-		let mut queue = CommandQueue::default();
-		queue.push(func);
-		self.send(queue);
-	}
-
-	/// Queues a command and returns a future that resolves when the command completes.
-	pub fn with_then<O>(
+	/// Runs a function with exclusive `&mut World` access, returning its output.
+	///
+	/// If the world has been dropped the returned future never resolves (the
+	/// runtime cleans it up).
+	fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&mut World) -> O,
-	) -> impl Future<Output = O>
+	) -> impl Future<Output = O> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		let (out_tx, out_rx) = async_channel::bounded(1);
-		let mut queue = CommandQueue::default();
-		queue.push(move |world: &mut World| {
-			let out = func(world);
-			out_tx
-				.try_send(out)
-				// allow dropped, they didnt want the output
-				.ok();
-		});
-		self.send(queue);
+		let fut = self.exclusive(BeetAsyncSyncPoint, func);
 		async move {
-			match out_rx.recv().await {
+			match fut.await {
 				Ok(out) => out,
-				Err(_) => {
-					// Channel closed - world was dropped during teardown.
-					// Abort by pending forever; the runtime will clean us up.
-					std::future::pending().await
+				Err(_) => core::future::pending().await,
+			}
+		}
+	}
+
+	/// Runs a function with access to a [`SystemParam`] via the system-state bridge.
+	///
+	/// Unlike [`with`](AsyncWorldExt::with), this exposes typed params (queries,
+	/// resources, ...) rather than raw `&mut World`.
+	///
+	/// # Panics
+	///
+	/// Panics if the system parameter fails validation, ie a required resource
+	/// is missing.
+	fn with_state<P: 'static + SystemParam, O>(
+		&self,
+		func: impl 'static + Send + FnOnce(P::Item<'_, '_>) -> O,
+	) -> impl Future<Output = O> + Send
+	where
+		O: 'static + Send + Sync,
+	{
+		let state = self.system_state::<P>();
+		async move {
+			match state.bridge(BeetAsyncSyncPoint, func).await {
+				Ok(out) => out,
+				Err(BridgeError::WorldDropped) => core::future::pending().await,
+				Err(BridgeError::SystemParamValidation(err)) => {
+					panic!("system parameter validation failed: {err}")
 				}
 			}
 		}
 	}
 
 	/// Creates an [`AsyncEntity`] handle for the given entity.
-	pub fn entity(&self, entity: Entity) -> AsyncEntity {
+	fn entity(&self, entity: Entity) -> AsyncEntity {
 		AsyncEntity {
 			entity,
 			world: self.clone(),
@@ -425,97 +371,78 @@ impl AsyncWorld {
 	}
 
 	/// Spawns an entity with the given bundle.
-	pub fn spawn<B: Bundle>(&self, bundle: B) {
+	fn spawn<B: Bundle>(&self, bundle: B) -> impl Future<Output = ()> + Send {
 		self.with(move |world: &mut World| {
 			world.spawn(bundle);
-		});
+		})
 	}
 
 	/// Spawns an entity and returns its [`AsyncEntity`] handle.
-	pub fn spawn_then<B: Bundle>(
+	fn spawn_then<B: Bundle>(
 		&self,
 		bundle: B,
-	) -> impl Future<Output = AsyncEntity> {
+	) -> impl Future<Output = AsyncEntity> + Send {
+		let world = self.clone();
 		async move {
-			let entity = self
+			let entity = world
 				.with_then(move |world: &mut World| world.spawn(bundle).id())
 				.await;
-			self.entity(entity)
+			world.entity(entity)
 		}
 	}
 
 	/// Inserts a resource into the world.
-	pub fn insert_resource<R: Resource>(&self, resource: R) {
+	fn insert_resource<R: Resource>(
+		&self,
+		resource: R,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world: &mut World| {
 			world.insert_resource(resource);
-		});
-	}
-
-	/// Inserts a resource and waits for completion.
-	pub async fn insert_resource_then<R: Resource>(&self, resource: R) {
-		self.with_then(move |world: &mut World| {
-			world.insert_resource(resource);
 		})
-		.await;
 	}
 
 	/// Accesses a resource mutably.
-	pub fn with_resource<R: Resource<Mutability = Mutable>>(
+	fn with_resource<R: Resource<Mutability = Mutable>>(
 		&self,
-		func: impl FnOnce(Mut<R>) + Send + 'static,
-	) {
+		func: impl 'static + Send + FnOnce(Mut<R>),
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
 			func(world.resource_mut::<R>());
-		});
+		})
 	}
 
-	/// Accesses a resource mutably and returns a future with the result.
-	pub fn with_resource_then<R, O>(
+	/// Accesses a resource mutably and returns the result.
+	fn with_resource_then<R, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<R>) -> O,
-	) -> impl Future<Output = O>
+	) -> impl Future<Output = O> + Send
 	where
 		R: Resource<Mutability = Mutable>,
 		O: 'static + Send + Sync,
 	{
 		self.with_then(move |world| func(world.resource_mut::<R>()))
 	}
-	/// Runs a function with access to a system parameter state.
-	///
-	/// # Panics
-	///
-	/// The spawned task panics if the system parameter fails validation, ie a
-	/// required resource is missing, as it defers to [`WorldExt::with_state`].
-	pub fn with_state<T: 'static + SystemParam, O>(
-		&self,
-		func: impl 'static + Send + FnOnce(T::Item<'_, '_>) -> O,
-	) -> impl Future<Output = O>
-	where
-		O: 'static + Send + Sync,
-	{
-		self.with_then(|world| world.with_state(func))
-	}
 
 	/// Clones a resource and returns it.
-	pub fn resource<R: Resource + Clone>(&self) -> impl Future<Output = R>
-	where
-		R: Resource,
-	{
+	fn resource<R: Resource + Clone>(&self) -> impl Future<Output = R> + Send {
 		self.with_then(move |world| world.resource::<R>().clone())
 	}
 
 	/// Queues a [`Command`] on the world.
-	pub fn queue(&self, command: impl 'static + Send + Command) {
+	fn queue(
+		&self,
+		command: impl 'static + Send + Command,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
 			command.apply(world);
-		});
+		})
 	}
 
-	/// Queues a [`Command`] and waits for its output.
-	pub fn queue_then<O>(
+	/// Queues a [`Command`] and returns its output.
+	fn queue_then<O>(
 		&self,
 		command: impl 'static + Send + Command<Out = O>,
-	) -> impl Future<Output = O>
+	) -> impl Future<Output = O> + Send
 	where
 		O: 'static + Send + Sync,
 	{
@@ -523,159 +450,172 @@ impl AsyncWorld {
 	}
 
 	/// Triggers an event.
-	pub fn trigger<'a, E: Event<Trigger<'a>: Default>>(&self, event: E) {
+	fn trigger<'a, E: Event<Trigger<'a>: Default>>(
+		&self,
+		event: E,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
 			world.trigger(event);
-		});
+		})
 	}
 
 	/// Writes a message to the world.
-	pub fn write_message<E: Message>(&self, event: E) {
+	fn write_message<E: Message>(
+		&self,
+		event: E,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
 			world.write_message(event);
-		});
+		})
 	}
 
 	/// Writes a batch of messages to the world.
-	pub fn write_message_batch<E: Message>(
+	fn write_message_batch<E: Message>(
 		&self,
-		event: impl 'static + Send + IntoIterator<Item = E>,
-	) {
+		events: impl 'static + Send + IntoIterator<Item = E>,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |world| {
-			world.write_message_batch(event);
-		});
+			world.write_message_batch(events);
+		})
 	}
 
 	/// Runs a cached system and returns its output.
-	pub async fn run_system_cached<O, M, S>(
+	fn run_system_cached<O, M, S>(
 		&self,
 		system: S,
-	) -> Result<O, RegisteredSystemError<(), O>>
+	) -> impl Future<Output = Result<O, RegisteredSystemError<(), O>>> + Send
 	where
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<(), O, M>,
 	{
-		self.run_system_cached_with(system, ()).await
+		self.with_then(move |world| world.run_system_cached(system))
 	}
 
 	/// Runs a cached system with input and returns its output.
-	pub async fn run_system_cached_with<I, O, M, S>(
+	fn run_system_cached_with<I, O, M, S>(
 		&self,
 		system: S,
-		input: I::Inner<'_>,
-	) -> Result<O, RegisteredSystemError<I, O>>
+		input: I::Inner<'static>,
+	) -> impl Future<Output = Result<O, RegisteredSystemError<I, O>>> + Send
 	where
 		I: SystemInput + 'static,
-		for<'a> I::Inner<'a>: 'static + Send + Sync,
+		I::Inner<'static>: Send + Sync,
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
 		self.with_then(move |world| world.run_system_cached_with(system, input))
-			.await
 	}
 
 	/// Runs a system once and returns its output.
-	pub async fn run_system_once<O, M, S>(
+	fn run_system_once<O, M, S>(
 		&self,
 		system: S,
-	) -> Result<O, RunSystemError>
+	) -> impl Future<Output = Result<O, RunSystemError>> + Send
 	where
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<(), O, M>,
 	{
-		self.run_system_once_with(system, ()).await
+		self.with_then(move |world| world.run_system_once(system))
 	}
 
 	/// Runs a system once with input and returns its output.
-	pub async fn run_system_once_with<I, O, M, S>(
+	fn run_system_once_with<I, O, M, S>(
 		&self,
 		system: S,
-		input: I::Inner<'_>,
-	) -> Result<O, RunSystemError>
+		input: I::Inner<'static>,
+	) -> impl Future<Output = Result<O, RunSystemError>> + Send
 	where
 		I: SystemInput + 'static,
-		for<'a> I::Inner<'a>: 'static + Send + Sync,
+		I::Inner<'static>: Send + Sync,
 		O: 'static + Send + Sync,
 		S: 'static + Send + IntoSystem<I, O, M>,
 	{
 		self.with_then(move |world| world.run_system_once_with(system, input))
-			.await
 	}
 
 	/// Spawns an async task.
-	pub fn run_async<Func, Fut, Out>(
+	fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> impl Future<Output = ()>
+	) -> impl Future<Output = ()> + Send
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.with_then(move |world| {
+		self.with(move |world| {
 			world.run_async(func);
 		})
 	}
 
 	/// Spawns an async task on the local thread.
-	pub fn run_async_local<Func, Fut, Out>(
+	fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> impl Future<Output = ()>
+	) -> impl Future<Output = ()> + Send
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.with_then(move |world| {
+		self.with(move |world| {
 			world.run_async_local(func);
 		})
 	}
 
 	/// Registers an observer.
-	pub async fn observe<E: Event, B: Bundle, M>(
+	fn observe<E: Event, B: Bundle, M>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M>,
-	) -> &Self {
-		self.with_then(|world| {
+	) -> impl Future<Output = ()> + Send {
+		self.with(|world| {
 			world.add_observer(observer);
 		})
-		.await;
-		self
 	}
 
 	/// Awaits a single event of type `E`, then despawns the observer.
-	pub async fn await_event<E: Event, B: Bundle>(&self) -> &Self {
-		let (send, recv) = async_channel::bounded(1);
-		self.observe(move |ev: On<E, B>, mut commands: Commands| {
-			send.try_send(()).ok();
-			commands.entity(ev.observer()).despawn();
-		})
-		.await;
-		recv.recv().await.ok();
-		self
+	fn await_event<E: Event, B: Bundle>(
+		&self,
+	) -> impl Future<Output = ()> + Send {
+		let world = self.clone();
+		async move {
+			let signal = OnceSignal::new();
+			let observer_signal = signal.clone();
+			world
+				.observe(move |ev: On<E, B>, mut commands: Commands| {
+					observer_signal.signal();
+					commands.entity(ev.observer()).despawn();
+				})
+				.await;
+			signal.wait().await;
+		}
 	}
 
 	/// Handles an error using the world's default error handler.
-	pub async fn handle_command_error<F>(
+	fn handle_command_error<F>(
 		&self,
 		err: BevyError,
 		location: &'static Location<'static>,
-	) -> &Self {
-		self.with_then(|world| {
+	) -> impl Future<Output = ()> + Send {
+		self.with(move |world| {
 			world.handle_command_error::<F>(err, location);
 		})
-		.await;
-		self
 	}
 }
 
 /// A handle for operating on a specific entity from async contexts.
-/// This type is [`Copy`] as it only stores an [`Entity`] and [`WorldId`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct AsyncEntity {
 	entity: Entity,
 	world: AsyncWorld,
+}
+
+impl core::fmt::Debug for AsyncEntity {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("AsyncEntity")
+			.field("entity", &self.entity)
+			.finish()
+	}
 }
 
 impl AsyncEntity {
@@ -686,75 +626,78 @@ impl AsyncEntity {
 	pub fn world(&self) -> &AsyncWorld { &self.world }
 
 	/// Returns `true` if the entity still exists in the world.
-	///
-	/// Useful in long-running async actions whose caller subtree may be
-	/// despawned between iterations — see [`Repeat`] for an example.
-	pub async fn is_alive(&self) -> bool {
-		let entity_id = self.entity;
-		self.world
-			.with_then(move |world: &mut World| {
-				world.get_entity(entity_id).is_ok()
-			})
-			.await
+	pub fn is_alive(&self) -> impl Future<Output = bool> + Send {
+		let entity = self.entity;
+		self.world.with_then(move |world: &mut World| {
+			world.get_entity(entity).is_ok()
+		})
 	}
 
-	/// Runs a function with access to the entity.
-	///
-	/// Silently no-ops if the entity has been despawned, since the
-	/// callsite already discarded any return value.
+	/// Runs a function with access to the entity, no-op if it has been despawned.
 	pub fn with(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut),
-	) -> &Self {
+	) -> impl Future<Output = ()> + Send {
 		let entity = self.entity;
 		self.world.with(move |world: &mut World| {
 			if let Ok(entity) = world.get_entity_mut(entity) {
 				func(entity);
 			}
-		});
-		self
+		})
 	}
 
 	/// Runs a function with access to the entity and returns the result.
 	///
-	/// Returns an error if the entity has been despawned between when this
-	/// handle was obtained and when the closure runs.
-	pub async fn with_then<O>(
+	/// Errors if the entity has been despawned.
+	pub fn with_then<O>(
 		&self,
 		func: impl 'static + Send + FnOnce(EntityWorldMut) -> O,
-	) -> Result<O>
+	) -> impl Future<Output = Result<O>> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		let entity_id = self.entity;
-		self.world
-			.with_then(move |world: &mut World| -> Result<O> {
-				let entity = world
-					.get_entity_mut(entity_id)
-					.map_err(|_| bevyhow!("Entity {entity_id:?} despawned"))?;
-				func(entity).xok()
-			})
-			.await
+		let entity = self.entity;
+		self.world.with_then(move |world: &mut World| -> Result<O> {
+			let entity = world
+				.get_entity_mut(entity)
+				.map_err(|_| bevyhow!("Entity {entity:?} despawned"))?;
+			func(entity).xok()
+		})
 	}
 
-	/// Spawns an async task.
-	pub async fn run_async<Func, Fut, Out>(&self, func: Func) -> Result<()>
+	/// Runs a function with access to the entity id and a [`SystemParam`].
+	///
+	/// Errors if the entity has been despawned.
+	pub fn with_state<P: 'static + SystemParam, O>(
+		&self,
+		func: impl 'static + Send + FnOnce(Entity, P::Item<'_, '_>) -> O,
+	) -> impl Future<Output = Result<O>> + Send
+	where
+		O: 'static + Send + Sync,
+	{
+		self.with_then(|mut entity| entity.with_state(func))
+	}
+
+	/// Spawns an async task for this entity.
+	pub fn run_async<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = Result<()>> + Send
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		self.with_then(move |mut entity| {
 			entity.run_async(func);
 		})
-		.await
 	}
 
-	/// Spawns an async task on the local thread.
-	pub async fn run_async_local<Func, Fut, Out>(
+	/// Spawns an async task on the local thread for this entity.
+	pub fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
-	) -> Result<()>
+	) -> impl Future<Output = Result<()>> + Send
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
 		Fut: 'static + Future<Output = Out>,
@@ -763,218 +706,248 @@ impl AsyncEntity {
 		self.with_then(move |mut entity| {
 			entity.run_async_local(func);
 		})
-		.await
 	}
 
 	/// Gets a component and runs a function with it.
-	pub async fn get<T: Component, O>(
+	pub fn get<T: Component, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(&T) -> O,
-	) -> Result<O>
+	) -> impl Future<Output = Result<O>> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(move |entity| -> Result<O> {
+		let fut = self.with_then(move |entity| -> Result<O> {
 			if let Some(comp) = entity.get() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found: {}", std::any::type_name::<T>())
+				bevybail!(
+					"Component not found: {}",
+					core::any::type_name::<T>()
+				)
 			}
-		})
-		.await
-		.flatten()
-	}
-	/// Checks if the entity contains the component
-	pub async fn contains<T: Component>(&self) -> bool {
-		self.with_then(|entity| entity.contains::<T>())
-			.await
-			.unwrap_or(false)
+		});
+		async move { fut.await.flatten() }
 	}
 
-	/// Runs a function with access to the entity id and system parameter state.
-	///
-	/// # Panics
-	///
-	/// The spawned task panics if the system parameter fails validation, ie a
-	/// required resource is missing, as it defers to
-	/// [`EntityWorldMutExt::with_state`].
-	pub async fn with_state<T: 'static + SystemParam, O>(
-		&self,
-		func: impl 'static + Send + FnOnce(Entity, T::Item<'_, '_>) -> O,
-	) -> Result<O>
-	where
-		O: 'static + Send + Sync,
-	{
-		self.with_then(|mut entity| entity.with_state(func)).await
+	/// Checks if the entity contains the component.
+	pub fn contains<T: Component>(&self) -> impl Future<Output = bool> + Send {
+		let fut = self.with_then(|entity| entity.contains::<T>());
+		async move { fut.await.unwrap_or(false) }
 	}
 
 	/// Gets a mutable component and runs a function with it.
-	pub async fn get_mut<T: Component<Mutability = Mutable>, O>(
+	pub fn get_mut<T: Component<Mutability = Mutable>, O>(
 		&self,
 		func: impl 'static + Send + FnOnce(Mut<T>) -> O,
-	) -> Result<O>
+	) -> impl Future<Output = Result<O>> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(|mut entity| {
+		let fut = self.with_then(|mut entity| {
 			if let Some(comp) = entity.get_mut() {
 				func(comp).xok()
 			} else {
-				bevybail!("Component not found: {}", std::any::type_name::<T>())
+				bevybail!(
+					"Component not found: {}",
+					core::any::type_name::<T>()
+				)
 			}
-		})
-		.await
-		.flatten()
+		});
+		async move { fut.await.flatten() }
 	}
 
-	/// Gets a cloned component from an [`AncestorQuery`]
-	pub async fn get_in_acestors_cloned<T: Component + Clone>(
+	/// Gets a cloned component from an [`AncestorQuery`].
+	pub fn get_in_ancestors_cloned<T: Component + Clone>(
 		&self,
-	) -> Result<T> {
+	) -> impl Future<Output = Result<T>> + Send {
 		// AncestorQuery is infallible, with_state will not panic
-		self.with_state::<AncestorQuery<&T>, _>(|entity, query| {
+		let fut = self.with_state::<AncestorQuery<&T>, _>(|entity, query| {
 			query.get(entity).cloned().xok()
-		})
-		.await
-		.flatten()
-		.flatten()
+		});
+		async move { fut.await.flatten().flatten() }
 	}
 
 	/// Gets a cloned component.
-	pub async fn get_cloned<T: Component + Clone>(&self) -> Result<T> {
-		self.get::<T, _>(|comp| comp.clone()).await
-	}
-	/// Gets two cloned components.
-	pub async fn get_cloned2<T1: Component + Clone, T2: Component + Clone>(
+	pub fn get_cloned<T: Component + Clone>(
 		&self,
-	) -> Result<(T1, T2)> {
-		self.with_then(|entity| {
+	) -> impl Future<Output = Result<T>> + Send {
+		self.get::<T, _>(|comp| comp.clone())
+	}
+
+	/// Gets two cloned components.
+	pub fn get_cloned2<T1: Component + Clone, T2: Component + Clone>(
+		&self,
+	) -> impl Future<Output = Result<(T1, T2)>> + Send {
+		let fut = self.with_then(|entity| {
 			(
 				entity.try_get::<T1>()?.clone(),
 				entity.try_get::<T2>()?.clone(),
 			)
 				.xok()
-		})
-		.await
-		.flatten()
+		});
+		async move { fut.await.flatten() }
 	}
 
-
 	/// Takes a component from the entity.
-	pub async fn take<T: Component>(&self) -> Result<Option<T>> {
-		self.with_then(|mut entity| entity.take()).await
+	pub fn take<T: Component>(
+		&self,
+	) -> impl Future<Output = Result<Option<T>>> + Send {
+		self.with_then(|mut entity| entity.take())
 	}
 
 	/// Inserts a bundle into the entity.
-	pub fn insert<B: Bundle>(&self, bundle: B) -> &Self {
+	pub fn insert<B: Bundle>(
+		&self,
+		bundle: B,
+	) -> impl Future<Output = ()> + Send {
 		self.with(|mut entity| {
 			entity.insert(bundle);
-		});
-		self
+		})
 	}
 
-	/// Inserts a bundle and waits for completion.
-	pub async fn insert_then<B: Bundle>(&self, bundle: B) -> Result<&Self> {
-		self.with_then(|mut entity| {
+	/// Inserts a bundle, erroring if the entity has been despawned.
+	pub fn insert_then<B: Bundle>(
+		&self,
+		bundle: B,
+	) -> impl Future<Output = Result<()>> + Send {
+		let fut = self.with_then(|mut entity| {
 			entity.insert(bundle);
-		})
-		.await?;
-		self.xok()
+		});
+		async move { fut.await }
 	}
 
 	/// Spawns a child entity and returns its ID.
-	pub async fn spawn_child<B: Bundle>(&self, bundle: B) -> Entity {
+	pub fn spawn_child<B: Bundle>(
+		&self,
+		bundle: B,
+	) -> impl Future<Output = Entity> + Send {
 		let id = self.entity;
 		self.world
 			.with_then(move |world| world.spawn((bundle, ChildOf(id))).id())
-			.await
 	}
 
 	/// Queues an [`EntityCommand`] on the entity.
-	pub fn queue(&self, command: impl 'static + Send + EntityCommand) -> &Self {
+	pub fn queue(
+		&self,
+		command: impl 'static + Send + EntityCommand,
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |entity| {
 			command.apply(entity);
-		});
-		self
+		})
 	}
 
-	/// Queues an [`EntityCommand`] and waits for its output.
-	pub async fn queue_then<O>(
+	/// Queues an [`EntityCommand`] and returns its output.
+	pub fn queue_then<O>(
 		&self,
 		command: impl 'static + Send + EntityCommand<Out = O>,
-	) -> Result<O>
+	) -> impl Future<Output = Result<O>> + Send
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with_then(move |entity| command.apply(entity)).await
+		self.with_then(move |entity| command.apply(entity))
 	}
 
 	/// Triggers an entity event.
 	pub fn trigger<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> &Self {
+	) -> impl Future<Output = ()> + Send {
 		self.with(move |mut entity| {
 			entity.trigger(ev);
-		});
-		self
+		})
 	}
 
-	/// Triggers an entity event and waits for completion.
-	pub async fn trigger_then<'t, E: EntityEvent<Trigger<'t>: Default>>(
+	/// Triggers an entity event, erroring if the entity has been despawned.
+	pub fn trigger_then<'t, E: EntityEvent<Trigger<'t>: Default>>(
 		&self,
 		ev: impl 'static + Send + Sync + FnOnce(Entity) -> E,
-	) -> Result<&Self> {
+	) -> impl Future<Output = Result<()>> + Send {
 		self.with_then(move |mut entity| {
 			entity.trigger(ev);
 		})
-		.await?;
-		self.xok()
 	}
 
-	/// Triggers an entity target event and waits for completion.
-	pub async fn trigger_target_then<M>(
+	/// Triggers an entity target event, erroring if the entity has been despawned.
+	pub fn trigger_target_then<M>(
 		&self,
-		event: impl IntoEntityTargetEvent<M>,
-	) -> Result<&Self> {
+		event: impl 'static + Send + IntoEntityTargetEvent<M>,
+	) -> impl Future<Output = Result<()>> + Send
+	where
+		M: 'static,
+	{
 		self.with_then(|mut entity| {
 			entity.trigger_target(event);
 		})
-		.await?;
-		self.xok()
 	}
 
 	/// Registers an observer on the entity.
-	pub async fn observe<E: Event, B: Bundle, M>(
+	pub fn observe<E: Event, B: Bundle, M>(
 		&self,
 		observer: impl IntoObserverSystem<E, B, M>,
-	) -> Result<&Self> {
+	) -> impl Future<Output = Result<()>> + Send {
 		self.with_then(|mut entity| {
 			entity.observe_any(observer);
 		})
-		.await?;
-		self.xok()
 	}
 
 	/// Awaits a single event of type `E` for this entity, then despawns the observer.
-	pub async fn await_event<E: Event, B: Bundle>(&self) -> Result<&Self> {
-		let (send, recv) = async_channel::bounded(1);
-		self.observe(move |ev: On<E, B>, mut commands: Commands| {
-			send.try_send(()).ok();
-			commands.entity(ev.observer()).despawn();
-		})
-		.await?;
-		recv.recv().await.ok();
-		self.xok()
+	pub fn await_event<E: Event, B: Bundle>(
+		&self,
+	) -> impl Future<Output = Result<()>> + Send {
+		let this = self.clone();
+		async move {
+			let signal = OnceSignal::new();
+			let observer_signal = signal.clone();
+			this.observe(move |ev: On<E, B>, mut commands: Commands| {
+				observer_signal.signal();
+				commands.entity(ev.observer()).despawn();
+			})
+			.await?;
+			signal.wait().await;
+			Ok(())
+		}
 	}
 
 	/// Despawns the entity.
-	pub async fn despawn(&self) {
-		self.with_then(move |entity| {
+	pub fn despawn(&self) -> impl Future<Output = ()> + Send {
+		self.with(move |entity| {
 			entity.despawn();
 		})
-		.await
-		.ok();
+	}
+}
+
+/// System parameter for spawning async tasks from a system, with an
+/// [`AsyncWorld`] handle for the spawned task.
+#[derive(SystemParam)]
+pub struct AsyncCommands<'w, 's> {
+	/// Commands for queuing ECS work.
+	pub commands: Commands<'w, 's>,
+	async_world: Res<'w, AsyncWorld>,
+	spawner: Res<'w, AsyncSpawner>,
+}
+
+impl AsyncCommands<'_, '_> {
+	/// Creates an [`AsyncWorld`] handle for sending commands.
+	pub fn world(&self) -> AsyncWorld { self.async_world.clone() }
+
+	/// Spawns an async task that can access the world.
+	pub fn run<Func, Fut, Out>(&self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner.spawn(run_async_task(self.world(), func));
+	}
+
+	/// Spawns an async task on the local thread.
+	pub fn run_local<Func, Fut, Out>(&self, func: Func)
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner.spawn_local(run_async_task(self.world(), func));
 	}
 }
 
@@ -989,7 +962,10 @@ pub impl World {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		spawn_async_task(AsyncWorld::new(self.id()), func);
+		let world = self.resource::<AsyncWorld>().clone();
+		self.resource::<AsyncSpawner>()
+			.clone()
+			.spawn(run_async_task(world, func));
 		self
 	}
 
@@ -1001,11 +977,15 @@ pub impl World {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		spawn_async_task_local(AsyncWorld::new(self.id()), func);
+		let world = self.resource::<AsyncWorld>().clone();
+		self.resource::<AsyncSpawner>()
+			.clone()
+			.spawn_local(run_async_task(world, func));
 		self
 	}
 
-	/// Spawns an async task, flushes all async tasks and returns the output.
+	/// Spawns an async task, drives the app to completion, and returns the output.
+	#[cfg(feature = "std")]
 	#[track_caller]
 	fn run_async_then<Func, Fut, Out>(
 		&mut self,
@@ -1016,14 +996,16 @@ pub impl World {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync,
 	{
-		spawn_async_task_then(
-			AsyncWorld::new(self.id()),
-			|| self.update_local(),
-			func,
-		)
+		let world = self.resource::<AsyncWorld>().clone();
+		let (send, recv) = oneshot();
+		self.resource::<AsyncSpawner>().clone().spawn(async move {
+			send.signal(func(world).await);
+		});
+		AsyncRunner::poll_and_update(|| self.update_local(), recv.wait())
 	}
 
-	/// Spawns an async local task, flushes all async tasks and returns the output.
+	/// Spawns a local async task, drives the app to completion, returns the output.
+	#[cfg(feature = "std")]
 	#[track_caller]
 	fn run_async_local_then<Func, Fut, Out>(
 		&mut self,
@@ -1034,11 +1016,14 @@ pub impl World {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static,
 	{
-		spawn_async_task_local_then(
-			AsyncWorld::new(self.id()),
-			|| self.update_local(),
-			func,
-		)
+		let world = self.resource::<AsyncWorld>().clone();
+		let (send, recv) = oneshot();
+		self.resource::<AsyncSpawner>()
+			.clone()
+			.spawn_local(async move {
+				send.signal(func(world).await);
+			});
+		AsyncRunner::poll_and_update(|| self.update_local(), recv.wait())
 	}
 }
 
@@ -1046,24 +1031,26 @@ pub impl World {
 #[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
 pub impl EntityWorldMut<'_> {
 	/// Spawns an async task for this entity.
-	// Only mutable to allow for ergonomic chaining.
 	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
-		spawn_async_task_local(
-			AsyncWorld::new(self.world().id()),
-			move |world| func(world.entity(id)),
-		);
+		self.world_scope(move |world| {
+			let async_world = world.resource::<AsyncWorld>().clone();
+			let entity = async_world.entity(id);
+			world
+				.resource::<AsyncSpawner>()
+				.clone()
+				.spawn(run_async_task_entity(entity, func));
+		});
 		self
 	}
 
 	/// Spawns an async task on the local thread for this entity.
-	// Only mutable to allow for ergonomic chaining.
 	#[track_caller]
 	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
 	where
@@ -1072,14 +1059,19 @@ pub impl EntityWorldMut<'_> {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		let id = self.id();
-		spawn_async_task_local(
-			AsyncWorld::new(self.world().id()),
-			move |world| func(world.entity(id)),
-		);
+		self.world_scope(move |world| {
+			let async_world = world.resource::<AsyncWorld>().clone();
+			let entity = async_world.entity(id);
+			world
+				.resource::<AsyncSpawner>()
+				.clone()
+				.spawn_local(run_async_task_entity(entity, func));
+		});
 		self
 	}
 
-	/// Spawns an async task, flushes all async tasks and returns the output.
+	/// Spawns an async task, drives the app to completion, and returns the output.
+	#[cfg(feature = "std")]
 	#[track_caller]
 	fn run_async_then<Func, Fut, Out>(
 		&mut self,
@@ -1087,18 +1079,29 @@ pub impl EntityWorldMut<'_> {
 	) -> impl Future<Output = Out>
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
-		Fut: 'static + Future<Output = Out> + Send,
+		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync,
 	{
 		let id = self.id();
-		spawn_async_task_then(
-			AsyncWorld::new(self.world().id()),
+		let (send, recv) = oneshot();
+		let (async_world, spawner) = self.world_scope(|world| {
+			(
+				world.resource::<AsyncWorld>().clone(),
+				world.resource::<AsyncSpawner>().clone(),
+			)
+		});
+		let entity = async_world.entity(id);
+		spawner.spawn(async move {
+			send.signal(func(entity).await);
+		});
+		AsyncRunner::poll_and_update(
 			|| self.world_scope(World::update_local),
-			move |world| func(world.entity(id)),
+			recv.wait(),
 		)
 	}
 
-	/// Spawns an async local task, flushes all async tasks and returns the output.
+	/// Spawns a local async task, drives the app to completion, returns the output.
+	#[cfg(feature = "std")]
 	#[track_caller]
 	fn run_async_local_then<Func, Fut, Out>(
 		&mut self,
@@ -1110,20 +1113,124 @@ pub impl EntityWorldMut<'_> {
 		Out: 'static,
 	{
 		let id = self.id();
-		spawn_async_task_local_then(
-			AsyncWorld::new(self.world().id()),
+		let (send, recv) = oneshot();
+		let (async_world, spawner) = self.world_scope(|world| {
+			(
+				world.resource::<AsyncWorld>().clone(),
+				world.resource::<AsyncSpawner>().clone(),
+			)
+		});
+		let entity = async_world.entity(id);
+		spawner.spawn_local(async move {
+			send.signal(func(entity).await);
+		});
+		AsyncRunner::poll_and_update(
 			|| self.world_scope(World::update_local),
-			move |world| func(world.entity(id)),
+			recv.wait(),
 		)
 	}
 }
 
+/// Like [`run_async_task`] but threads an [`AsyncEntity`] to the task.
+async fn run_async_task_entity<Func, Fut, Out>(entity: AsyncEntity, func: Func)
+where
+	Func: 'static + FnOnce(AsyncEntity) -> Fut,
+	Fut: 'static + Future<Output = Out>,
+	Out: 'static + IntoResult,
+{
+	let world = entity.world().clone();
+	run_async_task(world, move |_| func(entity)).await;
+}
 
+/// A one-shot value channel: a single value is published once and the awaiting
+/// task is woken. Used for the `run_async_*_then` result hand-off (std-only,
+/// since those drive the app via [`AsyncRunner`]).
+#[cfg(feature = "std")]
+fn oneshot<T>() -> (OnceValue<T>, OnceValueRx<T>) {
+	let inner = Arc::new(OnceValueInner {
+		value: Mutex::new(None),
+		waker: Mutex::new(None),
+		set: AtomicBool::new(false),
+	});
+	(OnceValue(inner.clone()), OnceValueRx(inner))
+}
+
+#[cfg(feature = "std")]
+struct OnceValueInner<T> {
+	value: Mutex<Option<T>>,
+	waker: Mutex<Option<Waker>>,
+	set: AtomicBool,
+}
+
+#[cfg(feature = "std")]
+struct OnceValue<T>(Arc<OnceValueInner<T>>);
+#[cfg(feature = "std")]
+struct OnceValueRx<T>(Arc<OnceValueInner<T>>);
+
+#[cfg(feature = "std")]
+impl<T> OnceValue<T> {
+	fn signal(self, value: T) {
+		*self.0.value.lock().unwrap() = Some(value);
+		self.0.set.store(true, Ordering::SeqCst);
+		if let Some(waker) = self.0.waker.lock().unwrap().take() {
+			waker.wake();
+		}
+	}
+}
+
+#[cfg(feature = "std")]
+impl<T> OnceValueRx<T> {
+	fn wait(self) -> impl Future<Output = T> {
+		core::future::poll_fn(move |cx| {
+			if self.0.set.load(Ordering::SeqCst) {
+				Poll::Ready(self.0.value.lock().unwrap().take().unwrap())
+			} else {
+				*self.0.waker.lock().unwrap() = Some(cx.waker().clone());
+				Poll::Pending
+			}
+		})
+	}
+}
+
+/// A clonable one-shot completion flag used by `await_event`.
+#[derive(Clone)]
+struct OnceSignal(Arc<OnceSignalInner>);
+
+struct OnceSignalInner {
+	fired: AtomicBool,
+	waker: Mutex<Option<Waker>>,
+}
+
+impl OnceSignal {
+	fn new() -> Self {
+		Self(Arc::new(OnceSignalInner {
+			fired: AtomicBool::new(false),
+			waker: Mutex::new(None),
+		}))
+	}
+
+	fn signal(&self) {
+		self.0.fired.store(true, Ordering::SeqCst);
+		if let Some(waker) = self.0.waker.lock().unwrap().take() {
+			waker.wake();
+		}
+	}
+
+	fn wait(&self) -> impl Future<Output = ()> + '_ {
+		core::future::poll_fn(move |cx| {
+			if self.0.fired.load(Ordering::SeqCst) {
+				Poll::Ready(())
+			} else {
+				*self.0.waker.lock().unwrap() = Some(cx.waker().clone());
+				Poll::Pending
+			}
+		})
+	}
+}
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::tasks::futures_lite::future;
 
 	fn test_app() -> App {
 		let mut app = App::new();
@@ -1143,7 +1250,7 @@ mod test {
 		let world = app.world_mut();
 		world
 			.run_async_then(|world| async move {
-				world.insert_resource(Count(0));
+				world.insert_resource(Count(0)).await;
 				world
 					.with_resource_then::<Count, _>(|mut count| {
 						count.0 += 1;
@@ -1208,34 +1315,7 @@ mod test {
 	#[beet_core::test]
 	async fn run_async_then() {
 		let mut app = test_app();
-		let result =
-			app.world_mut().run_async_then(|_| future::ready(42)).await;
+		let result = app.world_mut().run_async_then(|_| async { 42 }).await;
 		result.xpect_eq(42);
-	}
-
-	// requires panic = "abort"
-	// #[beet_core::test]
-	#[allow(unused)]
-	async fn panic_handling() {
-		let mut app = test_app();
-		let world = app.world_mut();
-		world.insert_resource(Count(0));
-
-		// This should not crash the test runner
-		world.run_async(async |_world| -> () {
-			panic!("This panic should be caught");
-		});
-
-		// Wait for the panic task to complete
-		world
-			.run_async_local_then(|world| async move {
-				world.resource::<Count>().await
-			})
-			.await
-			.xpect_eq(Count(0));
-
-		// Verify the world is still functional after the panic
-		world.resource_mut::<Count>().0 = 42;
-		world.resource::<Count>().0.xpect_eq(42);
 	}
 }

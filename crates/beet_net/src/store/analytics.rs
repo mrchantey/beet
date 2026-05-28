@@ -27,7 +27,7 @@ pub struct AnalyticsEventStore {
 }
 /// Spawns the analytics event store resource using the configured backend.
 fn spawn_analytics_event_store(
-	mut commands: AsyncCommands,
+	commands: AsyncCommands,
 	ws_config: When<Res<WorkspaceConfig>>,
 	pkg_config: When<Res<PackageConfig>>,
 ) {
@@ -38,7 +38,7 @@ fn spawn_analytics_event_store(
 		let store =
 			dynamo_fs_selector(&fs_dir, &bucket_name, &DEFAULT_REGION, access)
 				.await;
-		queue.insert_resource(AnalyticsEventStore { store });
+		queue.insert_resource(AnalyticsEventStore { store }).await;
 	});
 }
 
@@ -47,7 +47,7 @@ fn spawn_analytics_event_store(
 fn handle_analytics_events(
 	trigger: On<AnalyticsEvent>,
 	store: ResMut<AnalyticsEventStore>,
-	mut commands: AsyncCommands,
+	commands: AsyncCommands,
 ) {
 	let store = store.clone();
 	let event = trigger.event().clone();

@@ -24,7 +24,7 @@ pub impl Commands<'_, '_> {
 	}
 
 	/// Queues an asynchronous task to be run in the world context.
-	#[cfg(feature = "std")]
+	#[cfg(feature = "bevy_async")]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
@@ -37,7 +37,7 @@ pub impl Commands<'_, '_> {
 	}
 
 	/// Queues a local asynchronous task to be run in the world context.
-	#[cfg(feature = "std")]
+	#[cfg(feature = "bevy_async")]
 	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
@@ -81,7 +81,7 @@ pub impl EntityCommands<'_> {
 	}
 
 	/// Queues an asynchronous task to be run in the world context.
-	#[cfg(feature = "std")]
+	#[cfg(feature = "bevy_async")]
 	fn queue_async<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
@@ -94,7 +94,7 @@ pub impl EntityCommands<'_> {
 	}
 
 	/// Queues a local asynchronous task to be run in the world context.
-	#[cfg(feature = "std")]
+	#[cfg(feature = "bevy_async")]
 	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)
 	where
 		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,

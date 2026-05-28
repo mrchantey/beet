@@ -83,6 +83,9 @@ std = [
 	"serde?/std",
 	"serde_json?/std",
 	"futures-lite/race",
+	# the async bridge is std-independent, but every std build wants it
+	"bevy_async",
+	"beet_async?/std",
 	"dep:send_wrapper",
 	"dep:dotenv",
 	"dep:web-time",
@@ -96,6 +99,9 @@ std = [
 	"dep:async-io",
 	"dep:async-task",
 ]
+# vendored bevy_async bridge + beet's high-level AsyncWorld/AsyncEntity layer.
+# std-independent: only the default task spawner differs by target.
+bevy_async = ["dep:beet_async"]
 # no_std build for bare-metal targets (e.g. esp32): the libm / critical-section
 # shims bevy needs without std. Capabilities like `bevy_color` are opt-in.
 embedded = ["bevy/libm", "bevy/critical-section"]
@@ -157,6 +163,7 @@ rsx = ["beet_core_macros/rsx"]
 [dependencies]
 beet_core_macros.workspace = true
 beet_core_shared = { workspace = true, optional = true }
+beet_async = { workspace = true, optional = true, default-features = false }
 inventory = { workspace = true, optional = true }
 bytes.workspace = true
 bevy.workspace = true
@@ -237,6 +244,9 @@ wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 js-sys.workspace = true
 console_error_panic_hook.workspace = true
+# tickable local executor for the bevy_async bridge: wasm's bevy `spawn_local`
+# uses the JS event loop, which the synchronous sync-point driver cannot tick.
+async-executor = { workspace = true, optional = true }
 #https://rustwasm.github.io/wasm-bindgen/api/web_sys/
 #https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
 web-sys = {workspace = true, features = [

@@ -223,11 +223,13 @@ pub(crate) async fn start_tungstenite_server_with_tcp(
 		// immediately. `entity.run_async_local` returns a future that
 		// must be polled before anything is dispatched, which would
 		// deadlock the accept loop.
-		entity.with(move |mut entity| {
-			entity.run_async_local(move |entity| {
-				handle_connection(entity, stream)
-			});
-		});
+		entity
+			.with(move |mut entity| {
+				entity.run_async_local(move |entity| {
+					handle_connection(entity, stream)
+				});
+			})
+			.await;
 	}
 }
 async fn handle_connection(

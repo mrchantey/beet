@@ -106,9 +106,10 @@ where
 	let world = entity.into_world_mut();
 	match recv.try_recv() {
 		Ok(result) => result,
-		Err(TryRecvError::Empty) => {
-			AsyncRunner::poll_and_update(|| world.update_local(), recv).await?
-		}
+		Err(TryRecvError::Empty) => unwrap_channel_result(
+			AsyncRunner::poll_and_update(|| world.update_local(), recv.recv())
+				.await,
+		),
 		Err(TryRecvError::Closed) => {
 			bevybail!("Action call response channel closed unexpectedly.")
 		}

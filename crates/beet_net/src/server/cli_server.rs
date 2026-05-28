@@ -72,7 +72,7 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 
 	stream_body_to_stdout(body).await?;
 
-	entity.world().write_message(exit);
+	entity.world().write_message(exit).await;
 	Ok(())
 }
 

@@ -99,7 +99,7 @@ pub impl App {
 	}
 
 	/// Runs the app asynchronously, useful for wasm where `App::run` returns immediately.
-	#[cfg(feature = "std")]
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
 	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
 		AsyncRunner::run(core::mem::take(self))
 	}

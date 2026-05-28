@@ -64,7 +64,7 @@ where
 		Action::new(
 			TypeMeta::of::<WrapFn>(),
 			move |ActionCall {
-			          mut commands,
+			          commands,
 			          caller: _,
 			          input: (wrap_in, next),
 			          out_handler,
@@ -110,7 +110,7 @@ where
 		Action::new(
 			TypeMeta::of::<WrapFn>(),
 			move |ActionCall {
-			          mut commands,
+			          commands,
 			          caller: _,
 			          input: (wrap_in, next),
 			          out_handler,

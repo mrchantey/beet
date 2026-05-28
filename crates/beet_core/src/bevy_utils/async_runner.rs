@@ -3,10 +3,14 @@
 //! This module provides the [`AsyncRunner`] which allows running a Bevy [`App`]
 //! asynchronously to completion, useful for environments like wasm where
 //! `App::run` returns immediately.
+//!
+//! Two orthogonal concerns compose here: *driving the app* (`app.update()`,
+//! which runs the [`BeetAsyncSyncPoint`] driver) and *the task executor* (the
+//! pluggable [`AsyncSpawner`]). The runner only drives the app and can itself be
+//! `.await`ed inside any host runtime.
 
 use crate::prelude::*;
-use async_channel::Receiver;
-use async_channel::TryRecvError;
+use core::future::Future;
 
 /// Runner for executing Bevy apps asynchronously.
 ///
@@ -22,6 +26,10 @@ pub struct AsyncRunner;
 fn tick_task_pools() {
 	#[cfg(not(target_arch = "wasm32"))]
 	bevy::tasks::tick_global_task_pools_on_main_thread();
+	// wasm: drive our tickable bridge executor (bevy's `spawn_local` uses the
+	// untickable JS event loop), so spawned tasks make progress between updates.
+	#[cfg(target_arch = "wasm32")]
+	super::tick_bridge_executor();
 }
 
 impl AsyncRunner {
@@ -30,8 +38,7 @@ impl AsyncRunner {
 		app.init_plugin::<AsyncPlugin>();
 		app.init();
 
-		// this is an outer loop that will run when there are no
-		// in-flight async tasks. We'll just do a 100ms update loop
+		// outer loop runs when there are no in-flight async tasks
 		loop {
 			// 1. flush async tasks (also runs update)
 			Self::flush_async_tasks(app.world_mut()).await;
@@ -40,8 +47,6 @@ impl AsyncRunner {
 				return exit;
 			}
 			// 3. delay next update
-			// TODO no idea how long the correct duration is here,
-			// does it depend on use-case?
 			time_ext::sleep_millis(1).await;
 		}
 	}
@@ -55,7 +60,7 @@ impl AsyncRunner {
 		async_ext::yield_now().await;
 
 		loop {
-			// 1. update first to process command queues
+			// 1. update first to process the sync point + spawned commands
 			world.update_local();
 			// 2. tick local tasks in multi-threaded mode
 			tick_task_pools();
@@ -64,7 +69,7 @@ impl AsyncRunner {
 				return Some(exit);
 			}
 			// 4. exit if no remaining tasks
-			if world.resource::<AsyncChannel>().task_count() == 0 {
+			if world.resource::<AsyncSpawner>().in_flight() == 0 {
 				return None;
 			}
 			// 5. short delay
@@ -72,49 +77,43 @@ impl AsyncRunner {
 		}
 	}
 
-	/// Updates the world in 1ms increments until recv has a value.
+	/// Updates the app until `fut` resolves, returning its output.
 	///
 	/// Ticks task pools after yielding to ensure spawned local tasks make progress.
-	/// Runs one final update after receiving the result to process any pending commands.
-	pub async fn poll_and_update<T>(
+	/// Runs one final update after the future resolves to process any pending commands.
+	pub async fn poll_and_update<F>(
 		mut update: impl FnMut(),
-		recv: Receiver<T>,
-	) -> Result<T> {
+		fut: F,
+	) -> F::Output
+	where
+		F: Future,
+	{
+		let mut fut = Box::pin(fut);
 		loop {
-			match recv.try_recv() {
-				Ok(out) => {
-					// Run one final update to process any commands the async task
-					// sent before completing (e.g. resource modifications)
-					update();
-					return Ok(out);
-				}
-				Err(TryRecvError::Empty) => {
-					// Update to process command queues
-					update();
-					// Tick task pools BEFORE yielding to ensure newly spawned
-					// local tasks are polled in the same tick
-					tick_task_pools();
-					// Yield to let the executor poll other tasks.
-					// On WASM we need to actually sleep to return control to
-					// the JS event loop, otherwise setTimeout callbacks never fire.
-					cfg_if! {
-						if #[cfg(target_arch = "wasm32")] {
-							time_ext::sleep_millis(1).await;
-						} else {
-							async_ext::yield_now().await;
-						}
-					}
-					// Tick again after yielding to progress any tasks that were
-					// waiting on this task to yield
-					tick_task_pools();
-				}
-				Err(TryRecvError::Closed) => {
-					bevybail!(
-						"Channel closed: async task likely failed. \
-						 Enable logging to see the underlying error."
-					);
+			// Update to process the sync point + command queues.
+			update();
+			// Tick task pools BEFORE polling to ensure newly spawned
+			// local tasks are polled in the same tick.
+			tick_task_pools();
+			if let Some(out) = futures_lite::future::poll_once(&mut fut).await {
+				// Run one final update to process any commands the async task
+				// produced before completing (e.g. resource modifications).
+				update();
+				return out;
+			}
+			// Yield to let the executor poll other tasks.
+			// On WASM we need to actually sleep to return control to
+			// the JS event loop, otherwise setTimeout callbacks never fire.
+			cfg_if! {
+				if #[cfg(target_arch = "wasm32")] {
+					time_ext::sleep_millis(1).await;
+				} else {
+					async_ext::yield_now().await;
 				}
 			}
+			// Tick again after yielding to progress any tasks that were
+			// waiting on this task to yield.
+			tick_task_pools();
 		}
 	}
 }

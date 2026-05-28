@@ -78,6 +78,15 @@ impl Plugin for TestPlugin {
 			.edit_schedule(RunTests, |schedule| {
 				schedule.set_executor(SingleThreadedExecutor::new());
 			})
+			// Timeouts are checked in PreUpdate *before* the async bridge sync
+			// point applies test-completion inserts, so a test that finishes
+			// right at its deadline is still reported as a timeout rather than
+			// racing its own completion.
+			.add_systems(
+				PreUpdate,
+				trigger_timeouts
+					.before(async_world_sync_point::<BeetAsyncSyncPoint>),
+			)
 			.add_systems(
 				RunTests,
 				(
@@ -85,7 +94,6 @@ impl Plugin for TestPlugin {
 					filter_tests,
 					log_case_running,
 					(run_tests_series, run_non_send_tests_series),
-					trigger_timeouts,
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_file_outcomes,

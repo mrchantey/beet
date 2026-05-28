@@ -19,7 +19,7 @@ where
 		Action::new(
 			TypeMeta::of::<Func>(),
 			move |ActionCall {
-			          mut commands,
+			          commands,
 			          caller,
 			          input,
 			          out_handler,
@@ -54,7 +54,7 @@ where
 		Action::new(
 			TypeMeta::of::<Func>(),
 			move |ActionCall {
-			          mut commands,
+			          commands,
 			          caller,
 			          input,
 			          out_handler,

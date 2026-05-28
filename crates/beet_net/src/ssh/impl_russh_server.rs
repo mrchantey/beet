@@ -58,12 +58,15 @@ pub(crate) async fn start_russh_server_with_tcp(
 	loop {
 		match new_conn_rx.recv().await {
 			Ok(info) => {
-				// Use fire-and-forget so the accept loop is not blocked.
-				entity.with(move |mut server| {
-					server.run_async_local(|server| {
-						handle_connection(server, info)
-					});
-				});
+				// Spawn handling so the accept loop is not blocked; awaiting
+				// `with` only runs the spawn, not the connection handler.
+				entity
+					.with(move |mut server| {
+						server.run_async_local(|server| {
+							handle_connection(server, info)
+						});
+					})
+					.await;
 			}
 			Err(_) => break, // channel closed — server shutting down
 		}
@@ -94,7 +97,7 @@ async fn handle_connection(
 			entity_mut
 				.observe_any(
 					move |ev: On<SshSend>,
-					      mut commands: AsyncCommands|
+					      commands: AsyncCommands|
 					      -> Result {
 						let to_client = to_client_obs.clone();
 						let data = ev.event().clone();
