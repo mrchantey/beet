@@ -28,7 +28,7 @@ fn main() {
 		.run();
 }
 
-fn fetch_and_render(mut async_commands: AsyncCommands) {
+fn fetch_and_render(async_commands: AsyncCommands) {
 	async_commands.run(|world| async move {
 		let args = CliArgs::parse_env();
 		let url = args
@@ -57,23 +57,25 @@ fn fetch_and_render(mut async_commands: AsyncCommands) {
 			.await
 			.unwrap();
 
-		world.with(move |world: &mut World| {
-			let mut entity = world.spawn_empty();
+		world
+			.with(move |world: &mut World| {
+				let mut entity = world.spawn_empty();
 
-			// 2. Parse the response body into ECS and render it
-			MediaParser::new()
-				.parse(ParseContext::new(&mut entity, &input_bytes))
-				.unwrap();
+				// 2. Parse the response body into ECS and render it
+				MediaParser::new()
+					.parse(ParseContext::new(&mut entity, &input_bytes))
+					.unwrap();
 
-			// 3. Render to the requested media type
-			#[allow(unused)]
-			let output = MediaRenderer::default()
-				.run(&mut entity, vec![output_type])
-				.unwrap()
-				.to_string();
-			println!("{output}");
-		});
+				// 3. Render to the requested media type
+				#[allow(unused)]
+				let output = MediaRenderer::default()
+					.run(&mut entity, vec![output_type])
+					.unwrap()
+					.to_string();
+				println!("{output}");
+			})
+			.await;
 
-		world.write_message(AppExit::Success);
+		world.write_message(AppExit::Success).await;
 	});
 }

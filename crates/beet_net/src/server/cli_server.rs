@@ -20,27 +20,22 @@ use beet_core::prelude::*;
 ///
 /// Supports `--accept=<media types>` to override the default content negotiation,
 /// for example `--accept=text/html,text/plain`.
-///
-/// The `run_and_exit` task is launched on the next schedule tick via the
-/// [`launch_cli_servers`] system. Deferring to a system (instead of an
-/// `on_add` hook) avoids spawning a transient task when [`WorldSerdeStore`]
-/// briefly spawns a [`CliServer`] just to serialize it.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component)]
+#[component(on_add=on_add)]
 pub struct CliServer;
 
-/// Startup-style system that launches [`run_and_exit`] on each newly
-/// added [`CliServer`] entity. Registered by [`ServerPlugin`].
-pub fn launch_cli_servers(
-	async_commands: AsyncCommands,
-	query: Populated<Entity, Added<CliServer>>,
-) {
-	for entity in query.iter() {
-		async_commands.entity(entity).run(run_and_exit);
-	}
+fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	world.commands().entity(cx.entity).queue_async(run_and_exit);
 }
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
+	// short-circuit when the entity has already been despawned, ie
+	// [`WorldSerdeStore::save_bundle`] briefly spawns a [`CliServer`]
+	// just to serialize it.
+	if !entity.is_alive().await {
+		return Ok(());
+	}
 	let args = CliArgs::parse_env();
 
 	let accept = args
@@ -57,7 +52,7 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 		});
 
 	let req =
-		Request::from_cli_args(args)?.with_header::<header::Accept>(accept);
+		Request::from_cli_args(args).with_header::<header::Accept>(accept);
 
 	let res = entity.exchange(req).await;
 	let (parts, body) = res.into_parts();
@@ -108,23 +103,19 @@ mod tests {
 	#[beet_core::test]
 	fn into_request_simple_path() {
 		Request::from_cli_str("foo bar")
-			.unwrap()
 			.path_string()
 			.xpect_eq("/foo/bar");
 	}
 
 	#[beet_core::test]
 	fn into_request_with_query() {
-		let req = Request::from_cli_str("api users --id=123").unwrap();
+		let req = Request::from_cli_str("api users --id=123");
 		req.path_string().xpect_eq("/api/users");
 		req.get_param("id").xpect_some();
 	}
 
 	#[beet_core::test]
 	fn into_request_empty() {
-		Request::from_cli_str("")
-			.unwrap()
-			.path_string()
-			.xpect_eq("/");
+		Request::from_cli_str("").path_string().xpect_eq("/");
 	}
 }

@@ -67,7 +67,7 @@ mod tests {
 		}
 
 		let mut world = World::new();
-		let entity = world.spawn(Request::from_cli_str("--foo").unwrap()).id();
+		let entity = world.spawn(Request::from_cli_str("--foo")).id();
 		world
 			.run_system_once(move |mut foo: ParamQuery<Foo>| {
 				foo.get(entity).unwrap()

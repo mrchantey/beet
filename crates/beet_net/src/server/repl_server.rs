@@ -67,7 +67,7 @@ async fn repl_loop(entity: AsyncEntity) -> Result {
 	// root content when no args are provided.
 	call(
 		&entity,
-		Request::from_cli_args(CliArgs::parse_env())?
+		Request::from_cli_args(CliArgs::parse_env())
 			.with_header::<header::Accept>(accept.clone()),
 	)
 	.await?;
@@ -83,7 +83,7 @@ async fn repl_loop(entity: AsyncEntity) -> Result {
 
 		call(
 			&entity,
-			Request::from_cli_str(trimmed)?
+			Request::from_cli_str(trimmed)
 				.with_header::<header::Accept>(accept.clone()),
 		)
 		.await?;

@@ -201,7 +201,7 @@ mod test {
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
-			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.call::<Request, Response>(Request::from_cli_str("--help"))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -216,7 +216,7 @@ mod test {
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
-			.call::<Request, Response>(Request::from_cli_str("--help").unwrap())
+			.call::<Request, Response>(Request::from_cli_str("--help"))
 			.await
 			.unwrap()
 			.status()
@@ -228,7 +228,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
-				Request::from_cli_str("nonexistent").unwrap(),
+				Request::from_cli_str("nonexistent"),
 			)
 			.await
 			.unwrap()
@@ -246,7 +246,7 @@ mod test {
 				),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
-			.call::<Request, Response>(Request::from_cli_str("").unwrap())
+			.call::<Request, Response>(Request::from_cli_str(""))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -275,7 +275,7 @@ mod test {
 		let res = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("counter --help").unwrap(),
+				Request::from_cli_str("counter --help"),
 			)
 			.await
 			.unwrap();
@@ -290,7 +290,7 @@ mod test {
 		router_world()
 			.spawn((router(), children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
-				Request::from_cli_str("nonexistent").unwrap(),
+				Request::from_cli_str("nonexistent"),
 			)
 			.await
 			.unwrap()
@@ -315,7 +315,7 @@ mod test {
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
 			.call::<Request, Response>(
-				Request::from_cli_str("counter nonsense").unwrap(),
+				Request::from_cli_str("counter nonsense"),
 			)
 			.await
 			.unwrap()

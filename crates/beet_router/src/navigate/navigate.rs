@@ -291,7 +291,7 @@ mod test {
 		let body = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("about --navigate=parent").unwrap(),
+				Request::from_cli_str("about --navigate=parent"),
 			)
 			.await
 			.unwrap()
@@ -313,7 +313,7 @@ mod test {
 		let body = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("--navigate=first-child").unwrap(),
+				Request::from_cli_str("--navigate=first-child"),
 			)
 			.await
 			.unwrap()
@@ -336,7 +336,7 @@ mod test {
 		let body = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("alpha --navigate=next-sibling").unwrap(),
+				Request::from_cli_str("alpha --navigate=next-sibling"),
 			)
 			.await
 			.unwrap()
@@ -348,7 +348,7 @@ mod test {
 		let body = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("beta --navigate=next-sibling").unwrap(),
+				Request::from_cli_str("beta --navigate=next-sibling"),
 			)
 			.await
 			.unwrap()
@@ -371,7 +371,7 @@ mod test {
 		let body = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::from_cli_str("alpha --navigate=prev-sibling").unwrap(),
+				Request::from_cli_str("alpha --navigate=prev-sibling"),
 			)
 			.await
 			.unwrap()
