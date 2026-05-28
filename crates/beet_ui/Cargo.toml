@@ -36,7 +36,7 @@ required-features = ["style"]
 default = ["std","rsx", "style"]
 std = []
 action = ["dep:beet_action", "net"]
-net = ["std", "dep:beet_net"]
+net = ["std", "dep:beet_net", "beet_net/json"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 # Bevy's first-party scene system (`Scene`/`Template`/`bsn!`). Heavy + std-only,
@@ -115,5 +115,11 @@ harness = false
 [[test]]
 name = "scene"
 path = "tests/scene.rs"
+harness = false
+required-features = ["scene"]
+
+[[test]]
+name = "widgets"
+path = "tests/widgets.rs"
 harness = false
 required-features = ["scene"]
