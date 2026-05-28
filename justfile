@@ -189,7 +189,7 @@ snap:
 #   cargo +nightly test -p beet_core --test test_test --features custom_test_frameworks
 
 # Native test crate sets.
-_core-pkgs := "beet_core_shared beet_core_macros beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
+_core-pkgs := "beet_core_shared beet_core_macros beet_async beet_core beet_infra beet_net beet_ui beet_router beet_thread beet_action"
 
 # Wasm test crate sets (skip crates that don't build for wasm).
 _core-pkgs-wasm := "beet_core beet_net beet_ui beet_router beet_thread beet_action"
@@ -215,7 +215,9 @@ _core-features pkgs:
 		echo "--all-features"
 	else
 		feats=$(for c in {{ pkgs }}; do
-			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' crates/$c/Cargo.toml
+			# Crates may be nested (e.g. crates/beet_core/macros) — resolve by package name.
+			toml=$(grep -lE "^name *= *\"$c\"$" crates/$c/Cargo.toml crates/*/*/Cargo.toml 2>/dev/null | head -1)
+			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' "$toml"
 		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda)$' | paste -sd, -)
 		echo "--features $feats"
 	fi
