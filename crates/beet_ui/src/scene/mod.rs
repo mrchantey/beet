@@ -3,6 +3,7 @@
 //! Gated behind the `scene` feature so that `beet_core` and the `rsx_direct!`
 //! lowering stay free of the heavy, std-only `bevy_scene` layer. The
 //! scene-producing `rsx!` macro lowers markup into the types re-exported here.
+pub mod scene_ext;
 mod system_scene;
 pub use system_scene::*;
 pub use bevy::scene::CommandsSceneExt;
