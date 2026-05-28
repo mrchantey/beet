@@ -17,11 +17,9 @@ pub fn store_thread_on_post(
 			// this post is not in a world serde spawned hierarchy
 			continue;
 		};
-		commands
+		async_commands
 			.entity(**store)
-			.queue_async(move |entity| async move {
-				WorldSerdeStore::save(entity).await
-			});
+			.run(|entity| WorldSerdeStore::save(entity));
 	}
 
 	Ok(())

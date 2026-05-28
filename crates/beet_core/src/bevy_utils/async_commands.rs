@@ -12,6 +12,8 @@
 //!   (re-exported from [`beet_async`]; extension methods live on [`AsyncWorldExt`])
 //! - [`AsyncEntity`] - handle for operating on a specific entity
 //! - [`AsyncCommands`] - system parameter for spawning async tasks from a system
+//! - [`AsyncEntityCommands`] - handle for spawning async tasks targeting a
+//!   specific entity, built via [`AsyncCommands::entity`]
 //! - [`AsyncSpawner`] - runtime-agnostic task spawner + in-flight counter
 //!
 //! # Example
@@ -869,6 +871,16 @@ impl AsyncCommands<'_, '_> {
 	/// Creates an [`AsyncWorld`] handle for sending commands.
 	pub fn world(&self) -> AsyncWorld { self.async_world.clone() }
 
+	/// Creates an [`AsyncEntityCommands`] handle for spawning async tasks
+	/// targeting a specific entity.
+	pub fn entity(&self, entity: Entity) -> AsyncEntityCommands {
+		AsyncEntityCommands {
+			entity,
+			world: self.world(),
+			spawner: (*self.spawner).clone(),
+		}
+	}
+
 	/// Spawns an async task that can access the world.
 	pub fn run<Func, Fut, Out>(&self, func: Func)
 	where
@@ -887,6 +899,48 @@ impl AsyncCommands<'_, '_> {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		self.spawner.spawn_local(run_async_task(self.world(), func));
+	}
+}
+
+/// Handle for spawning async tasks targeting a specific entity.
+///
+/// Built via [`AsyncCommands::entity`]; spawned tasks receive an
+/// [`AsyncEntity`] for the target entity.
+#[derive(Clone)]
+pub struct AsyncEntityCommands {
+	entity: Entity,
+	world: AsyncWorld,
+	spawner: AsyncSpawner,
+}
+
+impl AsyncEntityCommands {
+	/// Returns the target entity ID.
+	pub fn id(&self) -> Entity { self.entity }
+
+	/// Returns an [`AsyncEntity`] handle for the target entity.
+	pub fn async_entity(&self) -> AsyncEntity { self.world.entity(self.entity) }
+
+	/// Spawns an async task with an [`AsyncEntity`] handle for the target entity.
+	pub fn run<Func, Fut, Out>(&self, func: Func)
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner
+			.spawn(run_async_task_entity(self.async_entity(), func));
+	}
+
+	/// Spawns an async task on the local thread with an [`AsyncEntity`] handle
+	/// for the target entity.
+	pub fn run_local<Func, Fut, Out>(&self, func: Func)
+	where
+		Func: 'static + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner
+			.spawn_local(run_async_task_entity(self.async_entity(), func));
 	}
 }
 

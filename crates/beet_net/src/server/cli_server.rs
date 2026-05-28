@@ -36,8 +36,7 @@ pub fn launch_cli_servers(
 	query: Populated<Entity, Added<CliServer>>,
 ) {
 	for entity in query.iter() {
-		async_commands
-			.run(move |world| async move { run_and_exit(world.entity(entity)).await });
+		async_commands.entity(entity).run(run_and_exit);
 	}
 }
 

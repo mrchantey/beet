@@ -98,9 +98,9 @@ fn url_bar_input(
 		match message.code {
 			KeyCode::Enter => {
 				let url = Url::parse(&textbox.value);
-				commands
+				async_commands
 					.entity(navigators.single()?)
-					.queue_async(|entity| Navigator::navigate_to(entity, url))
+					.run(|entity| Navigator::navigate_to(entity, url));
 			}
 			KeyCode::Backspace => {
 				textbox.value.pop();
@@ -165,9 +165,9 @@ fn history_input(
 	}
 
 	if go_back {
-		commands.entity(navigator).queue_async(Navigator::back);
+		async_commands.entity(navigator).run(Navigator::back);
 	} else if go_forward {
-		commands.entity(navigator).queue_async(Navigator::forward);
+		async_commands.entity(navigator).run(Navigator::forward);
 	}
 
 	Ok(())
