@@ -29,7 +29,7 @@ async fn Patrol(cx: ActionContext) -> Result<Outcome> {
 
 #[beet::main]
 async fn main() -> Result {
-	let mut world = AsyncPlugin::world();
+	let mut world = (MinimalPlugins, AsyncPlugin, ActionPlugin).into_world();
 	world
 		.spawn((
 			Name::new("root"),

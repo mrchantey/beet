@@ -138,9 +138,10 @@ pub fn load_world_serde_on_insert(
 ) {
 	for (entity, store) in query.iter() {
 		if store.load_on_spawn {
-			async_commands
-				.entity(entity)
-				.run(|entity| WorldSerdeStore::load(entity));
+			async_commands.entity(entity).run(async |entity| {
+				WorldSerdeStore::load(entity).await?;
+				Ok(())
+			});
 		}
 	}
 }
