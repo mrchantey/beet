@@ -37,7 +37,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((
+				.spawn((
 					server,
 					exchange_handler(|_| Response::ok().with_body("hello")),
 				))

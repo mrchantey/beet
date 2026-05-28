@@ -70,7 +70,7 @@ where
 		.await;
 	world
 		.entity(target)
-		.with_then(|mut entity| {
+		.with(|mut entity| {
 			entity.remove::<B>();
 		})
 		.await?;

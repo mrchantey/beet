@@ -33,7 +33,7 @@ impl WorldSerdeStore {
 		blob: TypedBlob<T>,
 		create: impl 'static + Send + Sync + AsyncFnOnce(AsyncEntity) -> Result<B>,
 	) -> Result<Vec<Entity>> {
-		let entity = world.spawn_then((blob, Self::default())).await;
+		let entity = world.spawn((blob, Self::default())).await;
 		Self::load_or_create_inner(entity, create).await
 	}
 
@@ -43,7 +43,7 @@ impl WorldSerdeStore {
 	) -> Result<Vec<Entity>> {
 		if !entity.get_cloned::<Blob>().await?.exists().await? {
 			let bundle = create(entity.clone()).await?;
-			Self::save_bundle(entity, bundle).await?;
+			Self::save_bundle(entity.clone(), bundle).await?;
 		}
 		Self::load(entity).await
 	}
@@ -57,7 +57,7 @@ impl WorldSerdeStore {
 		entity.get::<WorldSerdeStore, _>(|_| {}).await?;
 		let media = entity.get_cloned::<Blob>().await?.get_media().await?;
 		entity
-			.with_then(move |entity| -> Result<_> {
+			.with(move |entity| -> Result<_> {
 				WorldSerdeLoader::new_entity(entity).load(&media)
 			})
 			.await
@@ -73,7 +73,7 @@ impl WorldSerdeStore {
 		this.trigger
 			.run_flush(async move || {
 				let (blob, bytes) = entity
-					.with_then(move |mut entity| -> Result<_> {
+					.with(move |mut entity| -> Result<_> {
 						let blob = entity.get_or_else_mut::<Blob>()?.clone();
 
 						let spawned_entities =
@@ -117,7 +117,7 @@ impl WorldSerdeStore {
 		let media_type = blob.media_type().unwrap_or(MediaType::Json);
 		let bytes = store
 			.world()
-			.with_then(move |world| {
+			.with(move |world| {
 				let entity = world.spawn(bundle).id();
 				let bytes = WorldSerdeSaver::new(world)
 					.with_entity_tree(entity)
@@ -133,15 +133,14 @@ impl WorldSerdeStore {
 
 
 pub fn load_world_serde_on_insert(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	query: Populated<(Entity, &WorldSerdeStore), Added<WorldSerdeStore>>,
 ) {
 	for (entity, store) in query.iter() {
 		if store.load_on_spawn {
-			commands.entity(entity).queue_async(async |entity| {
-				WorldSerdeStore::load(entity).await?;
-				Ok(())
-			});
+			async_commands
+				.entity(entity)
+				.run(|entity| WorldSerdeStore::load(entity));
 		}
 	}
 }

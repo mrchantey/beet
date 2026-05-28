@@ -45,6 +45,7 @@ exclude = [
 members = [
 
 	## 💡 Core
+	"crates/beet_async",
 	"crates/beet_core",
 	"crates/beet_core/macros",
 	"crates/beet_core/shared",
@@ -79,6 +80,8 @@ beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.11" 
 beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.11" }
 # no_std by default; std-only consumers add `features = ["std"]`.
 beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11", default-features = false }
+# vendored bevy_async bridge; no_std by default, std consumers add `features = ["std"]`.
+beet_async = { path = "crates/beet_async", version = "0.0.9-dev.11", default-features = false }
 beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }

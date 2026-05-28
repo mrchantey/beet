@@ -91,7 +91,7 @@ async fn repl_loop(entity: AsyncEntity) -> Result {
 		cross_log_noline!("> ");
 	}
 
-	entity.world().write_message(AppExit::Success);
+	entity.world().write_message(AppExit::Success).await;
 	Ok(())
 }
 

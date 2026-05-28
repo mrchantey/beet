@@ -128,7 +128,7 @@ where
 	{
 		let this = self.clone();
 		entity
-			.with_then(move |entity| {
+			.with(move |entity| {
 				this.call_world(entity, input, out_handler)
 			})
 			.await
@@ -179,10 +179,10 @@ impl<Out> OutHandler<Out> {
 	/// discarding the [`Out`] value.
 	pub fn exit() -> Self {
 		OutHandler {
-			func: Box::new(|mut commands, result| {
+			func: Box::new(|commands, result| {
 				result?;
 				commands.run(async |world| {
-					world.write_message(AppExit::Success);
+					world.write_message(AppExit::Success).await;
 				});
 				Ok(())
 			}),
@@ -228,7 +228,7 @@ impl<Out> OutHandler<Out> {
 		Out: 'static + Send,
 	{
 		world
-			.with_then(move |world| self.call_world(world, result))
+			.with(move |world| self.call_world(world, result))
 			.await
 	}
 }

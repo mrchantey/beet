@@ -4,7 +4,7 @@ use beet_net::prelude::*;
 
 
 pub fn store_thread_on_post(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	changed: Query<(Entity, &Post), Changed<Post>>,
 	stores: AncestorQuery<&WorldSerdeOf>,
 ) -> Result {
@@ -17,11 +17,9 @@ pub fn store_thread_on_post(
 			// this post is not in a world serde spawned hierarchy
 			continue;
 		};
-		commands
+		async_commands
 			.entity(**store)
-			.queue_async(move |entity| async move {
-				WorldSerdeStore::save(entity).await
-			});
+			.run(|entity| WorldSerdeStore::save(entity));
 	}
 
 	Ok(())

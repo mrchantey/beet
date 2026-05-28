@@ -53,7 +53,7 @@ impl EchoHttpServer {
 		std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((server, exchange_handler(echo_request)))
+				.spawn((server, exchange_handler(echo_request)))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;

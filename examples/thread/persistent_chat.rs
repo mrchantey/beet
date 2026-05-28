@@ -25,7 +25,7 @@ fn main() {
 }
 
 
-fn setup(mut commands: Commands) {
+fn setup(async_commands: AsyncCommands) {
 	cfg_if! {
 		if #[cfg(feature="aws_sdk")]{
 			// swap out for s3 storage by changing the store
@@ -40,7 +40,7 @@ fn setup(mut commands: Commands) {
 	let blob = store.blob(RelPath::new(WORLD_SERDE_FILE));
 	let new_thread = CliArgs::parse_env().params.contains_key("new");
 
-	commands.queue_async(async move |world: AsyncWorld| {
+	async_commands.run(async move |world: AsyncWorld| {
 		if new_thread {
 			blob.remove().await.ok();
 		}

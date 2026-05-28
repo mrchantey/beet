@@ -18,7 +18,7 @@ fn main() {
 	println!("Done");
 }
 
-fn ping_example(mut async_commands: AsyncCommands) {
+fn ping_example(async_commands: AsyncCommands) {
 	async_commands.run(|world| async move {
 		let response = Request::get("http://example.com")
 			.send()
@@ -30,6 +30,6 @@ fn ping_example(mut async_commands: AsyncCommands) {
 
 		assert!(body.contains("Example Domain"));
 
-		world.write_message(AppExit::Success);
+		world.write_message(AppExit::Success).await;
 	});
 }

@@ -9,7 +9,7 @@ use bevy::time::TimePlugin;
 fn run_tests_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((TestRunnerConfig::from_env(), tests_bundle(tests)))
+		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)))
 		.run();
 }
 
@@ -46,7 +46,7 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((
+		.spawn((
 			TestRunnerConfig::from_env(),
 			tests_bundle_borrowed(tests),
 		))
@@ -78,6 +78,15 @@ impl Plugin for TestPlugin {
 			.edit_schedule(RunTests, |schedule| {
 				schedule.set_executor(SingleThreadedExecutor::new());
 			})
+			// Timeouts are checked in PreUpdate *before* the async bridge sync
+			// point applies test-completion inserts, so a test that finishes
+			// right at its deadline is still reported as a timeout rather than
+			// racing its own completion.
+			.add_systems(
+				PreUpdate,
+				trigger_timeouts
+					.before(async_world_sync_point::<BeetAsyncSyncPoint>),
+			)
 			.add_systems(
 				RunTests,
 				(
@@ -85,7 +94,6 @@ impl Plugin for TestPlugin {
 					filter_tests,
 					log_case_running,
 					(run_tests_series, run_non_send_tests_series),
-					trigger_timeouts,
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_file_outcomes,

@@ -92,7 +92,7 @@ where
 async fn emit(world: &AsyncWorld, msg: String) {
 	cross_log!("{msg}");
 	world
-		.with_then(move |world| {
+		.with(move |world| {
 			world.write_message(OnLogMessage::new(msg));
 		})
 		.await;

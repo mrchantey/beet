@@ -151,12 +151,12 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ActionNode]) -> Entity 
 	// spawn children first
 	let mut child_ids = Vec::new();
 	for child in children {
-		let child_entity = world.spawn_then(child).await;
+		let child_entity = world.spawn(child).await;
 		child_ids.push(child_entity.id());
 	}
 	// build parent with heading
 	let entity = world
-		.spawn_then(rsx_direct!{
+		.spawn(rsx_direct!{
 			<div>
 				<h2>"Available routes"</h2>
 			</div>
@@ -165,7 +165,7 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ActionNode]) -> Entity 
 	// add pre-spawned children to parent, then mark it an ephemeral render root
 	let parent_id = entity.id();
 	entity
-		.with_then(move |mut entity| {
+		.with(move |mut entity| {
 			entity.world_scope(move |world| {
 				for child_id in child_ids {
 					world.entity_mut(parent_id).add_child(child_id);
@@ -230,15 +230,15 @@ async fn spawn_not_found_scene(
 	// spawn children first
 	let mut child_ids = Vec::new();
 	for child in children {
-		let child_entity = world.spawn_then(child).await;
+		let child_entity = world.spawn(child).await;
 		child_ids.push(child_entity.id());
 	}
 	// build parent from preamble
-	let entity = world.spawn_then(not_found_preamble(info)).await;
+	let entity = world.spawn(not_found_preamble(info)).await;
 	// add pre-spawned children to parent, then mark it an ephemeral render root
 	let parent_id = entity.id();
 	entity
-		.with_then(move |mut entity| {
+		.with(move |mut entity| {
 			entity.world_scope(move |world| {
 				for child_id in child_ids {
 					world.entity_mut(parent_id).add_child(child_id);

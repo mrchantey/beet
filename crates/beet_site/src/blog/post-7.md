@@ -35,7 +35,7 @@ Bevy has already solved a lot of the cross-platform differences for us, now the 
 pub fn test_runner(tests: &[&TestDescAndFn]) {
 	App::new()
 		.add_plugins(TestPlugin)
-		.spawn_then(tests_bundle(tests))
+		.spawn(tests_bundle(tests))
 		.run();
 }
 ```

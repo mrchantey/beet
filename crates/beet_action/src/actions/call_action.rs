@@ -106,9 +106,10 @@ where
 	let world = entity.into_world_mut();
 	match recv.try_recv() {
 		Ok(result) => result,
-		Err(TryRecvError::Empty) => {
-			AsyncRunner::poll_and_update(|| world.update_local(), recv).await?
-		}
+		Err(TryRecvError::Empty) => unwrap_channel_result(
+			AsyncRunner::poll_and_update(|| world.update_local(), recv.recv())
+				.await,
+		),
 		Err(TryRecvError::Closed) => {
 			bevybail!("Action call response channel closed unexpectedly.")
 		}
@@ -193,7 +194,7 @@ pub impl AsyncEntity {
 		let async_entity = self.clone();
 		async move {
 			let recv = async_entity
-				.with_then(move |mut entity_mut| {
+				.with(move |mut entity_mut| {
 					call_with_channel::<Input, Out>(&mut entity_mut, input)
 				})
 				.await
@@ -223,7 +224,7 @@ pub impl AsyncEntity {
 		let action = action.into_action();
 		async move {
 			let recv = world
-				.with_then(move |world: &mut World| {
+				.with(move |world: &mut World| {
 					call_with_channel_for_value(
 						world.entity_mut(entity_id),
 						action,

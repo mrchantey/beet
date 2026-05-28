@@ -1,14 +1,13 @@
-## Fix tests
+## Run tests
 
 ## Context
 
 Always use `tail` when running tests to preserve context.
-Run all tests piping the entire output to `agent/scratch.txt`, use this for all commands, so that multiple greps can be applied.
-
+Run all tests piping the entire output to `agent/scratch.txt`, use this for all commands, so that multiple greps can be applied without rerunning the tetsts.
 
 ## Hanging Tests
 
-If instructed that some tests may hang, use `timeout` to catch these.
+If instructed, or you suspect, that some tests may hang, use `timeout` to catch these.
 Run an exponential backoff timeout, starting with two minutes, to catch hanging tests
 once you find a hanging test, shorten the timeout as much as possible to speed iteration cycles.
 When debugging hanging tests always pass the `log-runs` flag to detect the tests that dont finish, ie: `timeout 120 cargo test -p beet_core --lib -- --log-runs`. 
@@ -19,11 +18,10 @@ This will help you determine which test didnt complete
 these sweeping tests perform large compilations and sometimes the mold linker trips up. try running again, and if it still trips up sometimes incrementing the workspace and crates version, ie find-repplace Cargo.toml `0.0.9-dev.6`, ..dev.7, will unstuck it.
 A classic linker error is:
 `help: you can increase rustc's stack size by setting RUST_MIN_STACK=..`
-this can usually be fixed by running again
+this can usually be fixed by running again, and getting a little further down the compilation step.
 
 ## Instructions
 
-The timeout provided is negotiable, adjust as needed.
 
 Run `just test-core`
 If you encounter an error, isolate it and run again, ie if the error is in beet_core lib:
@@ -36,6 +34,5 @@ After the first complete pass, run fully again, checking for warnings. Fix any w
 
 ## Success
 
-Success means that `just test-core` passes without warnings, the whole command. not just each crate working individually.
-
+Success means that `just test-core` passes without warnings, the whole command
 Upon completion provide a comprehensive summary of what was changed.

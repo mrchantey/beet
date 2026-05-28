@@ -33,12 +33,13 @@
 //! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 
 mod ancestor_query;
-#[cfg(feature = "std")]
+#[cfg(feature = "bevy_async")]
 mod async_commands;
-// async init builds on AsyncEntity / futures (std-only)
-#[cfg(feature = "std")]
+// async init joins futures via the std-only `futures` crate
+#[cfg(all(feature = "bevy_async", feature = "std"))]
 mod async_init;
-#[cfg(feature = "std")]
+// the app runner needs a sleep/yield + task pool, so it is std-only
+#[cfg(all(feature = "bevy_async", feature = "std"))]
 mod async_runner;
 mod bevyhow;
 mod common_systems;
@@ -49,7 +50,7 @@ mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "bevy_async", feature = "std"))]
 pub use async_init::*;
 pub use bevyhow::*;
 mod observer_adder;
@@ -62,9 +63,9 @@ mod pretty_tracing;
 mod when;
 
 pub use ancestor_query::*;
-#[cfg(feature = "std")]
+#[cfg(feature = "bevy_async")]
 pub use async_commands::*;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "bevy_async", feature = "std"))]
 pub use async_runner::*;
 pub use common_systems::*;
 pub use entity_target_event::*;

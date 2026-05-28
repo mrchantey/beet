@@ -212,7 +212,7 @@ async fn LayoutTemplate(
 	// parse layout, head, and nav into entities, wire up slots, then make the
 	// layout the coordination render root
 	let layout_id = world
-		.with_then(move |world: &mut World| -> Result<Entity> {
+		.with(move |world: &mut World| -> Result<Entity> {
 			// the content render root names what to slot in and what to clean up
 			let (content_id, content_despawn) = {
 				let entity = world.entity(content_root);

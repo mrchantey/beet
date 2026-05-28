@@ -41,11 +41,13 @@ impl std::fmt::Debug for SocketServer {
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	#[cfg(test)]
 	return;
+	// `_local` so the accept loop and its `spawn_local` connection handlers stay
+	// on the world-owning thread, where the bridge sync point can drive them.
 	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	world
 		.commands()
 		.entity(cx.entity)
-		.queue_async(super::start_tungstenite_server);
+		.queue_async_local(super::start_tungstenite_server);
 	#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
 	panic!(
 		"WebSocket server requires the 'tungstenite' feature on non-wasm32 targets"
@@ -73,7 +75,7 @@ impl SocketServer {
 			.expect("failed to create async listener");
 		(
 			Self { port: Some(port) },
-			OnSpawn::new_async(move |entity| {
+			OnSpawn::new_async_local(move |entity| {
 				super::start_tungstenite_server_with_tcp(entity, listener)
 			}),
 		)
@@ -111,7 +113,7 @@ mod tests {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
-				.spawn_then(server)
+				.spawn(server)
 				.run();
 		});
 		time_ext::sleep_millis(200).await;
@@ -129,7 +131,7 @@ mod tests {
 		std::thread::spawn(move || {
 			App::new()
 				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
-				.spawn_then(server)
+				.spawn(server)
 				.run();
 		});
 		time_ext::sleep_millis(200).await;

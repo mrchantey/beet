@@ -49,7 +49,7 @@ async fn ParseRequest(cx: ActionContext<Request>) -> Result<Response> {
 	let caller_id = cx.id();
 	let media = cx.input.into_media_bytes().await?;
 	cx.caller
-		.with_then(move |mut entity| -> Result {
+		.with(move |mut entity| -> Result {
 			// ideally we wouldnt need to despawn children,
 			// parser should be diffing
 			entity.despawn_children();
@@ -71,7 +71,7 @@ async fn RenderTui(
 ) -> Result<Response> {
 	let mut renderer = cx.caller.get_cloned::<TuiNodeRenderer>().await?;
 	cx.caller
-		.with_then(move |mut entity| {
+		.with(move |mut entity| {
 			renderer.run(&mut entity, vec![MediaType::Ratatui])
 		})
 		.await??;
@@ -87,7 +87,7 @@ use beet::exports::ratatui::crossterm::event::MouseEventKind;
 
 /// Handle character input, backspace and enter key in the URL bar.
 fn url_bar_input(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	mut key_messages: MessageReader<KeyMessage>,
 	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
 	navigators: Query<Entity, With<Navigator>>,
@@ -98,9 +98,9 @@ fn url_bar_input(
 		match message.code {
 			KeyCode::Enter => {
 				let url = Url::parse(&textbox.value);
-				commands
+				async_commands
 					.entity(navigators.single()?)
-					.queue_async(|entity| Navigator::navigate_to(entity, url))
+					.run(|entity| Navigator::navigate_to(entity, url));
 			}
 			KeyCode::Backspace => {
 				textbox.value.pop();
@@ -124,7 +124,7 @@ fn url_bar_input(
 /// - `[` / `]` — keyboard shortcuts.
 /// - Middle-click fires back as a convenience (uncommon but handy in testing).
 fn history_input(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	mut key_messages: MessageReader<KeyMessage>,
 	mut mouse_messages: MessageReader<MouseMessage>,
 	navigators: Query<Entity, With<Navigator>>,
@@ -165,9 +165,9 @@ fn history_input(
 	}
 
 	if go_back {
-		commands.entity(navigator).queue_async(Navigator::back);
+		async_commands.entity(navigator).run(Navigator::back);
 	} else if go_forward {
-		commands.entity(navigator).queue_async(Navigator::forward);
+		async_commands.entity(navigator).run(Navigator::forward);
 	}
 
 	Ok(())

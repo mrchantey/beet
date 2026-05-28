@@ -33,29 +33,31 @@ pub(crate) async fn connect_and_setup_entity(
 
 	// Phase 3: wire up the bevy entity with inline data flow.
 	let to_server_obs = to_server_tx.clone();
-	entity.with(move |mut entity| {
-		entity
-			.observe_any(
-				move |ev: On<SshSend>, mut commands: AsyncCommands| -> Result {
-					let to_server = to_server_obs.clone();
-					let data = ev.event().clone();
-					commands.run_local(async move |_| {
-						to_server
-							.send(data.take())
-							.await
-							.unwrap_or_else(|err| error!("{:?}", err));
-					});
-					Ok(())
-				},
-			)
-			.run_async_local(async move |entity| {
-				while let Ok(event) = from_server_rx.recv().await {
-					entity.trigger_target_then(SshRecv(event)).await.ok();
-				}
-				// channel closed — session ended without an explicit Close event
-			})
-			.trigger_target(SshRecv(SshEvent::Connect));
-	});
+	entity
+		.with(move |mut entity| {
+			entity
+				.observe_any(
+					move |ev: On<SshSend>, commands: AsyncCommands| -> Result {
+						let to_server = to_server_obs.clone();
+						let data = ev.event().clone();
+						commands.run_local(async move |_| {
+							to_server
+								.send(data.take())
+								.await
+								.unwrap_or_else(|err| error!("{:?}", err));
+						});
+						Ok(())
+					},
+				)
+				.run_async_local(async move |entity| {
+					while let Ok(event) = from_server_rx.recv().await {
+						entity.trigger_target(SshRecv(event)).await.ok();
+					}
+					// channel closed — session ended without an explicit Close event
+				})
+				.trigger_target(SshRecv(SshEvent::Connect));
+		})
+		.await?;
 
 	Ok(())
 }

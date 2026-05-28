@@ -58,12 +58,10 @@ pub(crate) async fn start_russh_server_with_tcp(
 	loop {
 		match new_conn_rx.recv().await {
 			Ok(info) => {
-				// Use fire-and-forget so the accept loop is not blocked.
-				entity.with(move |mut server| {
-					server.run_async_local(|server| {
-						handle_connection(server, info)
-					});
-				});
+				entity
+					.run_async_local(|server| handle_connection(server, info))
+					.await
+					.ok();
 			}
 			Err(_) => break, // channel closed — server shutting down
 		}
@@ -87,14 +85,14 @@ async fn handle_connection(
 	// Spawn child entity and return its ID so we can trigger SshRecv(Connect) on it.
 	let child_id = server
 		.world()
-		.with_then(move |world: &mut World| -> Entity {
+		.with(move |world: &mut World| -> Entity {
 			let mut entity_mut =
 				world.spawn((SshPeerInfo { username }, ChildOf(server_id)));
 			let child_id = entity_mut.id();
 			entity_mut
 				.observe_any(
 					move |ev: On<SshSend>,
-					      mut commands: AsyncCommands|
+					      commands: AsyncCommands|
 					      -> Result {
 						let to_client = to_client_obs.clone();
 						let data = ev.event().clone();
@@ -110,13 +108,13 @@ async fn handle_connection(
 				.run_async_local(async move |child_entity| {
 					while let Ok(event) = from_client.recv().await {
 						child_entity
-							.trigger_target_then(SshRecv(event))
+							.trigger_target(SshRecv(event))
 							.await
 							.ok();
 					}
 					// Channel closed — fire a Close event so observers can clean up.
 					child_entity
-						.trigger_target_then(SshRecv(SshEvent::Close(None)))
+						.trigger_target(SshRecv(SshEvent::Close(None)))
 						.await
 						.ok();
 				});
@@ -129,7 +127,7 @@ async fn handle_connection(
 	server
 		.world()
 		.entity(child_id)
-		.trigger_target_then(SshRecv(SshEvent::Connect))
+		.trigger_target(SshRecv(SshEvent::Connect))
 		.await?;
 	Ok(())
 }

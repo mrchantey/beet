@@ -32,11 +32,11 @@ pub struct CliServer;
 /// Startup-style system that launches [`run_and_exit`] on each newly
 /// added [`CliServer`] entity. Registered by [`ServerPlugin`].
 pub fn launch_cli_servers(
-	mut commands: Commands,
+	async_commands: AsyncCommands,
 	query: Populated<Entity, Added<CliServer>>,
 ) {
 	for entity in query.iter() {
-		commands.entity(entity).queue_async(run_and_exit);
+		async_commands.entity(entity).run(run_and_exit);
 	}
 }
 
@@ -72,7 +72,7 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 
 	stream_body_to_stdout(body).await?;
 
-	entity.world().write_message(exit);
+	entity.world().write_message(exit).await;
 	Ok(())
 }
 
@@ -96,7 +96,7 @@ mod tests {
 	async fn cli_server_works() {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin))
-			.spawn_then((
+			.spawn((
 				CliServer,
 				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
 			))

@@ -58,11 +58,8 @@ pub async fn start_hyper_server_with_tcp(
 		trace!("New connection from: {}", addr);
 		let io = BevyIo::new(tcp);
 
-		let entity = entity.clone();
 		entity
-			.world()
-			.run_async_local(async move |world| {
-				let entity = world.entity(entity.id());
+			.run_async_local(async move |entity| {
 				// pass an AsyncEntity to the service_fn
 				let service = service_fn(move |req| {
 					let entity = entity.clone();
@@ -93,7 +90,8 @@ pub async fn start_hyper_server_with_tcp(
 					}
 				}
 			})
-			.await;
+			.await
+			.ok();
 	}
 }
 
@@ -294,7 +292,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((
+				.spawn((
 					server,
 					exchange_handler(move |req| {
 						Response::ok().with_body(req.take().body)
@@ -320,7 +318,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((server, mirror_exchange()))
+				.spawn((server, mirror_exchange()))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -350,7 +348,7 @@ mod test {
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((
+				.spawn((
 					exchange_handler(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(

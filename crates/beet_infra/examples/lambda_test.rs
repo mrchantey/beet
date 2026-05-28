@@ -13,7 +13,7 @@ const TEST_VERSION: &str = "test-v1";
 fn main() -> AppExit {
 	App::new()
 		.add_plugins((MinimalPlugins, ServerPlugin))
-		.spawn_then((HttpServer::default(), exchange_handler(handle_request)))
+		.spawn((HttpServer::default(), exchange_handler(handle_request)))
 		.run()
 }
 

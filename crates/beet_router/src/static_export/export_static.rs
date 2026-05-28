@@ -19,7 +19,7 @@ pub async fn collect_static_html(
 	router: Entity,
 ) -> Result<Vec<(RelPath, String)>> {
 	let paths = world
-		.with_then(move |world: &mut World| -> Result<Vec<RelPath>> {
+		.with(move |world: &mut World| -> Result<Vec<RelPath>> {
 			let tree = world
 				.entity(router)
 				.get::<RouteTree>()

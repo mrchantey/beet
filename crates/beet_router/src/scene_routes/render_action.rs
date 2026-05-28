@@ -105,7 +105,7 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 		let (caller, bundle) = (cx.caller, cx.input);
 		caller
 			.world()
-			.with_then(move |world: &mut World| {
+			.with(move |world: &mut World| {
 				let mut entity = world.spawn(bundle);
 				let id = entity.id();
 				RenderRoot::insert(&mut entity, vec![id]);
@@ -167,7 +167,7 @@ fn spawn_scene_step<S: 'static + Send + Sync + Scene>()
 		let (caller, scene) = (cx.caller, cx.input);
 		caller
 			.world()
-			.with_then(move |world: &mut World| -> Result<RenderRequest> {
+			.with(move |world: &mut World| -> Result<RenderRequest> {
 				let mut entity = world.spawn_scene(scene)?;
 				let id = entity.id();
 				RenderRoot::insert(&mut entity, vec![id]);

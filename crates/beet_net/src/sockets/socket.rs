@@ -33,7 +33,7 @@ impl Socket {
 		entity
 			.observe_any(
 				move |ev: On<MessageSend>,
-				      mut commands: AsyncCommands|
+				      commands: AsyncCommands|
 				      -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
@@ -46,12 +46,14 @@ impl Socket {
 					Ok(())
 				},
 			)
-			.run_async(async move |entity| {
+			// `_local`: the reader is a `SendWrapper` (under `bevy_multithreaded`)
+			// bound to the thread it was created on, so it must be polled there.
+			.run_async_local(async move |entity| {
 				while let Some(message) = recv.next().await {
 					match message {
 						Ok(msg) => {
 							entity
-								.trigger_target_then(MessageRecv(msg))
+								.trigger_target(MessageRecv(msg))
 								.await
 								.ok();
 						}
@@ -88,7 +90,7 @@ impl Socket {
 		let url = url.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |entity| -> Result {
 			let socket = Socket::connect(url).await?;
-			entity.insert_then(socket).await?;
+			entity.insert(socket).await?;
 			Ok(())
 		})
 	}

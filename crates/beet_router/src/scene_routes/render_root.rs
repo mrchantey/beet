@@ -105,7 +105,7 @@ impl RenderRoot {
 		let (rendered, to_despawn) = caller
 			.world()
 			.entity(root)
-			.with_then(|entity| -> Result<(Entity, Vec<Entity>)> {
+			.with(|entity| -> Result<(Entity, Vec<Entity>)> {
 				let rendered = entity
 					.get::<RenderRoot>()
 					.ok_or_else(|| {
@@ -129,7 +129,7 @@ impl RenderRoot {
 		// despawn all ephemeral entities
 		caller
 			.world()
-			.with_then(move |world| {
+			.with(move |world| {
 				for entity in to_despawn {
 					if let Ok(entity) = world.get_entity_mut(entity) {
 						entity.despawn();
@@ -170,7 +170,7 @@ pub(crate) async fn CallerScene(
 ) -> Result<RenderRequest> {
 	let id = cx.id();
 	cx.caller
-		.with_then(move |mut entity| {
+		.with(move |mut entity| {
 			RenderRoot::insert(&mut entity, default());
 		})
 		.await?;
@@ -206,7 +206,7 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<RenderRequest> {
 	let bytes = store.get_media(&path).await?;
 
 	cx.caller
-		.with_then(move |mut entity| -> Result {
+		.with(move |mut entity| -> Result {
 			MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
 			RenderRoot::insert(&mut entity, default());
 			Ok(())

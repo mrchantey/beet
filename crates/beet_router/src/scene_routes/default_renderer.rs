@@ -16,7 +16,7 @@ pub async fn default_renderer(
 		.unwrap_or_default();
 
 	cx.caller
-		.with_then(move |entity: EntityWorldMut| -> Result<Response> {
+		.with(move |entity: EntityWorldMut| -> Result<Response> {
 			let id = entity.id();
 			let world = entity.into_world_mut();
 

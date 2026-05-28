@@ -219,15 +219,10 @@ pub(crate) async fn start_tungstenite_server_with_tcp(
 
 		trace!("New WebSocket connection from: {}", addr);
 
-		// Use `entity.with` (fire-and-forget) so the command is sent
-		// immediately. `entity.run_async_local` returns a future that
-		// must be polled before anything is dispatched, which would
-		// deadlock the accept loop.
-		entity.with(move |mut entity| {
-			entity.run_async_local(move |entity| {
-				handle_connection(entity, stream)
-			});
-		});
+		entity
+			.run_async_local(move |entity| handle_connection(entity, stream))
+			.await
+			.ok();
 	}
 }
 async fn handle_connection(

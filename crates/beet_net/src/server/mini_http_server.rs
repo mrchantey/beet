@@ -58,23 +58,18 @@ pub async fn start_mini_http_server_with_tcp(
 			}
 		};
 
-		let entity = entity.clone();
 		entity
-			.world()
-			.run_async(async move |world| {
-				if let Err(err) = handle_connection(
-					world.entity(entity.id()),
-					stream,
-					peer_addr,
-				)
-				.await
+			.run_async(async move |entity| {
+				if let Err(err) =
+					handle_connection(entity, stream, peer_addr).await
 				{
 					cross_log_error!(
 						"Error handling connection from {peer_addr}: {err}"
 					);
 				}
 			})
-			.await;
+			.await
+			.ok();
 	}
 }
 
