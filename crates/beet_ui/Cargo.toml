@@ -39,6 +39,9 @@ action = ["dep:beet_action", "net"]
 net = ["std", "dep:beet_net"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
+# Bevy's first-party scene system (`Scene`/`Template`/`bsn!`). Heavy + std-only,
+# so it is opt-in; `rsx_direct!` and beet_core stay free of it.
+scene = ["std", "rsx", "bevy/scene"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
@@ -108,3 +111,9 @@ harness = false
 name = "rsx"
 path = "tests/rsx.rs"
 harness = false
+
+[[test]]
+name = "scene"
+path = "tests/scene.rs"
+harness = false
+required-features = ["scene"]

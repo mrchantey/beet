@@ -1,12 +1,24 @@
 use beet_core::prelude::*;
 
 #[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
 )]
-#[reflect(Component)]
+#[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[component(immutable)]
+// `Default` (empty tag) exists so `Element` picks up Bevy's blanket
+// `Template`/`FromTemplate` impls (`Clone + Default`), making it usable as a
+// scene template via `template_value`. The default is always overwritten.
 pub struct Element(String);
 
 impl Element {
@@ -71,6 +83,7 @@ impl Doctype {
 
 #[derive(
 	Debug,
+	Default,
 	Clone,
 	PartialEq,
 	Eq,
@@ -82,11 +95,13 @@ impl Doctype {
 	Reflect,
 	Component,
 )]
-#[reflect(Component)]
+#[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[component(immutable)]
 #[require(Value)]
+// `Default` (empty key) exists for the same reason as [`Element`]: blanket
+// `Template`/`FromTemplate`. The default is always overwritten.
 pub struct Attribute(String);
 
 impl Attribute {

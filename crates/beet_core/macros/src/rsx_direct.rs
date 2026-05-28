@@ -1,6 +1,6 @@
-//! RSX macro for tokenizing JSX-like syntax into Bevy ECS bundles.
+//! Direct RSX lowering: tokenizes JSX-like syntax straight into Bevy ECS
+//! bundles, spawning entities eagerly. Backs both `rsx!` and `rsx_direct!`.
 //!
-//! Converts rstml-parsed HTML-like syntax directly into bundle expressions:
 //! - Lowercase tags become `Element::new("tag")`
 //! - Capitalized tags become `TagName::default().with_field(val)...`
 //! - Attributes become `related!(Attributes[...])` entries
@@ -8,6 +8,9 @@
 //! - Block expressions `{(foo, bar)}` are spread as tuple components
 //! - `{Foo}` on both uppercase and lowercase tags inserts `Foo` as an
 //!   additional component
+//!
+//! This is the no_std-friendly lowering with no `bevy_scene` dependency. The
+//! scene-producing variant lives in [`crate::rsx_scene`].
 use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -28,7 +31,9 @@ use syn::spanned::Spanned;
 type CustomNode = rstml::Infallible;
 
 /// Entry point called from the proc macro.
-pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn impl_rsx_direct(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let parser = Parser::new(
 		ParserConfig::new()
 			.recover_block(true)

@@ -8,7 +8,11 @@ mod getset;
 mod main_attr;
 mod mdx;
 #[cfg(feature = "rsx")]
-mod rsx;
+mod rsx_direct;
+#[cfg(feature = "rsx")]
+mod rsx_scene;
+#[cfg(feature = "rsx")]
+mod scene;
 mod sendit;
 mod test_attr;
 mod to_tokens;
@@ -205,7 +209,54 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[cfg(feature = "rsx")]
 #[proc_macro]
 pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	rsx::impl_rsx(input)
+	rsx_direct::impl_rsx_direct(input)
+}
+
+/// Direct, immediate variant of [`rsx`]: lowers HTML-like markup straight to an
+/// `impl Bundle`, spawning entities eagerly.
+///
+/// This is the no_std-friendly, dependency-light lowering with no `bevy_scene`
+/// dependency. Use it when the scene-producing [`rsx`] machinery is overkill or
+/// unavailable.
+#[cfg(feature = "rsx")]
+#[proc_macro]
+pub fn rsx_direct(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	rsx_direct::impl_rsx_direct(input)
+}
+
+/// Scene-producing variant: lowers the same HTML-like syntax to an `impl Scene`
+/// that flows through Bevy's `bevy_scene` resolve→build→spawn pipeline.
+///
+/// Requires the consuming crate to enable the `scene` feature (which provides
+/// `template_value`, `RelatedScenes`, `EntityScene`, etc. via its prelude).
+#[cfg(feature = "rsx")]
+#[proc_macro]
+pub fn rsx_scene(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	rsx_scene::impl_rsx_scene(input)
+}
+
+/// Authors a Leptos/Solid-style function component that lowers to an
+/// `impl Scene`.
+///
+/// From `fn Name(p1: T1, p2: T2, ..) -> impl Scene` it generates a props
+/// struct `NameProps` (`Default` + `SetWith`, with per-param `#[prop(into)]`
+/// becoming `#[set_with(into)]`) and rewrites the function to take that props
+/// struct. Capitalized tags in [`rsx_scene`] map attributes to the props
+/// setters by name, so omitted attributes fall back to `Default`.
+///
+/// ```rust ignore
+/// #[scene]
+/// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Scene {
+///     rsx_scene! { <button>{label}</button> }
+/// }
+/// ```
+#[cfg(feature = "rsx")]
+#[proc_macro_attribute]
+pub fn scene(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	scene::impl_scene(attr, item)
 }
 
 
