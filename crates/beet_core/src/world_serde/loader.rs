@@ -1,4 +1,3 @@
-use super::serde::WorldDeserializer;
 use crate::prelude::*;
 use bevy::ecs::entity::EntityHashMap;
 
@@ -53,10 +52,17 @@ impl<'a> WorldSerdeLoader<'a> {
 
 	/// Deserializes from [`MediaBytes`] into the world, dispatching by media type.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
+		let dynamic_world = self.deserialize(bytes)?;
+		self.write(dynamic_world)
+	}
+
+	#[cfg(any(feature = "ron", feature = "json", feature = "postcard"))]
+	fn deserialize(&self, bytes: &MediaBytes) -> Result<super::DynamicWorld> {
+		use super::serde::WorldDeserializer;
 		use serde::de::DeserializeSeed;
 		let type_registry = self.world.resource::<AppTypeRegistry>().clone();
 		let registry = type_registry.read();
-		let dynamic_world = match bytes.media_type() {
+		match bytes.media_type() {
 			MediaType::Ron => {
 				cfg_if! {
 					if #[cfg(feature = "ron")] {
@@ -64,6 +70,7 @@ impl<'a> WorldSerdeLoader<'a> {
 						let mut de = ron::de::Deserializer::from_str(text)?;
 						WorldDeserializer { type_registry: &registry }
 							.deserialize(&mut de)?
+							.xok()
 					} else {
 						bevybail!("The `ron` feature is required for RON loading")
 					}
@@ -76,6 +83,7 @@ impl<'a> WorldSerdeLoader<'a> {
 							serde_json::Deserializer::from_slice(bytes.bytes());
 						WorldDeserializer { type_registry: &registry }
 							.deserialize(&mut de)?
+							.xok()
 					} else {
 						bevybail!("The `json` feature is required for JSON loading")
 					}
@@ -88,17 +96,25 @@ impl<'a> WorldSerdeLoader<'a> {
 							postcard::Deserializer::from_bytes(bytes.bytes());
 						WorldDeserializer { type_registry: &registry }
 							.deserialize(&mut de)?
+							.xok()
 					} else {
 						bevybail!("The `postcard` feature is required for postcard loading")
 					}
 				}
 			}
 			other => {
-				bevybail!("Unsupported media type for world serde loading: {other}")
+				bevybail!(
+					"Unsupported media type for world serde loading: {other}"
+				)
 			}
-		};
-		drop(registry);
-		self.write(dynamic_world)
+		}
+	}
+
+	#[cfg(not(any(feature = "ron", feature = "json", feature = "postcard")))]
+	fn deserialize(&self, _bytes: &MediaBytes) -> Result<super::DynamicWorld> {
+		bevybail!(
+			"No serde format feature enabled; enable `ron`, `json`, or `postcard`"
+		)
 	}
 
 	fn write(self, dynamic_world: super::DynamicWorld) -> Result<Vec<Entity>> {
@@ -172,7 +188,11 @@ mod test {
 		let world_serde_bytes = WorldSerdeSaver::new_default(app.world_mut())
 			.save(MediaType::Ron)
 			.unwrap();
-		world_serde_bytes.as_utf8().unwrap().xref().xpect_contains("Time");
+		world_serde_bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xpect_contains("Time");
 		WorldSerdeLoader::new(app.world_mut())
 			.load(&world_serde_bytes)
 			.unwrap();
@@ -182,7 +202,9 @@ mod test {
 	fn entity_scope() {
 		let mut app = serde_world();
 		let entity = app.world_mut().spawn(Name::new("Root")).id();
-		app.world_mut().entity_mut(entity).with_child(Name::new("Child"));
+		app.world_mut()
+			.entity_mut(entity)
+			.with_child(Name::new("Child"));
 
 		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
 			.with_entity_tree(entity)
