@@ -1,14 +1,20 @@
 //! Implementation of the `#[scene]` attribute macro.
 //!
 //! Turns a Leptos/Solid-style function component
-//! `fn Name(p1: T1, p2: T2, ..) -> impl Scene` into:
+//! `fn Name(p1: T1, p2: T2, ..) -> impl Scene` into a Bevy
+//! [`SceneComponent`](bevy::scene::SceneComponent) marker:
+//! - a unit struct `Name` deriving `SceneComponent` + `Default` + `Clone` +
+//!   `Reflect`, with `#[scene(NameProps)]` pointing at the props type;
 //! - a props struct `NameProps { p1, p2, .. }` with `Default` + `SetWith`
-//!   setters (per-param `#[prop(into)]` becomes `#[set_with(into)]`),
-//! - a callable function `Name(props: NameProps) -> impl Scene` whose body is
-//!   the original body with the props destructured into the named params.
+//!   setters (per-param `#[prop(into)]` becomes `#[set_with(into)]`);
+//! - an inherent `impl Name { fn scene(props: NameProps) -> impl Scene }` whose
+//!   body is the original body with the props destructured into the named
+//!   params.
 //!
-//! Capitalized tags in `rsx!` lower to `Name(NameProps::default()
-//! .with_p1(..))`, so omitted attributes fall back to `Default`.
+//! Capitalized tags in `rsx!` lower to
+//! `<Name as SceneComponent>::scene(NameProps::default().with_p1(..))`, so
+//! omitted attributes fall back to `Default` and the entity gains the `Name`
+//! component (unlocking `:Name { … }` inheritance, caching, reflection).
 extern crate alloc;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
@@ -63,7 +69,8 @@ fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
 	}
 }
 
-/// Build the props struct and the props-accepting callable for a pure scene.
+/// Build the marker struct + `SceneComponent` impl + props struct for a pure
+/// scene.
 fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
@@ -91,21 +98,63 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 
+	let scene_component_impl =
+		scene_component_impl(fn_name, &props_name, quote! { Self::scene(props) });
+
 	Ok(quote! {
+		#(#fn_attrs)*
+		#[derive(
+			::bevy::ecs::component::Component,
+			Default,
+			Clone,
+			::bevy::reflect::Reflect,
+		)]
+		#[reflect(Component)]
+		#vis struct #fn_name;
+
 		#[derive(Default, #beet_core::prelude::SetWith)]
 		#[allow(non_camel_case_types)]
 		#vis struct #props_name {
 			#(#field_defs),*
 		}
 
-		#(#fn_attrs)*
-		#[allow(non_snake_case)]
-		#vis fn #fn_name(props: #props_name) #output {
-			let #props_name { #(#field_idents),* } = props;
-			#[allow(unused_braces)]
-			#body
+		impl #fn_name {
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				let #props_name { #(#field_idents),* } = props;
+				#[allow(unused_braces)]
+				#body
+			}
 		}
+
+		#scene_component_impl
 	})
+}
+
+/// Emit the `SceneComponent` trait impl that wraps the inherent
+/// `Self::scene(props)` body with the (init-template, scene-component-info)
+/// tuple — mirroring what `#[derive(SceneComponent)]` would generate.
+fn scene_component_impl(
+	fn_name: &syn::Ident,
+	props_name: &syn::Ident,
+	scene_expr: TokenStream,
+) -> TokenStream {
+	quote! {
+		impl ::bevy::scene::SceneComponent for #fn_name {
+			type Props = #props_name;
+			fn scene(props: Self::Props) -> impl ::bevy::scene::Scene {
+				(
+					#scene_expr,
+					<::bevy::scene::InitTemplate::<
+						<Self as ::bevy::ecs::template::FromTemplate>::Template
+					> as ::core::default::Default>::default(),
+					::bevy::scene::template_value(
+						::bevy::scene::SceneComponentInfo::new::<Self>(true),
+					),
+				)
+			}
+		}
+	}
 }
 
 /// Build the props struct and a build-time callable for a `#[scene(system)]`.
@@ -147,26 +196,42 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 
+	let scene_component_impl =
+		scene_component_impl(fn_name, &props_name, quote! { Self::scene(props) });
+
 	Ok(quote! {
+		#(#fn_attrs)*
+		#[derive(
+			::bevy::ecs::component::Component,
+			Default,
+			Clone,
+			::bevy::reflect::Reflect,
+		)]
+		#[reflect(Component)]
+		#vis struct #fn_name;
+
 		#[derive(Default, Clone, #beet_core::prelude::SetWith)]
 		#[allow(non_camel_case_types)]
 		#vis struct #props_name {
 			#(#prop_field_defs),*
 		}
 
-		#(#fn_attrs)*
-		#[allow(non_snake_case)]
-		#vis fn #fn_name(props: #props_name) #output {
-			// build-time scene: fetch the system params, run the body, apply
-			// the produced sub-scene to the entity (synchronous world access)
-			#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
-				move |(#(#sys_pats,)*)| {
-					let #props_name { #(#prop_idents),* } = props.clone();
-					#[allow(unused_braces)]
-					#body
-				},
-			)
+		impl #fn_name {
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				// build-time scene: fetch the system params, run the body, apply
+				// the produced sub-scene to the entity (synchronous world access)
+				#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
+					move |(#(#sys_pats,)*)| {
+						let #props_name { #(#prop_idents),* } = props.clone();
+						#[allow(unused_braces)]
+						#body
+					},
+				)
+			}
 		}
+
+		#scene_component_impl
 	})
 }
 
@@ -212,15 +277,25 @@ mod test {
 	}
 
 	#[test]
-	fn generates_props_and_callable() {
+	fn generates_marker_props_and_scene() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn Button(label: String, variant: u32) -> impl Scene { todo!() }
 		});
+		// marker struct + reflect-component
+		assert!(result.contains("struct Button"));
+		assert!(result.contains("Component"));
+		assert!(result.contains("Reflect"));
+		// props struct + SetWith
 		assert!(result.contains("struct ButtonProps"));
-		assert!(result.contains("derive (Default"));
 		assert!(result.contains("SetWith"));
-		assert!(result.contains("fn Button (props : ButtonProps)"));
+		// inherent scene fn
+		assert!(result.contains("impl Button"));
+		assert!(result.contains("fn scene (props : ButtonProps)"));
 		assert!(result.contains("let ButtonProps { label , variant } = props"));
+		// SceneComponent trait impl wrapping the inherent body
+		assert!(result.contains("SceneComponent for Button"));
+		assert!(result.contains("type Props = ButtonProps"));
+		assert!(result.contains("SceneComponentInfo"));
 	}
 
 	#[test]
@@ -237,7 +312,9 @@ mod test {
 		let result = parse_str(quote!(system), syn::parse_quote! {
 			fn AppInfo(config: Res<PackageConfig>) -> impl Scene { todo!() }
 		});
+		assert!(result.contains("struct AppInfo"));
 		assert!(result.contains("struct AppInfoProps"));
+		assert!(result.contains("SceneComponent for AppInfo"));
 		assert!(result.contains("scene_system :: < (Res < PackageConfig > ,)"));
 		assert!(result.contains("move | (config ,) |"));
 	}
@@ -248,6 +325,7 @@ mod test {
 			fn Panel(#[prop] role: ColorRole, theme: Res<Theme>) -> impl Scene { todo!() }
 		});
 		// `role` is a prop field; `theme` is a system param
+		assert!(result.contains("struct Panel"));
 		assert!(result.contains("struct PanelProps"));
 		assert!(result.contains("role : ColorRole"));
 		assert!(result.contains("scene_system :: < (Res < Theme > ,)"));

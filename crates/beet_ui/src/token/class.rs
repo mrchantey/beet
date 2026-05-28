@@ -53,7 +53,7 @@ impl core::fmt::Display for ClassName {
 
 /// Classes assigned to an element entity, checked alongside the `class`
 /// attribute by [`ElementView::contains_class`].
-#[derive(Default, Component, Deref, DerefMut)]
+#[derive(Default, Clone, Component, Deref, DerefMut)]
 pub struct Classes(HashSet<ClassName>);
 
 impl Classes {

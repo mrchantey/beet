@@ -75,15 +75,15 @@ fn tokenize_node_scene(node: &Node<CustomNode>) -> TokenStream {
 		Node::Element(el) => tokenize_element_scene(el),
 		Node::Text(text) => {
 			let value = text.value_string();
-			quote! { template_value(Value::new(#value)) }
+			quote! { (#value).into_scene() }
 		}
 		Node::RawText(text) => {
 			let value = text.to_string_best();
-			quote! { template_value(Value::new(#value)) }
+			quote! { (#value).into_scene() }
 		}
 		Node::Block(NodeBlock::ValidBlock(block)) => {
-			// block expression in child position must itself be an `impl Scene`
-			quote! { #block }
+			// block expression in child position is lifted via `IntoScene`
+			quote! { (#block).into_scene() }
 		}
 		Node::Block(NodeBlock::Invalid(invalid)) => {
 			syn::Error::new(invalid.span(), "invalid block expression")
@@ -115,9 +115,11 @@ fn tokenize_element_scene(el: &NodeElement<CustomNode>) -> TokenStream {
 	}
 }
 
-/// Lower a capitalized component tag `<Foo a=1 b/>` to a `#[scene]` call:
-/// `Foo(FooProps::default().with_a(1).with_b(true))`. Block attributes spread
-/// extra scenes onto the same entity; children attach via `ChildOf`.
+/// Lower a capitalized component tag `<Foo a=1 b/>` to a `SceneComponent`
+/// inheritance call: `<Foo as SceneComponent>::scene(FooProps::default()
+/// .with_a(1).with_b(true))`. This both spawns the `Foo` component on the
+/// entity and runs `Foo::scene(props)`. Block attributes spread extra scenes
+/// onto the same entity; children attach via `ChildOf`.
 fn tokenize_component_scene(
 	el: &NodeElement<CustomNode>,
 	tag: &str,
@@ -162,8 +164,8 @@ fn tokenize_component_scene(
 				}
 			}
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				// block attribute spread is an extra `impl Scene` on this entity
-				block_parts.push(quote! { #block });
+				// block attribute spread is lifted via `IntoScene`
+				block_parts.push(quote! { (#block).into_scene() });
 			}
 			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
 				block_parts.push(
@@ -178,7 +180,11 @@ fn tokenize_component_scene(
 	}
 
 	let mut parts: Vec<TokenStream> = Vec::new();
-	parts.push(quote! { #tag_path(#props_path::default() #(#with_calls)*) });
+	parts.push(quote! {
+		<#tag_path as SceneComponent>::scene(
+			#props_path::default() #(#with_calls)*,
+		)
+	});
 	parts.extend(block_parts);
 
 	let child_scenes: Vec<TokenStream> = el
@@ -247,8 +253,8 @@ fn tokenize_html_element_scene(
 				}
 			}
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				// block attribute spread is itself an `impl Scene` on this entity
-				parts.push(quote! { #block });
+				// block attribute spread is lifted via `IntoScene`
+				parts.push(quote! { (#block).into_scene() });
 			}
 			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
 				parts.push(

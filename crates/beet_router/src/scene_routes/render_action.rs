@@ -131,6 +131,34 @@ where
 	exchange_route(path, Action::new_pure(handler).chain(spawn_scene_step::<S>()))
 }
 
+/// Shorthand for [`scene_route`] when the handler is a plain constructor that
+/// ignores the request — `<Foo as SceneComponent>::scene`-style. Builds the
+/// props via `Default` and calls the constructor each request.
+///
+/// ```no_run
+/// # use beet_router::prelude::*;
+/// # use beet_ui::prelude::SceneComponent;
+/// # #[derive(Default)] struct AppInfo;
+/// # impl AppInfo {
+/// #     fn scene(_: ()) -> impl beet_ui::prelude::Scene { () }
+/// # }
+/// // closure form
+/// render_action::scene_route("app-info", |_| AppInfo::scene(()));
+/// // shorthand
+/// render_action::scene_func_route("app-info", AppInfo::scene);
+/// ```
+pub fn scene_func_route<Func, Props, S>(
+	path: &str,
+	ctor: Func,
+) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone + Fn(Props) -> S,
+	Props: 'static + Send + Sync + Default,
+	S: 'static + Send + Sync + Scene,
+{
+	scene_route(path, move |_cx: ActionContext<Request>| ctor(Props::default()))
+}
+
 /// The scene equivalent of [`spawn_render_step`]: resolves and spawns the
 /// scene as an ephemeral render root.
 fn spawn_scene_step<S: 'static + Send + Sync + Scene>()

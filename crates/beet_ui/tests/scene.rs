@@ -29,7 +29,7 @@ fn element_with_text_child() {
 
 #[scene]
 fn Card(#[prop(into)] title: String) -> impl Scene {
-	rsx! { <div class="card">{ template_value(Value::new(title)) }</div> }
+	rsx! { <div class="card">{title}</div> }
 }
 
 #[beet_core::test]
@@ -62,7 +62,7 @@ struct AppTitle(String);
 #[scene(system)]
 fn AppInfo(config: Res<AppTitle>) -> impl Scene {
 	let title = config.0.clone();
-	rsx! { <article>{ template_value(Value::new(title)) }</article> }
+	rsx! { <article>{title}</article> }
 }
 
 #[beet_core::test]
@@ -109,24 +109,26 @@ fn event_attribute_attaches_observer() {
 	world.resource::<Pinged>().0.xpect_true();
 }
 
-/// `beet_design::Button` reduced to its scene-system shape: an enum-keyed class
-/// + an `#[prop(into)]` String. Demonstrates the `#[template]` → `#[scene]`
-/// migration pattern.
+/// `beet_design::Button` reduced to its scene shape: an enum-keyed semantic
+/// class attached via the [`Classes`] component (not a `class="…"` string),
+/// plus an `#[prop(into)]` String for the label. Demonstrates the
+/// `#[template]` → `#[scene]` migration pattern; the actual visual rules ship
+/// with `beet_design.md` Phase 3.
 #[derive(Default, Clone)]
 #[allow(dead_code)]
 enum ButtonVariant {
 	#[default]
-	Primary,
-	Secondary,
+	Filled,
+	Outlined,
 	Error,
 }
 
 impl ButtonVariant {
-	fn class_suffix(&self) -> &'static str {
+	fn class(&self) -> &'static str {
 		match self {
-			ButtonVariant::Primary => "primary",
-			ButtonVariant::Secondary => "secondary",
-			ButtonVariant::Error => "error",
+			ButtonVariant::Filled => "btn-filled",
+			ButtonVariant::Outlined => "btn-outlined",
+			ButtonVariant::Error => "btn-error",
 		}
 	}
 }
@@ -136,8 +138,11 @@ fn Button(
 	#[prop(into)] label: String,
 	variant: ButtonVariant,
 ) -> impl Scene {
-	let class = format!("bt-c-button bt-c-button--{}", variant.class_suffix());
-	rsx! { <button class={class}>{ template_value(Value::new(label)) }</button> }
+	rsx! {
+		<button {Classes::new(["btn", variant.class()])}>
+			{label}
+		</button>
+	}
 }
 
 #[beet_core::test]
@@ -150,14 +155,15 @@ fn button_widget_renders_with_props() {
 
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("button");
 
-	// class prop flowed through
-	let attrs = world.entity(root).get::<Attributes>().unwrap();
-	attrs.len().xpect_eq(1);
-	world
-		.entity(attrs[0])
-		.get::<Value>()
-		.unwrap()
-		.xpect_eq(Value::new("bt-c-button bt-c-button--error"));
+	// the marker Component is on the root entity — unlocks queries +
+	// `:Button` inheritance from BSN
+	world.entity(root).get::<Button>().unwrap();
+
+	// classes attached via the `Classes` component, not a `class="…"` string
+	let classes = world.entity(root).get::<Classes>().unwrap();
+	classes.contains_selector("btn").xpect_true();
+	classes.contains_selector("btn-error").xpect_true();
+	classes.contains_selector("btn-filled").xpect_false();
 
 	// label prop became a text child
 	let children = world.entity(root).get::<Children>().unwrap();
@@ -169,6 +175,35 @@ fn button_widget_renders_with_props() {
 		.xpect_eq(Value::new("Save"));
 }
 
+#[beet_core::test]
+fn bsn_inheritance_matches_rsx_tag_form() {
+	use bevy::scene::bsn;
+
+	// rsx form
+	let mut world = scene_ext::test_world();
+	let rsx_root = world
+		.spawn_scene(rsx! { <Button label="Save" variant=ButtonVariant::Error/> })
+		.unwrap()
+		.id();
+
+	// hand-written BSN form — `:Button` inherits the SceneComponent and `@`
+	// fields set props. Should produce the same tree.
+	let bsn_root = world
+		.spawn_scene(bsn! {
+			:Button { @label: {"Save".to_string()}, @variant: {ButtonVariant::Error} }
+		})
+		.unwrap()
+		.id();
+
+	let rsx_button = world.entity(rsx_root).get::<Element>().unwrap().tag().to_string();
+	let bsn_button = world.entity(bsn_root).get::<Element>().unwrap().tag().to_string();
+	rsx_button.xpect_eq(bsn_button);
+
+	// both carry the marker Component
+	world.entity(rsx_root).get::<Button>().unwrap();
+	world.entity(bsn_root).get::<Button>().unwrap();
+}
+
 /// `beet_design::BucketList` reduced to its essence: a synchronous `#[scene]`
 /// constructor whose **behavior** (observer firing → mutating a signal-driven
 /// resource) attaches via an event attribute on the scene-built tree. No part
@@ -176,10 +211,13 @@ fn button_widget_renders_with_props() {
 #[scene]
 fn Counter(#[prop(into)] label: String) -> impl Scene {
 	rsx! {
-		<button onclick={
-			|_: On<Bump>, mut count: ResMut<Count>| count.0 += 1
-		}>
-			{ template_value(Value::new(label)) }
+		<button
+			{Classes::new(["btn", "btn-counter"])}
+			onclick={
+				|_: On<Bump>, mut count: ResMut<Count>| count.0 += 1
+			}
+		>
+			{label}
 		</button>
 	}
 }

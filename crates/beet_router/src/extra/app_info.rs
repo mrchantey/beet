@@ -2,16 +2,16 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-// Brought in so the `-> impl Scene` return type on `AppInfoScene` resolves.
-use beet_ui::prelude::Scene;
+use beet_ui::prelude::*;
 
 /// A scene route at `/app-info` rendering the [`PackageConfig`] as an article.
 ///
 /// Requires a [`PackageConfig`] resource (eg via `pkg_config!()`).
 pub fn app_info() -> impl Bundle {
-	render_action::scene_route("app-info", |_cx: ActionContext<Request>| {
-		AppInfoScene(AppInfoSceneProps::default())
-	})
+	render_action::scene_func_route(
+		"app-info",
+		<AppInfoScene as SceneComponent>::scene,
+	)
 }
 
 /// Reads [`PackageConfig`] synchronously at scene build, returning an
@@ -22,10 +22,10 @@ fn AppInfoScene(config: Res<PackageConfig>) -> impl Scene {
 	rsx! {
 		<article>
 			<h1>"App Info"</h1>
-			<p>{template_value(Value::new(format!("Title: {title}")))}</p>
-			<p>{template_value(Value::new(format!("Description: {description}")))}</p>
-			<p>{template_value(Value::new(format!("Version: {version}")))}</p>
-			<p>{template_value(Value::new(format!("Stage: {stage}")))}</p>
+			<p>"Title: "{title}</p>
+			<p>"Description: "{description}</p>
+			<p>"Version: "{version}</p>
+			<p>"Stage: "{stage}</p>
 		</article>
 	}
 }
