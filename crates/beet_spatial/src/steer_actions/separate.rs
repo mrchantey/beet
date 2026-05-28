@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Ensures that boids avoid crowding neighbors by maintaining a minimum
 /// distance from each other. This updates the [`Velocity`] component.

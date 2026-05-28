@@ -12,11 +12,16 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-bevy_default = ["bevy/default","beet_core/bevy_default"]
+default = ["std"]
+# std-only beet_core features (path types, runtime drivers, ..) — beet_action
+# also forces std today, so the no_std beet_spatial build is gated on
+# beet_action gaining a real no_std mode (see beet_action_no_std.md).
+std = ["beet_core/std"]
+bevy_default = ["bevy/default", "beet_core/bevy_default"]
 
 [dependencies]
 beet_action.workspace = true
-beet_core = { workspace = true, features = ["std", "rand"] }
+beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rand"] }
 
 bevy.workspace = true
 

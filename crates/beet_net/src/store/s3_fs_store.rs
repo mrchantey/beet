@@ -42,7 +42,7 @@ impl BlobStoreProvider for S3FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
 		Box::new(self.clone())
 	}
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.active().with_subdir(path)
 	}
 	fn region(&self) -> Option<String> {
@@ -57,24 +57,24 @@ impl BlobStoreProvider for S3FsStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.active().store_remove()
 	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.active().insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		self.active().list()
 	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.active().get(path)
 	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		self.active().exists(path)
 	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		self.active().remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.active().public_url(path)
 	}

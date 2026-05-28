@@ -80,7 +80,7 @@ fn setup(mut commands: Commands) {
 			);
 			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
-			let path = RelPath::new("foo.md");
+			let path = SmolPath::new("foo.md");
 			let content = "bar";
 
 			println!(

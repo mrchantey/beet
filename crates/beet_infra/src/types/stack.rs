@@ -108,8 +108,8 @@ impl Stack {
 	}
 
 	/// The state backend path, ie `my-app--prod--tofu.tfstate`.
-	pub fn backend_path(&self) -> RelPath {
-		RelPath::new(
+	pub fn backend_path(&self) -> SmolPath {
+		SmolPath::new(
 			self.resource_ident(self.state_suffix.clone())
 				.primary_identifier()
 				.to_string(),

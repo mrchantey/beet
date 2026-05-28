@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::f32::consts::PI;
-use std::f32::consts::TAU;
+use core::f32::consts::PI;
+use core::f32::consts::TAU;
 
 /// A type alias for radians as f32.
 pub type Radians = f32;

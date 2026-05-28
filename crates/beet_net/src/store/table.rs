@@ -140,7 +140,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # }
 	/// ```
 	pub async fn exists(&self, id: Uuid) -> Result<bool> {
-		let path = RelPath::new(id.to_string());
+		let path = SmolPath::new(id.to_string());
 		BlobStoreProvider::exists(self.provider.as_ref(), &path).await
 	}
 
@@ -156,7 +156,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn list(&self) -> Result<Vec<RelPath>> {
+	pub async fn list(&self) -> Result<Vec<SmolPath>> {
 		BlobStoreProvider::list(self.provider.as_ref()).await
 	}
 
@@ -199,7 +199,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`Self::list`] + [`Self::get`] for large tables.
-	pub async fn get_all(&self) -> Result<Vec<(RelPath, T)>> {
+	pub async fn get_all(&self) -> Result<Vec<(SmolPath, T)>> {
 		self.list()
 			.await?
 			.into_iter()
@@ -232,7 +232,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # Errors
 	/// Returns error if object doesn't exist.
 	pub async fn remove(&self, id: Uuid) -> Result {
-		let path = RelPath::new(id.to_string());
+		let path = SmolPath::new(id.to_string());
 		BlobStoreProvider::remove(self.provider.as_ref(), &path).await
 	}
 
@@ -244,7 +244,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let table = temp_table::<TableItem<String>>();
-	/// let path = RelPath::from("some-uuid");
+	/// let path = SmolPath::from("some-uuid");
 	/// if let Some(url) = table.public_url(&path).await? {
 	///     println!("Public URL: {}", url);
 	/// }
@@ -253,7 +253,7 @@ impl<T: TableStoreRow> TableStore<T> {
 	/// ```
 	///
 	/// Returns `None` if provider doesn't support public URLs.
-	pub async fn public_url(&self, path: &RelPath) -> Result<Option<String>> {
+	pub async fn public_url(&self, path: &SmolPath) -> Result<Option<String>> {
 		BlobStoreProvider::public_url(self.provider.as_ref(), path).await
 	}
 
@@ -335,7 +335,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>>;
 	/// Inserts a row into the table, serializing it as JSON.
 	fn insert_row(&self, body: T) -> SendBoxedFuture<Result> {
-		let path = RelPath::new(body.id().to_string());
+		let path = SmolPath::new(body.id().to_string());
 		match serde_json::to_vec(&body) {
 			Ok(vec) => BlobStoreProvider::insert(self, &path, vec.into()),
 			Err(e) => {
@@ -345,7 +345,7 @@ pub trait TableProvider<T: TableStoreRow>:
 	}
 	/// Retrieves a row by its UUID, deserializing from JSON.
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<T>> {
-		let path = RelPath::new(id.to_string());
+		let path = SmolPath::new(id.to_string());
 		let fut = BlobStoreProvider::get(self, &path);
 		Box::pin(async move {
 			let bytes = fut.await?;
@@ -414,7 +414,7 @@ pub mod table_test {
 			}],
 		});
 		let id = body.id();
-		let path = RelPath::new(id.to_string());
+		let path = SmolPath::new(id.to_string());
 		table.store_remove().await.ok();
 		table.store_exists().await.unwrap().xpect_false();
 		table.store_try_create().await.unwrap();

@@ -56,7 +56,7 @@ impl BlobStore {
 	}
 
 	/// Returns a new store scoped to the given subdirectory.
-	pub fn with_subdir(&self, path: RelPath) -> BlobStore {
+	pub fn with_subdir(&self, path: SmolPath) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
@@ -67,15 +67,15 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let store = BlobStore::temp();
-	/// let item = store.item(RelPath::from("my-file.txt"));
+	/// let item = store.item(SmolPath::from("my-file.txt"));
 	/// ```
-	pub fn item(&self, path: RelPath) -> StoreItem {
+	pub fn item(&self, path: SmolPath) -> StoreItem {
 		StoreItem::new(self.clone(), path)
 	}
 
 	/// Get an object and infer the [`MediaType`] from its path extension.
-	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
-		let media_type = MediaType::from_path(path.as_path());
+	pub async fn get_media(&self, path: &SmolPath) -> Result<MediaBytes> {
+		let media_type = MediaType::from_path(path);
 		let bytes = self.get(path).await?;
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
@@ -87,9 +87,9 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let store = BlobStore::temp();
-	/// let blob = store.blob(RelPath::new("my-file.txt"));
+	/// let blob = store.blob(SmolPath::new("my-file.txt"));
 	/// ```
-	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
+	pub fn blob(&self, path: SmolPath) -> Blob { Blob::new(self.clone(), path) }
 
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
@@ -124,13 +124,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.insert(&SmolPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		self.provider.insert(path, body.into()).await
@@ -144,13 +144,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.try_insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.try_insert(&SmolPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn try_insert(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		if self.exists(path).await? {
@@ -175,7 +175,7 @@ impl BlobStore {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`BlobStoreProvider::list`] + [`BlobStoreProvider::get`]
-	pub async fn get_all(&self) -> Result<Vec<(RelPath, Bytes)>> {
+	pub async fn get_all(&self) -> Result<Vec<(SmolPath, Bytes)>> {
 		self.list()
 			.await?
 			.into_iter()
@@ -190,7 +190,7 @@ impl BlobStore {
 
 impl BlobStoreProvider for BlobStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.provider.with_subdir(path)
 	}
 	fn region(&self) -> Option<String> { self.provider.region() }
@@ -203,24 +203,24 @@ impl BlobStoreProvider for BlobStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.provider.store_remove()
 	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.provider.insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		self.provider.list()
 	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
 	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		self.provider.exists(path)
 	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.provider.public_url(path)
 	}
@@ -235,7 +235,7 @@ pub mod store_test {
 	/// Runs the standard store provider test suite.
 	pub async fn run(provider: impl BlobStoreProvider) {
 		let store = BlobStore::new(provider);
-		let path = RelPath::from("test_path");
+		let path = SmolPath::from("test_path");
 		let body = bytes::Bytes::from("test_body");
 		store.store_remove().await.ok();
 		store.store_exists().await.unwrap().xpect_false();

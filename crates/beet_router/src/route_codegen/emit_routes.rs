@@ -204,7 +204,7 @@ fn server_cfg(collection: &RouteCollection) -> Option<syn::Attribute> {
 }
 
 /// Emits the route bundle for a markdown/html content file.
-fn emit_blob_route(file: &RouteFile, store_path: &RelPath) -> TokenStream {
+fn emit_blob_route(file: &RouteFile, store_path: &SmolPath) -> TokenStream {
 	let path = file.route_path.to_string();
 	let store_path = store_path.to_string();
 	quote! {

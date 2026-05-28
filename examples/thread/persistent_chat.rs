@@ -37,7 +37,7 @@ fn setup(async_commands: AsyncCommands) {
 	}
 
 
-	let blob = store.blob(RelPath::new(WORLD_SERDE_FILE));
+	let blob = store.blob(SmolPath::new(WORLD_SERDE_FILE));
 	let new_thread = CliArgs::parse_env().params.contains_key("new");
 
 	async_commands.run(async move |world: AsyncWorld| {

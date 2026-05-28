@@ -43,17 +43,17 @@ impl ArtifactLedger {
 		Ok(())
 	}
 
-	fn current_ledger_key(&self) -> RelPath {
+	fn current_ledger_key(&self) -> SmolPath {
 		Self::version_ledger_key(&self.deploy_id)
 	}
-	fn current_artifact_key(&self, artifact_name: &str) -> RelPath {
+	fn current_artifact_key(&self, artifact_name: &str) -> SmolPath {
 		Self::version_artifact_key(&self.deploy_id, artifact_name)
 	}
-	fn version_ledger_key(uuid: &Uuid) -> RelPath {
-		RelPath::new(format!("versions/{uuid}/ledger.json"))
+	fn version_ledger_key(uuid: &Uuid) -> SmolPath {
+		SmolPath::new(format!("versions/{uuid}/ledger.json"))
 	}
-	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> RelPath {
-		RelPath::new(format!("versions/{uuid}/{artifact_name}"))
+	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> SmolPath {
+		SmolPath::new(format!("versions/{uuid}/{artifact_name}"))
 	}
 }
 
@@ -203,7 +203,7 @@ impl ArtifactsClient {
 	}
 }
 
-fn current_ledger_key() -> RelPath { RelPath::new("current-ledger.json") }
+fn current_ledger_key() -> SmolPath { SmolPath::new("current-ledger.json") }
 
 pub(crate) fn now_timestamp() -> String {
 	let duration = SystemTime::now()

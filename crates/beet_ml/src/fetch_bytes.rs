@@ -47,6 +47,6 @@ fn cache_store() -> BlobStore {
 }
 
 /// Hash the URL to keep cache keys short and filesystem-safe.
-fn cache_key(url: &str) -> RelPath {
-	RelPath::new(format!("{:016x}.bin", fs_ext::hash_string(url)))
+fn cache_key(url: &str) -> SmolPath {
+	SmolPath::new(format!("{:016x}.bin", fs_ext::hash_string(url)))
 }

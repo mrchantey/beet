@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Encourages boids to move towards the average position of their neighbors,
 /// keeping the flock together. This updates the [`Velocity`] component.

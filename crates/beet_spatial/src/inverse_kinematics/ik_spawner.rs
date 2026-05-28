@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::world_serialization::WorldInstanceReady;
-use std::f32::consts::FRAC_PI_2;
+use core::f32::consts::FRAC_PI_2;
 
 /// Hooks up the parts of the robot arm gltf scene
 /// to the inverse kinematics system.

@@ -140,7 +140,7 @@ pub async fn verify_assets(stack: &Stack, expected: &str) -> Result {
 		.iter()
 		.any(|path| path.to_string_lossy().contains("index.html"))
 		.xpect_true();
-	let bytes = store.get(&RelPath::new("index.html")).await?;
+	let bytes = store.get(&SmolPath::new("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
 	info!(

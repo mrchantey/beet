@@ -14,7 +14,7 @@ pub struct TextEdit {
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct EditTextParams {
 	/// Path to the file to edit.
-	pub path: RelPath,
+	pub path: SmolPath,
 	/// One or more targeted replacements matched against the original file.
 	pub edits: Vec<TextEdit>,
 }
@@ -101,7 +101,7 @@ mod test {
 	/// Shared helper: write content, apply edits, return resulting text.
 	async fn apply_edits(original: &str, edits: Vec<TextEdit>) -> String {
 		let store = BlobStore::temp();
-		let path = RelPath::from("file.txt");
+		let path = SmolPath::from("file.txt");
 		let original = original.to_owned();
 		store
 			.insert(&path, original.clone())

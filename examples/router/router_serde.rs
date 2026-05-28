@@ -55,7 +55,7 @@ struct GreetRequest {
 
 fn setup(async_commands: AsyncCommands) {
 	let blob =
-		FsStore::new(WsPathBuf::default()).blob(RelPath::new(WORLD_SERDE_FILE));
+		FsStore::new(WsPathBuf::default()).blob(SmolPath::new(WORLD_SERDE_FILE));
 	let new_world = CliArgs::parse_env().params.contains_key("new");
 
 	async_commands.run(async move |world: AsyncWorld| {

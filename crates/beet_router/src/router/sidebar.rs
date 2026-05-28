@@ -46,14 +46,14 @@ pub struct SidebarNode {
 pub struct SidebarState {
 	/// The current page path, used for active-link detection
 	/// and auto-expansion.
-	pub current_path: RelPath,
+	pub current_path: SmolPath,
 	/// Per-path node configuration overrides.
-	pub nodes: HashMap<RelPath, SidebarNode>,
+	pub nodes: HashMap<SmolPath, SidebarNode>,
 }
 
 impl SidebarState {
 	/// Create a new sidebar state targeting the given current path.
-	pub fn new(current_path: impl Into<RelPath>) -> Self {
+	pub fn new(current_path: impl Into<SmolPath>) -> Self {
 		Self {
 			current_path: current_path.into(),
 			nodes: HashMap::default(),
@@ -63,7 +63,7 @@ impl SidebarState {
 	/// Set configuration for a specific path.
 	pub fn with_node(
 		mut self,
-		path: impl Into<RelPath>,
+		path: impl Into<SmolPath>,
 		node: SidebarNode,
 	) -> Self {
 		self.nodes.insert(path.into(), node);
@@ -118,7 +118,7 @@ impl SidebarState {
 		world: &mut World,
 		tree: &RouteTree,
 	) -> Option<Entity> {
-		let path = tree.path.annotated_rel_path();
+		let path = tree.path.annotated_smol_path();
 		let config = self.nodes.get(&path);
 		let children = self.sort_children(tree);
 
@@ -139,7 +139,7 @@ impl SidebarState {
 	fn spawn_leaf(
 		&self,
 		world: &mut World,
-		path: &RelPath,
+		path: &SmolPath,
 		config: Option<&SidebarNode>,
 	) -> Entity {
 		let label = config
@@ -170,7 +170,7 @@ impl SidebarState {
 		&self,
 		world: &mut World,
 		tree: &RouteTree,
-		path: &RelPath,
+		path: &SmolPath,
 		config: Option<&SidebarNode>,
 		children: &[RouteTree],
 	) -> Entity {
@@ -250,8 +250,8 @@ impl SidebarState {
 	fn sort_children(&self, tree: &RouteTree) -> Vec<RouteTree> {
 		let mut children = tree.children.clone();
 		children.sort_by(|a, b| {
-			let path_a = a.path.annotated_rel_path();
-			let path_b = b.path.annotated_rel_path();
+			let path_a = a.path.annotated_smol_path();
+			let path_b = b.path.annotated_smol_path();
 			let order_a = self
 				.nodes
 				.get(&path_a)
@@ -273,12 +273,12 @@ impl SidebarState {
 	}
 
 	/// Extract a display label from the last path segment.
-	fn default_label(path: &RelPath) -> String {
+	fn default_label(path: &SmolPath) -> String {
 		path.last_segment().unwrap_or("home").to_string()
 	}
 
 	/// Check if the current path is at or beneath the given path.
-	fn is_ancestor_of_current(&self, path: &RelPath) -> bool {
+	fn is_ancestor_of_current(&self, path: &SmolPath) -> bool {
 		let current = self.current_path.segments();
 		let prefix = path.segments();
 		if prefix.is_empty() {
@@ -516,13 +516,13 @@ mod test {
 		let sorted = state.sort_children(&tree);
 		sorted[0]
 			.path
-			.annotated_rel_path()
+			.annotated_smol_path()
 			.last_segment()
 			.unwrap()
 			.xpect_eq("zulu");
 		sorted[1]
 			.path
-			.annotated_rel_path()
+			.annotated_smol_path()
 			.last_segment()
 			.unwrap()
 			.xpect_eq("alpha");
@@ -532,17 +532,17 @@ mod test {
 	fn is_ancestor_of_current() {
 		let state = SidebarState::new("docs/getting-started");
 		state
-			.is_ancestor_of_current(&RelPath::new("docs"))
+			.is_ancestor_of_current(&SmolPath::new("docs"))
 			.xpect_true();
 		state
-			.is_ancestor_of_current(&RelPath::new("docs/getting-started"))
+			.is_ancestor_of_current(&SmolPath::new("docs/getting-started"))
 			.xpect_true();
 		state
-			.is_ancestor_of_current(&RelPath::new("blog"))
+			.is_ancestor_of_current(&SmolPath::new("blog"))
 			.xpect_false();
 		// Root is ancestor of everything
 		state
-			.is_ancestor_of_current(&RelPath::default())
+			.is_ancestor_of_current(&SmolPath::default())
 			.xpect_true();
 	}
 

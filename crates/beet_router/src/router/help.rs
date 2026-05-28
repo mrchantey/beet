@@ -43,7 +43,7 @@ pub async fn HelpHandler(
 				let filtered: Vec<&ActionNode> = nodes
 					.into_iter()
 					.filter(|node| {
-						node.path.annotated_rel_path().last_segment()
+						node.path.annotated_smol_path().last_segment()
 							!= Some("help")
 					})
 					.collect();
@@ -134,7 +134,7 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
 	tree.flatten_nodes()
 		.into_iter()
 		.filter(|node| {
-			node.path.annotated_rel_path().last_segment() != Some("help")
+			node.path.annotated_smol_path().last_segment() != Some("help")
 		})
 		.cloned()
 		.collect()
@@ -256,7 +256,7 @@ async fn spawn_not_found_scene(
 /// Each route renders as a `<li>` containing the path heading
 /// and a nested `<ul>` with description, type info, and parameters.
 fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
-	let path = node.path.annotated_rel_path().to_string();
+	let path = node.path.annotated_smol_path().to_string();
 
 	// path with leading slash and kind tag
 	let heading = if node.is_scene() {
@@ -336,7 +336,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 	let filtered: Vec<&ActionNode> = nodes
 		.into_iter()
 		.filter(|node| {
-			node.path.annotated_rel_path().last_segment() != Some("help")
+			node.path.annotated_smol_path().last_segment() != Some("help")
 		})
 		.collect();
 
@@ -354,7 +354,7 @@ pub fn format_route_help(tree: &RouteTree) -> String {
 
 /// Format an [`ActionNode`] as plaintext for CLI output.
 fn format_action_node_text(output: &mut String, node: &ActionNode) {
-	let path = node.path.annotated_rel_path();
+	let path = node.path.annotated_smol_path();
 
 	if node.is_scene() {
 		output.push_str(&format!("  /{} [scene]\n", path));

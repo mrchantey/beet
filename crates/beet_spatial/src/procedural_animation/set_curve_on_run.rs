@@ -2,8 +2,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::Interval;
-use std::f32::consts::FRAC_PI_2;
-use std::ops::Range;
+use core::f32::consts::FRAC_PI_2;
+use core::ops::Range;
 
 /// Regenerates the curve of [`PlayProceduralAnimation`] with a random
 /// direction whenever the action begins [`Running`].

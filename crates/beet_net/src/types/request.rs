@@ -354,9 +354,9 @@ impl Request {
 		self
 	}
 
-	/// Returns the path as a [`RelPath`].
-	pub fn route_path(&self) -> RelPath {
-		RelPath::new(self.parts.path_string())
+	/// Returns the path as a [`SmolPath`].
+	pub fn route_path(&self) -> SmolPath {
+		SmolPath::new(self.parts.path_string())
 	}
 
 	/// Returns a reference to the request parts

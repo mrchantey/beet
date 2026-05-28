@@ -17,7 +17,7 @@ pub struct FsStore {
 	/// The full path to the store directory.
 	path: AbsPathBuf,
 	/// Optional subdirectory from which all paths are resolved.
-	subdir: Option<RelPath>,
+	subdir: Option<SmolPath>,
 }
 
 impl Default for FsStore {
@@ -38,7 +38,7 @@ impl FsStore {
 		}
 	}
 	/// Set the subdirectory from which all paths are resolved.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -50,11 +50,11 @@ impl FsStore {
 		}
 	}
 	/// Resolve the full path for an object key.
-	fn resolve_path(&self, route: &RelPath) -> AbsPathBuf {
+	fn resolve_path(&self, route: &SmolPath) -> AbsPathBuf {
 		self.effective_root().join(route.to_string())
 	}
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -70,7 +70,7 @@ impl<T: TableStoreRow> TableProvider<T> for FsStore {
 impl BlobStoreProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(FsStore {
 			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
@@ -103,7 +103,7 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::write_async(path, body).await?;
@@ -111,7 +111,7 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let root = self.effective_root();
 		Box::pin(async move {
 			ReadDir::files_recursive_async(&root)
@@ -121,14 +121,14 @@ impl BlobStoreProvider for FsStore {
 					let path = path
 						.strip_prefix(&root)
 						.unwrap_or_else(|_| path.as_path());
-					RelPath::new(path)
+					SmolPath::from(path)
 				})
 				.collect::<Vec<_>>()
 				.xok()
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::read_async(&path)
@@ -139,19 +139,19 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}

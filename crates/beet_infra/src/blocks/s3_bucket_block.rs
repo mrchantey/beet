@@ -58,7 +58,7 @@ impl S3BucketBlock {
 		);
 		if self.deploy_versioned {
 			store =
-				store.with_subdir(RelPath::new(stack.deploy_id().to_string()));
+				store.with_subdir(SmolPath::new(stack.deploy_id().to_string()));
 		}
 		store
 	}

@@ -3,7 +3,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::input::common_conditions::input_toggle_active;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 
 /// Provides debug visualization for the `Separate`, `Align`, and `Cohere` actions.

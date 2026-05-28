@@ -19,9 +19,9 @@ impl BlobStore {
 #[derive(Debug, Clone)]
 pub struct InMemoryStore {
 	/// Shared storage state.
-	inner: Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>,
+	inner: Arc<RwLock<Option<HashMap<SmolPath, Bytes>>>>,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<RelPath>,
+	subdir: Option<SmolPath>,
 }
 
 impl Default for InMemoryStore {
@@ -45,7 +45,7 @@ impl InMemoryStore {
 	}
 
 	/// Resolve an external path to the internal key by prepending the subdir.
-	fn resolve_key(&self, path: &RelPath) -> RelPath {
+	fn resolve_key(&self, path: &SmolPath) -> SmolPath {
 		match &self.subdir {
 			Some(sub) => sub.join(path),
 			None => path.clone(),
@@ -63,7 +63,7 @@ impl<T: TableStoreRow> TableProvider<T> for InMemoryStore {
 impl BlobStoreProvider for InMemoryStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(InMemoryStore {
 			inner: self.inner.clone(),
 			subdir: Some(match &self.subdir {
@@ -104,7 +104,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -117,7 +117,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -129,7 +129,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
 			let guard = this.inner.read().await;
@@ -141,9 +141,11 @@ impl BlobStoreProvider for InMemoryStore {
 					// filter keys by prefix and strip it
 					map.keys()
 						.filter_map(|key| {
-							key.strip_prefix(sub.as_path())
-								.ok()
-								.map(|stripped| RelPath::new(stripped))
+							key.as_str()
+								.strip_prefix(sub.as_str())
+								.map(|stripped| {
+									SmolPath::new(stripped.trim_start_matches('/'))
+								})
 						})
 						.collect::<Vec<_>>()
 						.xok()
@@ -153,7 +155,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -167,7 +169,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -183,7 +185,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}

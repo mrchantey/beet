@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use std::f32::consts::TAU;
+use core::f32::consts::TAU;
 
 
 /// Enum of common curves that can be serialized.

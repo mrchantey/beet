@@ -77,6 +77,7 @@ pub mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
+mod path;
 #[cfg(feature = "std")]
 mod path_utils;
 #[cfg(feature = "std")]
@@ -165,6 +166,7 @@ pub mod prelude {
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
+	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
 	#[cfg(feature = "testing")]

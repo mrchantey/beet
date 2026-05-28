@@ -57,7 +57,7 @@ pub mod prelude {
 	// Re-export core types used in beet_net's public API
 	pub use beet_core::prelude::MediaBytes;
 	pub use beet_core::prelude::MediaType;
-	pub use beet_core::prelude::RelPath;
+	pub use beet_core::prelude::SmolPath;
 
 	// Re-export common types from dependencies
 	pub use bevy::tasks::futures_lite::StreamExt;

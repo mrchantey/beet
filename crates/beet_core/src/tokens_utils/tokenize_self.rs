@@ -114,6 +114,12 @@ impl TokenizeSelf for String {
 		tokens.extend(quote! { String::from(#self) });
 	}
 }
+impl TokenizeSelf for SmolStr {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		let s = self.as_str();
+		tokens.extend(quote! { SmolStr::new(#s) });
+	}
+}
 impl TokenizeSelf for Span {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { proc_macro2::Span::call_site() });

@@ -182,10 +182,10 @@ pub(crate) async fn CallerScene(
 #[derive(Component, Reflect)]
 #[require(BlobSceneAction)]
 pub struct BlobScene {
-	path: RelPath,
+	path: SmolPath,
 }
 impl BlobScene {
-	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
+	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
 }
 
 

@@ -38,8 +38,8 @@ async fn ServeStoreAction(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let path = cx
 		.input
 		.get_params(STORE_PATH_PARAM)
-		.map(|segments| RelPath::from_segments(segments))
-		.unwrap_or_else(|| RelPath::from(cx.input.path()));
+		.map(|segments| SmolPath::from_segments(segments))
+		.unwrap_or_else(|| SmolPath::from(cx.input.path()));
 
 	serve_blob(&store, &path).await
 }
@@ -48,7 +48,7 @@ async fn ServeStoreAction(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// - extensioned path + a store public URL → permanent redirect
 /// - extensioned path, no public URL → stream the bytes (mime from extension)
 /// - extensionless path → serve `<path>/index.html` as HTML
-pub async fn serve_blob(store: &BlobStore, path: &RelPath) -> Result<Response> {
+pub async fn serve_blob(store: &BlobStore, path: &SmolPath) -> Result<Response> {
 	if path.extension().is_some() {
 		if let Some(url) = store.public_url(path).await? {
 			Response::permanent_redirect(url).xok()
@@ -80,10 +80,10 @@ mod test {
 	async fn serve_blob_streams_file() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("style.css"), "body { color: red; }")
+			.insert(&SmolPath::from("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &RelPath::from("style.css"))
+		super::serve_blob(&store, &SmolPath::from("style.css"))
 			.await
 			.unwrap()
 			.text()
@@ -96,10 +96,10 @@ mod test {
 	async fn serve_blob_appends_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("docs/index.html"), "<h1>Hello</h1>")
+			.insert(&SmolPath::from("docs/index.html"), "<h1>Hello</h1>")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &RelPath::from("docs"))
+		super::serve_blob(&store, &SmolPath::from("docs"))
 			.await
 			.unwrap()
 			.text()
@@ -112,7 +112,7 @@ mod test {
 	async fn serve_store_route_serves_file() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("style.css"), "body { color: red; }")
+			.insert(&SmolPath::from("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
 		router_world()
@@ -129,7 +129,7 @@ mod test {
 	async fn serve_store_route_serves_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("bar/index.html"), "<div>fallback</div>")
+			.insert(&SmolPath::from("bar/index.html"), "<div>fallback</div>")
 			.await
 			.unwrap();
 		router_world()

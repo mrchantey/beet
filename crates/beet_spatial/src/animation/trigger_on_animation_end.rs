@@ -2,7 +2,7 @@ use super::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::animation::RepeatAnimation;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Returns with the provided payload when the specified animation
 /// is almost finished.
