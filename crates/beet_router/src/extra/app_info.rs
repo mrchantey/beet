@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
-use beet_ui::prelude::*;
+use beet_ui::prelude::SceneComponent;
 
 /// A scene route at `/app-info` rendering the [`PackageConfig`] as an article.
 ///
