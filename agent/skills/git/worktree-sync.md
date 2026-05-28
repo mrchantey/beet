@@ -1,10 +1,14 @@
 # Worktree Sync
 
-Sync this worktree with the main repo at `~/me/beet`. Do not delete this worktree.
+Sync this worktree with the main repo at `~/me/beet` in **both directions**. Do not delete this worktree.
 
-**Pull** (default): merge commits from the main worktree into this one.
+Always check both directions and act on whichever has commits:
 
-**Push**: merge this worktree upstream into main.
+- **Pull**: if main has commits the worktree lacks, merge them into this worktree.
+- **Push**: if this worktree has commits main lacks, merge them upstream into main's branch.
+
+If both directions have commits, do the pull first, then the push.
+If neither direction has commits, report that the worktrees are already in sync.
 
 For either direction:
 - Carefully resolve all conflicts.
