@@ -28,9 +28,7 @@ pub enum RouteCollectionCategory {
 
 impl RouteCollectionCategory {
 	/// Whether routes in this category appear in the typed route tree.
-	pub fn include_in_route_tree(&self) -> bool {
-		matches!(self, Self::Pages)
-	}
+	pub fn include_in_route_tree(&self) -> bool { matches!(self, Self::Pages) }
 }
 
 /// A directory of route files scanned into a collection bundle and typed links.
@@ -118,8 +116,7 @@ impl RouteCollection {
 			if !self.filter.passes(&store_path) {
 				continue;
 			}
-			let Some(ext) = store_path.extension().and_then(|e| e.to_str())
-			else {
+			let Some(ext) = store_path.extension() else {
 				continue;
 			};
 			let route_path =
@@ -160,7 +157,9 @@ impl RouteCollection {
 	fn mod_path(&self, store_path: &SmolPath) -> Result<String> {
 		let abs = self.src.join(store_path.to_string());
 		let rel = path_ext::create_relative(self.codegen.output_dir()?, &abs)?;
-		Ok(path_ext::to_forward_slash(rel).to_string_lossy().to_string())
+		Ok(path_ext::to_forward_slash(rel)
+			.to_string_lossy()
+			.to_string())
 	}
 }
 
@@ -214,8 +213,11 @@ pub struct RouteMethod {
 /// Derives the route path from a source file path, stripping the extension and
 /// collapsing `index` files into their parent directory.
 fn route_path_from_file(store_path: &SmolPath) -> SmolPath {
-	let mut segments: Vec<String> =
-		store_path.segments().iter().map(|s| s.to_string()).collect();
+	let mut segments: Vec<String> = store_path
+		.segments()
+		.iter()
+		.map(|s| s.to_string())
+		.collect();
 	if let Some(last) = segments.last_mut() {
 		if let Some(dot) = last.rfind('.') {
 			last.truncate(dot);
@@ -229,8 +231,11 @@ fn route_path_from_file(store_path: &SmolPath) -> SmolPath {
 
 /// Derives a unique module identifier from a source file path.
 fn mod_ident_from_file(store_path: &SmolPath) -> Ident {
-	let mut segments: Vec<String> =
-		store_path.segments().iter().map(|s| s.to_string()).collect();
+	let mut segments: Vec<String> = store_path
+		.segments()
+		.iter()
+		.map(|s| s.to_string())
+		.collect();
 	if let Some(last) = segments.last_mut() {
 		if let Some(dot) = last.rfind('.') {
 			last.truncate(dot);
