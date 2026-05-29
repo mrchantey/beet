@@ -106,7 +106,7 @@ impl RouteTree {
 					if node.route.is_some() {
 						bevybail!(
 							"Duplicate route: multiple routes defined for path '{}'",
-							path.annotated_smol_path()
+							path.annotated_path()
 						);
 					}
 					node.route = Some(action_node.clone());
@@ -298,7 +298,7 @@ impl std::fmt::Display for RouteTree {
 			f: &mut std::fmt::Formatter<'_>,
 		) -> std::fmt::Result {
 			if let Some(action) = &node.node {
-				let path = node.path.annotated_smol_path();
+				let path = node.path.annotated_path();
 				if action.is_scene() {
 					writeln!(f, "  {} [scene]", path)?;
 				} else {
@@ -439,7 +439,7 @@ mod test {
 		let paths: Vec<String> = tree
 			.flatten()
 			.iter()
-			.map(|p| p.annotated_smol_path().to_string())
+			.map(|p| p.annotated_path().to_string())
 			.collect();
 		paths.contains(&"api/users".to_string()).xpect_true();
 		paths.contains(&"api/posts".to_string()).xpect_true();
@@ -650,7 +650,7 @@ mod test {
 			.flatten_nodes()
 			.iter()
 			.any(|node| {
-				node.path.annotated_smol_path().to_string().contains("other")
+				node.path.annotated_path().to_string().contains("other")
 			})
 			.xpect_false();
 	}
@@ -680,7 +680,7 @@ mod test {
 			.first()
 			.unwrap()
 			.path
-			.annotated_smol_path()
+			.annotated_path()
 			.to_string()
 			.xpect_contains("details");
 	}

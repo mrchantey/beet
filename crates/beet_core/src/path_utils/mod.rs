@@ -15,7 +15,7 @@
 //!
 //! - [`env_ext`] - Cross-platform environment variable access
 //! - [`fs_ext`] - Cross-platform filesystem operations
-//! - [`path_ext`] - Extension traits for [`Path`](std::path::Path)
+//! - [`path_ext`](crate::path::path_ext) - Path cleaning and [`Path`](std::path::Path) helpers
 
 mod abs_path_buf;
 /// Cross-platform environment variable access.
@@ -23,7 +23,6 @@ pub mod env_ext;
 mod env_var;
 mod fs_error;
 pub mod fs_ext;
-pub mod path_ext;
 mod read_dir;
 mod workspace_root;
 mod ws_path_buf;

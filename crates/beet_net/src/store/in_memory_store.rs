@@ -143,9 +143,7 @@ impl BlobStoreProvider for InMemoryStore {
 						.filter_map(|key| {
 							key.as_str()
 								.strip_prefix(sub.as_str())
-								.map(|stripped| {
-									SmolPath::new(stripped.trim_start_matches('/'))
-								})
+								.map(SmolPath::new)
 						})
 						.collect::<Vec<_>>()
 						.xok()

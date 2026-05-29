@@ -180,7 +180,7 @@ impl PathPattern {
 
 	/// Convert the segments to a [`SmolPath`] using annotations for dynamic segments,
 	/// ie `foo/:bar/*bazz`
-	pub fn annotated_smol_path(&self) -> SmolPath {
+	pub fn annotated_path(&self) -> SmolPath {
 		self.segments
 			.iter()
 			.map(|segment| segment.to_string_annotated())
@@ -213,7 +213,7 @@ impl PathPattern {
 
 impl std::fmt::Display for PathPattern {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.annotated_smol_path())
+		write!(f, "{}", self.annotated_path())
 	}
 }
 

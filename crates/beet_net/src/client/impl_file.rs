@@ -10,7 +10,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::TryStreamExt;
-use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -105,14 +104,14 @@ impl FileClient {
 	fn resolve_path(&self, raw: &str) -> Result<PathBuf> {
 		let stripped = raw.strip_prefix("file://").unwrap_or(raw);
 
-		let path = PathBuf::from(stripped).clean();
+		let path = path_ext::clean_path(stripped);
 
 		if path.is_absolute() {
 			path.xok()
 		} else {
 			let cwd = fs_ext::current_dir()
 				.map_err(|err| bevyhow!("Failed to get cwd: {err}"))?;
-			cwd.join(&path).clean().xok()
+			path_ext::clean_path(cwd.join(&path)).xok()
 		}
 	}
 

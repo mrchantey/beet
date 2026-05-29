@@ -44,7 +44,7 @@ pub async fn collect_static_html(
 					.copied()
 					.unwrap_or_default();
 				if node.is_scene() || cache == CacheStrategy::Static {
-					paths.push(node.path.annotated_smol_path());
+					paths.push(node.path.annotated_path());
 				}
 			}
 			Ok(paths)

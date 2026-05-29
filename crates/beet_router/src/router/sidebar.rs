@@ -118,7 +118,7 @@ impl SidebarState {
 		world: &mut World,
 		tree: &RouteTree,
 	) -> Option<Entity> {
-		let path = tree.path.annotated_smol_path();
+		let path = tree.path.annotated_path();
 		let config = self.nodes.get(&path);
 		let children = self.sort_children(tree);
 
@@ -250,8 +250,8 @@ impl SidebarState {
 	fn sort_children(&self, tree: &RouteTree) -> Vec<RouteTree> {
 		let mut children = tree.children.clone();
 		children.sort_by(|a, b| {
-			let path_a = a.path.annotated_smol_path();
-			let path_b = b.path.annotated_smol_path();
+			let path_a = a.path.annotated_path();
+			let path_b = b.path.annotated_path();
 			let order_a = self
 				.nodes
 				.get(&path_a)
@@ -516,13 +516,13 @@ mod test {
 		let sorted = state.sort_children(&tree);
 		sorted[0]
 			.path
-			.annotated_smol_path()
+			.annotated_path()
 			.last_segment()
 			.unwrap()
 			.xpect_eq("zulu");
 		sorted[1]
 			.path
-			.annotated_smol_path()
+			.annotated_path()
 			.last_segment()
 			.unwrap()
 			.xpect_eq("alpha");

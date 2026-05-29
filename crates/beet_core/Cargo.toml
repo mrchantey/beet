@@ -90,7 +90,6 @@ std = [
 	"dep:dotenv",
 	"dep:web-time",
 	"dep:async-lock",
-	"dep:path-clean",
 	"dep:pathdiff",
 	"dep:glob",
 	"dep:futures",
@@ -184,7 +183,6 @@ http = {workspace = true,optional=true}
 
 
 #💡 path
-path-clean = { version = "1", optional = true }
 pathdiff = { version = "0.2", optional = true }
 either = { version = "1", default-features = false }
 

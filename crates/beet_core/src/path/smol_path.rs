@@ -40,7 +40,12 @@ impl SmolPath {
 	/// empty segments, and collapsing `.`/`..` segments.
 	pub fn new(path: impl Into<SmolStr>) -> Self {
 		let raw: SmolStr = path.into();
-		Self(clean(raw.as_str()))
+		// `path_ext::clean` keeps a rooted path's leading `/` and may return
+		// the `.` placeholder; a [`SmolPath`] is always logically relative.
+		let cleaned = path_ext::clean(raw.as_str());
+		let cleaned = cleaned.trim_start_matches('/');
+		let cleaned = if cleaned == "." { "" } else { cleaned };
+		Self(SmolStr::new(cleaned))
 	}
 
 	/// Append another path onto this one, returning a new [`SmolPath`]. Any
@@ -270,31 +275,6 @@ impl From<&Path> for SmolPath {
 #[cfg(feature = "std")]
 impl From<SmolPath> for PathBuf {
 	fn from(value: SmolPath) -> Self { PathBuf::from(value.0.as_str()) }
-}
-
-// ---------------------------------------------------------------------------
-// Path cleaner (pure alloc — no `path-clean`).
-// ---------------------------------------------------------------------------
-
-/// Clean a `/`-separated path string: drop empty segments and `.`, collapse
-/// `..` against the previous non-`..` segment.
-fn clean(input: &str) -> SmolStr {
-	let mut out: Vec<&str> = Vec::new();
-	for seg in input.split('/') {
-		match seg {
-			"" | "." => continue,
-			".." => {
-				// only collapse when the previous segment is a real name
-				if matches!(out.last(), Some(&last) if last != "..") {
-					out.pop();
-				} else {
-					out.push("..");
-				}
-			}
-			other => out.push(other),
-		}
-	}
-	SmolStr::new(out.join("/"))
 }
 
 /// Length of the stem portion of `filename`, matching
