@@ -55,7 +55,6 @@ pub extern crate alloc as _alloc;
 #[cfg(feature = "custom_test_frameworks")]
 extern crate test;
 
-#[cfg(feature = "std")]
 pub use utils::async_ext;
 #[cfg(feature = "std")]
 pub use utils::time_ext;

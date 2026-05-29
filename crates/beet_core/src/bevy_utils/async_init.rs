@@ -53,7 +53,7 @@ impl AsyncInit {
 
 	/// Run the async init functions for this entity.
 	pub async fn run(self, entity: AsyncEntity) -> Result {
-		try_join_all(
+		async_ext::try_join_all(
 			self.items.into_iter().map(|item| item(entity.clone())),
 		)
 		.await?;
@@ -67,7 +67,7 @@ impl AsyncInit {
 			.with(|mut entity| entity.take_recursive::<AsyncInit>())
 			.await?;
 
-		try_join_all(
+		async_ext::try_join_all(
 			inits.into_iter().map(|init| init.run(entity.clone())),
 		)
 		.await?;

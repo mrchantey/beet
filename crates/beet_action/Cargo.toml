@@ -14,8 +14,6 @@ categories.workspace = true
 [features]
 default = ["std", "reflect"]
 std = ["beet_core/std"]
-# the async bridge layer; std implies it, no_std consumers enable it explicitly
-bevy_async = ["beet_core/bevy_async"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
 world_serde = ["beet_core/world_serde"]

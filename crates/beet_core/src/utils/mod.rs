@@ -15,7 +15,6 @@
 
 mod as_any;
 /// Async utilities and future helpers.
-#[cfg(feature = "std")]
 pub mod async_ext;
 mod backoff;
 mod cfg_if;
@@ -33,8 +32,6 @@ mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
 mod into_option;
-/// no_std future-joining helpers.
-mod join;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "std")]
 mod lazy_pool;
@@ -54,7 +51,6 @@ pub mod serde_ext;
 #[cfg(feature = "std")]
 pub mod stream_ext;
 pub use into_option::*;
-pub use join::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
 /// Time and duration utilities.
@@ -69,11 +65,8 @@ pub mod wasm;
 mod xtend;
 pub use as_any::*;
 
-#[cfg(feature = "std")]
 pub use async_ext::LifetimeSendBoxedFuture;
-#[cfg(feature = "std")]
 pub use async_ext::MaybeSendBoxedFuture;
-#[cfg(feature = "std")]
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
