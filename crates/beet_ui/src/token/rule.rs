@@ -237,8 +237,8 @@ pub enum Selector {
 }
 
 impl Selector {
-	pub fn class(class: impl Into<SmolStr>) -> Self {
-		Self::Class(class.into())
+	pub fn class(class: impl Into<ClassName>) -> Self {
+		Self::Class(class.into().as_selector())
 	}
 	pub fn tag(tag: impl Into<SmolStr>) -> Self { Self::Tag(tag.into()) }
 	pub fn state(state: ElementState) -> Self { Self::State(state) }

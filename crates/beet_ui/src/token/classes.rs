@@ -13,6 +13,12 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 use super::ClassName;
 
+// ── Color scheme ──────────────────────────────────────────────────────────────
+// Applied to an ancestor element (eg the document root); styled by the
+// `light_scheme`/`dark_scheme` rules and themed down the cascade.
+pub const LIGHT_SCHEME: ClassName = ClassName::new_static("light-scheme");
+pub const DARK_SCHEME: ClassName = ClassName::new_static("dark-scheme");
+
 // ── Buttons ───────────────────────────────────────────────────────────────────
 pub const BTN_FILLED: ClassName = ClassName::new_static("btn-filled");
 pub const BTN_OUTLINED: ClassName = ClassName::new_static("btn-outlined");

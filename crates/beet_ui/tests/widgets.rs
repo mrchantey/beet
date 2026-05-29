@@ -264,6 +264,25 @@ fn preflight_emits_style() {
 	});
 }
 
+#[beet_core::test]
+fn color_scheme_script_emits_scheme_classes() {
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <ColorSchemeScript/> }).unwrap().id();
+	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("script");
+	world.with_state::<ElementQuery, _>(|query| {
+		let body = query
+			.iter_descendant_values(root)
+			.filter_map(|v| v.as_str().ok())
+			.collect::<String>();
+		// the seed script references both scheme classes and the persistence key
+		body.as_str()
+			.xpect_contains(&*classes::LIGHT_SCHEME.as_selector())
+			.xpect_contains(&*classes::DARK_SCHEME.as_selector())
+			.xpect_contains("prefers-color-scheme")
+			.xpect_contains("setColorScheme");
+	});
+}
+
 #[cfg(feature = "net")]
 #[beet_core::test]
 fn analytics_emits_script() {

@@ -753,11 +753,13 @@ mod tests {
 	}
 
 	/// Charcell path: a `.error-text` span resolves its foreground through the
-	/// cascade to the same color as the `Error` token directly.
+	/// cascade to the same color as the `Error` token (light `:root` fallback).
 	#[beet_core::test]
 	fn error_text_resolves_to_error_color() {
 		let mut world = MaterialStylePlugin::world();
-		let entity = world.spawn(rsx_direct! { <span class="error-text"/> }).id();
+		let entity = world
+			.spawn(rsx_direct! { <span {Classes::new([ERROR_TEXT])}/> })
+			.id();
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let foreground =
 				query.resolve(entity, common_props::ForegroundColor).unwrap();

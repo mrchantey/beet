@@ -6,6 +6,7 @@ use material_colors::theme::Palettes;
 use material_colors::theme::ThemeBuilder;
 use crate::style::material::colors;
 use crate::style::material::tones;
+use crate::token::classes;
 
 /// Color conversion helpers for material-colors integration.
 #[extend::ext(name=MaterialColorExt)]
@@ -20,13 +21,10 @@ pub impl Color {
 	}
 }
 
-pub const LIGHT_SCHEME_CLASS: &str = "light-scheme";
-pub const DARK_SCHEME_CLASS: &str = "dark-scheme";
-
 /// Returns a [`Rule`] mapping semantic color tokens to their light-scheme tones.
 pub fn light_scheme() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(LIGHT_SCHEME_CLASS))
+		.with_selector(Selector::class(classes::LIGHT_SCHEME))
 		.with_token(colors::Primary, tones::Primary40).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary100).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary90).unwrap()
@@ -61,7 +59,7 @@ pub fn light_scheme() -> Rule {
 /// Returns a [`Rule`] mapping semantic color tokens to their dark-scheme tones.
 pub fn dark_scheme() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(DARK_SCHEME_CLASS))
+		.with_selector(Selector::class(classes::DARK_SCHEME))
 		.with_token(colors::Primary, tones::Primary80).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary20).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary30).unwrap()

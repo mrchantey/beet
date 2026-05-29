@@ -57,8 +57,11 @@ impl core::fmt::Display for ClassName {
 	}
 }
 
-impl From<ClassName> for SmolStr {
-	fn from(class: ClassName) -> Self { class.as_selector() }
+/// Anything that converts into a [`SmolStr`] (`&str`, `String`, `SmolStr`, …)
+/// is a class name. [`ClassName`] itself converts via the reflexive blanket, so
+/// both flow through `impl Into<ClassName>` APIs like [`Classes::new`].
+impl<S: Into<SmolStr>> From<S> for ClassName {
+	fn from(value: S) -> Self { Self::String(value.into()) }
 }
 
 
@@ -68,8 +71,8 @@ impl From<ClassName> for SmolStr {
 pub struct Classes(HashSet<ClassName>);
 
 impl Classes {
-	pub fn new(classes: impl IntoIterator<Item: Into<SmolStr>>) -> Self {
-		Self(classes.into_iter().map(|c| ClassName::string(c)).collect())
+	pub fn new(classes: impl IntoIterator<Item: Into<ClassName>>) -> Self {
+		Self(classes.into_iter().map(Into::into).collect())
 	}
 
 	pub fn insert_class(&mut self, class: ClassName) -> &mut Self {
