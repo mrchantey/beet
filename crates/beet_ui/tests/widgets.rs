@@ -249,6 +249,20 @@ fn sidebar_branch_renders_details() {
 	});
 }
 
+#[beet_core::test]
+fn preflight_emits_style() {
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <Preflight/> }).unwrap().id();
+	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("style");
+	world.with_state::<ElementQuery, _>(|query| {
+		query
+			.iter_descendant_values(root)
+			.filter_map(|v| v.as_str().ok())
+			.any(|s| s.contains("box-sizing:border-box"))
+			.xpect_true();
+	});
+}
+
 #[cfg(feature = "net")]
 #[beet_core::test]
 fn analytics_emits_script() {

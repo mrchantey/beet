@@ -12,6 +12,8 @@ pub enum Display {
 	Inline,
 	/// Flexbox layout.
 	Flex,
+	/// Removed from layout entirely (hidden), mapping to CSS `display: none`.
+	None,
 }
 
 impl AsCssValue for Display {
@@ -20,6 +22,7 @@ impl AsCssValue for Display {
 			Self::Block => "block",
 			Self::Inline => "inline",
 			Self::Flex => "flex",
+			Self::None => "none",
 		}
 		.xmap(CssValue::expression)
 		.xok()

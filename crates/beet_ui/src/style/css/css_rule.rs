@@ -127,9 +127,12 @@ impl CssRule {
 				.map(|rule| Self::selector_to_css_inner(rule))
 				.collect::<Vec<_>>()
 				.join(", "),
-			Selector::AllOf(_rules) => {
-				unimplemented!("how to do this properly?")
-			}
+			// concatenated with no separator, ie `.input:focus` or `div.btn`
+			Selector::AllOf(rules) => rules
+				.iter()
+				.map(|rule| Self::selector_to_css_inner(rule))
+				.collect::<Vec<_>>()
+				.join(""),
 			Selector::Tag(tag) => tag.to_string(),
 			Selector::Class(class) => format!(".{}", class),
 			Selector::State(ElementState::Hovered) => ":hover".to_string(),

@@ -31,6 +31,9 @@ pub fn token_map()->CssTokenMap{
 		.insert(FontWeightProp)
 		.insert(LineHeight)
 		.insert(Tracking)
+		.insert(TextAlignProp)
+		.insert(DisplayProp)
+		.insert(BorderColorProp)
 }
 
 

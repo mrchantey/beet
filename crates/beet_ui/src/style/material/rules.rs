@@ -51,6 +51,34 @@ pub const APP_BAR: &str = "app-bar";
 pub const APP_BAR_SCROLLED: &str = "app-bar-scrolled";
 pub const CONTAINER: &str = "container";
 pub const PAGE: &str = "page";
+pub const BTN_SECONDARY: &str = "btn-secondary";
+pub const BTN_TERTIARY: &str = "btn-tertiary";
+pub const BTN_ERROR: &str = "btn-error";
+pub const BTN_ICON: &str = "btn-icon";
+pub const INPUT: &str = "input";
+pub const INPUT_OUTLINED: &str = "input-outlined";
+pub const INPUT_FILLED: &str = "input-filled";
+pub const INPUT_TEXT: &str = "input-text";
+pub const SELECT: &str = "select";
+pub const SELECT_OUTLINED: &str = "select-outlined";
+pub const SELECT_FILLED: &str = "select-filled";
+pub const SELECT_TEXT: &str = "select-text";
+pub const ERROR_TEXT: &str = "error-text";
+pub const TABLE: &str = "table";
+pub const SIDEBAR: &str = "sidebar";
+pub const SIDEBAR_LINK: &str = "sidebar-link";
+pub const SIDEBAR_LABEL: &str = "sidebar-label";
+pub const SIDEBAR_GROUP: &str = "sidebar-group";
+pub const HIDDEN: &str = "hidden";
+pub const TEXT_LEFT: &str = "text-left";
+pub const TEXT_CENTER: &str = "text-center";
+pub const TEXT_RIGHT: &str = "text-right";
+pub const TEXT_XS: &str = "text-xs";
+pub const TEXT_SM: &str = "text-sm";
+pub const TEXT_BASE: &str = "text-base";
+pub const TEXT_LG: &str = "text-lg";
+pub const TEXT_XL: &str = "text-xl";
+pub const TEXT_2XL: &str = "text-2xl";
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -124,6 +152,47 @@ pub fn button_base() -> Rule {
 		.with_selector(Selector::Tag("button".into()))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+}
+
+/// Secondary filled button - medium emphasis using the secondary color.
+pub fn button_secondary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_SECONDARY))
+		.with_token(common_props::BackgroundColor,colors::Secondary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSecondary).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Tertiary filled button - medium emphasis using the tertiary color.
+pub fn button_tertiary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_TERTIARY))
+		.with_token(common_props::BackgroundColor,colors::Tertiary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnTertiary).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Error button - destructive action using the error color.
+pub fn button_error() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_ERROR))
+		.with_token(common_props::BackgroundColor,colors::Error).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnError).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Icon button - circular, container-less button sized for a single glyph.
+pub fn button_icon() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_ICON))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
 }
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
@@ -413,6 +482,206 @@ pub fn page() -> Rule {
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 }
 
+// ── Form controls ───────────────────────────────────────────────────────────
+
+/// Shared baseline for `.input` text fields and text areas.
+pub fn input_base() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Outlined input - visible border, transparent fill.
+pub fn input_outlined() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_OUTLINED))
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+}
+
+/// Filled input - shaded container, no border.
+pub fn input_filled() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_FILLED))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
+/// Text input - lowest emphasis, underline only (no container).
+pub fn input_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_TEXT))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+}
+
+/// Focused input - primary-colored border. Compound selector `.input:focus`.
+pub fn input_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(INPUT),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Shared baseline for `.select` elements.
+pub fn select_base() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Outlined select - visible border, transparent fill.
+pub fn select_outlined() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_OUTLINED))
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+}
+
+/// Filled select - shaded container, no border.
+pub fn select_filled() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_FILLED))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
+/// Text select - lowest emphasis.
+pub fn select_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_TEXT))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+}
+
+/// Focused select - primary-colored border. Compound selector `.select:focus`.
+pub fn select_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(SELECT),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Error message text, ie validation feedback below an input.
+pub fn error_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(ERROR_TEXT))
+		.with_token(common_props::ForegroundColor,colors::Error).unwrap()
+		.with_token(TypographyProps,typography::BodySmall).unwrap()
+}
+
+// ── Table ───────────────────────────────────────────────────────────────────
+
+/// Table container - full-width, surface foreground.
+pub fn table() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TABLE))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+		.with_value(common_props::Width, Length::Percent(100.))
+}
+
+/// Header cells - medium weight, left aligned, padded, bottom border.
+pub fn table_th() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("th"))
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_value(common_props::TextAlignProp, TextAlign::Left)
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Body cells - padded, faint divider border.
+pub fn table_td() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("td"))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+// ── Disclosure (`<details>`) + sidebar ───────────────────────────────────────
+
+/// Disclosure container - block layout for `<details>`.
+pub fn details() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("details"))
+		.with_value(common_props::DisplayProp, Display::Block)
+}
+
+/// Disclosure header (`<summary>`) - medium weight, surface foreground.
+pub fn summary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("summary"))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+}
+
+/// Sidebar nav container.
+pub fn sidebar() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+}
+
+/// Sidebar link - primary-colored, for navigable leaves and branches.
+pub fn sidebar_link() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_LINK))
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
+/// Sidebar group label - faint, for non-navigable headers.
+pub fn sidebar_label() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_LABEL))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+}
+
+// ── Utility classes ───────────────────────────────────────────────────────────
+
+/// `display: none` - removed from layout.
+pub fn hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(HIDDEN))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+fn text_align(class: &str, align: TextAlign) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(class))
+		.with_value(common_props::TextAlignProp, align)
+}
+
+fn text_size(class: &str, size: impl Into<Token>) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(class))
+		.with_token(common_props::FontSize, size).unwrap()
+}
+
+// ── Accessibility ─────────────────────────────────────────────────────────────
+
+/// Focus ring - primary-colored border on any focused element (`:focus`).
+pub fn focus_ring() -> Rule {
+	Rule::new()
+		.with_selector(Selector::state(ElementState::Focused))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Disabled elements - faint foreground (`:disabled`).
+pub fn disabled_state() -> Rule {
+	Rule::new()
+		.with_selector(Selector::state(ElementState::Disabled))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+}
+
 /// Returns all Material Design component rules.
 pub fn all_rules() -> Vec<Rule> {
 	vec![
@@ -422,6 +691,10 @@ pub fn all_rules() -> Vec<Rule> {
 		button_text(),
 		button_tonal(),
 		button_elevated(),
+		button_secondary(),
+		button_tertiary(),
+		button_error(),
+		button_icon(),
 		card_filled(),
 		card_elevated(),
 		card_outlined(),
@@ -458,5 +731,107 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar_scrolled(),
 		container(),
 		page(),
+		// form controls — state/compound rules first so they win the cascade
+		input_focus(),
+		select_focus(),
+		input_base(),
+		input_outlined(),
+		input_filled(),
+		input_text(),
+		select_base(),
+		select_outlined(),
+		select_filled(),
+		select_text(),
+		error_text(),
+		// table
+		table(),
+		table_th(),
+		table_td(),
+		// disclosure + sidebar
+		details(),
+		summary(),
+		sidebar(),
+		sidebar_link(),
+		sidebar_label(),
+		// utilities
+		hidden(),
+		text_align(TEXT_LEFT, TextAlign::Left),
+		text_align(TEXT_CENTER, TextAlign::Center),
+		text_align(TEXT_RIGHT, TextAlign::Right),
+		text_size(TEXT_XS, typography::FontSizeLabelSmall),
+		text_size(TEXT_SM, typography::FontSizeBodySmall),
+		text_size(TEXT_BASE, typography::FontSizeBodyLarge),
+		text_size(TEXT_LG, typography::FontSizeTitleLarge),
+		text_size(TEXT_XL, typography::FontSizeHeadlineSmall),
+		text_size(TEXT_2XL, typography::FontSizeHeadlineMedium),
+		// accessibility — global state rules
+		focus_ring(),
+		disabled_state(),
 	]
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use beet_core::prelude::*;
+	use crate::style::material::default_token_map;
+
+	/// CSS map covering both the material tokens and the common props the new
+	/// component rules reference.
+	fn css_map() -> CssTokenMap {
+		default_token_map().with_extend(common_props::token_map())
+	}
+
+	#[beet_core::test]
+	fn component_rules_css() {
+		let rule_set = RuleSet::new(Rule::new()).with_rules(vec![
+			error_text(),
+			input_base(),
+			input_outlined(),
+			input_focus(),
+			table_th(),
+			details(),
+			summary(),
+			hidden(),
+			text_align(TEXT_CENTER, TextAlign::Center),
+		]);
+		CssBuilder::default()
+			.with_minify(false)
+			.with_format_variables(FormatVariables::short())
+			.build(&css_map(), &rule_set)
+			.unwrap()
+			.xpect_snapshot();
+	}
+
+	#[beet_core::test]
+	fn all_rules_emit_selectors() {
+		let css = CssBuilder::default()
+			.with_format_variables(FormatVariables::short())
+			.build(&css_map(), &RuleSet::new(Rule::new()).with_rules(all_rules()))
+			.unwrap();
+		// compound `.input:focus` exercises Selector::AllOf serialization
+		css.as_str()
+			.xpect_contains(".input:focus")
+			.xpect_contains(".btn-error")
+			.xpect_contains(".error-text")
+			.xpect_contains("details")
+			.xpect_contains(".hidden")
+			.xpect_contains(".text-center")
+			.xpect_contains(":disabled");
+	}
+
+	/// Charcell path: a `.error-text` span resolves its foreground through the
+	/// cascade to the same color as the `Error` token directly.
+	#[beet_core::test]
+	fn error_text_resolves_to_error_color() {
+		let mut world = MaterialStylePlugin::world();
+		let entity = world.spawn(rsx_direct! { <span class="error-text"/> }).id();
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let foreground =
+				query.resolve(entity, common_props::ForegroundColor).unwrap();
+			let error = query.resolve(entity, colors::Error).unwrap();
+			foreground.xpect_eq(error);
+		});
+	}
 }

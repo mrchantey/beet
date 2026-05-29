@@ -23,6 +23,7 @@ mod form_controls;
 mod head;
 mod header;
 mod layout;
+mod preflight;
 mod sidebar;
 mod table;
 
@@ -34,5 +35,6 @@ pub use form_controls::*;
 pub use head::*;
 pub use header::*;
 pub use layout::*;
+pub use preflight::*;
 pub use sidebar::*;
 pub use table::*;
