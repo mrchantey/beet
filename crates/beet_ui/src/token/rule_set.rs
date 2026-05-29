@@ -3,19 +3,28 @@ use beet_core::prelude::*;
 use bevy::reflect::Typed;
 use std::collections::VecDeque;
 
-/// Global store of an ordered [`Rule`] list. Rules contain
-/// tokens that may or may not apply to an [`Element`].
-#[derive(Debug, Clone, Reflect, Deref, DerefMut, Resource)]
+/// Global store of style [`Rule`]s.
+///
+/// Holds an ordered list of matching rules plus a single `:root` default rule.
+/// The default rule is the **lowest-priority fallback**: the cascade only
+/// consults it (via [`RuleSetQuery`]) once the matching rules and the ancestor
+/// walk find nothing, so a matching rule like `.dark-scheme` always overrides a
+/// value baked into `:root`. Among the matching rules, earlier entries win ties
+/// (they're ordered most-specific first).
+#[derive(Debug, Clone, Reflect, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
-	#[deref]
+	/// The `:root` rule — the lowest-priority fallback, kept out of `rules` so
+	/// it never shadows a matching rule.
+	default_rule: Rule,
+	/// Ordered matching rules; earlier rules win ties.
 	rules: VecDeque<Rule>,
 	/// Inline rules are only declared once. Calling [`Self::try_insert_inline`]
 	/// with a rule whose selector matches one of these does nothing.
 	registered_inline: HashSet<Selector>,
 }
 
-/// By default, the rule set is initialized with a single root rule
+/// By default, the rule set is initialized with an empty `:root` rule.
 impl Default for RuleSet {
 	fn default() -> Self { Self::new(default()) }
 }
@@ -23,10 +32,9 @@ impl Default for RuleSet {
 
 impl RuleSet {
 	pub fn new(default_rule: Rule) -> Self {
-		let mut rules = VecDeque::with_capacity(1);
-		rules.push_back(default_rule);
 		Self {
-			rules,
+			default_rule,
+			rules: VecDeque::new(),
 			registered_inline: default(),
 		}
 	}
@@ -76,23 +84,20 @@ impl RuleSet {
 		})
 	}
 
-	/// Iterates all rules in insertion order.
+	/// Iterates the matching rules in insertion order, excluding the `:root`
+	/// default rule.
 	pub fn rules(&self) -> impl Iterator<Item = &Rule> { self.rules.iter() }
 
-	/// Gets the first added rule, by default this
-	/// is a rule with a root selector
-	pub fn default_rule(&self) -> &Rule {
-		self.rules
-			.front()
-			.expect("RuleSet should have at least one rule")
+	/// Iterates every rule for serialization — the `:root` default first, then
+	/// the matching rules.
+	pub fn iter(&self) -> impl Iterator<Item = &Rule> {
+		core::iter::once(&self.default_rule).chain(self.rules.iter())
 	}
-	/// Gets the first added rule, by default this
-	/// is a rule with a root selector
-	pub fn default_rule_mut(&mut self) -> &mut Rule {
-		self.rules
-			.front_mut()
-			.expect("RuleSet should have at least one rule")
-	}
+
+	/// The `:root` default rule — the lowest-priority cascade fallback.
+	pub fn default_rule(&self) -> &Rule { &self.default_rule }
+	/// Mutable access to the `:root` default rule.
+	pub fn default_rule_mut(&mut self) -> &mut Rule { &mut self.default_rule }
 	pub fn insert(
 		&mut self,
 		key: impl Into<Token>,
@@ -147,6 +152,9 @@ impl RuleSet {
 	}
 
 	fn cascade(&self, el: &ElementView, key: &Token) -> Result<&TokenValue> {
+		// The `:root` default rule is the lowest-priority fallback,
+		// applied by `RuleSetQuery` after the ancestor walk, so a matching rule
+		// (eg `.dark-scheme`) can override a `:root` default, mirroring CSS.
 		self.rules
 			.iter()
 			.filter(|rule| rule.selector().matches(el))
@@ -187,19 +195,27 @@ impl RuleSetQuery<'_, '_> {
 				// points to another token ie background-color: primary
 				self.resolve_untyped(entity, &token)
 			}
-			Err(err) if !token.is_inherited() => {
-				// dont look in ancestors for non-inherited tokens
-				Err(err)
-			}
 			Err(err) => {
-				if let Ok(ancestor) =
-					self.ancestors.get(entity).map(|ancestor| ancestor.get())
+				// inherited tokens search ancestors before the root fallback
+				if token.is_inherited()
+					&& let Ok(ancestor) =
+						self.ancestors.get(entity).map(|ancestor| ancestor.get())
 				{
 					self.resolve_untyped(ancestor, token)
 				} else {
-					Err(err)
+					// fall back to the `:root` default declarations
+					self.resolve_default(entity, token).map_err(|_| err)
 				}
 			}
+		}
+	}
+
+	/// Resolves `token` against the `:root` default rule — the lowest-priority
+	/// fallback consulted once the cascade and ancestor walk find nothing.
+	fn resolve_default(&self, entity: Entity, token: &Token) -> Result<&Value> {
+		match self.rule_set.default_rule().get(token)? {
+			TokenValue::Value(value) => value.value().xok(),
+			TokenValue::Token(token) => self.resolve_untyped(entity, token),
 		}
 	}
 	pub fn cascade(
@@ -229,12 +245,15 @@ mod tests {
 	#[beet_core::test]
 	fn cascade() {
 		let mut world = World::new();
+		// `Bar`'s value lives in the `:root` default rule (the lowest-priority
+		// fallback); `Foo` points at `Bar` from a matching rule.
 		world.insert_resource(
-			RuleSet::default()
-				.with_token(Foo, Bar)
-				.unwrap()
-				.with_value(Bar, 3u32)
-				.unwrap(),
+			RuleSet::default().with_value(Bar, 3u32).unwrap().with_rule(
+				Rule::new()
+					.with_selector(Selector::Any)
+					.with_token(Foo, Bar)
+					.unwrap(),
+			),
 		);
 		let mut entity = world.spawn(rsx_direct! { <div/> });
 
@@ -245,15 +264,18 @@ mod tests {
 			})
 			.unwrap()
 			.xpect_eq(TokenValue::token(Bar));
+
+		// `Bar` lives only in the `:root` default rule, which `cascade` excludes ...
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.cascade(entity, &Bar.into()).cloned()
+				query.cascade(entity, &Bar.into()).is_err()
 			})
-			.unwrap()
-			.xpect_eq(TokenValue::value(3u32).unwrap());
+			.xpect_true();
+
+		// ... but resolution falls back to it, following the token chain
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.resolve_untyped(entity, &Bar.into()).cloned()
+				query.resolve_untyped(entity, &Foo.into()).cloned()
 			})
 			.unwrap()
 			.xpect_eq(3u32.into());
