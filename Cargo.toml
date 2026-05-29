@@ -125,10 +125,14 @@ send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
 web-time = "1"
 itertools = { version = "0.14", default-features = false }
-uuid = {version = "1",features=["js"]}
+# default-features off (drops `std`) so dependents can compile on no_std;
+# std consumers re-add `uuid/std`. `js`/`rng-getrandom` backends are opt-in per crate.
+uuid = { version = "1", default-features = false }
 chrono = "0.4"
-rand = "0.9"
-rand_chacha = "0.9"
+# default-features off (drops `std`, `std_rng`, `thread_rng`) so dependents can
+# compile on no_std; std consumers re-add the relevant features.
+rand = { version = "0.9", default-features = false }
+rand_chacha = { version = "0.9", default-features = false }
 # wasm_js ignored in native
 getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
@@ -361,7 +365,7 @@ beet_examples = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
-uuid = { workspace = true, features = ["rng-getrandom"] }
+uuid = { workspace = true, features = ["std", "rng-getrandom"] }
 
 [dev-dependencies]
 beet = { path = "." }
