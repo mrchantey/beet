@@ -100,6 +100,7 @@ pub impl Vec3 {
 	#[cfg(feature = "rand")]
 	/// Returns a random position on the surface of a unit sphere.
 	fn random_on_sphere(rng: &mut impl rand::Rng) -> Self {
+		// `f32::sin`/`cos` are std-only; `bevy::math::ops` uses libm under no_std.
 		use bevy::math::ops;
 		let theta = rng.random_range(0.0..core::f32::consts::TAU);
 		let phi = rng.random_range(0.0..core::f32::consts::PI);
@@ -113,6 +114,7 @@ pub impl Vec3 {
 	#[cfg(feature = "rand")]
 	/// Returns a random position inside a unit sphere.
 	fn random_in_sphere(rng: &mut impl rand::Rng) -> Self {
+		// `f32::sin`/`cos`/`powf` are std-only; `bevy::math::ops` uses libm under no_std.
 		use bevy::math::ops;
 		let theta = rng.random_range(0.0..core::f32::consts::TAU);
 		let phi = rng.random_range(0.0..core::f32::consts::PI);

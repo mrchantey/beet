@@ -440,8 +440,15 @@ impl BackoffIter {
 			#[cfg(feature = "rand")]
 			rng: {
 				use rand::SeedableRng;
-				// no_std-capable seed via getrandom (see `RandomSource`)
-				rand_chacha::ChaCha8Rng::from_os_rng()
+				cfg_if! {
+					if #[cfg(feature = "std")] {
+						// std: seed from the thread-local entropy generator.
+						rand_chacha::ChaCha8Rng::from_rng(&mut rand::rng())
+					} else {
+						// no_std: seed from the platform entropy source (getrandom).
+						rand_chacha::ChaCha8Rng::from_os_rng()
+					}
+				}
 			},
 			inner,
 		}

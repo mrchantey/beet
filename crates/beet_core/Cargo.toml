@@ -100,6 +100,12 @@ std = [
 	"dep:async-executor",
 	"dep:async-io",
 	"dep:async-task",
+	# std builds want the full rand surface: `rand::rng()` (thread_rng) and the
+	# std backends. Optional so non-rand std builds are unaffected.
+	"rand?/std",
+	"rand?/thread_rng",
+	"rand_chacha?/std",
+	"uuid?/std",
 ]
 # vendored bevy_async bridge + beet's high-level AsyncWorld/AsyncEntity layer.
 # std-independent: only the default task spawner differs by target.
@@ -222,11 +228,16 @@ proc-macro2-diagnostics = { workspace = true, optional = true }
 variadics_please = { workspace = true, optional = true }
 prettyplease = { workspace = true, optional = true }
 
-# rand
-rand = { workspace = true, optional = true }
+# rand — workspace sets default-features = false so the `rand` feature is
+# no_std-capable (bare embedded targets). `std_rng` brings ChaCha, `os_rng`
+# brings `from_os_rng` + getrandom. The `std` feature below re-adds `rand/std`
+# + `thread_rng` so std builds keep `rand::rng()`.
+rand = { workspace = true, optional = true, features = ["std_rng", "os_rng"] }
 rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true, features = ["v4", "v7"] }
+# workspace sets default-features = false so uuid compiles on no_std (it is only
+# *used* by the std-only `tempdir`); `uuid/std` is re-added by the `std` feature.
+uuid = { workspace = true, optional = true, features = ["v4", "v7", "rng-getrandom"] }
 
 ## utils
 thiserror.workspace = true

@@ -26,7 +26,10 @@ mod actions;
 mod store_actions;
 #[cfg(feature = "std")]
 mod net_plugin;
-#[cfg(feature = "std")]
+// The server module is no_std-capable: only the `HttpServer` component and its
+// `set_http_server` install hook compile unconditionally — the concrete
+// backends (mini/hyper/lambda) and the cli/repl servers stay std/feature-gated
+// inside the module.
 mod server;
 /// WebSocket client and server implementations.
 #[cfg(feature = "std")]
@@ -63,7 +66,6 @@ pub mod prelude {
 	pub use crate::client::*;
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
-	#[cfg(feature = "std")]
 	pub use crate::server::*;
 	#[cfg(feature = "std")]
 	pub use crate::sockets;

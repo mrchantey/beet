@@ -31,6 +31,7 @@ std = [
 	"dep:send_wrapper",
 	"dep:uuid",
 	"uuid/v7",
+	"uuid/std",
 	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
 	# so it (and the extractors that use it) are std-only.
 	"dep:serde_urlencoded",

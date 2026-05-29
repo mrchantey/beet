@@ -76,7 +76,6 @@ beet_action = { workspace = true, optional = true, features = ["std", "reflect"]
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
-uuid.workspace = true
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

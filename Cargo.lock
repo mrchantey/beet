@@ -1645,7 +1645,6 @@ dependencies = [
  "tree-sitter-javascript",
  "tree-sitter-json",
  "tree-sitter-rust",
- "uuid",
  "variadics_please",
  "vte",
  "webbrowser",

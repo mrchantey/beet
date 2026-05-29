@@ -260,8 +260,10 @@ pub mod prelude {
 	// bare no_std target it reads from a clock source the embedded adapter
 	// installs via `Instant::set_elapsed(...)` (see agent/plans/no_std_instant.md).
 	pub use bevy::platform::time::Instant;
-	// Wall-clock time is the getter-backed `time_ext::now()` (no_std); code that
-	// needs the std `SystemTime` type imports `std::time::SystemTime` directly.
+	// wall-clock helpers, incl. the `set_now`/`try_now` hook a no_std adapter
+	// (eg an SNTP client) uses to supply time. Code that needs the std
+	// `SystemTime` type imports `std::time::SystemTime` directly.
+	pub use crate::time_ext;
 
 	#[cfg(feature = "std")]
 	pub use crate::abs_file;

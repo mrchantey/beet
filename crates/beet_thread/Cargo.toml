@@ -28,7 +28,7 @@ beet_core = { workspace = true, features = ["std", "serde","bevy_reflect_documen
 beet_router = { workspace = true, features = ["json"] }
 beet_action = { workspace = true, optional = true, features = ["std", "reflect", "json"] }
 bevy.workspace = true
-uuid = { workspace = true, features = ["v7", "js"] }
+uuid = { workspace = true, features = ["std", "v7", "js"] }
 async-openai = { version = "0.34", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
