@@ -82,13 +82,16 @@ std = [
 	"tracing/std",
 	"serde?/std",
 	"serde_json?/std",
+	"rand?/std",
+	"rand?/std_rng",
+	"rand?/thread_rng",
+	"rand_chacha?/std",
 	"futures-lite/race",
 	# the async bridge is std-independent, but every std build wants it
 	"bevy_async",
 	"beet_async?/std",
 	"dep:send_wrapper",
 	"dep:dotenv",
-	"dep:web-time",
 	"dep:async-lock",
 	"dep:pathdiff",
 	"dep:glob",
@@ -138,13 +141,24 @@ ron = ["serde", "dep:ron"]
 serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
-rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom","dep:uuid"]
+# no_std-capable RNG: `os_rng` seeds `ChaCha8Rng::from_os_rng()` via getrandom
+# (a bare target installs a getrandom backend at boot); `std` adds thread_rng.
+rand = [
+	"dep:rand",
+	"rand/os_rng",
+	"rand/alloc",
+	"dep:rand_chacha",
+	"dep:getrandom",
+]
 
+# fs is std-only (notify/async-fs); `uuid` lives here as `tempdir` is its only
+# user (`Uuid::now_v7`, which needs a clock).
 fs = [
 	"dep:notify",
 	"dep:notify-debouncer-full",
 	"dep:async-fs",
 	"dep:async-process",
+	"dep:uuid",
 ]
 tokens = [
 	"serde",
@@ -172,7 +186,6 @@ bevy_reflect.workspace = true
 tracing.workspace = true
 itertools = { workspace = true, features = ["use_alloc"] }
 send_wrapper = { workspace = true, optional = true }
-web-time = { workspace = true, optional = true }
 dotenv = { workspace = true, optional = true }
 smol_str = { workspace = true }
 heck.workspace = true

@@ -235,6 +235,10 @@ pub mod prelude {
 	pub use crate::js_runtime;
 
 	pub use bevy::prelude::*;
+	// no_std-capable integer-power helpers (`.squared()`/`.cubed()`); the
+	// `ops` module (cross-platform `sin`/`cos`/…) already arrives via
+	// `bevy::prelude`.
+	pub use bevy::math::FloatPow;
 	/// hack to fix bevy macros
 	pub use bevy::reflect as bevy_reflect;
 	pub use bevy::time::Stopwatch;
@@ -256,9 +260,8 @@ pub mod prelude {
 	// bare no_std target it reads from a clock source the embedded adapter
 	// installs via `Instant::set_elapsed(...)` (see agent/plans/no_std_instant.md).
 	pub use bevy::platform::time::Instant;
-	// `SystemTime` (wall-clock) has no no_std equivalent — stays std-only.
-	#[cfg(feature = "std")]
-	pub use web_time::SystemTime;
+	// Wall-clock time is the getter-backed `time_ext::now()` (no_std); code that
+	// needs the std `SystemTime` type imports `std::time::SystemTime` directly.
 
 	#[cfg(feature = "std")]
 	pub use crate::abs_file;
@@ -291,8 +294,6 @@ pub mod exports {
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;
-	#[cfg(feature = "std")]
-	pub use web_time;
 
 	// merged-in exports
 	#[cfg(feature = "std")]

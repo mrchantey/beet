@@ -206,10 +206,7 @@ impl ArtifactsClient {
 fn current_ledger_key() -> SmolPath { SmolPath::new("current-ledger.json") }
 
 pub(crate) fn now_timestamp() -> String {
-	let duration = SystemTime::now()
-		.duration_since(SystemTime::UNIX_EPOCH)
-		.unwrap_or_default();
-	format!("{}s", duration.as_secs())
+	format!("{}s", time_ext::now().as_secs())
 }
 
 

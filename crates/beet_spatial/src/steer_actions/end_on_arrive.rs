@@ -38,7 +38,7 @@ pub(crate) fn end_on_arrive(
 		match target.get_position(&transforms) {
 			Ok(target) => {
 				if transform.translation().distance_squared(target)
-					<= end_on_arrive.radius.powi(2)
+					<= end_on_arrive.radius.squared()
 				{
 					commands.entity(action).queue(EndRun(Outcome::PASS));
 				}
