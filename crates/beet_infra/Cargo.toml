@@ -40,7 +40,7 @@ required-features = ["bindings_generator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["std", "json", "rand", "fs"] }
-beet_net.workspace = true
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http"] }
 bytes.workspace = true
 beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
@@ -61,7 +61,7 @@ prettyplease = { workspace = true, optional = true }
 async-process = { workspace = true }
 
 [dev-dependencies]
-beet_net = { workspace = true, features = ["ureq", "rustls-tls","server"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls", "server"] }
 beet_router = { workspace = true, features = ["http"] }
 beet_core = { workspace = true, features = ["testing"] }
 pretty_env_logger.workspace = true

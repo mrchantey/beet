@@ -161,8 +161,8 @@ pub struct ParamMeta {
 	required: bool,
 }
 
-impl std::fmt::Display for ParamMeta {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ParamMeta {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "Param - name: {}", self.key)?;
 		if let Some(short) = self.short() {
 			write!(f, ", short: -{}", short)?;
@@ -256,8 +256,8 @@ pub enum ParamValue {
 	Multiple,
 }
 
-impl std::fmt::Display for ParamValue {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ParamValue {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::Flag => write!(f, "flag"),
 			Self::Single => write!(f, "single"),

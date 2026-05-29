@@ -83,7 +83,9 @@ beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11", default-featu
 # vendored bevy_async bridge; no_std by default, std consumers add `features = ["std"]`.
 beet_async = { path = "crates/beet_async", version = "0.0.9-dev.11", default-features = false }
 beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
+# no_std by default (the `types/` wire types); std-only consumers add
+# `features = ["std", "serde", "fs", "http"]`.
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11", default-features = false }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-features = false }
@@ -140,6 +142,8 @@ pretty_env_logger = "0.4"
 
 #💡 async
 futures = "0.3"
+# no_std core stream/future traits, used by no_std-capable wire types.
+futures-core = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
 pin-project = "1"
 async-channel = "2"
@@ -182,7 +186,8 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 rhai = { version = "1", features = ["serde"] }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
-base64 = "0.22"
+# no_std by default (alloc only); std consumers re-enable `base64/std`.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = "0.10"
 ron = "0.8"
 toml = "0.8"
@@ -229,7 +234,7 @@ default = ["std", "ui"]
 
 # Standard library support (enabled by default). no_std consumers depend on beet
 # with `default-features = false`.
-std = ["beet_core/std", "beet_action?/std"]
+std = ["beet_core/std", "beet_action?/std", "beet_net?/std"]
 # Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
 # critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
 embedded = ["beet_core/embedded"]

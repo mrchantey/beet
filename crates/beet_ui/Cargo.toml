@@ -36,7 +36,7 @@ required-features = ["style"]
 default = ["std","rsx", "style"]
 std = []
 action = ["dep:beet_action", "net"]
-net = ["std", "dep:beet_net"]
+net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/fs", "beet_net/http"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 # Bevy's first-party scene system (`Scene`/`Template`/`bsn!`). Heavy + std-only,
@@ -102,7 +102,7 @@ streaming-iterator = { version = "0.1", optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net.workspace = true
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http"] }
 
 [lib]
 harness = false

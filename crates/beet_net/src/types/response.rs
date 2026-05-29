@@ -19,7 +19,7 @@
 use super::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use std::convert::Infallible;
+use core::convert::Infallible;
 
 /// A generalized response type that can represent HTTP responses, CLI output,
 /// or other request-response patterns.
@@ -54,10 +54,10 @@ pub struct ResponseMarker {
 	_sealed: (),
 }
 
-impl std::error::Error for Response {}
+impl core::error::Error for Response {}
 
-impl std::fmt::Display for Response {
-	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Response {
+	fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(
 			formatter,
 			"Response - Status: {}, Message: '{}'",
@@ -78,12 +78,12 @@ impl PartialEq for Response {
 	}
 }
 
-impl std::ops::Deref for Response {
+impl core::ops::Deref for Response {
 	type Target = ResponseParts;
 	fn deref(&self) -> &Self::Target { &self.parts }
 }
 
-impl std::ops::DerefMut for Response {
+impl core::ops::DerefMut for Response {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
 }
 
@@ -208,7 +208,7 @@ impl Response {
 	/// let value: u32 = response.deserialize_blocking().unwrap();
 	/// assert_eq!(value, 42);
 	/// ```
-	#[cfg(feature = "serde")]
+	#[cfg(all(feature = "serde", feature = "std"))]
 	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
@@ -257,13 +257,10 @@ impl Response {
 	}
 
 	/// Create a response with the given body, inferring the content type
-	/// from the file extension via [`MediaType::from_path`].
+	/// from the path's extension via [`SmolPath::media_type`].
 	/// Defaults to `application/octet-stream` for unrecognized extensions.
-	pub fn ok_from_path(
-		body: impl Into<Body>,
-		path: impl AsRef<std::path::Path>,
-	) -> Self {
-		let media_type = MediaType::from_path(path);
+	pub fn ok_from_path(body: impl Into<Body>, path: impl Into<SmolPath>) -> Self {
+		let media_type = path.into().media_type().unwrap_or(MediaType::Bytes);
 		Self::ok_body(body, media_type)
 	}
 

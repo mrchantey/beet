@@ -51,7 +51,7 @@ pub mod prelude {
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::prelude::*;
-	#[cfg(all(feature = "net",feature="json"))]
+	#[cfg(all(feature = "net", feature = "json", feature = "std"))]
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;

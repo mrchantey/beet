@@ -102,10 +102,10 @@ impl HttpError {
 		}
 	}
 }
-impl std::error::Error for HttpError {}
+impl core::error::Error for HttpError {}
 
-impl std::fmt::Display for HttpError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for HttpError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		if self.message.is_empty() {
 			write!(f, "{}", self.status_code)
 		} else {
@@ -136,7 +136,7 @@ impl From<serde_json::Error> for HttpError {
 	fn from(err: serde_json::Error) -> HttpError { Self::from_opaque(err) }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl From<serde_urlencoded::de::Error> for HttpError {
 	fn from(err: serde_urlencoded::de::Error) -> HttpError {
 		Self::from_opaque(err)

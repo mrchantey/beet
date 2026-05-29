@@ -1523,6 +1523,7 @@ dependencies = [
  "eventsource-stream",
  "extend",
  "futures",
+ "futures-core",
  "futures-lite",
  "futures-rustls",
  "heck",

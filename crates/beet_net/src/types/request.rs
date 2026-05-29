@@ -64,12 +64,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		.insert(RequestMeta::new(parts));
 }
 
-impl std::ops::Deref for Request {
+impl core::ops::Deref for Request {
 	type Target = RequestParts;
 	fn deref(&self) -> &Self::Target { &self.parts }
 }
 
-impl std::ops::DerefMut for Request {
+impl core::ops::DerefMut for Request {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.parts }
 }
 
@@ -81,7 +81,9 @@ pub struct RequestMeta {
 	/// The request metadata, including method, path, headers, etc.
 	parts: RequestParts,
 	/// Note this is taken the moment the request is inserted. It does not account
-	/// for the approx 70us overhead created by using bevy at all.
+	/// for the approx 70us overhead created by using bevy at all. Only available
+	/// on std, where a wall clock ([`Instant`]) exists.
+	#[cfg(feature = "std")]
 	started: Instant,
 }
 
@@ -90,6 +92,7 @@ impl RequestMeta {
 	pub fn new(parts: RequestParts) -> Self {
 		Self {
 			parts,
+			#[cfg(feature = "std")]
 			started: Instant::now(),
 		}
 	}
@@ -101,7 +104,7 @@ impl RequestMeta {
 	pub fn request_parts(&self) -> &RequestParts { &self.parts }
 }
 
-impl std::ops::Deref for RequestMeta {
+impl core::ops::Deref for RequestMeta {
 	type Target = RequestParts;
 	fn deref(&self) -> &Self::Target { &self.parts }
 }
@@ -183,7 +186,7 @@ impl Request {
 	/// Sets the request body from a stream
 	pub fn with_body_stream<S>(mut self, stream: S) -> Self
 	where
-		S: 'static + Send + Sync + futures::Stream<Item = Result<Bytes>>,
+		S: 'static + Send + Sync + futures_core::Stream<Item = Result<Bytes>>,
 	{
 		self.body = Body::stream(stream);
 		self
@@ -284,7 +287,7 @@ impl Request {
 	/// let value: u32 = request.deserialize_blocking().unwrap();
 	/// assert_eq!(value, 42);
 	/// ```
-	#[cfg(feature = "serde")]
+	#[cfg(all(feature = "serde", feature = "std"))]
 	pub fn deserialize_blocking<T: serde::de::DeserializeOwned>(
 		self,
 	) -> Result<T> {
@@ -319,7 +322,7 @@ impl Request {
 	}
 
 	/// Parse both the key and value as valid URL query parameters
-	#[cfg(feature = "serde")]
+	#[cfg(all(feature = "serde", feature = "std"))]
 	pub fn parse_query_param<
 		T1: serde::Serialize + ?Sized,
 		T2: serde::Serialize,
@@ -388,6 +391,7 @@ impl Request {
 	/// set as the request body with a JSON `content-type`, mirroring an HTTP
 	/// request carrying a payload. Returns a Result for API symmetry, though
 	/// parsing always succeeds.
+	#[cfg(feature = "std")]
 	pub fn from_cli_args(mut args: CliArgs) -> Result<Self> {
 		let body = args.params.remove("body");
 		let request = Self {
@@ -404,6 +408,7 @@ impl Request {
 	}
 
 	/// Creates a request by parsing a CLI-style string.
+	#[cfg(feature = "std")]
 	pub fn from_cli_str(args: &str) -> Result<Self> {
 		let cli_args = CliArgs::parse(args);
 		Self::from_cli_args(cli_args)
@@ -449,6 +454,7 @@ impl From<&str> for Request {
 	fn from(path: &str) -> Self { Request::get(path) }
 }
 
+#[cfg(feature = "std")]
 impl From<CliArgs> for Request {
 	fn from(args: CliArgs) -> Self {
 		// infallible, see [`Request::from_cli_args`]
@@ -472,9 +478,10 @@ pub trait FromRequest<M>: Sized {
 /// This type also matches primitives: `(), String, u32 etc`
 #[derive(TypePath)]
 pub struct SerdeFromRequestMarker;
+#[cfg(feature = "serde")]
 impl<T> FromRequest<SerdeFromRequestMarker> for T
 where
-	T: DeserializeOwned + Send + 'static,
+	T: serde::de::DeserializeOwned + Send + 'static,
 {
 	fn from_request(
 		request: Request,

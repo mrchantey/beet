@@ -1,6 +1,5 @@
 use super::*;
 use beet_core::prelude::*;
-use std::path::Path;
 
 /// Extract the relative path from request metadata.
 impl FromRequestMeta<Self> for SmolPath {
@@ -33,25 +32,17 @@ pub fn smol_path_from_parts(parts: &RequestParts) -> SmolPath {
 	SmolPath::from_segments(parts.path())
 }
 
-/// Convert a local file path to a [`SmolPath`] suitable for URL routing.
+/// Convert a logical file path to a [`SmolPath`] suitable for URL routing.
 /// - Extensions are removed
 /// - `index` file stems are removed
-/// - Leading `/` is stripped
-pub fn url_path_from_file_path(file_path: impl AsRef<Path>) -> Result<SmolPath> {
-	let mut path = file_path.as_ref().to_path_buf();
-	path.set_extension("");
-	if path
-		.file_stem()
-		.and_then(|stem| stem.to_str())
-		.is_some_and(|stem| stem == "index")
-	{
-		path.pop();
+/// - Leading/trailing `/` is stripped (by [`SmolPath`])
+pub fn url_path_from_file_path(file_path: impl Into<SmolPath>) -> SmolPath {
+	let path = file_path.into().with_extension("");
+	if path.file_stem() == Some("index") {
+		path.parent().unwrap_or_default()
+	} else {
+		path
 	}
-	let mut raw_str = path.to_string_lossy().to_string();
-	if raw_str.len() > 1 && raw_str.ends_with('/') {
-		raw_str.pop();
-	}
-	Ok(SmolPath::new(raw_str))
 }
 
 
@@ -76,7 +67,6 @@ mod test {
 			("/index/hi/", "index/hi"),
 		] {
 			url_path_from_file_path(value)
-				.unwrap()
 				.to_string()
 				.xpect_eq(expected);
 		}

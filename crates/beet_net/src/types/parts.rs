@@ -27,12 +27,13 @@
 
 use super::*;
 use beet_core::prelude::*;
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 /// The default HTTP version string.
 const DEFAULT_HTTP_VERSION: &str = "1.1";
 
 /// The default CLI version string.
+#[cfg(feature = "std")]
 const DEFAULT_CLI_VERSION: &str = "0.1.0";
 
 
@@ -302,7 +303,7 @@ impl ResponseParts {
 	pub fn status(&self) -> StatusCode { self.status }
 
 	/// Use exit code conventions to map a status to an exit code.
-	pub fn status_to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
+	pub fn status_to_exit_code(&self) -> Result<(), core::num::NonZeroU8> {
 		self.status().to_exit_code()
 	}
 
@@ -411,6 +412,7 @@ impl From<&http::response::Parts> for ResponseParts {
 // Conversion: CliArgs -> RequestParts
 // ============================================================================
 
+#[cfg(feature = "std")]
 impl From<CliArgs> for RequestParts {
 	fn from(cli: CliArgs) -> Self {
 		let url = Url::new(Scheme::None, None, cli.path, cli.params, None);

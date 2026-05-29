@@ -75,12 +75,12 @@ impl StatusCode {
 	/// Converts status to exit code convention result.
 	///
 	/// Returns `Ok(())` for success, or `Err(NonZeroU8)` for errors.
-	pub fn to_exit_code(&self) -> Result<(), std::num::NonZeroU8> {
+	pub fn to_exit_code(&self) -> Result<(), core::num::NonZeroU8> {
 		let code: u8 = self.to_process_exit_code();
 		if code == 0 {
 			Ok(())
 		} else {
-			Err(std::num::NonZeroU8::new(code).unwrap())
+			Err(core::num::NonZeroU8::new(code).unwrap())
 		}
 	}
 
@@ -180,8 +180,8 @@ impl StatusCode {
 	}
 }
 
-impl std::fmt::Display for StatusCode {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for StatusCode {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{} {}", self.0, self.message())
 	}
 }

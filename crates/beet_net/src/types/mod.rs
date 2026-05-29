@@ -58,10 +58,14 @@ pub use status_code::*;
 #[cfg(feature = "http")]
 pub mod http_ext;
 
-// higher-level exchange patterns
+// higher-level exchange patterns built on the action system (std-only)
+#[cfg(feature = "std")]
 mod exchange;
+#[cfg(feature = "std")]
 mod exchange_stats;
 mod extractors;
+#[cfg(feature = "std")]
 pub use exchange::*;
+#[cfg(feature = "std")]
 pub use exchange_stats::*;
 pub use extractors::*;

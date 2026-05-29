@@ -22,7 +22,7 @@
 //! assert_eq!(url.to_string(), "https://example.com/api/users?limit=10#results");
 //! ```
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use beet_core::prelude::*;
 
@@ -310,8 +310,8 @@ impl Url {
 	}
 }
 
-impl std::fmt::Display for Url {
-	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Url {
+	fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		let query = self.query_string();
 
 		match (&self.scheme, &self.authority) {
@@ -467,8 +467,8 @@ impl Scheme {
 	}
 }
 
-impl std::fmt::Display for Scheme {
-	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Scheme {
+	fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(formatter, "{}", self.as_str())
 	}
 }
@@ -552,7 +552,7 @@ pub(crate) fn http_header_map_to_header_map(
 pub(crate) fn header_map_to_http(
 	headers: &super::HeaderMap,
 ) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {
-	use std::str::FromStr;
+	use core::str::FromStr;
 	let mut http_headers = http::HeaderMap::new();
 	for (key, values) in headers.iter_all() {
 		let header_name = http::header::HeaderName::from_str(key)

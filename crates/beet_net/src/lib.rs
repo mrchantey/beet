@@ -1,21 +1,31 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 beet_core::test_main!();
 
-mod actions;
-mod client;
+/// Transport-agnostic request/response wire types — the no_std core.
 mod types;
 /// Re-export the typed header module at crate level.
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
+// std-only: transports, stores, servers, sockets, and the action integration.
+#[cfg(feature = "std")]
+mod actions;
+#[cfg(feature = "std")]
+mod client;
+#[cfg(feature = "std")]
 mod store;
+#[cfg(feature = "std")]
 mod store_actions;
-/// Re-export media-type-driven serialization at crate level.
+#[cfg(feature = "std")]
 mod net_plugin;
+#[cfg(feature = "std")]
 mod server;
 /// WebSocket client and server implementations.
+#[cfg(feature = "std")]
 pub mod sockets;
 /// SSH client and server implementations.
 #[cfg(any(feature = "russh_server", feature = "russh_client"))]
@@ -42,12 +52,19 @@ pub mod prelude {
 	/// Default port for WebSocket connections in webdriver sessions.
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
+	#[cfg(feature = "std")]
 	pub use crate::actions::*;
+	#[cfg(feature = "std")]
 	pub use crate::store::*;
+	#[cfg(feature = "std")]
 	pub use crate::store_actions::*;
+	#[cfg(feature = "std")]
 	pub use crate::client::*;
+	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
+	#[cfg(feature = "std")]
 	pub use crate::server::*;
+	#[cfg(feature = "std")]
 	pub use crate::sockets;
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]
 	pub use crate::ssh::*;
@@ -61,6 +78,7 @@ pub mod prelude {
 
 	// Re-export common types from dependencies
 	pub use bevy::tasks::futures_lite::StreamExt;
+	#[cfg(feature = "std")]
 	pub use uuid::Uuid;
 }
 

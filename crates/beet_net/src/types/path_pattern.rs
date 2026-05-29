@@ -1,7 +1,6 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
 use beet_core::prelude::*;
-use std::collections::VecDeque;
-use std::path::Path;
+use alloc::collections::VecDeque;
 use thiserror::Error;
 
 /// Modifier for path pattern segments, aligned with URL Pattern API.
@@ -61,9 +60,9 @@ pub struct PathPartial {
 
 impl PathPartial {
 	/// Create a new `PathPartial` with the given path which is split into segments.
-	pub fn new(path: impl AsRef<Path>) -> Self { Self::parse(path).unwrap() }
+	pub fn new(path: impl AsRef<str>) -> Self { Self::parse(path).unwrap() }
 	/// Parses a path string into a [`PathPartial`].
-	pub fn parse(path: impl AsRef<Path>) -> Result<Self> {
+	pub fn parse(path: impl AsRef<str>) -> Result<Self> {
 		Self {
 			segments: PathPattern::new(path)?.segments,
 		}
@@ -92,7 +91,7 @@ pub struct PathPattern {
 	is_static: bool,
 }
 
-impl std::ops::Deref for PathPattern {
+impl core::ops::Deref for PathPattern {
 	type Target = Vec<PathPatternSegment>;
 	fn deref(&self) -> &Self::Target { &self.segments }
 }
@@ -101,11 +100,10 @@ impl PathPattern {
 	/// Parse a path into [`PathPatternSegments`]
 	/// ## Errors
 	/// - Errors if path contains a greedy pattern that isnt last
-	pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+	pub fn new(path: impl AsRef<str>) -> Result<Self> {
 		path.as_ref()
-			.to_string_lossy()
 			.split('/')
-			.filter(|s| !s.is_empty())
+			.filter(|segment| !segment.is_empty())
 			.map(PathPatternSegment::new)
 			.collect::<Vec<_>>()
 			.xmap(Self::from_segments)
@@ -211,8 +209,8 @@ impl PathPattern {
 	}
 }
 
-impl std::fmt::Display for PathPattern {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for PathPattern {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.annotated_path())
 	}
 }
@@ -540,8 +538,8 @@ impl From<String> for PathPatternSegment {
 	fn from(value: String) -> Self { Self::new(value) }
 }
 /// Print the segment name without dynamic and wildcard annotations
-impl std::fmt::Display for PathPatternSegment {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for PathPatternSegment {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.name)
 	}
 }

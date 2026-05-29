@@ -29,7 +29,7 @@ bevy.workspace = true
 beet_rsx.workspace = true
 beet_core.workspace = true
 beet_dom.workspace = true
-beet_net.workspace = true
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http"] }
 beet_flow.workspace = true
 beet_router.workspace = true
 chrono.workspace = true
