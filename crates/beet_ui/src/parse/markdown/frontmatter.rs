@@ -61,6 +61,27 @@ impl Frontmatter {
 			.and_then(|field| field.try_downcast_ref::<String>())
 			.map(|s| s.as_str())
 	}
+
+	/// Get a boolean field from the frontmatter by name.
+	///
+	/// Returns `None` if the field does not exist or is not a bool.
+	pub fn get_bool(&self, key: &str) -> Option<bool> {
+		self.value
+			.field(key)
+			.and_then(|field| field.try_downcast_ref::<bool>())
+			.copied()
+	}
+
+	/// Get an unsigned-integer field from the frontmatter by name.
+	///
+	/// Unsigned scalars parse to [`Value::Uint`](crate::prelude::Value::Uint)
+	/// (stored as `u64`); returns `None` if the field is missing or non-uint.
+	pub fn get_uint(&self, key: &str) -> Option<u64> {
+		self.value
+			.field(key)
+			.and_then(|field| field.try_downcast_ref::<u64>())
+			.copied()
+	}
 }
 
 /// Build a [`DynamicStruct`] from a list of key-value pairs.

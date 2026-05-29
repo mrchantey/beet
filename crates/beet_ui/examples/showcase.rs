@@ -160,7 +160,7 @@ fn sidebar_nodes() -> Vec<SidebarNode> {
 	vec![
 		SidebarNode {
 			display_name: "Home".into(),
-			path: Some("/".into()),
+			path: Some(RelPath::new("/")),
 			..default()
 		},
 		SidebarNode {
@@ -170,15 +170,16 @@ fn sidebar_nodes() -> Vec<SidebarNode> {
 			children: vec![
 				SidebarNode {
 					display_name: "Intro".into(),
-					path: Some("/docs/intro".into()),
+					path: Some(RelPath::new("docs/intro")),
 					..default()
 				},
 				SidebarNode {
 					display_name: "API".into(),
-					path: Some("/docs/api".into()),
+					path: Some(RelPath::new("docs/api")),
 					..default()
 				},
 			],
+			..default()
 		},
 	]
 }

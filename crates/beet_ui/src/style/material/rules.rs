@@ -10,6 +10,7 @@ use crate::style::material::*;
 // the class-name vocabulary these rules style lives in `token::classes`, shared
 // with the widgets that emit the same classes.
 use crate::token::classes::*;
+use beet_core::prelude::Duration;
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -615,6 +616,16 @@ pub fn page_break() -> Rule {
 		.with_value(common_props::BreakAfterProp, BreakAfter::Page)
 }
 
+/// Zeroes transition/animation duration when the user prefers reduced motion
+/// (`@media (prefers-reduced-motion: reduce) { * { …-duration: 0ms } }`).
+pub fn reduced_motion() -> Rule {
+	Rule::new()
+		.with_selector(Selector::Any)
+		.with_media(MediaQuery::ReducedMotion)
+		.with_value(common_props::TransitionDurationProp, Duration::ZERO)
+		.with_value(common_props::AnimationDurationProp, Duration::ZERO)
+}
+
 fn text_align(class: ClassName, align: TextAlign) -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(class))
@@ -729,6 +740,8 @@ pub fn all_rules() -> Vec<Rule> {
 		// print utilities — gated behind `@media print`
 		print_hidden(),
 		page_break(),
+		// reduced motion — gated behind `@media (prefers-reduced-motion)`
+		reduced_motion(),
 		// accessibility — global state rules
 		focus_ring(),
 		disabled_state(),
@@ -788,7 +801,10 @@ mod tests {
 			// print utilities serialize wrapped in an `@media print` at-rule
 			.xpect_contains("@media print")
 			.xpect_contains(".print-hidden")
-			.xpect_contains("break-after");
+			.xpect_contains("break-after")
+			// reduced-motion serializes wrapped in its own `@media` at-rule
+			.xpect_contains("@media (prefers-reduced-motion: reduce)")
+			.xpect_contains("transition-duration");
 	}
 
 	/// A media-gated rule serializes wrapped in its `@media` at-rule, with the
@@ -811,6 +827,24 @@ mod tests {
 		// the at-rule wraps the selector (appears before it in the output)
 		(css.find("@media print").unwrap() < css.find(".print-hidden").unwrap())
 			.xpect_true();
+	}
+
+	/// The reduced-motion rule serializes wrapped in its `@media` at-rule and
+	/// zeroes both transition and animation duration.
+	#[beet_core::test]
+	fn reduced_motion_wraps_in_media_block() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![reduced_motion()]),
+			)
+			.unwrap();
+		css.as_str()
+			.xpect_contains("@media (prefers-reduced-motion: reduce){")
+			.xpect_contains("transition-duration: 0ms;")
+			.xpect_contains("animation-duration: 0ms;");
 	}
 
 	/// Charcell path: a `.error-text` span resolves its foreground through the

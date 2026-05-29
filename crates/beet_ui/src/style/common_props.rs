@@ -35,6 +35,8 @@ pub fn token_map()->CssTokenMap{
 		.insert(DisplayProp)
 		.insert(BorderColorProp)
 		.insert(BreakAfterProp)
+		.insert(TransitionDurationProp)
+		.insert(AnimationDurationProp)
 }
 
 
@@ -72,6 +74,8 @@ css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
 css_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
 css_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
 css_property!(BreakAfterProp, BreakAfter, TokenInheritance::NotInherited, "break-after");
+css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, "transition-duration");
+css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 css_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");

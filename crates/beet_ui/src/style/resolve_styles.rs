@@ -11,7 +11,9 @@ use beet_core::prelude::*;
 pub fn resolve_styles(
 	mut commands: Commands,
 	ruleset_query: RuleSetQuery,
-	query: Query<Entity, Changed<Element>>,
+	// classes drive the cascade (eg `.dark-scheme`), so a runtime class change
+	// must re-resolve even when the [`Element`] itself is untouched.
+	query: Query<Entity, Or<(Changed<Element>, Changed<Classes>)>>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
 	mut styles: Query<(
@@ -21,9 +23,7 @@ pub fn resolve_styles(
 	)>,
 ) -> Result {
 	// TODO fine-grained listeners
-	// listen for class attribute changes,
-	// reparenting etc.
-	// only update whats needed
+	// reparenting etc. only update whats needed
 	let roots = query
 		.iter()
 		.map(|entity| ancestors.root_ancestor(entity))

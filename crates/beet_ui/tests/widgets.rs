@@ -56,6 +56,25 @@ fn head_emits_charset_meta() {
 }
 
 #[beet_core::test]
+fn head_title_override_beats_package_config() {
+	// per-page `ArticleMeta` title/description override the `PackageConfig`
+	// defaults; here the title prop wins over the resource's "Beet UI".
+	let mut world = shell_world();
+	let root = world
+		.spawn_scene(rsx! { <Head title="Override Title"/> })
+		.unwrap()
+		.id();
+	world.with_state::<ElementQuery, _>(|query| {
+		let values: Vec<String> = query
+			.iter_descendant_values(root)
+			.filter_map(|v| v.as_str().ok().map(String::from))
+			.collect();
+		values.iter().any(|v| v == "Override Title").xpect_true();
+		values.iter().any(|v| v == "Beet UI").xpect_false();
+	});
+}
+
+#[beet_core::test]
 fn head_includes_pwa_meta_beyond_twelve_children() {
 	// the PWA/Twitter block pushes Head past 12 children; chunking keeps them
 	let mut world = shell_world();
@@ -286,9 +305,8 @@ fn sidebar_renders_nav() {
 	let mut world = scene_ext::test_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Home".into(),
-		path: Some("/".into()),
-		children: vec![],
-		expanded: false,
+		path: Some(RelPath::new("/")),
+		..default()
 	}];
 	let root = world
 		.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
@@ -309,11 +327,11 @@ fn sidebar_branch_renders_details() {
 		path: None,
 		children: vec![SidebarNode {
 			display_name: "Intro".into(),
-			path: Some("/docs/intro".into()),
-			children: vec![],
-			expanded: false,
+			path: Some(RelPath::new("docs/intro")),
+			..default()
 		}],
 		expanded: true,
+		..default()
 	}];
 	let root = world
 		.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
@@ -327,6 +345,29 @@ fn sidebar_branch_renders_details() {
 			.collect();
 		tags.contains(&"details".to_string()).xpect_true();
 		tags.contains(&"summary".to_string()).xpect_true();
+	});
+}
+
+#[beet_core::test]
+fn sidebar_active_leaf_marks_aria_current() {
+	let mut world = scene_ext::test_world();
+	let nodes = vec![SidebarNode {
+		display_name: "About".into(),
+		path: Some(RelPath::new("about")),
+		active: true,
+		..default()
+	}];
+	let root = world
+		.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
+	// the active leaf carries an `aria-current` attribute
+	world.with_state::<ElementQuery, _>(|query| {
+		query
+			.iter_descendants_inclusive(root)
+			.filter_map(|el| el.attribute("aria-current").map(|a| a.value.clone()))
+			.any(|value| value == Value::str("page"))
+			.xpect_true();
 	});
 }
 

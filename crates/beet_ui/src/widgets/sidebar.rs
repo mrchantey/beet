@@ -2,41 +2,31 @@
 //! collapsible behavior works on the web with no JavaScript and in tui via the
 //! style system's `<details>` rendering. The legacy `sidebar.js` is gone.
 //!
-//! The data type [`SidebarNode`] is a minimal tree shape with `String` paths;
-//! Phase 4 of `agent/plans/beet_design.md` upgrades this to a `RoutePath`-aware
-//! tree and moves it to `beet_router`.
+//! [`SidebarNode`] is the render tree the widget consumes; `beet_router`'s
+//! `SidebarState` collects it from a `RouteTree`, applying per-route
+//! `SidebarInfo` overrides (label/order/expanded sourced from frontmatter).
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Per-route metadata that flows from frontmatter into the sidebar.
-///
-/// Phase 4 moves this to `beet_router` as part of the markdown frontmatter
-/// pipeline; for now it lives next to the widget that consumes it.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SidebarInfo {
-	/// Display label override (falls back to the route's prettified path).
-	pub label: Option<String>,
-	/// Sort order within siblings (lower comes first).
-	pub order: Option<u32>,
-}
-
-/// One node in a sidebar nav tree.
+/// One node in a sidebar nav tree — the render shape consumed by [`Sidebar`].
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 pub struct SidebarNode {
 	/// Title-case display name.
 	pub display_name: String,
-	/// Full path for this node's link, or `None` if it's a group header.
-	pub path: Option<String>,
+	/// Route for this node's link, or `None` if it's a group header. The href
+	/// is `path.with_leading_slash()`.
+	pub path: Option<RelPath>,
 	/// Child nodes.
 	pub children: Vec<SidebarNode>,
 	/// `true` to render expanded by default (`<details open>`).
 	pub expanded: bool,
+	/// `true` when this node is the current page; renders `aria-current="page"`.
+	pub active: bool,
 }
 
 impl SidebarNode {
 	/// All non-None paths in depth-first pre-order.
-	pub fn paths(&self) -> Vec<String> {
+	pub fn paths(&self) -> Vec<RelPath> {
 		let mut paths = Vec::new();
 		if let Some(path) = &self.path {
 			paths.push(path.clone());
@@ -51,7 +41,8 @@ impl SidebarNode {
 /// A collapsible navigation tree, styled by `nav`/`details`/`summary` rules.
 ///
 /// `nodes` is the tree to render. Each branch becomes a `<details>` (open when
-/// its node is `expanded`); leaves become `<a>` links.
+/// its node is `expanded`); leaves become `<a>` links, marked `aria-current`
+/// when `active`.
 #[scene]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 	let items: Vec<_> = nodes
@@ -73,19 +64,13 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 /// match builds a differently-shaped tree and `impl Trait` cannot unify across
 /// arms.
 fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
-	let SidebarNode { display_name, path, children, expanded } = node;
+	let SidebarNode { display_name, path, children, expanded, active } = node;
 	let root_class = if root { "sidebar-item-root" } else { "sidebar-item" };
+	let href = path.map(|path| path.with_leading_slash());
 
 	if children.is_empty() {
-		match path {
-			Some(path) => rsx! {
-				<li {Classes::new([root_class])}>
-					<a {Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")])} href=path>
-						{display_name}
-					</a>
-				</li>
-			}
-			.any_scene(),
+		match href {
+			Some(href) => leaf_link(root_class, display_name, href, active),
 			None => rsx! {
 				<li {Classes::new([root_class])}>
 					<span {Classes::new([classes::SIDEBAR_LABEL])}>{display_name}</span>
@@ -98,19 +83,8 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			.into_iter()
 			.map(|child| sidebar_item(child, false))
 			.collect();
-		// build summary content separately so the `<details>` arm doesn't fork.
-		let summary = match path {
-			Some(path) => rsx! {
-				<a {Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")])} href=path>
-					{display_name}
-				</a>
-			}
-			.any_scene(),
-			None => rsx! {
-				<span {Classes::new([classes::SIDEBAR_LABEL, ClassName::string("branch")])}>{display_name}</span>
-			}
-			.any_scene(),
-		};
+		let summary = summary_content(display_name, href, active);
+		// the `open` attribute can't be conditionally interpolated, so fork.
 		if expanded {
 			rsx! {
 				<li {Classes::new([root_class])}>
@@ -132,5 +106,55 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			}
 			.any_scene()
 		}
+	}
+}
+
+/// A leaf `<li><a>` link, marked `aria-current="page"` when active.
+fn leaf_link(
+	root_class: &'static str,
+	display_name: String,
+	href: String,
+	active: bool,
+) -> Box<dyn Scene> {
+	let link_classes = || Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")]);
+	// `aria-current` can't be conditionally interpolated, so fork on `active`.
+	if active {
+		rsx! {
+			<li {Classes::new([root_class])}>
+				<a {link_classes()} href=href aria-current="page">{display_name}</a>
+			</li>
+		}
+		.any_scene()
+	} else {
+		rsx! {
+			<li {Classes::new([root_class])}>
+				<a {link_classes()} href=href>{display_name}</a>
+			</li>
+		}
+		.any_scene()
+	}
+}
+
+/// The `<summary>` content for a branch: a link when the branch carries a route
+/// (marked `aria-current` when active), otherwise a plain label.
+fn summary_content(
+	display_name: String,
+	href: Option<String>,
+	active: bool,
+) -> Box<dyn Scene> {
+	let link_classes = || Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")]);
+	match href {
+		Some(href) if active => rsx! {
+			<a {link_classes()} href=href aria-current="page">{display_name}</a>
+		}
+		.any_scene(),
+		Some(href) => rsx! {
+			<a {link_classes()} href=href>{display_name}</a>
+		}
+		.any_scene(),
+		None => rsx! {
+			<span {Classes::new([classes::SIDEBAR_LABEL, ClassName::string("branch")])}>{display_name}</span>
+		}
+		.any_scene(),
 	}
 }

@@ -1,9 +1,12 @@
-//! Sidebar navigation builder for [`RouteTree`].
+//! Collects a [`RouteTree`] into the target-agnostic `beet_ui` [`Sidebar`]
+//! widget's render tree ([`SidebarNode`]).
 //!
-//! Builds a `<nav>` element with nested `<ul>` / `<details>` lists
-//! from a route tree, suitable for site navigation. Branch nodes
-//! collapse via `<details>` elements, auto-expanding when the
-//! current path is a descendant.
+//! [`SidebarState`] walks the route tree, applies per-route [`SidebarInfo`]
+//! overrides (label/order/expanded, sourced from markdown frontmatter via
+//! [`ArticleMeta`](crate::prelude::ArticleMeta)), computes active-link +
+//! auto-expansion against a `current_path`, sorts siblings in natural order, and
+//! returns the `Vec<SidebarNode>` the widget renders. The widget itself emits
+//! the `<nav>`/`<details>`/`<a>` DOM, so this module no longer hand-rolls bundles.
 //!
 //! # Example
 //!
@@ -12,257 +15,150 @@
 //! # use beet_core::prelude::*;
 //! # use beet_ui::prelude::*;
 //! let state = SidebarState::new("docs/getting-started")
-//!     .with_node("docs", SidebarNode {
+//!     .with_info("docs", SidebarInfo {
 //!         label: Some("Documentation".into()),
 //!         ..default()
 //!     });
-//! // let sidebar = world.spawn(state.build(&tree)).flush();
+//! // let nodes = state.collect(&tree);
+//! // let sidebar = world.spawn_scene(rsx!{ <Sidebar nodes=nodes/> });
 //! ```
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
-/// Configuration for a single sidebar entry.
-#[derive(Debug, Default, Clone)]
-pub struct SidebarNode {
+/// Per-route override for a sidebar entry, sourced from markdown frontmatter
+/// (the `sidebar` field of [`ArticleMeta`](crate::prelude::ArticleMeta)).
+///
+/// Unset fields fall back to derived defaults: the label to the route's last
+/// path segment, expansion to "open when the current path is a descendant".
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SidebarInfo {
 	/// Display label override. Defaults to the last path segment.
 	pub label: Option<String>,
 	/// Sort order within siblings. Lower values come first.
 	pub order: Option<u32>,
-	/// Whether children are expanded. If not set, defaults to `true`
-	/// if the current path is a descendant.
+	/// Force the branch open (`Some(true)`) or closed (`Some(false)`); `None`
+	/// auto-expands when the current path is a descendant.
 	pub expanded: Option<bool>,
-	/// Additional HTML attributes for this entry's anchor element.
-	pub attrs: HashMap<String, Value>,
 }
 
-/// Builder for sidebar navigation from a [`RouteTree`].
+/// Collector that turns a [`RouteTree`] into a [`SidebarNode`] render tree.
 ///
-/// Produces a `<nav>` containing nested `<ul>` lists. Leaf routes
-/// render as `<a>` links; branches render as `<details>/<summary>`
-/// elements that auto-expand when the current path is a descendant.
+/// Holds the current page path (for active-link + auto-expansion) and per-path
+/// [`SidebarInfo`] overrides.
 #[derive(Debug, Clone)]
 pub struct SidebarState {
-	/// The current page path, used for active-link detection
-	/// and auto-expansion.
+	/// The current page path, used for active-link detection and auto-expansion.
 	pub current_path: RelPath,
-	/// Per-path node configuration overrides.
-	pub nodes: HashMap<RelPath, SidebarNode>,
+	/// Per-path override configuration.
+	pub infos: HashMap<RelPath, SidebarInfo>,
 }
 
 impl SidebarState {
-	/// Create a new sidebar state targeting the given current path.
+	/// Create a new collector targeting the given current path.
 	pub fn new(current_path: impl Into<RelPath>) -> Self {
 		Self {
 			current_path: current_path.into(),
-			nodes: HashMap::default(),
+			infos: HashMap::default(),
 		}
 	}
 
-	/// Set configuration for a specific path.
-	pub fn with_node(
+	/// Set the override for a specific path.
+	pub fn with_info(
 		mut self,
 		path: impl Into<RelPath>,
-		node: SidebarNode,
+		info: SidebarInfo,
 	) -> Self {
-		self.nodes.insert(path.into(), node);
+		self.infos.insert(path.into(), info);
 		self
 	}
 
-	/// Build the top-level `<nav>` element from a route tree.
+	/// Collect the top-level [`SidebarNode`] list for the [`Sidebar`] widget.
 	///
-	/// Renders a home link followed by recursive entries for each
-	/// child in the tree. The resulting bundle can be spawned directly.
-	pub fn build(&self, tree: &RouteTree) -> (Element, OnSpawn) {
-		let sorted = self.sort_children(tree);
-		let state = self.clone();
-		(
-			Element::new("nav"),
-			OnSpawn::new(move |entity: &mut EntityWorldMut| {
-				let nav_id = entity.id();
-				entity.world_scope(move |world| {
-					// spawn all children first
-					let home = state.spawn_home(world);
-					let mut all_children: Vec<Entity> = vec![home];
-					for child in &sorted {
-						if let Some(id) = state.spawn_child(world, child) {
-							all_children.push(id);
-						}
-					}
-					// build ul with children, attach to nav
-					let ul = world
-						.spawn(rsx_direct!{ <ul>{all_children}</ul> })
-						.flush();
-					world.entity_mut(nav_id).add_child(ul);
-				});
-			}),
-		)
+	/// Emits a synthetic "Home" entry followed by a recursively collected,
+	/// order-sorted node for each routable child of the tree.
+	pub fn collect(&self, tree: &RouteTree) -> Vec<SidebarNode> {
+		let mut nodes = vec![self.home_node()];
+		for child in self.sort_children(tree) {
+			if let Some(node) = self.collect_node(&child) {
+				nodes.push(node);
+			}
+		}
+		nodes
 	}
 
-	/// Spawn a "Home" `<li>` and return its entity.
-	fn spawn_home(&self, world: &mut World) -> Entity {
-		let bundle = if self.current_path.segments().is_empty() {
-			rsx_direct!{ <li><a href="/" aria-current="page">"Home"</a></li> }
-				.any_bundle()
-		} else {
-			rsx_direct!{ <li><a href="/">"Home"</a></li> }.any_bundle()
-		};
-		world.spawn(bundle).flush()
+	/// The synthetic "Home" entry linking to `/`, active when at the root path.
+	fn home_node(&self) -> SidebarNode {
+		SidebarNode {
+			display_name: "Home".into(),
+			path: Some(RelPath::default()),
+			children: Vec::new(),
+			expanded: false,
+			active: self.current_path.segments().is_empty(),
+		}
 	}
 
-	/// Recursively spawn a sidebar entry, returning its entity
-	/// or `None` if the tree node has no route and no children.
-	fn spawn_child(
-		&self,
-		world: &mut World,
-		tree: &RouteTree,
-	) -> Option<Entity> {
+	/// Recursively collect a tree node, returning `None` when it has neither a
+	/// route nor any routable children.
+	fn collect_node(&self, tree: &RouteTree) -> Option<SidebarNode> {
 		let path = tree.path.annotated_rel_path();
-		let config = self.nodes.get(&path);
-		let children = self.sort_children(tree);
+		let info = self.infos.get(&path);
+		let children: Vec<SidebarNode> = self
+			.sort_children(tree)
+			.iter()
+			.filter_map(|child| self.collect_node(child))
+			.collect();
+		let has_route = tree.node().is_some();
 
 		if children.is_empty() {
-			// Leaf: render as link if it has a route
-			if tree.node().is_some() {
-				Some(self.spawn_leaf(world, &path, config))
-			} else {
-				None
+			// leaf: only render if it actually routes somewhere
+			if !has_route {
+				return None;
 			}
+			Some(SidebarNode {
+				display_name: self.label(&path, info),
+				path: Some(path.clone()),
+				children,
+				expanded: false,
+				active: path == self.current_path,
+			})
 		} else {
-			// Branch: render as collapsible details
-			Some(self.spawn_branch(world, tree, &path, config, &children))
+			// branch: collapsible, optionally also a link if it carries a route
+			let expanded = match info.and_then(|info| info.expanded) {
+				Some(value) => value,
+				None => self.is_ancestor_of_current(&path),
+			};
+			Some(SidebarNode {
+				display_name: self.label(&path, info),
+				path: has_route.then(|| path.clone()),
+				children,
+				expanded,
+				active: has_route && path == self.current_path,
+			})
 		}
 	}
 
-	/// Spawn a leaf link: `<li><a href="...">Label</a></li>`.
-	fn spawn_leaf(
-		&self,
-		world: &mut World,
-		path: &RelPath,
-		config: Option<&SidebarNode>,
-	) -> Entity {
-		let label = config
-			.and_then(|cfg| cfg.label.clone())
-			.unwrap_or_else(|| Self::default_label(path));
-		let href = path.with_leading_slash();
-		let is_active = path == &self.current_path;
-
-		// Wrap Value in a 1-tuple to disambiguate IntoBundle impls
-		let text = (Value::Str(label.into()),);
-		let bundle = if is_active {
-			rsx_direct!{
-				<li><a href=href aria-current="page">{text}</a></li>
-			}
-			.any_bundle()
-		} else {
-			rsx_direct!{
-				<li><a href=href>{text}</a></li>
-			}
-			.any_bundle()
-		};
-		world.spawn(bundle).flush()
+	/// The display label: explicit override, else the prettified last segment.
+	fn label(&self, path: &RelPath, info: Option<&SidebarInfo>) -> String {
+		info.and_then(|info| info.label.clone())
+			.unwrap_or_else(|| path.last_segment().unwrap_or("home").to_string())
 	}
 
-	/// Spawn a branch:
-	/// `<li><details open?><summary>...</summary><ul>...</ul></details></li>`.
-	fn spawn_branch(
-		&self,
-		world: &mut World,
-		tree: &RouteTree,
-		path: &RelPath,
-		config: Option<&SidebarNode>,
-		children: &[RouteTree],
-	) -> Entity {
-		let label = config
-			.and_then(|cfg| cfg.label.clone())
-			.unwrap_or_else(|| Self::default_label(path));
-
-		// Determine expansion state
-		let is_expanded = match config.and_then(|cfg| cfg.expanded) {
-			Some(value) => value,
-			None => self.is_ancestor_of_current(path),
-		};
-
-		// spawn recursive children first
-		let child_entities: Vec<Entity> = children
-			.iter()
-			.filter_map(|child| self.spawn_child(world, child))
-			.collect();
-
-		// build summary
-		let text = (Value::Str(label.into()),);
-		let summary = if tree.node().is_some() {
-			let href = path.with_leading_slash();
-			if path == &self.current_path {
-				rsx_direct!{ <summary><a href=href aria-current="page">{text}</a></summary> }
-					.any_bundle()
-			} else {
-				rsx_direct!{ <summary><a href=href>{text}</a></summary> }
-					.any_bundle()
-			}
-		} else {
-			rsx_direct!{ <summary>{text}</summary> }.any_bundle()
-		};
-		let summary = world.spawn(summary).flush();
-
-		// build nested ul with children
-		let ul = world.spawn(rsx_direct!{ <ul>{child_entities}</ul> }).flush();
-
-		// build details containing summary and ul
-		let details =
-			world.spawn(rsx_direct!{ <details>{summary}{ul}</details> }).flush();
-
-		// add open attribute
-		if is_expanded {
-			world.spawn((
-				Attribute::new("open"),
-				Value::Bool(true),
-				AttributeOf::new(details),
-			));
-		}
-
-		// custom attributes
-		if let Some(config) = config {
-			Self::spawn_custom_attrs(world, details, config);
-		}
-
-		// wrap in li
-		world.spawn(rsx_direct!{ <li>{details}</li> }).flush()
-	}
-
-	/// Spawn custom attributes from config onto an element.
-	fn spawn_custom_attrs(
-		world: &mut World,
-		element_id: Entity,
-		config: &SidebarNode,
-	) {
-		for (key, value) in &config.attrs {
-			world.spawn((
-				Attribute::new(key.clone()),
-				value.clone(),
-				AttributeOf::new(element_id),
-			));
-		}
-	}
-
-	/// Sort children by configured order, then alphabetically by path.
+	/// Sort children by configured order, then natural order by path.
 	fn sort_children(&self, tree: &RouteTree) -> Vec<RouteTree> {
 		let mut children = tree.children.clone();
 		children.sort_by(|a, b| {
 			let path_a = a.path.annotated_rel_path();
 			let path_b = b.path.annotated_rel_path();
-			let order_a = self
-				.nodes
-				.get(&path_a)
-				.and_then(|node| node.order)
-				.unwrap_or(u32::MAX);
-			let order_b = self
-				.nodes
-				.get(&path_b)
-				.and_then(|node| node.order)
-				.unwrap_or(u32::MAX);
-			match order_a.cmp(&order_b) {
+			let order = |path: &RelPath| {
+				self.infos
+					.get(path)
+					.and_then(|info| info.order)
+					.unwrap_or(u32::MAX)
+			};
+			match order(&path_a).cmp(&order(&path_b)) {
 				std::cmp::Ordering::Equal => {
 					natural_cmp(path_a.as_ref(), path_b.as_ref())
 				}
@@ -272,24 +168,14 @@ impl SidebarState {
 		children
 	}
 
-	/// Extract a display label from the last path segment.
-	fn default_label(path: &RelPath) -> String {
-		path.last_segment().unwrap_or("home").to_string()
-	}
-
-	/// Check if the current path is at or beneath the given path.
+	/// Whether the current path is at or beneath the given path.
 	fn is_ancestor_of_current(&self, path: &RelPath) -> bool {
-		let current = self.current_path.segments();
 		let prefix = path.segments();
-		if prefix.is_empty() {
-			return true;
-		}
-		current.starts_with(&prefix)
+		prefix.is_empty() || self.current_path.segments().starts_with(&prefix)
 	}
 }
 
 use std::cmp::Ordering;
-
 
 /// Compare with [natural sort order](https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/)
 fn natural_cmp(a: &str, b: &str) -> Ordering {
@@ -354,21 +240,29 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// Render an entity tree to an HTML string.
-	fn render_html(world: &mut World, entity: Entity) -> String {
+	/// Spawn the `Sidebar` widget from collected nodes and render it to HTML.
+	fn render_sidebar(world: &mut World, nodes: Vec<SidebarNode>) -> String {
+		let entity = world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(entity, world))
 			.unwrap()
 			.to_string()
 	}
+
+	/// Build a route tree from a spawned hierarchy.
+	fn tree_of(world: &mut World, root: Entity) -> RouteTree {
+		world.entity(root).get::<RouteTree>().unwrap().clone()
+	}
+
 	#[beet_core::test]
 	fn natural_compare() {
 		let mut v = vec!["page10", "page1", "page2"];
 		v.sort_by(|a, b| natural_cmp(a, b));
 		assert_eq!(v, vec!["page1", "page2", "page10"]);
 	}
+
 	#[beet_core::test]
-	fn builds_basic_sidebar() {
+	fn collects_home_and_leaves() {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
@@ -376,17 +270,14 @@ mod test {
 				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
 			])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		let state = SidebarState::new("about");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		html.xpect_contains("Home")
-			.xpect_contains("/about")
-			.xpect_contains("/docs")
-			.xpect_contains("<nav>")
-			.xpect_contains("<ul>");
+		let nodes = SidebarState::new("about").collect(&tree);
+		// home + about + docs
+		nodes.len().xpect_eq(3);
+		nodes[0].display_name.as_str().xpect_eq("Home");
+		nodes[1].display_name.as_str().xpect_eq("about");
+		nodes[2].display_name.as_str().xpect_eq("docs");
 	}
 
 	#[beet_core::test]
@@ -398,13 +289,13 @@ mod test {
 				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
 			])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		let state = SidebarState::new("about");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		html.xpect_contains("aria-current");
+		let nodes = SidebarState::new("about").collect(&tree);
+		// home is not active, the `about` leaf is
+		nodes[0].active.xpect_false();
+		nodes[1].active.xpect_true();
+		nodes[2].active.xpect_false();
 	}
 
 	#[beet_core::test]
@@ -413,19 +304,14 @@ mod test {
 		let root = world
 			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		// Current path is root
-		let state = SidebarState::new("");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		// Home link should have aria-current
-		html.xpect_contains("aria-current");
+		let nodes = SidebarState::new("").collect(&tree);
+		nodes[0].active.xpect_true();
 	}
 
 	#[beet_core::test]
-	fn builds_nested_branches() {
+	fn nested_branch_auto_expands_active_path() {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
@@ -436,18 +322,20 @@ mod test {
 				]),
 			])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		// Current path is inside docs, so docs branch should expand
-		let state = SidebarState::new("docs/intro");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		html.xpect_contains("<details")
-			.xpect_contains("<summary>")
-			.xpect_contains("open")
-			.xpect_contains("/docs/intro")
-			.xpect_contains("/docs/api");
+		let nodes = SidebarState::new("docs/intro").collect(&tree);
+		// home, about, docs(branch)
+		let docs = nodes.iter().find(|n| n.display_name == "docs").unwrap();
+		docs.expanded.xpect_true();
+		docs.path.is_none().xpect_true();
+		// the active leaf is inside the branch
+		docs.children
+			.iter()
+			.find(|n| n.display_name == "intro")
+			.unwrap()
+			.active
+			.xpect_true();
 	}
 
 	#[beet_core::test]
@@ -465,16 +353,11 @@ mod test {
 				),]),
 			])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		// At docs/intro, blog should be collapsed
-		let state = SidebarState::new("docs/intro");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		// docs branch should be open, blog should not
-		// Both branches have <details>, but only docs has open
-		html.xpect_contains("<details open");
+		let nodes = SidebarState::new("docs/intro").collect(&tree);
+		nodes.iter().find(|n| n.display_name == "docs").unwrap().expanded.xpect_true();
+		nodes.iter().find(|n| n.display_name == "blog").unwrap().expanded.xpect_false();
 	}
 
 	#[beet_core::test]
@@ -483,18 +366,14 @@ mod test {
 		let root = world
 			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		let state = SidebarState::new("").with_node("about", SidebarNode {
+		let nodes = SidebarState::new("").with_info("about", SidebarInfo {
 			label: Some("About Us".into()),
 			..default()
-		});
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		html.xpect_contains("About Us")
-			.xnot()
-			.xpect_contains(">about<");
+		}).collect(&tree);
+		nodes.iter().any(|n| n.display_name == "About Us").xpect_true();
+		nodes.iter().any(|n| n.display_name == "about").xpect_false();
 	}
 
 	#[beet_core::test]
@@ -506,44 +385,28 @@ mod test {
 				render_action::fixed_route("alpha", rsx_direct!{ <p>"alpha"</p> }),
 			])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		// Give zulu a lower order so it appears first despite alphabetical
-		let state = SidebarState::new("").with_node("zulu", SidebarNode {
+		// give zulu a lower order so it sorts ahead of alpha
+		let nodes = SidebarState::new("").with_info("zulu", SidebarInfo {
 			order: Some(0),
 			..default()
-		});
-		let sorted = state.sort_children(&tree);
-		sorted[0]
-			.path
-			.annotated_rel_path()
-			.last_segment()
-			.unwrap()
-			.xpect_eq("zulu");
-		sorted[1]
-			.path
-			.annotated_rel_path()
-			.last_segment()
-			.unwrap()
-			.xpect_eq("alpha");
+		}).collect(&tree);
+		// nodes[0] is Home, then zulu, then alpha
+		nodes[1].display_name.as_str().xpect_eq("zulu");
+		nodes[2].display_name.as_str().xpect_eq("alpha");
 	}
 
 	#[beet_core::test]
 	fn is_ancestor_of_current() {
 		let state = SidebarState::new("docs/getting-started");
-		state
-			.is_ancestor_of_current(&RelPath::new("docs"))
-			.xpect_true();
+		state.is_ancestor_of_current(&RelPath::new("docs")).xpect_true();
 		state
 			.is_ancestor_of_current(&RelPath::new("docs/getting-started"))
 			.xpect_true();
-		state
-			.is_ancestor_of_current(&RelPath::new("blog"))
-			.xpect_false();
-		// Root is ancestor of everything
-		state
-			.is_ancestor_of_current(&RelPath::default())
-			.xpect_true();
+		state.is_ancestor_of_current(&RelPath::new("blog")).xpect_false();
+		// root is ancestor of everything
+		state.is_ancestor_of_current(&RelPath::default()).xpect_true();
 	}
 
 	#[beet_core::test]
@@ -554,40 +417,57 @@ mod test {
 				render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
 			])])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		// Current path is NOT under docs, but force expansion
-		let state = SidebarState::new("about").with_node("docs", SidebarNode {
+		// current path is NOT under docs, but force expansion
+		let nodes = SidebarState::new("about").with_info("docs", SidebarInfo {
 			expanded: Some(true),
 			..default()
-		});
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
-
-		let html = render_html(&mut world, sidebar_id);
-		html.xpect_contains("<details open");
+		}).collect(&tree);
+		nodes.iter().find(|n| n.display_name == "docs").unwrap().expanded.xpect_true();
 	}
 
 	#[beet_core::test]
-	fn branch_with_route_renders_link_in_summary() {
+	fn branch_with_route_carries_path() {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(
 				render_action::fixed_route(
 					"docs",
-					// Use with_inner_text here because rsx! produces
-					// a children![] that conflicts with the outer children![]
 					Element::new("p").with_inner_text("docs index")
 				),
 				children![render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> })],
 			)])
 			.flush();
+		let tree = tree_of(&mut world, root);
 
-		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
-		let state = SidebarState::new("docs/intro");
-		let sidebar_id = world.spawn(state.build(&tree)).flush();
+		let nodes = SidebarState::new("docs").collect(&tree);
+		let docs = nodes.iter().find(|n| n.display_name == "docs").unwrap();
+		// branch carries its own route, and is active at /docs
+		docs.path.is_some().xpect_true();
+		docs.active.xpect_true();
+	}
 
-		let html = render_html(&mut world, sidebar_id);
-		// Summary should contain an anchor link
-		html.xpect_contains("<summary>").xpect_contains("/docs");
+	/// End-to-end: render the widget from a collected tree and check the
+	/// produced HTML carries `aria-current`, `<details open>`, and hrefs.
+	#[beet_core::test]
+	fn renders_to_html() {
+		let mut world = router_world();
+		let root = world
+			.spawn(children![
+				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				(PathPartial::new("docs"), children![
+					render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
+				]),
+			])
+			.flush();
+		let tree = tree_of(&mut world, root);
+		let nodes = SidebarState::new("docs/intro").collect(&tree);
+
+		let html = render_sidebar(&mut world, nodes);
+		html.xpect_contains("aria-current")
+			.xpect_contains("<details open")
+			.xpect_contains("/about")
+			.xpect_contains("/docs/intro");
 	}
 }
