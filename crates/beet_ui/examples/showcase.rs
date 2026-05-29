@@ -1,93 +1,113 @@
 //! Showcase gallery — a runnable page exercising the Material Design 3 rule
-//! set and the ported `beet_ui` widgets. Builds the full stylesheet from the
-//! active [`RuleSet`] and a gallery body (swatches, typography, buttons, cards,
-//! form controls, a table and a sidebar), then writes a self-contained
-//! `index.html` for visual inspection.
+//! set and the ported `beet_ui` widgets. The whole page (document shell,
+//! stylesheet, and gallery body) is a single scene: no hand-assembled HTML
+//! string. The built stylesheet is itself a widget ([`Stylesheet`]), the color
+//! scheme seeds via [`ColorSchemeScript`], and the body is rendered once and
+//! served over HTTP for live inspection (and also written to disk).
 //!
 //! Run with:
 //! ```not_rust
 //! cargo run -p beet_ui --example showcase --features scene,style
 //! ```
+//! then open <http://localhost:8337>.
 //!
-//! This is the first real visual-verification loop for the
-//! `beet_design` → `beet_ui` migration (see `agent/plans/beet_design.md`).
+//! Slot wiring is still pending for scene widgets, so `<Select>`/`<Table>`
+//! options and rows are written as raw markup (with semantic [`Classes`], not
+//! `class="…"` strings) until consumer slots land.
 use beet_core::prelude::*;
+use beet_net::prelude::DEFAULT_SERVER_PORT;
+use beet_net::prelude::HttpServer;
+use beet_net::prelude::MediaType;
+use beet_net::prelude::Response;
+use beet_net::prelude::ServerPlugin;
+use beet_net::prelude::exchange_handler;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
 use beet_ui::*;
-use bevy::app::TaskPoolPlugin;
+use bevy::MinimalPlugins;
+use bevy::app::App;
 use bevy::asset::AssetPlugin;
-use bevy::scene::ScenePlugin;
 
 fn main() {
-	// a world that can both build CSS (MaterialStylePlugin) and spawn scenes
-	// (ScenePlugin + AssetServer)
-	let mut world = (
-		TaskPoolPlugin::default(),
-		AssetPlugin::default(),
-		ScenePlugin,
-		material::MaterialStylePlugin::new(palettes::basic::BLUE),
-	)
-		.into_world();
-	world.insert_resource(PackageConfig {
-		title: "Beet UI Showcase".into(),
-		binary_name: "showcase".into(),
-		version: "0.0.0".into(),
-		description: "A gallery of beet_ui rules and widgets".into(),
-		homepage: "https://beetstack.dev".into(),
-		repository: None,
-		stage: "dev".into(),
-		service_access: ServiceAccess::Local,
-	});
-
-	let body = world.spawn_scene(gallery()).unwrap().id();
-	let body_html = HtmlRenderer::new()
-		.render(&mut RenderContext::new(body, &mut world))
-		.unwrap()
-		.to_string();
-
-	let css = world
-		.with_state::<StyleQuery, _>(|query| {
-			query.build_css(
-				&CssBuilder::default()
-					.with_minify(false)
-					.with_format_variables(FormatVariables::short()),
-			)
+	App::new()
+		.add_plugins((
+			MinimalPlugins,
+			AssetPlugin::default(),
+			ScenePlugin,
+			material::MaterialStylePlugin::new(palettes::basic::BLUE),
+			ServerPlugin,
+		))
+		.insert_resource(PackageConfig {
+			title: "Beet UI Showcase".into(),
+			binary_name: "showcase".into(),
+			version: "0.0.0".into(),
+			description: "A gallery of beet_ui rules and widgets".into(),
+			homepage: "https://beetstack.dev".into(),
+			repository: None,
+			stage: "dev".into(),
+			service_access: ServiceAccess::Local,
 		})
-		.unwrap();
-
-	let html = format!(
-		r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Beet UI Showcase</title>
-	<link rel="stylesheet" href="https://unpkg.com/tailwindcss@4/preflight.css"/>
-	<style>{css}</style>
-</head>
-<body class="light-scheme">
-{body_html}
-</body>
-</html>"#
-	);
-
-	let path =
-		AbsPathBuf::new_workspace_rel("target/examples/showcase/index.html")
-			.unwrap();
-	fs_ext::write(&path, &html).unwrap();
-	println!("Showcase written to: {}", path.display());
+		.add_systems(Startup, serve_showcase)
+		.run();
 }
 
-/// The full gallery scene: a `<main>` with a section per rule/widget group.
+/// Render the showcase page once, write it to disk, and serve it on every route.
+fn serve_showcase(world: &mut World) -> Result {
+	let root = world.spawn_scene(showcase_page())?.id();
+	let html = HtmlRenderer::new()
+		.render(&mut RenderContext::new(root, world))?
+		.to_string();
+
+	// write to disk for offline inspection
+	let path =
+		AbsPathBuf::new_workspace_rel("target/examples/showcase/index.html")?;
+	fs_ext::write(&path, &html)?;
+
+	// serve the pre-rendered page on every route
+	let server = HttpServer::default();
+	let port = server.port.unwrap_or(DEFAULT_SERVER_PORT);
+	world.spawn((
+		server,
+		exchange_handler(move |_| Response::ok_body(html.clone(), MediaType::Html)),
+	));
+
+	cross_log!(
+		"Showcase served at http://localhost:{port} (also written to {})",
+		path.display()
+	);
+	Ok(())
+}
+
+/// The full page as one scene: an `<html>` shell whose `<head>` carries the
+/// preflight reset, the built [`Stylesheet`], and the [`ColorSchemeScript`],
+/// with the [`gallery`] in the `<body>`.
+fn showcase_page() -> impl Scene {
+	rsx! {
+		<html lang="en">
+			<head>
+				<meta charset="utf-8"/>
+				<meta name="viewport" content="width=device-width, initial-scale=1"/>
+				<title>"Beet UI Showcase"</title>
+				<Preflight/>
+				<Stylesheet/>
+				<ColorSchemeScript/>
+			</head>
+			<body>
+				{gallery()}
+			</body>
+		</html>
+	}
+}
+
+/// The gallery body: a `<main>` with a section per rule/widget group.
 fn gallery() -> impl Scene {
 	rsx! {
-		<main class="page">
-			<h1 class="text-display-medium">"Beet UI Showcase"</h1>
+		<main {Classes::new([classes::PAGE])}>
+			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet UI Showcase"</h1>
 
 			// ── Buttons (widgets) ─────────────────────────────────────────────
 			<section>
-				<h2 class="text-headline-small">"Buttons"</h2>
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Buttons"</h2>
 				<Button label="Filled" variant=ButtonVariant::Filled/>
 				<Button label="Outlined" variant=ButtonVariant::Outlined/>
 				<Button label="Text" variant=ButtonVariant::Text/>
@@ -102,30 +122,30 @@ fn gallery() -> impl Scene {
 
 			// ── Cards ─────────────────────────────────────────────────────────
 			<section>
-				<h2 class="text-headline-small">"Cards"</h2>
-				<div class="card-filled">"Filled card"</div>
-				<div class="card-elevated">"Elevated card"</div>
-				<div class="card-outlined">"Outlined card"</div>
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Cards"</h2>
+				<div {Classes::new([classes::CARD_FILLED])}>"Filled card"</div>
+				<div {Classes::new([classes::CARD_ELEVATED])}>"Elevated card"</div>
+				<div {Classes::new([classes::CARD_OUTLINED])}>"Outlined card"</div>
 			</section>
 
 			// ── Typography scale ──────────────────────────────────────────────
 			<section>
-				<h2 class="text-headline-small">"Typography"</h2>
-				<p class="text-display-large">"Display large"</p>
-				<p class="text-headline-large">"Headline large"</p>
-				<p class="text-title-large">"Title large"</p>
-				<p class="text-body-large">"Body large"</p>
-				<p class="text-label-large">"Label large"</p>
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Typography"</h2>
+				<p {Classes::new([classes::TEXT_DISPLAY_LARGE])}>"Display large"</p>
+				<p {Classes::new([classes::TEXT_HEADLINE_LARGE])}>"Headline large"</p>
+				<p {Classes::new([classes::TEXT_TITLE_LARGE])}>"Title large"</p>
+				<p {Classes::new([classes::TEXT_BODY_LARGE])}>"Body large"</p>
+				<p {Classes::new([classes::TEXT_LABEL_LARGE])}>"Label large"</p>
 			</section>
 
 			// ── Form controls (widgets) ───────────────────────────────────────
 			<section>
-				<h2 class="text-headline-small">"Form controls"</h2>
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Form controls"</h2>
 				<TextField name="email" placeholder="Email" variant=TextFieldVariant::Outlined/>
 				<TextField name="filled" placeholder="Filled" variant=TextFieldVariant::Filled/>
 				<TextArea name="bio" placeholder="Bio"/>
-				// Select options use raw markup (slot wiring is still pending)
-				<select class="select select-outlined" name="fruit">
+				// Select options are raw markup (consumer slot wiring is pending)
+				<select {Classes::new([classes::SELECT, classes::SELECT_OUTLINED])} name="fruit">
 					<option>"Apple"</option>
 					<option>"Banana"</option>
 				</select>
@@ -134,8 +154,8 @@ fn gallery() -> impl Scene {
 
 			// ── Table (raw markup; slot wiring pending) ───────────────────────
 			<section>
-				<h2 class="text-headline-small">"Table"</h2>
-				<table class="table">
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Table"</h2>
+				<table {Classes::new([classes::TABLE])}>
 					<thead>
 						<tr><th>"Name"</th><th>"Role"</th></tr>
 					</thead>
@@ -148,7 +168,7 @@ fn gallery() -> impl Scene {
 
 			// ── Sidebar (widget) ──────────────────────────────────────────────
 			<section>
-				<h2 class="text-headline-small">"Sidebar"</h2>
+				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Sidebar"</h2>
 				<Sidebar nodes=sidebar_nodes()/>
 			</section>
 		</main>

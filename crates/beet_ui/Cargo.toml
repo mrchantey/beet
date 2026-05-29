@@ -107,7 +107,7 @@ streaming-iterator = { version = "0.1", optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-beet_net = { workspace = true, features = ["std", "serde", "fs", "http"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
 
 [lib]
 harness = false

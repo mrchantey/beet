@@ -4,8 +4,11 @@
 //! targeting Bevy's `Scene` instead of `Bundle`. The scene `rsx!` lowering
 //! routes text + block child positions through `.into_scene()` so authors can
 //! write `<p>"Title: " {title} </p>` instead of `template_value(Value::new(_))`.
+use crate::prelude::Attribute;
+use crate::prelude::AttributeOf;
 use beet_core::prelude::*;
 use bevy::prelude::ChildOf;
+use bevy::scene::EntityScene;
 use bevy::scene::RelatedScenes;
 use bevy::scene::Scene;
 use bevy::scene::template_value;
@@ -15,6 +18,33 @@ use variadics_please::all_tuples;
 /// blanket impls (mirrors [`crate::types::IntoBundle`]).
 pub trait IntoScene<M> {
 	fn into_scene(self) -> impl Scene;
+}
+
+/// Build a single HTML attribute as a [`Scene`], for use as an rsx! block
+/// attribute: `<a {attr("href", url)}/>`. Attributes accumulate, so this sits
+/// alongside the element's literal attributes rather than replacing them.
+///
+/// Pair it with [`Option`] for an attribute that disappears when absent —
+/// see [`optional_attr`], which is the ergonomic form for optional props.
+pub fn attr(key: impl Into<String>, value: impl Into<Value>) -> impl Scene {
+	RelatedScenes::<AttributeOf, _>::new(EntityScene((
+		template_value(Attribute::new(key)),
+		template_value(Value::new(value)),
+	)))
+}
+
+/// An HTML attribute that renders only when its value is [`Some`], for use as
+/// an rsx! block attribute: `<input {optional_attr("name", name)}/>` where
+/// `name: Option<String>`.
+///
+/// A [`None`] renders nothing — unlike a defaulted empty string, which would
+/// emit an incorrect `name=""`. This is the ergonomic answer to "this prop is
+/// optional, so its attribute should be absent when unset".
+pub fn optional_attr(
+	key: impl Into<String>,
+	value: Option<impl Into<Value>>,
+) -> impl Scene {
+	value.map(|value| attr(key, value)).into_scene()
 }
 
 /// Erase any [`Scene`] into a [`Box<dyn Scene>`] via method chain.

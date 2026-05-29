@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 ///
 /// Slots: `head` (extra `<head>` content), default (page `<body>`).
 #[scene]
-pub fn DocumentLayout() -> impl Scene {
+pub fn HtmlDocument() -> impl Scene {
 	rsx! {
 		<html lang="en">
 			<Head>
@@ -22,16 +22,16 @@ pub fn DocumentLayout() -> impl Scene {
 	}
 }
 
-/// A standard HTML page: a [`DocumentLayout`] with a [`Header`] and [`Footer`]
+/// A standard HTML page: an [`HtmlDocument`] with a [`Header`] and [`Footer`]
 /// around a body slot.
 ///
 /// Slots: `head`, `header`, `header-nav`, `footer`, default (page body).
 #[scene]
 pub fn PageLayout() -> impl Scene {
 	rsx! {
-		<DocumentLayout>
+		<HtmlDocument>
 			<slot name="head" slot="head"/>
-			<div {Classes::new(["page"])}>
+			<div {Classes::new([classes::PAGE])}>
 				<Header>
 					<slot name="header"/>
 					<slot name="header-nav" slot="nav"/>
@@ -41,7 +41,7 @@ pub fn PageLayout() -> impl Scene {
 					<slot name="footer"/>
 				</Footer>
 			</div>
-		</DocumentLayout>
+		</HtmlDocument>
 	}
 }
 

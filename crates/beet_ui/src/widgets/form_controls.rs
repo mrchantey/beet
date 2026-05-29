@@ -39,11 +39,14 @@ impl TextFieldVariant {
 /// A styled `<input>` text field. Optionally binds to a document field via
 /// `field`; when set, the [`FieldRef`] component attaches to the input and it
 /// syncs with the resolved [`Document`](crate::document::Document).
+///
+/// `name` and `placeholder` are optional — when unset their attributes are
+/// omitted rather than rendered empty.
 #[scene]
 pub fn TextField(
 	variant: TextFieldVariant,
-	name: String,
-	placeholder: String,
+	name: Option<String>,
+	placeholder: Option<String>,
 	field: Option<FieldRef>,
 ) -> impl Scene {
 	let class = variant.class();
@@ -52,19 +55,19 @@ pub fn TextField(
 			{Classes::new([classes::INPUT, class])}
 			{field}
 			type="text"
-			name={name}
-			placeholder={placeholder}
+			{optional_attr("name", name)}
+			{optional_attr("placeholder", placeholder)}
 		/>
 	}
 }
 
 /// A styled `<textarea>`. Same variant set and optional `field` binding as
-/// [`TextField`].
+/// [`TextField`]; `name` and `placeholder` are likewise optional.
 #[scene]
 pub fn TextArea(
 	variant: TextFieldVariant,
-	name: String,
-	placeholder: String,
+	name: Option<String>,
+	placeholder: Option<String>,
 	field: Option<FieldRef>,
 ) -> impl Scene {
 	let class = variant.class();
@@ -72,8 +75,8 @@ pub fn TextArea(
 		<textarea
 			{Classes::new([classes::INPUT, class])}
 			{field}
-			name={name}
-			placeholder={placeholder}
+			{optional_attr("name", name)}
+			{optional_attr("placeholder", placeholder)}
 		/>
 	}
 }
@@ -99,16 +102,16 @@ impl SelectVariant {
 
 /// A styled `<select>` element. The options are supplied via the default
 /// slot (typically `<option>` children). Optionally binds to a document field
-/// via `field`.
+/// via `field`; `name` is omitted when unset.
 #[scene]
 pub fn Select(
 	variant: SelectVariant,
-	name: String,
+	name: Option<String>,
 	field: Option<FieldRef>,
 ) -> impl Scene {
 	let class = variant.class();
 	rsx! {
-		<select {Classes::new([classes::SELECT, class])} {field} name={name}>
+		<select {Classes::new([classes::SELECT, class])} {field} {optional_attr("name", name)}>
 			<slot/>
 		</select>
 	}
@@ -120,9 +123,9 @@ pub fn Select(
 /// root the nested inputs resolve against). The legacy WASM
 /// `FormData → DynamicStruct` path is gone.
 #[scene]
-pub fn Form(name: String, field: Option<FieldRef>) -> impl Scene {
+pub fn Form(name: Option<String>, field: Option<FieldRef>) -> impl Scene {
 	rsx! {
-		<form {field} name={name}>
+		<form {field} {optional_attr("name", name)}>
 			<slot/>
 		</form>
 	}

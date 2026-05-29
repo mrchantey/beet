@@ -48,6 +48,15 @@ pub fn set_now(getter: NowFn) -> Result {
 		.map_err(|_| bevyhow!("wall clock already installed"))
 }
 
+/// The current year, derived from the cross-platform [`time_ext::now`]
+/// wall clock (seconds since the Unix epoch). Approximation is fine for a
+/// footer string (off by at most a day around new year).
+pub fn current_year() -> i32 {
+	let secs = time_ext::now().as_secs();
+	1970 + (secs as f64 / (365.2425 * 86400.0)) as i32
+}
+
+
 /// Formats a duration as a human-readable string with appropriate units.
 ///
 /// Automatically selects the most appropriate unit (minutes, seconds,

@@ -123,23 +123,23 @@ fn footer_includes_version() {
 }
 
 #[beet_core::test]
-fn document_layout_root_is_html() {
+fn html_document_root_is_html() {
 	let mut world = shell_world();
-	let root = world.spawn_scene(rsx! { <DocumentLayout/> }).unwrap().id();
+	let root = world.spawn_scene(rsx! { <HtmlDocument/> }).unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
 		.unwrap()
 		.tag()
 		.xpect_eq("html");
-	world.entity(root).get::<DocumentLayout>().unwrap();
+	world.entity(root).get::<HtmlDocument>().unwrap();
 }
 
 #[beet_core::test]
 fn page_layout_root_is_html() {
 	let mut world = shell_world();
 	let root = world.spawn_scene(rsx! { <PageLayout/> }).unwrap().id();
-	// PageLayout wraps DocumentLayout, whose root is <html>
+	// PageLayout wraps HtmlDocument, whose root is <html>
 	world
 		.entity(root)
 		.get::<Element>()
@@ -216,6 +216,24 @@ fn text_field_field_attaches_field_ref() {
 		.unwrap()
 		.id();
 	world.entity(bare).get::<FieldRef>().is_none().xpect_true();
+}
+
+#[beet_core::test]
+fn text_field_omits_unset_optional_attrs() {
+	let mut world = scene_ext::test_world();
+	// omitted: no `name`/`placeholder` attributes (not an empty `name=""`)
+	let bare = world.spawn_scene(rsx! { <TextField/> }).unwrap().id();
+	// supplied: the attribute is present with its value
+	let named = world
+		.spawn_scene(rsx! { <TextField name="email"/> })
+		.unwrap()
+		.id();
+	world.with_state::<ElementQuery, _>(|query| {
+		let bare = query.get(bare).unwrap();
+		bare.attribute("name").is_none().xpect_true();
+		bare.attribute("placeholder").is_none().xpect_true();
+		query.get(named).unwrap().attribute_string("name").xpect_eq("email");
+	});
 }
 
 #[beet_core::test]

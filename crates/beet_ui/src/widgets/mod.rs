@@ -27,6 +27,8 @@ mod header;
 mod layout;
 mod preflight;
 mod sidebar;
+#[cfg(feature = "style")]
+mod stylesheet;
 mod table;
 
 #[cfg(feature = "net")]
@@ -41,4 +43,6 @@ pub use header::*;
 pub use layout::*;
 pub use preflight::*;
 pub use sidebar::*;
+#[cfg(feature = "style")]
+pub use stylesheet::*;
 pub use table::*;

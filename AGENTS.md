@@ -110,3 +110,12 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - Observers can accept closures that accept their enviromnent, but systems cannot. Instead use input parameters: `fn my_system(foo: In<Foo>,...){}`;
 - when spawning entities prefer to use world.spawn((ParentComponent,children![(ChildComponent,..)])) instead of calling spawn again for the child with ChildOf(), unless the child entity needs to be tracked for the test.
 - Traversal. traversing entity hierarchies can quickly become a mess. for anything remotely complex just formalize it with a SystemParam, see `card_query.rs` for a good example of this. Avoid traversing using world directly, instead run a system, ie `world.run_system_once(|ancestors:Query<&ChildOf>| ... let root = ancestors.root(entity))`
+
+
+## UI Cheatsheet (`beet_ui`)
+
+- Widgets are function components: `#[scene] fn Button(..) -> impl Scene`, used as capitalized tags `<Button label="Save"/>`. Reach for a [`SystemParam`] with `#[scene(system)]` when build needs world access (eg `Res<PackageConfig>`, `StyleQuery`).
+- Classes, never strings: emit semantic classes with the `Classes` block attribute `<div {Classes::new([classes::CARD_FILLED])}/>`, not `class="card-filled"`. Constants live in `beet_ui::prelude::classes` and are the contract between widgets and the rule set; add a new constant rather than a stringly typed class.
+- Styling: `<Stylesheet/>` bakes the active rule set into a `<style>`, `<Preflight/>` is the base reset, `<ColorSchemeScript/>` seeds `.light-scheme`/`.dark-scheme`. Drop these in `<head>`; never hand-assemble a `<style>{css}</style>` string.
+- Optional attributes: for `Option` props use `{optional_attr("name", name)}` so the attribute is omitted when `None` (an empty `name=""` is wrong). Use `{attr(key, value)}` for a dynamically-built always-present attribute. Both accumulate alongside literal attributes.
+- Interpolation: share one value across many tags by reference, `<title>{&title}</title>` — this lowers to `Value::new(&title)` (a cheap clone at build) without moving the local or peppering `.clone()`.
