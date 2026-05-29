@@ -4,32 +4,6 @@ use crate::prelude::*;
 use std::time::Duration;
 use std::time::SystemTime;
 
-/// Formats a duration as a human-readable string with appropriate units.
-///
-/// Automatically selects the most appropriate unit (minutes, seconds,
-/// milliseconds, microseconds, or nanoseconds) based on the duration's magnitude.
-pub fn pretty_print_duration(dur: Duration) -> String {
-	let total_secs = dur.as_secs();
-	let minutes = total_secs / 60;
-	let secs = total_secs % 60;
-	let millis = dur.subsec_millis();
-	if minutes > 0 {
-		format!("{}:{:02}.{:03} m", minutes, secs, millis)
-	} else if secs > 0 {
-		format!("{}.{:02} s", secs, millis)
-	} else if millis > 0 {
-		format!("{} ms", millis)
-	} else {
-		let micros = dur.subsec_micros();
-		if micros > 0 {
-			format!("{} µs", micros)
-		} else {
-			let nanos = dur.subsec_nanos();
-			format!("{} ns", nanos)
-		}
-	}
-}
-
 /// Returns the current time as milliseconds since the Unix epoch.
 pub fn now_millis() -> u128 {
 	SystemTime::now()

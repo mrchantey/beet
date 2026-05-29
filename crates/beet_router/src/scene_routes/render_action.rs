@@ -137,13 +137,15 @@ where
 ///
 /// ```no_run
 /// # use beet_router::prelude::*;
+/// # use beet_action::prelude::*;
+/// # use beet_net::prelude::*;
 /// # use beet_ui::prelude::SceneComponent;
 /// # #[derive(Default)] struct AppInfo;
 /// # impl AppInfo {
 /// #     fn scene(_: ()) -> impl beet_ui::prelude::Scene { () }
 /// # }
-/// // closure form
-/// render_action::scene_route("app-info", |_| AppInfo::scene(()));
+/// // closure form (annotate the request type the handler ignores)
+/// render_action::scene_route("app-info", |_: ActionContext<Request>| AppInfo::scene(()));
 /// // shorthand
 /// render_action::scene_func_route("app-info", AppInfo::scene);
 /// ```

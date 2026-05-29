@@ -36,7 +36,7 @@ pub fn exchange_stats(
 
 	stats.push(format!(
 		"duration:\t{}",
-		time_ext::pretty_print_duration(ev.start_time.elapsed())
+		pretty_print_duration(ev.start_time.elapsed())
 	));
 
 	if let Ok(mut server) = servers.get_mut(entity) {

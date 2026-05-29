@@ -261,7 +261,7 @@ fn test_stats(outcome: &SuiteOutcome, color: bool) -> String {
 fn run_stats(outcome: &SuiteOutcome, config: &TestRunnerConfig) -> String {
 	let color = !config.no_color;
 	let duration = config.started().elapsed();
-	let time = time_ext::pretty_print_duration(duration);
+	let time = pretty_print_duration(duration);
 	let time = TermStyle::blue().bold().or_plain(color).paint(time);
 	let test_stats = test_stats(outcome, color);
 	format!("{} in {}", test_stats, time)
@@ -360,7 +360,7 @@ fn fail_reason(outcome: &TestFail, color: bool) -> String {
 			}
 		}
 		TestFail::Timeout { elapsed } => {
-			let time = time_ext::pretty_print_duration(*elapsed);
+			let time = pretty_print_duration(*elapsed);
 			let time = TermStyle::blue().or_plain(color).paint(time);
 			format!("{} {}", bold.paint("Timed out after:"), time)
 		}

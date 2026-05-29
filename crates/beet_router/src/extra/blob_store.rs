@@ -67,7 +67,8 @@ pub async fn serve_blob(store: &BlobStore, path: &SmolPath) -> Result<Response> 
 }
 
 
-#[cfg(test)]
+// the tests assemble a full `router()` and a temp fs-backed store (both std).
+#[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
 	use beet_action::prelude::*;

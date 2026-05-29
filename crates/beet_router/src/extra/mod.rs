@@ -5,16 +5,24 @@
 //! analytics routes, the [`HtmlStore`] prebuilt-HTML gate, and a
 //! batteries-included [`default_router`].
 
-mod app_info;
-pub use app_info::*;
 mod html_store;
 pub use html_store::*;
+// serving static files from a [`BlobStore`] as routes (no_std core).
+mod blob_store;
+pub use blob_store::*;
 
 #[cfg(feature = "json")]
 mod analytics;
 #[cfg(feature = "json")]
 pub use analytics::*;
-#[cfg(feature = "json")]
+
+// std-only: the app-info scene route renders through beet_ui, and the
+// batteries-included `default_router` wires it alongside `router()`.
+#[cfg(feature = "std")]
+mod app_info;
+#[cfg(feature = "std")]
+pub use app_info::*;
+#[cfg(all(feature = "json", feature = "std"))]
 mod default_router;
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 pub use default_router::*;

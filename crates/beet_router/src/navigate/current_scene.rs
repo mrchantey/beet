@@ -14,6 +14,9 @@ pub struct CurrentScene;
 /// Safety-net observer that removes [`CurrentScene`] from all other
 /// entities when a new one is inserted, ensuring at most one active
 /// scene at a time.
+///
+/// Only registered by the std-only [`NavigatorPlugin`].
+#[cfg(feature = "std")]
 pub(crate) fn single_current_scene(
 	insert: On<Insert, CurrentScene>,
 	query: Query<Entity, With<CurrentScene>>,

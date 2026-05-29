@@ -52,6 +52,9 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
+/// Pure duration formatting (no_std).
+pub mod duration_ext;
+pub use duration_ext::*;
 /// Time and duration utilities.
 #[cfg(feature = "std")]
 pub mod time_ext;
