@@ -102,7 +102,7 @@ fn setup(mut commands: Commands) {
 			);
 			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
-			entity.world().write_message(AppExit::Success);
+			entity.world().write_message(AppExit::Success).await;
 			Ok(())
 		});
 }
