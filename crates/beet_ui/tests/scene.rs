@@ -244,6 +244,98 @@ fn counter_widget_behavior_attaches_to_scene_built_tree() {
 	world.resource::<Count>().0.xpect_eq(2);
 }
 
+/// A widget with a `#[prop(required)]` prop, exercising the runtime-checked
+/// required-prop path (see `agent/plans/required_props.md`). Required-ness is
+/// validated at build time: an unset required prop surfaces [`MissingProps`]
+/// through the build channel rather than panicking.
+#[scene]
+fn Badge(#[prop(required)] variant: ButtonVariant) -> impl Scene {
+	rsx! { <span {Classes::new(["badge", variant.class()])}/> }
+}
+
+/// Spawn `scene` into `world`, returning the root id or the build error as a
+/// string — shared so the supplied and missing-prop cases stay DRY.
+fn try_spawn(world: &mut World, scene: impl Scene) -> Result<Entity, String> {
+	world.spawn_scene(scene).map(|entity| entity.id()).map_err(|err| err.to_string())
+}
+
+#[beet_core::test]
+fn required_prop_supplied_resolves() {
+	let mut world = scene_ext::test_world();
+	let root = try_spawn(&mut world, rsx! { <Badge variant=ButtonVariant::Error/> })
+		.unwrap();
+	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("span");
+	world.entity(root).get::<Badge>().unwrap();
+}
+
+#[beet_core::test]
+fn missing_required_prop_surfaces_error() {
+	let mut world = scene_ext::test_world();
+	// `<Badge/>` lowers to `BadgeProps::default()`, leaving `variant` unset
+	let err = try_spawn(&mut world, rsx! { <Badge/> }).unwrap_err();
+	err.xpect_contains("missing required props").xpect_contains("variant");
+}
+
+/// Exercises optional-prop ergonomics: `#[prop(default = expr)]` seeds a
+/// non-`Default` value, and a bare `Option<T>` field defaults to `None` while
+/// its setter accepts the inner `T`.
+#[scene]
+fn Tag(
+	#[prop(default = "tag")] kind: String,
+	label: Option<String>,
+) -> impl Scene {
+	let label = label.unwrap_or_default();
+	rsx! { <span class={kind}>{label}</span> }
+}
+
+#[beet_core::test]
+fn default_and_option_props() {
+	let mut world = scene_ext::test_world();
+
+	// omitted props fall back: `kind` -> "tag", `label` -> None (empty child)
+	let root = world.spawn_scene(rsx! { <Tag/> }).unwrap().id();
+	world.with_state::<ElementQuery, _>(|query| {
+		query.get(root).unwrap().attribute_string("class").xpect_eq("tag");
+	});
+
+	// supplied props flow through, `label` setter takes `&str` (unwrap_option)
+	let root = world.spawn_scene(rsx! { <Tag kind="x" label="hi"/> }).unwrap().id();
+	world.with_state::<ElementQuery, _>(|query| {
+		let view = query.get(root).unwrap();
+		view.attribute_string("class").xpect_eq("x");
+		query
+			.iter_descendant_values(root)
+			.any(|value| value.as_str().ok() == Some("hi"))
+			.xpect_true();
+	});
+}
+
+/// A custom props type supplied via `#[prop(all)]` — the macro emits no props
+/// struct, treating `LabelProps` as the props type directly.
+#[derive(Default, SetWith)]
+struct LabelProps {
+	#[set_with(into)]
+	text: String,
+}
+
+#[scene]
+fn Label(#[prop(all)] props: LabelProps) -> impl Scene {
+	rsx! { <span>{props.text}</span> }
+}
+
+#[beet_core::test]
+fn prop_all_uses_custom_props_type() {
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <Label text="hi"/> }).unwrap().id();
+	world.entity(root).get::<Label>().unwrap();
+	world.with_state::<ElementQuery, _>(|query| {
+		query
+			.iter_descendant_values(root)
+			.any(|value| value.as_str().ok() == Some("hi"))
+			.xpect_true();
+	});
+}
+
 #[beet_core::test]
 fn nested_elements_with_attribute() {
 	let mut world = scene_ext::test_world();

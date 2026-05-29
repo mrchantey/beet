@@ -31,6 +31,8 @@ impl TextFieldVariant {
 	}
 }
 
+// impl SceneComponent
+
 /// A styled `<input>` text field. Optionally binds to a document field via
 /// `field`; if set, the input syncs with the resolved [`Document`].
 #[scene]

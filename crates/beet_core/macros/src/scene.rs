@@ -15,7 +15,22 @@
 //! `<Name as SceneComponent>::scene(NameProps::default().with_p1(..))`, so
 //! omitted attributes fall back to `Default` and the entity gains the `Name`
 //! component (unlocking `:Name { … }` inheritance, caching, reflection).
+//!
+//! # Prop grammar
+//!
+//! Required-ness is **opt-in** (the upstream `Props: Default` bound makes
+//! compile-time required props impossible; see `agent/plans/required_props.md`):
+//!
+//! - bare field / `#[prop(default)]` → optional, `Default::default()`
+//! - `#[prop(default = expr)]` → optional, defaults to `expr`
+//! - `Option<T>` field → optional, defaults to `None` (setter takes `T`)
+//! - `#[prop(required)]` → required; stored as `Option<T>` and validated at
+//!   build time, surfacing [`MissingProps`](beet_ui::prelude::MissingProps)
+//!   through the build channel (never a panic) when unset
+//! - `#[prop(into)]` → `impl Into` setter
+//! - `#[prop(all)]` → the param's type *is* the props type (no struct emitted)
 extern crate alloc;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
@@ -54,9 +69,140 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	}
 }
 
+/// A `#[scene]` parameter lowered to a props field.
+struct Prop {
+	/// parameter name (also the props field name)
+	ident: syn::Ident,
+	/// type as written by the author — what the body binds
+	ty: syn::Type,
+	/// stored as `Option<ty>` and validated at build time
+	required: bool,
+	/// `#[prop(default = expr)]` default expression
+	default_expr: Option<syn::Expr>,
+	/// non-`#[prop]` attributes (doc comments etc) kept on the field
+	other_attrs: Vec<syn::Attribute>,
+	/// `#[set_with(..)]` argument tokens forwarded to the field
+	set_with_args: Vec<TokenStream>,
+}
+
+impl Prop {
+	/// The field's stored type: `Option<ty>` for required props, else `ty`.
+	fn stored_ty(&self) -> TokenStream {
+		let ty = &self.ty;
+		if self.required {
+			quote! { ::core::option::Option<#ty> }
+		} else {
+			quote! { #ty }
+		}
+	}
+
+	/// The struct field definition, with forwarded attrs + `#[set_with(..)]`.
+	fn field_def(&self) -> TokenStream {
+		let ident = &self.ident;
+		let stored_ty = self.stored_ty();
+		let other_attrs = &self.other_attrs;
+		let set_with = (!self.set_with_args.is_empty()).then(|| {
+			let args = &self.set_with_args;
+			quote! { #[set_with(#(#args),*)] }
+		});
+		quote! {
+			#(#other_attrs)*
+			#set_with
+			#ident: #stored_ty
+		}
+	}
+
+	/// The field's value inside a manual `Default` impl.
+	fn default_value(&self) -> TokenStream {
+		if self.required {
+			quote! { ::core::option::Option::None }
+		} else if let Some(expr) = &self.default_expr {
+			quote! { (#expr).into() }
+		} else {
+			quote! { ::core::default::Default::default() }
+		}
+	}
+}
+
+/// Parse one parameter into a [`Prop`], reporting whether it carried
+/// `#[prop(all)]` (the param's type *is* the props type).
+fn parse_prop(pt: &syn::PatType) -> syn::Result<(Prop, bool)> {
+	let ident = param_ident(pt)?;
+	let ty = (*pt.ty).clone();
+
+	let mut required = false;
+	let mut is_all = false;
+	let mut default_expr = None;
+	let mut set_with_args: Vec<TokenStream> = Vec::new();
+	let mut other_attrs: Vec<syn::Attribute> = Vec::new();
+
+	for attr in &pt.attrs {
+		if !attr.path().is_ident("prop") {
+			other_attrs.push(attr.clone());
+			continue;
+		}
+		let tokens = match &attr.meta {
+			syn::Meta::List(list) => list.tokens.clone(),
+			syn::Meta::Path(_) => TokenStream::new(), // bare `#[prop]`
+			syn::Meta::NameValue(_) => {
+				synbail!(attr, "`#[prop = ..]` form is not supported")
+			}
+		};
+		let map = AttributeMap::parse(tokens)?;
+		for key in map.keys() {
+			match key {
+				"required" => required = true,
+				"all" => is_all = true,
+				"default" => default_expr = map.get("default").cloned(),
+				// everything else forwards to `#[set_with(..)]`
+				other => match map.get(other) {
+					Some(expr) => {
+						let key = format_ident!("{}", other);
+						set_with_args.push(quote! { #key = #expr });
+					}
+					None => {
+						let key = format_ident!("{}", other);
+						set_with_args.push(quote! { #key });
+					}
+				},
+			}
+		}
+	}
+
+	// required props store `Option<ty>`, so the setter must unwrap to `ty`;
+	// bare `Option<T>` props get the same ergonomic (setter takes `T`).
+	let already_unwraps =
+		set_with_args.iter().any(|arg| arg.to_string().contains("unwrap_option"));
+	if !already_unwraps && (required || (!required && is_option(&ty))) {
+		set_with_args.push(quote! { unwrap_option });
+	}
+
+	let prop = Prop {
+		ident,
+		ty,
+		required,
+		default_expr,
+		other_attrs,
+		set_with_args,
+	};
+	Ok((prop, is_all))
+}
+
 /// Whether a parameter is a prop (carries a `#[prop]` attribute).
 fn is_prop_param(pt: &syn::PatType) -> bool {
 	pt.attrs.iter().any(|attr| attr.path().is_ident("prop"))
+}
+
+/// Whether a type is `Option<..>`.
+fn is_option(ty: &syn::Type) -> bool {
+	match ty {
+		syn::Type::Path(tp) => tp
+			.path
+			.segments
+			.last()
+			.is_some_and(|seg| seg.ident == "Option"),
+		_ => false,
+	}
 }
 
 /// Extract the identifier from a simple parameter pattern.
@@ -65,6 +211,16 @@ fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
 		syn::Pat::Ident(pi) => Ok(pi.ident.clone()),
 		other => {
 			synbail!(other, "`#[scene]` parameters must be plain identifiers")
+		}
+	}
+}
+
+/// Coerce a typed function argument, rejecting `self`.
+fn typed_arg(arg: &FnArg) -> syn::Result<&syn::PatType> {
+	match arg {
+		FnArg::Typed(pt) => Ok(pt),
+		FnArg::Receiver(recv) => {
+			synbail!(recv, "`#[scene]` functions cannot take `self`")
 		}
 	}
 }
@@ -79,27 +235,95 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	let fn_attrs = &item.attrs;
 	let props_name = format_ident!("{}Props", fn_name);
 
-	// each param becomes a props field; `#[prop(..)]` becomes `#[set_with(..)]`
-	let mut field_defs: Vec<TokenStream> = Vec::new();
-	let mut field_idents: Vec<syn::Ident> = Vec::new();
+	let mut props: Vec<Prop> = Vec::new();
+	let mut is_all = false;
 	for arg in &item.sig.inputs {
-		let pt = match arg {
-			FnArg::Typed(pt) => pt,
-			FnArg::Receiver(recv) => {
-				synbail!(recv, "`#[scene]` functions cannot take `self`")
-			}
-		};
-		let ident = param_ident(pt)?;
-		let ty = &pt.ty;
-		let set_with_attrs = translate_prop_attrs(&pt.attrs)?;
-		field_defs.push(quote! { #(#set_with_attrs)* #ident: #ty });
-		field_idents.push(ident);
+		let (prop, all) = parse_prop(typed_arg(arg)?)?;
+		is_all |= all;
+		props.push(prop);
 	}
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
+	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
+	let scene_component_impl = scene_component_impl(fn_name, &props_name);
 
-	let scene_component_impl =
-		scene_component_impl(fn_name, &props_name, quote! { Self::scene(props) });
+	// `#[prop(all)]`: the single param's type is the user-defined props type, so
+	// no struct/`Default`/`SetWith` is generated — just bind it for the body.
+	if is_all {
+		if props.len() != 1 {
+			synbail!(
+				&item.sig.inputs,
+				"`#[prop(all)]` must be the only parameter"
+			);
+		}
+		let ident = &props[0].ident;
+		return Ok(quote! {
+			#(#fn_attrs)*
+			#[derive(
+				::bevy::ecs::component::Component,
+				Default,
+				Clone,
+				::bevy::reflect::Reflect,
+			)]
+			#[reflect(Component)]
+			#vis struct #fn_name;
+
+			impl #fn_name {
+				#[allow(non_snake_case, unused_variables)]
+				#vis fn scene(props: #props_name) #output {
+					let #ident = props;
+					#[allow(unused_braces)]
+					#body
+				}
+			}
+
+			#scene_component_impl
+		});
+	}
+
+	let field_defs = props.iter().map(Prop::field_def);
+	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
+	let props_struct = props_struct(
+		vis,
+		&props_name,
+		&props,
+		field_defs,
+		&beet_core,
+		/* clone */ false,
+	);
+
+	let scene_fn = if props.iter().any(|p| p.required) {
+		let checks = required_checks(&props, &beet_core);
+		let unwraps = required_unwraps(&props);
+		quote! {
+			#[track_caller]
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				let location = ::core::panic::Location::caller();
+				let #props_name { #(#field_idents),* } = props;
+				let mut missing = #beet_core::prelude::Vec::new();
+				#(#checks)*
+				if !missing.is_empty() {
+					return #beet_ui::prelude::SceneExt::any_scene(
+						#beet_ui::prelude::ErrorScene::new(
+							#beet_ui::prelude::MissingProps { props: missing, location },
+						),
+					);
+				}
+				#(#unwraps)*
+				#beet_ui::prelude::SceneExt::any_scene(#body)
+			}
+		}
+	} else {
+		quote! {
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				let #props_name { #(#field_idents),* } = props;
+				#[allow(unused_braces)]
+				#body
+			}
+		}
+	};
 
 	Ok(quote! {
 		#(#fn_attrs)*
@@ -112,19 +336,10 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 		#[reflect(Component)]
 		#vis struct #fn_name;
 
-		#[derive(Default, #beet_core::prelude::SetWith)]
-		#[allow(non_camel_case_types)]
-		#vis struct #props_name {
-			#(#field_defs),*
-		}
+		#props_struct
 
 		impl #fn_name {
-			#[allow(non_snake_case, unused_variables)]
-			#vis fn scene(props: #props_name) #output {
-				let #props_name { #(#field_idents),* } = props;
-				#[allow(unused_braces)]
-				#body
-			}
+			#scene_fn
 		}
 
 		#scene_component_impl
@@ -137,14 +352,14 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 fn scene_component_impl(
 	fn_name: &syn::Ident,
 	props_name: &syn::Ident,
-	scene_expr: TokenStream,
 ) -> TokenStream {
 	quote! {
 		impl ::bevy::scene::SceneComponent for #fn_name {
 			type Props = #props_name;
+			#[track_caller]
 			fn scene(props: Self::Props) -> impl ::bevy::scene::Scene {
 				(
-					#scene_expr,
+					Self::scene(props),
 					<::bevy::scene::InitTemplate::<
 						<Self as ::bevy::ecs::template::FromTemplate>::Template
 					> as ::core::default::Default>::default(),
@@ -155,6 +370,81 @@ fn scene_component_impl(
 			}
 		}
 	}
+}
+
+/// The props struct definition. Derives `Default` directly unless a
+/// `#[prop(default = expr)]` forces a manual `Default` impl. `clone` adds a
+/// `Clone` derive (required by `#[scene(system)]`, which clones props into the
+/// build closure).
+fn props_struct(
+	vis: &syn::Visibility,
+	props_name: &syn::Ident,
+	props: &[Prop],
+	field_defs: impl Iterator<Item = TokenStream>,
+	beet_core: &syn::Path,
+	clone: bool,
+) -> TokenStream {
+	let field_defs: Vec<_> = field_defs.collect();
+	let clone_derive = clone.then(|| quote! { Clone, });
+	let needs_manual_default = props.iter().any(|p| p.default_expr.is_some());
+
+	if needs_manual_default {
+		let field_idents = props.iter().map(|p| &p.ident);
+		let defaults = props.iter().map(Prop::default_value);
+		quote! {
+			#[derive(#clone_derive #beet_core::prelude::SetWith)]
+			#[allow(non_camel_case_types)]
+			#vis struct #props_name {
+				#(#field_defs),*
+			}
+
+			impl ::core::default::Default for #props_name {
+				fn default() -> Self {
+					Self {
+						#(#field_idents: #defaults),*
+					}
+				}
+			}
+		}
+	} else {
+		quote! {
+			#[derive(Default, #clone_derive #beet_core::prelude::SetWith)]
+			#[allow(non_camel_case_types)]
+			#vis struct #props_name {
+				#(#field_defs),*
+			}
+		}
+	}
+}
+
+/// `if <field>.is_none() { missing.push("<field>"); }` for each required prop.
+fn required_checks(props: &[Prop], beet_core: &syn::Path) -> Vec<TokenStream> {
+	props
+		.iter()
+		.filter(|p| p.required)
+		.map(|p| {
+			let ident = &p.ident;
+			let name = syn::LitStr::new(&ident.to_string(), ident.span());
+			quote! {
+				if #ident.is_none() {
+					missing.push(#beet_core::prelude::SmolStr::new_static(#name));
+				}
+			}
+		})
+		.collect()
+}
+
+/// `let <field> = <field>.unwrap();` for each required prop — after validation
+/// each binding matches its originally declared type.
+fn required_unwraps(props: &[Prop]) -> Vec<TokenStream> {
+	props
+		.iter()
+		.filter(|p| p.required)
+		.map(|p| {
+			let ident = &p.ident;
+			quote! { let #ident = #ident.unwrap(); }
+		})
+		.collect()
 }
 
 /// Build the props struct and a build-time callable for a `#[scene(system)]`.
@@ -170,23 +460,17 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let fn_attrs = &item.attrs;
 	let props_name = format_ident!("{}Props", fn_name);
 
-	let mut prop_field_defs: Vec<TokenStream> = Vec::new();
-	let mut prop_idents: Vec<syn::Ident> = Vec::new();
+	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<&syn::Type> = Vec::new();
 	let mut sys_pats: Vec<syn::Ident> = Vec::new();
 	for arg in &item.sig.inputs {
-		let pt = match arg {
-			FnArg::Typed(pt) => pt,
-			FnArg::Receiver(recv) => {
-				synbail!(recv, "`#[scene]` functions cannot take `self`")
-			}
-		};
+		let pt = typed_arg(arg)?;
 		if is_prop_param(pt) {
-			let ident = param_ident(pt)?;
-			let ty = &pt.ty;
-			let set_with_attrs = translate_prop_attrs(&pt.attrs)?;
-			prop_field_defs.push(quote! { #(#set_with_attrs)* #ident: #ty });
-			prop_idents.push(ident);
+			let (prop, is_all) = parse_prop(pt)?;
+			if is_all {
+				synbail!(pt, "`#[prop(all)]` is not supported with `#[scene(system)]`");
+			}
+			props.push(prop);
 		} else {
 			sys_types.push(&pt.ty);
 			sys_pats.push(param_ident(pt)?);
@@ -195,9 +479,72 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
+	let scene_component_impl = scene_component_impl(fn_name, &props_name);
 
-	let scene_component_impl =
-		scene_component_impl(fn_name, &props_name, quote! { Self::scene(props) });
+	let field_defs = props.iter().map(Prop::field_def);
+	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
+	let props_struct = props_struct(
+		vis,
+		&props_name,
+		&props,
+		field_defs,
+		&beet_core,
+		/* clone */ true,
+	);
+
+	let unwraps = required_unwraps(&props);
+	let build_closure = quote! {
+		#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
+			move |(#(#sys_pats,)*)| {
+				let #props_name { #(#field_idents),* } = props.clone();
+				#(#unwraps)*
+				#[allow(unused_braces)]
+				#body
+			},
+		)
+	};
+
+	// only emit the build-time required check when a prop is required, keeping
+	// the zero-overhead path verbatim otherwise.
+	let scene_fn = if props.iter().any(|p| p.required) {
+		let checks: Vec<TokenStream> = props
+			.iter()
+			.filter(|p| p.required)
+			.map(|p| {
+				let ident = &p.ident;
+				let name = syn::LitStr::new(&ident.to_string(), ident.span());
+				quote! {
+					if props.#ident.is_none() {
+						missing.push(#beet_core::prelude::SmolStr::new_static(#name));
+					}
+				}
+			})
+			.collect();
+		quote! {
+			#[track_caller]
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				let location = ::core::panic::Location::caller();
+				let mut missing = #beet_core::prelude::Vec::new();
+				#(#checks)*
+				if !missing.is_empty() {
+					return #beet_ui::prelude::SceneExt::any_scene(
+						#beet_ui::prelude::ErrorScene::new(
+							#beet_ui::prelude::MissingProps { props: missing, location },
+						),
+					);
+				}
+				#beet_ui::prelude::SceneExt::any_scene(#build_closure)
+			}
+		}
+	} else {
+		quote! {
+			#[allow(non_snake_case, unused_variables)]
+			#vis fn scene(props: #props_name) #output {
+				#build_closure
+			}
+		}
+	};
 
 	Ok(quote! {
 		#(#fn_attrs)*
@@ -210,55 +557,14 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 		#[reflect(Component)]
 		#vis struct #fn_name;
 
-		#[derive(Default, Clone, #beet_core::prelude::SetWith)]
-		#[allow(non_camel_case_types)]
-		#vis struct #props_name {
-			#(#prop_field_defs),*
-		}
+		#props_struct
 
 		impl #fn_name {
-			#[allow(non_snake_case, unused_variables)]
-			#vis fn scene(props: #props_name) #output {
-				// build-time scene: fetch the system params, run the body, apply
-				// the produced sub-scene to the entity (synchronous world access)
-				#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
-					move |(#(#sys_pats,)*)| {
-						let #props_name { #(#prop_idents),* } = props.clone();
-						#[allow(unused_braces)]
-						#body
-					},
-				)
-			}
+			#scene_fn
 		}
 
 		#scene_component_impl
 	})
-}
-
-/// Translate per-param `#[prop(..)]` attributes into `#[set_with(..)]` on the
-/// generated props field. Other attributes (e.g. doc comments) pass through.
-fn translate_prop_attrs(
-	attrs: &[syn::Attribute],
-) -> syn::Result<Vec<TokenStream>> {
-	let mut out = Vec::new();
-	for attr in attrs {
-		if attr.path().is_ident("prop") {
-			match &attr.meta {
-				syn::Meta::List(list) => {
-					let tokens = &list.tokens;
-					out.push(quote! { #[set_with(#tokens)] });
-				}
-				// bare `#[prop]` carries no options
-				syn::Meta::Path(_) => {}
-				syn::Meta::NameValue(_) => {
-					synbail!(attr, "`#[prop = ..]` form is not supported")
-				}
-			}
-		} else {
-			out.push(quote! { #attr });
-		}
-	}
-	Ok(out)
 }
 
 #[cfg(test)]
@@ -296,6 +602,9 @@ mod test {
 		assert!(result.contains("SceneComponent for Button"));
 		assert!(result.contains("type Props = ButtonProps"));
 		assert!(result.contains("SceneComponentInfo"));
+		// no required props -> derives Default directly, no validation
+		assert!(result.contains("derive (Default"));
+		assert!(!result.contains("ErrorScene"));
 	}
 
 	#[test]
@@ -304,6 +613,65 @@ mod test {
 			fn Button(#[prop(into)] label: String) -> impl Scene { todo!() }
 		});
 		assert!(result.contains("# [set_with (into)]"));
+	}
+
+	#[test]
+	fn required_prop_generates_checked_path() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Field(#[prop(required)] variant: Variant) -> impl Scene { todo!() }
+		});
+		// stored as Option, setter unwraps it
+		assert!(result.contains("Option < Variant >"));
+		assert!(result.contains("unwrap_option"));
+		// validation + error-scene path
+		assert!(result.contains("if variant . is_none ()"));
+		assert!(result.contains("MissingProps"));
+		assert!(result.contains("ErrorScene"));
+		assert!(result.contains("let variant = variant . unwrap ()"));
+		// required props alone keep the derived Default (None)
+		assert!(result.contains("derive (Default"));
+	}
+
+	#[test]
+	fn default_expr_generates_manual_default() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Field(#[prop(default = "hi")] placeholder: String) -> impl Scene { todo!() }
+		});
+		// manual Default impl carrying the expression, not a derive
+		assert!(result.contains("impl :: core :: default :: Default for FieldProps"));
+		assert!(result.contains("\"hi\""));
+		assert!(!result.contains("derive (Default"));
+	}
+
+	#[test]
+	fn bare_option_prop_setter_unwraps() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Field(name: Option<String>) -> impl Scene { todo!() }
+		});
+		// optional -> stays Option, but the setter unwraps for ergonomics
+		assert!(result.contains("unwrap_option"));
+		// not required -> no validation
+		assert!(!result.contains("ErrorScene"));
+	}
+
+	#[test]
+	fn prop_all_skips_props_struct() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Field(#[prop(all)] cfg: FieldProps) -> impl Scene { todo!() }
+		});
+		// no generated struct; binds the param for the body
+		assert!(!result.contains("struct FieldProps"));
+		assert!(result.contains("fn scene (props : FieldProps)"));
+		assert!(result.contains("let cfg = props"));
+		assert!(result.contains("type Props = FieldProps"));
+	}
+
+	#[test]
+	fn prop_all_rejects_extra_params() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			fn Field(#[prop(all)] cfg: FieldProps, other: u32) -> impl Scene { todo!() }
+		});
+		assert!(err.contains("only parameter"));
 	}
 
 	#[test]
@@ -330,6 +698,16 @@ mod test {
 		assert!(result.contains("role : ColorRole"));
 		assert!(result.contains("scene_system :: < (Res < Theme > ,)"));
 		assert!(result.contains("let PanelProps { role } = props . clone ()"));
+	}
+
+	#[test]
+	fn system_required_prop_checks_before_closure() {
+		let result = parse_str(quote!(system), syn::parse_quote! {
+			fn Panel(#[prop(required)] role: ColorRole, theme: Res<Theme>) -> impl Scene { todo!() }
+		});
+		assert!(result.contains("if props . role . is_none ()"));
+		assert!(result.contains("ErrorScene"));
+		assert!(result.contains("let role = role . unwrap ()"));
 	}
 
 	#[test]
