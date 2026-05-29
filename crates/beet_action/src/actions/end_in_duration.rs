@@ -1,7 +1,7 @@
 //! Duration-delayed return action.
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Runs for a duration, then ends with the stored value.
 ///

@@ -60,7 +60,7 @@ async fn main() -> Result {
 
 	// a CLI invocation is just a request: the path selects the route and
 	// `--body` becomes the request body
-	let request = Request::from_cli_args(CliArgs::parse_env())?;
+	let request = Request::from_cli_args(CliArgs::parse_env());
 	let response = world
 		.entity_mut(root)
 		.call::<Request, Response>(request)

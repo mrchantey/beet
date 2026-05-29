@@ -1,8 +1,8 @@
 use beet_action::prelude::AsyncEntityActionExt;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use std::borrow::Cow;
-use std::collections::VecDeque;
+use alloc::borrow::Cow;
+use alloc::collections::VecDeque;
 
 // RenderMedia, RenderTargets, RenderedBy are defined in beet_ui::input::render_media
 

@@ -51,7 +51,7 @@ pub mod prelude {
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::prelude::*;
-	#[cfg(all(feature = "net",feature="json"))]
+	#[cfg(all(feature = "net", feature = "json", feature = "std"))]
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
@@ -99,9 +99,14 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::AlignContent;
 			pub use crate::ui::prelude::style::Visibility;
 			pub use crate::ui::prelude::style::FlexWrap;
+			pub use crate::ui::prelude::Pointer;
+		}
+	}
+	cfg_if! {
+		// widgets live behind beet_ui's `scene` feature
+		if #[cfg(feature = "scene")]{
 			pub use crate::ui::prelude::Header;
 			pub use crate::ui::prelude::Button;
-			pub use crate::ui::prelude::Pointer;
 			pub use crate::ui::prelude::SidebarNode;
 			pub use crate::ui::prelude::Table;
 		}

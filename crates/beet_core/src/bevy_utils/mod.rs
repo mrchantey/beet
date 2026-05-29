@@ -35,8 +35,7 @@
 mod ancestor_query;
 #[cfg(feature = "bevy_async")]
 mod async_commands;
-// async init joins futures via the std-only `futures` crate
-#[cfg(all(feature = "bevy_async", feature = "std"))]
+#[cfg(feature = "bevy_async")]
 mod async_init;
 // the app runner needs a sleep/yield + task pool, so it is std-only
 #[cfg(all(feature = "bevy_async", feature = "std"))]
@@ -50,7 +49,7 @@ mod maybe;
 mod non_send_marker;
 mod non_send_plugin;
 
-#[cfg(all(feature = "bevy_async", feature = "std"))]
+#[cfg(feature = "bevy_async")]
 pub use async_init::*;
 pub use bevyhow::*;
 mod observer_adder;

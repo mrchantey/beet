@@ -370,16 +370,7 @@ impl From<&str> for IntoPost {
 #[reflect(Serialize, Deserialize)]
 pub struct Timestamp(Duration);
 impl Timestamp {
-	pub fn now() -> Self {
-		Self(
-			SystemTime::now()
-				.duration_since(SystemTime::UNIX_EPOCH)
-				.unwrap(),
-		)
-	}
-	pub fn as_system_time(&self) -> SystemTime {
-		SystemTime::UNIX_EPOCH + self.0
-	}
+	pub fn now() -> Self { Self(time_ext::now()) }
 	pub fn unix_epoch_elapsed(&self) -> Duration { self.0 }
 }
 

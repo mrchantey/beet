@@ -2,8 +2,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::prelude::Interval;
-use std::f32::consts::FRAC_PI_2;
-use std::ops::Range;
+use core::f32::consts::FRAC_PI_2;
+use core::ops::Range;
 
 /// Regenerates the curve of [`PlayProceduralAnimation`] with a random
 /// direction whenever the action begins [`Running`].
@@ -60,7 +60,8 @@ pub(crate) fn set_curve_on_run(
 
 			let angle =
 				range.start + (range.end - range.start) * rng.random::<f32>();
-			let end = Dir2::new_unchecked(Vec2::new(angle.cos(), angle.sin()));
+			let end =
+				Dir2::new_unchecked(Vec2::new(ops::cos(angle), ops::sin(angle)));
 
 			EasingCurve::new(start, end, *func).into()
 		}

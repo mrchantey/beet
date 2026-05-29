@@ -11,6 +11,28 @@
 //! - Other → returns an error
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::platform::sync::OnceLock;
+
+/// Boxed async HTTP send function: an owned [`Request`] in, a boxed future out.
+///
+/// This is the no_std-friendly transport hook. When no transport feature
+/// (`reqwest`/`ureq`/web-sys) is compiled in, [`Request::send`] falls through
+/// to a function installed via [`set_http_client`] — letting a downstream
+/// adapter (embassy, an esp WiFi crate, …) plug in its own transport without
+/// living in `beet_net`.
+pub type HttpSendFn =
+	fn(Request) -> MaybeSendBoxedFuture<'static, Result<Response>>;
+
+static HTTP_CLIENT: OnceLock<HttpSendFn> = OnceLock::new();
+
+/// Install the default HTTP transport, used by [`Request::send`] when no
+/// transport feature is enabled. Call once at startup from the adapter crate;
+/// returns an error if a transport has already been installed.
+pub fn set_http_client(client: HttpSendFn) -> Result<()> {
+	HTTP_CLIENT
+		.set(client)
+		.map_err(|_| bevyhow!("HTTP client already installed"))
+}
 
 /// Validates that appropriate TLS features are enabled for HTTPS requests.
 #[allow(unused)]
@@ -39,9 +61,16 @@ async fn send_http(request: Request) -> Result<Response> {
 		} else if #[cfg(feature = "reqwest")] {
 			super::impl_reqwest::send_reqwest(request).await
 		} else {
-			bevybail!(
-				"No HTTP transport available, enable the 'reqwest' or 'ureq' feature for native builds"
-			);
+			// No transport feature compiled in — defer to a transport
+			// installed at runtime via `set_http_client` (eg an embedded
+			// adapter). This is the no_std bare-metal path.
+			match HTTP_CLIENT.get() {
+				Some(send) => send(request).await,
+				None => bevybail!(
+					"No HTTP transport configured. Enable a transport feature \
+					 (reqwest/ureq) or install one via set_http_client(...)."
+				),
+			}
 		}
 	}
 }

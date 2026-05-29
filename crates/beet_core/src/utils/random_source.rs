@@ -41,8 +41,9 @@ impl RandomSource {
 
 impl Default for RandomSource {
 	fn default() -> Self {
-		let rng = ChaCha8Rng::from_rng(&mut rand::rng());
-		Self(rng)
+		// `from_os_rng` works on std/wasm/bare via getrandom — a bare target
+		// installs a getrandom backend at boot.
+		Self(ChaCha8Rng::from_os_rng())
 	}
 }
 

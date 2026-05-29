@@ -51,14 +51,14 @@ pub struct SidebarInfo {
 #[derive(Debug, Clone)]
 pub struct SidebarState {
 	/// The current page path, used for active-link detection and auto-expansion.
-	pub current_path: RelPath,
+	pub current_path: SmolPath,
 	/// Per-path override configuration.
-	pub infos: HashMap<RelPath, SidebarInfo>,
+	pub infos: HashMap<SmolPath, SidebarInfo>,
 }
 
 impl SidebarState {
 	/// Create a new collector targeting the given current path.
-	pub fn new(current_path: impl Into<RelPath>) -> Self {
+	pub fn new(current_path: impl Into<SmolPath>) -> Self {
 		Self {
 			current_path: current_path.into(),
 			infos: HashMap::default(),
@@ -68,7 +68,7 @@ impl SidebarState {
 	/// Set the override for a specific path.
 	pub fn with_info(
 		mut self,
-		path: impl Into<RelPath>,
+		path: impl Into<SmolPath>,
 		info: SidebarInfo,
 	) -> Self {
 		self.infos.insert(path.into(), info);
@@ -93,7 +93,7 @@ impl SidebarState {
 	fn home_node(&self) -> SidebarNode {
 		SidebarNode {
 			display_name: "Home".into(),
-			path: Some(RelPath::default()),
+			path: Some(SmolPath::default()),
 			children: Vec::new(),
 			expanded: false,
 			active: self.current_path.segments().is_empty(),
@@ -103,7 +103,7 @@ impl SidebarState {
 	/// Recursively collect a tree node, returning `None` when it has neither a
 	/// route nor any routable children.
 	fn collect_node(&self, tree: &RouteTree) -> Option<SidebarNode> {
-		let path = tree.path.annotated_rel_path();
+		let path = tree.path.annotated_path();
 		let info = self.infos.get(&path);
 		let children: Vec<SidebarNode> = self
 			.sort_children(tree)
@@ -141,7 +141,7 @@ impl SidebarState {
 	}
 
 	/// The display label: explicit override, else the prettified last segment.
-	fn label(&self, path: &RelPath, info: Option<&SidebarInfo>) -> String {
+	fn label(&self, path: &SmolPath, info: Option<&SidebarInfo>) -> String {
 		info.and_then(|info| info.label.clone())
 			.unwrap_or_else(|| path.last_segment().unwrap_or("home").to_string())
 	}
@@ -150,9 +150,9 @@ impl SidebarState {
 	fn sort_children(&self, tree: &RouteTree) -> Vec<RouteTree> {
 		let mut children = tree.children.clone();
 		children.sort_by(|a, b| {
-			let path_a = a.path.annotated_rel_path();
-			let path_b = b.path.annotated_rel_path();
-			let order = |path: &RelPath| {
+			let path_a = a.path.annotated_path();
+			let path_b = b.path.annotated_path();
+			let order = |path: &SmolPath| {
 				self.infos
 					.get(path)
 					.and_then(|info| info.order)
@@ -169,7 +169,7 @@ impl SidebarState {
 	}
 
 	/// Whether the current path is at or beneath the given path.
-	fn is_ancestor_of_current(&self, path: &RelPath) -> bool {
+	fn is_ancestor_of_current(&self, path: &SmolPath) -> bool {
 		let prefix = path.segments();
 		prefix.is_empty() || self.current_path.segments().starts_with(&prefix)
 	}
@@ -400,13 +400,13 @@ mod test {
 	#[beet_core::test]
 	fn is_ancestor_of_current() {
 		let state = SidebarState::new("docs/getting-started");
-		state.is_ancestor_of_current(&RelPath::new("docs")).xpect_true();
+		state.is_ancestor_of_current(&SmolPath::new("docs")).xpect_true();
 		state
-			.is_ancestor_of_current(&RelPath::new("docs/getting-started"))
+			.is_ancestor_of_current(&SmolPath::new("docs/getting-started"))
 			.xpect_true();
-		state.is_ancestor_of_current(&RelPath::new("blog")).xpect_false();
+		state.is_ancestor_of_current(&SmolPath::new("blog")).xpect_false();
 		// root is ancestor of everything
-		state.is_ancestor_of_current(&RelPath::default()).xpect_true();
+		state.is_ancestor_of_current(&SmolPath::default()).xpect_true();
 	}
 
 	#[beet_core::test]

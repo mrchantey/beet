@@ -15,7 +15,7 @@ pub struct StoreItem {
 	/// The store containing this item.
 	pub store: BlobStore,
 	/// The path to this item within the store.
-	pub path: RelPath,
+	pub path: SmolPath,
 	/// Getter for the item's data content.
 	pub get_data: Getter<Option<String>>,
 	/// Setter for the item's data content.
@@ -28,7 +28,7 @@ pub struct StoreItem {
 
 impl StoreItem {
 	/// Creates a new store item and initializes reactive effects.
-	pub fn new(store: BlobStore, path: RelPath) -> Self {
+	pub fn new(store: BlobStore, path: SmolPath) -> Self {
 		let (get_data, set_data) = signal::<Option<String>>(None);
 		let (get_err, set_err) = signal::<Option<String>>(None);
 		let this = Self {

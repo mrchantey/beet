@@ -22,5 +22,3 @@ mod default_renderer;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
-mod blob_store;
-pub use blob_store::*;

@@ -16,15 +16,19 @@ pub fn exchange_fallback() -> impl Bundle {
 				Ok(Fail(req)) => {
 					let text =
 						format!("Resource not found: {}", req.path_string());
-					let accepts = req
-						.headers()
-						.get_or_default::<header::Accept>()
-						.unwrap_or_default();
-					let body = MediaType::serialize_accepts(
-						&accepts,
-						&format!("Resource not found: {}", req.path_string()),
-					)
-					.unwrap_or_else(|_| MediaBytes::new_text(text));
+					// negotiate the error body against `Accept` when serde is
+					// available; otherwise fall back to plain text
+					#[cfg(feature = "serde")]
+					let body = {
+						let accepts = req
+							.headers()
+							.get_or_default::<header::Accept>()
+							.unwrap_or_default();
+						MediaType::serialize_accepts(&accepts, &text)
+							.unwrap_or_else(|_| MediaBytes::new_text(text))
+					};
+					#[cfg(not(feature = "serde"))]
+					let body = MediaBytes::new_text(text);
 					Response::from_status(StatusCode::NOT_FOUND).with_media(body)
 				}
 				Err(err) => err.into_response(),

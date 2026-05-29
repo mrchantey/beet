@@ -24,9 +24,9 @@ bevy_default = [
 ml = ["dep:beet_ml"]
 
 [dependencies]
-beet_action = { workspace = true }
+beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_ml = { workspace = true, features = ["spatial"], optional = true }
-beet_spatial = { workspace = true, features = [] }
+beet_spatial = { workspace = true, features = ["std"] }
 beet_core = { workspace = true, features = ["std", "rand","bevy_keyboard"] }
 
 

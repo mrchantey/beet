@@ -65,7 +65,7 @@ pub async fn HtmlStoreAction(
 	};
 
 	// serve the prebuilt file, falling through to live rendering on a miss
-	match serve_blob(&store, &RelPath::from(request.path())).await {
+	match serve_blob(&store, &SmolPath::from(request.path())).await {
 		Ok(response) => Ok(response),
 		Err(_) => next.call(request).await,
 	}
@@ -82,7 +82,7 @@ mod test {
 	async fn html_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from("about/index.html"), "<p>prebuilt</p>")
+			.insert(&SmolPath::from("about/index.html"), "<p>prebuilt</p>")
 			.await
 			.unwrap();
 		store

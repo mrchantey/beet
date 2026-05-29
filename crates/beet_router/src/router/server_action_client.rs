@@ -7,26 +7,32 @@
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use std::sync::LazyLock;
-use std::sync::Mutex;
+use bevy::platform::sync::Mutex;
+use bevy::platform::sync::OnceLock;
 
-/// The base URL prepended to server-action paths.
-static SERVER_URL: LazyLock<Mutex<Url>> = LazyLock::new(|| {
-	#[cfg(not(target_arch = "wasm32"))]
-	let raw = DEFAULT_SERVER_LOCAL_URL.to_string();
-	#[cfg(target_arch = "wasm32")]
-	let raw = beet_core::exports::web_sys::window()
-		.and_then(|window| window.location().origin().ok())
-		.unwrap_or_else(|| DEFAULT_SERVER_LOCAL_URL.to_string());
-	Mutex::new(Url::parse(raw))
-});
+/// The base URL prepended to server-action paths. This is transport config,
+/// not world state, so it lives in a global rather than a resource (mirroring
+/// `beet_net`'s `set_http_client` hook).
+static SERVER_URL: OnceLock<Mutex<Url>> = OnceLock::new();
+
+fn server_url_cell() -> &'static Mutex<Url> {
+	SERVER_URL.get_or_init(|| {
+		#[cfg(not(target_arch = "wasm32"))]
+		let raw = DEFAULT_SERVER_LOCAL_URL.to_string();
+		#[cfg(target_arch = "wasm32")]
+		let raw = beet_core::exports::web_sys::window()
+			.and_then(|window| window.location().origin().ok())
+			.unwrap_or_else(|| DEFAULT_SERVER_LOCAL_URL.to_string());
+		Mutex::new(Url::parse(raw))
+	})
+}
 
 /// Returns the currently configured server URL for client actions.
-pub fn server_url() -> Url { SERVER_URL.lock().unwrap().clone() }
+pub fn server_url() -> Url { server_url_cell().lock().unwrap().clone() }
 
 /// Sets the server URL used by all subsequent client-action calls.
 pub fn set_server_url(url: impl Into<Url>) {
-	*SERVER_URL.lock().unwrap() = url.into();
+	*server_url_cell().lock().unwrap() = url.into();
 }
 
 /// Builds a [`Request`] to a server-action path using the configured

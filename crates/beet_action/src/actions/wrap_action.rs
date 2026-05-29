@@ -194,8 +194,8 @@ where
 
 #[cfg(test)]
 mod test {
-	use std::marker::PhantomData;
-	use std::str::FromStr;
+	use core::marker::PhantomData;
+	use core::str::FromStr;
 
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -269,7 +269,7 @@ mod test {
 	where
 		In: 'static + Send + Sync + FromStr,
 		Out: 'static + Send + Sync + ToString,
-		In::Err: std::fmt::Debug,
+		In::Err: core::fmt::Debug,
 	{
 		let parsed: In = input.parse().map_err(|err| bevyhow!("{err:?}"))?;
 		let output = next.call(parsed).await?;

@@ -1,9 +1,7 @@
 use super::FsError;
 use super::FsResult;
 use super::fs_ext;
-use super::path_ext;
 use crate::prelude::*;
-use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -25,7 +23,7 @@ macro_rules! abs_file {
 
 /// A newtype `PathBuf` representing an absolute unix file path with several indications:
 /// 1. the path is absolute, ie [`std::path::absolute`] is called
-/// 2. the path is cleaned using [`path_clean`]
+/// 2. the path is cleaned using [`path_ext::clean`]
 ///
 /// ## Serialization
 /// Naturally serializing absolute paths is problematic, moving the serialized path between
@@ -69,18 +67,18 @@ impl AbsPathBuf {
 	pub fn new(path: impl AsRef<Path>) -> FsResult<Self> {
 		let path = path.as_ref();
 		let path = path_ext::absolute(path)?;
-		let path = path.clean();
+		let path = path_ext::clean_path(path);
 		Ok(Self(path))
 	}
 
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
 	/// be an absolute path. This uses [`path_ext::join_relative`] so
 	/// any leading `/` will be discarded.
-	/// After the join [`PathClean::clean`] will run to resolve relative
+	/// After the join [`path_ext::clean`] will run to resolve relative
 	/// parts like `../`
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = path_ext::join_relative(&self.0, path);
-		let path = path.clean();
+		let path = path_ext::clean_path(path);
 		Self(path)
 	}
 
@@ -134,7 +132,7 @@ impl AbsPathBuf {
 	/// Create a new [`AbsPathBuf`] verbatim from a path, its the user's
 	/// responsibility to ensure that the path is absolute and cleaned.
 	pub fn new_unchecked(path: impl AsRef<Path>) -> Self {
-		let path = path.as_ref().clean();
+		let path = path_ext::clean_path(path);
 		Self(path)
 	}
 

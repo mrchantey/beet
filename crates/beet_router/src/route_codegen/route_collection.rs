@@ -28,9 +28,7 @@ pub enum RouteCollectionCategory {
 
 impl RouteCollectionCategory {
 	/// Whether routes in this category appear in the typed route tree.
-	pub fn include_in_route_tree(&self) -> bool {
-		matches!(self, Self::Pages)
-	}
+	pub fn include_in_route_tree(&self) -> bool { matches!(self, Self::Pages) }
 }
 
 /// A directory of route files scanned into a collection bundle and typed links.
@@ -43,7 +41,7 @@ pub struct RouteCollection {
 	/// Whether this is a pages or actions collection.
 	pub category: RouteCollectionCategory,
 	/// Route prefix prepended to every route in this collection, ie `docs`.
-	pub base_route: RelPath,
+	pub base_route: SmolPath,
 	/// Cargo feature gating server-only handlers (actions collections).
 	///
 	/// Defaults to `Some("server")`, matching the convention that server
@@ -65,7 +63,7 @@ impl RouteCollection {
 				.with_exclude("*mod.rs")
 				.with_exclude("*/codegen/*"),
 			category: RouteCollectionCategory::default(),
-			base_route: RelPath::default(),
+			base_route: SmolPath::default(),
 			server_feature: Some("server".into()),
 			codegen,
 		}
@@ -94,7 +92,7 @@ impl RouteCollection {
 	}
 
 	/// Sets the base route prepended to every route in this collection.
-	pub fn with_base_route(mut self, base_route: impl Into<RelPath>) -> Self {
+	pub fn with_base_route(mut self, base_route: impl Into<SmolPath>) -> Self {
 		self.base_route = base_route.into();
 		self
 	}
@@ -118,8 +116,7 @@ impl RouteCollection {
 			if !self.filter.passes(&store_path) {
 				continue;
 			}
-			let Some(ext) = store_path.extension().and_then(|e| e.to_str())
-			else {
+			let Some(ext) = store_path.extension() else {
 				continue;
 			};
 			let route_path =
@@ -157,10 +154,12 @@ impl RouteCollection {
 
 	/// The `#[path = ..]` value for a source file, relative to the codegen
 	/// output directory, using forward slashes.
-	fn mod_path(&self, store_path: &RelPath) -> Result<String> {
+	fn mod_path(&self, store_path: &SmolPath) -> Result<String> {
 		let abs = self.src.join(store_path.to_string());
 		let rel = path_ext::create_relative(self.codegen.output_dir()?, &abs)?;
-		Ok(path_ext::to_forward_slash(rel).to_string_lossy().to_string())
+		Ok(path_ext::to_forward_slash(rel)
+			.to_string_lossy()
+			.to_string())
 	}
 }
 
@@ -168,7 +167,7 @@ impl RouteCollection {
 #[derive(Debug, Clone)]
 pub struct RouteFile {
 	/// The full route path (including the collection base route).
-	pub route_path: RelPath,
+	pub route_path: SmolPath,
 	/// The kind of route file.
 	pub kind: RouteFileKind,
 }
@@ -188,7 +187,7 @@ pub enum RouteFileKind {
 	/// A content file (markdown/html) served via [`BlobScene`].
 	Blob {
 		/// Path of the content file relative to the store root.
-		store_path: RelPath,
+		store_path: SmolPath,
 	},
 }
 
@@ -213,9 +212,12 @@ pub struct RouteMethod {
 
 /// Derives the route path from a source file path, stripping the extension and
 /// collapsing `index` files into their parent directory.
-fn route_path_from_file(store_path: &RelPath) -> RelPath {
-	let mut segments: Vec<String> =
-		store_path.segments().iter().map(|s| s.to_string()).collect();
+fn route_path_from_file(store_path: &SmolPath) -> SmolPath {
+	let mut segments: Vec<String> = store_path
+		.segments()
+		.iter()
+		.map(|s| s.to_string())
+		.collect();
 	if let Some(last) = segments.last_mut() {
 		if let Some(dot) = last.rfind('.') {
 			last.truncate(dot);
@@ -224,13 +226,16 @@ fn route_path_from_file(store_path: &RelPath) -> RelPath {
 	if segments.last().map(|s| s == "index").unwrap_or(false) {
 		segments.pop();
 	}
-	RelPath::from_segments(&segments)
+	SmolPath::from_segments(&segments)
 }
 
 /// Derives a unique module identifier from a source file path.
-fn mod_ident_from_file(store_path: &RelPath) -> Ident {
-	let mut segments: Vec<String> =
-		store_path.segments().iter().map(|s| s.to_string()).collect();
+fn mod_ident_from_file(store_path: &SmolPath) -> Ident {
+	let mut segments: Vec<String> = store_path
+		.segments()
+		.iter()
+		.map(|s| s.to_string())
+		.collect();
 	if let Some(last) = segments.last_mut() {
 		if let Some(dot) = last.rfind('.') {
 			last.truncate(dot);

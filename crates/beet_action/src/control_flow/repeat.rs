@@ -214,9 +214,9 @@ where
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::sync::Arc;
-	use std::sync::atomic::AtomicU32;
-	use std::sync::atomic::Ordering;
+	use alloc::sync::Arc;
+	use core::sync::atomic::AtomicU32;
+	use core::sync::atomic::Ordering;
 
 	fn outcome_fail() -> Action<(), Outcome> {
 		Action::new_pure(|_: ActionContext| Outcome::FAIL.xok())

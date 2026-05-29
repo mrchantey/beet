@@ -1387,7 +1387,6 @@ dependencies = [
  "js-sys",
  "notify",
  "notify-debouncer-full",
- "path-clean",
  "pathdiff",
  "postcard",
  "prettyplease",
@@ -1411,7 +1410,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "web-time",
 ]
 
 [[package]]
@@ -1524,6 +1522,7 @@ dependencies = [
  "eventsource-stream",
  "extend",
  "futures",
+ "futures-core",
  "futures-lite",
  "futures-rustls",
  "heck",
@@ -1532,7 +1531,6 @@ dependencies = [
  "hyper 1.9.0",
  "js-sys",
  "lambda_http",
- "path-clean",
  "pin-project",
  "postcard",
  "rand 0.10.1",
@@ -9393,12 +9391,6 @@ name = "pastey"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
-
-[[package]]
-name = "path-clean"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17359afc20d7ab31fdb42bb844c8b3bb1dabd7dcf7e68428492da7f16966fcef"
 
 [[package]]
 name = "pathdiff"

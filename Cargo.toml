@@ -83,13 +83,15 @@ beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11", default-featu
 # vendored bevy_async bridge; no_std by default, std consumers add `features = ["std"]`.
 beet_async = { path = "crates/beet_async", version = "0.0.9-dev.11", default-features = false }
 beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
+# no_std by default (the `types/` wire types); std-only consumers add
+# `features = ["std", "serde", "fs", "http"]`.
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11", default-features = false }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
-beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11" }
+beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-features = false }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.11" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11", default-features = false }
 beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
@@ -121,12 +123,11 @@ glob = "0.3"
 dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
-web-time = "1"
 itertools = { version = "0.14", default-features = false }
 uuid = {version = "1",features=["js"]}
 chrono = "0.4"
-rand = "0.9"
-rand_chacha = "0.9"
+rand = { version = "0.9", default-features = false }
+rand_chacha = { version = "0.9", default-features = false }
 # wasm_js ignored in native
 getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
@@ -140,6 +141,8 @@ pretty_env_logger = "0.4"
 
 #💡 async
 futures = "0.3"
+# no_std core stream/future traits, used by no_std-capable wire types.
+futures-core = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
 pin-project = "1"
 async-channel = "2"
@@ -167,7 +170,7 @@ proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.26", default-features = false, features = ["derive"] }
 strum_macros = "0.26"
 extend = "1"
 
@@ -182,7 +185,8 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 rhai = { version = "1", features = ["serde"] }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
-base64 = "0.22"
+# no_std by default (alloc only); std consumers re-enable `base64/std`.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = "0.10"
 ron = "0.8"
 toml = "0.8"
@@ -229,7 +233,7 @@ default = ["std", "ui"]
 
 # Standard library support (enabled by default). no_std consumers depend on beet
 # with `default-features = false`.
-std = ["beet_core/std"]
+std = ["beet_core/std", "beet_action?/std", "beet_net?/std", "beet_spatial?/std"]
 # Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
 # critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
 embedded = ["beet_core/embedded"]
@@ -261,7 +265,7 @@ bevy_default = [
 	"beet_spatial?/bevy_default",
 ]
 world_serde = ["beet_core/world_serde", "beet_net?/world_serde","beet_thread?/world_serde"]
-bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
+bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithreaded"]
@@ -273,7 +277,7 @@ native-tls = [
 "net", "beet_net/native-tls",
 ]
 # beet_net is a hard dependency of beet_router
-router = ["action", "ui", "net", "dep:beet_router"]
+router = ["scene", "action", "net", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -300,6 +304,9 @@ action = ["dep:beet_action","beet_ui?/action"]
 rhai = ["action","beet_action/rhai"]
 scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
 ui = ["dep:beet_ui"]
+# Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
+# Sidebar, Table). Heavy + std-only, so it stays opt-in.
+scene = ["ui", "beet_ui?/scene"]
 style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]

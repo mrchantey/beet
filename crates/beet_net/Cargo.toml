@@ -13,13 +13,35 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs", "http"]
+default = ["std", "serde", "fs", "http"]
 nightly = []
-json = ["serde",	"dep:serde_json", "beet_core/json"]
+# Enables the std-only surface: transports, stores, servers, sockets, the
+# action/exchange integration, and the std-backed async primitives. The no_std
+# core (the `types/` wire types) builds with this off.
+std = [
+	"beet_core/std",
+	# the std surface (stores, transports, actions) is serde-saturated
+	"serde",
+	"dep:beet_action",
+	"beet_action/std",
+	"beet_action/reflect",
+	"dep:async-channel",
+	"dep:async-lock",
+	"dep:futures",
+	"dep:send_wrapper",
+	"dep:uuid",
+	"uuid/v7",
+	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
+	# so it (and the extractors that use it) are std-only.
+	"dep:serde_urlencoded",
+]
+json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
-# for conditional compilation in hooks
-client = []
+# for conditional compilation in hooks; pulls reactive store effects that use
+# the std-only spawn_local runtime driver
+client = ["std"]
 server = [
+"std",
 "dep:async-io",
 "dep:futures-lite",
 ]
@@ -30,10 +52,11 @@ hyper = [
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["rustls-tls", "dep:lambda_http", "beet_core/tokio"]
-fs = ["beet_core/fs","dep:async-process"]
+lambda = ["std", "rustls-tls", "dep:lambda_http", "beet_core/tokio"]
+fs = ["std", "beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
 aws_sdk = [
+	"std",
 	"serde",
 	"dep:crc-fast",
 	"dep:aws-sdk-s3",
@@ -45,17 +68,18 @@ aws_sdk = [
 serde = [
 	"dep:serde",
 	"dep:base64",
-	"dep:serde_urlencoded",
-	"uuid/serde",
+	"uuid?/serde",
 	"beet_core/serde",
+	"beet_action?/serde",
 ]
 http = [
+	"std",
 	"dep:http",
 	"dep:eventsource-stream",
 ]
-reqwest = ["dep:reqwest", "beet_core/tokio"]
-ureq = ["dep:ureq", "dep:blocking"]
-tungstenite = ["dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
+reqwest = ["std", "dep:reqwest", "beet_core/tokio"]
+ureq = ["std", "dep:ureq", "dep:blocking"]
+tungstenite = ["std", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
 webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [
 	"reqwest?/default",
@@ -74,10 +98,11 @@ rustls-tls = [
 	"dep:webpki-roots",
 	"russh?/aws-lc-rs",
 ]
-world_serde = ["beet_core/world_serde"]
+world_serde = ["beet_core/world_serde", "beet_action?/world_serde"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 russh_server = [
+	"std",
 	"dep:russh",
 	"russh?/ring",
 	"beet_core/tokio",
@@ -86,6 +111,7 @@ russh_server = [
 	"server",
 ]
 russh_client = [
+	"std",
 	"dep:russh",
 	"russh?/ring",
 	"beet_core/tokio",
@@ -93,23 +119,26 @@ russh_client = [
 ]
 
 [dependencies]
-beet_core = { workspace = true, features = ["std", "http"] }
-beet_action = {workspace = true}
+beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
+# only needed for the std action/exchange integration
+beet_action = { workspace = true, default-features = false, optional = true }
 
 bevy.workspace = true
 
 # utils
-async-channel.workspace = true
 extend.workspace = true
 heck.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-send_wrapper.workspace = true
-uuid = {workspace = true, features = ["v7"]}
-async-lock.workspace = true
+uuid = { workspace = true, optional = true }
+send_wrapper = { workspace = true, optional = true }
 bytes.workspace = true
-# async
-futures.workspace = true
+# async (no_std core stream trait)
+futures-core.workspace = true
+# async (std-only)
+async-channel = { workspace = true, optional = true }
+async-lock = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
 
 # serde
 base64 = { workspace = true, optional = true }
@@ -118,9 +147,6 @@ serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 postcard = { workspace = true, optional = true }
 
-
-# fs
-path-clean = { version = "1" }
 
 # http
 http = { workspace = true, optional = true }

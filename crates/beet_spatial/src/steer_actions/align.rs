@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Steers boids towards the average heading of their neighbors, promoting
 /// synchronized movement. This is done by updating the [`Velocity`] component.

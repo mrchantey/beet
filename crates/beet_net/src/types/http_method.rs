@@ -10,7 +10,7 @@
 //! This module provides a safer, more ergonomic alternative.
 
 use beet_core::prelude::*;
-use std::fmt;
+use core::fmt;
 
 /// Caching strategy for route responses.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
@@ -177,7 +177,7 @@ impl fmt::Display for HttpMethod {
 	}
 }
 
-impl std::str::FromStr for HttpMethod {
+impl core::str::FromStr for HttpMethod {
 	type Err = BevyError;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		// case insensitive

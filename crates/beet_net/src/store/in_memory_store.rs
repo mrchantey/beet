@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use async_lock::RwLock;
 use beet_core::prelude::*;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::RwLock;
 use bytes::Bytes;
-use std::sync::Arc;
 
 
 impl BlobStore {
@@ -19,9 +19,9 @@ impl BlobStore {
 #[derive(Debug, Clone)]
 pub struct InMemoryStore {
 	/// Shared storage state.
-	inner: Arc<RwLock<Option<HashMap<RelPath, Bytes>>>>,
+	inner: Arc<RwLock<Option<HashMap<SmolPath, Bytes>>>>,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<RelPath>,
+	subdir: Option<SmolPath>,
 }
 
 impl Default for InMemoryStore {
@@ -45,7 +45,7 @@ impl InMemoryStore {
 	}
 
 	/// Resolve an external path to the internal key by prepending the subdir.
-	fn resolve_key(&self, path: &RelPath) -> RelPath {
+	fn resolve_key(&self, path: &SmolPath) -> SmolPath {
 		match &self.subdir {
 			Some(sub) => sub.join(path),
 			None => path.clone(),
@@ -53,7 +53,7 @@ impl InMemoryStore {
 	}
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 impl<T: TableStoreRow> TableProvider<T> for InMemoryStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider<T>> {
 		Box::new(self.clone())
@@ -63,7 +63,7 @@ impl<T: TableStoreRow> TableProvider<T> for InMemoryStore {
 impl BlobStoreProvider for InMemoryStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(InMemoryStore {
 			inner: self.inner.clone(),
 			subdir: Some(match &self.subdir {
@@ -77,13 +77,13 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
-		Box::pin(async move { this.inner.read().await.is_some().xok() })
+		Box::pin(async move { this.inner.read().unwrap().is_some().xok() })
 	}
 
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
-			let mut guard = this.inner.write().await;
+			let mut guard = this.inner.write().unwrap();
 			if guard.is_some() {
 				bevybail!("store already exists")
 			}
@@ -95,7 +95,7 @@ impl BlobStoreProvider for InMemoryStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		Box::pin(async move {
-			let mut guard = this.inner.write().await;
+			let mut guard = this.inner.write().unwrap();
 			if guard.is_none() {
 				bevybail!("store does not exist")
 			}
@@ -104,11 +104,11 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
-			let mut guard = this.inner.write().await;
+			let mut guard = this.inner.write().unwrap();
 			let map = guard
 				.as_mut()
 				.ok_or_else(|| bevyhow!("store not created"))?;
@@ -117,11 +117,11 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
-			let guard = this.inner.read().await;
+			let guard = this.inner.read().unwrap();
 			let map = guard
 				.as_ref()
 				.ok_or_else(|| bevyhow!("store not created"))?;
@@ -129,10 +129,10 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			let guard = this.inner.read().await;
+			let guard = this.inner.read().unwrap();
 			let map = guard
 				.as_ref()
 				.ok_or_else(|| bevyhow!("store not created"))?;
@@ -141,9 +141,9 @@ impl BlobStoreProvider for InMemoryStore {
 					// filter keys by prefix and strip it
 					map.keys()
 						.filter_map(|key| {
-							key.strip_prefix(sub.as_path())
-								.ok()
-								.map(|stripped| RelPath::new(stripped))
+							key.as_str()
+								.strip_prefix(sub.as_str())
+								.map(SmolPath::new)
 						})
 						.collect::<Vec<_>>()
 						.xok()
@@ -153,11 +153,11 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
-			let guard = this.inner.read().await;
+			let guard = this.inner.read().unwrap();
 			let map = guard
 				.as_ref()
 				.ok_or_else(|| bevyhow!("store not created"))?;
@@ -167,11 +167,11 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
-			let mut guard = this.inner.write().await;
+			let mut guard = this.inner.write().unwrap();
 			let map = guard
 				.as_mut()
 				.ok_or_else(|| bevyhow!("store not created"))?;
@@ -183,7 +183,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}

@@ -99,7 +99,7 @@ impl FunctionToolDefinition {
 				"Tool path must be static (no parameters or wildcards) to create a FunctionToolDefinition.\nPath provided: {path}"
 			);
 		}
-		let path = path.annotated_rel_path().to_string();
+		let path = path.annotated_path().to_string();
 		let description = meta
 			.description()
 			.ok_or_else(||{

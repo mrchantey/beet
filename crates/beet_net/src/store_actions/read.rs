@@ -8,7 +8,7 @@ const DEFAULT_MAX_BYTES: usize = 50 * 1024; // 50KB
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct ReadBlobParams {
 	/// Path to the blob to read.
-	pub path: RelPath,
+	pub path: SmolPath,
 	/// Line offset to start reading from (0-indexed).
 	pub offset: Option<usize>,
 	/// Maximum number of lines to return.
@@ -76,7 +76,7 @@ mod test {
 	async fn store_with_text(path: &str, text: &str) -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&RelPath::from(path), text.to_owned())
+			.insert(&SmolPath::from(path), text.to_owned())
 			.await
 			.unwrap();
 		store
@@ -85,7 +85,7 @@ mod test {
 	#[beet_core::test]
 	async fn reads_text_blob() {
 		let store = store_with_text("hello.txt", "hello world").await;
-		let media = store.get_media(&RelPath::from("hello.txt")).await.unwrap();
+		let media = store.get_media(&SmolPath::from("hello.txt")).await.unwrap();
 		let text = media.as_utf8().unwrap();
 		text.xpect_eq("hello world");
 	}

@@ -12,11 +12,13 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-bevy_default = ["bevy/default","beet_core/bevy_default"]
+default = ["std"]
+std = ["beet_core/std", "beet_action/std"]
+bevy_default = ["bevy/default", "beet_core/bevy_default"]
 
 [dependencies]
 beet_action.workspace = true
-beet_core = { workspace = true, features = ["std", "rand"] }
+beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rand"] }
 
 bevy.workspace = true
 

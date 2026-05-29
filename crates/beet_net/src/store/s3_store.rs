@@ -18,7 +18,7 @@ pub struct S3Store {
 	/// The AWS region for this store.
 	region: SmolStr,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<RelPath>,
+	subdir: Option<SmolPath>,
 }
 
 #[cfg(feature = "json")]
@@ -42,7 +42,7 @@ impl S3Store {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -69,8 +69,8 @@ impl S3Store {
 		POOL.get(&self.region).await
 	}
 
-	/// Resolve the S3 object key from a [`RelPath`].
-	fn resolve_key(&self, path: &RelPath) -> String {
+	/// Resolve the S3 object key from a [`SmolPath`].
+	fn resolve_key(&self, path: &SmolPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -78,7 +78,7 @@ impl S3Store {
 	}
 
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -86,7 +86,7 @@ impl S3Store {
 impl BlobStoreProvider for S3Store {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(S3Store {
 			bucket_name: self.bucket_name.clone(),
 			region: self.region.clone(),
@@ -198,7 +198,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -214,7 +214,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -239,7 +239,7 @@ impl BlobStoreProvider for S3Store {
 						Some(p) => key.strip_prefix(p.as_str())?,
 						None => &key,
 					};
-					Some(RelPath::new(rel))
+					Some(SmolPath::new(rel))
 				}));
 
 				if list_result.is_truncated == Some(true) {
@@ -256,7 +256,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -271,7 +271,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -294,7 +294,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -319,7 +319,7 @@ impl BlobStoreProvider for S3Store {
 
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let region = &self.region;
 		let bucket_name = &self.bucket_name;
@@ -350,7 +350,7 @@ mod test {
 		store.store_exists().await.xpect_ok();
 
 		store
-			.get(&RelPath::new("index.html"))
+			.get(&SmolPath::new("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -361,7 +361,7 @@ mod test {
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
 		let provider = S3Store::new("beet-test", "us-west-2");
-		let test_key = RelPath::from("test-file.txt");
+		let test_key = SmolPath::from("test-file.txt");
 		BlobStore::new(provider)
 			.public_url(&test_key)
 			.await

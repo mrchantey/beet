@@ -1,7 +1,7 @@
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::borrow::Cow;
-use std::marker::PhantomData;
+use alloc::borrow::Cow;
+use core::marker::PhantomData;
 
 
 /// Sets the [`Text`] of all entities with the filter component `F`

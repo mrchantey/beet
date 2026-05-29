@@ -1,8 +1,52 @@
 //! Time utilities for cross-platform duration handling and async sleep.
+//!
+//! The wall-clock surface ([`now`]/[`now_millis`]/[`set_now`]) and
+//! [`pretty_print_duration`] are no_std; the sleep/timeout helpers are std-only
+//! (per-function gated, not whole-module).
 
 use crate::prelude::*;
-use std::time::Duration;
-use std::time::SystemTime;
+use bevy::platform::sync::OnceLock;
+use core::time::Duration;
+
+/// Wall-clock source: returns the [`Duration`] since the Unix epoch.
+///
+/// Installed via [`set_now`] to override the platform default — the same
+/// downstream-hook pattern as `set_http_client`/`Instant::set_elapsed`.
+pub type NowFn = fn() -> Duration;
+
+static NOW: OnceLock<NowFn> = OnceLock::new();
+
+/// Wall-clock time as a [`Duration`] since the Unix epoch.
+///
+/// Uses the source installed via [`set_now`] if present, else the platform
+/// default: `SystemTime` on std native, `Date::now()` on wasm. On bare no_std
+/// with no source installed this **panics** — an embedded adapter must call
+/// [`set_now`] at boot (RTC/NTP), the same way `Instant::set_elapsed` works.
+pub fn now() -> Duration {
+	if let Some(getter) = NOW.get() {
+		return getter();
+	}
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			Duration::from_millis(js_sys::Date::now() as u64)
+		} else if #[cfg(feature = "std")] {
+			std::time::SystemTime::now()
+				.duration_since(std::time::UNIX_EPOCH)
+				.unwrap()
+		} else {
+			panic!(
+				"no wall clock installed: call time_ext::set_now(...) at boot"
+			)
+		}
+	}
+}
+
+/// Install the wall-clock source used by [`now`]. Call once at startup;
+/// returns an error if a source has already been installed.
+pub fn set_now(getter: NowFn) -> Result {
+	NOW.set(getter)
+		.map_err(|_| bevyhow!("wall clock already installed"))
+}
 
 /// Formats a duration as a human-readable string with appropriate units.
 ///
@@ -30,28 +74,27 @@ pub fn pretty_print_duration(dur: Duration) -> String {
 	}
 }
 
-/// Returns the current time as milliseconds since the Unix epoch.
-pub fn now_millis() -> u128 {
-	SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap()
-		.as_millis()
-}
+/// Milliseconds since the Unix epoch (`now().as_millis()`).
+pub fn now_millis() -> u128 { now().as_millis() }
 
 /// Sleeps for the specified number of seconds.
+#[cfg(feature = "std")]
 pub async fn sleep_secs(secs: u64) { sleep(Duration::from_secs(secs)).await; }
 
 /// Sleeps for the specified number of milliseconds.
+#[cfg(feature = "std")]
 pub async fn sleep_millis(millis: u64) {
 	sleep(Duration::from_millis(millis)).await;
 }
 
 /// Sleeps for the specified number of microseconds.
+#[cfg(feature = "std")]
 pub async fn sleep_micros(micros: u64) {
 	sleep(Duration::from_micros(micros)).await;
 }
 
 /// Cross platform sleep function
+#[cfg(feature = "std")]
 #[allow(unused)]
 pub async fn sleep(duration: Duration) {
 	cfg_if! {
@@ -84,7 +127,7 @@ pub async fn sleep(duration: Duration) {
 ///
 /// On native, spawns the function in a thread and uses `recv_timeout`.
 /// On WASM, cannot enforce hard timeouts for sync code, so this is not available.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub fn timeout_sync(
 	func: impl 'static + Send + Sync + FnOnce() -> Result<(), String>,
 	timeout: Duration,
@@ -108,7 +151,8 @@ pub fn timeout_sync(
 }
 
 
-#[cfg(test)]
+// every test here exercises std-only sleep/timeout helpers
+#[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
 

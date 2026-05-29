@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Play a procedural animation with a provided [`SerdeCurve`] for
 /// a given [`Duration`]. Add a [`Transform`] to this behavior to

@@ -55,9 +55,7 @@ pub extern crate alloc as _alloc;
 #[cfg(feature = "custom_test_frameworks")]
 extern crate test;
 
-#[cfg(feature = "std")]
 pub use utils::async_ext;
-#[cfg(feature = "std")]
 pub use utils::time_ext;
 
 // Re-export cross_log helpers at crate root so `$crate::` in macros resolves them.
@@ -77,6 +75,7 @@ pub mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub mod fs;
+mod path;
 #[cfg(feature = "std")]
 mod path_utils;
 #[cfg(feature = "std")]
@@ -165,6 +164,7 @@ pub mod prelude {
 	pub use crate::extensions::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::*;
+	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
 	#[cfg(feature = "testing")]
@@ -217,12 +217,28 @@ pub mod prelude {
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;
 	pub use bevy_ecs::entity_disabling::Disabled;
+	// tracing's log macros are no_std, unlike bevy_log which is std-gated, so
+	// re-export them directly to give downstream crates a cross-platform surface.
 	pub use tracing::Level;
+	pub use tracing::debug;
+	pub use tracing::debug_span;
+	pub use tracing::error;
+	pub use tracing::error_span;
+	pub use tracing::info;
+	pub use tracing::info_span;
+	pub use tracing::trace;
+	pub use tracing::trace_span;
+	pub use tracing::warn;
+	pub use tracing::warn_span;
 
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::js_runtime;
 
 	pub use bevy::prelude::*;
+	// no_std-capable integer-power helpers (`.squared()`/`.cubed()`); the
+	// `ops` module (cross-platform `sin`/`cos`/…) already arrives via
+	// `bevy::prelude`.
+	pub use bevy::math::FloatPow;
 	/// hack to fix bevy macros
 	pub use bevy::reflect as bevy_reflect;
 	pub use bevy::time::Stopwatch;
@@ -240,12 +256,12 @@ pub mod prelude {
 	pub use futures_lite::StreamExt;
 	pub use smol_str::SmolStr;
 	pub use core::time::Duration;
-	// web_time provides Instant/SystemTime by wrapping std (or JS on wasm);
-	// neither has a core-only equivalent, so they are std-gated.
-	#[cfg(feature = "std")]
-	pub use web_time::Instant;
-	#[cfg(feature = "std")]
-	pub use web_time::SystemTime;
+	// `Instant` is no_std-capable: on std/wasm it wraps std/web_time, and on a
+	// bare no_std target it reads from a clock source the embedded adapter
+	// installs via `Instant::set_elapsed(...)` (see agent/plans/no_std_instant.md).
+	pub use bevy::platform::time::Instant;
+	// Wall-clock time is the getter-backed `time_ext::now()` (no_std); code that
+	// needs the std `SystemTime` type imports `std::time::SystemTime` directly.
 
 	#[cfg(feature = "std")]
 	pub use crate::abs_file;
@@ -278,8 +294,6 @@ pub mod exports {
 	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use syn;
-	#[cfg(feature = "std")]
-	pub use web_time;
 
 	// merged-in exports
 	#[cfg(feature = "std")]

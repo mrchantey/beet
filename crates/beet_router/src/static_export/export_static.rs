@@ -17,9 +17,9 @@ use beet_net::prelude::*;
 pub async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
-) -> Result<Vec<(RelPath, String)>> {
+) -> Result<Vec<(SmolPath, String)>> {
 	let paths = world
-		.with(move |world: &mut World| -> Result<Vec<RelPath>> {
+		.with(move |world: &mut World| -> Result<Vec<SmolPath>> {
 			let tree = world
 				.entity(router)
 				.get::<RouteTree>()
@@ -44,7 +44,7 @@ pub async fn collect_static_html(
 					.copied()
 					.unwrap_or_default();
 				if node.is_scene() || cache == CacheStrategy::Static {
-					paths.push(node.path.annotated_rel_path());
+					paths.push(node.path.annotated_path());
 				}
 			}
 			Ok(paths)
@@ -74,12 +74,12 @@ pub async fn export_static(
 	world: &AsyncWorld,
 	router: Entity,
 	out: &BlobStore,
-) -> Result<Vec<RelPath>> {
+) -> Result<Vec<SmolPath>> {
 	let pages = collect_static_html(world, router).await?;
 	let mut written = Vec::new();
 	for (path, html) in pages {
 		let out_path = if path.segments().is_empty() {
-			RelPath::new("index.html")
+			SmolPath::new("index.html")
 		} else {
 			path.join("index.html")
 		};
@@ -122,12 +122,12 @@ mod test {
 			.unwrap();
 
 		written.len().xpect_eq(2);
-		out.get(&RelPath::new("index.html"))
+		out.get(&SmolPath::new("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("Home");
-		out.get(&RelPath::new("about/index.html"))
+		out.get(&SmolPath::new("about/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())

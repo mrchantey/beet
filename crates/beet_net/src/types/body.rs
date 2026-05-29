@@ -19,10 +19,10 @@
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
-use futures::Stream;
+use futures_core::Stream;
 #[cfg(target_arch = "wasm32")]
 use send_wrapper::SendWrapper;
-use std::pin::Pin;
+use core::pin::Pin;
 
 cfg_if! {
 	if #[cfg(target_arch = "wasm32")] {
@@ -79,6 +79,7 @@ impl Body {
 	}
 
 	/// Converts this body into a [`TextStream`] of UTF-8 string chunks.
+	#[cfg(feature = "std")]
 	pub fn into_text_stream(self) -> TextStream {
 		stream_ext::bytes_to_text(self)
 	}
@@ -88,8 +89,8 @@ impl Default for Body {
 	fn default() -> Self { Body::Bytes(Bytes::new()) }
 }
 
-impl std::fmt::Debug for Body {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Body {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Body::Bytes(bytes) => write!(f, "Body::Bytes({:?})", bytes),
 			Body::Stream(_) => write!(f, "Body::Stream(...)"),
@@ -102,15 +103,15 @@ impl Stream for Body {
 
 	fn poll_next(
 		mut self: Pin<&mut Self>,
-		cx: &mut std::task::Context<'_>,
-	) -> std::task::Poll<Option<Self::Item>> {
+		cx: &mut core::task::Context<'_>,
+	) -> core::task::Poll<Option<Self::Item>> {
 		match &mut *self {
 			Body::Bytes(bytes) => {
 				if !bytes.is_empty() {
-					let taken = std::mem::take(bytes);
-					std::task::Poll::Ready(Some(Ok(taken)))
+					let taken = core::mem::take(bytes);
+					core::task::Poll::Ready(Some(Ok(taken)))
 				} else {
-					std::task::Poll::Ready(None)
+					core::task::Poll::Ready(None)
 				}
 			}
 			Body::Stream(stream) => Pin::new(stream).poll_next(cx),
@@ -214,7 +215,7 @@ impl Body {
 	pub async fn next(&mut self) -> Result<Option<Bytes>> {
 		match self {
 			Body::Bytes(bytes) if !bytes.is_empty() => {
-				Ok(Some(std::mem::take(bytes)))
+				Ok(Some(core::mem::take(bytes)))
 			}
 			Body::Bytes(_) => Ok(None),
 			Body::Stream(stream) => match stream.next().await {

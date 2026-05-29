@@ -305,7 +305,7 @@ fn sidebar_renders_nav() {
 	let mut world = scene_ext::test_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Home".into(),
-		path: Some(RelPath::new("/")),
+		path: Some(SmolPath::new("/")),
 		..default()
 	}];
 	let root = world
@@ -327,7 +327,7 @@ fn sidebar_branch_renders_details() {
 		path: None,
 		children: vec![SidebarNode {
 			display_name: "Intro".into(),
-			path: Some(RelPath::new("docs/intro")),
+			path: Some(SmolPath::new("docs/intro")),
 			..default()
 		}],
 		expanded: true,
@@ -353,7 +353,7 @@ fn sidebar_active_leaf_marks_aria_current() {
 	let mut world = scene_ext::test_world();
 	let nodes = vec![SidebarNode {
 		display_name: "About".into(),
-		path: Some(RelPath::new("about")),
+		path: Some(SmolPath::new("about")),
 		active: true,
 		..default()
 	}];

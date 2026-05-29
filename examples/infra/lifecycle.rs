@@ -80,7 +80,7 @@ fn setup(mut commands: Commands) {
 			);
 			println!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
-			let path = RelPath::new("foo.md");
+			let path = SmolPath::new("foo.md");
 			let content = "bar";
 
 			println!(
@@ -91,7 +91,10 @@ fn setup(mut commands: Commands) {
 			println!("🔨 Inserting File..");
 			store.insert(&path, content).await?;
 			let bytes = store.get(&path).await?;
-			println!("📄 BlobStore File Matches: {}", bytes == content.as_bytes());
+			println!(
+				"📄 BlobStore File Matches: {}",
+				bytes == content.as_bytes()
+			);
 
 			println!("🔨 Destroying..");
 			project.destroy().await?;

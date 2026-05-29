@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -106,7 +105,7 @@ impl RouteTree {
 					if node.route.is_some() {
 						bevybail!(
 							"Duplicate route: multiple routes defined for path '{}'",
-							path.annotated_rel_path()
+							path.annotated_path()
 						);
 					}
 					node.route = Some(action_node.clone());
@@ -291,14 +290,14 @@ impl RouteTree {
 	}
 }
 
-impl std::fmt::Display for RouteTree {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for RouteTree {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		fn inner(
 			node: &RouteTree,
-			f: &mut std::fmt::Formatter<'_>,
-		) -> std::fmt::Result {
+			f: &mut core::fmt::Formatter<'_>,
+		) -> core::fmt::Result {
 			if let Some(action) = &node.node {
-				let path = node.path.annotated_rel_path();
+				let path = node.path.annotated_path();
 				if action.is_scene() {
 					writeln!(f, "  {} [scene]", path)?;
 				} else {
@@ -325,6 +324,17 @@ impl std::fmt::Display for RouteTree {
 		inner(self, f)
 	}
 }
+
+/// The output handle of a scene route: a newtype over the render-root
+/// [`Entity`].
+///
+/// A dedicated type (rather than a bare `Entity`) is required so the
+/// `ExchangeRouteOut` impl does not collide with the blanket `Serialize`
+/// impl — `Entity` is itself `Serialize`. The render side (the impl, the
+/// despawn list) lives in `scene_routes`; the type itself is here in the
+/// no_std core so [`ActionNode::is_scene`] can detect scene routes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderRequest(pub Entity);
 
 /// An action route node, representing a callable action at a specific path.
 /// Scene routes are identified by their output type being [`RenderRequest`].
@@ -439,7 +449,7 @@ mod test {
 		let paths: Vec<String> = tree
 			.flatten()
 			.iter()
-			.map(|p| p.annotated_rel_path().to_string())
+			.map(|p| p.annotated_path().to_string())
 			.collect();
 		paths.contains(&"api/users".to_string()).xpect_true();
 		paths.contains(&"api/posts".to_string()).xpect_true();
@@ -650,7 +660,7 @@ mod test {
 			.flatten_nodes()
 			.iter()
 			.any(|node| {
-				node.path.annotated_rel_path().to_string().contains("other")
+				node.path.annotated_path().to_string().contains("other")
 			})
 			.xpect_false();
 	}
@@ -680,7 +690,7 @@ mod test {
 			.first()
 			.unwrap()
 			.path
-			.annotated_rel_path()
+			.annotated_path()
 			.to_string()
 			.xpect_contains("details");
 	}

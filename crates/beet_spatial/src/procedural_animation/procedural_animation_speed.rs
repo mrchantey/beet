@@ -1,6 +1,6 @@
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Sometimes we want a fixed duration and others a
 /// consistent speed. This enum allows for both.

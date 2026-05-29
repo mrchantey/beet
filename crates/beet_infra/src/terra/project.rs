@@ -134,7 +134,7 @@ impl Project {
 			.await
 			.ok();
 		// remove S3 native lock file left by interrupted runs
-		let lock_path = RelPath::new(format!("{}.tflock", self.backend_path()));
+		let lock_path = SmolPath::new(format!("{}.tflock", self.backend_path()));
 		self.backend().provider().remove(&lock_path).await.ok();
 		// TODO should be possible to just include artifacts client in the project
 		self.stack

@@ -12,12 +12,12 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider>;
 
 	/// Returns a new provider scoped to the given subdirectory.
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider>;
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider>;
 
 	/// Create a type-erased [`Blob`] handle for a single object managed by
 	/// this provider. Prefer the typed [`FsStore::blob`], [`S3Store::blob`]
 	/// etc. when you need world serialization.
-	fn erased_blob(&self, path: RelPath) -> Blob {
+	fn erased_blob(&self, path: SmolPath) -> Blob {
 		Blob::new(BlobStore::new(self.box_clone()), path)
 	}
 
@@ -110,11 +110,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&RelPath::from("file.txt"), "content").await?;
+	/// store.insert(&SmolPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result>;
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result>;
 
 	/// List all objects in store.
 	///
@@ -128,7 +128,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>>;
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>>;
 
 	/// Get object from store.
 	///
@@ -138,11 +138,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let data = store.get(&RelPath::from("file.txt")).await?;
+	/// let data = store.get(&SmolPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>>;
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>>;
 
 	/// Check if object exists in store.
 	///
@@ -152,11 +152,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let exists = store.exists(&RelPath::from("file.txt")).await?;
+	/// let exists = store.exists(&SmolPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>>;
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>>;
 
 	/// Remove object from store.
 	///
@@ -166,11 +166,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.remove(&RelPath::from("file.txt")).await?;
+	/// store.remove(&SmolPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result>;
 
 	/// Get public URL of object.
 	/// - fs: `file:///data/stores/my-store/key`
@@ -182,19 +182,19 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let url = store.public_url(&RelPath::from("file.txt")).await?;
+	/// let url = store.public_url(&SmolPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
 impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { self.as_ref().box_clone() }
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
 	}
 	fn region(&self) -> Option<String> { self.as_ref().region() }
@@ -207,24 +207,24 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.as_ref().store_remove()
 	}
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		self.as_ref().list()
 	}
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.as_ref().get(path)
 	}
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		self.as_ref().exists(path)
 	}
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &RelPath,
+		path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.as_ref().public_url(path)
 	}

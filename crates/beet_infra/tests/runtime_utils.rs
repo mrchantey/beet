@@ -97,10 +97,7 @@ pub fn assets_bucket_block() -> S3BucketBlock {
 
 /// Create the S3FsStore for syncing local assets to S3.
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
-pub fn assets_s3_fs_store(
-	stack: &Stack,
-	assets_dir: &AbsPathBuf,
-) -> S3FsStore {
+pub fn assets_s3_fs_store(stack: &Stack, assets_dir: &AbsPathBuf) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
 		assets_bucket_block().provider(stack),
@@ -138,9 +135,9 @@ pub async fn verify_assets(stack: &Stack, expected: &str) -> Result {
 	info!("assets at deploy {}: {:?}", stack.deploy_id(), files);
 	files
 		.iter()
-		.any(|path| path.to_string_lossy().contains("index.html"))
+		.any(|path| path.contains("index.html"))
 		.xpect_true();
-	let bytes = store.get(&RelPath::new("index.html")).await?;
+	let bytes = store.get(&SmolPath::new("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
 	info!(

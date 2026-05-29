@@ -47,8 +47,8 @@ pub use path_pattern::*;
 pub use request::*;
 mod http_error;
 pub use http_error::*;
-mod rel_path_ext;
-pub use rel_path_ext::*;
+mod smol_path_ext;
+pub use smol_path_ext::*;
 mod param_query;
 pub use param_query::*;
 mod http_method;
@@ -58,10 +58,14 @@ pub use status_code::*;
 #[cfg(feature = "http")]
 pub mod http_ext;
 
-// higher-level exchange patterns
+// higher-level exchange patterns built on the action system (std-only)
+#[cfg(feature = "std")]
 mod exchange;
+#[cfg(feature = "std")]
 mod exchange_stats;
 mod extractors;
+#[cfg(feature = "std")]
 pub use exchange::*;
+#[cfg(feature = "std")]
 pub use exchange_stats::*;
 pub use extractors::*;

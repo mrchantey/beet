@@ -8,8 +8,8 @@ use beet_core::prelude::*;
 use bevy::color::Color;
 use bevy::color::Srgba;
 use bevy::color::palettes::tailwind;
-use std::borrow::Cow;
-use std::fmt::Debug;
+use alloc::borrow::Cow;
+use core::fmt::Debug;
 
 /// Message carrying a line of action-trace output for log UIs.
 ///

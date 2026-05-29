@@ -32,12 +32,12 @@ enum ClientInput {
 #[derive(Default)]
 struct ActionNode {
 	ident: String,
-	methods: Vec<(RelPath, RouteMethod)>,
+	methods: Vec<(SmolPath, RouteMethod)>,
 	children: Vec<ActionNode>,
 }
 
 impl ActionNode {
-	fn insert(&mut self, path: &RelPath, method: RouteMethod) {
+	fn insert(&mut self, path: &SmolPath, method: RouteMethod) {
 		let mut node = self;
 		for seg in path.segments() {
 			let ident = PathPatternSegment::new(seg).name().to_snake_case();
@@ -90,7 +90,7 @@ fn client_mod(node: &ActionNode) -> Result<Item> {
 }
 
 /// Builds the client caller function for a single server-action handler.
-fn client_fn(path: &RelPath, method: &RouteMethod) -> Result<ItemFn> {
+fn client_fn(path: &SmolPath, method: &RouteMethod) -> Result<ItemFn> {
 	let fn_ident = Ident::new(
 		&method.method.to_string_lowercase(),
 		Span::call_site(),

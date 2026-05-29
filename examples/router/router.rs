@@ -186,7 +186,7 @@ async fn LayoutTemplate(
 ) -> Result<Entity> {
 	let caller = cx.caller.clone();
 	let (parts, next) = cx.take();
-	let path: RelPath = parts.path().into();
+	let path: SmolPath = parts.path().into();
 
 	// get the content render root from the inner handler
 	let content_root = next.call(parts).await?;

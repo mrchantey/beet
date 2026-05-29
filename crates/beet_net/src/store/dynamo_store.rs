@@ -20,7 +20,7 @@ pub struct DynamoStore {
 	/// The AWS region for this table.
 	region: SmolStr,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<RelPath>,
+	subdir: Option<SmolPath>,
 }
 
 impl DynamoStore {
@@ -37,7 +37,7 @@ impl DynamoStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -62,8 +62,8 @@ impl DynamoStore {
 		POOL.get(&self.region).await
 	}
 
-	/// Resolve a [`RelPath`] to a DynamoDB-friendly attribute value.
-	fn resolve_key(&self, path: &RelPath) -> AttributeValue {
+	/// Resolve a [`SmolPath`] to a DynamoDB-friendly attribute value.
+	fn resolve_key(&self, path: &SmolPath) -> AttributeValue {
 		let key = match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -134,7 +134,7 @@ impl DynamoStore {
 	}
 
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -142,7 +142,7 @@ impl DynamoStore {
 impl BlobStoreProvider for DynamoStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(DynamoStore {
 			table_name: self.table_name.clone(),
 			region: self.region.clone(),
@@ -220,7 +220,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -236,7 +236,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -257,7 +257,7 @@ impl BlobStoreProvider for DynamoStore {
 							},
 							None => id.as_str(),
 						};
-						paths.push(RelPath::new(rel));
+						paths.push(SmolPath::new(rel));
 					}
 				}
 			}
@@ -269,7 +269,7 @@ impl BlobStoreProvider for DynamoStore {
 	///
 	/// Assumes a two-field schema: `id` (path) and `data` (binary).
 	/// For typed tables, see [`TableProvider`].
-	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -290,7 +290,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -316,7 +316,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -337,7 +337,7 @@ impl BlobStoreProvider for DynamoStore {
 
 	fn public_url(
 		&self,
-		_path: &RelPath,
+		_path: &SmolPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}

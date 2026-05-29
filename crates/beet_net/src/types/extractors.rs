@@ -162,13 +162,13 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 pub struct JsonQueryParams<T>(pub T);
 
 /// Internal representation for JSON query params.
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct JsonQueryParamsInner {
 	data: String,
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 impl<T: serde::Serialize> JsonQueryParams<T> {
 	/// Serializes a value to a URL-encoded query string.
 	pub fn to_query_string(value: &T) -> Result<String> {
@@ -177,7 +177,7 @@ impl<T: serde::Serialize> JsonQueryParams<T> {
 	}
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 	/// Deserializes a value from a URL-encoded query string.
 	pub fn from_query_string(query: &str) -> Result<T> {
@@ -185,7 +185,7 @@ impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
 		serde_json::from_str::<T>(&inner.data)?.xok()
 	}
 }
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 	for JsonQueryParams<T>
 {
@@ -223,7 +223,7 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct QueryParams<T>(pub T);
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl<T: serde::Serialize> QueryParams<T> {
 	/// Encodes the params as a URL-encoded query string.
 	pub fn encode(&self) -> Result<String> {
@@ -231,7 +231,7 @@ impl<T: serde::Serialize> QueryParams<T> {
 	}
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 	/// Decodes a URL-encoded query string into the specified type.
 	pub fn decode(value: &str) -> Result<T> {
@@ -239,7 +239,7 @@ impl<T: serde::de::DeserializeOwned> QueryParams<T> {
 	}
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
 		let query = req.query_string();

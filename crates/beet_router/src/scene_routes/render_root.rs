@@ -142,16 +142,6 @@ impl RenderRoot {
 	}
 }
 
-/// The output handle of a scene route: a newtype over the render-root
-/// [`Entity`].
-///
-/// A dedicated type (rather than a bare `Entity`) is required so the
-/// [`ExchangeRouteOut`] impl does not collide with the blanket `Serialize`
-/// impl — `Entity` is itself `Serialize`. The despawn list still lives on the
-/// entity's [`DespawnAfterRender`], not on this handle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RenderRequest(pub Entity);
-
 impl ExchangeRouteOut<Self> for RenderRequest {
 	fn into_route_response(
 		self,
@@ -182,10 +172,10 @@ pub(crate) async fn CallerScene(
 #[derive(Component, Reflect)]
 #[require(BlobSceneAction)]
 pub struct BlobScene {
-	path: RelPath,
+	path: SmolPath,
 }
 impl BlobScene {
-	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
+	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
 }
 
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::f32::consts::PI;
+use core::f32::consts::PI;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space
 #[derive(Default, Component, Reflect)]
@@ -16,7 +16,7 @@ pub(crate) fn rotate_to_velocity_2d(
 			continue;
 		};
 		transform.rotation =
-			Quat::from_rotation_z(f32::atan2(dir.y, dir.x) - PI * 0.5);
+			Quat::from_rotation_z(ops::atan2(dir.y, dir.x) - PI * 0.5);
 	}
 }
 

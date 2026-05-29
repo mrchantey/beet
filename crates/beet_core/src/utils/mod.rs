@@ -15,7 +15,6 @@
 
 mod as_any;
 /// Async utilities and future helpers.
-#[cfg(feature = "std")]
 pub mod async_ext;
 mod backoff;
 mod cfg_if;
@@ -23,7 +22,6 @@ mod cfg_if;
 mod cli_args;
 mod clone_func;
 /// Coalescing trigger for async write deduplication.
-#[cfg(feature = "std")]
 mod coalescing_trigger;
 pub mod cross_log;
 /// Display formatting utilities.
@@ -37,6 +35,8 @@ mod into_option;
 #[cfg(feature = "std")]
 mod lazy_pool;
 mod line_col;
+/// A no_std one-shot value channel.
+mod once_value;
 #[cfg(feature = "std")]
 mod panic_context;
 /// Process and command execution utilities.
@@ -52,8 +52,8 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
-/// Time and duration utilities.
-#[cfg(feature = "std")]
+/// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
+/// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
 #[cfg(feature = "std")]
 pub use lazy_pool::*;
@@ -64,24 +64,21 @@ pub mod wasm;
 mod xtend;
 pub use as_any::*;
 
-#[cfg(feature = "std")]
 pub use async_ext::LifetimeSendBoxedFuture;
-#[cfg(feature = "std")]
 pub use async_ext::MaybeSendBoxedFuture;
-#[cfg(feature = "std")]
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
 #[cfg(feature = "std")]
 pub use cli_args::*;
 pub use clone_func::*;
-#[cfg(feature = "std")]
 pub use coalescing_trigger::*;
 #[cfg(feature = "std")]
 pub use file_span::*;
 #[cfg(feature = "std")]
 pub use glob_filter::*;
 pub use line_col::*;
+pub use once_value::*;
 #[cfg(feature = "std")]
 pub use panic_context::*;
 #[cfg(feature = "rand")]
