@@ -100,21 +100,29 @@ pub impl Vec3 {
 	#[cfg(feature = "rand")]
 	/// Returns a random position on the surface of a unit sphere.
 	fn random_on_sphere(rng: &mut impl rand::Rng) -> Self {
+		// `f32::sin`/`cos` are std-only; `bevy::math::ops` uses libm under no_std.
+		use bevy::math::ops;
 		let theta = rng.random_range(0.0..core::f32::consts::TAU);
 		let phi = rng.random_range(0.0..core::f32::consts::PI);
-		Vec3::new(phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos())
+		Vec3::new(
+			ops::sin(phi) * ops::cos(theta),
+			ops::sin(phi) * ops::sin(theta),
+			ops::cos(phi),
+		)
 	}
 
 	#[cfg(feature = "rand")]
 	/// Returns a random position inside a unit sphere.
 	fn random_in_sphere(rng: &mut impl rand::Rng) -> Self {
+		// `f32::sin`/`cos`/`powf` are std-only; `bevy::math::ops` uses libm under no_std.
+		use bevy::math::ops;
 		let theta = rng.random_range(0.0..core::f32::consts::TAU);
 		let phi = rng.random_range(0.0..core::f32::consts::PI);
-		let r = rng.random_range(0.0f32..1.0).powf(1. / 3.);
+		let r = ops::powf(rng.random_range(0.0f32..1.0), 1. / 3.);
 		Vec3::new(
-			r * phi.sin() * theta.cos(),
-			r * phi.sin() * theta.sin(),
-			r * phi.cos(),
+			r * ops::sin(phi) * ops::cos(theta),
+			r * ops::sin(phi) * ops::sin(theta),
+			r * ops::cos(phi),
 		)
 	}
 }

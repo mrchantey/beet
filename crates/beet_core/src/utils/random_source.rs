@@ -41,8 +41,18 @@ impl RandomSource {
 
 impl Default for RandomSource {
 	fn default() -> Self {
-		let rng = ChaCha8Rng::from_rng(&mut rand::rng());
-		Self(rng)
+		cfg_if! {
+			if #[cfg(feature = "std")] {
+				// std: seed from the thread-local entropy generator.
+				Self(ChaCha8Rng::from_rng(&mut rand::rng()))
+			} else {
+				// no_std (eg bare embedded): seed from the platform entropy
+				// source via getrandom's `os_rng`. On targets without a built-in
+				// getrandom backend the downstream adapter must supply one (eg
+				// the esp32 custom backend over the hardware RNG).
+				Self(ChaCha8Rng::from_os_rng())
+			}
+		}
 	}
 }
 

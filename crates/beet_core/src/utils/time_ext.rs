@@ -4,9 +4,69 @@
 //! and sleep helpers are std-only (per-function gated, not whole-module).
 
 use crate::prelude::*;
+use bevy::platform::sync::OnceLock;
 use core::time::Duration;
 #[cfg(feature = "std")]
 use std::time::SystemTime;
+
+/// A wall-clock source: the current time as a [`Duration`] since the Unix epoch.
+///
+/// This is the no_std-friendly clock hook, mirroring `Instant::set_elapsed` (for
+/// the monotonic clock) and `set_http_client` (for transport). On a bare target
+/// there is no `SystemTime`, so [`now`]/[`try_now`] fall back to a function
+/// installed via [`set_now`] — letting a downstream adapter (eg an SNTP client)
+/// supply wall-clock time once it has it.
+pub type NowFn = fn() -> Duration;
+
+static NOW: OnceLock<NowFn> = OnceLock::new();
+
+/// Install the wall-clock source used by [`now`] and [`try_now`].
+///
+/// Call once the source is ready (eg after an SNTP sync). Takes precedence over
+/// the std `SystemTime` fallback, so it can also be used to mock time. Returns
+/// an error if a source has already been installed.
+pub fn set_now(now: NowFn) -> Result<()> {
+	NOW.set(now)
+		.map_err(|_| bevyhow!("a `now` clock source is already installed"))
+}
+
+/// The current time as a [`Duration`] since the Unix epoch, or an error if no
+/// clock is available yet.
+///
+/// Resolution order:
+/// 1. a source installed via [`set_now`];
+/// 2. on `std`, the system clock (`SystemTime`);
+/// 3. otherwise an error — eg a bare target whose SNTP client hasn't synced.
+///
+/// Prefer this over [`now`] when the clock may still be loading.
+pub fn try_now() -> Result<Duration> {
+	if let Some(now) = NOW.get() {
+		return Ok(now());
+	}
+	cfg_if! {
+		if #[cfg(feature = "std")] {
+			SystemTime::now()
+				.duration_since(std::time::UNIX_EPOCH)
+				.map_err(|err| bevyhow!("system clock is before the Unix epoch: {err}"))
+		} else {
+			bevybail!(
+				"no wall clock available yet; install one with `set_now` \
+				 (eg once SNTP has synced)"
+			)
+		}
+	}
+}
+
+/// The current time as a [`Duration`] since the Unix epoch.
+///
+/// # Panics
+///
+/// Panics if no clock is available (see [`try_now`] for the fallible form).
+pub fn now() -> Duration {
+	try_now().expect(
+		"no wall clock available; install one with `set_now` or use `try_now`",
+	)
+}
 
 /// Formats a duration as a human-readable string with appropriate units.
 ///
