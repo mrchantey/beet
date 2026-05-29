@@ -59,7 +59,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 		.map(|node| sidebar_item(node, true))
 		.collect();
 	rsx! {
-		<nav id="sidebar" {Classes::new(["sidebar", "print-hidden"])}>
+		<nav id="sidebar" {Classes::new([classes::SIDEBAR, ClassName::string("print-hidden")])}>
 			{items}
 		</nav>
 	}
@@ -80,7 +80,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 		match path {
 			Some(path) => rsx! {
 				<li {Classes::new([root_class])}>
-					<a {Classes::new(["sidebar-link", "leaf"])} href=path>
+					<a {Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")])} href=path>
 						{display_name}
 					</a>
 				</li>
@@ -88,7 +88,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			.any_scene(),
 			None => rsx! {
 				<li {Classes::new([root_class])}>
-					<span {Classes::new(["sidebar-label"])}>{display_name}</span>
+					<span {Classes::new([classes::SIDEBAR_LABEL])}>{display_name}</span>
 				</li>
 			}
 			.any_scene(),
@@ -101,20 +101,20 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 		// build summary content separately so the `<details>` arm doesn't fork.
 		let summary = match path {
 			Some(path) => rsx! {
-				<a {Classes::new(["sidebar-link", "branch"])} href=path>
+				<a {Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")])} href=path>
 					{display_name}
 				</a>
 			}
 			.any_scene(),
 			None => rsx! {
-				<span {Classes::new(["sidebar-label", "branch"])}>{display_name}</span>
+				<span {Classes::new([classes::SIDEBAR_LABEL, ClassName::string("branch")])}>{display_name}</span>
 			}
 			.any_scene(),
 		};
 		if expanded {
 			rsx! {
 				<li {Classes::new([root_class])}>
-					<details {Classes::new(["sidebar-group"])} open>
+					<details {Classes::new([classes::SIDEBAR_GROUP])} open>
 						<summary>{summary}</summary>
 						<ul>{child_items}</ul>
 					</details>
@@ -124,7 +124,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 		} else {
 			rsx! {
 				<li {Classes::new([root_class])}>
-					<details {Classes::new(["sidebar-group"])}>
+					<details {Classes::new([classes::SIDEBAR_GROUP])}>
 						<summary>{summary}</summary>
 						<ul>{child_items}</ul>
 					</details>

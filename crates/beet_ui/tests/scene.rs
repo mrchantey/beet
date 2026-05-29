@@ -2,7 +2,7 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
-use beet_ui::style::material::classes;
+use beet_ui::prelude::classes;
 // `use beet_ui::*` resolves the `crate::prelude::*` paths emitted by the
 // `rsx!` / `#[scene]` macros (mirrors tests/rsx.rs).
 use beet_ui::*;

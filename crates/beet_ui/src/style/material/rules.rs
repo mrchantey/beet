@@ -7,84 +7,9 @@
 use crate::style::*;
 use crate::prelude::*;
 use crate::style::material::*;
-use classes::*;
-
-/// The shared class-name vocabulary styled by these rules, as [`ClassName`]
-/// constants. Widgets emit these classes and the rules below style them, so
-/// both sides stay in lockstep through a single source of truth.
-pub mod classes {
-	use crate::prelude::ClassName;
-
-	pub const BTN_FILLED: ClassName = ClassName::new_static("btn-filled");
-	pub const BTN_OUTLINED: ClassName = ClassName::new_static("btn-outlined");
-	pub const BTN_TEXT: ClassName = ClassName::new_static("btn-text");
-	pub const BTN_TONAL: ClassName = ClassName::new_static("btn-tonal");
-	pub const BTN_ELEVATED: ClassName = ClassName::new_static("btn-elevated");
-	pub const BTN_SECONDARY: ClassName = ClassName::new_static("btn-secondary");
-	pub const BTN_TERTIARY: ClassName = ClassName::new_static("btn-tertiary");
-	pub const BTN_ERROR: ClassName = ClassName::new_static("btn-error");
-	pub const BTN_ICON: ClassName = ClassName::new_static("btn-icon");
-	pub const CARD_FILLED: ClassName = ClassName::new_static("card-filled");
-	pub const CARD_ELEVATED: ClassName = ClassName::new_static("card-elevated");
-	pub const CARD_OUTLINED: ClassName = ClassName::new_static("card-outlined");
-	pub const TEXT_DISPLAY_LARGE: ClassName = ClassName::new_static("text-display-large");
-	pub const TEXT_DISPLAY_MEDIUM: ClassName = ClassName::new_static("text-display-medium");
-	pub const TEXT_DISPLAY_SMALL: ClassName = ClassName::new_static("text-display-small");
-	pub const TEXT_HEADLINE_LARGE: ClassName = ClassName::new_static("text-headline-large");
-	pub const TEXT_HEADLINE_MEDIUM: ClassName = ClassName::new_static("text-headline-medium");
-	pub const TEXT_HEADLINE_SMALL: ClassName = ClassName::new_static("text-headline-small");
-	pub const TEXT_TITLE_LARGE: ClassName = ClassName::new_static("text-title-large");
-	pub const TEXT_TITLE_MEDIUM: ClassName = ClassName::new_static("text-title-medium");
-	pub const TEXT_TITLE_SMALL: ClassName = ClassName::new_static("text-title-small");
-	pub const TEXT_BODY_LARGE: ClassName = ClassName::new_static("text-body-large");
-	pub const TEXT_BODY_MEDIUM: ClassName = ClassName::new_static("text-body-medium");
-	pub const TEXT_BODY_SMALL: ClassName = ClassName::new_static("text-body-small");
-	pub const TEXT_LABEL_LARGE: ClassName = ClassName::new_static("text-label-large");
-	pub const TEXT_LABEL_MEDIUM: ClassName = ClassName::new_static("text-label-medium");
-	pub const TEXT_LABEL_SMALL: ClassName = ClassName::new_static("text-label-small");
-	pub const COLOR_PRIMARY: ClassName = ClassName::new_static("color-primary");
-	pub const SHAPE_NONE: ClassName = ClassName::new_static("shape-none");
-	pub const SHAPE_EXTRA_SMALL: ClassName = ClassName::new_static("shape-xs");
-	pub const SHAPE_SMALL: ClassName = ClassName::new_static("shape-sm");
-	pub const SHAPE_MEDIUM: ClassName = ClassName::new_static("shape-md");
-	pub const SHAPE_LARGE: ClassName = ClassName::new_static("shape-lg");
-	pub const SHAPE_EXTRA_LARGE: ClassName = ClassName::new_static("shape-xl");
-	pub const SHAPE_FULL: ClassName = ClassName::new_static("shape-full");
-	pub const ELEVATION_0: ClassName = ClassName::new_static("elevation-0");
-	pub const ELEVATION_1: ClassName = ClassName::new_static("elevation-1");
-	pub const ELEVATION_2: ClassName = ClassName::new_static("elevation-2");
-	pub const ELEVATION_3: ClassName = ClassName::new_static("elevation-3");
-	pub const ELEVATION_4: ClassName = ClassName::new_static("elevation-4");
-	pub const ELEVATION_5: ClassName = ClassName::new_static("elevation-5");
-	pub const APP_BAR: ClassName = ClassName::new_static("app-bar");
-	pub const APP_BAR_SCROLLED: ClassName = ClassName::new_static("app-bar-scrolled");
-	pub const CONTAINER: ClassName = ClassName::new_static("container");
-	pub const PAGE: ClassName = ClassName::new_static("page");
-	pub const INPUT: ClassName = ClassName::new_static("input");
-	pub const INPUT_OUTLINED: ClassName = ClassName::new_static("input-outlined");
-	pub const INPUT_FILLED: ClassName = ClassName::new_static("input-filled");
-	pub const INPUT_TEXT: ClassName = ClassName::new_static("input-text");
-	pub const SELECT: ClassName = ClassName::new_static("select");
-	pub const SELECT_OUTLINED: ClassName = ClassName::new_static("select-outlined");
-	pub const SELECT_FILLED: ClassName = ClassName::new_static("select-filled");
-	pub const SELECT_TEXT: ClassName = ClassName::new_static("select-text");
-	pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
-	pub const TABLE: ClassName = ClassName::new_static("table");
-	pub const SIDEBAR: ClassName = ClassName::new_static("sidebar");
-	pub const SIDEBAR_LINK: ClassName = ClassName::new_static("sidebar-link");
-	pub const SIDEBAR_LABEL: ClassName = ClassName::new_static("sidebar-label");
-	pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
-	pub const HIDDEN: ClassName = ClassName::new_static("hidden");
-	pub const TEXT_LEFT: ClassName = ClassName::new_static("text-left");
-	pub const TEXT_CENTER: ClassName = ClassName::new_static("text-center");
-	pub const TEXT_RIGHT: ClassName = ClassName::new_static("text-right");
-	pub const TEXT_XS: ClassName = ClassName::new_static("text-xs");
-	pub const TEXT_SM: ClassName = ClassName::new_static("text-sm");
-	pub const TEXT_BASE: ClassName = ClassName::new_static("text-base");
-	pub const TEXT_LG: ClassName = ClassName::new_static("text-lg");
-	pub const TEXT_XL: ClassName = ClassName::new_static("text-xl");
-	pub const TEXT_2XL: ClassName = ClassName::new_static("text-2xl");
-}
+// the class-name vocabulary these rules style lives in `token::classes`, shared
+// with the widgets that emit the same classes.
+use crate::token::classes::*;
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 

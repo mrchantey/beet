@@ -10,6 +10,6 @@ use beet_core::prelude::*;
 #[scene]
 pub fn ErrorText(#[prop(into)] message: String) -> impl Scene {
 	rsx! {
-		<span {Classes::new(["error-text"])}>{message}</span>
+		<span {Classes::new([classes::ERROR_TEXT])}>{message}</span>
 	}
 }

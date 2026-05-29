@@ -6,8 +6,10 @@
 //! `FormData → DynamicStruct` web-only path.
 //!
 //! Variants are mapped one-to-one onto a class name (e.g. `Filled →
-//! "input-filled"`). The active rule set (Material Design 3 today) styles
-//! these classes via [`RuleSet`]; widget files never hand-roll CSS.
+//! [`classes::INPUT_FILLED`]). The active rule set (Material Design 3 today)
+//! styles these classes via [`RuleSet`]; widget files never hand-roll CSS.
+use crate::token::ClassName;
+use crate::token::classes;
 use beet_core::prelude::*;
 
 /// Variant style for a [`TextField`] or [`TextArea`], mapped onto a class
@@ -22,11 +24,11 @@ pub enum TextFieldVariant {
 
 impl TextFieldVariant {
 	/// The semantic class name for this variant.
-	pub fn class(&self) -> &'static str {
+	pub fn class(&self) -> ClassName {
 		match self {
-			TextFieldVariant::Outlined => "input-outlined",
-			TextFieldVariant::Filled => "input-filled",
-			TextFieldVariant::Text => "input-text",
+			TextFieldVariant::Outlined => classes::INPUT_OUTLINED,
+			TextFieldVariant::Filled => classes::INPUT_FILLED,
+			TextFieldVariant::Text => classes::INPUT_TEXT,
 		}
 	}
 }
@@ -44,7 +46,7 @@ pub fn TextField(
 	let class = variant.class();
 	rsx! {
 		<input
-			{Classes::new(["input", class])}
+			{Classes::new([classes::INPUT, class])}
 			type="text"
 			name={name}
 			placeholder={placeholder}
@@ -62,7 +64,7 @@ pub fn TextArea(
 	let class = variant.class();
 	rsx! {
 		<textarea
-			{Classes::new(["input", class])}
+			{Classes::new([classes::INPUT, class])}
 			name={name}
 			placeholder={placeholder}
 		/>
@@ -79,11 +81,11 @@ pub enum SelectVariant {
 }
 
 impl SelectVariant {
-	pub fn class(&self) -> &'static str {
+	pub fn class(&self) -> ClassName {
 		match self {
-			SelectVariant::Outlined => "select-outlined",
-			SelectVariant::Filled => "select-filled",
-			SelectVariant::Text => "select-text",
+			SelectVariant::Outlined => classes::SELECT_OUTLINED,
+			SelectVariant::Filled => classes::SELECT_FILLED,
+			SelectVariant::Text => classes::SELECT_TEXT,
 		}
 	}
 }
@@ -94,7 +96,7 @@ impl SelectVariant {
 pub fn Select(variant: SelectVariant, name: String) -> impl Scene {
 	let class = variant.class();
 	rsx! {
-		<select {Classes::new(["select", class])} name={name}>
+		<select {Classes::new([classes::SELECT, class])} name={name}>
 			<slot/>
 		</select>
 	}

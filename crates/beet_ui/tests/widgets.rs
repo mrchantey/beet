@@ -18,7 +18,7 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::*;
 use beet_ui::prelude::*;
-use beet_ui::style::material::classes;
+use beet_ui::prelude::classes;
 
 /// A scene world with a [`PackageConfig`] resource. The document-shell widgets
 /// read this synchronously at scene build via `#[scene(system)]`.

@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 #[scene]
 pub fn Table() -> impl Scene {
 	rsx! {
-		<table {Classes::new(["table"])}>
+		<table {Classes::new([classes::TABLE])}>
 			<thead>
 				<slot name="head"/>
 			</thead>

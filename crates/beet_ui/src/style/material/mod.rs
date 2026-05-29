@@ -7,4 +7,3 @@ pub mod themes;
 pub mod tones;
 pub mod typography;
 pub use material_plugin::*;
-pub use rules::classes;
