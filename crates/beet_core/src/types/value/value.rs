@@ -490,6 +490,9 @@ impl From<&String> for Value {
 impl From<SmolStr> for Value {
 	fn from(value: SmolStr) -> Self { Value::Str(value) }
 }
+impl From<&SmolStr> for Value {
+	fn from(value: &SmolStr) -> Self { Value::Str(value.clone()) }
+}
 impl<'a> From<Cow<'a, str>> for Value {
 	fn from(value: Cow<'a, str>) -> Self { Value::str(value.as_ref()) }
 }

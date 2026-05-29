@@ -10,6 +10,9 @@ use std::sync::Arc;
 pub struct CssRule {
 	selector: Selector,
 	declarations: HashMap<CssKey, CssValue>,
+	/// Optional `@media` gate carried over from the source [`Rule`]; when set,
+	/// serialization wraps this rule in `@media (…) { … }`.
+	media: Option<MediaQuery>,
 }
 
 impl CssRule {
@@ -24,6 +27,7 @@ impl CssRule {
 		Self::default()
 			.with_selector(selector)
 			.with_declarations(declarations)
+			.with_media(*rule.media())
 			.xok()
 	}
 

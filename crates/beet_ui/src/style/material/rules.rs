@@ -85,6 +85,17 @@ pub fn button_base() -> Rule {
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 }
 
+/// Class-based button baseline, mirroring [`button_base`].
+///
+/// Lets a non-`<button>` element styled as a button (eg an `<a>` [`Link`]) pick
+/// up the same baseline typography and shape via the `.btn` class.
+pub fn button_class() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN))
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+}
+
 /// Secondary filled button - medium emphasis using the secondary color.
 pub fn button_secondary() -> Rule {
 	Rule::new()
@@ -585,6 +596,25 @@ pub fn hidden() -> Rule {
 		.with_value(common_props::DisplayProp, Display::None)
 }
 
+/// Hides an element when printing (`@media print { display: none }`).
+///
+/// Emitted by `Sidebar`/`Header`/`Footer` so chrome drops out of print output.
+pub fn print_hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(PRINT_HIDDEN))
+		.with_media(MediaQuery::Print)
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// Forces a page break after the element when printing
+/// (`@media print { break-after: page }`).
+pub fn page_break() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(PAGE_BREAK))
+		.with_media(MediaQuery::Print)
+		.with_value(common_props::BreakAfterProp, BreakAfter::Page)
+}
+
 fn text_align(class: ClassName, align: TextAlign) -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(class))
@@ -617,6 +647,7 @@ pub fn disabled_state() -> Rule {
 pub fn all_rules() -> Vec<Rule> {
 	vec![
 		button_base(),
+		button_class(),
 		button_filled(),
 		button_outlined(),
 		button_text(),
@@ -695,6 +726,9 @@ pub fn all_rules() -> Vec<Rule> {
 		text_size(TEXT_LG, typography::FontSizeTitleLarge),
 		text_size(TEXT_XL, typography::FontSizeHeadlineSmall),
 		text_size(TEXT_2XL, typography::FontSizeHeadlineMedium),
+		// print utilities — gated behind `@media print`
+		print_hidden(),
+		page_break(),
 		// accessibility — global state rules
 		focus_ring(),
 		disabled_state(),
@@ -744,12 +778,39 @@ mod tests {
 		// compound `.input:focus` exercises Selector::AllOf serialization
 		css.as_str()
 			.xpect_contains(".input:focus")
+			.xpect_contains(".btn")
 			.xpect_contains(".btn-error")
 			.xpect_contains(".error-text")
 			.xpect_contains("details")
 			.xpect_contains(".hidden")
 			.xpect_contains(".text-center")
-			.xpect_contains(":disabled");
+			.xpect_contains(":disabled")
+			// print utilities serialize wrapped in an `@media print` at-rule
+			.xpect_contains("@media print")
+			.xpect_contains(".print-hidden")
+			.xpect_contains("break-after");
+	}
+
+	/// A media-gated rule serializes wrapped in its `@media` at-rule, with the
+	/// selector + declaration nested inside the block.
+	#[beet_core::test]
+	fn print_rule_wraps_in_media_block() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![print_hidden()]),
+			)
+			.unwrap();
+		// `@media print{ .print-hidden { display: none; } }`
+		css.as_str()
+			.xpect_contains("@media print{")
+			.xpect_contains(".print-hidden")
+			.xpect_contains("display: none;");
+		// the at-rule wraps the selector (appears before it in the output)
+		(css.find("@media print").unwrap() < css.find(".print-hidden").unwrap())
+			.xpect_true();
 	}
 
 	/// Charcell path: a `.error-text` span resolves its foreground through the

@@ -29,6 +29,31 @@ impl AsCssValue for Display {
 	}
 }
 
+/// Fragmentation break forced after a box, mapping to CSS `break-after`.
+///
+/// Only meaningful for paginated media (print); the `@media print` rule that
+/// uses it is ignored by the non-web cascade.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum BreakAfter {
+	/// No forced break.
+	#[default]
+	Auto,
+	/// Always force a page break after the box.
+	Page,
+}
+
+impl AsCssValue for BreakAfter {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Auto => "auto",
+			Self::Page => "page",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 /// How whitespace and line breaks inside a node are handled during text flow.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

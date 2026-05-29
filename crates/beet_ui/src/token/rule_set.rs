@@ -155,9 +155,11 @@ impl RuleSet {
 		// The `:root` default rule is the lowest-priority fallback,
 		// applied by `RuleSetQuery` after the ancestor walk, so a matching rule
 		// (eg `.dark-scheme`) can override a `:root` default, mirroring CSS.
+		// `@media`-gated rules are skipped: there is no target media context for
+		// charcell/native, so print/reduced-motion rules only affect CSS output.
 		self.rules
 			.iter()
-			.filter(|rule| rule.selector().matches(el))
+			.filter(|rule| rule.media().is_none() && rule.selector().matches(el))
 			.xtry_find_map(|rule| rule.get(key))
 	}
 }

@@ -12,7 +12,7 @@ pub fn Header(
 	let home_route =
 		if home_route.is_empty() { "/".to_string() } else { home_route };
 	rsx! {
-		<header {Classes::new(["app-bar", "print-hidden"])}>
+		<header {Classes::new([classes::APP_BAR, classes::PRINT_HIDDEN])}>
 			<a {Classes::new(["app-bar-title"])} href={home_route}>
 				{title}
 			</a>

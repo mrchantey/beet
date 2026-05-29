@@ -20,6 +20,7 @@ pub const LIGHT_SCHEME: ClassName = ClassName::new_static("light-scheme");
 pub const DARK_SCHEME: ClassName = ClassName::new_static("dark-scheme");
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
+pub const BTN: ClassName = ClassName::new_static("btn");
 pub const BTN_FILLED: ClassName = ClassName::new_static("btn-filled");
 pub const BTN_OUTLINED: ClassName = ClassName::new_static("btn-outlined");
 pub const BTN_TEXT: ClassName = ClassName::new_static("btn-text");
@@ -96,6 +97,9 @@ pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
 
 // ── Generic utilities ─────────────────────────────────────────────────────────────
 pub const HIDDEN: ClassName = ClassName::new_static("hidden");
+// Print utilities, styled by `@media print` rules.
+pub const PRINT_HIDDEN: ClassName = ClassName::new_static("print-hidden");
+pub const PAGE_BREAK: ClassName = ClassName::new_static("page-break");
 pub const TEXT_LEFT: ClassName = ClassName::new_static("text-left");
 pub const TEXT_CENTER: ClassName = ClassName::new_static("text-center");
 pub const TEXT_RIGHT: ClassName = ClassName::new_static("text-right");

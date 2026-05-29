@@ -18,7 +18,7 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Scene {
 	}
 
 	rsx! {
-		<footer id="page-footer" {Classes::new(["print-hidden"])}>
+		<footer id="page-footer" {Classes::new([classes::PRINT_HIDDEN])}>
 			<span>{footer_text}</span>
 			<slot/>
 			<span>{build_text}</span>

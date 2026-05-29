@@ -16,9 +16,10 @@
 beet_core::test_main!();
 
 use beet_core::prelude::*;
-use beet_ui::*;
-use beet_ui::prelude::*;
+use beet_ui::prelude::Button;
 use beet_ui::prelude::classes;
+use beet_ui::prelude::*;
+use beet_ui::*;
 
 /// A scene world with a [`PackageConfig`] resource. The document-shell widgets
 /// read this synchronously at scene build via `#[scene(system)]`.
@@ -55,6 +56,25 @@ fn head_emits_charset_meta() {
 }
 
 #[beet_core::test]
+fn head_includes_pwa_meta_beyond_twelve_children() {
+	// the PWA/Twitter block pushes Head past 12 children; chunking keeps them
+	let mut world = shell_world();
+	let root = world.spawn_scene(rsx! { <Head/> }).unwrap().id();
+	world.with_state::<ElementQuery, _>(|query| {
+		let names: Vec<String> = query
+			.iter_descendants_inclusive(root)
+			.filter(|el| el.attribute("name").is_some())
+			.map(|el| el.attribute_string("name"))
+			.collect();
+		names
+			.iter()
+			.any(|n| n == "apple-mobile-web-app-capable")
+			.xpect_true();
+		names.iter().any(|n| n == "twitter:card").xpect_true();
+	});
+}
+
+#[beet_core::test]
 fn header_renders_title_from_package_config() {
 	let mut world = shell_world();
 	let root = world.spawn_scene(rsx! { <Header/> }).unwrap().id();
@@ -87,7 +107,12 @@ fn footer_includes_version() {
 fn document_layout_root_is_html() {
 	let mut world = shell_world();
 	let root = world.spawn_scene(rsx! { <DocumentLayout/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("html");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("html");
 	world.entity(root).get::<DocumentLayout>().unwrap();
 }
 
@@ -96,7 +121,12 @@ fn page_layout_root_is_html() {
 	let mut world = shell_world();
 	let root = world.spawn_scene(rsx! { <PageLayout/> }).unwrap().id();
 	// PageLayout wraps DocumentLayout, whose root is <html>
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("html");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("html");
 	world.entity(root).get::<PageLayout>().unwrap();
 }
 
@@ -104,7 +134,12 @@ fn page_layout_root_is_html() {
 fn content_layout_root_is_html() {
 	let mut world = shell_world();
 	let root = world.spawn_scene(rsx! { <ContentLayout/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("html");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("html");
 	world.entity(root).get::<ContentLayout>().unwrap();
 }
 
@@ -121,7 +156,8 @@ fn text_field_uses_input_classes() {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("input");
 		view.contains_class_name(&classes::INPUT).xpect_true();
-		view.contains_class_name(&classes::INPUT_OUTLINED).xpect_true();
+		view.contains_class_name(&classes::INPUT_OUTLINED)
+			.xpect_true();
 	});
 }
 
@@ -136,37 +172,77 @@ fn text_field_variant_changes_class() {
 		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
-		view.contains_class_name(&classes::INPUT_FILLED).xpect_true();
-		view.contains_class_name(&classes::INPUT_OUTLINED).xpect_false();
+		view.contains_class_name(&classes::INPUT_FILLED)
+			.xpect_true();
+		view.contains_class_name(&classes::INPUT_OUTLINED)
+			.xpect_false();
 	});
+}
+
+#[beet_core::test]
+fn text_field_field_attaches_field_ref() {
+	let mut world = scene_ext::test_world();
+	// supplied: the FieldRef component attaches to the input entity
+	let root = world
+		.spawn_scene(rsx! {
+			<TextField name="email" field=FieldRef::new("email")/>
+		})
+		.unwrap()
+		.id();
+	world.entity(root).get::<FieldRef>().unwrap();
+
+	// omitted: no FieldRef
+	let bare = world
+		.spawn_scene(rsx! { <TextField name="email"/> })
+		.unwrap()
+		.id();
+	world.entity(bare).get::<FieldRef>().is_none().xpect_true();
 }
 
 #[beet_core::test]
 fn text_area_root_is_textarea() {
 	let mut world = scene_ext::test_world();
-	let root =
-		world.spawn_scene(rsx! { <TextArea name="bio"/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("textarea");
+	let root = world
+		.spawn_scene(rsx! { <TextArea name="bio"/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("textarea");
 }
 
 #[beet_core::test]
 fn select_root_is_select() {
 	let mut world = scene_ext::test_world();
-	let root =
-		world.spawn_scene(rsx! { <Select name="country"/> }).unwrap().id();
+	let root = world
+		.spawn_scene(rsx! { <Select name="country"/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("select");
 		view.contains_class_name(&classes::SELECT).xpect_true();
-		view.contains_class_name(&classes::SELECT_OUTLINED).xpect_true();
+		view.contains_class_name(&classes::SELECT_OUTLINED)
+			.xpect_true();
 	});
 }
 
 #[beet_core::test]
 fn form_root_is_form() {
 	let mut world = scene_ext::test_world();
-	let root = world.spawn_scene(rsx! { <Form name="signup"/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("form");
+	let root = world
+		.spawn_scene(rsx! { <Form name="signup"/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("form");
 	world.entity(root).get::<Form>().unwrap();
 }
 
@@ -214,8 +290,10 @@ fn sidebar_renders_nav() {
 		children: vec![],
 		expanded: false,
 	}];
-	let root =
-		world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
+	let root = world
+		.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("nav");
@@ -237,8 +315,10 @@ fn sidebar_branch_renders_details() {
 		}],
 		expanded: true,
 	}];
-	let root =
-		world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
+	let root = world
+		.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
+		.unwrap()
+		.id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		let tags: Vec<_> = query
@@ -254,7 +334,12 @@ fn sidebar_branch_renders_details() {
 fn preflight_emits_style() {
 	let mut world = scene_ext::test_world();
 	let root = world.spawn_scene(rsx! { <Preflight/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("style");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("style");
 	world.with_state::<ElementQuery, _>(|query| {
 		query
 			.iter_descendant_values(root)
@@ -267,8 +352,16 @@ fn preflight_emits_style() {
 #[beet_core::test]
 fn color_scheme_script_emits_scheme_classes() {
 	let mut world = scene_ext::test_world();
-	let root = world.spawn_scene(rsx! { <ColorSchemeScript/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("script");
+	let root = world
+		.spawn_scene(rsx! { <ColorSchemeScript/> })
+		.unwrap()
+		.id();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("script");
 	world.with_state::<ElementQuery, _>(|query| {
 		let body = query
 			.iter_descendant_values(root)
@@ -288,5 +381,80 @@ fn color_scheme_script_emits_scheme_classes() {
 fn analytics_emits_script() {
 	let mut world = scene_ext::test_world();
 	let root = world.spawn_scene(rsx! { <Analytics/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("script");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("script");
+}
+
+#[beet_core::test]
+fn page_break_emits_page_break_class() {
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <PageBreak/> }).unwrap().id();
+	world.with_state::<ElementQuery, _>(|query| {
+		query
+			.get(root)
+			.unwrap()
+			.contains_class_name(&classes::PAGE_BREAK)
+			.xpect_true();
+	});
+}
+
+#[beet_core::test]
+fn button_emits_base_and_variant_class() {
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(
+			rsx! { <Button label="Save" variant=ButtonVariant::Error/> },
+		)
+		.unwrap()
+		.id();
+	world.entity(root).get::<Button>().unwrap();
+	world.with_state::<ElementQuery, _>(|query| {
+		let view = query.get(root).unwrap();
+		view.tag().xpect_eq("button");
+		view.contains_class_name(&classes::BTN).xpect_true();
+		view.contains_class_name(&classes::BTN_ERROR).xpect_true();
+		view.contains_class_name(&classes::BTN_FILLED).xpect_false();
+		query
+			.iter_descendant_values(root)
+			.any(|v| v.as_str().ok() == Some("Save"))
+			.xpect_true();
+	});
+}
+
+#[beet_core::test]
+fn icon_button_adds_icon_class() {
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! { <IconButton label="+"/> })
+		.unwrap()
+		.id();
+	world.with_state::<ElementQuery, _>(|query| {
+		let view = query.get(root).unwrap();
+		view.tag().xpect_eq("button");
+		view.contains_class_name(&classes::BTN_ICON).xpect_true();
+	});
+}
+
+#[beet_core::test]
+fn link_is_anchor_styled_as_button() {
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<Link label="Home" href="/" variant=ButtonVariant::Outlined/>
+		})
+		.unwrap()
+		.id();
+	world.entity(root).get::<Link>().unwrap();
+	world.with_state::<ElementQuery, _>(|query| {
+		let view = query.get(root).unwrap();
+		view.tag().xpect_eq("a");
+		view.attribute_string("href").xpect_eq("/");
+		view.contains_class_name(&classes::BTN).xpect_true();
+		view.contains_class_name(&classes::BTN_OUTLINED)
+			.xpect_true();
+	});
 }

@@ -4,12 +4,45 @@ use bevy::reflect::Typed;
 use std::sync::Arc;
 
 /// A set of declarations applied to elements matching the given selector.
+///
+/// An optional [`media`](Self::media) query gates the rule behind an `@media`
+/// at-rule: such rules serialize to CSS wrapped in `@media (…) { … }`, and the
+/// non-web cascade ([`RuleSet::cascade`](crate::prelude::RuleSet)) ignores them
+/// since there is no target media context for charcell/native yet.
 #[derive(Debug, Default, Clone, Reflect, Get, GetMut, SetWith)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rule {
 	/// Predicate for which entities this rule applies to
 	selector: Selector,
 	declarations: HashMap<TokenKey, TokenValue>,
+	/// Optional `@media` gate; `None` means the rule always applies.
+	#[set_with(unwrap_option)]
+	media: Option<MediaQuery>,
+}
+
+/// An `@media` at-rule gate for a [`Rule`].
+///
+/// Only the media features beet needs today are modelled; the variants
+/// serialize to the CSS condition inside `@media …`.
+#[derive(
+	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum MediaQuery {
+	/// `@media print` — applies when printing.
+	Print,
+	/// `@media (prefers-reduced-motion: reduce)`.
+	ReducedMotion,
+}
+
+impl MediaQuery {
+	/// The CSS condition placed after `@media`.
+	pub fn as_css(&self) -> &'static str {
+		match self {
+			MediaQuery::Print => "print",
+			MediaQuery::ReducedMotion => "(prefers-reduced-motion: reduce)",
+		}
+	}
 }
 
 impl Rule {
@@ -20,6 +53,7 @@ impl Rule {
 		Self {
 			selector: Selector::Class(class.into()),
 			declarations: default(),
+			media: None,
 		}
 	}
 
@@ -28,6 +62,7 @@ impl Rule {
 		Self {
 			selector: Selector::Tag(tag.into()),
 			declarations: default(),
+			media: None,
 		}
 	}
 
@@ -42,6 +77,7 @@ impl Rule {
 		Self {
 			selector,
 			declarations: default(),
+			media: None,
 		}
 	}
 

@@ -45,6 +45,14 @@ pub fn PageLayout() -> impl Scene {
 	}
 }
 
+/// Forces a page break when printing. Renders an empty element carrying the
+/// [`classes::PAGE_BREAK`] class, styled by the `@media print` `page_break`
+/// rule (`break-after: page`); a no-op on screen and non-web targets.
+#[scene]
+pub fn PageBreak() -> impl Scene {
+	rsx! { <div {Classes::new([classes::PAGE_BREAK])}/> }
+}
+
 /// A [`PageLayout`] with a `<main>` content area for article-style pages.
 ///
 /// Slots: `head`, `header`, `header-nav`, `footer`, default (main content).

@@ -110,34 +110,34 @@ fn event_attribute_attaches_observer() {
 	world.resource::<Pinged>().0.xpect_true();
 }
 
-/// `beet_design::Button` reduced to its scene shape: an enum-keyed semantic
-/// class attached via the [`Classes`] component (not a `class="…"` string),
-/// plus an `#[prop(into)]` String for the label. Demonstrates the
-/// `#[template]` → `#[scene]` migration pattern; the actual visual rules ship
-/// with `beet_design.md` Phase 3.
+/// A throwaway fixture for the generic scene-machinery checks below (marker
+/// component, BSN inheritance, required/optional props). The *production*
+/// button widget lives in `beet_ui::widgets::button`; this stays local so the
+/// BSN form can set props by field (`@variant`) without exposing the
+/// production `*Props` fields.
 #[derive(Default, Clone)]
 #[allow(dead_code)]
-enum ButtonVariant {
+enum DemoVariant {
 	#[default]
 	Filled,
 	Outlined,
 	Error,
 }
 
-impl ButtonVariant {
+impl DemoVariant {
 	fn class(&self) -> ClassName {
 		match self {
-			ButtonVariant::Filled => classes::BTN_FILLED,
-			ButtonVariant::Outlined => classes::BTN_OUTLINED,
-			ButtonVariant::Error => classes::BTN_ERROR,
+			DemoVariant::Filled => classes::BTN_FILLED,
+			DemoVariant::Outlined => classes::BTN_OUTLINED,
+			DemoVariant::Error => classes::BTN_ERROR,
 		}
 	}
 }
 
 #[scene]
-fn Button(
+fn DemoButton(
 	#[prop(into)] label: String,
-	variant: ButtonVariant,
+	variant: DemoVariant,
 ) -> impl Scene {
 	rsx! {
 		<button {Classes::new([ClassName::new_static("btn"), variant.class()])}>
@@ -150,15 +150,15 @@ fn Button(
 fn button_widget_renders_with_props() {
 	let mut world = scene_ext::test_world();
 	let root = world
-		.spawn_scene(rsx! { <Button label="Save" variant=ButtonVariant::Error/> })
+		.spawn_scene(rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> })
 		.unwrap()
 		.id();
 
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("button");
 
 	// the marker Component is on the root entity — unlocks queries +
-	// `:Button` inheritance from BSN
-	world.entity(root).get::<Button>().unwrap();
+	// `:DemoButton` inheritance from BSN
+	world.entity(root).get::<DemoButton>().unwrap();
 
 	// classes attached via the `Classes` component, not a `class="…"` string.
 	// Assert against the shared `classes` constants to stay in lockstep with the
@@ -185,15 +185,15 @@ fn bsn_inheritance_matches_rsx_tag_form() {
 	// rsx form
 	let mut world = scene_ext::test_world();
 	let rsx_root = world
-		.spawn_scene(rsx! { <Button label="Save" variant=ButtonVariant::Error/> })
+		.spawn_scene(rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> })
 		.unwrap()
 		.id();
 
-	// hand-written BSN form — `:Button` inherits the SceneComponent and `@`
+	// hand-written BSN form — `:DemoButton` inherits the SceneComponent and `@`
 	// fields set props. Should produce the same tree.
 	let bsn_root = world
 		.spawn_scene(bsn! {
-			:Button { @label: {"Save".to_string()}, @variant: {ButtonVariant::Error} }
+			:DemoButton { @label: {"Save".to_string()}, @variant: {DemoVariant::Error} }
 		})
 		.unwrap()
 		.id();
@@ -203,8 +203,8 @@ fn bsn_inheritance_matches_rsx_tag_form() {
 	rsx_button.xpect_eq(bsn_button);
 
 	// both carry the marker Component
-	world.entity(rsx_root).get::<Button>().unwrap();
-	world.entity(bsn_root).get::<Button>().unwrap();
+	world.entity(rsx_root).get::<DemoButton>().unwrap();
+	world.entity(bsn_root).get::<DemoButton>().unwrap();
 }
 
 /// `beet_design::BucketList` reduced to its essence: a synchronous `#[scene]`
@@ -252,7 +252,7 @@ fn counter_widget_behavior_attaches_to_scene_built_tree() {
 /// validated at build time: an unset required prop surfaces [`MissingProps`]
 /// through the build channel rather than panicking.
 #[scene]
-fn Badge(#[prop(required)] variant: ButtonVariant) -> impl Scene {
+fn Badge(#[prop(required)] variant: DemoVariant) -> impl Scene {
 	rsx! { <span {Classes::new([ClassName::new_static("badge"), variant.class()])}/> }
 }
 
@@ -265,7 +265,7 @@ fn try_spawn(world: &mut World, scene: impl Scene) -> Result<Entity, String> {
 #[beet_core::test]
 fn required_prop_supplied_resolves() {
 	let mut world = scene_ext::test_world();
-	let root = try_spawn(&mut world, rsx! { <Badge variant=ButtonVariant::Error/> })
+	let root = try_spawn(&mut world, rsx! { <Badge variant=DemoVariant::Error/> })
 		.unwrap();
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("span");
 	world.entity(root).get::<Badge>().unwrap();
@@ -337,6 +337,23 @@ fn prop_all_uses_custom_props_type() {
 			.any(|value| value.as_str().ok() == Some("hi"))
 			.xpect_true();
 	});
+}
+
+#[beet_core::test]
+fn element_with_more_than_twelve_children() {
+	// 20 children exceeds `bevy_scene`'s 12-tuple cap; the rsx! lowering chunks
+	// them into nested tuples so all spawn as direct children.
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<ul>
+				<li/><li/><li/><li/><li/><li/><li/><li/><li/><li/>
+				<li/><li/><li/><li/><li/><li/><li/><li/><li/><li/>
+			</ul>
+		})
+		.unwrap()
+		.id();
+	world.entity(root).get::<Children>().unwrap().len().xpect_eq(20);
 }
 
 #[beet_core::test]

@@ -17,6 +17,7 @@
 
 #[cfg(feature = "net")]
 mod analytics;
+mod button;
 mod color_scheme;
 mod error_text;
 mod footer;
@@ -30,6 +31,7 @@ mod table;
 
 #[cfg(feature = "net")]
 pub use analytics::*;
+pub use button::*;
 pub use color_scheme::*;
 pub use error_text::*;
 pub use footer::*;

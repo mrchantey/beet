@@ -59,7 +59,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 		.map(|node| sidebar_item(node, true))
 		.collect();
 	rsx! {
-		<nav id="sidebar" {Classes::new([classes::SIDEBAR, ClassName::string("print-hidden")])}>
+		<nav id="sidebar" {Classes::new([classes::SIDEBAR, classes::PRINT_HIDDEN])}>
 			{items}
 		</nav>
 	}
