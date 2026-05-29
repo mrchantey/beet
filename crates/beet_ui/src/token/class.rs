@@ -18,6 +18,12 @@ pub enum ClassName {
 }
 
 impl ClassName {
+	/// A `const`-constructible class name from a static string, for declaring
+	/// the shared class-name vocabulary as constants.
+	pub const fn new_static(name: &'static str) -> Self {
+		Self::String(SmolStr::new_static(name))
+	}
+
 	pub fn string(name: impl Into<SmolStr>) -> Self {
 		Self::String(name.into())
 	}
@@ -33,7 +39,8 @@ impl ClassName {
 		}
 	}
 
-	/// The string used when matching against [`Selector::Class`].
+	/// The string used when matching against [`Selector::Class`],
+	/// the class name does not have a `.` prefix.
 	pub fn as_selector(&self) -> SmolStr {
 		match self {
 			Self::String(s) => s.clone(),
@@ -48,6 +55,10 @@ impl core::fmt::Display for ClassName {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		self.as_selector().fmt(f)
 	}
+}
+
+impl From<ClassName> for SmolStr {
+	fn from(class: ClassName) -> Self { class.as_selector() }
 }
 
 
@@ -69,6 +80,13 @@ impl Classes {
 	/// `true` if any contained class matches the given selector string.
 	pub fn contains_selector(&self, class: &str) -> bool {
 		self.0.iter().any(|c| c.as_selector() == class)
+	}
+
+	/// `true` if this set contains the given [`ClassName`]. Prefer this over
+	/// [`Self::contains_selector`] when asserting against the shared class-name
+	/// constants, keeping widget output and style rules in lockstep.
+	pub fn contains_name(&self, class: &ClassName) -> bool {
+		self.0.contains(class)
 	}
 }
 

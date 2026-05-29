@@ -2,6 +2,7 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
+use beet_ui::style::material::classes;
 // `use beet_ui::*` resolves the `crate::prelude::*` paths emitted by the
 // `rsx!` / `#[scene]` macros (mirrors tests/rsx.rs).
 use beet_ui::*;
@@ -124,11 +125,11 @@ enum ButtonVariant {
 }
 
 impl ButtonVariant {
-	fn class(&self) -> &'static str {
+	fn class(&self) -> ClassName {
 		match self {
-			ButtonVariant::Filled => "btn-filled",
-			ButtonVariant::Outlined => "btn-outlined",
-			ButtonVariant::Error => "btn-error",
+			ButtonVariant::Filled => classes::BTN_FILLED,
+			ButtonVariant::Outlined => classes::BTN_OUTLINED,
+			ButtonVariant::Error => classes::BTN_ERROR,
 		}
 	}
 }
@@ -139,7 +140,7 @@ fn Button(
 	variant: ButtonVariant,
 ) -> impl Scene {
 	rsx! {
-		<button {Classes::new(["btn", variant.class()])}>
+		<button {Classes::new([ClassName::new_static("btn"), variant.class()])}>
 			{label}
 		</button>
 	}
@@ -159,11 +160,13 @@ fn button_widget_renders_with_props() {
 	// `:Button` inheritance from BSN
 	world.entity(root).get::<Button>().unwrap();
 
-	// classes attached via the `Classes` component, not a `class="…"` string
-	let classes = world.entity(root).get::<Classes>().unwrap();
-	classes.contains_selector("btn").xpect_true();
-	classes.contains_selector("btn-error").xpect_true();
-	classes.contains_selector("btn-filled").xpect_false();
+	// classes attached via the `Classes` component, not a `class="…"` string.
+	// Assert against the shared `classes` constants to stay in lockstep with the
+	// style rules that target them.
+	let button_classes = world.entity(root).get::<Classes>().unwrap();
+	button_classes.contains_selector("btn").xpect_true();
+	button_classes.contains_name(&classes::BTN_ERROR).xpect_true();
+	button_classes.contains_name(&classes::BTN_FILLED).xpect_false();
 
 	// label prop became a text child
 	let children = world.entity(root).get::<Children>().unwrap();
@@ -250,7 +253,7 @@ fn counter_widget_behavior_attaches_to_scene_built_tree() {
 /// through the build channel rather than panicking.
 #[scene]
 fn Badge(#[prop(required)] variant: ButtonVariant) -> impl Scene {
-	rsx! { <span {Classes::new(["badge", variant.class()])}/> }
+	rsx! { <span {Classes::new([ClassName::new_static("badge"), variant.class()])}/> }
 }
 
 /// Spawn `scene` into `world`, returning the root id or the build error as a

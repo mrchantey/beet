@@ -7,78 +7,84 @@
 use crate::style::*;
 use crate::prelude::*;
 use crate::style::material::*;
+use classes::*;
 
-// ── Class name constants ──────────────────────────────────────────────────────
+/// The shared class-name vocabulary styled by these rules, as [`ClassName`]
+/// constants. Widgets emit these classes and the rules below style them, so
+/// both sides stay in lockstep through a single source of truth.
+pub mod classes {
+	use crate::prelude::ClassName;
 
-pub const BTN_FILLED: &str = "btn-filled";
-pub const BTN_OUTLINED: &str = "btn-outlined";
-pub const BTN_TEXT: &str = "btn-text";
-pub const BTN_TONAL: &str = "btn-tonal";
-pub const BTN_ELEVATED: &str = "btn-elevated";
-pub const CARD_FILLED: &str = "card-filled";
-pub const CARD_ELEVATED: &str = "card-elevated";
-pub const CARD_OUTLINED: &str = "card-outlined";
-pub const TEXT_DISPLAY_LARGE: &str = "text-display-large";
-pub const TEXT_DISPLAY_MEDIUM: &str = "text-display-medium";
-pub const TEXT_DISPLAY_SMALL: &str = "text-display-small";
-pub const TEXT_HEADLINE_LARGE: &str = "text-headline-large";
-pub const TEXT_HEADLINE_MEDIUM: &str = "text-headline-medium";
-pub const TEXT_HEADLINE_SMALL: &str = "text-headline-small";
-pub const TEXT_TITLE_LARGE: &str = "text-title-large";
-pub const TEXT_TITLE_MEDIUM: &str = "text-title-medium";
-pub const TEXT_TITLE_SMALL: &str = "text-title-small";
-pub const TEXT_BODY_LARGE: &str = "text-body-large";
-pub const TEXT_BODY_MEDIUM: &str = "text-body-medium";
-pub const TEXT_BODY_SMALL: &str = "text-body-small";
-pub const TEXT_LABEL_LARGE: &str = "text-label-large";
-pub const TEXT_LABEL_MEDIUM: &str = "text-label-medium";
-pub const TEXT_LABEL_SMALL: &str = "text-label-small";
-pub const COLOR_PRIMARY: &str = "color-primary";
-pub const SHAPE_NONE: &str = "shape-none";
-pub const SHAPE_EXTRA_SMALL: &str = "shape-xs";
-pub const SHAPE_SMALL: &str = "shape-sm";
-pub const SHAPE_MEDIUM: &str = "shape-md";
-pub const SHAPE_LARGE: &str = "shape-lg";
-pub const SHAPE_EXTRA_LARGE: &str = "shape-xl";
-pub const SHAPE_FULL: &str = "shape-full";
-pub const ELEVATION_0: &str = "elevation-0";
-pub const ELEVATION_1: &str = "elevation-1";
-pub const ELEVATION_2: &str = "elevation-2";
-pub const ELEVATION_3: &str = "elevation-3";
-pub const ELEVATION_4: &str = "elevation-4";
-pub const ELEVATION_5: &str = "elevation-5";
-pub const APP_BAR: &str = "app-bar";
-pub const APP_BAR_SCROLLED: &str = "app-bar-scrolled";
-pub const CONTAINER: &str = "container";
-pub const PAGE: &str = "page";
-pub const BTN_SECONDARY: &str = "btn-secondary";
-pub const BTN_TERTIARY: &str = "btn-tertiary";
-pub const BTN_ERROR: &str = "btn-error";
-pub const BTN_ICON: &str = "btn-icon";
-pub const INPUT: &str = "input";
-pub const INPUT_OUTLINED: &str = "input-outlined";
-pub const INPUT_FILLED: &str = "input-filled";
-pub const INPUT_TEXT: &str = "input-text";
-pub const SELECT: &str = "select";
-pub const SELECT_OUTLINED: &str = "select-outlined";
-pub const SELECT_FILLED: &str = "select-filled";
-pub const SELECT_TEXT: &str = "select-text";
-pub const ERROR_TEXT: &str = "error-text";
-pub const TABLE: &str = "table";
-pub const SIDEBAR: &str = "sidebar";
-pub const SIDEBAR_LINK: &str = "sidebar-link";
-pub const SIDEBAR_LABEL: &str = "sidebar-label";
-pub const SIDEBAR_GROUP: &str = "sidebar-group";
-pub const HIDDEN: &str = "hidden";
-pub const TEXT_LEFT: &str = "text-left";
-pub const TEXT_CENTER: &str = "text-center";
-pub const TEXT_RIGHT: &str = "text-right";
-pub const TEXT_XS: &str = "text-xs";
-pub const TEXT_SM: &str = "text-sm";
-pub const TEXT_BASE: &str = "text-base";
-pub const TEXT_LG: &str = "text-lg";
-pub const TEXT_XL: &str = "text-xl";
-pub const TEXT_2XL: &str = "text-2xl";
+	pub const BTN_FILLED: ClassName = ClassName::new_static("btn-filled");
+	pub const BTN_OUTLINED: ClassName = ClassName::new_static("btn-outlined");
+	pub const BTN_TEXT: ClassName = ClassName::new_static("btn-text");
+	pub const BTN_TONAL: ClassName = ClassName::new_static("btn-tonal");
+	pub const BTN_ELEVATED: ClassName = ClassName::new_static("btn-elevated");
+	pub const BTN_SECONDARY: ClassName = ClassName::new_static("btn-secondary");
+	pub const BTN_TERTIARY: ClassName = ClassName::new_static("btn-tertiary");
+	pub const BTN_ERROR: ClassName = ClassName::new_static("btn-error");
+	pub const BTN_ICON: ClassName = ClassName::new_static("btn-icon");
+	pub const CARD_FILLED: ClassName = ClassName::new_static("card-filled");
+	pub const CARD_ELEVATED: ClassName = ClassName::new_static("card-elevated");
+	pub const CARD_OUTLINED: ClassName = ClassName::new_static("card-outlined");
+	pub const TEXT_DISPLAY_LARGE: ClassName = ClassName::new_static("text-display-large");
+	pub const TEXT_DISPLAY_MEDIUM: ClassName = ClassName::new_static("text-display-medium");
+	pub const TEXT_DISPLAY_SMALL: ClassName = ClassName::new_static("text-display-small");
+	pub const TEXT_HEADLINE_LARGE: ClassName = ClassName::new_static("text-headline-large");
+	pub const TEXT_HEADLINE_MEDIUM: ClassName = ClassName::new_static("text-headline-medium");
+	pub const TEXT_HEADLINE_SMALL: ClassName = ClassName::new_static("text-headline-small");
+	pub const TEXT_TITLE_LARGE: ClassName = ClassName::new_static("text-title-large");
+	pub const TEXT_TITLE_MEDIUM: ClassName = ClassName::new_static("text-title-medium");
+	pub const TEXT_TITLE_SMALL: ClassName = ClassName::new_static("text-title-small");
+	pub const TEXT_BODY_LARGE: ClassName = ClassName::new_static("text-body-large");
+	pub const TEXT_BODY_MEDIUM: ClassName = ClassName::new_static("text-body-medium");
+	pub const TEXT_BODY_SMALL: ClassName = ClassName::new_static("text-body-small");
+	pub const TEXT_LABEL_LARGE: ClassName = ClassName::new_static("text-label-large");
+	pub const TEXT_LABEL_MEDIUM: ClassName = ClassName::new_static("text-label-medium");
+	pub const TEXT_LABEL_SMALL: ClassName = ClassName::new_static("text-label-small");
+	pub const COLOR_PRIMARY: ClassName = ClassName::new_static("color-primary");
+	pub const SHAPE_NONE: ClassName = ClassName::new_static("shape-none");
+	pub const SHAPE_EXTRA_SMALL: ClassName = ClassName::new_static("shape-xs");
+	pub const SHAPE_SMALL: ClassName = ClassName::new_static("shape-sm");
+	pub const SHAPE_MEDIUM: ClassName = ClassName::new_static("shape-md");
+	pub const SHAPE_LARGE: ClassName = ClassName::new_static("shape-lg");
+	pub const SHAPE_EXTRA_LARGE: ClassName = ClassName::new_static("shape-xl");
+	pub const SHAPE_FULL: ClassName = ClassName::new_static("shape-full");
+	pub const ELEVATION_0: ClassName = ClassName::new_static("elevation-0");
+	pub const ELEVATION_1: ClassName = ClassName::new_static("elevation-1");
+	pub const ELEVATION_2: ClassName = ClassName::new_static("elevation-2");
+	pub const ELEVATION_3: ClassName = ClassName::new_static("elevation-3");
+	pub const ELEVATION_4: ClassName = ClassName::new_static("elevation-4");
+	pub const ELEVATION_5: ClassName = ClassName::new_static("elevation-5");
+	pub const APP_BAR: ClassName = ClassName::new_static("app-bar");
+	pub const APP_BAR_SCROLLED: ClassName = ClassName::new_static("app-bar-scrolled");
+	pub const CONTAINER: ClassName = ClassName::new_static("container");
+	pub const PAGE: ClassName = ClassName::new_static("page");
+	pub const INPUT: ClassName = ClassName::new_static("input");
+	pub const INPUT_OUTLINED: ClassName = ClassName::new_static("input-outlined");
+	pub const INPUT_FILLED: ClassName = ClassName::new_static("input-filled");
+	pub const INPUT_TEXT: ClassName = ClassName::new_static("input-text");
+	pub const SELECT: ClassName = ClassName::new_static("select");
+	pub const SELECT_OUTLINED: ClassName = ClassName::new_static("select-outlined");
+	pub const SELECT_FILLED: ClassName = ClassName::new_static("select-filled");
+	pub const SELECT_TEXT: ClassName = ClassName::new_static("select-text");
+	pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
+	pub const TABLE: ClassName = ClassName::new_static("table");
+	pub const SIDEBAR: ClassName = ClassName::new_static("sidebar");
+	pub const SIDEBAR_LINK: ClassName = ClassName::new_static("sidebar-link");
+	pub const SIDEBAR_LABEL: ClassName = ClassName::new_static("sidebar-label");
+	pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
+	pub const HIDDEN: ClassName = ClassName::new_static("hidden");
+	pub const TEXT_LEFT: ClassName = ClassName::new_static("text-left");
+	pub const TEXT_CENTER: ClassName = ClassName::new_static("text-center");
+	pub const TEXT_RIGHT: ClassName = ClassName::new_static("text-right");
+	pub const TEXT_XS: ClassName = ClassName::new_static("text-xs");
+	pub const TEXT_SM: ClassName = ClassName::new_static("text-sm");
+	pub const TEXT_BASE: ClassName = ClassName::new_static("text-base");
+	pub const TEXT_LG: ClassName = ClassName::new_static("text-lg");
+	pub const TEXT_XL: ClassName = ClassName::new_static("text-xl");
+	pub const TEXT_2XL: ClassName = ClassName::new_static("text-2xl");
+}
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -654,13 +660,13 @@ pub fn hidden() -> Rule {
 		.with_value(common_props::DisplayProp, Display::None)
 }
 
-fn text_align(class: &str, align: TextAlign) -> Rule {
+fn text_align(class: ClassName, align: TextAlign) -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(class))
 		.with_value(common_props::TextAlignProp, align)
 }
 
-fn text_size(class: &str, size: impl Into<Token>) -> Rule {
+fn text_size(class: ClassName, size: impl Into<Token>) -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(class))
 		.with_token(common_props::FontSize, size).unwrap()

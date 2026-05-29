@@ -5,7 +5,8 @@
 //!
 use beet_core::prelude::*;
 
-/// Emits the [`PREFLIGHT_CSS`] reset as a `<style>` element.
+/// Emits the bundled Tailwind Preflight reset (`preflight.css`) as a `<style>`
+/// element.
 #[scene]
 pub fn Preflight() -> impl Scene {
 	let preflight = include_str!("./preflight.css");

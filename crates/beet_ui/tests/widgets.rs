@@ -18,6 +18,7 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::*;
 use beet_ui::prelude::*;
+use beet_ui::style::material::classes;
 
 /// A scene world with a [`PackageConfig`] resource. The document-shell widgets
 /// read this synchronously at scene build via `#[scene(system)]`.
@@ -119,8 +120,8 @@ fn text_field_uses_input_classes() {
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("input");
-		view.contains_class("input").xpect_true();
-		view.contains_class("input-outlined").xpect_true();
+		view.contains_class_name(&classes::INPUT).xpect_true();
+		view.contains_class_name(&classes::INPUT_OUTLINED).xpect_true();
 	});
 }
 
@@ -135,8 +136,8 @@ fn text_field_variant_changes_class() {
 		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
-		view.contains_class("input-filled").xpect_true();
-		view.contains_class("input-outlined").xpect_false();
+		view.contains_class_name(&classes::INPUT_FILLED).xpect_true();
+		view.contains_class_name(&classes::INPUT_OUTLINED).xpect_false();
 	});
 }
 
@@ -156,8 +157,8 @@ fn select_root_is_select() {
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("select");
-		view.contains_class("select").xpect_true();
-		view.contains_class("select-outlined").xpect_true();
+		view.contains_class_name(&classes::SELECT).xpect_true();
+		view.contains_class_name(&classes::SELECT_OUTLINED).xpect_true();
 	});
 }
 
@@ -179,7 +180,7 @@ fn error_text_carries_class() {
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("span");
-		view.contains_class("error-text").xpect_true();
+		view.contains_class_name(&classes::ERROR_TEXT).xpect_true();
 		query
 			.iter_descendant_values(root)
 			.any(|v| v.as_str().ok() == Some("oops"))
@@ -218,7 +219,7 @@ fn sidebar_renders_nav() {
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("nav");
-		view.contains_class("sidebar").xpect_true();
+		view.contains_class_name(&classes::SIDEBAR).xpect_true();
 	});
 }
 
@@ -258,7 +259,7 @@ fn preflight_emits_style() {
 		query
 			.iter_descendant_values(root)
 			.filter_map(|v| v.as_str().ok())
-			.any(|s| s.contains("box-sizing:border-box"))
+			.any(|s| s.contains("box-sizing: border-box"))
 			.xpect_true();
 	});
 }
