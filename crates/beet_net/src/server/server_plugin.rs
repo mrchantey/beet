@@ -5,16 +5,14 @@ use beet_core::prelude::*;
 /// Plugin for running Bevy HTTP servers.
 ///
 /// Sets up the async runtime needed for action-based exchange handling
-/// and the [`launch_cli_servers`] system that drives [`CliServer`] entities.
+/// and registers reflection for the server component types.
 #[derive(Default)]
 pub struct ServerPlugin;
 
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>()
-			.register_type::<CliServer>()
-			.add_systems(Update, launch_cli_servers);
+		app.init_plugin::<AsyncPlugin>().register_type::<CliServer>();
 	}
 }
 

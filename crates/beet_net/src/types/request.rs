@@ -386,10 +386,9 @@ impl Request {
 	///
 	/// A `--body=<value>` argument is lifted out of the query parameters and
 	/// set as the request body with a JSON `content-type`, mirroring an HTTP
-	/// request carrying a payload. Returns a Result for API symmetry, though
-	/// parsing always succeeds.
+	/// request carrying a payload.
 	#[cfg(feature = "std")]
-	pub fn from_cli_args(mut args: CliArgs) -> Result<Self> {
+	pub fn from_cli_args(mut args: CliArgs) -> Self {
 		let body = args.params.remove("body");
 		let request = Self {
 			parts: RequestParts::from(args),
@@ -401,14 +400,12 @@ impl Request {
 				.with_content_type(MediaType::Json),
 			None => request,
 		}
-		.xok()
 	}
 
 	/// Creates a request by parsing a CLI-style string.
 	#[cfg(feature = "std")]
-	pub fn from_cli_str(args: &str) -> Result<Self> {
-		let cli_args = CliArgs::parse(args);
-		Self::from_cli_args(cli_args)
+	pub fn from_cli_str(args: &str) -> Self {
+		Self::from_cli_args(CliArgs::parse(args))
 	}
 
 	/// Converts this request into an http::Request
@@ -453,10 +450,7 @@ impl From<&str> for Request {
 
 #[cfg(feature = "std")]
 impl From<CliArgs> for Request {
-	fn from(args: CliArgs) -> Self {
-		// infallible, see [`Request::from_cli_args`]
-		Self::from_cli_args(args).unwrap()
-	}
+	fn from(args: CliArgs) -> Self { Self::from_cli_args(args) }
 }
 
 /// Types that can be extracted from a [`Request`], consuming its body.
@@ -615,7 +609,7 @@ mod test {
 	fn from_cli_args_body() {
 		// a shell would single-quote the json, preserving its inner quotes
 		let request =
-			Request::from_cli_str(r#"create --body='{"done":false}'"#).unwrap();
+			Request::from_cli_str(r#"create --body='{"done":false}'"#);
 
 		request.path_string().xpect_eq("/create");
 		// the body arg is lifted out of the query params

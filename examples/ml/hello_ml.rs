@@ -44,6 +44,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn choose_when_loaded(
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
+	mut exit: MessageWriter<AppExit>,
 	sentences: Query<&Sentence>,
 	names: Query<&Name>,
 	mut pending: Query<
@@ -66,6 +67,7 @@ fn choose_when_loaded(
 			.unwrap_or_else(|_| format!("{chosen}"));
 		info!("NearestSentence chose: {name}");
 		commands.entity(entity).remove::<Pending>();
+		exit.write(AppExit::Success);
 	}
 	Ok(())
 }

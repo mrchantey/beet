@@ -21,7 +21,7 @@ fn main() {
 	println!("Done");
 }
 
-fn run_webdriver(mut async_commands: AsyncCommands) {
+fn run_webdriver(async_commands: AsyncCommands) {
 	async_commands.run_local(|world| async move {
 		ClientProcess::check_installed(Provider::Chromedriver).await?;
 
@@ -66,7 +66,7 @@ fn run_webdriver(mut async_commands: AsyncCommands) {
 		page.kill().await.expect("session kill failed");
 		process.kill().expect("driver kill failed");
 
-		world.write_message(AppExit::Success);
+		world.write_message(AppExit::Success).await;
 		Ok(())
 	});
 }
