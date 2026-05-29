@@ -11,13 +11,17 @@ mod types;
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
 pub use types::headers;
-// std-only: transports, stores, servers, sockets, and the action integration.
+// `client` is no_std-capable: only `send.rs` (scheme routing, the data: URI
+// path, and the `set_http_client` transport hook) compiles unconditionally —
+// the concrete transports (reqwest/ureq/web-sys/file) stay feature-gated.
+mod client;
+// `store` is no_std-capable at its core (BlobStore, BlobStoreProvider,
+// InMemoryStore); the concrete backends (fs/s3/dynamo/local-storage) and
+// StorePlugin stay feature/std-gated inside the module.
+mod store;
+// std-only: transports, servers, sockets, and the action integration.
 #[cfg(feature = "std")]
 mod actions;
-#[cfg(feature = "std")]
-mod client;
-#[cfg(feature = "std")]
-mod store;
 #[cfg(feature = "std")]
 mod store_actions;
 #[cfg(feature = "std")]
@@ -54,11 +58,9 @@ pub mod prelude {
 
 	#[cfg(feature = "std")]
 	pub use crate::actions::*;
-	#[cfg(feature = "std")]
 	pub use crate::store::*;
 	#[cfg(feature = "std")]
 	pub use crate::store_actions::*;
-	#[cfg(feature = "std")]
 	pub use crate::client::*;
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;

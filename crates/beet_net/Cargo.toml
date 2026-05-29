@@ -37,8 +37,9 @@ std = [
 ]
 json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
-# for conditional compilation in hooks
-client = []
+# for conditional compilation in hooks; pulls reactive store effects that use
+# the std-only spawn_local runtime driver
+client = ["std"]
 server = [
 "std",
 "dep:async-io",

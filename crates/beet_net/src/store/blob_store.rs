@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_core::prelude::bevy_ecs::error::ErrorContext;
+use bevy::platform::sync::Arc;
 use bytes::Bytes;
-use std::sync::Arc;
 
 /// Cross-service storage store for S3, filesystem, memory, or other providers.
 ///
@@ -15,8 +15,8 @@ pub struct BlobStore {
 	provider: Arc<dyn BlobStoreProvider>,
 }
 
-impl std::fmt::Debug for BlobStore {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for BlobStore {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("BlobStore").finish_non_exhaustive()
 	}
 }
@@ -41,6 +41,7 @@ impl BlobStore {
 	/// Create local store with platform-specific provider.
 	/// - wasm: [`LocalStorageStore`]
 	/// - native: [`FsStore`] at `.cache/stores/<name>`
+	#[cfg(feature = "std")]
 	pub fn new_local(name: impl Into<String>) -> BlobStore {
 		let name = name.into();
 		cfg_if! {
@@ -69,13 +70,14 @@ impl BlobStore {
 	/// let store = BlobStore::temp();
 	/// let item = store.item(SmolPath::from("my-file.txt"));
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn item(&self, path: SmolPath) -> StoreItem {
 		StoreItem::new(self.clone(), path)
 	}
 
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &SmolPath) -> Result<MediaBytes> {
-		let media_type = MediaType::from_path(path);
+		let media_type = path.media_type().unwrap_or(MediaType::Bytes);
 		let bytes = self.get(path).await?;
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
@@ -107,7 +109,7 @@ impl BlobStore {
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {
-					name: std::any::type_name_of_val(&BlobStore::on_add::<T>)
+					name: core::any::type_name_of_val(&BlobStore::on_add::<T>)
 						.into(),
 				});
 			}

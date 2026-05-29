@@ -25,37 +25,45 @@
 //! # Ok(())
 //! # }
 //! ```
-#[cfg(feature = "json")]
-mod analytics;
-#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
-mod aws_cli;
+// no_std core: the BlobStore facade, provider trait, in-memory store, and the
+// reactive/handle wrappers. The concrete backends below are std-only.
 mod blob;
 mod blob_store_provider;
 pub use blob_store_provider::*;
 mod blob_store;
-#[cfg(feature = "world_serde")]
-mod world_serde_store;
-#[cfg(feature = "json")]
-mod table;
-#[cfg(feature = "json")]
-pub use analytics::*;
-#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
-pub use aws_cli::*;
-#[cfg(feature = "json")]
-pub use table::*;
-mod store_item;
 mod in_memory_store;
 pub use blob::*;
 pub use blob_store::*;
-pub use store_item::*;
 pub use in_memory_store::*;
-#[cfg(feature = "world_serde")]
+// reactive store handle (signals/effects/spawn_local) — std-only
+#[cfg(feature = "std")]
+mod store_item;
+#[cfg(feature = "std")]
+pub use store_item::*;
+
+#[cfg(all(feature = "json", feature = "std"))]
+mod analytics;
+#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
+mod aws_cli;
+#[cfg(all(feature = "world_serde", feature = "std"))]
+mod world_serde_store;
+#[cfg(all(feature = "json", feature = "std"))]
+mod table;
+#[cfg(all(feature = "json", feature = "std"))]
+pub use analytics::*;
+#[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
+pub use aws_cli::*;
+#[cfg(all(feature = "json", feature = "std"))]
+pub use table::*;
+#[cfg(all(feature = "world_serde", feature = "std"))]
 pub use world_serde_store::*;
+#[cfg(feature = "std")]
 mod fs_store;
 #[cfg(target_arch = "wasm32")]
 mod indexed_db_store;
 #[cfg(target_arch = "wasm32")]
 mod local_storage_store;
+#[cfg(feature = "std")]
 pub use fs_store::*;
 #[cfg(target_arch = "wasm32")]
 pub use indexed_db_store::*;
@@ -74,12 +82,15 @@ pub use dynamo_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod dynamo_store;
 
+#[cfg(feature = "std")]
 use beet_core::prelude::*;
 
 /// Plugin that registers store types for world serialization.
+#[cfg(feature = "std")]
 #[derive(Default)]
 pub struct StorePlugin;
 
+#[cfg(feature = "std")]
 impl Plugin for StorePlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<FsStore>()

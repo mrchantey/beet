@@ -82,7 +82,7 @@ impl Blob {
 	/// Retrieve the blob's content as [`MediaBytes`], inferring the
 	/// [`MediaType`] from the path extension.
 	pub async fn get_media(&self) -> Result<MediaBytes> {
-		let media_type = MediaType::from_path(&self.path);
+		let media_type = self.path.media_type().unwrap_or(MediaType::Bytes);
 		let bytes = self.get().await?;
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
@@ -252,7 +252,7 @@ where
 	/// Retrieve the blob's content as [`MediaBytes`], inferring the
 	/// [`MediaType`] from the path extension.
 	pub async fn get_media(&self) -> Result<MediaBytes> {
-		let media_type = MediaType::from_path(&self.path);
+		let media_type = self.path.media_type().unwrap_or(MediaType::Bytes);
 		let bytes = self.get().await?;
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
 	}
@@ -312,7 +312,7 @@ where
 	}
 }
 
-impl<B> std::fmt::Debug for TypedBlob<B>
+impl<B> core::fmt::Debug for TypedBlob<B>
 where
 	B: 'static
 		+ Send
@@ -320,9 +320,9 @@ where
 		+ Clone
 		+ Reflect
 		+ BlobStoreProvider
-		+ std::fmt::Debug,
+		+ core::fmt::Debug,
 {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("TypedBlob")
 			.field("path", &self.path)
 			.field("store", &self.store)
