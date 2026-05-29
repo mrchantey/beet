@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Mutex;
 
 /// Ensures at most one async operation runs at a time, with one pending retry.
 ///

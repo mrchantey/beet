@@ -45,7 +45,7 @@ pub use store_item::*;
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
-#[cfg(all(feature = "world_serde", feature = "std"))]
+#[cfg(feature = "world_serde")]
 mod world_serde_store;
 #[cfg(all(feature = "json", feature = "std"))]
 mod table;
@@ -55,7 +55,7 @@ pub use analytics::*;
 pub use aws_cli::*;
 #[cfg(all(feature = "json", feature = "std"))]
 pub use table::*;
-#[cfg(all(feature = "world_serde", feature = "std"))]
+#[cfg(feature = "world_serde")]
 pub use world_serde_store::*;
 #[cfg(feature = "std")]
 mod fs_store;

@@ -22,7 +22,6 @@ mod cfg_if;
 mod cli_args;
 mod clone_func;
 /// Coalescing trigger for async write deduplication.
-#[cfg(feature = "std")]
 mod coalescing_trigger;
 pub mod cross_log;
 /// Display formatting utilities.
@@ -73,7 +72,6 @@ pub use bevy::tasks::BoxedFuture;
 #[cfg(feature = "std")]
 pub use cli_args::*;
 pub use clone_func::*;
-#[cfg(feature = "std")]
 pub use coalescing_trigger::*;
 #[cfg(feature = "std")]
 pub use file_span::*;
