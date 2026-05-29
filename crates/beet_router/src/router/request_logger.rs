@@ -20,7 +20,7 @@ pub async fn RequestLogger(
 	debug!(
 		"RequestLogger: {} Response in {}",
 		response.status(),
-		pretty_print_duration(now.elapsed())
+		time_ext::pretty_print_duration(now.elapsed())
 	);
 	if !response.status.is_ok() {
 		// status only if ok

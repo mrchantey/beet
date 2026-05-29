@@ -52,11 +52,8 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
-/// Pure duration formatting (no_std).
-pub mod duration_ext;
-pub use duration_ext::*;
-/// Time and duration utilities.
-#[cfg(feature = "std")]
+/// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
+/// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
 #[cfg(feature = "std")]
 pub use lazy_pool::*;

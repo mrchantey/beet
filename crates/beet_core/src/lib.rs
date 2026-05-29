@@ -56,7 +56,6 @@ pub extern crate alloc as _alloc;
 extern crate test;
 
 pub use utils::async_ext;
-#[cfg(feature = "std")]
 pub use utils::time_ext;
 
 // Re-export cross_log helpers at crate root so `$crate::` in macros resolves them.

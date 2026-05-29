@@ -1,10 +1,41 @@
 //! Time utilities for cross-platform duration handling and async sleep.
+//!
+//! [`pretty_print_duration`] is pure formatting and works on no_std; the clock
+//! and sleep helpers are std-only (per-function gated, not whole-module).
 
 use crate::prelude::*;
-use std::time::Duration;
+use core::time::Duration;
+#[cfg(feature = "std")]
 use std::time::SystemTime;
 
+/// Formats a duration as a human-readable string with appropriate units.
+///
+/// Automatically selects the most appropriate unit (minutes, seconds,
+/// milliseconds, microseconds, or nanoseconds) based on the duration's magnitude.
+pub fn pretty_print_duration(dur: Duration) -> String {
+	let total_secs = dur.as_secs();
+	let minutes = total_secs / 60;
+	let secs = total_secs % 60;
+	let millis = dur.subsec_millis();
+	if minutes > 0 {
+		format!("{}:{:02}.{:03} m", minutes, secs, millis)
+	} else if secs > 0 {
+		format!("{}.{:02} s", secs, millis)
+	} else if millis > 0 {
+		format!("{} ms", millis)
+	} else {
+		let micros = dur.subsec_micros();
+		if micros > 0 {
+			format!("{} µs", micros)
+		} else {
+			let nanos = dur.subsec_nanos();
+			format!("{} ns", nanos)
+		}
+	}
+}
+
 /// Returns the current time as milliseconds since the Unix epoch.
+#[cfg(feature = "std")]
 pub fn now_millis() -> u128 {
 	SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
@@ -13,19 +44,23 @@ pub fn now_millis() -> u128 {
 }
 
 /// Sleeps for the specified number of seconds.
+#[cfg(feature = "std")]
 pub async fn sleep_secs(secs: u64) { sleep(Duration::from_secs(secs)).await; }
 
 /// Sleeps for the specified number of milliseconds.
+#[cfg(feature = "std")]
 pub async fn sleep_millis(millis: u64) {
 	sleep(Duration::from_millis(millis)).await;
 }
 
 /// Sleeps for the specified number of microseconds.
+#[cfg(feature = "std")]
 pub async fn sleep_micros(micros: u64) {
 	sleep(Duration::from_micros(micros)).await;
 }
 
 /// Cross platform sleep function
+#[cfg(feature = "std")]
 #[allow(unused)]
 pub async fn sleep(duration: Duration) {
 	cfg_if! {
@@ -58,7 +93,7 @@ pub async fn sleep(duration: Duration) {
 ///
 /// On native, spawns the function in a thread and uses `recv_timeout`.
 /// On WASM, cannot enforce hard timeouts for sync code, so this is not available.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 pub fn timeout_sync(
 	func: impl 'static + Send + Sync + FnOnce() -> Result<(), String>,
 	timeout: Duration,
@@ -82,7 +117,8 @@ pub fn timeout_sync(
 }
 
 
-#[cfg(test)]
+// every test here exercises std-only sleep/timeout helpers
+#[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
 
