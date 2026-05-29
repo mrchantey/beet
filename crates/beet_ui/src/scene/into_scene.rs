@@ -4,7 +4,6 @@
 //! targeting Bevy's `Scene` instead of `Bundle`. The scene `rsx!` lowering
 //! routes text + block child positions through `.into_scene()` so authors can
 //! write `<p>"Title: " {title} </p>` instead of `template_value(Value::new(_))`.
-use crate::prelude::Classes;
 use beet_core::prelude::*;
 use bevy::prelude::ChildOf;
 use bevy::scene::RelatedScenes;
@@ -17,6 +16,18 @@ use variadics_please::all_tuples;
 pub trait IntoScene<M> {
 	fn into_scene(self) -> impl Scene;
 }
+
+/// Erase any [`Scene`] into a [`Box<dyn Scene>`] via method chain.
+///
+/// Useful where match arms produce differently-shaped trees and `impl Trait`
+/// cannot unify — `rsx!{ <a/> }.any_scene()` reads more naturally than
+/// `Box::new(rsx!{ <a/> }) as Box<dyn Scene>`. [`Box<dyn Scene>`] itself
+/// implements [`Scene`] via `bevy_scene`'s `SceneBox` machinery.
+#[extend::ext(name = SceneExt)]
+pub impl<S: Scene> S {
+	fn any_scene(self) -> Box<dyn Scene> { Box::new(self) }
+}
+
 
 /// Marker for the pass-through impl on existing [`Scene`] values.
 pub struct SceneMarker;
@@ -38,12 +49,18 @@ impl<T: Into<Value>> IntoScene<(NotSceneMarker, SceneIntoValueMarker)> for T {
 	fn into_scene(self) -> impl Scene { template_value(Value::new(self)) }
 }
 
-/// Marker for the [`Classes`] block-attribute lift.
-pub struct SceneClassesMarker;
+/// Marker for the [`Component`] block-attribute lift.
+pub struct SceneComponentMarker;
 
-/// `{Classes::new(["btn"])}` as a block attribute lifts into a
-/// [`template_value`] of the [`Classes`] component.
-impl IntoScene<(NotSceneMarker, SceneClassesMarker)> for Classes {
+/// Any [`Component`] (eg [`Classes`](crate::prelude::Classes),
+/// [`FieldRef`](crate::document::FieldRef))
+/// used as a block attribute lifts into a [`template_value`] patch that
+/// attaches it to the current entity. `Option<C>` composes for free via the
+/// `Option` impl, so widgets can take an optional `field: Option<FieldRef>`.
+impl<C> IntoScene<(NotSceneMarker, SceneComponentMarker)> for C
+where
+	C: 'static + Send + Sync + Unpin + Default + Clone + Component,
+{
 	fn into_scene(self) -> impl Scene { template_value(self) }
 }
 
@@ -116,7 +133,11 @@ mod test {
 		is_scene(vec!["a", "b", "c"]);
 		// tuple
 		is_scene((1_i32, "two"));
-		// classes block-attribute lift
+		// classes block-attribute lift (a Component)
 		is_scene(Classes::new(["btn", "btn-error"]));
+		// arbitrary Component lift, and its optional form
+		is_scene(FieldRef::new("name"));
+		is_scene(Some(FieldRef::new("name")));
+		is_scene(None::<FieldRef>);
 	}
 }

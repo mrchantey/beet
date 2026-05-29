@@ -77,7 +77,7 @@ impl Into<SerdeCurve> for SampleAutoCurve<Vec3> {
 
 fn circle_curve(t: f32) -> Vec3 {
 	let angle = t * TAU;
-	Vec3::new(angle.cos(), angle.sin(), 0.)
+	Vec3::new(ops::cos(angle), ops::sin(angle), 0.)
 }
 
 fn square_curve(t: f32) -> Vec3 {

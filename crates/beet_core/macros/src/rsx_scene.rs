@@ -30,6 +30,31 @@ use syn::spanned::Spanned;
 /// Custom node type, currently unused.
 type CustomNode = rstml::Infallible;
 
+/// `bevy_scene` implements `Scene`/`SceneList` for tuples up to 12 elements.
+/// Larger lists are chunked into nested tuples — a tuple of tuples is itself a
+/// valid `Scene`/`SceneList` (each impl recurses), so this lifts the 12-child
+/// cap while keeping build-time (zero-alloc) spawning.
+const SCENE_TUPLE_MAX: usize = 12;
+
+/// Combine `items` into a (possibly nested) tuple that stays within
+/// [`SCENE_TUPLE_MAX`] elements per level. Works for both `Scene` and
+/// `SceneList` positions since both traits impl tuples 0..=12 recursively.
+fn nested_tuple(items: Vec<TokenStream>) -> TokenStream {
+	if items.len() <= SCENE_TUPLE_MAX {
+		quote! { (#(#items,)*) }
+	} else {
+		let groups: Vec<TokenStream> = items
+			.chunks(SCENE_TUPLE_MAX)
+			.map(|chunk| {
+				let chunk = chunk.to_vec();
+				quote! { (#(#chunk,)*) }
+			})
+			.collect();
+		// the group count may again exceed the cap — recurse
+		nested_tuple(groups)
+	}
+}
+
 /// Entry point for the scene-producing variant.
 pub fn impl_rsx_scene(
 	input: proc_macro::TokenStream,
@@ -196,12 +221,13 @@ fn tokenize_component_scene(
 		})
 		.collect();
 	if !child_scenes.is_empty() {
+		let children = nested_tuple(child_scenes);
 		parts.push(quote! {
-			RelatedScenes::<ChildOf, _>::new((#(#child_scenes,)*))
+			RelatedScenes::<ChildOf, _>::new(#children)
 		});
 	}
 
-	quote! { (#(#parts),*) }
+	nested_tuple(parts)
 }
 
 /// Lower a lowercase HTML element to a scene:
@@ -268,8 +294,9 @@ fn tokenize_html_element_scene(
 		}
 	}
 	if !attr_scenes.is_empty() {
+		let attrs = nested_tuple(attr_scenes);
 		parts.push(quote! {
-			RelatedScenes::<AttributeOf, _>::new((#(#attr_scenes,)*))
+			RelatedScenes::<AttributeOf, _>::new(#attrs)
 		});
 	}
 
@@ -283,10 +310,11 @@ fn tokenize_html_element_scene(
 		})
 		.collect();
 	if !child_scenes.is_empty() {
+		let children = nested_tuple(child_scenes);
 		parts.push(quote! {
-			RelatedScenes::<ChildOf, _>::new((#(#child_scenes,)*))
+			RelatedScenes::<ChildOf, _>::new(#children)
 		});
 	}
 
-	quote! { (#(#parts),*) }
+	nested_tuple(parts)
 }

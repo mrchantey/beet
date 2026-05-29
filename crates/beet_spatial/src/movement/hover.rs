@@ -50,7 +50,7 @@ pub(crate) fn hover(
 ) -> Result {
 	for (action, hover) in actions.iter() {
 		let elapsed = time.elapsed_secs();
-		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
+		let y = ops::sin(TAU * elapsed * hover.speed) * hover.height;
 		agents.get_mut(action)?.translation.y = y;
 	}
 	Ok(())

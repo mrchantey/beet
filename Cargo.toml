@@ -91,7 +91,7 @@ beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
 beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-features = false }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.11" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11", default-features = false }
 beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
@@ -123,7 +123,6 @@ glob = "0.3"
 dotenv = "0.15"
 send_wrapper = { version = "0.6", features = ["futures"] }
 inventory = "0.3"
-web-time = "1"
 itertools = { version = "0.14", default-features = false }
 # default-features off (drops `std`) so dependents can compile on no_std;
 # std consumers re-add `uuid/std`. `js`/`rng-getrandom` backends are opt-in per crate.
@@ -175,7 +174,7 @@ proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.26", default-features = false, features = ["derive"] }
 strum_macros = "0.26"
 extend = "1"
 
@@ -238,7 +237,7 @@ default = ["std", "ui"]
 
 # Standard library support (enabled by default). no_std consumers depend on beet
 # with `default-features = false`.
-std = ["beet_core/std", "beet_action?/std", "beet_net?/std"]
+std = ["beet_core/std", "beet_action?/std", "beet_net?/std", "beet_spatial?/std"]
 # Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
 # critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
 embedded = ["beet_core/embedded"]
@@ -282,7 +281,7 @@ native-tls = [
 "net", "beet_net/native-tls",
 ]
 # beet_net is a hard dependency of beet_router
-router = ["action", "ui", "net", "dep:beet_router"]
+router = ["scene", "action", "net", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -309,6 +308,9 @@ action = ["dep:beet_action","beet_ui?/action"]
 rhai = ["action","beet_action/rhai"]
 scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
 ui = ["dep:beet_ui"]
+# Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
+# Sidebar, Table). Heavy + std-only, so it stays opt-in.
+scene = ["ui", "beet_ui?/scene"]
 style = ["ui", "beet_ui?/style"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]

@@ -12,6 +12,11 @@ css_variable!(
 	TypefaceMono,
 	Typeface
 );
+css_variable!(
+	/// Emoji family, appended to text runs that mix prose and emoji.
+	TypefaceEmoji,
+	Typeface
+);
 
 // ── Weight ref tokens ─────────────────────────────────────────────────────────
 
@@ -97,6 +102,7 @@ pub fn token_map() -> CssTokenMap {
 		.insert(TypefaceBrand)
 		.insert(TypefacePlain)
 		.insert(TypefaceMono)
+		.insert(TypefaceEmoji)
 		.insert(WeightRegular)
 		.insert(WeightMedium)
 		.insert(WeightBold)
@@ -175,6 +181,7 @@ pub fn default_typography() -> Vec<(TokenKey, TokenValue)> {
 		.with_value(TypefacePlain, 	Typeface::new(["Google Sans", "Product Sans", "Inter", "Work Sans", "system-ui", "sans-serif"]))
 		.with_value(TypefaceBrand, 	Typeface::new(["Roboto", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]))
 		.with_value(TypefaceMono, 	Typeface::new(["Roboto Mono", "'Courier New'", "monospace"]))
+		.with_value(TypefaceEmoji, 	Typeface::new(["Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "emoji"]))
 		// ── Weight ref tokens ─────────────────────────────────────────────────
 		.with_value(WeightRegular, 	FontWeight::Absolute(400))
 		.with_value(WeightMedium, 	FontWeight::Absolute(500))

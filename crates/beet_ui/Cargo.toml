@@ -31,6 +31,11 @@ name = "build_css"
 path = "examples/build_css.rs"
 required-features = ["style"]
 
+[[example]]
+name = "showcase"
+path = "examples/showcase.rs"
+required-features = ["scene", "style"]
+
 
 [features]
 default = ["std","rsx", "style"]
@@ -114,5 +119,11 @@ harness = false
 [[test]]
 name = "scene"
 path = "tests/scene.rs"
+harness = false
+required-features = ["scene"]
+
+[[test]]
+name = "widgets"
+path = "tests/widgets.rs"
 harness = false
 required-features = ["scene"]

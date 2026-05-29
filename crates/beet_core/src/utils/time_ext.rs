@@ -1,21 +1,19 @@
 //! Time utilities for cross-platform duration handling and async sleep.
 //!
-//! [`pretty_print_duration`] is pure formatting and works on no_std; the clock
-//! and sleep helpers are std-only (per-function gated, not whole-module).
+//! The wall-clock surface ([`now`]/[`now_millis`]/[`set_now`]) and
+//! [`pretty_print_duration`] are no_std; the sleep/timeout helpers are std-only
+//! (per-function gated, not whole-module).
 
 use crate::prelude::*;
 use bevy::platform::sync::OnceLock;
 use core::time::Duration;
-#[cfg(feature = "std")]
-use std::time::SystemTime;
 
 /// A wall-clock source: the current time as a [`Duration`] since the Unix epoch.
 ///
 /// This is the no_std-friendly clock hook, mirroring `Instant::set_elapsed` (for
-/// the monotonic clock) and `set_http_client` (for transport). On a bare target
-/// there is no `SystemTime`, so [`now`]/[`try_now`] fall back to a function
-/// installed via [`set_now`] — letting a downstream adapter (eg an SNTP client)
-/// supply wall-clock time once it has it.
+/// the monotonic clock) and `set_http_client` (for transport). Installed via
+/// [`set_now`] to override the platform default, eg so a bare target's SNTP
+/// client can supply wall-clock time once it has synced.
 pub type NowFn = fn() -> Duration;
 
 static NOW: OnceLock<NowFn> = OnceLock::new();
@@ -23,10 +21,10 @@ static NOW: OnceLock<NowFn> = OnceLock::new();
 /// Install the wall-clock source used by [`now`] and [`try_now`].
 ///
 /// Call once the source is ready (eg after an SNTP sync). Takes precedence over
-/// the std `SystemTime` fallback, so it can also be used to mock time. Returns
-/// an error if a source has already been installed.
-pub fn set_now(now: NowFn) -> Result<()> {
-	NOW.set(now)
+/// the platform default, so it can also be used to mock time. Returns an error
+/// if a source has already been installed.
+pub fn set_now(getter: NowFn) -> Result {
+	NOW.set(getter)
 		.map_err(|_| bevyhow!("a `now` clock source is already installed"))
 }
 
@@ -35,22 +33,24 @@ pub fn set_now(now: NowFn) -> Result<()> {
 ///
 /// Resolution order:
 /// 1. a source installed via [`set_now`];
-/// 2. on `std`, the system clock (`SystemTime`);
+/// 2. the platform default: `SystemTime` on std native, `Date::now()` on wasm;
 /// 3. otherwise an error — eg a bare target whose SNTP client hasn't synced.
 ///
 /// Prefer this over [`now`] when the clock may still be loading.
 pub fn try_now() -> Result<Duration> {
-	if let Some(now) = NOW.get() {
-		return Ok(now());
+	if let Some(getter) = NOW.get() {
+		return Ok(getter());
 	}
 	cfg_if! {
-		if #[cfg(feature = "std")] {
-			SystemTime::now()
+		if #[cfg(target_arch = "wasm32")] {
+			Ok(Duration::from_millis(js_sys::Date::now() as u64))
+		} else if #[cfg(feature = "std")] {
+			std::time::SystemTime::now()
 				.duration_since(std::time::UNIX_EPOCH)
 				.map_err(|err| bevyhow!("system clock is before the Unix epoch: {err}"))
 		} else {
 			bevybail!(
-				"no wall clock available yet; install one with `set_now` \
+				"no wall clock installed: call `set_now` at boot \
 				 (eg once SNTP has synced)"
 			)
 		}
@@ -94,14 +94,8 @@ pub fn pretty_print_duration(dur: Duration) -> String {
 	}
 }
 
-/// Returns the current time as milliseconds since the Unix epoch.
-#[cfg(feature = "std")]
-pub fn now_millis() -> u128 {
-	SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap()
-		.as_millis()
-}
+/// Milliseconds since the Unix epoch (`now().as_millis()`).
+pub fn now_millis() -> u128 { now().as_millis() }
 
 /// Sleeps for the specified number of seconds.
 #[cfg(feature = "std")]

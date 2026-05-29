@@ -7,50 +7,10 @@
 use crate::style::*;
 use crate::prelude::*;
 use crate::style::material::*;
-
-// ── Class name constants ──────────────────────────────────────────────────────
-
-pub const BTN_FILLED: &str = "btn-filled";
-pub const BTN_OUTLINED: &str = "btn-outlined";
-pub const BTN_TEXT: &str = "btn-text";
-pub const BTN_TONAL: &str = "btn-tonal";
-pub const BTN_ELEVATED: &str = "btn-elevated";
-pub const CARD_FILLED: &str = "card-filled";
-pub const CARD_ELEVATED: &str = "card-elevated";
-pub const CARD_OUTLINED: &str = "card-outlined";
-pub const TEXT_DISPLAY_LARGE: &str = "text-display-large";
-pub const TEXT_DISPLAY_MEDIUM: &str = "text-display-medium";
-pub const TEXT_DISPLAY_SMALL: &str = "text-display-small";
-pub const TEXT_HEADLINE_LARGE: &str = "text-headline-large";
-pub const TEXT_HEADLINE_MEDIUM: &str = "text-headline-medium";
-pub const TEXT_HEADLINE_SMALL: &str = "text-headline-small";
-pub const TEXT_TITLE_LARGE: &str = "text-title-large";
-pub const TEXT_TITLE_MEDIUM: &str = "text-title-medium";
-pub const TEXT_TITLE_SMALL: &str = "text-title-small";
-pub const TEXT_BODY_LARGE: &str = "text-body-large";
-pub const TEXT_BODY_MEDIUM: &str = "text-body-medium";
-pub const TEXT_BODY_SMALL: &str = "text-body-small";
-pub const TEXT_LABEL_LARGE: &str = "text-label-large";
-pub const TEXT_LABEL_MEDIUM: &str = "text-label-medium";
-pub const TEXT_LABEL_SMALL: &str = "text-label-small";
-pub const COLOR_PRIMARY: &str = "color-primary";
-pub const SHAPE_NONE: &str = "shape-none";
-pub const SHAPE_EXTRA_SMALL: &str = "shape-xs";
-pub const SHAPE_SMALL: &str = "shape-sm";
-pub const SHAPE_MEDIUM: &str = "shape-md";
-pub const SHAPE_LARGE: &str = "shape-lg";
-pub const SHAPE_EXTRA_LARGE: &str = "shape-xl";
-pub const SHAPE_FULL: &str = "shape-full";
-pub const ELEVATION_0: &str = "elevation-0";
-pub const ELEVATION_1: &str = "elevation-1";
-pub const ELEVATION_2: &str = "elevation-2";
-pub const ELEVATION_3: &str = "elevation-3";
-pub const ELEVATION_4: &str = "elevation-4";
-pub const ELEVATION_5: &str = "elevation-5";
-pub const APP_BAR: &str = "app-bar";
-pub const APP_BAR_SCROLLED: &str = "app-bar-scrolled";
-pub const CONTAINER: &str = "container";
-pub const PAGE: &str = "page";
+// the class-name vocabulary these rules style lives in `token::classes`, shared
+// with the widgets that emit the same classes.
+use crate::token::classes::*;
+use beet_core::prelude::Duration;
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
@@ -124,6 +84,58 @@ pub fn button_base() -> Rule {
 		.with_selector(Selector::Tag("button".into()))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+}
+
+/// Class-based button baseline, mirroring [`button_base`].
+///
+/// Lets a non-`<button>` element styled as a button (eg an `<a>` [`Link`]) pick
+/// up the same baseline typography and shape via the `.btn` class.
+pub fn button_class() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN))
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+}
+
+/// Secondary filled button - medium emphasis using the secondary color.
+pub fn button_secondary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_SECONDARY))
+		.with_token(common_props::BackgroundColor,colors::Secondary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSecondary).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Tertiary filled button - medium emphasis using the tertiary color.
+pub fn button_tertiary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_TERTIARY))
+		.with_token(common_props::BackgroundColor,colors::Tertiary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnTertiary).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Error button - destructive action using the error color.
+pub fn button_error() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_ERROR))
+		.with_token(common_props::BackgroundColor,colors::Error).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnError).unwrap()
+		.with_token(TypographyProps,typography::LabelLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+}
+
+/// Icon button - circular, container-less button sized for a single glyph.
+pub fn button_icon() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(BTN_ICON))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
 }
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
@@ -413,15 +425,249 @@ pub fn page() -> Rule {
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 }
 
+// ── Form controls ───────────────────────────────────────────────────────────
+
+/// Shared baseline for `.input` text fields and text areas.
+pub fn input_base() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Outlined input - visible border, transparent fill.
+pub fn input_outlined() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_OUTLINED))
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+}
+
+/// Filled input - shaded container, no border.
+pub fn input_filled() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_FILLED))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
+/// Text input - lowest emphasis, underline only (no container).
+pub fn input_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(INPUT_TEXT))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+}
+
+/// Focused input - primary-colored border. Compound selector `.input:focus`.
+pub fn input_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(INPUT),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Shared baseline for `.select` elements.
+pub fn select_base() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Outlined select - visible border, transparent fill.
+pub fn select_outlined() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_OUTLINED))
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+}
+
+/// Filled select - shaded container, no border.
+pub fn select_filled() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_FILLED))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
+/// Text select - lowest emphasis.
+pub fn select_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_TEXT))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+}
+
+/// Focused select - primary-colored border. Compound selector `.select:focus`.
+pub fn select_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(SELECT),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Error message text, ie validation feedback below an input.
+pub fn error_text() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(ERROR_TEXT))
+		.with_token(common_props::ForegroundColor,colors::Error).unwrap()
+		.with_token(TypographyProps,typography::BodySmall).unwrap()
+}
+
+// ── Table ───────────────────────────────────────────────────────────────────
+
+/// Table container - full-width, surface foreground.
+pub fn table() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(TABLE))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+		.with_value(common_props::Width, Length::Percent(100.))
+}
+
+/// Header cells - medium weight, left aligned, padded, bottom border.
+pub fn table_th() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("th"))
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_value(common_props::TextAlignProp, TextAlign::Left)
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+/// Body cells - padded, faint divider border.
+pub fn table_td() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("td"))
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
+}
+
+// ── Disclosure (`<details>`) + sidebar ───────────────────────────────────────
+
+/// Disclosure container - block layout for `<details>`.
+pub fn details() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("details"))
+		.with_value(common_props::DisplayProp, Display::Block)
+}
+
+/// Disclosure header (`<summary>`) - medium weight, surface foreground.
+pub fn summary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("summary"))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+}
+
+/// Sidebar nav container.
+pub fn sidebar() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+}
+
+/// Sidebar link - primary-colored, for navigable leaves and branches.
+pub fn sidebar_link() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_LINK))
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
+/// Sidebar group label - faint, for non-navigable headers.
+pub fn sidebar_label() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_LABEL))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+}
+
+// ── Utility classes ───────────────────────────────────────────────────────────
+
+/// `display: none` - removed from layout.
+pub fn hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(HIDDEN))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// Hides an element when printing (`@media print { display: none }`).
+///
+/// Emitted by `Sidebar`/`Header`/`Footer` so chrome drops out of print output.
+pub fn print_hidden() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(PRINT_HIDDEN))
+		.with_media(MediaQuery::Print)
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// Forces a page break after the element when printing
+/// (`@media print { break-after: page }`).
+pub fn page_break() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(PAGE_BREAK))
+		.with_media(MediaQuery::Print)
+		.with_value(common_props::BreakAfterProp, BreakAfter::Page)
+}
+
+/// Zeroes transition/animation duration when the user prefers reduced motion
+/// (`@media (prefers-reduced-motion: reduce) { * { …-duration: 0ms } }`).
+pub fn reduced_motion() -> Rule {
+	Rule::new()
+		.with_selector(Selector::Any)
+		.with_media(MediaQuery::ReducedMotion)
+		.with_value(common_props::TransitionDurationProp, Duration::ZERO)
+		.with_value(common_props::AnimationDurationProp, Duration::ZERO)
+}
+
+fn text_align(class: ClassName, align: TextAlign) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(class))
+		.with_value(common_props::TextAlignProp, align)
+}
+
+fn text_size(class: ClassName, size: impl Into<Token>) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(class))
+		.with_token(common_props::FontSize, size).unwrap()
+}
+
+// ── Accessibility ─────────────────────────────────────────────────────────────
+
+/// Focus ring - primary-colored border on any focused element (`:focus`).
+pub fn focus_ring() -> Rule {
+	Rule::new()
+		.with_selector(Selector::state(ElementState::Focused))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Disabled elements - faint foreground (`:disabled`).
+pub fn disabled_state() -> Rule {
+	Rule::new()
+		.with_selector(Selector::state(ElementState::Disabled))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+}
+
 /// Returns all Material Design component rules.
 pub fn all_rules() -> Vec<Rule> {
 	vec![
 		button_base(),
+		button_class(),
 		button_filled(),
 		button_outlined(),
 		button_text(),
 		button_tonal(),
 		button_elevated(),
+		button_secondary(),
+		button_tertiary(),
+		button_error(),
+		button_icon(),
 		card_filled(),
 		card_elevated(),
 		card_outlined(),
@@ -458,5 +704,162 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar_scrolled(),
 		container(),
 		page(),
+		// form controls — state/compound rules first so they win the cascade
+		input_focus(),
+		select_focus(),
+		input_base(),
+		input_outlined(),
+		input_filled(),
+		input_text(),
+		select_base(),
+		select_outlined(),
+		select_filled(),
+		select_text(),
+		error_text(),
+		// table
+		table(),
+		table_th(),
+		table_td(),
+		// disclosure + sidebar
+		details(),
+		summary(),
+		sidebar(),
+		sidebar_link(),
+		sidebar_label(),
+		// utilities
+		hidden(),
+		text_align(TEXT_LEFT, TextAlign::Left),
+		text_align(TEXT_CENTER, TextAlign::Center),
+		text_align(TEXT_RIGHT, TextAlign::Right),
+		text_size(TEXT_XS, typography::FontSizeLabelSmall),
+		text_size(TEXT_SM, typography::FontSizeBodySmall),
+		text_size(TEXT_BASE, typography::FontSizeBodyLarge),
+		text_size(TEXT_LG, typography::FontSizeTitleLarge),
+		text_size(TEXT_XL, typography::FontSizeHeadlineSmall),
+		text_size(TEXT_2XL, typography::FontSizeHeadlineMedium),
+		// print utilities — gated behind `@media print`
+		print_hidden(),
+		page_break(),
+		// reduced motion — gated behind `@media (prefers-reduced-motion)`
+		reduced_motion(),
+		// accessibility — global state rules
+		focus_ring(),
+		disabled_state(),
 	]
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use beet_core::prelude::*;
+	use crate::style::material::default_token_map;
+
+	/// CSS map covering both the material tokens and the common props the new
+	/// component rules reference.
+	fn css_map() -> CssTokenMap {
+		default_token_map().with_extend(common_props::token_map())
+	}
+
+	#[beet_core::test]
+	fn component_rules_css() {
+		let rule_set = RuleSet::new(Rule::new()).with_rules(vec![
+			error_text(),
+			input_base(),
+			input_outlined(),
+			input_focus(),
+			table_th(),
+			details(),
+			summary(),
+			hidden(),
+			text_align(TEXT_CENTER, TextAlign::Center),
+		]);
+		CssBuilder::default()
+			.with_minify(false)
+			.with_format_variables(FormatVariables::short())
+			.build(&css_map(), &rule_set)
+			.unwrap()
+			.xpect_snapshot();
+	}
+
+	#[beet_core::test]
+	fn all_rules_emit_selectors() {
+		let css = CssBuilder::default()
+			.with_format_variables(FormatVariables::short())
+			.build(&css_map(), &RuleSet::new(Rule::new()).with_rules(all_rules()))
+			.unwrap();
+		// compound `.input:focus` exercises Selector::AllOf serialization
+		css.as_str()
+			.xpect_contains(".input:focus")
+			.xpect_contains(".btn")
+			.xpect_contains(".btn-error")
+			.xpect_contains(".error-text")
+			.xpect_contains("details")
+			.xpect_contains(".hidden")
+			.xpect_contains(".text-center")
+			.xpect_contains(":disabled")
+			// print utilities serialize wrapped in an `@media print` at-rule
+			.xpect_contains("@media print")
+			.xpect_contains(".print-hidden")
+			.xpect_contains("break-after")
+			// reduced-motion serializes wrapped in its own `@media` at-rule
+			.xpect_contains("@media (prefers-reduced-motion: reduce)")
+			.xpect_contains("transition-duration");
+	}
+
+	/// A media-gated rule serializes wrapped in its `@media` at-rule, with the
+	/// selector + declaration nested inside the block.
+	#[beet_core::test]
+	fn print_rule_wraps_in_media_block() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![print_hidden()]),
+			)
+			.unwrap();
+		// `@media print{ .print-hidden { display: none; } }`
+		css.as_str()
+			.xpect_contains("@media print{")
+			.xpect_contains(".print-hidden")
+			.xpect_contains("display: none;");
+		// the at-rule wraps the selector (appears before it in the output)
+		(css.find("@media print").unwrap() < css.find(".print-hidden").unwrap())
+			.xpect_true();
+	}
+
+	/// The reduced-motion rule serializes wrapped in its `@media` at-rule and
+	/// zeroes both transition and animation duration.
+	#[beet_core::test]
+	fn reduced_motion_wraps_in_media_block() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![reduced_motion()]),
+			)
+			.unwrap();
+		css.as_str()
+			.xpect_contains("@media (prefers-reduced-motion: reduce){")
+			.xpect_contains("transition-duration: 0ms;")
+			.xpect_contains("animation-duration: 0ms;");
+	}
+
+	/// Charcell path: a `.error-text` span resolves its foreground through the
+	/// cascade to the same color as the `Error` token (light `:root` fallback).
+	#[beet_core::test]
+	fn error_text_resolves_to_error_color() {
+		let mut world = MaterialStylePlugin::world();
+		let entity = world
+			.spawn(rsx_direct! { <span {Classes::new([ERROR_TEXT])}/> })
+			.id();
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let foreground =
+				query.resolve(entity, common_props::ForegroundColor).unwrap();
+			let error = query.resolve(entity, colors::Error).unwrap();
+			foreground.xpect_eq(error);
+		});
+	}
 }

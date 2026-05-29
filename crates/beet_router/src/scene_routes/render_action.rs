@@ -144,8 +144,11 @@ where
 /// # impl AppInfo {
 /// #     fn scene(_: ()) -> impl beet_ui::prelude::Scene { () }
 /// # }
-/// // closure form (annotate the request type the handler ignores)
-/// render_action::scene_route("app-info", |_: ActionContext<Request>| AppInfo::scene(()));
+/// // closure form (annotate the input so `scene_route` can pick a `FromRequest`)
+/// render_action::scene_route(
+///     "app-info",
+///     |_: ActionContext<Request>| AppInfo::scene(()),
+/// );
 /// // shorthand
 /// render_action::scene_func_route("app-info", AppInfo::scene);
 /// ```

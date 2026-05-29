@@ -429,7 +429,7 @@ use core::iter;
 pub struct BackoffIter {
 	inner: Backoff,
 	#[cfg(feature = "rand")]
-	rng: rand::rngs::StdRng,
+	rng: rand_chacha::ChaCha8Rng,
 	attempts: u32,
 }
 
@@ -440,15 +440,8 @@ impl BackoffIter {
 			#[cfg(feature = "rand")]
 			rng: {
 				use rand::SeedableRng;
-				cfg_if! {
-					if #[cfg(feature = "std")] {
-						// std: seed from the thread-local entropy generator.
-						rand::rngs::StdRng::from_rng(&mut rand::rng())
-					} else {
-						// no_std: seed from the platform entropy source (getrandom).
-						rand::rngs::StdRng::from_os_rng()
-					}
-				}
+				// no_std-capable seed via getrandom (see `RandomSource`)
+				rand_chacha::ChaCha8Rng::from_os_rng()
 			},
 			inner,
 		}
@@ -715,7 +708,7 @@ mod tests {
 			backoff.set_jitter(0.0);
 		}
 
-		let start = web_time::Instant::now();
+		let start = Instant::now();
 		let result = backoff
 			.retry_async({
 				let counter = counter.clone();
@@ -782,7 +775,7 @@ mod tests {
 		}
 
 		let mut stream = backoff.stream();
-		let start = web_time::Instant::now();
+		let start = Instant::now();
 		let mut items = Vec::new();
 
 		while let Some(frame) = stream.next().await {

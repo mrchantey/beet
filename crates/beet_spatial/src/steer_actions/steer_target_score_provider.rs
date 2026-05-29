@@ -58,7 +58,7 @@ fn score_steer_target(
 	match target.get_position(&transforms) {
 		Ok(target) => {
 			let dist = transform.translation().distance_squared(target);
-			if dist >= min_radius.powi(2) && dist <= max_radius.powi(2) {
+			if dist >= min_radius.squared() && dist <= max_radius.squared() {
 				Score::PASS
 			} else {
 				Score::FAIL

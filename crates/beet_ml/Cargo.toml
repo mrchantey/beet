@@ -26,7 +26,7 @@ cuda = ["burn/cuda"]
 beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_core = { workspace = true, features = ["std", "rand", "fs"] }
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls"] }
-beet_spatial = { workspace = true, optional = true }
+beet_spatial = { workspace = true, optional = true, features = ["std"] }
 
 bevy = { workspace = true, features = ["bevy_asset"] }
 

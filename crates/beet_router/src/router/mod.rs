@@ -18,6 +18,8 @@ mod request_logger;
 pub use request_logger::*;
 mod interrupt;
 pub use interrupt::*;
+mod article_meta;
+pub use article_meta::*;
 mod middleware;
 pub use middleware::*;
 mod route_tree;

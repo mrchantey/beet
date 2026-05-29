@@ -18,6 +18,8 @@ pub mod scene;
 pub mod style;
 mod token;
 mod types;
+#[cfg(feature = "scene")]
+mod widgets;
 
 /// Exports the most commonly used items.
 pub mod prelude {
@@ -39,6 +41,8 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::StylePlugin;
 	#[cfg(feature = "style")]
+	pub use crate::style::ColorScheme;
+	#[cfg(feature = "style")]
 	pub use crate::style::DecorationLine;
 	#[cfg(feature = "style")]
 	pub use crate::style::DecorationStyle;
@@ -56,6 +60,8 @@ pub mod prelude {
 	pub use crate::token::*;
 
 	pub use crate::types::*;
+	#[cfg(feature = "scene")]
+	pub use crate::widgets::*;
 
 	// re-exported so the `token!` macro can resolve `$crate::prelude::FieldSchema`
 	pub use beet_core::prelude::FieldSchema;

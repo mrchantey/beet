@@ -66,6 +66,9 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 					)?,
+					// removed from layout: skip the subtree so children get no
+					// rects and are not drawn
+					Display::None => {}
 				}
 			}
 		}

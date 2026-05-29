@@ -12,6 +12,8 @@ pub enum Display {
 	Inline,
 	/// Flexbox layout.
 	Flex,
+	/// Removed from layout entirely (hidden), mapping to CSS `display: none`.
+	None,
 }
 
 impl AsCssValue for Display {
@@ -20,6 +22,32 @@ impl AsCssValue for Display {
 			Self::Block => "block",
 			Self::Inline => "inline",
 			Self::Flex => "flex",
+			Self::None => "none",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// Fragmentation break forced after a box, mapping to CSS `break-after`.
+///
+/// Only meaningful for paginated media (print); the `@media print` rule that
+/// uses it is ignored by the non-web cascade.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum BreakAfter {
+	/// No forced break.
+	#[default]
+	Auto,
+	/// Always force a page break after the box.
+	Page,
+}
+
+impl AsCssValue for BreakAfter {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Auto => "auto",
+			Self::Page => "page",
 		}
 		.xmap(CssValue::expression)
 		.xok()

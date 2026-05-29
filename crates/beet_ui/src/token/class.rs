@@ -18,6 +18,12 @@ pub enum ClassName {
 }
 
 impl ClassName {
+	/// A `const`-constructible class name from a static string, for declaring
+	/// the shared class-name vocabulary as constants.
+	pub const fn new_static(name: &'static str) -> Self {
+		Self::String(SmolStr::new_static(name))
+	}
+
 	pub fn string(name: impl Into<SmolStr>) -> Self {
 		Self::String(name.into())
 	}
@@ -33,7 +39,8 @@ impl ClassName {
 		}
 	}
 
-	/// The string used when matching against [`Selector::Class`].
+	/// The string used when matching against [`Selector::Class`],
+	/// the class name does not have a `.` prefix.
 	pub fn as_selector(&self) -> SmolStr {
 		match self {
 			Self::String(s) => s.clone(),
@@ -50,6 +57,13 @@ impl core::fmt::Display for ClassName {
 	}
 }
 
+/// Anything that converts into a [`SmolStr`] (`&str`, `String`, `SmolStr`, …)
+/// is a class name. [`ClassName`] itself converts via the reflexive blanket, so
+/// both flow through `impl Into<ClassName>` APIs like [`Classes::new`].
+impl<S: Into<SmolStr>> From<S> for ClassName {
+	fn from(value: S) -> Self { Self::String(value.into()) }
+}
+
 
 /// Classes assigned to an element entity, checked alongside the `class`
 /// attribute by [`ElementView::contains_class`].
@@ -57,8 +71,8 @@ impl core::fmt::Display for ClassName {
 pub struct Classes(HashSet<ClassName>);
 
 impl Classes {
-	pub fn new(classes: impl IntoIterator<Item: Into<SmolStr>>) -> Self {
-		Self(classes.into_iter().map(|c| ClassName::string(c)).collect())
+	pub fn new(classes: impl IntoIterator<Item: Into<ClassName>>) -> Self {
+		Self(classes.into_iter().map(Into::into).collect())
 	}
 
 	pub fn insert_class(&mut self, class: ClassName) -> &mut Self {
@@ -69,6 +83,13 @@ impl Classes {
 	/// `true` if any contained class matches the given selector string.
 	pub fn contains_selector(&self, class: &str) -> bool {
 		self.0.iter().any(|c| c.as_selector() == class)
+	}
+
+	/// `true` if this set contains the given [`ClassName`]. Prefer this over
+	/// [`Self::contains_selector`] when asserting against the shared class-name
+	/// constants, keeping widget output and style rules in lockstep.
+	pub fn contains_name(&self, class: &ClassName) -> bool {
+		self.0.contains(class)
 	}
 }
 
@@ -85,6 +106,7 @@ pub trait IntoDeclaration {
 	fn into_declaration(self) -> (TokenKey, TokenValue);
 }
 
+#[cfg(feature = "serde")]
 impl<T, V> IntoDeclaration for (T, V)
 where
 	T: TypedToken + Into<Token>,

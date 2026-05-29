@@ -169,6 +169,11 @@ impl NodeVisitor for HtmlRenderer {
 		self.buffer.push_str(view.tag());
 
 		for attr in &view.attributes {
+			// the `class` attribute is merged with the `Classes` component and
+			// emitted once below, so skip the raw attribute here
+			if attr.attribute.as_str() == "class" {
+				continue;
+			}
 			self.buffer.push(' ');
 			self.buffer.push_str(attr.attribute.as_str());
 			match attr.value {
@@ -186,6 +191,23 @@ impl NodeVisitor for HtmlRenderer {
 					self.buffer.push('"');
 				}
 			}
+		}
+
+		// merge the `Classes` component with any `class` attribute into a single
+		// deterministic `class="…"`, so widget-emitted semantic classes reach the
+		// rendered HTML (and the stylesheet that targets them)
+		let mut classes: Vec<SmolStr> = view.iter_classes().collect();
+		if !classes.is_empty() {
+			classes.sort();
+			classes.dedup();
+			let joined = classes.join(" ");
+			self.buffer.push_str(" class=\"");
+			if self.escape_html {
+				self.buffer.push_str(&escape_html_attribute(&joined));
+			} else {
+				self.buffer.push_str(&joined);
+			}
+			self.buffer.push('"');
 		}
 
 		let is_void = self.is_void_element(view.tag());
@@ -410,6 +432,21 @@ mod test {
 			.render(&mut RenderContext::new(entity, &mut world))
 			.unwrap()
 			.to_string()
+	}
+
+	#[beet_core::test]
+	fn renders_classes_component_as_class_attribute() {
+		// the `Classes` component (no `class` attribute) reaches the HTML output,
+		// sorted and merged so the stylesheet's selectors match
+		let mut world = World::new();
+		let root = world
+			.spawn((Element::new("button"), Classes::new(["btn-error", "btn"])))
+			.id();
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("class=\"btn btn-error\"");
 	}
 
 	#[beet_core::test]

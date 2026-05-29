@@ -102,6 +102,15 @@ pub mod prelude {
 			pub use crate::ui::prelude::Pointer;
 		}
 	}
+	cfg_if! {
+		// widgets live behind beet_ui's `scene` feature
+		if #[cfg(feature = "scene")]{
+			pub use crate::ui::prelude::Header;
+			pub use crate::ui::prelude::Button;
+			pub use crate::ui::prelude::SidebarNode;
+			pub use crate::ui::prelude::Table;
+		}
+	}
 }
 
 pub mod exports {

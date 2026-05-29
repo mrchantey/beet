@@ -98,7 +98,7 @@ impl CssBuilder {
 
 		declarations.sort();
 
-		if self.minify {
+		let rule = if self.minify {
 			format!("{} {{ {} }}", selector, declarations.join(" "))
 		} else {
 			format!(
@@ -110,6 +110,22 @@ impl CssBuilder {
 					.collect::<Vec<_>>()
 					.join("\n")
 			)
+		};
+
+		// gate behind an `@media (…)` at-rule when the rule carries a media query
+		match css_rule.media() {
+			None => rule,
+			Some(media) if self.minify => {
+				format!("@media {}{{{}}}", media.as_css(), rule)
+			}
+			Some(media) => {
+				let indented = rule
+					.lines()
+					.map(|line| format!("  {line}"))
+					.collect::<Vec<_>>()
+					.join("\n");
+				format!("@media {} {{\n{}\n}}", media.as_css(), indented)
+			}
 		}
 		.xok()
 	}

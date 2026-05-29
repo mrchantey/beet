@@ -9,7 +9,15 @@ impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<TokenPlugin>()
 			.init_plugin::<ParsePlugin>()
-			.init_resource::<CssTokenMap>();
+			.init_resource::<CssTokenMap>()
+			.register_type::<ColorScheme>();
+
+		// mirror the typed scheme handle onto classes before the cascade runs,
+		// so a runtime scheme switch re-themes on non-web targets.
+		app.add_systems(
+			PostParseTree,
+			sync_color_scheme.before(ResolveStylesSet),
+		);
 
 		// terminal/char-cell defaults for prose elements (em → italic,
 		// h1 → bold colour, …), expressed as ordinary tag rules.

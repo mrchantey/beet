@@ -19,6 +19,10 @@ pub struct ElementQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	attributes: Query<'w, 's, (Entity, &'static Attribute, &'static Value)>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
+	/// Used by descendant traversal — picks up `Children` regardless of whether
+	/// the entity is an [`Element`] (value/text entities can carry children
+	/// too in principle, and we want the same walker to work for both).
+	all_children: Query<'w, 's, &'static Children>,
 }
 
 impl ElementQuery<'_, '_> {
@@ -101,6 +105,52 @@ impl ElementQuery<'_, '_> {
 	{
 		let element = self.get(entity)?;
 		element.try_as::<T>().map_err(|e| e.into())
+	}
+
+	/// Pre-order walk over `root` and every entity reachable via [`Children`],
+	/// yielding an [`ElementView`] for each entity that is itself an
+	/// [`Element`]. Non-element entities (eg. text [`Value`]s) are skipped, but
+	/// their children are still traversed.
+	pub fn iter_descendants_inclusive(
+		&self,
+		root: Entity,
+	) -> impl Iterator<Item = ElementView<'_>> {
+		let mut stack = vec![root];
+		let mut out = Vec::new();
+		while let Some(entity) = stack.pop() {
+			if let Ok(view) = self.get(entity) {
+				out.push(view);
+			}
+			if let Ok(children) = self.all_children.get(entity) {
+				// reverse so we yield children left-to-right
+				for child in children.iter().rev() {
+					stack.push(child);
+				}
+			}
+		}
+		out.into_iter()
+	}
+
+	/// Every [`Value`] reachable from `root` via the [`Children`] tree,
+	/// excluding values stored on element entities themselves (attributes live
+	/// under [`AttributeOf`], not [`ChildOf`], so they aren't visited).
+	pub fn iter_descendant_values(
+		&self,
+		root: Entity,
+	) -> impl Iterator<Item = &Value> {
+		let mut stack = vec![root];
+		let mut out = Vec::new();
+		while let Some(entity) = stack.pop() {
+			if let Ok(value) = self.values.get(entity) {
+				out.push(value);
+			}
+			if let Ok(children) = self.all_children.get(entity) {
+				for child in children.iter().rev() {
+					stack.push(child);
+				}
+			}
+		}
+		out.into_iter()
 	}
 }
 

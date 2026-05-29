@@ -76,6 +76,14 @@ impl<'a> ElementView<'a> {
 		self.iter_classes().any(|c| c == class)
 	}
 
+	/// `true` if any visible class matches the given [`ClassName`]. Prefer this
+	/// over [`Self::contains_class`] when asserting against the shared
+	/// class-name constants.
+	pub fn contains_class_name(&self, class: &ClassName) -> bool {
+		let selector = class.as_selector();
+		self.iter_classes().any(|c| c == selector)
+	}
+
 	/// Iterate every class name visible to selector matching, combining
 	/// whitespace-separated values from the `class` attribute with names
 	/// stored in the [`Classes`] component.

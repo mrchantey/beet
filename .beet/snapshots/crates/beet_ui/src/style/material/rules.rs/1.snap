@@ -1,0 +1,60 @@
+
+:root {
+
+}
+
+.error-text {
+  color: var(--material-colors-error);
+  font-family: var(--material-typography-body-small-family);
+  font-size: var(--material-typography-body-small-size);
+  font-weight: var(--material-typography-body-small-weight);
+  letter-spacing: var(--material-typography-body-small-ls);
+  line-height: var(--material-typography-body-small-lh);
+}
+
+.input {
+  border-bottom-left-radius: var(--material-geometry-shape-extra-small-bl);
+  border-bottom-right-radius: var(--material-geometry-shape-extra-small-br);
+  border-top-left-radius: var(--material-geometry-shape-extra-small-tl);
+  border-top-right-radius: var(--material-geometry-shape-extra-small-tr);
+  color: var(--material-colors-on-surface);
+  font-family: var(--material-typography-body-large-family);
+  font-size: var(--material-typography-body-large-size);
+  font-weight: var(--material-typography-body-large-weight);
+  letter-spacing: var(--material-typography-body-large-ls);
+  line-height: var(--material-typography-body-large-lh);
+  padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+}
+
+.input-outlined {
+  border-color: var(--material-colors-outline);
+  border-width: var(--material-geometry-outline-width-thin);
+}
+
+.input:focus {
+  border-color: var(--material-colors-primary);
+}
+
+th {
+  border-color: var(--material-colors-outline);
+  font-weight: var(--material-typography-weight-medium);
+  padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+  text-align: left;
+}
+
+details {
+  display: block;
+}
+
+summary {
+  color: var(--material-colors-on-surface);
+  font-weight: var(--material-typography-weight-medium);
+}
+
+.hidden {
+  display: none;
+}
+
+.text-center {
+  text-align: center;
+}
