@@ -12,7 +12,6 @@ use super::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
-use tracing::error;
 
 /// Result type alias using [`HttpError`].
 pub type HttpResult<T> = Result<T, HttpError>;

@@ -218,7 +218,19 @@ pub mod prelude {
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;
 	pub use bevy_ecs::entity_disabling::Disabled;
+	// tracing's log macros are no_std, unlike bevy_log which is std-gated, so
+	// re-export them directly to give downstream crates a cross-platform surface.
 	pub use tracing::Level;
+	pub use tracing::debug;
+	pub use tracing::debug_span;
+	pub use tracing::error;
+	pub use tracing::error_span;
+	pub use tracing::info;
+	pub use tracing::info_span;
+	pub use tracing::trace;
+	pub use tracing::trace_span;
+	pub use tracing::warn;
+	pub use tracing::warn_span;
 
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::js_runtime;

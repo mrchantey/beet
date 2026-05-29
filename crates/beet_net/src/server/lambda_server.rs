@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use lambda_http::tower::service_fn;
-use lambda_http::tracing;
 
 
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
@@ -18,7 +17,7 @@ pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
 	// required to enable CloudWatch error logging by the runtime
 	// tracing::init_default_subscriber(); //we use PrettyTracing instead
 
-	tracing::info!("🌱 listening for lambda requests");
+	info!("🌱 listening for lambda requests");
 
 	// lambda_http uses Tokio internally, so we need a Tokio runtime context.
 	// The enter guard sets the Tokio reactor for I/O operations while
@@ -31,7 +30,7 @@ pub async fn start_lambda_server(entity: AsyncEntity) -> Result {
 	}))
 	.await
 	.map_err(|err| {
-		tracing::error!("Error running lambda: {:?}", err);
+		error!("Error running lambda: {:?}", err);
 		bevyhow!("{}", err)
 	})
 }

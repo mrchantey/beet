@@ -64,7 +64,7 @@ fn choose_when_loaded(
 			.get(chosen)
 			.map(|n| n.to_string())
 			.unwrap_or_else(|_| format!("{chosen}"));
-		bevy::log::info!("NearestSentence chose: {name}");
+		info!("NearestSentence chose: {name}");
 		commands.entity(entity).remove::<Pending>();
 	}
 	Ok(())

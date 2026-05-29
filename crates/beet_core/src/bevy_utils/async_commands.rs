@@ -324,7 +324,7 @@ pub impl AsyncWorld {
 			match fut.await {
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
-					tracing::warn!(
+					warn!(
 						"AsyncWorld::with: world dropped before bridge completed (at {location}); task will not resume"
 					);
 					core::future::pending().await
@@ -363,7 +363,7 @@ pub impl AsyncWorld {
 			match state.bridge(BeetAsyncSyncPoint, func).await {
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
-					tracing::warn!(
+					warn!(
 						"AsyncWorld::with_state: world dropped before bridge completed (at {location}); task will not resume"
 					);
 					core::future::pending().await

@@ -133,7 +133,7 @@ impl<T: serde::de::DeserializeOwned> FromRequest<Self> for Json<T> {
 	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
 		Box::pin(async move {
 			let body = req.body.into_bytes().await.map_err(|err| {
-				tracing::error!("Failed to read request body: {}", err);
+				error!("Failed to read request body: {}", err);
 				HttpError::bad_request("Failed to read stream")
 			})?;
 			let json = serde_json::from_slice(&body).map_err(|err| {

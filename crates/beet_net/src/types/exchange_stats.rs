@@ -44,7 +44,7 @@ pub fn exchange_stats(
 		stats.push(format!("index:\t{}", server.request_count()));
 	}
 
-	bevy::log::info!("Request Complete:\n{}", stats.join("\n"));
+	info!("Request Complete:\n{}", stats.join("\n"));
 	Ok(())
 }
 
