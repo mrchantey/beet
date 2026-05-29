@@ -253,10 +253,11 @@ pub mod prelude {
 	pub use futures_lite::StreamExt;
 	pub use smol_str::SmolStr;
 	pub use core::time::Duration;
-	// web_time provides Instant/SystemTime by wrapping std (or JS on wasm);
-	// neither has a core-only equivalent, so they are std-gated.
-	#[cfg(feature = "std")]
-	pub use web_time::Instant;
+	// `Instant` is no_std-capable: on std/wasm it wraps std/web_time, and on a
+	// bare no_std target it reads from a clock source the embedded adapter
+	// installs via `Instant::set_elapsed(...)` (see agent/plans/no_std_instant.md).
+	pub use bevy::platform::time::Instant;
+	// `SystemTime` (wall-clock) has no no_std equivalent — stays std-only.
 	#[cfg(feature = "std")]
 	pub use web_time::SystemTime;
 

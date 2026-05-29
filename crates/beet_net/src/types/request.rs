@@ -81,9 +81,7 @@ pub struct RequestMeta {
 	/// The request metadata, including method, path, headers, etc.
 	parts: RequestParts,
 	/// Note this is taken the moment the request is inserted. It does not account
-	/// for the approx 70us overhead created by using bevy at all. Only available
-	/// on std, where a wall clock ([`Instant`]) exists.
-	#[cfg(feature = "std")]
+	/// for the approx 70us overhead created by using bevy at all.
 	started: Instant,
 }
 
@@ -92,7 +90,6 @@ impl RequestMeta {
 	pub fn new(parts: RequestParts) -> Self {
 		Self {
 			parts,
-			#[cfg(feature = "std")]
 			started: Instant::now(),
 		}
 	}
