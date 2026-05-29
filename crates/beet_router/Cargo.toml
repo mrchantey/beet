@@ -39,7 +39,7 @@ codegen = [
 [dependencies]
 beet_core = { workspace = true, features = ["std"] }
 beet_ui = { workspace = true, features = ["action", "scene"] }
-beet_action.workspace = true
+beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_net.workspace = true
 bevy.workspace = true
 extend.workspace = true

@@ -1,7 +1,4 @@
 use crate::prelude::*;
-use beet_core::exports::async_channel;
-use beet_core::exports::async_channel::Receiver;
-use beet_core::exports::async_channel::TryRecvError;
 use beet_core::prelude::*;
 
 /// Dispatches an action call through a cached system, then flushes the world.
@@ -40,8 +37,8 @@ fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
 			}
 			bevybail!(
 				"No Action<{}, {}> on entity {caller:?}",
-				std::any::type_name::<Input>(),
-				std::any::type_name::<Out>()
+				core::any::type_name::<Input>(),
+				core::any::type_name::<Out>()
 			);
 		}
 	};
@@ -55,45 +52,36 @@ fn call_action_system<Input: Send + Sync, Out: Send + Sync>(
 	Ok(())
 }
 
-/// Wires a channel-based [`OutHandler`] and calls [`call_world`].
+/// Wires a [`oneshot`]-backed [`OutHandler`] and calls [`call_world`].
 ///
-/// Returns the receiving end of the channel so the caller can await the result.
-/// The channel carries `Result<Out>` so that async action errors propagate
-/// back to the caller instead of silently closing the channel.
+/// Returns the receiving half so the caller can await the result. The value
+/// carries `Result<Out>` so async action errors propagate back to the caller
+/// instead of silently dropping the handler.
 #[track_caller]
-fn call_with_channel<Input, Out>(
+fn call_with_oneshot<Input, Out>(
 	entity: &mut EntityWorldMut,
 	input: Input,
-) -> Result<Receiver<Result<Out>>>
+) -> Result<OnceValueRx<Result<Out>>>
 where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
+	let (send, recv) = oneshot::<Result<Out>>();
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
-		send.try_send(result).map_err(|err| {
-			bevyhow!("Failed to send action output through channel: {err:?}")
-		})
+		send.signal(result);
+		Ok(())
 	});
 	call_world(entity, input, out_handler)?;
 	Ok(recv)
 }
 
-/// Unwraps a `Result<Out>` received from an action-call channel,
-/// providing a clear error when the channel closes unexpectedly.
-fn unwrap_channel_result<Out>(
-	result: std::result::Result<Result<Out>, async_channel::RecvError>,
-) -> Result<Out> {
-	match result {
-		Ok(inner) => inner,
-		Err(_) => {
-			bevybail!("Action call response channel closed unexpectedly.")
-		}
-	}
-}
-
-/// Drives an action call to completion from an [`EntityWorldMut`] context,
-/// polling the world as needed while waiting for the result.
+/// Drives an action call to completion from an owned [`EntityWorldMut`],
+/// polling the world via [`AsyncRunner`] while waiting for the result.
+///
+/// std-only: it owns and drives the world itself. The bridge-based
+/// [`AsyncEntityActionExt`] paths instead rely on the running app's update
+/// loop and resume via the [`oneshot`] waker, so they are no_std-clean.
+#[cfg(feature = "std")]
 async fn call_polling<Input, Out>(
 	mut entity: EntityWorldMut<'_>,
 	input: Input,
@@ -102,18 +90,9 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let recv = call_with_channel::<Input, Out>(&mut entity, input)?;
+	let recv = call_with_oneshot::<Input, Out>(&mut entity, input)?;
 	let world = entity.into_world_mut();
-	match recv.try_recv() {
-		Ok(result) => result,
-		Err(TryRecvError::Empty) => unwrap_channel_result(
-			AsyncRunner::poll_and_update(|| world.update_local(), recv.recv())
-				.await,
-		),
-		Err(TryRecvError::Closed) => {
-			bevybail!("Action call response channel closed unexpectedly.")
-		}
-	}
+	AsyncRunner::poll_and_update(|| world.update_local(), recv.wait()).await
 }
 
 
@@ -126,6 +105,7 @@ pub impl EntityWorldMut<'_> {
 	/// # Errors
 	/// Errors if the entity has no matching [`Action`] component
 	/// or the action call fails.
+	#[cfg(feature = "std")]
 	fn call_blocking<
 		Input: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
@@ -141,6 +121,7 @@ pub impl EntityWorldMut<'_> {
 	/// # Errors
 	/// Errors if the entity has no matching [`Action`] component
 	/// or the action call fails.
+	#[cfg(feature = "std")]
 	fn call<Input: 'static + Send + Sync, Out: 'static + Send + Sync>(
 		self,
 		input: Input,
@@ -156,20 +137,19 @@ pub impl EntityWorldMut<'_> {
 	}
 }
 
-fn call_with_channel_for_value<Input, Out>(
+fn call_with_oneshot_for_value<Input, Out>(
 	entity: EntityWorldMut,
 	action: Action<Input, Out>,
 	input: Input,
-) -> Result<Receiver<Result<Out>>>
+) -> Result<OnceValueRx<Result<Out>>>
 where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = async_channel::bounded::<Result<Out>>(1);
+	let (send, recv) = oneshot::<Result<Out>>();
 	let out_handler = OutHandler::new(move |_, result: Result<Out>| {
-		send.try_send(result).map_err(|err| {
-			bevyhow!("Failed to send action output through channel: {err:?}")
-		})
+		send.signal(result);
+		Ok(())
 	});
 	action.call_world(entity, input, out_handler)?;
 	Ok(recv)
@@ -181,7 +161,7 @@ pub impl AsyncEntity {
 	/// Make an action call asynchronously.
 	///
 	/// The world's normal update loop drives any async work inside the action;
-	/// this side just awaits the channel result.
+	/// this side just awaits the [`oneshot`] result.
 	///
 	/// # Errors
 	/// Errors if the entity has no matching [`Action`] or the
@@ -195,11 +175,11 @@ pub impl AsyncEntity {
 		async move {
 			let recv = async_entity
 				.with(move |mut entity_mut| {
-					call_with_channel::<Input, Out>(&mut entity_mut, input)
+					call_with_oneshot::<Input, Out>(&mut entity_mut, input)
 				})
 				.await
 				.flatten()?;
-			unwrap_channel_result(recv.recv().await)
+			recv.wait().await
 		}
 	}
 
@@ -209,7 +189,7 @@ pub impl AsyncEntity {
 	/// handler may use or ignore this entity depending on its implementation.
 	///
 	/// # Errors
-	/// Errors if the action handler fails or the response channel closes.
+	/// Errors if the action handler fails.
 	fn call_detached<
 		Input: 'static + Send + Sync,
 		Out: 'static + Send + Sync,
@@ -225,14 +205,14 @@ pub impl AsyncEntity {
 		async move {
 			let recv = world
 				.with(move |world: &mut World| {
-					call_with_channel_for_value(
+					call_with_oneshot_for_value(
 						world.entity_mut(entity_id),
 						action,
 						input,
 					)
 				})
 				.await?;
-			unwrap_channel_result(recv.recv().await)
+			recv.wait().await
 		}
 	}
 }

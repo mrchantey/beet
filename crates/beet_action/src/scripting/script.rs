@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// A scripted, pure `Input -> Output` action.
 ///
@@ -77,12 +77,12 @@ where
 	}
 }
 
-impl<Input, Output> std::fmt::Debug for Script<Input, Output>
+impl<Input, Output> core::fmt::Debug for Script<Input, Output>
 where
 	Input: 'static + Send + Sync + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("Script")
 			.field("language", &self.language)
 			.field("content", &self.content)

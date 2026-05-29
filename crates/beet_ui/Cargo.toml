@@ -67,7 +67,7 @@ world_serde = ["beet_core/world_serde", "serde"]
 [dependencies]
 beet_core = { workspace = true, features = ["std"] }
 beet_net = { workspace = true, optional = true }
-beet_action = { workspace = true, optional = true }
+beet_action = { workspace = true, optional = true, features = ["std", "reflect"] }
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true

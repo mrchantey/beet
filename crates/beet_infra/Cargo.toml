@@ -42,7 +42,7 @@ required-features = ["bindings_generator"]
 beet_core = { workspace = true, features = ["std", "json", "rand", "fs"] }
 beet_net.workspace = true
 bytes.workspace = true
-beet_action = { workspace = true, features = ["json"] }
+beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }
 serde.workspace = true
 # `std` for `to_writer_pretty` and the `io`-based serializers.

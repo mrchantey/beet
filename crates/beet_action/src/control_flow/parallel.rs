@@ -113,7 +113,7 @@ where
 		});
 	}
 
-	for outcome in async_ext::try_join_all(calls).await? {
+	for outcome in try_join_all(calls).await? {
 		if let Outcome::Fail(output) = outcome {
 			return Ok(Outcome::Fail(output));
 		}

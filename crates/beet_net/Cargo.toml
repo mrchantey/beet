@@ -94,7 +94,7 @@ russh_client = [
 
 [dependencies]
 beet_core = { workspace = true, features = ["std", "http"] }
-beet_action = {workspace = true}
+beet_action = { workspace = true, features = ["std", "reflect"] }
 
 bevy.workspace = true
 

@@ -86,7 +86,7 @@ impl ActionMeta {
 
 	/// Returns true if the output type matches `T`.
 	pub fn output_is<T: 'static>(&self) -> bool {
-		self.output.type_id() == std::any::TypeId::of::<T>()
+		self.output.type_id() == core::any::TypeId::of::<T>()
 	}
 
 	/// The handler [`TypeInfo`], if reflection data is available.
@@ -212,32 +212,32 @@ impl ActionTypeInfo {
 }
 
 
-/// Lightweight type metadata using [`TypeId`](std::any::TypeId) for
-/// comparison and [`type_name`](std::any::type_name) for display.
+/// Lightweight type metadata using [`TypeId`](core::any::TypeId) for
+/// comparison and [`type_name`](core::any::type_name) for display.
 #[derive(Debug, Copy, Clone)]
 pub struct TypeMeta {
 	type_name: &'static str,
-	type_id: std::any::TypeId,
+	type_id: core::any::TypeId,
 }
 
 impl TypeMeta {
 	/// Create a [`TypeMeta`] for the given type.
 	pub fn of<T: 'static>() -> Self {
 		Self {
-			type_name: std::any::type_name::<T>(),
-			type_id: std::any::TypeId::of::<T>(),
+			type_name: core::any::type_name::<T>(),
+			type_id: core::any::TypeId::of::<T>(),
 		}
 	}
 	pub fn of_val<T: 'static>(_: &T) -> Self { Self::of::<T>() }
 
 	/// The full type name, ie `core::option::Option<i32>`.
 	pub fn type_name(&self) -> &'static str { self.type_name }
-	/// The [`TypeId`](std::any::TypeId) for this type.
-	pub fn type_id(&self) -> std::any::TypeId { self.type_id }
+	/// The [`TypeId`](core::any::TypeId) for this type.
+	pub fn type_id(&self) -> core::any::TypeId { self.type_id }
 }
 
-impl std::fmt::Display for TypeMeta {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for TypeMeta {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.type_name)
 	}
 }

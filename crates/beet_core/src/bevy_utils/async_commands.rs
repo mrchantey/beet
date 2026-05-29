@@ -324,7 +324,7 @@ pub impl AsyncWorld {
 			match fut.await {
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
-					warn!(
+					tracing::warn!(
 						"AsyncWorld::with: world dropped before bridge completed (at {location}); task will not resume"
 					);
 					core::future::pending().await
@@ -363,7 +363,7 @@ pub impl AsyncWorld {
 			match state.bridge(BeetAsyncSyncPoint, func).await {
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
-					warn!(
+					tracing::warn!(
 						"AsyncWorld::with_state: world dropped before bridge completed (at {location}); task will not resume"
 					);
 					core::future::pending().await
@@ -1133,56 +1133,6 @@ where
 {
 	let world = entity.world().clone();
 	run_async_task(world, move |_| func(entity)).await;
-}
-
-/// A one-shot value channel: a single value is published once and the awaiting
-/// task is woken. Used for the `run_async_*_then` result hand-off (std-only,
-/// since those drive the app via [`AsyncRunner`]).
-#[cfg(feature = "std")]
-fn oneshot<T>() -> (OnceValue<T>, OnceValueRx<T>) {
-	let inner = Arc::new(OnceValueInner {
-		value: Mutex::new(None),
-		waker: Mutex::new(None),
-		set: AtomicBool::new(false),
-	});
-	(OnceValue(inner.clone()), OnceValueRx(inner))
-}
-
-#[cfg(feature = "std")]
-struct OnceValueInner<T> {
-	value: Mutex<Option<T>>,
-	waker: Mutex<Option<Waker>>,
-	set: AtomicBool,
-}
-
-#[cfg(feature = "std")]
-struct OnceValue<T>(Arc<OnceValueInner<T>>);
-#[cfg(feature = "std")]
-struct OnceValueRx<T>(Arc<OnceValueInner<T>>);
-
-#[cfg(feature = "std")]
-impl<T> OnceValue<T> {
-	fn signal(self, value: T) {
-		*self.0.value.lock().unwrap() = Some(value);
-		self.0.set.store(true, Ordering::SeqCst);
-		if let Some(waker) = self.0.waker.lock().unwrap().take() {
-			waker.wake();
-		}
-	}
-}
-
-#[cfg(feature = "std")]
-impl<T> OnceValueRx<T> {
-	fn wait(self) -> impl Future<Output = T> {
-		core::future::poll_fn(move |cx| {
-			if self.0.set.load(Ordering::SeqCst) {
-				Poll::Ready(self.0.value.lock().unwrap().take().unwrap())
-			} else {
-				*self.0.waker.lock().unwrap() = Some(cx.waker().clone());
-				Poll::Pending
-			}
-		})
-	}
 }
 
 /// A clonable one-shot completion flag used by `await_event`.

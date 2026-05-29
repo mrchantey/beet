@@ -86,7 +86,7 @@ beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
 beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11" }
 beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
-beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11" }
+beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-features = false }
 
 # beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.11" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11" }
@@ -229,7 +229,7 @@ default = ["std", "ui"]
 
 # Standard library support (enabled by default). no_std consumers depend on beet
 # with `default-features = false`.
-std = ["beet_core/std"]
+std = ["beet_core/std", "beet_action?/std"]
 # Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
 # critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
 embedded = ["beet_core/embedded"]
@@ -261,7 +261,7 @@ bevy_default = [
 	"beet_spatial?/bevy_default",
 ]
 world_serde = ["beet_core/world_serde", "beet_net?/world_serde","beet_thread?/world_serde"]
-bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_net?/bevy_reflect_documentation"]
+bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]
 bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithreaded"]

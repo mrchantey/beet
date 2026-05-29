@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use alloc::sync::Arc;
 use bevy::ecs::system::SystemState;
-use std::sync::Arc;
 
 #[derive(Component)]
 #[component(on_add=on_add::<In, Out>)]
@@ -11,8 +11,8 @@ pub struct Action<In: 'static, Out: 'static> {
 	handler: Arc<dyn 'static + Send + Sync + Fn(ActionCall<In, Out>) -> Result>,
 }
 
-impl<In: 'static, Out: 'static> std::fmt::Debug for Action<In, Out> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<In: 'static, Out: 'static> core::fmt::Debug for Action<In, Out> {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("Action")
 			.field("handler_meta", &self.handler_meta)
 			.finish()

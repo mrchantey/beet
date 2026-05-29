@@ -15,13 +15,13 @@ use beet_core::prelude::*;
 pub struct CallOnSpawn<In, Out> {
 	input: In,
 	#[reflect(ignore)]
-	phantom: std::marker::PhantomData<Out>,
+	phantom: core::marker::PhantomData<Out>,
 }
 impl<In, Out> CallOnSpawn<In, Out> {
 	pub fn new(input: In) -> Self {
 		Self {
 			input,
-			phantom: std::marker::PhantomData,
+			phantom: core::marker::PhantomData,
 		}
 	}
 }
@@ -29,7 +29,7 @@ impl<In: Default, Out> Default for CallOnSpawn<In, Out> {
 	fn default() -> Self {
 		Self {
 			input: default(),
-			phantom: std::marker::PhantomData,
+			phantom: core::marker::PhantomData,
 		}
 	}
 }

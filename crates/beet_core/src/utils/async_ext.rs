@@ -2,7 +2,7 @@
 
 use bevy::tasks::IoTaskPool;
 use bevy::tasks::Task;
-pub use futures::future::try_join_all;
+pub use crate::utils::try_join_all;
 use futures_lite::future::YieldNow;
 use std::pin::Pin;
 use std::time::Duration;

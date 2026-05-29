@@ -33,10 +33,14 @@ mod file_span;
 #[cfg(feature = "std")]
 mod glob_filter;
 mod into_option;
+/// no_std future-joining helpers.
+mod join;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "std")]
 mod lazy_pool;
 mod line_col;
+/// A no_std one-shot value channel.
+mod once_value;
 #[cfg(feature = "std")]
 mod panic_context;
 /// Process and command execution utilities.
@@ -50,6 +54,7 @@ pub mod serde_ext;
 #[cfg(feature = "std")]
 pub mod stream_ext;
 pub use into_option::*;
+pub use join::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
 /// Time and duration utilities.
@@ -82,6 +87,7 @@ pub use file_span::*;
 #[cfg(feature = "std")]
 pub use glob_filter::*;
 pub use line_col::*;
+pub use once_value::*;
 #[cfg(feature = "std")]
 pub use panic_context::*;
 #[cfg(feature = "rand")]

@@ -305,7 +305,7 @@ mod test {
 			.spawn(Action::<i32, i32>::new_async_local(
 				async |cx: ActionContext<i32>| -> Result<i32> {
 					// Rc is `!Send`, held live across the await below.
-					let rc = std::rc::Rc::new(*cx);
+					let rc = alloc::rc::Rc::new(*cx);
 					async_ext::yield_now().await;
 					Ok(*rc * 2)
 				},
@@ -318,7 +318,7 @@ mod test {
 
 	#[action(local)]
 	async fn async_local_double(val: i32) -> i32 {
-		let rc = std::rc::Rc::new(val);
+		let rc = alloc::rc::Rc::new(val);
 		async_ext::yield_now().await;
 		*rc * 2
 	}

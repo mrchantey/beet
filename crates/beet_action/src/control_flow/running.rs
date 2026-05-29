@@ -10,7 +10,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::Typed;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Marks an action as actively running, holding the deferred [`OutHandler`]
 /// used to complete the original call.
@@ -150,7 +150,7 @@ where
 		let running = entity.take::<Running<T>>().ok_or_else(|| {
 			bevyhow!(
 				"EndRun expected a Running<{}> component",
-				std::any::type_name::<T>()
+				core::any::type_name::<T>()
 			)
 		})?;
 		running.end(entity.into_world_mut(), self.0)
