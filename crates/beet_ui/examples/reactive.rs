@@ -1,11 +1,11 @@
-//! Reactive keyed state: a typed [`DocState<T>`] field stays in sync and reads /
-//! writes without touching [`Value`] or `FieldSegment` directly.
+//! Reactive keyed state: a typed [`TypedFieldRef<T>`] field stays in sync and
+//! reads / writes without touching [`Value`] or `FieldSegment` directly.
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
 fn main() -> Result {
 	let mut world = DocumentPlugin::world();
-	let count = DocState::<i64>::new("count").with_default(7);
+	let count = TypedFieldRef::<i64>::new("count").with_init(7);
 
 	// the field lives in the entity's document, initialized to the default
 	let entity = world
