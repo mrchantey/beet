@@ -13,6 +13,11 @@ use beet_action::prelude::*;
 /// This is a thin convenience wrapper around the action call pattern,
 /// converting the `Result<Response>` into a `Response` by logging
 /// errors and returning an internal error response on failure.
+///
+/// std-only: it drives the app to completion via `run_async_then`, which needs
+/// the std [`AsyncRunner`]. no_std consumers use [`AsyncExchangeExt`] on an
+/// [`AsyncEntity`] instead.
+#[cfg(feature = "std")]
 #[extend::ext(name=ExchangeExt)]
 pub impl EntityWorldMut<'_> {
 	/// Send a request and await the response.

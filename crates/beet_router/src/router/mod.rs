@@ -31,29 +31,21 @@ pub use route_tree::*;
 mod server_action_client;
 pub use server_action_client::*;
 
-// no_std-only: a lightweight `router()` + dispatch + route-building plugin for
-// bare-metal targets, without the std scene/help rendering pipeline. Compiled
-// only when `std` is off, so its `Router`/`router()`/`RouterPlugin` never
-// collide with the std versions below.
-#[cfg(not(feature = "std"))]
-mod embedded;
-#[cfg(not(feature = "std"))]
-pub use embedded::*;
+// The `Router` dispatch action, the `router()` bundle, and the route-building
+// `RouterPlugin` are shared across std and no_std (one `Router` type, one
+// plugin). The std-only scene/help rendering pipeline stays feature-gated inside
+// them and in the `help`/`sidebar` modules below; the no_std build falls back to
+// a plain-text route listing and a lean `router()` bundle.
+mod router;
+pub use router::*;
+mod router_plugin;
+pub use router_plugin::*;
 
-// std-only: the assembled `router()` + dispatch, the route-building plugin,
-// and the help/sidebar rendering — all built on the beet_ui scene pipeline.
+// std-only: the help/sidebar rendering built on the beet_ui scene pipeline.
 #[cfg(feature = "std")]
 mod help;
 #[cfg(feature = "std")]
 pub use help::*;
-#[cfg(feature = "std")]
-mod router;
-#[cfg(feature = "std")]
-pub use router::*;
-#[cfg(feature = "std")]
-mod router_plugin;
-#[cfg(feature = "std")]
-pub use router_plugin::*;
 #[cfg(feature = "std")]
 mod sidebar;
 #[cfg(feature = "std")]

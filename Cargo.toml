@@ -314,7 +314,10 @@ thread = ["dep:beet_thread","net","action"]
 
 # 💡 Stack
 
-action = ["dep:beet_action","beet_ui?/action"]
+# When beet_net is also present (eg `router_embedded`), turn on its no_std
+# action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
+# are available on bare-metal targets too.
+action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
 rhai = ["action","beet_action/rhai"]
 scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
 ui = ["dep:beet_ui"]

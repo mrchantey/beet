@@ -19,8 +19,9 @@ mod client;
 // InMemoryStore); the concrete backends (fs/s3/dynamo/local-storage) and
 // StorePlugin stay feature/std-gated inside the module.
 mod store;
-// std-only: transports, servers, sockets, and the action integration.
-#[cfg(feature = "std")]
+// The action/exchange integration (`exchange_handler`, …) only needs
+// `beet_action`, so it rides the no_std-capable `action` feature, not `std`.
+#[cfg(feature = "action")]
 mod actions;
 #[cfg(feature = "std")]
 mod store_actions;
@@ -58,7 +59,7 @@ pub mod prelude {
 	/// Default port for WebSocket connections in webdriver sessions.
 	pub const DEFAULT_WEBDRIVER_SESSION_PORT: u16 = 8341;
 
-	#[cfg(feature = "std")]
+	#[cfg(feature = "action")]
 	pub use crate::actions::*;
 	pub use crate::store::*;
 	#[cfg(feature = "std")]

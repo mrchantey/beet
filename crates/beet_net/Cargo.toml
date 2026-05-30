@@ -22,7 +22,9 @@ std = [
 	"beet_core/std",
 	# the std surface (stores, transports, actions) is serde-saturated
 	"serde",
-	"dep:beet_action",
+	# the action/exchange integration; no_std-capable, so split out as its own
+	# feature `std` simply turns on (see `action` below).
+	"action",
 	"beet_action/std",
 	"beet_action/reflect",
 	"dep:async-channel",
@@ -36,6 +38,11 @@ std = [
 	# so it (and the extractors that use it) are std-only.
 	"dep:serde_urlencoded",
 ]
+# The action/exchange integration: `Action<Request, Response>`, `exchange_handler`
+# and `AsyncEntity::exchange`. no_std-capable — it only needs `beet_action` (not
+# the full std surface), so a bare-metal consumer can route incoming requests
+# through the async action layer. `std` enables it automatically.
+action = ["dep:beet_action"]
 json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # for conditional compilation in hooks; pulls reactive store effects that use
