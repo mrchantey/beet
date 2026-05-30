@@ -39,7 +39,11 @@ markdown = ["std", "dep:pulldown-cmark"]
 html_parser = ["std", "beet_ui/html_parser"]
 markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["std", "beet_net/server"]
-world_serde = ["beet_core/world_serde","bevy/bevy_world_serialization", "serde"]
+# beet_router's only world_serde use is rebuilding route trees on a
+# `WorldSerdeLoaded` event, which comes from `beet_core/world_serde` (beet's
+# own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
+# drags in `bevy_asset` (std) and so breaks no_std consumers.
+world_serde = ["beet_core/world_serde", "serde"]
 scripting = ["std", "beet_action/scripting", "serde"]
 # Build-time code generation: route tree, server/client actions, typed links.
 codegen = [

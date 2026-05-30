@@ -35,7 +35,7 @@ fn main() {
 				// CliServer::default(),
 				HttpServer::default(),
 				Count::default(),
-				Action::<Request, Response>::new_system(handler),
+				Handler,
 			));
 		})
 		.run();
@@ -45,7 +45,9 @@ fn main() {
 struct Count(u32);
 
 /// Handler function that processes all incoming requests.
-fn handler(
+#[action]
+#[derive(Component)]
+fn Handler(
 	cx: In<ActionContext<Request>>,
 	mut query: Query<&mut Count>,
 ) -> Result<Response> {

@@ -11,9 +11,11 @@ pub use html_store::*;
 mod blob_store;
 pub use blob_store::*;
 
-#[cfg(feature = "json")]
+// std-only: the analytics route stores into beet_net's `AnalyticsEvent`, which
+// is part of beet_net's std-only store surface.
+#[cfg(all(feature = "json", feature = "std"))]
 mod analytics;
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 pub use analytics::*;
 
 // std-only: the app-info scene route renders through beet_ui, and the

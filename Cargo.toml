@@ -277,12 +277,21 @@ bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithrea
 
 # 💡 Net
 
-net = ["dep:beet_net", "beet_router?/http"]
+# Note: `net` deliberately does NOT enable `beet_router/http` — that would pull
+# beet_router's std HTTP-server surface, which a no_std consumer (`router_embedded`)
+# must avoid. The std `router`/`http_server` features re-add it explicitly.
+net = ["dep:beet_net"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-# beet_net is a hard dependency of beet_router
-router = ["scene", "action", "net", "dep:beet_router"]
+# beet_net is a hard dependency of beet_router. The facade pins beet_router to
+# `default-features = false`, so the std router must re-enable the std + markdown
+# + http surface it relied on (previously supplied by default features + net).
+router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http"]
+# no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
+# dispatch and middleware core from beet_router, without the std scene/help
+# rendering pipeline. See `beet_router`'s `embedded` module.
+router_embedded = ["action", "net", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -353,7 +362,10 @@ beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_ui = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
+# Declared explicitly (not via `workspace = true`) so the facade can set
+# `default-features = false`: no_std consumers (`router_embedded`) get the no_std
+# core; the std `router` feature re-adds `beet_router/std` (+ markdown + http).
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11", optional = true, default-features = false }
 beet_action = { workspace = true, optional = true }
 
 #💡 web
