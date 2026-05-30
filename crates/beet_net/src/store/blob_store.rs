@@ -61,20 +61,6 @@ impl BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
-	/// Create a [`StoreItem`] for working with a specific path.
-	///
-	/// # Example
-	/// ```no_run
-	/// # use beet_core::prelude::*;
-	/// # use beet_net::prelude::*;
-	/// let store = BlobStore::temp();
-	/// let item = store.item(SmolPath::from("my-file.txt"));
-	/// ```
-	#[cfg(feature = "std")]
-	pub fn item(&self, path: SmolPath) -> StoreItem {
-		StoreItem::new(self.clone(), path)
-	}
-
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &SmolPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);

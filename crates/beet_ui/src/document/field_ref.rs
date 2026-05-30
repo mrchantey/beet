@@ -19,6 +19,7 @@ use beet_core::prelude::*;
 	Hash,
 	Reflect,
 	Component,
+	Get,
 	SetWith,
 )]
 #[reflect(Component)]
@@ -69,12 +70,6 @@ impl FieldRef {
 	/// Set this field reference to error if the field is missing instead of initializing it.
 	pub fn error_on_missing(mut self) -> Self {
 		self.on_missing = OnMissingField::EmitError;
-		self
-	}
-
-	/// Set the behavior when the field is missing.
-	pub fn on_missing(mut self, on_missing: OnMissingField) -> Self {
-		self.on_missing = on_missing;
 		self
 	}
 

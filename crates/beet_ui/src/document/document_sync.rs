@@ -92,7 +92,7 @@ pub(super) fn unlink_field_from_document(
 /// System that updates [`Value`] when their associated [`Document`] changes.
 ///
 /// Runs in `PreUpdate` to ensure values are synchronized before user systems run.
-pub(super) fn update_text_fields(
+pub(super) fn update_document_values(
 	query: Populated<(&Document, &Fields), Changed<Document>>,
 	mut text_fields: Query<(&FieldRef, &mut Value)>,
 ) -> Result {
@@ -102,7 +102,10 @@ pub(super) fn update_text_fields(
 				// skip if field not yet present (document may be uninitialized)
 				if let Ok(field_val) = doc.get_field_ref(&field_ref.field_path)
 				{
-					*text = field_val.clone();
+					if *text != *field_val {
+						// only clone if we have to
+						*text = field_val.clone();
+					}
 				}
 			}
 		}

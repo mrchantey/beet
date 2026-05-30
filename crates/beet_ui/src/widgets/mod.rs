@@ -8,12 +8,13 @@
 //! Gated behind the `scene` feature; rendering targets and styling come from
 //! the same DOM + rule machinery as parsed HTML.
 //!
-//! **Deferred — `BucketList`.** Blocked by (a) missing `Bucket`/`local_bucket`
-//! infra in `beet_net`, (b) reactive `{Getter<T>}` block-child lift in
-//! scene-`rsx!` (see `agent/plans/beet_design.md` § Outstanding scene-API
-//! polish §4). Once both land, port `BucketList` as a synchronous `#[scene]`
-//! constructor whose behavior (list/insert/remove) is async via `effect` +
-//! `onclick` (see `tests/scene.rs::Counter` for the simpler pattern).
+//! **Pending — `BlobStoreList`.** The reactive substrate it needs now exists:
+//! [`DocState`](crate::prelude::DocState) for the live path list and
+//! [`ReactiveChildren`](crate::prelude::ReactiveChildren) for the per-blob rows.
+//! What remains is the async glue: `onclick` handlers (see
+//! `tests/scene.rs::Counter`) that run `BlobStore` ops via
+//! [`AsyncWorld`](beet_core::prelude::AsyncWorld) and write the refreshed
+//! `BlobStore::list()` back into the `DocState`, re-spawning the rows.
 
 #[cfg(feature = "net")]
 mod analytics;
