@@ -161,7 +161,10 @@ impl BlobStoreProvider for LocalStorageStore {
 			let value = Self::local_storage().get_item(&key).map_jserr()?;
 			match value {
 				Some(val) => {
-					let bytes = BASE64_STANDARD.decode(val)?;
+					// base64 is no_std here, so DecodeError lacks the `Error`
+					// impl BevyError's blanket `From` needs; wrap via Display.
+					let bytes =
+						BASE64_STANDARD.decode(val).map_err(|err| bevyhow!("{err}"))?;
 					Bytes::from(bytes).xok()
 				}
 				None => bevybail!("Object not found: {}", key),

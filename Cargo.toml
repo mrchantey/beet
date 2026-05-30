@@ -132,7 +132,8 @@ chrono = "0.4"
 # compile on no_std; std consumers re-add the relevant features.
 rand = { version = "0.9", default-features = false }
 rand_chacha = { version = "0.9", default-features = false }
-# wasm_js ignored in native
+# wasm_js ignored in native. Backs ahash (via material-colors) and rand 0.9 on
+# wasm. uuid uses its own `js` backend, so getrandom 0.4 stays out of the graph.
 getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
 webbrowser = "1"
@@ -366,8 +367,9 @@ beet_spatial = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# required for rand 0.9 to compile on wasm targets
-uuid = { workspace = true, features = ["std", "rng-getrandom"] }
+# pins uuid's wasm RNG to its `js` (WebCrypto) backend; `rng-getrandom` would
+# drag in getrandom 0.4, whose wasm marshalling traps the test runner.
+uuid = { workspace = true, features = ["std", "js"] }
 
 [dev-dependencies]
 beet = { path = "." }

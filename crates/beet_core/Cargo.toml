@@ -237,7 +237,9 @@ rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
 # workspace sets default-features = false so uuid compiles on no_std (it is only
 # *used* by the std-only `tempdir`); `uuid/std` is re-added by the `std` feature.
-uuid = { workspace = true, optional = true, features = ["v4", "v7", "rng-getrandom"] }
+# `js` (not `rng-getrandom`) supplies the wasm RNG: it keeps getrandom 0.4 out of
+# the wasm graph, whose `MaybeUninit` slice marshalling traps the test runner.
+uuid = { workspace = true, optional = true, features = ["v4", "v7", "js"] }
 
 ## utils
 thiserror.workspace = true

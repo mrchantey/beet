@@ -242,13 +242,14 @@ async fn LayoutTemplate(
 			}
 			if let Some(slot) = find_named_slot(world, layout_id, "sidebar") {
 				let sidebar_state = SidebarState::new(path);
-				let bundle =
+				let nodes =
 					world.with_state::<RouteQuery, Result<_>>(move |query| {
 						let tree = query.route_tree(caller_entity)?;
-						let bundle = sidebar_state.build(&tree);
-						bundle.xok()
+						sidebar_state.collect(&tree).xok()
 					})?;
-				world.entity_mut(slot).insert(bundle);
+				let sidebar_id =
+					world.spawn_scene(rsx! { <Sidebar nodes=nodes/> })?.id();
+				world.entity_mut(slot).insert(SlotContainer::new(sidebar_id));
 			}
 			// build article header from frontmatter if present
 			let article_header_id = world

@@ -78,8 +78,8 @@ http = [
 	"dep:http",
 	"dep:eventsource-stream",
 ]
-reqwest = ["std", "dep:reqwest", "beet_core/tokio"]
-ureq = ["std", "dep:ureq", "dep:blocking"]
+reqwest = ["std", "http", "dep:reqwest", "beet_core/tokio"]
+ureq = ["std", "http", "dep:ureq", "dep:blocking"]
 tungstenite = ["std", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
 webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [

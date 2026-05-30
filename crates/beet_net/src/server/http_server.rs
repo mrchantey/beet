@@ -212,8 +212,9 @@ mod std_impl {
 }
 
 
+// needs `new_test` + `async_io` (server, native) and the ureq client.
 #[cfg(test)]
-#[cfg(feature = "ureq")]
+#[cfg(all(feature = "ureq", feature = "server", not(target_arch = "wasm32")))]
 pub(crate) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
