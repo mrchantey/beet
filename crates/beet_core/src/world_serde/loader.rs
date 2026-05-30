@@ -130,8 +130,29 @@ impl<'a> WorldSerdeLoader<'a> {
 			}
 		}
 
+		// observers ran per-insert during the write above, before
+		// relationships like `ChildOf` settled. Flush queued commands, then
+		// signal completion so listeners can react to the now-whole hierarchy
+		// (eg rebuilding a `RouteTree`) before any async work observes it.
+		self.world.flush();
+		self.world
+			.trigger(WorldSerdeLoaded { entities: spawned.clone() });
+		self.world.flush();
+
 		Ok(spawned)
 	}
+}
+
+/// Triggered after a [`WorldSerdeLoader`] writes deserialized entities into
+/// the world and flushes queued commands.
+///
+/// Reflect-driven loads insert components one entity at a time, so per-insert
+/// observers run before relationships settle. Listeners use this to react to a
+/// completed load synchronously, against the fully-formed hierarchy.
+#[derive(Debug, Clone, Event)]
+pub struct WorldSerdeLoaded {
+	/// The entities spawned by this load.
+	pub entities: Vec<Entity>,
 }
 
 /// Added to entities spawned by the loader to track their source entity in the

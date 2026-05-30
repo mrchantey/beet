@@ -43,8 +43,9 @@ impl Plugin for RouterPlugin {
 			.register_type::<Router>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			.add_observer(insert_route_tree)
-			.add_systems(Update, rebuild_route_trees_after_load);
+			.add_observer(insert_route_tree);
+		#[cfg(feature = "world_serde")]
+		app.add_observer(rebuild_route_trees_on_load);
 		#[cfg(feature = "scripting")]
 		app.register_type::<Script<RequestParts, String>>()
 			.register_type::<ExchangeScript<(), String>>()
@@ -145,27 +146,25 @@ pub fn insert_route_tree(
 	Ok(())
 }
 
-/// System that rebuilds [`RouteTree`] roots after scene loads, where
-/// reflect-driven [`ChildOf`] inserts settle later than [`PathPattern`]
+/// Observer that rebuilds [`RouteTree`] roots after a [`WorldSerdeLoaded`],
+/// where reflect-driven [`ChildOf`] inserts settle later than [`PathPattern`]
 /// and leave per-leaf trees on the wrong ancestors.
 ///
-/// Each tick, every root with a freshly-added [`PathPattern`]
-/// descendant is recomputed once.
-///
-/// TODO to be addressed after the new bevy scene system in 0.19,
-/// which should provide after-scene-load hooks so this can be
-/// replaced with a single one-shot pass.
-pub fn rebuild_route_trees_after_load(
+/// The load trigger fires synchronously once the hierarchy is whole, so each
+/// affected root is recomputed exactly once before any async serving begins.
+#[cfg(feature = "world_serde")]
+pub fn rebuild_route_trees_on_load(
+	ev: On<WorldSerdeLoaded>,
 	mut commands: Commands,
-	added_paths: Populated<Entity, Added<PathPattern>>,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,
 	actions: Query<ActionQueryItem, Without<RouteHidden>>,
 ) -> Result {
-	// collect unique roots so we rebuild each tree at most once per tick
-	let mut roots: Vec<Entity> = added_paths
+	// collect unique roots so we rebuild each tree at most once
+	let mut roots: Vec<Entity> = ev
+		.entities
 		.iter()
-		.map(|entity| ancestors.root_ancestor(entity))
+		.map(|entity| ancestors.root_ancestor(*entity))
 		.collect();
 	roots.sort();
 	roots.dedup();
