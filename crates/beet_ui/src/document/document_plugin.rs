@@ -59,7 +59,6 @@ impl Plugin for DocumentPlugin {
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
-			.add_observer(link_reactive_children_to_document)
 			.add_systems(
 				PreUpdate,
 				(update_document_values, update_reactive_children).chain(),

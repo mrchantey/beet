@@ -8,13 +8,18 @@
 //! Gated behind the `scene` feature; rendering targets and styling come from
 //! the same DOM + rule machinery as parsed HTML.
 //!
-//! **Pending — `BlobStoreList`.** The reactive substrate it needs now exists:
-//! [`DocState`](crate::prelude::DocState) for the live path list and
-//! [`ReactiveChildren`](crate::prelude::ReactiveChildren) for the per-blob rows.
-//! What remains is the async glue: `onclick` handlers (see
-//! `tests/scene.rs::Counter`) that run `BlobStore` ops via
-//! [`AsyncWorld`](beet_core::prelude::AsyncWorld) and write the refreshed
-//! `BlobStore::list()` back into the `DocState`, re-spawning the rows.
+//! **Reactive substrate.** State lives in documents:
+//! [`TypedFieldRef`](crate::prelude::TypedFieldRef) for a single typed atom and
+//! [`ReactiveChildren`](crate::prelude::ReactiveChildren) for a list field that
+//! materializes one child per item. The full loop — native event then document
+//! mutation then change-detected rebuild — is proven by `native_event_drives_list`
+//! in `document/reactive_children.rs`, with zero render-target coupling.
+//!
+//! A DOM widget or a `BlobStore`-backed list is a render-target / storage
+//! binding layered on top, not a gap in the substrate: a render backend triggers
+//! the native events (see `input/pointer.rs`), and an async store can sync
+//! `BlobStore::list()` into a `Vec<_>` field via
+//! [`AsyncWorld`](beet_core::prelude::AsyncWorld) when that integration is wanted.
 
 #[cfg(feature = "net")]
 mod analytics;

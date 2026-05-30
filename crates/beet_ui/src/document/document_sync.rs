@@ -13,7 +13,7 @@
 //! 2. The [`Fields`] component on document entities tracks all field
 //!    references that depend on it.
 //!
-//! 3. When a [`Document`] changes, the `update_text_fields` system iterates
+//! 3. When a [`Document`] changes, the `update_document_values` system iterates
 //!    through all related [`FieldRef`] entities and updates their [`Value`].
 //!
 //! # Example
