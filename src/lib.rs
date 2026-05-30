@@ -51,7 +51,13 @@ pub mod prelude {
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::prelude::*;
-	#[cfg(all(feature = "net", feature = "json", feature = "std"))]
+	// `TableStore` overlaps: `beet_net`'s store struct (json+std) vs
+	// `beet_thread`'s trait. `thread` transitively compiles beet_net with
+	// json+std, so cover it too; prefer the net store.
+	#[cfg(all(
+		feature = "net",
+		any(all(feature = "json", feature = "std"), feature = "thread")
+	))]
 	pub use crate::net::prelude::TableStore;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
@@ -105,12 +111,18 @@ pub mod prelude {
 	cfg_if! {
 		// widgets live behind beet_ui's `scene` feature
 		if #[cfg(feature = "scene")]{
-			pub use crate::ui::prelude::Header;
 			pub use crate::ui::prelude::Button;
 			pub use crate::ui::prelude::SidebarNode;
-			pub use crate::ui::prelude::Table;
 		}
 	}
+	// ui's widget `Header`/`Table` types overlap with `beet_net`'s `Header`
+	// trait and `beet_thread`'s `Table` trait. `thread` transitively compiles
+	// beet_ui with `scene` (via `beet_router`), so cover it alongside `scene`;
+	// prefer the ui widgets.
+	#[cfg(all(feature = "ui", any(feature = "scene", feature = "thread")))]
+	pub use crate::ui::prelude::Header;
+	#[cfg(all(feature = "ui", any(feature = "scene", feature = "thread")))]
+	pub use crate::ui::prelude::Table;
 }
 
 pub mod exports {

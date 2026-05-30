@@ -130,14 +130,12 @@ impl<'a> WorldSerdeLoader<'a> {
 			}
 		}
 
-		// observers ran per-insert during the write above, before
-		// relationships like `ChildOf` settled. Flush queued commands, then
-		// signal completion so listeners can react to the now-whole hierarchy
-		// (eg rebuilding a `RouteTree`) before any async work observes it.
-		self.world.flush();
+		// reflect inserts settle per-entity during the write above, so
+		// per-insert observers run before relationships like `ChildOf` are
+		// whole. Signal completion now the hierarchy is settled, so listeners
+		// can react (eg rebuilding a `RouteTree`) before any async work runs.
 		self.world
 			.trigger(WorldSerdeLoaded { entities: spawned.clone() });
-		self.world.flush();
 
 		Ok(spawned)
 	}

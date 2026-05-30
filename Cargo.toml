@@ -269,7 +269,7 @@ bevy_default = [
 	"beet_examples?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
-world_serde = ["beet_core/world_serde", "beet_net?/world_serde","beet_thread?/world_serde"]
+world_serde = ["beet_core/world_serde", "beet_net?/world_serde", "beet_router?/world_serde", "beet_thread?/world_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]
