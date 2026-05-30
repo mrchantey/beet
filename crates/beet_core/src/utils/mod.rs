@@ -20,7 +20,6 @@ mod backoff;
 mod cfg_if;
 #[cfg(feature = "std")]
 mod cli_args;
-mod clone_func;
 /// Coalescing trigger for async write deduplication.
 mod coalescing_trigger;
 pub mod cross_log;
@@ -71,7 +70,6 @@ pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
 #[cfg(feature = "std")]
 pub use cli_args::*;
-pub use clone_func::*;
 pub use coalescing_trigger::*;
 #[cfg(feature = "std")]
 pub use file_span::*;

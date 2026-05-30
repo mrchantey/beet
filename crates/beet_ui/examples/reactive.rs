@@ -1,45 +1,23 @@
-//! Reactive document fields: a child [`Value`] mirrors a [`Document`] field
-//! and stays in sync as the document changes.
+//! Reactive keyed state: a typed [`DocState<T>`] field stays in sync and reads /
+//! writes without touching [`Value`] or `FieldSegment` directly.
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
-/// Schema describing the document, enabling typed field writes.
-#[derive(Reflect)]
-#[allow(dead_code)]
-struct CountDoc {
-	count: i64,
-}
-
 fn main() -> Result {
 	let mut world = DocumentPlugin::world();
-	let doc = world
-		.spawn((
-			Document::new(val!({ "count": 7i64 })),
-			DocumentSchema::of::<CountDoc>(),
-			children![(Value::default(), FieldRef::new("count"))],
-		))
+	let count = DocState::<i64>::new("count").with_default(7);
+
+	// the field lives in the entity's document, initialized to the default
+	let entity = world
+		.spawn((Document::default(), children![count.field()]))
 		.id();
-
-	// mirror the document field onto the child Value
 	world.update_local();
-	mirrored(&mut world).xpect_eq(Value::Int(7));
 
-	// mutate the document; the change propagates on the next update
-	{
-		let mut entity = world.entity_mut(doc);
-		let mut document = entity.get_mut::<Document>().unwrap();
-		let count = document.get_field_mut(&[FieldSegment::key("count")])?;
-		*count = Value::Int(count.as_i64().unwrap_or(0) + 1);
-	}
-
+	count.get(&mut world.entity_mut(entity))?.xpect_eq(7); // ergonomic read
+	count.update(&mut world.entity_mut(entity), |n| *n += 1)?; // ergonomic write
 	world.update_local();
-	mirrored(&mut world).xpect_eq(Value::Int(8));
+	count.get(&mut world.entity_mut(entity))?.xpect_eq(8);
 
-	println!("success");
+	cross_log!("success");
 	Ok(())
-}
-
-/// The current value mirrored onto the field's [`Value`] component.
-fn mirrored(world: &mut World) -> Value {
-	world.query_once::<(&Value, &FieldRef)>()[0].0.clone()
 }

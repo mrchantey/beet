@@ -35,11 +35,6 @@ mod in_memory_store;
 pub use blob::*;
 pub use blob_store::*;
 pub use in_memory_store::*;
-// reactive store handle (signals/effects/spawn_local) — std-only
-#[cfg(feature = "std")]
-mod store_item;
-#[cfg(feature = "std")]
-pub use store_item::*;
 
 #[cfg(all(feature = "json", feature = "std"))]
 mod analytics;
