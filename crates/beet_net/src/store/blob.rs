@@ -35,6 +35,14 @@ impl Blob {
 	/// Create a new [`Blob`] from a provider and path.
 	pub fn new(store: BlobStore, path: SmolPath) -> Self { Self { path, store } }
 
+	/// True if `event` is this exact object: same backing and the
+	/// root-relative locations are equal (object-exact, not scope-covering).
+	pub fn matches_event(&self, event: &BlobEvent) -> bool {
+		self.store.root_key() == event.store.root_key()
+			&& self.store.subdir().join(&self.path)
+				== event.root_relative_path()
+	}
+
 	/// Insert (or overwrite) the blob's content.
 	///
 	/// # Example

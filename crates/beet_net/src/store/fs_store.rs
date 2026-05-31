@@ -10,7 +10,7 @@ use bytes::Bytes;
 ///
 /// ## Default
 /// The default store is relative to the workspace root.
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
 #[component(on_add = BlobStore::on_add::<Self>)]
 pub struct FsStore {
@@ -79,6 +79,12 @@ impl BlobStoreProvider for FsStore {
 			}),
 		})
 	}
+
+	fn id(&self) -> &'static str { "fs" }
+
+	fn root_key(&self) -> SmolStr { format!("fs:{}", self.path).into() }
+
+	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> { None }
 

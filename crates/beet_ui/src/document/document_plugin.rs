@@ -8,7 +8,8 @@ use beet_core::prelude::*;
 ///
 /// This plugin:
 /// - Links [`FieldRef`] components to their associated documents
-/// - Automatically updates [`Value`] when documents change
+/// - Automatically updates [`Value`] when documents change (read path)
+/// - Writes a changed [`Value`] back into its document field (write-back)
 ///
 /// # Example
 ///
@@ -44,6 +45,8 @@ impl Plugin for DocumentPlugin {
 			.register_type::<OnMissingField>()
 			.register_type::<FieldRef>()
 			.register_type::<FieldSegment>()
+			.register_type::<DocumentScope>()
+			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>();
 
 		// Register action types when the action feature is enabled
@@ -59,10 +62,31 @@ impl Plugin for DocumentPlugin {
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
+			.add_observer(resolve_field_path)
+			// the document sync chain runs after the async sync point so an
+			// async field write (eg refresh_blob_store_list) lands the same pass
 			.add_systems(
 				PreUpdate,
-				(update_document_values, update_reactive_children).chain(),
+				(
+					update_resolved_field_paths,
+					sync_document_to_local,
+					sync_resolved_path_changes,
+					sync_local_to_document,
+					update_reactive_children,
+				)
+					.chain()
+					.after(async_world_sync_point::<BeetAsyncSyncPoint>),
 			);
+
+		// re-list a changed BlobStore into its backing field, before the sync
+		// chain renders it, also after the async sync point
+		#[cfg(feature = "net")]
+		app.add_systems(
+			PreUpdate,
+			refresh_blob_store_list
+				.after(async_world_sync_point::<BeetAsyncSyncPoint>)
+				.before(sync_document_to_local),
+		);
 	}
 }
 

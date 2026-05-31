@@ -123,6 +123,12 @@ impl BlobStoreProvider for IndexedDbStore {
 		})
 	}
 
+	fn id(&self) -> &'static str { "indexeddb" }
+
+	fn root_key(&self) -> SmolStr { format!("indexeddb:{}", self.db_name).into() }
+
+	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+
 	fn region(&self) -> Option<String> { None }
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {

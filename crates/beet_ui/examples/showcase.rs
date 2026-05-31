@@ -11,9 +11,9 @@
 //! ```
 //! then open <http://localhost:8337>.
 //!
-//! Slot wiring is still pending for scene widgets, so `<Select>`/`<Table>`
-//! options and rows are written as raw markup (with semantic [`Classes`], not
-//! `class="…"` strings) until consumer slots land.
+//! `<Select>`/`<Table>` options and rows flow into the widgets' slots: caller
+//! content written between the tags is auto-wired into the matching `<slot>`
+//! at spawn time (see `beet_ui::scene::apply_slots`).
 use beet_core::prelude::*;
 use beet_net::prelude::DEFAULT_SERVER_PORT;
 use beet_net::prelude::HttpServer;
@@ -23,6 +23,9 @@ use beet_net::prelude::ServerPlugin;
 use beet_net::prelude::exchange_handler;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
+// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
+// `bevy::scene` one also glob-imported via `beet_core::prelude`.
+use beet_ui::prelude::WorldSceneExt;
 use beet_ui::*;
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -144,26 +147,22 @@ fn gallery() -> impl Scene {
 				<TextField name="email" placeholder="Email" variant=TextFieldVariant::Outlined/>
 				<TextField name="filled" placeholder="Filled" variant=TextFieldVariant::Filled/>
 				<TextArea name="bio" placeholder="Bio"/>
-				// Select options are raw markup (consumer slot wiring is pending)
-				<select {Classes::new([classes::SELECT, classes::SELECT_OUTLINED])} name="fruit">
+				// options flow into the Select's default slot
+				<Select name="fruit">
 					<option>"Apple"</option>
 					<option>"Banana"</option>
-				</select>
+				</Select>
 				<ErrorText message="This field is required"/>
 			</section>
 
-			// ── Table (raw markup; slot wiring pending) ───────────────────────
+			// ── Table (rows flow into head/default slots) ─────────────────────
 			<section>
 				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Table"</h2>
-				<table {Classes::new([classes::TABLE])}>
-					<thead>
-						<tr><th>"Name"</th><th>"Role"</th></tr>
-					</thead>
-					<tbody>
-						<tr><td>"Ada"</td><td>"Engineer"</td></tr>
-						<tr><td>"Grace"</td><td>"Admiral"</td></tr>
-					</tbody>
-				</table>
+				<Table>
+					<tr slot="head"><th>"Name"</th><th>"Role"</th></tr>
+					<tr><td>"Ada"</td><td>"Engineer"</td></tr>
+					<tr><td>"Grace"</td><td>"Admiral"</td></tr>
+				</Table>
 			</section>
 
 			// ── Sidebar (widget) ──────────────────────────────────────────────

@@ -212,12 +212,17 @@ fn tokenize_component_scene(
 	});
 	parts.extend(block_parts);
 
+	// caller children of a component tag carry a `SlotChild` marker so the
+	// slot-wiring pass can route them into the widget's `<slot>` elements,
+	// distinct from the widget's own structural subtree.
 	let child_scenes: Vec<TokenStream> = el
 		.children
 		.iter()
 		.map(|child| {
 			let scene = tokenize_node_scene(child);
-			quote! { EntityScene(#scene) }
+			quote! {
+				EntityScene((template_value(SlotChild), #scene))
+			}
 		})
 		.collect();
 	if !child_scenes.is_empty() {

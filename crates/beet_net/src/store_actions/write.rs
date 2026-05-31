@@ -11,6 +11,9 @@ pub struct WriteBlobParams {
 }
 
 /// Completely replace a blob in the nearest ancestor [`BlobStore`].
+///
+/// Emits a [`BlobEvent`] on success, covering the wasm same-tab gap and giving
+/// s3 reactivity that no external watcher provides.
 #[action]
 #[derive(Component, Reflect)]
 pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
@@ -20,7 +23,18 @@ pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
 			query.get(entity).cloned()
 		})
 		.await??;
-	store.insert(&cx.input.path, cx.input.bytes).await
+	// existence picks Created vs Changed so a new object refreshes the listing
+	let existed = store.exists(&cx.input.path).await.unwrap_or(false);
+	store.insert(&cx.input.path, cx.input.bytes).await?;
+	let kind = match existed {
+		true => BlobEventKind::Changed,
+		false => BlobEventKind::Created,
+	};
+	cx.caller
+		.world()
+		.trigger(BlobEvent::new(store, cx.input.path, kind))
+		.await;
+	Ok(())
 }
 
 

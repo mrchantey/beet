@@ -45,6 +45,12 @@ impl BlobStoreProvider for S3FsStore {
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.active().with_subdir(path)
 	}
+	fn id(&self) -> &'static str { self.active().id() }
+	fn root_key(&self) -> SmolStr { self.active().root_key() }
+	fn subdir(&self) -> SmolPath { self.active().subdir() }
+	fn did_change(&self, event: &BlobEvent) -> bool {
+		self.active().did_change(event)
+	}
 	fn region(&self) -> Option<String> {
 		self.active().region()
 	}

@@ -80,6 +80,14 @@ impl BlobStoreProvider for LocalStorageStore {
 		})
 	}
 
+	fn id(&self) -> &'static str { "localstorage" }
+
+	fn root_key(&self) -> SmolStr {
+		format!("localstorage:{}", self.store_name).into()
+	}
+
+	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+
 	fn region(&self) -> Option<String> { None }
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
@@ -195,6 +203,86 @@ impl BlobStoreProvider for LocalStorageStore {
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}
+}
+
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::Ordering;
+use std::rc::Rc;
+
+/// A single global `storage` event listener forwarding cross-tab localStorage
+/// mutations into the [`BlobEventBus`], refcounted across all
+/// [`LocalStorageStore`]s.
+///
+/// `storage` only fires for *other* tabs, so same-tab writes are covered by the
+/// write-path [`BlobEvent`] trigger instead. Installed by
+/// [`add_local_storage_store_watcher`] on the first store, torn down on the last.
+///
+/// `!Send` (it owns the JS closure), so it lives in a [`NonSend`](bevy::ecs::system::NonSend)
+/// resource.
+#[derive(Default)]
+pub struct LocalStorageBlobWatcher {
+	/// Cleared on the last unsubscribe to stop the forwarding task.
+	alive: Option<Rc<AtomicBool>>,
+	/// Number of active [`LocalStorageStore`]s.
+	subscribers: usize,
+}
+
+/// Install the global `storage` listener on the first [`LocalStorageStore`].
+pub fn add_local_storage_store_watcher(
+	_ev: On<Add, LocalStorageStore>,
+	bus: Res<BlobEventBus>,
+	spawner: Res<AsyncSpawner>,
+	mut watcher: NonSendMut<LocalStorageBlobWatcher>,
+) {
+	watcher.subscribers += 1;
+	if watcher.subscribers > 1 {
+		return;
+	}
+	let alive = Rc::new(AtomicBool::new(true));
+	watcher.alive = Some(alive.clone());
+	let sender = bus.sender.clone();
+	spawner.spawn_local(async move {
+		let mut listener =
+			HtmlEventListener::<web_sys::StorageEvent>::new("storage");
+		while alive.load(Ordering::Relaxed) {
+			let Some(ev) = listener.next_event().await else {
+				break;
+			};
+			if let Some(event) = storage_event_to_blob(&ev) {
+				sender.try_send(event).ok();
+			}
+		}
+	});
+}
+
+/// Drop the refcount, tearing down the listener on the last
+/// [`LocalStorageStore`].
+pub fn remove_local_storage_store_watcher(
+	_ev: On<Remove, LocalStorageStore>,
+	mut watcher: NonSendMut<LocalStorageBlobWatcher>,
+) {
+	watcher.subscribers = watcher.subscribers.saturating_sub(1);
+	if watcher.subscribers == 0 {
+		if let Some(alive) = watcher.alive.take() {
+			alive.store(false, Ordering::Relaxed);
+		}
+	}
+}
+
+/// Map a `storage` event to a [`BlobEvent`], or `None` if its key is not a beet
+/// store key. Derives the kind from `oldValue` / `newValue` null-ness.
+fn storage_event_to_blob(ev: &web_sys::StorageEvent) -> Option<BlobEvent> {
+	let key = ev.key()?;
+	// key format: `store:{store_name}:{path}`
+	let rest = key.strip_prefix("store:")?;
+	let (store_name, path) = rest.split_once(':')?;
+	let kind = match (ev.old_value().is_some(), ev.new_value().is_some()) {
+		(false, true) => BlobEventKind::Created,
+		(true, false) => BlobEventKind::Removed,
+		_ => BlobEventKind::Changed,
+	};
+	let store = BlobStore::new(LocalStorageStore::new(store_name));
+	Some(BlobEvent::new(store, SmolPath::new(path), kind))
 }
 
 #[cfg(test)]

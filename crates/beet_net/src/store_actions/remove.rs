@@ -9,6 +9,9 @@ pub struct RemoveBlobParams {
 }
 
 /// Remove a blob from the nearest ancestor [`BlobStore`].
+///
+/// Emits a `Removed` [`BlobEvent`] on success, covering the wasm same-tab gap
+/// and giving s3 reactivity that no external watcher provides.
 #[action]
 #[derive(Component, Reflect)]
 pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
@@ -18,7 +21,12 @@ pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
 			query.get(entity).cloned()
 		})
 		.await??;
-	store.remove(&cx.input.path).await
+	store.remove(&cx.input.path).await?;
+	cx.caller
+		.world()
+		.trigger(BlobEvent::new(store, cx.input.path, BlobEventKind::Removed))
+		.await;
+	Ok(())
 }
 
 

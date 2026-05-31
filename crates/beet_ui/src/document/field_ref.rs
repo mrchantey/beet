@@ -164,6 +164,17 @@ where
 }
 
 impl<T> TypedFieldRef<T> {
+	/// Re-type an existing [`FieldRef`] as a [`TypedFieldRef<T>`].
+	///
+	/// For places that hold an erased [`FieldRef`] (ie read from a component)
+	/// but know its `T`, so typed reads/writes can go through [`FieldQuery`].
+	pub fn from_field(field: FieldRef) -> Self {
+		Self {
+			field,
+			_marker: PhantomData,
+		}
+	}
+
 	/// Clone the inner [`FieldRef`], for places that need an owned ref rather
 	/// than a deref borrow, ie `ReactiveChildren::new(items.field(), ..)` or a
 	/// `children![items.field()]` markup slot.

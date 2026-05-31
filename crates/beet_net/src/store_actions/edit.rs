@@ -46,9 +46,13 @@ pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
 		text = text.replacen(&edit.old_text, &edit.new_text, 1);
 	}
 
-	store
-		.insert(&cx.input.path, text.into_bytes())
-		.await
+	store.insert(&cx.input.path, text.into_bytes()).await?;
+	// the object already existed, so this is a byte Change
+	cx.caller
+		.world()
+		.trigger(BlobEvent::new(store, cx.input.path, BlobEventKind::Changed))
+		.await;
+	Ok(())
 }
 
 /// Validate that all edits are present, unique, and non-overlapping.
