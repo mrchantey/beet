@@ -73,8 +73,7 @@ fn setup(async_commands: AsyncCommands) {
 fn route_bundle() -> impl Bundle {
 	(
 		CliServer::default(),
-		router(),
-		children![
+		default_router(children![
 			(
 				Script::<(), String>::rhai(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
@@ -101,6 +100,6 @@ fn route_bundle() -> impl Bundle {
 				ExchangeScript::<RequestParts, String, _, _>::default(),
 				PathPartial::new("greet-request"),
 			),
-		],
+		]),
 	)
 }

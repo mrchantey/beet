@@ -5,7 +5,7 @@ use beet_net::prelude::*;
 
 /// Serves prebuilt HTML from a [`BlobStore`], gating live rendering.
 ///
-/// Add it alongside a [`router`](crate::prelude::router). It requires the
+/// Add it alongside a [`default_router`](crate::prelude::default_router). It requires the
 /// [`HtmlStoreAction`] middleware, which in `ssg_mode` serves
 /// `<path>/index.html` from `store` and only renders live on a store miss; with
 /// `ssg_mode` off it always renders live.
@@ -92,9 +92,9 @@ mod test {
 	async fn ssg_serves_prebuilt() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), HtmlStore::ssg(html_store().await), children![
+			.spawn((default_router(children![
 				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
-			]))
+			]), HtmlStore::ssg(html_store().await)))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -109,9 +109,9 @@ mod test {
 	async fn ssr_renders_live() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), HtmlStore::ssr(html_store().await), children![
+			.spawn((default_router(children![
 				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
-			]))
+			]), HtmlStore::ssr(html_store().await)))
 			.call::<Request, Response>(Request::get("about"))
 			.await
 			.unwrap()
@@ -124,9 +124,9 @@ mod test {
 	async fn ssg_falls_through_on_miss() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), HtmlStore::ssg(html_store().await), children![
+			.spawn((default_router(children![
 				render_action::fixed_route("contact", rsx_direct!{ <p>"live contact"</p> })
-			]))
+			]), HtmlStore::ssg(html_store().await)))
 			.call::<Request, Response>(Request::get("contact"))
 			.await
 			.unwrap()

@@ -21,12 +21,6 @@
 mod http_server;
 pub use http_server::*;
 
-// Pure HTTP/1.1 wire helpers (parse/serialise on byte buffers + beet's
-// Request/Response). no_std and backend-agnostic, so the std mini server and a
-// downstream embedded backend share them. Compiled unconditionally.
-mod http_ext;
-pub use http_ext::*;
-
 #[cfg(feature = "std")]
 mod cli_server;
 #[cfg(feature = "std")]

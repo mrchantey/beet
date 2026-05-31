@@ -67,7 +67,7 @@ pub async fn serve_blob(store: &BlobStore, path: &SmolPath) -> Result<Response> 
 }
 
 
-// the tests assemble a full `router()` and a temp fs-backed store (both std).
+// the tests assemble a full `default_router` and a temp fs-backed store (both std).
 #[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
@@ -117,7 +117,7 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn((router(), children![serve_store("assets", store)]))
+			.spawn(default_router(children![serve_store("assets", store)]))
 			.call::<Request, Response>(Request::get("assets/style.css"))
 			.await
 			.unwrap()
@@ -134,7 +134,7 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn((router(), children![serve_store("foo", store)]))
+			.spawn(default_router(children![serve_store("foo", store)]))
 			.call::<Request, Response>(Request::get("foo/bar"))
 			.await
 			.unwrap()

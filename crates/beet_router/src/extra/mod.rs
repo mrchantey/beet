@@ -19,12 +19,12 @@ mod analytics;
 pub use analytics::*;
 
 // std-only: the app-info scene route renders through beet_ui, and the
-// batteries-included `default_router` wires it alongside `router()`.
+// batteries-included `default_router` wires it as one of its children when std.
 #[cfg(feature = "std")]
 mod app_info;
 #[cfg(feature = "std")]
 pub use app_info::*;
-#[cfg(all(feature = "json", feature = "std"))]
+// The single router builder, available on std and no_std. The feature-specific
+// app routes (`app-info`, `analytics`) are gated inside the module.
 mod default_router;
-#[cfg(all(feature = "json", feature = "std"))]
 pub use default_router::*;

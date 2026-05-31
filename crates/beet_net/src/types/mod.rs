@@ -55,7 +55,6 @@ mod http_method;
 mod status_code;
 pub use http_method::*;
 pub use status_code::*;
-#[cfg(feature = "http")]
 pub mod http_ext;
 
 // higher-level exchange patterns built on the action system. `exchange` only

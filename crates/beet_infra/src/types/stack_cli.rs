@@ -6,15 +6,16 @@ use beet_router::prelude::*;
 pub fn stack_cli() -> impl Bundle {
 	(
 		CliServer::default(),
-		router(),
-		OnSpawn::insert_child(Validate),
-		OnSpawn::insert_child(Plan),
-		OnSpawn::insert_child(Apply),
-		OnSpawn::insert_child(Show),
-		OnSpawn::insert_child(List),
-		OnSpawn::insert_child(Destroy),
-		OnSpawn::insert_child(Rollback),
-		OnSpawn::insert_child(Rollforward),
+		default_router((
+			OnSpawn::insert_child(Validate),
+			OnSpawn::insert_child(Plan),
+			OnSpawn::insert_child(Apply),
+			OnSpawn::insert_child(Show),
+			OnSpawn::insert_child(List),
+			OnSpawn::insert_child(Destroy),
+			OnSpawn::insert_child(Rollback),
+			OnSpawn::insert_child(Rollforward),
+		)),
 	)
 }
 

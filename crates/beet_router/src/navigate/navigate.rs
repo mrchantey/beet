@@ -253,6 +253,14 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
+	/// A minimal router bundle for the navigation tests: the [`Router`] dispatch
+	/// action plus the [`NavigateHandler`] middleware under test, and nothing
+	/// else. Unlike [`default_router`], it wires no opinionated app routes, so
+	/// the sibling/first-child ordering these tests assert is not perturbed.
+	fn nav_router<B: Bundle>(routes: B) -> impl Bundle {
+		(Router, NavigateHandler::default(), children![routes])
+	}
+
 	#[beet_core::test]
 	fn navigate_to_from_str() {
 		NavigateTo::from_str_param("parent")
@@ -282,7 +290,7 @@ mod test {
 	async fn navigate_parent_from_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![
+			.spawn(nav_router(children![
 				render_action::fixed_route("", rsx_direct!{ <h1>"Root"</h1> }),
 				render_action::fixed_route("about", rsx_direct!{ <p>"About page"</p> }),
 			]))
@@ -304,7 +312,7 @@ mod test {
 	async fn navigate_first_child() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![
+			.spawn(nav_router(children![
 				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
 				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
 			]))
@@ -326,7 +334,7 @@ mod test {
 	async fn navigate_next_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![
+			.spawn(nav_router(children![
 				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
 				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
 			]))
@@ -361,7 +369,7 @@ mod test {
 	async fn navigate_prev_sibling_wraps() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![
+			.spawn(nav_router(children![
 				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
 				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
 			]))
@@ -384,7 +392,7 @@ mod test {
 	async fn navigate_without_param_passes_through() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), children![render_action::fixed_route(
+			.spawn(nav_router(children![render_action::fixed_route(
 				"about",
 				rsx_direct!{ <p>"About page"</p> }
 			),]))

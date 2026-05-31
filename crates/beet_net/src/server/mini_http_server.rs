@@ -93,9 +93,10 @@ async fn handle_connection(
 	buf.truncate(bytes_read);
 
 	// Check if we need to read more bytes based on Content-Length
-	let header_end = find_header_end(&buf);
+	let header_end = http_ext::find_header_end(&buf);
 	if let Some(header_end_pos) = header_end {
-		let content_length = parse_content_length(&buf[..header_end_pos]);
+		let content_length =
+			http_ext::parse_content_length(&buf[..header_end_pos]);
 		if content_length > 0 {
 			let body_start = header_end_pos;
 			let body_received = buf.len() - body_start;
@@ -118,7 +119,7 @@ async fn handle_connection(
 	}
 
 	// Parse the raw HTTP request into our Request type
-	let request = parse_http_request(&buf)?;
+	let request = http_ext::parse_http_request(&buf)?;
 
 	// Dispatch through the entity's exchange
 	let response: Response = entity.exchange(request).await;
@@ -131,7 +132,8 @@ async fn handle_connection(
 				parts,
 				body: Body::Bytes(bytes),
 			};
-			let raw_response = serialize_http_response(response).await?;
+			let raw_response =
+				http_ext::serialize_http_response(response).await?;
 			stream.write_all(&raw_response).await?;
 			stream.flush().await?;
 		}
@@ -180,7 +182,7 @@ mod test {
 
 	// -- integration test via shared suite --
 	// (pure parse/serialise unit tests live with the shared helpers in
-	// `server::http_ext`.)
+	// `crate::types::http_ext`.)
 
 	#[cfg(feature = "ureq")]
 	#[beet_core::test]

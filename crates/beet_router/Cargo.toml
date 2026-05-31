@@ -14,7 +14,7 @@ categories.workspace = true
 
 [features]
 default = ["std", "markdown"]
-# Enables the std-only surface: the assembled router (`router()`/`RouterPlugin`),
+# Enables the std-only surface: the scene-rendering router pieces (help/navigate
 # scene routes + rendering (`beet_ui`), media parsing, sidebar, help, and static
 # export. The no_std core — route tree, path patterns, navigation, standalone
 # middleware, and the server-action client — builds with this off.

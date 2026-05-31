@@ -31,11 +31,12 @@ pub use route_tree::*;
 mod server_action_client;
 pub use server_action_client::*;
 
-// The `Router` dispatch action, the `router()` bundle, and the route-building
-// `RouterPlugin` are shared across std and no_std (one `Router` type, one
-// plugin). The std-only scene/help rendering pipeline stays feature-gated inside
-// them and in the `help`/`sidebar` modules below; the no_std build falls back to
-// a plain-text route listing and a lean `router()` bundle.
+// The `Router` dispatch action and the route-building `RouterPlugin` are shared
+// across std and no_std (one `Router` type, one plugin). The single builder that
+// assembles them with the standard middleware and app routes is `default_router`
+// (in `extra`). The std-only scene/help rendering pipeline stays feature-gated
+// inside these and in the `help`/`sidebar` modules below; the no_std build falls
+// back to a plain-text route listing.
 mod router;
 pub use router::*;
 mod router_plugin;

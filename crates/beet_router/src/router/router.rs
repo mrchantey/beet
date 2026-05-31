@@ -3,35 +3,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Creates a router bundle with logging, help, and navigate middleware.
-///
-/// This is the standard way to set up routing. It includes:
-/// - [`Router`] for route lookup and dispatch
-/// - [`RequestLogger`] middleware for per-request logging
-/// - [`HelpHandler`] middleware for `--help` support
-/// - [`NavigateHandler`] middleware for `--navigate` support
-///
-/// All components are [`Reflect`] so the bundle round-trips through a scene.
-#[cfg(feature = "std")]
-pub fn router() -> impl Bundle {
-	(
-		Router,
-		RequestLogger::default(),
-		HelpHandler::default(),
-		NavigateHandler::default(),
-	)
-}
-
-/// Creates a router bundle: just the [`Router`] dispatch action.
-///
-/// The `no_std` counterpart of the std [`router()`], kept lean for
-/// memory-constrained targets: it omits the `HelpHandler` / `NavigateHandler`
-/// middleware (which render through the std-only scene pipeline) and the
-/// per-request [`RequestLogger`]. Add [`RequestLogger`] or any other
-/// `Request`/`Response` [`Middleware`] to the bundle yourself if wanted.
-#[cfg(not(feature = "std"))]
-pub fn router() -> impl Bundle { (Router,) }
-
 /// Routes a request to the matching action in the [`RouteTree`],
 /// applying ancestor [`MiddlewareList`] around the matched action.
 ///
@@ -41,12 +12,11 @@ pub fn router() -> impl Bundle { (Router,) }
 /// scene). Middleware such as [`HelpHandler`] and [`NavigateHandler`] wrap the
 /// inner action so they can intercept before dispatch.
 ///
-/// `Reflect` is derived only on std (no_std drops the scene/serialization
-/// pipeline that consumes it), but the type itself is shared across both.
+/// `Reflect` is derived unconditionally: reflection works on no_std and is
+/// wanted there for scene loading. The type itself is shared across both.
 #[action(handler_only)]
-#[derive(Debug, Default, Clone, Component)]
-#[cfg_attr(feature = "std", derive(Reflect))]
-#[cfg_attr(feature = "std", reflect(Component))]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub async fn Router(cx: ActionContext<Request>) -> Response {
 	let caller = cx.caller.clone();
 	let world = cx.world();
@@ -181,7 +151,7 @@ mod test {
 	#[beet_core::test]
 	async fn dynamic_segment_reaches_handler() {
 		router_world()
-			.spawn((router(), children![exchange_route(
+			.spawn(default_router(children![exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -196,7 +166,7 @@ mod test {
 	#[beet_core::test]
 	async fn greedy_segment_reaches_handler() {
 		router_world()
-			.spawn((router(), children![exchange_route(
+			.spawn(default_router(children![exchange_route(
 				"files/*path",
 				EchoParams
 			)]))
@@ -211,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	async fn path_param_wins_over_query_param() {
 		router_world()
-			.spawn((router(), children![exchange_route(
+			.spawn(default_router(children![exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -228,7 +198,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn((router(), children![render_action::fixed_route(
+			.spawn(default_router(children![render_action::fixed_route(
 				"about",
 				rsx_direct!{ <p>"About page"</p> }
 			),]))
@@ -244,7 +214,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn((router(), children![render_action::fixed_route(
+			.spawn(default_router(children![render_action::fixed_route(
 				"",
 				rsx_direct!{ <p>"Root content"</p> }
 			),]))
@@ -259,7 +229,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				render_action::fixed_route(
 					"",
 					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -278,7 +248,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		router_world()
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
@@ -293,7 +263,7 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_help_request() {
 		router_world()
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
@@ -307,7 +277,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn((router(), children![increment(FieldRef::new("count")),]))
+			.spawn(default_router(children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent"),
 			)
@@ -320,7 +290,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				render_action::fixed_route(
 					"",
 					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -341,7 +311,7 @@ mod test {
 		let mut world = router_world();
 
 		let root = world
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				(
 					render_action::fixed_route(
 						"counter",
@@ -369,7 +339,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn((router(), children![increment(FieldRef::new("count")),]))
+			.spawn(default_router(children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent"),
 			)
@@ -385,7 +355,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		router_world()
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				(
 					render_action::fixed_route(
 						"counter",
@@ -429,7 +399,7 @@ mod test {
 		}
 
 		router_world()
-			.spawn((router(), children![exchange_route("ticks", Ticks)]))
+			.spawn(default_router(children![exchange_route("ticks", Ticks)]))
 			.call::<Request, Response>(Request::get("ticks"))
 			.await
 			.unwrap()

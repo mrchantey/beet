@@ -49,13 +49,13 @@ async fn main() -> Result {
 	let before = document.0.clone();
 
 	let root = world
-		.spawn((document, router(), children![
+		.spawn((document, default_router(children![
 			create(),
 			read(),
 			update(),
 			delete(),
 			list(),
-		]))
+		])))
 		.flush();
 
 	// a CLI invocation is just a request: the path selects the route and

@@ -28,10 +28,29 @@ impl Plugin for RouterPlugin {
 			.add_observer(insert_path_pattern_for_late_path_partial)
 			.add_observer(insert_route_tree);
 
+		// no_std-core reflect registrations: these types are shared across std
+		// and no_std and reflection works on bare metal, so register them
+		// unconditionally to keep scene-loading reflection available on no_std.
+		// `register_type` initialises the `AppTypeRegistry` if the app has not
+		// added one, so this is safe without an explicit registry.
+		app.register_type::<InterruptOnRun>()
+			.register_type::<InterruptOnEnd>()
+			.register_type::<PathPartial>()
+			.register_type::<ParamsPartial>()
+			.register_type::<PathPattern>()
+			.register_type::<ParamsPattern>()
+			.register_type::<RequestLogger>()
+			.register_type::<NoCacheHeaders>()
+			.register_type::<CorsHandler>()
+			.register_type::<CorsConfig>()
+			.register_type::<HtmlStoreAction>()
+			.register_type::<Router>();
+
 		// std-only: the scene/asset/charcell rendering pipeline (help pages,
-		// markdown/html scenes → ANSI/text) and the reflect registrations that
-		// back it. no_std routers dispatch and fall back to plain text without
-		// any of this.
+		// markdown/html scenes → ANSI/text) and the reflect registrations for
+		// the help/navigate middleware, which live in the std-only `help` /
+		// `navigate` render-media modules. no_std routers dispatch and fall back
+		// to plain text without any of this.
 		#[cfg(feature = "std")]
 		{
 			app
@@ -44,19 +63,7 @@ impl Plugin for RouterPlugin {
 				.init_plugin::<AssetPlugin>()
 				.init_plugin::<ScenePlugin>()
 				.register_type::<HelpHandler>()
-				.register_type::<NavigateHandler>()
-				.register_type::<InterruptOnRun>()
-				.register_type::<InterruptOnEnd>()
-				.register_type::<PathPartial>()
-				.register_type::<ParamsPartial>()
-				.register_type::<PathPattern>()
-				.register_type::<ParamsPattern>()
-				.register_type::<RequestLogger>()
-				.register_type::<NoCacheHeaders>()
-				.register_type::<CorsHandler>()
-				.register_type::<CorsConfig>()
-				.register_type::<HtmlStoreAction>()
-				.register_type::<Router>();
+				.register_type::<NavigateHandler>();
 			#[cfg(feature = "world_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			#[cfg(feature = "scripting")]

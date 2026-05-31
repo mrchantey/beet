@@ -41,7 +41,8 @@ mod test {
 				hits.0 += 1;
 			},
 		);
-		let root = world.spawn((router(), children![analytics_handler()])).flush();
+		// `default_router` already wires `analytics_handler()` under json + std.
+		let root = world.spawn(default_router(())).flush();
 		let payload = r#"{"event_type":"click","client_timestamp":1,"event_data":{},"session_data":{}}"#;
 
 		world

@@ -2,7 +2,8 @@
 //!
 //! Each collection emits a `pub fn <name>_routes() -> impl Bundle` that spawns
 //! one child per route via [`spawn_with`], so multiple collections can be merged
-//! onto a single `router()` entity without clobbering each other's children.
+//! onto a single router entity (eg passed together to `default_router`) without
+//! clobbering each other's children.
 
 use crate::route_codegen::syn_utils::action_input_ty;
 use crate::route_codegen::syn_utils::action_output_ty;
@@ -89,7 +90,7 @@ pub(crate) fn emit_collection(
 
 	let collection_ident = format_ident!("{}_routes", collection.name()?);
 	// A uniquely-typed `OnSpawnTyped` effect that appends each route as a child.
-	// Multiple collections compose onto one `router()` entity this way without
+	// Multiple collections compose onto one router entity this way without
 	// clobbering each other, and without the duplicate-`Children` error that a
 	// shared `SpawnRelated` bundle would cause.
 	let body = quote! {

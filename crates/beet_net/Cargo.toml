@@ -53,6 +53,21 @@ server = [
 "dep:async-io",
 "dep:futures-lite",
 ]
+# The std impl of the trait-only `UdpEndpoint`/`UdpSocket` seam over `async-io`.
+# The trait itself (in `src/udp/udp_socket.rs`) is no_std and always compiled;
+# only this std backend needs a runtime, so it (and the std mDNS browser driver)
+# ride this feature. esp supplies its own `edge-nal`-backed impl downstream.
+udp = [
+"std",
+"dep:async-io",
+"dep:futures-lite",
+]
+# The agnostic mDNS service browser: pure `PTR`/`SRV`/`TXT`/`A` wire helpers plus
+# the bytes-and-world ECS engine (a `UdpPacket` event, a `DiscoveredServices`
+# resource, `ServiceDiscovered`/`ServiceRemoved` events). The parse + engine are
+# no_std (esp consumes them); the std socket driver `run_mdns_browser` needs the
+# `udp` backend, so enable `mdns` + `udp` together to browse on a host.
+mdns = []
 hyper = [
 "server",
 "dep:hyper",

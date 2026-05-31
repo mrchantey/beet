@@ -32,6 +32,10 @@ mod net_plugin;
 // backends (mini/hyper/lambda) and the cli/repl servers stay std/feature-gated
 // inside the module.
 mod server;
+// The udp module is no_std-capable: the trait-only `UdpEndpoint`/`UdpSocket`
+// seam compiles unconditionally; the std `async-io` impl is std-gated and the
+// mDNS browser engine sits behind the `mdns` feature, all inside the module.
+mod udp;
 /// WebSocket client and server implementations.
 #[cfg(feature = "std")]
 pub mod sockets;
@@ -68,6 +72,7 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
 	pub use crate::server::*;
+	pub use crate::udp::*;
 	#[cfg(feature = "std")]
 	pub use crate::sockets;
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]

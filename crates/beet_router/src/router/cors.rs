@@ -135,9 +135,7 @@ mod test {
 
 	fn spawn_cors(world: &mut World, config: CorsConfig) -> Entity {
 		world
-			.spawn((router(), cors(config), children![exchange_route(
-				"", Hello
-			)]))
+			.spawn((default_router(children![exchange_route("", Hello)]), cors(config)))
 			.flush()
 	}
 

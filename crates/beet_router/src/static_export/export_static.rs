@@ -99,8 +99,11 @@ mod test {
 	#[beet_core::test]
 	async fn exports_static_scenes() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		// `default_router` also wires the std-only `/app-info` scene route, which
+		// reads a `PackageConfig` at render; insert one so it exports cleanly.
+		world.insert_resource(pkg_config!());
 		let router = world
-			.spawn((router(), children![
+			.spawn(default_router(children![
 				(
 					render_action::fixed_route("about", rsx_direct!{ <p>"About"</p> }),
 					HttpMethod::Get
@@ -121,7 +124,9 @@ mod test {
 			.await
 			.unwrap();
 
-		written.len().xpect_eq(2);
+		// the two user scene routes plus the `app-info` route wired by
+		// `default_router`.
+		written.len().xpect_eq(3);
 		out.get(&SmolPath::new("index.html"))
 			.await
 			.unwrap()
@@ -132,5 +137,10 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("About");
+		out.get(&SmolPath::new("app-info/index.html"))
+			.await
+			.unwrap()
+			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+			.xpect_contains("App Info");
 	}
 }

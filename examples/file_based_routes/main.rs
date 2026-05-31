@@ -68,10 +68,11 @@ fn content_store() -> FsStore {
 fn site() -> impl Bundle {
 	(
 		content_store(),
-		router(),
-		pages_routes(),
-		content_routes(),
-		actions_routes(),
+		default_router((
+			pages_routes(),
+			content_routes(),
+			actions_routes(),
+		)),
 	)
 }
 

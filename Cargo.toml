@@ -281,6 +281,14 @@ bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithrea
 # beet_router's std HTTP-server surface, which a no_std consumer (`router_embedded`)
 # must avoid. The std `router`/`http_server` features re-add it explicitly.
 net = ["dep:beet_net"]
+# The agnostic mDNS service browser engine + pure wire helpers (no_std). esp
+# enables this for the browser and supplies its own `edge-nal`-backed UDP socket
+# impl; on a host, pair with `udp` to get the std `async-io` socket driver.
+mdns = ["net", "beet_net/mdns"]
+# The std impl of beet_net's trait-only UDP socket seam over `async-io` (the
+# `UdpEndpoint`/`UdpSocket` trait itself is in `net`, always no_std). Needed by
+# the std mDNS browser driver `run_mdns_browser`.
+udp = ["net", "beet_net/udp"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
