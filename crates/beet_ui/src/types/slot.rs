@@ -1,6 +1,16 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// Marks an entity as caller-provided content for a component's slots.
+///
+/// Emitted by the scene `rsx!` lowering on every child of a component tag
+/// (`<Foo>…children…</Foo>`), so [`apply_slots`] can tell caller content from
+/// the widget's own structural subtree — both end up as plain [`ChildOf`]
+/// children of the same composition root after spawn.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[reflect(Default, Component)]
+pub struct SlotChild;
+
 /// The container entity tracking the content for the slot.
 ///
 /// When a [`NodeWalker`] visits an entity with this component,

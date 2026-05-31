@@ -250,6 +250,7 @@ web-sys = { workspace = true, features = [
 	'BinaryType',
 	# localstorage
 	"Storage",
+	"StorageEvent",
 	# indexeddb
 	"IdbFactory",
 	"IdbOpenDbRequest",

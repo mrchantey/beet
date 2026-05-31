@@ -181,6 +181,12 @@ impl BlobStoreProvider for BlobStore {
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.provider.with_subdir(path)
 	}
+	fn id(&self) -> &'static str { self.provider.id() }
+	fn root_key(&self) -> SmolStr { self.provider.root_key() }
+	fn subdir(&self) -> SmolPath { self.provider.subdir() }
+	fn did_change(&self, event: &BlobEvent) -> bool {
+		self.provider.did_change(event)
+	}
 	fn region(&self) -> Option<String> { self.provider.region() }
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		self.provider.store_exists()

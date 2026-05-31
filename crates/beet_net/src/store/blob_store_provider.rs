@@ -21,6 +21,30 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 		Blob::new(BlobStore::new(self.box_clone()), path)
 	}
 
+	/// Stable family discriminator, ie `"fs"`, `"memory"`, `"localstorage"`,
+	/// `"s3"`.
+	fn id(&self) -> &'static str;
+
+	/// [`id`](Self::id) plus the backing-instance identity, *without* the subdir.
+	/// Two stores with the same `root_key` are the same effective store:
+	/// - fs:           `"fs:{path}"`             (the base store directory)
+	/// - memory:       `"memory:{instance_id}"`  (incrementing id per `new`)
+	/// - localstorage: `"localstorage:{store_name}"`
+	/// - s3:           `"s3:{bucket}"`           (unwatchable)
+	fn root_key(&self) -> SmolStr;
+
+	/// This store's `subdir` within its [`root_key`](Self::root_key), empty for
+	/// the root. Used for per-event routing.
+	fn subdir(&self) -> SmolPath { SmolPath::default() }
+
+	/// True if `event` concerns an object inside this store's scope: same
+	/// backing, and the event's root-relative location is this scope or a child
+	/// of it.
+	fn did_change(&self, event: &BlobEvent) -> bool {
+		self.root_key() == event.store.root_key()
+			&& key_covers(&self.subdir(), &event.root_relative_path())
+	}
+
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
 
@@ -196,6 +220,12 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { self.as_ref().box_clone() }
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
+	}
+	fn id(&self) -> &'static str { self.as_ref().id() }
+	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }
+	fn subdir(&self) -> SmolPath { self.as_ref().subdir() }
+	fn did_change(&self, event: &BlobEvent) -> bool {
+		self.as_ref().did_change(event)
 	}
 	fn region(&self) -> Option<String> { self.as_ref().region() }
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {

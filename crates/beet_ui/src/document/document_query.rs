@@ -11,6 +11,9 @@ pub struct DocumentQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	doc_query: Query<'w, 's, &'static mut Document>,
 	schemas: Query<'w, 's, &'static DocumentSchema>,
+	/// Shared upward resolver for the [`DocumentScope`] prefix, so reads and
+	/// writes scope through the same walk.
+	scopes: ScopeQuery<'w, 's>,
 	commands: Commands<'w, 's>,
 }
 
@@ -61,19 +64,20 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		func: impl FnOnce(&mut Value) -> Out,
 	) -> Result<Out> {
 		let doc_entity = self.entity(subject, &field.document);
+		// resolve the scope prefix fresh, so writes are reactive by construction
+		let field_path = self.scopes.resolved_path(subject, &field.field_path);
 
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
-			let value = if let Ok(value) = doc.get_field_mut(&field.field_path)
-			{
+			let value = if let Ok(value) = doc.get_field_mut(&field_path) {
 				value
 			} else if let OnMissingField::Init { value: init_value } =
 				&field.on_missing
 			{
-				doc.insert(&field.field_path, init_value)?
+				doc.insert(&field_path, init_value)?
 			} else {
 				return Err(DocumentError::ObjectKeyNotFound {
-					path: field.field_path.clone(),
-					key: format!("{:?}", field.field_path),
+					path: field_path.clone(),
+					key: format!("{:?}", field_path),
 				}
 				.into());
 			};
@@ -83,14 +87,14 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		{
 			// create the document and run the method with it
 			let mut doc = Document::default();
-			let value = doc.insert(&field.field_path, init_value)?;
+			let value = doc.insert(&field_path, init_value)?;
 			let out = func(value);
 			self.commands.entity(doc_entity).insert(doc);
 			Ok(out)
 		} else {
 			Err(DocumentError::ObjectKeyNotFound {
-				path: field.field_path.clone(),
-				key: format!("{:?}", field.field_path),
+				path: field_path.clone(),
+				key: format!("{:?}", field_path),
 			}
 			.into())
 		}
@@ -105,8 +109,10 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		field: &FieldRef,
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
+		// schema paths are authored against the resolved (absolute) path
+		let field_path = self.scopes.resolved_path(subject, &field.field_path);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
-			schema.assert_field_type::<T>(&field.field_path)?;
+			schema.assert_field_type::<T>(&field_path)?;
 		}
 		Ok(())
 	}
@@ -119,8 +125,10 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		field: &FieldRef,
 	) -> Result {
 		let doc_entity = self.entity(subject, &field.document);
+		// schema paths are authored against the resolved (absolute) path
+		let field_path = self.scopes.resolved_path(subject, &field.field_path);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
-			schema.assert_list_item_type::<T>(&field.field_path)?;
+			schema.assert_list_item_type::<T>(&field_path)?;
 		}
 		Ok(())
 	}

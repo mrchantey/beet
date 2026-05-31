@@ -238,6 +238,27 @@ impl Value {
 		}
 	}
 
+	/// Apply a text edit, returning whether the value actually changed.
+	///
+	/// `Str` and `Null` are editable (`Null` starts an empty string and is
+	/// promoted to `Str`); every other variant is left untouched. A no-op edit
+	/// on an existing `Str` (eg backspace at the start) returns `false`.
+	pub fn edit_text(&mut self, func: impl FnOnce(&mut String)) -> bool {
+		let (mut text, was_str) = match self {
+			Value::Str(text) => (text.to_string(), true),
+			Value::Null => (String::new(), false),
+			_ => return false,
+		};
+		let before = text.clone();
+		func(&mut text);
+		// promotion from Null always counts; an unchanged Str does not
+		if was_str && text == before {
+			return false;
+		}
+		*self = Value::Str(text.into());
+		true
+	}
+
 	/// Returns this value as a byte slice.
 	///
 	/// ## Errors
@@ -639,6 +660,29 @@ mod test {
 		] {
 			Value::parse_string(test_case).xpect_eq(Value::new(test_case));
 		}
+	}
+
+	#[crate::test]
+	fn edit_text_coercion() {
+		// Str is editable and reports the change
+		let mut value = Value::str("hi");
+		value.edit_text(|text| text.push('!')).xpect_true();
+		value.xpect_eq(Value::str("hi!"));
+
+		// Null promotes to Str, even when the edit leaves it empty
+		let mut value = Value::Null;
+		value.edit_text(|_| {}).xpect_true();
+		value.xpect_eq(Value::str(""));
+
+		// a no-op edit on an existing Str returns false
+		let mut value = Value::str("hi");
+		value.edit_text(|_| {}).xpect_false();
+		value.xpect_eq(Value::str("hi"));
+
+		// non-text variants are left untouched
+		let mut value = Value::Int(5);
+		value.edit_text(|text| text.push('x')).xpect_false();
+		value.xpect_eq(Value::Int(5));
 	}
 
 	#[crate::test]

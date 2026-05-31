@@ -30,7 +30,7 @@ impl ReactiveChildren {
 	/// Track `field` (a list field), spawning a child per item via `build_item`.
 	///
 	/// Returns a bundle pairing the [`FieldRef`] with the [`ReactiveChildren`]:
-	/// the ref's `on_add` inserts the synced [`Value`] and `update_document_values`
+	/// the ref's `on_add` inserts the synced [`Value`] and `sync_document_to_local`
 	/// keeps it current, so the rebuild rides `Changed<Value>`.
 	pub fn new(
 		field: FieldRef,
@@ -44,18 +44,24 @@ impl ReactiveChildren {
 
 /// System that rebuilds [`ReactiveChildren`] when their synced [`Value`] changes.
 ///
-/// Chained after [`update_document_values`](super::update_document_values),
+/// Chained after [`sync_document_to_local`](super::sync_document_to_local),
 /// which writes the [`Value`] and marks it `Changed`, so the rebuild reads the
 /// current list the same pass, including the initial generation.
 pub(super) fn update_reactive_children(
 	mut commands: Commands,
 	changed: Populated<
-		(Entity, &Value, &ReactiveChildren, Option<&Children>),
+		(
+			Entity,
+			&Value,
+			&ResolvedFieldPath,
+			&ReactiveChildren,
+			Option<&Children>,
+		),
 		Changed<Value>,
 	>,
 	reactive_children: Query<(), With<ReactiveChild>>,
 ) -> Result {
-	for (entity, value, reactive, children) in changed.iter() {
+	for (entity, value, resolved, reactive, children) in changed.iter() {
 		// despawn the previous generation: this entity's ReactiveChild children
 		if let Some(children) = children {
 			children
@@ -69,6 +75,12 @@ pub(super) fn update_reactive_children(
 				commands.spawn((
 					ChildOf(entity),
 					ReactiveChild,
+					// the child's fully-resolved absolute item path, terminating
+					// so an inner FieldRef does not double-count outer scopes
+					DocumentScope {
+						path: resolved.field_path.with_pushed(index),
+						terminate: true,
+					},
 					(reactive.build_item)(index, item),
 				));
 			}
@@ -233,5 +245,78 @@ mod test {
 		world.entity_mut(doc).trigger_target(PopItem).flush();
 		world.update_local();
 		child_count(&mut world, list).xpect_eq(1);
+	}
+
+	/// Collect the [`Value`] of each leaf entity carrying a [`FieldRef`].
+	fn field_values(world: &mut World) -> Vec<Value> {
+		world
+			.query_once::<(&Value, &FieldRef)>()
+			.iter()
+			.map(|(value, _)| (*value).clone())
+			.collect()
+	}
+
+	#[beet_core::test]
+	fn child_field_resolves_to_item() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(val!({
+				"items": [{ "name": "Alice" }, { "name": "Bob" }]
+			})))
+			.id();
+		world.spawn((
+			ChildOf(doc),
+			ReactiveChildren::new(FieldRef::new("items"), |_, _| {
+				// each child reads its own item's "name", scoped to items[N]
+				OnSpawn::insert((Value::default(), FieldRef::new("name")))
+			}),
+		));
+		// children spawn the first pass, their FieldRef resolves and syncs the
+		// next, so a second pass settles the leaf values
+		world.update_local();
+		world.update_local();
+
+		let values = field_values(&mut world);
+		values.contains(&Value::Str("Alice".into())).xpect_true();
+		values.contains(&Value::Str("Bob".into())).xpect_true();
+	}
+
+	#[beet_core::test]
+	fn nested_list_no_double_count() {
+		let mut world = DocumentPlugin::world();
+		// outer list of groups, each with an inner list of items
+		let doc = world
+			.spawn(Document::new(val!({
+				"groups": [
+					{ "items": [{ "name": "a0" }, { "name": "a1" }] },
+					{ "items": [{ "name": "b0" }] }
+				]
+			})))
+			.id();
+		// the outer ReactiveChildren spawns one child per group; each group child
+		// hosts an inner ReactiveChildren over its own "items"
+		world.spawn((
+			ChildOf(doc),
+			ReactiveChildren::new(FieldRef::new("groups"), |_, _| {
+				OnSpawn::insert(ReactiveChildren::new(
+					FieldRef::new("items"),
+					|_, _| {
+						OnSpawn::insert((Value::default(), FieldRef::new("name")))
+					},
+				))
+			}),
+		));
+		// outer children -> outer FieldRef syncs -> inner children -> inner
+		// FieldRef syncs -> leaf "name" syncs: four staged passes
+		for _ in 0..4 {
+			world.update_local();
+		}
+
+		// leaves resolve to groups[G].items[I].name without double-counting the
+		// outer groups[G] prefix (the terminating child scope seals it)
+		let values = field_values(&mut world);
+		values.contains(&Value::Str("a0".into())).xpect_true();
+		values.contains(&Value::Str("a1".into())).xpect_true();
+		values.contains(&Value::Str("b0".into())).xpect_true();
 	}
 }

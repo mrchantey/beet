@@ -97,6 +97,10 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
+	fn id(&self) -> &'static str { "s3" }
+
+	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }
+
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
