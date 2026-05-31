@@ -18,7 +18,7 @@ fn main() -> AppExit {
 /// Spawns the CLI server with every command wired as a route.
 fn setup(mut commands: Commands) {
 	commands
-		.spawn((CliServer::default(), default_router(())))
+		.spawn((CliServer::default(), default_router()))
 		.with_children(|parent| {
 			parent.spawn(exchange_route("run-wasm/*args", RunWasm));
 			parent.spawn(exchange_route("build-wasm", BuildWasm));

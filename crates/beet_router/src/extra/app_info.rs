@@ -42,7 +42,7 @@ mod test {
 		world.insert_resource(pkg_config!());
 		// `default_router` already wires `app_info()` as a child under std.
 		world
-			.spawn(default_router(()))
+			.spawn(default_router())
 			.call::<Request, Response>(Request::get("app-info"))
 			.await
 			.unwrap()

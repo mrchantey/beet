@@ -1,30 +1,30 @@
 //! The agnostic mDNS service **Browser** engine: bytes-and-world, no sockets.
 //!
-//! This is the platform-independent half of decision 4 / phase 2 in
-//! `agent/plans/mdns.md`. It enumerates instances of a service type on the LAN
-//! and surfaces them in the ECS as **state plus events**, never as a request:
+//! This is the platform-independent half of the mDNS browser. It enumerates
+//! instances of a service type on the LAN and surfaces each as **one entity**
+//! carrying an [`MDnsService`] component, so downstream code observes discoveries
+//! with a plain `Query<&MDnsService>` (or `On<Add, MDnsService>` /
+//! `On<Remove, MDnsService>` observers) instead of a bespoke event/resource API:
 //!
 //! - a low-level [`UdpPacket`] `{ from, bytes }` global event is the seam: every
 //!   inbound datagram becomes one, regardless of how it arrived (the std driver
 //!   in this crate, or a downstream esp embassy loop bridging across silicon);
 //! - an [`observer`](handle_udp_packet) parses each datagram's mDNS records
-//!   ([`super::mdns`]) and reconciles the live set;
-//! - the live set lives in the [`DiscoveredServices`] resource, and the observer
-//!   triggers [`ServiceDiscovered`] / [`ServiceRemoved`] as it changes.
+//!   ([`super::wire`]) and reconciles the live set of [`MDnsService`] entities:
+//!   spawning one when an instance first resolves, updating it in place when its
+//!   host/port/addr change, and despawning it on an mDNS goodbye (TTL=0).
 //!
 //! All of the above is `&mut World`-only, so it is fully agnostic. The only
 //! platform-specific piece is *driving the socket*: binding it, joining
 //! multicast, periodically sending the `PTR` query, and turning each
 //! `recv_from` into a [`UdpPacket`]. On std the socket runtime and the world
 //! runtime coincide, so [`run_mdns_browser`] drives the socket directly with no
-//! bridge (see [`super::impl_async_io`]). On esp that loop lives on embassy and
-//! bridges datagrams into `world.trigger(UdpPacket)`; everything in *this* module
-//! is reused unchanged.
+//! bridge (see [`super::super::udp::impl_async_io`]). On esp that loop lives on
+//! embassy and bridges datagrams into `world.trigger(UdpPacket)`; everything in
+//! *this* module is reused unchanged.
 
-use super::mdns;
-use super::mdns::Record;
-#[cfg(feature = "udp")]
-use super::UdpEndpoint;
+use super::wire;
+use super::wire::Record;
 use beet_core::prelude::*;
 use core::net::Ipv4Addr;
 use core::net::SocketAddr;
@@ -43,37 +43,31 @@ pub struct UdpPacket {
 	pub bytes: Vec<u8>,
 }
 
-/// A discovered (or refreshed) service instance.
+/// A resolved mDNS service instance, one per discovered device, as a [`Component`].
 ///
-/// Triggered when an instance first appears, or when a previously known
-/// instance's host/port/addr is (re)learned. Carries the full resolved record;
-/// listeners can act without touching [`DiscoveredServices`].
-#[derive(Debug, Clone, Event)]
-pub struct ServiceDiscovered(pub ServiceInstance);
-
-/// A service instance that has left the network (an mDNS *goodbye*, TTL=0).
-#[derive(Debug, Clone, Event)]
-pub struct ServiceRemoved(pub ServiceInstance);
-
-/// A resolved service instance: the correlated `PTR`+`SRV`+`A`(+`TXT`) for one
-/// device.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServiceInstance {
+/// The browser engine spawns an entity with this component when a service
+/// instance first resolves (a usable `SRV` host+port), updates it in place when
+/// the instance's host/port/addr change, and despawns the entity on an mDNS
+/// goodbye (TTL=0). Downstream code queries `&MDnsService` to act on discovered
+/// services, and can use `On<Add, MDnsService>` / `On<Remove, MDnsService>`
+/// observers for the appear/leave edges.
+#[derive(Debug, Clone, PartialEq, Eq, Component)]
+pub struct MDnsService {
 	/// The service type queried, e.g. `_http._tcp.local`.
-	pub service_type: String,
+	pub service_type: SmolStr,
 	/// The instance name, e.g. `My Device._http._tcp.local`.
-	pub instance: String,
+	pub instance: SmolStr,
 	/// The target host, e.g. `my-device.local` (from `SRV`).
-	pub host: String,
+	pub host: SmolStr,
 	/// The service port (from `SRV`).
 	pub port: u16,
 	/// The host's IPv4 (from `A`), once known.
 	pub addr: Option<Ipv4Addr>,
 	/// `TXT` metadata entries, if any.
-	pub txt: Vec<String>,
+	pub txt: Vec<SmolStr>,
 }
 
-impl ServiceInstance {
+impl MDnsService {
 	/// The socket address to reach this instance, once both the `A` record and
 	/// `SRV` port are known.
 	pub fn socket_addr(&self) -> Option<SocketAddr> {
@@ -81,51 +75,22 @@ impl ServiceInstance {
 	}
 }
 
-/// The live set of discovered service instances, keyed by instance name.
-///
-/// Maintained by [`handle_udp_packet`]; read by application systems. This is the
-/// browser's "state" half — the subscription's current value — complementing the
-/// [`ServiceDiscovered`] / [`ServiceRemoved`] "events" half.
-#[derive(Debug, Clone, Default, Resource)]
-pub struct DiscoveredServices {
-	/// Instance name -> resolved instance.
-	pub instances: HashMap<String, ServiceInstance>,
-}
-
-impl DiscoveredServices {
-	/// All currently-known instances.
-	pub fn iter(&self) -> impl Iterator<Item = &ServiceInstance> {
-		self.instances.values()
-	}
-	/// Look up an instance by its full name.
-	pub fn get(&self, instance: &str) -> Option<&ServiceInstance> {
-		self.instances.get(instance)
-	}
-	/// The number of known instances.
-	pub fn len(&self) -> usize {
-		self.instances.len()
-	}
-	/// Whether no instances are known.
-	pub fn is_empty(&self) -> bool {
-		self.instances.is_empty()
-	}
-}
-
 /// Config component describing a service type to browse for.
 ///
 /// Spawn an entity carrying this (and, on the driving side, the socket) to start
 /// a browser. The agnostic engine only reads the `service_type`; the
-/// [`UdpEndpoint`] the socket is opened from is supplied by the driver
-/// ([`run_mdns_browser`] on std), keeping this component platform-free.
+/// [`UdpEndpoint`](crate::udp::UdpEndpoint) the socket is opened from is supplied
+/// by the driver ([`run_mdns_browser`] on std), keeping this component
+/// platform-free.
 #[derive(Debug, Clone, Component)]
 pub struct MdnsBrowser {
 	/// The DNS-SD service type to enumerate, e.g. `_http._tcp.local`.
-	pub service_type: String,
+	pub service_type: SmolStr,
 }
 
 impl MdnsBrowser {
 	/// Browse for the given service type, e.g. `"_http._tcp.local"`.
-	pub fn new(service_type: impl Into<String>) -> Self {
+	pub fn new(service_type: impl Into<SmolStr>) -> Self {
 		Self {
 			service_type: service_type.into(),
 		}
@@ -137,7 +102,7 @@ impl MdnsBrowser {
 }
 
 /// Plugin wiring the agnostic browser engine into an [`App`]: registers the
-/// [`DiscoveredServices`] resource and the [`handle_udp_packet`] observer.
+/// [`handle_udp_packet`] observer that maintains the [`MDnsService`] entities.
 ///
 /// This is all that's needed on *any* platform; the socket driver is added
 /// separately (on std via [`run_mdns_browser`]).
@@ -146,64 +111,63 @@ pub struct MdnsBrowserPlugin;
 
 impl Plugin for MdnsBrowserPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<DiscoveredServices>()
-			.add_observer(handle_udp_packet);
+		app.add_observer(handle_udp_packet);
 	}
 }
 
 /// Observer: parse an inbound [`UdpPacket`] as an mDNS response and reconcile
-/// [`DiscoveredServices`], triggering [`ServiceDiscovered`] / [`ServiceRemoved`].
+/// the live set of [`MDnsService`] entities (spawn / update / despawn).
 ///
 /// Pure decision logic over the world — no IO. Correlates the `PTR`/`SRV`/`A`/
 /// `TXT` records in one packet by name. A `SRV`/`A` with TTL `0` is an mDNS
-/// goodbye: the instance is removed. The set of service types to browse is taken
-/// from every [`MdnsBrowser`] entity in the world, so a packet is only acted on
-/// for types we actually asked about.
+/// goodbye: the matching entity is despawned. The set of service types to browse
+/// is taken from every [`MdnsBrowser`] entity in the world, so a packet is only
+/// acted on for types we actually asked about.
 fn handle_udp_packet(
 	ev: On<UdpPacket>,
 	browsers: Query<&MdnsBrowser>,
-	mut discovered: ResMut<DiscoveredServices>,
+	mut services: Query<(Entity, &mut MDnsService)>,
 	mut commands: Commands,
 ) {
-	let Some(response) = mdns::parse_response(&ev.event().bytes) else {
+	let Some(response) = wire::parse_response(&ev.event().bytes) else {
 		return;
 	};
 
 	// Reconcile against every browsed service type.
 	for browser in browsers.iter() {
-		let service_type = browser.service_type.as_str();
+		let service_type = browser.service_type.clone();
 
+		// Instances named directly by a PTR in this packet.
 		for instance in response
-			.ptr_instances(service_type)
-			.map(|s| s.to_string())
+			.ptr_instances(&service_type)
+			.map(SmolStr::new)
 			.collect::<Vec<_>>()
 		{
 			reconcile_instance(
-				service_type,
+				&service_type,
 				&instance,
 				&response,
-				&mut discovered,
+				&mut services,
 				&mut commands,
 			);
 		}
 
 		// A response may carry SRV/A updates (or a goodbye) for an
 		// already-known instance without re-sending its PTR. Reconcile those
-		// too, by walking the records for instances we already track under this
-		// service type.
-		let known: Vec<String> = discovered
-			.instances
-			.values()
-			.filter(|inst| inst.service_type == service_type)
-			.map(|inst| inst.instance.clone())
+		// too, by walking the instances we already track under this service
+		// type whose SRV the packet touches.
+		let known: Vec<SmolStr> = services
+			.iter()
+			.filter(|(_, svc)| svc.service_type == service_type)
+			.map(|(_, svc)| svc.instance.clone())
 			.collect();
 		for instance in known {
 			if response.srv_for(&instance).is_some() {
 				reconcile_instance(
-					service_type,
+					&service_type,
 					&instance,
 					&response,
-					&mut discovered,
+					&mut services,
 					&mut commands,
 				);
 			}
@@ -211,24 +175,31 @@ fn handle_udp_packet(
 	}
 }
 
-/// Reconcile a single instance against one parsed response, mutating
-/// [`DiscoveredServices`] and queuing the appropriate event.
+/// Reconcile a single instance against one parsed response: spawn a fresh
+/// [`MDnsService`] entity, update the existing one in place, or despawn it on a
+/// goodbye.
 fn reconcile_instance(
-	service_type: &str,
-	instance: &str,
-	response: &mdns::MdnsResponse,
-	discovered: &mut DiscoveredServices,
+	service_type: &SmolStr,
+	instance: &SmolStr,
+	response: &wire::MdnsResponse,
+	services: &mut Query<(Entity, &mut MDnsService)>,
 	commands: &mut Commands,
 ) {
+	// Locate any existing entity for this instance.
+	let existing = services
+		.iter()
+		.find(|(_, svc)| &svc.instance == instance)
+		.map(|(entity, svc)| (entity, svc.clone()));
+
 	// A goodbye is an SRV or A record for this instance/host with TTL 0.
 	let mut goodbye = false;
 
 	// Start from the known instance (so partial updates merge) or a fresh one.
-	let mut inst = discovered.instances.get(instance).cloned().unwrap_or(
-		ServiceInstance {
-			service_type: service_type.to_string(),
-			instance: instance.to_string(),
-			host: String::new(),
+	let mut next = existing.as_ref().map(|(_, svc)| svc.clone()).unwrap_or(
+		MDnsService {
+			service_type: service_type.clone(),
+			instance: instance.clone(),
+			host: SmolStr::default(),
 			port: 0,
 			addr: None,
 			txt: Vec::new(),
@@ -242,44 +213,48 @@ fn reconcile_instance(
 		if *ttl == 0 {
 			goodbye = true;
 		}
-		inst.host = host.clone();
-		inst.port = *port;
+		next.host = host.clone();
+		next.port = *port;
 	}
 
-	if !inst.host.is_empty()
-		&& let Some(Record::A { addr, ttl, .. }) = response.a_for(&inst.host)
+	if !next.host.is_empty()
+		&& let Some(Record::A { addr, ttl, .. }) = response.a_for(&next.host)
 	{
 		if *ttl == 0 {
 			goodbye = true;
 		}
-		inst.addr = Some(*addr);
+		next.addr = Some(*addr);
 	}
 
 	if let Some(Record::Txt { entries, .. }) = response.txt_for(instance) {
-		inst.txt = entries.clone();
+		next.txt = entries.clone();
 	}
 
 	if goodbye {
-		if let Some(removed) = discovered.instances.remove(instance) {
-			commands.trigger(ServiceRemoved(removed));
+		if let Some((entity, _)) = existing {
+			commands.entity(entity).despawn();
 		}
 		return;
 	}
 
 	// We need at least a host+port (a usable SRV) before announcing.
-	if inst.host.is_empty() || inst.port == 0 {
+	if next.host.is_empty() || next.port == 0 {
 		return;
 	}
 
-	let changed = match discovered.instances.get(instance) {
-		Some(existing) => existing != &inst,
-		None => true,
-	};
-	if changed {
-		discovered
-			.instances
-			.insert(instance.to_string(), inst.clone());
-		commands.trigger(ServiceDiscovered(inst));
+	match existing {
+		// Update an existing entity in place only if something changed.
+		Some((entity, prev)) => {
+			if prev != next
+				&& let Ok((_, mut svc)) = services.get_mut(entity)
+			{
+				*svc = next;
+			}
+		}
+		// First sighting: spawn a new service entity.
+		None => {
+			commands.spawn(next);
+		}
 	}
 }
 
@@ -302,14 +277,14 @@ pub const DEFAULT_QUERY_INTERVAL_MS: u64 = 5_000;
 /// This is the std analogue of the esp embassy loop: it binds a socket on the
 /// mDNS port, joins the multicast group, sends an initial `PTR` query, then
 /// concurrently (a) reads datagrams and triggers [`UdpPacket`] (which the
-/// [`handle_udp_packet`] observer turns into resource updates + events) and (b)
+/// [`handle_udp_packet`] observer turns into [`MDnsService`] entities) and (b)
 /// re-sends the query on an interval. It never returns on its own; spawn it as
 /// an async task (e.g. via `run_async_local`).
 ///
 /// `world` is an [`AsyncWorld`] handle so the loop can trigger events into the
 /// ECS without any bridge — on std the socket runtime *is* the world runtime.
 #[cfg(feature = "udp")]
-pub async fn run_mdns_browser<E: UdpEndpoint>(
+pub async fn run_mdns_browser<E: crate::udp::UdpEndpoint>(
 	world: AsyncWorld,
 	endpoint: E,
 	service_type: String,
@@ -344,7 +319,7 @@ pub async fn run_mdns_browser<E: UdpEndpoint>(
 /// host (or test) can drive the same engine over loopback / unicast without the
 /// `5353` + multicast assumptions — useful where multicast is unavailable (CI).
 #[cfg(feature = "udp")]
-pub async fn run_mdns_browser_on<E: UdpEndpoint>(
+pub async fn run_mdns_browser_on<E: crate::udp::UdpEndpoint>(
 	world: AsyncWorld,
 	endpoint: E,
 	service_type: String,
@@ -353,7 +328,7 @@ pub async fn run_mdns_browser_on<E: UdpEndpoint>(
 	target: core::net::SocketAddr,
 	multicast_group: Option<core::net::Ipv4Addr>,
 ) -> Result {
-	use super::UdpSocket;
+	use crate::udp::UdpSocket;
 	use core::net::SocketAddr;
 	use futures_lite::FutureExt;
 
@@ -364,7 +339,7 @@ pub async fn run_mdns_browser_on<E: UdpEndpoint>(
 
 	// Build the query once; it never changes for a given service type.
 	let mut query = [0u8; 256];
-	let query_len = mdns::build_ptr_query(&mut query, &service_type)
+	let query_len = wire::build_ptr_query(&mut query, &service_type)
 		.ok_or_else(|| bevyhow!("mDNS service type too long: {service_type}"))?;
 	let query = &query[..query_len];
 
@@ -441,8 +416,8 @@ mod test {
 		buf.extend_from_slice(&0u16.to_be_bytes());
 
 		write_name(&mut buf, service_type);
-		buf.extend_from_slice(&mdns::TYPE_PTR.to_be_bytes());
-		buf.extend_from_slice(&mdns::CLASS_IN.to_be_bytes());
+		buf.extend_from_slice(&wire::TYPE_PTR.to_be_bytes());
+		buf.extend_from_slice(&wire::CLASS_IN.to_be_bytes());
 		buf.extend_from_slice(&ttl.to_be_bytes());
 		let mut ptr = Vec::new();
 		write_name(&mut ptr, instance);
@@ -450,8 +425,8 @@ mod test {
 		buf.extend_from_slice(&ptr);
 
 		write_name(&mut buf, instance);
-		buf.extend_from_slice(&mdns::TYPE_SRV.to_be_bytes());
-		buf.extend_from_slice(&mdns::CLASS_IN.to_be_bytes());
+		buf.extend_from_slice(&wire::TYPE_SRV.to_be_bytes());
+		buf.extend_from_slice(&wire::CLASS_IN.to_be_bytes());
 		buf.extend_from_slice(&ttl.to_be_bytes());
 		let mut srv = Vec::new();
 		srv.extend_from_slice(&0u16.to_be_bytes());
@@ -462,8 +437,8 @@ mod test {
 		buf.extend_from_slice(&srv);
 
 		write_name(&mut buf, host);
-		buf.extend_from_slice(&mdns::TYPE_A.to_be_bytes());
-		buf.extend_from_slice(&mdns::CLASS_IN.to_be_bytes());
+		buf.extend_from_slice(&wire::TYPE_A.to_be_bytes());
+		buf.extend_from_slice(&wire::CLASS_IN.to_be_bytes());
 		buf.extend_from_slice(&ttl.to_be_bytes());
 		buf.extend_from_slice(&4u16.to_be_bytes());
 		buf.extend_from_slice(&addr.octets());
@@ -471,30 +446,14 @@ mod test {
 	}
 
 	/// Feed a crafted datagram through the agnostic `UdpPacket` path (no socket)
-	/// and assert the resource + events behave. This exercises the same code the
-	/// std driver and the esp bridge both feed.
+	/// and assert the [`MDnsService`] entities behave: one spawned on discovery,
+	/// despawned on goodbye. This exercises the same code the std driver and the
+	/// esp bridge both feed.
 	#[beet_core::test]
 	fn discover_and_remove_via_packet_path() {
-		use std::sync::Arc;
-		use std::sync::Mutex;
-
 		let mut app = App::new();
 		app.add_plugins((MinimalPlugins, MdnsBrowserPlugin));
 		app.world_mut().spawn(MdnsBrowser::http());
-
-		// Capture the discovered/removed events via observers.
-		let discovered_log = Arc::new(Mutex::new(Vec::<String>::new()));
-		let removed_log = Arc::new(Mutex::new(Vec::<String>::new()));
-		{
-			let log = discovered_log.clone();
-			app.add_observer(move |ev: On<ServiceDiscovered>| {
-				log.lock().unwrap().push(ev.event().0.instance.clone());
-			});
-			let log = removed_log.clone();
-			app.add_observer(move |ev: On<ServiceRemoved>| {
-				log.lock().unwrap().push(ev.event().0.instance.clone());
-			});
-		}
 
 		let addr = Ipv4Addr::new(192, 168, 1, 42);
 		let discover = browse_response(
@@ -506,7 +465,7 @@ mod test {
 			120,
 		);
 
-		// Trigger discovery.
+		// Trigger discovery: one service entity should appear.
 		app.world_mut().trigger(UdpPacket {
 			from: SocketAddr::from((addr, 5353)),
 			bytes: discover,
@@ -514,24 +473,20 @@ mod test {
 		app.update();
 
 		{
-			let services = app.world().resource::<DiscoveredServices>();
-			services.len().xpect_eq(1);
-			let inst =
-				services.get("My Device._http._tcp.local").unwrap();
-			inst.host.as_str().xpect_eq("my-device.local");
-			inst.port.xpect_eq(8337);
-			inst.addr.xpect_eq(Some(addr));
-			inst.socket_addr()
+			let mut query = app.world_mut().query::<&MDnsService>();
+			let found: Vec<_> = query.iter(app.world()).collect();
+			found.len().xpect_eq(1);
+			let svc = found[0];
+			svc.instance.as_str().xpect_eq("My Device._http._tcp.local");
+			svc.host.as_str().xpect_eq("my-device.local");
+			svc.port.xpect_eq(8337);
+			svc.addr.xpect_eq(Some(addr));
+			svc.socket_addr()
 				.unwrap()
 				.xpect_eq(SocketAddr::from((addr, 8337)));
 		}
-		discovered_log
-			.lock()
-			.unwrap()
-			.clone()
-			.xpect_eq(vec!["My Device._http._tcp.local".to_string()]);
 
-		// A goodbye (TTL=0) removes it.
+		// A goodbye (TTL=0) despawns the entity.
 		let goodbye = browse_response(
 			"_http._tcp.local",
 			"My Device._http._tcp.local",
@@ -546,25 +501,17 @@ mod test {
 		});
 		app.update();
 
-		app.world()
-			.resource::<DiscoveredServices>()
-			.is_empty()
-			.xpect_true();
-		removed_log
-			.lock()
-			.unwrap()
-			.clone()
-			.xpect_eq(vec!["My Device._http._tcp.local".to_string()]);
+		let mut query = app.world_mut().query::<&MDnsService>();
+		query.iter(app.world()).count().xpect_eq(0);
 	}
 
 	/// End-to-end over a real `async-io` socket on loopback (no multicast, so
 	/// it's deterministic in CI): a test "responder" socket answers the
 	/// browser's `PTR` query with a crafted `PTR`/`SRV`/`A` response, and we
-	/// assert the live [`DiscoveredServices`] resource picks it up, then a
-	/// goodbye removes it. This drives the full std path:
-	/// `run_mdns_browser_on` -> bind -> query -> recv -> `UdpPacket` ->
-	/// observer -> resource, with the socket runtime and world runtime
-	/// coincident (no bridge).
+	/// assert an [`MDnsService`] entity appears, then a goodbye despawns it.
+	/// This drives the full std path: `run_mdns_browser_on` -> bind -> query ->
+	/// recv -> `UdpPacket` -> observer -> entity, with the socket runtime and
+	/// world runtime coincident (no bridge).
 	#[cfg(feature = "udp")]
 	#[beet_core::test]
 	async fn browse_over_loopback_socket() {
@@ -585,22 +532,14 @@ mod test {
 		let responder = async_io::Async::new(responder).unwrap();
 
 		// Run the browser inside an App on a background thread, reporting the
-		// live resource out on every update so this side can poll it.
-		let (tx, rx) = std::sync::mpsc::channel::<DiscoveredServices>();
+		// count of discovered service entities out on every update.
+		let (tx, rx) = std::sync::mpsc::channel::<usize>();
 		let target = responder_addr;
 		std::thread::spawn(move || {
 			let mut app = App::new();
-			// `AsyncPlugin` supplies the std async runtime (`AsyncWorld`/
-			// `AsyncSpawner`) the driver runs on; the agnostic
-			// `MdnsBrowserPlugin` doesn't force it (it's no_std-capable).
 			app.add_plugins((MinimalPlugins, AsyncPlugin, MdnsBrowserPlugin));
 			app.world_mut().spawn(MdnsBrowser::http());
 
-			// Spawn the std driver from a Startup system, so the async runtime
-			// (`AsyncSpawner`/`AsyncWorld`) is already installed by the runner.
-			// The driver obtains the `AsyncWorld` from its entity handle and
-			// triggers `UdpPacket`s straight into this world — no bridge, since
-			// the socket and world runtimes coincide on std.
 			let bind = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0));
 			app.add_systems(
 				Startup,
@@ -625,8 +564,8 @@ mod test {
 
 			app.add_systems(
 				Update,
-				move |services: Res<DiscoveredServices>| {
-					let _ = tx.send(services.clone());
+				move |services: Query<&MDnsService>| {
+					let _ = tx.send(services.iter().count());
 				},
 			);
 			app.run();
@@ -639,37 +578,28 @@ mod test {
 			browse_response(SERVICE, INSTANCE, HOST, 8337, addr, 120);
 		responder.send_to(&discover, browser_src).await.unwrap();
 
-		// Poll the reported resource until the instance shows up.
-		let discovered = wait_for(&rx, |services| {
-			services
-				.get(INSTANCE)
-				.map(|inst| inst.port == 8337 && inst.addr == Some(addr))
-				.unwrap_or(false)
-		})
-		.await;
-		discovered.get(INSTANCE).unwrap().host.as_str().xpect_eq(HOST);
+		// Poll the reported count until the instance shows up.
+		wait_for(&rx, |count| *count == 1).await;
 
 		// Send a goodbye (TTL=0) and assert removal.
 		let goodbye = browse_response(SERVICE, INSTANCE, HOST, 8337, addr, 0);
 		responder.send_to(&goodbye, browser_src).await.unwrap();
-		let removed = wait_for(&rx, |services| services.get(INSTANCE).is_none())
-			.await;
-		removed.is_empty().xpect_true();
+		wait_for(&rx, |count| *count == 0).await;
 	}
 
-	/// Poll the resource snapshots coming over `rx` until `pred` holds, with a
-	/// generous timeout so a flaky datagram doesn't hang CI.
+	/// Poll the counts coming over `rx` until `pred` holds, with a generous
+	/// timeout so a flaky datagram doesn't hang CI.
 	#[cfg(feature = "udp")]
 	async fn wait_for(
-		rx: &std::sync::mpsc::Receiver<DiscoveredServices>,
-		pred: impl Fn(&DiscoveredServices) -> bool,
-	) -> DiscoveredServices {
+		rx: &std::sync::mpsc::Receiver<usize>,
+		pred: impl Fn(&usize) -> bool,
+	) {
 		let deadline =
 			std::time::Instant::now() + std::time::Duration::from_secs(10);
 		loop {
 			while let Ok(snapshot) = rx.try_recv() {
 				if pred(&snapshot) {
-					return snapshot;
+					return;
 				}
 			}
 			if std::time::Instant::now() > deadline {

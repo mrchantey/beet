@@ -38,7 +38,7 @@ struct GreetRequest {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn((CliServer::default(), default_router(children![
+	commands.spawn((CliServer::default(), (default_router(), children![
 		exchange_route("", Action::<(), &str>::new_pure(|_| { "hello world" })),
 		exchange_route(
 			"foo",

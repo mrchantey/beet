@@ -92,7 +92,7 @@ mod test {
 	async fn ssg_serves_prebuilt() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((default_router(children![
+			.spawn(((default_router(), children![
 				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
 			]), HtmlStore::ssg(html_store().await)))
 			.call::<Request, Response>(Request::get("about"))
@@ -109,7 +109,7 @@ mod test {
 	async fn ssr_renders_live() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((default_router(children![
+			.spawn(((default_router(), children![
 				render_action::fixed_route("about", rsx_direct!{ <p>"live about"</p> })
 			]), HtmlStore::ssr(html_store().await)))
 			.call::<Request, Response>(Request::get("about"))
@@ -124,7 +124,7 @@ mod test {
 	async fn ssg_falls_through_on_miss() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((default_router(children![
+			.spawn(((default_router(), children![
 				render_action::fixed_route("contact", rsx_direct!{ <p>"live contact"</p> })
 			]), HtmlStore::ssg(html_store().await)))
 			.call::<Request, Response>(Request::get("contact"))

@@ -199,7 +199,7 @@ mod test {
 			rsx_direct!{ <p>"async home"</p> }
 		}
 		router_world()
-			.spawn(default_router(children![render_action::async_route(
+			.spawn((default_router(), children![render_action::async_route(
 				"home", home
 			)]))
 			.call::<Request, Response>(Request::get("home"))
@@ -216,7 +216,7 @@ mod test {
 			rsx_direct!{ <p>"system home"</p> }
 		}
 		router_world()
-			.spawn(default_router(children![render_action::system_route(
+			.spawn((default_router(), children![render_action::system_route(
 				"home", home
 			)]))
 			.call::<Request, Response>(Request::get("home"))
@@ -234,7 +234,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn(default_router(children![render_action::async_route(
+			.spawn((default_router(), children![render_action::async_route(
 				"home", home
 			)]))
 			.flush();

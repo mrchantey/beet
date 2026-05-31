@@ -90,7 +90,6 @@ impl UdpSocket for AsyncIoUdpSocket {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 	use core::net::Ipv4Addr;
 	use core::net::SocketAddr;
 	use core::net::SocketAddrV4;
@@ -117,9 +116,11 @@ mod test {
 		let endpoint = AsyncIoUdpEndpoint;
 		let bind = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
 		let socket = endpoint.bind(bind).await.unwrap();
-		// joining the mDNS group must not error on a normal host
+		// joining a multicast group (the mDNS group `224.0.0.251`) must not error
+		// on a normal host. Spelled out here so the UDP layer's tests stay free of
+		// any mDNS dependency.
 		socket
-			.join_multicast_v4(MDNS_MULTICAST_V4)
+			.join_multicast_v4(Ipv4Addr::new(224, 0, 0, 251))
 			.await
 			.xpect_ok();
 	}

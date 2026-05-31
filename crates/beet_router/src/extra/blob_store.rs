@@ -117,7 +117,7 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn(default_router(children![serve_store("assets", store)]))
+			.spawn((default_router(), children![serve_store("assets", store)]))
 			.call::<Request, Response>(Request::get("assets/style.css"))
 			.await
 			.unwrap()
@@ -134,7 +134,7 @@ mod test {
 			.await
 			.unwrap();
 		router_world()
-			.spawn(default_router(children![serve_store("foo", store)]))
+			.spawn((default_router(), children![serve_store("foo", store)]))
 			.call::<Request, Response>(Request::get("foo/bar"))
 			.await
 			.unwrap()

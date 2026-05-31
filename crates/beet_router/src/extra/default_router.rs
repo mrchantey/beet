@@ -12,14 +12,10 @@ use beet_core::prelude::*;
 /// - an `/app-info` scene route (std-only) and a `POST /analytics` route
 ///   (`json` + std), both of which require a [`PackageConfig`] resource.
 ///
-/// `routes` may be a single route or a `children![..]` group; either is nested
-/// under a path-less entity, so route paths are preserved. All components are
-/// [`Reflect`] so the bundle round-trips through a scene.
-///
 /// On no_std the std-only children/middleware are omitted and the not-found
 /// fallback is a plain-text route listing; add any extra `Request`/`Response`
 /// [`Middleware`] to the spawned entity yourself if wanted.
-pub fn default_router<B: Bundle>(routes: B) -> impl Bundle {
+pub fn default_router() -> impl Bundle {
 	(
 		Router,
 		RequestLogger::default(),
@@ -38,9 +34,6 @@ pub fn default_router<B: Bundle>(routes: B) -> impl Bundle {
 		OnSpawn::insert_child(app_info()),
 		#[cfg(all(feature = "json", feature = "std"))]
 		OnSpawn::insert_child(analytics_handler()),
-		// the user routes, nested under a single path-less entity (so a single
-		// route or a `children![a, b]` group both keep their paths).
-		children![routes],
 	)
 }
 
@@ -65,7 +58,9 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		let root = world
-			.spawn(default_router(exchange_route("foobar", Foobar)))
+			.spawn((default_router(), children![exchange_route(
+				"foobar", Foobar
+			)]))
 			.flush();
 
 		world
@@ -105,14 +100,14 @@ mod test {
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
-	/// A `children![a, b]` group passes through `default_router` with both
-	/// routes preserved at top level (nested under a path-less entity).
+	/// A `children![a, b]` group sits alongside `default_router` with both
+	/// routes preserved at top level.
 	#[beet_core::test(timeout_ms = 10000)]
 	async fn wires_multi_route_group() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
 		let root = world
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				exchange_route("foo", Foobar),
 				exchange_route("bar", Foobar),
 			]))

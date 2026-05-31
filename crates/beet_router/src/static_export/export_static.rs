@@ -103,7 +103,7 @@ mod test {
 		// reads a `PackageConfig` at render; insert one so it exports cleanly.
 		world.insert_resource(pkg_config!());
 		let router = world
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				(
 					render_action::fixed_route("about", rsx_direct!{ <p>"About"</p> }),
 					HttpMethod::Get

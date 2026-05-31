@@ -151,7 +151,7 @@ mod test {
 	#[beet_core::test]
 	async fn dynamic_segment_reaches_handler() {
 		router_world()
-			.spawn(default_router(children![exchange_route(
+			.spawn((default_router(), children![exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -166,7 +166,7 @@ mod test {
 	#[beet_core::test]
 	async fn greedy_segment_reaches_handler() {
 		router_world()
-			.spawn(default_router(children![exchange_route(
+			.spawn((default_router(), children![exchange_route(
 				"files/*path",
 				EchoParams
 			)]))
@@ -181,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	async fn path_param_wins_over_query_param() {
 		router_world()
-			.spawn(default_router(children![exchange_route(
+			.spawn((default_router(), children![exchange_route(
 				"users/:id",
 				EchoParams
 			)]))
@@ -198,7 +198,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_scene() {
 		router_world()
-			.spawn(default_router(children![render_action::fixed_route(
+			.spawn((default_router(), children![render_action::fixed_route(
 				"about",
 				rsx_direct!{ <p>"About page"</p> }
 			),]))
@@ -214,7 +214,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_on_empty_path() {
 		router_world()
-			.spawn(default_router(children![render_action::fixed_route(
+			.spawn((default_router(), children![render_action::fixed_route(
 				"",
 				rsx_direct!{ <p>"Root content"</p> }
 			),]))
@@ -229,7 +229,7 @@ mod test {
 	#[beet_core::test]
 	async fn route_renders_root_scene_child() {
 		let body = router_world()
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -248,7 +248,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_flag_returns_route_list() {
 		router_world()
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
@@ -263,7 +263,7 @@ mod test {
 	#[beet_core::test]
 	async fn dispatches_help_request() {
 		router_world()
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
 				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
 			]))
@@ -277,7 +277,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn(default_router(children![increment(FieldRef::new("count")),]))
+			.spawn((default_router(), children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent"),
 			)
@@ -290,7 +290,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_root_scene_on_empty_args() {
 		router_world()
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
@@ -311,7 +311,7 @@ mod test {
 		let mut world = router_world();
 
 		let root = world
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				(
 					render_action::fixed_route(
 						"counter",
@@ -339,7 +339,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn(default_router(children![increment(FieldRef::new("count")),]))
+			.spawn((default_router(), children![increment(FieldRef::new("count")),]))
 			.call::<Request, Response>(
 				Request::from_cli_str("nonexistent"),
 			)
@@ -355,7 +355,7 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_scoped_ancestor_help() {
 		router_world()
-			.spawn(default_router(children![
+			.spawn((default_router(), children![
 				(
 					render_action::fixed_route(
 						"counter",
@@ -399,7 +399,7 @@ mod test {
 		}
 
 		router_world()
-			.spawn(default_router(children![exchange_route("ticks", Ticks)]))
+			.spawn((default_router(), children![exchange_route("ticks", Ticks)]))
 			.call::<Request, Response>(Request::get("ticks"))
 			.await
 			.unwrap()

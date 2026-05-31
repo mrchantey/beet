@@ -33,9 +33,13 @@ mod net_plugin;
 // inside the module.
 mod server;
 // The udp module is no_std-capable: the trait-only `UdpEndpoint`/`UdpSocket`
-// seam compiles unconditionally; the std `async-io` impl is std-gated and the
-// mDNS browser engine sits behind the `mdns` feature, all inside the module.
+// seam compiles unconditionally; the std `async-io` impl is std-gated.
 mod udp;
+// mDNS rides the udp seam but is a distinct protocol, so it lives in its own
+// module behind the `mdns` feature. The wire codec and browser engine are
+// no_std; only the std socket driver `run_mdns_browser` needs `udp` + `std`.
+#[cfg(feature = "mdns")]
+mod mdns;
 /// WebSocket client and server implementations.
 #[cfg(feature = "std")]
 pub mod sockets;
@@ -73,6 +77,8 @@ pub mod prelude {
 	pub use crate::net_plugin::*;
 	pub use crate::server::*;
 	pub use crate::udp::*;
+	#[cfg(feature = "mdns")]
+	pub use crate::mdns::*;
 	#[cfg(feature = "std")]
 	pub use crate::sockets;
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]

@@ -42,10 +42,11 @@ use beet_core::prelude::*;
 /// 			RouterPlugin
 /// 		));
 ///     app.world_mut().spawn((
-///         default_router(children![
+///         default_router(),
+///         children![
 ///             render_action::fixed_route("", Name::new("welcome!")),
 ///             render_action::fixed_route("about", Name::new("about")),
-///         ]),
+///         ],
 ///         ReplServer,
 ///     ));
 ///     async_ext::block_on(app.run_async());

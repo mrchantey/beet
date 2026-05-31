@@ -1,18 +1,18 @@
-//! UDP/datagram sockets and the agnostic mDNS service browser.
+//! UDP datagram sockets: the transport seam that protocols like mDNS ride on.
 //!
-//! This module has three layers, each independently gated so the trait builds
-//! `no_std` and only the std driver pulls `async-io`:
+//! UDP is kept deliberately distinct from any protocol spoken over it — mDNS
+//! lives in its own [`mdns`](crate::mdns) module. This module has two layers,
+//! each independently gated so the trait builds `no_std` and only the std
+//! driver pulls `async-io`:
 //!
 //! - [`udp_socket`]: the cheap, trait-only [`UdpEndpoint`] / [`UdpSocket`]
-//!   abstraction (mirrors `edge-nal`'s method shape, not its types). `no_std`,
-//!   always compiled — this is beet's first socket-level seam, reusable beyond
-//!   mDNS (SNTP, plain DNS). See decision 4 in `agent/plans/mdns.md`.
-//! - [`impl_async_io`]: the std impl over `async-io`. `std`-gated; esp supplies
-//!   its own `edge-nal`-backed impl downstream.
-//! - [`mdns`] + [`browser`]: the agnostic mDNS service browser — pure wire
-//!   helpers plus a bytes-and-world ECS engine (events + a resource, not
-//!   actions). Gated behind the `mdns` feature; the parse + engine are `no_std`,
-//!   only [`run_mdns_browser`] (the std socket driver) needs `std`.
+//!   abstraction. It carries no runtime and no buffers of its own, so it is a
+//!   pure handle around whatever the platform's datagram socket is. This is
+//!   beet's general socket-level seam, reusable for any UDP protocol (mDNS,
+//!   SNTP, plain DNS), not mDNS-specific.
+//! - [`impl_async_io`]: a std implementation of that trait over `async-io`,
+//!   gated behind the `udp` feature. A `no_std` target supplies its own
+//!   implementation of the same trait instead.
 
 mod udp_socket;
 pub use udp_socket::*;
@@ -23,10 +23,3 @@ pub use udp_socket::*;
 mod impl_async_io;
 #[cfg(all(feature = "udp", not(target_arch = "wasm32")))]
 pub use impl_async_io::*;
-
-#[cfg(feature = "mdns")]
-pub mod mdns;
-#[cfg(feature = "mdns")]
-mod browser;
-#[cfg(feature = "mdns")]
-pub use browser::*;

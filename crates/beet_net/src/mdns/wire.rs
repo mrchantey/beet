@@ -19,6 +19,10 @@
 //! Inbound mDNS responses pack these records and compress names aggressively, so
 //! the reader follows compression pointers (`0xc0`) when decoding names. The
 //! query writer emits a single uncompressed `PTR` question.
+//!
+//! Decoded names are [`SmolStr`]: mDNS labels are short (a hostname, a service
+//! type) and copied around as the browser reconciles, so the small-string
+//! representation avoids a heap allocation for the common case.
 
 use beet_core::prelude::*;
 use core::net::Ipv4Addr;
@@ -41,23 +45,23 @@ pub const CLASS_MASK: u16 = 0x7fff;
 ///
 /// Only the four browse-relevant record types are decoded; everything else is
 /// surfaced as [`Record::Other`] so the answer count still lines up while
-/// scanning. Names are owned `String`s (decompressed); the byte budget is tiny
-/// (a handful of records per packet).
+/// scanning. Names are owned [`SmolStr`]s (decompressed); the byte budget is
+/// tiny (a handful of records per packet).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Record {
 	/// `PTR <service_type> -> <instance>`: an instance of the queried service.
 	Ptr {
 		/// The queried service type, e.g. `_http._tcp.local`.
-		name: String,
+		name: SmolStr,
 		/// The pointed-to instance name, e.g. `My Device._http._tcp.local`.
-		instance: String,
+		instance: SmolStr,
 	},
 	/// `SRV <instance> -> <host>:<port>`: where to reach the instance.
 	Srv {
 		/// The instance name this record describes.
-		name: String,
+		name: SmolStr,
 		/// The target host name, e.g. `my-device.local`.
-		host: String,
+		host: SmolStr,
 		/// The TCP/UDP port the service listens on.
 		port: u16,
 		/// The record's TTL in seconds; `0` is a goodbye (the instance is
@@ -67,7 +71,7 @@ pub enum Record {
 	/// `A <host> -> <ipv4>`: the host's address.
 	A {
 		/// The host name this address belongs to.
-		name: String,
+		name: SmolStr,
 		/// The IPv4 address.
 		addr: Ipv4Addr,
 		/// The record's TTL in seconds; `0` is a goodbye.
@@ -76,15 +80,15 @@ pub enum Record {
 	/// `TXT <instance> -> [key=value, ...]`: service metadata.
 	Txt {
 		/// The instance name this metadata belongs to.
-		name: String,
+		name: SmolStr,
 		/// The raw `key=value` strings (mDNS TXT entries are length-prefixed
 		/// byte strings; left undecoded beyond UTF-8 lossy).
-		entries: Vec<String>,
+		entries: Vec<SmolStr>,
 	},
 	/// Any other record type, kept only so the answer scan stays aligned.
 	Other {
 		/// The record name.
-		name: String,
+		name: SmolStr,
 		/// The DNS record type.
 		rtype: u16,
 		/// The record's TTL in seconds.
@@ -283,10 +287,10 @@ impl<'a> Reader<'a> {
 		Some(())
 	}
 
-	/// Decode the DNS name at `pos` into a dotted `String`, following
+	/// Decode the DNS name at `pos` into a dotted [`SmolStr`], following
 	/// compression pointers. Advances `pos` past the name in the *current*
 	/// stream (pointer jumps do not move the outer cursor past the pointer).
-	fn read_name(&mut self) -> Option<String> {
+	fn read_name(&mut self) -> Option<SmolStr> {
 		let mut out = String::new();
 		// Where the outer cursor ends up: set once we follow the first pointer.
 		let mut end: Option<usize> = None;
@@ -333,7 +337,7 @@ impl<'a> Reader<'a> {
 		}
 
 		self.pos = end.unwrap_or(pos);
-		Some(out)
+		Some(SmolStr::new(out))
 	}
 
 	/// Advance past a DNS name without decoding it (used for the question
@@ -413,7 +417,7 @@ impl<'a> Reader<'a> {
 					let start = self.pos;
 					let bytes = self.buf.get(start..start + len)?;
 					entries
-						.push(String::from_utf8_lossy(bytes).into_owned());
+						.push(SmolStr::new(String::from_utf8_lossy(bytes)));
 					self.pos = start + len;
 				}
 				Record::Txt { name, entries }
@@ -575,8 +579,8 @@ mod test {
 		match resp.txt_for("My Device._http._tcp.local").unwrap() {
 			Record::Txt { entries, .. } => {
 				entries.clone().xpect_eq(vec![
-					"path=/".to_string(),
-					"v=1".to_string(),
+					SmolStr::new("path=/"),
+					SmolStr::new("v=1"),
 				]);
 			}
 			other => panic!("expected TXT, got {other:?}"),

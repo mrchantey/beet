@@ -31,13 +31,12 @@
 use beet_core::prelude::*;
 use core::net::Ipv4Addr;
 use core::net::SocketAddr;
-use core::net::SocketAddrV4;
 use core::future::Future;
 
 /// A binder for UDP sockets: opens a [`UdpSocket`] bound to a local address.
 ///
 /// Mirrors `edge-nal`'s `UdpBind`. The endpoint owns whatever per-platform
-/// context is needed to open a socket (nothing on std; the `embassy-net` stack
+/// context is needed to open a socket (nothing on std; the platform network-stack
 /// handle on esp), so a [`UdpSocket`] can be opened from it on demand.
 ///
 /// This is also the natural shape for a config component: a downstream driver
@@ -101,16 +100,3 @@ pub trait UdpSocket {
 		group: Ipv4Addr,
 	) -> impl Future<Output = Result<()>>;
 }
-
-/// The IPv4 mDNS multicast group, `224.0.0.251`.
-pub const MDNS_MULTICAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
-
-/// The mDNS UDP port, `5353`.
-pub const MDNS_PORT: u16 = 5353;
-
-/// The standard mDNS multicast socket address, `224.0.0.251:5353`.
-///
-/// Sent *to* by queriers and responders; the socket itself is bound on
-/// `0.0.0.0:5353` and joined to [`MDNS_MULTICAST_V4`] to receive it.
-pub const MDNS_ENDPOINT: SocketAddr =
-	SocketAddr::V4(SocketAddrV4::new(MDNS_MULTICAST_V4, MDNS_PORT));

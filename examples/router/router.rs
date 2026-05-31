@@ -63,7 +63,7 @@ pub fn router_scene() -> Result<impl Bundle> {
 		server_from_cli()?,
 		// the batteries-included router: route lookup + the default app routes,
 		// wrapping the user routes (children with a PathPartial and action)
-		default_router(routes()),
+		(default_router(), children![routes()]),
 	)
 		.xok()
 }

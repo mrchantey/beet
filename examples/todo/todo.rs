@@ -49,7 +49,7 @@ async fn main() -> Result {
 	let before = document.0.clone();
 
 	let root = world
-		.spawn((document, default_router(children![
+		.spawn((document, (default_router(), children![
 			create(),
 			read(),
 			update(),
