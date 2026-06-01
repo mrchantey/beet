@@ -47,7 +47,8 @@ impl Plugin for DocumentPlugin {
 			.register_type::<FieldSegment>()
 			.register_type::<DocumentScope>()
 			.register_type::<ResolvedFieldPath>()
-			.register_type::<Value>();
+			.register_type::<Value>()
+			.register_type::<ValueSchema>();
 
 		// Register action types when the action feature is enabled
 		#[cfg(feature = "action")]
@@ -69,6 +70,7 @@ impl Plugin for DocumentPlugin {
 				PreUpdate,
 				(
 					update_resolved_field_paths,
+					sync_schema,
 					sync_document_to_local,
 					sync_resolved_path_changes,
 					sync_local_to_document,

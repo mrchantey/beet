@@ -166,6 +166,58 @@ pub(super) fn sync_resolved_path_changes(
 	Ok(())
 }
 
+/// Schema read path: reconcile each field's local [`ValueSchema`] with its
+/// document's [`DocumentSchema`], the schema-side analog of
+/// [`sync_document_to_local`].
+///
+/// One-directional and lazy: schemas are effectively static after construction,
+/// so this resolves a field's schema only on first link (`Added<FieldOf>`) or
+/// when the document schema changes, never writing back.
+///
+/// - a field with no local schema is seeded from the document.
+/// - a field with a local schema is asserted to match, erroring on mismatch so a
+///   [`TypedFieldRef`] pointed at a differently-typed field is caught rather than
+///   silently diverging.
+///
+/// A document with no [`DocumentSchema`], or a field whose path the schema does
+/// not describe, leaves the field-local schema authoritative, mirroring how a
+/// document with no value defers to the seeded [`Value`].
+pub(super) fn sync_schema(
+	mut commands: Commands,
+	fields: Query<(Entity, &FieldOf, &ResolvedFieldPath, Option<&ValueSchema>)>,
+	new_links: Query<(), Added<FieldOf>>,
+	changed_schemas: Query<(), Changed<DocumentSchema>>,
+	schemas: Query<&DocumentSchema>,
+) -> Result {
+	for (entity, field_of, resolved, local) in fields.iter() {
+		// lazy: skip unless the field just linked or its document schema changed
+		if !new_links.contains(entity)
+			&& !changed_schemas.contains(field_of.document)
+		{
+			continue;
+		}
+		// only an inlined schema resolves without a type registry
+		let Ok(DocumentSchema(FieldSchema::Inline(schema))) =
+			schemas.get(field_of.document)
+		else {
+			continue;
+		};
+		// a path the schema does not describe leaves the local schema authoritative
+		let Ok(field_schema) = schema.get_field_schema(&resolved.field_path) else {
+			continue;
+		};
+		match local {
+			Some(local) => {
+				local.assert_matches(field_schema, &resolved.field_path)?
+			}
+			None => {
+				commands.entity(entity).insert(field_schema.clone());
+			}
+		}
+	}
+	Ok(())
+}
+
 /// Write-back: when a field-bound entity's local [`Value`] changes, propagate it
 /// into the resolved document field. The symmetric counterpart of
 /// [`sync_document_to_local`]; the equality guard on both directions is what
@@ -600,5 +652,32 @@ mod test {
 			val!({ "name": "reloaded" });
 		world.update_local();
 		read_value(&mut world, child).xpect_eq(Value::Str("reloaded".into()));
+	}
+
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	fn schema_seeds_untyped_field() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct CountDoc {
+			count: i64,
+		}
+
+		let mut world = DocumentPlugin::world();
+		// an untyped field beneath a schema-bearing document
+		world.spawn((
+			Document::default(),
+			DocumentSchema::of::<CountDoc>(),
+			children![(Value::default(), FieldRef::new("count"))],
+		));
+		world.update_local();
+
+		// sync_schema seeded the field-local ValueSchema from the document schema
+		world
+			.query_once::<&ValueSchema>()
+			.iter()
+			.map(|schema| (*schema).clone())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![ValueSchema::of::<i64>()]);
 	}
 }

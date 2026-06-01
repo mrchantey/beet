@@ -29,11 +29,12 @@ pub struct ReactiveChild;
 impl ReactiveChildren {
 	/// Track `field` (a list field), spawning a child per item via `build_item`.
 	///
-	/// Returns a bundle pairing the [`FieldRef`] with the [`ReactiveChildren`]:
-	/// the ref's `on_add` inserts the synced [`Value`] and `sync_document_to_local`
-	/// keeps it current, so the rebuild rides `Changed<Value>`.
+	/// `field` is the field bundle: a bare [`FieldRef`], or the
+	/// `(FieldRef, ValueSchema)` produced by [`TypedFieldRef::field`]. The ref's
+	/// `on_add` inserts the synced [`Value`] and `sync_document_to_local` keeps it
+	/// current, so the rebuild rides `Changed<Value>`.
 	pub fn new(
-		field: FieldRef,
+		field: impl Bundle,
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
 	) -> impl Bundle {
 		(field, ReactiveChildren {

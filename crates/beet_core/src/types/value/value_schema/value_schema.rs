@@ -8,8 +8,9 @@ use bevy::reflect::Typed;
 ///
 /// Used for driving dynamic UIs, performing validation and producing a
 /// [`Schema`] (JSON Schema) representation.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component)]
 #[reflect(opaque)]
+#[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValueSchema {
 	/// Matches any value. An escape hatch that disables validation and
@@ -108,6 +109,34 @@ impl ValueSchema {
 			};
 		}
 		Ok(current)
+	}
+
+	/// Whether this schema is compatible with `other`, treating
+	/// [`ValueSchema::Any`] on either side as a wildcard.
+	pub fn matches(&self, other: &ValueSchema) -> bool {
+		matches!(self, ValueSchema::Any)
+			|| matches!(other, ValueSchema::Any)
+			|| self == other
+	}
+
+	/// Assert this schema [`matches`](Self::matches) `other`, reporting the
+	/// field `path` on mismatch.
+	///
+	/// Shared by the `DocumentSchema` field-type checks and the field-local
+	/// typed write fast path.
+	pub fn assert_matches(
+		&self,
+		other: &ValueSchema,
+		path: &[FieldSegment],
+	) -> Result {
+		if self.matches(other) {
+			Ok(())
+		} else {
+			bevybail!(
+				"Field Schema Mismatch at `{}`\nExpected: `{other:?}`\nReceived: `{self:?}`",
+				FieldPath::from(path)
+			)
+		}
 	}
 }
 

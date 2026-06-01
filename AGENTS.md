@@ -56,6 +56,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 	- Good: `bar(bazz).xmap(foo)`
 - Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
 - when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
+- never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature
 
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
@@ -113,7 +114,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - when spawning entities prefer to use world.spawn((ParentComponent,children![(ChildComponent,..)])) instead of calling spawn again for the child with ChildOf(), unless the child entity needs to be tracked for the test.
 - Traversal. traversing entity hierarchies can quickly become a mess. for anything remotely complex just formalize it with a SystemParam, see `card_query.rs` for a good example of this. Avoid traversing using world directly, instead run a system, ie `world.run_system_once(|ancestors:Query<&ChildOf>| ... let root = ancestors.root(entity))`
 - often a world.with_state::<MyQuery>(|my_query|{}) is more ergonomic than world.run_system_once(|my_query:MyQuery|{..});
-
+- Prefer Populated over Query which will skip system running if that query is empty, if its an 'any of these queries' pattern, use my_system.run_if(|a,b|!a.is_empty() || !b.is_empty()..)
 
 ## UI Cheatsheet (`beet_ui`)
 
