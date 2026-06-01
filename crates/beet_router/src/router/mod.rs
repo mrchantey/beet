@@ -48,6 +48,10 @@ mod help;
 #[cfg(feature = "std")]
 pub use help::*;
 #[cfg(feature = "std")]
+mod layout;
+#[cfg(feature = "std")]
+pub use layout::*;
+#[cfg(feature = "std")]
 mod sidebar;
 #[cfg(feature = "std")]
 pub use sidebar::*;
