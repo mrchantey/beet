@@ -333,6 +333,8 @@ ui = ["dep:beet_ui"]
 # Sidebar, Table). Heavy + std-only, so it stays opt-in.
 scene = ["ui", "beet_ui?/scene"]
 style = ["ui", "beet_ui?/style"]
+# Backend-agnostic keyboard input routed to the focused entity (`FocusPlugin`).
+keyboard = ["ui", "beet_ui?/keyboard"]
 ratatui = ["beet_ui?/ratatui"]
 terminal = ["ui", "beet_ui?/terminal"]
 markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]

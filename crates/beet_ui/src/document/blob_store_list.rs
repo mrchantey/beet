@@ -67,16 +67,6 @@ pub(super) fn refresh_blob_store_list(
 #[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
-	use beet_net::prelude::*;
-
-	/// Drive the app, ticking task pools so bridged `spawn_local` tasks (eg the
-	/// list refresh) make progress between updates, mirroring [`AsyncRunner`].
-	fn pump(app: &mut App, frames: usize) {
-		for _ in 0..frames {
-			app.update();
-			bevy::tasks::tick_global_task_pools_on_main_thread();
-		}
-	}
 
 	/// Count the `ReactiveChild` rows of `entity`.
 	fn row_count(world: &mut World, entity: Entity) -> usize {
@@ -111,15 +101,15 @@ mod test {
 			))
 			.id();
 
-		// seed two objects, pump frames until the async refresh converges
+		// seed two objects, drive async until the refresh converges
 		store.insert(&SmolPath::new("a.txt"), "a").await.unwrap();
 		store.insert(&SmolPath::new("b.txt"), "b").await.unwrap();
-		pump(&mut app, 6);
+		app.update_async().await;
 		row_count(app.world_mut(), entity).xpect_eq(2);
 
 		// remove one, the Removed event marks the store Changed and re-lists
 		store.remove(&SmolPath::new("a.txt")).await.unwrap();
-		pump(&mut app, 6);
+		app.update_async().await;
 		row_count(app.world_mut(), entity).xpect_eq(1);
 	}
 }

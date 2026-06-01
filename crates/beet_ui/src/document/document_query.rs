@@ -190,23 +190,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		})?
 	}
 
-	/// Remove the value at an index of a list field, returning it when the index
-	/// was in bounds.
-	pub fn remove_at_field(
-		&mut self,
-		subject: Entity,
-		field: &FieldRef,
-		index: usize,
-	) -> Result<Option<Value>> {
-		self.with_field(subject, field, move |slot| -> Result<Option<Value>> {
-			let list = as_list_mut(slot)?;
-			if index < list.len() {
-				Ok(Some(list.remove(index)))
-			} else {
-				Ok(None)
-			}
-		})?
-	}
 }
 
 /// Coerce a field [`Value`] into a mutable list, treating null as empty.
