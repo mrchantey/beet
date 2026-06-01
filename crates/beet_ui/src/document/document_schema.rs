@@ -47,7 +47,7 @@ impl DocumentSchema {
 			return Ok(());
 		};
 		let field = schema.get_field_schema(path)?;
-		assert_schema_matches(field, &ValueSchema::of::<T>(), path)
+		field.assert_matches(&ValueSchema::of::<T>(), path)
 	}
 
 	/// Assert the field at `path` is a list whose items accept type `T`.
@@ -64,32 +64,13 @@ impl DocumentSchema {
 		match schema.get_field_schema(path)? {
 			ValueSchema::Any => Ok(()),
 			ValueSchema::List(list) => {
-				assert_schema_matches(&list.item, &ValueSchema::of::<T>(), path)
+				list.item.assert_matches(&ValueSchema::of::<T>(), path)
 			}
 			other => bevybail!(
 				"Field Schema Mismatch at `{}`\nExpected: list\nReceived: `{other:?}`",
 				FieldPath::from(path)
 			),
 		}
-	}
-}
-
-/// Compare two [`ValueSchema`]s, treating [`ValueSchema::Any`] as a wildcard.
-fn assert_schema_matches(
-	actual: &ValueSchema,
-	expected: &ValueSchema,
-	path: &[FieldSegment],
-) -> Result {
-	if matches!(actual, ValueSchema::Any)
-		|| matches!(expected, ValueSchema::Any)
-		|| actual == expected
-	{
-		Ok(())
-	} else {
-		bevybail!(
-			"Field Schema Mismatch at `{}`\nExpected: `{expected:?}`\nReceived: `{actual:?}`",
-			FieldPath::from(path)
-		)
 	}
 }
 

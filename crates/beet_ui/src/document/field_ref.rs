@@ -109,6 +109,9 @@ impl FieldRef {
 pub struct TypedFieldRef<T> {
 	#[deref]
 	field: FieldRef,
+	/// The field's resolved schema, ie `ValueSchema::of::<T>()`, computed once at
+	/// construction and co-located on the spawned field entity by [`field`](Self::field).
+	schema: ValueSchema,
 	_marker: PhantomData<fn() -> T>,
 }
 
@@ -118,6 +121,7 @@ impl<T> Clone for TypedFieldRef<T> {
 	fn clone(&self) -> Self {
 		Self {
 			field: self.field.clone(),
+			schema: self.schema.clone(),
 			_marker: PhantomData,
 		}
 	}
@@ -127,13 +131,14 @@ impl<T> core::fmt::Debug for TypedFieldRef<T> {
 	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
 		f.debug_struct("TypedFieldRef")
 			.field("field", &self.field)
+			.field("schema", &self.schema)
 			.finish()
 	}
 }
 
 impl<T> TypedFieldRef<T>
 where
-	T: Default + Serialize,
+	T: Default + Serialize + Typed,
 {
 	/// Declare a typed field ref with an explicit, shared key, ie a named atom.
 	///
@@ -145,6 +150,7 @@ where
 			field: FieldRef::new(key).with_init(
 				Value::from_serde(&T::default()).unwrap_or_default(),
 			),
+			schema: ValueSchema::of::<T>(),
 			_marker: PhantomData,
 		}
 	}
@@ -163,7 +169,7 @@ where
 	}
 }
 
-impl<T> TypedFieldRef<T> {
+impl<T: Typed> TypedFieldRef<T> {
 	/// Re-type an existing [`FieldRef`] as a [`TypedFieldRef<T>`].
 	///
 	/// For places that hold an erased [`FieldRef`] (ie read from a component)
@@ -171,14 +177,20 @@ impl<T> TypedFieldRef<T> {
 	pub fn from_field(field: FieldRef) -> Self {
 		Self {
 			field,
+			schema: ValueSchema::of::<T>(),
 			_marker: PhantomData,
 		}
 	}
+}
 
-	/// Clone the inner [`FieldRef`], for places that need an owned ref rather
-	/// than a deref borrow, ie `ReactiveChildren::new(items.field(), ..)` or a
-	/// `children![items.field()]` markup slot.
-	pub fn field(&self) -> FieldRef { self.field.clone() }
+impl<T> TypedFieldRef<T> {
+	/// The [`FieldRef`] paired with its co-located [`ValueSchema`], for places
+	/// that need an owned bundle rather than a deref borrow, ie
+	/// `ReactiveChildren::new(items.field(), ..)` or a `children![items.field()]`
+	/// markup slot. The schema lets a typed write type-check locally.
+	pub fn field(&self) -> (FieldRef, ValueSchema) {
+		(self.field.clone(), self.schema.clone())
+	}
 
 	/// Map the inner [`FieldRef`], preserving the typed wrapper.
 	///
@@ -248,7 +260,9 @@ pub struct SceneTypedFieldRefMarker;
 impl<T> crate::prelude::IntoScene<(NotSceneMarker, SceneTypedFieldRefMarker)>
 	for TypedFieldRef<T>
 {
-	fn into_scene(self) -> impl bevy::scene::Scene { self.field.into_scene() }
+	fn into_scene(self) -> impl bevy::scene::Scene {
+		(self.field, self.schema).into_scene()
+	}
 }
 
 #[cfg(test)]
@@ -282,23 +296,44 @@ mod tests {
 	fn seeds_default_and_round_trips() {
 		let mut world = DocumentPlugin::world();
 		let count = TypedFieldRef::<i64>::new("count").with_init(7);
-		let entity = world
-			.spawn((Document::default(), children![count.field()]))
-			.id();
+		// the field entity carries its own (Value, ValueSchema): the local fast path
+		let doc = world.spawn(Document::default()).id();
+		let field = world.spawn((ChildOf(doc), count.field())).id();
+		// settle the seed so the document's changed flag ages out, else the read
+		// path would clobber the local edits when they are mirrored back
+		world.update_local();
 		world.update_local();
 
-		// the default seeded on first touch
-		count.get(&mut world.entity_mut(entity)).unwrap().xpect_eq(7);
+		// the schema lands on the field entity alongside the seeded value
+		world
+			.entity(field)
+			.get::<ValueSchema>()
+			.unwrap()
+			.clone()
+			.xpect_eq(ValueSchema::of::<i64>());
 
-		count.set(&mut world.entity_mut(entity), 10).unwrap();
-		world.update_local();
-		count.get(&mut world.entity_mut(entity)).unwrap().xpect_eq(10);
+		// reads come straight off the local Value, no document traversal
+		count.get(&mut world.entity_mut(field)).unwrap().xpect_eq(7);
 
+		// a typed write hits the local Value immediately, observable before sync
+		count.set(&mut world.entity_mut(field), 10).unwrap();
+		count.get(&mut world.entity_mut(field)).unwrap().xpect_eq(10);
+
+		// update reads, mutates and writes the local Value in one step
 		count
-			.update(&mut world.entity_mut(entity), |n| *n += 1)
+			.update(&mut world.entity_mut(field), |n| *n += 1)
 			.unwrap();
+		count.get(&mut world.entity_mut(field)).unwrap().xpect_eq(11);
+
+		// bidi sync mirrors the local Value into the document
 		world.update_local();
-		count.get(&mut world.entity_mut(entity)).unwrap().xpect_eq(11);
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.get_field::<i64>(&[FieldSegment::key("count")])
+			.unwrap()
+			.xpect_eq(11);
 	}
 
 	#[cfg(feature = "json")]
