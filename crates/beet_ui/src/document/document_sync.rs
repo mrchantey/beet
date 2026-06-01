@@ -182,6 +182,15 @@ pub(super) fn sync_resolved_path_changes(
 /// A document with no [`DocumentSchema`], or a field whose path the schema does
 /// not describe, leaves the field-local schema authoritative, mirroring how a
 /// document with no value defers to the seeded [`Value`].
+/// Run condition gating [`sync_schema`] to frames with a freshly-linked field or
+/// a changed document schema, so it does not iterate every frame.
+pub(super) fn schema_needs_sync(
+	new_links: Query<(), Added<FieldOf>>,
+	changed_schemas: Query<(), Changed<DocumentSchema>>,
+) -> bool {
+	!new_links.is_empty() || !changed_schemas.is_empty()
+}
+
 pub(super) fn sync_schema(
 	mut commands: Commands,
 	fields: Query<(Entity, &FieldOf, &ResolvedFieldPath, Option<&ValueSchema>)>,

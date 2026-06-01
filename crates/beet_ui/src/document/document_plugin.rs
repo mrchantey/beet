@@ -69,8 +69,8 @@ impl Plugin for DocumentPlugin {
 			.add_systems(
 				PreUpdate,
 				(
-					update_resolved_field_paths,
-					sync_schema,
+					update_resolved_field_paths.run_if(resolved_paths_need_update),
+					sync_schema.run_if(schema_needs_sync),
 					sync_document_to_local,
 					sync_resolved_path_changes,
 					sync_local_to_document,

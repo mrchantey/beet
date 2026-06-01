@@ -27,19 +27,19 @@ pub struct ReactiveChildren {
 pub struct ReactiveChild;
 
 impl ReactiveChildren {
-	/// Track `field` (a list field), spawning a child per item via `build_item`.
+	/// Build a [`ReactiveChildren`] that spawns a child per list item via
+	/// `build_item`.
 	///
-	/// `field` is the field bundle: a bare [`FieldRef`], or the
-	/// `(FieldRef, ValueSchema)` produced by [`TypedFieldRef::field`]. The ref's
-	/// `on_add` inserts the synced [`Value`] and `sync_document_to_local` keeps it
-	/// current, so the rebuild rides `Changed<Value>`.
+	/// Spawn it beside the field that backs it, ie `(FieldRef::new("items"),
+	/// ReactiveChildren::new(..))` or `(items.field(), ReactiveChildren::new(..))`.
+	/// The ref's `on_add` inserts the synced [`Value`] and `sync_document_to_local`
+	/// keeps it current, so the rebuild rides `Changed<Value>`.
 	pub fn new(
-		field: impl Bundle,
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
-	) -> impl Bundle {
-		(field, ReactiveChildren {
+	) -> Self {
+		ReactiveChildren {
 			build_item: Arc::new(build_item),
-		})
+		}
 	}
 }
 
@@ -116,9 +116,9 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				ReactiveChildren::new(FieldRef::new("items"), |_, value| {
+				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
 					OnSpawn::insert(value.clone())
-				}),
+				})),
 			))
 			.id();
 		world.update_local();
@@ -146,9 +146,9 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				ReactiveChildren::new(FieldRef::new("items"), |_, value| {
+				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
 					OnSpawn::insert(value.clone())
-				}),
+				})),
 			))
 			.id();
 		// a static, non-ReactiveChild sibling that must never be despawned
@@ -176,9 +176,9 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				ReactiveChildren::new(FieldRef::new("items"), |_, value| {
+				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
 					OnSpawn::insert(value.clone())
-				}),
+				})),
 			))
 			.id();
 		world.update_local();
@@ -230,9 +230,9 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				ReactiveChildren::new(items.field(), |_, value| {
+				(items.field(), ReactiveChildren::new(|_, value| {
 					OnSpawn::insert(value.clone())
-				}),
+				})),
 			))
 			.id();
 		world.update_local();
@@ -267,10 +267,10 @@ mod test {
 			.id();
 		world.spawn((
 			ChildOf(doc),
-			ReactiveChildren::new(FieldRef::new("items"), |_, _| {
+			(FieldRef::new("items"), ReactiveChildren::new(|_, _| {
 				// each child reads its own item's "name", scoped to items[N]
 				OnSpawn::insert((Value::default(), FieldRef::new("name")))
-			}),
+			})),
 		));
 		// children spawn the first pass, their FieldRef resolves and syncs the
 		// next, so a second pass settles the leaf values
@@ -298,14 +298,14 @@ mod test {
 		// hosts an inner ReactiveChildren over its own "items"
 		world.spawn((
 			ChildOf(doc),
-			ReactiveChildren::new(FieldRef::new("groups"), |_, _| {
-				OnSpawn::insert(ReactiveChildren::new(
+			(FieldRef::new("groups"), ReactiveChildren::new(|_, _| {
+				OnSpawn::insert((
 					FieldRef::new("items"),
-					|_, _| {
+					ReactiveChildren::new(|_, _| {
 						OnSpawn::insert((Value::default(), FieldRef::new("name")))
-					},
+					}),
 				))
-			}),
+			})),
 		));
 		// outer children -> outer FieldRef syncs -> inner children -> inner
 		// FieldRef syncs -> leaf "name" syncs: four staged passes
