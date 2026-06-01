@@ -32,7 +32,7 @@ impl BlobStoreList {
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
 	) -> impl Bundle {
 		let field = TypedFieldRef::<Vec<SmolPath>>::inline();
-		ReactiveChildren::new(field.field(), build_item)
+		(field.field(), ReactiveChildren::new(build_item))
 	}
 }
 
@@ -43,21 +43,18 @@ impl BlobStoreList {
 /// path is multi-frame: this frame spawns the list task, a later frame writes
 /// the field at the sync point and converges.
 pub(super) fn refresh_blob_store_list(
-	stores: Populated<
-		(Entity, &BlobStore, &FieldRef),
-		Changed<BlobStore>,
-	>,
+	stores: Populated<(Entity, &BlobStore), (Changed<BlobStore>, With<FieldRef>)>,
 	commands: AsyncCommands,
 ) {
-	for (entity, store, field) in stores.iter() {
+	for (entity, store) in stores.iter() {
 		let store = store.clone();
-		let field = TypedFieldRef::<Vec<SmolPath>>::from_field(field.clone());
 		commands.entity(entity).run_local(async move |entity| {
 			// graceful empty, like ListBlobs
 			let paths = store.list().await.unwrap_or_default();
+			// the store entity is the self-bound field: write its local Value
 			entity
 				.with_state::<FieldQuery, _>(move |subject, mut fields| {
-					fields.set_typed(subject, &field, paths)
+					fields.set_local::<Vec<SmolPath>>(subject, paths)
 				})
 				.await?
 		});

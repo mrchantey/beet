@@ -169,20 +169,6 @@ where
 	}
 }
 
-impl<T: Typed> TypedFieldRef<T> {
-	/// Re-type an existing [`FieldRef`] as a [`TypedFieldRef<T>`].
-	///
-	/// For places that hold an erased [`FieldRef`] (ie read from a component)
-	/// but know its `T`, so typed reads/writes can go through [`FieldQuery`].
-	pub fn from_field(field: FieldRef) -> Self {
-		Self {
-			field,
-			schema: ValueSchema::of::<T>(),
-			_marker: PhantomData,
-		}
-	}
-}
-
 impl<T> TypedFieldRef<T> {
 	/// The [`FieldRef`] paired with its co-located [`ValueSchema`], for places
 	/// that need an owned bundle rather than a deref borrow, ie
@@ -225,27 +211,48 @@ where
 	T: Default + Serialize + DeserializeOwned + Typed,
 {
 	/// Read the current value against `entity`, seeding the default if missing.
+	///
+	/// Reads the entity's own [`Value`] when it is the self-bound field, else
+	/// resolves the field's document and descends by path.
 	pub fn get(&self, entity: &mut EntityWorldMut) -> Result<T> {
 		entity.with_state::<FieldQuery, _>(|subject, mut fields| {
-			fields.get_typed(subject, self)
+			if fields.is_local(subject) {
+				fields.get_local(subject)
+			} else {
+				fields.get_typed(subject, self)
+			}
 		})
 	}
 
 	/// Write a new value against `entity`, type-checked against the schema.
+	///
+	/// Writes the entity's own [`Value`] when it is the self-bound field, else
+	/// resolves the field's document and descends by path.
 	pub fn set(&self, entity: &mut EntityWorldMut, value: T) -> Result {
 		entity.with_state::<FieldQuery, _>(|subject, mut fields| {
-			fields.set_typed(subject, self, value)
+			if fields.is_local(subject) {
+				fields.set_local(subject, value)
+			} else {
+				fields.set_typed(subject, self, value)
+			}
 		})
 	}
 
 	/// Read, mutate, and write back in one step against `entity`.
+	///
+	/// Operates on the entity's own [`Value`] when it is the self-bound field,
+	/// else resolves the field's document and descends by path.
 	pub fn update(
 		&self,
 		entity: &mut EntityWorldMut,
 		func: impl FnOnce(&mut T),
 	) -> Result {
 		entity.with_state::<FieldQuery, _>(|subject, mut fields| {
-			fields.update_typed(subject, self, func)
+			if fields.is_local(subject) {
+				fields.update_local(subject, func)
+			} else {
+				fields.update_typed(subject, self, func)
+			}
 		})
 	}
 }

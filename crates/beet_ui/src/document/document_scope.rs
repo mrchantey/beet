@@ -114,6 +114,19 @@ pub(super) fn resolve_field_path(
 	Ok(())
 }
 
+/// Run condition gating [`update_resolved_field_paths`] to frames where an
+/// ancestor scope was added, mutated, removed, or an entity reparented, so the
+/// subtree descent does not run on quiet frames.
+pub(super) fn resolved_paths_need_update(
+	changed_scopes: Query<(), Changed<DocumentScope>>,
+	reparented: Query<(), Changed<ChildOf>>,
+	removed_scopes: RemovedComponents<DocumentScope>,
+) -> bool {
+	!changed_scopes.is_empty()
+		|| !reparented.is_empty()
+		|| !removed_scopes.is_empty()
+}
+
 /// System that recomputes [`ResolvedFieldPath`] for existing refs whose
 /// *ancestor* scope changed — a change the descendant's own change ticks cannot
 /// see.
