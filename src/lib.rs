@@ -128,6 +128,7 @@ pub mod prelude {
 pub mod exports {
 	pub use crate::core::exports::*;
 	#[cfg(feature = "net")]
+	#[allow(unused)]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "ui")]
 	pub use beet_ui::exports::*;
