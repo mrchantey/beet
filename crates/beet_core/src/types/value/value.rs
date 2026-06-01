@@ -240,11 +240,13 @@ impl Value {
 
 	/// Apply a text edit, returning whether the value actually changed.
 	///
-	/// `Str` and `Null` edit as text (`Null` starts an empty string and is
-	/// promoted to `Str`). Numeric variants (`Int`, `Uint`, `Float`) stringify,
-	/// edit, then parse back, so typing into a number field keeps it numeric; an
-	/// edit that no longer parses as a number is rejected with an error and
-	/// leaves the value untouched. Every other variant is a no-op `Ok(false)`.
+	/// The variant is preserved: `Str` stays `Str`, and each numeric variant
+	/// (`Int`, `Uint`, `Float`) stringifies, edits, then re-parses into its own
+	/// type, so typing into a number field keeps that exact numeric kind. An edit
+	/// that no longer parses as the original type is rejected with an error and
+	/// leaves the value untouched. `Null` is the sole exception, promoting to
+	/// `Str`. Non-textual variants (`Bool`, `Bytes`, `Map`, `List`) are not
+	/// editable and return an error.
 	///
 	/// A no-op edit on an existing `Str` or number (eg backspace at the start)
 	/// returns `Ok(false)`.
@@ -252,13 +254,13 @@ impl Value {
 		&mut self,
 		func: impl FnOnce(&mut String),
 	) -> Result<bool> {
-		let (mut text, numeric) = match self {
-			Value::Str(text) => (text.to_string(), false),
-			Value::Null => (String::new(), false),
-			Value::Int(num) => (num.to_string(), true),
-			Value::Uint(num) => (num.to_string(), true),
-			Value::Float(num) => (num.to_string(), true),
-			_ => return Ok(false),
+		let mut text = match self {
+			Value::Str(text) => text.to_string(),
+			Value::Null => String::new(),
+			Value::Int(num) => num.to_string(),
+			Value::Uint(num) => num.to_string(),
+			Value::Float(num) => num.to_string(),
+			other => bevybail!("{} is not editable as text", other.kind()),
 		};
 		let before = text.clone();
 		func(&mut text);
@@ -266,16 +268,13 @@ impl Value {
 		if text == before && !self.is_null() {
 			return Ok(false);
 		}
-		// text fields stay text; number fields must parse back to a number
-		*self = if numeric {
-			match Value::parse_string(&text) {
-				parsed @ (Value::Int(_) | Value::Uint(_) | Value::Float(_)) => {
-					parsed
-				}
-				_ => bevybail!("'{text}' is not a valid number"),
-			}
-		} else {
-			Value::Str(text.into())
+		// each variant re-parses into its own type, so the kind is preserved;
+		// Null is the sole exception, promoting to Str
+		*self = match self {
+			Value::Int(_) => Value::Int(parse_number(&text)?),
+			Value::Uint(_) => Value::Uint(parse_number(&text)?),
+			Value::Float(_) => Value::Float(parse_number(&text)?),
+			_ => Value::Str(text.into()),
 		};
 		Ok(true)
 	}
@@ -399,6 +398,13 @@ impl Value {
 		)
 		.map_err(|e| bevyhow!("failed to deserialize from Value: {e}"))
 	}
+}
+
+/// Parse the trimmed text into a number `T`, erroring with the original text.
+fn parse_number<T: core::str::FromStr>(text: &str) -> Result<T> {
+	text.trim()
+		.parse()
+		.map_err(|_| bevyhow!("'{text}' is not a valid number"))
 }
 
 impl core::fmt::Display for Value {
@@ -700,20 +706,34 @@ mod test {
 		value.edit_text(|_| {}).unwrap().xpect_false();
 		value.xpect_eq(Value::str("hi"));
 
-		// numbers stringify, edit, and parse back, staying numeric
+		// numbers stringify, edit, and parse back, preserving the exact variant
 		let mut value = Value::Int(-5);
 		value.edit_text(|text| text.push('3')).unwrap().xpect_true();
 		value.xpect_eq(Value::Int(-53));
 
-		// an edit that no longer parses as a number errors, leaving it untouched
+		// an Int stays Int even when the text would otherwise parse as a Uint
+		let mut value = Value::Int(5);
+		value.edit_text(|text| text.push('0')).unwrap().xpect_true();
+		value.xpect_eq(Value::Int(50));
+
+		// a Float stays Float even when the text would otherwise parse as an int
+		let mut value = Value::Float(1.5);
+		value.edit_text(|text| text.truncate(1)).unwrap().xpect_true();
+		value.xpect_eq(Value::Float(1.0));
+
+		// an edit that no longer parses as the original type errors, untouched
 		let mut value = Value::Int(5);
 		value.edit_text(|text| text.push('x')).is_err().xpect_true();
 		value.xpect_eq(Value::Int(5));
 
-		// genuinely non-editable variants report false
+		// non-editable variants error rather than silently no-op
 		let mut value = Value::Bool(true);
-		value.edit_text(|text| text.push('x')).unwrap().xpect_false();
+		value.edit_text(|text| text.push('x')).is_err().xpect_true();
 		value.xpect_eq(Value::Bool(true));
+
+		let mut value = Value::list();
+		value.edit_text(|text| text.push('x')).is_err().xpect_true();
+		value.xpect_eq(Value::list());
 	}
 
 	#[crate::test]

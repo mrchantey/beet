@@ -188,9 +188,9 @@ pub fn RemoveAtField(
 ) -> Result<Option<Value>> {
 	let index = cx.input;
 	let mut value = values.get_mut(cx.id())?;
-	// nothing to remove from a non-list field or an out-of-range index;
-	// the immutable check avoids spuriously marking `Value` changed
-	if value.as_list().is_ok_and(|list| index < list.len()) {
+	// error on a non-list field; an out-of-range index removes nothing. the
+	// read-only length check avoids spuriously marking `Value` changed
+	if index < value.as_list()?.len() {
 		Ok(Some(value.as_list_mut()?.remove(index)))
 	} else {
 		Ok(None)
@@ -592,6 +592,21 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_none();
+	}
+
+	#[beet_core::test]
+	async fn remove_at_rejects_non_list() {
+		let mut world = AsyncPlugin::world();
+		let actor = world
+			.spawn((FieldRef::new("todos").with_init(val!("not a list")), RemoveAtField))
+			.id();
+
+		world
+			.entity_mut(actor)
+			.call::<usize, Option<Value>>(0)
+			.await
+			.is_err()
+			.xpect_true();
 	}
 
 	#[beet_core::test]

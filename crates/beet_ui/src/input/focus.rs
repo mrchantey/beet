@@ -202,9 +202,9 @@ mod test {
 	fn typing_digit_into_number() {
 		let mut app = app();
 		let entity = app.world_mut().spawn((Focus, Value::Int(5))).id();
-		// number fields stringify, edit, and parse back, staying numeric
+		// number fields stringify, edit, and parse back, preserving the variant
 		type_keys(&mut app, [char_key("3")]);
-		value_of(&app, entity).xpect_eq(Value::Uint(53));
+		value_of(&app, entity).xpect_eq(Value::Int(53));
 	}
 
 	#[beet_core::test]
