@@ -31,12 +31,41 @@ impl WorldSceneExt for World {
 		&mut self,
 		scene: S,
 	) -> Result<EntityWorldMut<'_>, BevyError> {
-		let root =
-			bevy::scene::WorldSceneExt::spawn_scene(self, scene)?.id();
+		let root = bevy::scene::WorldSceneExt::spawn_scene(self, scene)?.id();
 		apply_slots(self, root);
 		self.get_entity_mut(root).map_err(Into::into)
 	}
 }
+
+/// Adapts an [`impl Scene`](Scene) into an [`impl Bundle`], the form file-route
+/// page handlers return content in.
+///
+/// File-based routes are classified by their *input* signature and the
+/// `render_action::*_route` constructors all spawn an `impl Bundle`. A
+/// widget-using page returns `rsx!{ .. }.into_scene_bundle()` and a plain page
+/// returns `rsx_direct!{ .. }` directly — both satisfy the same constructors,
+/// so a single file-route collection handles either macro.
+///
+/// The returned [`OnSpawn`] resolves and spawns the scene (wiring its slots via
+/// [`WorldSceneExt::spawn_scene`]) as a child of the entity it is added to. The
+/// host entity (eg a `fixed_route` `CallerScene` render root) carries no
+/// [`Element`], so it renders transparently and the scene content lands in its
+/// place.
+pub trait IntoSceneBundle: 'static + Send + Sync + Scene + Sized {
+	/// Spawn this scene as a child of the host entity on add. See
+	/// [`IntoSceneBundle`].
+	fn into_scene_bundle(self) -> impl Bundle {
+		OnSpawn::new(move |entity: &mut EntityWorldMut| -> Result {
+			let parent = entity.id();
+			entity.world_scope(move |world: &mut World| -> Result {
+				let child = world.spawn_scene(self)?.id();
+				world.entity_mut(child).insert(ChildOf(parent));
+				Ok(())
+			})
+		})
+	}
+}
+impl<S: 'static + Send + Sync + Scene> IntoSceneBundle for S {}
 
 /// Route every caller [`SlotChild`] under `root` into its matching `<slot>`.
 ///
@@ -97,7 +126,10 @@ fn plan_slots(
 		})
 	};
 	let is_slot = |entity: Entity| {
-		elements.get(entity).map(|el| el.tag() == "slot").unwrap_or(false)
+		elements
+			.get(entity)
+			.map(|el| el.tag() == "slot")
+			.unwrap_or(false)
 	};
 
 	// composition roots are the distinct `ChildOf` parents of caller content;
@@ -105,7 +137,9 @@ fn plan_slots(
 	let composition_roots: HashSet<Entity> = children
 		.iter_descendants_inclusive(*root)
 		.filter(|entity| slot_children.contains(*entity))
-		.filter_map(|entity| parents.get(entity).ok().map(|parent| parent.parent()))
+		.filter_map(|entity| {
+			parents.get(entity).ok().map(|parent| parent.parent())
+		})
 		.collect();
 
 	let mut plan = Vec::<SlotWiring>::new();
@@ -168,7 +202,10 @@ fn plan_slots(
 					targets.push((attr(*content, "name"), *content));
 				}
 			}
-			plan.push(SlotWiring { slot, content: matched });
+			plan.push(SlotWiring {
+				slot,
+				content: matched,
+			});
 		}
 	}
 	plan
@@ -223,7 +260,6 @@ fn remove_slot_attribute(world: &mut World, entity: Entity) {
 	world.entity_mut(slot_attr).despawn();
 }
 
-
 #[cfg(test)]
 mod test {
 	// explicit import so `spawn_scene` resolves to beet_ui's slot-wiring
@@ -263,7 +299,8 @@ mod test {
 
 	#[beet_core::test]
 	fn named_slot_receives_caller_content() {
-		let html = render(rsx! { <Panel><h1 slot="title">"Title"</h1></Panel> });
+		let html =
+			render(rsx! { <Panel><h1 slot="title">"Title"</h1></Panel> });
 		html.as_str().xpect_contains("<h1>Title</h1>");
 		html.as_str().xnot().xpect_contains("Fallback Title");
 	}

@@ -1,59 +1,49 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The plugin added to the router app
+/// The site's render substrate, shared by the web and terminal entry points.
+///
+/// Adds the router observers and charcell pipeline (via [`RouterPlugin`]) plus
+/// the Material style rule set that both the web [`Stylesheet`] and the charcell
+/// renderer read.
 pub fn server_plugin(app: &mut App) {
 	app.add_plugins((
 		MinimalPlugins,
 		RouterPlugin,
-		// AgentPlugin,
-		// DebugFlowPlugin::default(),
-	))
-	.world_mut()
-	.spawn(default_router_cli(beet_site_router, beet_site_endpoints));
+		ServerPlugin,
+		material::MaterialStylePlugin::new(palettes::basic::BLUE),
+	));
 }
 
+/// Every site route: the page collection plus the docs and blog collections,
+/// each grouped under a [`BlobStore`] rooted at its markdown source directory so
+/// their [`BlobScene`] routes can read their content.
 pub fn beet_site_endpoints() -> impl Bundle {
-	(InfallibleSequence, children![
+	children![
 		pages_routes(),
-		docs_routes(),
-		blog_routes(),
-		actions_routes(),
-		beet_design::mockups::mockups_routes(),
-		article_layout_middleware("docs"),
-		article_layout_middleware("blog"),
-		image_generator(),
-	])
+		(content_store("docs"), docs_routes()),
+		(content_store("blog"), blog_routes()),
+	]
 }
 
+/// A [`BlobStore`] rooted at `crates/beet_site/src/<dir>`, the source directory
+/// of a markdown collection.
+fn content_store(dir: &str) -> BlobStore {
+	let root =
+		AbsPathBuf::new_workspace_rel(format!("crates/beet_site/src/{dir}"))
+			.unwrap();
+	BlobStore::new(FsStore::new(root))
+}
+
+/// The site router.
+///
+/// The batteries-included [`default_router`] (adding `/app-info` and
+/// `POST /analytics`) wrapped in the global [`beet_document_shell`] via the
+/// [`document_shell`] render middleware, so every route's body is slotted into
+/// the shell's `<slot name="main">`.
 pub fn beet_site_router() -> impl Bundle {
-	default_router(
-		|| EndWith(Outcome::Pass),
-		beet_site_endpoints,
-		|| EndWith(Outcome::Pass),
+	(
+		default_router(beet_site_endpoints()),
+		document_shell(beet_document_shell),
 	)
-}
-
-#[allow(unused)]
-fn image_generator() -> impl Bundle {
-	EndpointBuilder::default()
-		.with_path("generate_image")
-		.with_action(async |request: Request, action: AsyncEntity| -> () {
-			// let request = world.remove_resource::<Request>().unwrap();
-			// let content =
-			// 	Json::<ContentVec>::from_request(request).await.unwrap();
-			// let agent =
-			// 	GeminiAgent::from_env().with_model(GEMINI_2_5_FLASH_IMAGE);
-
-			// let message = session_ext::message(content.0);
-			// let session = session_ext::user_message_session(agent, message);
-			// agents.entity(entity).spawn_child(session).await;
-			todo!("run session and await outcome");
-
-			// let out = action
-			// 	.run_system_cached(session_ext::collect_output)
-			// 	.await
-			// 	.unwrap();
-			// Json(out)
-		})
 }

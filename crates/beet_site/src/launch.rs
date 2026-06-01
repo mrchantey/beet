@@ -10,12 +10,10 @@
 use beet::prelude::*;
 
 /// Scans every route collection and writes the generated route modules to disk.
-pub fn run_codegen() -> Result {
-	async_ext::block_on(route_codegen().export())
-}
+pub fn run_codegen() -> Result { async_ext::block_on(route_codegen().export()) }
 
-/// The full codegen pass: the page, docs, blog and action collections plus the
-/// typed route tree and client-action callers.
+/// The full codegen pass: the page, docs and blog collections plus the typed
+/// route tree.
 fn route_codegen() -> RouteCodegen {
 	RouteCodegen::new()
 		.add_collection(RouteCollection::new(
@@ -30,13 +28,7 @@ fn route_codegen() -> RouteCodegen {
 			RouteCollection::new(site_rel("src/blog"), codegen("blog/mod.rs"))
 				.with_base_route("blog"),
 		)
-		.add_collection(
-			RouteCollection::new(site_rel("src/actions"), codegen("actions.rs"))
-				.with_category(RouteCollectionCategory::Actions)
-				.with_server_feature(Some("web")),
-		)
 		.with_route_tree(codegen("route_tree.rs"))
-		.with_client_actions(codegen("client_actions.rs"))
 }
 
 /// An absolute path to a file relative to the `beet_site` crate root.

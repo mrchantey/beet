@@ -163,19 +163,36 @@ fn tokenize_component_scene(
 	// the props struct lives next to the function as `{Tag}Props`
 	let mut props_path = tag_path.clone();
 	if let Some(last) = props_path.segments.last_mut() {
-		last.ident = syn::Ident::new(
-			&format!("{}Props", last.ident),
-			last.ident.span(),
-		);
+		last.ident =
+			syn::Ident::new(&format!("{}Props", last.ident), last.ident.span());
 		last.arguments = syn::PathArguments::None;
 	}
 
 	let mut with_calls: Vec<TokenStream> = Vec::new();
 	let mut block_parts: Vec<TokenStream> = Vec::new();
+	let mut attr_scenes: Vec<TokenStream> = Vec::new();
 	for attr in &el.open_tag.attributes {
 		match attr {
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
+				// `slot` targets a parent `<slot>`, it is not a prop: emit it as
+				// an `Attribute` on the component entity so the slot-wiring pass
+				// (which reads the `slot` attribute) routes the widget like any
+				// other slot child.
+				if key_str == "slot" {
+					if let KeyedAttributeValue::Value(value) =
+						&attr.possible_value
+					{
+						let val_expr = &value.value;
+						attr_scenes.push(quote! {
+							EntityScene((
+								template_value(Attribute::new("slot")),
+								template_value(Value::new(#val_expr)),
+							))
+						});
+					}
+					continue;
+				}
 				let setter = syn::Ident::new(
 					&format!("with_{key_str}"),
 					Span::call_site(),
@@ -211,6 +228,15 @@ fn tokenize_component_scene(
 		)
 	});
 	parts.extend(block_parts);
+
+	// a `slot` attribute (routing this widget into a parent `<slot>`) attaches
+	// as an `AttributeOf` child, the same shape an HTML element's attrs take.
+	if !attr_scenes.is_empty() {
+		let attrs = nested_tuple(attr_scenes);
+		parts.push(quote! {
+			RelatedScenes::<AttributeOf, _>::new(#attrs)
+		});
+	}
 
 	// caller children of a component tag carry a `SlotChild` marker so the
 	// slot-wiring pass can route them into the widget's `<slot>` elements,

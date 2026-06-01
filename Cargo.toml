@@ -255,13 +255,16 @@ tui_server = ["ratatui","router", "markdown"]
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
-json = ["serde", "beet_core/json", "beet_net?/json"]
+json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 # RON text format for `MediaType::Ron` and `world_serde` loading.
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
 testing = ["beet_core/testing"]
+# The nightly `custom_test_frameworks` test-runner path (libtest harness). Stable
+# builds use the default `inventory` runner.
+custom_test_frameworks = ["beet_core/custom_test_frameworks"]
 fs = ["beet_core/fs","beet_net?/fs"]
 bevy_default = [
 	"bevy/default",

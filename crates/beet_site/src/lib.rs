@@ -16,41 +16,27 @@ pub use launch::run_codegen;
 
 // ── render targets (web + terminal) ──────────────────────────────────────────
 #[cfg(feature = "render")]
-pub mod components;
-#[cfg(feature = "render")]
 pub mod layouts;
 #[cfg(feature = "render")]
 mod server;
 
 // generated route modules (see `run_codegen`)
 #[cfg(feature = "render")]
-#[path = "codegen/pages.rs"]
-mod pages_codegen;
+#[path = "codegen/blog/mod.rs"]
+mod blog_codegen;
 #[cfg(feature = "render")]
 #[path = "codegen/docs/mod.rs"]
 mod docs_codegen;
 #[cfg(feature = "render")]
-#[path = "codegen/blog/mod.rs"]
-mod blog_codegen;
-#[cfg(feature = "render")]
-#[path = "codegen/actions.rs"]
-mod actions_codegen;
+#[path = "codegen/pages.rs"]
+mod pages_codegen;
 #[cfg(feature = "render")]
 #[path = "codegen/route_tree.rs"]
 mod route_tree;
-#[cfg(feature = "render")]
-#[path = "codegen/client_actions.rs"]
-pub mod client_actions;
 
 pub mod prelude {
 	#[cfg(feature = "render")]
-	pub use crate::actions_codegen::*;
-	#[cfg(feature = "render")]
 	pub use crate::blog_codegen::*;
-	#[cfg(feature = "render")]
-	pub use crate::client_actions as actions;
-	#[cfg(feature = "render")]
-	pub use crate::components::*;
 	#[cfg(feature = "render")]
 	pub use crate::docs_codegen::*;
 	#[cfg(feature = "render")]

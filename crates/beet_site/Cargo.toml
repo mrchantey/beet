@@ -19,7 +19,9 @@ default = ["web", "terminal"]
 
 # Shared render substrate: the router, scene system, markdown content and the
 # style rule set, used by both render targets. Page bodies and layouts live here.
-render = ["beet/router", "beet/scene", "beet/markdown", "beet/style"]
+# `json` brings the batteries-included `default_router` (`/app-info`,
+# `POST /analytics`).
+render = ["beet/router", "beet/scene", "beet/markdown", "beet/style", "beet/json"]
 
 # Web render target: the document shell + HTTP server + `HtmlRenderer`.
 web = ["render", "beet/http_server"]
@@ -36,9 +38,16 @@ codegen = ["beet/codegen"]
 native-tls = ["web", "beet/native-tls"]
 lambda = ["web", "beet/lambda"]
 
+# The nightly `custom_test_frameworks` test-runner path. Off by default, so the
+# test suites run on stable via the `inventory` runner; `--all-features` on
+# nightly turns it on for the libtest harness.
+custom_test_frameworks = ["beet/custom_test_frameworks"]
+
 [dependencies]
 serde.workspace = true
 beet.workspace = true
+# the `#[scene]` macro emits `::bevy::` paths, so the crate root needs `bevy`.
+bevy.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }

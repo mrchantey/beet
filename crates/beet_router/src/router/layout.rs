@@ -38,7 +38,7 @@ where
 	Func: 'static + Send + Sync + Clone + Fn() -> S,
 	S: 'static + Send + Sync + Scene,
 {
-	layout_middleware("main", scene)
+	layout_middleware_inner("main", scene, true)
 }
 
 /// The generalized form of [`document_shell`]: slot route content into the
@@ -51,6 +51,22 @@ where
 	Func: 'static + Send + Sync + Clone + Fn() -> S,
 	S: 'static + Send + Sync + Scene,
 {
+	layout_middleware_inner(content_slot, scene, false)
+}
+
+/// Shared implementation. When `html_only` is set (the [`document_shell`]
+/// case), the wrap is skipped unless the request accepts HTML, so non-HTML
+/// targets (the terminal/CLI negotiating `ansi-term`/`text`) render the bare
+/// body without the `<html>` document chrome.
+fn layout_middleware_inner<Func, S>(
+	content_slot: impl Into<String>,
+	scene: Func,
+	html_only: bool,
+) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone + Fn() -> S,
+	S: 'static + Send + Sync + Scene,
+{
 	let content_slot = content_slot.into();
 	let action: Action<(RequestParts, Next<RequestParts, Entity>), Entity> =
 		(move |parts: RequestParts, next: Next<RequestParts, Entity>| {
@@ -58,7 +74,10 @@ where
 			let content_slot = content_slot.clone();
 			async move {
 				// resolve the inner content render root, then wrap it
-				let content = next.call(parts).await?;
+				let content = next.call(parts.clone()).await?;
+				if html_only && !accepts_html(&parts) {
+					return content.xok();
+				}
 				next.world()
 					.clone()
 					.with(move |world: &mut World| {
@@ -75,6 +94,23 @@ where
 			.0
 			.push(action);
 	})
+}
+
+/// Whether the request prefers HTML: an explicit `text/html` in `Accept`, or no
+/// `Accept` at all (the web default). A terminal client negotiating
+/// `ansi-term`/`text` therefore skips the document shell.
+fn accepts_html(parts: &RequestParts) -> bool {
+	match parts
+		.headers
+		.get::<header::Accept>()
+		.and_then(|res| res.ok())
+	{
+		Some(accepts) => {
+			accepts.is_empty()
+				|| accepts.iter().any(|media| *media == MediaType::Html)
+		}
+		None => true,
+	}
 }
 
 /// Spawn the shell `scene` and slot the existing `content` render root into its
@@ -107,9 +143,10 @@ fn wrap_content<S: Scene>(
 
 	// spawn the shell and point its content slot at the existing content
 	let layout = world.spawn_scene(scene())?.id();
-	let slot = find_named_slot(world, layout, content_slot).ok_or_else(|| {
-		bevyhow!("layout shell has no `<slot name=\"{content_slot}\">`")
-	})?;
+	let slot =
+		find_named_slot(world, layout, content_slot).ok_or_else(|| {
+			bevyhow!("layout shell has no `<slot name=\"{content_slot}\">`")
+		})?;
 	world.entity_mut(slot).insert(SlotContainer::new(rendered));
 
 	// despawn the shell subtree plus the content's ephemerals after render
@@ -118,7 +155,6 @@ fn wrap_content<S: Scene>(
 	RenderRoot::insert(&mut world.entity_mut(layout), to_despawn);
 	layout.xok()
 }
-
 
 #[cfg(test)]
 mod test {
@@ -162,14 +198,12 @@ mod test {
 	async fn wraps_fixed_route() {
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				router(),
-				document_shell(shell),
-				children![render_action::fixed_route(
+			.spawn((router(), document_shell(shell), children![
+				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
-				)],
-			))
+				)
+			]))
 			.flush();
 
 		let html = get(&mut world, root, "").await;
@@ -187,14 +221,12 @@ mod test {
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				router(),
-				document_shell(shell),
-				children![render_action::fixed_route(
+			.spawn((router(), document_shell(shell), children![
+				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
-				)],
-			))
+				)
+			]))
 			.flush();
 
 		let first = get(&mut world, root, "").await;
@@ -210,11 +242,9 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				router(),
-				document_shell(shell),
-				children![render_action::async_route("", page)],
-			))
+			.spawn((router(), document_shell(shell), children![
+				render_action::async_route("", page)
+			]))
 			.flush();
 
 		// per-request content is ephemeral; render twice to prove cleanup
@@ -237,12 +267,10 @@ mod test {
 
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				store,
-				router(),
-				document_shell(shell),
-				children![route("post", BlobScene::new("post.md"))],
-			))
+			.spawn((store, router(), document_shell(shell), children![route(
+				"post",
+				BlobScene::new("post.md")
+			)]))
 			.flush();
 
 		// the markdown content (parsed per request) lands inside the shell's
@@ -261,14 +289,9 @@ mod test {
 		// content slotted into `nav` instead of `main`; it lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((
-				router(),
-				layout_middleware("nav", nav_shell),
-				children![render_action::fixed_route(
-					"",
-					rsx_direct! { <a>"home"</a> }
-				)],
-			))
+			.spawn((router(), layout_middleware("nav", nav_shell), children![
+				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
+			]))
 			.flush();
 
 		let html = get(&mut world, root, "").await;

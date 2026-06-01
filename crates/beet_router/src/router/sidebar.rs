@@ -54,6 +54,9 @@ pub struct SidebarState {
 	pub current_path: SmolPath,
 	/// Per-path override configuration.
 	pub infos: HashMap<SmolPath, SidebarInfo>,
+	/// Paths whose subtree is omitted from the nav (eg infra routes like
+	/// `app-info`/`analytics`).
+	pub exclude: HashSet<SmolPath>,
 }
 
 impl SidebarState {
@@ -62,6 +65,7 @@ impl SidebarState {
 		Self {
 			current_path: current_path.into(),
 			infos: HashMap::default(),
+			exclude: HashSet::default(),
 		}
 	}
 
@@ -72,6 +76,12 @@ impl SidebarState {
 		info: SidebarInfo,
 	) -> Self {
 		self.infos.insert(path.into(), info);
+		self
+	}
+
+	/// Omit the route at `path` (and its subtree) from the collected nav.
+	pub fn with_exclude(mut self, path: impl Into<SmolPath>) -> Self {
+		self.exclude.insert(path.into());
 		self
 	}
 
@@ -142,13 +152,22 @@ impl SidebarState {
 
 	/// The display label: explicit override, else the prettified last segment.
 	fn label(&self, path: &SmolPath, info: Option<&SidebarInfo>) -> String {
-		info.and_then(|info| info.label.clone())
-			.unwrap_or_else(|| path.last_segment().unwrap_or("home").to_string())
+		info.and_then(|info| info.label.clone()).unwrap_or_else(|| {
+			path.last_segment().unwrap_or("home").to_string()
+		})
 	}
 
-	/// Sort children by configured order, then natural order by path.
+	/// Sort children by configured order, then natural order by path,
+	/// dropping any whose path is excluded.
 	fn sort_children(&self, tree: &RouteTree) -> Vec<RouteTree> {
-		let mut children = tree.children.clone();
+		let mut children: Vec<RouteTree> = tree
+			.children
+			.iter()
+			.filter(|child| {
+				!self.exclude.contains(&child.path.annotated_path())
+			})
+			.cloned()
+			.collect();
 		children.sort_by(|a, b| {
 			let path_a = a.path.annotated_path();
 			let path_b = b.path.annotated_path();
@@ -232,7 +251,6 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -245,7 +263,10 @@ mod test {
 
 	/// Spawn the `Sidebar` widget from collected nodes and render it to HTML.
 	fn render_sidebar(world: &mut World, nodes: Vec<SidebarNode>) -> String {
-		let entity = world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
+		let entity = world
+			.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
+			.unwrap()
+			.id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(entity, world))
 			.unwrap()
@@ -269,8 +290,14 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
-				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
+				render_action::fixed_route(
+					"docs",
+					rsx_direct! { <p>"docs"</p> }
+				),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -288,8 +315,14 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
-				render_action::fixed_route("docs", rsx_direct!{ <p>"docs"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
+				render_action::fixed_route(
+					"docs",
+					rsx_direct! { <p>"docs"</p> }
+				),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -305,7 +338,10 @@ mod test {
 	fn marks_active_home() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route(
+				"about",
+				rsx_direct! { <p>"about"</p> }
+			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
@@ -318,10 +354,19 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
-					render_action::fixed_route("api", rsx_direct!{ <p>"api"</p> }),
+					render_action::fixed_route(
+						"intro",
+						rsx_direct! { <p>"intro"</p> }
+					),
+					render_action::fixed_route(
+						"api",
+						rsx_direct! { <p>"api"</p> }
+					),
 				]),
 			])
 			.flush();
@@ -346,37 +391,62 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				(PathPartial::new("docs"), children![render_action::fixed_route(
-					"intro",
-					rsx_direct!{ <p>"intro"</p> }
-				),]),
-				(PathPartial::new("blog"), children![render_action::fixed_route(
-					"post1",
-					rsx_direct!{ <p>"post1"</p> }
-				),]),
+				(PathPartial::new("docs"), children![
+					render_action::fixed_route(
+						"intro",
+						rsx_direct! { <p>"intro"</p> }
+					),
+				]),
+				(PathPartial::new("blog"), children![
+					render_action::fixed_route(
+						"post1",
+						rsx_direct! { <p>"post1"</p> }
+					),
+				]),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
 		let nodes = SidebarState::new("docs/intro").collect(&tree);
-		nodes.iter().find(|n| n.display_name == "docs").unwrap().expanded.xpect_true();
-		nodes.iter().find(|n| n.display_name == "blog").unwrap().expanded.xpect_false();
+		nodes
+			.iter()
+			.find(|n| n.display_name == "docs")
+			.unwrap()
+			.expanded
+			.xpect_true();
+		nodes
+			.iter()
+			.find(|n| n.display_name == "blog")
+			.unwrap()
+			.expanded
+			.xpect_false();
 	}
 
 	#[beet_core::test]
 	fn custom_label_override() {
 		let mut world = router_world();
 		let root = world
-			.spawn(children![render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> })])
+			.spawn(children![render_action::fixed_route(
+				"about",
+				rsx_direct! { <p>"about"</p> }
+			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
-		let nodes = SidebarState::new("").with_info("about", SidebarInfo {
-			label: Some("About Us".into()),
-			..default()
-		}).collect(&tree);
-		nodes.iter().any(|n| n.display_name == "About Us").xpect_true();
-		nodes.iter().any(|n| n.display_name == "about").xpect_false();
+		let nodes = SidebarState::new("")
+			.with_info("about", SidebarInfo {
+				label: Some("About Us".into()),
+				..default()
+			})
+			.collect(&tree);
+		nodes
+			.iter()
+			.any(|n| n.display_name == "About Us")
+			.xpect_true();
+		nodes
+			.iter()
+			.any(|n| n.display_name == "about")
+			.xpect_false();
 	}
 
 	#[beet_core::test]
@@ -384,17 +454,25 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("zulu", rsx_direct!{ <p>"zulu"</p> }),
-				render_action::fixed_route("alpha", rsx_direct!{ <p>"alpha"</p> }),
+				render_action::fixed_route(
+					"zulu",
+					rsx_direct! { <p>"zulu"</p> }
+				),
+				render_action::fixed_route(
+					"alpha",
+					rsx_direct! { <p>"alpha"</p> }
+				),
 			])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
 		// give zulu a lower order so it sorts ahead of alpha
-		let nodes = SidebarState::new("").with_info("zulu", SidebarInfo {
-			order: Some(0),
-			..default()
-		}).collect(&tree);
+		let nodes = SidebarState::new("")
+			.with_info("zulu", SidebarInfo {
+				order: Some(0),
+				..default()
+			})
+			.collect(&tree);
 		// nodes[0] is Home, then zulu, then alpha
 		nodes[1].display_name.as_str().xpect_eq("zulu");
 		nodes[2].display_name.as_str().xpect_eq("alpha");
@@ -403,13 +481,19 @@ mod test {
 	#[beet_core::test]
 	fn is_ancestor_of_current() {
 		let state = SidebarState::new("docs/getting-started");
-		state.is_ancestor_of_current(&SmolPath::new("docs")).xpect_true();
+		state
+			.is_ancestor_of_current(&SmolPath::new("docs"))
+			.xpect_true();
 		state
 			.is_ancestor_of_current(&SmolPath::new("docs/getting-started"))
 			.xpect_true();
-		state.is_ancestor_of_current(&SmolPath::new("blog")).xpect_false();
+		state
+			.is_ancestor_of_current(&SmolPath::new("blog"))
+			.xpect_false();
 		// root is ancestor of everything
-		state.is_ancestor_of_current(&SmolPath::default()).xpect_true();
+		state
+			.is_ancestor_of_current(&SmolPath::default())
+			.xpect_true();
 	}
 
 	#[beet_core::test]
@@ -417,17 +501,27 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![(PathPartial::new("docs"), children![
-				render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
+				render_action::fixed_route(
+					"intro",
+					rsx_direct! { <p>"intro"</p> }
+				),
 			])])
 			.flush();
 		let tree = tree_of(&mut world, root);
 
 		// current path is NOT under docs, but force expansion
-		let nodes = SidebarState::new("about").with_info("docs", SidebarInfo {
-			expanded: Some(true),
-			..default()
-		}).collect(&tree);
-		nodes.iter().find(|n| n.display_name == "docs").unwrap().expanded.xpect_true();
+		let nodes = SidebarState::new("about")
+			.with_info("docs", SidebarInfo {
+				expanded: Some(true),
+				..default()
+			})
+			.collect(&tree);
+		nodes
+			.iter()
+			.find(|n| n.display_name == "docs")
+			.unwrap()
+			.expanded
+			.xpect_true();
 	}
 
 	#[beet_core::test]
@@ -439,7 +533,10 @@ mod test {
 					"docs",
 					Element::new("p").with_inner_text("docs index")
 				),
-				children![render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> })],
+				children![render_action::fixed_route(
+					"intro",
+					rsx_direct! { <p>"intro"</p> }
+				)],
 			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -458,9 +555,15 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn(children![
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 				(PathPartial::new("docs"), children![
-					render_action::fixed_route("intro", rsx_direct!{ <p>"intro"</p> }),
+					render_action::fixed_route(
+						"intro",
+						rsx_direct! { <p>"intro"</p> }
+					),
 				]),
 			])
 			.flush();

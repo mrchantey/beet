@@ -58,11 +58,13 @@ impl SlotContainer {
 #[relationship_target(relationship = SlotContainer)]
 pub struct SlotContent(Vec<Entity>);
 
-
 /// Finds a named `<slot>` entity in a tree.
 ///
-/// Traverses descendants of `root` looking for an [`Element`] with
-/// tag `slot` and a `name` attribute matching `slot_name`.
+/// Traverses descendants of `root` looking for an [`Element`] with tag `slot`
+/// and a `name` attribute matching `slot_name`. Mirrors [`NodeWalker`]: when an
+/// entity carries a [`SlotContainer`] its slotted content is searched in place
+/// of its [`Children`], so a slot nested inside an already-wired widget slot
+/// (eg a shell composed from `<PageLayout>`) is still reachable.
 pub fn find_named_slot(
 	world: &World,
 	entity: Entity,
@@ -90,6 +92,11 @@ pub fn find_named_slot(
 		}
 	}
 
+	// a wired slot points at its content; search that in place of children
+	if let Some(container) = entity_ref.get::<SlotContainer>() {
+		return find_named_slot(world, **container, slot_name);
+	}
+
 	// recurse into children
 	if let Some(children) = entity_ref.get::<Children>() {
 		for child in children.iter() {
@@ -101,7 +108,6 @@ pub fn find_named_slot(
 
 	None
 }
-
 
 #[cfg(test)]
 mod test {

@@ -88,9 +88,11 @@
 			},
 		},
 	},
-	"file_scan_inclusions": ["agent/plan*", "agent/beet_flow*"],
+	"file_scan_inclusions": ["agent/plan*", "agent/beet_flow*", "agent/report*"],
 	"file_scan_exclusions": [
 		// "agent/*",
+		".beet",
+		".claude",
 		"scripts",
 		// "tests",
 		// "target",
