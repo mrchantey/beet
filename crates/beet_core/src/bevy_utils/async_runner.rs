@@ -70,7 +70,7 @@ impl AsyncRunner {
 	///
 	/// Note that some tasks like http/socket listeners will never complete,
 	/// in which case this will never return.
-	async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
+	pub async fn flush_async_tasks(world: &mut World) -> Option<AppExit> {
 		// yield required for wasm to spawn tasks
 		async_ext::yield_now().await;
 
@@ -88,6 +88,44 @@ impl AsyncRunner {
 				return None;
 			}
 			// 5. yield to the executor
+			yield_to_executor().await;
+		}
+	}
+
+	/// Drives the app until it has been idle (no async tasks in flight) for
+	/// several consecutive frames, settling pipelines that span multiple frames
+	/// and only spawn a follow-up task after some synchronous frames (eg an
+	/// event marking a component `Changed`, whose system then spawns an async
+	/// re-list a frame later).
+	///
+	/// [`flush_async_tasks`](Self::flush_async_tasks) returns the instant
+	/// `in_flight` hits zero, so it can exit inside such a synchronous-only
+	/// window before the follow-up task spawns. This waits for stable idle.
+	///
+	/// Never settles if a task never completes (eg an http/socket listener),
+	/// returning at the safety cap instead of hanging indefinitely.
+	pub async fn settle_async_tasks(world: &mut World) {
+		// idle frames needed to bridge an event → `Changed` → spawn latency
+		const STABLE_IDLE_FRAMES: usize = 8;
+		// guard against pipelines that never quiesce (eg a live listener)
+		const MAX_FRAMES: usize = 10_000;
+
+		async_ext::yield_now().await;
+		let mut idle = 0;
+		for _ in 0..MAX_FRAMES {
+			world.update_local();
+			tick_task_pools();
+			if world.should_exit().is_some() {
+				return;
+			}
+			idle = if world.resource::<AsyncSpawner>().in_flight() == 0 {
+				idle + 1
+			} else {
+				0
+			};
+			if idle >= STABLE_IDLE_FRAMES {
+				return;
+			}
 			yield_to_executor().await;
 		}
 	}

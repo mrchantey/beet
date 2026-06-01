@@ -381,10 +381,11 @@ mod test {
 		world
 			.run_system_cached_with(
 				|In((subject, field_ref)): In<(Entity, FieldRef)>,
-				 mut fields: FieldQuery| {
-					fields
-						.set(subject, &field_ref, Value::Str("new".into()))
-						.unwrap();
+				 mut docs: DocumentQuery| {
+					docs.with_field(subject, &field_ref, |value| {
+						*value = Value::Str("new".into())
+					})
+					.unwrap();
 				},
 				(field, field_ref),
 			)

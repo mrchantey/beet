@@ -74,6 +74,8 @@ fn write_focus_input(
 			// some backends send space distinctly
 			Key::Space => Some(KeyEdit::Insert(" ".to_string())),
 			Key::Backspace => Some(KeyEdit::Backspace),
+				// forward delete: drops the first character in this append-at-end model
+				Key::Delete => Some(KeyEdit::Delete),
 			// Enter, arrows, Tab, Escape, etc belong to navigation/shortcuts
 			_ => None,
 		})
@@ -91,12 +93,20 @@ fn write_focus_input(
 	// then flag Changed once if an edit actually landed
 	let bypass = value.bypass_change_detection();
 	let changed = edits.into_iter().fold(false, |changed, edit| {
-		let did_edit = bypass.edit_text(|text| match edit {
-			KeyEdit::Insert(chars) => text.push_str(&chars),
-			KeyEdit::Backspace => {
-				text.pop();
-			}
-		});
+		let did_edit = bypass
+			.edit_text(|text| match edit {
+				KeyEdit::Insert(chars) => text.push_str(&chars),
+				KeyEdit::Backspace => {
+					text.pop();
+				}
+				KeyEdit::Delete => {
+					if !text.is_empty() {
+						text.remove(0);
+					}
+				}
+			})
+			// a rejected edit (eg a non-numeric key in a number field) is a no-op
+			.unwrap_or(false);
 		changed || did_edit
 	});
 	if changed {
@@ -110,6 +120,8 @@ enum KeyEdit {
 	Insert(String),
 	/// Remove the last character.
 	Backspace,
+	/// Remove the first character (forward delete).
+	Delete,
 }
 
 #[cfg(test)]
@@ -187,14 +199,34 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn non_text_variant_skipped() {
+	fn typing_digit_into_number() {
+		let mut app = app();
+		let entity = app.world_mut().spawn((Focus, Value::Int(5))).id();
+		// number fields stringify, edit, and parse back, staying numeric
+		type_keys(&mut app, [char_key("3")]);
+		value_of(&app, entity).xpect_eq(Value::Uint(53));
+	}
+
+	#[beet_core::test]
+	fn invalid_number_edit_rejected() {
 		let mut app = app();
 		let entity = app.world_mut().spawn((Focus, Value::Int(5))).id();
 		app.update(); // clear the spawn-time Changed tick
+		// a non-numeric key leaves the number untouched and unmarked
 		type_keys(&mut app, [char_key("x")]);
-		// unchanged and not marked Changed
 		value_of(&app, entity).xpect_eq(Value::Int(5));
 		changed_count(&mut app).xpect_eq(0);
+	}
+
+	#[beet_core::test]
+	fn delete_drops_first() {
+		let mut app = app();
+		let entity = app.world_mut().spawn((Focus, Value::str("hi"))).id();
+		type_keys(&mut app, [Key::Delete]);
+		value_of(&app, entity).xpect_eq(Value::str("i"));
+		// delete on empty stays Str(""), does not panic
+		type_keys(&mut app, [Key::Delete, Key::Delete]);
+		value_of(&app, entity).xpect_eq(Value::str(""));
 	}
 
 	#[beet_core::test]

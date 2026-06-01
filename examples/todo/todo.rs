@@ -42,7 +42,9 @@ struct Todo {
 
 #[beet::main]
 async fn main() -> Result {
-	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	// DocumentPlugin drives the bidi sync the self-bound actions rely on: each
+	// route's local `Value` mirrors the shared `todos` field
+	let mut world = (AsyncPlugin, RouterPlugin, DocumentPlugin).into_world();
 
 	// load the persisted list, falling back to an empty document
 	let document = load_document().await?;
@@ -57,6 +59,11 @@ async fn main() -> Result {
 			list(),
 		]))
 		.flush();
+
+	// settle the read path so each route's `Value` mirrors the loaded list
+	// before the action runs (the action body executes at dispatch, ahead of
+	// the call's own update loop)
+	world.update_local();
 
 	// a CLI invocation is just a request: the path selects the route and
 	// `--body` becomes the request body
@@ -112,43 +119,43 @@ fn delete() -> impl Bundle {
 fn list() -> impl Bundle { (todos(), exchange_route("list", ReadField)) }
 
 /// Returns a single todo by its index, erroring when out of bounds.
+///
+/// Self-bound: reads the entity's own [`Value`], which bidi sync mirrors from
+/// the `todos` field.
 #[action]
 #[derive(Default, Clone, Component)]
 fn ReadTodo(
 	cx: In<ActionContext<usize>>,
-	mut query: DocumentQuery,
-	fields: Query<&FieldRef>,
+	values: Query<&Value>,
 ) -> Result<Value> {
-	let field = fields.get(cx.id())?;
 	let index = cx.input;
-	query.with_field(cx.id(), field, move |value| -> Result<Value> {
-		value
-			.as_list()?
-			.get(index)
-			.cloned()
-			.ok_or_else(|| bevyhow!("no todo at index {index}"))
-	})?
+	values
+		.get(cx.id())?
+		.as_list()?
+		.get(index)
+		.cloned()
+		.ok_or_else(|| bevyhow!("no todo at index {index}"))
 }
 
 /// Replaces the todo at the given index, erroring when out of bounds.
+///
+/// Self-bound: mutates the entity's own [`Value`]; write-back reaches the
+/// document.
 #[action]
 #[derive(Default, Clone, Component)]
 fn UpdateTodo(
 	cx: In<ActionContext<(usize, Todo)>>,
-	mut query: DocumentQuery,
-	fields: Query<&FieldRef>,
+	mut values: Query<&mut Value>,
 ) -> Result {
 	let entity = cx.id();
-	let field = fields.get(entity)?;
 	let (index, todo) = cx.take();
 	let todo = Value::from_serde(&todo)?;
-	query.with_field(entity, field, move |value| -> Result {
-		*value
-			.as_list_mut()?
-			.get_mut(index)
-			.ok_or_else(|| bevyhow!("no todo at index {index}"))? = todo;
-		Ok(())
-	})?
+	*values
+		.get_mut(entity)?
+		.as_list_mut()?
+		.get_mut(index)
+		.ok_or_else(|| bevyhow!("no todo at index {index}"))? = todo;
+	Ok(())
 }
 
 // ╔═══════════════════════════════════════════╗

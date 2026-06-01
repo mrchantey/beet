@@ -98,6 +98,19 @@ pub impl App {
 		AsyncRunner::run(core::mem::take(self))
 	}
 
+	/// Drives the app until it settles, ticking the task pools between updates.
+	/// Unlike [`run_async`](Self::run_async) it returns once the work settles
+	/// rather than looping to [`AppExit`].
+	///
+	/// Use in async contexts (eg tests) to await multi-frame async convergence,
+	/// such as a bridged `spawn_local` task writing a field then a reactive
+	/// rebuild, without hand-rolling the update + tick loop. See
+	/// [`AsyncRunner::settle_async_tasks`] for the settle semantics.
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
+	async fn update_async(&mut self) {
+		AsyncRunner::settle_async_tasks(self.world_mut()).await;
+	}
+
 	/// Runs an IO task to completion, polling at 10 millisecond intervals.
 	#[cfg(feature = "std")]
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O

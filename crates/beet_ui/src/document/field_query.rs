@@ -8,40 +8,15 @@ use bevy::reflect::Typed;
 /// an event handler. Reuses [`DocumentQuery`], so writes are change-detected and
 /// schema-checked just like any other document write.
 ///
-/// Two surfaces: an untyped one over raw [`Value`] keyed by [`FieldRef`], and a
-/// typed one keyed by [`TypedFieldRef`].
+/// This is the schema-checked typed surface, keyed by [`TypedFieldRef`]. A
+/// self-bound subject already mirrors its field in a local [`Value`], so untyped
+/// reads/writes go straight through that `Value` rather than this indirection.
 #[derive(SystemParam)]
 pub struct FieldQuery<'w, 's> {
 	docs: DocumentQuery<'w, 's>,
 }
 
 impl FieldQuery<'_, '_> {
-	/// Read the current value, initializing the field from its
-	/// [`on_missing`](FieldRef::on_missing) if absent.
-	pub fn get(&mut self, subject: Entity, field: &FieldRef) -> Result<Value> {
-		self.docs.with_field(subject, field, |value| value.clone())
-	}
-
-	/// Write a raw value, initializing the field if absent.
-	pub fn set(
-		&mut self,
-		subject: Entity,
-		field: &FieldRef,
-		value: Value,
-	) -> Result {
-		self.docs.with_field(subject, field, move |slot| *slot = value)
-	}
-
-	/// Read, mutate, and write back a raw value in one step.
-	pub fn update(
-		&mut self,
-		subject: Entity,
-		field: &FieldRef,
-		func: impl FnOnce(&mut Value),
-	) -> Result {
-		self.docs.with_field(subject, field, func)
-	}
-
 	/// Read the current value as `T`, seeding the default if missing.
 	pub fn get_typed<T>(
 		&mut self,
@@ -51,7 +26,9 @@ impl FieldQuery<'_, '_> {
 	where
 		T: DeserializeOwned + Typed,
 	{
-		self.get(subject, field)?.into_serde()
+		self.docs
+			.with_field(subject, field, |value| value.clone())?
+			.into_serde()
 	}
 
 	/// Write a typed value, type-checked against the document schema.
@@ -90,30 +67,6 @@ impl FieldQuery<'_, '_> {
 #[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
-
-	#[beet_core::test]
-	fn untyped_get_set_update() {
-		let mut world = DocumentPlugin::world();
-		let doc = world.spawn(Document::new(val!({ "count": 1i64 }))).id();
-		let field = FieldRef::new("count");
-
-		world
-			.run_system_cached_with(
-				|In((subject, field)): In<(Entity, FieldRef)>,
-				 mut fields: FieldQuery| {
-					fields.get(subject, &field).unwrap().xpect_eq(Value::Int(1));
-					fields.set(subject, &field, Value::Int(5)).unwrap();
-					fields
-						.update(subject, &field, |value| {
-							*value = Value::Int(value.as_i64().unwrap() + 1)
-						})
-						.unwrap();
-					fields.get(subject, &field).unwrap().xpect_eq(Value::Int(6));
-				},
-				(doc, field.clone()),
-			)
-			.unwrap();
-	}
 
 	#[beet_core::test]
 	fn typed_seeds_default() {

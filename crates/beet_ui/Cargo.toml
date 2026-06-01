@@ -39,9 +39,11 @@ required-features = ["scene", "style"]
 
 [features]
 default = ["std","rsx", "style"]
-# `keyboard` is always on: the backend-agnostic `FocusPlugin` reads bevy
-# `KeyboardInput` messages regardless of renderer.
-std = ["beet_core/bevy_keyboard"]
+std = []
+# Backend-agnostic keyboard input: the `FocusPlugin` reads bevy `KeyboardInput`
+# messages and routes them to the focused entity's `Value`. Opt-in so a plain
+# `beet_ui` build does not pull `bevy/keyboard`. Terminal renderers enable it.
+keyboard = ["std", "beet_core/bevy_keyboard"]
 action = ["dep:beet_action", "net"]
 net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/fs", "beet_net/http"]
 tokens = ["beet_core/tokens"]
@@ -52,8 +54,8 @@ scene = ["std", "rsx", "bevy/scene"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-ratatui = ["dep:bevy_ratatui", "dep:ratatui"]
-terminal = ["style", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse"]
+ratatui = ["dep:bevy_ratatui", "dep:ratatui", "keyboard"]
+terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]

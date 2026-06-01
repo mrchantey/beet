@@ -240,23 +240,44 @@ impl Value {
 
 	/// Apply a text edit, returning whether the value actually changed.
 	///
-	/// `Str` and `Null` are editable (`Null` starts an empty string and is
-	/// promoted to `Str`); every other variant is left untouched. A no-op edit
-	/// on an existing `Str` (eg backspace at the start) returns `false`.
-	pub fn edit_text(&mut self, func: impl FnOnce(&mut String)) -> bool {
-		let (mut text, was_str) = match self {
-			Value::Str(text) => (text.to_string(), true),
+	/// `Str` and `Null` edit as text (`Null` starts an empty string and is
+	/// promoted to `Str`). Numeric variants (`Int`, `Uint`, `Float`) stringify,
+	/// edit, then parse back, so typing into a number field keeps it numeric; an
+	/// edit that no longer parses as a number is rejected with an error and
+	/// leaves the value untouched. Every other variant is a no-op `Ok(false)`.
+	///
+	/// A no-op edit on an existing `Str` or number (eg backspace at the start)
+	/// returns `Ok(false)`.
+	pub fn edit_text(
+		&mut self,
+		func: impl FnOnce(&mut String),
+	) -> Result<bool> {
+		let (mut text, numeric) = match self {
+			Value::Str(text) => (text.to_string(), false),
 			Value::Null => (String::new(), false),
-			_ => return false,
+			Value::Int(num) => (num.to_string(), true),
+			Value::Uint(num) => (num.to_string(), true),
+			Value::Float(num) => (num.to_string(), true),
+			_ => return Ok(false),
 		};
 		let before = text.clone();
 		func(&mut text);
-		// promotion from Null always counts; an unchanged Str does not
-		if was_str && text == before {
-			return false;
+		// promotion from Null always counts; an unchanged Str/number does not
+		if text == before && !self.is_null() {
+			return Ok(false);
 		}
-		*self = Value::Str(text.into());
-		true
+		// text fields stay text; number fields must parse back to a number
+		*self = if numeric {
+			match Value::parse_string(&text) {
+				parsed @ (Value::Int(_) | Value::Uint(_) | Value::Float(_)) => {
+					parsed
+				}
+				_ => bevybail!("'{text}' is not a valid number"),
+			}
+		} else {
+			Value::Str(text.into())
+		};
+		Ok(true)
 	}
 
 	/// Returns this value as a byte slice.
@@ -666,23 +687,33 @@ mod test {
 	fn edit_text_coercion() {
 		// Str is editable and reports the change
 		let mut value = Value::str("hi");
-		value.edit_text(|text| text.push('!')).xpect_true();
+		value.edit_text(|text| text.push('!')).unwrap().xpect_true();
 		value.xpect_eq(Value::str("hi!"));
 
 		// Null promotes to Str, even when the edit leaves it empty
 		let mut value = Value::Null;
-		value.edit_text(|_| {}).xpect_true();
+		value.edit_text(|_| {}).unwrap().xpect_true();
 		value.xpect_eq(Value::str(""));
 
 		// a no-op edit on an existing Str returns false
 		let mut value = Value::str("hi");
-		value.edit_text(|_| {}).xpect_false();
+		value.edit_text(|_| {}).unwrap().xpect_false();
 		value.xpect_eq(Value::str("hi"));
 
-		// non-text variants are left untouched
+		// numbers stringify, edit, and parse back, staying numeric
+		let mut value = Value::Int(-5);
+		value.edit_text(|text| text.push('3')).unwrap().xpect_true();
+		value.xpect_eq(Value::Int(-53));
+
+		// an edit that no longer parses as a number errors, leaving it untouched
 		let mut value = Value::Int(5);
-		value.edit_text(|text| text.push('x')).xpect_false();
+		value.edit_text(|text| text.push('x')).is_err().xpect_true();
 		value.xpect_eq(Value::Int(5));
+
+		// genuinely non-editable variants report false
+		let mut value = Value::Bool(true);
+		value.edit_text(|text| text.push('x')).unwrap().xpect_false();
+		value.xpect_eq(Value::Bool(true));
 	}
 
 	#[crate::test]
