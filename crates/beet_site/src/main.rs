@@ -1,41 +1,28 @@
-#![cfg_attr(rustfmt, rustfmt_skip)]
-#![allow(unused)]
+//! The beet website binary.
+//!
+//! With the `codegen` feature it runs the route codegen pass and exits. With a
+//! render target (`web` and/or `terminal`) it boots the site server.
 
-use beet::prelude::*;
-use beet_site::prelude::*;
+#[cfg(feature = "codegen")]
+fn main() -> beet::prelude::Result {
+	beet_site::run_codegen()
+}
 
+#[cfg(all(not(feature = "codegen"), feature = "render"))]
 fn main() {
+	use beet::prelude::*;
+	use beet_site::prelude::*;
+
 	App::new()
-		.add_plugins((
-			#[cfg(feature = "launch")]
-			launch_plugin,
-			#[cfg(feature = "server")]
-			server_plugin,
-			#[cfg(feature = "client")]
-			client_plugin,
-			BeetPlugins,
-		))
-		.insert_resource(PackageConfig{
-			title:"Beet".to_string(),
+		.add_plugins((server_plugin, BeetPlugins))
+		.insert_resource(PackageConfig {
+			title: "Beet".to_string(),
 			..pkg_config!()
-		})
-		.add_systems(Startup,|config:Res<PackageConfig>|{
-			config.xprint("config");
 		})
 		.run();
 }
 
-#[cfg(feature = "client")]
-fn client_plugin(app: &mut App) {
-	app
-		.register_type::<ClientIslandRoot<beet_design::templates::BucketList>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_text_field_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_bucket_list_bucket_id_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_select_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_button_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_form_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<ClientCounter>>()
-		.register_type::<ClientIslandRoot<ServerCounter>>()
-		.register_type::<ClientIslandRoot<ImageGenerator>>()
-	/* */;
+#[cfg(not(any(feature = "codegen", feature = "render")))]
+fn main() {
+	panic!("enable a render target (`web`/`terminal`) or the `codegen` feature");
 }

@@ -67,7 +67,7 @@ members = [
 	# "crates/beet_design",
 
 	## 💡 Beet
-	# "crates/beet_site",
+	"crates/beet_site",
 	"crates/beet-cli",
 ]
 
