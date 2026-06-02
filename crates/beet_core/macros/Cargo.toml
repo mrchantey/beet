@@ -17,7 +17,11 @@ keywords.workspace = true
 proc-macro = true
 
 [features]
+default = ["slot"]
 rsx = ["dep:rstml"]
+# Hoist `<slot>` markup into scene props: the `#[scene]` macro injects a
+# `SceneProp` field per slot and `rsx!` lowers `<slot name="x"/>` to that prop.
+slot = []
 # When enabled the `#[beet::test]` macro additionally emits a libtest
 # `#[test]` fn so the nightly `custom_test_frameworks` harness can collect
 # it. The `inventory` registration is always emitted regardless.

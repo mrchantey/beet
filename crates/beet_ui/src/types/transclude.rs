@@ -8,10 +8,10 @@ use beet_core::prelude::*;
 /// a persistent, separately-managed subtree (eg fixed-route content shared
 /// across requests) transcluded into an ephemeral shell.
 ///
-/// This is the one piece of the former slot system that survives: author-facing
-/// `<slot>` composition is gone (see [`SceneProp`]), but the layout middleware
-/// still needs to inject already-spawned route content into a freshly-spawned
-/// document shell without despawning it.
+/// This is distinct from author-facing `<slot>` composition (which lowers to
+/// [`SceneProp`] props at macro time): the layout middleware needs to inject
+/// already-spawned route content into a freshly-spawned document shell without
+/// despawning it, by reference rather than by value.
 #[derive(
 	Debug,
 	Clone,

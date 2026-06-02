@@ -356,14 +356,26 @@ fn element_with_more_than_twelve_children() {
 	world.entity(root).get::<Children>().unwrap().len().xpect_eq(20);
 }
 
-/// A widget with a named `header` prop and default `children`, exercising
-/// children-as-props composition (replacing the removed `<slot>` system).
+/// A widget with a named `header` slot and a default slot. The `#[scene]` macro
+/// hoists each `<slot>` into a `SceneProp` prop (`header`, `children`), and the
+/// caller fills them via `slot="header"` / unmarked content.
 #[scene]
-fn Panel(header: SceneProp, children: SceneProp) -> impl Scene {
+fn Panel() -> impl Scene {
 	rsx! {
 		<section>
-			<header>{header}</header>
-			<div>{children}</div>
+			<header><slot name="header"/></header>
+			<div><slot/></div>
+		</section>
+	}
+}
+
+/// A widget whose slots carry fallback content, rendered when the prop is unset.
+#[scene]
+fn FallbackPanel() -> impl Scene {
+	rsx! {
+		<section>
+			<header><slot name="header">"Default Title"</slot></header>
+			<div><slot>"Default Body"</slot></div>
 		</section>
 	}
 }
@@ -424,6 +436,38 @@ fn unset_prop_renders_empty() {
 		.xpect_contains("<section>")
 		.xnot()
 		.xpect_contains("slot");
+}
+
+#[beet_core::test]
+fn slot_fallback_renders_when_unset() {
+	// no caller content: each `<slot>`'s own children are the fallback.
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <FallbackPanel/> }).unwrap().id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains("<header>Default Title</header>")
+		.xpect_contains("<div>Default Body</div>");
+}
+
+#[beet_core::test]
+fn slot_fallback_overridden_by_caller() {
+	// caller content replaces the fallback in both the named and default slot.
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<FallbackPanel>
+				<h1 slot="header">"Real Title"</h1>
+				<p>"Real Body"</p>
+			</FallbackPanel>
+		})
+		.unwrap()
+		.id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains("<header><h1>Real Title</h1></header>")
+		.xpect_contains("<p>Real Body</p>")
+		.xnot()
+		.xpect_contains("Default");
 }
 
 #[beet_core::test]

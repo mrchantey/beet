@@ -295,6 +295,9 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 		});
 	}
 
+	#[cfg(feature = "slot")]
+	append_slot_props(body, &mut props, &beet_ui);
+
 	let field_defs = props.iter().map(Prop::field_def);
 	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
 	let props_struct = props_struct(
@@ -506,6 +509,9 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 	let scene_component_impl = scene_component_impl(fn_name, &props_name);
 
+	#[cfg(feature = "slot")]
+	append_slot_props(body, &mut props, &beet_ui);
+
 	let field_defs = props.iter().map(Prop::field_def);
 	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
 	let props_struct = props_struct(
@@ -612,6 +618,89 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 
 		#scene_component_impl
 	})
+}
+
+/// Scan a `#[scene]` body for `<slot>` placeholders and append a `SceneProp`
+/// prop for each slot name not already declared as a parameter. `<slot/>` maps
+/// to `children`, `<slot name="x"/>` to `x` (`-` lowered to `_`).
+#[cfg(feature = "slot")]
+fn append_slot_props(
+	body: &syn::Block,
+	props: &mut Vec<Prop>,
+	beet_ui: &syn::Path,
+) {
+	use quote::ToTokens;
+	let mut names = Vec::new();
+	collect_slot_names(body.to_token_stream(), &mut names);
+	let scene_prop_ty: syn::Type =
+		syn::parse_quote! { #beet_ui::prelude::SceneProp };
+	for name in names {
+		let ident = format_ident!("{}", name.replace('-', "_"));
+		if props.iter().any(|prop| prop.ident == ident) {
+			continue;
+		}
+		props.push(Prop {
+			ident,
+			ty: scene_prop_ty.clone(),
+			required: false,
+			default_expr: None,
+			other_attrs: Vec::new(),
+			set_with_args: Vec::new(),
+		});
+	}
+}
+
+/// Walk a token stream collecting `<slot>` names (default `children`), recursing
+/// into groups so nested `rsx! { .. }` bodies are covered. A slot tag is a `<`
+/// punct immediately followed by a `slot` ident; its `name = "x"` literal, if
+/// any, names the prop. Names are deduplicated, first-seen order preserved.
+#[cfg(feature = "slot")]
+fn collect_slot_names(
+	tokens: TokenStream,
+	out: &mut Vec<alloc::string::String>,
+) {
+	use alloc::string::ToString;
+	use proc_macro2::TokenTree;
+
+	let is_punct = |tree: Option<&TokenTree>, ch: char| {
+		matches!(tree, Some(TokenTree::Punct(punct)) if punct.as_char() == ch)
+	};
+
+	let trees: Vec<TokenTree> = tokens.into_iter().collect();
+	let mut idx = 0;
+	while idx < trees.len() {
+		if let TokenTree::Group(group) = &trees[idx] {
+			collect_slot_names(group.stream(), out);
+			idx += 1;
+			continue;
+		}
+		let is_slot_tag = is_punct(trees.get(idx), '<')
+			&& matches!(trees.get(idx + 1), Some(TokenTree::Ident(id)) if id == "slot");
+		if !is_slot_tag {
+			idx += 1;
+			continue;
+		}
+		// scan attributes up to the closing `>` for a `name = "x"` literal
+		let mut name = "children".to_string();
+		let mut scan = idx + 2;
+		while scan < trees.len() && !is_punct(trees.get(scan), '>') {
+			let is_name_attr =
+				matches!(&trees[scan], TokenTree::Ident(id) if id == "name")
+					&& is_punct(trees.get(scan + 1), '=');
+			if is_name_attr {
+				if let Some(TokenTree::Literal(lit)) = trees.get(scan + 2) {
+					if let syn::Lit::Str(str) = syn::Lit::new(lit.clone()) {
+						name = str.value();
+					}
+				}
+			}
+			scan += 1;
+		}
+		if !out.contains(&name) {
+			out.push(name);
+		}
+		idx = scan + 1;
+	}
 }
 
 #[cfg(test)]
@@ -777,6 +866,47 @@ mod test {
 			fn Panel(role: u32) -> impl Scene { todo!() }
 		});
 		assert!(err.contains("not yet implemented"));
+	}
+
+	#[cfg(feature = "slot")]
+	#[test]
+	fn slot_injects_scene_props() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Panel() -> impl Scene {
+				rsx! {
+					<section>
+						<header><slot name="header"/></header>
+						<div><slot/></div>
+					</section>
+				}
+			}
+		});
+		// the named slot and the default slot each become a `SceneProp` field
+		assert!(result.contains("header : beet_ui :: prelude :: SceneProp"));
+		assert!(result.contains("children : beet_ui :: prelude :: SceneProp"));
+	}
+
+	#[cfg(feature = "slot")]
+	#[test]
+	fn slot_name_dash_lowers_to_underscore() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Panel() -> impl Scene {
+				rsx! { <nav><slot name="header-nav"/></nav> }
+			}
+		});
+		assert!(result.contains("header_nav : beet_ui :: prelude :: SceneProp"));
+	}
+
+	#[cfg(feature = "slot")]
+	#[test]
+	fn slot_skips_explicitly_declared_prop() {
+		// an author-declared `children` is not duplicated by the `<slot/>` scan
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Panel(children: SceneProp) -> impl Scene {
+				rsx! { <div><slot/></div> }
+			}
+		});
+		assert_eq!(result.matches("children :").count(), 1);
 	}
 
 	#[test]

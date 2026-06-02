@@ -1,10 +1,11 @@
 //! Type-erased scene content passed to a component as a prop.
 //!
-//! Replaces the `<slot>` system: caller content (`<Card>…</Card>`) is lowered
-//! into a [`SceneProp`] and handed to the widget as its `children` prop (or a
-//! named prop for additional insertion points). The widget places it explicitly
-//! in its `rsx!` body — `{children}`, `{header}`, … — so composition is direct
-//! and non-destructive rather than a post-spawn graph rewrite.
+//! The runtime backing for `<slot>` composition: caller content (`<Card>…</Card>`)
+//! is lowered by `rsx!` into a [`SceneProp`] and handed to the widget as its
+//! `children` prop (or a named prop for additional insertion points). The widget
+//! exposes the insertion points as `<slot>`s, which the `#[scene]` macro hoists
+//! into `SceneProp` props and `rsx!` lowers to read them — so composition is
+//! direct and non-destructive rather than a post-spawn graph rewrite.
 use beet_core::prelude::*;
 use bevy::scene::ResolveContext;
 use bevy::scene::ResolveSceneError;

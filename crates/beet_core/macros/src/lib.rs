@@ -236,10 +236,15 @@ pub fn rsx_direct(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// struct. Capitalized tags in [`rsx`] map attributes to the props setters by
 /// name, so omitted attributes fall back to `Default`.
 ///
+/// With the `slot` feature (default), `<slot>` placeholders in the body are
+/// hoisted into `SceneProp` props: `<slot/>` becomes a `children` prop,
+/// `<slot name="x"/>` an `x` prop (`-` lowered to `_`). The caller fills them
+/// with `slot="x"` content (default = unmarked children).
+///
 /// ```rust ignore
 /// #[scene]
 /// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Scene {
-///     rsx! { <button>{label}</button> }
+///     rsx! { <button>{label} <slot/></button> }
 /// }
 /// ```
 #[cfg(feature = "rsx")]

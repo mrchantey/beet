@@ -15,6 +15,8 @@
 //! - Attributes attach via `RelatedScenes::<AttributeOf, _>`
 //! - Event attributes (`on*`) become `on(...)` observer templates
 //! - Capitalized tags `<Foo prop=x/>` become `Foo(FooProps::default().with_prop(x))`
+//! - `<slot>` placeholders (with the `slot` feature) read the matching
+//!   `SceneProp` prop the `#[scene]` macro injects; children are the fallback
 //!
 //! The consuming crate must enable the `scene` feature, which provides
 //! `template_value`, `RelatedScenes`, `EntityScene`, `on`, etc. via its prelude.
@@ -142,11 +144,66 @@ fn tokenize_node_scene(node: &Node<CustomNode>) -> TokenStream {
 /// Tokenize an element into a scene, dispatching on tag casing.
 fn tokenize_element_scene(el: &NodeElement<CustomNode>) -> TokenStream {
 	let tag_str = el.open_tag.name.to_string();
+	#[cfg(feature = "slot")]
+	if tag_str == "slot" {
+		return tokenize_slot_scene(el);
+	}
 	if tag_str.starts_with(|ch: char| ch.is_uppercase()) {
 		tokenize_component_scene(el, &tag_str)
 	} else {
 		tokenize_html_element_scene(el, &tag_str)
 	}
+}
+
+/// Lower a `<slot>` placeholder to the matching scene prop. `<slot/>` reads the
+/// `children` prop, `<slot name="x"/>` the `x` prop (`-` lowered to `_`); the
+/// `#[scene]` macro injects these props from the same `<slot>` markup. Any
+/// children are the fallback rendered when the prop is empty (via
+/// [`SceneProp::or`](beet_ui::prelude::SceneProp::or)).
+#[cfg(feature = "slot")]
+fn tokenize_slot_scene(el: &NodeElement<CustomNode>) -> TokenStream {
+	let name = slot_name_attr(el).unwrap_or_else(|| "children".into());
+	let ident =
+		syn::Ident::new(&name.replace('-', "_"), el.open_tag.name.span());
+
+	// fallback children attach as `ChildOf` the placement entity, matching how
+	// caller content (a `SceneProp`) attaches when the prop is set.
+	let fallback: Vec<TokenStream> = el
+		.children
+		.iter()
+		.map(|child| {
+			let scene = tokenize_node_scene(child);
+			quote! { EntityScene(#scene) }
+		})
+		.collect();
+
+	if fallback.is_empty() {
+		quote! { (#ident).into_scene() }
+	} else {
+		let fallback = nested_tuple(fallback);
+		quote! {
+			(#ident)
+				.or(RelatedScenes::<ChildOf, _>::new(#fallback))
+				.into_scene()
+		}
+	}
+}
+
+/// Read a `<slot name="x"/>`'s `name` attribute (string literals only).
+#[cfg(feature = "slot")]
+fn slot_name_attr(el: &NodeElement<CustomNode>) -> Option<String> {
+	el.open_tag.attributes.iter().find_map(|attr| {
+		let NodeAttribute::Attribute(attr) = attr else {
+			return None;
+		};
+		if attr.key.to_string() != "name" {
+			return None;
+		}
+		match &attr.possible_value {
+			KeyedAttributeValue::Value(value) => value.value_literal_string(),
+			_ => None,
+		}
+	})
 }
 
 /// Lower a capitalized component tag `<Foo a=1 b/>` to a `SceneComponent`
