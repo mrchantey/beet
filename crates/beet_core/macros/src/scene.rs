@@ -193,6 +193,20 @@ fn is_prop_param(pt: &syn::PatType) -> bool {
 	pt.attrs.iter().any(|attr| attr.path().is_ident("prop"))
 }
 
+/// Whether a parameter is the render-context channel: a shared reference to a
+/// type named `RouteContext` (`cx: &RouteContext`). The macro wires an ancestor
+/// lookup for it rather than treating it as a `SystemParam`.
+fn is_route_context_param(pt: &syn::PatType) -> bool {
+	let syn::Type::Reference(reference) = pt.ty.as_ref() else {
+		return false;
+	};
+	matches!(
+		reference.elem.as_ref(),
+		syn::Type::Path(tp)
+			if tp.path.segments.last().is_some_and(|seg| seg.ident == "RouteContext")
+	)
+}
+
 /// Whether a type is `Option<..>`.
 fn is_option(ty: &syn::Type) -> bool {
 	match ty {
@@ -461,8 +475,10 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let props_name = format_ident!("{}Props", fn_name);
 
 	let mut props: Vec<Prop> = Vec::new();
-	let mut sys_types: Vec<&syn::Type> = Vec::new();
+	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::Ident> = Vec::new();
+	// the author's `cx: &RouteContext` binding, if any
+	let mut cx_binding: Option<syn::Ident> = None;
 	for arg in &item.sig.inputs {
 		let pt = typed_arg(arg)?;
 		if is_prop_param(pt) {
@@ -471,8 +487,17 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 				synbail!(pt, "`#[prop(all)]` is not supported with `#[scene(system)]`");
 			}
 			props.push(prop);
+		} else if is_route_context_param(pt) {
+			if cx_binding.is_some() {
+				synbail!(pt, "only one `&RouteContext` parameter is supported");
+			}
+			cx_binding = Some(param_ident(pt)?);
+			// fetched via an injected `RenderQuery` ancestor lookup
+			sys_types.push(quote! { RenderQuery });
+			sys_pats.push(format_ident!("__render_query"));
 		} else {
-			sys_types.push(&pt.ty);
+			let ty = &pt.ty;
+			sys_types.push(quote! { #ty });
 			sys_pats.push(param_ident(pt)?);
 		}
 	}
@@ -493,13 +518,35 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	);
 
 	let unwraps = required_unwraps(&props);
+	// when a `cx: &RouteContext` param is present the entity being built is
+	// looked up via the injected `RenderQuery`; a missing context surfaces an
+	// `ErrorScene` through the build channel (same path as a missing prop). The
+	// body must then be type-erased so both arms unify as `Box<dyn Scene>`.
+	let closure_body = match &cx_binding {
+		Some(cx) => quote! {
+			let #props_name { #(#field_idents),* } = props.clone();
+			#(#unwraps)*
+			let #cx = match __render_query.get_context(_entity) {
+				::core::result::Result::Ok(cx) => cx,
+				::core::result::Result::Err(err) => {
+					return #beet_ui::prelude::SceneExt::any_scene(
+						#beet_ui::prelude::ErrorScene::new(err),
+					);
+				}
+			};
+			#beet_ui::prelude::SceneExt::any_scene({ #body })
+		},
+		None => quote! {
+			let #props_name { #(#field_idents),* } = props.clone();
+			#(#unwraps)*
+			#[allow(unused_braces)]
+			#body
+		},
+	};
 	let build_closure = quote! {
 		#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
-			move |(#(#sys_pats,)*)| {
-				let #props_name { #(#field_idents),* } = props.clone();
-				#(#unwraps)*
-				#[allow(unused_braces)]
-				#body
+			move |_entity, (#(#sys_pats,)*)| {
+				#closure_body
 			},
 		)
 	};
@@ -684,7 +731,7 @@ mod test {
 		assert!(result.contains("struct AppInfoProps"));
 		assert!(result.contains("SceneComponent for AppInfo"));
 		assert!(result.contains("scene_system :: < (Res < PackageConfig > ,)"));
-		assert!(result.contains("move | (config ,) |"));
+		assert!(result.contains("move | _entity , (config ,) |"));
 	}
 
 	#[test]
@@ -708,6 +755,20 @@ mod test {
 		assert!(result.contains("if props . role . is_none ()"));
 		assert!(result.contains("ErrorScene"));
 		assert!(result.contains("let role = role . unwrap ()"));
+	}
+
+	#[test]
+	fn system_render_context_param() {
+		// `cx: &RouteContext` injects a `RenderQuery` system param, threads the
+		// built entity, fetches the context, and errors via `ErrorScene` if absent.
+		let result = parse_str(quote!(system), syn::parse_quote! {
+			fn Nav(cx: &RouteContext, trees: Query<&RouteTree>) -> impl Scene { todo!() }
+		});
+		assert!(result.contains("RenderQuery"));
+		assert!(result.contains("__render_query . get_context (_entity)"));
+		assert!(result.contains("ErrorScene"));
+		// the regular system param is preserved alongside the injected query
+		assert!(result.contains("Query < & RouteTree >"));
 	}
 
 	#[test]

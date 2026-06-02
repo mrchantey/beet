@@ -65,11 +65,6 @@ pub mod prelude {
 	pub use crate::net::prelude::*;
 	#[cfg(feature = "ui")]
 	pub use crate::ui::prelude::*;
-	// `WorldSceneExt` overlaps: `bevy::scene`'s spawn trait (via
-	// `beet_core::prelude`) vs `beet_ui`'s slot-wiring wrapper. Prefer
-	// `beet_ui`'s so `spawn_scene` auto-wires caller content into widget slots.
-	#[cfg(feature = "ui")]
-	pub use crate::ui::prelude::WorldSceneExt;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	pub use beet_core::val;

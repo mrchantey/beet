@@ -40,13 +40,10 @@ async fn home_in_document_shell() {
 		.await
 		// document shell from the layout middleware
 		.xpect_contains(r#"<meta charset="UTF-8""#)
-		// page body slotted into the shell
+		// page body transcluded into the shell's <main>
 		.xpect_contains("A personal application framework")
 		// header + sidebar chrome
-		.xpect_contains(r#"id="sidebar"#)
-		// the content slot is consumed by the layout middleware
-		.xnot()
-		.xpect_contains(r#"<slot name="main""#);
+		.xpect_contains(r#"id="sidebar"#);
 }
 
 #[beet::test]
@@ -74,9 +71,32 @@ async fn blog_post_in_shell() {
 }
 
 #[beet::test]
-async fn terminal_skips_document_shell() {
-	// the terminal target negotiates text/ansi, not HTML, so the document shell
-	// is skipped and the bare page body is rendered.
+async fn blog_post_title_from_frontmatter() {
+	// the per-page `<title>` comes from the post's frontmatter via `RouteContext`
+	// -> `ArticleMeta` -> the context-aware `BeetHead`, not the package default.
+	site_world()
+		.spawn(beet_site_router())
+		.exchange_str(html_get("blog/post-1"))
+		.await
+		.xpect_contains("<title>The Full Moon Harvest #1</title>");
+}
+
+#[beet::test]
+async fn sidebar_marks_active_route() {
+	// the sidebar reads the current path from `RouteContext`, marking the active
+	// leaf with `aria-current="page"`.
+	site_world()
+		.spawn(beet_site_router())
+		.exchange_str(html_get("blog/post-1"))
+		.await
+		.xpect_contains(r#"aria-current="page""#);
+}
+
+#[beet::test]
+async fn terminal_renders_full_shell() {
+	// the terminal target negotiates text, not HTML, but now renders the *full*
+	// document shell (header, sidebar, footer) around the body — the non-visual
+	// `<head>`/`<style>` simply does not paint, so no markup or CSS leaks.
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(
@@ -84,11 +104,15 @@ async fn terminal_skips_document_shell() {
 				.with_header::<header::Accept>(vec![MediaType::Text]),
 		)
 		.await
-		// the page body is still present
+		// the page body is present ...
 		.xpect_contains("A personal application framework")
-		// but the `<html>`/`<head>` document chrome is not
+		// ... wrapped in the shell chrome (a header nav link, a sidebar entry) ...
+		.xpect_contains("Docs")
+		// ... while the non-visual document head never leaks as text
 		.xnot()
-		.xpect_contains("<meta charset");
+		.xpect_contains("<meta charset")
+		.xnot()
+		.xpect_contains("box-sizing");
 }
 
 #[beet::test]

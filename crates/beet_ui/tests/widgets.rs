@@ -18,9 +18,6 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::prelude::Button;
 use beet_ui::prelude::classes;
-// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
-// `bevy::scene` one also glob-imported via `beet_core::prelude`.
-use beet_ui::prelude::WorldSceneExt;
 use beet_ui::prelude::*;
 use beet_ui::*;
 
@@ -123,6 +120,60 @@ fn footer_includes_version() {
 			.any(|s| s.contains("v0.0.0"))
 			.xpect_true();
 	});
+}
+
+/// Render `root` to an HTML string (shell widgets emit `<head>` etc).
+fn render_html(world: &mut World, root: Entity) -> String {
+	HtmlRenderer::new()
+		.render(&mut RenderContext::new(root, world))
+		.unwrap()
+		.to_string()
+}
+
+#[beet_core::test]
+fn header_places_children_and_nav() {
+	// a `#[scene(system)]` widget receiving children: default content sits after
+	// the title, `slot="nav"` content fills the <nav>. Proves the cloned-props
+	// path carries `SceneProp`s (the old slot system clobbered system widgets).
+	let mut world = shell_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<Header>
+				<span slot="nav">"NavLink"</span>
+				"HeaderExtra"
+			</Header>
+		})
+		.unwrap()
+		.id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains("HeaderExtra")
+		.xpect_contains("<nav><span>NavLink</span></nav>");
+}
+
+#[beet_core::test]
+fn page_layout_forwards_through_nested_composition() {
+	// the headline fix: PageLayout forwards head/header_nav/body through
+	// HtmlDocument into Head/Header — multi-level forwarding the old `<slot>`
+	// system could not do.
+	let mut world = shell_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<PageLayout>
+				<meta slot="head" name="custom" content="x"/>
+				<a slot="header_nav" href="/docs">"Docs"</a>
+				"PageBody"
+			</PageLayout>
+		})
+		.unwrap()
+		.id();
+	render_html(&mut world, root)
+		.as_str()
+		// the custom meta forwarded into <head> (Head's children), the nav link
+		// into <nav> (Header's nav), and the body between header and footer.
+		.xpect_contains("name=\"custom\"")
+		.xpect_contains(">Docs</a>")
+		.xpect_contains("PageBody");
 }
 
 #[beet_core::test]

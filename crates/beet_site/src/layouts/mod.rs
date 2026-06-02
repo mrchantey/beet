@@ -1,12 +1,12 @@
 //! The site's document shell and navigation, shared by the web and terminal
 //! render targets.
 //!
-//! [`beet_document_shell`] is the global layout scene fed to
-//! [`document_shell`](beet::prelude::document_shell): every route's rendered
-//! body is slotted into its `<slot name="main">`. The web-only pieces (the
-//! built stylesheet, color-scheme seed, preflight reset, favicon link) live in
-//! the document `<head>`, which the charcell renderer skips, so the one shell
-//! serves both targets.
+//! [`beet_document_shell`] is the global layout fed to
+//! [`document_shell`](beet::prelude::document_shell): it receives each route's
+//! rendered body as its `children` and places it in `<main>`. The web-only
+//! pieces (the built stylesheet, color-scheme seed, preflight reset, favicon
+//! link) live in the document `<head>`, which is non-visual and does not paint
+//! in the terminal, so the one shell serves both targets.
 mod head;
 pub use head::*;
 mod shell;

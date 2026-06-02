@@ -8,7 +8,7 @@ pub type NodeView<'a> = (
 	Option<&'a Children>,
 	Option<&'a Value>,
 	Option<&'a Expression>,
-	Option<&'a SlotContainer>,
+	Option<&'a RenderRef>,
 );
 
 
@@ -47,16 +47,16 @@ impl NodeWalker<'_, '_> {
 			return;
 		}
 
-		let (doctype, comment, element, children, value, expression, slot) =
+		let (doctype, comment, element, children, value, expression, render_ref) =
 			node;
 
-		// If a SlotContainer is present, the slot element is transparent:
-		// recurse directly into the content entity, skipping this
-		// entity's own components entirely.
-		if let Some(slot) = slot {
+		// A RenderRef holder is transparent: recurse directly into the
+		// referenced entity, rendering it in place without touching this
+		// entity's own components.
+		if let Some(render_ref) = render_ref {
 			let child_cx = VisitContext {
 				start: cx.start,
-				entity: **slot,
+				entity: **render_ref,
 				depth: cx.depth,
 			};
 			self.walk_entity(visitor, child_cx);
@@ -84,8 +84,7 @@ impl NodeWalker<'_, '_> {
 		if let Some(expression) = expression {
 			visitor.visit_expression(&cx, expression);
 		}
-		// 6. Children (also serves as default content for <slot> elements
-		// when no SlotContainer is present)
+		// 6. Children
 		if let Some(children) = children {
 			for child in children {
 				let child_cx = VisitContext {
@@ -104,19 +103,34 @@ impl NodeWalker<'_, '_> {
 	}
 }
 
+/// HTML tags that carry no visual content: document metadata, scripting, and
+/// embedded resources. This is the single source of truth for "non-visual",
+/// consumed in two places that must agree:
+/// - the user-agent style layer ([`default_element_rules`]) maps these to
+///   [`Display::None`] so visual renderers (charcell) omit them, and
+/// - [`NodeVisitor::skip_node`] skips them for text renderers that run before
+///   styles resolve.
+///
+/// A markup serializer ([`HtmlRenderer`]) is the exception: it overrides
+/// `skip_node` to emit every tag, since `<head>`/`<style>`/`<script>` are valid,
+/// non-visual-but-serialized HTML.
+///
+/// [`Display::None`]: crate::style::Display
+/// [`default_element_rules`]: crate::style::default_element_rules
+/// [`HtmlRenderer`]: crate::prelude::HtmlRenderer
+pub const NON_VISUAL_TAGS: &[&str] = &[
+	"head", "script", "style", "template", "noscript", "meta", "link",
+	"title", "base", "iframe", "object", "embed",
+];
+
+/// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].
+pub fn is_non_visual(tag: &str) -> bool { NON_VISUAL_TAGS.contains(&tag) }
+
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.
-	/// By default skips all non-visible html tags, ie `head, style, ..`
+	/// By default skips all non-visual html tags, ie `head, style, ..`
 	fn skip_node(&mut self, (_, _, element, ..): &NodeView) -> bool {
-		const HIDDEN_HTML_TAGS: &[&str] = &[
-			"head", "script", "style", "template", "noscript", "iframe",
-			"object", "embed",
-		];
-		if let Some(element) = element {
-			HIDDEN_HTML_TAGS.iter().any(|tag| element.tag() == *tag)
-		} else {
-			false
-		}
+		element.is_some_and(|element| is_non_visual(element.tag()))
 	}
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}

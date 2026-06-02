@@ -2,6 +2,13 @@
 //! [`crate::rsx_direct`], but produces an `impl Scene` that flows through
 //! Bevy's `bevy_scene` resolve→build→spawn pipeline.
 //!
+//! **`rsx!` is the authoring default**: pages, widgets, and layouts return
+//! `impl Scene`, since only scenes carry the `#[scene]` widget / props /
+//! children-as-props machinery. [`rsx_direct!`](crate::rsx_direct) is the
+//! lower-level primitive that lowers to a plain `impl Bundle` without
+//! `bevy_scene`; reach for it only in contexts that genuinely cannot pull the
+//! scene layer (the charcell render internals, core `no_std`-ish code).
+//!
 //! - Lowercase tags become an `Element` template value
 //! - Text / `{expr}` become `Value` / child scenes (`{expr}` must be a `Scene`)
 //! - Children attach via `RelatedScenes::<ChildOf, _>`
@@ -12,7 +19,9 @@
 //! The consuming crate must enable the `scene` feature, which provides
 //! `template_value`, `RelatedScenes`, `EntityScene`, `on`, etc. via its prelude.
 use alloc::format;
+use alloc::string::String;
 use alloc::string::ToString;
+use alloc::vec;
 use alloc::vec::Vec;
 use beet_core_shared::pkg_ext;
 use proc_macro2::Span;
@@ -144,7 +153,13 @@ fn tokenize_element_scene(el: &NodeElement<CustomNode>) -> TokenStream {
 /// inheritance call: `<Foo as SceneComponent>::scene(FooProps::default()
 /// .with_a(1).with_b(true))`. This both spawns the `Foo` component on the
 /// entity and runs `Foo::scene(props)`. Block attributes spread extra scenes
-/// onto the same entity; children attach via `ChildOf`.
+/// onto the same entity.
+///
+/// Caller content is passed as **scene props**, not graph children: children
+/// with no `slot` attribute become the `children` prop, and `slot="name"`
+/// children become the `name` prop (`-` lowered to `_`). Each prop is a
+/// [`SceneProp`] the widget places explicitly in its body via `{children}` /
+/// `{name}`.
 fn tokenize_component_scene(
 	el: &NodeElement<CustomNode>,
 	tag: &str,
@@ -170,27 +185,14 @@ fn tokenize_component_scene(
 
 	let mut with_calls: Vec<TokenStream> = Vec::new();
 	let mut block_parts: Vec<TokenStream> = Vec::new();
-	let mut attr_scenes: Vec<TokenStream> = Vec::new();
 	for attr in &el.open_tag.attributes {
 		match attr {
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
-				// `slot` targets a parent `<slot>`, it is not a prop: emit it as
-				// an `Attribute` on the component entity so the slot-wiring pass
-				// (which reads the `slot` attribute) routes the widget like any
-				// other slot child.
+				// a `slot` on the component tag itself routes this whole component
+				// into a parent's named prop; it is read by the parent, never a
+				// prop of this component.
 				if key_str == "slot" {
-					if let KeyedAttributeValue::Value(value) =
-						&attr.possible_value
-					{
-						let val_expr = &value.value;
-						attr_scenes.push(quote! {
-							EntityScene((
-								template_value(Attribute::new("slot")),
-								template_value(Value::new(#val_expr)),
-							))
-						});
-					}
 					continue;
 				}
 				let setter = syn::Ident::new(
@@ -221,6 +223,33 @@ fn tokenize_component_scene(
 		}
 	}
 
+	// group caller children by their `slot` attribute (default = `children`),
+	// preserving first-seen order so the generated setters are deterministic.
+	let mut buckets: Vec<(String, Vec<TokenStream>)> = Vec::new();
+	for child in &el.children {
+		let slot = node_slot_name(child).unwrap_or_else(|| "children".into());
+		let scene = tokenize_node_scene(child);
+		let entry = quote! { EntityScene(#scene) };
+		match buckets.iter_mut().find(|(name, _)| *name == slot) {
+			Some((_, items)) => items.push(entry),
+			None => buckets.push((slot, vec![entry])),
+		}
+	}
+	for (name, items) in buckets {
+		let setter = syn::Ident::new(
+			&format!("with_{}", name.replace('-', "_")),
+			Span::call_site(),
+		);
+		// each bucket becomes a `SceneProp` whose content attaches as `ChildOf`
+		// the (transparent) entity the widget places it on.
+		let children = nested_tuple(items);
+		with_calls.push(quote! {
+			.#setter(SceneProp::new(
+				RelatedScenes::<ChildOf, _>::new(#children)
+			))
+		});
+	}
+
 	let mut parts: Vec<TokenStream> = Vec::new();
 	parts.push(quote! {
 		<#tag_path as SceneComponent>::scene(
@@ -229,36 +258,27 @@ fn tokenize_component_scene(
 	});
 	parts.extend(block_parts);
 
-	// a `slot` attribute (routing this widget into a parent `<slot>`) attaches
-	// as an `AttributeOf` child, the same shape an HTML element's attrs take.
-	if !attr_scenes.is_empty() {
-		let attrs = nested_tuple(attr_scenes);
-		parts.push(quote! {
-			RelatedScenes::<AttributeOf, _>::new(#attrs)
-		});
-	}
-
-	// caller children of a component tag carry a `SlotChild` marker so the
-	// slot-wiring pass can route them into the widget's `<slot>` elements,
-	// distinct from the widget's own structural subtree.
-	let child_scenes: Vec<TokenStream> = el
-		.children
-		.iter()
-		.map(|child| {
-			let scene = tokenize_node_scene(child);
-			quote! {
-				EntityScene((template_value(SlotChild), #scene))
-			}
-		})
-		.collect();
-	if !child_scenes.is_empty() {
-		let children = nested_tuple(child_scenes);
-		parts.push(quote! {
-			RelatedScenes::<ChildOf, _>::new(#children)
-		});
-	}
-
 	nested_tuple(parts)
+}
+
+/// Extract a child node's `slot="name"` attribute value, if present. Only
+/// string-literal slot names are supported (they name a prop setter).
+fn node_slot_name(node: &Node<CustomNode>) -> Option<alloc::string::String> {
+	let Node::Element(el) = node else {
+		return None;
+	};
+	el.open_tag.attributes.iter().find_map(|attr| {
+		let NodeAttribute::Attribute(attr) = attr else {
+			return None;
+		};
+		if attr.key.to_string() != "slot" {
+			return None;
+		}
+		match &attr.possible_value {
+			KeyedAttributeValue::Value(value) => value.value_literal_string(),
+			_ => None,
+		}
+	})
 }
 
 /// Lower a lowercase HTML element to a scene:
@@ -279,6 +299,11 @@ fn tokenize_html_element_scene(
 		match attr {
 			NodeAttribute::Attribute(attr) => {
 				let key_str = attr.key.to_string();
+				// `slot` routes an element into a parent component's named prop;
+				// it is read by the component lowering and never rendered.
+				if key_str == "slot" {
+					continue;
+				}
 				let value = match &attr.possible_value {
 					KeyedAttributeValue::Value(value) => Some(&value.value),
 					_ => None,

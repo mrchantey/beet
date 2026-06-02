@@ -11,9 +11,10 @@
 //! ```
 //! then open <http://localhost:8337>.
 //!
-//! `<Select>`/`<Table>` options and rows flow into the widgets' slots: caller
-//! content written between the tags is auto-wired into the matching `<slot>`
-//! at spawn time (see `beet_ui::scene::apply_slots`).
+//! `<Select>`/`<Table>` options and rows are passed as **scene props**: caller
+//! content written between the tags becomes the widget's `children` prop, and
+//! `slot="head"` rows route to the named `head` prop, which the widget places
+//! explicitly (see [`SceneProp`]).
 use beet_core::prelude::*;
 use beet_net::prelude::DEFAULT_SERVER_PORT;
 use beet_net::prelude::HttpServer;
@@ -23,9 +24,6 @@ use beet_net::prelude::ServerPlugin;
 use beet_net::prelude::exchange_handler;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
-// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
-// `bevy::scene` one also glob-imported via `beet_core::prelude`.
-use beet_ui::prelude::WorldSceneExt;
 use beet_ui::*;
 use bevy::MinimalPlugins;
 use bevy::app::App;
@@ -147,7 +145,7 @@ fn gallery() -> impl Scene {
 				<TextField name="email" placeholder="Email" variant=TextFieldVariant::Outlined/>
 				<TextField name="filled" placeholder="Filled" variant=TextFieldVariant::Filled/>
 				<TextArea name="bio" placeholder="Bio"/>
-				// options flow into the Select's default slot
+				// options become the Select's `children` prop
 				<Select name="fruit">
 					<option>"Apple"</option>
 					<option>"Banana"</option>
@@ -155,7 +153,7 @@ fn gallery() -> impl Scene {
 				<ErrorText message="This field is required"/>
 			</section>
 
-			// ── Table (rows flow into head/default slots) ─────────────────────
+			// ── Table (rows route to the head / default props) ────────────────
 			<section>
 				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Table"</h2>
 				<Table>

@@ -67,10 +67,14 @@ impl CharcellNodeData<'_> {
 		&'a self,
 		query: &'a CharcellQuery,
 	) -> impl 'a + Iterator<Item = CharcellNodeData<'a>> {
+		// `display: none` children are removed from layout: skipping them here
+		// means they reserve no space (measure) and are never assigned a rect
+		// (layout), so the subtree is neither sized nor painted.
 		self.children
 			.iter()
 			.flat_map(|children| children.iter())
 			.filter_map(move |child| query.node(child).ok())
+			.filter(|node| node.layout_style().display != Display::None)
 	}
 
 	/// Whether this node has any renderable child nodes.

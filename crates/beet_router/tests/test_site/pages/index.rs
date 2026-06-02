@@ -1,6 +1,6 @@
 use beet::prelude::*;
 
 /// The static home page.
-pub fn get() -> impl Bundle {
-	rsx_direct!{ <h1>"Home"</h1> }
+pub fn get() -> impl Scene {
+	rsx! { <h1>"Home"</h1> }
 }

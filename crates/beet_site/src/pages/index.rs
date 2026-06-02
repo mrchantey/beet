@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The site landing page, slotted into the [`beet_document_shell`] `main` slot.
-pub fn get() -> impl Bundle {
+/// The site landing page, placed into the [`beet_document_shell`] `<main>`.
+pub fn get() -> impl Scene {
 	rsx! {
 		<div {Classes::new(["hero"])}>
 			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet"</h1>
@@ -26,5 +26,4 @@ pub fn get() -> impl Bundle {
 			</p>
 		</div>
 	}
-	.into_scene_bundle()
 }

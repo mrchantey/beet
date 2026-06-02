@@ -198,6 +198,15 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<RenderRequest> {
 	cx.caller
 		.with(move |mut entity| -> Result {
 			MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
+			// derive per-page metadata from the parsed frontmatter, if any, so the
+			// render context can expose this route's title/description/sidebar info.
+			#[cfg(feature = "markdown_parser")]
+			if let Some(meta) = entity
+				.get::<beet_ui::prelude::Frontmatter>()
+				.map(ArticleMeta::from_frontmatter)
+			{
+				entity.insert(meta);
+			}
 			RenderRoot::insert(&mut entity, default());
 			Ok(())
 		})

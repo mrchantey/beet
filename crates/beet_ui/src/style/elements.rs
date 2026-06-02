@@ -42,6 +42,7 @@ fn block_gap() -> Spacing {
 /// blocks, while emphasis/links/inline code flow inline.
 pub fn default_element_rules() -> Vec<Rule> {
 	vec![
+		non_visual_rule(),
 		// ── Block structure ──
 		block_spaced(&["p", "ul", "ol"]),
 		block(&["li", "div"]),
@@ -65,6 +66,16 @@ pub fn default_element_rules() -> Vec<Rule> {
 		link(),
 		inline(&["img"]).with_value(ForegroundColor, faint()),
 	]
+}
+
+/// User-agent rule removing the [`NON_VISUAL_TAGS`] from layout via
+/// `display: none`, so visual renderers omit metadata/scripting/embedded tags.
+///
+/// Kept separate from the prose [`default_element_rules`] so theme rule sets (eg
+/// Material) can include it without pulling in prose props that need their own
+/// CSS resolvers.
+pub fn non_visual_rule() -> Rule {
+	Rule::tags(NON_VISUAL_TAGS).with_value(DisplayProp, Display::None)
 }
 
 /// A rule forcing `display: block` on the given tags.

@@ -1,19 +1,23 @@
-//! Scene-route constructors — turn a path + handler into a complete route.
+//! Route constructors — turn a path + handler into a complete route.
 //!
-//! The public constructors are the intended downstream surface:
+//! **Page handlers return `impl Scene`** (the authoring default), served by the
+//! scene-route family the codegen emits:
 //!
-//! - [`fixed_route`] — `fn() -> impl Bundle`, a static page spawned once.
-//! - [`pure_route`] — `fn(cx: ActionContext<In>) -> impl Bundle`.
-//! - [`async_route`] — `async fn(cx: ActionContext<In>) -> impl Bundle`.
-//! - [`system_route`] — `fn(cx: In<ActionContext<In>>, ..system params) -> impl Bundle`.
+//! - [`fixed_scene_route`] — `fn() -> impl Scene`, a static page.
 //! - [`scene_route`] — `fn(cx: ActionContext<In>) -> impl Scene`.
+//! - [`async_scene_route`] — `async fn(cx: ActionContext<In>) -> impl Scene`.
+//! - [`system_scene_route`] — `fn(cx: In<ActionContext<In>>, ..) -> impl Scene`.
 //!
-//! File-based page handlers return content as an `impl Bundle`, but the router
-//! dispatches actions whose output must be [`ExchangeRouteOut`]. The per-request
-//! constructors bridge the two: a handler becomes an `Action<In, RenderRequest>`
-//! called on every request that runs the handler, spawns the bundle as an
-//! ephemeral render root, and hands back its [`RenderRequest`]. The renderer
-//! then serializes it and despawns it via [`DespawnAfterRender`].
+//! The `impl Bundle` family ([`fixed_route`]/[`pure_route`]/[`async_route`]/
+//! [`system_route`]) is the lower-level primitive for content built without the
+//! scene layer (eg `rsx_direct!`); it is no longer the page-authoring default.
+//!
+//! Either way the router dispatches actions whose output must be
+//! [`ExchangeRouteOut`]. The per-request constructors bridge this: a handler
+//! becomes an `Action<In, RenderRequest>` called on every request that runs the
+//! handler, spawns the result as an ephemeral render root, and hands back its
+//! [`RenderRequest`]. The renderer then serializes it and despawns it via
+//! [`DespawnAfterRender`].
 //!
 //! For pages whose content depends on the request, `In` is typically [`Request`]
 //! (the full request, the same shape route actions like `CallerScene` use).
@@ -162,6 +166,57 @@ where
 	S: 'static + Send + Sync + Scene,
 {
 	scene_route(path, move |_cx: ActionContext<Request>| ctor(Props::default()))
+}
+
+/// A static scene page from a no-argument handler `fn() -> impl Scene`, the
+/// scene equivalent of [`fixed_route`]. The handler is called per request (the
+/// route is typically marked `CacheStrategy::Static`, so the result is cached).
+pub fn fixed_scene_route<Func, S>(path: &str, handler: Func) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone + Fn() -> S,
+	S: 'static + Send + Sync + Scene,
+{
+	scene_route(path, move |_cx: ActionContext<Request>| handler())
+}
+
+/// A per-request scene route from an async handler
+/// `async fn(cx: ActionContext<In>) -> impl Scene`, the scene equivalent of
+/// [`async_route`].
+pub fn async_scene_route<Func, Input, Fut, S, M1>(
+	path: &str,
+	handler: Func,
+) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> Fut,
+	Fut: 'static + MaybeSend + Future<Output = S>,
+	Input: 'static + Send + Sync + FromRequest<M1>,
+	S: 'static + Send + Sync + Scene,
+{
+	exchange_route(
+		path,
+		Action::new_async(handler).chain(spawn_scene_step::<S>()),
+	)
+}
+
+/// A per-request scene route from a system handler
+/// `fn(cx: In<ActionContext<In>>, ..system params) -> impl Scene`, the scene
+/// equivalent of [`system_route`].
+pub fn system_scene_route<Func, Input, S, FnMarker, M1>(
+	path: &str,
+	handler: Func,
+) -> impl Bundle
+where
+	Func: 'static + Send + Sync + Clone,
+	FnMarker: 'static,
+	Func: SystemParamFunction<FnMarker, Out = S>,
+	Func: IntoSystem<In<ActionContext<Input>>, S, (IsFunctionSystem, FnMarker)>,
+	Input: 'static + Send + Sync + FromRequest<M1>,
+	S: 'static + Send + Sync + Scene,
+{
+	exchange_route(
+		path,
+		Action::new_system(handler).chain(spawn_scene_step::<S>()),
+	)
 }
 
 /// The scene equivalent of [`spawn_render_step`]: resolves and spawns the

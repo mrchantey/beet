@@ -86,6 +86,37 @@ mod tests {
 	}
 
 	#[beet_core::test]
+	fn non_visual_tags_skipped_with_material() {
+		// beet_site composes CharcellPlugin (which brings StylePlugin) plus
+		// MaterialStylePlugin, whose rule set replaces the one StylePlugin seeds.
+		// The user-agent `non_visual_rule` must survive that replace so
+		// <head>/<style> resolve to display:none and never paint into the terminal.
+		let mut world =
+			(CharcellPlugin, crate::style::material::MaterialStylePlugin::default())
+				.into_world();
+		let entity = world
+			.spawn((
+				Buffer::new(UVec2::new(40, 6)).into_double_buffer(),
+				rsx_direct!{
+					<div>
+						<head><style>"body { color: red; }"</style></head>
+						<p>"Visible"</p>
+					</div>
+				},
+			))
+			.id();
+		world.run_schedule(PostParseTree);
+		world
+			.get::<DoubleBuffer>(entity)
+			.unwrap()
+			.current_buffer()
+			.render_plain()
+			.xpect_contains("Visible")
+			.xnot()
+			.xpect_contains("color: red");
+	}
+
+	#[beet_core::test]
 	fn auto_grow_oneshot_is_unbounded() {
 		// 30 preformatted lines exceed a typical short buffer; auto-grow keeps
 		// them all instead of clipping to a fixed height.

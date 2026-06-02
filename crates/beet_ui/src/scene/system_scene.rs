@@ -1,6 +1,7 @@
 //! Runtime support for `#[scene(system)]`: a build-time [`Scene`] that reads
 //! the world synchronously and applies a produced sub-scene to the entity.
 use beet_core::prelude::EntityWorldMutExt;
+use bevy::ecs::entity::Entity;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
@@ -23,11 +24,12 @@ pub struct SceneSystem<P, F, S> {
 }
 
 /// Wrap a build closure into a [`SceneSystem`]. `P` is the tuple of
-/// [`SystemParam`]s the closure reads; the closure returns the sub-scene `S`.
+/// [`SystemParam`]s the closure reads; the closure also receives the [`Entity`]
+/// being built (its `In<Entity>`) and returns the sub-scene `S`.
 pub fn scene_system<P, F, S>(build: F) -> SceneSystem<P, F, S>
 where
 	P: SystemParam + 'static,
-	F: Fn(P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
+	F: Fn(Entity, P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
 	S: Scene,
 {
 	SceneSystem {
@@ -39,7 +41,7 @@ where
 impl<P, F, S> Template for SceneSystem<P, F, S>
 where
 	P: SystemParam + 'static,
-	F: Fn(P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
+	F: Fn(Entity, P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
 	S: Scene,
 {
 	type Output = ();
@@ -49,8 +51,9 @@ where
 		ctx: &mut TemplateContext,
 	) -> bevy::ecs::error::Result<Self::Output> {
 		let build = &self.build;
-		// read the world synchronously and produce the sub-scene
-		let inner = ctx.entity.with_state::<P, S>(|_entity, params| build(params));
+		// read the world synchronously and produce the sub-scene, threading the
+		// entity being built so the closure can read ancestor/self context.
+		let inner = ctx.entity.with_state::<P, S>(|entity, params| build(entity, params));
 		// apply the produced sub-scene to this entity (immediate; no asset deps)
 		ctx.entity.apply_scene(inner)?;
 		Ok(())
@@ -67,7 +70,7 @@ where
 impl<P, F, S> Scene for SceneSystem<P, F, S>
 where
 	P: SystemParam + Send + Sync + 'static,
-	F: Fn(P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
+	F: Fn(Entity, P::Item<'_, '_>) -> S + Clone + Send + Sync + 'static,
 	S: Scene,
 {
 	fn resolve(

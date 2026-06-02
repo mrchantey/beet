@@ -255,8 +255,6 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
 mod test {
 	use super::*;
 	use beet_net::prelude::*;
-	// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not
-	// the `bevy::scene` one also in scope via `beet_core::prelude`.
 	use beet_ui::prelude::WorldSceneExt;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }

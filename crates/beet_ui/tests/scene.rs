@@ -3,9 +3,6 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 use beet_ui::prelude::classes;
-// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
-// `bevy::scene` one also glob-imported via `beet_core::prelude`.
-use beet_ui::prelude::WorldSceneExt;
 // `use beet_ui::*` resolves the `crate::prelude::*` paths emitted by the
 // `rsx!` / `#[scene]` macros (mirrors tests/rsx.rs).
 use beet_ui::*;
@@ -357,6 +354,76 @@ fn element_with_more_than_twelve_children() {
 		.unwrap()
 		.id();
 	world.entity(root).get::<Children>().unwrap().len().xpect_eq(20);
+}
+
+/// A widget with a named `header` prop and default `children`, exercising
+/// children-as-props composition (replacing the removed `<slot>` system).
+#[scene]
+fn Panel(header: SceneProp, children: SceneProp) -> impl Scene {
+	rsx! {
+		<section>
+			<header>{header}</header>
+			<div>{children}</div>
+		</section>
+	}
+}
+
+/// Render `root` to an HTML string.
+fn render_html(world: &mut World, root: Entity) -> String {
+	HtmlRenderer::new()
+		.render(&mut RenderContext::new(root, world))
+		.unwrap()
+		.to_string()
+}
+
+#[beet_core::test]
+fn children_as_props_default_and_named() {
+	// `slot="header"` routes to the `header` prop; unmarked content fills the
+	// default `children` prop. Each is placed where the widget puts it.
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<Panel>
+				<h1 slot="header">"Title"</h1>
+				<p>"Body"</p>
+			</Panel>
+		})
+		.unwrap()
+		.id();
+	let html = render_html(&mut world, root);
+	// the title lands inside <header>, the body inside the <div>; the transparent
+	// prop wrappers emit no tags, and `slot=` never reaches the output.
+	html.as_str()
+		.xpect_contains("<header><h1>Title</h1></header>")
+		.xpect_contains("<p>Body</p>")
+		.xnot()
+		.xpect_contains("slot=");
+}
+
+#[beet_core::test]
+fn children_prop_preserves_order_and_multiplicity() {
+	let mut world = scene_ext::test_world();
+	let root = world
+		.spawn_scene(rsx! {
+			<Panel><p>"one"</p><p>"two"</p><p>"three"</p></Panel>
+		})
+		.unwrap()
+		.id();
+	let html = render_html(&mut world, root);
+	html.find("one").unwrap().xpect_less_than(html.find("two").unwrap());
+	html.find("two").unwrap().xpect_less_than(html.find("three").unwrap());
+}
+
+#[beet_core::test]
+fn unset_prop_renders_empty() {
+	// no caller content: both props default to empty, leaving bare containers.
+	let mut world = scene_ext::test_world();
+	let root = world.spawn_scene(rsx! { <Panel/> }).unwrap().id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains("<section>")
+		.xnot()
+		.xpect_contains("slot");
 }
 
 #[beet_core::test]

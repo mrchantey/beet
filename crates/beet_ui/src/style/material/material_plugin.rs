@@ -43,8 +43,14 @@ pub fn default_token_map() -> CssTokenMap {
 }
 
 /// All default material declarations and component rules.
+///
+/// Includes the user-agent [`non_visual_rule`] so metadata/scripting tags resolve
+/// to `display: none` even in apps where this rule set replaces the one
+/// [`StylePlugin`] seeds (the prose [`default_element_rules`] are left to
+/// `StylePlugin`, as they need CSS resolvers Material does not register).
 pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
 	RuleSet::new(default_declarations(color))
+		.with_rule(non_visual_rule())
 		.with_rules(rules::all_rules())
 		.with_rule(themes::light_scheme())
 		.with_rule(themes::dark_scheme())
