@@ -25,3 +25,9 @@ bevy
 
 packages/beet_state/node_modules
 packages/beet_state/dist
+
+# temp
+.claude/
+examples/file_based_routes/
+examples/router/router_serde.json
+examples/todo/

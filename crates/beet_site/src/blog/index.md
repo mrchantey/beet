@@ -5,6 +5,13 @@ title = "The Full Moon Harvest"
 
 # The Full Moon Harvest
 
+###### [#12 — Gentle Slopes and Lonely Mountains](/blog/post-12)
+*Pete Hayman — 2nd June, 2026*
+
+Usually a gentle slope means climbing to a mountain peak of specialization, only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus: domains of UI, physics, networking etc remain within reach at all skill levels.
+
+<br/>
+
 ###### [#11 — User Modifiable Users](/blog/post-11)
 *Pete Hayman — 1st May, 2026*
 
@@ -16,6 +23,7 @@ Is malleable software the key to effective personal development tech? Also some 
 *Pete Hayman — 6th April, 2026*
 
 Malleable software bends but doesn't break. Encoding behavior as data is a natural fit for sync engines and provides a fine-grained boundary for developers to safely expose parts of the application.
+
 <br/>
 
 ###### [#9 — Multi-Interface Applications](/blog/post-9)
