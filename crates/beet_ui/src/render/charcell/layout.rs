@@ -3,7 +3,6 @@
 //! Each node answers: *"Given the rect I've been granted, how do I distribute
 //! space to my children?"*
 use super::*;
-use crate::prelude::RenderRef;
 use crate::style::Display;
 use beet_core::prelude::*;
 use bevy::math::URect;
@@ -22,13 +21,12 @@ pub struct LayoutRect(pub URect);
 /// ECS system: assign [`LayoutRect`] to all nodes top-down.
 pub fn layout_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut LayoutRect>)>,
-	children: Query<&Children>,
-	refs: Query<&RenderRef>,
+	tree: CharcellTree,
 	roots: Populated<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();
-		let ordered = collect_pre_order(&children, &refs, root);
+		let ordered = tree.pre_order(root);
 
 		// Root gets the full viewport rect
 		let mut layout_rects = HashMap::<Entity, URect>::new();

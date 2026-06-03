@@ -89,59 +89,77 @@ impl CharcellNodeData<'_> {
 /// A [`RenderRef`] holder is transparent: the charcell pipeline treats the
 /// referenced entity as if it sat at the holder's position (see [`RenderRef`]),
 /// so every traversal resolves through this before visiting a node.
-pub(super) fn resolve_render_ref(
-	refs: &Query<&RenderRef>,
-	mut entity: Entity,
-) -> Entity {
+fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
 	while let Ok(render_ref) = refs.get(entity) {
 		entity = **render_ref;
 	}
 	entity
 }
 
-/// Pre-order ([`RenderRef`]-resolved) traversal from `root`, inclusive.
+/// [`RenderRef`]-aware traversal of a charcell buffer tree.
 ///
-/// Holders are skipped in favour of the entity they reference, matching
-/// [`CharcellNodeData::child_nodes`] so the rect map keys line up.
-pub(super) fn collect_pre_order(
-	children: &Query<&Children>,
-	refs: &Query<&RenderRef>,
-	root: Entity,
-) -> Vec<Entity> {
-	let mut result = Vec::new();
-	let mut stack = vec![resolve_render_ref(refs, root)];
-	while let Some(entity) = stack.pop() {
-		result.push(entity);
-		if let Ok(children) = children.get(entity) {
-			stack.extend(
-				children.iter().rev().map(|child| resolve_render_ref(refs, child)),
-			);
-		}
-	}
-	result
+/// Every phase (prepare, measure, layout, paint) walks the tree through this, so
+/// a [`RenderRef`] holder is transparently replaced by the entity it renders in
+/// a single place rather than each system threading [`Children`] + [`RenderRef`]
+/// queries and re-deriving the resolution. Its orderings match
+/// [`CharcellNodeData::child_nodes`], so the per-entity rect map keys line up.
+#[derive(SystemParam)]
+pub(super) struct CharcellTree<'w, 's> {
+	children: Query<'w, 's, &'static Children>,
+	refs: Query<'w, 's, &'static RenderRef>,
 }
 
-/// Post-order ([`RenderRef`]-resolved) traversal from `root`, inclusive.
-pub(super) fn collect_post_order(
-	children: &Query<&Children>,
-	refs: &Query<&RenderRef>,
-	root: Entity,
-) -> Vec<Entity> {
-	let mut result = Vec::new();
-	let mut stack = vec![(resolve_render_ref(refs, root), false)];
-	while let Some((entity, visited)) = stack.pop() {
-		if visited {
+impl CharcellTree<'_, '_> {
+	/// Follow [`RenderRef`] holders to the entity that renders in place.
+	pub fn resolve(&self, entity: Entity) -> Entity {
+		resolve_render_ref(&self.refs, entity)
+	}
+
+	/// Resolved children of `entity`, holders replaced by their referents.
+	fn children(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+		self.children
+			.get(entity)
+			.into_iter()
+			.flat_map(|children| children.iter())
+			.map(|child| self.resolve(child))
+	}
+
+	/// Pre-order traversal from `root`, inclusive.
+	pub fn pre_order(&self, root: Entity) -> Vec<Entity> {
+		let mut result = Vec::new();
+		let mut stack = vec![self.resolve(root)];
+		while let Some(entity) = stack.pop() {
 			result.push(entity);
-		} else {
-			stack.push((entity, true));
-			if let Ok(children) = children.get(entity) {
-				stack.extend(children.iter().rev().map(|child| {
-					(resolve_render_ref(refs, child), false)
-				}));
+			stack.extend(self.children(entity).collect::<Vec<_>>().into_iter().rev());
+		}
+		result
+	}
+
+	/// Post-order traversal from `root`, inclusive.
+	pub fn post_order(&self, root: Entity) -> Vec<Entity> {
+		let mut result = Vec::new();
+		let mut stack = vec![(self.resolve(root), false)];
+		while let Some((entity, visited)) = stack.pop() {
+			if visited {
+				result.push(entity);
+			} else {
+				stack.push((entity, true));
+				stack.extend(
+					self.children(entity)
+						.collect::<Vec<_>>()
+						.into_iter()
+						.rev()
+						.map(|child| (child, false)),
+				);
 			}
 		}
+		result
 	}
-	result
+
+	/// Resolved descendants of `entity`, excluding `entity` itself.
+	pub fn descendants(&self, entity: Entity) -> impl Iterator<Item = Entity> {
+		self.pre_order(entity).into_iter().skip(1)
+	}
 }
 
 /// System parameter shared by all charcell render systems.

@@ -2,7 +2,6 @@
 //!
 //! Each node answers: *"If I had infinite space, how big would I want to be?"*
 use super::*;
-use crate::prelude::RenderRef;
 use crate::style::Display;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
@@ -16,13 +15,12 @@ pub struct IntrinsicSize(pub UVec2);
 /// ECS system: compute [`IntrinsicSize`] for all nodes bottom-up.
 pub fn measure_nodes<B: Component + AsBuffer>(
 	mut params: ParamSet<(CharcellQuery, Query<&mut IntrinsicSize>)>,
-	children_query: Query<&Children>,
-	refs: Query<&RenderRef>,
+	tree: CharcellTree,
 	roots: Populated<(Entity, &B)>,
 ) -> Result {
 	for (root, buffer) in roots {
 		let viewport_size = buffer.size();
-		let ordered = collect_post_order(&children_query, &refs, root);
+		let ordered = tree.post_order(root);
 		let mut sizes = HashMap::<Entity, UVec2>::new();
 
 		// Read phase: use CharcellQuery to measure each node bottom-up
