@@ -23,6 +23,19 @@ pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
 		syn::parse_str(pkg_name).unwrap()
 	}
 }
+/// Resolve the path to the `bevy` crate for macro output.
+///
+/// Internal beet crates depend on `bevy` directly, so emit `::bevy`. Downstream
+/// crates (eg `beet_site`, external users) reach it through the `beet` facade's
+/// re-export, so emit `::beet::exports::bevy` and need no direct `bevy` dep.
+pub fn bevy() -> syn::Path {
+	if is_internal() {
+		syn::parse_str("bevy").unwrap()
+	} else {
+		syn::parse_str("beet::exports::bevy").unwrap()
+	}
+}
+
 fn crate_name() -> alloc::string::String {
 	std::env::var("CARGO_PKG_NAME").unwrap()
 }

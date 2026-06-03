@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::prelude::RenderRef;
 use beet_core::prelude::*;
 use bevy::ecs::component::Mutable;
 use bevy::math::UVec2;
@@ -16,10 +17,11 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 	mut roots: Populated<(Entity, &mut B)>,
 	charcell: CharcellQuery,
 	children_query: Query<&Children>,
+	refs: Query<&RenderRef>,
 ) -> Result {
 	for (root, mut buffer) in roots.iter_mut() {
 		let viewport_size = buffer.size();
-		let ordered = children_query.collect_pre_order(root);
+		let ordered = collect_pre_order(&children_query, &refs, root);
 
 		// descendants of an IFC owner are painted by the owner, not themselves
 		let mut managed = HashSet::<Entity>::default();
@@ -31,7 +33,12 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 				continue;
 			};
 			if establishes_inline_flow(&node, &charcell) {
-				managed.extend(children_query.iter_descendants(entity));
+				managed.extend(
+					collect_pre_order(&children_query, &refs, entity)
+						.into_iter()
+						// skip this entity
+						.skip(1),
+				);
 			}
 		}
 

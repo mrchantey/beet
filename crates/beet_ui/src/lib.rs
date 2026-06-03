@@ -24,6 +24,8 @@ mod widgets;
 /// Exports the most commonly used items.
 pub mod prelude {
 	#[cfg(feature = "style")]
+	pub use crate::canonical_property;
+	#[cfg(feature = "style")]
 	pub use crate::css_property;
 	#[cfg(feature = "style")]
 	pub use crate::css_variable;

@@ -303,6 +303,7 @@ fn parse_raw_tokens(tokens: Vec<TokenTree>) -> Vec<Segment> {
 /// Generate the output token stream from parsed segments.
 fn generate_output(segments: Vec<Segment>) -> TokenStream {
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
+	let bevy = pkg_ext::bevy();
 
 	// Filter out empty markdown segments
 	let segments: Vec<Segment> = segments
@@ -334,7 +335,7 @@ fn generate_output(segments: Vec<Segment>) -> TokenStream {
 		quote! { #single }
 	} else {
 		quote! {
-			::bevy::prelude::children![
+			#bevy::prelude::children![
 				#(#segment_tokens),*
 			]
 		}

@@ -127,6 +127,28 @@ mod tests {
 	}
 
 	#[beet_core::test]
+	fn paints_render_ref_content() {
+		// a RenderRef holder is transparent: the charcell pipeline measures,
+		// lays out, and paints the referenced entity in the holder's place,
+		// without it being parented under the buffer tree.
+		let mut world = CharcellPlugin::world();
+		let content = world.spawn(rsx_direct!{ <p>"transcluded"</p> }).id();
+		let root = world
+			.spawn((
+				FlexBuffer::new(40),
+				children![(RenderRef::new(content),)],
+			))
+			.id();
+		world.run_schedule(PostParseTree);
+		world
+			.entity_mut(root)
+			.take::<FlexBuffer>()
+			.unwrap()
+			.render_plain()
+			.xpect_contains("transcluded");
+	}
+
+	#[beet_core::test]
 	fn anchor_emits_osc8_link() {
 		// `apply_hyperlinks` promotes the `<a href>` to a `Hyperlink`, which the
 		// inline flow wraps around the link's painted columns as OSC-8.

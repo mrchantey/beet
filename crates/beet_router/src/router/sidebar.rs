@@ -54,9 +54,9 @@ pub struct SidebarState {
 	pub current_path: SmolPath,
 	/// Per-path override configuration.
 	pub infos: HashMap<SmolPath, SidebarInfo>,
-	/// Paths whose subtree is omitted from the nav (eg infra routes like
-	/// `app-info`/`analytics`).
-	pub exclude: HashSet<SmolPath>,
+	/// Glob filter for paths whose subtree is omitted from the nav (eg infra
+	/// routes like `app-info`/`analytics`). Allows every path by default.
+	pub filter: GlobFilter,
 }
 
 impl SidebarState {
@@ -65,7 +65,7 @@ impl SidebarState {
 		Self {
 			current_path: current_path.into(),
 			infos: HashMap::default(),
-			exclude: HashSet::default(),
+			filter: GlobFilter::default(),
 		}
 	}
 
@@ -79,9 +79,17 @@ impl SidebarState {
 		self
 	}
 
-	/// Omit the route at `path` (and its subtree) from the collected nav.
-	pub fn with_exclude(mut self, path: impl Into<SmolPath>) -> Self {
-		self.exclude.insert(path.into());
+	/// Omit routes matching the glob `pattern` (and their subtrees) from the
+	/// collected nav, eg `app-info`. Allows every path by default.
+	pub fn with_exclude(mut self, pattern: &str) -> Self {
+		self.filter = self.filter.with_exclude(pattern);
+		self
+	}
+
+	/// Include only routes matching the glob `pattern` (and their subtrees) in the
+	/// collected nav, eg `docs/**`. Allows every path by default.
+	pub fn with_include(mut self, pattern: &str) -> Self {
+		self.filter = self.filter.with_include(pattern);
 		self
 	}
 
@@ -163,9 +171,7 @@ impl SidebarState {
 		let mut children: Vec<RouteTree> = tree
 			.children
 			.iter()
-			.filter(|child| {
-				!self.exclude.contains(&child.path.annotated_path())
-			})
+			.filter(|child| self.filter.passes(child.path.annotated_path()))
 			.cloned()
 			.collect();
 		children.sort_by(|a, b| {

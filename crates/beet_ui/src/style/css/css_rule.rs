@@ -257,6 +257,37 @@ macro_rules! css_property {
 }
 
 
+/// Like [`css_property!`] but also implements [`CanonicalToken`] for the value
+/// type, so a [`Rule`] can set it via [`Rule::with_canonical`] without naming
+/// the property token, eg `Rule::new().with_canonical(Display::None)`.
+///
+/// Use only when the value type maps to exactly one property (eg `Display` →
+/// `display`); a multi-property value like `Color` (`color`, `background-color`,
+/// …) has no canonical token and must use [`css_property!`].
+///
+/// [`CanonicalToken`]: crate::prelude::CanonicalToken
+/// [`Rule::with_canonical`]: crate::prelude::Rule::with_canonical
+#[macro_export]
+macro_rules! canonical_property {
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+  $($rest:tt)+
+ ) => {
+  $crate::css_property!(
+   $(#[$meta])*
+   $new_ty,
+   $schema_ty,
+   $($rest)+
+  );
+  impl $crate::prelude::CanonicalToken for $schema_ty {
+   type Token = $new_ty;
+  }
+ };
+}
+
+
 /// Generates a token type that resolves to a CSS variable declaration.
 ///
 /// ```rust

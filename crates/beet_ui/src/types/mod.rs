@@ -9,6 +9,6 @@ pub use element_view::*;
 pub use expression::*;
 mod into_bundle;
 pub use into_bundle::*;
-mod transclude;
-pub use transclude::*;
+mod render_ref;
+pub use render_ref::*;
 pub use state::*;

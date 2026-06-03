@@ -1,24 +1,25 @@
 //! Prepare phase: ensure all nodes in a buffer tree have the required layout
 //! components before measure and layout systems run.
+use super::*;
+use crate::prelude::RenderRef;
 use beet_core::prelude::*;
-
-use super::IntrinsicSize;
-use super::LayoutRect;
 
 /// Insert [`IntrinsicSize`] and [`LayoutRect`] on every node in a buffer tree
 /// (rooted at a `B` component) that is missing them.
 ///
-/// Structural mutations are isolated to this step so the measure, layout,
-/// and paint phases can run pure query access without command buffering.
+/// Walks the tree resolving [`RenderRef`] holders, so transcluded content is
+/// prepared too. Structural mutations are isolated to this step so the measure,
+/// layout, and paint phases can run pure query access without command buffering.
 pub fn prepare_charcell_tree<B: Component>(
 	mut commands: Commands,
 	roots: Populated<Entity, With<B>>,
 	children: Query<&Children>,
+	refs: Query<&RenderRef>,
 	has_intrinsic: Query<(), With<IntrinsicSize>>,
 	has_layout: Query<(), With<LayoutRect>>,
 ) {
 	for root in roots.iter() {
-		for entity in children.iter_descendants_inclusive(root) {
+		for entity in collect_pre_order(&children, &refs, root) {
 			if !has_intrinsic.contains(entity) {
 				commands.entity(entity).insert(IntrinsicSize::default());
 			}

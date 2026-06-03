@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet::test_runner))]
 //! The beet website, rendered to both the web (HTML) and the terminal.
 //!
 //! Pages are authored as `beet_ui` body scenes; the render target (web document

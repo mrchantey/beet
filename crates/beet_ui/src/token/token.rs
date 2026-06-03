@@ -67,6 +67,19 @@ pub trait TypedToken: Into<Token> {
 	type Value;
 }
 
+/// A value type with a single canonical property token, eg [`Display`] maps to
+/// the one `display` property. This lets [`Rule::with_canonical`] infer the
+/// property from the value's type, unlike a value like [`Color`] that feeds many
+/// properties (`color`, `background-color`, …) and so has no canonical token.
+///
+/// [`Display`]: crate::style::Display
+/// [`Color`]: beet_core::prelude::Color
+/// [`Rule::with_canonical`]: crate::prelude::Rule::with_canonical
+pub trait CanonicalToken: Sized {
+	/// The property token this value canonically sets.
+	type Token: Default + TypedToken<Value = Self> + Into<Token>;
+}
+
 
 #[macro_export]
 macro_rules! token {
@@ -88,7 +101,7 @@ macro_rules! token {
 		$schema_ty:ty,
 		$inherited:expr
 	) => {
-		#[derive(::bevy::reflect::TypePath)]
+		#[derive(::bevy::reflect::TypePath, Default)]
 		$(#[$meta])*
 		pub struct $new_ty;
 		impl $crate::prelude::TypedToken for $new_ty{

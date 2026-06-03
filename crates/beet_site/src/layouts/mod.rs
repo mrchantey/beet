@@ -7,8 +7,6 @@
 //! pieces (the built stylesheet, color-scheme seed, preflight reset, favicon
 //! link) live in the document `<head>`, which is non-visual and does not paint
 //! in the terminal, so the one shell serves both targets.
-mod head;
-pub use head::*;
 mod shell;
 pub use shell::*;
 mod sidebar;

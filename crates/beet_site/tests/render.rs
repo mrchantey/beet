@@ -1,20 +1,7 @@
-#![cfg_attr(feature = "custom_test_frameworks", allow(unused_features))]
-#![cfg_attr(
-	feature = "custom_test_frameworks",
-	feature(test, custom_test_frameworks)
-)]
-#![cfg_attr(
-	feature = "custom_test_frameworks",
-	test_runner(beet::libtest_runner)
-)]
+beet_core::test_main!();
+
 use beet::prelude::*;
 use beet_site::prelude::*;
-
-// Stable path: the default libtest harness, driven by a single `#[test]` over
-// the `inventory`-registered `#[beet::test]` cases.
-#[cfg(not(feature = "custom_test_frameworks"))]
-#[test]
-fn __beet_inventory() { beet::testing::test_main(); }
 
 /// A world with the site's render substrate: the router observers and the
 /// Material style rule set, plus the package config the `Head`/`Footer` read.
@@ -73,7 +60,7 @@ async fn blog_post_in_shell() {
 #[beet::test]
 async fn blog_post_title_from_frontmatter() {
 	// the per-page `<title>` comes from the post's frontmatter via `RouteContext`
-	// -> `ArticleMeta` -> the context-aware `BeetHead`, not the package default.
+	// -> `ArticleMeta` -> the shell's `Head`, not the package default.
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get("blog/post-1"))

@@ -43,12 +43,12 @@ pub fn token_map()->CssTokenMap{
 css_property!(ForegroundColor, Color, "color");
 css_property!(BackgroundColor, Color, TokenInheritance::NotInherited, "background-color");
 css_property!(DecorationColor, Color, "text-decoration-color");
-css_property!(TextAlignProp, TextAlign, "text-align");
-css_property!(FontStyleProp, FontStyle, "font-style");
-css_property!(BlinkStyleProp, BlinkStyle, "blink");
-css_property!(VisibilityProp, Visibility, "visibility");
-css_property!(DecorationLineProp, DecorationLine, "text-decoration-line");
-css_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style");
+canonical_property!(TextAlignProp, TextAlign, "text-align");
+canonical_property!(FontStyleProp, FontStyle, "font-style");
+canonical_property!(BlinkStyleProp, BlinkStyle, "blink");
+canonical_property!(VisibilityProp, Visibility, "visibility");
+canonical_property!(DecorationLineProp, DecorationLine, "text-decoration-line");
+canonical_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style");
 
 css_property!(Font, Typography, "font-family");
 
@@ -59,31 +59,31 @@ css_property!(GapProp, Length, "gap");
 css_property!(
 	ShapeProp, Shape, "border-radius"
 );
-css_property!(
+canonical_property!(
 	ElevationProp, Elevation, "box-shadow"
 );
 css_property!(OutlineWidth, Length, "border-width");
 css_property!(OutlineOffset, Length, "outline-offset");
 css_property!(FontSize, Length, "font-size");
-css_property!(FontWeightProp, FontWeight, "font-weight");
+canonical_property!(FontWeightProp, FontWeight, "font-weight");
 css_property!(LineHeight, Length, "line-height");
 css_property!(Tracking, Length, "letter-spacing");
 
 css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
 css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
-css_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
-css_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
-css_property!(BreakAfterProp, BreakAfter, TokenInheritance::NotInherited, "break-after");
+canonical_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
+canonical_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
+canonical_property!(BreakAfterProp, BreakAfter, TokenInheritance::NotInherited, "break-after");
 css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, "transition-duration");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
-css_property!(WhiteSpaceProp, WhiteSpace, "white-space");
+canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");
 
-css_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
-css_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");
-css_property!(AlignContentProp, AlignContent, TokenInheritance::NotInherited, "align-content");
-css_property!(FlexDirectionProp, Direction, TokenInheritance::NotInherited, "flex-direction");
-css_property!(FlexWrapProp, FlexWrap, TokenInheritance::NotInherited, "flex-wrap");
+canonical_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
+canonical_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");
+canonical_property!(AlignContentProp, AlignContent, TokenInheritance::NotInherited, "align-content");
+canonical_property!(FlexDirectionProp, Direction, TokenInheritance::NotInherited, "flex-direction");
+canonical_property!(FlexWrapProp, FlexWrap, TokenInheritance::NotInherited, "flex-wrap");
 css_property!(RowGapProp, u32, TokenInheritance::NotInherited, "row-gap");
 css_property!(ColumnGapProp, u32, TokenInheritance::NotInherited, "column-gap");

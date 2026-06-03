@@ -1,20 +1,7 @@
-#![cfg_attr(feature = "custom_test_frameworks", allow(unused_features))]
-#![cfg_attr(
-	feature = "custom_test_frameworks",
-	feature(test, custom_test_frameworks)
-)]
-#![cfg_attr(
-	feature = "custom_test_frameworks",
-	test_runner(beet::libtest_runner)
-)]
+beet_core::test_main!();
+
 use beet::prelude::*;
 use beet_site::prelude::*;
-
-// Stable path: the default libtest harness, driven by a single `#[test]` over
-// the `inventory`-registered `#[beet::test]` cases.
-#[cfg(not(feature = "custom_test_frameworks"))]
-#[test]
-fn __beet_inventory() { beet::testing::test_main(); }
 
 /// Spawn the site router and collect the sidebar nav the shell would render
 /// from its [`RouteTree`].

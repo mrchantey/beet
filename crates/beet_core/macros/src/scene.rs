@@ -259,7 +259,8 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
-	let scene_component_impl = scene_component_impl(fn_name, &props_name);
+	let bevy = pkg_ext::bevy();
+	let scene_component_impl = scene_component_impl(fn_name, &props_name, &bevy);
 
 	// `#[prop(all)]`: the single param's type is the user-defined props type, so
 	// no struct/`Default`/`SetWith` is generated — just bind it for the body.
@@ -274,10 +275,10 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 		return Ok(quote! {
 			#(#fn_attrs)*
 			#[derive(
-				::bevy::ecs::component::Component,
+				#bevy::ecs::component::Component,
 				Default,
 				Clone,
-				::bevy::reflect::Reflect,
+				#bevy::reflect::Reflect,
 			)]
 			#[reflect(Component)]
 			#vis struct #fn_name;
@@ -348,10 +349,10 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	Ok(quote! {
 		#(#fn_attrs)*
 		#[derive(
-			::bevy::ecs::component::Component,
+			#bevy::ecs::component::Component,
 			Default,
 			Clone,
-			::bevy::reflect::Reflect,
+			#bevy::reflect::Reflect,
 		)]
 		#[reflect(Component)]
 		#vis struct #fn_name;
@@ -421,19 +422,20 @@ fn type_is_scene_prop(ty: &syn::Type) -> bool {
 fn scene_component_impl(
 	fn_name: &syn::Ident,
 	props_name: &syn::Ident,
+	bevy: &syn::Path,
 ) -> TokenStream {
 	quote! {
-		impl ::bevy::scene::SceneComponent for #fn_name {
+		impl #bevy::scene::SceneComponent for #fn_name {
 			type Props = #props_name;
 			#[track_caller]
-			fn scene(props: Self::Props) -> impl ::bevy::scene::Scene {
+			fn scene(props: Self::Props) -> impl #bevy::scene::Scene {
 				(
 					Self::scene(props),
-					<::bevy::scene::InitTemplate::<
-						<Self as ::bevy::ecs::template::FromTemplate>::Template
+					<#bevy::scene::InitTemplate::<
+						<Self as #bevy::ecs::template::FromTemplate>::Template
 					> as ::core::default::Default>::default(),
-					::bevy::scene::template_value(
-						::bevy::scene::SceneComponentInfo::new::<Self>(true),
+					#bevy::scene::template_value(
+						#bevy::scene::SceneComponentInfo::new::<Self>(true),
 					),
 				)
 			}
@@ -559,7 +561,8 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
-	let scene_component_impl = scene_component_impl(fn_name, &props_name);
+	let bevy = pkg_ext::bevy();
+	let scene_component_impl = scene_component_impl(fn_name, &props_name, &bevy);
 
 	#[cfg(feature = "slot")]
 	append_slot_props(body, &mut props, &beet_ui);
@@ -657,10 +660,10 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	Ok(quote! {
 		#(#fn_attrs)*
 		#[derive(
-			::bevy::ecs::component::Component,
+			#bevy::ecs::component::Component,
 			Default,
 			Clone,
-			::bevy::reflect::Reflect,
+			#bevy::reflect::Reflect,
 		)]
 		#[reflect(Component)]
 		#vis struct #fn_name;

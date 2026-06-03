@@ -125,6 +125,18 @@ impl Rule {
 			"Schema assertion failed for a typed value, this shouldnt be possible",
 		)
 	}
+	/// Set a value whose property token is inferred from the value's type via
+	/// its [`CanonicalToken`], eg `Rule::new().with_canonical(Display::None)`.
+	/// For multi-property values (eg [`Color`]) name the token with
+	/// [`with_value`](Self::with_value) instead.
+	#[cfg(feature = "serde")]
+	pub fn with_canonical<V>(self, value: V) -> Self
+	where
+		V: CanonicalToken + Typed + Serialize,
+	{
+		self.with_value(V::Token::default(), value)
+	}
+
 	#[cfg(feature = "serde")]
 	pub fn with_value_untyped(
 		self,

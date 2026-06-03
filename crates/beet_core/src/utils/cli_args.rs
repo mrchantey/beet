@@ -69,8 +69,14 @@ impl CliArgs {
 					// This is the value for the pending key
 					params.insert(key, arg);
 				} else {
-					// Path param
-					path.push(arg);
+					// Path param: split slash-delimited segments so a single
+					// `blog/post-1` arg becomes `["blog", "post-1"]`, matching
+					// nested routes.
+					path.extend(
+						arg.split('/')
+							.filter(|seg| !seg.is_empty())
+							.map(String::from),
+					);
 				}
 			}
 		}
@@ -202,6 +208,20 @@ mod tests {
 			"baz".to_string(),
 		]);
 		cli.params.is_empty().xpect_true();
+	}
+
+	#[crate::test]
+	fn parse_slash_delimited_path() {
+		// a single positional with slashes splits into route segments
+		CliArgs::parse("blog/post-1").path.xpect_eq(vec![
+			"blog".to_string(),
+			"post-1".to_string(),
+		]);
+		// leading/trailing slashes produce no empty segments
+		CliArgs::parse("/docs/web/").path.xpect_eq(vec![
+			"docs".to_string(),
+			"web".to_string(),
+		]);
 	}
 
 	#[crate::test]
@@ -755,8 +775,12 @@ mod tests {
 		let cli = CliArgs::parse(
 			r#"build --msg="Initial commit" --author='John Doe' src/main.rs"#,
 		);
-		cli.path
-			.xpect_eq(vec!["build".to_string(), "src/main.rs".to_string()]);
+		// positionals are request-style paths, so `src/main.rs` splits into segments
+		cli.path.xpect_eq(vec![
+			"build".to_string(),
+			"src".to_string(),
+			"main.rs".to_string(),
+		]);
 		cli.params.len().xpect_eq(2);
 		cli.params.get("msg").unwrap().xpect_eq("Initial commit");
 		cli.params.get("author").unwrap().xpect_eq("John Doe");

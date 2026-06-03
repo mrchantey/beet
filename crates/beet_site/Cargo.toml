@@ -38,16 +38,9 @@ codegen = ["beet/codegen"]
 native-tls = ["web", "beet/native-tls"]
 lambda = ["web", "beet/lambda"]
 
-# The nightly `custom_test_frameworks` test-runner path. Off by default, so the
-# test suites run on stable via the `inventory` runner; `--all-features` on
-# nightly turns it on for the libtest harness.
-custom_test_frameworks = ["beet/custom_test_frameworks"]
-
 [dependencies]
 serde.workspace = true
 beet.workspace = true
-# the `#[scene]` macro emits `::bevy::` paths, so the crate root needs `bevy`.
-bevy.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
@@ -56,3 +49,15 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 serde_json.workspace = true
 futures.workspace = true
 beet = { workspace = true, features = ["testing"] }
+beet_core = { workspace = true, features = ["testing"] }
+
+# the `beet_core` test runner replaces libtest's harness
+[[test]]
+name = "render"
+path = "tests/render.rs"
+harness = false
+
+[[test]]
+name = "sidebar_tree"
+path = "tests/sidebar_tree.rs"
+harness = false

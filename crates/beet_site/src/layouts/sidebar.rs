@@ -5,7 +5,8 @@ use beet::prelude::*;
 /// Reads the single router-root [`RouteTree`] at scene build and drops the
 /// infra routes (`app-info`/`analytics`). The current path comes from the
 /// [`RouteContext`], so the active route is marked and its ancestor branches
-/// auto-expand (no forced `expanded` overrides needed).
+/// auto-expand. The `docs` and `blog` collections are forced open so their
+/// entries are always visible.
 #[scene(system)]
 pub fn BeetSidebar(
 	cx: &RouteContext,

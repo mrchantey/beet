@@ -50,11 +50,11 @@ pub fn default_element_rules() -> Vec<Rule> {
 		heading("h2", Color::srgb(0.,    0.502, 0.502)),
 		heading("h3", Color::srgb(0.,    0.,    0.502)),
 		heading("h4", Color::srgb(0.502, 0.,    0.502)),
-		block_spaced(&["h5"]).with_value(FontWeightProp, FontWeight::Bold),
+		block_spaced(&["h5"]).with_canonical(FontWeight::Bold),
 		heading("h6", faint()),
 		blockquote(),
 		block_spaced(&["pre"])
-			.with_value(WhiteSpaceProp, WhiteSpace::Pre)
+			.with_canonical(WhiteSpace::Pre)
 			.with_value(ForegroundColor, code_fg()),
 		block_spaced(&["hr"]).with_value(ForegroundColor, faint()),
 		// ── Inline formatting ──
@@ -75,12 +75,12 @@ pub fn default_element_rules() -> Vec<Rule> {
 /// Material) can include it without pulling in prose props that need their own
 /// CSS resolvers.
 pub fn non_visual_rule() -> Rule {
-	Rule::tags(NON_VISUAL_TAGS).with_value(DisplayProp, Display::None)
+	Rule::tags(NON_VISUAL_TAGS).with_canonical(Display::None)
 }
 
 /// A rule forcing `display: block` on the given tags.
 fn block(tags: &[&str]) -> Rule {
-	Rule::tags(tags).with_value(DisplayProp, Display::Block)
+	Rule::tags(tags).with_canonical(Display::Block)
 }
 
 /// A `display: block` rule that also reserves a [`block_gap`] below, separating
@@ -91,35 +91,35 @@ fn block_spaced(tags: &[&str]) -> Rule {
 
 /// A rule forcing `display: inline` on the given tags.
 fn inline(tags: &[&str]) -> Rule {
-	Rule::tags(tags).with_value(DisplayProp, Display::Inline)
+	Rule::tags(tags).with_canonical(Display::Inline)
 }
 
 fn heading(tag: &str, color: Color) -> Rule {
 	block_spaced(&[tag])
 		.with_value(ForegroundColor, color)
-		.with_value(FontWeightProp, FontWeight::Bold)
+		.with_canonical(FontWeight::Bold)
 }
 
 fn bold(tags: &[&str]) -> Rule {
-	inline(tags).with_value(FontWeightProp, FontWeight::Bold)
+	inline(tags).with_canonical(FontWeight::Bold)
 }
 
 fn italic(tags: &[&str]) -> Rule {
-	inline(tags).with_value(FontStyleProp, FontStyle::Italic)
+	inline(tags).with_canonical(FontStyle::Italic)
 }
 
 fn strikethrough(tags: &[&str]) -> Rule {
-	inline(tags).with_value(DecorationLineProp, DecorationLine::line_through())
+	inline(tags).with_canonical(DecorationLine::line_through())
 }
 
 fn link() -> Rule {
 	inline(&["a"])
 		.with_value(ForegroundColor, Color::srgb(0., 0., 0.502))
-		.with_value(DecorationLineProp, DecorationLine::underline())
+		.with_canonical(DecorationLine::underline())
 }
 
 fn blockquote() -> Rule {
 	block_spaced(&["blockquote"])
 		.with_value(ForegroundColor, faint())
-		.with_value(FontStyleProp, FontStyle::Italic)
+		.with_canonical(FontStyle::Italic)
 }

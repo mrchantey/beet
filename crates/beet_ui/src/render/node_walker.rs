@@ -107,9 +107,11 @@ impl NodeWalker<'_, '_> {
 /// embedded resources. This is the single source of truth for "non-visual",
 /// consumed in two places that must agree:
 /// - the user-agent style layer ([`default_element_rules`]) maps these to
-///   [`Display::None`] so visual renderers (charcell) omit them, and
-/// - [`NodeVisitor::skip_node`] skips them for text renderers that run before
-///   styles resolve.
+///   [`Display::None`] so the style-resolved visual renderer (charcell) omits
+///   them via its `display: none` filter, and
+/// - [`NodeVisitor::skip_node`] skips them for the markup/text renderers
+///   (markdown, plaintext, tui) that walk the raw node tree without resolving
+///   CSS, so `display: none` is unavailable to them.
 ///
 /// A markup serializer ([`HtmlRenderer`]) is the exception: it overrides
 /// `skip_node` to emit every tag, since `<head>`/`<style>`/`<script>` are valid,
