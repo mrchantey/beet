@@ -13,7 +13,11 @@ categories.workspace = true
 
 [features]
 default = ["std", "reflect"]
-std = ["beet_core/std"]
+# rhai's std mode follows ours: a std build links rhai's std, so engine-only
+# consumers get a usable rhai. no_std consumers (eg `beet_esp`) leave `std` off
+# and select rhai's `no_std` mode on their own dependency edge, keeping the
+# `rhai` feature mode-agnostic so it never collides under `--all-features`.
+std = ["beet_core/std", "rhai?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
 world_serde = ["beet_core/world_serde"]

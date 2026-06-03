@@ -44,7 +44,11 @@ http = ["std", "beet_net/server"]
 # own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
 # drags in `bevy_asset` (std) and so breaks no_std consumers.
 world_serde = ["beet_core/world_serde", "serde"]
+# Generic scripting registration (the `Script`/`ExchangeScript` reflect types).
+# Backend-agnostic; pair with a backend (eg `rhai`) for a working runtime.
 scripting = ["std", "beet_action/scripting", "serde"]
+# rhai backend for the scripting registrations above.
+rhai = ["scripting", "beet_action/rhai"]
 # Build-time code generation: route tree, server/client actions, typed links.
 codegen = [
 	"std",
