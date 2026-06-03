@@ -68,12 +68,12 @@ pub(crate) fn event_playback(
 	// we no longer need event store and event handler
 	// because the event listeners have been hooked up
 	js_sys::Reflect::delete_property(
-		&global_this.unchecked_ref(),
+		global_this.unchecked_ref::<js_sys::Object>(),
 		&constants.event_store.clone().into(),
 	)
 	.unwrap();
 	js_sys::Reflect::delete_property(
-		&global_this.unchecked_ref(),
+		global_this.unchecked_ref::<js_sys::Object>(),
 		&constants.event_handler.clone().into(),
 	)
 	.unwrap();
