@@ -190,6 +190,10 @@ serde_json = { version = "1", default-features = false, features = ["alloc"] }
 # std/no_std mode + serde are selected by beet_action's feature flags
 # (`rhai` for std scripting, `rhai_no_std` for embedded), so no defaults here.
 rhai = { version = "1", default-features = false }
+# QuickJS engine via high-level bindings to the bundled C engine. `rust-alloc`
+# routes allocation through Rust's global allocator instead of libc's malloc; the
+# std vs bare-metal mode is selected on beet_action's `quickjs` feature edge.
+rquickjs = { version = "0.12", default-features = false, features = ["rust-alloc"] }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
@@ -337,6 +341,12 @@ rhai = ["action","beet_action/rhai"]
 # The std typed-`Script` rhai backend: the serde marshalling runtime plus the
 # beet_router scripting registrations. Pulls `rhai` + `serde` + `std`.
 rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/scripting"]
+# The QuickJS engine, re-exported via `beet::exports::rquickjs`. Bare engine for
+# consumers that marshal values by hand (no serde, no router registrations).
+quickjs = ["action","beet_action/quickjs"]
+# The std typed-`Script` QuickJS backend: the JSON marshalling runtime plus the
+# beet_router scripting registrations. Pulls `quickjs` + `serde` + `std`.
+quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
 # Sidebar, Table). Heavy + std-only, so it stays opt-in.

@@ -27,7 +27,10 @@ pub mod prelude {
 /// Re-exported third-party crates, so downstream consumers (eg `no_std`
 /// embedded targets) can reach the [`rhai`] engine through beet rather than
 /// declaring their own pinned dependency.
-#[cfg(feature = "rhai")]
+#[allow(unused)]
 pub mod exports {
+	#[cfg(feature = "rhai")]
 	pub use rhai;
+	#[cfg(feature = "quickjs")]
+	pub use rquickjs;
 }

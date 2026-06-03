@@ -38,11 +38,14 @@ where
 impl Default for ScriptLanguage {
 	fn default() -> Self {
 		cfg_if! {
-			if #[cfg(feature = "rhai")] {
+			if #[cfg(feature = "quickjs")] {
+				return ScriptLanguage::QuickJs;
+			} else if #[cfg(feature = "rhai")] {
 				return ScriptLanguage::Rhai;
 			} else {
 				compile_error!("ScriptLanguage requires at least one runtime feature");
 			}
+
 		}
 	}
 }
@@ -98,6 +101,9 @@ pub enum ScriptLanguage {
 	/// The [rhai](https://rhai.rs) embedded scripting language.
 	#[cfg(feature = "rhai")]
 	Rhai,
+	/// JavaScript via the [QuickJS](https://bellard.org/quickjs/) engine.
+	#[cfg(feature = "quickjs")]
+	QuickJs,
 }
 
 impl<Input, Output> Script<Input, Output>
@@ -120,6 +126,12 @@ where
 		Self::new(ScriptLanguage::Rhai, content)
 	}
 
+	/// Create a [`Script`] from JavaScript (QuickJS) source.
+	#[cfg(feature = "quickjs")]
+	pub fn quickjs(content: impl Into<String>) -> Self {
+		Self::new(ScriptLanguage::QuickJs, content)
+	}
+
 	/// Evaluate the script, transforming `input` into the output value.
 	///
 	/// # Errors
@@ -133,6 +145,16 @@ where
 			ScriptLanguage::Rhai => {
 				let _ = input;
 				bevybail!("the rhai `Script` backend requires the `rhai_serde` feature")
+			}
+			#[cfg(feature = "quickjs_serde")]
+			ScriptLanguage::QuickJs => {
+				crate::scripting::run_quickjs(&self.content, input)
+			}
+			// the quickjs engine is present but its serde runtime is gated on `quickjs_serde`.
+			#[cfg(all(feature = "quickjs", not(feature = "quickjs_serde")))]
+			ScriptLanguage::QuickJs => {
+				let _ = input;
+				bevybail!("the quickjs `Script` backend requires the `quickjs_serde` feature")
 			}
 		}
 	}

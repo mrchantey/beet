@@ -132,12 +132,14 @@ pub mod prelude {
 
 pub mod exports {
 	pub use crate::core::exports::*;
-	#[cfg(feature = "rhai")]
+	#[cfg(feature = "action")]
+	#[allow(unused)]
 	pub use beet_action::exports::*;
 	#[cfg(feature = "net")]
 	#[allow(unused)]
 	pub use beet_net::exports::*;
 	#[cfg(feature = "ui")]
+	#[allow(unused)]
 	pub use beet_ui::exports::*;
 	pub use bevy;
 }
