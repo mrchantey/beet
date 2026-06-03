@@ -591,9 +591,11 @@ fn make_default(fn_name: &syn::Ident, generics: &syn::Generics) -> TokenStream {
 			}
 		}
 	} else {
+		// `ty_generics` (not `impl_generics`) in the type position: bounds belong
+		// only on the `impl` header / `where` clause, never on `Foo<..>` itself.
+		let (_, ty_generics, _) = generics.split_for_impl();
 		quote! {
-
-			impl #impl_generics Default for #fn_name #impl_generics #where_clause {
+			impl #impl_generics Default for #fn_name #ty_generics #where_clause {
 				fn default() -> Self {
 					Self(Default::default())
 				}

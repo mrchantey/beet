@@ -5,7 +5,7 @@ use beet::prelude::*;
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
 /// around the route content (the default `<slot/>`, transcluded in place by the
-/// [`document_shell`] middleware), with a context-aware [`BeetHead`] carrying
+/// [`DocumentShell`] middleware), with a context-aware [`BeetHead`] carrying
 /// the web-only stylesheet/color-scheme/preflight/favicon. The `<head>` is
 /// non-visual, so the same shell renders in the terminal.
 #[scene]

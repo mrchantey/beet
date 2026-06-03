@@ -342,6 +342,9 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 		}
 	};
 
+	let with_children_impl =
+		with_children_impl(fn_name, &props_name, &props, &beet_ui);
+
 	Ok(quote! {
 		#(#fn_attrs)*
 		#[derive(
@@ -360,7 +363,56 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 		}
 
 		#scene_component_impl
+		#with_children_impl
 	})
+}
+
+/// Emit a `WithChildren` impl when the widget has a `children: SceneProp` prop
+/// (declared or `<slot/>`-injected), letting it serve as a document shell. No
+/// output when absent or when the `slot` feature is off.
+#[cfg(feature = "slot")]
+fn with_children_impl(
+	fn_name: &syn::Ident,
+	props_name: &syn::Ident,
+	props: &[Prop],
+	beet_ui: &syn::Path,
+) -> TokenStream {
+	let has_children = props
+		.iter()
+		.any(|prop| prop.ident == "children" && type_is_scene_prop(&prop.ty));
+	if !has_children {
+		return TokenStream::new();
+	}
+	quote! {
+		impl #beet_ui::prelude::WithChildren for #fn_name {
+			fn with_children(
+				children: #beet_ui::prelude::SceneProp,
+			) -> Self::Props {
+				<#props_name as ::core::default::Default>::default()
+					.with_children(children)
+			}
+		}
+	}
+}
+
+#[cfg(not(feature = "slot"))]
+fn with_children_impl(
+	_fn_name: &syn::Ident,
+	_props_name: &syn::Ident,
+	_props: &[Prop],
+	_beet_ui: &syn::Path,
+) -> TokenStream {
+	TokenStream::new()
+}
+
+/// Whether a type's final path segment is `SceneProp`.
+#[cfg(feature = "slot")]
+fn type_is_scene_prop(ty: &syn::Type) -> bool {
+	matches!(
+		ty,
+		syn::Type::Path(tp)
+			if tp.path.segments.last().is_some_and(|seg| seg.ident == "SceneProp")
+	)
 }
 
 /// Emit the `SceneComponent` trait impl that wraps the inherent
@@ -599,6 +651,9 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 		}
 	};
 
+	let with_children_impl =
+		with_children_impl(fn_name, &props_name, &props, &beet_ui);
+
 	Ok(quote! {
 		#(#fn_attrs)*
 		#[derive(
@@ -617,6 +672,7 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 		}
 
 		#scene_component_impl
+		#with_children_impl
 	})
 }
 
@@ -900,13 +956,40 @@ mod test {
 	#[cfg(feature = "slot")]
 	#[test]
 	fn slot_skips_explicitly_declared_prop() {
-		// an author-declared `children` is not duplicated by the `<slot/>` scan
+		// an author-declared `children` is not duplicated by the `<slot/>` scan;
+		// only the struct field matches (the `WithChildren` param uses the full
+		// `beet_ui::prelude::SceneProp` path).
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn Panel(children: SceneProp) -> impl Scene {
 				rsx! { <div><slot/></div> }
 			}
 		});
-		assert_eq!(result.matches("children :").count(), 1);
+		assert_eq!(result.matches("children : SceneProp").count(), 1);
+	}
+
+	#[cfg(feature = "slot")]
+	#[test]
+	fn children_prop_emits_with_children_impl() {
+		// a `<slot/>` (children prop) makes the widget usable as a document shell
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Shell() -> impl Scene {
+				rsx! { <html><body><slot/></body></html> }
+			}
+		});
+		assert!(result.contains("WithChildren for Shell"));
+		assert!(result.contains(". with_children (children)"));
+	}
+
+	#[cfg(feature = "slot")]
+	#[test]
+	fn no_children_skips_with_children_impl() {
+		// a widget with only named slots is not a shell
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Bar() -> impl Scene {
+				rsx! { <nav><slot name="links"/></nav> }
+			}
+		});
+		assert!(!result.contains("WithChildren"));
 	}
 
 	#[test]
