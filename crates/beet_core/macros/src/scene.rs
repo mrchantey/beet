@@ -60,7 +60,10 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		);
 	}
 	if !item.sig.generics.params.is_empty() {
-		synbail!(&item.sig.generics, "`#[scene]` does not yet support generics");
+		synbail!(
+			&item.sig.generics,
+			"`#[scene]` does not yet support generics"
+		);
 	}
 	if attrs.contains_key("system") {
 		parse_system(item)
@@ -171,8 +174,9 @@ fn parse_prop(pt: &syn::PatType) -> syn::Result<(Prop, bool)> {
 
 	// required props store `Option<ty>`, so the setter must unwrap to `ty`;
 	// bare `Option<T>` props get the same ergonomic (setter takes `T`).
-	let already_unwraps =
-		set_with_args.iter().any(|arg| arg.to_string().contains("unwrap_option"));
+	let already_unwraps = set_with_args
+		.iter()
+		.any(|arg| arg.to_string().contains("unwrap_option"));
 	if !already_unwraps && (required || (!required && is_option(&ty))) {
 		set_with_args.push(quote! { unwrap_option });
 	}
@@ -191,20 +195,6 @@ fn parse_prop(pt: &syn::PatType) -> syn::Result<(Prop, bool)> {
 /// Whether a parameter is a prop (carries a `#[prop]` attribute).
 fn is_prop_param(pt: &syn::PatType) -> bool {
 	pt.attrs.iter().any(|attr| attr.path().is_ident("prop"))
-}
-
-/// Whether a parameter is the render-context channel: a shared reference to a
-/// type named `RequestContext` (`cx: &RequestContext`). The macro wires a
-/// [`RenderQuery`] lookup for it rather than treating it as a `SystemParam`.
-fn is_request_context_param(pt: &syn::PatType) -> bool {
-	let syn::Type::Reference(reference) = pt.ty.as_ref() else {
-		return false;
-	};
-	matches!(
-		reference.elem.as_ref(),
-		syn::Type::Path(tp)
-			if tp.path.segments.last().is_some_and(|seg| seg.ident == "RequestContext")
-	)
 }
 
 /// Whether a type is `Option<..>`.
@@ -260,7 +250,8 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 	let bevy = pkg_ext::bevy();
-	let scene_component_impl = scene_component_impl(fn_name, &props_name, &bevy);
+	let scene_component_impl =
+		scene_component_impl(fn_name, &props_name, &bevy);
 
 	// `#[prop(all)]`: the single param's type is the user-defined props type, so
 	// no struct/`Default`/`SetWith` is generated — just bind it for the body.
@@ -300,7 +291,8 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	append_slot_props(body, &mut props, &beet_ui);
 
 	let field_defs = props.iter().map(Prop::field_def);
-	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
+	let field_idents: Vec<&syn::Ident> =
+		props.iter().map(|p| &p.ident).collect();
 	let props_struct = props_struct(
 		vis,
 		&props_name,
@@ -534,25 +526,19 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::Ident> = Vec::new();
-	// the author's `cx: &RequestContext` binding, if any
-	let mut cx_binding: Option<syn::Ident> = None;
 	for arg in &item.sig.inputs {
 		let pt = typed_arg(arg)?;
 		if is_prop_param(pt) {
 			let (prop, is_all) = parse_prop(pt)?;
 			if is_all {
-				synbail!(pt, "`#[prop(all)]` is not supported with `#[scene(system)]`");
+				synbail!(
+					pt,
+					"`#[prop(all)]` is not supported with `#[scene(system)]`"
+				);
 			}
 			props.push(prop);
-		} else if is_request_context_param(pt) {
-			if cx_binding.is_some() {
-				synbail!(pt, "only one `&RequestContext` parameter is supported");
-			}
-			cx_binding = Some(param_ident(pt)?);
-			// fetched via an injected `RenderQuery` ancestor lookup
-			sys_types.push(quote! { RenderQuery });
-			sys_pats.push(format_ident!("__render_query"));
 		} else {
+			// everything else is a Bevy `SystemParam` fetched at build
 			let ty = &pt.ty;
 			sys_types.push(quote! { #ty });
 			sys_pats.push(param_ident(pt)?);
@@ -562,13 +548,15 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 	let bevy = pkg_ext::bevy();
-	let scene_component_impl = scene_component_impl(fn_name, &props_name, &bevy);
+	let scene_component_impl =
+		scene_component_impl(fn_name, &props_name, &bevy);
 
 	#[cfg(feature = "slot")]
 	append_slot_props(body, &mut props, &beet_ui);
 
 	let field_defs = props.iter().map(Prop::field_def);
-	let field_idents: Vec<&syn::Ident> = props.iter().map(|p| &p.ident).collect();
+	let field_idents: Vec<&syn::Ident> =
+		props.iter().map(|p| &p.ident).collect();
 	let props_struct = props_struct(
 		vis,
 		&props_name,
@@ -579,30 +567,11 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	);
 
 	let unwraps = required_unwraps(&props);
-	// when a `cx: &RequestContext` param is present the entity being built is
-	// looked up via the injected `RenderQuery`; a missing context surfaces an
-	// `ErrorScene` through the build channel (same path as a missing prop). The
-	// body must then be type-erased so both arms unify as `Box<dyn Scene>`.
-	let closure_body = match &cx_binding {
-		Some(cx) => quote! {
-			let #props_name { #(#field_idents),* } = props.clone();
-			#(#unwraps)*
-			let #cx = match __render_query.get_context(_entity) {
-				::core::result::Result::Ok(cx) => cx,
-				::core::result::Result::Err(err) => {
-					return #beet_ui::prelude::SceneExt::any_scene(
-						#beet_ui::prelude::ErrorScene::new(err),
-					);
-				}
-			};
-			#beet_ui::prelude::SceneExt::any_scene({ #body })
-		},
-		None => quote! {
-			let #props_name { #(#field_idents),* } = props.clone();
-			#(#unwraps)*
-			#[allow(unused_braces)]
-			#body
-		},
+	let closure_body = quote! {
+		let #props_name { #(#field_idents),* } = props.clone();
+		#(#unwraps)*
+		#[allow(unused_braces)]
+		#body
 	};
 	let build_closure = quote! {
 		#beet_ui::prelude::scene_system::<(#(#sys_types,)*), _, _>(
@@ -721,9 +690,7 @@ fn collect_slot_names(
 	use alloc::string::ToString;
 	use proc_macro2::TokenTree;
 
-	let is_punct = |tree: Option<&TokenTree>, ch: char| {
-		matches!(tree, Some(TokenTree::Punct(punct)) if punct.as_char() == ch)
-	};
+	let is_punct = |tree: Option<&TokenTree>, ch: char| matches!(tree, Some(TokenTree::Punct(punct)) if punct.as_char() == ch);
 
 	let trees: Vec<TokenTree> = tokens.into_iter().collect();
 	let mut idx = 0;
@@ -743,9 +710,8 @@ fn collect_slot_names(
 		let mut name = "children".to_string();
 		let mut scan = idx + 2;
 		while scan < trees.len() && !is_punct(trees.get(scan), '>') {
-			let is_name_attr =
-				matches!(&trees[scan], TokenTree::Ident(id) if id == "name")
-					&& is_punct(trees.get(scan + 1), '=');
+			let is_name_attr = matches!(&trees[scan], TokenTree::Ident(id) if id == "name")
+				&& is_punct(trees.get(scan + 1), '=');
 			if is_name_attr {
 				if let Some(TokenTree::Literal(lit)) = trees.get(scan + 2) {
 					if let syn::Lit::Str(str) = syn::Lit::new(lit.clone()) {
@@ -833,7 +799,10 @@ mod test {
 			fn Field(#[prop(default = "hi")] placeholder: String) -> impl Scene { todo!() }
 		});
 		// manual Default impl carrying the expression, not a derive
-		assert!(result.contains("impl :: core :: default :: Default for FieldProps"));
+		assert!(
+			result
+				.contains("impl :: core :: default :: Default for FieldProps")
+		);
 		assert!(result.contains("\"hi\""));
 		assert!(!result.contains("derive (Default"));
 	}
@@ -906,17 +875,18 @@ mod test {
 	}
 
 	#[test]
-	fn system_render_context_param() {
-		// `cx: &RequestContext` injects a `RenderQuery` system param, threads the
-		// built entity, fetches the context, and errors via `ErrorScene` if absent.
+	fn system_request_context_is_plain_param() {
+		// `Res<RequestContext>` is now an ordinary `SystemParam`, fetched at build
+		// with no special-casing — the request context is a regular resource.
 		let result = parse_str(quote!(system), syn::parse_quote! {
-			fn Nav(cx: &RequestContext, trees: Query<&RouteTree>) -> impl Scene { todo!() }
+			fn Nav(cx: Res<RequestContext>, trees: Query<&RouteTree>) -> impl Scene { todo!() }
 		});
-		assert!(result.contains("RenderQuery"));
-		assert!(result.contains("__render_query . get_context (_entity)"));
-		assert!(result.contains("ErrorScene"));
-		// the regular system param is preserved alongside the injected query
-		assert!(result.contains("Query < & RouteTree >"));
+		assert!(result.contains(
+			"scene_system :: < (Res < RequestContext > , Query < & RouteTree > ,)"
+		));
+		assert!(result.contains("move | _entity , (cx , trees ,) |"));
+		// no injected render-query machinery remains
+		assert!(!result.contains("RenderQuery"));
 	}
 
 	#[test]
@@ -953,7 +923,9 @@ mod test {
 				rsx! { <nav><slot name="header-nav"/></nav> }
 			}
 		});
-		assert!(result.contains("header_nav : beet_ui :: prelude :: SceneProp"));
+		assert!(
+			result.contains("header_nav : beet_ui :: prelude :: SceneProp")
+		);
 	}
 
 	#[cfg(feature = "slot")]

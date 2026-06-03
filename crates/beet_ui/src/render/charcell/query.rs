@@ -187,14 +187,23 @@ pub struct CharcellQuery<'w, 's> {
 
 impl CharcellQuery<'_, '_> {
 	/// Build a node, resolving [`RenderRef`] holders to the entity they render.
+	///
+	/// Use this when starting from a raw [`Children`] entity. Once an entity has
+	/// already been resolved (eg by [`CharcellTree`] traversal), call
+	/// [`Self::unresolved_node`] to avoid a redundant resolution.
 	pub(super) fn resolved_node(
 		&self,
 		entity: Entity,
 	) -> Result<CharcellNodeData<'_>> {
-		self.node(resolve_render_ref(&self.refs, entity))
+		self.unresolved_node(resolve_render_ref(&self.refs, entity))
 	}
 
-	pub(super) fn node(&self, entity: Entity) -> Result<CharcellNodeData<'_>> {
+	/// Build a node for an entity that is already [`RenderRef`]-resolved,
+	/// without following holders again.
+	pub(super) fn unresolved_node(
+		&self,
+		entity: Entity,
+	) -> Result<CharcellNodeData<'_>> {
 		let (
 			intrinsic_size,
 			layout_rect,

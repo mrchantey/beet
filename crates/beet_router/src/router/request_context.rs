@@ -3,8 +3,7 @@
 //! The layout middleware installs a [`RequestContext`] resource before the
 //! document-shell scene is built and removes it after, so the shell's
 //! `#[scene(system)]` widgets can read the current request and the matched
-//! route entity via [`RenderQuery`]. The `#[scene(system)]` macro wires this
-//! automatically for a `cx: &RequestContext` parameter.
+//! route entity through an ordinary `cx: Res<RequestContext>` parameter.
 //!
 //! It is a resource rather than an ancestor component because scene systems run
 //! during the build *before* their `ChildOf` edge is wired, so an ancestor walk
@@ -49,27 +48,6 @@ impl RequestContext {
 	pub fn current_path(&self) -> String { self.parts.path().join("/") }
 }
 
-/// Access to the active [`RequestContext`].
-///
-/// The `#[scene(system)]` macro injects this for a `cx: &RequestContext`
-/// parameter, so widgets rarely name it directly. The `entity` argument of
-/// [`get_context`](Self::get_context) is accepted for forward-compatibility
-/// (per-subtree contexts) but currently unused.
-#[derive(SystemParam)]
-pub struct RenderQuery<'w> {
-	context: Option<Res<'w, RequestContext>>,
-}
-
-impl RenderQuery<'_> {
-	/// The active [`RequestContext`], erroring if none is installed (no render is
-	/// in progress).
-	pub fn get_context(&self, _entity: Entity) -> Result<&RequestContext> {
-		self.context
-			.as_deref()
-			.ok_or_else(|| bevyhow!("no RequestContext: not inside a render"))
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -77,37 +55,17 @@ mod test {
 	use beet_net::prelude::*;
 
 	#[beet_core::test]
-	fn get_context_reads_resource() {
+	fn read_context_resource() {
+		// scene systems read the installed context through `Res<RequestContext>`.
 		let mut world = World::new();
 		let route = world.spawn_empty().id();
 		world.insert_resource(RequestContext::new(
 			RequestParts::get("docs/intro"),
 			route,
 		));
-		let entity = world.spawn_empty().id();
 		world
-			.run_system_cached_with(
-				|entity: In<Entity>, query: RenderQuery| {
-					query.get_context(*entity).unwrap().current_path()
-				},
-				entity,
-			)
+			.run_system_cached(|cx: Res<RequestContext>| cx.current_path())
 			.unwrap()
 			.xpect_eq("docs/intro".to_string());
-	}
-
-	#[beet_core::test]
-	fn get_context_errors_when_absent() {
-		let mut world = World::new();
-		let entity = world.spawn_empty().id();
-		world
-			.run_system_cached_with(
-				|entity: In<Entity>, query: RenderQuery| {
-					query.get_context(*entity).is_err()
-				},
-				entity,
-			)
-			.unwrap()
-			.xpect_true();
 	}
 }

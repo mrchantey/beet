@@ -40,7 +40,7 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 				let Some(&node_rect) = layout_rects.get(&entity) else {
 					continue;
 				};
-				let Ok(node) = charcell.node(entity) else {
+				let Ok(node) = charcell.unresolved_node(entity) else {
 					continue;
 				};
 

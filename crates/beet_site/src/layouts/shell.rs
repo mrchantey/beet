@@ -12,7 +12,7 @@ use beet::prelude::*;
 /// `<head>` is non-visual, so the same shell renders in the terminal.
 #[scene(system)]
 pub fn BeetDocumentShell(
-	cx: &RequestContext,
+	cx: Res<RequestContext>,
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
 ) -> impl Scene {

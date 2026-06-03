@@ -32,8 +32,21 @@ pub fn token_map()->CssTokenMap{
 		.insert(LineHeight)
 		.insert(Tracking)
 		.insert(TextAlignProp)
+		.insert(FontStyleProp)
+		.insert(DecorationLineProp)
+		.insert(WhiteSpaceProp)
+		.insert(MarginProp)
+		.insert(FlexGrowProp)
+		.insert(AlignItemsProp)
+		.insert(JustifyContentProp)
+		.insert(ColumnGapProp)
+		.insert(RowGapProp)
 		.insert(DisplayProp)
 		.insert(BorderColorProp)
+		.insert(BorderTopWidth)
+		.insert(BorderRightWidth)
+		.insert(BorderBottomWidth)
+		.insert(BorderLeftWidth)
 		.insert(BreakAfterProp)
 		.insert(TransitionDurationProp)
 		.insert(AnimationDurationProp)
@@ -79,6 +92,10 @@ css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");
+css_property!(BorderTopWidth, Length, TokenInheritance::NotInherited, "border-top-width");
+css_property!(BorderRightWidth, Length, TokenInheritance::NotInherited, "border-right-width");
+css_property!(BorderBottomWidth, Length, TokenInheritance::NotInherited, "border-bottom-width");
+css_property!(BorderLeftWidth, Length, TokenInheritance::NotInherited, "border-left-width");
 
 canonical_property!(JustifyContentProp, JustifyContent, TokenInheritance::NotInherited, "justify-content");
 canonical_property!(AlignItemsProp, AlignItems, TokenInheritance::NotInherited, "align-items");

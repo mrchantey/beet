@@ -9,8 +9,8 @@ use super::frontmatter::FrontmatterKind;
 use crate::parse::html::combinators::HtmlParseConfig;
 use crate::parse::html::diff::HtmlDiffConfig;
 use crate::parse::html::diff::HtmlNode;
-use crate::parse::html::diff::build_html_tree;
 use crate::parse::html::tokens::HtmlAttribute;
+use crate::parse::html::tokens::HtmlToken;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;
@@ -74,8 +74,9 @@ struct MdTreeBuilder<'a> {
 }
 
 struct StackFrame<'a> {
-	/// HTML tag name for this element.
-	name: &'static str,
+	/// HTML tag name for this element. Markdown tags are `'static` literals;
+	/// embedded HTML tags borrow from the source, hence the `'a` lifetime.
+	name: &'a str,
 	/// Attributes on this element.
 	attributes: Vec<HtmlAttribute<'a>>,
 	/// Source text slice for span tracking.
@@ -85,7 +86,7 @@ struct StackFrame<'a> {
 }
 
 impl<'a> StackFrame<'a> {
-	fn new(name: &'static str, source: &'a str) -> Self {
+	fn new(name: &'a str, source: &'a str) -> Self {
 		Self {
 			name,
 			attributes: Vec::new(),
@@ -95,7 +96,7 @@ impl<'a> StackFrame<'a> {
 	}
 
 	fn with_attributes(
-		name: &'static str,
+		name: &'a str,
 		source: &'a str,
 		attributes: Vec<HtmlAttribute<'a>>,
 	) -> Self {
@@ -162,7 +163,7 @@ impl<'a> MdTreeBuilder<'a> {
 	/// Append a void element (no children) to the current frame.
 	fn push_void(
 		&mut self,
-		name: &'static str,
+		name: &'a str,
 		source: &'a str,
 		attributes: Vec<HtmlAttribute<'a>>,
 	) {
@@ -221,11 +222,12 @@ impl<'a> MdTreeBuilder<'a> {
 			Event::Rule => {
 				self.push_void("hr", source, vec![]);
 			}
-			Event::Html(html) => {
-				self.handle_html_block(&html, source);
-			}
-			Event::InlineHtml(html) => {
-				self.handle_inline_html(&html, source);
+			// Both block and inline embedded HTML are tokenized and applied to
+			// the builder stack, so they become real elements rather than
+			// verbatim text. `source` is a slice of the original `'a` input, so
+			// the parsed nodes borrow from it directly.
+			Event::Html(_) | Event::InlineHtml(_) => {
+				self.apply_html_fragment(source);
 			}
 			Event::FootnoteReference(label) => {
 				let label_str = label.as_ref();
@@ -456,19 +458,12 @@ impl<'a> MdTreeBuilder<'a> {
 				// Don't push to parent — frontmatter is handled separately
 			}
 			"__html_block" => {
-				// Collect accumulated text children and parse as HTML
+				// `apply_html_fragment` parsed the block's embedded HTML into
+				// this frame's children as it streamed in; splice them into the
+				// parent in place of the synthetic block frame.
 				let frame = self.stack.pop().unwrap();
-				let html_content: String = frame
-					.children
-					.iter()
-					.filter_map(|node| match node {
-						HtmlNode::Text(text) => Some(*text),
-						_ => None,
-					})
-					.collect();
-
-				if !html_content.is_empty() {
-					self.handle_html_block(&html_content, frame.source);
+				if let Some(parent) = self.stack.last_mut() {
+					parent.children.extend(frame.children);
 				}
 			}
 			"img" => {
@@ -501,46 +496,79 @@ impl<'a> MdTreeBuilder<'a> {
 		}
 	}
 
-	/// Parse an HTML block string and splice the resulting nodes into
-	/// the current frame.
-	fn handle_html_block(&mut self, html: &str, source: &'a str) {
-		// Try to parse the HTML via the HTML tokenizer
-		match crate::parse::html::combinators::parse_document(
-			html,
+	/// Tokenize an embedded HTML fragment and apply its tokens to the builder
+	/// stack, turning embedded HTML into real elements rather than verbatim
+	/// text.
+	///
+	/// Open tags push a frame, close tags pop the matching one, and
+	/// void/self-closing tags become leaf elements. Driving the shared stack
+	/// (rather than building a sub-tree) lets a single element span several
+	/// `Event::Html` lines — the open tag on one line, the close on another —
+	/// and lets a paired inline tag (`<strong>…</strong>`) wrap the markdown
+	/// text events that arrive between its open and close.
+	fn apply_html_fragment(&mut self, source: &'a str) {
+		let tokens = match crate::parse::html::combinators::parse_document(
+			source,
 			&self.html_parse_config,
 		) {
-			Ok(tokens) => {
-				match build_html_tree(
-					&tokens,
-					&self.html_diff_config,
-					&self.html_parse_config,
-				) {
-					Ok(_nodes) => {
-						// Splice parsed HTML nodes into current frame.
-						// Since the HTML tokens borrow from `html` (a
-						// temporary), we can't directly use them. Instead,
-						// insert as a raw text node.
-						self.push_leaf(HtmlNode::Text(source));
-					}
-					Err(_) => {
-						// Fallback: treat as raw text
-						self.push_leaf(HtmlNode::Text(source));
+			Ok(tokens) => tokens,
+			// an unparseable fragment falls back to verbatim text
+			Err(_) => {
+				self.push_leaf(HtmlNode::Text(source));
+				return;
+			}
+		};
+		for token in tokens {
+			match token {
+				HtmlToken::OpenTag {
+					name,
+					attributes,
+					self_closing,
+					source,
+				} => {
+					if self_closing
+						|| self.html_diff_config.is_void_element(name)
+					{
+						self.push_void(name, source, attributes);
+					} else {
+						self.push(StackFrame::with_attributes(
+							name, source, attributes,
+						));
 					}
 				}
-			}
-			Err(_) => {
-				// Fallback: treat as raw text
-				self.push_leaf(HtmlNode::Text(source));
+				HtmlToken::CloseTag(name) => self.pop_named(name),
+				HtmlToken::Text(text) => {
+					if self.html_parse_config.parse_expressions {
+						self.push_text_with_expressions(text);
+					} else {
+						self.push_leaf(HtmlNode::Text(text));
+					}
+				}
+				HtmlToken::Comment(text) => {
+					self.push_leaf(HtmlNode::Comment(text))
+				}
+				HtmlToken::Doctype(text) => {
+					self.push_leaf(HtmlNode::Doctype(text))
+				}
+				HtmlToken::Expression(expr) => {
+					self.push_leaf(HtmlNode::Expression(expr))
+				}
 			}
 		}
 	}
 
-	/// Parse inline HTML and insert into the current frame.
-	fn handle_inline_html(&mut self, _html: &str, source: &'a str) {
-		// Inline HTML is tricky because it may be a partial tag
-		// (opening tag in one event, closing in another).
-		// For now, insert as raw text; the HTML renderer will pass it through.
-		self.push_leaf(HtmlNode::Text(source));
+	/// Pop the top frame only when its tag matches `name`, building its element
+	/// and appending it to the parent. A mismatched close tag is ignored so a
+	/// stray `</p>` cannot unwind the surrounding markdown structure.
+	fn pop_named(&mut self, name: &str) {
+		let matches = self.stack.len() > 1
+			&& self
+				.stack
+				.last()
+				.is_some_and(|frame| frame.name.eq_ignore_ascii_case(name));
+		if matches {
+			self.pop();
+		}
 	}
 
 	/// Try to find a substring within the source slice, returning a
@@ -820,6 +848,44 @@ mod test {
 		node_name(&nodes[0]).xpect_eq("ul");
 		let items = node_children(&nodes[0]);
 		items.len().xpect_eq(2);
+	}
+
+	#[beet_core::test]
+	fn embedded_block_html_becomes_element() {
+		// a block-level HTML element is parsed into a real element, not
+		// verbatim text, so its tag drives layout/styling (eg `<iframe>` is
+		// non-visual and `<br>` is a line break).
+		let nodes =
+			build("text\n\n<iframe src=\"https://x\"></iframe>\n\ntext");
+		nodes
+			.iter()
+			.any(|node| node_name(node) == "iframe")
+			.xpect_true();
+	}
+
+	#[beet_core::test]
+	fn embedded_void_block_html_becomes_element() {
+		let nodes = build("a\n\n<br/>\n<br/>\n\nb");
+		nodes
+			.iter()
+			.filter(|node| node_name(node) == "br")
+			.count()
+			.xpect_eq(2);
+	}
+
+	#[beet_core::test]
+	fn inline_html_wraps_markdown_text() {
+		// a paired inline tag wraps the markdown text that streams between its
+		// open and close events, becoming a real element around the text.
+		let nodes = build("Hello <strong>brave</strong> world");
+		let para = &nodes[0];
+		node_name(para).xpect_eq("p");
+		let strong = node_children(para)
+			.iter()
+			.find(|node| node_name(node) == "strong")
+			.unwrap();
+		matches!(&node_children(strong)[0], HtmlNode::Text(text) if *text == "brave")
+			.xpect_true();
 	}
 
 	#[beet_core::test]

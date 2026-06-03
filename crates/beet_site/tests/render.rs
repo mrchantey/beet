@@ -1,4 +1,4 @@
-beet_core::test_main!();
+beet::test_main!();
 
 use beet::prelude::*;
 use beet_site::prelude::*;
@@ -112,4 +112,70 @@ async fn repeated_requests_are_stable() {
 	let first = world.entity_mut(id).exchange_str(html_get("")).await;
 	let second = world.entity_mut(id).exchange_str(html_get("")).await;
 	first.xpect_eq(second);
+}
+
+/// Strip ANSI/OSC escape sequences, leaving the visible glyphs.
+fn strip_ansi(body: &str) -> String {
+	let mut out = String::new();
+	let mut chars = body.chars().peekable();
+	while let Some(ch) = chars.next() {
+		if ch != '\u{1b}' {
+			out.push(ch);
+			continue;
+		}
+		match chars.peek() {
+			// CSI: ESC [ … final-letter
+			Some('[') => {
+				for next in chars.by_ref() {
+					if next.is_ascii_alphabetic() {
+						break;
+					}
+				}
+			}
+			// OSC: ESC ] … BEL or ST
+			Some(']') => {
+				while let Some(next) = chars.next() {
+					if next == '\u{7}' {
+						break;
+					}
+					if next == '\u{1b}' {
+						chars.next();
+						break;
+					}
+				}
+			}
+			_ => {}
+		}
+	}
+	out
+}
+
+#[beet::test]
+async fn terminal_renders_charcell_shell_layout() {
+	// the CLI target negotiates AnsiTerm first, driving the charcell layout
+	// engine (not the plain-text fallback): the shell becomes a real two-column
+	// layout with an elevated header/footer and a sidebar divider.
+	let body = site_world()
+		.spawn(beet_site_router())
+		.exchange_str(
+			Request::get("").with_header::<header::Accept>(vec![
+				MediaType::AnsiTerm,
+				MediaType::Text,
+			]),
+		)
+		.await;
+
+	// the header/footer elevation dividers and the sidebar's right border
+	body.as_str()
+		.xpect_contains("─") // header/footer horizontal divider
+		.xpect_contains("│") // sidebar right border
+		// some styling was applied (bold/colour escapes), proving the prose +
+		// material rules reach the charcell paint, not raw text
+		.xpect_contains("\u{1b}[");
+
+	// sidebar and main share rows: a line holds both a nav entry and body text
+	strip_ansi(&body)
+		.lines()
+		.any(|line| line.contains("blog") && line.contains("Beet"))
+		.xpect_true();
 }

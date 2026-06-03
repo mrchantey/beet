@@ -27,7 +27,7 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 			if managed.contains(&entity) {
 				continue;
 			}
-			let Ok(node) = charcell.node(entity) else {
+			let Ok(node) = charcell.unresolved_node(entity) else {
 				continue;
 			};
 			if establishes_inline_flow(&node, &charcell) {
@@ -43,7 +43,7 @@ pub fn paint_nodes<B: Component<Mutability = Mutable> + AsBuffer>(
 			if managed.contains(&entity) {
 				continue;
 			}
-			let Ok(node) = charcell.node(entity) else {
+			let Ok(node) = charcell.unresolved_node(entity) else {
 				continue;
 			};
 			paint_node(&node, &charcell, viewport_size, &mut *buffer)?;
@@ -77,9 +77,9 @@ fn paint_node(
 		);
 	}
 
-	// 2. Draw border if present
-	if box_model.has_border {
-		draw_border(&mut *buffer, border_rect, node);
+	// 2. Draw any present border sides
+	if box_model.border.any() {
+		draw_border(&mut *buffer, border_rect, box_model.border, node);
 	}
 
 	// 3. Paint content: flow inline descendants if this owns an inline

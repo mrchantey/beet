@@ -27,7 +27,7 @@ pub fn measure_nodes<B: Component + AsBuffer>(
 		{
 			let charcell = params.p0();
 			for &entity in &ordered {
-				let Ok(node) = charcell.node(entity) else {
+				let Ok(node) = charcell.unresolved_node(entity) else {
 					continue;
 				};
 				let size =

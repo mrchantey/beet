@@ -318,6 +318,30 @@ impl Selector {
 		}
 	}
 
+	/// CSS-like cascade weight: a more specific selector wins regardless of
+	/// insertion order. Class/state/attribute selectors outweigh tag selectors,
+	/// which outweigh the universal/root match, so a `.container` rule beats a
+	/// bare `div` rule even when the tag rule was registered first.
+	pub fn specificity(&self) -> u32 {
+		match self {
+			Selector::Root | Selector::Any => 0,
+			Selector::Tag(_) => 1,
+			Selector::Class(_)
+			| Selector::State(_)
+			| Selector::Attribute { .. } => 10,
+			Selector::Entity(_) => 100,
+			Selector::Not(inner) => inner.specificity(),
+			// a compound `div.btn` sums its parts; a `div, .btn` group takes the
+			// strongest branch, mirroring CSS.
+			Selector::AllOf(parts) => {
+				parts.iter().map(Selector::specificity).sum()
+			}
+			Selector::AnyOf(parts) => {
+				parts.iter().map(Selector::specificity).max().unwrap_or(0)
+			}
+		}
+	}
+
 	pub fn matches(&self, el: &ElementView) -> bool {
 		match self {
 			Selector::Root => true,

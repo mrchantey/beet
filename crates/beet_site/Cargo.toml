@@ -49,9 +49,8 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 serde_json.workspace = true
 futures.workspace = true
 beet = { workspace = true, features = ["testing"] }
-beet_core = { workspace = true, features = ["testing"] }
 
-# the `beet_core` test runner replaces libtest's harness
+# the `beet` test runner replaces libtest's harness
 [[test]]
 name = "render"
 path = "tests/render.rs"

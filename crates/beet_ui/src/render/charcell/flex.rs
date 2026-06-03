@@ -86,7 +86,7 @@ pub fn measure_flex(
 	// Sort by flex_order
 	child_sizes.sort_by_key(|(e, _)| {
 		query
-			.node(*e)
+			.unresolved_node(*e)
 			.map(|n| n.layout_style().flex_order)
 			.unwrap_or(0)
 	});
@@ -177,7 +177,7 @@ pub fn flex_layout_rects(
 	// Sort by flex_order
 	child_sizes.sort_by_key(|(e, _)| {
 		query
-			.node(*e)
+			.unresolved_node(*e)
 			.map(|n| n.layout_style().flex_order)
 			.unwrap_or(0)
 	});
@@ -413,7 +413,7 @@ fn resolve_align(
 	default_align: AlignItems,
 ) -> AlignItems {
 	let align_self = query
-		.node(entity)
+		.unresolved_node(entity)
 		.map(|n| n.layout_style().align_self.clone())
 		.unwrap_or(AlignSelf::Auto);
 	match align_self {
@@ -476,7 +476,7 @@ fn apply_flex_grow(
 		.iter()
 		.map(|(entity, _)| {
 			query
-				.node(*entity)
+				.unresolved_node(*entity)
 				.map(|n| n.layout_style().flex_grow)
 				.unwrap_or(0)
 		})

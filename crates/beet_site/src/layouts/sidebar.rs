@@ -9,7 +9,7 @@ use beet::prelude::*;
 /// entries are always visible.
 #[scene(system)]
 pub fn BeetSidebar(
-	cx: &RequestContext,
+	cx: Res<RequestContext>,
 	trees: Query<&RouteTree, With<Router>>,
 ) -> impl Scene {
 	let nodes = trees

@@ -1,4 +1,4 @@
-beet_core::test_main!();
+beet::test_main!();
 
 use beet::prelude::*;
 use beet_site::prelude::*;

@@ -16,6 +16,9 @@ pub fn resolve_styles(
 	query: Query<Entity, Or<(Changed<Element>, Changed<Classes>)>>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
+	// the box model (margin/border/padding/background) is element-level; text and
+	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
+	elements: Query<(), With<Element>>,
 	mut styles: Query<(
 		Option<&mut VisualStyle>,
 		Option<&mut LayoutStyle>,
@@ -50,8 +53,13 @@ pub fn resolve_styles(
 				commands.entity(entity).insert(layout);
 			}
 
-			// resolve box style
-			let box_s = resolve_box(&ruleset_query, entity)?;
+			// resolve box style — only for elements, so a text/fragment child does
+			// not inherit and re-paint its ancestor element's border/background.
+			let box_s = if elements.contains(entity) {
+				resolve_box(&ruleset_query, entity)?
+			} else {
+				BoxStyle::default()
+			};
 			if let Some(mut style) = styles.get_mut(entity)?.2 {
 				style.set_if_neq(box_s);
 			} else {
@@ -136,14 +144,24 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
 	let padding = query.resolve(entity, Padding).unwrap_or_default();
 	let margin = query.resolve(entity, MarginProp).unwrap_or_default();
-	let border_width = query.resolve(entity, OutlineWidth).ok();
 	let border_color = query.resolve(entity, BorderColorProp).ok();
+	// per-side border widths fall back to the uniform `border-width`, so a rule
+	// can reserve a single edge (eg `border-right`) or a full box.
+	let uniform = query.resolve(entity, OutlineWidth).ok();
+	let resolve_side = |width: Result<Length>| {
+		width.ok().or(uniform).unwrap_or(Length::DEFAULT)
+	};
 	BoxStyle {
 		border_left: border_color,
 		border_right: border_color,
 		border_top: border_color,
 		border_bottom: border_color,
-		border: border_width.map(Spacing::all).unwrap_or_default(),
+		border: Spacing {
+			top: resolve_side(query.resolve(entity, BorderTopWidth)),
+			right: resolve_side(query.resolve(entity, BorderRightWidth)),
+			bottom: resolve_side(query.resolve(entity, BorderBottomWidth)),
+			left: resolve_side(query.resolve(entity, BorderLeftWidth)),
+		},
 		margin,
 		padding,
 	}

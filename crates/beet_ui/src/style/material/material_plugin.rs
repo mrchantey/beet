@@ -25,8 +25,16 @@ impl Default for MaterialStylePlugin {
 
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<CssPlugin>()
-			.insert_resource(default_rule_set(self.color.clone()));
+		app.init_plugin::<CssPlugin>();
+		// Extend the existing rule set rather than replacing it, so the prose
+		// `default_element_rules` seeded by `StylePlugin` (em → italic, h1 →
+		// bold, code/a → inline, …) survive alongside the Material rules. The
+		// `:root` defaults merge into the shared default rule.
+		let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
+		rules
+			.default_rule_mut()
+			.push_declarations(default_declarations(self.color.clone()));
+		rules.extend_rules(default_material_rules());
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
@@ -42,18 +50,21 @@ pub fn default_token_map() -> CssTokenMap {
 		.with_extend(typography::token_map())
 }
 
-/// All default material declarations and component rules.
-///
-/// Includes the user-agent [`non_visual_rule`] so metadata/scripting tags resolve
-/// to `display: none` even in apps where this rule set replaces the one
-/// [`StylePlugin`] seeds (the prose [`default_element_rules`] are left to
-/// `StylePlugin`, as they need CSS resolvers Material does not register).
+/// All default material declarations and component rules, as a standalone rule
+/// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
+/// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
 pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
-	RuleSet::new(default_declarations(color))
-		.with_rule(non_visual_rule())
-		.with_rules(rules::all_rules())
-		.with_rule(themes::light_scheme())
-		.with_rule(themes::dark_scheme())
+	RuleSet::new(default_declarations(color)).with_rules(default_material_rules())
+}
+
+/// The Material component rules: the user-agent [`non_visual_rule`] (so
+/// metadata/scripting tags resolve to `display: none`), the component
+/// [`rules::all_rules`], and the light/dark scheme rules.
+pub fn default_material_rules() -> Vec<Rule> {
+	core::iter::once(non_visual_rule())
+		.chain(rules::all_rules())
+		.chain([themes::light_scheme(), themes::dark_scheme()])
+		.collect()
 }
 
 /// Returns a [`Rule`] with all material design default values.

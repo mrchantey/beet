@@ -389,15 +389,42 @@ pub fn elevation_5() -> Rule {
 
 // ── Layout Components ─────────────────────────────────────────────────────────
 
-/// App bar / header - surface background suitable for navigation.
+/// App bar / header - elevated surface suitable for navigation.
 ///
-/// 64px height with surface background and elevation for scrolled state.
+/// Reads as raised against the page: a `SurfaceContainer` fill plus a bottom
+/// divider, the terminal stand-in for the web app bar's box-shadow elevation.
 pub fn app_bar() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(APP_BAR))
-		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_token(common_props::BorderBottomWidth,geometry::OutlineWidthThin).unwrap()
+		// title and nav sit side by side, spread across the bar
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::JustifyContentProp, JustifyContent::SpaceBetween)
+		.with_value(common_props::ColumnGapProp, 2u32)
+}
+
+/// App bar navigation - a flex row so its links are spaced rather than running
+/// together as adjacent inline anchors.
+pub fn app_bar_nav() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(APP_BAR_NAV))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::ColumnGapProp, 2u32)
+}
+
+/// Page `<footer>` - mirrors the app bar's elevation with a top divider.
+pub fn footer() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("footer"))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_token(common_props::BorderTopWidth,geometry::OutlineWidthThin).unwrap()
 }
 
 /// App bar in scrolled state - adds elevation shadow.
@@ -408,12 +435,26 @@ pub fn app_bar_scrolled() -> Rule {
 		.with_token(common_props::ElevationProp,geometry::Elevation2).unwrap()
 }
 
-/// Container - basic surface container for grouping content.
+/// Container - the body's sidebar + main row.
+///
+/// A flex row (default [`Direction::Horizontal`]) so the `nav` sidebar and
+/// `<main>` content sit side by side rather than stacking.
 pub fn container() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CONTAINER))
-		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_value(common_props::DisplayProp, Display::Flex)
+		// stretch the sidebar to the row height so its right divider runs the
+		// full height of the content, not just its own entries.
+		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
+}
+
+/// Main content column - grows to fill the space beside the sidebar.
+pub fn main_content() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("main"))
+		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
 /// Page - full page background using the base surface color.
@@ -565,12 +606,19 @@ pub fn summary() -> Rule {
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
 }
 
-/// Sidebar nav container.
+/// Sidebar nav container - a left rail divided from the main column by a
+/// right border, with padding so its links clear the divider.
 pub fn sidebar() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_token(common_props::BorderRightWidth,geometry::OutlineWidthThin).unwrap()
+		.with_value(common_props::Padding, Spacing {
+			right: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
 }
 
 /// Sidebar link - primary-colored, for navigable leaves and branches.
@@ -578,6 +626,18 @@ pub fn sidebar_link() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_LINK))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
+/// Nested sidebar item - indented under its parent group. Each nesting level's
+/// padding insets the level below it, so the tree steps in per depth. Only the
+/// non-root `sidebar-item` carries it; `sidebar-item-root` stays flush left.
+pub fn sidebar_item() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class("sidebar-item"))
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
 }
 
 /// Sidebar group label - faint, for non-navigable headers.
@@ -702,7 +762,10 @@ pub fn all_rules() -> Vec<Rule> {
 		elevation_5(),
 		app_bar(),
 		app_bar_scrolled(),
+		app_bar_nav(),
+		footer(),
 		container(),
+		main_content(),
 		page(),
 		// form controls — state/compound rules first so they win the cascade
 		input_focus(),
@@ -725,6 +788,7 @@ pub fn all_rules() -> Vec<Rule> {
 		summary(),
 		sidebar(),
 		sidebar_link(),
+		sidebar_item(),
 		sidebar_label(),
 		// utilities
 		hidden(),

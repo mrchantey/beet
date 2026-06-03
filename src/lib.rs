@@ -21,6 +21,8 @@ pub use beet_core::main;
 #[cfg(feature = "testing")]
 pub use beet_core::test;
 #[cfg(feature = "testing")]
+pub use beet_core::test_main;
+#[cfg(feature = "testing")]
 pub use beet_core::test_runner;
 #[cfg(feature = "testing")]
 pub use beet_core::testing;

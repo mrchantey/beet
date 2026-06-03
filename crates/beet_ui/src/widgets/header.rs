@@ -17,7 +17,7 @@ pub fn Header(
 				{title}
 			</a>
 			<slot/>
-			<nav>
+			<nav {Classes::new([classes::APP_BAR_NAV])}>
 				<slot name="nav"/>
 			</nav>
 		</header>

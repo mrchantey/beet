@@ -15,13 +15,42 @@ use super::query::CharcellNodeData;
 
 // ── BoxModel ─────────────────────────────────────────────────────────────────
 
+/// Which sides of a box carry a border. Each present side reserves and paints a
+/// single terminal cell, so a node can have just a right border (a sidebar
+/// divider) or just a bottom border (an elevated bar) rather than a full box.
+#[derive(Default, Clone, Copy)]
+pub(super) struct BorderSides {
+	pub left: bool,
+	pub right: bool,
+	pub top: bool,
+	pub bottom: bool,
+}
+
+impl BorderSides {
+	/// Whether every side carries a border (a full box, drawn with corners).
+	pub fn all(&self) -> bool {
+		self.left && self.right && self.top && self.bottom
+	}
+	/// Whether any side carries a border.
+	pub fn any(&self) -> bool {
+		self.left || self.right || self.top || self.bottom
+	}
+	/// Margin-style inset (in cells) reserved by the present sides.
+	fn inset(&self) -> URect {
+		URect {
+			min: UVec2::new(self.left as u32, self.top as u32),
+			max: UVec2::new(self.right as u32, self.bottom as u32),
+		}
+	}
+}
+
 /// Pure-data box model computed from a node's box style.
 ///
 /// Describes margin, border, and padding dimensions for a single node.
 /// All values are in terminal cells.
 pub(super) struct BoxModel {
 	pub margin: URect,
-	pub has_border: bool,
+	pub border: BorderSides,
 	pub padding: URect,
 }
 
@@ -43,7 +72,7 @@ impl BoxModel {
 		let Some(box_style) = box_style else {
 			return Self {
 				margin: URect::default(),
-				has_border: false,
+				border: BorderSides::default(),
 				padding: URect::default(),
 			};
 		};
@@ -51,11 +80,18 @@ impl BoxModel {
 		let vp = Vec2::new(viewport.x as f32, viewport.y as f32);
 		let margin = tui_inset(&box_style.margin, vp);
 		let padding = tui_inset(&box_style.padding, vp);
-		let has_border = box_style.border != Spacing::DEFAULT;
+		// a side carries a border when it has a positive width; per-side widths
+		// let a rule reserve a single edge (eg `border-right`).
+		let border = BorderSides {
+			left: box_style.border.left.into_rem(vp) > 0.,
+			right: box_style.border.right.into_rem(vp) > 0.,
+			top: box_style.border.top.into_rem(vp) > 0.,
+			bottom: box_style.border.bottom.into_rem(vp) > 0.,
+		};
 
 		Self {
 			margin,
-			has_border,
+			border,
 			padding,
 		}
 	}
@@ -67,17 +103,9 @@ impl BoxModel {
 
 	/// The rect after subtracting margin and border from `containing`.
 	///
-	/// Shrinks by 1 cell on every side when `has_border` is true.
+	/// Shrinks by one cell per present border side.
 	pub fn inner_rect(&self, containing: URect) -> URect {
-		let border = self.border_rect(containing);
-		if self.has_border {
-			inset_rect(border, URect {
-				min: UVec2::new(1, 1),
-				max: UVec2::new(1, 1),
-			})
-		} else {
-			border
-		}
+		inset_rect(self.border_rect(containing), self.border.inset())
 	}
 
 	/// The rect after subtracting margin, border, and padding from `containing`.
@@ -91,8 +119,8 @@ impl BoxModel {
 		let margin_y = self.margin.min.y + self.margin.max.y;
 		let padding_x = self.padding.min.x + self.padding.max.x;
 		let padding_y = self.padding.min.y + self.padding.max.y;
-		let border_x = if self.has_border { 2 } else { 0 };
-		let border_y = if self.has_border { 2 } else { 0 };
+		let border_x = self.border.left as u32 + self.border.right as u32;
+		let border_y = self.border.top as u32 + self.border.bottom as u32;
 		UVec2::new(
 			margin_x + padding_x + border_x,
 			margin_y + padding_y + border_y,
@@ -102,14 +130,16 @@ impl BoxModel {
 
 // ── Drawing ─────────────────────────────────────────────────────────────────
 
-/// Draw a single-line box border inside `rect` using box-drawing characters.
+/// Draw the present border sides inside `rect` using box-drawing characters.
 ///
-/// Uses per-side colors from [`BoxStyle`]: top/bottom colors for horizontal
-/// segments and corners, left/right colors for vertical segments.
-/// No-ops when the rect is too small to hold a border (width or height < 2).
+/// A full box (all four sides) is drawn with corners; otherwise each present
+/// side is drawn as a straight edge, so a lone right border becomes a vertical
+/// divider and a lone bottom border an underline. Per-side colors come from
+/// [`BoxStyle`]. No-ops when the rect is too small (width or height < 2).
 pub(super) fn draw_border(
 	buffer: &mut impl AsBuffer,
 	rect: URect,
+	sides: BorderSides,
 	node: &CharcellNodeData,
 ) {
 	let box_style = node.box_style();
@@ -123,7 +153,6 @@ pub(super) fn draw_border(
 		return; // too small for a border
 	}
 
-	// build per-side char styles
 	let top_style = side_style(box_style.and_then(|b| b.border_top), visual);
 	let bottom_style =
 		side_style(box_style.and_then(|b| b.border_bottom), visual);
@@ -131,46 +160,47 @@ pub(super) fn draw_border(
 	let right_style =
 		side_style(box_style.and_then(|b| b.border_right), visual);
 
-	// top border — corners use the top border color
-	buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
-	for x in 1..width - 1 {
-		buffer.set(
-			UVec2::new(rect.min.x + x, rect.min.y),
-			Cell::new("─", top_style.clone(), entity),
-		);
-	}
-	buffer.set(
-		UVec2::new(rect.min.x + width - 1, rect.min.y),
-		Cell::new("┐", top_style.clone(), entity),
-	);
+	let (left, right) = (rect.min.x, rect.max.x - 1);
+	let (top, bottom) = (rect.min.y, rect.max.y - 1);
 
-	// middle rows — left and right sides only
-	for y in 1..height - 1 {
-		buffer.set(
-			UVec2::new(rect.min.x, rect.min.y + y),
-			Cell::new("│", left_style.clone(), entity),
-		);
-		buffer.set(
-			UVec2::new(rect.min.x + width - 1, rect.min.y + y),
-			Cell::new("│", right_style.clone(), entity),
-		);
+	if sides.all() {
+		// full box: corners join the sides
+		buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set(UVec2::new(right, top), Cell::new("┐", top_style.clone(), entity));
+		buffer.set(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
+		buffer.set(UVec2::new(right, bottom), Cell::new("┘", bottom_style.clone(), entity));
 	}
 
-	// bottom border — corners use the bottom border color
-	buffer.set(
-		UVec2::new(rect.min.x, rect.min.y + height - 1),
-		Cell::new("└", bottom_style.clone(), entity),
-	);
-	for x in 1..width - 1 {
-		buffer.set(
-			UVec2::new(rect.min.x + x, rect.min.y + height - 1),
-			Cell::new("─", bottom_style.clone(), entity),
-		);
+	// horizontal edges span the full width (corners overwrite the ends above)
+	if sides.top {
+		for x in left..=right {
+			buffer.set(UVec2::new(x, top), Cell::new("─", top_style.clone(), entity));
+		}
 	}
-	buffer.set(
-		UVec2::new(rect.min.x + width - 1, rect.min.y + height - 1),
-		Cell::new("┘", bottom_style.clone(), entity),
-	);
+	if sides.bottom {
+		for x in left..=right {
+			buffer.set(UVec2::new(x, bottom), Cell::new("─", bottom_style.clone(), entity));
+		}
+	}
+	// vertical edges span the full height
+	if sides.left {
+		for y in top..=bottom {
+			buffer.set(UVec2::new(left, y), Cell::new("│", left_style.clone(), entity));
+		}
+	}
+	if sides.right {
+		for y in top..=bottom {
+			buffer.set(UVec2::new(right, y), Cell::new("│", right_style.clone(), entity));
+		}
+	}
+
+	if sides.all() {
+		// re-draw corners so they sit on top of the straight edges
+		buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set(UVec2::new(right, top), Cell::new("┐", top_style, entity));
+		buffer.set(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
+		buffer.set(UVec2::new(right, bottom), Cell::new("┘", bottom_style, entity));
+	}
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

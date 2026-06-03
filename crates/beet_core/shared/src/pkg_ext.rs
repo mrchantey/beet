@@ -25,15 +25,20 @@ pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
 }
 /// Resolve the path to the `bevy` crate for macro output.
 ///
-/// Internal beet crates depend on `bevy` directly, so emit `::bevy`. Downstream
-/// crates (eg `beet_site`, external users) reach it through the `beet` facade's
-/// re-export, so emit `::beet::exports::bevy` and need no direct `bevy` dep.
+/// Always reached through a `beet_core`/`beet` re-export (`exports::bevy`), so a
+/// crate consuming the macro needs no direct `bevy` dependency — only the
+/// `beet_core` (internal) or `beet` (downstream) it already depends on. Mirrors
+/// [`internal_or_beet`]: `crate` inside `beet_core`, `beet_core` for other
+/// internal crates, `beet` downstream.
 pub fn bevy() -> syn::Path {
-	if is_internal() {
-		syn::parse_str("bevy").unwrap()
+	let base = if !is_internal() {
+		"beet"
+	} else if crate_name() == "beet_core" {
+		"crate"
 	} else {
-		syn::parse_str("beet::exports::bevy").unwrap()
-	}
+		"beet_core"
+	};
+	syn::parse_str(&alloc::format!("{base}::exports::bevy")).unwrap()
 }
 
 fn crate_name() -> alloc::string::String {

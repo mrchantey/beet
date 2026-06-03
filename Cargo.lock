@@ -1583,7 +1583,6 @@ name = "beet_site"
 version = "0.0.9-dev.11"
 dependencies = [
  "beet",
- "beet_core",
  "futures",
  "getrandom 0.3.4",
  "serde",

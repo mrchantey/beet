@@ -72,6 +72,7 @@ pub const ELEVATION_5: ClassName = ClassName::new_static("elevation-5");
 // ── Document shell ──────────────────────────────────────────────────────────────
 pub const APP_BAR: ClassName = ClassName::new_static("app-bar");
 pub const APP_BAR_SCROLLED: ClassName = ClassName::new_static("app-bar-scrolled");
+pub const APP_BAR_NAV: ClassName = ClassName::new_static("app-bar-nav");
 pub const CONTAINER: ClassName = ClassName::new_static("container");
 pub const PAGE: ClassName = ClassName::new_static("page");
 

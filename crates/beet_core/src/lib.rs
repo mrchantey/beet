@@ -281,6 +281,9 @@ pub mod prelude {
 /// These exports allow downstream crates to use the same versions of
 /// dependencies without adding them to their own `Cargo.toml`.
 pub mod exports {
+	// the engine, re-exported so internal macros can emit
+	// `beet_core::exports::bevy` and downstream crates need no direct `bevy` dep.
+	pub use bevy;
 	pub use itertools::Itertools;
 	// original exports
 	#[cfg(feature = "std")]
