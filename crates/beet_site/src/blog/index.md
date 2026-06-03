@@ -5,10 +5,10 @@ title = "The Full Moon Harvest"
 
 # The Full Moon Harvest
 
-###### [#12 — Gentle Slopes and Lonely Mountains](/blog/post-12)
+###### [#12 — Gentle Slopes up Lonely Mountains](/blog/post-12)
 *Pete Hayman — 2nd June, 2026*
 
-Usually a gentle slope means climbing to a mountain peak of specialization, only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus: domains of UI, physics, networking etc remain within reach at all skill levels.
+Usually a gentle slope means climbing to a mountain peak of specialization, only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus: domains of UI, physics, networking etc are connected, remaining within reach at all skill levels.
 
 <br/>
 

@@ -3,17 +3,14 @@ title="The Harvest #12"
 created="2026-06-02"
 +++
 
-# Gentle Slopes and Lonely Mountains
+# Gentle Slopes up Lonely Mountains
 
 *Pete Hayman — 2nd June, 2026*
 
-<iframe src="https://www.youtube.com/embed/TODO" title="The Harvest #12 - Gentle Slopes and Lonely Mountains" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe src="https://www.youtube.com/embed/3V4-WM6Pc-4" title="The Harvest #12 - Gentle Slopes up Lonely Mountains" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 <br/>
 <br/>
-
-
-# Gentle slopes and lonely mountains
 
 My hometown of Wollongong has a very special geography. The entire region is quite narrow because its nestled between the Pacific Ocean and one long unbroken escarpment. Once you're up there, you're up, and the boundless plateau of eastern Australia awaits.
 
