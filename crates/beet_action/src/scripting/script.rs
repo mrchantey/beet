@@ -126,8 +126,14 @@ where
 	/// Propagates parse, evaluation, or (de)serialization errors.
 	pub fn run(&self, input: Input) -> Result<Output> {
 		match self.language {
-			#[cfg(feature = "rhai")]
+			#[cfg(feature = "rhai_serde")]
 			ScriptLanguage::Rhai => crate::scripting::run_rhai(&self.content, input),
+			// the rhai engine is present but its serde runtime is gated on `rhai_serde`.
+			#[cfg(all(feature = "rhai", not(feature = "rhai_serde")))]
+			ScriptLanguage::Rhai => {
+				let _ = input;
+				bevybail!("the rhai `Script` backend requires the `rhai_serde` feature")
+			}
 		}
 	}
 }

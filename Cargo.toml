@@ -328,9 +328,15 @@ thread = ["dep:beet_thread","net","action"]
 # action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
 # are available on bare-metal targets too.
 action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
-# Generic, backend-agnostic scripting layer (the `Script` action). Pick a
-# backend (eg `rhai`) for an actual runtime, ie `scripting` + `rhai`.
-scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
+# Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pair with a
+# backend (eg `rhai`) and `rhai_serde` for a working typed `Script`.
+scripting = ["action","beet_action/scripting"]
+# The rhai engine, re-exported via `beet::exports::rhai`. Bare engine for
+# embedded consumers (no_std, no serde, no router registrations).
+rhai = ["action","beet_action/rhai"]
+# The std typed-`Script` rhai backend: the serde marshalling runtime plus the
+# beet_router scripting registrations. Pulls `rhai` + `serde` + `std`.
+rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
 # Sidebar, Table). Heavy + std-only, so it stays opt-in.
@@ -518,12 +524,12 @@ required-features = ["router", "markdown"]
 [[example]]
 name = "cli"
 path = "examples/router/cli.rs"
-required-features = ["router", "serde", "scripting"]
+required-features = ["router", "rhai_serde"]
 
 [[example]]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
-required-features = ["router", "serde", "scripting", "world_serde"]
+required-features = ["router", "rhai_serde", "world_serde"]
 
 [[example]]
 name = "file_based_routes"
@@ -601,7 +607,7 @@ required-features = ["action"]
 [[example]]
 name = "scripting"
 path = "examples/action/scripting.rs"
-required-features = ["scripting"]
+required-features = ["rhai_serde"]
 
 [[example]]
 name = "behavior_tree"
