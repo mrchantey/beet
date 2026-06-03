@@ -4,11 +4,11 @@
 //!
 //! [`document_shell`] registers a render middleware on its entity. For every
 //! descendant render route, the middleware runs the inner handler to obtain the
-//! content render root, then spawns the shell — a function of the content —
-//! passing the content as a [`RenderRef`] transclusion in the shell's
-//! `children`. The content is rendered *in place, by reference*: it is never
-//! reparented under the shell nor re-resolved, so a persistent fixed route
-//! survives request after request.
+//! content render root, then builds the shell — an ordinary `#[scene]` widget —
+//! with the content as its `children` prop (a [`RenderRef`] transclusion). The
+//! content is rendered *in place, by reference*: it is never reparented under
+//! the shell nor re-resolved, so a persistent fixed route survives request after
+//! request.
 //!
 //! The shell wraps **every** request regardless of target. Non-visual document
 //! chrome (`<head>`/`<style>`/`<script>`) simply does not paint in the terminal
@@ -20,10 +20,10 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// Wrap every descendant render route in a document `shell`.
+/// Wrap every descendant render route in a document shell `C`.
 ///
-/// The shell is a `Fn(SceneProp) -> impl Scene` constructor: it receives the
-/// route's rendered content as its `children` and places it with `{children}`
+/// The shell is just a `#[scene]` widget with a default `<slot/>`: the route's
+/// rendered content is built into its `children` prop and the widget places it
 /// (directly, or by forwarding to a [`PageLayout`]). It is invoked fresh per
 /// request. Place it on an ancestor of the routes it should wrap, eg the router
 /// entity:
@@ -32,14 +32,23 @@ use beet_ui::prelude::*;
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_ui::prelude::*;
-/// # fn shell(content: SceneProp) -> impl Scene { rsx! { <html><body>{content}</body></html> } }
-/// # fn routes() -> impl Bundle {}
-/// let bundle = (router(), document_shell(shell), children![routes()]);
+/// #[scene]
+/// fn Shell() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
+/// let bundle = (router(), document_shell::<Shell>());
 /// ```
-pub fn document_shell<Func, S>(shell: Func) -> impl Bundle
+pub fn document_shell<C>() -> impl Bundle
+where
+	C: 'static + Send + Sync + WithChildren,
+{
+	shell_middleware(|content: SceneProp| C::scene(C::with_children(content)))
+}
+
+/// The render-middleware machinery behind [`document_shell`]: register an action
+/// that wraps every descendant render route's content via the `shell` builder.
+fn shell_middleware<Func, S>(shell: Func) -> impl Bundle
 where
 	Func: 'static + Send + Sync + Clone + Fn(SceneProp) -> S,
-	S: 'static + Send + Sync + Scene,
+	S: Scene,
 {
 	let action: Action<(RequestParts, Next<RequestParts, Entity>), Entity> =
 		(move |parts: RequestParts, next: Next<RequestParts, Entity>| {
@@ -71,7 +80,7 @@ where
 /// shell as the new render root.
 ///
 /// The content is handed to the shell as a [`SceneProp`] wrapping a
-/// [`RenderRef`]: the shell places it via `{children}`, transcluding the
+/// [`RenderRef`]: the shell places it via its `<slot/>`, transcluding the
 /// existing content entity **by reference**. The shell subtree is ephemeral and
 /// despawned after render (along with the content's own ephemerals), but the
 /// referenced content is never owned or despawned here, so a persistent fixed
@@ -134,18 +143,20 @@ mod test {
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	/// A document shell with a `<meta charset>` head; the content fills `<main>`.
-	fn shell(content: SceneProp) -> impl Scene {
+	#[scene]
+	fn Shell() -> impl Scene {
 		rsx! {
 			<html>
 				<head><meta charset="utf-8"/></head>
-				<body><main><slot name="main"/></main></body>
+				<body><main><slot/></main></body>
 			</html>
 		}
 	}
 
-	/// A shell whose only slot is a `nav` slot, for named-slot routing.
-	fn nav_shell() -> impl Scene {
-		rsx! { <body><nav><slot name="nav"/></nav></body> }
+	/// A shell that places the content inside `<nav>`.
+	#[scene]
+	fn NavShell() -> impl Scene {
+		rsx! { <body><nav><slot/></nav></body> }
 	}
 
 	/// Request `path`, negotiating HTML, and return the rendered body.
@@ -166,7 +177,7 @@ mod test {
 	async fn wraps_fixed_route() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), document_shell(shell), children![
+			.spawn((router(), document_shell::<Shell>(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -187,7 +198,7 @@ mod test {
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), document_shell(shell), children![
+			.spawn((router(), document_shell::<Shell>(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -208,7 +219,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), document_shell(shell), children![
+			.spawn((router(), document_shell::<Shell>(), children![
 				render_action::async_route("", page)
 			]))
 			.flush();
@@ -233,7 +244,7 @@ mod test {
 
 		let mut world = router_world();
 		let root = world
-			.spawn((store, router(), document_shell(shell), children![route(
+			.spawn((store, router(), document_shell::<Shell>(), children![route(
 				"post",
 				BlobScene::new("post.md")
 			)]))
@@ -253,7 +264,7 @@ mod test {
 		// the shell decides placement; here the content lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), document_shell(nav_shell), children![
+			.spawn((router(), document_shell::<NavShell>(), children![
 				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
 			]))
 			.flush();

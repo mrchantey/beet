@@ -4,11 +4,12 @@ use beet::prelude::*;
 /// The global document shell wrapping every route's body.
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
-/// around the route content (a [`SceneProp`] transcluded in place by the
+/// around the route content (the default `<slot/>`, transcluded in place by the
 /// [`document_shell`] middleware), with a context-aware [`BeetHead`] carrying
 /// the web-only stylesheet/color-scheme/preflight/favicon. The `<head>` is
 /// non-visual, so the same shell renders in the terminal.
-pub fn beet_document_shell(content: SceneProp) -> impl Scene {
+#[scene]
+pub fn BeetDocumentShell() -> impl Scene {
 	rsx! {
 		<html lang="en">
 			<BeetHead>
@@ -26,7 +27,7 @@ pub fn beet_document_shell(content: SceneProp) -> impl Scene {
 				<div {Classes::new([classes::CONTAINER])}>
 					<BeetSidebar/>
 					<main {Classes::new(["site-main"])}>
-						<slot name="main"/>
+						<slot/>
 					</main>
 				</div>
 				<Footer/>

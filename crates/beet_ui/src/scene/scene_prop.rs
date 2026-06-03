@@ -11,6 +11,7 @@ use bevy::scene::ResolveContext;
 use bevy::scene::ResolveSceneError;
 use bevy::scene::ResolvedScene;
 use bevy::scene::Scene;
+use bevy::scene::SceneComponent;
 use bevy::scene::SceneDependencies;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -40,6 +41,17 @@ impl SceneProp {
 	pub fn or(self, fallback: impl Scene) -> Self {
 		if self.is_empty() { Self::new(fallback) } else { self }
 	}
+}
+
+/// A [`SceneComponent`] that accepts transcluded content as its `children` prop.
+///
+/// Emitted by `#[scene]` for any widget with a `children: SceneProp` prop
+/// (declared explicitly or via a default `<slot/>`). It bridges a widget to the
+/// layout middleware: a document shell is just a `#[scene]` widget, built with
+/// the route content as its `children`.
+pub trait WithChildren: SceneComponent {
+	/// The widget's props with `children` set, all other props defaulted.
+	fn with_children(children: SceneProp) -> Self::Props;
 }
 
 impl Scene for SceneProp {

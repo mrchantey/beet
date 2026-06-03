@@ -1,7 +1,7 @@
 //! The site's document shell and navigation, shared by the web and terminal
 //! render targets.
 //!
-//! [`beet_document_shell`] is the global layout fed to
+//! [`BeetDocumentShell`] is the global layout fed to
 //! [`document_shell`](beet::prelude::document_shell): it receives each route's
 //! rendered body as its `children` and places it in `<main>`. The web-only
 //! pieces (the built stylesheet, color-scheme seed, preflight reset, favicon

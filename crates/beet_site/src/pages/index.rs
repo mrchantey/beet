@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The site landing page, placed into the [`beet_document_shell`] `<main>`.
+/// The site landing page, placed into the [`BeetDocumentShell`] `<main>`.
 pub fn get() -> impl Scene {
 	rsx! {
 		<div {Classes::new(["hero"])}>
