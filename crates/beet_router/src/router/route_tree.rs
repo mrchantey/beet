@@ -165,6 +165,32 @@ impl RouteTree {
 		.xok()
 	}
 
+	/// Rebuild the [`RouteTree`] on `server` from all of its descendant actions.
+	///
+	/// A system meant to be run on demand via
+	/// [`run_system_cached_with`](bevy::ecs::world::World::run_system_cached_with),
+	/// mirroring the router's [`insert_route_tree`](crate::prelude::insert_route_tree)
+	/// observer for cases where the tree must be recomputed without a
+	/// [`PathPattern`] insert — eg after reparenting a loaded scene under a server.
+	pub fn rebuild(
+		server: In<Entity>,
+		children_query: Query<&Children>,
+		actions: Query<ActionQueryItem, Without<RouteHidden>>,
+		mut commands: Commands,
+	) -> Result {
+		let nodes = children_query
+			.iter_descendants_inclusive(*server)
+			.filter_map(|entity| actions.get(entity).ok())
+			.map(ActionNode::from_query)
+			.collect::<Vec<_>>();
+		if nodes.is_empty() {
+			return Ok(());
+		}
+		let tree = Self::from_nodes(nodes)?;
+		commands.entity(*server).insert(tree);
+		Ok(())
+	}
+
 	/// Returns all route paths in the tree as a flat list.
 	/// Nodes with no matching route are skipped.
 	pub fn flatten(&self) -> Vec<PathPattern> {

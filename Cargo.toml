@@ -187,7 +187,9 @@ smol_str = { version = "0.2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 # no_std by default (alloc only); std consumers re-enable `serde_json/std`.
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
-rhai = { version = "1", features = ["serde"] }
+# std/no_std mode + serde are selected by beet_action's feature flags
+# (`scripting` for std, `rhai_no_std` for embedded), so no defaults here.
+rhai = { version = "1", default-features = false }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
@@ -326,7 +328,9 @@ thread = ["dep:beet_thread","net","action"]
 # action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
 # are available on bare-metal targets too.
 action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
-rhai = ["action","beet_action/rhai"]
+# no_std rhai engine, re-exported via `beet::exports::rhai` for embedded
+# consumers (no serde). Std scripting goes through `scripting` instead.
+rhai = ["action","beet_action/rhai_no_std"]
 scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
