@@ -59,8 +59,9 @@ async fn blog_post_in_shell() {
 
 #[beet::test]
 async fn blog_post_title_from_frontmatter() {
-	// the per-page `<title>` comes from the post's frontmatter via `RouteContext`
-	// -> `ArticleMeta` -> the shell's `Head`, not the package default.
+	// the per-page `<title>` comes from the post's frontmatter via `ArticleMeta`
+	// (queried off the `RequestContext` route entity) -> the shell's `Head`, not
+	// the package default.
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get("blog/post-1"))
@@ -70,7 +71,7 @@ async fn blog_post_title_from_frontmatter() {
 
 #[beet::test]
 async fn sidebar_marks_active_route() {
-	// the sidebar reads the current path from `RouteContext`, marking the active
+	// the sidebar reads the current path from `RequestContext`, marking the active
 	// leaf with `aria-current="page"`.
 	site_world()
 		.spawn(beet_site_router())

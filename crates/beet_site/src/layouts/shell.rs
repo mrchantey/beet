@@ -7,18 +7,22 @@ use beet::prelude::*;
 /// around the route content (the default `<slot/>`, transcluded in place by the
 /// [`DocumentShell`] middleware). The library [`Head`] carries the web-only
 /// stylesheet/color-scheme/preflight/favicon, with its title/description sourced
-/// from the matched route's [`RouteContext`] (markdown frontmatter, falling back
-/// to [`PackageConfig`]). The `<head>` is non-visual, so the same shell renders
-/// in the terminal.
+/// from the matched route's [`ArticleMeta`] (markdown frontmatter, queried off
+/// the [`RequestContext`] route entity, falling back to [`PackageConfig`]). The
+/// `<head>` is non-visual, so the same shell renders in the terminal.
 #[scene(system)]
 pub fn BeetDocumentShell(
-	cx: &RouteContext,
+	cx: &RequestContext,
+	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
 ) -> impl Scene {
-	let meta = cx.article_meta();
-	let title = meta.title.clone().unwrap_or_else(|| pkg.title.clone());
-	let description =
-		meta.description.clone().unwrap_or_else(|| pkg.description.clone());
+	let meta = metas.get(cx.route()).ok();
+	let title = meta
+		.and_then(|meta| meta.title.clone())
+		.unwrap_or_else(|| pkg.title.clone());
+	let description = meta
+		.and_then(|meta| meta.description.clone())
+		.unwrap_or_else(|| pkg.description.clone());
 	rsx! {
 		<html lang="en">
 			<Head title=title description=description>

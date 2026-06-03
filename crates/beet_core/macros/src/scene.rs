@@ -194,16 +194,16 @@ fn is_prop_param(pt: &syn::PatType) -> bool {
 }
 
 /// Whether a parameter is the render-context channel: a shared reference to a
-/// type named `RouteContext` (`cx: &RouteContext`). The macro wires an ancestor
-/// lookup for it rather than treating it as a `SystemParam`.
-fn is_route_context_param(pt: &syn::PatType) -> bool {
+/// type named `RequestContext` (`cx: &RequestContext`). The macro wires a
+/// [`RenderQuery`] lookup for it rather than treating it as a `SystemParam`.
+fn is_request_context_param(pt: &syn::PatType) -> bool {
 	let syn::Type::Reference(reference) = pt.ty.as_ref() else {
 		return false;
 	};
 	matches!(
 		reference.elem.as_ref(),
 		syn::Type::Path(tp)
-			if tp.path.segments.last().is_some_and(|seg| seg.ident == "RouteContext")
+			if tp.path.segments.last().is_some_and(|seg| seg.ident == "RequestContext")
 	)
 }
 
@@ -534,7 +534,7 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	let mut sys_types: Vec<TokenStream> = Vec::new();
 	let mut sys_pats: Vec<syn::Ident> = Vec::new();
-	// the author's `cx: &RouteContext` binding, if any
+	// the author's `cx: &RequestContext` binding, if any
 	let mut cx_binding: Option<syn::Ident> = None;
 	for arg in &item.sig.inputs {
 		let pt = typed_arg(arg)?;
@@ -544,9 +544,9 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 				synbail!(pt, "`#[prop(all)]` is not supported with `#[scene(system)]`");
 			}
 			props.push(prop);
-		} else if is_route_context_param(pt) {
+		} else if is_request_context_param(pt) {
 			if cx_binding.is_some() {
-				synbail!(pt, "only one `&RouteContext` parameter is supported");
+				synbail!(pt, "only one `&RequestContext` parameter is supported");
 			}
 			cx_binding = Some(param_ident(pt)?);
 			// fetched via an injected `RenderQuery` ancestor lookup
@@ -579,7 +579,7 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	);
 
 	let unwraps = required_unwraps(&props);
-	// when a `cx: &RouteContext` param is present the entity being built is
+	// when a `cx: &RequestContext` param is present the entity being built is
 	// looked up via the injected `RenderQuery`; a missing context surfaces an
 	// `ErrorScene` through the build channel (same path as a missing prop). The
 	// body must then be type-erased so both arms unify as `Box<dyn Scene>`.
@@ -907,10 +907,10 @@ mod test {
 
 	#[test]
 	fn system_render_context_param() {
-		// `cx: &RouteContext` injects a `RenderQuery` system param, threads the
+		// `cx: &RequestContext` injects a `RenderQuery` system param, threads the
 		// built entity, fetches the context, and errors via `ErrorScene` if absent.
 		let result = parse_str(quote!(system), syn::parse_quote! {
-			fn Nav(cx: &RouteContext, trees: Query<&RouteTree>) -> impl Scene { todo!() }
+			fn Nav(cx: &RequestContext, trees: Query<&RouteTree>) -> impl Scene { todo!() }
 		});
 		assert!(result.contains("RenderQuery"));
 		assert!(result.contains("__render_query . get_context (_entity)"));

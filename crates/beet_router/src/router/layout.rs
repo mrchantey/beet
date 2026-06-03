@@ -50,11 +50,11 @@ where
 	let (parts, next) = &cx.input;
 	// resolve the inner content render root, then wrap it
 	let content = next.call(parts.clone()).await?;
-	// the request path feeds the render context (active nav, etc.)
-	let path = parts.path().join("/");
+	// the request parts feed the render context (active nav, per-route meta, etc.)
+	let parts = parts.clone();
 	next.world()
 		.clone()
-		.with(move |world: &mut World| wrap_content::<C>(world, &path, content))
+		.with(move |world: &mut World| wrap_content::<C>(world, parts, content))
 		.await
 }
 
@@ -69,7 +69,7 @@ where
 /// route survives request after request.
 fn wrap_content<C: WithChildren>(
 	world: &mut World,
-	path: &str,
+	parts: RequestParts,
 	content: Entity,
 ) -> Result<Entity> {
 	// the inner render root names the entity to render and its ephemerals
@@ -88,20 +88,18 @@ fn wrap_content<C: WithChildren>(
 		(rendered, despawn)
 	};
 
-	// the request-scoped route context, read by the shell's scene systems: the
-	// current path plus the matched route's metadata (parsed from frontmatter
-	// onto the content entity). Installed as a resource for the synchronous
-	// shell build, then removed.
-	let article_meta =
-		world.entity(rendered).get::<ArticleMeta>().cloned().unwrap_or_default();
-	world.insert_resource(RouteContext::new(path, article_meta));
+	// the request-scoped render context, read by the shell's scene systems: the
+	// request parts plus the rendered content entity, off which widgets query
+	// any per-route components (eg `ArticleMeta` parsed from frontmatter).
+	// Installed as a resource for the synchronous shell build, then removed.
+	world.insert_resource(RequestContext::new(parts, rendered));
 
 	// the content is transcluded by reference: the shell places this prop, which
 	// resolves to a transparent entity pointing at the existing content.
 	let content_prop = SceneProp::new(template_value(RenderRef::new(rendered)));
 	let layout =
 		world.spawn_scene(C::scene(C::with_children(content_prop)))?.id();
-	world.remove_resource::<RouteContext>();
+	world.remove_resource::<RequestContext>();
 
 	// despawn the shell subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];
@@ -116,7 +114,6 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-	use beet_ui::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 

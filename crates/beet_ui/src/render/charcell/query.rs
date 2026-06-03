@@ -130,7 +130,9 @@ impl CharcellTree<'_, '_> {
 		let mut stack = vec![self.resolve(root)];
 		while let Some(entity) = stack.pop() {
 			result.push(entity);
-			stack.extend(self.children(entity).collect::<Vec<_>>().into_iter().rev());
+			stack.extend(
+				self.children(entity).collect::<Vec<_>>().into_iter().rev(),
+			);
 		}
 		result
 	}
