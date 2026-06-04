@@ -61,11 +61,11 @@ pub impl<T: Debug> Vec<T> {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn xpect_any_panics() { vec![false, false].xpect_any(|v| *v == true); }
-	#[test]
+	#[crate::test]
 	fn xpect_any() { vec![false, true].xpect_any(|v| *v == true); }
-	#[test]
+	#[crate::test]
 	fn xpect_empty() { Vec::<()>::default().xpect_empty(); }
 }

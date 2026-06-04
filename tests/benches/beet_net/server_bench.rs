@@ -1,10 +1,10 @@
-//! Server benchmark example.
+//! Server benchmark.
 //!
 //! Measures roundtrip latency for HTTP requests to a minimal server.
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example server_bench --features server_app
+//! cargo bench --bench server_bench --features server_app
 //! ```
 use beet::prelude::*;
 
@@ -17,7 +17,7 @@ async fn main_async() {
 			.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {
 				commands
 					.entity(ev.event_target())
-					.insert(Response::ok_body("hello world", "text/plain"));
+					.insert(Response::ok_body("hello world", MimeType::Text));
 			})
 			.run();
 	});

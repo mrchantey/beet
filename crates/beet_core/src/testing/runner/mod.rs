@@ -6,12 +6,16 @@
 mod exit_on_suite_outcome;
 mod insert_tests;
 mod register_test;
+mod test_desc;
+pub use test_desc::*;
+mod runner_args;
 mod suite_outcome;
 mod test_outcome;
 mod test_plugin;
 pub use exit_on_suite_outcome::*;
 pub use insert_tests::*;
 pub use register_test::*;
+pub use runner_args::*;
 pub use suite_outcome::*;
 pub use test_outcome::*;
 pub use test_plugin::*;

@@ -8,7 +8,7 @@ use uuid::Uuid;
 ///
 /// This struct provides a safe way to create temporary directories that are
 /// guaranteed to be cleaned up when they go out of scope. The directory name
-/// is generated using a UUID v4 to ensure uniqueness and avoid collisions.
+/// is generated using a UUID v7 to ensure uniqueness and avoid collisions.
 ///
 /// This type is not [`Clone`] as it removes the underlying directory on drop.
 ///
@@ -45,7 +45,7 @@ impl TempDir {
 	/// Creates a new temporary directory in the system's temporary directory.
 	///
 	/// The directory is created with a unique name in the format `beet_tmp_<uuid>`,
-	/// where `<uuid>` is a randomly generated UUID v4. The directory will be
+	/// where `<uuid>` is a randomly generated UUID v7. The directory will be
 	/// automatically deleted when the `TempDir` instance is dropped.
 	///
 	/// # Example
@@ -57,15 +57,25 @@ impl TempDir {
 	/// ```
 	pub fn new() -> FsResult<Self> {
 		let temp_dir = std::env::temp_dir();
-		let dir_name = format!("beet_tmp_{}", Uuid::new_v4().to_string());
+		let dir_name = format!("beet_tmp_{}", Uuid::now_v7().to_string());
 		let dir_path = temp_dir.join(dir_name);
+		Self::new_with_path(dir_path)
+	}
+
+	/// Create a new temporary directory in `target/tmp`, relative to the workspace root.
+	/// The `CARGO_TARGET_DIR` env var is not used.
+	pub fn new_ws() -> FsResult<Self> {
+		let workspace_root = fs_ext::workspace_root();
+		let dir_name =
+			format!("target/tmp/beet_tmp_{}", Uuid::now_v7().to_string());
+		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
 
 	/// Creates a new temporary directory relative to the workspace root.
 	///
 	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp_<uuid>`,
-	/// where `<uuid>` is a randomly generated UUID v4. This is useful for keeping
+	/// where `<uuid>` is a randomly generated UUID v7. This is useful for keeping
 	/// temporary files within the project structure.
 	///
 	/// # Example
@@ -78,7 +88,7 @@ impl TempDir {
 	pub fn new_workspace() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
 		let dir_name =
-			format!("target/tmp/beet_tmp_{}", Uuid::new_v4().to_string());
+			format!("target/tmp/beet_tmp_{}", Uuid::now_v7().to_string());
 		let dir_path = workspace_root.join(dir_name);
 		Self::new_with_path(dir_path)
 	}
@@ -126,7 +136,7 @@ impl Drop for TempDir {
 mod tests {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_new_creates_and_cleans_up() {
 		let dir_path;
 		{
@@ -143,7 +153,7 @@ mod tests {
 		dir_path.exists().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_workspace_relative_creates_and_cleans_up() {
 		let dir_path;
 		{
@@ -165,7 +175,7 @@ mod tests {
 		dir_path.exists().xpect_false();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_unique_names() {
 		// Create multiple temp directories and verify they have unique names
 		let temp1 =
@@ -176,7 +186,7 @@ mod tests {
 		temp1.path().clone().xpect_not_eq(temp2.path().clone());
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tempdir_keep_prevents_cleanup() {
 		let dir_path;
 		{

@@ -1,7 +1,7 @@
 use crate::prelude::OnSpawn;
 use beet_core_macros::BundleEffect;
 use bevy::ecs::relationship::Relationship;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 /// Add to a temporary entity spawned as a child of another entity.
 /// When spawned, each item in the iterator will be added as a child
@@ -76,7 +76,7 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let mut world = World::new();
 		let entity = world

@@ -4,7 +4,7 @@
 //! It loads assets and uses string replacement to create dynamic html pages.
 //! Assets are loaded on each request so can be modified without restarting the server.
 //!
-//! For a full routing example see the `http_router` example which uses `beet_router`.
+//! For a full routing example see the `router` example which uses `beet_router`.
 //!
 //! ## Running the Example
 //!
@@ -31,7 +31,7 @@ fn main() {
 			commands.spawn((
 				HttpServer::default(),
 				Count::default(),
-				handler_exchange(router),
+				Action::<Request, Response>::new_system(router),
 			));
 		})
 		.run();
@@ -41,23 +41,30 @@ fn main() {
 struct Count(u32);
 
 /// A simple router implementation that matches the request path
-fn router(entity: EntityWorldMut, request: Request) -> Response {
+fn router(
+	In(cx): In<ActionContext<Request>>,
+	mut counts: Query<&mut Count>,
+) -> Result<Response> {
+	let entity = cx.caller.id();
+	let request = cx.input;
 	println!("{}: {}", request.method(), request.path_string());
 
-	let route = match request.path_string().as_str() {
-		"/" => home,
-		"/planting-trees" => planting_trees,
-		_ => not_found,
-	};
-	route(entity, request)
+	match request.path_string().as_str() {
+		"/" => {
+			let mut count = counts.get_mut(entity).unwrap();
+			count.0 += 1;
+			home(count.0)
+		}
+		"/planting-trees" => planting_trees(),
+		_ => not_found(&request),
+	}
+	.xok()
 }
 
 
 
 /// Home page.
-fn home(mut entity: EntityWorldMut, _: Request) -> Response {
-	let mut count = entity.get_mut::<Count>().unwrap();
-	count.0 += 1;
+fn home(visitor_number: u32) -> Response {
 	Response::ok_body(
 		render(&format!(
 			r#"
@@ -67,14 +74,14 @@ fn home(mut entity: EntityWorldMut, _: Request) -> Response {
 <p>Greetings visitor {}</p>
 <p>Visit a link or check out a <a href="/foobar">broken link</a>
 "#,
-			count.0
+			visitor_number
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
 /// Planting trees page.
-fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
+fn planting_trees() -> Response {
 	Response::ok_body(
 		render(
 			r#"
@@ -82,22 +89,22 @@ fn planting_trees(_: EntityWorldMut, _: Request) -> Response {
 <p>Do it, just do it. Dont ask questions. Go and buy a native tree and plant it somewhere.</p>
 "#,
 		),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
 /// 404 handler
-fn not_found(_: EntityWorldMut, request: Request) -> Response {
+fn not_found(request: &Request) -> Response {
 	let path = request.path_string();
 	Response::from_status_body(
-		StatusCode::NotFound,
+		StatusCode::NOT_FOUND,
 		render(&format!(
 			r#"
 <h1>Not Found</h1>
 <p>The path at <a href="{path}">{path}</a> could not be found.</p>
 "#,
 		)),
-		"text/html",
+		MimeType::Html,
 	)
 }
 
@@ -119,9 +126,9 @@ fn render(main_content: &str) -> String {
 
 	read_to_string("examples/assets/layouts/default-layout.html")
 		.unwrap()
-		.replace("{{ head }}", &head())
-		.replace("{{ nav }}", &nav())
-		.replace("{{ main }}", &main_content)
+		.replace(r#"<slot name="head" />"#, &head())
+		.replace(r#"<slot name="nav" />"#, &nav())
+		.replace(r#"<slot name="main" />"#, &main_content)
 }
 
 /// Generates the `<head>` content for pages.

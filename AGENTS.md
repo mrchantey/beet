@@ -5,11 +5,15 @@ You are the coding agent for the beet project. You should assume a personality o
 
 Beet is a pre-release (no current users) rust framework built on the bevy game engine, aligned with user-modifiable software like smalltalk and hypercard.
 
+## Workflow
+- when provided a plan or list of work to do, just do it! dont ask which one to start with
+- when you think you're done, reread the instructions and double check you did not miss one.
+
 ## Context
 
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
-- This is a rapidly changing, pre `0.1.0` project, we do not care about backward compatibility, instead prioritizing refactors and cleaning up dead or experimental code.
-- You have a tendancy to perform massive searches when already provided ample context, only search when nessecary
+- This is a rapidly changing, pre-release project, we do not care about backward compatibility, instead prioritizing clean refactors and cleaning up dead or experimental code.
+- Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
 - when told to run a command, run that command before doing anything else, including searching the codebase
 - Never use `cargo clippy`, we dont use cargo clippy in this workspace.
 - Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything
@@ -18,22 +22,41 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Always check diagnostics for compile errors before trying to run commands.
 - We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
 
+## Memory
+
+Never use `.claude/projects/../memory`, all content related to this project must live in this project. The only place you are permitted to persist memory is in `./agent/memory`.
+
 ## Conventions
 
+- A rust module should read like a good book: public high level structs at the top and implementation details below
+- Its perfectly acceptable for functions longer than ~20 lines to have brief comments describing each step
+- Never consider backward-compatibility. when asked to change something, remove the old implementation
+- all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required
 - Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
+- We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
 - DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - we never mark #[deprecated] because we have no users, instead replace existing machinery
+- prefer method chaining over if statements, but dont use `for_each`. ie  this is correct`for child in children.iter().filter(query.contains}`
 - Fix any spelling mistakes you come across in code or docs.
 - Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
 - Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
 - Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster non-crypto etc, so only use others if theres a good reason for it.
-- Always use `bevyhow!{}`, `bevybail!{}` instead of `thiserror` unless a result consumer needs to access the error type
+- Always use `bevyhow!{}`, `bevybail!{}` unless a result consumer needs to access the error type, in which case use `thiserror` which is now no_std. 
+- prefer SmolStr for string types that are likely to be small
+- It is almost never nessecary to wrap other errors, ie `.map_err(|e| bevyhow!("{e}"))?`, as BevyError blanket implements `From<E> where E: Error`, just use a `?`.
 - Never use single letter variable names (except for `i` in loops) instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`
+	- FooContext: `cx`
 	- Entities: `entity`
 - In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type. Prefer `.xok(foo)` instead of `Ok(foo)`
+- avoid nested functions and always use method chainining where possible:
+	- Bad: `foo(bar(bazz))`
+	- Good: `bar(bazz).xmap(foo)`
+- Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
+- when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
+- never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature
 
 ## Documentation
 - Quality over quantity, documentation should always be as short and concise as possible.
@@ -52,7 +75,9 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 
 ## Testing
 
+
 - We use the custom `beet_core::testing` test runner and matchers in all crates.
+- All tests must use the beet core test attribute ie `#[beet_core::test]`
 - wasm tests: beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
 - for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
 - unit tests belong at the bottom of the file, the need for integration tests is rare
@@ -66,7 +91,10 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 - Beet uses method chaining matchers instead of `assert!`:
 	- `some().long().chain().xpect_true();`
 	- `some().long().chain().xpect_close(0.300001);`
+	- `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar");`
 - Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
+- scene tests: get a world from `scene_ext::test_world()` (the minimal scene plugin set), insert any required resources, then `world.spawn_scene(rsx!{ <div/> }).unwrap()`
+- by default only test files are logged, use `--log-cases` to see individual cases, and 
 
 ## Debugging
 - The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
@@ -77,3 +105,21 @@ Beet is a pre-release (no current users) rust framework built on the bevy game e
 	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
 	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.
 - when a bug is found in actual usage of a feature, like in examples or `beet_site`, it is not enough to just fix the bug. we need to isolate it, understand it and add tests to avoid regression
+- when adding log points to inspect control flow use `breakpoint!()` which will print the span of the breakpoint
+
+
+## Bevy Cheatsheet
+
+- Observers can accept closures that accept their enviromnent, but systems cannot. Instead use input parameters: `fn my_system(foo: In<Foo>,...){}`;
+- when spawning entities prefer to use world.spawn((ParentComponent,children![(ChildComponent,..)])) instead of calling spawn again for the child with ChildOf(), unless the child entity needs to be tracked for the test.
+- Traversal. traversing entity hierarchies can quickly become a mess. for anything remotely complex just formalize it with a SystemParam, see `card_query.rs` for a good example of this. Avoid traversing using world directly, instead run a system, ie `world.run_system_once(|ancestors:Query<&ChildOf>| ... let root = ancestors.root(entity))`
+- often a world.with_state::<MyQuery>(|my_query|{}) is more ergonomic than world.run_system_once(|my_query:MyQuery|{..});
+- Prefer Populated over Query which will skip system running if that query is empty, if its an 'any of these queries' pattern, use my_system.run_if(|a,b|!a.is_empty() || !b.is_empty()..)
+
+## UI Cheatsheet (`beet_ui`)
+
+- Widgets are function components: `#[scene] fn Button(..) -> impl Scene`, used as capitalized tags `<Button label="Save"/>`. Reach for a [`SystemParam`] with `#[scene(system)]` when build needs world access (eg `Res<PackageConfig>`, `StyleQuery`).
+- Classes, never strings: emit semantic classes with the `Classes` block attribute `<div {Classes::new([classes::CARD_FILLED])}/>`, not `class="card-filled"`. Constants live in `beet_ui::prelude::classes` and are the contract between widgets and the rule set; add a new constant rather than a stringly typed class.
+- Styling: `<Stylesheet/>` bakes the active rule set into a `<style>`, `<Preflight/>` is the base reset, `<ColorSchemeScript/>` seeds `.light-scheme`/`.dark-scheme`. Drop these in `<head>`; never hand-assemble a `<style>{css}</style>` string.
+- Optional attributes: for `Option` props use `{optional_attr("name", name)}` so the attribute is omitted when `None` (an empty `name=""` is wrong). Use `{attr(key, value)}` for a dynamically-built always-present attribute. Both accumulate alongside literal attributes.
+- Interpolation: share one value across many tags by reference, `<title>{&title}</title>` — this lowers to `Value::new(&title)` (a cheap clone at build) without moving the local or peppering `.clone()`.

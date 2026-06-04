@@ -1,41 +1,49 @@
-#![cfg_attr(rustfmt, rustfmt_skip)]
-#![allow(unused)]
+//! The beet website binary.
+//!
+//! With the `codegen` feature it runs the route codegen pass and exits.
+//! Otherwise it boots the site router behind a server: an [`HttpServer`] by
+//! default, or a [`CliServer`] (with the `cli` feature, or when no `web` target
+//! is enabled) that renders a single route to stdout (HTML or ANSI per
+//! `--accept`) and exits.
 
-use beet::prelude::*;
-use beet_site::prelude::*;
+#[cfg(feature = "codegen")]
+fn main() -> beet::prelude::Result { beet_site::run_codegen() }
 
+#[cfg(all(not(feature = "codegen"), feature = "render"))]
 fn main() {
+	use beet::prelude::*;
+	use beet_site::prelude::*;
+
 	App::new()
-		.add_plugins((
-			#[cfg(feature = "launch")]
-			launch_plugin,
-			#[cfg(feature = "server")]
-			server_plugin,
-			#[cfg(feature = "client")]
-			client_plugin,
-			BeetPlugins,
-		))
-		.insert_resource(PackageConfig{
-			title:"Beet".to_string(),
+		.add_plugins(server_plugin)
+		.insert_resource(PackageConfig {
+			title: "Beet".to_string(),
 			..pkg_config!()
 		})
-		.add_systems(Startup,|config:Res<PackageConfig>|{
-			config.xprint("config");
+		.add_systems(Startup, |mut commands: Commands| {
+			commands.spawn((site_server(), beet_site_router()));
 		})
 		.run();
 }
 
-#[cfg(feature = "client")]
-fn client_plugin(app: &mut App) {
-	app
-		.register_type::<ClientIslandRoot<beet_design::templates::BucketList>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_text_field_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_bucket_list_bucket_id_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_select_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_button_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<beet_design::mockups::_templates_form_mockup::Inner>>()
-		.register_type::<ClientIslandRoot<ClientCounter>>()
-		.register_type::<ClientIslandRoot<ServerCounter>>()
-		.register_type::<ClientIslandRoot<ImageGenerator>>()
-	/* */;
+/// Boots an HTTP server, the default web target.
+#[cfg(all(not(feature = "codegen"), feature = "web", not(feature = "cli")))]
+fn site_server() -> impl beet::prelude::Bundle {
+	beet::prelude::HttpServer::default()
+}
+
+/// Renders a single route to stdout and exits. Selected by the `cli` feature, or
+/// whenever no `web` target is present (eg `--no-default-features --features
+/// terminal`).
+#[cfg(all(
+	not(feature = "codegen"),
+	any(feature = "cli", not(feature = "web"))
+))]
+fn site_server() -> impl beet::prelude::Bundle { beet::prelude::CliServer }
+
+#[cfg(not(any(feature = "codegen", feature = "render")))]
+fn main() {
+	panic!(
+		"enable a render target (`web`/`terminal`) or the `codegen` feature"
+	);
 }

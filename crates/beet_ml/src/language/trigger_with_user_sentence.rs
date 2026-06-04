@@ -1,71 +1,69 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
-
-
-
-/// When [`OnUserMessage`] is triggered, run the [`OnRunAction`],
-/// setting the [`OnUserMessage`] as the [`Sentence`].
+/// When a [`UserMessage`] is triggered, copy its text onto this entity's
+/// [`Sentence`] and call the entity's [`Action`].
 ///
-/// ## Warning
-/// This requires the [`LanguagePlugin`] to be registered, and
-/// that only registers the default payload, others must register
-/// [`run_with_user_sentence`] manually.
-#[derive(Debug, Component)]
+/// Wires a terminal-style chat input to a behavior tree: as the user types
+/// commands, each one drives a fresh call of the attached action with the
+/// new prompt available to any [`Sentence`]-based action below it (eg
+/// [`SentenceSteerTarget`](crate::prelude::SentenceSteerTarget)).
+///
+/// The [`Sentence`] is required so the prompt slot always exists.
+#[derive(Debug, Default, Component)]
 #[require(Sentence)]
-pub struct TriggerWithUserSentence<P = GetOutcome> {
-	/// The action to trigger.
-	pub payload: P,
-}
+pub struct TriggerWithUserSentence;
 
-impl Default for TriggerWithUserSentence {
-	fn default() -> Self { Self { payload: default() } }
-}
-
-impl<P> TriggerWithUserSentence<P> {
-	/// Create a new [`RunWithUserSentence`] with the given [`OnRunAction`].
-	pub fn new(payload: P) -> Self { Self { payload } }
-}
-
-pub fn trigger_with_user_sentence<P: EntityTargetEvent + Clone>(
+/// Observer system: writes [`UserMessage`] text into each matching
+/// [`Sentence`] and queues an [`Action<(), Outcome>`] call.
+pub fn trigger_with_user_sentence(
 	ev: On<UserMessage>,
 	mut commands: Commands,
-	mut query: Query<(Entity, &TriggerWithUserSentence<P>, &mut Sentence)>,
+	mut query: Query<(Entity, &mut Sentence), With<TriggerWithUserSentence>>,
 ) {
-	for (action, run_with_user_sentence, mut sentence) in query.iter_mut() {
-		sentence.0 = (**ev).clone().into();
+	for (action, mut sentence) in query.iter_mut() {
+		sentence.0 = ev.event().0.clone().into();
 		commands
 			.entity(action)
-			.trigger_target(run_with_user_sentence.payload.clone());
+			.call::<(), Outcome>((), OutHandler::default());
 	}
 }
-
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
-	#[test]
-	fn works() {
-		let mut app = App::new();
-		app.add_plugins(ControlFlowPlugin::default())
-			.add_observer(trigger_with_user_sentence::<GetOutcome>);
-		let world = app.world_mut();
-		let on_run = observer_ext::observe_triggers::<GetOutcome>(world);
+	#[beet_core::test]
+	async fn writes_sentence_and_calls() {
+		let mut world = AsyncPlugin::world();
+		world.commands().add_observer(trigger_with_user_sentence);
+		world.flush();
 
+		let store = Store::<u32>::default();
+		let counter = store.clone();
 		let entity = world
-			.spawn((TriggerWithUserSentence::default(), EndWith(Outcome::Pass)))
+			.spawn((
+				TriggerWithUserSentence,
+				Action::<(), Outcome>::new_pure(move |_| {
+					counter.set(counter.get() + 1);
+					Ok(Outcome::PASS)
+				}),
+			))
 			.id();
 		world.flush();
 
-		world.flush_trigger(UserMessage::new("pizza"));
+		world.commands().trigger(UserMessage::new("pizza"));
+		world.flush();
 
-		on_run.len().xpect_eq(1);
 		world
 			.get::<Sentence>(entity)
-			.xpect_eq(Some(&Sentence::new("pizza")));
+			.unwrap()
+			.0
+			.as_ref()
+			.xpect_eq("pizza");
+		store.get().xpect_eq(1);
 	}
 }

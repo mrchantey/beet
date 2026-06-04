@@ -1,13 +1,12 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use bevy::prelude::Interval;
-use std::f32::consts::FRAC_PI_2;
-use std::ops::Range;
+use core::f32::consts::FRAC_PI_2;
+use core::ops::Range;
 
-/// Updates the curve of [`PlayProceduralAnimation`] with a random direction curve
-/// whenever an [`OnRun`] trigger is received.
-#[action(set_curve_on_run)]
+/// Regenerates the curve of [`PlayProceduralAnimation`] with a random
+/// direction whenever the action begins [`Running`].
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(PlayProceduralAnimation)]
@@ -39,17 +38,20 @@ impl Default for SetCurveOnRun {
 	}
 }
 
-impl SetCurveOnRun {}
-
-fn set_curve_on_run(
-	ev: On<GetOutcome>,
+/// Observer that rebuilds the [`PlayProceduralAnimation`] curve each time
+/// the action enters the [`Running`] state.
+pub(crate) fn set_curve_on_run(
+	ev: On<Add, Running<Outcome>>,
 	transforms: AgentQuery<&Transform>,
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
 ) -> Result {
-	let (action, mut anim) = query.get_mut(ev.target())?;
+	let target = ev.event().event_target();
+	let Ok((action, mut anim)) = query.get_mut(target) else {
+		return Ok(());
+	};
 
-	let transform = transforms.get(ev.target())?;
+	let transform = transforms.get(target)?;
 
 	anim.curve = match action {
 		SetCurveOnRun::EaseRangeDir2 { func, range } => {
@@ -58,7 +60,10 @@ fn set_curve_on_run(
 
 			let angle =
 				range.start + (range.end - range.start) * rng.random::<f32>();
-			let end = Dir2::new_unchecked(Vec2::new(angle.cos(), angle.sin()));
+			let end = Dir2::new_unchecked(Vec2::new(
+				ops::cos(angle),
+				ops::sin(angle),
+			));
 
 			EasingCurve::new(start, end, *func).into()
 		}
@@ -71,19 +76,13 @@ fn set_curve_on_run(
 
 			let from = EasingCurve::new(start, *target, *func);
 			let pause =
-				FunctionCurve::new(Interval::new(0., *pause).unwrap(), |_| {
-					*target
-				});
+				FunctionCurve::new(Interval::new(0., *pause)?, |_| *target);
 			let to = EasingCurve::new(*target, start, *func);
 
-			from.chain(pause)
-				.unwrap()
-				.chain(to)
-				.unwrap()
-				.reparametrize_linear(Interval::UNIT)
-				.unwrap()
-				.resample_auto(32)
-				.unwrap()
+			from.chain(pause)?
+				.chain(to)?
+				.reparametrize_linear(Interval::UNIT)?
+				.resample_auto(32)?
 				.into()
 		}
 	};

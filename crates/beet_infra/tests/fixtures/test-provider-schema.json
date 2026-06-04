@@ -1,0 +1,228 @@
+{
+   "provider_schemas" : {
+      "test_provider" : {
+         "provider" : {
+            "version" : 0,
+            "block" : {
+               "attributes" : {
+                  "base_url" : {
+                     "type" : "string",
+                     "description" : "The url.",
+                     "optional" : true
+                  },
+                  "max_wait_seconds" : {
+                     "type" : "number",
+                     "description" : "maximum seconds to wait when rate limit is hit. We use exponential backoffs when backoff is enabled.",
+                     "optional" : true
+                  },
+                  "api_token" : {
+                     "type" : "string",
+                     "description" : "API Token",
+                     "required" : true
+                  },
+                  "min_wait_seconds" : {
+                     "description" : "minimum seconds to wait when rate limit is hit. We use exponential backoffs when backoff is enabled.",
+                     "type" : "number",
+                     "optional" : true
+                  },
+                  "parallelism" : {
+                     "description" : "Number of concurrent requests to make within a resource where bulk operations are not possible.",
+                     "type" : "number",
+                     "optional" : true
+                  },
+                  "org_name" : {
+                     "required" : true,
+                     "type" : "string",
+                     "description" : "The organization to manage."
+                  },
+                  "backoff" : {
+                     "optional" : true,
+                     "description" : "Use exponential back off strategy for rate limits.",
+                     "type" : "bool"
+                  },
+                  "max_retries" : {
+                     "optional" : true,
+                     "type" : "number",
+                     "description" : "maximum number of retries to attempt before erroring out."
+                  }
+               }
+            }
+         },
+         "data_source_schemas" : {
+            "test_data_source_a" : {
+               "version" : 0,
+               "block" : {
+                  "attributes" : {
+                     "id" : {
+                        "type" : "string",
+                        "optional" : true,
+                        "computed" : true
+                     },
+                     "users" : {
+                        "description" : "Users associated with the group. This can also be done per user.",
+                        "type" : [
+                           "set",
+                           "string"
+                        ],
+                        "computed" : true
+                     },
+                     "name" : {
+                        "required" : true,
+                        "type" : "string"
+                     },
+                     "description" : {
+                        "computed" : true,
+                        "type" : "string"
+                     }
+                  },
+                  "block_types" : {
+                     "datasource_a_type" : {
+                        "block" : {
+                           "attributes" : {
+                              "filter_value" : {
+                                 "optional" : true,
+                                 "description" : "Filter value to use",
+                                 "type" : "string"
+                              },
+                              "type" : {
+                                 "optional" : true,
+                                 "type" : "string"
+                              },
+                              "values" : {
+                                 "type" : [
+                                    "list",
+                                    "string"
+                                 ],
+                                 "optional" : true
+                              },
+                              "filter_type" : {
+                                 "optional" : true,
+                                 "description" : "Type of group attribute filter",
+                                 "type" : "string"
+                              },
+                              "namespace" : {
+                                 "optional" : true,
+                                 "type" : "string"
+                              },
+                              "name" : {
+                                 "type" : "string",
+                                 "required" : true
+                              }
+                           }
+                        },
+                        "nesting_mode" : "list"
+                     }
+                  }
+               }
+            },
+            "test_data_source_b" : {
+               "block" : {
+                  "attributes" : {
+                     "type" : {
+                        "required" : true,
+                        "type" : "string",
+                        "description" : "Policy type"
+                     },
+                     "id" : {
+                        "type" : "string",
+                        "computed" : true,
+                        "optional" : true
+                     },
+                     "name" : {
+                        "required" : true,
+                        "type" : "string",
+                        "description" : "name of policy"
+                     }
+                  }
+               },
+               "version" : 0
+            }
+         },
+         "resource_schemas" : {
+            "test_resource_a" : {
+               "version" : 0,
+               "block" : {
+                  "attributes" : {
+                     "client_whitelist" : {
+                        "required" : true,
+                        "type" : [
+                           "set",
+                           "string"
+                        ],
+                        "description" : "Use [\"ALL_CLIENTS\"] when unsure."
+                     },
+                     "status" : {
+                        "optional" : true,
+                        "type" : "string"
+                     },
+                     "name" : {
+                        "required" : true,
+                        "type" : "string"
+                     },
+                     "type" : {
+                        "optional" : true,
+                        "type" : "string",
+                        "description" : "Auth server policy type, unlikely this will be anything other then the default"
+                     },
+                     "id" : {
+                        "type" : "string",
+                        "optional" : true,
+                        "computed" : true
+                     },
+                     "priority" : {
+                        "required" : true,
+                        "type" : "number",
+                        "description" : "Priority of the auth server policy"
+                     },
+                     "description" : {
+                        "required" : true,
+                        "type" : "string"
+                     }
+                  }
+               }
+            },
+            "test_resource_b" : {
+               "version" : 0,
+               "block" : {
+                  "attributes" : {
+                     "description" : {
+                        "type" : "string",
+                        "description" : "Policy Description",
+                        "optional" : true
+                     },
+                     "priority" : {
+                        "optional" : true,
+                        "type" : "number",
+                        "description" : "Policy Priority, this attribute can be set to a valid priority. To avoid endless diff situation we error if an invalid priority is provided. API defaults it to the last/lowest if not there."
+                     },
+                     "name" : {
+                        "type" : "string",
+                        "description" : "Policy Name",
+                        "required" : true
+                     },
+                     "groups_included" : {
+                        "description" : "List of Group IDs to Include",
+                        "type" : [
+                           "set",
+                           "string"
+                        ],
+                        "optional" : true
+                     },
+                     "status" : {
+                        "optional" : true,
+                        "description" : "Policy Status: ACTIVE or INACTIVE.",
+                        "type" : "string"
+                     },
+                     "id" : {
+                        "computed" : true,
+                        "optional" : true,
+                        "type" : "string"
+                     }
+                  }
+               }
+            }
+         }
+      }
+   },
+   "format_version" : "0.1"
+}

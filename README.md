@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a"<a href="https://bevy.org">"Bevy App"</a>", and all structure and behavior is written in Entity Component System architecture.
+Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a <a href="https://bevy.org">Bevy App</a>, and all structure and behavior is written in Entity Component System architecture.
 
 > 🚧 Mind your step! 🚧
 >
@@ -82,7 +82,7 @@ Crates for building and deploying web apps. These crates are very experimental a
 fn Counter(initial: i32) -> impl Bundle {
   let (get, set) = signal(initial);
 
-  rsx! {
+  rsx!{
     <button onclick=move |_| set(get() + 1)>
       Cookie Count: {get}
     </button>
@@ -93,13 +93,8 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                                          | Status | Description                                         |
 | -------------------------------------------------------------- | ------ | --------------------------------------------------- |
-| [`beet_dom`](crates/beet_dom/Cargo.toml)                       | 🐉      | Utilities for dom rendering and interaction         |
-| [`beet_parse`](crates/beet_parse/Cargo.toml)                   | 🐉      | Parsers for various text and token formats          |
-| [`beet_rsx`](crates/beet_rsx/Cargo.toml)                       | 🐉      | An Astro inspired templating system built with bevy |
-| [`beet_rsx_combinator`](crates/beet_rsx_combinator/Cargo.toml) | 🐉      | JSX-like parser combinator for Rust                 |
 | [`beet_router`](crates/beet_router/Cargo.toml)                 | 🐉      | Transport agnostic routing for bevy applications                     |
 | [`beet_build`](crates/beet_build/Cargo.toml)                   | 🐉      | Codegen and compilation tooling for beet            |
-| [`beet_design`](crates/beet_design/Cargo.toml)                 | 🐉      | Design system and components for beet rsx           |
 | [`beet-cli`](crates/beet-cli/Cargo.toml)                       | 🐉      | Tools for building and deploying beet apps          |
 | [`beet_site`](crates/beet_site/Cargo.toml)                     | 🐉      | The beet website, built with beet                   |
 
@@ -108,10 +103,8 @@ fn Counter(initial: i32) -> impl Bundle {
 
 | Crate                                              | Status | Description                                      |
 | -------------------------------------------------- | ------ | ------------------------------------------------ |
-| [`beet_clanker`](crates/beet_clanker/Cargo.toml)       | 🐉      | Structured context and tool calling for llms  |
+| [`beet_actor`](crates/beet_actor/Cargo.toml)       | 🐉      | Actor types and systems  |
 | [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
-| [`emby`](crates/emby/Cargo.toml)                   | 🐉      | the beetmash ambassador                          |
-
 
 ## Bevy Versions
 

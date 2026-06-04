@@ -1,45 +1,86 @@
 //! CLI-based server for running beet applications from the command line.
 //!
 //! This module provides [`CliServer`], which accepts command-line arguments
-//! as a request and logs the response to stdout. Useful for CLI tools and
+//! as a request and logs the response to stdout. Useful for CLI actions and
 //! scripting.
+//!
+//! ## Accept Header
+//!
+//! Use `--accept` to specify preferred response media types:
+//! ```sh
+//! cargo run --example router -- --accept=text/html
+//! cargo run --example router -- --accept=text/html,text/plain
+//! ```
+//! When omitted the default preference is `ansi-term, text, markdown, json`.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A 'server' that accepts the cli arguments and environment variables as a request,
+/// A server that accepts CLI arguments and environment variables as a request,
 /// logging the response body to stdout.
-#[derive(Default, Component)]
+///
+/// Supports `--accept=<media types>` to override the default content negotiation,
+/// for example `--accept=text/html,text/plain`.
+#[derive(Default, Component, Reflect)]
+#[reflect(Component)]
 #[component(on_add=on_add)]
 pub struct CliServer;
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
-	let entity = cx.entity;
-	world.commands().queue(move |world: &mut World| -> Result {
-		world.entity_mut(entity).run_async_local(
-			async move |entity| -> Result {
-				let req = Request::from_cli_args(CliArgs::parse_env())?;
-				let res = entity.exchange(req).await;
-				let (parts, mut body) = res.into_parts();
-
-				// stream body to stdout
-				while let Some(chunk) = body.next().await? {
-					let chunk_str = String::from_utf8_lossy(&chunk);
-					cross_log_noline!("{}", chunk_str);
-				}
-				let exit = match parts.status_to_exit_code() {
-					Ok(()) => AppExit::Success,
-					Err(code) => {
-						error!("Command failed\nStatus code: {code}");
-						AppExit::Error(code)
-					}
-				};
-				entity.world().write_message(exit);
-				Ok(())
-			},
-		);
-		Ok(())
-	});
+	world.commands().entity(cx.entity).queue_async(run_and_exit);
 }
+
+async fn run_and_exit(entity: AsyncEntity) -> Result {
+	// short-circuit when the entity has already been despawned, ie
+	// [`WorldSerdeStore::save_bundle`] briefly spawns a [`CliServer`]
+	// just to serialize it.
+	if !entity.is_alive().await {
+		return Ok(());
+	}
+	let args = CliArgs::parse_env();
+
+	let accept = args
+		.params
+		.get("accept")
+		.map(|item| MediaType::from_accepts(item))
+		.unwrap_or_else(|| {
+			vec![
+				MediaType::AnsiTerm,
+				MediaType::Text,
+				MediaType::Markdown,
+				MediaType::Json,
+			]
+		});
+
+	let req =
+		Request::from_cli_args(args).with_header::<header::Accept>(accept);
+
+	let res = entity.exchange(req).await;
+	let (parts, body) = res.into_parts();
+
+	let exit = match parts.status_to_exit_code() {
+		Ok(()) => AppExit::Success,
+		Err(code) => {
+			error!("Command failed\nStatus code: {code}");
+			AppExit::Error(code)
+		}
+	};
+
+	stream_body_to_stdout(body).await?;
+
+	entity.world().write_message(exit).await;
+	Ok(())
+}
+
+/// Streams a [`Response`] body to stdout chunk-by-chunk, returning
+/// the response parts for exit-code inspection.
+pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
+	while let Some(chunk) = body.next().await? {
+		let chunk_str = String::from_utf8_lossy(&chunk);
+		cross_log_noline!("{}", chunk_str);
+	}
+	Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -50,35 +91,31 @@ mod tests {
 	async fn cli_server_works() {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin))
-			.spawn_then((
+			.spawn((
 				CliServer,
-				handler_exchange(|_, _| StatusCode::ImATeapot.into()),
+				exchange_handler(|_| StatusCode::IM_A_TEAPOT.into_response()),
 			))
 			.run_async()
 			.await
 			.xpect_eq(AppExit::Error(1.try_into().unwrap()));
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_request_simple_path() {
 		Request::from_cli_str("foo bar")
-			.unwrap()
 			.path_string()
 			.xpect_eq("/foo/bar");
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_request_with_query() {
-		let req = Request::from_cli_str("api users --id=123").unwrap();
+		let req = Request::from_cli_str("api users --id=123");
 		req.path_string().xpect_eq("/api/users");
 		req.get_param("id").xpect_some();
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn into_request_empty() {
-		Request::from_cli_str("")
-			.unwrap()
-			.path_string()
-			.xpect_eq("/");
+		Request::from_cli_str("").path_string().xpect_eq("/");
 	}
 }

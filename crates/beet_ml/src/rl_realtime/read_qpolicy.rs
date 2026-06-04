@@ -1,44 +1,53 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use std::marker::PhantomData;
 
-
-/// Read the QPolicy from the asset and update the agent's action.
-/// ## Tags
-/// - [MutateAgent](ActionTag::MutateAgent)
-#[action(read_q_policy::<P>)]
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+/// One-shot action: looks up the agent's current state in a [`QPolicy`]
+/// asset and writes the greedy action onto the agent before returning
+/// [`Outcome::PASS`].
+///
+/// The [`Handle`] lives on the action component itself rather than via a
+/// wrapper, since the action struct already derives [`Component`].
+#[derive(Component, Reflect)]
 #[reflect(Component)]
+#[require(Action<(), Outcome> = Action::<(), Outcome>::new_system(read_q_policy::<P>))]
 pub struct ReadQPolicy<P: QPolicy + Asset> {
+	/// Asset handle for the policy to read.
+	pub handle: Handle<P>,
 	#[reflect(ignore)]
 	phantom: PhantomData<P>,
 }
 
-impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
-	fn default() -> Self {
+impl<P: QPolicy + Asset> ReadQPolicy<P> {
+	/// Create a [`ReadQPolicy`] from an asset handle.
+	pub fn new(handle: Handle<P>) -> Self {
 		Self {
+			handle,
 			phantom: PhantomData,
 		}
 	}
 }
 
-fn read_q_policy<P: QPolicy + Asset>(
-	ev: On<GetOutcome>,
-	mut commands: Commands,
+/// Backing system: reads the policy and writes the greedy action onto
+/// the agent. Resolves [`Outcome::PASS`] on success.
+fn read_q_policy<P>(
+	cx: In<ActionContext>,
 	assets: Res<Assets<P>>,
 	mut agents: AgentQuery<(&P::State, &mut P::Action)>,
-	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
-) -> Result {
-	let action_entity = ev.target();
-	let (_, handle) = query.get(action_entity)?;
-	let policy = assets.get(&**handle).ok_or_else(|| {
+	query: Query<&ReadQPolicy<P>>,
+) -> Result<Outcome>
+where
+	P: QPolicy + Asset,
+	P::State: Component,
+	P::Action: Component,
+{
+	let action_entity = cx.caller.id();
+	let read = query.get(action_entity)?;
+	let policy = assets.get(&read.handle).ok_or_else(|| {
 		bevyhow!("QPolicy asset not loaded for entity {:?}", action_entity)
 	})?;
-
 	let (state, mut action) = agents.get_mut(action_entity)?;
-
 	*action = policy.greedy_policy(state).0;
-	commands.entity(action_entity).trigger_target(Outcome::Pass);
-	Ok(())
+	Ok(Outcome::PASS)
 }

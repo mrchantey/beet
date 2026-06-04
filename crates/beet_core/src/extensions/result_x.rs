@@ -1,7 +1,5 @@
+use crate::prelude::*;
 use extend::ext;
-
-#[cfg(target_arch = "wasm32")]
-use crate::web_utils::js_runtime;
 
 /// Extension trait for [`Result`] providing additional conversion methods.
 #[ext]
@@ -39,8 +37,9 @@ pub impl<T, E> Result<T, E> {
 
 
 /// Extension trait for [`Result`] with displayable errors.
+#[cfg(feature = "std")]
 #[ext(name=ResultExtDisplay)]
-pub impl<T, E: std::fmt::Display> Result<T, E> {
+pub impl<T, E: core::fmt::Display> Result<T, E> {
 	/// Unwraps the value or exits the process with a formatted error message.
 	///
 	/// Unlike [`unwrap`](Result::unwrap), this prints a user-friendly error
@@ -62,13 +61,15 @@ pub impl<T, E: std::fmt::Display> Result<T, E> {
 			Ok(value) => value,
 			Err(err) => {
 				eprintln!("{err}");
-				#[cfg(not(target_arch = "wasm32"))]
-				std::process::exit(1);
-				#[cfg(target_arch = "wasm32")]
-				{
-					js_runtime::exit(1);
-					#[allow(clippy::empty_loop)]
-					loop {}
+				cfg_if! {
+					if #[cfg(target_arch = "wasm32")] {
+						use crate::web_utils::js_runtime;
+						js_runtime::exit(1);
+						#[allow(clippy::empty_loop)]
+						loop {}
+					} else {
+						std::process::exit(1);
+					}
 				}
 			}
 		}

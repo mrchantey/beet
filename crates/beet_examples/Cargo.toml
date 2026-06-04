@@ -16,21 +16,18 @@ categories.workspace = true
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default",
-	"beet_flow/bevy_default",
-	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
+	"beet_ml?/bevy_default",
 	# "beet_bevy/bevy_default",
 ]
+# enable beet_ml integration; pulled in by the top-level `ml` feature
 ml = ["dep:beet_ml"]
 
 [dependencies]
-beet_flow = { workspace = true }
-beet_ml = { workspace = true, features = [
-	"candle",
-	"spatial",
-], optional = true }
-beet_spatial = { workspace = true, features = [] }
-beet_core = { workspace = true, features = ["rand"] }
+beet_action = { workspace = true, features = ["std", "reflect"] }
+beet_ml = { workspace = true, features = ["spatial"], optional = true }
+beet_spatial = { workspace = true, features = ["std"] }
+beet_core = { workspace = true, features = ["std", "rand","bevy_keyboard"] }
 
 
 serde.workspace = true
@@ -38,15 +35,12 @@ serde_json.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"
-log.workspace = true
-pretty_env_logger.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
-log.workspace = true
-pretty_env_logger.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+
+[lib]
+harness = false
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

@@ -8,93 +8,173 @@ readme = "README.md"
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-keywords = ["router", "request", "buckets", "key-value-store"]
+keywords = ["router", "request", "blob-store", "key-value-store", "action"]
 categories.workspace = true
 publish = true
 
 [features]
-default = ["serde", "fs", "http", "nightly"]
+default = ["std", "serde", "fs", "http"]
 nightly = []
-# for conditional compilation in hooks
-client = []
+# Enables the std-only surface: transports, stores, servers, sockets, the
+# action/exchange integration, and the std-backed async primitives. The no_std
+# core (the `types/` wire types) builds with this off.
+std = [
+	"beet_core/std",
+	# the std surface (stores, transports, actions) is serde-saturated
+	"serde",
+	# the action/exchange integration; no_std-capable, so split out as its own
+	# feature `std` simply turns on (see `action` below).
+	"action",
+	"beet_action/std",
+	"beet_action/reflect",
+	"dep:async-channel",
+	"dep:async-lock",
+	"dep:futures",
+	"dep:send_wrapper",
+	"dep:uuid",
+	"uuid/v7",
+	"uuid/std",
+	# url-encoded query-param extractors: serde_urlencoded forces serde/std,
+	# so it (and the extractors that use it) are std-only.
+	"dep:serde_urlencoded",
+]
+# The action/exchange integration: `Action<Request, Response>`, `exchange_handler`
+# and `AsyncEntity::exchange`. no_std-capable — it only needs `beet_action` (not
+# the full std surface), so a bare-metal consumer can route incoming requests
+# through the async action layer. `std` enables it automatically.
+action = ["dep:beet_action"]
+json = ["serde",	"dep:serde_json", "beet_core/json", "beet_action?/json"]
+postcard = ["serde", "dep:postcard", "beet_core/postcard"]
+# for conditional compilation in hooks; pulls reactive store effects that use
+# the std-only spawn_local runtime driver
+client = ["std"]
 server = [
+"std",
+"dep:async-io",
+"dep:futures-lite",
+]
+# The std impl of the trait-only `UdpEndpoint`/`UdpSocket` seam over `async-io`.
+# The trait itself (in `src/udp/udp_socket.rs`) is no_std and always compiled;
+# only this std backend needs a runtime, so it (and the std mDNS browser driver)
+# ride this feature. esp supplies its own `edge-nal`-backed impl downstream.
+udp = [
+"std",
+"dep:async-io",
+"dep:futures-lite",
+]
+# The agnostic mDNS service browser: pure `PTR`/`SRV`/`TXT`/`A` wire helpers plus
+# the bytes-and-world ECS engine (a `UdpPacket` event, a `DiscoveredServices`
+# resource, `ServiceDiscovered`/`ServiceRemoved` events). The parse + engine are
+# no_std (esp consumes them); the std socket driver `run_mdns_browser` needs the
+# `udp` backend, so enable `mdns` + `udp` together to browse on a host.
+mdns = []
+hyper = [
+"server",
 "dep:hyper",
 "dep:http-body-util",
-"dep:async-io",
 "dep:async-executor",
 "dep:pin-project"
 ]
-lambda = ["rustls-tls", "dep:lambda_http","dep:tokio"]
-fs = ["beet_core/fs","dep:async-process"]
+lambda = ["std", "rustls-tls", "dep:lambda_http", "beet_core/tokio"]
+fs = ["std", "beet_core/fs","dep:async-process"]
 tokens = ["beet_core/tokens"]
-flow = ["dep:beet_flow"]
-aws = [
+aws_sdk = [
+	"std",
 	"serde",
 	"dep:crc-fast",
 	"dep:aws-sdk-s3",
 	"dep:serde_dynamo",
 	"dep:aws-sdk-dynamodb",
 	"dep:aws-config",
+	"beet_core/tokio",
 ]
 serde = [
 	"dep:serde",
-	"dep:serde_json",
 	"dep:base64",
-	"dep:serde_urlencoded",
-	"uuid/serde",
+	"uuid?/serde",
 	"beet_core/serde",
+	"beet_action?/serde",
 ]
-reqwest = ["dep:reqwest","dep:tokio"]
-ureq = ["dep:ureq", "dep:blocking"]
-tungstenite = ["dep:async-tungstenite","dep:async-lock","dep:async-io","dep:blocking"]
+http = [
+	"std",
+	"dep:http",
+	"dep:eventsource-stream",
+]
+reqwest = ["std", "http", "dep:reqwest", "beet_core/tokio"]
+ureq = ["std", "http", "dep:ureq", "dep:blocking"]
+tungstenite = ["std", "dep:async-tungstenite","dep:async-io","dep:blocking",	"dep:url"]
+webdriver = ["tungstenite", "ureq", "json", "dep:async-process"]
 native-tls = [
 	"reqwest?/default",
 	"ureq?/native-tls",
 	"async-tungstenite?/async-native-tls",
-	"dep:async-native-tls"
+	"dep:async-native-tls",
+	"russh?/ring",
 ]
 rustls-tls = [
 	"reqwest?/rustls-tls",
 	"ureq?/rustls",
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
-	"aws-sdk-s3?/rustls"
+	"aws-sdk-s3?/rustls",
+	"dep:futures-rustls",
+	"dep:webpki-roots",
+	"russh?/aws-lc-rs",
+]
+world_serde = ["beet_core/world_serde", "beet_action?/world_serde"]
+bevy_multithreaded = ["beet_core/bevy_multithreaded"]
+bevy_reflect_documentation = ["bevy/reflect_documentation"]
+russh_server = [
+	"std",
+	"dep:russh",
+	"russh?/ring",
+	"beet_core/tokio",
+	"dep:tokio",
+	"dep:rand",
+	"server",
+]
+russh_client = [
+	"std",
+	"dep:russh",
+	"russh?/ring",
+	"beet_core/tokio",
+	"dep:tokio",
 ]
 
-
 [dependencies]
-beet_core = {workspace = true,features=["exchange","http"]}
-beet_flow = { workspace = true, optional = true }
+beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
+# only needed for the std action/exchange integration
+beet_action = { workspace = true, default-features = false, optional = true }
 
 bevy.workspace = true
 
 # utils
-async-channel.workspace = true
 extend.workspace = true
+heck.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-heck.workspace = true
-tracing-subscriber.workspace = true
-send_wrapper.workspace = true
-uuid = {workspace = true, features = ["v7"]}
-async-lock.workspace = true
+uuid = { workspace = true, optional = true }
+send_wrapper = { workspace = true, optional = true }
+bytes.workspace = true
+# async (no_std core stream trait)
+futures-core.workspace = true
+# async (std-only)
+async-channel = { workspace = true, optional = true }
+async-lock = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
 
 # serde
 base64 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
+postcard = { workspace = true, optional = true }
 
 
 # http
 http = { workspace = true, optional = true }
-http-body-util.workspace = true
-bytes.workspace = true
-url = "2"
-html-escape = "0.2"
-eventsource-stream = "0.2.3"
-# async
-futures.workspace = true
+eventsource-stream = { version = "0.2.3", optional = true }
+url = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }
@@ -107,14 +187,23 @@ async-tungstenite = { version = "0.31", optional = true, default-features = fals
 "async-std-runtime",
 "futures-03-sink"
 ] }
-async-lock = {workspace = true, optional = true }
 blocking = { version = "1.6", optional = true }
 async-native-tls = { version = "0.5", optional = true }
+# ureq uses ring instead of aws-lc-rs so we must too
+futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }
+webpki-roots = { version = "1", optional = true }
 
 #💡 server
+async-io = { workspace = true, optional = true }
+futures-lite = { workspace = true, optional = true }
+#💡 ssh
+russh = { version = "0.60", optional = true }
+tokio = { workspace = true, optional = true, features = ["net", "sync", "io-util", "time", "macros"] }
+# version must match russh's rand_core requirement for PrivateKey::random
+rand = { version = "0.10", optional = true }
+#💡 hyper server
 hyper = { version = "1.7", features = ["server","http1"], optional = true }
 http-body-util = {workspace = true, optional = true }
-async-io = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 pin-project = { workspace = true, optional = true }
 
@@ -141,15 +230,7 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 	"rt-tokio",
 	"behavior-version-latest",
 ] }
-# actually a dev-dep but we need optional
-# strictly for testing only
-tokio = { version = "1", features = [
-	"macros",
-	# "sync",
-	# "rt",
-	# "rt-multi-thread",
-	# "time",
-], optional=true }
+
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -169,6 +250,17 @@ web-sys = { workspace = true, features = [
 	'BinaryType',
 	# localstorage
 	"Storage",
+	"StorageEvent",
+	# indexeddb
+	"IdbFactory",
+	"IdbOpenDbRequest",
+	"IdbDatabase",
+	"IdbObjectStore",
+	"IdbRequest",
+	"IdbTransaction",
+	"IdbTransactionMode",
+	"Event",
+	"EventTarget",
 	# sockets
 	"WebSocket",
 	"ErrorEvent",
@@ -179,7 +271,15 @@ web-sys = { workspace = true, features = [
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+beet_net = {path = ".", features = ["world_serde"] }
 # beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rcgen = { version = "0.14" }
+futures-lite = { workspace = true }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+
+[lib]
+harness = false

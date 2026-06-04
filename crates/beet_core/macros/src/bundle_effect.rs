@@ -44,9 +44,9 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 	   unsafe fn get_components(ptr: bevy::ptr::MovingPtr<'_, Self>, _func: &mut impl FnMut(bevy::ecs::component::StorageType, bevy::ptr::OwningPtr<'_>)){
 				 // Forget the pointer so that the value is available in `apply_effect`.
-					std::mem::forget(ptr);
+					core::mem::forget(ptr);
 				}
-		 unsafe fn apply_effect(mut ptr: bevy::ptr::MovingPtr<'_, std::mem::MaybeUninit<Self>>, entity: &mut EntityWorldMut){
+		 unsafe fn apply_effect(mut ptr: bevy::ptr::MovingPtr<'_, core::mem::MaybeUninit<Self>>, entity: &mut EntityWorldMut){
 				let effect = unsafe { ptr.assume_init() }.read();
 				// let effect = unsafe { &mut *ptr.as_mut_ptr() };
 				#effect_name(effect, entity);
@@ -57,13 +57,13 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			fn component_ids(
 				_components: &mut bevy::ecs::component::ComponentsRegistrator,
 			) -> impl Iterator<Item = bevy::ecs::component::ComponentId> #use_clause {
-				std::iter::empty()
+				core::iter::empty()
 			}
 
 			fn get_component_ids(
 				_components: &bevy::ecs::component::Components,
 			) -> impl Iterator<Item = Option<bevy::ecs::component::ComponentId>> {
-				std::iter::empty()
+				core::iter::empty()
 			}
 
 		}

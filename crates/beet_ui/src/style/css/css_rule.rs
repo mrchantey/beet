@@ -1,0 +1,343 @@
+use crate::prelude::*;
+use crate::style::*;
+use beet_core::prelude::*;
+use bevy::reflect::Typed;
+use std::sync::Arc;
+
+/// A resolved CSS rule: a predicate (selector) paired with a set of
+/// property/value declarations, ready to be serialized to CSS text.
+#[derive(Default, Get, SetWith)]
+pub struct CssRule {
+	selector: Selector,
+	declarations: HashMap<CssKey, CssValue>,
+	/// Optional `@media` gate carried over from the source [`Rule`]; when set,
+	/// serialization wraps this rule in `@media (…) { … }`.
+	media: Option<MediaQuery>,
+}
+
+impl CssRule {
+	/// Build a [`CssRule`] from a [`Rule`] by resolving each token declaration.
+	pub fn from_rule(token_map: &CssTokenMap, rule: &Rule) -> Result<Self> {
+		let selector = rule.selector().clone();
+		let mut declarations = HashMap::default();
+		for (key, value) in rule.declarations().iter() {
+			let css_rule = Self::resolve(token_map, key, value)?;
+			declarations.extend(css_rule.into_declarations());
+		}
+		Self::default()
+			.with_selector(selector)
+			.with_declarations(declarations)
+			.with_media(*rule.media())
+			.xok()
+	}
+
+	/// Consumes this rule, returning its declarations map.
+	pub fn into_declarations(self) -> HashMap<CssKey, CssValue> {
+		self.declarations
+	}
+
+	pub fn merge_any(&mut self, other: CssRule) {
+		self.selector = self.selector.clone().merge_any(other.selector);
+		self.declarations.extend(other.declarations);
+	}
+
+	/// Resolves a single token entry to a [`CssRule`].
+	///
+	/// Tokens are looked up by key in the [`CssTokenMap`].
+	pub fn resolve(
+		css_map: &CssTokenMap,
+		key: &TokenKey,
+		value: &TokenValue,
+	) -> Result<Self> {
+		css_map.get(key)?.as_css_rule(value)
+	}
+
+	/// Builds a rule from a token key and a typed value, using the key as the
+	/// CSS variable name and appending property suffixes when needed.
+	pub fn from_key_value<
+		V: 'static
+			+ Send
+			+ Sync
+			+ DeserializeOwned
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		key: &TokenKey,
+		value: &TokenValue,
+	) -> Result<Self> {
+		let key = CssVariable::from_token_key(&key);
+		let values = CssValue::from_token_value::<V>(value)?;
+		let suffixes = V::suffixes();
+		let declarations = if suffixes.len() <= 1 {
+			// no need for suffix for zero or one props
+			key.xinto::<CssKey>().xvec()
+		} else {
+			if suffixes.len() != values.len() {
+				bevybail!(
+					"Property count mismatch:\nkeys: {suffixes:#?}\nvalues:{values:#?}",
+				);
+			}
+			suffixes
+				.into_iter()
+				.map(|suffix| {
+					key.with_suffix(suffix.to_string()).xinto::<CssKey>()
+				})
+				.collect::<Vec<_>>()
+		};
+		Self::default()
+			.with_declarations(declarations.into_iter().zip(values).collect())
+			.xok()
+	}
+
+	/// Builds a rule with explicit CSS property keys and a typed value.
+	#[cfg(feature = "serde")]
+	pub fn from_props_value<
+		V: 'static
+			+ Send
+			+ Sync
+			+ DeserializeOwned
+			+ Typed
+			+ TypedTokenKey
+			+ AsCssValues,
+	>(
+		keys: Vec<CssKey>,
+		value: &TokenValue,
+	) -> Result<Self> {
+		let values = CssValue::from_token_value::<V>(value)?;
+		if keys.len() != values.len() {
+			bevybail!(
+				"Property count mismatch:\nkeys: {keys:#?}\nvalues:{values:#?}",
+			);
+		}
+		Self::default()
+			.with_declarations(keys.into_iter().zip(values).collect())
+			.xok()
+	}
+
+	pub fn selector_to_css(&self) -> String {
+		Self::selector_to_css_inner(&self.selector)
+	}
+
+	fn selector_to_css_inner(rule: &Selector) -> String {
+		match rule {
+			Selector::Any => "*".to_string(),
+			Selector::Root => ":root".to_string(),
+			Selector::Entity(_) => todo!(
+				"entities that use this should be assigned a special class, ie entity.to_bits"
+			),
+			Selector::AnyOf(rules) => rules
+				.iter()
+				.map(|rule| Self::selector_to_css_inner(rule))
+				.collect::<Vec<_>>()
+				.join(", "),
+			// concatenated with no separator, ie `.input:focus` or `div.btn`
+			Selector::AllOf(rules) => rules
+				.iter()
+				.map(|rule| Self::selector_to_css_inner(rule))
+				.collect::<Vec<_>>()
+				.join(""),
+			Selector::Tag(tag) => tag.to_string(),
+			Selector::Class(class) => format!(".{}", class),
+			Selector::State(ElementState::Hovered) => ":hover".to_string(),
+			Selector::State(ElementState::Focused) => ":focus".to_string(),
+			Selector::State(ElementState::Pressed) => ":active".to_string(),
+			Selector::State(ElementState::Selected) => {
+				"[aria-selected=\"true\"]".to_string()
+			}
+			Selector::State(ElementState::Dragged) => {
+				"[data-dragging=\"true\"]".to_string()
+			}
+			Selector::State(ElementState::Disabled) => ":disabled".to_string(),
+			Selector::State(ElementState::Custom(val)) => {
+				format!("[data-state-{}]", val)
+			}
+			Selector::Attribute { key, value } => match value {
+				Some(value) => format!("[{}=\"{}\"]", key, value),
+				None => format!("[{}]", key),
+			},
+			Selector::Not(inner) => {
+				format!(":not({})", Self::selector_to_css_inner(inner))
+			}
+		}
+	}
+}
+
+
+/// Converts a token value to a [`CssRule`].
+pub trait AsCssRule {
+	fn as_css_rule(&self, value: &TokenValue) -> Result<CssRule>;
+}
+
+/// Maps token keys to their [`AsCssRule`] resolvers.
+#[derive(Default, Deref, Resource)]
+pub struct CssTokenMap(
+	HashMap<TokenKey, Arc<dyn 'static + Send + Sync + AsCssRule>>,
+);
+
+impl CssTokenMap {
+	/// Registers a CSS resolver keyed on `T`'s type path.
+	pub fn insert<T: 'static + Send + Sync + TypedTokenKey + AsCssRule>(
+		mut self,
+		token: T,
+	) -> Self {
+		self.0.insert(TokenKey::of::<T>(), Arc::new(token));
+		self
+	}
+
+	pub fn get(
+		&self,
+		key: &TokenKey,
+	) -> Result<&(dyn Send + Sync + AsCssRule)> {
+		self.0.get(key).map(|arc| arc.as_ref()).ok_or_else(|| {
+			bevyhow!("No CSS resolver registered for token key:\n{}", key)
+		})
+	}
+
+	pub fn extend(&mut self, other: Self) -> &mut Self {
+		self.0.extend(other.0);
+		self
+	}
+
+	pub fn with_extend(mut self, other: Self) -> Self {
+		self.0.extend(other.0);
+		self
+	}
+}
+
+
+/// Generates a token type that resolves to named CSS properties.
+///
+/// ```rust
+/// # use beet_ui::prelude::*;
+/// # use beet_ui::prelude::style::*;
+/// css_property!(MyOpacity, f32, "opacity");
+/// ```
+#[macro_export]
+macro_rules! css_property {
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+  $($property:literal),+
+ ) => {
+  css_property!(
+	 $(#[$meta])*
+	 $new_ty,
+	 $schema_ty,
+	 Default::default(),
+	 $($property),+
+	);
+ };
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+	$inherited:expr,
+  $($property:literal),+
+ ) => {
+  $crate::token!(
+   $(#[$meta])*
+   $new_ty,
+   $schema_ty,
+   $inherited
+  );
+  impl $crate::prelude::style::AsCssRule for $new_ty {
+   fn as_css_rule(
+    &self,
+    value: &$crate::prelude::TokenValue,
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
+    $crate::prelude::style::CssRule::from_props_value::<$schema_ty>(
+    vec![$($crate::prelude::style::CssKey::static_property($property)),+],
+    value
+   )
+   }
+  }
+ };
+}
+
+
+/// Like [`css_property!`] but also implements [`CanonicalToken`] for the value
+/// type, so a [`Rule`] can set it via [`Rule::with_canonical`] without naming
+/// the property token, eg `Rule::new().with_canonical(Display::None)`.
+///
+/// Use only when the value type maps to exactly one property (eg `Display` →
+/// `display`); a multi-property value like `Color` (`color`, `background-color`,
+/// …) has no canonical token and must use [`css_property!`].
+///
+/// [`CanonicalToken`]: crate::prelude::CanonicalToken
+/// [`Rule::with_canonical`]: crate::prelude::Rule::with_canonical
+#[macro_export]
+macro_rules! canonical_property {
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident,
+  $($rest:tt)+
+ ) => {
+  $crate::css_property!(
+   $(#[$meta])*
+   $new_ty,
+   $schema_ty,
+   $($rest)+
+  );
+  impl $crate::prelude::CanonicalToken for $schema_ty {
+   type Token = $new_ty;
+  }
+ };
+}
+
+
+/// Generates a token type that resolves to a CSS variable declaration.
+///
+/// ```rust
+/// # use beet_ui::prelude::*;
+/// # use beet_ui::prelude::style::*;
+/// css_variable!(MyOpacityVar, f32);
+/// ```
+#[macro_export]
+macro_rules! css_variable {
+ (
+  $(#[$meta:meta])*
+  $new_ty:ident,
+  $schema_ty:ident
+ ) => {
+  $crate::token!(
+   $(#[$meta])*
+   $new_ty,
+   $schema_ty
+  );
+  impl $crate::prelude::style::AsCssRule for $new_ty {
+   fn as_css_rule(
+    &self,
+    value: &$crate::prelude::TokenValue,
+   ) -> ::bevy::prelude::Result<$crate::prelude::style::CssRule> {
+    $crate::prelude::style::CssRule::from_key_value::<$schema_ty>(&$new_ty::token_key(), value)
+   }
+  }
+ };
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	css_property!(
+		#[allow(unused)]
+		Foo,
+		Color,
+		"color"
+	);
+	css_variable!(
+		#[allow(unused)]
+		Bar,
+		Color
+	);
+
+	#[beet_core::test]
+	fn name() {
+		Bar.xinto::<Token>()
+			.key()
+			.to_string()
+			.xpect_eq("io.crates/beet_ui/style/css/css_rule/tests/Bar");
+	}
+}

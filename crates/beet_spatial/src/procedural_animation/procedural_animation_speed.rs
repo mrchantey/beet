@@ -1,6 +1,6 @@
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::RunTimer;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Sometimes we want a fixed duration and others a
 /// consistent speed. This enum allows for both.
@@ -20,8 +20,8 @@ impl Default for ProceduralAnimationSpeed {
 
 impl ProceduralAnimationSpeed {
 	/// Calculate the current `t` value for the procedural animation.
-	/// - For m/s this will use [`Time::elapsed_secs()`] and `total_len_meters`.
-	/// - for `Duration` this will use the [`RunTimer::last_started`]
+	/// - For m/s this uses the [`RunTimer::last_run`] and `total_len_meters`.
+	/// - For [`Duration`] this uses the [`RunTimer::last_run`].
 	pub fn calculate_t(
 		&self,
 		total_len_meters: f32,

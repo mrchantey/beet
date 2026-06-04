@@ -7,19 +7,21 @@ use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
 use send_wrapper::SendWrapper;
-use test::TestDesc;
-use test::TestDescAndFn;
 
 
-/// Inserts the provided tests into the [`World`] by cloning.
+/// Inserts a borrowed libtest slice into the [`World`] by converting each
+/// descriptor into a beet [`TestDescAndFn`].
+///
+/// Only available on the nightly `custom_test_frameworks` path.
 ///
 /// # Panics
 ///
-/// Panics if dynamic tests or benches are passed in, see [`test_ext::clone`].
-pub fn tests_bundle_borrowed(tests: &[&TestDescAndFn]) -> impl Bundle {
+/// Panics if dynamic tests or benches are passed in (they cannot be cloned).
+#[cfg(feature = "custom_test_frameworks")]
+pub fn tests_bundle_borrowed(tests: &[&test::TestDescAndFn]) -> impl Bundle {
 	let tests = tests
 		.iter()
-		.map(|test| test_ext::clone_static(test))
+		.map(|test| TestDescAndFn::from(*test))
 		.collect();
 	tests_bundle(tests)
 }
@@ -37,21 +39,15 @@ fn test_bundle(test: TestDescAndFn) -> impl Bundle {
 	(test_desc_bundle(test.desc), test_fn_bundle(test.testfn))
 }
 
-fn test_fn_bundle(func: test::TestFn) -> impl Bundle {
+fn test_fn_bundle(func: TestFn) -> impl Bundle {
 	match func {
-		test::TestFn::StaticTestFn(func) => {
-			OnSpawn::insert(TestFunc::new(func))
-		}
-		test::TestFn::DynTestFn(fn_once) => {
+		TestFn::StaticTestFn(func) => OnSpawn::insert(TestFunc::new(func)),
+		TestFn::DynTestFn(fn_once) => {
 			OnSpawn::insert(NonSendTestFunc::new(fn_once))
 		}
-		test::TestFn::StaticBenchFn(_) => todo!(),
-		test::TestFn::DynBenchFn(_) => todo!(),
-		test::TestFn::StaticBenchAsTestFn(_) => todo!(),
-		test::TestFn::DynBenchAsTestFn(_) => todo!(),
 	}
 }
-fn test_desc_bundle(desc: test::TestDesc) -> impl Bundle {
+fn test_desc_bundle(desc: TestDesc) -> impl Bundle {
 	(
 		Name::new(desc.name.to_string()),
 		FileSpan::new(
@@ -158,7 +154,7 @@ impl TestFunc {
 
 /// Component wrapping a dynamic test function.
 ///
-/// The [`test::TestFn::DynTestFn`] is [`Send`] but not [`Sync`].
+/// The `DynTestFn` boxed closure is [`Send`] but not [`Sync`].
 /// This type is for running these tests on the main thread.
 #[derive(Component)]
 pub struct NonSendTestFunc(
@@ -182,7 +178,7 @@ impl NonSendTestFunc {
 mod tests {
 	use super::*;
 
-	fn setup() -> Vec<test::TestDescAndFn> {
+	fn setup() -> Vec<TestDescAndFn> {
 		vec![
 			test_ext::new("test1", "crates/crate1/file1.rs", || Ok(())),
 			test_ext::new("test2", "crates/crate1/file1.rs", || Ok(())),
@@ -194,7 +190,7 @@ mod tests {
 		]
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_tree() {
 		let mut world = World::new();
 		let root = world.spawn(tests_bundle(setup())).id();

@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use std::f32::consts::TAU;
+use core::f32::consts::TAU;
 
 
 /// Enum of common curves that can be serialized.
@@ -77,7 +77,7 @@ impl Into<SerdeCurve> for SampleAutoCurve<Vec3> {
 
 fn circle_curve(t: f32) -> Vec3 {
 	let angle = t * TAU;
-	Vec3::new(angle.cos(), angle.sin(), 0.)
+	Vec3::new(ops::cos(angle), ops::sin(angle), 0.)
 }
 
 fn square_curve(t: f32) -> Vec3 {
@@ -99,7 +99,7 @@ mod test {
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
 
-	#[test]
+	#[beet_core::test]
 	fn calculates_length() {
 		SerdeCurve::Circle.total_len().xpect_less_than(TAU);
 		SerdeCurve::Circle.total_len().xpect_greater_than(6.);

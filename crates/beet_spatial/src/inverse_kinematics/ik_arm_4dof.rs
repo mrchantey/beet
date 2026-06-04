@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::f32::consts::PI;
-use std::f32::consts::TAU;
+use core::f32::consts::PI;
+use core::f32::consts::TAU;
 
 /// A type alias for radians as f32.
 pub type Radians = f32;
@@ -75,7 +75,7 @@ impl IkArm4Dof {
 	/// Returns angles for the base, segment1 and segment2 in radians
 	pub fn solve3d(&self, delta_pos: Vec3) -> (f32, f32, f32) {
 		let delta_pos_flat = Vec2::new(delta_pos.x, delta_pos.z);
-		let angle_base = f32::atan2(delta_pos_flat.y, delta_pos_flat.x);
+		let angle_base = ops::atan2(delta_pos_flat.y, delta_pos_flat.x);
 		let hypotenuse = delta_pos_flat.length();
 		let (angle_segment1, angle_segment2) =
 			self.solve2d(Vec2::new(hypotenuse, delta_pos.y));
@@ -93,7 +93,7 @@ impl IkArm4Dof {
 		let reach = self.reach();
 
 		// if the target is not reachable, clamp the target to the maximum reach
-		if target.length_squared() > reach.powi(2) {
+		if target.length_squared() > reach.squared() {
 			target = target.normalize_or_zero() * (reach * 0.999);
 		}
 
@@ -106,19 +106,20 @@ impl IkArm4Dof {
 
 
 		// Calculate angle for segment 2 using the Law of Cosines
-		let cos_angle2 =
-			(target.x.powi(2) + target.y.powi(2) - l1.powi(2) - l2.powi(2))
-				/ (2.0 * l1 * l2);
+		let cos_angle2 = (target.x.squared() + target.y.squared()
+			- l1.squared()
+			- l2.squared())
+			/ (2.0 * l1 * l2);
 		let angle2 = match self.arm_style {
-			IkArmStyle::Overarm => -cos_angle2.acos(),
-			IkArmStyle::Underarm => cos_angle2.acos(),
+			IkArmStyle::Overarm => -ops::acos(cos_angle2),
+			IkArmStyle::Underarm => ops::acos(cos_angle2),
 		}
 		.clamp(self.segment2.min_angle, self.segment2.max_angle);
 
 		// Calculate angle for segment 1 using the Law of Cosines and adjust for target position
-		let k1 = l1 + l2 * angle2.cos();
-		let k2 = l2 * angle2.sin();
-		let angle1 = (target.y.atan2(target.x) - k2.atan2(k1))
+		let k1 = l1 + l2 * ops::cos(angle2);
+		let k2 = l2 * ops::sin(angle2);
+		let angle1 = (ops::atan2(target.y, target.x) - ops::atan2(k2, k1))
 			.clamp(self.segment1.min_angle, self.segment1.max_angle);
 
 		if is_neg {
@@ -138,7 +139,7 @@ mod test {
 	use beet_core::prelude::*;
 	use std::f32::consts::PI;
 
-	#[test]
+	#[beet_core::test]
 	fn test_reachable_target() {
 		let ik_solver = IkArm4Dof::default();
 
@@ -150,7 +151,7 @@ mod test {
 		assert!((angle2).abs() <= PI);
 	}
 
-	#[test]
+	#[beet_core::test]
 	fn test_unreachable_target_too_far() {
 		let ik_solver = IkArm4Dof::default();
 

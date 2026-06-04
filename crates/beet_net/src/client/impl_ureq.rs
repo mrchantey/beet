@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
-use send_wrapper::SendWrapper;
 use std::io::Read;
 
 pub(super) async fn send_ureq(req: Request) -> Result<Response> {
@@ -79,23 +79,20 @@ fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {
 	let should_stream = is_event_stream || is_chunked;
 
 	// Build ResponseParts with headers
-	let parts = {
-		let mut builder = PartsBuilder::new();
-		for (key, value) in res.headers().iter() {
-			if let Ok(value_str) = value.to_str() {
-				builder = builder.header(key.to_string(), value_str);
-			}
+	let mut parts = ResponseParts::new(res.status().into());
+	for (key, value) in res.headers().iter() {
+		if let Ok(value_str) = value.to_str() {
+			parts.headers.set_raw(key.to_string(), value_str);
 		}
-		builder.build_response_parts(res.status().into())
-	};
+	}
 
 	let body = if should_stream {
 		// Create a streaming body for SSE/chunked responses
 		create_streaming_body(res.into_body())
 	} else {
-		// Read the whole body into bytes for regular responses
-		let bytes_vec =
-			res.into_body().read_to_vec().map_err(BevyError::from)?;
+		// `Body::read_to_vec` caps at 10MB; bypass via the unlimited reader.
+		let mut bytes_vec = Vec::new();
+		res.into_body().into_reader().read_to_end(&mut bytes_vec)?;
 		Body::Bytes(Bytes::from(bytes_vec))
 	};
 
@@ -144,5 +141,5 @@ fn create_streaming_body(ureq_body: ureq::Body) -> Body {
 		}
 	});
 
-	Body::Stream(SendWrapper::new(Box::pin(byte_stream)))
+	Body::stream(byte_stream)
 }

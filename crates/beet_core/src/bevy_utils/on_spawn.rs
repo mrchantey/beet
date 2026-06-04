@@ -13,7 +13,7 @@
 
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
-use bevy::ecs::error::ErrorContext;
+use bevy::ecs::component::Mutable;
 use bevy::ecs::relationship::RelatedSpawner;
 use bevy::ecs::relationship::Relationship;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -41,51 +41,51 @@ pub struct OnSpawn(
 	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
 );
 
-/// Trait for allowing bundles and results to be returned from methods.
-pub trait ApplyToEntity<M>: 'static + Send + Sync {
-	/// Applies this value to the entity.
-	fn apply(self, entity: &mut EntityWorldMut);
-}
-
-/// Marker type for bundle implementations of [`ApplyToEntity`].
-pub struct BundleApplyToEntityMarker;
-
-/// Marker type for result implementations of [`ApplyToEntity`].
-pub struct ResultApplyToEntityMarker;
-
-impl<T: Bundle> ApplyToEntity<BundleApplyToEntityMarker> for T {
-	fn apply(self, entity: &mut EntityWorldMut) { entity.insert(self); }
-}
-
-impl<T: Bundle> ApplyToEntity<ResultApplyToEntityMarker> for Result<T> {
-	fn apply(self, entity: &mut EntityWorldMut) {
-		match self {
-			Ok(bundle) => {
-				entity.insert(bundle);
-			}
-			Err(err) => entity.world_scope(|world| {
-				world.default_error_handler()(
-					err.into(),
-					ErrorContext::Command {
-						name: "ApplyToEntity".into(),
-					},
-				);
-			}),
-		}
-	}
-}
 impl OnSpawn {
 	/// Creates a new [`OnSpawn`] effect.
-	pub fn new(
-		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
-	) -> Self {
-		Self(Box::new(func))
+	#[track_caller]
+	pub fn new<F, O>(func: F) -> Self
+	where
+		F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> O,
+		O: IntoResult,
+	{
+		let location = core::panic::Location::caller();
+		Self(Box::new(move |entity| {
+			if let Err(err) = func(entity).into_result() {
+				entity.world_scope(move |world| {
+					world.handle_command_error::<F>(err, location);
+				});
+			}
+		}))
+	}
+
+	/// Merges the given value into the existing component of the same type on spawn,
+	/// or inserts it if no existing component is found.
+	pub fn merge<T: Merge + Component<Mutability = Mutable>>(value: T) -> Self {
+		Self::new(move |entity| {
+			if let Some(mut existing) = entity.get_mut::<T>() {
+				existing.try_merge(value)?;
+			} else {
+				entity.insert(value);
+			}
+			Ok(())
+		})
 	}
 
 	/// Inserts a bundle into the entity on spawn.
 	pub fn insert(bundle: impl Bundle) -> Self {
 		Self::new(move |entity| {
 			entity.insert(bundle);
+		})
+	}
+	/// Inserts a bundle into the entities children on spawn,
+	/// avoiding bevy's duplicate component gotya with children!
+	pub fn insert_child(bundle: impl Bundle) -> Self {
+		Self::new(move |entity| {
+			let id = entity.id();
+			entity.world_scope(move |world| {
+				world.spawn((bundle, ChildOf(id)));
+			});
 		})
 	}
 
@@ -99,19 +99,41 @@ impl OnSpawn {
 	}
 
 	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
 	pub fn run_insert<
-		System: 'static + Send + Sync + IntoSystem<(), Out, M1>,
+		System: 'static + Send + Sync + IntoSystem<In<Entity>, Out, M1>,
 		M1,
-		Out: ApplyToEntity<M2>,
-		M2,
+		Out: IntoResult<B>,
+		B: Bundle,
 	>(
 		system: System,
 	) -> Self {
-		Self::new(move |entity| {
+		Self::new(move |entity| -> Result {
+			let id = entity.id();
+			let bundle = entity
+				.world_scope(move |world| {
+					world.run_system_once_with(system, id)
+				})
+				.map_err(|err| bevyhow!("{}", err))?
+				.into_result()?;
+			entity.insert(bundle);
+			Ok(())
+		})
+	}
+	/// Runs the system and inserts the resulting bundle into the entity on spawn.
+	#[track_caller]
+	pub fn run<S, M>(system: S) -> Self
+	where
+		S: 'static + Send + Sync + IntoSystem<In<Entity>, Result, M>,
+	{
+		Self::new(move |entity| -> Result {
+			let id = entity.id();
 			entity
-				.world_scope(move |world| world.run_system_once(system))
-				.unwrap()
-				.apply(entity);
+				.world_scope(move |world| {
+					world.run_system_once_with::<_, _, Result, _>(system, id)
+				})
+				.map_err(|err| bevyhow!("{}", err))??;
+			Ok(())
 		})
 	}
 
@@ -153,12 +175,13 @@ impl OnSpawn {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function.
+	#[cfg(feature = "std")]
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
 	where
 		Fut: 'static + Send + Sync + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();
@@ -170,12 +193,13 @@ impl OnSpawn {
 	}
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function on the local thread.
+	#[cfg(feature = "std")]
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
 	where
 		Fut: 'static + Future<Output = Out>,
-		Out: 'static + AsyncTaskOut,
+		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
 			let id = entity.id();
@@ -300,10 +324,10 @@ impl OnSpawnDeferred {
 	///
 	/// Panics if the method has already been taken.
 	pub fn take(&mut self) -> Self {
-		Self::new(std::mem::replace(
+		Self::new(core::mem::replace(
 			&mut self.0,
 			Box::new(|_| {
-				panic!("OnSpawwnDeferred: This method has already been taken")
+				panic!("OnSpawnDeferred: This method has already been taken")
 			}),
 		))
 	}
@@ -314,6 +338,12 @@ impl OnSpawnDeferred {
 /// Uses a trait object that implements [`Clone`] to allow the effect to be cloned.
 #[derive(BundleEffect)]
 pub struct OnSpawnClone(pub Box<dyn CloneEntityFunc>);
+
+impl core::fmt::Debug for OnSpawnClone {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_tuple("OnSpawnClone").finish()
+	}
+}
 
 impl OnSpawnClone {
 	/// Creates a new [`OnSpawnClone`] effect.
@@ -355,10 +385,11 @@ where
 
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn dfs() {
 		let mut world = World::new();
 
@@ -378,7 +409,7 @@ mod test {
 
 		numbers.get().xpect_eq(&[1, 2, 3]);
 	}
-	#[test]
+	#[crate::test]
 	fn on_spawn_deferred() {
 		let mut world = World::new();
 
@@ -400,14 +431,12 @@ mod test {
 		numbers.get().xpect_eq(&[] as &[u32]);
 		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
 
-		// why is this?
-		#[cfg(target_arch = "wasm32")]
+		// Flush visits entities in spawn order, so the parent (1, then its
+		// inserted `OnSpawnTyped` 2) resolves before the child (3).
 		numbers.get().xpect_eq(&[1, 2, 3]);
-		#[cfg(not(target_arch = "wasm32"))]
-		numbers.get().xpect_eq(&[3, 1, 2]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn observe() {
 		#[derive(EntityEvent)]
 		struct Foo(Entity);
@@ -419,5 +448,29 @@ mod test {
 			.trigger(Foo);
 
 		store.get().xpect_eq(3);
+	}
+}
+
+/// Trait for merging two values of the same type
+pub trait Merge {
+	/// Returns a new value by merging `self` with `other`.
+	fn with_merge(mut self, other: Self) -> Self
+	where
+		Self: Sized,
+	{
+		self.merge(other);
+		self
+	}
+
+	/// Merges `other` into `self`.
+	fn merge(&mut self, other: Self);
+
+	/// Merges `other` into `self`, returning an error if the values are incompatible.
+	fn try_merge(&mut self, other: Self) -> Result
+	where
+		Self: Sized,
+	{
+		self.merge(other);
+		Ok(())
 	}
 }

@@ -114,17 +114,17 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn err_xpect_contains() { "foobar".xpect_contains("bazz"); }
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn err_xpect_str() { "foobar".xpect_str("bazz"); }
-	#[test]
+	#[crate::test]
 	#[should_panic]
 	fn err_xpect_not_str() { "foobar".xnot().xpect_str("foobar"); }
 
-	#[test]
+	#[crate::test]
 	fn str() {
 		"foobar".xpect_contains("bar");
 		"foobar".xnot().xpect_contains("bazz");

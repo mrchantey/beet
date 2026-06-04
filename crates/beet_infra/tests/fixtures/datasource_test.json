@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "test_data_source_b": [
+        {
+          "test": [
+            {
+              "name": "test_datasource_b",
+              "type": "rdbms",
+              "id": "abc123"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

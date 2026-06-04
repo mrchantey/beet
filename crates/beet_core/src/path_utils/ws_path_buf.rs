@@ -1,7 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use bevy::prelude::*;
-use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -18,7 +17,7 @@ use std::str::FromStr;
 ///
 /// A newtype with several indications:
 /// 1. the path is relative to the workspace root
-/// 2. the path is cleaned using [`path_clean`]
+/// 2. the path is cleaned using [`path_ext::clean`]
 /// 3. on windows backslashes are replaced by forward slashes
 ///    - This is done to ensure exact matches because this type is often used across architectures.
 ///
@@ -31,7 +30,18 @@ use std::str::FromStr;
 ///
 /// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	Component,
+)]
 pub struct WsPathBuf(PathBuf);
 impl std::fmt::Display for WsPathBuf {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,11 +53,7 @@ impl WsPathBuf {
 	/// Create a new [`WsPathBuf`], a common use case is to use `file!()`
 	/// which is already relative to the workspace root.
 	pub fn new(path: impl AsRef<Path>) -> Self {
-		let path = path.as_ref();
-		#[cfg(target_os = "windows")]
-		let path = PathBuf::from(path.to_string_lossy().replace('\\', "/"));
-		let path = path.clean();
-		Self(path)
+		Self(path_ext::clean_path(path))
 	}
 
 	/// Using calls like `std::fs::read_dir` will return paths relative
@@ -70,8 +76,7 @@ impl WsPathBuf {
 	/// Create a new [`WsPathBuf`] from joining this one with
 	/// another [`Path`]
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path).clean();
-		Self::new(path)
+		Self::new(self.0.join(path))
 	}
 
 	/// Returns the parent directory as a new [`WsPathBuf`].
@@ -92,7 +97,7 @@ impl WsPathBuf {
 	/// # Panics
 	/// Panics if the workspace root or cwd cannot be determined.
 	pub fn into_abs(&self) -> AbsPathBuf {
-		let path = fs_ext::workspace_root().join(self).clean();
+		let path = fs_ext::workspace_root().join(self);
 		AbsPathBuf::new(path)
 			.map_err(|err| {
 				format!("Failed to convert WsPathBuf to AbsPathBuf: {err}")
@@ -123,6 +128,9 @@ impl Into<WsPathBuf> for &str {
 impl Into<WsPathBuf> for PathBuf {
 	fn into(self) -> WsPathBuf { WsPathBuf::new(self) }
 }
+impl Into<AbsPathBuf> for WsPathBuf {
+	fn into(self) -> AbsPathBuf { self.into_abs() }
+}
 
 
 #[cfg(test)]
@@ -130,7 +138,7 @@ mod test {
 	use crate::prelude::*;
 	use std::path::PathBuf;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		WsPathBuf::new("Cargo.toml")
 			.as_path()

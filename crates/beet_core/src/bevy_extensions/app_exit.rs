@@ -2,14 +2,17 @@
 
 use crate::prelude::*;
 use bevy::app::AppExit;
+#[cfg(feature = "std")]
 use bevy::ecs::schedule::common_conditions;
 
 /// Plugin that exits the process upon an [`AppExit`] message.
 ///
 /// Uses [`process_ext::exit`] for cross-platform compatibility.
+#[cfg(feature = "std")]
 #[derive(Default)]
 pub struct AppExitPlugin;
 
+#[cfg(feature = "std")]
 impl Plugin for AppExitPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
@@ -19,6 +22,7 @@ impl Plugin for AppExitPlugin {
 	}
 }
 
+#[cfg(feature = "std")]
 fn cross_exit(mut app_ext: MessageReader<AppExit>) {
 	if let Some(exit) = app_ext.read().next() {
 		process_ext::exit(exit.exit_code());

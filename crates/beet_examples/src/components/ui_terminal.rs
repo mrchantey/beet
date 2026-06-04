@@ -13,7 +13,7 @@ pub struct UiTerminalPlugin;
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app
-
+			.add_message::<OnLogMessage>()
 			.add_systems(Update, (parse_text_input,log_on_message))
 			.add_systems(
 				PostUpdate,
@@ -43,7 +43,7 @@ pub struct OutputContainer;
 
 fn font() -> TextFont {
 	TextFont {
-		font_size: 32.,
+		font_size: FontSize::Px(32.),
 		..default()
 	}
 }
@@ -61,7 +61,7 @@ fn log_on_message(
 				(
 					OutputItem,
 					Text::new(&*msg.msg),
-					TextColor(msg.color),
+					TextColor(msg.color.clone()),
 					font(),
 				),
 			);

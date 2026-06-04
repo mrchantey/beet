@@ -2,7 +2,7 @@
 name = "beet_spatial"
 version = { workspace = true }
 edition = { workspace = true }
-description = "Spatial actions built upon beet_flow"
+description = "Spatial actions built upon beet_action"
 documentation = { workspace = true }
 readme = "README.md"
 homepage = { workspace = true }
@@ -12,18 +12,18 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-bevy_default = ["bevy/default","beet_core/bevy_default"]
+default = ["std"]
+std = ["beet_core/std", "beet_action/std"]
+bevy_default = ["bevy/default", "beet_core/bevy_default"]
 
 [dependencies]
-beet_flow.workspace = true
-beet_core = { workspace = true, features = ["rand"] }
+beet_action.workspace = true
+beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rand"] }
 
 bevy.workspace = true
 
 extend.workspace = true
 log.workspace = true
-pretty_env_logger.workspace = true
-serde.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 
@@ -32,3 +32,6 @@ web-sys.workspace = true
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+
+[lib]
+harness = false

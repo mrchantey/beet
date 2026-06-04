@@ -1,0 +1,120 @@
+#![cfg_attr(rustfmt, rustfmt_skip)]
+use crate::prelude::*;
+use crate::style::*;
+use beet_core::prelude::*;
+
+
+
+
+// ── Duration ref tokens ───────────────────────────────────────────────────────
+
+css_variable!(Short1,      Duration);
+css_variable!(Short2,      Duration);
+css_variable!(Short3,      Duration);
+css_variable!(Short4,      Duration);
+css_variable!(Medium1,     Duration);
+css_variable!(Medium2,     Duration);
+css_variable!(Medium3,     Duration);
+css_variable!(Medium4,     Duration);
+css_variable!(Long1,       Duration);
+css_variable!(Long2,       Duration);
+css_variable!(Long3,       Duration);
+css_variable!(Long4,       Duration);
+css_variable!(ExtraLong1,  Duration);
+css_variable!(ExtraLong2,  Duration);
+css_variable!(ExtraLong3,  Duration);
+css_variable!(ExtraLong4,  Duration);
+
+// ── Motion sys tokens ─────────────────────────────────────────────────────────
+
+css_variable!(MotionStandard,            Motion);
+css_variable!(MotionStandardAccelerate,  Motion);
+css_variable!(MotionStandardDecelerate,  Motion);
+css_variable!(MotionEmphasized,          Motion);
+css_variable!(MotionEmphasizedAccelerate,Motion);
+css_variable!(MotionEmphasizedDecelerate,Motion);
+
+
+
+pub fn token_map() -> CssTokenMap {
+	CssTokenMap::default()
+    .insert(MotionProps)
+		.insert(Short1)
+		.insert(Short2)
+		.insert(Short3)
+		.insert(Short4)
+		.insert(Medium1)
+		.insert(Medium2)
+		.insert(Medium3)
+		.insert(Medium4)
+		.insert(Long1)
+		.insert(Long2)
+		.insert(Long3)
+		.insert(Long4)
+		.insert(ExtraLong1)
+		.insert(ExtraLong2)
+		.insert(ExtraLong3)
+		.insert(ExtraLong4)
+		.insert(MotionStandard)
+		.insert(MotionStandardAccelerate)
+		.insert(MotionStandardDecelerate)
+		.insert(MotionEmphasized)
+		.insert(MotionEmphasizedAccelerate)
+		.insert(MotionEmphasizedDecelerate)
+}
+
+
+/// Returns all MD3 duration default values.
+pub fn default_durations() -> Vec<(TokenKey, TokenValue)> {
+	Rule::new()
+		.with_value(Short1, Duration::from_millis(50))
+		.with_value(Short2, Duration::from_millis(100))
+		.with_value(Short3, Duration::from_millis(150))
+		.with_value(Short4, Duration::from_millis(200))
+		.with_value(Medium1, Duration::from_millis(250))
+		.with_value(Medium2, Duration::from_millis(300))
+		.with_value(Medium3, Duration::from_millis(350))
+		.with_value(Medium4, Duration::from_millis(400))
+		.with_value(Long1, Duration::from_millis(450))
+		.with_value(Long2, Duration::from_millis(500))
+		.with_value(Long3, Duration::from_millis(550))
+		.with_value(Long4, Duration::from_millis(600))
+		.with_value(ExtraLong1, Duration::from_millis(700))
+		.with_value(ExtraLong2, Duration::from_millis(800))
+		.with_value(ExtraLong3, Duration::from_millis(900))
+		.with_value(ExtraLong4, Duration::from_millis(1000))
+		.into_iter().collect()
+}
+
+/// Returns all MD3 motion default values.
+///
+/// Each [`Motion`] references a duration token via [`FieldRef`] rather than
+/// embedding the duration directly.
+pub fn default_motions() -> Vec<(TokenKey, TokenValue)> {
+	Rule::new()
+		.with_value(MotionStandard, Motion {
+			ease:     EaseFunction::CubicInOut,
+			duration: Medium2.into(),
+		})
+		.with_value(MotionStandardAccelerate, Motion {
+			ease:     EaseFunction::CubicIn,
+			duration: Short4.into(),
+		})
+		.with_value(MotionStandardDecelerate, Motion {
+			ease:     EaseFunction::CubicOut,
+			duration: Medium1.into(),
+		})
+		.with_value(MotionEmphasized, Motion {
+			ease:     EaseFunction::QuinticInOut,
+			duration: Long2.into(),
+		})
+		.with_value(MotionEmphasizedAccelerate, Motion {
+			ease:     EaseFunction::QuarticIn,
+			duration: Short4.into(),
+		})
+		.with_value(MotionEmphasizedDecelerate, Motion {
+			ease:     EaseFunction::QuarticOut,
+			duration: Medium4.into(),
+		})
+		.into_iter().collect()
+}

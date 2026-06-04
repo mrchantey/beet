@@ -1,11 +1,12 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
-/// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
-/// ## Tags
-/// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateAgent](ActionTag::MutateAgent)
+/// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`].
+///
+/// A long-running action: stays [`Running`] while active, steering the
+/// agent toward its [`SteerTarget`] every frame. Pair with [`EndOnArrive`]
+/// (in a [`Parallel`] or [`Fallback`]) for a terminating sibling.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
@@ -16,7 +17,7 @@ pub struct Seek {
 }
 
 impl Seek {
-	/// Create a new [`Seek`] action with the given [`OnTargetNotFound`] behavior
+	/// Create a new [`Seek`] with the given [`OnTargetNotFound`] behavior
 	pub fn new(on_not_found: OnTargetNotFound) -> Self { Self { on_not_found } }
 }
 
@@ -28,12 +29,12 @@ pub enum OnTargetNotFound {
 	Warn,
 	/// Remove the [`SteerTarget`]
 	Clear,
-	/// Remove the [`SteerTarget`] and emit [`OnRunResult::failure()`]
-	Fail,
-	/// Remove the [`SteerTarget`] and emit [`OnRunResult::success()`]
-	Succeed,
 	/// Do nothing
 	Ignore,
+	/// End the run with [`Outcome::FAIL`]
+	Fail,
+	/// End the run with [`Outcome::PASS`]
+	Succeed,
 }
 
 
@@ -75,17 +76,15 @@ pub(crate) fn seek(
 			(OnTargetNotFound::Clear, Err(_)) => {
 				commands.entity(agent_entity).remove::<SteerTarget>();
 			}
-			(OnTargetNotFound::Fail, Err(_)) => {
-				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_target(Outcome::Fail);
-			}
-			(OnTargetNotFound::Succeed, Err(_)) => {
-				commands.entity(agent_entity).remove::<SteerTarget>();
-				commands.entity(action).trigger_target(Outcome::Pass);
-			}
 			(OnTargetNotFound::Ignore, Err(_)) => {}
 			(OnTargetNotFound::Warn, Err(msg)) => {
 				log::warn!("{}", msg);
+			}
+			(OnTargetNotFound::Fail, Err(_)) => {
+				commands.entity(action).queue(EndRun(Outcome::FAIL));
+			}
+			(OnTargetNotFound::Succeed, Err(_)) => {
+				commands.entity(action).queue(EndRun(Outcome::PASS));
 			}
 		}
 	}
@@ -96,14 +95,13 @@ pub(crate) fn seek(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
-			.init_resource::<Time>();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
 
 		let agent = app
 			.world_mut()
@@ -113,8 +111,8 @@ mod test {
 				SteerBundle::default(),
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 				Seek::default(),
+				Running::<Outcome>::new(OutHandler::default()),
 			))
-			.trigger_target(GetOutcome)
 			.id();
 
 		app.update_with_secs(1);

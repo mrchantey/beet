@@ -1,12 +1,14 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
-/// ## Tags
-/// - [MutateAgent](ActionTag::MutateAgent)
+///
+/// A long-running action: stays [`Running`] while active, searching
+/// for a matching target every frame.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(ContinueRun)]
 pub struct FindSteerTarget {
 	/// The name of the entity to find
 	pub name: String,

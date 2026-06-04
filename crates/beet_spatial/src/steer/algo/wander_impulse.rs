@@ -36,7 +36,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		wander_impulse(
 			&Vec3::default(),

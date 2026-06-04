@@ -1,7 +1,6 @@
 //! Panic and assertion helpers for matchers.
 //! All functions use `#[track_caller]` to capture the correct source location.
 use crate::prelude::*;
-use crate::utils::paint_ext;
 use std::fmt::Debug;
 use std::fmt::Display;
 
@@ -23,8 +22,8 @@ pub fn panic_expected_received_display<T1: Display, T2: Display>(
 	expected: T1,
 	received: T2,
 ) -> ! {
-	let expected = paint_ext::green(expected);
-	let received = paint_ext::red(received);
+	let expected = TermStyle::green().paint(expected);
+	let received = TermStyle::red().paint(received);
 	std::panic::panic_any(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
@@ -36,8 +35,8 @@ pub fn panic_expected_received_debug<T1: Debug, T2: Debug>(
 	expected: T1,
 	received: T2,
 ) -> ! {
-	let expected = paint_ext::green(format!("{:?}", expected));
-	let received = paint_ext::red(format!("{:?}", received));
+	let expected = TermStyle::green().paint(format!("{:?}", expected));
+	let received = TermStyle::red().paint(format!("{:?}", received));
 	std::panic::panic_any(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
@@ -49,8 +48,8 @@ pub fn panic_expected_received_debug_display<T1: Debug, T2: Display>(
 	expected: T1,
 	received: T2,
 ) -> ! {
-	let expected = paint_ext::green(format!("{:?}", expected));
-	let received = paint_ext::red(received);
+	let expected = TermStyle::green().paint(format!("{:?}", expected));
+	let received = TermStyle::red().paint(received);
 	std::panic::panic_any(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));
@@ -62,8 +61,8 @@ pub fn panic_expected_received_display_debug<T1: Display, T2: Debug>(
 	expected: T1,
 	received: T2,
 ) -> ! {
-	let expected = paint_ext::green(expected);
-	let received = paint_ext::red(format!("{:?}", received));
+	let expected = TermStyle::green().paint(expected);
+	let received = TermStyle::red().paint(format!("{:?}", received));
 	std::panic::panic_any(format!(
 		"Expected: {expected}\nReceived: {received}"
 	));

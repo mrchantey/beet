@@ -152,7 +152,7 @@ mod tests {
 	use crate::web_utils::document_ext as doc;
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = doc::document();

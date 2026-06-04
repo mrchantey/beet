@@ -1,12 +1,9 @@
 use super::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
 /// Sets the [`Score`] based on the [`DepthValue`], usually
 /// updated by a sensor.
-/// ## Tags
-/// - [ControlFlow](ActionTag::ControlFlow)
-#[action(depth_sensor_scorer)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct DepthSensorScorer {
@@ -37,26 +34,32 @@ impl DepthSensorScorer {
 			..Default::default()
 		}
 	}
+
+	/// Build a [`ScoreProvider`] that scores by the agent's [`DepthValue`].
+	pub fn provider(self) -> ScoreProvider<()> {
+		ScoreProvider(Action::<(), Score>::new_async(
+			move |cx: ActionContext| {
+				let scorer = self.clone();
+				async move {
+					cx.world()
+						.run_system_cached_with(score_depth, (cx.id(), scorer))
+						.await?
+						.xok()
+				}
+			},
+		))
+	}
 }
 
-fn depth_sensor_scorer(
-	ev: On<GetScore>,
-	mut commands: Commands,
-	query: Query<&DepthSensorScorer>,
-	sensors: AgentQuery<&DepthValue, Changed<DepthValue>>,
-) -> Result {
-	let target = ev.target();
-	let scorer = query.get(target)?;
-	let depth = sensors.get(target)?;
-	let next_score = if let Some(depth) = **depth {
-		if depth < scorer.threshold_dist {
-			scorer.close_score
-		} else {
-			scorer.far_score
-		}
-	} else {
-		scorer.far_score
+fn score_depth(
+	In((action, scorer)): In<(Entity, DepthSensorScorer)>,
+	sensors: AgentQuery<&DepthValue>,
+) -> Score {
+	let Ok(depth) = sensors.get(action) else {
+		return scorer.far_score;
 	};
-	commands.entity(target).trigger_target(next_score);
-	Ok(())
+	match **depth {
+		Some(depth) if depth < scorer.threshold_dist => scorer.close_score,
+		_ => scorer.far_score,
+	}
 }

@@ -87,7 +87,7 @@ mod tests {
 	use crate::web_utils::document_ext as doc;
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn works() {
 		// DOM access smoke-check
 		let _ = doc::document();

@@ -1,9 +1,7 @@
 use super::FsError;
 use super::FsResult;
 use super::fs_ext;
-use super::path_ext;
 use crate::prelude::*;
-use path_clean::PathClean;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -25,7 +23,7 @@ macro_rules! abs_file {
 
 /// A newtype `PathBuf` representing an absolute unix file path with several indications:
 /// 1. the path is absolute, ie [`std::path::absolute`] is called
-/// 2. the path is cleaned using [`path_clean`]
+/// 2. the path is cleaned using [`path_ext::clean`]
 ///
 /// ## Serialization
 /// Naturally serializing absolute paths is problematic, moving the serialized path between
@@ -69,18 +67,18 @@ impl AbsPathBuf {
 	pub fn new(path: impl AsRef<Path>) -> FsResult<Self> {
 		let path = path.as_ref();
 		let path = path_ext::absolute(path)?;
-		let path = path.clean();
+		let path = path_ext::clean_path(path);
 		Ok(Self(path))
 	}
 
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
 	/// be an absolute path. This uses [`path_ext::join_relative`] so
 	/// any leading `/` will be discarded.
-	/// After the join [`PathClean::clean`] will run to resolve relative
+	/// After the join [`path_ext::clean`] will run to resolve relative
 	/// parts like `../`
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = path_ext::join_relative(&self.0, path);
-		let path = path.clean();
+		let path = path_ext::clean_path(path);
 		Self(path)
 	}
 
@@ -134,14 +132,17 @@ impl AbsPathBuf {
 	/// Create a new [`AbsPathBuf`] verbatim from a path, its the user's
 	/// responsibility to ensure that the path is absolute and cleaned.
 	pub fn new_unchecked(path: impl AsRef<Path>) -> Self {
-		let path = path.as_ref().clean();
+		let path = path_ext::clean_path(path);
 		Self(path)
 	}
 
 	/// Converts this absolute path to a workspace-relative path.
 	pub fn into_ws_path(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
-		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())?;
+		let path = path_ext::strip_prefix(&self.0, &fs_ext::workspace_root())
+			.map_err(|_| FsError::ExpectedWorkspaceRelative {
+			path: self.into(),
+		})?;
 		Ok(WsPathBuf::new(path))
 	}
 }
@@ -225,10 +226,10 @@ mod test {
 
 
 
-	#[test]
+	#[crate::test]
 	fn canonicalizes() { let _buf = AbsPathBuf::new("Cargo.toml").unwrap(); }
 
-	#[test]
+	#[crate::test]
 	fn resolves_relative_non_exist() {
 		#[cfg(not(target_os = "windows"))]
 		let expected = "foo/bar/boo.rs";
@@ -241,14 +242,14 @@ mod test {
 			.ends_with(expected)
 			.xpect_true();
 	}
-	#[test]
+	#[crate::test]
 	fn abs_file() {
 		abs_file!()
 			.to_string_lossy()
 			.ends_with("abs_path_buf.rs")
 			.xpect_true();
 	}
-	#[test]
+	#[crate::test]
 	fn workspace_rel() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
@@ -256,7 +257,7 @@ mod test {
 		let workspace_rel = buf.into_ws_path().unwrap();
 		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
-	#[test]
+	#[crate::test]
 	fn workspace_rel_leading_slash() {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(format!("/{file}")).unwrap();
@@ -264,7 +265,7 @@ mod test {
 		let workspace_rel = buf.into_ws_path().unwrap();
 		workspace_rel.to_string_lossy().xpect_eq(file);
 	}
-	#[test]
+	#[crate::test]
 	fn manifest_rel() {
 		let buf =
 			AbsPathBuf::new_manifest_rel("src/path_utils/abs_path_buf.rs")
@@ -272,8 +273,8 @@ mod test {
 		buf.xpect_eq(abs_file!());
 	}
 
-	#[test]
-	#[cfg(feature = "serde")]
+	#[crate::test]
+	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		// Create an AbsPathBuf instance
 		let original = abs_file!();

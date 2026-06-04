@@ -219,7 +219,7 @@ mod tests {
 	use web_sys::HtmlScriptElement;
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn runs_in_wasm() {
 		// This ensures the test harness can reach the DOM.
 		let _ = document_ext::document();
@@ -228,7 +228,7 @@ mod tests {
 	}
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn creates_and_appends_div() {
 		document_ext::clear_body();
 

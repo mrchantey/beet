@@ -1,4 +1,8 @@
-use std::fmt;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::fmt;
 
 /// A simple general-purpose tree structure.
 ///
@@ -188,7 +192,7 @@ impl<T: fmt::Display> fmt::Display for Tree<T> {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let tree = Tree::new("root").with_children(vec![
 			Tree::new("child1"),

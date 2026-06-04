@@ -1,3 +1,13 @@
+//! Local observer benchmark.
+//!
+//! Measures the cost of adding and removing observers per entity per spawn.
+//! Compare with `bench_observer_global` to see the overhead.
+//!
+//! Run with:
+//! ```sh
+//! cargo bench --bench bench_observer_local
+//! ```
+
 use bevy::prelude::*;
 
 #[derive(EntityEvent)]

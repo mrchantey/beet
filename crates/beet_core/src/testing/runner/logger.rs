@@ -1,48 +1,27 @@
+use itertools::Itertools;
+
 use crate::prelude::*;
 use crate::testing::runner::*;
 use crate::testing::utils::*;
 
 
 
-#[derive(Clone, Reflect, Component, Default)]
-#[reflect(Default)]
-pub struct RunnerParams {
-	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode
-	pub watch: bool,
-	/// Do not log test outcomes as they complete
-	pub no_incremental: bool,
-	/// Log each test name before running it
-	pub log_runs: bool,
-	/// Log each skipped test
-	pub log_skipped: bool,
-	/// Disable ANSII colored output
-	pub no_color: bool,
-	/// Suppress all logger output
-	pub quiet: bool,
-}
-
 #[allow(unused)]
 pub(super) fn log_suite_running(
-	requests: Populated<(Entity, &RequestMeta), Added<RequestMeta>>,
-	mut logger_params: ParamQuery<RunnerParams>,
+	requests: Populated<(Entity, &TestRunnerConfig), Added<TestRunnerConfig>>,
 ) -> Result {
-	for (entity, _req) in requests {
-		let logger_params = logger_params.get(entity)?;
-		if logger_params.watch {
+	for (_entity, config) in requests {
+		if config.watch {
 			terminal_ext::clear().ok();
 		}
 
-		if logger_params.quiet {
+		if config.quiet {
 			continue;
 		}
-		let _guard =
-			paint_ext::SetPaintEnabledTemp::new(!logger_params.no_color);
 
 		let mut out = Vec::new();
 
 		out.push("🌱 beet test 🌱".to_string());
-		// out.push(format!("Request: {:#?}", req));
-		// out.push(format!("Test filter: {:#?}", filter_params));
 
 
 		crate::cross_log!("\n{}\n", out.join("\n"));
@@ -52,23 +31,19 @@ pub(super) fn log_suite_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_running(
-	requests: Populated<(Entity, &Children), With<RequestMeta>>,
+	requests: Populated<(&TestRunnerConfig, &Children), With<TestRunnerConfig>>,
 	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-	mut params: ParamQuery<RunnerParams>,
 ) -> Result {
-	for (entity, children) in requests {
-		let params = params.get(entity)?;
-		if !params.log_runs {
+	for (config, children) in requests {
+		if !config.log_runs {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
-
 
 		for test in children
 			.iter()
 			.filter_map(|child| just_started.get(child).ok())
 		{
-			log_case_runs(&test).xprint_display();
+			log_case_runs(&test, !config.no_color).xprint_display();
 		}
 	}
 	Ok(())
@@ -76,16 +51,17 @@ pub(super) fn log_case_running(
 
 /// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_outcomes(
-	requests: Populated<(Entity, &Children), With<RequestMeta>>,
+	requests: Populated<
+		(Entity, &TestRunnerConfig, &Children),
+		With<TestRunnerConfig>,
+	>,
 	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
-	mut params: ParamQuery<RunnerParams>,
 ) -> Result {
-	for (entity, children) in requests {
-		let params = params.get(entity)?;
-		if params.quiet || params.no_incremental {
+	for (_entity, config, children) in requests {
+		if config.quiet || config.no_incremental || !config.log_cases {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+		let color = !config.no_color;
 
 		let just_finished = children
 			.iter()
@@ -93,10 +69,10 @@ pub(super) fn log_case_outcomes(
 			.collect::<Vec<_>>();
 
 		for (test, outcome) in &just_finished {
-			if outcome.is_skip() && !params.log_skipped {
+			if outcome.is_skip() && !config.log_skipped {
 				continue;
 			}
-			log_case_output(&test, outcome).xprint_display();
+			test_heading_log(&outcome.ansi_str(color), &test).xprint_display();
 		}
 	}
 	Ok(())
@@ -104,23 +80,105 @@ pub(super) fn log_case_outcomes(
 
 
 
-fn log_case_runs(test: &Test) -> String {
-	let prefix = paint_ext::bg_yellow_black_bold(" RUNS ");
+fn log_case_runs(test: &Test, color: bool) -> String {
+	let prefix = TermStyle::new()
+		.fg(TermColor::Black)
+		.on(TermColor::Yellow)
+		.bold()
+		.or_plain(color)
+		.paint(" RUNS ");
 	test_heading_log(&prefix, test)
 }
 
+/// Collects test outcomes once all tests have finished running
+pub(super) fn log_file_outcomes(
+	requests: Populated<
+		(Entity, &TestRunnerConfig, &Children),
+		With<TestRunnerConfig>,
+	>,
+	just_finished: Populated<(&Test, &TestOutcome), Added<TestOutcome>>,
+	running: Query<&Test, Without<TestOutcome>>,
+	finished: Query<(&Test, &TestOutcome)>,
+) -> Result {
+	for (_entity, config, children) in requests {
+		if config.quiet || config.no_incremental || config.log_cases {
+			continue;
+		}
+		let color = !config.no_color;
 
-/// Returns the colored or non-colored outcome prefix for the test:
-/// - pass: " PASS "
-/// - skip: " SKIP "
-/// - fail: " FAIL "
-fn log_case_output(test: &Test, outcome: &TestOutcome) -> String {
-	let prefix = match outcome {
-		TestOutcome::Pass => paint_ext::bg_green_black_bold(" PASS "),
-		TestOutcome::Skip(_) => paint_ext::bg_yellow_black_bold(" SKIP "),
-		TestOutcome::Fail(_) => paint_ext::bg_red_black_bold(" FAIL "),
-	};
-	test_heading_log(&prefix, test)
+		// get newly finished tests
+		let just_finished = children
+			.iter()
+			.filter_map(|child| just_finished.get(child).ok())
+			.collect::<Vec<_>>();
+
+		// get files that have tests still running
+		let running = children
+			.iter()
+			.filter_map(|child| running.get(child).ok())
+			.map(|test| test.source_file)
+			.collect::<HashSet<_>>();
+
+		// collect files with newly finished tests that are now complete
+		let files_to_log = just_finished
+			.iter()
+			.map(|(test, _)| test.source_file)
+			.filter(|file| !running.contains(file))
+			.collect::<HashSet<_>>();
+
+		// collect all finished tests for files that should be logged
+		let finished = children
+			.iter()
+			.filter_map(|child| finished.get(child).ok())
+			.fold(HashMap::new(), |mut map, (test, outcome)| {
+				if files_to_log.contains(test.source_file) {
+					map.entry(test.short_file())
+						.or_insert_with(Vec::new)
+						.push((test, outcome));
+				}
+				map
+			});
+
+		for (short_file, finished) in
+			finished.into_iter().sorted_by_key(|a| a.0)
+		{
+			use TestOutcome::*;
+			if finished.iter().any(|(_test, outcome)| outcome.is_fail()) {
+				// if any failed, fall back to individual logging
+				for (test, outcome) in finished {
+					test_heading_log(&outcome.ansi_str(color), &test)
+						.xprint_display();
+				}
+			} else {
+				let outcome =
+					finished.iter().fold(Pass, |acc, (_, outcome)| {
+						match (acc, outcome) {
+							(Pass, Pass) => Pass,
+							(_, Fail(_)) => {
+								Fail(outcome.as_fail().unwrap().clone())
+							}
+							(acc, Skip(reason)) => {
+								if acc.is_fail() {
+									acc
+								} else {
+									Skip(reason.clone())
+								}
+							}
+							(acc, _) => acc,
+						}
+					});
+				if !outcome.is_skip() {
+					format!(
+						"{} {}",
+						outcome.ansi_str(color),
+						short_file.to_string()
+					)
+					.xprint_display();
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 fn test_heading_log(prefix: &str, test: &Test) -> String {
@@ -130,18 +188,16 @@ fn test_heading_log(prefix: &str, test: &Test) -> String {
 
 pub(super) fn log_suite_outcome(
 	requests: Populated<
-		(Entity, &RequestMeta, &SuiteOutcome, &Children),
+		(&TestRunnerConfig, &SuiteOutcome, &Children),
 		Added<SuiteOutcome>,
 	>,
-	mut params: ParamQuery<RunnerParams>,
 	tests: Query<(&Test, &TestOutcome)>,
 ) -> Result {
-	for (entity, req, outcome, children) in requests {
-		let params = params.get(entity)?;
-		if params.quiet {
+	for (config, outcome, children) in requests {
+		if config.quiet {
 			continue;
 		}
-		let _guard = paint_ext::SetPaintEnabledTemp::new(!params.no_color);
+		let color = !config.no_color;
 
 		let mut out = Vec::new();
 		if outcome.num_fail() != 0 {
@@ -150,58 +206,74 @@ pub(super) fn log_suite_outcome(
 			{
 				if let TestOutcome::Fail(fail) = case_outcome {
 					out.push(String::new());
-					out.push(failed_heading(test, fail));
+					out.push(failed_heading(test, fail, color));
 					out.push(String::new());
-					out.push(failed_file_context(test, fail)?);
+					out.push(failed_file_context(test, fail, color)?);
 					out.push(String::new());
-					out.push(failed_stacktrace(test, fail));
+					out.push(failed_stacktrace(test, fail, color));
 					out.push(String::new());
 				}
 			}
 		}
-		out.push(run_stats(outcome, req));
+		out.push(run_stats(outcome, config));
 		crate::cross_log!("\n{}\n", out.join("\n"));
 	}
 
 	Ok(())
 }
 
-fn test_stats(outcome: &SuiteOutcome) -> String {
+fn test_stats(outcome: &SuiteOutcome, color: bool) -> String {
 	let mut stats = Vec::new();
 	if outcome.num_fail() > 0 {
-		stats.push(paint_ext::red_bold(format!(
-			"{} failed",
-			outcome.num_fail()
-		)));
+		stats.push(
+			TermStyle::red()
+				.bold()
+				.or_plain(color)
+				.paint(format!("{} failed", outcome.num_fail())),
+		);
 	}
 	if outcome.num_skip() > 0 {
-		stats.push(paint_ext::yellow_bold(format!(
-			"{} skipped",
-			outcome.num_skip()
-		)));
+		stats.push(
+			TermStyle::yellow()
+				.bold()
+				.or_plain(color)
+				.paint(format!("{} skipped", outcome.num_skip())),
+		);
 	}
 	if outcome.num_pass() > 0 {
-		stats.push(paint_ext::green_bold(format!(
-			"{} passed",
-			outcome.num_pass()
-		)));
+		stats.push(
+			TermStyle::green()
+				.bold()
+				.or_plain(color)
+				.paint(format!("{} passed", outcome.num_pass())),
+		);
 	}
 	if outcome.num_ran() == 0 {
-		stats.push(paint_ext::yellow_bold(format!("no tests ran")));
+		stats.push(
+			TermStyle::yellow()
+				.bold()
+				.or_plain(color)
+				.paint("no tests ran"),
+		);
 	}
 
 	stats.join(", ")
 }
 
-fn run_stats(outcome: &SuiteOutcome, req: &RequestMeta) -> String {
-	let duration = req.started().elapsed();
+fn run_stats(outcome: &SuiteOutcome, config: &TestRunnerConfig) -> String {
+	let color = !config.no_color;
+	let duration = config.started().elapsed();
 	let time = time_ext::pretty_print_duration(duration);
-	let time = paint_ext::blue_bold(time);
-	let test_stats = test_stats(outcome);
+	let time = TermStyle::blue().bold().or_plain(color).paint(time);
+	let test_stats = test_stats(outcome, color);
 	format!("{} in {}", test_stats, time)
 }
 
-fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
+fn failed_file_context(
+	test: &Test,
+	outcome: &TestFail,
+	color: bool,
+) -> Result<String> {
 	const LINE_CONTEXT_SIZE: usize = 2;
 	const TAB_SPACES: usize = 2;
 
@@ -226,7 +298,7 @@ fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 		let curr_line_no = i + 1;
 		let is_err_line = curr_line_no == start.line() as usize;
 		let prefix = if is_err_line {
-			paint_ext::red(">")
+			TermStyle::red().or_plain(color).paint(">")
 		} else {
 			" ".to_string()
 		};
@@ -236,18 +308,22 @@ fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 			let len = max_digits.saturating_sub(line_digits);
 			" ".repeat(len)
 		};
-		let line_prefix =
-			paint_ext::dimmed(format!("{}{}|", curr_line_no, buffer));
+		let line_prefix = TermStyle::new()
+			.dimmed()
+			.or_plain(color)
+			.paint(format!("{}{}|", curr_line_no, buffer));
 
 		// replace tabs with spaces
 		let line_with_spaces = lines[i].replace("\t", &" ".repeat(TAB_SPACES));
 
 		output.push(format!("{} {}{}", prefix, line_prefix, line_with_spaces));
 		if is_err_line {
-			let empty_line_prefix =
-				paint_ext::dimmed(format!("{}|", " ".repeat(2 + max_digits)));
+			let empty_line_prefix = TermStyle::new()
+				.dimmed()
+				.or_plain(color)
+				.paint(format!("{}|", " ".repeat(2 + max_digits)));
 			let col_buffer = " ".repeat(start.col() as usize);
-			let up_arrow = paint_ext::red("^");
+			let up_arrow = TermStyle::red().or_plain(color).paint("^");
 			output.push(format!(
 				"{}{}{}",
 				empty_line_prefix, col_buffer, up_arrow
@@ -258,56 +334,59 @@ fn failed_file_context(test: &Test, outcome: &TestFail) -> Result<String> {
 	output.join("\n").xok()
 }
 
-fn failed_heading(test: &Test, outcome: &TestFail) -> String {
-	let title = paint_ext::red(test.short_file_and_name());
-	let reason = fail_reason(outcome);
+fn failed_heading(test: &Test, outcome: &TestFail, color: bool) -> String {
+	let title = TermStyle::red()
+		.or_plain(color)
+		.paint(test.short_file_and_name());
+	let reason = fail_reason(outcome, color);
 	format!("{}\n{}", title, reason)
 }
 
-fn fail_reason(outcome: &TestFail) -> String {
+fn fail_reason(outcome: &TestFail, color: bool) -> String {
+	let bold = TermStyle::new().bold().or_plain(color);
 	match outcome {
 		TestFail::Err { message } => {
-			let prefix = paint_ext::bold("Returned error:");
-			format!("{} {}", prefix, message)
+			format!("{} {}", bold.paint("Returned error:"), message)
 		}
 		TestFail::ExpectedPanic { message } => {
 			if let Some(message) = message {
-				let prefix = paint_ext::bold("Expected panic:");
-				format!("{} {}", prefix, message)
+				format!("{} {}", bold.paint("Expected panic:"), message)
 			} else {
-				paint_ext::bold("Expected panic")
+				bold.paint("Expected panic")
 			}
 		}
 		TestFail::Panic { payload, .. } => {
 			if let Some(payload) = payload {
-				let prefix = paint_ext::bold("");
-				format!("{}\n{}", prefix, payload)
+				format!("{}\n{}", bold.paint(""), payload)
 			} else {
-				paint_ext::bold("Panic - opaque payload")
+				bold.paint("Panic - opaque payload")
 			}
 		}
 		TestFail::Timeout { elapsed } => {
-			let prefix = paint_ext::bold("Timed out after:");
 			let time = time_ext::pretty_print_duration(*elapsed);
-			let time = paint_ext::blue(time);
-			format!("{} {}", prefix, time)
+			let time = TermStyle::blue().or_plain(color).paint(time);
+			format!("{} {}", bold.paint("Timed out after:"), time)
 		}
 	}
 }
 
-fn failed_stacktrace(test: &Test, outcome: &TestFail) -> String {
-	let prefix = paint_ext::dimmed("at");
-	let path = paint_ext::cyan(outcome.path(test).to_string());
+fn failed_stacktrace(test: &Test, outcome: &TestFail, color: bool) -> String {
+	let prefix = TermStyle::new().dimmed().or_plain(color).paint("at");
+	let path = TermStyle::cyan()
+		.or_plain(color)
+		.paint(outcome.path(test).to_string());
 	let start = outcome.start(test);
-	let line_loc =
-		paint_ext::dimmed(format!(":{}:{}", start.line(), start.col()));
+	let line_loc = TermStyle::new().dimmed().or_plain(color).paint(format!(
+		":{}:{}",
+		start.line(),
+		start.col()
+	));
 	format!("{} {}{}", prefix, path, line_loc)
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use test::TestDescAndFn;
 
 	fn run_tests(tests: Vec<TestDescAndFn>) {
 		let mut app = App::new().with_plugins((
@@ -316,13 +395,13 @@ mod tests {
 			TestPlugin,
 		));
 		app.world_mut().spawn((
-			Request::from_cli_str("--quiet").unwrap(),
+			TestRunnerConfig::from_cli_str("--quiet"),
 			tests_bundle(tests),
 		));
 		app.run();
 	}
 
-	#[test]
+	#[crate::test]
 	fn works_sync() {
 		// panic!("foo");
 		run_tests(vec![

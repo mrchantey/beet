@@ -1,0 +1,29 @@
+[package]
+name = "beet_async"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description = "Vendored bevy_async bridge"
+repository.workspace = true
+
+[features]
+default = ["std"]
+std = [
+	"bevy/std",
+	"scoped_static_storage/std",
+	"keyed_concurrent_queue/std",
+]
+
+[dependencies]
+bevy = { workspace = true }
+# bridge primitives; std re-enabled under this crate's `std` feature.
+scoped_static_storage = { version = "0.1.2", default-features = false }
+keyed_concurrent_queue = { version = "0.1.3", default-features = false }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# multi_threaded so spawned (non-local) tasks actually run on worker threads
+bevy = { workspace = true, features = ["std", "multi_threaded"] }

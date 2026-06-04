@@ -48,9 +48,8 @@ pub impl bool {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn bool() {
-		// false.xpect_true();
 		true.xpect_true();
 		false.xpect_false();
 	}

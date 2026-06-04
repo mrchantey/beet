@@ -7,11 +7,15 @@ mod serde_curve;
 pub use self::serde_curve::*;
 mod set_curve_on_run;
 pub use self::set_curve_on_run::*;
+use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
 /// Add all systems and types for procedural animation actions:
 /// - [`PlayProceduralAnimation`]
+/// - [`SetCurveOnRun`]
 pub fn procedural_animation_plugin(app: &mut App) {
-	app.add_systems(Update, play_procedural_animation.in_set(TickSet));
+	app.add_systems(Update, play_procedural_animation.in_set(TickSet))
+		.add_observer(set_curve_on_run)
+		.register_type::<PlayProceduralAnimation>()
+		.register_type::<SetCurveOnRun>();
 }

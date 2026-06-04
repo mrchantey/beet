@@ -72,23 +72,23 @@
 //! ```
 
 use crate::prelude::*;
-use bevy::reflect::DynamicStruct;
-use bevy::reflect::DynamicTuple;
-use bevy::reflect::DynamicTupleStruct;
 use bevy::reflect::FromReflect;
 use bevy::reflect::PartialReflect;
-use bevy::reflect::StructInfo;
-use bevy::reflect::TupleInfo;
-use bevy::reflect::TupleStructInfo;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use bevy::reflect::attributes::CustomAttributes;
+use bevy::reflect::structs::DynamicStruct;
+use bevy::reflect::structs::StructInfo;
+use bevy::reflect::tuple::DynamicTuple;
+use bevy::reflect::tuple::TupleInfo;
+use bevy::reflect::tuple_struct::DynamicTupleStruct;
+use bevy::reflect::tuple_struct::TupleStructInfo;
+use core::any::TypeId;
+use core::borrow::Borrow;
+use core::hash::BuildHasher;
+use core::hash::Hash;
+use core::str::FromStr;
 use heck::ToSnakeCase;
-use std::any::TypeId;
-use std::borrow::Borrow;
-use std::hash::BuildHasher;
-use std::hash::Hash;
-use std::str::FromStr;
 
 /// Marker attribute indicating a field is required during MultiMap parsing.
 ///
@@ -116,12 +116,20 @@ pub struct RequiredField;
 /// Unlike a standard `HashMap`, this allows multiple values to be associated
 /// with the same key. Values are stored in insertion order per key.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+	feature = "serde",
+	serde(
+		transparent,
+		bound(
+			serialize = "K: serde::Serialize + Eq + Hash, V: serde::Serialize, S: BuildHasher",
+			deserialize = "K: serde::Deserialize<'de> + Eq + Hash, V: serde::Deserialize<'de>, S: BuildHasher + Default"
+		)
+	)
+)]
 pub struct MultiMap<K, V, S = FixedHasher> {
 	inner: HashMap<K, Vec<V>, S>,
 }
-
-/// Type alias for the common case of string keys and values.
-pub type StringMultiMap = MultiMap<String, String>;
 
 impl<K, V, S: Default> Default for MultiMap<K, V, S> {
 	fn default() -> Self {
@@ -139,14 +147,67 @@ impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 
 impl<K: Eq + Hash, V: Eq, S: BuildHasher> Eq for MultiMap<K, V, S> {}
 
+impl<K, V, S> core::hash::Hash for MultiMap<K, V, S>
+where
+	K: Eq + Ord + Hash,
+	V: Eq + Hash,
+	S: BuildHasher,
+{
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+		// order of keys doesn't matter, but order of values per key does
+		let mut entries: Vec<_> = self.inner.iter().collect();
+		entries.sort_by(|a, b| a.0.cmp(b.0)); // sort by key for consistent hashing
+		for (key, values) in entries {
+			key.hash(state);
+			values.hash(state);
+		}
+	}
+}
+
+impl<K, V, S> Ord for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+		let mut a: Vec<_> = self.inner.iter().collect();
+		let mut b: Vec<_> = other.inner.iter().collect();
+
+		a.sort_by(|x, y| x.0.cmp(y.0));
+		b.sort_by(|x, y| x.0.cmp(y.0));
+
+		a.cmp(&b)
+	}
+}
+impl<K, V, S> PartialOrd for MultiMap<K, V, S>
+where
+	K: Hash + Ord,
+	V: Ord,
+	S: BuildHasher,
+{
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<K, V> MultiMap<K, V>
+where
+	K: Eq + Hash,
+{
+	/// Create a new empty multimap.
+	pub const fn new() -> Self {
+		Self {
+			inner: HashMap::new(),
+		}
+	}
+}
+
 impl<K, V, S> MultiMap<K, V, S>
 where
 	K: Eq + Hash,
 	S: BuildHasher + Default,
 {
-	/// Create a new empty multimap.
-	pub fn new() -> Self { Self::default() }
-
 	/// Insert a key with no values.
 	/// If the key already exists, this is a no-op.
 	pub fn insert_key(&mut self, key: K) { self.inner.entry(key).or_default(); }
@@ -169,6 +230,23 @@ where
 		Q: Hash + Eq + ?Sized,
 	{
 		self.inner.get(key).and_then(|values| values.first())
+	}
+
+	/// Get the first value matching any of the provided keys.
+	pub fn get_multikey<'a, Q>(
+		&self,
+		keys: impl IntoIterator<Item = &'a Q>,
+	) -> Option<&V>
+	where
+		K: Borrow<Q>,
+		Q: Hash + Eq + ?Sized + 'a,
+	{
+		for key in keys.into_iter() {
+			if let Some(value) = self.get(key) {
+				return Some(value);
+			}
+		}
+		None
 	}
 
 	/// Get all values for a key.
@@ -207,6 +285,11 @@ where
 	/// Iterate over all key-values pairs.
 	pub fn iter_all(&self) -> impl Iterator<Item = (&K, &Vec<V>)> {
 		self.inner.iter()
+	}
+
+	/// Consume the multimap and iterate over all key-values pairs.
+	pub fn into_iter_all(self) -> impl Iterator<Item = (K, Vec<V>)> {
+		self.inner.into_iter()
 	}
 
 	/// Iterate over all keys.
@@ -532,64 +615,62 @@ fn build_field_value(
 
 	// Handle primitive/leaf types
 	match field_type_id {
-		id if id == TypeId::of::<String>() => {
-			return parse_string_field(map_item);
-		}
+		id if id == TypeId::of::<String>() => parse_string_field(map_item),
 		id if id == TypeId::of::<Option<String>>() => {
-			return Ok(Some(Box::new(parse_option_string_field(map_item))));
+			Ok(Some(Box::new(parse_option_string_field(map_item))))
 		}
 		id if id == TypeId::of::<Vec<String>>() => {
-			return Ok(Some(Box::new(parse_vec_string_field(map_item))));
+			Ok(Some(Box::new(parse_vec_string_field(map_item))))
 		}
 		id if id == TypeId::of::<i8>() => {
-			return parse_number_field::<i8>(map_item, field_name);
+			parse_number_field::<i8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i16>() => {
-			return parse_number_field::<i16>(map_item, field_name);
+			parse_number_field::<i16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i32>() => {
-			return parse_number_field::<i32>(map_item, field_name);
+			parse_number_field::<i32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i64>() => {
-			return parse_number_field::<i64>(map_item, field_name);
+			parse_number_field::<i64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<i128>() => {
-			return parse_number_field::<i128>(map_item, field_name);
+			parse_number_field::<i128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<isize>() => {
-			return parse_number_field::<isize>(map_item, field_name);
+			parse_number_field::<isize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u8>() => {
-			return parse_number_field::<u8>(map_item, field_name);
+			parse_number_field::<u8>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u16>() => {
-			return parse_number_field::<u16>(map_item, field_name);
+			parse_number_field::<u16>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u32>() => {
-			return parse_number_field::<u32>(map_item, field_name);
+			parse_number_field::<u32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u64>() => {
-			return parse_number_field::<u64>(map_item, field_name);
+			parse_number_field::<u64>(map_item, field_name)
 		}
 		id if id == TypeId::of::<u128>() => {
-			return parse_number_field::<u128>(map_item, field_name);
+			parse_number_field::<u128>(map_item, field_name)
 		}
 		id if id == TypeId::of::<usize>() => {
-			return parse_number_field::<usize>(map_item, field_name);
+			parse_number_field::<usize>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f32>() => {
-			return parse_number_field::<f32>(map_item, field_name);
+			parse_number_field::<f32>(map_item, field_name)
 		}
 		id if id == TypeId::of::<f64>() => {
-			return parse_number_field::<f64>(map_item, field_name);
+			parse_number_field::<f64>(map_item, field_name)
 		}
-		_ => {}
+		_ => {
+			bevybail!(
+				"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
+				field_name
+			)
+		}
 	}
-
-	bevybail!(
-		"unsupported field type for '{}', expected bool, String, Option<String>, Vec<String>, numeric types, or nested struct",
-		field_name
-	)
 }
 
 /// Parse a number field from the multimap.
@@ -601,7 +682,7 @@ fn parse_number_field<T: FromStr + PartialReflect>(
 	field_name: &str,
 ) -> Result<Option<Box<dyn PartialReflect>>>
 where
-	T::Err: std::fmt::Display,
+	T::Err: core::fmt::Display,
 {
 	let value_str = values.first();
 
@@ -673,7 +754,7 @@ fn parse_vec_newtype_field(
 	values: &Vec<String>,
 	item_type_info: &TypeInfo,
 ) -> Result<Box<dyn PartialReflect>> {
-	use bevy::reflect::DynamicList;
+	use bevy::reflect::list::DynamicList;
 
 	let mut dynamic_list = DynamicList::default();
 
@@ -702,7 +783,7 @@ mod test {
 		verbose: bool,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_simple_struct() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -713,7 +794,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_bool_variants() {
 		// true variants
 		for val in ["true", "1", "yes", "on"] {
@@ -734,7 +815,7 @@ mod test {
 		}
 	}
 
-	#[test]
+	#[crate::test]
 	fn missing_bool_defaults_false() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -750,7 +831,7 @@ mod test {
 		optional: Option<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_optional_present() {
 		let mut map = MultiMap::new();
 		map.insert("required".to_string(), "req".to_string());
@@ -761,7 +842,7 @@ mod test {
 		result.optional.xpect_eq(Some("opt".to_string()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_optional_missing() {
 		let mut map = MultiMap::new();
 		map.insert("required".to_string(), "req".to_string());
@@ -778,7 +859,7 @@ mod test {
 		tags: Vec<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_vec_multiple_values() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -795,7 +876,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_vec_empty() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -817,7 +898,7 @@ mod test {
 		nested: Inner,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_nested_struct_flattened() {
 		let mut map = MultiMap::new();
 		map.insert("outer_field".to_string(), "outer".to_string());
@@ -828,7 +909,7 @@ mod test {
 		result.nested.inner_field.xpect_eq("inner".to_string());
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_missing_required_field() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -842,7 +923,7 @@ mod test {
 		result.xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_invalid_bool() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -852,7 +933,7 @@ mod test {
 		result.xpect_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn empty_string_bool_is_true() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -862,7 +943,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn empty_value_list_bool_is_true() {
 		let mut map = MultiMap::new();
 		map.insert("name".to_string(), "test".to_string());
@@ -872,7 +953,7 @@ mod test {
 		result.verbose.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_tuple() {
 		let mut map = MultiMap::new();
 		map.insert("0".to_string(), "first".to_string());
@@ -903,7 +984,7 @@ mod test {
 		level1: Level1,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_deeply_nested_struct() {
 		let mut map = MultiMap::new();
 		map.insert("top_field".to_string(), "top".to_string());
@@ -925,7 +1006,7 @@ mod test {
 		vec_field: Vec<String>,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_all_field_types_together() {
 		let mut map = MultiMap::new();
 		map.insert("string_field".to_string(), "hello".to_string());
@@ -963,7 +1044,7 @@ mod test {
 		bazz: Bazz,
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_newtype_tuple_struct_fields() {
 		let mut map = MultiMap::new();
 		map.insert("foo".to_string(), "hello".to_string());
@@ -983,7 +1064,7 @@ mod test {
 			.xpect_eq(vec!["a".to_string(), "b".to_string()]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_exact_user_example() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1027,7 +1108,7 @@ mod test {
 		]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn insert_key_creates_empty_entry() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert_key("flag".to_string());
@@ -1036,7 +1117,7 @@ mod test {
 		map.get_vec("flag").xpect_eq(Some(&Vec::<String>::new()));
 	}
 
-	#[test]
+	#[crate::test]
 	fn insert_key_noop_if_exists() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert("key".to_string(), "value".to_string());
@@ -1047,7 +1128,7 @@ mod test {
 			.xpect_eq(Some(&vec!["value".to_string()]));
 	}
 
-	#[test]
+	#[crate::test]
 	fn multimap_basic_operations() {
 		let mut map = MultiMap::<String, String>::new();
 		map.insert("a".to_string(), "1".to_string());
@@ -1069,7 +1150,7 @@ mod test {
 		map.is_empty().xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_signed_integers() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1104,7 +1185,7 @@ mod test {
 		result.isize_field.xpect_eq(-12345);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_unsigned_integers() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1139,7 +1220,7 @@ mod test {
 		result.usize_field.xpect_eq(99999);
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_floats() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1157,7 +1238,7 @@ mod test {
 		result.f64_field.xpect_close(-2.718281828459045);
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_invalid_number() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1172,7 +1253,7 @@ mod test {
 		result.unwrap_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn errors_on_missing_required_number() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1187,7 +1268,7 @@ mod test {
 		result.unwrap_err();
 	}
 
-	#[test]
+	#[crate::test]
 	fn parses_mixed_types_with_numbers() {
 		#[derive(Debug, Reflect)]
 		#[reflect(Default)]
@@ -1232,7 +1313,7 @@ mod test {
 		result.enabled.xpect_false(); // default bool
 	}
 
-	#[test]
+	#[crate::test]
 	fn missing_optional_fields_use_defaults() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1254,7 +1335,7 @@ mod test {
 		result.tags.xpect_eq(Vec::<String>::new()); // default vec
 	}
 
-	#[test]
+	#[crate::test]
 	fn nested_struct_fields_use_defaults() {
 		#[derive(Debug, Reflect, Default, PartialEq)]
 		#[reflect(Default)]
@@ -1282,7 +1363,7 @@ mod test {
 		result.database.port.xpect_eq(0); // default u16
 	}
 
-	#[test]
+	#[crate::test]
 	fn required_field_with_defaults() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]
@@ -1309,7 +1390,7 @@ mod test {
 		result.retries.xpect_eq(0); // default
 	}
 
-	#[test]
+	#[crate::test]
 	fn custom_defaults_are_respected() {
 		#[derive(Debug, Reflect, PartialEq)]
 		#[reflect(Default)]
@@ -1345,7 +1426,7 @@ mod test {
 		result.ratio.xpect_eq(0.5);
 	}
 
-	#[test]
+	#[crate::test]
 	fn kebab_case_keys_normalized_to_snake_case() {
 		#[derive(Debug, Reflect, PartialEq)]
 		#[reflect(Default)]
@@ -1378,7 +1459,7 @@ mod test {
 		result.max_retry_count.xpect_eq(5);
 	}
 
-	#[test]
+	#[crate::test]
 	fn mixed_case_keys_all_normalized() {
 		#[derive(Debug, Reflect, Default)]
 		#[reflect(Default)]

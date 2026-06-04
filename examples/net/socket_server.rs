@@ -24,7 +24,7 @@ fn main() -> Result {
 			LogPlugin::default(),
 			SocketServerPlugin::default(),
 		))
-		.spawn_then((
+		.spawn((
 			SocketServer::new(9000),
 			OnSpawn::observe(my_handler),
 			// just echo back the close if you dont need to

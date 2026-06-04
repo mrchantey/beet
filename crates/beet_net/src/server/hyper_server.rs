@@ -11,7 +11,6 @@ use hyper::rt::Timer;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use pin_project::pin_project;
-use send_wrapper::SendWrapper;
 use std::convert::Infallible;
 use std::future::Future;
 use std::io;
@@ -20,41 +19,54 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-/// A hyper/bevy server
-/// This bevy system contains unopinionated machinery for handling
+/// A hyper/bevy server.
+///
+/// This async function contains unopinionated machinery for handling
 /// hyper requests.
-/// See [`Server::handler`] for customizing handlers
-pub(super) fn start_hyper_server(
-	In(entity): In<Entity>,
-	query: Query<&HttpServer>,
-	mut async_commands: AsyncCommands,
+/// See [`HttpServer`] for customizing handlers.
+pub async fn start_hyper_server(entity: AsyncEntity) -> Result {
+	let addr = entity
+		.get::<HttpServer, SocketAddr>(|server| {
+			(server.host, server.port.unwrap_or(0)).into()
+		})
+		.await?;
+
+	let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
+		.map_err(|err| bevyhow!("Failed to bind to {}: {}", addr, err))?;
+
+	start_hyper_server_with_tcp(entity, listener).await
+}
+
+/// Like [`start_hyper_server`] but accepts a pre-bound TCP listener,
+/// eliminating port race conditions in tests.
+pub async fn start_hyper_server_with_tcp(
+	entity: AsyncEntity,
+	listener: async_io::Async<std::net::TcpListener>,
 ) -> Result {
-	let server = query.get(entity)?;
-	let addr: SocketAddr = ([127, 0, 0, 1], server.port).into();
+	let addr = listener
+		.get_ref()
+		.local_addr()
+		.map_err(|err| bevyhow!("Failed to get local address: {}", err))?;
+	info!("Server listening on http://{}", addr);
 
-	async_commands.run(async move |world| -> Result {
-		let listener = async_io::Async::<std::net::TcpListener>::bind(addr)
-			.map_err(|e| bevyhow!("Failed to bind to {}: {}", addr, e))?;
+	loop {
+		let (tcp, addr) = listener
+			.accept()
+			.await
+			.map_err(|err| bevyhow!("Failed to accept connection: {}", err))
+			.unwrap();
+		trace!("New connection from: {}", addr);
+		let io = BevyIo::new(tcp);
 
-		info!("Server listening on http://{}", addr);
-
-		loop {
-			let (tcp, addr) = listener
-				.accept()
-				.await
-				.map_err(|e| bevyhow!("Failed to accept connection: {}", e))
-				.unwrap();
-			trace!("New connection from: {}", addr);
-			let io = BevyIo::new(tcp);
-
-			let _entity_fut = world.run_async(async move |world| {
-				// pass an AsyncWorld to the service_fn
+		entity
+			.run_async_local(async move |entity| {
+				// pass an AsyncEntity to the service_fn
 				let service = service_fn(move |req| {
-					let world = world.clone();
+					let entity = entity.clone();
 
 					async move {
 						let req = hyper_to_request(req).await;
-						let res = world.entity(entity).exchange(req).await;
+						let res = entity.exchange(req).await;
 						let res = response_to_hyper(res).await;
 						res.xok::<Infallible>()
 					}
@@ -77,10 +89,10 @@ pub(super) fn start_hyper_server(
 						error!("Error serving connection: {:?}", err);
 					}
 				}
-			});
-		}
-	});
-	Ok(())
+			})
+			.await
+			.ok();
+	}
 }
 
 
@@ -91,16 +103,16 @@ async fn hyper_to_request(
 
 	// Convert hyper body into a stream
 	let stream = http_body_util::BodyStream::new(body);
-	let stream = Box::pin(stream.map(|result| match result {
+	let stream = stream.map(|result| match result {
 		Ok(frame) => match frame.into_data() {
 			Ok(data) => Ok(data),
 			Err(_) => Err(bevyhow!("Failed to convert frame to data")),
 		},
 		Err(err) => Err(bevyhow!("Body stream error: {:?}", err)),
-	}));
+	});
 
 	// Create body based on size
-	let body = Body::Stream(SendWrapper::new(stream));
+	let body = Body::stream(stream);
 
 	Request::from_parts(RequestParts::from(parts), body)
 }
@@ -113,7 +125,8 @@ async fn response_to_hyper(
 
 	// Convert our ResponseParts to http::response::Parts
 	let http_parts: http::response::Parts =
-		parts.try_into().unwrap_or_else(|_| {
+		parts.try_into().unwrap_or_else(|err| {
+			error!("Failed to convert response parts: {}", err);
 			http::Response::builder()
 				.status(http::StatusCode::INTERNAL_SERVER_ERROR)
 				.body(())
@@ -129,7 +142,7 @@ async fn response_to_hyper(
 		}
 		Body::Stream(stream) => {
 			// Convert our stream to a stream of Frames
-			let frame_stream = stream.take().map(|result| {
+			let frame_stream = stream.map(|result| {
 				result.map(Frame::data).map_err(|e| {
 					std::io::Error::new(
 						std::io::ErrorKind::Other,
@@ -265,22 +278,24 @@ mod test {
 	use std::time::Instant;
 
 	#[beet_core::test]
-	async fn works() {
-		let server = HttpServer::new_test();
+	async fn roundtrip() {
+		super::super::http_server::test::test_server(
+			start_hyper_server_with_tcp,
+		)
+		.await;
+	}
 
-		let url = server.local_url();
+	#[beet_core::test]
+	async fn works() {
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((
+				.spawn((
 					server,
-					handler_exchange(move |mut entity, req| {
-						let count = entity.world_scope(|world: &mut World| {
-							world.query_once::<&ExchangeStats>()[0]
-								.request_count()
-						});
-						assert!(count < 99999);
-						Response::ok().with_body(req.body)
+					exchange_handler(move |req| {
+						Response::ok().with_body(req.take().body)
 					}),
 				))
 				.run();
@@ -298,12 +313,12 @@ mod test {
 	}
 	#[beet_core::test]
 	async fn stream_roundtrip() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((server, mirror_exchange()))
+				.spawn((server, mirror_exchange()))
 				.run();
 		});
 		time_ext::sleep_millis(100).await;
@@ -328,16 +343,16 @@ mod test {
 	// asserts stream behavior with timestamps and delays
 	#[beet_core::test]
 	async fn stream_timestamp() {
-		let server = HttpServer::new_test();
-		let url = server.local_url();
+		let server = HttpServer::new_test(start_hyper_server_with_tcp);
+		let url = server.0.local_url();
 		let _handle = std::thread::spawn(|| {
 			App::new()
 				.add_plugins((MinimalPlugins, ServerPlugin))
-				.spawn_then((
-					handler_exchange(move |_, req| {
+				.spawn((
+					exchange_handler(move |req| {
 						// Server adds 100ms delay per chunk
 						let delayed_stream = futures::stream::unfold(
-							req.body,
+							req.take().body,
 							|mut body| async move {
 								match body.next().await {
 									Ok(Some(chunk)) => {

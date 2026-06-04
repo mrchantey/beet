@@ -66,7 +66,7 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn equality() {
 		true.xpect_eq(true);
 		(&true).xpect_eq(true);

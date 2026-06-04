@@ -252,7 +252,7 @@ mod test {
 	use crate::prelude::*;
 	use glob::Pattern;
 
-	#[test]
+	#[crate::test]
 	fn pattern() {
 		let pat = Pattern::new("*target*").unwrap();
 		pat.matches("foo").xpect_false();
@@ -260,7 +260,7 @@ mod test {
 		pat.matches("foo/target/foo").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn glob_pattern_new() {
 		let gp = GlobPattern::new("*foo*");
 		gp.as_str().xpect_eq("*foo*");
@@ -268,7 +268,7 @@ mod test {
 		gp.to_pattern().matches("bar/foo/baz").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn passes() {
 		// test include all but
 
@@ -338,8 +338,8 @@ mod test {
 		filter.passes("src/codegen/mockups.rs").xpect_false();
 	}
 
-	#[test]
-	#[cfg(feature = "serde")]
+	#[crate::test]
+	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
 		let filter = GlobFilter::default()
 			.with_include("**/*.rs")
@@ -355,8 +355,8 @@ mod test {
 		filter.exclude[0].as_str().xpect_eq("*target*");
 	}
 
-	#[test]
-	#[cfg(feature = "serde")]
+	#[crate::test]
+	#[cfg(feature = "json")]
 	fn glob_pattern_serde() {
 		let pattern = GlobPattern::new("*foo*");
 		let json = serde_json::to_string(&pattern).unwrap();

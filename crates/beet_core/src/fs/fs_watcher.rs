@@ -154,7 +154,7 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 				}
 				(false, _) => ev,
 			};
-			world.entity(entity).trigger_target_then(ev).await;
+			world.entity(entity).trigger_target(ev).await?;
 		}
 		Ok(())
 	})
@@ -354,12 +354,16 @@ impl DirEvent {
 
 
 #[cfg(test)]
+#[cfg(feature = "rand")]
 mod test {
 	use crate::prelude::*;
 
-	/// this one is notoriously flaky
 	#[crate::test]
 	async fn works() {
+		use std::sync::Arc;
+		use std::sync::atomic::AtomicBool;
+		use std::sync::atomic::Ordering;
+
 		let mut app = App::new();
 		let tempdir = TempDir::new().unwrap();
 		let path = tempdir.path().clone();
@@ -374,12 +378,26 @@ mod test {
 				}
 			});
 
-		// off-thread required for for multi_threaded, not sure why
+		// De-flake: the watcher may not be registered yet when the first
+		// write lands, and the debouncer batches events. Keep writing
+		// (distinct content each time) until the observer triggers exit,
+		// rather than relying on a single perfectly-timed write.
+		let done = Arc::new(AtomicBool::new(false));
+		let done2 = done.clone();
+		// off-thread required for bevy_multithreaded, not sure why
 		std::thread::spawn(move || {
-			std::thread::sleep(Duration::from_millis(100));
-			fs_ext::write(path.join("foobar.txt"), "foobar").unwrap();
+			let mut i = 0u32;
+			while !done2.load(Ordering::Relaxed) {
+				std::thread::sleep(Duration::from_millis(50));
+				let _ = fs_ext::write(
+					path.join("foobar.txt"),
+					format!("foobar {i}"),
+				);
+				i += 1;
+			}
 		});
 		app.run_async().await.xpect_eq(AppExit::Success);
+		done.store(true, Ordering::Relaxed);
 		// tempdir kept alive until here to prevent cleanup race
 		drop(tempdir);
 	}

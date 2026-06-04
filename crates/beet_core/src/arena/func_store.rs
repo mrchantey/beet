@@ -225,7 +225,7 @@ where
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn calls_and_records() {
 		let func_store = FuncStore::new(|n: u32| n + 1);
 
@@ -237,7 +237,7 @@ mod test {
 		outputs.xpect_eq(vec![2, 3]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn multiple_calls() {
 		let func_store = FuncStore::new(|v| v);
 
@@ -248,7 +248,7 @@ mod test {
 		outputs.xpect_eq(vec![4, 5]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn call0_uses_default_input() {
 		let func_store = FuncStore::new(|n: u32| n + 5);
 
@@ -258,7 +258,7 @@ mod test {
 		outputs.xpect_eq(vec![5]);
 	}
 
-	#[test]
+	#[crate::test]
 	fn call_and_get_returns_and_records() {
 		let func_store = FuncStore::new(|n: u32| n * 2);
 

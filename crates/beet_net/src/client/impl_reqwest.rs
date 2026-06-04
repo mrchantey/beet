@@ -1,20 +1,22 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use reqwest::Client;
 use reqwest::RequestBuilder;
 use std::sync::LazyLock;
 
-#[allow(unused)]
-pub(super) async fn send_reqwest(req: Request) -> Result<Response> {
-	static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(|| Client::new());
-
+/// Send a request using the reqwest client.
+pub async fn send_reqwest(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
-
 	let req: reqwest::Request = into_request(req)?;
-	let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
-		.send()
-		.await?;
-	let res: Response = into_response(res).await?;
-	Ok(res)
+	async_ext::on_tokio(async move {
+		static REQWEST_CLIENT: LazyLock<Client> =
+			LazyLock::new(|| Client::new());
+		let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
+			.send()
+			.await?;
+		into_response(res).await
+	})
+	.await
 }
 
 fn into_request(request: Request) -> Result<reqwest::Request> {
@@ -30,9 +32,8 @@ fn into_request(request: Request) -> Result<reqwest::Request> {
 			use futures::TryStreamExt;
 			use reqwest::Body as ReqwestBody;
 
-			let stream_inner = stream.take();
 			let reqwest_body =
-				ReqwestBody::wrap_stream(stream_inner.map_err(|err| {
+				ReqwestBody::wrap_stream(stream.map_err(|err| {
 					std::io::Error::new(
 						std::io::ErrorKind::Other,
 						format!("{}", err),
@@ -76,16 +77,13 @@ fn into_request(request: Request) -> Result<reqwest::Request> {
 async fn into_response(res: reqwest::Response) -> Result<Response> {
 	let status = res.status();
 
-	// Copy headers to our ResponseParts using PartsBuilder
-	let parts = {
-		let mut builder = PartsBuilder::new();
-		for (key, value) in res.headers().iter() {
-			if let Ok(value_str) = value.to_str() {
-				builder = builder.header(key.to_string(), value_str);
-			}
+	// Copy headers to our ResponseParts
+	let mut parts = ResponseParts::new(status.into());
+	for (key, value) in res.headers().iter() {
+		if let Ok(value_str) = value.to_str() {
+			parts.headers.set_raw(key.to_string(), value_str);
 		}
-		builder.build_response_parts(status.into())
-	};
+	}
 
 	let is_bytes = res
 		.headers()
@@ -98,11 +96,7 @@ async fn into_response(res: reqwest::Response) -> Result<Response> {
 		Body::Bytes(res.bytes().await?.into())
 	} else {
 		use futures::TryStreamExt;
-		use send_wrapper::SendWrapper;
-
-		Body::Stream(SendWrapper::new(Box::pin(
-			res.bytes_stream().map_err(BevyError::from),
-		)))
+		Body::stream(res.bytes_stream().map_err(BevyError::from))
 	};
 
 	Ok(Response::from_parts(parts, bytes::Bytes::new()).with_body(body))

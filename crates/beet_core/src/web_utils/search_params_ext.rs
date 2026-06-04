@@ -187,7 +187,7 @@ mod tests {
 			.unwrap();
 	}
 
-	#[test]
+	#[crate::test]
 	#[ignore = "requires dom"]
 	fn works() {
 		// Smoke check: ensure we can reach basic DOM APIs.

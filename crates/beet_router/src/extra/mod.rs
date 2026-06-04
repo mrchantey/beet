@@ -1,0 +1,30 @@
+//! App-level router features built on the core routing primitives.
+//!
+//! Unlike the generic middleware and dispatch in [`router`](crate::router),
+//! these are opinionated, ready-made building blocks: package-info and
+//! analytics routes, the [`HtmlStore`] prebuilt-HTML gate, and a
+//! batteries-included [`default_router`].
+
+mod html_store;
+pub use html_store::*;
+// serving static files from a [`BlobStore`] as routes (no_std core).
+mod blob_store;
+pub use blob_store::*;
+
+// std-only: the analytics route stores into beet_net's `AnalyticsEvent`, which
+// is part of beet_net's std-only store surface.
+#[cfg(all(feature = "json", feature = "std"))]
+mod analytics;
+#[cfg(all(feature = "json", feature = "std"))]
+pub use analytics::*;
+
+// std-only: the app-info scene route renders through beet_ui, and the
+// batteries-included `default_router` wires it as one of its children when std.
+#[cfg(feature = "std")]
+mod app_info;
+#[cfg(feature = "std")]
+pub use app_info::*;
+// The single router builder, available on std and no_std. The feature-specific
+// app routes (`app-info`, `analytics`) are gated inside the module.
+mod default_router;
+pub use default_router::*;

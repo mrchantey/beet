@@ -2,7 +2,7 @@ use beet_rsx::prelude::*;
 
 #[template]
 fn PageLayout(title: String) -> impl Bundle {
-	rsx! {
+	rsx!{
 		<html>
 			<div>
 				<h1>{title}</h1>

@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::sync::atomic::AtomicU16;
-use std::sync::atomic::Ordering;
 
 /// Plugin for running bevy WebSocket servers.
 pub struct SocketServerPlugin {}
@@ -27,13 +25,13 @@ impl Plugin for SocketServerPlugin {
 #[derive(Clone, Component)]
 #[component(on_add = on_add)]
 pub struct SocketServer {
-	/// The address to bind to (e.g., "127.0.0.1:8080")
-	pub port: u16,
+	/// The port to bind to. `None` means the OS will assign a port.
+	pub port: Option<u16>,
 }
 
 impl std::fmt::Debug for SocketServer {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("SocketServer")
+	fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		fmt.debug_struct("SocketServer")
 			.field("port", &self.port)
 			.finish()
 	}
@@ -41,10 +39,15 @@ impl std::fmt::Debug for SocketServer {
 
 #[allow(unused)]
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
+	#[cfg(test)]
+	return;
+	// `_local` so the accept loop and its `spawn_local` connection handlers stay
+	// on the world-owning thread, where the bridge sync point can drive them.
 	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	world
 		.commands()
-		.run_system_cached_with(super::start_tungstenite_server, cx.entity);
+		.entity(cx.entity)
+		.queue_async_local(super::start_tungstenite_server);
 	#[cfg(not(all(feature = "tungstenite", not(target_arch = "wasm32"))))]
 	panic!(
 		"WebSocket server requires the 'tungstenite' feature on non-wasm32 targets"
@@ -53,20 +56,36 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 impl SocketServer {
 	/// Creates a new socket server bound to the specified port.
-	pub fn new(port: u16) -> Self { Self { port } }
+	pub fn new(port: u16) -> Self { Self { port: Some(port) } }
 
-	/// Create a new Server with an incrementing port to avoid
-	/// collisions in tests
-	pub fn new_test() -> Self {
-		static PORT: AtomicU16 = AtomicU16::new(DEFAULT_SOCKET_TEST_PORT);
-		Self {
-			port: PORT.fetch_add(1, Ordering::SeqCst),
-			..default()
-		}
+	/// Creates a new server with an OS-assigned port for testing.
+	///
+	/// Binds to port 0 so the OS picks an available port,
+	/// avoiding collisions in parallel tests. The listener is kept
+	/// alive and passed directly to the server, eliminating port race conditions.
+	///
+	/// The `on_add` hook is disabled in tests, so the returned [`OnSpawn`]
+	/// must be included in the spawn bundle to start the listener.
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
+	pub fn new_test() -> (SocketServer, OnSpawn) {
+		let listener = std::net::TcpListener::bind("127.0.0.1:0")
+			.expect("failed to bind test socket server");
+		let port = listener.local_addr().unwrap().port();
+		let listener = async_io::Async::new(listener)
+			.expect("failed to create async listener");
+		(
+			Self { port: Some(port) },
+			OnSpawn::new_async_local(move |entity| {
+				super::start_tungstenite_server_with_tcp(entity, listener)
+			}),
+		)
 	}
 
-	/// The host and path without the protocol, ie `127.0.0.1:3000`
-	pub fn local_address(&self) -> String { format!("127.0.0.1:{}", self.port) }
+	/// The host and port without the protocol, ie `127.0.0.1:3000`
+	pub fn local_address(&self) -> String {
+		let port = self.port.unwrap_or(0);
+		format!("127.0.0.1:{}", port)
+	}
 	/// Returns the full WebSocket URL for local connections, e.g. `ws://127.0.0.1:8339`.
 	pub fn local_url(&self) -> String {
 		format!("ws://{}", self.local_address())
@@ -89,121 +108,90 @@ mod tests {
 	#[beet_core::test]
 	async fn server_binds_and_accepts() {
 		let server = SocketServer::new_test();
-		let url = server.local_url();
+		let url = server.0.local_url();
 
-		App::new()
-			.add_plugins((
-				MinimalPlugins,
-				// LogPlugin::default(),
-				SocketServerPlugin::default(),
-			))
-			.spawn_then(server)
-			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
-				let url = url.clone();
-				commands.run(async move |world| {
-					time_ext::sleep_millis(200).await;
-					let mut client = Socket::connect(&url).await.unwrap();
-					client.send(Message::text("hello server")).await.unwrap();
-					client.close(None).await.ok();
-					world.write_message(AppExit::Success);
-				});
-			})
-			.run();
-		// exits ok
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
+				.spawn(server)
+				.run();
+		});
+		time_ext::sleep_millis(200).await;
+
+		let mut client = Socket::connect(&url).await.unwrap();
+		client.send(Message::text("hello server")).await.unwrap();
+		client.close(None).await.ok();
 	}
 
 	#[beet_core::test]
 	async fn handles_multiple_concurrent_connections() {
 		let server = SocketServer::new_test();
-		let url = server.local_url();
+		let url = server.0.local_url();
 
-		App::new()
-			.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
-			.spawn_then(server)
-			.add_systems(PostStartup, move |mut commands: AsyncCommands| {
-				let url = url.clone();
-				commands.run(async move |world| {
-					time_ext::sleep_millis(200).await;
-					let mut client1 = Socket::connect(&url).await.unwrap();
-					client1.send(Message::text("client1")).await.unwrap();
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, SocketServerPlugin::default()))
+				.spawn(server)
+				.run();
+		});
+		time_ext::sleep_millis(200).await;
 
-					time_ext::sleep_millis(100).await;
+		let mut client_one = Socket::connect(&url).await.unwrap();
+		client_one.send(Message::text("client1")).await.unwrap();
 
-					let mut client2 = Socket::connect(&url).await.unwrap();
-					client2.send(Message::text("client2")).await.unwrap();
+		let mut client_two = Socket::connect(&url).await.unwrap();
+		client_two.send(Message::text("client2")).await.unwrap();
 
-					client1.close(None).await.ok();
-					client2.close(None).await.ok();
-
-					world.write_message(AppExit::Success);
-				});
-			})
-			.run();
-		// exits ok
+		client_one.close(None).await.ok();
+		client_two.close(None).await.ok();
 	}
 
-
-
-	/// This test shows a common sockets workflow
+	/// Common sockets workflow:
 	///
-	/// 1. client send text to server
-	/// 2. server echos text back
+	/// 1. client sends text to server
+	/// 2. server echoes text back
 	/// 3. client sends close to server
 	/// 4. server sends close back
-	///
 	#[beet_core::test]
 	async fn ecs_sockets() {
 		let server = SocketServer::new_test();
-		let url = server.local_url();
+		let url = server.0.local_url();
+		let store = Store::<bool>::default();
 
-		let store = Store::default();
-		App::new()
-			.add_plugins((
-				MinimalPlugins,
-				// LogPlugin::default(),
-				SocketServerPlugin::default(),
-			))
-			.add_systems(Startup, move |mut commands: Commands| {
-				// server
-				commands.spawn(server.clone()).observe_any(
-					|ev: On<MessageRecv>, mut commands: Commands| match ev
-						.event()
-						.inner()
-					{
-						Message::Text(text) => {
-							commands
-								.entity(ev.original_target())
-								.trigger_target(MessageSend(Message::Text(
-									text.clone(),
-								)));
-						}
-						Message::Close(_) => {
-							commands
-								.entity(ev.original_target())
-								.trigger_target(MessageSend(Message::Close(
-									None,
-								)));
-						}
-						_ => {}
-					},
-				);
-				// client
-				commands
-					.spawn(Socket::insert_on_connect(&url))
-					.observe_any(
-						|ev: On<SocketReady>, mut commands: Commands| {
-							commands.entity(ev.target()).trigger_target(
-								MessageSend(Message::Text(
-									"hello matey".into(),
-								)),
-							);
-						},
-					)
-					.observe_any(
-						move |ev: On<MessageRecv>,
-					 mut commands: Commands,
-					 // mut sockets: Query<&mut Socket>
-						| match ev
+		let _handle = std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, SocketServerPlugin::default()));
+
+			// spawn server with echo observer
+			app.world_mut().spawn(server).observe_any(
+				|ev: On<MessageRecv>, mut commands: Commands| match ev
+					.event()
+					.inner()
+				{
+					Message::Text(text) => {
+						commands.entity(ev.original_target()).trigger_target(
+							MessageSend(Message::Text(text.clone())),
+						);
+					}
+					Message::Close(_) => {
+						commands
+							.entity(ev.original_target())
+							.trigger_target(MessageSend(Message::Close(None)));
+					}
+					_ => {}
+				},
+			);
+
+			// spawn client with ready and recv observers
+			app.world_mut()
+				.spawn(Socket::insert_on_connect(&url))
+				.observe_any(|ev: On<SocketReady>, mut commands: Commands| {
+					commands.entity(ev.target()).trigger_target(MessageSend(
+						Message::Text("hello matey".into()),
+					));
+				})
+				.observe_any(
+					move |ev: On<MessageRecv>, mut commands: Commands| match ev
 						.event()
 						.inner()
 					{
@@ -211,9 +199,9 @@ mod tests {
 							text.xpect_eq("hello matey");
 							commands
 								.entity(ev.original_target())
-								.trigger_target(MessageSend(
-									Message::Close(None),
-								));
+								.trigger_target(MessageSend(Message::Close(
+									None,
+								)));
 						}
 						Message::Close(_) => {
 							store.set(true);
@@ -221,9 +209,18 @@ mod tests {
 						}
 						_ => {}
 					},
-					);
-			})
-			.run();
+				);
+
+			app.run();
+		});
+
+		// poll the store until the app signals completion
+		for _ in 0..100 {
+			time_ext::sleep_millis(50).await;
+			if store.get() {
+				break;
+			}
+		}
 		store.get().xpect_true();
 	}
 }

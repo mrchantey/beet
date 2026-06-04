@@ -1,12 +1,21 @@
+#![no_std]
+extern crate alloc;
 mod action;
+mod as_any;
 mod bundle_effect;
 mod entity_target_event;
-mod macros;
+mod getset;
+mod main_attr;
+mod mdx;
+#[cfg(feature = "rsx")]
+mod rsx_direct;
+#[cfg(feature = "rsx")]
+mod rsx_scene;
+#[cfg(feature = "rsx")]
+mod scene;
 mod sendit;
+mod test_attr;
 mod to_tokens;
-mod utils;
-use macros::*;
-
 
 
 /// Implements `TokenizeSelf` for a struct or enum.
@@ -39,6 +48,7 @@ pub fn derive_to_tokens(
 ) -> proc_macro::TokenStream {
 	to_tokens::impl_derive_to_tokens(input).into()
 }
+
 /// Creates a [SendWrapper](send_wrapper::SendWrapper) newtype that implements `Send` for a struct or enum.
 ///
 /// ## Example
@@ -84,26 +94,10 @@ pub fn bundle_effect(
 	bundle_effect::impl_bundle_effect(input).into()
 }
 
-/// Convenience helper to directly add observers to this entity.
-/// This macro must be placed above `#[derive(Component)]` as it
-/// sets the `on_add` hook.
-/// ## Example
-/// ```rust ignore
-/// #[action(log_on_run)]
-/// #[derive(Component)]
-/// struct LogOnRun(pub String);
-///
-/// fn log_on_run(trigger: On<GetOutcome>, query: Populated<&LogOnRun>) {
-/// 	let name = query.get(trigger.target()).unwrap();
-/// 	println!("log_name_on_run: {}", name.0);
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn action(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-	action::impl_action(attr, item)
+/// Implements `AsAny` for a struct or enum, allowing it to be downcast at runtime.
+#[proc_macro_derive(Any, attributes(event))]
+pub fn as_any(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	as_any::impl_as_any(input).into()
 }
 
 
@@ -175,7 +169,235 @@ pub fn beet_test(
 	attr: proc_macro::TokenStream,
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	parse_test_attr(attr, input)
+	test_attr::impl_test_attr(attr, input)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+/// MDX-style markdown macro with `{}` interpolation.
+///
+/// Parses markdown text interspersed with `{}` bundle expressions.
+/// The crate path is resolved automatically via `internal_or_beet`.
+///
+/// # Input Format
+///
+/// ```text
+/// mdx!(# Heading text {bundle_expr} more text)
+/// mdx!("string with {interpolation}")
+/// ```
+#[proc_macro]
+pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	mdx::impl_mdx(input)
+}
+
+/// JSX-like macro that lowers HTML-like markup to an `impl Scene`, flowing
+/// through Bevy's `bevy_scene` resolve→build→spawn pipeline.
+///
+/// Requires the consuming crate to enable the `scene` feature (which provides
+/// `template_value`, `RelatedScenes`, `EntityScene`, etc. via its prelude). For
+/// the no_std-friendly, dependency-light variant that produces an `impl Bundle`
+/// directly, use [`rsx_direct`].
+///
+/// ## Example
+///
+/// ```rust ignore
+/// fn my_ui() -> impl Scene {
+///     rsx! {
+///         <div class="container">
+///             <span>"hello"</span>
+///         </div>
+///     }
+/// }
+/// ```
+#[cfg(feature = "rsx")]
+#[proc_macro]
+pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	rsx_scene::impl_rsx_scene(input)
+}
+
+/// Direct, immediate variant of [`rsx`]: lowers HTML-like markup straight to an
+/// `impl Bundle`, spawning entities eagerly.
+///
+/// This is the no_std-friendly, dependency-light lowering with no `bevy_scene`
+/// dependency. Use it when the scene-producing [`rsx`] machinery is overkill or
+/// unavailable.
+#[cfg(feature = "rsx")]
+#[proc_macro]
+pub fn rsx_direct(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	rsx_direct::impl_rsx_direct(input)
+}
+
+/// Authors a Leptos/Solid-style function component that lowers to an
+/// `impl Scene`.
+///
+/// From `fn Name(p1: T1, p2: T2, ..) -> impl Scene` it generates a props
+/// struct `NameProps` (`Default` + `SetWith`, with per-param `#[prop(into)]`
+/// becoming `#[set_with(into)]`) and rewrites the function to take that props
+/// struct. Capitalized tags in [`rsx`] map attributes to the props setters by
+/// name, so omitted attributes fall back to `Default`.
+///
+/// With the `slot` feature (default), `<slot>` placeholders in the body are
+/// hoisted into `SceneProp` props: `<slot/>` becomes a `children` prop,
+/// `<slot name="x"/>` an `x` prop (`-` lowered to `_`). The caller fills them
+/// with `slot="x"` content (default = unmarked children).
+///
+/// ```rust ignore
+/// #[scene]
+/// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Scene {
+///     rsx! { <button>{label} <slot/></button> }
+/// }
+/// ```
+#[cfg(feature = "rsx")]
+#[proc_macro_attribute]
+pub fn scene(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	scene::impl_scene(attr, item)
+}
+
+
+/// Entry point macro for async `main` functions, using [`async_executor::LocalExecutor`].
+///
+/// Works like a standard async main entry point but uses `async-executor` for a lightweight, dependency-light runtime.
+///
+/// # Requirements
+///
+/// - Must be applied to an `async fn main()`
+/// - Not supported on `wasm32` targets
+///
+/// # Example
+///
+/// ```ignore
+/// #[beet::main]
+/// async fn main() {
+///   // async code here
+/// }
+///
+/// #[beet::main]
+/// async fn main() -> Result {
+///   // async code returning a Result
+///   Ok(())
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn beet_main(
+	attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	main_attr::impl_main_attr(attr, input)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
+}
+
+#[proc_macro_attribute]
+pub fn action(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	action::impl_action(attr, item)
+}
+
+/// Generate getter methods for struct fields.
+///
+/// All methods are `pub` by default and return `&T`.
+///
+/// ## Struct-level attributes
+///
+/// - `#[get(clone)]` - return `T` via `.clone()` by default
+/// - `#[get(copy)]` - return `T` by copy by default
+/// - `#[get(vis = private)]` - set default visibility
+/// - `#[get(unwrap_trait)]` - unwrap `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ## Field-level attributes
+///
+/// - `#[get(skip)]` - skip this field
+/// - `#[get(clone)]`, `#[get(copy)]`, `#[get(vis = pub_crate)]` - override per field
+/// - `#[get(unwrap_trait)]` - unwrap trait wrapper for this field
+///
+/// ```ignore
+/// #[derive(Get)]
+/// #[get(copy)]
+/// pub struct Point {
+///     x: f32,
+///     #[get(clone, vis = private)]
+///     name: String,
+/// }
+/// ```
+#[proc_macro_derive(Get, attributes(get))]
+pub fn derive_get(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	getset::get::impl_get(input)
+}
+
+/// Generate mutable getter methods for struct fields.
+///
+/// All methods are `pub` by default and return `&mut T`.
+/// Method names follow the `field_mut` convention.
+///
+/// ```ignore
+/// #[derive(GetMut)]
+/// pub struct Foo {
+///     #[get_mut(vis = pub_crate)]
+///     name: String,
+///     #[get_mut(skip)]
+///     secret: String,
+/// }
+/// ```
+#[proc_macro_derive(GetMut, attributes(get_mut))]
+pub fn derive_get_mut(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	getset::get_mut::impl_get_mut(input)
+}
+
+/// Generate setter methods for struct fields.
+///
+/// All methods are `pub` by default, take `&mut self`, and return `&mut Self`.
+/// Method names follow the `set_field` convention.
+///
+/// ## Options
+///
+/// - `unwrap_option` - accept `T` instead of `Option<T>`, wrapping with `Some`
+/// - `unwrap_trait` - accept `impl Trait` for `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ```ignore
+/// #[derive(Set)]
+/// pub struct Config {
+///     name: String,
+///     #[set(unwrap_option)]
+///     label: Option<String>,
+///     #[set(unwrap_trait)]
+///     handler: Box<dyn Handler>,
+/// }
+/// ```
+#[proc_macro_derive(Set, attributes(set))]
+pub fn derive_set(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	getset::set::impl_set(input)
+}
+
+/// Generate builder-style setter methods for struct fields.
+///
+/// All methods are `pub` by default, take `mut self`, and return `Self`.
+/// Method names follow the `with_field` convention.
+///
+/// ## Options
+///
+/// - `unwrap_option` - accept `T` instead of `Option<T>`, wrapping with `Some`
+/// - `unwrap_trait` - accept `impl Trait` for `Box<dyn Trait>` / `Arc<dyn Trait>`
+///
+/// ```ignore
+/// #[derive(SetWith)]
+/// pub struct Config {
+///     name: String,
+///     #[set_with(unwrap_option)]
+///     label: Option<String>,
+/// }
+///
+/// let config = Config::default().with_name("hello".into()).with_label("world".into());
+/// ```
+#[proc_macro_derive(SetWith, attributes(set_with))]
+pub fn derive_set_with(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	getset::set_with::impl_set_with(input)
 }

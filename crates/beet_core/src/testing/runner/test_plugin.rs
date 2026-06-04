@@ -2,16 +2,51 @@
 
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::SingleThreadedExecutor;
 use bevy::time::TimePlugin;
 
-/// Entry point for the custom test runner, invoked by the test harness.
-pub fn test_runner(tests: &[&test::TestDescAndFn]) {
+/// Builds and runs the test app for the given owned tests.
+fn run_tests_app(tests: Vec<TestDescAndFn>) {
 	let mut app = App::new();
 	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
-		.spawn_then((
-			Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),
-			tests_bundle_borrowed(tests),
-		))
+		.spawn((TestRunnerConfig::from_env(), tests_bundle(tests)))
+		.run();
+}
+
+// On wasm the linker only calls `__wasm_call_ctors` from exported functions
+// under "command-style linkage" heuristics; calling it explicitly guarantees
+// `inventory`'s registration constructors have run before we collect. It is
+// idempotent for inventory-generated constructors. See the inventory docs.
+#[cfg(target_family = "wasm")]
+unsafe extern "C" {
+	fn __wasm_call_ctors();
+}
+
+/// Stable-Rust entry point: runs every [`BeetTestCase`] registered via
+/// [`inventory`]. Invoked by the `beet_core::test_main!()` macro.
+pub fn test_main() {
+	#[cfg(target_family = "wasm")]
+	unsafe {
+		__wasm_call_ctors();
+	}
+	run_tests_app(inventory_tests());
+}
+
+/// Runs an explicit set of beet tests, cloning static descriptors.
+///
+/// Used by the `examples/runner.rs` demo. The nightly
+/// `custom_test_frameworks` harness uses [`libtest_runner`] instead.
+pub fn test_runner(tests: &[&TestDescAndFn]) {
+	run_tests_app(tests.iter().map(|t| test_ext::clone_static(t)).collect());
+}
+
+/// Entry point for the nightly `custom_test_frameworks` test harness,
+/// invoked via `#![test_runner(beet_core::libtest_runner)]`.
+#[cfg(feature = "custom_test_frameworks")]
+pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
+	let mut app = App::new();
+	app.add_plugins((MinimalPlugins, AppExitPlugin, TestPlugin))
+		.spawn((TestRunnerConfig::from_env(), tests_bundle_borrowed(tests)))
 		.run();
 }
 
@@ -28,6 +63,27 @@ impl Plugin for TestPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<TimePlugin>()
 			.insert_schedule_before(Update, RunTests)
+			// Force single-threaded execution so `spawn_local` in `run_tests_series`
+			// always lands on the main thread's local executor.
+			// With `bevy_multithreaded`, the default is `MultiThreaded`, which
+			// can dispatch systems to worker threads whose thread-local executors
+			// are not ticked by `tick_global_task_pools_on_main_thread`, causing
+			// async test tasks to never complete.
+			//
+			// We could alternatively just mark run_tests_series with NonSendMarker,
+			// but thats more error-prone
+			.edit_schedule(RunTests, |schedule| {
+				schedule.set_executor(SingleThreadedExecutor::new());
+			})
+			// Timeouts are checked in PreUpdate *before* the async bridge sync
+			// point applies test-completion inserts, so a test that finishes
+			// right at its deadline is still reported as a timeout rather than
+			// racing its own completion.
+			.add_systems(
+				PreUpdate,
+				trigger_timeouts
+					.before(async_world_sync_point::<BeetAsyncSyncPoint>),
+			)
 			.add_systems(
 				RunTests,
 				(
@@ -35,9 +91,9 @@ impl Plugin for TestPlugin {
 					filter_tests,
 					log_case_running,
 					(run_tests_series, run_non_send_tests_series),
-					trigger_timeouts,
 					insert_suite_outcome,
 					log_case_outcomes,
+					log_file_outcomes,
 					log_suite_outcome,
 					exit_on_suite_outcome,
 				)

@@ -1,24 +1,20 @@
+use beet_action::prelude::*;
 use beet_core::prelude::When;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 
-/// Applies constant translation to [`Running::origin`],
-/// multiplied by [`Time::delta_secs`]
-/// ## Tags
-/// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateAgent](ActionTag::MutateAgent)
+/// Applies constant translation to the agent, multiplied by
+/// [`Time::delta_secs`].
+///
+/// A long-running action: stays [`Running`] while active, translating
+/// the agent every frame.
 /// ## Example
-/// Translates to the right at 1 unit per second.
+/// Translates to the right at 1 unit per second while running.
 /// ```
-/// # use beet_flow::prelude::*;
 /// # use beet_core::prelude::*;
+/// # use beet_action::prelude::*;
 /// # use beet_spatial::prelude::*;
 /// # let mut world = World::new();
-///	world.spawn((
-/// 	Transform::default(),
-///		Translate::new(Vec3::new(1.0, 0., 0.)),
-///		))
-///		.trigger_target(GetOutcome);
+/// world.spawn((Transform::default(), Translate::new(Vec3::new(1.0, 0., 0.))));
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -49,25 +45,23 @@ pub(crate) fn translate(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
-			.init_resource::<Time>();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
 
 		let agent = app
 			.world_mut()
 			.spawn((
 				Transform::default(),
 				Translate::new(Vec3::new(1.0, 0., 0.)),
+				Running::<Outcome>::new(OutHandler::default()),
 			))
-			.trigger_target(GetOutcome)
-			.flush()
 			.id();
 
 		app.update_with_secs(1);

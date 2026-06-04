@@ -1,21 +1,29 @@
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
+//! The `beet` command-line interface.
+//!
+//! Every command runs as a route on a [`CliServer`]-backed [`router`], so
+//! `beet --help` lists them and `beet <command>` dispatches. `run-wasm` is the
+//! cargo runner for `wasm32-unknown-unknown` targets; it is served greedily
+//! (`run-wasm/*args`) so the binary path and trailing args are captured and
+//! forwarded to the running module.
 use beet::prelude::*;
+use beet_cli::prelude::*;
 
-fn main() {
+fn main() -> AppExit {
 	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			CliPlugin,
-			AppExitPlugin,
-			LogPlugin::default(),
-			// #[cfg(debug_assertions)]
-			// DebugFlowPlugin::default(),
-		))
-		.try_set_error_handler(bevy::ecs::error::panic)
-		.add_systems(Startup, cli_routes)
-		.run();
+		.add_plugins((MinimalPlugins, LogPlugin::default(), ClientAppPlugin))
+		.add_systems(Startup, setup)
+		.run()
 }
 
-
-fn cli_routes(mut commands: Commands) { commands.spawn(beet_cli()); }
+/// Spawns the CLI server with every command wired as a route.
+fn setup(mut commands: Commands) {
+	commands
+		.spawn((CliServer::default(), default_router()))
+		.with_children(|parent| {
+			parent.spawn(exchange_route("run-wasm/*args", RunWasm));
+			parent.spawn(exchange_route("build-wasm", BuildWasm));
+			parent.spawn(exchange_route("export-pdf", ExportPdf));
+			#[cfg(feature = "qrcode")]
+			parent.spawn(exchange_route("qrcode", QrCode));
+		});
+}

@@ -38,7 +38,7 @@ fn spawn_arm_with_keyboard_target(
 		spawn_keyboard_target(&mut commands, &mut meshes, &mut materials);
 	commands.spawn((
 		Name::new("scene"),
-		SceneRoot(asset_server.load(
+		WorldAssetRoot(asset_server.load(
 			GltfAssetLabel::Scene(0).from_asset("robot-arm/robot-arm.glb"),
 		)),
 		Transform::from_scale(Vec3::splat(10.)),
@@ -170,6 +170,7 @@ fn ik_segment(
 	arm_width: f32,
 	color: Srgba,
 ) -> Entity {
+	use beet::exports::bevy::prelude::Visibility;
 	commands
 		.insert((Name::new("Segment"), transform, Visibility::Visible))
 		.with_children(|parent| {

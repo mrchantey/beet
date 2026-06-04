@@ -1,0 +1,9 @@
+
+:root {
+  --io-crates-beet-ui-style-material-colors-on-primary: var(--io-crates-beet-ui-style-material-tones-primary20);
+  --io-crates-beet-ui-style-material-tones-primary20: rgb(0, 255, 0);
+}
+
+.color-primary {
+  color: var(--io-crates-beet-ui-style-material-colors-on-primary);
+}

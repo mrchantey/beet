@@ -1,14 +1,15 @@
 //! inspired by [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
+extern crate alloc;
+
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use proc_macro2::TokenStream;
-use syn::Expr;
 use syn::Ident;
 use syn::Member;
 use syn::Result;
 use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
-use syn::parse::Parser;
-use syn::punctuated::Punctuated;
 
 
 /// [`AttributeItem`] collection parsed from Syn attributes.
@@ -35,16 +36,6 @@ impl AttributeGroup {
 		Ok(Self { attributes })
 	}
 
-	/// Parse 'foo,bar,bazz' into a vec of expressions
-	pub fn parse_punctated(tokens: TokenStream) -> Result<Vec<Expr>> {
-		let args = Punctuated::<Expr, Token![,]>::parse_terminated
-			.parse2(tokens)?
-			.into_iter()
-			.collect::<Vec<_>>();
-		Ok(args)
-	}
-
-
 	/// ## Errors
 	/// if any of the attributes does not match a provided key
 	pub fn validate_allowed_keys(&self, keys: &[&str]) -> Result<&Self> {
@@ -53,7 +44,7 @@ impl AttributeGroup {
 				if !keys.contains(&name.to_string().as_str()) {
 					return Err(syn::Error::new(
 						name.span(),
-						format!(
+						alloc::format!(
 							"Invalid Attribute key `{}`. Allowed attributes are: {}",
 							name,
 							keys.join(", ")

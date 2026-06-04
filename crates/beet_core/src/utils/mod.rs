@@ -7,56 +7,77 @@
 //! # Key Types
 //!
 //! - [`Xtend`] - Method chaining utilities for any type
-//! - [`BevyhowError`] - Error type for use with Bevy's error handling
 //! - [`Tree`] - Simple tree data structure
-//! - [`GlobFilter`] - Glob pattern matching utilities
-//!
+//! - [`GlobFilter`] - Glob pattern matching utilities (requires `std`)
 //! # Macros
 //!
-//! - [`bevyhow!`](crate::bevyhow) - Create a [`BevyError`](bevy::ecs::error::BevyError) with formatting
-//! - [`bevybail!`](crate::bevybail) - Early return with a [`BevyError`](bevy::ecs::error::BevyError)
 //! - [`cross_log!`](crate::cross_log) - Cross-platform logging (works in wasm)
 
+mod as_any;
 /// Async utilities and future helpers.
 pub mod async_ext;
 mod backoff;
-mod bevyhow;
+mod cfg_if;
+#[cfg(feature = "std")]
 mod cli_args;
-mod clone_func;
-mod cross_log;
+/// Coalescing trigger for async write deduplication.
+mod coalescing_trigger;
+pub mod cross_log;
 /// Display formatting utilities.
 pub mod display_ext;
+#[cfg(feature = "std")]
 mod file_span;
+#[cfg(feature = "std")]
 mod glob_filter;
+mod into_option;
+// LazyPool is built on async_lock (std-only).
+#[cfg(feature = "std")]
+mod lazy_pool;
 mod line_col;
-#[cfg(feature = "ansi_paint")]
-pub mod paint_ext;
+/// A no_std one-shot value channel.
+mod once_value;
+#[cfg(feature = "std")]
 mod panic_context;
 /// Process and command execution utilities.
+#[cfg(feature = "std")]
 pub mod process_ext;
 #[cfg(feature = "rand")]
 mod random_source;
-pub mod terminal_ext;
-/// Time and duration utilities.
-pub mod time_ext;
-mod tree;
 #[cfg(feature = "serde")]
-pub mod type_info_to_json_schema;
+pub mod serde_ext;
+/// Stream conversion utilities for byte-to-text streaming.
+#[cfg(feature = "std")]
+pub mod stream_ext;
+pub use into_option::*;
+#[cfg(feature = "std")]
+pub use stream_ext::TextStream;
+/// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
+/// [`time_ext::pretty_print_duration`] works on no_std.
+pub mod time_ext;
+#[cfg(feature = "std")]
+pub use lazy_pool::*;
+mod tree;
 /// Timer utilities for WebAssembly environments.
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 mod xtend;
+pub use as_any::*;
 
 pub use async_ext::LifetimeSendBoxedFuture;
 pub use async_ext::MaybeSendBoxedFuture;
 pub use async_ext::SendBoxedFuture;
 pub use backoff::*;
-pub use bevyhow::*;
+pub use bevy::tasks::BoxedFuture;
+#[cfg(feature = "std")]
 pub use cli_args::*;
-pub use clone_func::*;
+pub use coalescing_trigger::*;
+#[cfg(feature = "std")]
 pub use file_span::*;
+#[cfg(feature = "std")]
 pub use glob_filter::*;
 pub use line_col::*;
+pub use once_value::*;
+#[cfg(feature = "std")]
 pub use panic_context::*;
 #[cfg(feature = "rand")]
 pub use random_source::*;

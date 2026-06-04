@@ -18,22 +18,18 @@ path = "src/main.rs"
 
 [features]
 default = ["qrcode"]
-qrcode = ["dep:qrcode","dep:image"]
+qrcode = ["dep:qrcode", "dep:image"]
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# TODO only launch, others should be seperate apps
-beet = { workspace = true, features = ["launch", "webdriver", "clanker"] }
-ron.workspace = true
-bevy.workspace = true
-heck.workspace = true
-qrcode = {version = "0.14", optional = true }
-image = {version = "0.25", optional = true }
-
-#💡 Automod
-syn.workspace = true
-proc-macro2.workspace = true
-quote.workspace = true
-prettyplease.workspace = true
+[dependencies]
+beet = { workspace = true, features = [
+	"router",
+	"fs",
+	"infra",
+	"json",
+	"webdriver",
+] }
+qrcode = { version = "0.14", optional = true }
+image = { version = "0.25", optional = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }

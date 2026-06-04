@@ -238,7 +238,7 @@ impl<T: 'static + Send> Store<Vec<T>> {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let store = Store::new(0);
 
@@ -247,7 +247,7 @@ mod test {
 		store.get().xpect_eq(1);
 	}
 
-	#[test]
+	#[crate::test]
 	fn vec() {
 		let store = Store::<Vec<u32>>::default();
 
@@ -262,7 +262,7 @@ mod test {
 		store.len().xpect_eq(0);
 	}
 
-	#[test]
+	#[crate::test]
 	fn get_index() {
 		let store = Store::<Vec<u32>>::default();
 		store.push(10);

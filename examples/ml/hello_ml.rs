@@ -1,52 +1,73 @@
 //! # Hello ML
-//! A popular 'hello world' for machine learning in games is sentence similarity,
-//! where models rank the similarity of sentences.
-//! This example uses a locally run *small* language model to
-//! select the child behavior with the most similar sentence.
 //!
-//! So if we ask the Bert to run the child with the nearest sentence
-//! to "please kill the baddies", which action do you think it will take?
-//!
-//! Note that the [Name] components are for debugging only, its the
-//! [Sentence] components that are used for the actual behavior selection.
+//! Minimal sentence-similarity demo: once the [`Bert`] asset finishes
+//! loading, the agent's prompt ("please kill the baddies") is compared
+//! to each child's [`Sentence`] and the winner is logged.
 use beet::prelude::*;
 
-// #[rustfmt::skip]
 pub fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
-			AssetPlugin::default(),
-			ControlFlowPlugin::default(),
-			DebugFlowPlugin::default(),
-			RunOnAssetReadyPlugin::<Bert>::default(),
-			LanguagePlugin::default(),
+			LogPlugin::default(),
+			AssetPlugin {
+				meta_check: bevy::asset::AssetMetaCheck::Never,
+				..default()
+			},
+			AsyncPlugin,
+			ActionPlugin,
+			BeetMlPlugins,
 		))
 		.add_systems(Startup, setup)
+		.add_systems(Update, choose_when_loaded)
 		.run();
 }
 
-#[rustfmt::skip]
+/// Marker so the chooser system runs at most once.
+#[derive(Component)]
+struct Pending;
+
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-	let bert = asset_server.load("ml/default-bert.ron");
-	commands
-		.spawn((
-			Name::new("Hello ML"),
-			HandleWrapper(bert.clone()),
-			RunOnAssetReady::<Bert>::new(bert),
-			NearestSentence::new(),
-			Sentence::new("please kill the baddies"),
-			children![
-				(
-					// this wont run
-					Name::new("Heal Behavior"),
-					Sentence::new("heal")
-				),
-				(
-					// this will run, closer sentence similarity
-					Name::new("Attack Behavior"),
-					Sentence::new("attack")
-				)
-			]
-		));
+	let bert = asset_server.load::<Bert>("ml/default-bert.ron");
+	commands.spawn((
+		Name::new("Hello ML"),
+		Pending,
+		Sentence::new("please kill the baddies"),
+		NearestSentence::new(bert),
+		children![
+			(Name::new("Heal Behavior"), Sentence::new("heal")),
+			(Name::new("Attack Behavior"), Sentence::new("attack")),
+		],
+	));
+}
+
+fn choose_when_loaded(
+	mut commands: Commands,
+	mut berts: ResMut<Assets<Bert>>,
+	mut exit: MessageWriter<AppExit>,
+	sentences: Query<&Sentence>,
+	names: Query<&Name>,
+	mut pending: Query<
+		(Entity, &Sentence, &NearestSentence, &Children),
+		With<Pending>,
+	>,
+) -> Result {
+	for (entity, prompt, near, children) in pending.iter_mut() {
+		let Some(mut bert) = berts.get_mut(&near.bert) else {
+			continue;
+		};
+		let chosen = bert.closest_sentence_entity(
+			prompt.0.clone(),
+			children.iter(),
+			&sentences,
+		)?;
+		let name = names
+			.get(chosen)
+			.map(|n| n.to_string())
+			.unwrap_or_else(|_| format!("{chosen}"));
+		info!("NearestSentence chose: {name}");
+		commands.entity(entity).remove::<Pending>();
+		exit.write(AppExit::Success);
+	}
+	Ok(())
 }

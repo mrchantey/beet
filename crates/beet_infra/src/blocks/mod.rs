@@ -1,0 +1,19 @@
+#![allow(unused)]
+#[cfg(feature = "lambda_block")]
+mod lambda;
+#[cfg(feature = "lambda_block")]
+pub use lambda::*;
+#[cfg(feature = "lightsail_block")]
+mod lightsail;
+#[cfg(feature = "lightsail_block")]
+pub use lightsail::*;
+#[cfg(feature = "fargate_block")]
+mod fargate;
+#[cfg(feature = "fargate_block")]
+pub use fargate::*;
+mod block;
+pub use block::*;
+#[cfg(feature = "bindings_aws_common")]
+mod s3_bucket_block;
+#[cfg(feature = "bindings_aws_common")]
+pub use s3_bucket_block::*;

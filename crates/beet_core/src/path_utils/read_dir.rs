@@ -350,7 +350,7 @@ impl ReadDir {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	#[ignore = "just experiments"]
 	fn relative_to() {
 		let a = std::fs::read_dir("../")
@@ -370,7 +370,7 @@ mod test {
 		// a.to_str().unwrap().xpect_eq("../beet_core");
 	}
 
-	#[test]
+	#[crate::test]
 	fn fails() {
 		let err_str = ReadDir::default()
 			.read(fs_ext::test_dir().join("foo"))
@@ -380,7 +380,7 @@ mod test {
 		err_str.contains("test_dir/foo").xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn dirs() {
 		let err_str = ReadDir::dirs(fs_ext::test_dir().join("foo"))
 			.unwrap_err()
@@ -390,7 +390,7 @@ mod test {
 		ReadDir::dirs(fs_ext::test_dir()).unwrap().len().xpect_eq(2);
 	}
 
-	#[test]
+	#[crate::test]
 	fn read_dir_recursive() {
 		ReadDir::dirs_recursive(fs_ext::test_dir())
 			.unwrap()
@@ -398,7 +398,7 @@ mod test {
 			.xpect_eq(2);
 	}
 
-	#[test]
+	#[crate::test]
 	fn files() {
 		ReadDir::files(fs_ext::test_dir())
 			.unwrap()
@@ -406,7 +406,7 @@ mod test {
 			.xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn files_recursive() {
 		ReadDir::files_recursive(fs_ext::test_dir())
 			.unwrap()

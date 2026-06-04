@@ -1,13 +1,10 @@
-// Folder-specific settings
-//
-// For a full list of overridable settings, and general information on folder-specific settings,
-// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+// https://zed.dev/docs/configuring-zed#settings-files
 {
+	// "show_completions_on_input": false,
 	// "completions": {
 	// 	"words": "disabled"
 	// },
 	// "show_edit_predictions": false,
-	// "show_completions_on_input": false,
 	// "snippet_sort_order": "inline",
 	// "autosave": "off",
 	"lsp": {
@@ -15,38 +12,99 @@
 			"initialization_options": {
 				"cargo": {
 					// "target": "wasm32-unknown-unknown",
-					"features": [
-						// "server"
-						// "client",
-						// "launch",
-						// "tungstenite"
-						// "lambda"
-						// "aws"
-						// "webdriver",
-						// "css",
-						// "sim",
-						// "bevy_default",
-						// "spatial",
-						// "examples",
-						// "ml",
-						// "cuda",
-						// "rand"
-					]
-				}
-			}
-		}
+					// "features": "all",
+					"features": [],
+					// run check on nightly so `nightly` feature's #![feature(..)] compiles (avoids E0554)
+					"extraEnv": { "RUSTUP_TOOLCHAIN": "nightly" },
+					// [
+					// "all",
+					// "tui",
+					// "world_serde",
+					// "json",
+					// "_pretty_curl",
+					// "_mini_browser",
+					// "http_server",
+					// "stack",
+					// "server"
+					// "client",
+					// "launch",
+					// "tungstenite"
+					// "lambda"
+					// "aws"
+					// "webdriver",
+					// "css",
+					// "sim",
+					// "bevy_default",
+					// "spatial",
+					// "examples",
+					// "ml",
+					// "cuda",
+					// "rand"
+					// ],
+				},
+				"completion": {
+					"snippets": {
+						"custom": {
+							"Arc::new": {
+								"postfix": "arc",
+								"body": ["Arc::new(${receiver})"],
+								"requires": "std::sync::Arc",
+								"scope": "expr",
+							},
+							"Some": {
+								"postfix": "some",
+								"body": ["Some(${receiver})"],
+								"scope": "expr",
+							},
+							"Ok": {
+								"postfix": "ok",
+								"body": ["Ok(${receiver})"],
+								"scope": "expr",
+							},
+							"Rc::new": {
+								"postfix": "rc",
+								"body": ["Rc::new(${receiver})"],
+								"requires": "std::rc::Rc",
+								"scope": "expr",
+							},
+							"Box::pin": {
+								"postfix": "boxpin",
+								"body": ["Box::pin(${receiver})"],
+								"requires": "std::boxed::Box",
+								"scope": "expr",
+							},
+							"vec!": {
+								"postfix": "vec",
+								"body": ["vec![${receiver}]"],
+								"description": "vec![]",
+								"scope": "expr",
+							},
+						},
+					},
+				},
+			},
+		},
 	},
-	"diagnostics": {},
+	"file_scan_inclusions": ["agent/plan*", "agent/beet_flow*", "agent/report*"],
 	"file_scan_exclusions": [
-		// ".beet",
+		".cargo",
+		".beet",
+		".claude",
+		".gitignore",
+		".env.example",
+		".github",
+		".playwright-cli",
+		".vscode",
+		"CLAUDE.md",
+		"target",
+		"rustfmt.toml",
+		"CHANGELOG.md",
+		"Cargo.lock",
 		"**/.git",
 		".gitattributes",
 		"LICENSE-APACHE.txt",
 		"LICENSE-MIT.txt",
 		"**/node_modules",
-		// "**/target",
-		// "**/*.log",
-		// "**/Cargo.lock",
-		"rustc-ice**"
-	]
+		// "rustc-ice**",
+	],
 }

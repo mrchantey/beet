@@ -13,7 +13,7 @@
 //!
 //! This module requires the `tokens` feature flag.
 
-pub use beet_core_shared::*;
+pub use beet_core_shared::prelude::*;
 mod tokenize_components;
 mod tokenize_self;
 mod unspan;

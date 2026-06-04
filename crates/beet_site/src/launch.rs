@@ -1,169 +1,42 @@
-use beet::exports::syn;
+//! Build-time route codegen.
+//!
+//! Scans the site's route directories and writes the generated route modules
+//! into `src/codegen/`. Run before a `web`/`terminal` build so the generated
+//! modules exist:
+//!
+//! ```not_rust
+//! cargo run -p beet_site --no-default-features --features codegen
+//! ```
 use beet::prelude::*;
 
+/// Scans every route collection and writes the generated route modules to disk.
+pub fn run_codegen() -> Result { async_ext::block_on(route_codegen().export()) }
 
-pub fn launch_plugin(app: &mut App) {
-	let mut config = WorkspaceConfig::default();
-	config
-		.snippet_filter
-		.include("*/crates/beet_design/src/**/*")
-		.include("*/crates/beet_site/src/**/*");
-
-	app.insert_resource(config);
-
-	app.world_mut().spawn(collections());
-}
-
-pub fn collections() -> impl Bundle {
-	(
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_site/src/codegen/mod.rs",
-			)
-			.unwrap(),
-		),
-		children![
-			route_tree(),
-			pages_collection(),
-			docs_collection(),
-			blog_collection(),
-			design_mockups_collection(),
-			actions_collection()
-		],
-	)
-}
-
-fn route_tree() -> impl Bundle {
-	(
-		StaticRouteTree::default(),
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_site/src/codegen/route_tree.rs",
-			)
-			.unwrap(),
-		),
-	)
-}
-
-
-fn pages_collection() -> impl Bundle {
-	(
-		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_site/src/pages")
-				.unwrap(),
-			..default()
-		},
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_site/src/codegen/pages.rs",
-			)
-			.unwrap(),
-		),
-	)
-}
-fn docs_collection() -> impl Bundle {
-	(
-		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_site/src/docs")
-				.unwrap(),
-			..default()
-		},
-		ModifyRoutePath::default().base_route("/docs"),
-		MetaType::new(syn::parse_quote!(beet::prelude::ArticleMeta)),
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_site/src/codegen/docs/mod.rs",
-			)
-			.unwrap(),
-		),
-	)
-}
-fn blog_collection() -> impl Bundle {
-	(
-		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_site/src/blog")
-				.unwrap(),
-			..default()
-		},
-		ModifyRoutePath::default().base_route("/blog"),
-		MetaType::new(syn::parse_quote!(beet::prelude::ArticleMeta)),
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_site/src/codegen/blog/mod.rs",
-			)
-			.unwrap(),
-		),
-	)
-}
-
-fn design_mockups_collection() -> impl Bundle {
-	(
-		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_design/src")
-				.unwrap(),
-			filter: GlobFilter::default()
-				.with_include("*.mockup*")
-				.with_exclude("/codegen/*"),
-			..default()
-		},
-		ModifyRoutePath::default()
-			.base_route("/docs/design")
-			.replace_route(".mockup", ""),
-		MetaType::new(syn::parse_quote!(crate::prelude::ArticleMeta)),
-		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel(
-				"crates/beet_design/src/codegen/mockups.rs",
-			)
-			.unwrap(),
+/// The full codegen pass: the page, docs and blog collections plus the typed
+/// route tree.
+fn route_codegen() -> RouteCodegen {
+	RouteCodegen::new()
+		.add_collection(RouteCollection::new(
+			site_rel("src/pages"),
+			codegen("pages.rs"),
+		))
+		.add_collection(
+			RouteCollection::new(site_rel("src/docs"), codegen("docs/mod.rs"))
+				.with_base_route("docs"),
 		)
-		.with_pkg_name("beet_design")
-		.set_imports(vec![
-			syn::parse_quote! {
-			#[allow(unused_imports)]
-			use beet_core::prelude::*;},
-			syn::parse_quote! {
-			#[allow(unused_imports)]
-			use beet_rsx::prelude::*;},
-			syn::parse_quote! {
-			#[allow(unused_imports)]
-			use beet_dom::prelude::*;},
-			syn::parse_quote! {
-			#[allow(unused_imports)]
-			use beet_router::prelude::*;},
-			syn::parse_quote! {
-			#[allow(unused_imports)]
-			use crate::prelude::*;},
-		]),
-	)
+		.add_collection(
+			RouteCollection::new(site_rel("src/blog"), codegen("blog/mod.rs"))
+				.with_base_route("blog"),
+		)
+		.with_route_tree(codegen("route_tree.rs"))
 }
 
+/// An absolute path to a file relative to the `beet_site` crate root.
+fn site_rel(path: &str) -> AbsPathBuf {
+	AbsPathBuf::new_workspace_rel(format!("crates/beet_site/{path}")).unwrap()
+}
 
-fn actions_collection() -> impl Bundle {
-	let actions_path = AbsPathBuf::new_workspace_rel(
-		"crates/beet_site/src/codegen/actions.rs",
-	)
-	.unwrap();
-
-	(
-		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_site/src/actions")
-				.unwrap(),
-			category: RouteCollectionCategory::Actions,
-			..default()
-		},
-		CodegenFile::new(actions_path.clone()),
-		children![(
-			CollectClientActions::default(),
-			CodegenFile::new(
-				AbsPathBuf::new_workspace_rel(
-					"crates/beet_site/src/codegen/client_actions.rs",
-				)
-				.unwrap(),
-			)
-			.with_import(syn::parse_quote!(
-				#[allow(unused_imports)]
-				use crate::prelude::*;
-			))
-		)],
-	)
+/// A [`CodegenFile`] targeting `src/codegen/<name>`.
+fn codegen(name: &str) -> CodegenFile {
+	CodegenFile::new(site_rel(&format!("src/codegen/{name}")))
 }

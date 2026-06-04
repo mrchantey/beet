@@ -17,34 +17,52 @@
 pub fn internal_or_beet(pkg_name: &str) -> syn::Path {
 	if !is_internal() {
 		syn::parse_str("beet").unwrap()
-	} else if pkg_name == std::env::var("CARGO_PKG_NAME").unwrap() {
+	} else if pkg_name == crate_name() {
 		syn::parse_str("crate").unwrap()
 	} else {
 		syn::parse_str(pkg_name).unwrap()
 	}
 }
+/// Resolve the path to the `bevy` crate for macro output.
+///
+/// Always reached through a `beet_core`/`beet` re-export (`exports::bevy`), so a
+/// crate consuming the macro needs no direct `bevy` dependency — only the
+/// `beet_core` (internal) or `beet` (downstream) it already depends on. Mirrors
+/// [`internal_or_beet`]: `crate` inside `beet_core`, `beet_core` for other
+/// internal crates, `beet` downstream.
+pub fn bevy() -> syn::Path {
+	let base = if !is_internal() {
+		"beet"
+	} else if crate_name() == "beet_core" {
+		"crate"
+	} else {
+		"beet_core"
+	};
+	syn::parse_str(&alloc::format!("{base}::exports::bevy")).unwrap()
+}
+
+fn crate_name() -> alloc::string::String {
+	std::env::var("CARGO_PKG_NAME").unwrap()
+}
+
 
 /// checks the CARGO_PKG_NAME against a list of internal packages
 pub fn is_internal() -> bool {
 	const INTERNAL_PKGS: &[&str] = &[
-		"beet_clanker",
+		"beet_thread",
 		"beet_build",
 		"beet_core",
 		"beet_core_macros",
 		"beet_core_shared",
-		"beet_design",
-		"beet_dom",
 		"beet_flow",
 		"beet_flow_macros",
 		"beet_ml",
 		"beet_net",
-		"beet_parse",
-		"beet_rsx",
-		"beet_rsx_macros",
-		"beet_rsx_combinator",
+		"beet_ui",
 		"beet_router",
 		"beet_spatial",
+		"beet_action",
+		"beet_infra",
 	];
-	let current_pkg = std::env::var("CARGO_PKG_NAME").unwrap();
-	INTERNAL_PKGS.contains(&current_pkg.as_str())
+	INTERNAL_PKGS.contains(&crate_name().as_str())
 }

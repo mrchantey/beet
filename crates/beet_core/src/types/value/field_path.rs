@@ -1,0 +1,196 @@
+//! A path for navigating nested [`Value`] structures by key or index.
+//!
+//! Used by [`ValueSchema`] validation, document field references, and any
+//! other code that needs to point at a specific location within a [`Value`].
+use crate::prelude::*;
+
+/// A path to a specific field within a [`Value`].
+#[derive(
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	DerefMut,
+	Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FieldPath(Vec<FieldSegment>);
+
+impl FieldPath {
+	/// Build a path from any iterator of items convertible into [`FieldSegment`].
+	pub fn new<T>(segments: impl IntoIterator<Item = T>) -> Self
+	where
+		T: Into<FieldSegment>,
+	{
+		Self(segments.into_iter().map(Into::into).collect())
+	}
+	/// Consume into the underlying segment vector.
+	pub fn into_inner(self) -> Vec<FieldSegment> { self.0 }
+
+	/// Push a segment onto this path.
+	pub fn push(&mut self, segment: impl Into<FieldSegment>) {
+		self.0.push(segment.into());
+	}
+	/// Pop the last segment, if any.
+	pub fn pop(&mut self) -> Option<FieldSegment> { self.0.pop() }
+
+	/// Clone this path with `segment` appended.
+	pub fn with_pushed(&self, segment: impl Into<FieldSegment>) -> Self {
+		let mut path = self.clone();
+		path.push(segment);
+		path
+	}
+}
+
+impl From<Vec<FieldSegment>> for FieldPath {
+	fn from(segments: Vec<FieldSegment>) -> Self { Self(segments) }
+}
+impl From<&[FieldSegment]> for FieldPath {
+	fn from(segments: &[FieldSegment]) -> Self { Self(segments.to_vec()) }
+}
+
+impl core::fmt::Display for FieldPath {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let segments = self
+			.0
+			.iter()
+			.map(|seg| match seg {
+				FieldSegment::ArrayIndex(i) => format!("[{}]", i),
+				FieldSegment::ObjectKey(k) => k.to_string(),
+			})
+			.collect::<Vec<_>>()
+			.join(".");
+		write!(f, "{}", segments)
+	}
+}
+
+/// A path segment for navigating [`Value`] structures.
+///
+/// Paths are built from sequences of these segments to access nested fields.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FieldSegment {
+	/// Access an array element by index.
+	ArrayIndex(usize),
+	/// Access an object field by key.
+	ObjectKey(SmolStr),
+}
+impl FieldSegment {
+	/// Create a field segment for an object key.
+	pub fn key(key: impl Into<SmolStr>) -> Self { Self::ObjectKey(key.into()) }
+	/// Create a field segment for an array index.
+	pub fn index(index: usize) -> Self { Self::ArrayIndex(index) }
+}
+
+impl core::fmt::Display for FieldSegment {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			FieldSegment::ArrayIndex(i) => write!(f, "{}", i),
+			FieldSegment::ObjectKey(k) => write!(f, "{}", k),
+		}
+	}
+}
+
+impl From<&str> for FieldSegment {
+	fn from(s: &str) -> Self { Self::key(s) }
+}
+impl From<&&str> for FieldSegment {
+	fn from(s: &&str) -> Self { Self::key(*s) }
+}
+impl From<String> for FieldSegment {
+	fn from(s: String) -> Self { Self::key(s) }
+}
+impl From<SmolStr> for FieldSegment {
+	fn from(s: SmolStr) -> Self { Self::ObjectKey(s) }
+}
+impl From<usize> for FieldSegment {
+	fn from(i: usize) -> Self { Self::index(i) }
+}
+impl From<u32> for FieldSegment {
+	fn from(i: u32) -> Self { Self::index(i as usize) }
+}
+impl From<u64> for FieldSegment {
+	fn from(i: u64) -> Self { Self::index(i as usize) }
+}
+impl From<i32> for FieldSegment {
+	fn from(i: i32) -> Self { Self::index(i as usize) }
+}
+impl From<i64> for FieldSegment {
+	fn from(i: i64) -> Self { Self::index(i as usize) }
+}
+
+/// Convert various types into a [`FieldPath`].
+pub trait IntoFieldPath<M> {
+	/// Convert this value into a [`FieldPath`].
+	fn into_field_path(self) -> FieldPath;
+}
+impl IntoFieldPath<Self> for FieldPath {
+	fn into_field_path(self) -> FieldPath { self }
+}
+/// Marker type for the iterator-based [`IntoFieldPath`] impl.
+pub struct IteratorIntoFieldPathMarker;
+
+impl<T, U> IntoFieldPath<IteratorIntoFieldPathMarker> for T
+where
+	T: IntoIterator<Item = U>,
+	U: Into<FieldSegment>,
+{
+	fn into_field_path(self) -> FieldPath {
+		self.into_iter().map(Into::into).collect::<Vec<_>>().into()
+	}
+}
+
+impl IntoFieldPath<Self> for &[FieldSegment] {
+	fn into_field_path(self) -> FieldPath { self.to_vec().into() }
+}
+impl IntoFieldPath<Self> for &str {
+	fn into_field_path(self) -> FieldPath {
+		vec![FieldSegment::key(self)].into()
+	}
+}
+impl IntoFieldPath<Self> for String {
+	fn into_field_path(self) -> FieldPath {
+		vec![FieldSegment::key(self)].into()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[crate::test]
+	fn field_path_conversion() {
+		let string_vec =
+			vec!["a".to_string(), "b".to_string()].into_field_path();
+		string_vec
+			.into_inner()
+			.xpect_eq(vec![FieldSegment::key("a"), FieldSegment::key("b")]);
+
+		let str_vec = vec!["x", "y"].into_field_path();
+		str_vec
+			.into_inner()
+			.xpect_eq(vec![FieldSegment::key("x"), FieldSegment::key("y")]);
+
+		let index_vec = vec![0, 1, 2].into_field_path();
+		index_vec.into_inner().xpect_eq(vec![
+			FieldSegment::index(0),
+			FieldSegment::index(1),
+			FieldSegment::index(2),
+		]);
+	}
+
+	#[crate::test]
+	fn push_pop() {
+		let mut path = FieldPath::default();
+		path.push("foo");
+		path.push(2usize);
+		path.to_string().xpect_eq("foo.[2]");
+		path.pop().unwrap().xpect_eq(FieldSegment::index(2));
+		path.to_string().xpect_eq("foo");
+	}
+}

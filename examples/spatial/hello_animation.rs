@@ -44,39 +44,48 @@ fn setup(
 	commands.spawn((
 		Name::new("Foxie"),
 		Transform::from_scale(Vec3::splat(0.1)),
-		SceneRoot(asset_server.load("misc/fox.glb#Scene0")),
+		WorldAssetRoot(asset_server.load("misc/fox.glb#Scene0")),
 		graph_handle,
 		// AnimationTransitions::default(),
 		children![(
 			Name::new("Behavior"),
 			TriggerOnAnimationReady::run(),
-			Sequence::default(),
-			Retrigger::default(),
-			children![
-				(
-					Name::new("Idle"),
-					PlayAnimation::new(idle_index)
+			Repeat::new(),
+			children![(Name::new("round"), Sequence::new(), children![
+				(Name::new("Idle"), Sequence::new(), children![
+					(
+						Name::new("Play Idle"),
+						PlayAnimation::new(idle_index)
+							.with_transition_duration(transition_duration,),
+					),
+					(
+						Name::new("Await Idle End"),
+						TriggerOnAnimationEnd::new(
+							idle_clip,
+							idle_index,
+							Outcome::PASS,
+						)
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(
-						idle_clip,
-						idle_index,
-						Outcome::Pass
-					)
-					.with_transition_duration(transition_duration)
-				),
-				(
-					Name::new("Walking"),
-					PlayAnimation::new(walk_index)
-						.repeat(RepeatAnimation::Count(8))
+					),
+				],),
+				(Name::new("Walking"), Sequence::new(), children![
+					(
+						Name::new("Play Walk"),
+						PlayAnimation::new(walk_index)
+							.repeat(RepeatAnimation::Count(8))
+							.with_transition_duration(transition_duration,),
+					),
+					(
+						Name::new("Await Walk End"),
+						TriggerOnAnimationEnd::new(
+							walk_clip,
+							walk_index,
+							Outcome::PASS,
+						)
 						.with_transition_duration(transition_duration),
-					TriggerOnAnimationEnd::new(
-						walk_clip,
-						walk_index,
-						Outcome::Pass
-					)
-					.with_transition_duration(transition_duration)
-				)
-			]
+					),
+				],)
+			])]
 		)],
 	));
 }

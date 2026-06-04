@@ -1,25 +1,21 @@
+use beet_action::prelude::*;
 use beet_core::prelude::When;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
-use std::f32::consts::TAU;
+use core::f32::consts::TAU;
 
 
 /// Translates the agent up and down in a sine wave.
-/// ## Tags
-/// - [LongRunning](ActionTag::LongRunning)
-/// - [MutateAgent](ActionTag::MutateAgent)
+///
+/// A long-running action: stays [`Running`] while active, hovering
+/// the agent every frame.
 /// ## Example
 /// Hovers up and down every two seconds, at a height of 0.1 meters.
 /// ```
-/// # use beet_flow::prelude::*;
 /// # use beet_core::prelude::*;
+/// # use beet_action::prelude::*;
 /// # use beet_spatial::prelude::*;
 /// # let mut world = World::new();
-///	world.spawn((
-/// 	Transform::default(),
-///		Hover::new(2.,0.1),
-///		))
-///		.trigger_target(GetOutcome);
+/// world.spawn((Transform::default(), Hover::new(2., 0.1)));
 /// ```
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -54,7 +50,7 @@ pub(crate) fn hover(
 ) -> Result {
 	for (action, hover) in actions.iter() {
 		let elapsed = time.elapsed_secs();
-		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
+		let y = ops::sin(TAU * elapsed * hover.speed) * hover.height;
 		agents.get_mut(action)?.translation.y = y;
 	}
 	Ok(())
@@ -64,21 +60,23 @@ pub(crate) fn hover(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((ControlFlowPlugin::default(), BeetSpatialPlugins))
-			.init_resource::<Time>();
+		app.add_plugins(BeetSpatialPlugins).init_resource::<Time>();
 
 		let agent = app
 			.world_mut()
-			.spawn((Transform::default(), Hover::default()))
-			.trigger_target(GetOutcome)
+			.spawn((
+				Transform::default(),
+				Hover::default(),
+				Running::<Outcome>::new(OutHandler::default()),
+			))
 			.id();
 
 		// the 'top' of a sine wave is a quarter of 1 hz

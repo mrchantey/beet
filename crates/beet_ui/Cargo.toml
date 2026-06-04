@@ -1,0 +1,139 @@
+[package]
+name = "beet_ui"
+version.workspace = true
+edition.workspace = true
+description = "Agnostic structured data representations in Bevy ECS"
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[[example]]
+name = "render_simple"
+path = "examples/render_simple.rs"
+required-features = ["style"]
+
+[[example]]
+name = "tui"
+path = "examples/tui.rs"
+required-features = ["terminal", "style"]
+
+[[example]]
+name = "term_input"
+path = "examples/term_input.rs"
+required-features = ["terminal"]
+
+[[example]]
+name = "build_css"
+path = "examples/build_css.rs"
+required-features = ["style"]
+
+[[example]]
+name = "showcase"
+path = "examples/showcase.rs"
+required-features = ["scene", "style"]
+
+# measures the real terminal via crossterm, so requires the `terminal` feature
+[[example]]
+name = "layout"
+path = "examples/layout.rs"
+required-features = ["terminal"]
+
+
+[features]
+default = ["std","rsx", "style"]
+std = []
+# Backend-agnostic keyboard input: the `FocusPlugin` reads bevy `KeyboardInput`
+# messages and routes them to the focused entity's `Value`. Opt-in so a plain
+# `beet_ui` build does not pull `bevy/keyboard`. Terminal renderers enable it.
+keyboard = ["std", "beet_core/bevy_keyboard"]
+action = ["dep:beet_action", "net"]
+net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/fs", "beet_net/http"]
+tokens = ["beet_core/tokens"]
+rsx = ["beet_core/rsx"]
+# Bevy's first-party scene system (`Scene`/`Template`/`bsn!`). Heavy + std-only,
+# so it is opt-in; `rsx_direct!` and beet_core stay free of it.
+scene = ["std", "rsx", "bevy/scene"]
+style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
+serde = ["dep:serde"]
+
+ratatui = ["dep:bevy_ratatui", "dep:ratatui", "keyboard"]
+terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse"]
+
+json = ["dep:serde_json", "serde", "beet_core/json"]
+postcard = ["dep:postcard", "serde", "beet_core/postcard"]
+html_parser = ["dep:winnow"]
+markdown_parser = ["html_parser", "dep:pulldown-cmark"]
+syntax_highlighting = [
+	"style",
+	"dep:tree-sitter",
+	"dep:tree-sitter-rust",
+	"dep:tree-sitter-javascript",
+	"dep:tree-sitter-json",
+	"dep:tree-sitter-html",
+	"dep:streaming-iterator"
+]
+
+world_serde = ["beet_core/world_serde", "serde"]
+
+[dependencies]
+beet_core = { workspace = true, features = ["std"] }
+beet_net = { workspace = true, optional = true }
+beet_action = { workspace = true, optional = true, features = ["std", "reflect"] }
+bevy.workspace = true
+extend.workspace = true
+bytes.workspace = true
+libc = { workspace = true, optional = true }
+vte = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+winnow = { version = "0.7", optional = true }
+pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
+serde_json = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
+heck = { workspace = true, optional = true }
+bitflags = { workspace = true, optional = true }
+thiserror.workspace = true
+variadics_please.workspace = true
+webbrowser.workspace = true
+material-colors = {version = "0.4.2", optional = true }
+
+
+# tree-sitter grammars are C parsers that don't cross-compile to wasm
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+libc = {workspace = true, optional = true}
+ratatui = {workspace = true, optional = true, features=["crossterm","unstable-rendered-line-info"]}
+bevy_ratatui = {workspace = true, optional = true, features = ["crossterm","keyboard", "mouse"] }
+tree-sitter = { version = "0.26", optional = true }
+tree-sitter-rust = { version = "0.24", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-json = { version = "0.24", optional = true }
+tree-sitter-html = { version = "0.23", optional = true }
+streaming-iterator = { version = "0.1", optional = true }
+
+
+[dev-dependencies]
+beet_core = { workspace = true, features = ["testing"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server"] }
+
+[lib]
+harness = false
+
+[[test]]
+name = "rsx"
+path = "tests/rsx.rs"
+harness = false
+
+[[test]]
+name = "scene"
+path = "tests/scene.rs"
+harness = false
+required-features = ["scene"]
+
+[[test]]
+name = "widgets"
+path = "tests/widgets.rs"
+harness = false
+required-features = ["scene"]

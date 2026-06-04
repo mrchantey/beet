@@ -1,4 +1,4 @@
-//! Router benchmark example.
+//! Router benchmark.
 //!
 //! Benches a large amount of nested branches to measure routing overhead.
 //! In practice this is quite a large tree; a well formed router should
@@ -10,14 +10,7 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo run --example router_bench --features server_app
-//! ```
-//!
-//! Test with:
-//! ```sh
-//! curl http://localhost:8337
-//! curl http://localhost:8337/nested
-//! curl http://localhost:8337/status
+//! cargo bench --bench router_bench --features server_app
 //! ```
 #![recursion_limit = "1024"]
 use beet::prelude::*;

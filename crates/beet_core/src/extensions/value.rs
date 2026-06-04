@@ -1,8 +1,14 @@
 //! Extension trait for [`serde_json::Value`] with ergonomic accessors.
 
+use crate::bevybail;
+use alloc::format;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use bevy::ecs::error::BevyError;
 use bevy::ecs::error::Result;
 use extend::ext;
+use serde_json::Number;
 use serde_json::Value;
 
 /// Extension methods for [`Value`] providing typed field access with error messages.
@@ -17,7 +23,6 @@ pub impl Value {
 			Err(BevyError::from(format!("Expected object, got {:?}", self)))
 		}
 	}
-
 
 	/// wraps [`Value::as_str`] with helpful error message
 	fn to_str(&self) -> Result<&str> {
@@ -60,8 +65,47 @@ pub impl Value {
 			.then(|| ())
 			.ok_or_else(|| format!("Expected null, got {:?}", self).into())
 	}
+	/// wraps [`Value::as_str`] with helpful error message
+	fn to_str_mut(&mut self) -> Result<&mut str> {
+		if let Value::String(str) = self {
+			Ok(str)
+		} else {
+			bevybail!("Expected string, got {:?}", self)
+		}
+	}
+	/// wraps [`Value::Number`] as mut with helpful error message (mutable)
+	fn to_number_mut(&mut self) -> Result<&mut Number> {
+		if let Value::Number(num) = self {
+			Ok(num)
+		} else {
+			bevybail!("Expected Number, got {:?}", self)
+		}
+	}
 
-
+	/// wraps [`Value::as_bool`] with helpful error message (mutable)
+	fn to_bool_mut(&mut self) -> Result<&mut bool> {
+		if let Value::Bool(b) = self {
+			Ok(b)
+		} else {
+			bevybail!("Expected bool, got {:?}", self)
+		}
+	}
+	/// wraps [`Value::as_array`] with helpful error message (mutable)
+	fn to_array_mut(&mut self) -> Result<&mut Vec<Value>> {
+		if let Value::Array(arr) = self {
+			Ok(arr)
+		} else {
+			bevybail!("Expected array, got {:?}", self)
+		}
+	}
+	/// wraps [`Value::as_object`] with helpful error message (mutable)
+	fn to_object_mut(&mut self) -> Result<&mut serde_json::Map<String, Value>> {
+		if let Value::Object(obj) = self {
+			Ok(obj)
+		} else {
+			bevybail!("Expected object, got {:?}", self)
+		}
+	}
 	/// Get a non-null field, returning a helpful error message if it is missing.
 	fn field(&self, field_name: &str) -> Result<&Value> {
 		match &self[field_name]{
@@ -174,7 +218,7 @@ mod tests {
 	use serde_json::json;
 
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_success() {
 		json!({"name": "Alice"})
 			.field_str("name")
@@ -182,7 +226,7 @@ mod tests {
 			.xpect_eq("Alice");
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_missing_field() {
 		json!({"name": "Alice"})
 			.field_str("age")
@@ -192,7 +236,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_str_wrong_type() {
 		json!({"age": 30})
 			.field_str("age")
@@ -202,12 +246,12 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_i64_success() {
 		json!({"age": 42}).field_i64("age").unwrap().xpect_eq(42);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_i64_wrong_type() {
 		json!({"age": "not a number"})
 			.field_i64("age")
@@ -217,7 +261,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_u64_success() {
 		json!({"count": 123u64})
 			.field_u64("count")
@@ -225,7 +269,7 @@ mod tests {
 			.xpect_eq(123);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_f64_success() {
 		json!({"score": 3.14})
 			.field_f64("score")
@@ -233,7 +277,7 @@ mod tests {
 			.xpect_eq(3.14);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_bool_success() {
 		json!({"active": true})
 			.field_bool("active")
@@ -241,21 +285,21 @@ mod tests {
 			.xpect_eq(true);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_array_success() {
 		let value = json!({"items": [1, 2, 3]});
 		let arr = value.field_array("items").unwrap();
 		arr.len().xpect_eq(3);
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_object_success() {
 		let value = json!({"meta": {"foo": 1}});
 		let obj = value.field_object("meta").unwrap();
 		obj.get("foo").unwrap().clone().xpect_eq(json!(1));
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_null_success() {
 		json!({"gone": null})
 			.field_null("gone")
@@ -263,7 +307,7 @@ mod tests {
 			.xpect_true();
 	}
 
-	#[test]
+	#[crate::test]
 	fn test_field_null_wrong_type() {
 		json!({"gone": 1})
 			.field_null("gone")

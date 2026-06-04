@@ -39,7 +39,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	#[test]
+	#[beet_core::test]
 	fn works() {
 		let mut world = World::new();
 

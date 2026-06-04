@@ -5,6 +5,8 @@ opt-level = 0
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1
+# keeps debug binaries from exceeding /tmp limits during doctest linking
+split-debuginfo = "unpacked"
 
 # Enable high optimizations for dependencies (incl. Bevy) which do not change often
 # but not for our code which takes longer to rebuild:
@@ -12,7 +14,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.9-dev.1"
+version = "0.0.9-dev.11"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "A malleable application framework"
@@ -21,7 +23,7 @@ readme = "README.md"
 homepage = "https://beetstack.dev"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["folk-technology", "web", "behavior", "game-ai", "robotics"]
+keywords = ["malleable-software", "local-first", "cross-platform", "framework", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
@@ -37,34 +39,29 @@ resolver = "2"
 
 exclude = [
 	"infra",
-	"crates/beet_build/tests/pipeline_test_crate",
 	"bevy"
 ]
 
 members = [
 
 	## 💡 Core
+	"crates/beet_async",
 	"crates/beet_core",
 	"crates/beet_core/macros",
 	"crates/beet_core/shared",
+	"crates/beet_infra",
+	"crates/beet_net",
+	"crates/beet_ui",
+	"crates/beet_router",
+	"crates/beet_thread",
+	"crates/beet_action",
+	"examples/infra/extra-types",
 
 	## 💡 Flow
 	"crates/beet_examples",
-	"crates/beet_flow",
+	# "crates/beet_flow",
 	"crates/beet_ml",
 	"crates/beet_spatial",
-
-	## 💡 RSX
-	"crates/beet_net",
-	"crates/beet_clanker",
-	"crates/beet_build",
-	"crates/beet_design",
-	"crates/beet_dom",
-	"crates/beet_parse",
-	"crates/beet_router",
-	"crates/beet_rsx_combinator",
-	"crates/beet_rsx/macros",
-	"crates/beet_rsx",
 
 	## 💡 Beet
 	"crates/beet_site",
@@ -74,84 +71,89 @@ members = [
 [workspace.dependencies]
 ## internal
 
-beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.1" }
-beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.1" }
-beet_core = { path = "crates/beet_core", version = "0.0.9-dev.1" }
+beet = { path = "", version = "0.0.9-dev.11" }
+beet_thread = { path = "crates/beet_thread", version = "0.0.9-dev.11" }
+beet_core_macros = { path = "crates/beet_core/macros", version = "0.0.9-dev.11" }
+beet_core_shared = { path = "crates/beet_core/shared", version = "0.0.9-dev.11" }
+# no_std by default; std-only consumers add `features = ["std"]`.
+beet_core = { path = "crates/beet_core", version = "0.0.9-dev.11", default-features = false }
+# vendored bevy_async bridge; no_std by default, std consumers add `features = ["std"]`.
+beet_async = { path = "crates/beet_async", version = "0.0.9-dev.11", default-features = false }
+beet_infra = { path = "crates/beet_infra", version = "0.0.9-dev.11" }
+# no_std by default (the `types/` wire types); std-only consumers add
+# `features = ["std", "serde", "fs", "http"]`.
+beet_net = { path = "crates/beet_net", version = "0.0.9-dev.11", default-features = false }
+beet_ui = { path = "crates/beet_ui", version = "0.0.9-dev.11" }
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11" }
+beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-features = false }
 
-beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.1" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.1" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.1" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.1" }
-
-beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.9-dev.1" }
-beet_parse = { path = "crates/beet_parse", version = "0.0.9-dev.1" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.9-dev.1" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.9-dev.1" }
-beet_build = { path = "crates/beet_build", version = "0.0.9-dev.1" }
-beet_design = { path = "crates/beet_design", version = "0.0.9-dev.1" }
-beet_net = { path = "crates/beet_net", version = "0.0.9-dev.1" }
-beet_router = { path = "crates/beet_router", version = "0.0.9-dev.1" }
-beet_dom = { path = "crates/beet_dom", version = "0.0.9-dev.1" }
-beet_clanker = { path = "crates/beet_clanker", version = "0.0.9-dev.1" }
-
-beet = { path = "", version = "0.0.9-dev.1" }
+# beet_flow = { path = "crates/beet_flow", version = "0.0.9-dev.11" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11", default-features = false }
+beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
 
 #💡 local
-bevy = { version = "0.18", default-features = false, features = [
-	"std", # std for reflect PathBuf
-	"debug",
-	"bevy_log",
-	"bevy_color",
-	# bug, required cos bevy not compiling when beet_router includes this
-	# TODO remove after sweet local observers
-	"reflect_documentation",
-	# bevy recommends not to do this in libraries but beet_core --all-features wont compile without it
-	# even if feature forced on, not sure why
-	"reflect_auto_register",
+# bevy_ecs = {version = "0.19", default-features = false, features = ["backtrace"]}
+# std / bevy_log / debug are NOT forced here so that no_std consumers (e.g. the
+# esp32 firmware) can depend on a bare bevy. They are re-enabled for normal
+# builds via `beet_core/std`, which every std beet crate pulls transitively.
+bevy = { version = "0.19.0-rc.2", default-features = false, features = [
 	# for most oneshot apps multi-threaded coldstart is much slower than
 	# any potential performance gain, even more prominent for linear pipelines
 	# "multi_threaded",
 	# doesnt seem accurate, lists despawn location as spawn location
 	# "track_location",
-	"keyboard",
+	# "keyboard",
 ] }
+bevy_reflect = { version = "0.19.0-rc.2", default-features = false, features = ["smol_str"] }
 
 #💡 utility
-thiserror = "1"
-heck = "0.4"
+# default-features disabled so beet_core can build no_std; std consumers get the
+# std bits back transitively via `beet_core/std`.
+bitflags = "2"
+thiserror = { version = "2", default-features = false }
+heck = "0.5"
 glob = "0.3"
 dotenv = "0.15"
-send_wrapper = "0.6"
-web-time = "1"
-itertools = "0.14"
-mime_guess = "2"
-uuid = {version = "1",features=["js"]}
+send_wrapper = { version = "0.6", features = ["futures"] }
+inventory = "0.3"
+itertools = { version = "0.14", default-features = false }
+# default-features off (drops `std`) so dependents can compile on no_std;
+# std consumers re-add `uuid/std`. `js`/`rng-getrandom` backends are opt-in per crate.
+uuid = { version = "1", default-features = false }
 chrono = "0.4"
-rand = "0.9"
-rand_chacha = "0.9"
-# wasm_js ignored in native
-getrandom = { version = "0.4", features = ["wasm_js"] }
+# default-features off (drops `std`, `std_rng`, `thread_rng`) so dependents can
+# compile on no_std; std consumers re-add the relevant features.
+rand = { version = "0.9", default-features = false }
+rand_chacha = { version = "0.9", default-features = false }
+# wasm_js ignored in native. Backs ahash (via material-colors) and rand 0.9 on
+# wasm. uuid uses its own `js` backend, so getrandom 0.4 stays out of the graph.
+getrandom = { version = "0.3", features = ["wasm_js"] }
 variadics_please = "1"
+webbrowser = "1"
 
 #💡 logging
 log = "0.4"
-tracing = "0.1"
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-nu-ansi-term = "0.50"
 pretty_env_logger = "0.4"
-
 
 #💡 async
 futures = "0.3"
+# no_std core stream/future traits, used by no_std-capable wire types.
+futures-core = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "2", default-features = false, features = ["alloc"] }
 pin-project = "1"
 async-channel = "2"
 async-executor = "1"
 async-fs = "2"
 async-io = "2"
+futures-io = "0.3"
 async-lock = "3"
 async-process = "2"
 async-task = "4"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
+russh = { version = "0.60", default-features = false }
 
 #💡 macros
 
@@ -167,24 +169,48 @@ proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.26", default-features = false, features = ["derive"] }
 strum_macros = "0.26"
 extend = "1"
 
 #💡 io
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-base64 = "0.22"
+libc = "0.2"
+bytes = { version = "1", default-features = false }
+smol_str = { version = "0.2", default-features = false }
+# no_std by default; std consumers re-enable `serde/std` (eg via `beet_core/std`).
+serde = { version = "1", default-features = false, features = ["derive"] }
+# no_std by default (alloc only); std consumers re-enable `serde_json/std`.
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+# std/no_std mode + serde are selected by beet_action's feature flags
+# (`rhai` for std scripting, `rhai_no_std` for embedded), so no defaults here.
+rhai = { version = "1", default-features = false }
+# QuickJS engine via high-level bindings to the bundled C engine. `rust-alloc`
+# routes allocation through Rust's global allocator instead of libc's malloc; the
+# std vs bare-metal mode is selected on beet_action's `quickjs` feature edge.
+rquickjs = { version = "0.12", default-features = false, features = ["rust-alloc"] }
+postcard = { version = "1", features = ["alloc"] }
+serde_plain = "1"
+# no_std by default (alloc only); std consumers re-enable `base64/std`.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+sha2 = "0.10"
 ron = "0.8"
 toml = "0.8"
-bytes = "1"
 
 #💡 http
 http = "1"
 http-body-util = "0.1"
+url = "2"
+
+#💡 tui
+vte = "0.15.0"
+termion = { version = "4" }
+crossterm = { version = "0.29" }
+bevy_ratatui = { git = "https://github.com/mrchantey/bevy_ratatui", branch = "main", default-features = false }
+ratatui = { version = "0.30", default-features = false }
 
 #💡 web
 js-sys = "0.3"
+# lock to the same version as the cli
 wasm-bindgen = "=0.2.121"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
@@ -207,72 +233,148 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["flow"]
-# default = ["nightly"]
-#💡 helper features
-launch = ["dom", "net", "build", "router"]
-server_app = ["serde","dom","fs", "net", "router", "beet_router/server","design"]
-client = [
-	"rsx",
-	"design",
-	"net",
-	"dom",
-	"serde",
-	"router",
-	"beet_net/client",
-	"beet_dom/client",
-	"beet_design/client",
-]
-http_server = ["net", "beet_net/server"]
+# default = ["stack"]
+default = ["std", "ui"]
 
-#💡 fine-grained
-native-tls = [
-	"beet_clanker?/native-tls",
-	"beet_net?/native-tls",
-]
-rustls-tls = [
-	"beet_clanker?/rustls-tls",
-	"beet_net?/rustls-tls",
-]
+# Standard library support (enabled by default). no_std consumers depend on beet
+# with `default-features = false`.
+std = ["beet_core/std", "beet_action?/std", "beet_net?/std", "beet_spatial?/std"]
+# Minimal no_std build for bare-metal targets (e.g. esp32 firmware): the libm /
+# critical-section shims, no ui/net/action/etc. Capabilities are opt-in.
+embedded = ["beet_core/embedded"]
+# Bevy colour types (`Color`, `Srgba`, …) plus beet's `ColorExt`.
+bevy_color = ["beet_core/bevy_color"]
+
+# 💡 Top Level
+
+http_server = ["net", "action","router", "beet_net/server", "beet_router?/http"]
+tui_server = ["ratatui","router", "markdown"]
+
+# 💡 Core
+
 serde = ["beet_core/serde", "beet_net?/serde", "beet_router?/serde"]
-nightly = ["beet_core/nightly","beet_dom?/nightly","beet_rsx?/nightly"]
+nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
-clanker = ["dep:beet_clanker","net","router"]
+json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
+postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
+# RON text format for `MediaType::Ron` and `world_serde` loading.
+ron = ["serde", "beet_core/ron"]
+# Plaintext (de)serialization for `MediaType::Text`.
+serde_plain = ["serde", "beet_core/serde_plain"]
 testing = ["beet_core/testing"]
-dom = ["css", "dep:beet_dom"]
-router = ["dep:beet_router"]
-examples = ["bevy_default", "spatial", "dep:beet_examples"]
-flow = ["dep:beet_flow"]
-css = ["beet_parse?/css", "beet_rsx?/css"]
-design = ["rsx", "dep:beet_design"]
-webdriver = ["dom","beet_dom?/webdriver"]
-parse = ["dep:beet_parse"]
-rsx = ["dep:beet_rsx"]
-ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-cuda = ["ml","beet_ml/cuda"]
-# 💡 Server
-lambda = ["rustls-tls", "beet_net?/lambda"]
-aws = ["beet_net?/aws"]
-
-spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
-build = ["parse", "dep:beet_build"]
-bevy_scene = ["beet_core/bevy_scene"]
+# The nightly `custom_test_frameworks` test-runner path (libtest harness). Stable
+# builds use the default `inventory` runner.
+custom_test_frameworks = ["beet_core/custom_test_frameworks"]
+fs = ["beet_core/fs","beet_net?/fs"]
 bevy_default = [
 	"bevy/default",
 	"beet_core/bevy_default",
-	"beet_dom/bevy_scene",
-	"beet_dom/bevy_text",
 	"beet_examples?/bevy_default",
-	"beet_flow?/bevy_default",
-	"beet_ml?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
-#💡 utils
-fs = ["beet_clanker?/fs","beet_core/fs","beet_net?/fs","beet_router?/fs"]
+world_serde = ["beet_core/world_serde", "beet_net?/world_serde", "beet_router?/world_serde", "beet_thread?/world_serde"]
+bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
+bevy_keyboard = ["beet_core/bevy_keyboard"]
+bevy_mouse = ["beet_core/bevy_mouse"]
+bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithreaded"]
+
+# 💡 Net
+
+# Note: `net` deliberately does NOT enable `beet_router/http` — that would pull
+# beet_router's std HTTP-server surface, which a no_std consumer (`router_embedded`)
+# must avoid. The std `router`/`http_server` features re-add it explicitly.
 net = ["dep:beet_net"]
+# The agnostic mDNS service browser engine + pure wire helpers (no_std). esp
+# enables this for the browser and supplies its own `edge-nal`-backed UDP socket
+# impl; on a host, pair with `udp` to get the std `async-io` socket driver.
+mdns = ["net", "beet_net/mdns"]
+# The std impl of beet_net's trait-only UDP socket seam over `async-io` (the
+# `UdpEndpoint`/`UdpSocket` trait itself is in `net`, always no_std). Needed by
+# the std mDNS browser driver `run_mdns_browser`.
+udp = ["net", "beet_net/udp"]
+native-tls = [
+"net", "beet_net/native-tls",
+]
+# beet_net is a hard dependency of beet_router. The facade pins beet_router to
+# `default-features = false`, so the std router must re-enable the std + markdown
+# + http surface it relied on (previously supplied by default features + net).
+router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http"]
+# no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
+# dispatch and middleware core from beet_router, without the std scene/help
+# rendering pipeline. See `beet_router`'s `embedded` module.
+router_embedded = ["action", "net", "dep:beet_router"]
+rustls-tls = [
+"net", "beet_net/rustls-tls",
+]
+lambda = ["rustls-tls", "beet_net?/lambda"]
+aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk"]
+deploy = ["infra", "beet_infra?/deploy"]
 tungstenite = ["net", "beet_net?/tungstenite"]
+webdriver = ["net", "beet_net?/webdriver"]
 ureq = ["net", "beet_net?/ureq"]
 reqwest = ["net", "beet_net?/reqwest"]
+hyper = ["net", "beet_net?/hyper"]
+_pretty_curl = ["net", "ui", "ureq", "rustls-tls"]
+_mini_browser = ["_pretty_curl", "ratatui", "router"]
+ssh_server = ["net", "beet_net?/russh_server", "native-tls"]
+ssh_client = ["net", "beet_net?/russh_client", "native-tls"]
+
+
+thread = ["dep:beet_thread","net","action"]
+
+
+# 💡 Stack
+
+# When beet_net is also present (eg `router_embedded`), turn on its no_std
+# action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
+# are available on bare-metal targets too.
+action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
+# Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pair with a
+# backend (eg `rhai`) and `rhai_serde` for a working typed `Script`.
+scripting = ["action","beet_action/scripting"]
+# The rhai engine, re-exported via `beet::exports::rhai`. Bare engine for
+# embedded consumers (no_std, no serde, no router registrations).
+rhai = ["action","beet_action/rhai"]
+# The std typed-`Script` rhai backend: the serde marshalling runtime plus the
+# beet_router scripting registrations. Pulls `rhai` + `serde` + `std`.
+rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/scripting"]
+# The QuickJS engine, re-exported via `beet::exports::rquickjs`. Bare engine for
+# consumers that marshal values by hand (no serde, no router registrations).
+quickjs = ["action","beet_action/quickjs"]
+# The std typed-`Script` QuickJS backend: the JSON marshalling runtime plus the
+# beet_router scripting registrations. Pulls `quickjs` + `serde` + `std`.
+quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
+ui = ["dep:beet_ui"]
+# Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
+# Sidebar, Table). Heavy + std-only, so it stays opt-in.
+scene = ["ui", "beet_ui?/scene"]
+style = ["ui", "beet_ui?/style"]
+# Backend-agnostic keyboard input routed to the focused entity (`FocusPlugin`).
+keyboard = ["ui", "beet_ui?/keyboard"]
+ratatui = ["beet_ui?/ratatui"]
+terminal = ["ui", "beet_ui?/terminal"]
+markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
+# Build-time route code generation (route tree, server/client actions, typed links).
+codegen = ["router", "beet_router?/codegen"]
+syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
+
+infra = ["dep:beet_infra"]
+lambda_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lambda_block", "fs", "rand"]
+lightsail_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/lightsail_block", "fs", "rand"]
+fargate_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/fargate_block", "fs", "rand"]
+bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
+bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
+bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]
+
+
+examples = ["bevy_default", "spatial", "dep:beet_examples"]
+ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
+cuda = ["ml", "beet_ml/cuda"]
+# flow = ["dep:beet_flow"]
+# 💡 Server
+
+spatial = ["action", "dep:beet_spatial"]
+# world_serde = ["beet_core/world_serde"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -283,35 +385,31 @@ reqwest = ["net", "beet_net?/reqwest"]
 [dependencies]
 bevy = { workspace = true }
 
-#💡 utils
-beet_core.workspace = true
-
-#💡 web
+beet_core = { workspace = true }
+beet_infra = { workspace = true, optional = true }
+beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
-beet_dom = { workspace = true, optional = true }
-beet_parse = { workspace = true, optional = true }
-beet_rsx = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
-beet_build = { workspace = true, optional = true }
-beet_design = { workspace = true, optional = true }
-beet_clanker = { workspace = true, optional = true }
+beet_ui = { workspace = true, optional = true }
+# Declared explicitly (not via `workspace = true`) so the facade can set
+# `default-features = false`: no_std consumers (`router_embedded`) get the no_std
+# core; the std `router` feature re-adds `beet_router/std` (+ markdown + http).
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11", optional = true, default-features = false }
+beet_action = { workspace = true, optional = true }
 
 #💡 flow
-beet_flow = { workspace = true, optional = true }
+# beet_flow = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
 beet_examples = { workspace = true, optional = true }
 
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# required for rand 0.9 to compile on wasm targets
-uuid = { workspace = true, features = ["rng-getrandom"] }
-# getrandom = { workspace = true }
-getrandom.workspace = true
+# pins uuid's wasm RNG to its `js` (WebCrypto) backend; `rng-getrandom` would
+# drag in getrandom 0.4, whose wasm marshalling traps the test runner.
+uuid = { workspace = true, features = ["std", "js"] }
 
 [dev-dependencies]
-beet = { path = ".", features = ["flow"] }
+beet = { path = "." }
 # beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
@@ -331,35 +429,22 @@ web-sys.workspace = true
 # wasm-bindgen.workspace = true
 # wasm-bindgen-futures.workspace = true
 
-# 💡 Examples - agent
+# 💡 Examples - Net
 
 [[example]]
-name = "chat"
-path = "examples/clanker/chat.rs"
-required-features = ["clanker"]
-
-
-# 💡 Examples - net
-
-[[example]]
-name = "server"
-path = "examples/net/server.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "templating"
-path = "examples/net/templating.rs"
-required-features = ["http_server"]
-
-[[example]]
-name = "client"
-path = "examples/net/client.rs"
+name = "http_client"
+path = "examples/net/http_client.rs"
 required-features = ["net", "ureq", "native-tls"]
 
 [[example]]
-name = "server_bench"
-path = "examples/net/server_bench.rs"
-required-features = ["server_app"]
+name = "http_server"
+path = "examples/net/http_server.rs"
+required-features = ["http_server"]
+
+[[example]]
+name = "socket_client"
+path = "examples/net/socket_client.rs"
+required-features = ["tungstenite", "json"]
 
 [[example]]
 name = "socket_server"
@@ -367,184 +452,242 @@ path = "examples/net/socket_server.rs"
 required-features = ["tungstenite"]
 
 [[example]]
-name = "socket_client"
-path = "examples/net/socket_client.rs"
-required-features = ["tungstenite"]
+name = "templating"
+path = "examples/net/templating.rs"
+required-features = ["http_server"]
 
-# 💡 Examples - flow
+[[example]]
+name = "webdriver"
+path = "examples/net/webdriver.rs"
+required-features = ["webdriver"]
+
+[[example]]
+name = "ssh_server"
+path = "examples/net/ssh_server.rs"
+required-features = ["ssh_server"]
+
+[[example]]
+name = "ssh_client"
+path = "examples/net/ssh_client.rs"
+required-features = ["ssh_client"]
+
+[[example]]
+name = "ssh_tui"
+path = "examples/ui/ssh_tui.rs"
+required-features = ["ssh_server", "terminal"]
+
+# 💡 Examples - Node
+
+[[example]]
+name = "media_renderer"
+path = "examples/ui/media_renderer.rs"
+required-features = ["ui"]
+[[example]]
+name = "style"
+path = "examples/ui/style.rs"
+required-features = ["http_server", "style"]
+
+[[example]]
+name = "pretty_curl"
+path = "examples/ui/pretty_curl.rs"
+required-features = ["_pretty_curl"]
+
+[[example]]
+name = "state"
+path = "examples/ui/state.rs"
+required-features = ["ratatui"]
+
+[[example]]
+name = "crud"
+path = "examples/ui/crud.rs"
+required-features = ["ui", "action"]
+
+[[example]]
+name = "todo"
+path = "examples/todo/todo.rs"
+required-features = ["router", "json"]
+
+[[example]]
+name = "syntax_highlighting"
+path = "examples/ui/syntax_highlighting.rs"
+required-features = ["syntax_highlighting", "markdown"]
+
+# 💡 Examples - Router
+
+[[example]]
+name = "mini_browser"
+path = "examples/router/mini_browser.rs"
+required-features = ["_mini_browser","action"]
+
+[[example]]
+name = "router"
+path = "examples/router/router.rs"
+required-features = ["router", "markdown"]
+
+[[example]]
+name = "cli"
+path = "examples/router/cli.rs"
+required-features = ["router", "rhai_serde"]
+
+[[example]]
+name = "router_serde"
+path = "examples/router/router_serde.rs"
+required-features = ["router", "rhai_serde", "world_serde"]
+
+[[example]]
+name = "file_based_routes"
+path = "examples/file_based_routes/main.rs"
+required-features = ["codegen", "http_server", "json", "markdown", "fs", "ureq", "rustls-tls"]
+
+# 💡 Examples - Thread
+
+[[example]]
+name = "chat"
+path = "examples/thread/chat.rs"
+required-features = ["thread"]
+
+[[example]]
+name = "multi_agent"
+path = "examples/thread/multi_agent.rs"
+required-features = ["thread"]
+
+[[example]]
+name = "oneshot"
+path = "examples/thread/oneshot.rs"
+required-features = ["thread"]
+
+[[example]]
+name = "tool_call"
+path = "examples/thread/tool_call.rs"
+required-features = ["thread", "router"]
+
+[[example]]
+name = "self_evolving"
+path = "examples/thread/self_evolving.rs"
+required-features = ["thread", "fs", "router"]
+
+[[example]]
+name = "coding_agent"
+path = "examples/thread/coding_agent.rs"
+required-features = ["thread", "fs", "router"]
+
+[[example]]
+name = "persistent_chat"
+path = "examples/thread/persistent_chat.rs"
+required-features = ["thread","world_serde"]
+
+
+
+# 💡 Examples - infra
+
+[[example]]
+name = "lifecycle"
+path = "examples/infra/lifecycle.rs"
+required-features = ["bindings_aws_common", "aws_sdk"]
+
+[[example]]
+name = "hello_lambda"
+path = "examples/infra/hello_lambda.rs"
+required-features = ["router", "lambda_block", "markdown"]
+
+[[example]]
+name = "hello_lightsail"
+path = "examples/infra/hello_lightsail.rs"
+required-features = ["router", "lightsail_block", "markdown"]
+
+[[example]]
+name = "hello_fargate"
+path = "examples/infra/hello_fargate.rs"
+required-features = ["router", "fargate_block", "markdown"]
+
+# 💡 Examples - action
 
 [[example]]
 name = "hello_world"
-path = "examples/flow/hello_world.rs"
-required-features = ["flow"]
+path = "examples/action/hello_world.rs"
+required-features = ["action"]
 
 [[example]]
-name = "long_running"
-path = "examples/flow/long_running.rs"
-required-features = ["flow"]
+name = "scripting"
+path = "examples/action/scripting.rs"
+required-features = ["rhai_serde"]
 
 [[example]]
-name = "malenia"
-path = "examples/flow/malenia.rs"
-required-features = ["flow", "rand"]
-
-[[example]]
-name = "repeat_while"
-path = "examples/flow/repeat_while.rs"
-required-features = ["flow"]
+name = "behavior_tree"
+path = "examples/action/behavior_tree.rs"
+required-features = ["action"]
 
 [[example]]
 name = "simple_action"
-path = "examples/flow/simple_action.rs"
-required-features = ["flow"]
+path = "examples/action/simple_action.rs"
+required-features = ["action"]
+
+[[example]]
+name = "long_running"
+path = "examples/action/long_running.rs"
+required-features = ["action"]
+
+[[example]]
+name = "repeat_while"
+path = "examples/action/repeat_while.rs"
+required-features = ["action"]
 
 [[example]]
 name = "state_machine"
-path = "examples/flow/state_machine.rs"
-required-features = ["flow"]
+path = "examples/action/state_machine.rs"
+required-features = ["action"]
 
 [[example]]
 name = "utility_ai"
-path = "examples/flow/utility_ai.rs"
-required-features = ["flow"]
-
-# 💡 Examples - router
+path = "examples/action/utility_ai.rs"
+required-features = ["action"]
 
 [[example]]
-name = "http_router"
-path = "examples/router/http_router.rs"
-required-features = ["server_app"]
-
-[[example]]
-name = "router_bench"
-path = "examples/router/router_bench.rs"
-required-features = ["server_app"]
-
+name = "malenia"
+path = "examples/action/malenia.rs"
+required-features = ["action", "rand"]
 
 # [[example]]
 # name = "app_ml"
 # path = "examples/app_ml.rs"
 
-# [[package.metadata.scene]]
-# name = "app-ml"
-# thumb-text = "🔨"
-# description = "Full Beet App with machine learning, networking, and UI."
-# app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
-# app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
-# app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
-# app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
-
 # [[example]]
 # name = "app"
 # path = "examples/app.rs"
-
-# [[package.metadata.scene]]
-# name = "app"
-# thumb-text = "🔨"
-# description = "Basic Beet App with debugging, camera, and UI."
-# app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app.js"
-# app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_bg.wasm"
-# app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry.json"
-# app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry.json"
-
-# [[package.metadata.scene]]
-# name = "beet-debug"
-# thumb-text = "🐛"
-# description = "Enable debugging for printing to the console, and screen if used with bevyhub/ui-terminal."
-# path = "scenes/beet-debug.json"
-
-# [[example]]
-# name = "export_scenes"
-# path = "examples/export_scenes.rs"
-
-# 💡 Examples - ml
-
-# [[package.metadata.scene]]
-# name = "fetch-scene"
-# thumb-text = "🏠"
-# description = "A camera and the items that the fetch character can go to."
-# path = "scenes/fetch-scene.json"
 
 [[example]]
 name = "fetch"
 path = "examples/ml/fetch.rs"
 required-features = ["examples", "ml"]
 
-# [[package.metadata.scene]]
-# name = "fetch"
-# description = "Combining LLM, steering and animation behaviors."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/fetch.png"
-# app = "app-ml"
-# path = "scenes/fetch-npc.json"
-# include = [
-# 	"bevyhub/ui-terminal-input",
-# 	"bevyhub/lighting-3d",
-# 	"bevyhub/ground-3d",
-# 	"fetch-scene",
-# ]
-# events.playerMessage.initial = "I'm hungry!"
-
-# [[package.metadata.scene]]
-# name = "frozen-lake-scene"
-# thumb-text = "❄️"
-# description = "The static scene for the frozen lake environment."
-# path = "scenes/frozen-lake-scene.json"
-
-
 [[example]]
 name = "frozen_lake_train"
 path = "examples/ml/frozen_lake_train.rs"
 required-features = ["examples", "ml"]
-
-# [[package.metadata.scene]]
-# name = "frozen-lake-train"
-# description = "Train a Q-learning agent to navigate the frozen lake environment."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-# app = "app-ml"
-# path = "scenes/frozen-lake-train.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"beet-debug",
-# 	"frozen-lake-scene",
-# ]
 
 [[example]]
 name = "frozen_lake_run"
 path = "examples/ml/frozen_lake_run.rs"
 required-features = ["examples", "ml"]
 
-# [[package.metadata.scene]]
-# name = "frozen-lake-run"
-# description = "Use a trained Q-learning agent to navigate the frozen lake environment."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-# app = "app-ml"
-# path = "scenes/frozen-lake-run.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"beet-debug",
-# 	"frozen-lake-scene",
-# ]
-
-[[example]]
-name = "hello_ml_chat"
-path = "examples/ml/hello_ml_chat.rs"
-required-features = ["examples", "ml"]
+# [[example]]
+# name = "hello_ml_chat"
+# path = "examples/ml/hello_ml_chat.rs"
+# required-features = ["examples", "ml"]
 
 [[example]]
 name = "hello_ml"
 path = "examples/ml/hello_ml.rs"
 required-features = ["examples", "ml"]
 
-[[package.metadata.scene]]
-name = "hello-ml"
-description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-path = "scenes/hello-ml.json"
-include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
+# [[package.metadata.scene]]
+# name = "hello-ml"
+# description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
+# path = "scenes/hello-ml.json"
+# include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
-# 💡 Examples - spatial
+# 💡 Examples - Spatial
 
 [[example]]
 name = "flock"
@@ -560,25 +703,23 @@ required-features = ["examples", "spatial"]
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
-
 [[example]]
 name = "hello_animation"
 path = "examples/spatial/hello_animation.rs"
 required-features = ["examples", "spatial"]
 
-
-[[package.metadata.scene]]
-name = "hello-animation"
-description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-app = "app"
-path = "scenes/hello-animation.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"beet-debug",
-]
+# [[package.metadata.scene]]
+# name = "hello-animation"
+# description = "A simple behavior demonstrating animation control."
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+# app = "app"
+# path = "scenes/hello-animation.json"
+# include = [
+# 	"bevyhub/ui-terminal",
+# 	"bevyhub/lighting-3d",
+# 	"bevyhub/ground-3d",
+# 	"beet-debug",
+# ]
 
 [[example]]
 name = "inverse_kinematics"
@@ -631,4 +772,26 @@ harness = false
 [[bench]]
 name = "entity_spawn"
 path = "tests/benches/entity_spawn.rs"
+harness = false
+
+[[bench]]
+name = "server_bench"
+path = "tests/benches/beet_net/server_bench.rs"
+harness = false
+# required-features = ["server_app"]
+
+# [[bench]]
+# name = "router_bench"
+# path = "tests/benches/beet_router/router_bench.rs"
+# harness = false
+# required-features = ["server_app"]
+
+[[bench]]
+name = "bench_observer_global"
+path = "tests/benches/bench_observer_global.rs"
+harness = false
+
+[[bench]]
+name = "bench_observer_local"
+path = "tests/benches/bench_observer_local.rs"
 harness = false

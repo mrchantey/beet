@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// Result type alias using [`FsError`].
-pub type FsResult<T = ()> = std::result::Result<T, FsError>;
+pub type FsResult<T = ()> = Result<T, FsError>;
 
 
 /// An file system error that includes the path that caused the error.
@@ -34,6 +34,12 @@ pub enum FsError {
 	#[error("Fs Error - Already Exists\nPath: {path}")]
 	AlreadyExists {
 		/// The path that already exists.
+		path: PathBuf,
+	},
+	/// The path was expected to be relative to the workspace root, but was not.
+	#[error("Fs Error - Expected Workspace Relative Path\nPath: {path}")]
+	ExpectedWorkspaceRelative {
+		/// The path that was expected to be a workspace path.
 		path: PathBuf,
 	},
 	/// Catch-all error for IO errors that are not [`io::ErrorKind::NotFound`].

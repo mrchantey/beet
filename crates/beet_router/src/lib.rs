@@ -1,14 +1,32 @@
-#![doc = include_str!("../README.md")]
-#![cfg_attr(test, feature(test, custom_test_frameworks))]
-#![cfg_attr(test, test_runner(beet_core::test_runner))]
-#![feature(if_let_guard)]
-#![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
-mod actions;
-mod types;
+beet_core::test_main!();
 
-/// Prelude module re-exporting commonly used items.
+mod extra;
+#[cfg(all(feature = "codegen", feature = "std"))]
+mod route_codegen;
+// The media exchange parses responses into beet_ui scene trees (std-only).
+#[cfg(feature = "std")]
+mod media;
+mod navigate;
+mod router;
+#[cfg(feature = "std")]
+mod scene_routes;
+#[cfg(feature = "std")]
+mod static_export;
+
+/// Exports the most commonly used items.
 pub mod prelude {
-	pub use crate::actions::*;
-	pub use crate::types::*;
+	pub use crate::extra::*;
+	#[cfg(feature = "std")]
+	pub use crate::media::*;
+	pub use crate::navigate::*;
+	#[cfg(all(feature = "codegen", feature = "std"))]
+	pub use crate::route_codegen::*;
+	pub use crate::router::*;
+	#[cfg(feature = "std")]
+	pub use crate::scene_routes::*;
+	#[cfg(feature = "std")]
+	pub use crate::static_export::*;
 }

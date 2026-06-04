@@ -51,12 +51,21 @@ unsafe extern "C" {
 	/// Get single environment variable by key, ie `Deno.env.get(key)`
 	#[wasm_bindgen]
 	pub fn env_var(key: &str) -> Option<String>;
+	/// Set an environment variable, ie `Deno.env.set(key, value)`
+	#[wasm_bindgen]
+	pub fn set_env(key: &str, value: &str);
 	/// Get all environment variables as entries 2D array, ie `Object.entries(Deno.env.toObject())`
 	#[wasm_bindgen]
 	pub fn env_all() -> js_sys::Array;
 }
 
-// TODO this is just to get it to compile, we need a better solution
+// The `test_*` js names are load-bearing, not cosmetic: `beet_core` has a
+// dev-dependency on itself (for the `testing` feature), so a `--lib` wasm test
+// links beet_core twice — once compiled with `cfg(test)` and once as a plain
+// rlib. wasm-bindgen derives its `__wbindgen_describe___wbg_<name>` symbols from
+// the js name, so identical names across the two builds collide as duplicate
+// symbols. Giving the test build distinct js names avoids the collision. The
+// matching `globalThis.test_*` aliases live in `deno.ts`.
 #[cfg(test)]
 #[wasm_bindgen]
 unsafe extern "C" {
@@ -89,6 +98,9 @@ unsafe extern "C" {
 	/// Get a single environment variable (test variant).
 	#[wasm_bindgen(js_name = "test_env_var")]
 	pub fn env_var(key: &str) -> Option<String>;
+	/// Set an environment variable (test variant).
+	#[wasm_bindgen(js_name = "test_set_env")]
+	pub fn set_env(key: &str, value: &str);
 	/// Get all environment variables (test variant).
 	#[wasm_bindgen(js_name = "test_env_all")]
 	pub fn env_all() -> js_sys::Array;

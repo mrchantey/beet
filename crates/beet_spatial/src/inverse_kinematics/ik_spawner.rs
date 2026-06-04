@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
-use bevy::scene::SceneInstanceReady;
-use std::f32::consts::FRAC_PI_2;
+use bevy::world_serialization::WorldInstanceReady;
+use core::f32::consts::FRAC_PI_2;
 
 /// Hooks up the parts of the robot arm gltf scene
 /// to the inverse kinematics system.
@@ -25,7 +25,7 @@ pub fn ik_spawner_plugin(app: &mut App) {
 }
 
 fn ik_spawner(
-	trigger: On<SceneInstanceReady>,
+	trigger: On<WorldInstanceReady>,
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,

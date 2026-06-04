@@ -6,9 +6,10 @@ use bevy::app::Plugins;
 use bevy::app::PluginsState;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
+#[cfg(feature = "std")]
 use bevy::tasks::IoTaskPool;
+#[cfg(feature = "std")]
 use bevy::tasks::Task;
-use std::time::Duration;
 
 /// Extension trait adding utility methods to [`App`].
 #[extend::ext(name=BeetCoreAppExt)]
@@ -28,12 +29,6 @@ pub impl App {
 		}
 		self
 	}
-	/// Spawns an entity with the given bundle, returning self for chaining.
-	fn spawn_then(&mut self, bundle: impl Bundle) -> &mut Self {
-		self.world_mut().spawn(bundle);
-		self
-	}
-
 	/// Sets the error handler if one hasn't been set yet,
 	/// otherwise does nothing.
 	fn try_set_error_handler(
@@ -98,11 +93,26 @@ pub impl App {
 	}
 
 	/// Runs the app asynchronously, useful for wasm where `App::run` returns immediately.
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
 	fn run_async(&mut self) -> impl 'static + Future<Output = AppExit> {
-		AsyncRunner::run(std::mem::take(self))
+		AsyncRunner::run(core::mem::take(self))
+	}
+
+	/// Drives the app until it settles, ticking the task pools between updates.
+	/// Unlike [`run_async`](Self::run_async) it returns once the work settles
+	/// rather than looping to [`AppExit`].
+	///
+	/// Use in async contexts (eg tests) to await multi-frame async convergence,
+	/// such as a bridged `spawn_local` task writing a field then a reactive
+	/// rebuild, without hand-rolling the update + tick loop. See
+	/// [`AsyncRunner::settle_async_tasks`] for the settle semantics.
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
+	async fn update_async(&mut self) {
+		AsyncRunner::settle_async_tasks(self.world_mut()).await;
 	}
 
 	/// Runs an IO task to completion, polling at 10 millisecond intervals.
+	#[cfg(feature = "std")]
 	async fn run_io_task<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static + Send,
@@ -111,6 +121,7 @@ pub impl App {
 		self.await_io_task(IoTaskPool::get().spawn(fut)).await
 	}
 	/// Runs a local IO task to completion, polling at 10 millisecond intervals.
+	#[cfg(feature = "std")]
 	async fn run_io_task_local<F, O>(&mut self, fut: F) -> O
 	where
 		F: Future<Output = O> + 'static,
@@ -119,6 +130,7 @@ pub impl App {
 		self.await_io_task(IoTaskPool::get().spawn_local(fut)).await
 	}
 	/// Awaits an IO task, updating the app while waiting.
+	#[cfg(feature = "std")]
 	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
 		self.init_plugin::<TaskPoolPlugin>();
 		// spin up async task pool
@@ -221,7 +233,7 @@ mod test {
 	#[derive(Default, Resource)]
 	struct Foo(Vec<f32>);
 
-	#[test]
+	#[crate::test]
 	fn time() {
 		let mut app = App::new();
 		app.init_resource::<Foo>()

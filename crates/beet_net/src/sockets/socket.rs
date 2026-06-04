@@ -32,12 +32,10 @@ impl Socket {
 		let (send, mut recv) = self.split();
 		entity
 			.observe_any(
-				move |ev: On<MessageSend>,
-				      mut commands: AsyncCommands|
-				      -> Result {
+				move |ev: On<MessageSend>, commands: AsyncCommands| -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
-					commands.run(async move |_| {
+					commands.run_local(async move |_| {
 						// socket send errors are non-fatal
 						send.send(message.take()).await.unwrap_or_else(|err| {
 							error!("{:?}", err);
@@ -46,11 +44,13 @@ impl Socket {
 					Ok(())
 				},
 			)
-			.run_async(async move |entity| {
+			// `_local`: the reader is a `SendWrapper` (under `bevy_multithreaded`)
+			// bound to the thread it was created on, so it must be polled there.
+			.run_async_local(async move |entity| {
 				while let Some(message) = recv.next().await {
 					match message {
 						Ok(msg) => {
-							entity.trigger_target_then(MessageRecv(msg)).await;
+							entity.trigger_target(MessageRecv(msg)).await.ok();
 						}
 						Err(err) => {
 							// socket receive errors break connection but are non-fatal
@@ -68,19 +68,16 @@ impl Socket {
 	/// Returns a connected [`Socket`] that can be used to send and receive messages.
 	#[allow(unused_variables)]
 	pub async fn connect(url: impl AsRef<str>) -> Result<Socket> {
-		#[cfg(target_arch = "wasm32")]
-		{
-			super::impl_web_sys::connect_wasm(url).await
-		}
-		#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
-		{
-			super::impl_tungstenite::connect_tungstenite(url).await
-		}
-		#[cfg(not(any(target_arch = "wasm32", feature = "tungstenite")))]
-		{
-			panic!(
-				"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
-			)
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				super::impl_web_sys::connect_wasm(url).await
+			} else if #[cfg(feature = "tungstenite")] {
+				super::impl_tungstenite::connect_tungstenite(url).await
+			} else {
+				panic!(
+					"WebSocket implementation not available - enable the tungstenite feature or target wasm32"
+				)
+			}
 		}
 	}
 	/// Returns an [`OnSpawn`] callback that connects to the URL and inserts the socket.
@@ -88,7 +85,7 @@ impl Socket {
 		let url = url.as_ref().to_owned();
 		OnSpawn::new_async_local(async move |entity| -> Result {
 			let socket = Socket::connect(url).await?;
-			entity.insert_then(socket).await;
+			entity.insert(socket).await?;
 			Ok(())
 		})
 	}
@@ -203,7 +200,7 @@ impl SocketWrite {
 	}
 
 	/// Gracefully close the connection with an optional close frame.
-	pub async fn close(mut self, close: Option<CloseFrame>) -> Result<()> {
+	pub async fn close(&mut self, close: Option<CloseFrame>) -> Result<()> {
 		self.writer.close_boxed(close).await
 	}
 }
@@ -424,7 +421,7 @@ mod tests {
 		let writer = DummyWriter::default();
 		let socket = Socket::new(reader, writer);
 
-		let (send, _recv) = socket.split();
+		let (mut send, _recv) = socket.split();
 
 		let frame = CloseFrame {
 			code: 1000,
@@ -435,26 +432,25 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	// #[ignore="hits public api"]
+	#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 	async fn echo_endpoint() {
-		let url = "wss://echo.websocket.org";
-		let mut socket = match Socket::connect(url).await {
-			Ok(s) => s,
-			Err(e) => panic!("failed to connect to {}: {:?}", url, e),
-		};
+		use crate::sockets::echo_socket_server::EchoSocketServer;
+
+		let server = EchoSocketServer::new().await;
+		let mut socket =
+			Socket::connect(&server.url().to_string()).await.unwrap();
 
 		let payload = "beet-ws-integration-test";
 		socket.send(Message::text(payload)).await.unwrap();
 
-		// only way out is success, error or close
 		while let Some(item) = socket.next().await {
 			match item {
-				Ok(Message::Text(t)) if t == payload => {
+				Ok(Message::Text(text)) if text == payload => {
 					break;
 				}
 				Ok(_) => continue,
-				Err(e) => {
-					panic!("error from socket stream: {:?}", e);
+				Err(err) => {
+					panic!("error from socket stream: {:?}", err);
 				}
 			}
 		}

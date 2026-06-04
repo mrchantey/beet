@@ -33,13 +33,15 @@ impl<T> When<T> {
 	pub fn into_inner(self) -> T { self.0 }
 }
 
-impl<T> std::ops::Deref for When<T> {
+impl<T> core::ops::Deref for When<T> {
 	type Target = T;
-	fn deref(&self) -> &Self::Target { &self.0 }
+	fn deref(&self) -> &<Self as core::ops::Deref>::Target { &self.0 }
 }
 
-impl<T> std::ops::DerefMut for When<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+impl<T> core::ops::DerefMut for When<T> {
+	fn deref_mut(&mut self) -> &mut <Self as core::ops::Deref>::Target {
+		&mut self.0
+	}
 }
 
 // SAFETY: Delegates to `T`, which ensures the safety requirements are met
@@ -59,27 +61,18 @@ unsafe impl<T: SystemParam> SystemParam for When<T> {
 	}
 
 	#[inline]
-	unsafe fn validate_param(
-		state: &mut Self::State,
-		system_meta: &SystemMeta,
-		world: UnsafeWorldCell,
-	) -> Result<(), SystemParamValidationError> {
-		unsafe {
-			T::validate_param(state, system_meta, world).map_err(|mut e| {
-				e.skipped = true;
-				e
-			})
-		}
-	}
-
-	#[inline]
 	unsafe fn get_param<'world, 'state>(
 		state: &'state mut Self::State,
 		system_meta: &SystemMeta,
 		world: UnsafeWorldCell<'world>,
 		change_tick: Tick,
-	) -> Self::Item<'world, 'state> {
-		When(unsafe { T::get_param(state, system_meta, world, change_tick) })
+	) -> Result<Self::Item<'world, 'state>, SystemParamValidationError> {
+		unsafe { T::get_param(state, system_meta, world, change_tick) }
+			.map(When)
+			.map_err(|mut e| {
+				e.skipped = true;
+				e
+			})
 	}
 
 	fn apply(
@@ -109,12 +102,12 @@ mod test {
 	#[derive(Default, Resource)]
 	struct Foo;
 
-	#[test]
+	#[crate::test]
 	#[ignore = "noisy"]
 	#[should_panic]
 	fn default() { App::new().add_systems(Update, |_res: Res<Foo>| {}).run(); }
 
-	#[test]
+	#[crate::test]
 	#[ignore = "noisy"]
 	#[should_panic]
 	fn panics() {
@@ -125,7 +118,7 @@ mod test {
 			})
 			.run();
 	}
-	#[test]
+	#[crate::test]
 	fn doesnt_panic() {
 		App::new()
 			.add_systems(Update, |_res: When<Res<Foo>>| {

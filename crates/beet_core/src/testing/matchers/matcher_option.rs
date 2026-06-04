@@ -57,7 +57,7 @@ pub impl<T> Option<T> {
 mod test {
 	use crate::prelude::*;
 
-	#[test]
+	#[crate::test]
 	fn option() {
 		Some(true).xpect_some();
 		(None::<bool>).xpect_none();

@@ -1,5 +1,8 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
+#[cfg(feature = "json")]
+use bytes::Bytes;
 use eventsource_stream::Event;
 use eventsource_stream::EventStream;
 use eventsource_stream::Eventsource;
@@ -43,6 +46,40 @@ impl<T> SseBody<T> {
 			data,
 		}
 	}
+
+	/// Creates a `message` event with the given data.
+	pub fn message(data: T) -> Self { Self::new("message", data) }
+}
+
+#[cfg(feature = "json")]
+impl<T: serde::Serialize> SseBody<T> {
+	/// Serializes this event into an SSE wire chunk
+	/// `event: <event>\ndata: <json>\n\n`.
+	///
+	/// The inverse of the client-side
+	/// [`event_source_typed`](ResponseSseExt::event_source_typed).
+	pub fn to_chunk(&self) -> Result<Bytes> {
+		let data = serde_json::to_string(&self.data)?;
+		Bytes::from(format!("event: {}\ndata: {}\n\n", self.event, data)).xok()
+	}
+}
+
+/// Builds a `text/event-stream` [`Response`] from a stream of typed SSE events.
+///
+/// Each [`SseBody`] is serialized to an `event: <event>\ndata: <json>\n\n`
+/// chunk via [`SseBody::to_chunk`]. This is the server-side counterpart to the
+/// client's [`event_source_typed`](ResponseSseExt::event_source_typed): a route
+/// or handler returns it directly as a streaming response.
+#[cfg(feature = "json")]
+pub fn sse_response<S, T>(events: S) -> Response
+where
+	S: 'static + Send + Sync + Stream<Item = Result<SseBody<T>>>,
+	T: 'static + serde::Serialize,
+{
+	let bytes = events.map(|event| event.and_then(|body| body.to_chunk()));
+	Response::ok()
+		.with_content_type(MediaType::EventStream)
+		.with_body(Body::stream(bytes))
 }
 
 /// A stream of mapped SSE events.
@@ -153,7 +190,7 @@ pub impl Response {
 	///     println!("{}: {}", sse.data.user, sse.data.text);
 	/// }
 	/// ```
-	#[cfg(feature = "serde")]
+	#[cfg(feature = "json")]
 	#[allow(async_fn_in_trait)]
 	async fn event_source_typed<T>(
 		self,
@@ -176,35 +213,51 @@ pub impl Response {
 }
 
 
+#[cfg(test)]
+#[cfg(feature = "json")]
+mod sse_builder_test {
+	use super::*;
+
+	#[derive(serde::Serialize)]
+	struct Tick {
+		index: u32,
+	}
+
+	#[beet_core::test]
+	async fn formats_event_stream() {
+		let response = sse_response(futures::stream::iter(
+			(0..2).map(|index| Ok(SseBody::message(Tick { index }))),
+		));
+
+		response
+			.headers
+			.get::<header::ContentType>()
+			.unwrap()
+			.unwrap()
+			.xpect_eq(MediaType::EventStream);
+
+		response.text().await.unwrap().xpect_eq(
+			"event: message\ndata: {\"index\":0}\n\n\
+				 event: message\ndata: {\"index\":1}\n\n",
+		);
+	}
+}
+
+#[cfg(test)]
 #[cfg(all(
-	test,
-	any(
-		target_arch = "wasm32",
-		all(
-			feature = "native-tls",
-			any(feature = "reqwest", feature = "ureq")
-		)
-	)
+	feature = "server",
+	feature = "ureq",
+	feature = "json",
+	not(target_arch = "wasm32")
 ))]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
-	#[derive(serde::Deserialize, Debug)]
-	struct TestEvent {
-		testing: bool,
-		sse_dev: String,
-		msg: String,
-		now: u64,
-	}
-
-	#[cfg_attr(
-		feature = "reqwest",
-		beet_core::test(tokio, timeout_ms = 30_000)
-	)]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
+	#[beet_core::test]
 	async fn raw_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
@@ -214,52 +267,48 @@ mod test {
 
 		let mut count = 0;
 		while let Some(Ok(event)) = ev.next().await {
-			event.data.xref().xpect_contains("It works!");
-			if count == 2 {
+			event.data.xref().xpect_contains("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 
-	#[cfg_attr(
-		feature = "reqwest",
-		beet_core::test(tokio, timeout_ms = 30_000)
-	)]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30_000))]
+	#[beet_core::test]
 	async fn typed_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
-			.event_source_typed::<TestEvent>()
+			.event_source_typed::<SseTestEvent>()
 			.await
 			.unwrap();
 
 		let mut count = 0;
 		while let Some(Ok(sse)) = ev.next().await {
-			sse.data.testing.xpect_true();
-			sse.data.sse_dev.xpect_eq("is great");
-			sse.data.msg.xpect_eq("It works!");
-			sse.data.now.xpect_greater_than(0);
-			if count == 2 {
+			sse.data.index.xpect_eq(count as u32);
+			sse.data.msg.xpect_eq("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 
-	#[cfg_attr(feature = "reqwest", beet_core::test(tokio, timeout_ms = 30000))]
-	#[cfg_attr(not(feature = "reqwest"), beet_core::test(timeout_ms = 30000))]
+	#[beet_core::test]
 	async fn mapped_works() {
-		let mut ev = Request::get("https://sse.dev/test")
+		let server = EchoHttpServer::new().await;
+		let mut ev = Request::get(server.url().clone().push("sse"))
+			.with_param("count", "3")
 			.send()
 			.await
 			.unwrap()
 			.event_source_mapped(|event| {
-				// Custom parsing: just extract the msg field
 				let data: serde_json::Value =
 					serde_json::from_str(&event.data)?;
 				let msg = data["msg"].as_str().unwrap_or_default().to_string();
@@ -270,12 +319,12 @@ mod test {
 
 		let mut count = 0;
 		while let Some(Ok(sse)) = ev.next().await {
-			sse.data.xpect_eq("It works!");
-			if count == 2 {
+			sse.data.xpect_eq("hello");
+			count += 1;
+			if count >= 3 {
 				break;
-			} else {
-				count += 1;
 			}
 		}
+		count.xpect_eq(3);
 	}
 }

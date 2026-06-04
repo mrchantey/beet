@@ -1,68 +1,82 @@
 use super::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Returns with the provided payload when the specified animation
 /// is almost finished.
+///
+/// A long-running action: while [`Running`] the [`trigger_on_animation_end`]
+/// system watches the agent's [`AnimationPlayer`] each frame and ends the
+/// run with `payload` once the active animation is within
+/// [`transition_duration`] of finishing.
+///
+/// [`transition_duration`]: TriggerOnAnimationEnd::transition_duration
 #[derive(Debug, Clone, Component)]
-#[require(ContinueRun)]
-pub struct TriggerOnAnimationEnd<P> {
+#[require(ContinueRun<(), P>)]
+pub struct TriggerOnAnimationEnd<P>
+where
+	P: 'static + Send + Sync + Clone,
+{
 	/// The result payload to return when the animation ends.
 	pub payload: P,
 	/// The animation clip to check for end.
 	pub handle: Handle<AnimationClip>,
-	/// The index of the animation node to check for end.
+	/// The index of the animation to check for end.
 	pub animation_index: AnimationNodeIndex,
-	/// The duration of the transition to the next action.
-	/// This should be greater than frame delta time or there will be no chance
-	/// for the the system to catch the end of the animation.
+	/// The duration before the animation ends to trigger the action.
+	/// This should usually match the [`AnimationTransitions`] duration for
+	/// smooth crossfade.
 	pub transition_duration: Duration,
 }
 
 
-impl<P> TriggerOnAnimationEnd<P> {
+impl<P> TriggerOnAnimationEnd<P>
+where
+	P: 'static + Send + Sync + Clone,
+{
 	/// Create a new [`TriggerOnAnimationEnd`] action.
 	pub fn new(
 		handle: Handle<AnimationClip>,
-		index: AnimationNodeIndex,
+		animation_index: AnimationNodeIndex,
 		payload: P,
 	) -> Self {
 		Self {
-			payload,
 			handle,
-			animation_index: index,
+			animation_index,
+			payload,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
 	}
-	/// The duration before the end of the animation to trigger the event.
-	/// This is commonly the same as the transition duration of the animation.
+
+	/// Set the [`Self::transition_duration`]
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
 		self.transition_duration = duration;
 		self
 	}
 }
 
-pub(crate) fn trigger_on_animation_end<P: EntityTargetEvent + Clone>(
+/// Ends any [`Running`] [`TriggerOnAnimationEnd`] whose active animation is
+/// within `transition_duration` of completing.
+pub(crate) fn trigger_on_animation_end<P>(
 	mut commands: Commands,
 	clips: When<Res<Assets<AnimationClip>>>,
-	mut query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running>>,
+	query: Populated<(Entity, &TriggerOnAnimationEnd<P>), With<Running<P>>>,
 	agents: AgentQuery<&AnimationPlayer>,
-) -> Result {
-	for (action, on_end) in query.iter_mut() {
+) -> Result
+where
+	P: 'static + Send + Sync + Clone,
+{
+	for (action, on_end) in query.iter() {
 		let player = agents.get_descendent(action)?;
-
 		let clip = clips
 			.get(&on_end.handle)
 			.ok_or_else(|| bevyhow!("clip not found"))?;
 
 		let Some(active_animation) = player.animation(on_end.animation_index)
 		else {
-			// animation not playing
-			warn!(
-				"animation is not playing, TriggerOnAnimationEnd will not be called"
-			);
+			// animation not playing yet
 			continue;
 		};
 
@@ -80,15 +94,10 @@ pub(crate) fn trigger_on_animation_end<P: EntityTargetEvent + Clone>(
 			RepeatAnimation::Forever => f32::INFINITY,
 		};
 
-		let duration = on_end.transition_duration.as_secs_f32();
-
-		let nearly_finished = remaining_time < duration;
-
-		// println!("remaining time: {:.1}/{:.1}", remaining_time, duration);
-		if nearly_finished {
+		if remaining_time < on_end.transition_duration.as_secs_f32() {
 			commands
 				.entity(action)
-				.trigger_target(on_end.payload.clone());
+				.queue(EndRun(on_end.payload.clone()));
 		}
 	}
 	Ok(())

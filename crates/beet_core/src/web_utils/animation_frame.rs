@@ -158,7 +158,7 @@ mod tests {
 	use crate::prelude::*;
 
 	#[ignore = "requires dom"]
-	#[test]
+	#[crate::test]
 	fn works() {
 		// Ensure minimal DOM access available
 		let _ = document_ext::document();

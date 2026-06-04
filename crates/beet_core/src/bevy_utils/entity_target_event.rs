@@ -16,7 +16,7 @@
 //! - [`EntityTargetEvent`] - Trait for events using [`EntityTargetTrigger`]
 //! - [`IntoEntityTargetEvent`] - Conversion trait for entity-like events
 
-use std::fmt;
+use core::fmt;
 
 use crate::prelude::*;
 use bevy::ecs::change_detection::MaybeLocation;
@@ -352,7 +352,7 @@ mod test {
 	struct MyEvent;
 
 
-	#[test]
+	#[crate::test]
 	fn works() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();

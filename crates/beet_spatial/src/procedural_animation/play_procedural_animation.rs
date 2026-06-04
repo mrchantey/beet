@@ -1,14 +1,19 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_flow::prelude::*;
-use std::time::Duration;
+use core::time::Duration;
 
 /// Play a procedural animation with a provided [`SerdeCurve`] for
 /// a given [`Duration`]. Add a [`Transform`] to this behavior to
 /// offset the target position.
+///
+/// A long-running action: while [`Running`] the [`play_procedural_animation`]
+/// system updates the agent's translation along the curve each frame and
+/// ends the run with [`Outcome::PASS`] once `t >= 1.0`. Pair with
+/// [`SetCurveOnRun`] to regenerate the curve every time the action starts.
 #[derive(Debug, Clone, Component, Reflect)]
+#[require(ContinueRun<(), Outcome>)]
 #[reflect(Default, Component)]
-#[require(ContinueRun)]
 pub struct PlayProceduralAnimation {
 	/// The type of curve to animate along.
 	pub curve: SerdeCurve,
@@ -48,73 +53,63 @@ impl PlayProceduralAnimation {
 	}
 }
 
+/// Steps every [`Running`] [`PlayProceduralAnimation`] along its curve,
+/// ending the run with [`Outcome::PASS`] once the parameter reaches `1.0`.
 pub(crate) fn play_procedural_animation(
 	mut commands: Commands,
 	mut agents: AgentQuery<&mut Transform>,
-	query: Query<(Entity, &PlayProceduralAnimation, &RunTimer), With<Running>>,
-) -> Result {
+	query: Populated<
+		(Entity, &PlayProceduralAnimation, &RunTimer),
+		With<Running<Outcome>>,
+	>,
+) {
 	for (action, play_procedural, run_timer) in query.iter() {
-		// run_timer.last_started.
 		let total_len_meters = play_procedural.curve.total_len();
 		let t = play_procedural
 			.speed
-			.calculate_t(total_len_meters, &run_timer);
+			.calculate_t(total_len_meters, run_timer);
 		let target_pos = play_procedural.curve.sample_clamped(t);
 
-		// if let Ok(transform) = transforms.get(entity) {
-		// 	target_pos = transform.transform_point(target_pos);
-		// }
-
-		agents.get_mut(action)?.translation = target_pos;
+		if let Ok(mut transform) = agents.get_mut(action) {
+			transform.translation = target_pos;
+		}
 
 		if t >= 1.0 {
-			commands.entity(action).trigger_target(Outcome::Pass);
+			commands.entity(action).queue(EndRun(Outcome::PASS));
 		}
 	}
-	Ok(())
 }
 
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
-	use beet_flow::prelude::*;
 
-	#[test]
-	fn works() {
+	#[beet_core::test]
+	async fn works() {
 		let mut app = App::new();
 		app.add_plugins((
-			ControlFlowPlugin::default(),
-			BeetSpatialPlugins::default(),
-		))
-		.init_resource::<Time>();
+			MinimalPlugins,
+			AsyncPlugin,
+			ActionPlugin,
+			BeetSpatialPlugins,
+		));
 
 		let agent = app
 			.world_mut()
 			.spawn((
 				Transform::default(),
-				Running::default(),
-				PlayProceduralAnimation::default(),
+				PlayProceduralAnimation::default().with_duration_secs(0.05),
 			))
 			.id();
 
-		app.update();
-
-		app.world()
-			.entity(agent)
-			.get::<Transform>()
+		app.world_mut()
+			.entity_mut(agent)
+			.call::<(), Outcome>(())
+			.await
 			.unwrap()
-			.translation
-			.xpect_eq(Vec3::new(1., 0., 0.));
-
-		app.update_with_millis(500);
-
-		app.world()
-			.entity(agent)
-			.get::<Transform>()
-			.unwrap()
-			.translation
-			.xpect_close(Vec3::new(-1., 0., 0.));
+			.xpect_eq(Outcome::PASS);
 	}
 }

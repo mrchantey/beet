@@ -13,7 +13,7 @@ where
 	fn into_world(self) -> World {
 		let mut app = App::new();
 		app.add_plugins(self);
-		std::mem::take(app.world_mut())
+		core::mem::take(app.world_mut())
 	}
 	/// Creates a [`World`] with the `Default` instance of this plugin applied.
 	fn world() -> World
