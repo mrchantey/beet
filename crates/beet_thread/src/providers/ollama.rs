@@ -37,9 +37,7 @@ impl OllamaProvider {
 		"http://localhost:11434/v1/chat/completions";
 
 	/// Uses the recommended model for a gpu with 12GB of ram
-	pub fn default_12gb() -> O11sStreamer {
-		Self::o11s(Self::DEFAULT_12GB)
-	}
+	pub fn default_12gb() -> O11sStreamer { Self::o11s(Self::DEFAULT_12GB) }
 
 	/// Uses the recommended model for a gpu with 12GB of ram,
 	/// served via the older completions api

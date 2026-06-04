@@ -73,7 +73,9 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_action(self) -> Action<Self::In, Self::Out> { Action::new_system(self) }
+	fn into_action(self) -> Action<Self::In, Self::Out> {
+		Action::new_system(self)
+	}
 }
 
 
@@ -88,7 +90,9 @@ mod test {
 		world.init_resource::<Time>();
 		let entity = world
 			.spawn(Action::<(), f32>::new_system(
-				|In(input): In<ActionContext>, time: Res<Time>| -> Result<f32> {
+				|In(input): In<ActionContext>,
+				 time: Res<Time>|
+				 -> Result<f32> {
 					let _ = input.caller;
 					Ok(time.elapsed_secs())
 				},
@@ -125,9 +129,9 @@ mod test {
 	async fn unit_in_unit_out() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn(Action::<(), ()>::new_system(|_: In<ActionContext>| -> Result {
-				Ok(())
-			}))
+			.spawn(Action::<(), ()>::new_system(
+				|_: In<ActionContext>| -> Result { Ok(()) },
+			))
 			.id();
 		world.entity_mut(entity).call::<(), ()>(()).await.unwrap();
 	}

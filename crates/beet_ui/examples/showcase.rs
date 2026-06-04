@@ -69,7 +69,9 @@ fn serve_showcase(world: &mut World) -> Result {
 	let port = server.port.unwrap_or(DEFAULT_SERVER_PORT);
 	world.spawn((
 		server,
-		exchange_handler(move |_| Response::ok_body(html.clone(), MediaType::Html)),
+		exchange_handler(move |_| {
+			Response::ok_body(html.clone(), MediaType::Html)
+		}),
 	));
 
 	cross_log!(

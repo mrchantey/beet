@@ -40,7 +40,9 @@ pub fn frozen_lake_scene(
 				pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
 				commands.spawn((
 					Transform::from_translation(pos).with_scale(object_scale),
-					WorldAssetRoot(asset_server.load(frozen_lake_assets::HAZARD)),
+					WorldAssetRoot(
+						asset_server.load(frozen_lake_assets::HAZARD),
+					),
 				));
 			}
 			FrozenLakeCell::Goal => {

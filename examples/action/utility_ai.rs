@@ -17,22 +17,18 @@ use beet::prelude::*;
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
 	let outcome = world
-		.spawn((
-			Name::new("selector"),
-			HighestScore::new(),
-			children![
-				(
-					Name::new("low score, skipped"),
-					ScoreProvider::<()>::fixed(Score(0.4)),
-					Log::new("this child does not run"),
-				),
-				(
-					Name::new("high score, selected"),
-					ScoreProvider::<()>::fixed(Score(0.6)),
-					Log::new("this child runs"),
-				),
-			],
-		))
+		.spawn((Name::new("selector"), HighestScore::new(), children![
+			(
+				Name::new("low score, skipped"),
+				ScoreProvider::<()>::fixed(Score(0.4)),
+				Log::new("this child does not run"),
+			),
+			(
+				Name::new("high score, selected"),
+				ScoreProvider::<()>::fixed(Score(0.6)),
+				Log::new("this child runs"),
+			),
+		]))
 		.call::<(), Outcome>(())
 		.await?;
 	cross_log!("selector finished: {outcome:?}");

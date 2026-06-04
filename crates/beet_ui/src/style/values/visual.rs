@@ -413,7 +413,9 @@ mod tests {
 		};
 		let style_without = VisualStyle::default();
 		let mut buf: Vec<u8> = Vec::new();
-		style_without.write_style(&mut buf, Some(&style_with)).unwrap();
+		style_without
+			.write_style(&mut buf, Some(&style_with))
+			.unwrap();
 		let out = String::from_utf8(buf).unwrap();
 		out.as_str().xpect_contains("\x1b[0m");
 		out.xnot().xpect_contains("\x1b[4m");

@@ -72,8 +72,7 @@ pub(super) fn log_case_outcomes(
 			if outcome.is_skip() && !config.log_skipped {
 				continue;
 			}
-			test_heading_log(&outcome.ansi_str(color), &test)
-				.xprint_display();
+			test_heading_log(&outcome.ansi_str(color), &test).xprint_display();
 		}
 	}
 	Ok(())
@@ -251,7 +250,10 @@ fn test_stats(outcome: &SuiteOutcome, color: bool) -> String {
 	}
 	if outcome.num_ran() == 0 {
 		stats.push(
-			TermStyle::yellow().bold().or_plain(color).paint("no tests ran"),
+			TermStyle::yellow()
+				.bold()
+				.or_plain(color)
+				.paint("no tests ran"),
 		);
 	}
 
@@ -333,8 +335,9 @@ fn failed_file_context(
 }
 
 fn failed_heading(test: &Test, outcome: &TestFail, color: bool) -> String {
-	let title =
-		TermStyle::red().or_plain(color).paint(test.short_file_and_name());
+	let title = TermStyle::red()
+		.or_plain(color)
+		.paint(test.short_file_and_name());
 	let reason = fail_reason(outcome, color);
 	format!("{}\n{}", title, reason)
 }
@@ -373,10 +376,11 @@ fn failed_stacktrace(test: &Test, outcome: &TestFail, color: bool) -> String {
 		.or_plain(color)
 		.paint(outcome.path(test).to_string());
 	let start = outcome.start(test);
-	let line_loc = TermStyle::new()
-		.dimmed()
-		.or_plain(color)
-		.paint(format!(":{}:{}", start.line(), start.col()));
+	let line_loc = TermStyle::new().dimmed().or_plain(color).paint(format!(
+		":{}:{}",
+		start.line(),
+		start.col()
+	));
 	format!("{} {}{}", prefix, path, line_loc)
 }
 

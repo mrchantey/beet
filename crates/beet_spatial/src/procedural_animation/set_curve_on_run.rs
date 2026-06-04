@@ -60,8 +60,10 @@ pub(crate) fn set_curve_on_run(
 
 			let angle =
 				range.start + (range.end - range.start) * rng.random::<f32>();
-			let end =
-				Dir2::new_unchecked(Vec2::new(ops::cos(angle), ops::sin(angle)));
+			let end = Dir2::new_unchecked(Vec2::new(
+				ops::cos(angle),
+				ops::sin(angle),
+			));
 
 			EasingCurve::new(start, end, *func).into()
 		}

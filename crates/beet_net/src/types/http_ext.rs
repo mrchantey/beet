@@ -159,7 +159,13 @@ pub fn encode_request(request: &Request) -> Result<Vec<u8>> {
 	};
 
 	let mut head = String::new();
-	write!(head, "{} {} HTTP/1.1\r\n", method_token(request.method()), target).ok();
+	write!(
+		head,
+		"{} {} HTTP/1.1\r\n",
+		method_token(request.method()),
+		target
+	)
+	.ok();
 	write!(head, "Host: {}\r\n", request.authority()).ok();
 	for (key, values) in request.headers().iter_all() {
 		if is_managed_header(key) {
@@ -367,7 +373,9 @@ mod test {
 		let request = Request::get("http://localhost/hello?q=world");
 		let raw = encode_request(&request).unwrap();
 		let raw_str = String::from_utf8(raw.clone()).unwrap();
-		raw_str.as_str().xpect_contains("GET /hello?q=world HTTP/1.1");
+		raw_str
+			.as_str()
+			.xpect_contains("GET /hello?q=world HTTP/1.1");
 		raw_str.as_str().xpect_contains("Host: localhost");
 		raw_str.as_str().xpect_contains("Content-Length: 0");
 
@@ -394,7 +402,8 @@ mod test {
 	#[cfg(feature = "std")]
 	#[beet_core::test]
 	fn encode_rejects_streaming_body() {
-		let stream = futures::stream::once(async { Ok(bytes::Bytes::from("x")) });
+		let stream =
+			futures::stream::once(async { Ok(bytes::Bytes::from("x")) });
 		let mut request = Request::post("http://localhost/api");
 		request.body = Body::stream(stream);
 		encode_request(&request).xpect_err();

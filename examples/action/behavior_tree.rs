@@ -21,14 +21,10 @@ use beet::prelude::*;
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
 	let outcome = world
-		.spawn((
-			Name::new("root"),
-			Sequence::new(),
-			children![
-				(Name::new("child1"), Log::new("running child1")),
-				(Name::new("child2"), Log::new("running child2")),
-			],
-		))
+		.spawn((Name::new("root"), Sequence::new(), children![
+			(Name::new("child1"), Log::new("running child1")),
+			(Name::new("child2"), Log::new("running child2")),
+		]))
 		.call::<(), Outcome>(())
 		.await?;
 	cross_log!("sequence finished: {outcome:?}");

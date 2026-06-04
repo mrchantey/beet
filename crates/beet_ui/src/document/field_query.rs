@@ -143,9 +143,7 @@ mod test {
 					// missing field seeded with T::default()
 					fields.get_typed(subject, &count).unwrap().xpect_eq(0);
 					fields.set_typed(subject, &count, 10).unwrap();
-					fields
-						.update_typed(subject, &count, |n| *n += 1)
-						.unwrap();
+					fields.update_typed(subject, &count, |n| *n += 1).unwrap();
 					fields.get_typed(subject, &count).unwrap().xpect_eq(11);
 				},
 				(doc, count),

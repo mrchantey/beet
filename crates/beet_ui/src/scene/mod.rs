@@ -5,13 +5,9 @@
 //! scene-producing `rsx!` macro lowers markup into the types re-exported here.
 mod error_scene;
 mod into_scene;
-mod scene_prop;
 pub mod scene_ext;
+mod scene_prop;
 mod system_scene;
-pub use error_scene::*;
-pub use into_scene::*;
-pub use scene_prop::*;
-pub use system_scene::*;
 pub use bevy::scene::CommandsSceneExt;
 pub use bevy::scene::EntityCommandsSceneExt;
 pub use bevy::scene::EntityScene;
@@ -23,5 +19,9 @@ pub use bevy::scene::SceneList;
 pub use bevy::scene::ScenePlugin;
 pub use bevy::scene::on;
 pub use bevy::scene::template_value;
+pub use error_scene::*;
+pub use into_scene::*;
+pub use scene_prop::*;
+pub use system_scene::*;
 // re-exported so `rsx!` output can name the child relationship
 pub use bevy::prelude::ChildOf;

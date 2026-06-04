@@ -66,7 +66,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Buffer::new(UVec2::new(20, 5)).into_double_buffer(),
-				rsx_direct!{ <div><h1>"Title"</h1><p>"Body"</p></div> },
+				rsx_direct! { <div><h1>"Title"</h1><p>"Body"</p></div> },
 			))
 			.id();
 		// the schedule resolves styles, decorates, lays out, and paints
@@ -91,13 +91,15 @@ mod tests {
 		// MaterialStylePlugin, whose rule set replaces the one StylePlugin seeds.
 		// The user-agent `non_visual_rule` must survive that replace so
 		// <head>/<style> resolve to display:none and never paint into the terminal.
-		let mut world =
-			(CharcellPlugin, crate::style::material::MaterialStylePlugin::default())
-				.into_world();
+		let mut world = (
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
 		let entity = world
 			.spawn((
 				Buffer::new(UVec2::new(40, 6)).into_double_buffer(),
-				rsx_direct!{
+				rsx_direct! {
 					<div>
 						<head><style>"body { color: red; }"</style></head>
 						<p>"Visible"</p>
@@ -120,9 +122,12 @@ mod tests {
 	fn auto_grow_oneshot_is_unbounded() {
 		// 30 preformatted lines exceed a typical short buffer; auto-grow keeps
 		// them all instead of clipping to a fixed height.
-		let text =
-			(0..30).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
-		let out = FlexBuffer::render_oneshot(20, rsx_direct!{ <pre>{text}</pre> });
+		let text = (0..30)
+			.map(|i| i.to_string())
+			.collect::<Vec<_>>()
+			.join("\n");
+		let out =
+			FlexBuffer::render_oneshot(20, rsx_direct! { <pre>{text}</pre> });
 		out.lines().count().xpect_eq(30);
 	}
 
@@ -132,12 +137,9 @@ mod tests {
 		// lays out, and paints the referenced entity in the holder's place,
 		// without it being parented under the buffer tree.
 		let mut world = CharcellPlugin::world();
-		let content = world.spawn(rsx_direct!{ <p>"transcluded"</p> }).id();
+		let content = world.spawn(rsx_direct! { <p>"transcluded"</p> }).id();
 		let root = world
-			.spawn((
-				FlexBuffer::new(40),
-				children![(RenderRef::new(content),)],
-			))
+			.spawn((FlexBuffer::new(40), children![(RenderRef::new(content),)]))
 			.id();
 		world.run_schedule(PostParseTree);
 		world
@@ -154,7 +156,7 @@ mod tests {
 		// inline flow wraps around the link's painted columns as OSC-8.
 		let out = FlexBuffer::render_oneshot(
 			40,
-			rsx_direct!{ <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
+			rsx_direct! { <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
 		);
 		out.as_str()
 			.xpect_contains("\x1b]8;;https://beet.org\x1b\\")

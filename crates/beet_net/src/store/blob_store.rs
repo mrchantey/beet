@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::prelude::bevy_ecs::error::ErrorContext;
+use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 use bytes::Bytes;
 

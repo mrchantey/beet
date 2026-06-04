@@ -44,7 +44,11 @@ impl TargetEntity {
 
 	/// Resolves the target entity asynchronously, using [`AgentQuery`] to
 	/// resolve the agent when [`TargetEntity::Agent`] is specified.
-	pub async fn get_async(&self, world: &AsyncWorld, action: Entity) -> Entity {
+	pub async fn get_async(
+		&self,
+		world: &AsyncWorld,
+		action: Entity,
+	) -> Entity {
 		match self {
 			TargetEntity::Action => action,
 			TargetEntity::Agent => {

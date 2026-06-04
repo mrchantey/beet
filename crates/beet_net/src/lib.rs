@@ -24,9 +24,9 @@ mod store;
 #[cfg(feature = "action")]
 mod actions;
 #[cfg(feature = "std")]
-mod store_actions;
-#[cfg(feature = "std")]
 mod net_plugin;
+#[cfg(feature = "std")]
+mod store_actions;
 // The server module is no_std-capable: only the `HttpServer` component and its
 // `set_http_server` install hook compile unconditionally — the concrete
 // backends (mini/hyper/lambda) and the cli/repl servers stay std/feature-gated
@@ -69,21 +69,21 @@ pub mod prelude {
 
 	#[cfg(feature = "action")]
 	pub use crate::actions::*;
-	pub use crate::store::*;
-	#[cfg(feature = "std")]
-	pub use crate::store_actions::*;
 	pub use crate::client::*;
+	#[cfg(feature = "mdns")]
+	pub use crate::mdns::*;
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
 	pub use crate::server::*;
-	pub use crate::udp::*;
-	#[cfg(feature = "mdns")]
-	pub use crate::mdns::*;
 	#[cfg(feature = "std")]
 	pub use crate::sockets;
 	#[cfg(any(feature = "russh_server", feature = "russh_client"))]
 	pub use crate::ssh::*;
+	pub use crate::store::*;
+	#[cfg(feature = "std")]
+	pub use crate::store_actions::*;
 	pub use crate::types::*;
+	pub use crate::udp::*;
 	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
 	pub use crate::webdriver;
 	// Re-export core types used in beet_net's public API

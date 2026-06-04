@@ -26,7 +26,14 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub struct RunNext<T = Outcome>
 where
-	T: 'static + Send + Sync + Clone + PartialEq + Reflect + FromReflect + bevy::reflect::Typed,
+	T: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ PartialEq
+		+ Reflect
+		+ FromReflect
+		+ bevy::reflect::Typed,
 {
 	/// The next action entity to call.
 	pub target: Entity,
@@ -49,7 +56,14 @@ impl RunNext<Outcome> {
 
 impl<T> RunNext<T>
 where
-	T: 'static + Send + Sync + Clone + PartialEq + Reflect + FromReflect + bevy::reflect::Typed,
+	T: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ PartialEq
+		+ Reflect
+		+ FromReflect
+		+ bevy::reflect::Typed,
 {
 	/// Always jump to `target`, threading a `T`.
 	pub fn typed(target: Entity) -> Self {
@@ -76,7 +90,14 @@ where
 #[derive(Component)]
 pub async fn RunNextAction<T>(cx: ActionContext<T>) -> Result<T>
 where
-	T: 'static + Send + Sync + Clone + PartialEq + Reflect + FromReflect + bevy::reflect::Typed,
+	T: 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ PartialEq
+		+ Reflect
+		+ FromReflect
+		+ bevy::reflect::Typed,
 {
 	let run_next = cx.caller.get_cloned::<RunNext<T>>().await?;
 	if let Some(expected) = &run_next.if_input_matches {

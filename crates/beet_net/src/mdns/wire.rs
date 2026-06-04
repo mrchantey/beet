@@ -208,9 +208,7 @@ struct Writer<'a> {
 }
 
 impl<'a> Writer<'a> {
-	fn new(buf: &'a mut [u8]) -> Self {
-		Self { buf, pos: 0 }
-	}
+	fn new(buf: &'a mut [u8]) -> Self { Self { buf, pos: 0 } }
 	fn u8(&mut self, v: u8) -> Option<()> {
 		*self.buf.get_mut(self.pos)? = v;
 		self.pos += 1;
@@ -416,8 +414,7 @@ impl<'a> Reader<'a> {
 					}
 					let start = self.pos;
 					let bytes = self.buf.get(start..start + len)?;
-					entries
-						.push(SmolStr::new(String::from_utf8_lossy(bytes)));
+					entries.push(SmolStr::new(String::from_utf8_lossy(bytes)));
 					self.pos = start + len;
 				}
 				Record::Txt { name, entries }

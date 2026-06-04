@@ -22,8 +22,9 @@ where
 {
 	let mut futures: Vec<Option<Pin<Box<Fut>>>> =
 		futures.into_iter().map(|fut| Some(Box::pin(fut))).collect();
-	let mut results: Vec<Option<T>> =
-		core::iter::repeat_with(|| None).take(futures.len()).collect();
+	let mut results: Vec<Option<T>> = core::iter::repeat_with(|| None)
+		.take(futures.len())
+		.collect();
 
 	core::future::poll_fn(move |cx| {
 		let mut all_done = true;
@@ -39,7 +40,10 @@ where
 			}
 		}
 		if all_done {
-			Poll::Ready(Ok(results.iter_mut().map(|r| r.take().unwrap()).collect()))
+			Poll::Ready(Ok(results
+				.iter_mut()
+				.map(|r| r.take().unwrap())
+				.collect()))
 		} else {
 			Poll::Pending
 		}

@@ -35,10 +35,7 @@ impl TreeNode {
 				.iter()
 				.position(|child| child.ident == ident)
 				.unwrap_or_else(|| {
-					node.children.push(TreeNode {
-						ident,
-						..default()
-					});
+					node.children.push(TreeNode { ident, ..default() });
 					node.children.len() - 1
 				});
 			node = &mut node.children[idx];

@@ -1,8 +1,12 @@
-use crate::plugin::{AsyncTickBudget, StrongAsyncWorld};
+use crate::plugin::AsyncTickBudget;
+use crate::plugin::StrongAsyncWorld;
 use crate::system_state::ErasedSystemStateCell;
-use bevy::ecs::prelude::{IntoSystemSet, SystemSet, World};
+use bevy::ecs::prelude::IntoSystemSet;
+use bevy::ecs::prelude::SystemSet;
+use bevy::ecs::prelude::World;
 use bevy::ecs::schedule::InternedSystemSet;
-use bevy::platform::prelude::{Vec, vec};
+use bevy::platform::prelude::Vec;
+use bevy::platform::prelude::vec;
 use bevy::platform::sync::Arc;
 
 /// Drives the queued bridge work for `SyncPoint`.
@@ -50,7 +54,9 @@ pub fn async_world_sync_point<SyncPoint: 'static>(world: &mut World) {
 		// Drive once. If no work was found, we may truly be done.
 		// but we should give external task pools one more opportunity to make newly-woken
 		// tasks runnable.
-		if async_world.0.tick_sync_point(sync_point, world) == TickResult::NoWork {
+		if async_world.0.tick_sync_point(sync_point, world)
+			== TickResult::NoWork
+		{
 			bevy::tasks::cfg::web! {
 				if {
 					crate::wasm_tick::tick();
@@ -119,7 +125,9 @@ impl AsyncWorldInner {
 /// We need to notify all our Wakers that have queued that we've dropped so they can error
 impl Drop for AsyncWorldInner {
 	fn drop(&mut self) {
-		for bridge_requests in self.bridge_requests.inner().read().unwrap().values() {
+		for bridge_requests in
+			self.bridge_requests.inner().read().unwrap().values()
+		{
 			while let Ok(request) = bridge_requests.pop() {
 				request.waker.wake();
 			}

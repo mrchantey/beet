@@ -12,7 +12,8 @@ pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>().register_type::<CliServer>();
+		app.init_plugin::<AsyncPlugin>()
+			.register_type::<CliServer>();
 	}
 }
 

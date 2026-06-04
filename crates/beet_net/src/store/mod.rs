@@ -42,10 +42,10 @@ pub use in_memory_store::*;
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
-#[cfg(feature = "world_serde")]
-mod world_serde_store;
 #[cfg(all(feature = "json", feature = "std"))]
 mod table;
+#[cfg(feature = "world_serde")]
+mod world_serde_store;
 #[cfg(all(feature = "json", feature = "std"))]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
@@ -54,10 +54,10 @@ pub use aws_cli::*;
 pub use table::*;
 #[cfg(feature = "world_serde")]
 pub use world_serde_store::*;
-#[cfg(feature = "std")]
-mod fs_store;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_blob_watchers;
+#[cfg(feature = "std")]
+mod fs_store;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_blob_watchers::*;
 #[cfg(target_arch = "wasm32")]
@@ -73,13 +73,13 @@ pub use local_storage_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use s3_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-mod s3_store;
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod s3_fs_store;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub use s3_fs_store::*;
+mod s3_store;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use dynamo_store::*;
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+pub use s3_fs_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod dynamo_store;
 

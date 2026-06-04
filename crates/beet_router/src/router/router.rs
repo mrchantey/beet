@@ -69,25 +69,30 @@ pub async fn Router(cx: ActionContext<Request>) -> Response {
 /// scene through the beet_ui pipeline.
 #[cfg(not(feature = "std"))]
 fn not_found_action() -> Action<Request, Response> {
-	Action::new_async(async move |cx: ActionContext<Request>| -> Result<Response> {
-		let path = cx.input.path_string();
-		let fallback = format!("Route {path} not found.");
-		let body = cx
-			.caller
-			.with_state::<AncestorQuery<&RouteTree>, String>(move |entity, query| {
-				match query.get(entity) {
-					Ok(tree) => {
-						format!("Route {path} not found.\n\n{}", format_route_help(tree))
-					}
-					Err(_) => format!("Route {path} not found."),
-				}
-			})
-			.await
-			.unwrap_or(fallback);
-		let mut response = Response::ok().with_body(body);
-		response.parts.status = StatusCode::NOT_FOUND;
-		Ok(response)
-	})
+	Action::new_async(
+		async move |cx: ActionContext<Request>| -> Result<Response> {
+			let path = cx.input.path_string();
+			let fallback = format!("Route {path} not found.");
+			let body = cx
+				.caller
+				.with_state::<AncestorQuery<&RouteTree>, String>(
+					move |entity, query| match query.get(entity) {
+						Ok(tree) => {
+							format!(
+								"Route {path} not found.\n\n{}",
+								format_route_help(tree)
+							)
+						}
+						Err(_) => format!("Route {path} not found."),
+					},
+				)
+				.await
+				.unwrap_or(fallback);
+			let mut response = Response::ok().with_body(body);
+			response.parts.status = StatusCode::NOT_FOUND;
+			Ok(response)
+		},
+	)
 }
 
 /// Format a [`RouteTree`] as a plain-text route listing (no_std help fallback).
@@ -109,9 +114,7 @@ fn format_route_help(tree: &RouteTree) -> String {
 	for node in nodes {
 		let path = node.path.annotated_path();
 		match &node.method {
-			Some(method) => {
-				output.push_str(&format!("  /{path} [{method}]\n"))
-			}
+			Some(method) => output.push_str(&format!("  /{path} [{method}]\n")),
 			None => output.push_str(&format!("  /{path}\n")),
 		}
 		if let Some(description) = node.description() {
@@ -200,7 +203,7 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![render_action::fixed_route(
 				"about",
-				rsx_direct!{ <p>"About page"</p> }
+				rsx_direct! { <p>"About page"</p> }
 			),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -216,7 +219,7 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![render_action::fixed_route(
 				"",
-				rsx_direct!{ <p>"Root content"</p> }
+				rsx_direct! { <p>"Root content"</p> }
 			),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -232,9 +235,12 @@ mod test {
 			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
+					rsx_direct! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -250,7 +256,10 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
 			.await
@@ -265,7 +274,10 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![
 				increment(FieldRef::new("count")),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
 			.await
@@ -277,10 +289,10 @@ mod test {
 	#[beet_core::test]
 	async fn not_found() {
 		router_world()
-			.spawn((default_router(), children![increment(FieldRef::new("count")),]))
-			.call::<Request, Response>(
-				Request::from_cli_str("nonexistent"),
-			)
+			.spawn((default_router(), children![increment(FieldRef::new(
+				"count"
+			)),]))
+			.call::<Request, Response>(Request::from_cli_str("nonexistent"))
 			.await
 			.unwrap()
 			.status()
@@ -293,9 +305,12 @@ mod test {
 			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct!{ <h1>"My Server"</h1> <p>"welcome!"</p> }
+					rsx_direct! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str(""))
 			.await
@@ -319,15 +334,16 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
 			.flush();
 
 		let res = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("counter --help"),
-			)
+			.call::<Request, Response>(Request::from_cli_str("counter --help"))
 			.await
 			.unwrap();
 
@@ -339,10 +355,10 @@ mod test {
 	#[beet_core::test]
 	async fn not_found_shows_ancestor_help() {
 		router_world()
-			.spawn((default_router(), children![increment(FieldRef::new("count")),]))
-			.call::<Request, Response>(
-				Request::from_cli_str("nonexistent"),
-			)
+			.spawn((default_router(), children![increment(FieldRef::new(
+				"count"
+			)),]))
+			.call::<Request, Response>(Request::from_cli_str("nonexistent"))
 			.await
 			.unwrap()
 			.text()
@@ -363,11 +379,14 @@ mod test {
 					),
 					children![increment(FieldRef::new("count")),],
 				),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 			]))
-			.call::<Request, Response>(
-				Request::from_cli_str("counter nonsense"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"counter nonsense",
+			))
 			.await
 			.unwrap()
 			.text()
@@ -399,7 +418,9 @@ mod test {
 		}
 
 		router_world()
-			.spawn((default_router(), children![exchange_route("ticks", Ticks)]))
+			.spawn((default_router(), children![exchange_route(
+				"ticks", Ticks
+			)]))
 			.call::<Request, Response>(Request::get("ticks"))
 			.await
 			.unwrap()

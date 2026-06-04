@@ -217,7 +217,9 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 }
 
 impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { self.as_ref().box_clone() }
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
+		self.as_ref().box_clone()
+	}
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
 	}

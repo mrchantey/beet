@@ -212,7 +212,8 @@ pub(super) fn sync_schema(
 			continue;
 		};
 		// a path the schema does not describe leaves the local schema authoritative
-		let Ok(field_schema) = schema.get_field_schema(&resolved.field_path) else {
+		let Ok(field_schema) = schema.get_field_schema(&resolved.field_path)
+		else {
 			continue;
 		};
 		match local {
@@ -246,7 +247,9 @@ pub(super) fn sync_local_to_document(
 				// field exists: write only when it differs
 				Ok(field_val) => *field_val != *value,
 				// field missing: create it unless the ref opts out
-				Err(_) => !matches!(field.on_missing, OnMissingField::EmitError),
+				Err(_) => {
+					!matches!(field.on_missing, OnMissingField::EmitError)
+				}
 			},
 			// no document: create one only when the ref initializes on missing
 			Err(_) => matches!(field.on_missing, OnMissingField::Init { .. }),
@@ -455,7 +458,11 @@ mod test {
 	}
 
 	/// Read the resolved document field of `field` as seen from `entity`.
-	fn read_field(world: &mut World, entity: Entity, field: &FieldRef) -> Value {
+	fn read_field(
+		world: &mut World,
+		entity: Entity,
+		field: &FieldRef,
+	) -> Value {
 		world
 			.run_system_cached_with(
 				|In((entity, field)): In<(Entity, FieldRef)>,

@@ -88,7 +88,9 @@ impl WorldFilter {
 	#[must_use]
 	pub fn deny_by_id(mut self, type_id: TypeId) -> Self {
 		match &mut self {
-			Self::Unset => self = Self::Denylist([type_id].into_iter().collect()),
+			Self::Unset => {
+				self = Self::Denylist([type_id].into_iter().collect())
+			}
 			Self::Allowlist(list) => {
 				list.remove(&type_id);
 			}
@@ -135,7 +137,9 @@ impl WorldFilter {
 	pub fn iter(&self) -> Box<dyn ExactSizeIterator<Item = &TypeId> + '_> {
 		match self {
 			Self::Unset => Box::new(core::iter::empty()),
-			Self::Allowlist(list) | Self::Denylist(list) => Box::new(list.iter()),
+			Self::Allowlist(list) | Self::Denylist(list) => {
+				Box::new(list.iter())
+			}
 		}
 	}
 

@@ -13,7 +13,9 @@ pub struct ListBlobsParams {
 /// Outputs a [`Vec<SmolPath>`] of blob paths relative to the given subdirectory.
 #[action]
 #[derive(Component, Reflect)]
-pub async fn ListBlobs(cx: ActionContext<ListBlobsParams>) -> Result<Vec<SmolPath>> {
+pub async fn ListBlobs(
+	cx: ActionContext<ListBlobsParams>,
+) -> Result<Vec<SmolPath>> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
@@ -67,9 +69,6 @@ mod test {
 			.await
 			.unwrap();
 		result.sort();
-		result.xpect_eq(vec![
-			SmolPath::from("a.txt"),
-			SmolPath::from("b.txt"),
-		]);
+		result.xpect_eq(vec![SmolPath::from("a.txt"), SmolPath::from("b.txt")]);
 	}
 }

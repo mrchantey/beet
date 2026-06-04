@@ -46,7 +46,10 @@ impl DynamicWorld {
 	/// Create a new dynamic world from a given world and [`TypeRegistry`].
 	///
 	/// Extracts all entities and resources registered with the appropriate reflect type data.
-	pub fn from_world_with(world: &World, type_registry: &TypeRegistry) -> Self {
+	pub fn from_world_with(
+		world: &World,
+		type_registry: &TypeRegistry,
+	) -> Self {
 		DynamicWorldBuilder::from_world(world, type_registry)
 			.extract_entities(
 				// sidestep default query filters by iterating archetypes directly,
@@ -89,7 +92,8 @@ impl DynamicWorld {
 					reflect_component(type_registry, component.as_ref())?;
 
 				{
-					let component_id = reflect_component.register_component(world);
+					let component_id =
+						reflect_component.register_component(world);
 					// SAFETY: we registered the component above, so the info exists
 					#[expect(unsafe_code, reason = "this is faster")]
 					let component_info = unsafe {
@@ -103,15 +107,19 @@ impl DynamicWorld {
 					}
 				}
 
-				SceneEntityMapper::world_scope(entity_map, world, |world, mapper| {
-					reflect_component.apply_or_insert_mapped(
-						&mut world.entity_mut(entity),
-						component.as_partial_reflect(),
-						type_registry,
-						mapper,
-						RelationshipHookMode::Skip,
-					);
-				});
+				SceneEntityMapper::world_scope(
+					entity_map,
+					world,
+					|world, mapper| {
+						reflect_component.apply_or_insert_mapped(
+							&mut world.entity_mut(entity),
+							component.as_partial_reflect(),
+							type_registry,
+							mapper,
+							RelationshipHookMode::Skip,
+						);
+					},
+				);
 			}
 		}
 
@@ -123,22 +131,27 @@ impl DynamicWorld {
 			let resource_id = reflect_component.register_component(world);
 
 			// override the existing resource value, or spawn one if absent
-			let entity =
-				if let Some(entity) = world.resource_entities().get(resource_id) {
-					entity
-				} else {
-					world.spawn_empty().id()
-				};
+			let entity = if let Some(entity) =
+				world.resource_entities().get(resource_id)
+			{
+				entity
+			} else {
+				world.spawn_empty().id()
+			};
 
-			SceneEntityMapper::world_scope(entity_map, world, |world, mapper| {
-				reflect_component.apply_or_insert_mapped(
-					&mut world.entity_mut(entity),
-					resource.as_partial_reflect(),
-					type_registry,
-					mapper,
-					RelationshipHookMode::Skip,
-				);
-			});
+			SceneEntityMapper::world_scope(
+				entity_map,
+				world,
+				|world, mapper| {
+					reflect_component.apply_or_insert_mapped(
+						&mut world.entity_mut(entity),
+						resource.as_partial_reflect(),
+						type_registry,
+						mapper,
+						RelationshipHookMode::Skip,
+					);
+				},
+			);
 		}
 
 		Ok(())
@@ -178,7 +191,8 @@ fn reflect_component<'a>(
 			type_info.type_path()
 		);
 	};
-	let Some(reflect_component) = registration.data::<ReflectComponent>() else {
+	let Some(reflect_component) = registration.data::<ReflectComponent>()
+	else {
 		bevybail!(
 			"world contains the unregistered component `{}`, \
 			consider adding `#[reflect(Component)]` to your type",
@@ -298,7 +312,9 @@ mod test {
 				.build()
 		};
 		let mut entity_map = EntityHashMap::default();
-		dynamic_world.write_to_world(&mut world, &mut entity_map).unwrap();
+		dynamic_world
+			.write_to_world(&mut world, &mut entity_map)
+			.unwrap();
 
 		let from_parent = *entity_map.get(&original_parent).unwrap();
 		let from_child = *entity_map.get(&original_child).unwrap();
@@ -306,7 +322,9 @@ mod test {
 		// Original Parent <- Original Child <- Dynamic Parent <- Dynamic Child
 		world.entity_mut(original_child).add_child(from_parent);
 		// reloading must not touch the original child's parent
-		dynamic_world.write_to_world(&mut world, &mut entity_map).unwrap();
+		dynamic_world
+			.write_to_world(&mut world, &mut entity_map)
+			.unwrap();
 
 		world
 			.get_entity(original_child)
@@ -361,9 +379,11 @@ mod test {
 		let dynamic_world = DynamicWorld::from_world(&world);
 
 		let mut dst_world = World::new();
-		dst_world.register_component_hooks::<A>().on_add(|mut world, _| {
-			world.commands().spawn_empty();
-		});
+		dst_world
+			.register_component_hooks::<A>()
+			.on_add(|mut world, _| {
+				world.commands().spawn_empty();
+			});
 		dst_world.insert_resource(registry.clone());
 
 		// should not panic on pending entities from the observer

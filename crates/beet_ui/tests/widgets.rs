@@ -151,7 +151,9 @@ fn header_places_children_and_nav() {
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("HeaderExtra")
-		.xpect_contains("<nav class=\"app-bar-nav\"><span>NavLink</span></nav>");
+		.xpect_contains(
+			"<nav class=\"app-bar-nav\"><span>NavLink</span></nav>",
+		);
 }
 
 #[beet_core::test]
@@ -289,7 +291,11 @@ fn text_field_omits_unset_optional_attrs() {
 		let bare = query.get(bare).unwrap();
 		bare.attribute("name").is_none().xpect_true();
 		bare.attribute("placeholder").is_none().xpect_true();
-		query.get(named).unwrap().attribute_string("name").xpect_eq("email");
+		query
+			.get(named)
+			.unwrap()
+			.attribute_string("name")
+			.xpect_eq("email");
 	});
 }
 
@@ -440,7 +446,9 @@ fn sidebar_active_leaf_marks_aria_current() {
 	world.with_state::<ElementQuery, _>(|query| {
 		query
 			.iter_descendants_inclusive(root)
-			.filter_map(|el| el.attribute("aria-current").map(|a| a.value.clone()))
+			.filter_map(|el| {
+				el.attribute("aria-current").map(|a| a.value.clone())
+			})
 			.any(|value| value == Value::str("page"))
 			.xpect_true();
 	});

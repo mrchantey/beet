@@ -32,10 +32,10 @@ mod impl_ureq;
 #[cfg(target_arch = "wasm32")]
 mod impl_web_sys;
 mod send;
-pub use send::*;
 #[cfg(feature = "http")]
 pub use event_source::*;
 #[cfg(feature = "fs")]
 pub use impl_file::*;
 #[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
 pub use impl_reqwest::*;
+pub use send::*;

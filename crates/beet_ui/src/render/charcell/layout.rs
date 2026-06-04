@@ -190,7 +190,7 @@ mod tests {
 				display: Display::Inline,
 				..default()
 			},
-			children![rsx_direct!{"A"}, rsx_direct!{"B"}, rsx_direct!{"C"}],
+			children![rsx_direct! {"A"}, rsx_direct! {"B"}, rsx_direct! {"C"}],
 		));
 		// All three children should appear on the same line
 		let first_line = out.lines().next().unwrap_or("");
@@ -208,7 +208,11 @@ mod tests {
 					display: Display::Inline,
 					..default()
 				},
-				children![rsx_direct!{"Hello"}, rsx_direct!{"World"}, rsx_direct!{"Foo"},],
+				children![
+					rsx_direct! {"Hello"},
+					rsx_direct! {"World"},
+					rsx_direct! {"Foo"},
+				],
 			),
 		)
 		.trim_lines();
@@ -227,9 +231,9 @@ mod tests {
 		// a grow box filling the line, an unbreakable run, and wide chars that
 		// would straddle the right edge all stay within the buffer width.
 		let bundle = (LayoutStyle::flex_row().column_gap(1), children![
-			(rsx_direct!{ "中文日本語ＡＢＣ" }, bordered.clone()),
+			(rsx_direct! { "中文日本語ＡＢＣ" }, bordered.clone()),
 			(
-				rsx_direct!{ "Supercalifragilistic" },
+				rsx_direct! { "Supercalifragilistic" },
 				bordered.clone(),
 				LayoutStyle::default().with_flex_grow(1)
 			),

@@ -58,7 +58,9 @@ pub fn apply_markers(
 ) {
 	for view in elements.iter() {
 		let marker = match view.tag() {
-			"li" => list_marker(view.entity, &parents, &tags, &children, &elements),
+			"li" => {
+				list_marker(view.entity, &parents, &tags, &children, &elements)
+			}
 			"p" => blockquote_bar(view.entity, &parents, &tags),
 			"hr" => Some(HR_RULE.into()),
 			"img" => Some(img_marker(&view)),
@@ -94,7 +96,9 @@ fn list_marker(
 					siblings
 						.iter()
 						.filter(|&entity| {
-							tags.get(entity).map(|el| el.tag() == "li").unwrap_or(false)
+							tags.get(entity)
+								.map(|el| el.tag() == "li")
+								.unwrap_or(false)
 						})
 						.position(|entity| entity == li)
 				})
@@ -116,7 +120,11 @@ fn blockquote_bar(
 	let mut current = paragraph;
 	while let Ok(parent) = parents.get(current) {
 		current = parent.0;
-		if tags.get(current).map(|el| el.tag() == "blockquote").unwrap_or(false) {
+		if tags
+			.get(current)
+			.map(|el| el.tag() == "blockquote")
+			.unwrap_or(false)
+		{
 			depth += 1;
 		}
 	}
@@ -176,32 +184,32 @@ mod tests {
 
 	#[beet_core::test]
 	fn unordered_list_bullets() {
-		render(rsx_direct!{ <ul><li>"alpha"</li><li>"beta"</li></ul> })
+		render(rsx_direct! { <ul><li>"alpha"</li><li>"beta"</li></ul> })
 			.xpect_contains("• alpha")
 			.xpect_contains("• beta");
 	}
 
 	#[beet_core::test]
 	fn ordered_list_numbers() {
-		render(rsx_direct!{ <ol><li>"first"</li><li>"second"</li></ol> })
+		render(rsx_direct! { <ol><li>"first"</li><li>"second"</li></ol> })
 			.xpect_contains("1. first")
 			.xpect_contains("2. second");
 	}
 
 	#[beet_core::test]
 	fn blockquote_bar() {
-		render(rsx_direct!{ <blockquote><p>"quoted text"</p></blockquote> })
+		render(rsx_direct! { <blockquote><p>"quoted text"</p></blockquote> })
 			.xpect_contains("▌ quoted text");
 	}
 
 	#[beet_core::test]
 	fn thematic_break_rule() {
-		render(rsx_direct!{ <hr/> }).xpect_contains("────");
+		render(rsx_direct! { <hr/> }).xpect_contains("────");
 	}
 
 	#[beet_core::test]
 	fn image_alt_text() {
-		render(rsx_direct!{ <img src="image.png" alt="alt text"/> })
+		render(rsx_direct! { <img src="image.png" alt="alt text"/> })
 			.xpect_contains("[alt text]");
 	}
 
@@ -209,7 +217,7 @@ mod tests {
 	fn nested_list_indented() {
 		// the outer item's marker sits in a left gutter, so its nested list is
 		// inset one marker-width, indenting the nested bullet under the label.
-		let out = FlexBuffer::render_oneshot_plain(40, rsx_direct!{
+		let out = FlexBuffer::render_oneshot_plain(40, rsx_direct! {
 			<ul><li>"top"<ul><li>"nested"</li></ul></li></ul>
 		});
 		out.lines()

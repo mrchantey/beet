@@ -6,7 +6,10 @@ use bevy::ecs::system::In;
 /// A `POST /analytics` route that parses an [`AnalyticsEvent`] from the JSON
 /// body and triggers it as a bevy event for any registered observer to record.
 pub fn analytics_handler() -> impl Bundle {
-	(exchange_route("analytics", AnalyticsHandler), HttpMethod::Post)
+	(
+		exchange_route("analytics", AnalyticsHandler),
+		HttpMethod::Post,
+	)
 }
 
 #[action(handler_only)]
@@ -48,7 +51,8 @@ mod test {
 		world
 			.entity_mut(root)
 			.call::<Request, Response>(Request::with_json_str(
-				"analytics", payload,
+				"analytics",
+				payload,
 			))
 			.await
 			.unwrap()

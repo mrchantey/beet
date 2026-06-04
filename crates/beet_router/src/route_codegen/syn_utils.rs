@@ -28,7 +28,11 @@ pub(crate) fn type_last_ident(ty: &Type) -> Option<String> {
 	let Type::Path(type_path) = ty else {
 		return None;
 	};
-	type_path.path.segments.last().map(|seg| seg.ident.to_string())
+	type_path
+		.path
+		.segments
+		.last()
+		.map(|seg| seg.ident.to_string())
 }
 
 /// The action's input type, ie the `In` of `ActionContext<In>` in the handler's

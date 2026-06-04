@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_core::exports::notify::EventKind;
+use beet_core::prelude::*;
 
 /// Native filesystem watchers backing reactive [`FsStore`]s.
 ///

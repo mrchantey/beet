@@ -1,7 +1,7 @@
 //! Local echo HTTP server for testing.
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_action::prelude::*;
+use beet_core::prelude::*;
 use bytes::Bytes;
 
 /// Structured response from the echo server.

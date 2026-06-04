@@ -3,9 +3,9 @@ extern crate alloc;
 
 beet_core::test_main!();
 
+mod extra;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
-mod extra;
 // The media exchange parses responses into beet_ui scene trees (std-only).
 #[cfg(feature = "std")]
 mod media;
@@ -18,12 +18,12 @@ mod static_export;
 
 /// Exports the most commonly used items.
 pub mod prelude {
-	#[cfg(all(feature = "codegen", feature = "std"))]
-	pub use crate::route_codegen::*;
 	pub use crate::extra::*;
 	#[cfg(feature = "std")]
 	pub use crate::media::*;
 	pub use crate::navigate::*;
+	#[cfg(all(feature = "codegen", feature = "std"))]
+	pub use crate::route_codegen::*;
 	pub use crate::router::*;
 	#[cfg(feature = "std")]
 	pub use crate::scene_routes::*;

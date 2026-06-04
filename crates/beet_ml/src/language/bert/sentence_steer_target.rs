@@ -69,7 +69,10 @@ fn sentence_steer_target<F: Component>(
 
 	let chosen = bert.closest_sentence_entity(
 		target_sentence.0.clone(),
-		items.iter().filter(|e| *e != target_entity).collect::<Vec<_>>(),
+		items
+			.iter()
+			.filter(|e| *e != target_entity)
+			.collect::<Vec<_>>(),
 		&sentences,
 	)?;
 	commands.entity(agent).insert(SteerTarget::Entity(chosen));

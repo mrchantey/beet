@@ -74,11 +74,12 @@ mod test {
 			.into_world()
 			.spawn((default_router(), children![route(
 				"seq",
-				(exchange_sequence(), children![
-					Action::<Request, Outcome<Request, Response>>::new_pure(
-						|cx: ActionContext<Request>| Pass(cx.input),
-					),
-				]),
+				(exchange_sequence(), children![Action::<
+					Request,
+					Outcome<Request, Response>,
+				>::new_pure(
+					|cx: ActionContext<Request>| Pass(cx.input),
+				),]),
 			)]))
 			.exchange(Request::get("seq"))
 			.await

@@ -50,10 +50,7 @@ impl PostPartial {
 	/// - [`OutputItem::FunctionCall`]
 	/// - [`OutputItem::Reasoning`]
 	/// defaulting to [`PostStatus::Completed`]
-	pub fn from_output_item(
-		item: OutputItem,
-		status: PostStatus,
-	) -> Vec<Self> {
+	pub fn from_output_item(item: OutputItem, status: PostStatus) -> Vec<Self> {
 		match item {
 			OutputItem::Message(message) => {
 				let status = match message.status {
@@ -85,9 +82,7 @@ impl PostPartial {
 						FunctionCallStatus::InProgress => {
 							PostStatus::InProgress
 						}
-						FunctionCallStatus::Completed => {
-							PostStatus::Completed
-						}
+						FunctionCallStatus::Completed => PostStatus::Completed,
 						FunctionCallStatus::Incomplete => {
 							PostStatus::Interrupted
 						}
@@ -243,4 +238,3 @@ pub enum PartialContent {
 	/// will be overwritten with this string.
 	FunctionCallArgumentsDone(String),
 }
-

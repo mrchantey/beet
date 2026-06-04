@@ -1,9 +1,9 @@
 beet_core::test_main!();
 
 use beet_core::exports;
-use beet_core::testing;
 use beet_core::prelude;
 use beet_core::prelude::*;
+use beet_core::testing;
 use quote::quote;
 
 #[beet_core::test]

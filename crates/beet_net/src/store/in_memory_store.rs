@@ -159,9 +159,7 @@ impl BlobStoreProvider for InMemoryStore {
 		format!("memory:{}", self.inner.instance_id).into()
 	}
 
-	fn subdir(&self) -> SmolPath {
-		self.subdir.clone().unwrap_or_default()
-	}
+	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> { None }
 

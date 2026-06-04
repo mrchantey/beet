@@ -86,14 +86,14 @@ fn main() -> AppExit {
 /// Spawns the server (`--server=cli|http`) with the site and the dev-command
 /// routes layered on the same router.
 fn setup(mut commands: Commands) -> Result {
-	commands.spawn((server_from_cli()?, site())).with_children(
-		|parent| {
+	commands
+		.spawn((server_from_cli()?, site()))
+		.with_children(|parent| {
 			#[cfg(feature = "codegen")]
 			parent.spawn(exchange_route("codegen", Codegen));
 			parent.spawn(exchange_route("export", Export));
 			parent.spawn(exchange_route("call-add", CallAdd));
-		},
-	);
+		});
 	Ok(())
 }
 
@@ -151,7 +151,8 @@ impl Default for CallAddParams {
 #[derive(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<CallAddParams>())]
 async fn CallAdd(cx: ActionContext<Request>) -> Result<String> {
-	let CallAddParams { a, b } = cx.params().parse_reflect::<CallAddParams>()?;
+	let CallAddParams { a, b } =
+		cx.params().parse_reflect::<CallAddParams>()?;
 	let caller = cx.caller.clone();
 	let world = cx.world();
 	let router = caller
@@ -181,8 +182,10 @@ async fn CallAdd(cx: ActionContext<Request>) -> Result<String> {
 #[derive(Component)]
 async fn Codegen(_: ActionContext) -> Result<String> {
 	fn dir(sub: &str) -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel(format!("examples/file_based_routes/{sub}"))
-			.unwrap()
+		AbsPathBuf::new_workspace_rel(format!(
+			"examples/file_based_routes/{sub}"
+		))
+		.unwrap()
 	}
 	fn cg(name: &str) -> CodegenFile {
 		CodegenFile::new(dir(&format!("generated/{name}")))

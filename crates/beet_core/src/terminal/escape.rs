@@ -166,10 +166,7 @@ pub fn background(w: &mut impl Write, color: Color) -> io::Result<()> {
 
 /// Write a foreground [`TermColor`] using the 16-colour, 256-colour or 24-bit
 /// sequence as appropriate.
-pub fn foreground_term(
-	w: &mut impl Write,
-	color: TermColor,
-) -> io::Result<()> {
+pub fn foreground_term(w: &mut impl Write, color: TermColor) -> io::Result<()> {
 	match color.palette_index() {
 		Some(index) if index < 8 => write!(w, "\x1b[{}m", 30 + index),
 		Some(index) => write!(w, "\x1b[{}m", 90 + index - 8),
@@ -183,10 +180,7 @@ pub fn foreground_term(
 
 /// Write a background [`TermColor`] using the 16-colour, 256-colour or 24-bit
 /// sequence as appropriate.
-pub fn background_term(
-	w: &mut impl Write,
-	color: TermColor,
-) -> io::Result<()> {
+pub fn background_term(w: &mut impl Write, color: TermColor) -> io::Result<()> {
 	match color.palette_index() {
 		Some(index) if index < 8 => write!(w, "\x1b[{}m", 40 + index),
 		Some(index) => write!(w, "\x1b[{}m", 100 + index - 8),
@@ -197,4 +191,3 @@ pub fn background_term(
 		},
 	}
 }
-

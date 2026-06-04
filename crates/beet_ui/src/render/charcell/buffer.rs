@@ -507,7 +507,7 @@ mod tests {
 	#[beet_core::test]
 	fn underline_does_not_bleed_into_border() {
 		let out = render((LayoutStyle::flex_row(), children![(
-			rsx_direct!{ "Hello" },
+			rsx_direct! { "Hello" },
 			bordered(),
 			VisualStyle {
 				decoration_line: DecorationLine::underline(),
@@ -521,7 +521,7 @@ mod tests {
 	#[beet_core::test]
 	fn strike_does_not_bleed_into_border() {
 		let out = render((LayoutStyle::flex_row(), children![(
-			rsx_direct!{ "Hi" },
+			rsx_direct! { "Hi" },
 			bordered(),
 			VisualStyle {
 				decoration_line: DecorationLine::line_through(),
@@ -535,7 +535,7 @@ mod tests {
 	#[beet_core::test]
 	fn italic_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
-			rsx_direct!{ "Italic" },
+			rsx_direct! { "Italic" },
 			VisualStyle {
 				font_style: FontStyle::Italic,
 				..default()
@@ -547,7 +547,7 @@ mod tests {
 	#[beet_core::test]
 	fn bold_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
-			rsx_direct!{ "Bold" },
+			rsx_direct! { "Bold" },
 			VisualStyle {
 				font_weight: FontWeight::Bold,
 				..default()
@@ -563,7 +563,7 @@ mod tests {
 		let bg = Color::srgb(0.5, 0., 0.5);
 		let buffer = Buffer::new(UVec2::new(10, 4)).populate((
 			LayoutStyle::flex_row(),
-			children![(rsx_direct!{ "X" }, bordered(), VisualStyle {
+			children![(rsx_direct! { "X" }, bordered(), VisualStyle {
 				background: Some(bg),
 				..default()
 			})],
@@ -582,7 +582,7 @@ mod tests {
 		let buffer = Buffer::new(UVec2::new(10, 4)).populate((
 			LayoutStyle::flex_row(),
 			children![(
-				rsx_direct!{ "Bar" },
+				rsx_direct! { "Bar" },
 				BoxStyle::default().with_border(Spacing {
 					bottom: Length::Rem(1.),
 					..Spacing::DEFAULT
@@ -606,7 +606,7 @@ mod tests {
 	#[beet_core::test]
 	fn blink_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
-			rsx_direct!{ "Blink" },
+			rsx_direct! { "Blink" },
 			VisualStyle {
 				blink: BlinkStyle::Blink,
 				..default()

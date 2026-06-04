@@ -278,8 +278,7 @@ impl Block for LightsailBlock {
 			policy_ident,
 			AwsIamUserPolicyAttachmentDetails {
 				user: user_name_ref.clone().into(),
-				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-					.into(),
+				policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess".into(),
 				..default()
 			},
 		);
@@ -291,8 +290,8 @@ impl Block for LightsailBlock {
 			cw_policy_ident,
 			AwsIamUserPolicyAttachmentDetails {
 				user: user_name_ref.clone().into(),
-				policy_arn: "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-					.into(),
+				policy_arn:
+					"arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy".into(),
 				..default()
 			},
 		);

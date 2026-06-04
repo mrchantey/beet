@@ -193,8 +193,13 @@ impl Iterator for DirectDescendantIter {
 /// even on self-referential relationships. Created via
 /// [`iter_ancestors_once`](HierarchyQueryExtExt::iter_ancestors_once) and
 /// [`iter_ancestors_inclusive_once`](HierarchyQueryExtExt::iter_ancestors_inclusive_once).
-pub struct AncestorOnceIter<'w, 's, D: QueryData, F: QueryFilter, R: Relationship>
-{
+pub struct AncestorOnceIter<
+	'w,
+	's,
+	D: QueryData,
+	F: QueryFilter,
+	R: Relationship,
+> {
 	query: &'w Query<'w, 's, D, F>,
 	visited: HashSet<Entity>,
 	next: Option<Entity>,

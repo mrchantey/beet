@@ -33,7 +33,9 @@ pub struct Blob {
 
 impl Blob {
 	/// Create a new [`Blob`] from a provider and path.
-	pub fn new(store: BlobStore, path: SmolPath) -> Self { Self { path, store } }
+	pub fn new(store: BlobStore, path: SmolPath) -> Self {
+		Self { path, store }
+	}
 
 	/// True if `event` is this exact object: same backing and the
 	/// root-relative locations are equal (object-exact, not scope-covering).
@@ -126,9 +128,7 @@ impl Blob {
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn remove(&self) -> Result {
-		self.store.remove(&self.path).await
-	}
+	pub async fn remove(&self) -> Result { self.store.remove(&self.path).await }
 
 	/// Get the public URL of the blob, if the provider supports it.
 	///
@@ -211,7 +211,9 @@ where
 	pub fn store(&self) -> &B { &self.store }
 
 	/// Get the underlying [`BlobStore`] (type-erased).
-	pub fn erased_store(&self) -> BlobStore { BlobStore::new(self.store.clone()) }
+	pub fn erased_store(&self) -> BlobStore {
+		BlobStore::new(self.store.clone())
+	}
 
 	/// Insert (or overwrite) the blob's content.
 	///
@@ -296,9 +298,7 @@ where
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub async fn remove(&self) -> Result {
-		self.store.remove(&self.path).await
-	}
+	pub async fn remove(&self) -> Result { self.store.remove(&self.path).await }
 
 	/// Get the public URL of the blob, if the provider supports it.
 	///

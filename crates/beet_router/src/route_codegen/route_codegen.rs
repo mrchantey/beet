@@ -135,8 +135,11 @@ mod test {
 				codegen("content.rs"),
 			))
 			.add_collection(
-				RouteCollection::new(site_dir("actions"), codegen("actions.rs"))
-					.with_category(RouteCollectionCategory::Actions),
+				RouteCollection::new(
+					site_dir("actions"),
+					codegen("actions.rs"),
+				)
+				.with_category(RouteCollectionCategory::Actions),
 			)
 			.with_route_tree(codegen("route_tree.rs"))
 			.with_client_actions(codegen("client_actions.rs"))

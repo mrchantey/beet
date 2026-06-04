@@ -354,7 +354,10 @@ mod test {
 	async fn set_field_updates_existing() {
 		let mut world = AsyncPlugin::world();
 		let entity = world
-			.spawn((FieldRef::new("status").with_init(val!("pending")), SetField))
+			.spawn((
+				FieldRef::new("status").with_init(val!("pending")),
+				SetField,
+			))
 			.id();
 
 		world
@@ -370,8 +373,9 @@ mod test {
 	async fn set_field_typed_creates_new_field() {
 		let mut world = AsyncPlugin::world();
 		let field = FieldRef::new("message");
-		let entity =
-			world.spawn((field, SetFieldTyped::<String>::default())).id();
+		let entity = world
+			.spawn((field, SetFieldTyped::<String>::default()))
+			.id();
 
 		world
 			.entity_mut(entity)
@@ -551,7 +555,11 @@ mod test {
 			.id();
 
 		for value in [1i32, 2, 3] {
-			world.entity_mut(actor).call::<i32, ()>(value).await.unwrap();
+			world
+				.entity_mut(actor)
+				.call::<i32, ()>(value)
+				.await
+				.unwrap();
 		}
 		// list is now [1, 2, 3]
 		world
@@ -598,7 +606,10 @@ mod test {
 	async fn remove_at_rejects_non_list() {
 		let mut world = AsyncPlugin::world();
 		let actor = world
-			.spawn((FieldRef::new("todos").with_init(val!("not a list")), RemoveAtField))
+			.spawn((
+				FieldRef::new("todos").with_init(val!("not a list")),
+				RemoveAtField,
+			))
 			.id();
 
 		world

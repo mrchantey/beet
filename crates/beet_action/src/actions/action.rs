@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use alloc::sync::Arc;
+use beet_core::prelude::*;
 use bevy::ecs::system::SystemState;
 
 #[derive(Component)]
@@ -128,9 +128,7 @@ where
 	{
 		let this = self.clone();
 		entity
-			.with(move |entity| {
-				this.call_world(entity, input, out_handler)
-			})
+			.with(move |entity| this.call_world(entity, input, out_handler))
 			.await
 			.flatten()
 	}

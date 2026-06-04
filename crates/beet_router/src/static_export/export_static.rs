@@ -33,7 +33,9 @@ pub async fn collect_static_html(
 				if !node.path.is_static() {
 					continue;
 				}
-				if node.method.map(|method| method != HttpMethod::Get)
+				if node
+					.method
+					.map(|method| method != HttpMethod::Get)
 					.unwrap_or(false)
 				{
 					continue;
@@ -105,11 +107,17 @@ mod test {
 		let router = world
 			.spawn((default_router(), children![
 				(
-					render_action::fixed_route("about", rsx_direct!{ <p>"About"</p> }),
+					render_action::fixed_route(
+						"about",
+						rsx_direct! { <p>"About"</p> }
+					),
 					HttpMethod::Get
 				),
 				(
-					render_action::fixed_route("", rsx_direct!{ <h1>"Home"</h1> }),
+					render_action::fixed_route(
+						"",
+						rsx_direct! { <h1>"Home"</h1> }
+					),
 					HttpMethod::Get
 				),
 			]))

@@ -1,7 +1,7 @@
 //! Debug logging leaf action.
 use crate::prelude::*;
-use beet_core::prelude::*;
 use alloc::borrow::Cow;
+use beet_core::prelude::*;
 
 /// Logs a message when called, then returns [`Outcome::PASS`].
 ///

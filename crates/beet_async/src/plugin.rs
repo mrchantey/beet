@@ -1,7 +1,8 @@
 use crate::bridge_future::AsyncSystemState;
 use bevy::app::App;
 use bevy::ecs::system::SystemParam;
-use bevy::platform::sync::{Arc, Weak};
+use bevy::platform::sync::Arc;
+use bevy::platform::sync::Weak;
 
 /// Plugin entry point for the async <-> ECS bridge system.
 ///
@@ -40,9 +41,11 @@ impl bevy::app::Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
 		let strong_world = StrongAsyncWorld::default();
 		let weak_world = AsyncWorld(Arc::downgrade(&strong_world.0));
-		app.insert_resource(AsyncTickBudget(self.max_async_ticks_per_sync_point))
-			.insert_resource(strong_world)
-			.insert_resource(weak_world);
+		app.insert_resource(AsyncTickBudget(
+			self.max_async_ticks_per_sync_point,
+		))
+		.insert_resource(strong_world)
+		.insert_resource(weak_world);
 	}
 }
 
@@ -61,7 +64,9 @@ pub struct AsyncWorld(pub(crate) Weak<crate::bridge_request::AsyncWorldInner>);
 /// We only expose [`Weak`] handles publicly so we can rely on the behavior that if the `World`
 /// is dropped then we can detect it by a failing [`Weak::upgrade`]
 #[derive(bevy::ecs::resource::Resource, Default, Clone)]
-pub(crate) struct StrongAsyncWorld(pub(crate) Arc<crate::bridge_request::AsyncWorldInner>);
+pub(crate) struct StrongAsyncWorld(
+	pub(crate) Arc<crate::bridge_request::AsyncWorldInner>,
+);
 
 impl AsyncWorld {
 	/// Creates a reusable async handle for accessing the ECS with the
@@ -116,7 +121,9 @@ impl AsyncWorld {
 	///
 	/// `P` is stored lazily, meaning the underlying `SystemState<P>` is only
 	/// initialized when the bridge is first driven against a real `World`.
-	pub fn system_state<P: SystemParam + 'static>(&self) -> AsyncSystemState<P> {
+	pub fn system_state<P: SystemParam + 'static>(
+		&self,
+	) -> AsyncSystemState<P> {
 		AsyncSystemState::new(self.clone())
 	}
 }

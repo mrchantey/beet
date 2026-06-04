@@ -4,13 +4,16 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 pub fn stack_cli() -> impl Bundle {
-	(
-		CliServer::default(),
-		default_router(),
-		children![
-			Validate, Plan, Apply, Show, List, Destroy, Rollback, Rollforward
-		],
-	)
+	(CliServer::default(), default_router(), children![
+		Validate,
+		Plan,
+		Apply,
+		Show,
+		List,
+		Destroy,
+		Rollback,
+		Rollforward
+	])
 }
 
 /// Build a [`terra::Project`] from the nearest ancestor [`Stack`].

@@ -19,10 +19,9 @@ where
 	let input = serde_json::to_string(&input)
 		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))?;
 
-	let runtime =
-		Runtime::new().map_err(|err| bevyhow!("quickjs: {err}"))?;
-	let context = Context::full(&runtime)
-		.map_err(|err| bevyhow!("quickjs: {err}"))?;
+	let runtime = Runtime::new().map_err(|err| bevyhow!("quickjs: {err}"))?;
+	let context =
+		Context::full(&runtime).map_err(|err| bevyhow!("quickjs: {err}"))?;
 
 	context.with(|ctx| {
 		// bind `input` by parsing the JSON encoding into a live value.

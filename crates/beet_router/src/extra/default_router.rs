@@ -84,7 +84,8 @@ mod test {
 		world
 			.entity_mut(root)
 			.call::<Request, Response>(Request::with_json_str(
-				"analytics", payload,
+				"analytics",
+				payload,
 			))
 			.await
 			.unwrap()

@@ -1,6 +1,6 @@
+mod annotation_inliner;
 mod post_partial;
 mod post_partial_map;
-mod annotation_inliner;
 mod response_partial;
 pub use annotation_inliner::*;
 pub use post_partial::*;

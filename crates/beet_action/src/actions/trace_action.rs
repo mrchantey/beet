@@ -4,11 +4,11 @@
 //! [`OnLogMessage`]/[`UserMessage`] are kept for log-UI consumers such as
 //! `beet_site`.
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use beet_core::prelude::*;
 use bevy::color::Color;
 use bevy::color::Srgba;
 use bevy::color::palettes::tailwind;
-use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 /// Message carrying a line of action-trace output for log UIs.

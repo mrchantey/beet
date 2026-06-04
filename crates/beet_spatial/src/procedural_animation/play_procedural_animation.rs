@@ -65,7 +65,9 @@ pub(crate) fn play_procedural_animation(
 ) {
 	for (action, play_procedural, run_timer) in query.iter() {
 		let total_len_meters = play_procedural.curve.total_len();
-		let t = play_procedural.speed.calculate_t(total_len_meters, run_timer);
+		let t = play_procedural
+			.speed
+			.calculate_t(total_len_meters, run_timer);
 		let target_pos = play_procedural.curve.sample_clamped(t);
 
 		if let Ok(mut transform) = agents.get_mut(action) {
@@ -99,8 +101,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				Transform::default(),
-				PlayProceduralAnimation::default()
-					.with_duration_secs(0.05),
+				PlayProceduralAnimation::default().with_duration_secs(0.05),
 			))
 			.id();
 

@@ -39,7 +39,11 @@ impl SceneProp {
 	/// Fall back to `fallback` when no content was provided, mirroring a
 	/// `<slot>`'s default children.
 	pub fn or(self, fallback: impl Scene) -> Self {
-		if self.is_empty() { Self::new(fallback) } else { self }
+		if self.is_empty() {
+			Self::new(fallback)
+		} else {
+			self
+		}
 	}
 }
 

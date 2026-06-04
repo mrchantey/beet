@@ -158,12 +158,16 @@ mod test {
 	fn setup() -> (App, Store<Vec<u32>>, Entity, AnimationNodeIndex) {
 		let store = Store::default();
 		let mut app = App::new();
-		app.add_plugins((AssetPlugin::default(), AnimationPlugin, ActionPlugin))
-			.init_resource::<Time>()
-			.add_observer(move |foo: On<MyEvent>| {
-				store.push(foo.0);
-			})
-			.run_once();
+		app.add_plugins((
+			AssetPlugin::default(),
+			AnimationPlugin,
+			ActionPlugin,
+		))
+		.init_resource::<Time>()
+		.add_observer(move |foo: On<MyEvent>| {
+			store.push(foo.0);
+		})
+		.run_once();
 
 		let mut clip = AnimationClip::default();
 		// animation.set_duration(2.0);
@@ -231,13 +235,10 @@ mod test {
 		let (mut app, store, agent, index) = setup();
 
 		app.world_mut().entity_mut(agent).with_children(|builder| {
-			builder.spawn((
+			builder.spawn((Sequence::new(), children![(
 				Sequence::new(),
-				children![(
-					Sequence::new(),
-					children![PlayAnimation::new(index)],
-				)],
-			));
+				children![PlayAnimation::new(index)],
+			)]));
 		});
 
 		let behavior = app

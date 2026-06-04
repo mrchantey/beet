@@ -31,18 +31,14 @@ async fn Patrol(cx: ActionContext) -> Result<Outcome> {
 async fn main() -> Result {
 	let mut world = (MinimalPlugins, AsyncPlugin, ActionPlugin).into_world();
 	world
-		.spawn((
-			Name::new("root"),
-			Sequence::new(),
-			children![
-				(Name::new("patrol"), Patrol),
-				(
-					Name::new("cooldown"),
-					EndInDuration::pass(Duration::from_millis(300)),
-				),
-				(Name::new("after"), Log::new("patrol complete")),
-			],
-		))
+		.spawn((Name::new("root"), Sequence::new(), children![
+			(Name::new("patrol"), Patrol),
+			(
+				Name::new("cooldown"),
+				EndInDuration::pass(Duration::from_millis(300)),
+			),
+			(Name::new("after"), Log::new("patrol complete")),
+		]))
 		.call::<(), Outcome>(())
 		.await?;
 	Ok(())

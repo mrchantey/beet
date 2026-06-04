@@ -5,10 +5,10 @@
 //! onto a single router entity (eg passed together to `default_router`) without
 //! clobbering each other's children.
 
+use crate::prelude::*;
 use crate::route_codegen::syn_utils::action_input_ty;
 use crate::route_codegen::syn_utils::action_output_ty;
 use crate::route_codegen::syn_utils::type_last_ident;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -54,7 +54,11 @@ fn first_param_outer_ident(item: &ItemFn) -> Option<String> {
 	let syn::Type::Path(type_path) = &*pat_type.ty else {
 		return None;
 	};
-	type_path.path.segments.last().map(|seg| seg.ident.to_string())
+	type_path
+		.path
+		.segments
+		.last()
+		.map(|seg| seg.ident.to_string())
 }
 
 /// Adds the module declarations and the collection bundle function to the
@@ -63,8 +67,9 @@ pub(crate) fn emit_collection(
 	collection: &RouteCollection,
 	files: &[RouteFile],
 ) -> Result<CodegenFile> {
-	let mut codegen =
-		collection.codegen.clone_info(collection.codegen.output().clone());
+	let mut codegen = collection
+		.codegen
+		.clone_info(collection.codegen.output().clone());
 
 	let mut children = Vec::<TokenStream>::new();
 

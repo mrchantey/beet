@@ -95,7 +95,10 @@ impl CodegenFile {
 			.file_stem()
 			.and_then(|stem| stem.to_str())
 			.ok_or_else(|| {
-				bevyhow!("codegen output must have a file stem: {}", self.output)
+				bevyhow!(
+					"codegen output must have a file stem: {}",
+					self.output
+				)
 			})?;
 		if stem != "mod" {
 			return Ok(stem.to_snake_case());

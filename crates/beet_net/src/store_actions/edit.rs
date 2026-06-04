@@ -64,9 +64,9 @@ fn validate_edits(text: &str, edits: &[TextEdit]) -> Result<()> {
 			bevybail!("old_text must not be empty");
 		}
 
-		let pos = text
-			.find(&edit.old_text)
-			.ok_or_else(|| bevyhow!("old_text not found in file: {:?}", &edit.old_text))?;
+		let pos = text.find(&edit.old_text).ok_or_else(|| {
+			bevyhow!("old_text not found in file: {:?}", &edit.old_text)
+		})?;
 		let end = pos + edit.old_text.len();
 
 		// check uniqueness: ensure old_text appears exactly once
@@ -107,49 +107,43 @@ mod test {
 		let store = BlobStore::temp();
 		let path = SmolPath::from("file.txt");
 		let original = original.to_owned();
-		store
-			.insert(&path, original.clone())
-			.await
-			.unwrap();
+		store.insert(&path, original.clone()).await.unwrap();
 
 		validate_edits(&original, &edits).unwrap();
 		let mut text = original;
 		for edit in &edits {
 			text = text.replacen(&edit.old_text, &edit.new_text, 1);
 		}
-		store.insert(&path, text.clone().into_bytes()).await.unwrap();
+		store
+			.insert(&path, text.clone().into_bytes())
+			.await
+			.unwrap();
 		let got = store.get(&path).await.unwrap();
 		String::from_utf8(got.to_vec()).unwrap()
 	}
 
 	#[beet_core::test]
 	async fn single_edit() {
-		let result = apply_edits(
-			"hello world",
-			vec![TextEdit {
-				old_text: "world".into(),
-				new_text: "rust".into(),
-			}],
-		)
+		let result = apply_edits("hello world", vec![TextEdit {
+			old_text: "world".into(),
+			new_text: "rust".into(),
+		}])
 		.await;
 		result.xpect_eq("hello rust".to_string());
 	}
 
 	#[beet_core::test]
 	async fn multiple_edits() {
-		let result = apply_edits(
-			"aaa bbb ccc",
-			vec![
-				TextEdit {
-					old_text: "aaa".into(),
-					new_text: "xxx".into(),
-				},
-				TextEdit {
-					old_text: "ccc".into(),
-					new_text: "zzz".into(),
-				},
-			],
-		)
+		let result = apply_edits("aaa bbb ccc", vec![
+			TextEdit {
+				old_text: "aaa".into(),
+				new_text: "xxx".into(),
+			},
+			TextEdit {
+				old_text: "ccc".into(),
+				new_text: "zzz".into(),
+			},
+		])
 		.await;
 		result.xpect_eq("xxx bbb zzz".to_string());
 	}

@@ -1,11 +1,14 @@
+use crate::bridge_request;
 use crate::bridge_request::BridgeRequest;
 use crate::plugin::AsyncWorld;
-use crate::system_state::{
-	ErasedSystemStateCell, NoopSystemStateCell, SystemStateCell,
-};
+use crate::system_state::ErasedSystemStateCell;
+use crate::system_state::NoopSystemStateCell;
+use crate::system_state::SystemStateCell;
+use crate::wake_signal;
 use crate::wake_signal::WakeSignaler;
-use crate::{bridge_request, wake_signal};
-use bevy::ecs::schedule::{InternedSystemSet, IntoSystemSet, SystemSet};
+use bevy::ecs::schedule::InternedSystemSet;
+use bevy::ecs::schedule::IntoSystemSet;
+use bevy::ecs::schedule::SystemSet;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::world::World;
 use bevy::platform::sync::Arc;
@@ -63,11 +66,10 @@ impl<P: SystemParam + 'static> AsyncSystemState<P> {
 			#[cfg(feature = "std")]
 			system_state: Arc::new(SystemStateCell::<P>::default()),
 			#[cfg(not(feature = "std"))]
-			system_state: Arc::from(
-				bevy::platform::prelude::Box::new(
-					SystemStateCell::<P>::default(),
-				) as bevy::platform::prelude::Box<dyn ErasedSystemStateCell>,
-			),
+			system_state: Arc::from(bevy::platform::prelude::Box::new(
+				SystemStateCell::<P>::default(),
+			)
+				as bevy::platform::prelude::Box<dyn ErasedSystemStateCell>),
 		}
 	}
 
@@ -125,10 +127,10 @@ impl AsyncWorld {
 			#[cfg(feature = "std")]
 			system_state: Arc::new(NoopSystemStateCell),
 			#[cfg(not(feature = "std"))]
-			system_state: Arc::from(
-				bevy::platform::prelude::Box::new(NoopSystemStateCell)
-					as bevy::platform::prelude::Box<dyn ErasedSystemStateCell>,
-			),
+			system_state: Arc::from(bevy::platform::prelude::Box::new(
+				NoopSystemStateCell,
+			)
+				as bevy::platform::prelude::Box<dyn ErasedSystemStateCell>),
 			world: self.clone(),
 		}
 	}
@@ -264,14 +266,11 @@ where
 				// 3. The erased `SystemState` storage itself.
 				strong_world
 					.bridge_requests
-					.try_send(
-						&self.system_set,
-						BridgeRequest {
-							waker: cx.waker().clone(),
-							wake_waiter,
-							system_state: self.system_state.clone(),
-						},
-					)
+					.try_send(&self.system_set, BridgeRequest {
+						waker: cx.waker().clone(),
+						wake_waiter,
+						system_state: self.system_state.clone(),
+					})
 					.ok()
 					.unwrap();
 				Poll::Pending
@@ -334,14 +333,11 @@ where
 				self.wake_signal.replace(wake_signal);
 				strong_world
 					.bridge_requests
-					.try_send(
-						&self.system_set,
-						BridgeRequest {
-							waker: cx.waker().clone(),
-							wake_waiter,
-							system_state: self.system_state.clone(),
-						},
-					)
+					.try_send(&self.system_set, BridgeRequest {
+						waker: cx.waker().clone(),
+						wake_waiter,
+						system_state: self.system_state.clone(),
+					})
 					.ok()
 					.unwrap();
 				Poll::Pending

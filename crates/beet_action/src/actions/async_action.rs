@@ -90,7 +90,9 @@ where
 	type In = Input;
 	type Out = Out;
 
-	fn into_action(self) -> Action<Self::In, Self::Out> { Action::new_async(self) }
+	fn into_action(self) -> Action<Self::In, Self::Out> {
+		Action::new_async(self)
+	}
 }
 
 /// Marker for the typed async action [`IntoAction`] impl accepting
@@ -140,7 +142,9 @@ mod test {
 	async fn negate() {
 		AsyncPlugin::world()
 			.spawn(Action::<i32, i32>::new_async(
-				async |input: ActionContext<i32>| -> Result<i32> { Ok(-*input) },
+				async |input: ActionContext<i32>| -> Result<i32> {
+					Ok(-*input)
+				},
 			))
 			.call::<i32, i32>(42)
 			.await

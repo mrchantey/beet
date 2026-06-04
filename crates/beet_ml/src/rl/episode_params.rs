@@ -4,7 +4,9 @@ use bevy::ecs::component::Mutable;
 
 /// Configuration carried by an RL session, parameterising how many
 /// episodes to run.
-pub trait EpisodeParams: 'static + Send + Sync + std::fmt::Debug + Clone + Reflect {
+pub trait EpisodeParams:
+	'static + Send + Sync + std::fmt::Debug + Clone + Reflect
+{
 	/// Number of training episodes in the session.
 	fn num_episodes(&self) -> u32;
 }

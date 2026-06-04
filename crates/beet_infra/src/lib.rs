@@ -28,5 +28,5 @@ pub mod prelude {
 	pub use crate::terra;
 	pub use crate::terra::tofu;
 	pub use crate::types::*;
-		pub use crate::wasm::*;
+	pub use crate::wasm::*;
 }

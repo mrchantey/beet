@@ -73,8 +73,10 @@ mod test {
 	#[beet_core::test]
 	async fn interrupt_on_run_clears_descendants() {
 		let mut world = AsyncPlugin::world();
-		let (parent, child) =
-			spawn_with_running_child(&mut world, super::InterruptOnRun.wrap(ok_inner()));
+		let (parent, child) = spawn_with_running_child(
+			&mut world,
+			super::InterruptOnRun.wrap(ok_inner()),
+		);
 
 		world
 			.entity_mut(parent)
@@ -88,8 +90,10 @@ mod test {
 	#[beet_core::test]
 	async fn interrupt_on_end_clears_descendants() {
 		let mut world = AsyncPlugin::world();
-		let (parent, child) =
-			spawn_with_running_child(&mut world, super::InterruptOnEnd.wrap(ok_inner()));
+		let (parent, child) = spawn_with_running_child(
+			&mut world,
+			super::InterruptOnEnd.wrap(ok_inner()),
+		);
 
 		world
 			.entity_mut(parent)

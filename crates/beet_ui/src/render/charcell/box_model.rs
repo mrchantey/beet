@@ -160,7 +160,8 @@ pub(super) fn draw_border(
 	let top_style = side_style(box_style.and_then(|b| b.border_top), border_bg);
 	let bottom_style =
 		side_style(box_style.and_then(|b| b.border_bottom), border_bg);
-	let left_style = side_style(box_style.and_then(|b| b.border_left), border_bg);
+	let left_style =
+		side_style(box_style.and_then(|b| b.border_left), border_bg);
 	let right_style =
 		side_style(box_style.and_then(|b| b.border_right), border_bg);
 
@@ -169,41 +170,73 @@ pub(super) fn draw_border(
 
 	if sides.all() {
 		// full box: corners join the sides
-		buffer.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, top), Cell::new("┐", top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, bottom), Cell::new("┘", bottom_style.clone(), entity));
+		buffer
+			.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set_composite(
+			UVec2::new(right, top),
+			Cell::new("┐", top_style.clone(), entity),
+		);
+		buffer.set_composite(
+			UVec2::new(left, bottom),
+			Cell::new("└", bottom_style.clone(), entity),
+		);
+		buffer.set_composite(
+			UVec2::new(right, bottom),
+			Cell::new("┘", bottom_style.clone(), entity),
+		);
 	}
 
 	// horizontal edges span the full width (corners overwrite the ends above)
 	if sides.top {
 		for x in left..=right {
-			buffer.set_composite(UVec2::new(x, top), Cell::new("─", top_style.clone(), entity));
+			buffer.set_composite(
+				UVec2::new(x, top),
+				Cell::new("─", top_style.clone(), entity),
+			);
 		}
 	}
 	if sides.bottom {
 		for x in left..=right {
-			buffer.set_composite(UVec2::new(x, bottom), Cell::new("─", bottom_style.clone(), entity));
+			buffer.set_composite(
+				UVec2::new(x, bottom),
+				Cell::new("─", bottom_style.clone(), entity),
+			);
 		}
 	}
 	// vertical edges span the full height
 	if sides.left {
 		for y in top..=bottom {
-			buffer.set_composite(UVec2::new(left, y), Cell::new("│", left_style.clone(), entity));
+			buffer.set_composite(
+				UVec2::new(left, y),
+				Cell::new("│", left_style.clone(), entity),
+			);
 		}
 	}
 	if sides.right {
 		for y in top..=bottom {
-			buffer.set_composite(UVec2::new(right, y), Cell::new("│", right_style.clone(), entity));
+			buffer.set_composite(
+				UVec2::new(right, y),
+				Cell::new("│", right_style.clone(), entity),
+			);
 		}
 	}
 
 	if sides.all() {
 		// re-draw corners so they sit on top of the straight edges
-		buffer.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, top), Cell::new("┐", top_style, entity));
-		buffer.set_composite(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, bottom), Cell::new("┘", bottom_style, entity));
+		buffer
+			.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set_composite(
+			UVec2::new(right, top),
+			Cell::new("┐", top_style, entity),
+		);
+		buffer.set_composite(
+			UVec2::new(left, bottom),
+			Cell::new("└", bottom_style.clone(), entity),
+		);
+		buffer.set_composite(
+			UVec2::new(right, bottom),
+			Cell::new("┘", bottom_style, entity),
+		);
 	}
 }
 

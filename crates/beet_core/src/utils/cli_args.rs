@@ -213,15 +213,13 @@ mod tests {
 	#[crate::test]
 	fn parse_slash_delimited_path() {
 		// a single positional with slashes splits into route segments
-		CliArgs::parse("blog/post-1").path.xpect_eq(vec![
-			"blog".to_string(),
-			"post-1".to_string(),
-		]);
+		CliArgs::parse("blog/post-1")
+			.path
+			.xpect_eq(vec!["blog".to_string(), "post-1".to_string()]);
 		// leading/trailing slashes produce no empty segments
-		CliArgs::parse("/docs/web/").path.xpect_eq(vec![
-			"docs".to_string(),
-			"web".to_string(),
-		]);
+		CliArgs::parse("/docs/web/")
+			.path
+			.xpect_eq(vec!["docs".to_string(), "web".to_string()]);
 	}
 
 	#[crate::test]

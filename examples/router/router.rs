@@ -130,7 +130,7 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		render_action::fixed_route("counter", rsx_direct!{
+		render_action::fixed_route("counter", rsx_direct! {
 			<div>
 				<h1>"Cookie Counter"</h1>
 				<p>"Value: "{field_ref.clone()}</p>
@@ -197,8 +197,7 @@ async fn LayoutTemplate(
 				.unwrap_or_else(|_| BlobStore::new(FsStore::default()))
 		})
 		.await?;
-	let layout_bytes =
-		store.get(&"layouts/default-layout.html".into()).await?;
+	let layout_bytes = store.get(&"layouts/default-layout.html".into()).await?;
 	let layout_html = String::from_utf8(layout_bytes.to_vec())?;
 	let head_html = head_content(&store).await?;
 	let nav_html = nav_content();
@@ -239,14 +238,17 @@ async fn LayoutTemplate(
 			}
 			if let Some(slot) = find_named_slot(world, layout_id, "sidebar") {
 				let sidebar_state = SidebarState::new(path);
-				let nodes =
-					world.with_state::<RouteQuery, Result<_>>(move |query| {
+				let nodes = world.with_state::<RouteQuery, Result<_>>(
+					move |query| {
 						let tree = query.route_tree(caller_entity)?;
 						sidebar_state.collect(&tree).xok()
-					})?;
+					},
+				)?;
 				let sidebar_id =
 					world.spawn_scene(rsx! { <Sidebar nodes=nodes/> })?.id();
-				world.entity_mut(slot).insert(SlotContainer::new(sidebar_id));
+				world
+					.entity_mut(slot)
+					.insert(SlotContainer::new(sidebar_id));
 			}
 			// build article header from frontmatter if present
 			let article_header_id = world
@@ -261,11 +263,15 @@ async fn LayoutTemplate(
 				find_named_slot(world, layout_id, "article-header")
 			{
 				if let Some(header_id) = article_header_id {
-					world.entity_mut(slot).insert(SlotContainer::new(header_id));
+					world
+						.entity_mut(slot)
+						.insert(SlotContainer::new(header_id));
 				}
 			}
 			if let Some(slot) = find_named_slot(world, layout_id, "main") {
-				world.entity_mut(slot).insert(SlotContainer::new(content_id));
+				world
+					.entity_mut(slot)
+					.insert(SlotContainer::new(content_id));
 			}
 
 			// assemble the ephemeral cleanup list, extending the content's own
@@ -295,8 +301,7 @@ fn parse_html_entity(world: &mut World, html: &str) -> Result<Entity> {
 
 /// Generates `<head>` content including the theme switcher script.
 async fn head_content(store: &BlobStore) -> Result<String> {
-	let theme_bytes =
-		store.get(&"js/minimal-theme-switcher.js".into()).await?;
+	let theme_bytes = store.get(&"js/minimal-theme-switcher.js".into()).await?;
 	let theme_switcher = String::from_utf8(theme_bytes.to_vec())?;
 	Ok(format!(r#"<script>{theme_switcher}</script>"#))
 }

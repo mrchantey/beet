@@ -69,9 +69,12 @@ impl Plugin for RouterPlugin {
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
 				.register_type::<ExchangeScript<(), String>>()
-				.register_type::<
-					ExchangeScript<RequestParts, String, RequestParts, SerdeIntoResponseMarker>,
-				>();
+				.register_type::<ExchangeScript<
+					RequestParts,
+					String,
+					RequestParts,
+					SerdeIntoResponseMarker,
+				>>();
 		}
 	}
 }

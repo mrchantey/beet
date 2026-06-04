@@ -82,21 +82,23 @@ fn run_test(
 			commands.entity(entity).insert(outcome);
 		}
 		MaybeAsync::Async(panic_result_fut) => {
-			async_commands.entity(entity).run_local(async move |entity| {
-				let result = panic_result_fut.await;
-				let outcome =
-					TestOutcome::from_panic_result(result, should_panic);
-				// Don't clobber a `TestOutcome` already set this frame (eg a
-				// timeout); a test that finishes after timing out stays a timeout.
-				entity
-					.with(move |mut entity| {
-						if !entity.contains::<TestOutcome>() {
-							entity.insert(outcome);
-						}
-					})
-					.await
-					.ok();
-			});
+			async_commands
+				.entity(entity)
+				.run_local(async move |entity| {
+					let result = panic_result_fut.await;
+					let outcome =
+						TestOutcome::from_panic_result(result, should_panic);
+					// Don't clobber a `TestOutcome` already set this frame (eg a
+					// timeout); a test that finishes after timing out stays a timeout.
+					entity
+						.with(move |mut entity| {
+							if !entity.contains::<TestOutcome>() {
+								entity.insert(outcome);
+							}
+						})
+						.await
+						.ok();
+				});
 		}
 	}
 
@@ -192,7 +194,8 @@ mod tests {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("expected");
-					#[allow(unreachable_code)] Ok::<(), String>(())
+					#[allow(unreachable_code)]
+					Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -219,7 +222,8 @@ mod tests {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("boom");
-					#[allow(unreachable_code)] Ok::<(), String>(())
+					#[allow(unreachable_code)]
+					Ok::<(), String>(())
 				});
 				Ok(())
 			})
@@ -251,7 +255,8 @@ mod tests {
 			register_test(TestCaseParams::new(), async {
 				async_ext::yield_now().await;
 				panic!("pizza");
-				#[allow(unreachable_code)] Ok::<(), String>(())
+				#[allow(unreachable_code)]
+				Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -302,7 +307,8 @@ mod tests {
 				register_test(TestCaseParams::new(), async {
 					async_ext::yield_now().await;
 					panic!("expected panic");
-					#[allow(unreachable_code)] Ok::<(), String>(())
+					#[allow(unreachable_code)]
+					Ok::<(), String>(())
 				});
 				Ok(())
 			})

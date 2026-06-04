@@ -166,7 +166,9 @@ pub(super) fn update_resolved_field_paths(
 				kids.iter()
 					// a terminating child scope seals itself + its subtree from `root`
 					.filter(|child| {
-						scopes.get(*child).map_or(true, |scope| !scope.terminate)
+						scopes
+							.get(*child)
+							.map_or(true, |scope| !scope.terminate)
 					})
 					.for_each(|child| stack.push(child));
 			}
@@ -250,9 +252,7 @@ mod test {
 	#[beet_core::test]
 	fn terminate_seals_outer_scope() {
 		let mut world = DocumentPlugin::world();
-		let doc = world
-			.spawn(Document::new(val!({ "name": "top" })))
-			.id();
+		let doc = world.spawn(Document::new(val!({ "name": "top" }))).id();
 		// an outer scope that would otherwise prefix "outer"
 		let outer = world
 			.spawn((ChildOf(doc), DocumentScope {
@@ -299,12 +299,16 @@ mod test {
 		read_value(&mut world, field).xpect_eq(Value::Str("from_a".into()));
 
 		// mutate the ancestor scope, no document change
-		world.entity_mut(scope).get_mut::<DocumentScope>().unwrap().path =
-			FieldPath::new(["b"]);
+		world
+			.entity_mut(scope)
+			.get_mut::<DocumentScope>()
+			.unwrap()
+			.path = FieldPath::new(["b"]);
 		world.update_local();
 
 		// the descendant re-syncs to the new scoped path
-		resolved_path(&mut world, field).xpect_eq(FieldPath::new(["b", "name"]));
+		resolved_path(&mut world, field)
+			.xpect_eq(FieldPath::new(["b", "name"]));
 		read_value(&mut world, field).xpect_eq(Value::Str("from_b".into()));
 	}
 
@@ -368,7 +372,8 @@ mod test {
 		world.entity_mut(field).insert(ChildOf(scope_b));
 		world.update_local();
 
-		resolved_path(&mut world, field).xpect_eq(FieldPath::new(["b", "name"]));
+		resolved_path(&mut world, field)
+			.xpect_eq(FieldPath::new(["b", "name"]));
 		read_value(&mut world, field).xpect_eq(Value::Str("from_b".into()));
 	}
 

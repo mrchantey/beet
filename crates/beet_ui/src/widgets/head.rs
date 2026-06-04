@@ -28,10 +28,12 @@ use beet_core::prelude::*;
 pub fn Head(
 	#[prop] fixed_scale: bool,
 	/// Per-page title override; falls back to [`PackageConfig::title`].
-	#[prop] title: Option<String>,
+	#[prop]
+	title: Option<String>,
 	/// Per-page description override; falls back to
 	/// [`PackageConfig::description`].
-	#[prop] description: Option<String>,
+	#[prop]
+	description: Option<String>,
 	pkg_config: Res<PackageConfig>,
 ) -> impl Scene {
 	// per-page `ArticleMeta` values override the package defaults.

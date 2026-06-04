@@ -39,10 +39,7 @@ impl DocumentSchema {
 	/// Mirrors `FieldSchema::assert_eq_ty` on the token side. Passes silently
 	/// when the schema is a `TypePath` (no registry to resolve) or when either
 	/// side is [`ValueSchema::Any`].
-	pub fn assert_field_type<T: Typed>(
-		&self,
-		path: &[FieldSegment],
-	) -> Result {
+	pub fn assert_field_type<T: Typed>(&self, path: &[FieldSegment]) -> Result {
 		let FieldSchema::Inline(schema) = &self.0 else {
 			return Ok(());
 		};

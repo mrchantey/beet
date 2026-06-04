@@ -23,7 +23,16 @@ pub fn impl_action(
 fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// ── 1. Parse attributes ──
 	let attrs = AttributeMap::parse(attr)?;
-	attrs.assert_types(&[], &["result_out", "route", "pure", "local", "default", "no_default", "no_clone", "handler_only"])?;
+	attrs.assert_types(&[], &[
+		"result_out",
+		"route",
+		"pure",
+		"local",
+		"default",
+		"no_default",
+		"no_clone",
+		"handler_only",
+	])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
 	let is_local = attrs.contains_key("local");
@@ -1361,13 +1370,10 @@ mod test {
 
 	#[test]
 	fn user_derive_default_no_double_impl() {
-		let result = parse_str(
-			quote!(),
-			syn::parse_quote! {
-				#[derive(Default, Component)]
-				async fn my_action() -> i32 { 42 }
-			},
-		);
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Default, Component)]
+			async fn my_action() -> i32 { 42 }
+		});
 		// derive(Default) is in the user attrs, so macro should NOT generate impl Default
 		assert!(!result.contains("impl Default for my_action"));
 	}

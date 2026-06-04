@@ -59,7 +59,10 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	B: 'static + Send + Sync + Bundle,
 {
-	exchange_route(path, Action::new_pure(handler).chain(spawn_render_step::<B>()))
+	exchange_route(
+		path,
+		Action::new_pure(handler).chain(spawn_render_step::<B>()),
+	)
 }
 
 /// A per-request scene route from an async handler
@@ -132,7 +135,10 @@ where
 	Input: 'static + Send + Sync + FromRequest<M1>,
 	S: 'static + Send + Sync + Scene,
 {
-	exchange_route(path, Action::new_pure(handler).chain(spawn_scene_step::<S>()))
+	exchange_route(
+		path,
+		Action::new_pure(handler).chain(spawn_scene_step::<S>()),
+	)
 }
 
 /// Shorthand for [`scene_route`] when the handler is a plain constructor that
@@ -156,16 +162,15 @@ where
 /// // shorthand
 /// render_action::scene_func_route("app-info", AppInfo::scene);
 /// ```
-pub fn scene_func_route<Func, Props, S>(
-	path: &str,
-	ctor: Func,
-) -> impl Bundle
+pub fn scene_func_route<Func, Props, S>(path: &str, ctor: Func) -> impl Bundle
 where
 	Func: 'static + Send + Sync + Clone + Fn(Props) -> S,
 	Props: 'static + Send + Sync + Default,
 	S: 'static + Send + Sync + Scene,
 {
-	scene_route(path, move |_cx: ActionContext<Request>| ctor(Props::default()))
+	scene_route(path, move |_cx: ActionContext<Request>| {
+		ctor(Props::default())
+	})
 }
 
 /// A static scene page from a no-argument handler `fn() -> impl Scene`, the
@@ -251,7 +256,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_async_handler() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx_direct!{ <p>"async home"</p> }
+			rsx_direct! { <p>"async home"</p> }
 		}
 		router_world()
 			.spawn((default_router(), children![render_action::async_route(
@@ -268,7 +273,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_system_handler() {
 		fn home(_cx: In<ActionContext<Request>>) -> impl Bundle {
-			rsx_direct!{ <p>"system home"</p> }
+			rsx_direct! { <p>"system home"</p> }
 		}
 		router_world()
 			.spawn((default_router(), children![render_action::system_route(
@@ -285,7 +290,7 @@ mod test {
 	#[beet_core::test]
 	async fn rebuilds_per_request() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx_direct!{ <p>"home"</p> }
+			rsx_direct! { <p>"home"</p> }
 		}
 		let mut world = router_world();
 		let root = world

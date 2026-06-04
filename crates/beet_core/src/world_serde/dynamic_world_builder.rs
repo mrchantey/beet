@@ -69,7 +69,10 @@ impl<'w> DynamicWorldBuilder<'w> {
 	///
 	/// The `type_registry` provides type information for extracting components and resources
 	/// through reflection, usually acquired via `world.resource::<AppTypeRegistry>().read()`.
-	pub fn from_world(world: &'w World, type_registry: &'w TypeRegistry) -> Self {
+	pub fn from_world(
+		world: &'w World,
+		type_registry: &'w TypeRegistry,
+	) -> Self {
 		Self {
 			extracted_resources: default(),
 			extracted_entities: default(),
@@ -228,7 +231,8 @@ impl<'w> DynamicWorldBuilder<'w> {
 			}
 
 			// for each component on the entity, run reflection extraction through the filter
-			for &component_id in original_entity.archetype().components().iter() {
+			for &component_id in original_entity.archetype().components().iter()
+			{
 				let mut extract_and_push = || {
 					let type_id = self
 						.original_world
@@ -345,9 +349,10 @@ mod test {
 		type_registry.register::<ComponentA>();
 		let entity = world.spawn((ComponentA, ComponentB)).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity)
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_entity(entity)
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(1);
 		dynamic_world.entities[0].entity.xpect_eq(entity);
@@ -365,9 +370,10 @@ mod test {
 		type_registry.register::<ComponentB>();
 		let entity = world.spawn((ComponentA, ComponentB)).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity)
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_entity(entity)
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(1);
 		dynamic_world.entities[0].components.len().xpect_eq(2);
@@ -382,18 +388,31 @@ mod test {
 		let entity_d = world.spawn_empty().id();
 
 		let type_registry = TypeRegistry::default();
-		let mut entities = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity_b)
-			.extract_entities([entity_d, entity_a].into_iter())
-			.extract_entity(entity_c)
-			.build()
-			.entities
-			.into_iter();
+		let mut entities =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_entity(entity_b)
+				.extract_entities([entity_d, entity_a].into_iter())
+				.extract_entity(entity_c)
+				.build()
+				.entities
+				.into_iter();
 
-		entities.next().map(|entry| entry.entity).xpect_eq(Some(entity_d));
-		entities.next().map(|entry| entry.entity).xpect_eq(Some(entity_c));
-		entities.next().map(|entry| entry.entity).xpect_eq(Some(entity_b));
-		entities.next().map(|entry| entry.entity).xpect_eq(Some(entity_a));
+		entities
+			.next()
+			.map(|entry| entry.entity)
+			.xpect_eq(Some(entity_d));
+		entities
+			.next()
+			.map(|entry| entry.entity)
+			.xpect_eq(Some(entity_c));
+		entities
+			.next()
+			.map(|entry| entry.entity)
+			.xpect_eq(Some(entity_b));
+		entities
+			.next()
+			.map(|entry| entry.entity)
+			.xpect_eq(Some(entity_a));
 	}
 
 	#[crate::test]
@@ -408,9 +427,10 @@ mod test {
 		world.spawn(ComponentB);
 
 		let mut query = world.query_filtered::<Entity, With<ComponentA>>();
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_entities(query.iter(&world))
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_entities(query.iter(&world))
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(2);
 		let mut entities = vec![
@@ -430,10 +450,11 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_entities([entity_a, entity_b].into_iter())
-			.remove_empty_entities()
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_entities([entity_a, entity_b].into_iter())
+				.remove_empty_entities()
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(1);
 		dynamic_world.entities[0].entity.xpect_eq(entity_a);
@@ -446,12 +467,15 @@ mod test {
 		type_registry.register::<ResourceA>();
 		world.insert_resource(ResourceA);
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_resources()
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_resources()
+				.build();
 
 		dynamic_world.resources.len().xpect_eq(1);
-		dynamic_world.resources[0].represents::<ResourceA>().xpect_true();
+		dynamic_world.resources[0]
+			.represents::<ResourceA>()
+			.xpect_true();
 	}
 
 	#[crate::test]
@@ -465,10 +489,11 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.allow_component::<ComponentA>()
-			.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.allow_component::<ComponentA>()
+				.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(3);
 		dynamic_world.entities[2].components[0]
@@ -491,10 +516,11 @@ mod test {
 		let entity_a = world.spawn(ComponentA).id();
 		let entity_b = world.spawn(ComponentB).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.deny_component::<ComponentA>()
-			.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.deny_component::<ComponentA>()
+				.extract_entities([entity_a_b, entity_a, entity_b].into_iter())
+				.build();
 
 		dynamic_world.entities.len().xpect_eq(3);
 		dynamic_world.entities[0].components[0]
@@ -515,13 +541,16 @@ mod test {
 		world.insert_resource(ResourceA);
 		world.insert_resource(ResourceB);
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.deny_resource::<ResourceA>()
-			.extract_resources()
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.deny_resource::<ResourceA>()
+				.extract_resources()
+				.build();
 
 		dynamic_world.resources.len().xpect_eq(1);
-		dynamic_world.resources[0].represents::<ResourceB>().xpect_true();
+		dynamic_world.resources[0]
+			.represents::<ResourceB>()
+			.xpect_true();
 	}
 
 	#[crate::test]
@@ -542,10 +571,11 @@ mod test {
 		world.insert_resource(SomeResource(123));
 		let entity = world.spawn(SomeType(123)).id();
 
-		let dynamic_world = DynamicWorldBuilder::from_world(&world, &type_registry)
-			.extract_resources()
-			.extract_entities(vec![entity].into_iter())
-			.build();
+		let dynamic_world =
+			DynamicWorldBuilder::from_world(&world, &type_registry)
+				.extract_resources()
+				.extract_entities(vec![entity].into_iter())
+				.build();
 
 		dynamic_world.entities[0].components[0]
 			.try_as_reflect()

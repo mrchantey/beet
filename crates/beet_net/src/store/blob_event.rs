@@ -81,9 +81,7 @@ impl Default for BlobEventBus {
 #[cfg(feature = "std")]
 impl BlobEventBus {
 	/// Send a [`BlobEvent`] into the bus, ignoring a dropped receiver.
-	pub fn send(&self, event: BlobEvent) {
-		self.sender.try_send(event).ok();
-	}
+	pub fn send(&self, event: BlobEvent) { self.sender.try_send(event).ok(); }
 }
 
 /// Drains the [`BlobEventBus`] channel, triggering each [`BlobEvent`] globally.
@@ -148,8 +146,11 @@ mod test {
 		let base = BlobStore::new(InMemoryStore::new());
 		let other = BlobStore::new(InMemoryStore::new());
 		let sub = base.with_subdir(SmolPath::new("dir"));
-		let ev =
-			BlobEvent::new(base.clone(), SmolPath::new("dir/x.txt"), BlobEventKind::Created);
+		let ev = BlobEvent::new(
+			base.clone(),
+			SmolPath::new("dir/x.txt"),
+			BlobEventKind::Created,
+		);
 
 		// base covers the event (root scope covers all)
 		base.did_change(&ev).xpect_true();
@@ -163,7 +164,9 @@ mod test {
 		other.did_change(&ev).xpect_false();
 
 		// blob object-exact match
-		base.blob(SmolPath::new("dir/x.txt")).matches_event(&ev).xpect_true();
+		base.blob(SmolPath::new("dir/x.txt"))
+			.matches_event(&ev)
+			.xpect_true();
 		base.blob(SmolPath::new("dir/y.txt"))
 			.matches_event(&ev)
 			.xpect_false();

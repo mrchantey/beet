@@ -166,7 +166,8 @@ mod tests {
 			register_test(TestCaseParams::new(), async {
 				time_ext::sleep_millis(100).await;
 				unreachable!("should timeout");
-				#[allow(unreachable_code)] Ok::<(), String>(())
+				#[allow(unreachable_code)]
+				Ok::<(), String>(())
 			});
 			Ok(())
 		}))
@@ -198,7 +199,8 @@ mod tests {
 			register_test(TestCaseParams::new().with_timeout_ms(10), async {
 				time_ext::sleep_millis(100).await;
 				unreachable!("should timeout");
-				#[allow(unreachable_code)] Ok::<(), String>(())
+				#[allow(unreachable_code)]
+				Ok::<(), String>(())
 			});
 			Ok(())
 		});
@@ -218,7 +220,8 @@ mod tests {
 			register_test(TestCaseParams::new().with_timeout_ms(10), async {
 				time_ext::sleep_millis(100).await;
 				unreachable!("should timeout");
-				#[allow(unreachable_code)] Ok::<(), String>(())
+				#[allow(unreachable_code)]
+				Ok::<(), String>(())
 			});
 			Ok(())
 		});

@@ -219,19 +219,11 @@ mod ser {
 		type SerializeStructVariant = VariantStructSer;
 
 		fn serialize_bool(self, v: bool) -> SerResult { Ok(Value::Bool(v)) }
-		fn serialize_i8(self, v: i8) -> SerResult {
-			Ok(Value::Int(v as i64))
-		}
-		fn serialize_i16(self, v: i16) -> SerResult {
-			Ok(Value::Int(v as i64))
-		}
-		fn serialize_i32(self, v: i32) -> SerResult {
-			Ok(Value::Int(v as i64))
-		}
+		fn serialize_i8(self, v: i8) -> SerResult { Ok(Value::Int(v as i64)) }
+		fn serialize_i16(self, v: i16) -> SerResult { Ok(Value::Int(v as i64)) }
+		fn serialize_i32(self, v: i32) -> SerResult { Ok(Value::Int(v as i64)) }
 		fn serialize_i64(self, v: i64) -> SerResult { Ok(Value::Int(v)) }
-		fn serialize_u8(self, v: u8) -> SerResult {
-			Ok(Value::Uint(v as u64))
-		}
+		fn serialize_u8(self, v: u8) -> SerResult { Ok(Value::Uint(v as u64)) }
 		fn serialize_u16(self, v: u16) -> SerResult {
 			Ok(Value::Uint(v as u64))
 		}
@@ -251,10 +243,7 @@ mod ser {
 			Ok(Value::Bytes(v.to_vec()))
 		}
 		fn serialize_none(self) -> SerResult { Ok(Value::Null) }
-		fn serialize_some<T: ?Sized + Serialize>(
-			self,
-			v: &T,
-		) -> SerResult {
+		fn serialize_some<T: ?Sized + Serialize>(self, v: &T) -> SerResult {
 			v.serialize(self)
 		}
 		fn serialize_unit(self) -> SerResult { Ok(Value::Null) }
@@ -287,10 +276,7 @@ mod ser {
 			map.insert(variant, v.serialize(ValueSerializer)?);
 			Ok(Value::Map(map))
 		}
-		fn serialize_seq(
-			self,
-			_len: Option<usize>,
-		) -> SerResult<SeqSer> {
+		fn serialize_seq(self, _len: Option<usize>) -> SerResult<SeqSer> {
 			Ok(SeqSer { items: Vec::new() })
 		}
 		fn serialize_tuple(self, len: usize) -> SerResult<SeqSer> {
@@ -310,20 +296,25 @@ mod ser {
 			variant: &'static str,
 			_len: usize,
 		) -> SerResult<VariantSeqSer> {
-			Ok(VariantSeqSer { variant, items: Vec::new() })
+			Ok(VariantSeqSer {
+				variant,
+				items: Vec::new(),
+			})
 		}
-		fn serialize_map(
-			self,
-			_len: Option<usize>,
-		) -> SerResult<MapSer> {
-			Ok(MapSer { map: Map::default(), next_key: None })
+		fn serialize_map(self, _len: Option<usize>) -> SerResult<MapSer> {
+			Ok(MapSer {
+				map: Map::default(),
+				next_key: None,
+			})
 		}
 		fn serialize_struct(
 			self,
 			_name: &'static str,
 			_len: usize,
 		) -> SerResult<StructSer> {
-			Ok(StructSer { map: Map::default() })
+			Ok(StructSer {
+				map: Map::default(),
+			})
 		}
 		fn serialize_struct_variant(
 			self,
@@ -332,7 +323,10 @@ mod ser {
 			variant: &'static str,
 			_len: usize,
 		) -> SerResult<VariantStructSer> {
-			Ok(VariantStructSer { variant, map: Map::default() })
+			Ok(VariantStructSer {
+				variant,
+				map: Map::default(),
+			})
 		}
 	}
 
@@ -514,9 +508,9 @@ mod de {
 				Value::Float(f) => visitor.visit_f64(f),
 				Value::Bytes(b) => visitor.visit_byte_buf(b),
 				Value::Str(s) => visitor.visit_string(s.to_string()),
-				Value::List(list) => {
-					visitor.visit_seq(SeqAccess { iter: list.into_iter() })
-				}
+				Value::List(list) => visitor.visit_seq(SeqAccess {
+					iter: list.into_iter(),
+				}),
 				Value::Map(map) => visitor.visit_map(MapAccess {
 					iter: map.into_iter(),
 					value: None,
@@ -591,9 +585,9 @@ mod de {
 			seed: T,
 		) -> DeResult<Option<T::Value>> {
 			match self.iter.next() {
-				Some(value) => seed
-					.deserialize(ValueDeserializer::new(value))
-					.map(Some),
+				Some(value) => {
+					seed.deserialize(ValueDeserializer::new(value)).map(Some)
+				}
 				None => Ok(None),
 			}
 		}
@@ -612,10 +606,7 @@ mod de {
 			match self.iter.next() {
 				Some((key, value)) => {
 					self.value = Some(value);
-					seed.deserialize(
-						key.as_str().into_deserializer(),
-					)
-					.map(Some)
+					seed.deserialize(key.as_str().into_deserializer()).map(Some)
 				}
 				None => Ok(None),
 			}
@@ -644,7 +635,9 @@ mod de {
 		) -> DeResult<(V::Value, Self::Variant)> {
 			let variant =
 				seed.deserialize(self.variant.as_str().into_deserializer())?;
-			Ok((variant, VariantAccess { payload: self.payload }))
+			Ok((variant, VariantAccess {
+				payload: self.payload,
+			}))
 		}
 	}
 
@@ -656,9 +649,9 @@ mod de {
 		fn unit_variant(self) -> DeResult<()> {
 			match self.payload {
 				None => Ok(()),
-				Some(_) => Err(DeError(
-					"expected unit variant, found payload".into(),
-				)),
+				Some(_) => {
+					Err(DeError("expected unit variant, found payload".into()))
+				}
 			}
 		}
 		fn newtype_variant_seed<T: de::DeserializeSeed<'de>>(
@@ -673,8 +666,9 @@ mod de {
 			visitor: V,
 		) -> DeResult<V::Value> {
 			match self.require_payload()? {
-				Value::List(list) => visitor
-					.visit_seq(SeqAccess { iter: list.into_iter() }),
+				Value::List(list) => visitor.visit_seq(SeqAccess {
+					iter: list.into_iter(),
+				}),
 				other => Err(DeError(format!(
 					"expected a list for tuple variant, got {:?}",
 					other.kind()
@@ -700,9 +694,8 @@ mod de {
 	}
 	impl VariantAccess {
 		fn require_payload(self) -> DeResult<Value> {
-			self.payload.ok_or_else(|| {
-				DeError("expected a payload for variant".into())
-			})
+			self.payload
+				.ok_or_else(|| DeError("expected a payload for variant".into()))
 		}
 	}
 }

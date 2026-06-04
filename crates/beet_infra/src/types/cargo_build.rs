@@ -187,7 +187,10 @@ impl CargoBuild {
 		} else {
 			"cargo"
 		};
-		BuildArtifact::new(ChildProcess::new(cmd).with_args(args), artifact_path)
+		BuildArtifact::new(
+			ChildProcess::new(cmd).with_args(args),
+			artifact_path,
+		)
 	}
 	/// Convert into a lambda build artifact.
 	/// Builds the lambda binary then zips it for S3 deployment,

@@ -29,9 +29,9 @@
 //! needed at the boundary.
 
 use beet_core::prelude::*;
+use core::future::Future;
 use core::net::Ipv4Addr;
 use core::net::SocketAddr;
-use core::future::Future;
 
 /// A binder for UDP sockets: opens a [`UdpSocket`] bound to a local address.
 ///

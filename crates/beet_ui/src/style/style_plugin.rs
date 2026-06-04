@@ -25,7 +25,10 @@ impl Plugin for StylePlugin {
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(default_element_rules());
 
-		#[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
+		#[cfg(all(
+			feature = "syntax_highlighting",
+			not(target_arch = "wasm32")
+		))]
 		{
 			// highlight code blocks into styled spans, then resolve styles
 			app.init_resource::<SyntaxHighlighting>().add_systems(
@@ -40,18 +43,17 @@ impl Plugin for StylePlugin {
 			// `apply_syntax_highlighting` resolve to a foreground colour with no
 			// further setup: each class rule redirects `color` to a syntax
 			// token whose value lives in the root rule's declarations.
-			let mut rules =
-				app.world_mut().get_resource_or_init::<RuleSet>();
+			let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
 			rules.default_rule_mut().push_declarations(
 				Rule::new().with_extend(syntax::default_scheme()),
 			);
 			rules.extend_rules(syntax::class_rules());
 		}
-		#[cfg(any(not(feature = "syntax_highlighting"), target_arch = "wasm32"))]
-		app.add_systems(
-			PostParseTree,
-			resolve_styles.in_set(ResolveStylesSet),
-		);
+		#[cfg(any(
+			not(feature = "syntax_highlighting"),
+			target_arch = "wasm32"
+		))]
+		app.add_systems(PostParseTree, resolve_styles.in_set(ResolveStylesSet));
 	}
 }
 

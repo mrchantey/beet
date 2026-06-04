@@ -66,21 +66,18 @@ where
 	let world = cx.world();
 	let mut valid = Vec::with_capacity(children.len());
 	for child in children {
-		let action_meta = match world
-			.entity(child)
-			.get(|meta: &ActionMeta| *meta)
-			.await
-		{
-			Ok(action_meta) => action_meta,
-			Err(child_error) => {
-				if exclude_errors.contains(ChildError::NO_ACTION) {
-					continue;
+		let action_meta =
+			match world.entity(child).get(|meta: &ActionMeta| *meta).await {
+				Ok(action_meta) => action_meta,
+				Err(child_error) => {
+					if exclude_errors.contains(ChildError::NO_ACTION) {
+						continue;
+					}
+					bevybail!(
+						"sequence child has no action: {child:?}, error: {child_error}"
+					);
 				}
-				bevybail!(
-					"sequence child has no action: {child:?}, error: {child_error}"
-				);
-			}
-		};
+			};
 
 		if let Err(mismatch_error) =
 			action_meta.assert_match::<Input, Outcome<Input, Output>>()
@@ -279,8 +276,7 @@ mod tests {
 	async fn threads_input_without_clone() {
 		// a non-Clone payload proves Sequence threads by move
 		struct NoClone(i32);
-		fn increment()
-		-> Action<NoClone, Outcome<NoClone, ()>> {
+		fn increment() -> Action<NoClone, Outcome<NoClone, ()>> {
 			Action::new_pure(|cx: ActionContext<NoClone>| {
 				Outcome::Pass(NoClone(cx.input.0 + 1))
 			})

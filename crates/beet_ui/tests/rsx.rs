@@ -1,4 +1,3 @@
-
 beet_core::test_main!();
 
 use beet_core::prelude::*;
@@ -10,14 +9,14 @@ fn is_bundle(_: impl Bundle) {}
 
 #[beet_core::test]
 fn single_element() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div/>
 	});
 }
 
 #[beet_core::test]
 fn element_with_flag_attribute() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div my_flag/>
 	});
 }
@@ -25,21 +24,21 @@ fn element_with_flag_attribute() {
 #[beet_core::test]
 fn element_with_key_value_attribute() {
 	let bar = 2;
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div foo=bar/>
 	});
 }
 
 #[beet_core::test]
 fn element_with_string_attribute() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div bazz="boo"/>
 	});
 }
 
 #[beet_core::test]
 fn element_with_literal_attribute() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div bang=3/>
 	});
 }
@@ -48,21 +47,21 @@ fn element_with_literal_attribute() {
 fn element_with_block_spread() {
 	let foo = Name::new("foo");
 	let boo = Name::new("boo");
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div {(foo,boo)}/>
 	});
 }
 
 #[beet_core::test]
 fn element_with_children() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div>"hello"</div>
 	});
 }
 
 #[beet_core::test]
 fn multiple_root_elements() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div/>
 		<div/>
 	});
@@ -70,7 +69,7 @@ fn multiple_root_elements() {
 
 #[beet_core::test]
 fn nested_elements() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div>
 			<span>"inner"</span>
 		</div>
@@ -87,14 +86,14 @@ struct MyComponent {
 
 #[beet_core::test]
 fn component_with_set_with() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<MyComponent foo bar="hello"/>
 	});
 }
 
 #[beet_core::test]
 fn mixed_elements_and_components() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div>
 			<MyComponent foo/>
 			<span>"text"</span>
@@ -107,7 +106,7 @@ fn combined_attributes() {
 	let bar = 2;
 	let foo = Name::new("test");
 	let boo = Name::new("test2");
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<div my_flag foo=bar bazz="boo" bang=3 {(foo,boo)}>"child"</div>
 	});
 }
@@ -116,14 +115,14 @@ fn combined_attributes() {
 #[beet_core::test]
 fn component_with_block_attr_inserts_additional_component() {
 	let extra = Name::new("extra");
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<MyComponent foo {extra}/>
 	});
 }
 
 #[beet_core::test]
 fn component_with_children() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<MyComponent foo>
 			<span>"child"</span>
 		</MyComponent>
@@ -132,7 +131,7 @@ fn component_with_children() {
 
 #[beet_core::test]
 fn doctype_node() {
-	is_bundle(rsx_direct!{
+	is_bundle(rsx_direct! {
 		<!DOCTYPE html>
 	});
 }

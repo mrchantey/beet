@@ -25,9 +25,9 @@ pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	// rebuilds `[run-wasm, <binary>, ..forwarded]`; skip the `run-wasm`
 	// command consumed by the route, pop the binary path, forward the rest.
 	let mut args = parts.unparse_cli_args().into_iter().skip(1);
-	let exe_path = args
-		.next()
-		.ok_or_else(|| bevyhow!("usage: beet run-wasm <binary-path> [args..]"))?;
+	let exe_path = args.next().ok_or_else(|| {
+		bevyhow!("usage: beet run-wasm <binary-path> [args..]")
+	})?;
 	run_wasm(Path::new(&exe_path), args.collect()).await?;
 	// the module's output already streamed via inherited stdio
 	Ok(String::new())

@@ -19,10 +19,10 @@
 use beet_core::prelude::*;
 use bevy::tasks::futures_lite::StreamExt;
 use bytes::Bytes;
+use core::pin::Pin;
 use futures_core::Stream;
 #[cfg(target_arch = "wasm32")]
 use send_wrapper::SendWrapper;
-use core::pin::Pin;
 
 cfg_if! {
 	if #[cfg(target_arch = "wasm32")] {

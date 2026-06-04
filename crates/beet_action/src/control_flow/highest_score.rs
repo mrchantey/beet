@@ -90,8 +90,8 @@ where
 		}
 	}
 
-	let (winner, _) = best
-		.ok_or_else(|| bevyhow!("HighestScore has no scored children"))?;
+	let (winner, _) =
+		best.ok_or_else(|| bevyhow!("HighestScore has no scored children"))?;
 
 	world
 		.entity(winner)

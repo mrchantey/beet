@@ -53,9 +53,10 @@ fn infra_scene() -> Result<impl Bundle> {
 	(stack(), stack_cli(), assets_s3_fs_store(), children![
 		route(
 			"watch",
-			(exchange_sequence(), children![
-				AwsWatch::for_lambda(&stack(), &block),
-			])
+			(exchange_sequence(), children![AwsWatch::for_lambda(
+				&stack(),
+				&block
+			),])
 		),
 		route(
 			"deploy",

@@ -54,7 +54,8 @@ pub fn default_token_map() -> CssTokenMap {
 /// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
 /// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
 pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
-	RuleSet::new(default_declarations(color)).with_rules(default_material_rules())
+	RuleSet::new(default_declarations(color))
+		.with_rules(default_material_rules())
 }
 
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
@@ -122,9 +123,13 @@ mod tests {
 	fn descendant_inherits_scheme_class() {
 		let mut world = MaterialStylePlugin::world();
 		let parent = world
-			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.spawn((
+				rsx_direct! { <div/> },
+				Classes::new([classes::DARK_SCHEME]),
+			))
 			.id();
-		let child = world.spawn((rsx_direct! { <span/> }, ChildOf(parent))).id();
+		let child =
+			world.spawn((rsx_direct! { <span/> }, ChildOf(parent))).id();
 		// a sibling with no scheme falls back to the light `:root` default
 		let bare = world.spawn(rsx_direct! { <span/> }).id();
 

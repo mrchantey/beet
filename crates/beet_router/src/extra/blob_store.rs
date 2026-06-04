@@ -48,7 +48,10 @@ async fn ServeStoreAction(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// - extensioned path + a store public URL → permanent redirect
 /// - extensioned path, no public URL → stream the bytes (mime from extension)
 /// - extensionless path → serve `<path>/index.html` as HTML
-pub async fn serve_blob(store: &BlobStore, path: &SmolPath) -> Result<Response> {
+pub async fn serve_blob(
+	store: &BlobStore,
+	path: &SmolPath,
+) -> Result<Response> {
 	if path.extension().is_some() {
 		if let Some(url) = store.public_url(path).await? {
 			Response::permanent_redirect(url).xok()

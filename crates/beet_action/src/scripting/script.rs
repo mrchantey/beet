@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+use core::marker::PhantomData;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use core::marker::PhantomData;
 
 /// A scripted, pure `Input -> Output` action.
 ///
@@ -144,7 +144,9 @@ where
 			#[cfg(all(feature = "rhai", not(feature = "rhai_serde")))]
 			ScriptLanguage::Rhai => {
 				let _ = input;
-				bevybail!("the rhai `Script` backend requires the `rhai_serde` feature")
+				bevybail!(
+					"the rhai `Script` backend requires the `rhai_serde` feature"
+				)
 			}
 			#[cfg(feature = "quickjs_serde")]
 			ScriptLanguage::QuickJs => {
@@ -154,7 +156,9 @@ where
 			#[cfg(all(feature = "quickjs", not(feature = "quickjs_serde")))]
 			ScriptLanguage::QuickJs => {
 				let _ = input;
-				bevybail!("the quickjs `Script` backend requires the `quickjs_serde` feature")
+				bevybail!(
+					"the quickjs `Script` backend requires the `quickjs_serde` feature"
+				)
 			}
 		}
 	}

@@ -16,7 +16,13 @@ pub fn app_info() -> impl Bundle {
 /// `<article>` describing the package.
 #[scene(system)]
 fn AppInfoScene(config: Res<PackageConfig>) -> impl Scene {
-	let PackageConfig { title, description, version, stage, .. } = config.clone();
+	let PackageConfig {
+		title,
+		description,
+		version,
+		stage,
+		..
+	} = config.clone();
 	rsx! {
 		<article>
 			<h1>"App Info"</h1>

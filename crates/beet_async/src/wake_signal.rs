@@ -3,7 +3,9 @@
 // the handshake is a no-op: those targets drive futures synchronously via
 // `spawn_local` + local task-pool ticking before the waiter is reached.
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-use bevy::platform::sync::{Arc, Mutex};
+use bevy::platform::sync::Arc;
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+use bevy::platform::sync::Mutex;
 
 /// [`WakeSignaler`] is a custom signaling primitive used in order to fulfill our specific requirements for
 /// our async bridge. We need to wait at the sync point, after waking all the futures and only when

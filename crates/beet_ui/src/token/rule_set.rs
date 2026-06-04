@@ -162,7 +162,9 @@ impl RuleSet {
 		// so a theme override appended after a user-agent default wins on both.
 		self.rules
 			.iter()
-			.filter(|rule| rule.media().is_none() && rule.selector().matches(el))
+			.filter(|rule| {
+				rule.media().is_none() && rule.selector().matches(el)
+			})
 			.filter_map(|rule| {
 				rule.get(key)
 					.ok()
@@ -210,8 +212,10 @@ impl RuleSetQuery<'_, '_> {
 			Err(err) => {
 				// inherited tokens search ancestors before the root fallback
 				if token.is_inherited()
-					&& let Ok(ancestor) =
-						self.ancestors.get(entity).map(|ancestor| ancestor.get())
+					&& let Ok(ancestor) = self
+						.ancestors
+						.get(entity)
+						.map(|ancestor| ancestor.get())
 				{
 					self.resolve_untyped(ancestor, token)
 				} else {

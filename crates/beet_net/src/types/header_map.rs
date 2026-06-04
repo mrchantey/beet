@@ -17,8 +17,8 @@
 //! ```
 
 use super::*;
-use beet_core::prelude::*;
 use alloc::borrow::Cow;
+use beet_core::prelude::*;
 
 /// A multimap of HTTP-style headers with kebab-case key normalization.
 ///

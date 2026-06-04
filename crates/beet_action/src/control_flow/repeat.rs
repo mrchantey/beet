@@ -117,14 +117,20 @@ where
 		}
 	}
 }
-impl<Input> Copy for RepeatTimes<Input> where Input: 'static + Send + Sync + Clone {}
+impl<Input> Copy for RepeatTimes<Input> where
+	Input: 'static + Send + Sync + Clone
+{
+}
 
 impl<Input> Default for RepeatTimes<Input>
 where
 	Input: 'static + Send + Sync + Clone,
 {
 	fn default() -> Self {
-		Self { total_times: 0, _marker: PhantomData }
+		Self {
+			total_times: 0,
+			_marker: PhantomData,
+		}
 	}
 }
 
@@ -142,7 +148,10 @@ impl RepeatTimes<()> {
 
 	/// Create a bounded repeat counter.
 	pub fn new(total_times: u32) -> Self {
-		Self { total_times, _marker: PhantomData }
+		Self {
+			total_times,
+			_marker: PhantomData,
+		}
 	}
 
 	/// Create an unbounded repeat counter.
@@ -155,7 +164,10 @@ where
 {
 	/// Create a bounded repeat counter with a typed input marker.
 	pub fn typed(total_times: u32) -> Self {
-		Self { total_times, _marker: PhantomData }
+		Self {
+			total_times,
+			_marker: PhantomData,
+		}
 	}
 
 	/// Create an unbounded typed repeat counter.
@@ -166,7 +178,9 @@ where
 /// `total_times`, returning on first failure.
 #[action(default)]
 #[derive(Component)]
-pub async fn RepeatTimesAction<Input>(cx: ActionContext<Input>) -> Result<Outcome>
+pub async fn RepeatTimesAction<Input>(
+	cx: ActionContext<Input>,
+) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -192,7 +206,9 @@ where
 		.get(|meta: &ActionMeta| *meta)
 		.await
 		.map_err(|err| {
-			bevyhow!("repeat_times child has no action: {child:?}, error: {err}")
+			bevyhow!(
+				"repeat_times child has no action: {child:?}, error: {err}"
+			)
 		})?;
 	action_meta.assert_match::<Input, Outcome>()?;
 

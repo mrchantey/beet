@@ -54,7 +54,8 @@ fn truncate_text(
 	let mut line_count = 0;
 
 	for line in text.lines().skip(start_line) {
-		if line_count >= max_lines || result.len() + line.len() + 1 > max_bytes {
+		if line_count >= max_lines || result.len() + line.len() + 1 > max_bytes
+		{
 			break;
 		}
 		if !result.is_empty() {
@@ -85,7 +86,8 @@ mod test {
 	#[beet_core::test]
 	async fn reads_text_blob() {
 		let store = store_with_text("hello.txt", "hello world").await;
-		let media = store.get_media(&SmolPath::from("hello.txt")).await.unwrap();
+		let media =
+			store.get_media(&SmolPath::from("hello.txt")).await.unwrap();
 		let text = media.as_utf8().unwrap();
 		text.xpect_eq("hello world");
 	}
@@ -93,8 +95,10 @@ mod test {
 	#[beet_core::test]
 	fn truncates_by_line_limit() {
 		let lines: Vec<&str> = (0..10).map(|_| "line").collect();
-		let text = lines.join("
-");
+		let text = lines.join(
+			"
+",
+		);
 		let media = MediaBytes::new(
 			MediaType::from_extension("txt"),
 			text.into_bytes(),
@@ -110,8 +114,10 @@ mod test {
 		// but 2000+ lines of 30 chars each exceeds 50KB
 		let line = "abcdefghijklmnopqrstuvwxyz0123";
 		let lines: Vec<&str> = (0..2500).map(|_| line).collect();
-		let text = lines.join("
-");
+		let text = lines.join(
+			"
+",
+		);
 		let media = MediaBytes::new(
 			MediaType::from_extension("txt"),
 			text.into_bytes(),
@@ -138,7 +144,9 @@ four";
 		);
 		let result = truncate_text(media, Some(2), Some(2)).unwrap();
 		let out = result.as_utf8().unwrap();
-		out.xpect_eq("two
-three");
+		out.xpect_eq(
+			"two
+three",
+		);
 	}
 }

@@ -50,7 +50,11 @@ where
 	M1: 'static + Send + Sync,
 	M2: 'static + Send + Sync,
 {
-	fn default() -> Self { Self { _marker: PhantomData } }
+	fn default() -> Self {
+		Self {
+			_marker: PhantomData,
+		}
+	}
 }
 
 impl<Input, Output, M1, M2> Clone for ExchangeScript<Input, Output, M1, M2>

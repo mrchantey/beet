@@ -1,5 +1,5 @@
-use beet::prelude::*;
 use beet::prelude::webdriver::*;
+use beet::prelude::*;
 use std::path::PathBuf;
 
 /// Request params for the [`ExportPdf`] command, surfaced in `--help`.
@@ -38,8 +38,10 @@ pub async fn ExportPdf(parts: RequestParts) -> Result<String> {
 		options.margin = PdfMargin::none();
 	}
 	if let Some(ranges) = &params.page_ranges {
-		options.page_ranges =
-			ranges.split(',').map(|range| range.trim().to_string()).collect();
+		options.page_ranges = ranges
+			.split(',')
+			.map(|range| range.trim().to_string())
+			.collect();
 	}
 
 	let (_process, page) = Page::visit(&params.input).await?;

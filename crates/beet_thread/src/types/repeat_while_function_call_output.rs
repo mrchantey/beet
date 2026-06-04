@@ -35,7 +35,9 @@ async fn has_pending_function_call_output(
 #[action]
 #[derive(Debug, Clone, Copy, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn RepeatWhileFunctionCallOutput(cx: ActionContext) -> Result<Outcome> {
+pub async fn RepeatWhileFunctionCallOutput(
+	cx: ActionContext,
+) -> Result<Outcome> {
 	let child = match cx
 		.caller
 		.get(|children: &Children| children.first().copied())

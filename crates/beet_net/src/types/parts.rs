@@ -26,8 +26,8 @@
 //! ```
 
 use super::*;
-use beet_core::prelude::*;
 use alloc::borrow::Cow;
+use beet_core::prelude::*;
 
 /// The default HTTP version string.
 const DEFAULT_HTTP_VERSION: &str = "1.1";

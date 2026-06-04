@@ -74,8 +74,8 @@ fn write_focus_input(
 			// some backends send space distinctly
 			Key::Space => Some(KeyEdit::Insert(" ".to_string())),
 			Key::Backspace => Some(KeyEdit::Backspace),
-				// forward delete: drops the first character in this append-at-end model
-				Key::Delete => Some(KeyEdit::Delete),
+			// forward delete: drops the first character in this append-at-end model
+			Key::Delete => Some(KeyEdit::Delete),
 			// Enter, arrows, Tab, Escape, etc belong to navigation/shortcuts
 			_ => None,
 		})

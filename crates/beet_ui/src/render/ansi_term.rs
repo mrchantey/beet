@@ -52,7 +52,11 @@ impl AnsiTermRenderer {
 
 	/// Paint the tree rooted at `entity` into a [`FlexBuffer`] and return the
 	/// assembled ANSI string (clear + prefix + body).
-	fn render_to_string(&self, entity: Entity, world: &mut World) -> Result<String> {
+	fn render_to_string(
+		&self,
+		entity: Entity,
+		world: &mut World,
+	) -> Result<String> {
 		let width = terminal_ext::size().x.max(1);
 		world.entity_mut(entity).insert(FlexBuffer::new(width));
 

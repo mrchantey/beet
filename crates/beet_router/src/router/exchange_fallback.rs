@@ -29,7 +29,8 @@ pub fn exchange_fallback() -> impl Bundle {
 					};
 					#[cfg(not(feature = "serde"))]
 					let body = MediaBytes::new_text(text);
-					Response::from_status(StatusCode::NOT_FOUND).with_media(body)
+					Response::from_status(StatusCode::NOT_FOUND)
+						.with_media(body)
 				}
 				Err(err) => err.into_response(),
 			}
@@ -74,11 +75,12 @@ mod test {
 	#[beet_core::test]
 	async fn no_match_returns_not_found() {
 		AsyncPlugin::world()
-			.spawn((exchange_fallback(), children![
-				Action::<Request, Outcome<Response, Request>>::new_pure(
-					|cx: ActionContext<Request>| Fail(cx.input),
-				),
-			]))
+			.spawn((exchange_fallback(), children![Action::<
+				Request,
+				Outcome<Response, Request>,
+			>::new_pure(
+				|cx: ActionContext<Request>| Fail(cx.input),
+			),]))
 			.exchange(Request::get("test"))
 			.await
 			.status()
@@ -91,13 +93,14 @@ mod test {
 			.into_world()
 			.spawn((default_router(), children![route(
 				"fb",
-				(exchange_fallback(), children![
-					Action::<Request, Outcome<Response, Request>>::new_pure(
-						|_cx: ActionContext<Request>| {
-							Pass(Response::ok().with_body("matched"))
-						},
-					),
-				]),
+				(exchange_fallback(), children![Action::<
+					Request,
+					Outcome<Response, Request>,
+				>::new_pure(
+					|_cx: ActionContext<Request>| {
+						Pass(Response::ok().with_body("matched"))
+					},
+				),]),
 			)]))
 			.exchange(Request::get("fb"))
 			.await

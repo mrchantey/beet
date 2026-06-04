@@ -27,9 +27,7 @@ fn clone_static(test: &test::TestDescAndFn) -> test::TestDescAndFn {
 	}
 }
 
-fn apply_filenames(
-	tests: &[&test::TestDescAndFn],
-) -> Vec<test::TestDescAndFn> {
+fn apply_filenames(tests: &[&test::TestDescAndFn]) -> Vec<test::TestDescAndFn> {
 	tests
 		.iter()
 		.map(|test| {

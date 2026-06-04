@@ -34,9 +34,7 @@ impl Pose {
 	}
 
 	/// The yaw about the Z axis, the planar heading of a 2D [`Pose`].
-	pub fn yaw(&self) -> f32 {
-		self.rotation.to_euler(EulerRot::ZYX).0
-	}
+	pub fn yaw(&self) -> f32 { self.rotation.to_euler(EulerRot::ZYX).0 }
 
 	/// Creates a new [`Pose`] from the translation and rotation of a [`Transform`].
 	pub fn from_transform(tran: &Transform) -> Pose {

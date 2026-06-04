@@ -116,9 +116,12 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
-					OnSpawn::insert(value.clone())
-				})),
+				(
+					FieldRef::new("items"),
+					ReactiveChildren::new(|_, value| {
+						OnSpawn::insert(value.clone())
+					}),
+				),
 			))
 			.id();
 		world.update_local();
@@ -146,9 +149,12 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
-					OnSpawn::insert(value.clone())
-				})),
+				(
+					FieldRef::new("items"),
+					ReactiveChildren::new(|_, value| {
+						OnSpawn::insert(value.clone())
+					}),
+				),
 			))
 			.id();
 		// a static, non-ReactiveChild sibling that must never be despawned
@@ -170,15 +176,16 @@ mod test {
 	#[beet_core::test]
 	fn rebuilds_only_on_own_value_change() {
 		let mut world = DocumentPlugin::world();
-		let doc = world
-			.spawn(Document::new(val!({ "items": ["a"] })))
-			.id();
+		let doc = world.spawn(Document::new(val!({ "items": ["a"] }))).id();
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				(FieldRef::new("items"), ReactiveChildren::new(|_, value| {
-					OnSpawn::insert(value.clone())
-				})),
+				(
+					FieldRef::new("items"),
+					ReactiveChildren::new(|_, value| {
+						OnSpawn::insert(value.clone())
+					}),
+				),
 			))
 			.id();
 		world.update_local();
@@ -230,9 +237,12 @@ mod test {
 		let list = world
 			.spawn((
 				ChildOf(doc),
-				(items.field(), ReactiveChildren::new(|_, value| {
-					OnSpawn::insert(value.clone())
-				})),
+				(
+					items.field(),
+					ReactiveChildren::new(|_, value| {
+						OnSpawn::insert(value.clone())
+					}),
+				),
 			))
 			.id();
 		world.update_local();
@@ -267,10 +277,13 @@ mod test {
 			.id();
 		world.spawn((
 			ChildOf(doc),
-			(FieldRef::new("items"), ReactiveChildren::new(|_, _| {
-				// each child reads its own item's "name", scoped to items[N]
-				OnSpawn::insert((Value::default(), FieldRef::new("name")))
-			})),
+			(
+				FieldRef::new("items"),
+				ReactiveChildren::new(|_, _| {
+					// each child reads its own item's "name", scoped to items[N]
+					OnSpawn::insert((Value::default(), FieldRef::new("name")))
+				}),
+			),
 		));
 		// children spawn the first pass, their FieldRef resolves and syncs the
 		// next, so a second pass settles the leaf values
@@ -298,14 +311,20 @@ mod test {
 		// hosts an inner ReactiveChildren over its own "items"
 		world.spawn((
 			ChildOf(doc),
-			(FieldRef::new("groups"), ReactiveChildren::new(|_, _| {
-				OnSpawn::insert((
-					FieldRef::new("items"),
-					ReactiveChildren::new(|_, _| {
-						OnSpawn::insert((Value::default(), FieldRef::new("name")))
-					}),
-				))
-			})),
+			(
+				FieldRef::new("groups"),
+				ReactiveChildren::new(|_, _| {
+					OnSpawn::insert((
+						FieldRef::new("items"),
+						ReactiveChildren::new(|_, _| {
+							OnSpawn::insert((
+								Value::default(),
+								FieldRef::new("name"),
+							))
+						}),
+					))
+				}),
+			),
 		));
 		// outer children -> outer FieldRef syncs -> inner children -> inner
 		// FieldRef syncs -> leaf "name" syncs: four staged passes

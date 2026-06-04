@@ -56,25 +56,22 @@ impl<'a> DynamicWorldSerializer<'a> {
 }
 
 impl Serialize for DynamicWorldSerializer<'_> {
-	fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+	fn serialize<S>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
 		let mut state = serializer.serialize_struct(WORLD_STRUCT, 2)?;
-		state.serialize_field(
-			WORLD_RESOURCES,
-			&WorldMapSerializer {
-				entries: &self.world.resources,
-				registry: self.registry,
-			},
-		)?;
-		state.serialize_field(
-			WORLD_ENTITIES,
-			&EntitiesSerializer {
-				entities: &self.world.entities,
-				registry: self.registry,
-			},
-		)?;
+		state.serialize_field(WORLD_RESOURCES, &WorldMapSerializer {
+			entries: &self.world.resources,
+			registry: self.registry,
+		})?;
+		state.serialize_field(WORLD_ENTITIES, &EntitiesSerializer {
+			entities: &self.world.entities,
+			registry: self.registry,
+		})?;
 		state.end()
 	}
 }
@@ -88,19 +85,19 @@ pub struct EntitiesSerializer<'a> {
 }
 
 impl Serialize for EntitiesSerializer<'_> {
-	fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+	fn serialize<S>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
 		let mut state = serializer.serialize_map(Some(self.entities.len()))?;
 		for entity in self.entities {
-			state.serialize_entry(
-				&entity.entity,
-				&EntitySerializer {
-					entity,
-					registry: self.registry,
-				},
-			)?;
+			state.serialize_entry(&entity.entity, &EntitySerializer {
+				entity,
+				registry: self.registry,
+			})?;
 		}
 		state.end()
 	}
@@ -115,7 +112,10 @@ pub struct EntitySerializer<'a> {
 }
 
 impl Serialize for EntitySerializer<'_> {
-	fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+	fn serialize<S>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
@@ -143,7 +143,10 @@ pub struct WorldMapSerializer<'a> {
 }
 
 impl Serialize for WorldMapSerializer<'_> {
-	fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+	fn serialize<S>(
+		&self,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
@@ -195,7 +198,10 @@ pub struct WorldDeserializer<'a> {
 impl<'a, 'de> DeserializeSeed<'de> for WorldDeserializer<'a> {
 	type Value = DynamicWorld;
 
-	fn deserialize<D>(self, deserializer: D) -> core::result::Result<Self::Value, D::Error>
+	fn deserialize<D>(
+		self,
+		deserializer: D,
+	) -> core::result::Result<Self::Value, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
@@ -220,7 +226,10 @@ impl<'de> Visitor<'de> for WorldVisitor<'_> {
 		formatter.write_str("world struct")
 	}
 
-	fn visit_seq<A>(self, mut seq: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_seq<A>(
+		self,
+		mut seq: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: SeqAccess<'de>,
 	{
@@ -242,7 +251,10 @@ impl<'de> Visitor<'de> for WorldVisitor<'_> {
 		})
 	}
 
-	fn visit_map<A>(self, mut map: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_map<A>(
+		self,
+		mut map: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: MapAccess<'de>,
 	{
@@ -254,17 +266,20 @@ impl<'de> Visitor<'de> for WorldVisitor<'_> {
 					if resources.is_some() {
 						return Err(Error::duplicate_field(WORLD_RESOURCES));
 					}
-					resources = Some(map.next_value_seed(WorldMapDeserializer {
-						registry: self.type_registry,
-					})?);
+					resources =
+						Some(map.next_value_seed(WorldMapDeserializer {
+							registry: self.type_registry,
+						})?);
 				}
 				WorldField::Entities => {
 					if entities.is_some() {
 						return Err(Error::duplicate_field(WORLD_ENTITIES));
 					}
-					entities = Some(map.next_value_seed(WorldEntitiesDeserializer {
-						type_registry: self.type_registry,
-					})?);
+					entities = Some(map.next_value_seed(
+						WorldEntitiesDeserializer {
+							type_registry: self.type_registry,
+						},
+					)?);
 				}
 			}
 		}
@@ -290,7 +305,10 @@ pub struct WorldEntitiesDeserializer<'a> {
 impl<'a, 'de> DeserializeSeed<'de> for WorldEntitiesDeserializer<'a> {
 	type Value = Vec<DynamicEntity>;
 
-	fn deserialize<D>(self, deserializer: D) -> core::result::Result<Self::Value, D::Error>
+	fn deserialize<D>(
+		self,
+		deserializer: D,
+	) -> core::result::Result<Self::Value, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
@@ -311,7 +329,10 @@ impl<'de> Visitor<'de> for WorldEntitiesVisitor<'_> {
 		formatter.write_str("map of entities")
 	}
 
-	fn visit_map<A>(self, mut map: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_map<A>(
+		self,
+		mut map: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: MapAccess<'de>,
 	{
@@ -337,7 +358,10 @@ pub struct WorldEntityDeserializer<'a> {
 impl<'a, 'de> DeserializeSeed<'de> for WorldEntityDeserializer<'a> {
 	type Value = DynamicEntity;
 
-	fn deserialize<D>(self, deserializer: D) -> core::result::Result<Self::Value, D::Error>
+	fn deserialize<D>(
+		self,
+		deserializer: D,
+	) -> core::result::Result<Self::Value, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
@@ -364,7 +388,10 @@ impl<'de> Visitor<'de> for WorldEntityVisitor<'_> {
 		formatter.write_str("entities")
 	}
 
-	fn visit_seq<A>(self, mut seq: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_seq<A>(
+		self,
+		mut seq: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: SeqAccess<'de>,
 	{
@@ -380,7 +407,10 @@ impl<'de> Visitor<'de> for WorldEntityVisitor<'_> {
 		})
 	}
 
-	fn visit_map<A>(self, mut map: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_map<A>(
+		self,
+		mut map: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: MapAccess<'de>,
 	{
@@ -389,11 +419,14 @@ impl<'de> Visitor<'de> for WorldEntityVisitor<'_> {
 			match key {
 				EntityField::Components => {
 					if components.is_some() {
-						return Err(Error::duplicate_field(ENTITY_FIELD_COMPONENTS));
+						return Err(Error::duplicate_field(
+							ENTITY_FIELD_COMPONENTS,
+						));
 					}
-					components = Some(map.next_value_seed(WorldMapDeserializer {
-						registry: self.registry,
-					})?);
+					components =
+						Some(map.next_value_seed(WorldMapDeserializer {
+							registry: self.registry,
+						})?);
 				}
 			}
 		}
@@ -417,7 +450,10 @@ pub struct WorldMapDeserializer<'a> {
 impl<'a, 'de> DeserializeSeed<'de> for WorldMapDeserializer<'a> {
 	type Value = Vec<Box<dyn PartialReflect>>;
 
-	fn deserialize<D>(self, deserializer: D) -> core::result::Result<Self::Value, D::Error>
+	fn deserialize<D>(
+		self,
+		deserializer: D,
+	) -> core::result::Result<Self::Value, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
@@ -438,7 +474,10 @@ impl<'de> Visitor<'de> for WorldMapVisitor<'_> {
 		formatter.write_str("map of reflect types")
 	}
 
-	fn visit_seq<A>(self, mut seq: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_seq<A>(
+		self,
+		mut seq: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: SeqAccess<'de>,
 	{
@@ -451,7 +490,10 @@ impl<'de> Visitor<'de> for WorldMapVisitor<'_> {
 		Ok(dynamic_properties)
 	}
 
-	fn visit_map<A>(self, mut map: A) -> core::result::Result<Self::Value, A::Error>
+	fn visit_map<A>(
+		self,
+		mut map: A,
+	) -> core::result::Result<Self::Value, A::Error>
 	where
 		A: MapAccess<'de>,
 	{
@@ -476,7 +518,9 @@ impl<'de> Visitor<'de> for WorldMapVisitor<'_> {
 			let value = self
 				.registry
 				.get(registration.type_id())
-				.and_then(|registration| registration.data::<ReflectFromReflect>())
+				.and_then(|registration| {
+					registration.data::<ReflectFromReflect>()
+				})
 				.and_then(|from_reflect| {
 					from_reflect.from_reflect(value.as_partial_reflect())
 				})
@@ -507,7 +551,10 @@ mod test {
 		use serde::Serializer;
 		use serde::de::Error;
 
-		pub fn serialize<S>(value: &u32, serializer: S) -> Result<S::Ok, S::Error>
+		pub fn serialize<S>(
+			value: &u32,
+			serializer: S,
+		) -> Result<S::Ok, S::Error>
 		where
 			S: Serializer,
 		{
@@ -526,7 +573,16 @@ mod test {
 		}
 	}
 
-	#[derive(Component, Copy, Clone, Reflect, Debug, PartialEq, Serialize, Deserialize)]
+	#[derive(
+		Component,
+		Copy,
+		Clone,
+		Reflect,
+		Debug,
+		PartialEq,
+		Serialize,
+		Deserialize,
+	)]
 	#[reflect(Component, Serialize, Deserialize)]
 	struct Qux(#[serde(with = "qux")] u32);
 
@@ -557,7 +613,8 @@ mod test {
 			registry.register::<MyComponent>();
 			registry.register::<MyEnum>();
 			registry.register::<String>();
-			registry.register_type_data::<String, bevy_reflect::ReflectSerialize>();
+			registry
+				.register_type_data::<String, bevy_reflect::ReflectSerialize>();
 			registry.register::<[usize; 3]>();
 			registry.register::<(f32, f32)>();
 		}
@@ -595,7 +652,11 @@ mod test {
 		deserialized
 			.write_to_world(&mut world, &mut EntityHashMap::default())
 			.unwrap();
-		world.query::<&Qux>().single(&world).unwrap().xpect_eq(Qux(42));
+		world
+			.query::<&Qux>()
+			.single(&world)
+			.unwrap()
+			.xpect_eq(Qux(42));
 	}
 
 	#[cfg(feature = "postcard")]

@@ -1,7 +1,7 @@
 //! # Beet Async
-//! 
+//!
 //! ⚠️ Temporary Crate ⚠️
-//! 
+//!
 //! This crate will eventually be replaced with the upstream bevy_async, currently with two differentiating features:
 //! - exclusive world access
 //! - wasm support
@@ -89,9 +89,12 @@ mod wake_signal;
 #[cfg(target_arch = "wasm32")]
 mod wasm_tick;
 
-pub use crate::bridge_future::{AsyncSystemState, BridgeError};
+pub use crate::bridge_future::AsyncSystemState;
+pub use crate::bridge_future::BridgeError;
 pub use crate::bridge_request::async_world_sync_point;
-pub use crate::plugin::{AsyncPlugin, AsyncTickBudget, AsyncWorld};
+pub use crate::plugin::AsyncPlugin;
+pub use crate::plugin::AsyncTickBudget;
+pub use crate::plugin::AsyncWorld;
 #[cfg(target_arch = "wasm32")]
 pub use crate::wasm_tick::set_wasm_tick_hook;
 
@@ -100,10 +103,17 @@ pub use crate::wasm_tick::set_wasm_tick_hook;
 /// This includes the most common types in this crate, re-exported for your convenience.
 pub mod prelude {
 	#[doc(hidden)]
-	pub use crate::{
-		AsyncPlugin, AsyncSystemState, AsyncTickBudget, AsyncWorld, BridgeError,
-		async_world_sync_point,
-	};
+	pub use crate::AsyncPlugin;
+	#[doc(hidden)]
+	pub use crate::AsyncSystemState;
+	#[doc(hidden)]
+	pub use crate::AsyncTickBudget;
+	#[doc(hidden)]
+	pub use crate::AsyncWorld;
+	#[doc(hidden)]
+	pub use crate::BridgeError;
+	#[doc(hidden)]
+	pub use crate::async_world_sync_point;
 }
 
 #[cfg(test)]
@@ -127,8 +137,10 @@ mod tests {
 		struct MySyncPoint;
 		static WORLD_WAS_DROPPED: AtomicBool = AtomicBool::new(false);
 		let mut other_app = App::new();
-		other_app
-			.add_plugins((TaskPoolPlugin::default(), ScheduleRunnerPlugin::default()));
+		other_app.add_plugins((
+			TaskPoolPlugin::default(),
+			ScheduleRunnerPlugin::default(),
+		));
 		let mut app = App::new();
 		app.add_plugins((
 			AsyncPlugin::default(),
@@ -183,11 +195,16 @@ mod tests {
 			AsyncComputeTaskPool::get()
 				.spawn(async move {
 					let system_state = world.system_state::<Res<MyResource>>();
-					match system_state.bridge(MySyncPoint, |_| unreachable!()).await {
+					match system_state
+						.bridge(MySyncPoint, |_| unreachable!())
+						.await
+					{
 						Err(BridgeError::SystemParamValidation(_)) => {
 							FAILED_VALIDATION.store(true, Ordering::Relaxed);
 						}
-						_ => unreachable!("Parameter validation should have failed"),
+						_ => unreachable!(
+							"Parameter validation should have failed"
+						),
 					}
 				})
 				.detach();

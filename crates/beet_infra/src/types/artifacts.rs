@@ -141,9 +141,7 @@ impl ArtifactsClient {
 	pub async fn set_current(&self, version: &Uuid) -> Result {
 		let key = ArtifactLedger::version_ledger_key(version);
 		let ledger_bytes = self.store.get(&key).await?;
-		self.store
-			.insert(&current_ledger_key(), ledger_bytes)
-			.await
+		self.store.insert(&current_ledger_key(), ledger_bytes).await
 	}
 
 	/// List all deployed versions, sorted chronologically.
@@ -229,8 +227,10 @@ mod tests {
 
 	#[beet_core::test]
 	async fn upload_and_download() {
-		let mut client =
-			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
+		let mut client = ArtifactsClient::new(
+			BlobStore::temp(),
+			ArtifactLedger::default_test(),
+		);
 		let bytes = b"hello world".to_vec();
 		client
 			.upload_artifact(
@@ -279,8 +279,10 @@ mod tests {
 
 	#[beet_core::test]
 	async fn rollback_and_rollforward() {
-		let mut client =
-			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
+		let mut client = ArtifactsClient::new(
+			BlobStore::temp(),
+			ArtifactLedger::default_test(),
+		);
 		let ledger1 = test_ledger(vec![("app.zip", "v1", "h1")]);
 		let ledger2 = test_ledger(vec![("app.zip", "v2", "h2")]);
 		let ledger3 = test_ledger(vec![("app.zip", "v3", "h3")]);
@@ -302,12 +304,13 @@ mod tests {
 
 	#[beet_core::test]
 	async fn rollback_too_far_fails() {
-		let mut client =
-			ArtifactsClient::new(BlobStore::temp(), ArtifactLedger::default_test());
+		let mut client = ArtifactsClient::new(
+			BlobStore::temp(),
+			ArtifactLedger::default_test(),
+		);
 		let ledger = test_ledger(vec![("app.zip", "v1", "h1")]);
 		client.ledger = ledger.clone();
 		client.publish_ledger().await.unwrap();
 		client.rollback(1).await.unwrap_err();
 	}
-
 }

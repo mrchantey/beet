@@ -8,7 +8,9 @@ use bevy::reflect::Typed;
 ///
 /// Used for driving dynamic UIs, performing validation and producing a
 /// [`Schema`] (JSON Schema) representation.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
+)]
 #[reflect(opaque)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -83,9 +85,7 @@ impl ValueSchema {
 						.fields
 						.iter()
 						.find(|field| field.key == *key)
-						.ok_or_else(|| {
-							bevyhow!("schema has no field `{key}`")
-						})?
+						.ok_or_else(|| bevyhow!("schema has no field `{key}`"))?
 						.schema
 				}
 				(ValueSchema::Map(schema), FieldSegment::ObjectKey(_)) => {
@@ -430,9 +430,11 @@ async fn validate_enum(
 ) -> Vec<ValidationError> {
 	// Unit variant as bare string.
 	if let Value::Str(name) = value {
-		if schema.variants.iter().any(|v| {
-			v.payload.is_none() && v.name.as_str() == name.as_str()
-		}) {
+		if schema
+			.variants
+			.iter()
+			.any(|v| v.payload.is_none() && v.name.as_str() == name.as_str())
+		{
 			return Vec::new();
 		}
 		return vec![ValidationError::new(
@@ -452,8 +454,10 @@ async fn validate_enum(
 		)];
 	}
 	let (key, payload) = map.0.iter_mut().next().expect("len == 1");
-	let Some(variant) =
-		schema.variants.iter().find(|v| v.name.as_str() == key.as_str())
+	let Some(variant) = schema
+		.variants
+		.iter()
+		.find(|v| v.name.as_str() == key.as_str())
 	else {
 		return vec![ValidationError::new(
 			path.clone(),
@@ -614,7 +618,10 @@ mod test {
 		});
 		let mut value = val!([1, 2, 2]);
 		let errors = schema.validate(&mut value).await;
-		errors.iter().any(|e| e.message.contains("unique")).xpect_true();
+		errors
+			.iter()
+			.any(|e| e.message.contains("unique"))
+			.xpect_true();
 	}
 
 	#[crate::test]
@@ -636,7 +643,11 @@ mod test {
 	#[crate::test]
 	async fn any_matches_everything() {
 		let schema = ValueSchema::Any;
-		schema.validate(&mut val!("anything")).await.is_empty().xpect_true();
+		schema
+			.validate(&mut val!("anything"))
+			.await
+			.is_empty()
+			.xpect_true();
 		schema.validate(&mut val!(42)).await.is_empty().xpect_true();
 	}
 
@@ -644,12 +655,16 @@ mod test {
 	fn get_field_schema_walks_struct() {
 		let schema = ValueSchema::of::<UserProfile>();
 		matches!(
-			schema.get_field_schema(&[FieldSegment::key("name")]).unwrap(),
+			schema
+				.get_field_schema(&[FieldSegment::key("name")])
+				.unwrap(),
 			ValueSchema::String(_)
 		)
 		.xpect_true();
 		matches!(
-			schema.get_field_schema(&[FieldSegment::key("age")]).unwrap(),
+			schema
+				.get_field_schema(&[FieldSegment::key("age")])
+				.unwrap(),
 			ValueSchema::U64(_)
 		)
 		.xpect_true();
@@ -684,4 +699,3 @@ mod test {
 		.xpect_true();
 	}
 }
-

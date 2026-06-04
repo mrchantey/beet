@@ -257,9 +257,7 @@ mod test {
 	/// action plus the [`NavigateHandler`] middleware under test, and nothing
 	/// else. Unlike [`default_router`], it wires no opinionated app routes, so
 	/// the sibling/first-child ordering these tests assert is not perturbed.
-	fn nav_router() -> impl Bundle {
-		(Router, NavigateHandler::default())
-	}
+	fn nav_router() -> impl Bundle { (Router, NavigateHandler::default()) }
 
 	#[beet_core::test]
 	fn navigate_to_from_str() {
@@ -291,16 +289,19 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("", rsx_direct!{ <h1>"Root"</h1> }),
-				render_action::fixed_route("about", rsx_direct!{ <p>"About page"</p> }),
+				render_action::fixed_route("", rsx_direct! { <h1>"Root"</h1> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"About page"</p> }
+				),
 			]))
 			.flush();
 
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("about --navigate=parent"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"about --navigate=parent",
+			))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -313,16 +314,22 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
-				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
+				render_action::fixed_route(
+					"alpha",
+					rsx_direct! { <p>"Alpha page"</p> }
+				),
+				render_action::fixed_route(
+					"beta",
+					rsx_direct! { <p>"Beta page"</p> }
+				),
 			]))
 			.flush();
 
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("--navigate=first-child"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"--navigate=first-child",
+			))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -335,17 +342,23 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
-				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
+				render_action::fixed_route(
+					"alpha",
+					rsx_direct! { <p>"Alpha page"</p> }
+				),
+				render_action::fixed_route(
+					"beta",
+					rsx_direct! { <p>"Beta page"</p> }
+				),
 			]))
 			.flush();
 
 		// alpha -> next -> beta
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("alpha --navigate=next-sibling"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"alpha --navigate=next-sibling",
+			))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -355,9 +368,9 @@ mod test {
 		// beta -> next -> wraps to alpha
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("beta --navigate=next-sibling"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"beta --navigate=next-sibling",
+			))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -370,17 +383,23 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("alpha", rsx_direct!{ <p>"Alpha page"</p> }),
-				render_action::fixed_route("beta", rsx_direct!{ <p>"Beta page"</p> }),
+				render_action::fixed_route(
+					"alpha",
+					rsx_direct! { <p>"Alpha page"</p> }
+				),
+				render_action::fixed_route(
+					"beta",
+					rsx_direct! { <p>"Beta page"</p> }
+				),
 			]))
 			.flush();
 
 		// alpha -> prev -> wraps to beta
 		let body = world
 			.entity_mut(root)
-			.call::<Request, Response>(
-				Request::from_cli_str("alpha --navigate=prev-sibling"),
-			)
+			.call::<Request, Response>(Request::from_cli_str(
+				"alpha --navigate=prev-sibling",
+			))
 			.await
 			.unwrap()
 			.unwrap_str()
@@ -394,8 +413,8 @@ mod test {
 		let root = world
 			.spawn((nav_router(), children![render_action::fixed_route(
 				"about",
-				rsx_direct!{ <p>"About page"</p> }
-			),])
+				rsx_direct! { <p>"About page"</p> }
+			),]))
 			.flush();
 
 		// No --navigate param, should route normally

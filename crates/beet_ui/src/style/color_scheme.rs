@@ -91,14 +91,24 @@ mod test {
 			))
 			.id();
 		world.update_local();
-		let light_bg =
-			world.entity(entity).get::<VisualStyle>().unwrap().background;
+		let light_bg = world
+			.entity(entity)
+			.get::<VisualStyle>()
+			.unwrap()
+			.background;
 
 		// flip to dark at runtime — only the typed handle changes
-		world.entity_mut(entity).get_mut::<ColorScheme>().unwrap().toggle();
+		world
+			.entity_mut(entity)
+			.get_mut::<ColorScheme>()
+			.unwrap()
+			.toggle();
 		world.update_local();
-		let dark_bg =
-			world.entity(entity).get::<VisualStyle>().unwrap().background;
+		let dark_bg = world
+			.entity(entity)
+			.get::<VisualStyle>()
+			.unwrap()
+			.background;
 
 		light_bg.is_some().xpect_true();
 		(light_bg != dark_bg).xpect_true();

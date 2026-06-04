@@ -91,9 +91,7 @@ async fn handle_connection(
 			let child_id = entity_mut.id();
 			entity_mut
 				.observe_any(
-					move |ev: On<SshSend>,
-					      commands: AsyncCommands|
-					      -> Result {
+					move |ev: On<SshSend>, commands: AsyncCommands| -> Result {
 						let to_client = to_client_obs.clone();
 						let data = ev.event().clone();
 						commands.run_local(async move |_| {
@@ -107,10 +105,7 @@ async fn handle_connection(
 				)
 				.run_async_local(async move |child_entity| {
 					while let Ok(event) = from_client.recv().await {
-						child_entity
-							.trigger_target(SshRecv(event))
-							.await
-							.ok();
+						child_entity.trigger_target(SshRecv(event)).await.ok();
 					}
 					// Channel closed — fire a Close event so observers can clean up.
 					child_entity

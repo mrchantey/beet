@@ -32,9 +32,7 @@ impl LocalStorageStore {
 		self
 	}
 
-	fn store_prefix(&self) -> String {
-		format!("store:{}:", self.store_name)
-	}
+	fn store_prefix(&self) -> String { format!("store:{}:", self.store_name) }
 
 	/// Compose the localStorage key for the store and path.
 	fn storage_key(&self, path: &SmolPath) -> String {
@@ -171,8 +169,9 @@ impl BlobStoreProvider for LocalStorageStore {
 				Some(val) => {
 					// base64 is no_std here, so DecodeError lacks the `Error`
 					// impl BevyError's blanket `From` needs; wrap via Display.
-					let bytes =
-						BASE64_STANDARD.decode(val).map_err(|err| bevyhow!("{err}"))?;
+					let bytes = BASE64_STANDARD
+						.decode(val)
+						.map_err(|err| bevyhow!("{err}"))?;
 					Bytes::from(bytes).xok()
 				}
 				None => bevybail!("Object not found: {}", key),

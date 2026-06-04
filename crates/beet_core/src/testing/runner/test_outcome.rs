@@ -199,10 +199,7 @@ impl TestOutcome {
 				// panicked and should have
 				TestOutcome::Pass
 			}
-			(
-				PanicResult::Panic { location, payload },
-				ShouldPanic::No,
-			) => {
+			(PanicResult::Panic { location, payload }, ShouldPanic::No) => {
 				// panicked but shouldnt have
 				TestOutcome::Fail(TestFail::Panic { location, payload })
 			}

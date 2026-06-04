@@ -156,8 +156,7 @@ pub fn handle_episode_end<T: EpisodeParams>(
 	mut sessions: Query<(Entity, &mut RlSession<T>)>,
 ) {
 	for event in end_ep.read() {
-		let Ok((session_entity, mut session)) =
-			sessions.get_mut(event.session)
+		let Ok((session_entity, mut session)) = sessions.get_mut(event.session)
 		else {
 			continue;
 		};

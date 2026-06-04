@@ -41,7 +41,8 @@ fn main() -> AppExit {
 		// registering — ClientAppPlugin's RouterPlugin / ActionPlugin
 		// cover the hierarchy and unit-input Script types.
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>()
+		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
+		)
 		.add_systems(Startup, setup)
 		.run()
 }
@@ -54,8 +55,8 @@ struct GreetRequest {
 }
 
 fn setup(async_commands: AsyncCommands) {
-	let blob =
-		FsStore::new(WsPathBuf::default()).blob(SmolPath::new(WORLD_SERDE_FILE));
+	let blob = FsStore::new(WsPathBuf::default())
+		.blob(SmolPath::new(WORLD_SERDE_FILE));
 	let new_world = CliArgs::parse_env().params.contains_key("new");
 
 	async_commands.run(async move |world: AsyncWorld| {

@@ -25,18 +25,14 @@ use beet::prelude::*;
 async fn main() -> Result {
 	let mut world = AsyncPlugin::world();
 	let outcome = world
-		.spawn((
-			Name::new("root"),
-			Repeat::new(),
-			children![(
-				Name::new("loop body"),
-				Sequence::new(),
-				children![
-					(Name::new("condition"), SucceedTimes::new(2)),
-					(Name::new("work"), Log::new("doing work")),
-				],
-			)],
-		))
+		.spawn((Name::new("root"), Repeat::new(), children![(
+			Name::new("loop body"),
+			Sequence::new(),
+			children![
+				(Name::new("condition"), SucceedTimes::new(2)),
+				(Name::new("work"), Log::new("doing work")),
+			],
+		)]))
 		.call::<(), Outcome>(())
 		.await?;
 	cross_log!("loop exited with {outcome:?}");

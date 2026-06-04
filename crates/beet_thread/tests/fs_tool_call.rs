@@ -35,51 +35,29 @@ fn main() {
 			let store = FsStore::new(store_path.clone());
 
 			commands
-				.spawn((
-					store,
-					RepeatWhileFunctionCallOutput,
-					children![(
-						Thread::default(),
-						Sequence::new(),
-						ExcludeErrors(ChildError::NO_ACTION),
-						children![
-							(
-								Actor::system(),
-								children![Post::spawn(PROMPT)]
-							),
-							(
-								Actor::new("Tester", ActorKind::Agent),
-								OpenAiProvider::gpt_5_mini().unwrap(),
-								children![
-									exchange_route(
-										"list-blobs",
-										ListBlobs
-									),
-									exchange_route(
-										"read-blob",
-										ReadBlob
-									),
-									exchange_route(
-										"write-blob",
-										WriteBlob
-									),
-									exchange_route(
-										"edit-text",
-										EditText
-									),
-									exchange_route(
-										"remove-blob",
-										RemoveBlob
-									),
-									exchange_route(
-										"execution-outcome",
-										ExecutionOutcome
-									),
-								]
-							),
-						]
-					)],
-				))
+				.spawn((store, RepeatWhileFunctionCallOutput, children![(
+					Thread::default(),
+					Sequence::new(),
+					ExcludeErrors(ChildError::NO_ACTION),
+					children![
+						(Actor::system(), children![Post::spawn(PROMPT)]),
+						(
+							Actor::new("Tester", ActorKind::Agent),
+							OpenAiProvider::gpt_5_mini().unwrap(),
+							children![
+								exchange_route("list-blobs", ListBlobs),
+								exchange_route("read-blob", ReadBlob),
+								exchange_route("write-blob", WriteBlob),
+								exchange_route("edit-text", EditText),
+								exchange_route("remove-blob", RemoveBlob),
+								exchange_route(
+									"execution-outcome",
+									ExecutionOutcome
+								),
+							]
+						),
+					]
+				)]))
 				.call::<(), Outcome>((), OutHandler::exit());
 		})
 		.run();

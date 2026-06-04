@@ -43,7 +43,10 @@ impl BlobStoreList {
 /// path is multi-frame: this frame spawns the list task, a later frame writes
 /// the field at the sync point and converges.
 pub(super) fn refresh_blob_store_list(
-	stores: Populated<(Entity, &BlobStore), (Changed<BlobStore>, With<FieldRef>)>,
+	stores: Populated<
+		(Entity, &BlobStore),
+		(Changed<BlobStore>, With<FieldRef>),
+	>,
 	commands: AsyncCommands,
 ) {
 	for (entity, store) in stores.iter() {
@@ -84,7 +87,12 @@ mod test {
 	#[beet_core::test]
 	async fn lists_and_reacts() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin, DocumentPlugin));
+		app.add_plugins((
+			MinimalPlugins,
+			AsyncPlugin,
+			StorePlugin,
+			DocumentPlugin,
+		));
 		// the InMemoryStore is co-located with the Document + list; `store`
 		// shares its backing Arc so test writes reach the same objects
 		let inner = InMemoryStore::new();

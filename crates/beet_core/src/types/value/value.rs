@@ -718,7 +718,10 @@ mod test {
 
 		// a Float stays Float even when the text would otherwise parse as an int
 		let mut value = Value::Float(1.5);
-		value.edit_text(|text| text.truncate(1)).unwrap().xpect_true();
+		value
+			.edit_text(|text| text.truncate(1))
+			.unwrap()
+			.xpect_true();
 		value.xpect_eq(Value::Float(1.0));
 
 		// an edit that no longer parses as the original type errors, untouched

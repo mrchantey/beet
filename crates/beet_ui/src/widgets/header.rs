@@ -9,8 +9,11 @@ pub fn Header(
 	pkg_config: Res<PackageConfig>,
 ) -> impl Scene {
 	let title = pkg_config.title.clone();
-	let home_route =
-		if home_route.is_empty() { "/".to_string() } else { home_route };
+	let home_route = if home_route.is_empty() {
+		"/".to_string()
+	} else {
+		home_route
+	};
 	rsx! {
 		<header {Classes::new([classes::APP_BAR, classes::PRINT_HIDDEN])}>
 			<a {Classes::new(["app-bar-title"])} href={home_route}>

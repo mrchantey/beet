@@ -29,10 +29,7 @@ pub struct ArticleMeta {
 impl ArticleMeta {
 	/// The sidebar label: explicit `sidebar.label`, else the page `title`.
 	pub fn sidebar_label(&self) -> Option<&str> {
-		self.sidebar
-			.label
-			.as_deref()
-			.or(self.title.as_deref())
+		self.sidebar.label.as_deref().or(self.title.as_deref())
 	}
 
 	/// Build from parsed markdown [`Frontmatter`](beet_ui::prelude::Frontmatter).
@@ -41,7 +38,9 @@ impl ArticleMeta {
 	/// keys `sidebar_label`, `order`, `expanded`. The sidebar label falls back
 	/// to the page title.
 	#[cfg(feature = "markdown_parser")]
-	pub fn from_frontmatter(frontmatter: &beet_ui::prelude::Frontmatter) -> Self {
+	pub fn from_frontmatter(
+		frontmatter: &beet_ui::prelude::Frontmatter,
+	) -> Self {
 		Self {
 			title: frontmatter.get_str("title").map(String::from),
 			description: frontmatter.get_str("description").map(String::from),
@@ -80,7 +79,8 @@ mod test {
 
 	#[beet_core::test]
 	fn defaults_when_empty() {
-		let frontmatter = Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
+		let frontmatter =
+			Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
 		let meta = ArticleMeta::from_frontmatter(&frontmatter);
 		meta.xpect_eq(ArticleMeta::default());
 		meta.sidebar_label().is_none().xpect_true();

@@ -40,7 +40,8 @@ impl Bert {
 		let weights_bytes =
 			crate::fetch_bytes::fetch_bytes(&config.model.model_url()).await?;
 		let tokenizer_bytes =
-			crate::fetch_bytes::fetch_bytes(&config.model.tokenizer_url()).await?;
+			crate::fetch_bytes::fetch_bytes(&config.model.tokenizer_url())
+				.await?;
 		Self::from_bytes(
 			config,
 			&model_config_bytes,
@@ -99,9 +100,13 @@ impl Bert {
 		options: Vec<Cow<'static, str>>,
 	) -> Result<SentenceEmbeddings> {
 		let refs: Vec<&str> = options.iter().map(|s| s.as_ref()).collect();
-		let (input_ids, attention_mask) =
-			tokenize_batch::<DefaultBackend>(&self.tokenizer, &refs, &self.device);
-		let output = self.model.forward(input_ids, attention_mask.clone(), None);
+		let (input_ids, attention_mask) = tokenize_batch::<DefaultBackend>(
+			&self.tokenizer,
+			&refs,
+			&self.device,
+		);
+		let output =
+			self.model.forward(input_ids, attention_mask.clone(), None);
 		let pooled = mean_pool(output.hidden_states, attention_mask);
 		let pooled = if self.config.normalize_embeddings {
 			normalize_l2(pooled)
@@ -181,14 +186,18 @@ impl SentenceEmbeddings {
 		let others = self.embeddings.clone().narrow(0, 1, n - 1);
 		// rows are L2-normalised, so cosine sim is just the dot product
 		let scores = (others * target).sum_dim(1).reshape([n - 1]);
-		scores.into_data().to_vec::<f32>().map_err(|e| {
-			bevyhow!("failed to extract embedding scores: {e:?}")
-		})
+		scores
+			.into_data()
+			.to_vec::<f32>()
+			.map_err(|e| bevyhow!("failed to extract embedding scores: {e:?}"))
 	}
 
 	/// Same as [`scores_from_first`](Self::scores_from_first) but returns
 	/// `(sentence_index, score)` sorted by score descending.
-	pub fn scores_sorted(&self, target_idx: usize) -> Result<Vec<(usize, f32)>> {
+	pub fn scores_sorted(
+		&self,
+		target_idx: usize,
+	) -> Result<Vec<(usize, f32)>> {
 		if target_idx != 0 {
 			bevybail!(
 				"scores_sorted currently only supports target_idx = 0 \

@@ -53,7 +53,9 @@ where
 		let build = &self.build;
 		// read the world synchronously and produce the sub-scene, threading the
 		// entity being built so the closure can read ancestor/self context.
-		let inner = ctx.entity.with_state::<P, S>(|entity, params| build(entity, params));
+		let inner = ctx
+			.entity
+			.with_state::<P, S>(|entity, params| build(entity, params));
 		// apply the produced sub-scene to this entity (immediate; no asset deps)
 		ctx.entity.apply_scene(inner)?;
 		Ok(())

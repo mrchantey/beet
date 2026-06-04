@@ -148,7 +148,9 @@ impl ExchangeRouteOut<Self> for RenderRequest {
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
-		Box::pin(async move { RenderRoot::render(self.0, &caller, parts).await })
+		Box::pin(
+			async move { RenderRoot::render(self.0, &caller, parts).await },
+		)
 	}
 }
 

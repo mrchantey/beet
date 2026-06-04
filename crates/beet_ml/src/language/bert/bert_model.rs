@@ -126,24 +126,25 @@ mod test {
 
 		let device = default_device();
 		let config = BertModelConfig::new(
-			16,   // hidden_size
-			2,    // num_attention_heads
-			1,    // num_hidden_layers
-			32,   // intermediate_size
-			128,  // vocab_size
-			32,   // max_position_embeddings
-			2,    // type_vocab_size
-			0.0,  // hidden_dropout_prob
+			16,    // hidden_size
+			2,     // num_attention_heads
+			1,     // num_hidden_layers
+			32,    // intermediate_size
+			128,   // vocab_size
+			32,    // max_position_embeddings
+			2,     // type_vocab_size
+			0.0,   // hidden_dropout_prob
 			1e-12, // layer_norm_eps
 		);
 		let model = config.init::<DefaultBackend>(&device);
 
 		// batch=2, seq_len=4, one padded token in row 0
-		let input_ids = Tensor::<DefaultBackend, 1, burn::tensor::Int>::from_data(
-			[7i64, 9, 11, 0, 4, 5, 6, 7].as_slice(),
-			&device,
-		)
-		.reshape([2, 4]);
+		let input_ids =
+			Tensor::<DefaultBackend, 1, burn::tensor::Int>::from_data(
+				[7i64, 9, 11, 0, 4, 5, 6, 7].as_slice(),
+				&device,
+			)
+			.reshape([2, 4]);
 		let attention_mask = Tensor::<DefaultBackend, 1>::from_data(
 			[1.0f32, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0].as_slice(),
 			&device,

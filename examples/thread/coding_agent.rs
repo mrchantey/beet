@@ -25,29 +25,25 @@ fn setup(mut commands: Commands) {
 	);
 
 	commands
-		.spawn((
-			store,
-			RepeatWhileFunctionCallOutput,
-			children![(
-				Thread::default(),
-				Sequence::new(),
-				ExcludeErrors(ChildError::NO_ACTION),
-				children![
-					(Actor::system(), children![Post::spawn(PROMPT)]),
-					(
-						Actor::new("Coder", ActorKind::Agent),
-						OpenAiProvider::gpt_5_mini().unwrap(),
-						children![
-							exchange_route("list-blobs", ListBlobs),
-							exchange_route("read-blob", ReadBlob),
-							exchange_route("write-blob", WriteBlob),
-							exchange_route("edit-text", EditText),
-							exchange_route("remove-blob", RemoveBlob),
-						]
-					),
-				]
-			)],
-		))
+		.spawn((store, RepeatWhileFunctionCallOutput, children![(
+			Thread::default(),
+			Sequence::new(),
+			ExcludeErrors(ChildError::NO_ACTION),
+			children![
+				(Actor::system(), children![Post::spawn(PROMPT)]),
+				(
+					Actor::new("Coder", ActorKind::Agent),
+					OpenAiProvider::gpt_5_mini().unwrap(),
+					children![
+						exchange_route("list-blobs", ListBlobs),
+						exchange_route("read-blob", ReadBlob),
+						exchange_route("write-blob", WriteBlob),
+						exchange_route("edit-text", EditText),
+						exchange_route("remove-blob", RemoveBlob),
+					]
+				),
+			]
+		)]))
 		.call::<(), Outcome>((), OutHandler::exit());
 }
 

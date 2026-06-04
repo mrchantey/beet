@@ -189,7 +189,6 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			Ok(())
 		})?
 	}
-
 }
 
 /// Coerce a field [`Value`] into a mutable list, treating null as empty.

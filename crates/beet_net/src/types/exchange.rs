@@ -4,8 +4,8 @@
 //! exchanges on entities that have an [`Action<Request, Response>`] component,
 //! and [`ExchangeEnd`] for observability.
 use super::*;
-use beet_core::prelude::*;
 use beet_action::prelude::*;
+use beet_core::prelude::*;
 
 /// Extension trait for performing request/response exchanges on entities
 /// with an [`Action<Request, Response>`] component.

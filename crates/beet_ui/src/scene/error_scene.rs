@@ -51,7 +51,9 @@ impl ErrorScene {
 	/// Wrap the error this scene will fail with.
 	#[inline]
 	pub fn new(error: impl Into<BevyError>) -> Self {
-		Self { error: Arc::new(error.into()) }
+		Self {
+			error: Arc::new(error.into()),
+		}
 	}
 }
 

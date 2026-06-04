@@ -97,7 +97,8 @@ mod test {
 	#[beet_core::test]
 	async fn loopback_roundtrip() {
 		let endpoint = AsyncIoUdpEndpoint;
-		let loopback = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0));
+		let loopback =
+			SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0));
 
 		let server = endpoint.bind(loopback).await.unwrap();
 		let server_addr = server.local_addr().unwrap();

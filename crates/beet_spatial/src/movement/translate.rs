@@ -60,7 +60,7 @@ mod test {
 			.spawn((
 				Transform::default(),
 				Translate::new(Vec3::new(1.0, 0., 0.)),
-				Running::<Outcome>::new(OutHandler::default())
+				Running::<Outcome>::new(OutHandler::default()),
 			))
 			.id();
 

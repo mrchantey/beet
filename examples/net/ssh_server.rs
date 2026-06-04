@@ -145,9 +145,9 @@ fn on_recv(
 									}
 								};
 								entity
-									.trigger_target(SshSend(
-										SshEvent::text(response),
-									))
+									.trigger_target(SshSend(SshEvent::text(
+										response,
+									)))
 									.await?;
 								Ok(())
 							},

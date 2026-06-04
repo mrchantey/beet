@@ -32,9 +32,7 @@ impl Socket {
 		let (send, mut recv) = self.split();
 		entity
 			.observe_any(
-				move |ev: On<MessageSend>,
-				      commands: AsyncCommands|
-				      -> Result {
+				move |ev: On<MessageSend>, commands: AsyncCommands| -> Result {
 					let mut send = send.clone();
 					let message = ev.event().clone();
 					commands.run_local(async move |_| {
@@ -52,10 +50,7 @@ impl Socket {
 				while let Some(message) = recv.next().await {
 					match message {
 						Ok(msg) => {
-							entity
-								.trigger_target(MessageRecv(msg))
-								.await
-								.ok();
+							entity.trigger_target(MessageRecv(msg)).await.ok();
 						}
 						Err(err) => {
 							// socket receive errors break connection but are non-fatal

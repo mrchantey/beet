@@ -141,7 +141,10 @@ fn filtered_nodes(tree: &RouteTree) -> Vec<ActionNode> {
 }
 /// Spawns a help scene entity tree with route documentation, returning the
 /// render-root entity.
-async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ActionNode]) -> Entity {
+async fn spawn_help_scene(
+	caller: &AsyncEntity,
+	nodes: &[ActionNode],
+) -> Entity {
 	let children: Vec<OnSpawn> = nodes
 		.iter()
 		.map(|node| format_action_node_bundle(node).any_bundle())
@@ -156,7 +159,7 @@ async fn spawn_help_scene(caller: &AsyncEntity, nodes: &[ActionNode]) -> Entity 
 	}
 	// build parent with heading
 	let entity = world
-		.spawn(rsx_direct!{
+		.spawn(rsx_direct! {
 			<div>
 				<h2>"Available routes"</h2>
 			</div>
@@ -186,7 +189,7 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 
 	if let Some(ancestor) = info.ancestor_path {
 		let ancestor_href = format!("/{ancestor}");
-		rsx_direct!{
+		rsx_direct! {
 			<div>
 				<p>
 					"Route "
@@ -200,7 +203,7 @@ fn not_found_preamble(info: NotFoundInfo) -> OnSpawn {
 		}
 		.any_bundle()
 	} else {
-		rsx_direct!{
+		rsx_direct! {
 			<div>
 				<p>
 					"Route "
@@ -302,7 +305,7 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 						.into_iter()
 						.map(|(label, value)| {
 							world
-								.spawn(rsx_direct!{
+								.spawn(rsx_direct! {
 									<li>
 										<strong>{format!("{label}:")}</strong>
 										{format!(" {value}")}
@@ -311,7 +314,8 @@ fn format_action_node_bundle(node: &ActionNode) -> (Element, OnSpawn) {
 								.flush()
 						})
 						.collect();
-					let ul = world.spawn(rsx_direct!{ <ul>{lis}</ul> }).flush();
+					let ul =
+						world.spawn(rsx_direct! { <ul>{lis}</ul> }).flush();
 					// add heading and ul as children of li
 					world.entity_mut(li_id).add_children(&[heading_entity, ul]);
 				} else {
@@ -533,7 +537,10 @@ mod test {
 		let root = world
 			.spawn(children![
 				help(),
-				render_action::fixed_route("about", rsx_direct!{ <p>"about"</p> }),
+				render_action::fixed_route(
+					"about",
+					rsx_direct! { <p>"about"</p> }
+				),
 				increment(FieldRef::new("count")),
 			])
 			.flush();

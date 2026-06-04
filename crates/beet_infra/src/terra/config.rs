@@ -482,7 +482,9 @@ impl Config {
 			.resources
 			.get_mut(resource_type)
 			.and_then(|v| v.as_object_mut())
-			.ok_or_else(|| bevyhow!("resource type `{resource_type}` not found"))?;
+			.ok_or_else(|| {
+				bevyhow!("resource type `{resource_type}` not found")
+			})?;
 		let resource = map
 			.get_mut(label)
 			.and_then(|v| v.as_object_mut())

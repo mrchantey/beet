@@ -57,9 +57,7 @@ impl<'a> ElementView<'a> {
 	}
 
 	/// The tag name of this element, ie `div`, `span`, `p`.
-	pub fn tag(&self) -> &str {
-		self.element.tag()
-	}
+	pub fn tag(&self) -> &str { self.element.tag() }
 
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
@@ -204,7 +202,5 @@ pub struct AttributeView<'a> {
 }
 
 impl<'a> AttributeView<'a> {
-	pub fn key(&self) -> &str {
-		&self.attribute
-	}
+	pub fn key(&self) -> &str { &self.attribute }
 }

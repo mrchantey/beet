@@ -1,6 +1,9 @@
-use bevy::ecs::system::{SystemParam, SystemState};
+use bevy::ecs::system::SystemParam;
+use bevy::ecs::system::SystemState;
 use bevy::ecs::world::World;
-use bevy::platform::sync::{Mutex, MutexGuard, OnceLock};
+use bevy::platform::sync::Mutex;
+use bevy::platform::sync::MutexGuard;
+use bevy::platform::sync::OnceLock;
 
 /// Stores a typed `SystemState<P>` behind a `OnceLock<Mutex>` so it can be initialized once
 /// and then mutably shared across bridge requests.
@@ -12,7 +15,9 @@ use bevy::platform::sync::{Mutex, MutexGuard, OnceLock};
 ///
 /// We use a `OnceLock` because we cannot construct the `SystemState<P>` until we have a mutable
 /// `World`. So we initialize it `SystemStateCell<P>` the first time it is used.
-pub(crate) struct SystemStateCell<P: SystemParam + 'static>(OnceLock<Mutex<SystemState<P>>>);
+pub(crate) struct SystemStateCell<P: SystemParam + 'static>(
+	OnceLock<Mutex<SystemState<P>>>,
+);
 
 impl<P: SystemParam + 'static> Default for SystemStateCell<P> {
 	fn default() -> Self {
@@ -28,7 +33,9 @@ impl<P: SystemParam + 'static> Default for SystemStateCell<P> {
 ///
 /// This trait exposes a single operation: to apply deferred state back into the `World`.
 /// The second operation the trait is used for is in it's `impl dyn` implementation below.
-pub(crate) trait ErasedSystemStateCell: Send + Sync + core::any::Any + 'static {
+pub(crate) trait ErasedSystemStateCell:
+	Send + Sync + core::any::Any + 'static
+{
 	/// Apply deferred operations accumulated by the `SystemState` back into
 	/// the world.
 	///

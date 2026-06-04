@@ -17,8 +17,8 @@
 
 mod render_root;
 pub use render_root::*;
-pub mod render_action;
 mod default_renderer;
+pub mod render_action;
 pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;

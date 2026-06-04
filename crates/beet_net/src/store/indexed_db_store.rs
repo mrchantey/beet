@@ -125,7 +125,9 @@ impl BlobStoreProvider for IndexedDbStore {
 
 	fn id(&self) -> &'static str { "indexeddb" }
 
-	fn root_key(&self) -> SmolStr { format!("indexeddb:{}", self.db_name).into() }
+	fn root_key(&self) -> SmolStr {
+		format!("indexeddb:{}", self.db_name).into()
+	}
 
 	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
@@ -157,11 +159,12 @@ impl BlobStoreProvider for IndexedDbStore {
 			let req = factory.delete_database(&db_name).map_jserr()?;
 			let (sender, receiver) = futures::channel::oneshot::channel();
 			let sender = std::cell::RefCell::new(Some(sender));
-			let onsuccess = Closure::<dyn FnMut(web_sys::Event)>::new(move |_| {
-				if let Some(tx) = sender.borrow_mut().take() {
-					let _ = tx.send(());
-				}
-			});
+			let onsuccess =
+				Closure::<dyn FnMut(web_sys::Event)>::new(move |_| {
+					if let Some(tx) = sender.borrow_mut().take() {
+						let _ = tx.send(());
+					}
+				});
 			req.set_onsuccess(Some(onsuccess.as_ref().unchecked_ref()));
 			onsuccess.forget();
 			receiver

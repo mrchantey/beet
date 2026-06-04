@@ -157,12 +157,10 @@ async fn terminal_renders_charcell_shell_layout() {
 	// layout with an elevated header/footer and a sidebar divider.
 	let body = site_world()
 		.spawn(beet_site_router())
-		.exchange_str(
-			Request::get("").with_header::<header::Accept>(vec![
-				MediaType::AnsiTerm,
-				MediaType::Text,
-			]),
-		)
+		.exchange_str(Request::get("").with_header::<header::Accept>(vec![
+			MediaType::AnsiTerm,
+			MediaType::Text,
+		]))
 		.await;
 
 	// the header/footer elevation dividers and the sidebar's right border

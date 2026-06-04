@@ -96,9 +96,7 @@ impl MdnsBrowser {
 		}
 	}
 	/// Browse for `_http._tcp.local` (HTTP servers).
-	pub fn http() -> Self {
-		Self::new("_http._tcp.local")
-	}
+	pub fn http() -> Self { Self::new("_http._tcp.local") }
 }
 
 /// Plugin wiring the agnostic browser engine into an [`App`]: registers the
@@ -110,9 +108,7 @@ impl MdnsBrowser {
 pub struct MdnsBrowserPlugin;
 
 impl Plugin for MdnsBrowserPlugin {
-	fn build(&self, app: &mut App) {
-		app.add_observer(handle_udp_packet);
-	}
+	fn build(&self, app: &mut App) { app.add_observer(handle_udp_packet); }
 }
 
 /// Observer: parse an inbound [`UdpPacket`] as an mDNS response and reconcile
@@ -195,16 +191,18 @@ fn reconcile_instance(
 	let mut goodbye = false;
 
 	// Start from the known instance (so partial updates merge) or a fresh one.
-	let mut next = existing.as_ref().map(|(_, svc)| svc.clone()).unwrap_or(
-		MDnsService {
-			service_type: service_type.clone(),
-			instance: instance.clone(),
-			host: SmolStr::default(),
-			port: 0,
-			addr: None,
-			txt: Vec::new(),
-		},
-	);
+	let mut next =
+		existing
+			.as_ref()
+			.map(|(_, svc)| svc.clone())
+			.unwrap_or(MDnsService {
+				service_type: service_type.clone(),
+				instance: instance.clone(),
+				host: SmolStr::default(),
+				port: 0,
+				addr: None,
+				txt: Vec::new(),
+			});
 
 	if let Some(Record::Srv {
 		host, port, ttl, ..
@@ -299,7 +297,8 @@ pub async fn run_mdns_browser<E: crate::udp::UdpEndpoint>(
 
 	// The default mDNS configuration: bind 0.0.0.0:5353, join the group, send
 	// queries to the multicast endpoint.
-	let bind = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MDNS_PORT));
+	let bind =
+		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MDNS_PORT));
 	run_mdns_browser_on(
 		world,
 		endpoint,
@@ -340,13 +339,15 @@ pub async fn run_mdns_browser_on<E: crate::udp::UdpEndpoint>(
 	// Build the query once; it never changes for a given service type.
 	let mut query = [0u8; 256];
 	let query_len = wire::build_ptr_query(&mut query, &service_type)
-		.ok_or_else(|| bevyhow!("mDNS service type too long: {service_type}"))?;
+		.ok_or_else(|| {
+			bevyhow!("mDNS service type too long: {service_type}")
+		})?;
 	let query = &query[..query_len];
 
 	// Initial query.
 	socket.send_to(query, target).await?;
-	let mut next_query =
-		std::time::Instant::now() + std::time::Duration::from_millis(query_interval_ms);
+	let mut next_query = std::time::Instant::now()
+		+ std::time::Duration::from_millis(query_interval_ms);
 
 	let mut buf = vec![0u8; 1536];
 	loop {
@@ -540,34 +541,29 @@ mod test {
 			app.add_plugins((MinimalPlugins, AsyncPlugin, MdnsBrowserPlugin));
 			app.world_mut().spawn(MdnsBrowser::http());
 
-			let bind = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0));
-			app.add_systems(
-				Startup,
-				move |world: &mut World| {
-					world.run_async_local(
-						move |async_world: AsyncWorld| async move {
-							run_mdns_browser_on(
-								async_world,
-								AsyncIoUdpEndpoint,
-								SERVICE.to_string(),
-								// re-query fast so a missed packet recovers
-								200,
-								bind,
-								target,
-								None,
-							)
-							.await
-						},
-					);
-				},
-			);
+			let bind =
+				SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0));
+			app.add_systems(Startup, move |world: &mut World| {
+				world.run_async_local(
+					move |async_world: AsyncWorld| async move {
+						run_mdns_browser_on(
+							async_world,
+							AsyncIoUdpEndpoint,
+							SERVICE.to_string(),
+							// re-query fast so a missed packet recovers
+							200,
+							bind,
+							target,
+							None,
+						)
+						.await
+					},
+				);
+			});
 
-			app.add_systems(
-				Update,
-				move |services: Query<&MDnsService>| {
-					let _ = tx.send(services.iter().count());
-				},
-			);
+			app.add_systems(Update, move |services: Query<&MDnsService>| {
+				let _ = tx.send(services.iter().count());
+			});
 			app.run();
 		});
 

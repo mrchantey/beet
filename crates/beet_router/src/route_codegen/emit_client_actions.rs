@@ -5,9 +5,9 @@
 //! the configured server URL, and deserializes the typed response. The callers
 //! are organized into a module tree mirroring the route paths.
 
+use crate::prelude::*;
 use crate::route_codegen::syn_utils::action_output_ty;
 use crate::route_codegen::syn_utils::inner_generic;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use heck::ToSnakeCase;
@@ -46,10 +46,7 @@ impl ActionNode {
 				.iter()
 				.position(|child| child.ident == ident)
 				.unwrap_or_else(|| {
-					node.children.push(ActionNode {
-						ident,
-						..default()
-					});
+					node.children.push(ActionNode { ident, ..default() });
 					node.children.len() - 1
 				});
 			node = &mut node.children[idx];
@@ -77,7 +74,11 @@ fn client_mod(node: &ActionNode) -> Result<Item> {
 		.iter()
 		.map(|(path, method)| client_fn(path, method))
 		.collect::<Result<Vec<_>>>()?;
-	let children = node.children.iter().map(client_mod).collect::<Result<Vec<_>>>()?;
+	let children = node
+		.children
+		.iter()
+		.map(client_mod)
+		.collect::<Result<Vec<_>>>()?;
 	Ok(syn::parse_quote! {
 		#[allow(missing_docs)]
 		pub mod #ident {
@@ -91,10 +92,8 @@ fn client_mod(node: &ActionNode) -> Result<Item> {
 
 /// Builds the client caller function for a single server-action handler.
 fn client_fn(path: &SmolPath, method: &RouteMethod) -> Result<ItemFn> {
-	let fn_ident = Ident::new(
-		&method.method.to_string_lowercase(),
-		Span::call_site(),
-	);
+	let fn_ident =
+		Ident::new(&method.method.to_string_lowercase(), Span::call_site());
 	let http = method.method.self_token_stream();
 	let route = path.with_leading_slash();
 	let out_ty = action_output_ty(&method.item);
@@ -103,10 +102,9 @@ fn client_fn(path: &SmolPath, method: &RouteMethod) -> Result<ItemFn> {
 	let (args, build): (TokenStream, TokenStream) =
 		match client_input(&method.item) {
 			ClientInput::None => (quote! {}, quote! {}),
-			ClientInput::Json(ty) => (
-				quote! { input: #ty },
-				quote! { .with_json_body(&input)? },
-			),
+			ClientInput::Json(ty) => {
+				(quote! { input: #ty }, quote! { .with_json_body(&input)? })
+			}
 			ClientInput::Query(ty) => (
 				quote! { input: #ty },
 				quote! { .with_query_string(&QueryParams(input).encode()?) },

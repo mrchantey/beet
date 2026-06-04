@@ -398,7 +398,8 @@ mod test {
 			.run_system_cached_with(
 				|In((entity, expected)): In<(Entity, Vec<Entity>)>,
 				 query: RouteQuery| {
-					let entities: Vec<_> = query.iter_dfs_from(entity).collect();
+					let entities: Vec<_> =
+						query.iter_dfs_from(entity).collect();
 					// Should start from child, not render root
 					entities.xpect_eq(expected);
 				},

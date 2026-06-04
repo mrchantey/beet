@@ -112,7 +112,8 @@ pub(super) fn paint_inline_flow(
 		if y >= content_rect.max.y {
 			break;
 		}
-		let mut x = content_rect.min.x + align_offset(line_width(line), width, align);
+		let mut x =
+			content_rect.min.x + align_offset(line_width(line), width, align);
 		for span in line {
 			if x >= content_rect.max.x {
 				break;
@@ -240,7 +241,9 @@ fn split_pre_lines(chars: &[(char, usize)]) -> Vec<Vec<(char, usize)>> {
 fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 	let max_w = max_w as usize;
 	if max_w == 0 {
-		return vec![chars.iter().filter(|(c, _)| *c != '\n').copied().collect()];
+		return vec![
+			chars.iter().filter(|(c, _)| *c != '\n').copied().collect(),
+		];
 	}
 	let mut lines = Vec::new();
 	let mut cur: Vec<(char, usize)> = Vec::new();
@@ -325,7 +328,9 @@ fn group_spans(line: &[(char, usize)], runs: &[InlineRun]) -> Vec<InlineSpan> {
 
 /// Total display width of a flowed line.
 fn line_width(line: &Vec<InlineSpan>) -> u32 {
-	line.iter().map(|span| display_width(&span.text) as u32).sum()
+	line.iter()
+		.map(|span| display_width(&span.text) as u32)
+		.sum()
 }
 
 /// Leading-column offset for a line of `line_w` columns within `width`.
@@ -369,7 +374,9 @@ mod tests {
 		lines
 			.iter()
 			.map(|line| {
-				line.iter().map(|span| span.text.as_str()).collect::<String>()
+				line.iter()
+					.map(|span| span.text.as_str())
+					.collect::<String>()
 			})
 			.collect()
 	}
@@ -428,15 +435,12 @@ mod tests {
 	fn spans_keep_their_run_style() {
 		let mut italic = VisualStyle::default();
 		italic = italic.italic();
-		let runs = [
-			run("plain "),
-			InlineRun {
-				text: "fancy".to_string(),
-				style: italic.clone(),
-				entity: Entity::PLACEHOLDER,
-				link: None,
-			},
-		];
+		let runs = [run("plain "), InlineRun {
+			text: "fancy".to_string(),
+			style: italic.clone(),
+			entity: Entity::PLACEHOLDER,
+			link: None,
+		}];
 		let lines = flow_inline(&runs, 40, false);
 		// one line, two spans: "plain " (default) and "fancy" (italic)
 		let line = &lines[0];
@@ -468,27 +472,33 @@ mod pipeline_tests {
 		// text, emphasis and trailing text flow onto one continuous line
 		render(
 			UVec2::new(40, 5),
-			rsx_direct!{ <p>"Hello "<em>"world"</em>"!"</p> },
+			rsx_direct! { <p>"Hello "<em>"world"</em>"!"</p> },
 		)
 		.xpect_eq("Hello world!");
 	}
 
 	#[beet_core::test]
 	fn paragraph_wraps_at_content_width() {
-		render(UVec2::new(9, 5), rsx_direct!{ <p>"one two three four"</p> })
-			.xpect_eq("one two\nthree\nfour");
+		render(
+			UVec2::new(9, 5),
+			rsx_direct! { <p>"one two three four"</p> },
+		)
+		.xpect_eq("one two\nthree\nfour");
 	}
 
 	#[beet_core::test]
 	fn preformatted_preserves_newlines_and_spaces() {
-		render(UVec2::new(20, 5), rsx_direct!{ <pre>"fn  main()\n    body"</pre> })
-			.xpect_eq("fn  main()\n    body");
+		render(
+			UVec2::new(20, 5),
+			rsx_direct! { <pre>"fn  main()\n    body"</pre> },
+		)
+		.xpect_eq("fn  main()\n    body");
 	}
 
 	#[beet_core::test]
 	fn normal_paragraph_collapses_newlines() {
 		// outside <pre>, an embedded newline collapses to a space in the flow
-		render(UVec2::new(40, 5), rsx_direct!{ <p>"alpha\nbeta"</p> })
+		render(UVec2::new(40, 5), rsx_direct! { <p>"alpha\nbeta"</p> })
 			.xpect_eq("alpha beta");
 	}
 
@@ -499,16 +509,15 @@ mod pipeline_tests {
 		// wraps into more rows than measured at the viewport width; its reserved
 		// height must follow the assigned width so the tail is not clipped.
 		let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa";
-		let out = FlexBuffer::render_oneshot_plain(40, (
-			LayoutStyle::flex_row(),
-			children![
-				(rsx_direct!{ "SIDEBARWIDTH" }, LayoutStyle::default()),
-				(
-					LayoutStyle::default().with_flex_grow(1),
-					children![ rsx_direct!{ <p>{text}</p> } ],
-				),
-			],
-		));
+		let out = FlexBuffer::render_oneshot_plain(
+			40,
+			(LayoutStyle::flex_row(), children![
+				(rsx_direct! { "SIDEBARWIDTH" }, LayoutStyle::default()),
+				(LayoutStyle::default().with_flex_grow(1), children![
+					rsx_direct! { <p>{text}</p> }
+				],),
+			]),
+		);
 		// every word, including the last, makes it into the flowed column
 		out.as_str().xpect_contains("alpha").xpect_contains("kappa");
 	}
@@ -519,7 +528,7 @@ mod pipeline_tests {
 		// independently-inheriting font-style and font-weight cascades.
 		Buffer::render_oneshot_sized(
 			UVec2::new(40, 3),
-			rsx_direct!{ <p><em><strong>"x"</strong></em></p> },
+			rsx_direct! { <p><em><strong>"x"</strong></em></p> },
 		)
 		.xpect_contains("\x1b[1m")
 		.xpect_contains("\x1b[3m");

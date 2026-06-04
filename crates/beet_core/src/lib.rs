@@ -100,12 +100,12 @@ pub use web_utils::js_runtime;
 
 #[cfg(feature = "std")]
 mod workspace_config;
-#[cfg(feature = "testing")]
-pub use crate::testing::test_runner;
-#[cfg(feature = "testing")]
-pub use crate::testing::test_main;
 #[cfg(feature = "custom_test_frameworks")]
 pub use crate::testing::libtest_runner;
+#[cfg(feature = "testing")]
+pub use crate::testing::test_main;
+#[cfg(feature = "testing")]
+pub use crate::testing::test_runner;
 
 /// Entry point for a `harness = false` test target / lib.
 ///
@@ -179,14 +179,14 @@ pub mod prelude {
 	// `bevy::prelude` when `bevy_world_serialization` is enabled (eg via
 	// `bevy/default`). Re-export ours explicitly so they shadow bevy's globs,
 	// keeping beet's fork canonical and avoiding ambiguous glob re-exports.
+	#[cfg(feature = "std")]
+	pub use crate::terminal::*;
 	#[cfg(feature = "world_serde")]
 	pub use crate::world_serde::DynamicWorld;
 	#[cfg(feature = "world_serde")]
 	pub use crate::world_serde::DynamicWorldBuilder;
 	#[cfg(feature = "world_serde")]
 	pub use crate::world_serde::WorldFilter;
-	#[cfg(feature = "std")]
-	pub use crate::terminal::*;
 	pub use either::Either;
 	#[cfg(feature = "serde")]
 	pub use serde::Deserialize;
@@ -253,9 +253,9 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::workspace_config::*;
 	pub use beet_core_macros::*;
+	pub use core::time::Duration;
 	pub use futures_lite::StreamExt;
 	pub use smol_str::SmolStr;
-	pub use core::time::Duration;
 	// `Instant` is no_std-capable: on std/wasm it wraps std/web_time, and on a
 	// bare no_std target it reads from a clock source the embedded adapter
 	// installs via `Instant::set_elapsed(...)` (see agent/plans/no_std_instant.md).

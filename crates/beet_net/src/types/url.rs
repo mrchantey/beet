@@ -311,7 +311,10 @@ impl Url {
 }
 
 impl core::fmt::Display for Url {
-	fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
 		let query = self.query_string();
 
 		match (&self.scheme, &self.authority) {
@@ -468,7 +471,10 @@ impl Scheme {
 }
 
 impl core::fmt::Display for Scheme {
-	fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
 		write!(formatter, "{}", self.as_str())
 	}
 }

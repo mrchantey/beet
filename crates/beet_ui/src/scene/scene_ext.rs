@@ -9,6 +9,10 @@ use bevy::scene::ScenePlugin;
 /// `spawn_scene` needs), and [`ScenePlugin`]. Insert any required resources on
 /// the returned world before calling `spawn_scene`.
 pub fn test_world() -> World {
-	(TaskPoolPlugin::default(), AssetPlugin::default(), ScenePlugin)
+	(
+		TaskPoolPlugin::default(),
+		AssetPlugin::default(),
+		ScenePlugin,
+	)
 		.into_world()
 }

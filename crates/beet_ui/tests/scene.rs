@@ -1,8 +1,8 @@
 beet_core::test_main!();
 
 use beet_core::prelude::*;
-use beet_ui::prelude::*;
 use beet_ui::prelude::classes;
+use beet_ui::prelude::*;
 // explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
 // `bevy::scene` one also glob-imported via `beet_core::prelude`.
 use beet_ui::prelude::WorldSceneExt;
@@ -14,14 +14,24 @@ use beet_ui::*;
 fn single_element() {
 	let mut world = scene_ext::test_world();
 	let root = world.spawn_scene(rsx! { <div/> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 }
 
 #[beet_core::test]
 fn element_with_text_child() {
 	let mut world = scene_ext::test_world();
 	let root = world.spawn_scene(rsx! { <div>"hello"</div> }).unwrap().id();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	let children = world.entity(root).get::<Children>().unwrap();
 	children.len().xpect_eq(1);
 	world
@@ -43,7 +53,12 @@ fn scene_component_via_tag() {
 	let root = world.spawn_scene(rsx! { <Card title="Hi"/> }).unwrap().id();
 
 	// the root is the div returned by `Card`
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	let attrs = world.entity(root).get::<Attributes>().unwrap();
 	attrs.len().xpect_eq(1);
 	(**world.entity(attrs[0]).get::<Attribute>().unwrap()).xpect_eq("class");
@@ -78,7 +93,12 @@ fn scene_system_reads_resource() {
 	let root = world.spawn_scene(rsx! { <AppInfo/> }).unwrap().id();
 
 	// the resource value flowed into the built sub-scene synchronously
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("article");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("article");
 	let children = world.entity(root).get::<Children>().unwrap();
 	children.len().xpect_eq(1);
 	world
@@ -138,10 +158,7 @@ impl DemoVariant {
 }
 
 #[scene]
-fn DemoButton(
-	#[prop(into)] label: String,
-	variant: DemoVariant,
-) -> impl Scene {
+fn DemoButton(#[prop(into)] label: String, variant: DemoVariant) -> impl Scene {
 	rsx! {
 		<button {Classes::new([ClassName::new_static("btn"), variant.class()])}>
 			{label}
@@ -153,11 +170,18 @@ fn DemoButton(
 fn button_widget_renders_with_props() {
 	let mut world = scene_ext::test_world();
 	let root = world
-		.spawn_scene(rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> })
+		.spawn_scene(
+			rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> },
+		)
 		.unwrap()
 		.id();
 
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("button");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("button");
 
 	// the marker Component is on the root entity — unlocks queries +
 	// `:DemoButton` inheritance from BSN
@@ -168,8 +192,12 @@ fn button_widget_renders_with_props() {
 	// style rules that target them.
 	let button_classes = world.entity(root).get::<Classes>().unwrap();
 	button_classes.contains_selector("btn").xpect_true();
-	button_classes.contains_name(&classes::BTN_ERROR).xpect_true();
-	button_classes.contains_name(&classes::BTN_FILLED).xpect_false();
+	button_classes
+		.contains_name(&classes::BTN_ERROR)
+		.xpect_true();
+	button_classes
+		.contains_name(&classes::BTN_FILLED)
+		.xpect_false();
 
 	// label prop became a text child
 	let children = world.entity(root).get::<Children>().unwrap();
@@ -188,7 +216,9 @@ fn bsn_inheritance_matches_rsx_tag_form() {
 	// rsx form
 	let mut world = scene_ext::test_world();
 	let rsx_root = world
-		.spawn_scene(rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> })
+		.spawn_scene(
+			rsx! { <DemoButton label="Save" variant=DemoVariant::Error/> },
+		)
 		.unwrap()
 		.id();
 
@@ -201,8 +231,18 @@ fn bsn_inheritance_matches_rsx_tag_form() {
 		.unwrap()
 		.id();
 
-	let rsx_button = world.entity(rsx_root).get::<Element>().unwrap().tag().to_string();
-	let bsn_button = world.entity(bsn_root).get::<Element>().unwrap().tag().to_string();
+	let rsx_button = world
+		.entity(rsx_root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.to_string();
+	let bsn_button = world
+		.entity(bsn_root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.to_string();
 	rsx_button.xpect_eq(bsn_button);
 
 	// both carry the marker Component
@@ -262,15 +302,24 @@ fn Badge(#[prop(required)] variant: DemoVariant) -> impl Scene {
 /// Spawn `scene` into `world`, returning the root id or the build error as a
 /// string — shared so the supplied and missing-prop cases stay DRY.
 fn try_spawn(world: &mut World, scene: impl Scene) -> Result<Entity, String> {
-	world.spawn_scene(scene).map(|entity| entity.id()).map_err(|err| err.to_string())
+	world
+		.spawn_scene(scene)
+		.map(|entity| entity.id())
+		.map_err(|err| err.to_string())
 }
 
 #[beet_core::test]
 fn required_prop_supplied_resolves() {
 	let mut world = scene_ext::test_world();
-	let root = try_spawn(&mut world, rsx! { <Badge variant=DemoVariant::Error/> })
-		.unwrap();
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("span");
+	let root =
+		try_spawn(&mut world, rsx! { <Badge variant=DemoVariant::Error/> })
+			.unwrap();
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("span");
 	world.entity(root).get::<Badge>().unwrap();
 }
 
@@ -279,7 +328,8 @@ fn missing_required_prop_surfaces_error() {
 	let mut world = scene_ext::test_world();
 	// `<Badge/>` lowers to `BadgeProps::default()`, leaving `variant` unset
 	let err = try_spawn(&mut world, rsx! { <Badge/> }).unwrap_err();
-	err.xpect_contains("missing required props").xpect_contains("variant");
+	err.xpect_contains("missing required props")
+		.xpect_contains("variant");
 }
 
 /// Exercises optional-prop ergonomics: `#[prop(default = expr)]` seeds a
@@ -301,11 +351,18 @@ fn default_and_option_props() {
 	// omitted props fall back: `kind` -> "tag", `label` -> None (empty child)
 	let root = world.spawn_scene(rsx! { <Tag/> }).unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
-		query.get(root).unwrap().attribute_string("class").xpect_eq("tag");
+		query
+			.get(root)
+			.unwrap()
+			.attribute_string("class")
+			.xpect_eq("tag");
 	});
 
 	// supplied props flow through, `label` setter takes `&str` (unwrap_option)
-	let root = world.spawn_scene(rsx! { <Tag kind="x" label="hi"/> }).unwrap().id();
+	let root = world
+		.spawn_scene(rsx! { <Tag kind="x" label="hi"/> })
+		.unwrap()
+		.id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.attribute_string("class").xpect_eq("x");
@@ -356,7 +413,12 @@ fn element_with_more_than_twelve_children() {
 		})
 		.unwrap()
 		.id();
-	world.entity(root).get::<Children>().unwrap().len().xpect_eq(20);
+	world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.len()
+		.xpect_eq(20);
 }
 
 /// A widget with a named `header` slot and a default slot. The `#[scene]` macro
@@ -425,8 +487,12 @@ fn children_prop_preserves_order_and_multiplicity() {
 		.unwrap()
 		.id();
 	let html = render_html(&mut world, root);
-	html.find("one").unwrap().xpect_less_than(html.find("two").unwrap());
-	html.find("two").unwrap().xpect_less_than(html.find("three").unwrap());
+	html.find("one")
+		.unwrap()
+		.xpect_less_than(html.find("two").unwrap());
+	html.find("two")
+		.unwrap()
+		.xpect_less_than(html.find("three").unwrap());
 }
 
 #[beet_core::test]
@@ -482,12 +548,19 @@ fn nested_elements_with_attribute() {
 		.id();
 
 	// root: <div class="container">
-	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	world
+		.entity(root)
+		.get::<Element>()
+		.unwrap()
+		.tag()
+		.xpect_eq("div");
 	let attrs = world.entity(root).get::<Attributes>().unwrap();
 	attrs.len().xpect_eq(1);
 	let attr = world.entity(attrs[0]);
 	(**attr.get::<Attribute>().unwrap()).xpect_eq("class");
-	attr.get::<Value>().unwrap().xpect_eq(Value::new("container"));
+	attr.get::<Value>()
+		.unwrap()
+		.xpect_eq(Value::new("container"));
 
 	// child: <span>"inner"</span>
 	let children = world.entity(root).get::<Children>().unwrap();

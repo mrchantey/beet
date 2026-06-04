@@ -1,6 +1,6 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
-use beet_core::prelude::*;
 use alloc::collections::VecDeque;
+use beet_core::prelude::*;
 use thiserror::Error;
 
 /// Modifier for path pattern segments, aligned with URL Pattern API.

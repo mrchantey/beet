@@ -220,10 +220,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 
 	/// Collect all [`Variable`] declarations from block descendants.
 	#[cfg(feature = "deploy")]
-	pub fn collect_variables(
-		&self,
-		entity: Entity,
-	) -> Result<Vec<Variable>> {
+	pub fn collect_variables(&self, entity: Entity) -> Result<Vec<Variable>> {
 		let (root, _) = self.stacks.get(entity)?;
 		let mut variables = Vec::new();
 		for child in self.children.iter_descendants_inclusive(root) {

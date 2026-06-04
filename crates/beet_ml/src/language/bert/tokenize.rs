@@ -14,7 +14,11 @@ pub fn tokenize_batch<B: Backend>(
 		.encode_batch(sentences.to_vec(), true)
 		.expect("Failed to tokenize");
 
-	let max_len = encodings.iter().map(|e| e.get_ids().len()).max().unwrap_or(0);
+	let max_len = encodings
+		.iter()
+		.map(|e| e.get_ids().len())
+		.max()
+		.unwrap_or(0);
 	let batch_size = sentences.len();
 
 	let mut input_ids_data = vec![0i64; batch_size * max_len];

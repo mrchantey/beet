@@ -64,8 +64,18 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 /// match builds a differently-shaped tree and `impl Trait` cannot unify across
 /// arms.
 fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
-	let SidebarNode { display_name, path, children, expanded, active } = node;
-	let root_class = if root { "sidebar-item-root" } else { "sidebar-item" };
+	let SidebarNode {
+		display_name,
+		path,
+		children,
+		expanded,
+		active,
+	} = node;
+	let root_class = if root {
+		"sidebar-item-root"
+	} else {
+		"sidebar-item"
+	};
 	let href = path.map(|path| path.with_leading_slash());
 
 	if children.is_empty() {
@@ -116,7 +126,8 @@ fn leaf_link(
 	href: String,
 	active: bool,
 ) -> Box<dyn Scene> {
-	let link_classes = || Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")]);
+	let link_classes =
+		|| Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")]);
 	// `aria-current` can't be conditionally interpolated, so fork on `active`.
 	if active {
 		rsx! {
@@ -142,7 +153,8 @@ fn summary_content(
 	href: Option<String>,
 	active: bool,
 ) -> Box<dyn Scene> {
-	let link_classes = || Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")]);
+	let link_classes =
+		|| Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")]);
 	match href {
 		Some(href) if active => rsx! {
 			<a {link_classes()} href=href aria-current="page">{display_name}</a>

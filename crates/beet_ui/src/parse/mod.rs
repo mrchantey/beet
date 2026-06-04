@@ -20,5 +20,3 @@ pub use plaintext::*;
 pub use span_tracker::*;
 #[cfg(all(feature = "syntax_highlighting", not(target_arch = "wasm32")))]
 pub use syntax_highlighting::*;
-
-

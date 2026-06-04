@@ -101,7 +101,9 @@ impl FlexBuffer {
 }
 
 impl AsBuffer for FlexBuffer {
-	fn size(&self) -> UVec2 { UVec2::new(self.width, AUTO_GROW_VIEWPORT_HEIGHT) }
+	fn size(&self) -> UVec2 {
+		UVec2::new(self.width, AUTO_GROW_VIEWPORT_HEIGHT)
+	}
 
 	fn allocated_rows(&self) -> u32 {
 		if self.width == 0 {
@@ -176,7 +178,10 @@ mod tests {
 			Entity::PLACEHOLDER,
 		);
 		buf.allocated_rows().xpect_eq(501);
-		buf.get(UVec2::new(0, 500)).unwrap().symbol_str().xpect_eq("h");
+		buf.get(UVec2::new(0, 500))
+			.unwrap()
+			.symbol_str()
+			.xpect_eq("h");
 	}
 
 	#[beet_core::test]
@@ -184,7 +189,10 @@ mod tests {
 		// a viewport-tall (sentinel) background must not balloon the allocation;
 		// such a fill is clamped to the rows already painted (none here).
 		let mut buf = FlexBuffer::new(4);
-		buf.fill_rect(URect::new(0, 0, 4, AUTO_GROW_VIEWPORT_HEIGHT), cell("x"));
+		buf.fill_rect(
+			URect::new(0, 0, 4, AUTO_GROW_VIEWPORT_HEIGHT),
+			cell("x"),
+		);
 		buf.allocated_rows().xpect_eq(0);
 	}
 
@@ -195,7 +203,10 @@ mod tests {
 		let mut buf = FlexBuffer::new(4);
 		buf.fill_rect(URect::new(0, 0, 4, 2), cell("x"));
 		buf.allocated_rows().xpect_eq(2);
-		buf.get(UVec2::new(3, 1)).unwrap().symbol_str().xpect_eq("x");
+		buf.get(UVec2::new(3, 1))
+			.unwrap()
+			.symbol_str()
+			.xpect_eq("x");
 	}
 
 	#[beet_core::test]

@@ -69,64 +69,48 @@ fn setup(
 			Name::new("Behavior"),
 			TriggerOnAnimationReady::run(),
 			Repeat::new(),
-			children![(
-				Name::new("round"),
-				Sequence::new(),
-				children![
+			children![(Name::new("round"), Sequence::new(), children![
+				(Name::new("Idle"), Sequence::new(), children![
 					(
-						Name::new("Idle"),
-						Sequence::new(),
-						children![
-							(
-								Name::new("Stop Moving"),
-								InsertOn::new_with_target(
-									Velocity::default(),
-									TargetEntity::Agent,
-								),
-							),
-							(
-								Name::new("Play Idle"),
-								PlayAnimation::new(idle_index)
-									.with_transition_duration(
-										transition_duration,
-									),
-							),
-							(
-								Name::new("Await Idle End"),
-								TriggerOnAnimationEnd::new(
-									idle_clip,
-									idle_index,
-									Outcome::PASS,
-								)
-								.with_transition_duration(transition_duration),
-							),
-						],
+						Name::new("Stop Moving"),
+						InsertOn::new_with_target(
+							Velocity::default(),
+							TargetEntity::Agent,
+						),
 					),
 					(
-						Name::new("Seek"),
-						Sequence::new(),
-						children![
-							(
-								Name::new("Play Walk"),
-								PlayAnimation::new(walk_index)
-									.repeat_forever()
-									.with_transition_duration(
-										transition_duration,
-									),
-							),
-							(
-								// Seek steers the agent toward the target each
-								// frame while [`Running`]; EndOnArrive ends the
-								// run with [`Outcome::PASS`] once the agent is
-								// within radius.
-								Name::new("Seek to Arrive"),
-								Seek::default(),
-								EndOnArrive::new(6.),
-							),
-						],
-					)
-				]
-			)]
+						Name::new("Play Idle"),
+						PlayAnimation::new(idle_index)
+							.with_transition_duration(transition_duration,),
+					),
+					(
+						Name::new("Await Idle End"),
+						TriggerOnAnimationEnd::new(
+							idle_clip,
+							idle_index,
+							Outcome::PASS,
+						)
+						.with_transition_duration(transition_duration),
+					),
+				],),
+				(Name::new("Seek"), Sequence::new(), children![
+					(
+						Name::new("Play Walk"),
+						PlayAnimation::new(walk_index)
+							.repeat_forever()
+							.with_transition_duration(transition_duration,),
+					),
+					(
+						// Seek steers the agent toward the target each
+						// frame while [`Running`]; EndOnArrive ends the
+						// run with [`Outcome::PASS`] once the agent is
+						// within radius.
+						Name::new("Seek to Arrive"),
+						Seek::default(),
+						EndOnArrive::new(6.),
+					),
+				],)
+			])]
 		)],
 	));
 }

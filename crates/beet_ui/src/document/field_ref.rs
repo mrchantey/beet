@@ -324,13 +324,19 @@ mod tests {
 
 		// a typed write hits the local Value immediately, observable before sync
 		count.set(&mut world.entity_mut(field), 10).unwrap();
-		count.get(&mut world.entity_mut(field)).unwrap().xpect_eq(10);
+		count
+			.get(&mut world.entity_mut(field))
+			.unwrap()
+			.xpect_eq(10);
 
 		// update reads, mutates and writes the local Value in one step
 		count
 			.update(&mut world.entity_mut(field), |n| *n += 1)
 			.unwrap();
-		count.get(&mut world.entity_mut(field)).unwrap().xpect_eq(11);
+		count
+			.get(&mut world.entity_mut(field))
+			.unwrap()
+			.xpect_eq(11);
 
 		// bidi sync mirrors the local Value into the document
 		world.update_local();
@@ -347,8 +353,8 @@ mod tests {
 	#[beet_core::test]
 	fn root_document_path() {
 		let mut world = DocumentPlugin::world();
-		let count =
-			TypedFieldRef::<i64>::new("count").with_document(DocumentPath::Root);
+		let count = TypedFieldRef::<i64>::new("count")
+			.with_document(DocumentPath::Root);
 		// state lives on the root, read from a nested child
 		let root = world.spawn(Document::default()).id();
 		let child = world.spawn(ChildOf(root)).id();

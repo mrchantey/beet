@@ -24,9 +24,7 @@ pub struct Rule {
 ///
 /// Only the media features beet needs today are modelled; the variants
 /// serialize to the CSS condition inside `@media …`.
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum MediaQuery {
 	/// `@media print` — applies when printing.
@@ -72,7 +70,9 @@ impl Rule {
 	pub fn tags(tags: &[&str]) -> Self {
 		let selector = match tags {
 			[tag] => Selector::tag(*tag),
-			_ => Selector::AnyOf(tags.iter().map(|t| Selector::tag(*t)).collect()),
+			_ => Selector::AnyOf(
+				tags.iter().map(|t| Selector::tag(*t)).collect(),
+			),
 		};
 		Self {
 			selector,

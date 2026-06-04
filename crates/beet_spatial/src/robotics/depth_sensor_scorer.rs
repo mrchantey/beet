@@ -42,10 +42,7 @@ impl DepthSensorScorer {
 				let scorer = self.clone();
 				async move {
 					cx.world()
-						.run_system_cached_with(
-							score_depth,
-							(cx.id(), scorer),
-						)
+						.run_system_cached_with(score_depth, (cx.id(), scorer))
 						.await?
 						.xok()
 				}

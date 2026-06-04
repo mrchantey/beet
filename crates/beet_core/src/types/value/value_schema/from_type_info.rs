@@ -38,10 +38,7 @@ pub fn build(type_info: &TypeInfo) -> ValueSchema {
 	}
 }
 
-fn resolve_field(
-	type_info: Option<&TypeInfo>,
-	type_path: &str,
-) -> ValueSchema {
+fn resolve_field(type_info: Option<&TypeInfo>, type_path: &str) -> ValueSchema {
 	match type_info {
 		Some(info) => build(info),
 		None => primitive_schema(type_path),
@@ -241,9 +238,7 @@ fn is_option_type(type_path: &str) -> bool {
 
 fn extract_option_inner(type_path: &str) -> Option<&str> {
 	let path = type_path.trim();
-	let inner = if let Some(rest) =
-		path.strip_prefix("core::option::Option<")
-	{
+	let inner = if let Some(rest) = path.strip_prefix("core::option::Option<") {
 		Some(rest)
 	} else {
 		path.strip_prefix("Option<")

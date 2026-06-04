@@ -13,9 +13,8 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	commands.spawn(StdioTerminal::inline()
-		// .with_raw_mode(true)
-
+	commands.spawn(
+		StdioTerminal::inline(), // .with_raw_mode(true)
 	);
 }
 

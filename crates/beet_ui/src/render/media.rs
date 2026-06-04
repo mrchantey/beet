@@ -92,7 +92,10 @@ impl MediaRenderer {
 	}
 
 	#[cfg(feature = "world_serde")]
-	pub fn with_world_serde_renderer(mut self, renderer: WorldSerdeRenderer) -> Self {
+	pub fn with_world_serde_renderer(
+		mut self,
+		renderer: WorldSerdeRenderer,
+	) -> Self {
 		self.world_serde_renderer = renderer;
 		self
 	}
@@ -134,7 +137,9 @@ impl MediaRenderer {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(all(feature = "world_serde", feature = "postcard"))]
-			MediaType::Postcard => self.world_serde_renderer.render(&mut inner_cx).map(Some),
+			MediaType::Postcard => {
+				self.world_serde_renderer.render(&mut inner_cx).map(Some)
+			}
 			#[cfg(all(feature = "world_serde", feature = "json"))]
 			MediaType::Json => self.world_serde_renderer.render(&mut inner_cx).map(Some),
 			_ => Ok(None),

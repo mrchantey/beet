@@ -36,7 +36,8 @@ impl SshConnection {
 
 	/// Build SSH arguments including key and standard options.
 	fn ssh_args(&self) -> Vec<SmolStr> {
-		let mut args: Vec<SmolStr> = SSH_OPTS.iter().map(|s| SmolStr::from(*s)).collect();
+		let mut args: Vec<SmolStr> =
+			SSH_OPTS.iter().map(|s| SmolStr::from(*s)).collect();
 		args.push("-i".into());
 		args.push(self.key_path.display().to_string().into());
 		args
@@ -47,10 +48,7 @@ impl SshConnection {
 		let mut args = self.ssh_args();
 		args.push(self.remote_user().into());
 		args.push(command.into());
-		ChildProcess::new("ssh")
-			.with_args(args)
-			.run_async()
-			.await?;
+		ChildProcess::new("ssh").with_args(args).run_async().await?;
 		Ok(())
 	}
 
@@ -63,10 +61,7 @@ impl SshConnection {
 		let mut args = self.ssh_args();
 		args.push(local_path.display().to_string().into());
 		args.push(format!("{}:{}", self.remote_user(), remote_path).into());
-		ChildProcess::new("scp")
-			.with_args(args)
-			.run_async()
-			.await?;
+		ChildProcess::new("scp").with_args(args).run_async().await?;
 		Ok(())
 	}
 

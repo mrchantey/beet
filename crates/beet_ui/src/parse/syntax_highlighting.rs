@@ -236,7 +236,6 @@ impl SyntaxHighlighting {
 		}
 		spans
 	}
-
 }
 
 /// Walk every `<code class="language-X">` element in the world whose only

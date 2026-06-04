@@ -113,47 +113,39 @@ pub fn fetch_npc(
 									.get::<ChildOf>()
 									.unwrap()
 									.parent();
-								world.entity_mut(id).insert(SentenceSteerTarget::<
-									Collectable,
-								>::new(
-									bert,
-									TargetEntity::Other(parent),
-								));
+								world.entity_mut(id).insert(
+									SentenceSteerTarget::<Collectable>::new(
+										bert,
+										TargetEntity::Other(parent),
+									),
+								);
 							})
 						}),
 					),
-					(
-						Name::new("Fetch"),
-						Sequence::new(),
-						children![
-							(
-								Name::new("Play Walk"),
-								PlayAnimation::new(walk_index).repeat_forever(),
+					(Name::new("Fetch"), Sequence::new(), children![
+						(
+							Name::new("Play Walk"),
+							PlayAnimation::new(walk_index).repeat_forever(),
+						),
+						(
+							Name::new("Seek to Arrive"),
+							Seek::default(),
+							EndOnArrive::new(1.),
+						),
+					],),
+					(Name::new("Return to Idle"), Sequence::new(), children![
+						(
+							Name::new("Stop Moving"),
+							InsertOn::new_with_target(
+								Velocity::default(),
+								TargetEntity::Agent,
 							),
-							(
-								Name::new("Seek to Arrive"),
-								Seek::default(),
-								EndOnArrive::new(1.),
-							),
-						],
-					),
-					(
-						Name::new("Return to Idle"),
-						Sequence::new(),
-						children![
-							(
-								Name::new("Stop Moving"),
-								InsertOn::new_with_target(
-									Velocity::default(),
-									TargetEntity::Agent,
-								),
-							),
-							(
-								Name::new("Play Idle"),
-								PlayAnimation::new(idle_index).repeat_forever(),
-							),
-						],
-					),
+						),
+						(
+							Name::new("Play Idle"),
+							PlayAnimation::new(idle_index).repeat_forever(),
+						),
+					],),
 				],
 			),
 		],

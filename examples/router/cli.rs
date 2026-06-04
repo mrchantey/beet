@@ -38,25 +38,31 @@ struct GreetRequest {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn((CliServer::default(), (default_router(), children![
-		exchange_route("", Action::<(), &str>::new_pure(|_| { "hello world" })),
-		exchange_route(
-			"foo",
-			Action::<(), &str>::new_pure(|_| { "hello foo" })
-		),
-		exchange_route(
-			"greet",
-			Script::<QueryParams<GreetRequest>, String>::rhai(
-				r#""hello " + input.name"#,
+	commands.spawn((
+		CliServer::default(),
+		(default_router(), children![
+			exchange_route(
+				"",
+				Action::<(), &str>::new_pure(|_| { "hello world" })
 			),
-		),
-		// same idea, but the script receives the full [`RequestParts`]
-		// and digs out the `name` query parameter itself.
-		exchange_route(
-			"greet-request",
-			Script::<RequestParts, String>::rhai(
-				r#""hello " + input.url.params.name[0]"#,
+			exchange_route(
+				"foo",
+				Action::<(), &str>::new_pure(|_| { "hello foo" })
 			),
-		),
-	])));
+			exchange_route(
+				"greet",
+				Script::<QueryParams<GreetRequest>, String>::rhai(
+					r#""hello " + input.name"#,
+				),
+			),
+			// same idea, but the script receives the full [`RequestParts`]
+			// and digs out the `name` query parameter itself.
+			exchange_route(
+				"greet-request",
+				Script::<RequestParts, String>::rhai(
+					r#""hello " + input.url.params.name[0]"#,
+				),
+			),
+		]),
+	));
 }

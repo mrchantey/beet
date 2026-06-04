@@ -39,9 +39,7 @@ impl S3FsStore {
 }
 
 impl BlobStoreProvider for S3FsStore {
-	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
-		Box::new(self.clone())
-	}
+	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		self.active().with_subdir(path)
 	}
@@ -51,9 +49,7 @@ impl BlobStoreProvider for S3FsStore {
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.active().did_change(event)
 	}
-	fn region(&self) -> Option<String> {
-		self.active().region()
-	}
+	fn region(&self) -> Option<String> { self.active().region() }
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		self.active().store_exists()
 	}

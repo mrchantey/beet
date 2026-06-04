@@ -97,8 +97,9 @@ fn wrap_content<C: WithChildren>(
 	// the content is transcluded by reference: the shell places this prop, which
 	// resolves to a transparent entity pointing at the existing content.
 	let content_prop = SceneProp::new(template_value(RenderRef::new(rendered)));
-	let layout =
-		world.spawn_scene(C::scene(C::with_children(content_prop)))?.id();
+	let layout = world
+		.spawn_scene(C::scene(C::with_children(content_prop)))?
+		.id();
 	world.remove_resource::<RequestContext>();
 
 	// despawn the shell subtree plus the content's ephemerals after render
@@ -219,10 +220,12 @@ mod test {
 
 		let mut world = router_world();
 		let root = world
-			.spawn((store, router(), DocumentShell::<Shell>::default(), children![route(
-				"post",
-				BlobScene::new("post.md")
-			)]))
+			.spawn((
+				store,
+				router(),
+				DocumentShell::<Shell>::default(),
+				children![route("post", BlobScene::new("post.md"))],
+			))
 			.flush();
 
 		// the markdown content (parsed per request) lands inside the shell's

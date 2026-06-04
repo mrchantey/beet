@@ -47,8 +47,15 @@ impl NodeWalker<'_, '_> {
 			return;
 		}
 
-		let (doctype, comment, element, children, value, expression, render_ref) =
-			node;
+		let (
+			doctype,
+			comment,
+			element,
+			children,
+			value,
+			expression,
+			render_ref,
+		) = node;
 
 		// A RenderRef holder is transparent: recurse directly into the
 		// referenced entity, rendering it in place without touching this
@@ -121,8 +128,8 @@ impl NodeWalker<'_, '_> {
 /// [`default_element_rules`]: crate::style::default_element_rules
 /// [`HtmlRenderer`]: crate::prelude::HtmlRenderer
 pub const NON_VISUAL_TAGS: &[&str] = &[
-	"head", "script", "style", "template", "noscript", "meta", "link",
-	"title", "base", "iframe", "object", "embed",
+	"head", "script", "style", "template", "noscript", "meta", "link", "title",
+	"base", "iframe", "object", "embed",
 ];
 
 /// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].

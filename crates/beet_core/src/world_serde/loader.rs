@@ -134,8 +134,9 @@ impl<'a> WorldSerdeLoader<'a> {
 		// per-insert observers run before relationships like `ChildOf` are
 		// whole. Signal completion now the hierarchy is settled, so listeners
 		// can react (eg rebuilding a `RouteTree`) before any async work runs.
-		self.world
-			.trigger(WorldSerdeLoaded { entities: spawned.clone() });
+		self.world.trigger(WorldSerdeLoaded {
+			entities: spawned.clone(),
+		});
 
 		Ok(spawned)
 	}

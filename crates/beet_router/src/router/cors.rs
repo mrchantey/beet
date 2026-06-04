@@ -41,7 +41,8 @@ impl CorsConfig {
 
 	/// Returns `true` if the given origin is allowed by this configuration.
 	pub fn origin_allowed(&self, origin: &str) -> bool {
-		self.allow_any_origin || self.allowed_origins.iter().any(|o| o == origin)
+		self.allow_any_origin
+			|| self.allowed_origins.iter().any(|o| o == origin)
 	}
 }
 
@@ -99,8 +100,9 @@ pub async fn CorsHandler(
 		let mut response = Response::ok();
 		let headers = &mut response.parts.headers;
 		headers.set::<header::AccessControlMaxAge>(60u32);
-		headers
-			.set::<header::AccessControlAllowHeaders>("content-type".to_string());
+		headers.set::<header::AccessControlAllowHeaders>(
+			"content-type".to_string(),
+		);
 		headers.set::<header::AccessControlAllowOrigin>(origin);
 		return Ok(response);
 	}
@@ -135,19 +137,26 @@ mod test {
 
 	fn spawn_cors(world: &mut World, config: CorsConfig) -> Entity {
 		world
-			.spawn((default_router(), children![exchange_route("", Hello)], cors(config)))
+			.spawn((
+				default_router(),
+				children![exchange_route("", Hello)],
+				cors(config),
+			))
 			.flush()
 	}
 
 	#[beet_core::test]
 	async fn allows_configured_origin() {
 		let mut world = router_world();
-		let root =
-			spawn_cors(&mut world, CorsConfig::allow_origins(["https://allowed.com"]));
+		let root = spawn_cors(
+			&mut world,
+			CorsConfig::allow_origins(["https://allowed.com"]),
+		);
 		let response = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::get("").with_header_raw("origin", "https://allowed.com"),
+				Request::get("")
+					.with_header_raw("origin", "https://allowed.com"),
 			)
 			.await
 			.unwrap();
@@ -164,11 +173,13 @@ mod test {
 	#[beet_core::test]
 	async fn blocks_disallowed_origin() {
 		let mut world = router_world();
-		let root = spawn_cors(&mut world, CorsConfig::allow_origins([] as [&str; 0]));
+		let root =
+			spawn_cors(&mut world, CorsConfig::allow_origins([] as [&str; 0]));
 		world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::get("").with_header_raw("origin", "https://blocked.com"),
+				Request::get("")
+					.with_header_raw("origin", "https://blocked.com"),
 			)
 			.await
 			.unwrap()
@@ -183,7 +194,8 @@ mod test {
 		let response = world
 			.entity_mut(root)
 			.call::<Request, Response>(
-				Request::get("").with_header_raw("origin", "https://anything.com"),
+				Request::get("")
+					.with_header_raw("origin", "https://anything.com"),
 			)
 			.await
 			.unwrap();
@@ -216,8 +228,10 @@ mod test {
 	#[beet_core::test]
 	async fn preflight_returns_allow_headers() {
 		let mut world = router_world();
-		let root =
-			spawn_cors(&mut world, CorsConfig::allow_origins(["https://allowed.com"]));
+		let root = spawn_cors(
+			&mut world,
+			CorsConfig::allow_origins(["https://allowed.com"]),
+		);
 		let response = world
 			.entity_mut(root)
 			.call::<Request, Response>(

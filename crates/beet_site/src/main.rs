@@ -27,11 +27,7 @@ fn main() {
 }
 
 /// Boots an HTTP server, the default web target.
-#[cfg(all(
-	not(feature = "codegen"),
-	feature = "web",
-	not(feature = "cli")
-))]
+#[cfg(all(not(feature = "codegen"), feature = "web", not(feature = "cli")))]
 fn site_server() -> impl beet::prelude::Bundle {
 	beet::prelude::HttpServer::default()
 }

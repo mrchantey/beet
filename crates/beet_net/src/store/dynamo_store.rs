@@ -155,7 +155,9 @@ impl BlobStoreProvider for DynamoStore {
 
 	fn id(&self) -> &'static str { "dynamo" }
 
-	fn root_key(&self) -> SmolStr { format!("dynamo:{}", self.table_name).into() }
+	fn root_key(&self) -> SmolStr {
+		format!("dynamo:{}", self.table_name).into()
+	}
 
 	fn region(&self) -> Option<String> { Some(self.region.to_string()) }
 

@@ -28,32 +28,32 @@ fn render<B: Bundle>(name: &str, width: u32, setup: fn() -> B) {
 // ── Demos ───────────────────────────────────────────────────────────────────
 
 fn mixed_runs() -> impl Bundle {
-	rsx_direct!{
+	rsx_direct! {
 		<p>"Plain text, "<em>"emphasised"</em>", "<strong>"strong"</strong>
 			" and "<code>"inline_code()"</code>" on one flowing line."</p>
 	}
 }
 
 fn wrapping() -> impl Bundle {
-	rsx_direct!{
+	rsx_direct! {
 		<p>"This paragraph is wider than the column, so it wraps onto several
 			lines at word boundaries."</p>
 	}
 }
 
 fn nested_emphasis() -> impl Bundle {
-	rsx_direct!{ <p>"A "<em><strong>"bold italic"</strong></em>" phrase."</p> }
+	rsx_direct! { <p>"A "<em><strong>"bold italic"</strong></em>" phrase."</p> }
 }
 
 fn link_and_code() -> impl Bundle {
-	rsx_direct!{
+	rsx_direct! {
 		<p>"See "<a href="https://beetstack.dev">"the docs"</a>
 			" or run "<code>"cargo test"</code>"."</p>
 	}
 }
 
 fn block_stack() -> impl Bundle {
-	rsx_direct!{
+	rsx_direct! {
 		<div>
 			<h2>"A Heading"</h2>
 			<p>"Followed by a paragraph that flows its own inline content
@@ -63,7 +63,7 @@ fn block_stack() -> impl Bundle {
 }
 
 fn preformatted() -> impl Bundle {
-	rsx_direct!{
+	rsx_direct! {
 		<pre>"fn main() {\n    let x = 1;\n    println!(\"{x}\");\n}"</pre>
 	}
 }

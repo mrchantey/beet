@@ -16,8 +16,8 @@ use bevy::ecs::system::SystemParamValidationError;
 use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use core::marker::PhantomData;
-use extend::ext;
 use core::panic::Location;
+use extend::ext;
 
 /// System that logs component names for an entity.
 pub fn log_component_names(entity: In<Entity>, world: &mut World) {

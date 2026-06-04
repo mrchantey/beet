@@ -62,9 +62,7 @@ mod test {
 	#[beet_core::test]
 	async fn mutates_a_struct_field() {
 		AsyncPlugin::world()
-			.spawn(Script::<Player, Player>::rhai(
-				"input.score += 10; input",
-			))
+			.spawn(Script::<Player, Player>::rhai("input.score += 10; input"))
 			.call::<Player, Player>(Player {
 				name: "ada".to_string(),
 				score: 5,

@@ -74,9 +74,7 @@ where
 	E: serde::de::DeserializeOwned,
 {
 	match response.status() {
-		status if status == err_status => {
-			Ok(Err(response.json::<E>().await?))
-		}
+		status if status == err_status => Ok(Err(response.json::<E>().await?)),
 		status if status.is_ok() => Ok(Ok(response.json::<T>().await?)),
 		_ => Err(response.into_error().await.into()),
 	}
@@ -89,7 +87,10 @@ mod test {
 	use super::*;
 
 	fn ok_body<T: serde::Serialize>(value: &T) -> Response {
-		Response::ok_body(serde_json::to_string(value).unwrap(), MediaType::Json)
+		Response::ok_body(
+			serde_json::to_string(value).unwrap(),
+			MediaType::Json,
+		)
 	}
 
 	#[beet_core::test]
