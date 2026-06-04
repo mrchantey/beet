@@ -43,7 +43,8 @@ fn content_store(dir: &str) -> BlobStore {
 /// the shell's `<main>`.
 pub fn beet_site_router() -> impl Bundle {
 	(
-		default_router(beet_site_endpoints()),
+		default_router(),
+		beet_site_endpoints(),
 		DocumentShell::<BeetDocumentShell>::default(),
 	)
 }
