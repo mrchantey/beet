@@ -94,6 +94,7 @@
 		// "agent/*",
 		".beet",
 		".claude",
+		".playwright-cli",
 		"scripts",
 		// "tests",
 		// "target",
