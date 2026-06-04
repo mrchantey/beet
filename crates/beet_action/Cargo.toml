@@ -36,7 +36,9 @@ rhai = ["scripting", "dep:rhai"]
 rhai_serde = ["rhai", "serde", "std", "rhai/serde"]
 # The QuickJS engine + `ScriptLanguage::QuickJs` + `exports::quickjs`. Like
 # `rhai`, this stays serde-free: the raw engine builds on the agnostic
-# `scripting` layer so embedded consumers can marshal values by hand.
+# `scripting` layer so embedded consumers can marshal values by hand. QuickJS is
+# a C engine, so it is native-only — `rquickjs` is a `not(wasm32)` dependency and
+# the engine code is cfg'd off wasm even when this feature is on.
 quickjs = ["scripting", "dep:rquickjs"]
 # The QuickJS typed-`Script` backend (`run_quickjs`, `Script::run`). Marshals
 # input/output as JSON across the engine boundary, so it pulls `json`
@@ -53,7 +55,11 @@ thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 rhai = { workspace = true, optional = true }
+
+# QuickJS is a C engine with no wasm bindings, so its dependency is native-only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rquickjs = { workspace = true, optional = true }
+
 [dev-dependencies]
 beet_action = { path = ".", features= ["world_serde", "rhai_serde", "quickjs_serde"] }
 beet_core = { workspace = true, features = ["testing", "ron"] }

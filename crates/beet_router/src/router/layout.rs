@@ -32,7 +32,7 @@ use beet_ui::prelude::*;
 /// # use beet_ui::prelude::*;
 /// #[scene]
 /// fn Shell() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
-/// let bundle = (router(), DocumentShell::<Shell>::default());
+/// let bundle = (Router, DocumentShell::<Shell>::default());
 /// ```
 ///
 /// For each request it runs the inner route to obtain the content render root,
@@ -153,7 +153,7 @@ mod test {
 	async fn wraps_fixed_route() {
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), DocumentShell::<Shell>::default(), children![
+			.spawn((Router, DocumentShell::<Shell>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -174,7 +174,7 @@ mod test {
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), DocumentShell::<Shell>::default(), children![
+			.spawn((Router, DocumentShell::<Shell>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -195,7 +195,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), DocumentShell::<Shell>::default(), children![
+			.spawn((Router, DocumentShell::<Shell>::default(), children![
 				render_action::async_route("", page)
 			]))
 			.flush();
@@ -222,7 +222,7 @@ mod test {
 		let root = world
 			.spawn((
 				store,
-				router(),
+				Router,
 				DocumentShell::<Shell>::default(),
 				children![route("post", BlobScene::new("post.md"))],
 			))
@@ -242,7 +242,7 @@ mod test {
 		// the shell decides placement; here the content lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((router(), DocumentShell::<NavShell>::default(), children![
+			.spawn((Router, DocumentShell::<NavShell>::default(), children![
 				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
 			]))
 			.flush();

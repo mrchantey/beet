@@ -202,25 +202,31 @@ _extra-pkgs := "beet_spatial beet_ml"
 # needs the `wasm_js` feature).
 _extra-pkgs-wasm := "beet_spatial"
 
-# Computes the cargo feature flag for the in-scope crates on the current
-# toolchain channel (nightly => --all-features, else explicit exclude list).
-# Excludes:
-# - `nightly` / `custom_test_frameworks`: nightly-only test runner path
-# - `default`: redundant with explicit feature enumeration
-# - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (default)
+# Computes the cargo feature flag for the in-scope crates by enumerating each
+# crate's `[features]` and excluding the ones that must not be co-enabled.
+# Always excludes:
+# - `default`: redundant, cargo keeps default features on without naming them
+# - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (the
+#   default). Co-enabling them links conflicting backend runtimes and corrupts
+#   the heap at process teardown, so `--all-features` is never safe here.
+# On stable additionally excludes `nightly` / `custom_test_frameworks`, the
+# nightly-only test-runner features that stable cannot compile.
 _core-features pkgs:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	if rustc --version | grep -q nightly; then
-		echo "--all-features"
+		exclude='/(default|ndarray|cuda)$'
 	else
-		feats=$(for c in {{ pkgs }}; do
-			# Crates may be nested (e.g. crates/beet_core/macros) — resolve by package name.
-			toml=$(grep -lE "^name *= *\"$c\"$" crates/$c/Cargo.toml crates/*/*/Cargo.toml 2>/dev/null | head -1)
-			awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /=/{print C"/"$1}' "$toml"
-		done | grep -vE '/(nightly|custom_test_frameworks|default|ndarray|cuda)$' | paste -sd, -)
-		echo "--features $feats"
+		exclude='/(nightly|custom_test_frameworks|default|ndarray|cuda)$'
 	fi
+	feats=$(for c in {{ pkgs }}; do
+		# Crates may be nested (e.g. crates/beet_core/macros) — resolve by package name.
+		toml=$(grep -lE "^name *= *\"$c\"$" crates/$c/Cargo.toml crates/*/*/Cargo.toml 2>/dev/null | head -1)
+		# Match only `name = ...` feature lines, skipping comments (`#`) that may
+		# themselves contain an `=`.
+		awk -v C=$c '/^\[features\]/{f=1;next} /^\[/{f=0} f && /^[A-Za-z0-9_-]+[[:space:]]*=/{key=$0; sub(/[[:space:]]*=.*/,"",key); print C"/"key}' "$toml"
+	done | grep -vE "$exclude" | paste -sd, -)
+	echo "--features $feats"
 
 # Shared native cargo test runner over a space-separated list of crates.
 _test-pkgs pkgs *args:

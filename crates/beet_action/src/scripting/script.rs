@@ -38,7 +38,7 @@ where
 impl Default for ScriptLanguage {
 	fn default() -> Self {
 		cfg_if! {
-			if #[cfg(feature = "quickjs")] {
+			if #[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))] {
 				return ScriptLanguage::QuickJs;
 			} else if #[cfg(feature = "rhai")] {
 				return ScriptLanguage::Rhai;
@@ -102,7 +102,7 @@ pub enum ScriptLanguage {
 	#[cfg(feature = "rhai")]
 	Rhai,
 	/// JavaScript via the [QuickJS](https://bellard.org/quickjs/) engine.
-	#[cfg(feature = "quickjs")]
+	#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
 	QuickJs,
 }
 
@@ -127,7 +127,7 @@ where
 	}
 
 	/// Create a [`Script`] from JavaScript (QuickJS) source.
-	#[cfg(feature = "quickjs")]
+	#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
 	pub fn quickjs(content: impl Into<String>) -> Self {
 		Self::new(ScriptLanguage::QuickJs, content)
 	}
@@ -148,12 +148,16 @@ where
 					"the rhai `Script` backend requires the `rhai_serde` feature"
 				)
 			}
-			#[cfg(feature = "quickjs_serde")]
+			#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
 			ScriptLanguage::QuickJs => {
 				crate::scripting::run_quickjs(&self.content, input)
 			}
 			// the quickjs engine is present but its serde runtime is gated on `quickjs_serde`.
-			#[cfg(all(feature = "quickjs", not(feature = "quickjs_serde")))]
+			#[cfg(all(
+				feature = "quickjs",
+				not(feature = "quickjs_serde"),
+				not(target_arch = "wasm32")
+			))]
 			ScriptLanguage::QuickJs => {
 				let _ = input;
 				bevybail!(

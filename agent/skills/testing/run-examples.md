@@ -31,10 +31,10 @@ cargo run --example long_running    --features=action       # 1.3s timer chain
 cargo run --example malenia         --features=action,rand  # BT + utility AI
 ```
 
-### 2. Scripting (`--features=scripting`)
+### 2. Scripting (`--features=rhai_serde`)
 
 ```sh
-cargo run --example scripting --features=scripting          # rhai Script<I,O>
+cargo run --example scripting --features=rhai_serde         # rhai Script<I,O>
 ```
 
 ### 3. Router (`--features=router,markdown` / plus extras)
@@ -42,11 +42,11 @@ cargo run --example scripting --features=scripting          # rhai Script<I,O>
 CLI router server, persisted router, and the codegen pipeline.
 
 ```sh
-cargo run --example router                                  --features=router,markdown
-cargo run --example router      -- about                    --features=router,markdown
-cargo run --example cli         -- greet --name=world       --features=router,serde,scripting
-cargo run --example router_serde --                         --features=router,serde,scripting,world_serde
-cargo run --example router_serde -- greet --name=world      --features=router,serde,scripting,world_serde
+cargo run --example router           --features=router,markdown
+cargo run --example router           --features=router,markdown -- about
+cargo run --example cli              --features=router,rhai_serde -- greet --name=world
+cargo run --example router_serde     --features=router,rhai_serde,world_serde
+cargo run --example router_serde     --features=router,rhai_serde,world_serde -- greet --name=world
 cargo run --example file_based_routes -- codegen            --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
 cargo run --example file_based_routes -- about              --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls
 cargo run --example file_based_routes -- call-add --a=10 --b=20  --features=codegen,http_server,json,markdown,fs,ureq,rustls-tls

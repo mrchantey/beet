@@ -2,7 +2,7 @@
 // serde runtimes additionally need std. Without serde the agnostic layer is just
 // `ScriptLanguage`; without a `*_serde` backend `Script::run` has no runtime for
 // that language.
-#[cfg(feature = "quickjs_serde")]
+#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
 mod quickjs_runtime;
 #[cfg(feature = "rhai_serde")]
 mod rhai_runtime;
@@ -10,7 +10,7 @@ mod rhai_runtime;
 mod script;
 #[cfg(feature = "serde")]
 mod script_action;
-#[cfg(feature = "quickjs_serde")]
+#[cfg(all(feature = "quickjs_serde", not(target_arch = "wasm32")))]
 pub(crate) use quickjs_runtime::run_quickjs;
 #[cfg(feature = "rhai_serde")]
 pub(crate) use rhai_runtime::run_rhai;

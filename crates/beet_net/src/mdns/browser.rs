@@ -329,7 +329,7 @@ pub async fn run_mdns_browser_on<E: crate::udp::UdpEndpoint>(
 ) -> Result {
 	use crate::udp::UdpSocket;
 	use core::net::SocketAddr;
-	use futures_lite::FutureExt;
+	use bevy::tasks::futures_lite::FutureExt;
 
 	let socket = endpoint.bind(bind).await?;
 	if let Some(group) = multicast_group {
@@ -513,7 +513,8 @@ mod test {
 	/// This drives the full std path: `run_mdns_browser_on` -> bind -> query ->
 	/// recv -> `UdpPacket` -> observer -> entity, with the socket runtime and
 	/// world runtime coincident (no bridge).
-	#[cfg(feature = "udp")]
+	// real `async-io` UDP on loopback: native-only (no sockets/threads on wasm).
+	#[cfg(all(feature = "udp", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn browse_over_loopback_socket() {
 		use crate::prelude::AsyncIoUdpEndpoint;
@@ -585,7 +586,7 @@ mod test {
 
 	/// Poll the counts coming over `rx` until `pred` holds, with a generous
 	/// timeout so a flaky datagram doesn't hang CI.
-	#[cfg(feature = "udp")]
+	#[cfg(all(feature = "udp", not(target_arch = "wasm32")))]
 	async fn wait_for(
 		rx: &std::sync::mpsc::Receiver<usize>,
 		pred: impl Fn(&usize) -> bool,

@@ -52,7 +52,7 @@ fn Handler(
 	mut query: Query<&mut Count>,
 ) -> Result<Response> {
 	let caller = cx.id();
-	let request = cx.0.input;
+	let request = cx.take();
 	// only accept `/` routes
 	if !request.path().is_empty() {
 		let message = format!("Not Found: {}", request.path_string());

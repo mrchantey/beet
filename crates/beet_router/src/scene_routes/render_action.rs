@@ -28,7 +28,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::Scene;
-use beet_ui::prelude::WorldSceneExt;
 use bevy::ecs::system::In;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;

@@ -261,7 +261,6 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
 mod test {
 	use super::*;
 	use beet_net::prelude::*;
-	use beet_ui::prelude::WorldSceneExt;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 

@@ -31,6 +31,6 @@ pub mod prelude {
 pub mod exports {
 	#[cfg(feature = "rhai")]
 	pub use rhai;
-	#[cfg(feature = "quickjs")]
+	#[cfg(all(feature = "quickjs", not(target_arch = "wasm32")))]
 	pub use rquickjs;
 }
