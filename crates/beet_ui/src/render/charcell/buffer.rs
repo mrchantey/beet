@@ -574,10 +574,10 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	fn lone_divider_does_not_carry_node_background() {
-		// a bottom-border-only node (eg an app bar) is a divider, not a box: its
-		// edge composes over the surface beneath rather than trailing the node's
-		// own background a row past its content.
+	fn divider_carries_node_background() {
+		// a bottom-border-only node (eg an app bar / footer) renders its divider
+		// in its own surface colour, so the edge reads as part of the bar rather
+		// than the page beneath it.
 		let bg = Color::srgb(0.5, 0., 0.5);
 		let buffer = Buffer::new(UVec2::new(10, 4)).populate((
 			LayoutStyle::flex_row(),
@@ -593,7 +593,6 @@ mod tests {
 				}
 			)],
 		));
-		// the divider row's dash inherits no fill of its own
 		buffer
 			.iter_cells()
 			.find(|(_, cell)| cell.symbol_str() == "─")
@@ -601,7 +600,7 @@ mod tests {
 			.1
 			.style
 			.background
-			.xpect_eq(None);
+			.xpect_eq(Some(bg));
 	}
 
 	#[beet_core::test]

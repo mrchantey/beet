@@ -152,12 +152,11 @@ pub(super) fn draw_border(
 		return; // too small for a border
 	}
 
-	// A full box clips its background to the border edge (CSS border-box), so its
-	// borders sit on the node's own fill. A lone edge (eg an app bar's bottom
-	// divider) carries no fill of its own and composes over what's beneath, so it
-	// reads on the page rather than trailing the bar's surface a row past its
-	// content.
-	let border_bg = sides.all().then(|| node.visual_style().background).flatten();
+	// Borders sit on the node's own background (CSS border-box), so an app bar's
+	// bottom divider or a card's edge reads in that element's colour rather than
+	// the page beneath. A node with no background of its own leaves this `None`,
+	// composing the border over whatever fill already sits beneath it.
+	let border_bg = node.visual_style().background;
 	let top_style = side_style(box_style.and_then(|b| b.border_top), border_bg);
 	let bottom_style =
 		side_style(box_style.and_then(|b| b.border_bottom), border_bg);
