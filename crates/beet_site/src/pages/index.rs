@@ -7,7 +7,7 @@ pub fn get() -> impl Scene {
 		<div {Classes::new(["hero"])}>
 			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet"</h1>
 			<p {Classes::new([classes::TEXT_TITLE_LARGE])}>
-				<b>"A personal application framework"</b>
+				<b>"A malleable application framework"</b>
 			</p>
 			<div {Classes::new([classes::CARD_FILLED])}>
 				<p>"🚧 Mind your step! 🚧"</p>

@@ -2,7 +2,10 @@
 title = "The Full Moon Harvest #1"
 created= "2025-07-11"
 +++
+
 # The Full Moon Harvest #1 - Full Stack Bevy
+
+*Pete Hayman — 11th July, 2025*
 
 I'm very excited for the `0.0.6-rc.3` of beet, now available.
 

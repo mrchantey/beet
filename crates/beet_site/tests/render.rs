@@ -28,7 +28,7 @@ async fn home_in_document_shell() {
 		// document shell from the layout middleware
 		.xpect_contains(r#"<meta charset="UTF-8""#)
 		// page body transcluded into the shell's <main>
-		.xpect_contains("A personal application framework")
+		.xpect_contains("A malleable application framework")
 		// header + sidebar chrome
 		.xpect_contains(r#"id="sidebar"#);
 }
@@ -93,7 +93,7 @@ async fn terminal_renders_full_shell() {
 		)
 		.await
 		// the page body is present ...
-		.xpect_contains("A personal application framework")
+		.xpect_contains("A malleable application framework")
 		// ... wrapped in the shell chrome (a header nav link, a sidebar entry) ...
 		.xpect_contains("Docs")
 		// ... while the non-visual document head never leaks as text
