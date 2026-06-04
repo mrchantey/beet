@@ -1,9 +1,9 @@
 assets
-agent/*
+.agents/*
+!.agents/skills
 .claude
 .playwright-cli
 .beet/infra
-!agent/skills
 out.txt
 examples/file_based_routes/generated
 examples/file_based_routes/dist
