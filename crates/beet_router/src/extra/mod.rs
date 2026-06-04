@@ -11,18 +11,20 @@ pub use html_store::*;
 mod blob_store;
 pub use blob_store::*;
 
-#[cfg(feature = "json")]
+// std-only: the analytics route stores into beet_net's `AnalyticsEvent`, which
+// is part of beet_net's std-only store surface.
+#[cfg(all(feature = "json", feature = "std"))]
 mod analytics;
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "std"))]
 pub use analytics::*;
 
 // std-only: the app-info scene route renders through beet_ui, and the
-// batteries-included `default_router` wires it alongside `router()`.
+// batteries-included `default_router` wires it as one of its children when std.
 #[cfg(feature = "std")]
 mod app_info;
 #[cfg(feature = "std")]
 pub use app_info::*;
-#[cfg(all(feature = "json", feature = "std"))]
+// The single router builder, available on std and no_std. The feature-specific
+// app routes (`app-info`, `analytics`) are gated inside the module.
 mod default_router;
-#[cfg(all(feature = "json", feature = "std"))]
 pub use default_router::*;

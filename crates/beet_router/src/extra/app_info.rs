@@ -40,8 +40,9 @@ mod test {
 	async fn renders_package_title() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(pkg_config!());
+		// `default_router` already wires `app_info()` as a child under std.
 		world
-			.spawn((router(), children![app_info()]))
+			.spawn(default_router())
 			.call::<Request, Response>(Request::get("app-info"))
 			.await
 			.unwrap()

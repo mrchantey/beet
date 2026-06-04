@@ -24,7 +24,7 @@ fn main() -> AppExit {
 /// Spawns the CLI server with every command wired as a route.
 fn setup(mut commands: Commands) {
 	commands
-		.spawn((CliServer::default(), router()))
+		.spawn((CliServer::default(), default_router()))
 		.with_children(|parent| {
 			parent.spawn(exchange_route("build-wasm", BuildWasm));
 			parent.spawn(exchange_route("export-pdf", ExportPdf));
@@ -35,8 +35,9 @@ fn setup(mut commands: Commands) {
 
 - `CliServer` turns `beet <args>` into a request and streams the response to
   stdout, mapping a non-OK status to a non-zero exit code.
-- `router()` bundles the route lookup plus the `HelpHandler` and
-  `NavigateHandler` middleware.
+- `default_router()` bundles the route lookup plus the `RequestLogger`,
+  `HelpHandler` and `NavigateHandler` middleware and the default app routes;
+  spawn your own routes as `children` of the same entity.
 - Each `exchange_route(path, Action)` is one command. The `path` is matched
   against the args, ie `beet build-wasm` hits the `build-wasm` route.
 

@@ -5,16 +5,19 @@ use bevy::platform::sync::OnceLock;
 
 /// Boxed server-start function: installs a backend for [`HttpServer`].
 ///
-/// This is the no_std-friendly server hook, mirroring [`set_http_client`] on
-/// the client side. When no server backend feature (`server`/`hyper`/`lambda`)
-/// is compiled in, [`HttpServer`]'s `on_add` hook falls through to a function
+/// This is the no_std-friendly server hook, mirroring [`HttpSendFn`] on the
+/// client side. When no server backend feature (`server`/`hyper`/`lambda`) is
+/// compiled in, [`HttpServer`]'s `on_add` hook falls through to a function
 /// installed via [`set_http_server`] — letting a downstream adapter (an embassy
 /// / esp WiFi crate, …) plug in its own listener without living in `beet_net`.
 ///
-/// It is handed the spawned [`Entity`] and a clone of its [`HttpServer`]
-/// configuration; the adapter is responsible for actually opening a socket and
-/// routing requests back to that entity.
-pub type HttpServerFn = fn(Entity, HttpServer);
+/// It is handed an [`AsyncEntity`] for the spawned server (run on the async
+/// layer, exactly like the built-in [`start_hyper_server`] /
+/// `start_mini_http_server` backends) and returns a boxed future. The adapter
+/// reads the [`HttpServer`] config off the entity, opens its own listener, and
+/// dispatches each request back through `entity.exchange(req)`.
+pub type HttpServerFn =
+	fn(AsyncEntity) -> MaybeSendBoxedFuture<'static, Result>;
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
 
@@ -147,16 +150,19 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 				.queue_async_local(super::start_mini_http_server);
 		} else {
 			// No backend compiled in (eg a no_std embedded target): defer to a
-			// backend installed at runtime via `set_http_server`. The hook fires
-			// the moment the component is added, handing the adapter the entity
-			// and a clone of its config.
+			// backend installed at runtime via `set_http_server`. Dispatch it on
+			// the async layer with an `AsyncEntity`, exactly like the hyper/mini
+			// arms above, so the adapter can read the `HttpServer` config off the
+			// entity and route requests back through `entity.exchange(req)`.
 			match HTTP_SERVER.get() {
 				Some(start) => {
-					if let Some(server) =
-						world.get_mut::<HttpServer>(cx.entity).map(|s| s.clone())
-					{
-						start(cx.entity, server);
-					}
+					let start = *start;
+					world
+						.commands()
+						.entity(cx.entity)
+						.queue_async_local(move |entity: AsyncEntity| {
+							start(entity)
+						});
 				}
 				None => cross_log_error!(
 					"No HTTP server backend configured. Enable a server feature \

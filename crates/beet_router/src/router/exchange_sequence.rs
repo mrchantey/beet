@@ -72,7 +72,7 @@ mod test {
 	async fn works_with_router() {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
-			.spawn((router(), children![route(
+			.spawn((default_router(), children![route(
 				"seq",
 				(exchange_sequence(), children![
 					Action::<Request, Outcome<Request, Response>>::new_pure(

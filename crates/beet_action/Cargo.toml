@@ -13,13 +13,36 @@ categories.workspace = true
 
 [features]
 default = ["std", "reflect"]
-std = ["beet_core/std"]
+# a std build links rhai's std *mode*; no_std consumers (eg `beet_esp`) leave
+# `std` off and select rhai's `no_std` mode on their own dependency edge, keeping
+# the `rhai` feature mode-agnostic so it never collides under `--all-features`.
+# rhai's *serde* is a separate concern, owned by `rhai_serde`, not `std`/`serde`.
+std = ["beet_core/std", "rhai?/std", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
 world_serde = ["beet_core/world_serde"]
 reflect = ["beet_core/bevy_reflect_documentation"]
-scripting = ["std", "rhai"]
-rhai = ["dep:rhai", "serde", "std"]
+# Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pulls
+# nothing — no serde, no engine, no std. The serde-marshalled `Script` /
+# `ScriptAction` additionally require `serde`; a runtime requires a backend.
+scripting = []
+# The rhai engine + `ScriptLanguage::Rhai` + `exports::rhai`. Builds on the
+# agnostic `scripting` layer (no point pulling the engine without it in a beet
+# app); the raw engine carries no serde, so this stays serde-free for embedded
+# consumers that marshal by hand.
+rhai = ["scripting", "dep:rhai"]
+# rhai's serde marshalling runtime (`run_rhai`, the typed `Script::run`). rhai's
+# serde layer needs std, so this pulls `rhai` + `serde` + `std` together.
+rhai_serde = ["rhai", "serde", "std", "rhai/serde"]
+# The QuickJS engine + `ScriptLanguage::QuickJs` + `exports::quickjs`. Like
+# `rhai`, this stays serde-free: the raw engine builds on the agnostic
+# `scripting` layer so embedded consumers can marshal values by hand.
+quickjs = ["scripting", "dep:rquickjs"]
+# The QuickJS typed-`Script` backend (`run_quickjs`, `Script::run`). Marshals
+# input/output as JSON across the engine boundary, so it pulls `json`
+# (serde_json) alongside the engine; `rust-alloc` keeps it std/libc-light but
+# the C engine still needs a C toolchain, so this is a std-target backend.
+quickjs_serde = ["quickjs", "json", "std"]
 
 [dependencies]
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
@@ -30,8 +53,9 @@ thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 rhai = { workspace = true, optional = true }
+rquickjs = { workspace = true, optional = true }
 [dev-dependencies]
-beet_action = { path = ".", features= ["world_serde", "scripting"] }
+beet_action = { path = ".", features= ["world_serde", "rhai_serde", "quickjs_serde"] }
 beet_core = { workspace = true, features = ["testing", "ron"] }
 
 [lib]

@@ -3,6 +3,9 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 use beet_ui::prelude::classes;
+// explicit so `spawn_scene` resolves to beet_ui's slot-wiring trait, not the
+// `bevy::scene` one also glob-imported via `beet_core::prelude`.
+use beet_ui::prelude::WorldSceneExt;
 // `use beet_ui::*` resolves the `crate::prelude::*` paths emitted by the
 // `rsx!` / `#[scene]` macros (mirrors tests/rsx.rs).
 use beet_ui::*;

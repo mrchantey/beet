@@ -339,6 +339,22 @@ pub impl World {
 		self.query::<Entity>().iter(self).collect()
 	}
 
+	/// Returns the topmost ancestor of `entity` by walking [`ChildOf`], or
+	/// `entity` itself when it has no parent.
+	///
+	/// Runs through [`run_system_cached_with`](World::run_system_cached_with) so
+	/// the traversal query is cached for the scheduler rather than rebuilt each
+	/// call.
+	fn root_ancestor(&mut self, entity: Entity) -> Entity {
+		self.run_system_cached_with(
+			|entity: In<Entity>, ancestors: Query<&ChildOf>| {
+				ancestors.root_ancestor(*entity)
+			},
+			entity,
+		)
+		.unwrap()
+	}
+
 	/// Removes all components of the given type from all entities
 	/// and returns their values.
 	fn take_all<C: Component>(&mut self) -> Vec<C> {

@@ -61,12 +61,9 @@ pub fn router_scene() -> Result<impl Bundle> {
 		// the server is the IO layer, handling incoming requests
 		// from http, stdin etc
 		server_from_cli()?,
-		// the router will handle the request, shortcircuiting
-		// on a `help` param, otherwise directing to a child route
-		router(),
-		// the actual routes, children with a PathPartial and associated action
-		// for handling a request
-		routes(),
+		// the batteries-included router: route lookup + the default app routes,
+		// wrapping the user routes (children with a PathPartial and action)
+		(default_router(), children![routes()]),
 	)
 		.xok()
 }

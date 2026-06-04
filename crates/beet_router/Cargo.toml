@@ -14,7 +14,7 @@ categories.workspace = true
 
 [features]
 default = ["std", "markdown"]
-# Enables the std-only surface: the assembled router (`router()`/`RouterPlugin`),
+# Enables the std-only surface: the scene-rendering router pieces (help/navigate
 # scene routes + rendering (`beet_ui`), media parsing, sidebar, help, and static
 # export. The no_std core — route tree, path patterns, navigation, standalone
 # middleware, and the server-action client — builds with this off.
@@ -39,8 +39,16 @@ markdown = ["std", "dep:pulldown-cmark"]
 html_parser = ["std", "beet_ui/html_parser"]
 markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["std", "beet_net/server"]
-world_serde = ["beet_core/world_serde","bevy/bevy_world_serialization", "serde"]
+# beet_router's only world_serde use is rebuilding route trees on a
+# `WorldSerdeLoaded` event, which comes from `beet_core/world_serde` (beet's
+# own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
+# drags in `bevy_asset` (std) and so breaks no_std consumers.
+world_serde = ["beet_core/world_serde", "serde"]
+# Generic scripting registration (the `Script`/`ExchangeScript` reflect types).
+# Backend-agnostic; pair with a backend (eg `rhai`) for a working runtime.
 scripting = ["std", "beet_action/scripting", "serde"]
+# rhai backend for the scripting registrations above.
+rhai = ["scripting", "beet_action/rhai"]
 # Build-time code generation: route tree, server/client actions, typed links.
 codegen = [
 	"std",

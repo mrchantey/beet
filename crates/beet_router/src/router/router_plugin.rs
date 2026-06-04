@@ -2,16 +2,21 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+#[cfg(feature = "std")]
 use beet_ui::prelude::*;
+#[cfg(feature = "std")]
 use bevy::asset::AssetPlugin;
 
 
 /// Plugin that registers route-building observers for actions.
 ///
-/// Automatically constructs a [`RouteTree`] on the root ancestor
-/// whenever actions are spawned in an entity hierarchy. Scene routes
-/// register as actions (via [`RenderRoot`] + [`ActionMeta`]), so there
-/// is no separate scene observer.
+/// Automatically constructs a [`RouteTree`] on the root ancestor whenever
+/// actions are spawned in an entity hierarchy. The route-building observers are
+/// shared across std and no_std; the std build additionally wires the scene /
+/// asset / charcell rendering pipeline and the reflect registrations the
+/// help/scene routes and `world_serde`/scripting need (all std-only). Scene
+/// routes register as actions (via [`RenderRoot`] + [`ActionMeta`]), so there is
+/// no separate scene observer.
 #[derive(Default)]
 pub struct RouterPlugin;
 
@@ -19,17 +24,16 @@ impl Plugin for RouterPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<ActionPlugin>()
 			.init_plugin::<AsyncPlugin>()
-			// scene routes render through the charcell layout/paint pipeline
-			// (help pages, markdown/html scenes → ANSI/text); without it the
-			// `PostParseTree` schedule has no systems and ANSI output is blank.
-			.init_plugin::<CharcellPlugin>()
-			// `scene_route` spawns Bevy scenes per request; needs the
-			// AssetServer and ScenePatch asset machinery.
-			.init_plugin::<AssetPlugin>()
-			.init_plugin::<ScenePlugin>()
-			.register_type::<HelpHandler>()
-			.register_type::<NavigateHandler>()
-			.register_type::<InterruptOnRun>()
+			.add_observer(insert_action_path_and_params)
+			.add_observer(insert_path_pattern_for_late_path_partial)
+			.add_observer(insert_route_tree);
+
+		// no_std-core reflect registrations: these types are shared across std
+		// and no_std and reflection works on bare metal, so register them
+		// unconditionally to keep scene-loading reflection available on no_std.
+		// `register_type` initialises the `AppTypeRegistry` if the app has not
+		// added one, so this is safe without an explicit registry.
+		app.register_type::<InterruptOnRun>()
 			.register_type::<InterruptOnEnd>()
 			.register_type::<PathPartial>()
 			.register_type::<ParamsPartial>()
@@ -40,18 +44,35 @@ impl Plugin for RouterPlugin {
 			.register_type::<CorsHandler>()
 			.register_type::<CorsConfig>()
 			.register_type::<HtmlStoreAction>()
-			.register_type::<Router>()
-			.add_observer(insert_action_path_and_params)
-			.add_observer(insert_path_pattern_for_late_path_partial)
-			.add_observer(insert_route_tree);
-		#[cfg(feature = "world_serde")]
-		app.add_observer(rebuild_route_trees_on_load);
-		#[cfg(feature = "scripting")]
-		app.register_type::<Script<RequestParts, String>>()
-			.register_type::<ExchangeScript<(), String>>()
-			.register_type::<
-				ExchangeScript<RequestParts, String, RequestParts, SerdeIntoResponseMarker>,
-			>();
+			.register_type::<Router>();
+
+		// std-only: the scene/asset/charcell rendering pipeline (help pages,
+		// markdown/html scenes → ANSI/text) and the reflect registrations for
+		// the help/navigate middleware, which live in the std-only `help` /
+		// `navigate` render-media modules. no_std routers dispatch and fall back
+		// to plain text without any of this.
+		#[cfg(feature = "std")]
+		{
+			app
+				// scene routes render through the charcell layout/paint pipeline;
+				// without it the `PostParseTree` schedule has no systems and ANSI
+				// output is blank.
+				.init_plugin::<CharcellPlugin>()
+				// `scene_route` spawns Bevy scenes per request; needs the
+				// AssetServer and ScenePatch asset machinery.
+				.init_plugin::<AssetPlugin>()
+				.init_plugin::<ScenePlugin>()
+				.register_type::<HelpHandler>()
+				.register_type::<NavigateHandler>();
+			#[cfg(feature = "world_serde")]
+			app.add_observer(rebuild_route_trees_on_load);
+			#[cfg(feature = "scripting")]
+			app.register_type::<Script<RequestParts, String>>()
+				.register_type::<ExchangeScript<(), String>>()
+				.register_type::<
+					ExchangeScript<RequestParts, String, RequestParts, SerdeIntoResponseMarker>,
+				>();
+		}
 	}
 }
 

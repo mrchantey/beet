@@ -21,7 +21,6 @@ pub use bevy::scene::Scene;
 pub use bevy::scene::SceneComponent;
 pub use bevy::scene::SceneList;
 pub use bevy::scene::ScenePlugin;
-pub use bevy::scene::WorldSceneExt;
 pub use bevy::scene::on;
 pub use bevy::scene::template_value;
 // re-exported so `rsx!` output can name the child relationship

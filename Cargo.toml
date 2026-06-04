@@ -187,7 +187,13 @@ smol_str = { version = "0.2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 # no_std by default (alloc only); std consumers re-enable `serde_json/std`.
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
-rhai = { version = "1", features = ["serde"] }
+# std/no_std mode + serde are selected by beet_action's feature flags
+# (`rhai` for std scripting, `rhai_no_std` for embedded), so no defaults here.
+rhai = { version = "1", default-features = false }
+# QuickJS engine via high-level bindings to the bundled C engine. `rust-alloc`
+# routes allocation through Rust's global allocator instead of libc's malloc; the
+# std vs bare-metal mode is selected on beet_action's `quickjs` feature edge.
+rquickjs = { version = "0.12", default-features = false, features = ["rust-alloc"] }
 postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
@@ -280,12 +286,29 @@ bevy_multithreaded = ["beet_core/bevy_multithreaded", "beet_net?/bevy_multithrea
 
 # 💡 Net
 
-net = ["dep:beet_net", "beet_router?/http"]
+# Note: `net` deliberately does NOT enable `beet_router/http` — that would pull
+# beet_router's std HTTP-server surface, which a no_std consumer (`router_embedded`)
+# must avoid. The std `router`/`http_server` features re-add it explicitly.
+net = ["dep:beet_net"]
+# The agnostic mDNS service browser engine + pure wire helpers (no_std). esp
+# enables this for the browser and supplies its own `edge-nal`-backed UDP socket
+# impl; on a host, pair with `udp` to get the std `async-io` socket driver.
+mdns = ["net", "beet_net/mdns"]
+# The std impl of beet_net's trait-only UDP socket seam over `async-io` (the
+# `UdpEndpoint`/`UdpSocket` trait itself is in `net`, always no_std). Needed by
+# the std mDNS browser driver `run_mdns_browser`.
+udp = ["net", "beet_net/udp"]
 native-tls = [
 "net", "beet_net/native-tls",
 ]
-# beet_net is a hard dependency of beet_router
-router = ["scene", "action", "net", "dep:beet_router"]
+# beet_net is a hard dependency of beet_router. The facade pins beet_router to
+# `default-features = false`, so the std router must re-enable the std + markdown
+# + http surface it relied on (previously supplied by default features + net).
+router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http"]
+# no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
+# dispatch and middleware core from beet_router, without the std scene/help
+# rendering pipeline. See `beet_router`'s `embedded` module.
+router_embedded = ["action", "net", "dep:beet_router"]
 rustls-tls = [
 "net", "beet_net/rustls-tls",
 ]
@@ -308,9 +331,25 @@ thread = ["dep:beet_thread","net","action"]
 
 # 💡 Stack
 
-action = ["dep:beet_action","beet_ui?/action"]
+# When beet_net is also present (eg `router_embedded`), turn on its no_std
+# action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
+# are available on bare-metal targets too.
+action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
+# Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pair with a
+# backend (eg `rhai`) and `rhai_serde` for a working typed `Script`.
+scripting = ["action","beet_action/scripting"]
+# The rhai engine, re-exported via `beet::exports::rhai`. Bare engine for
+# embedded consumers (no_std, no serde, no router registrations).
 rhai = ["action","beet_action/rhai"]
-scripting = ["action","beet_action/scripting", "beet_router?/scripting"]
+# The std typed-`Script` rhai backend: the serde marshalling runtime plus the
+# beet_router scripting registrations. Pulls `rhai` + `serde` + `std`.
+rhai_serde = ["rhai","serde","std","beet_action/rhai_serde","beet_router?/scripting"]
+# The QuickJS engine, re-exported via `beet::exports::rquickjs`. Bare engine for
+# consumers that marshal values by hand (no serde, no router registrations).
+quickjs = ["action","beet_action/quickjs"]
+# The std typed-`Script` QuickJS backend: the JSON marshalling runtime plus the
+# beet_router scripting registrations. Pulls `quickjs` + `serde` + `std`.
+quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
 # Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
 # Sidebar, Table). Heavy + std-only, so it stays opt-in.
@@ -358,7 +397,10 @@ beet_infra = { workspace = true, optional = true }
 beet_thread = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 beet_ui = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
+# Declared explicitly (not via `workspace = true`) so the facade can set
+# `default-features = false`: no_std consumers (`router_embedded`) get the no_std
+# core; the std `router` feature re-adds `beet_router/std` (+ markdown + http).
+beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11", optional = true, default-features = false }
 beet_action = { workspace = true, optional = true }
 
 #💡 web
@@ -495,12 +537,12 @@ required-features = ["router", "markdown"]
 [[example]]
 name = "cli"
 path = "examples/router/cli.rs"
-required-features = ["router", "serde", "scripting"]
+required-features = ["router", "rhai_serde"]
 
 [[example]]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
-required-features = ["router", "serde", "scripting", "world_serde"]
+required-features = ["router", "rhai_serde", "world_serde"]
 
 [[example]]
 name = "file_based_routes"
@@ -578,7 +620,7 @@ required-features = ["action"]
 [[example]]
 name = "scripting"
 path = "examples/action/scripting.rs"
-required-features = ["scripting"]
+required-features = ["rhai_serde"]
 
 [[example]]
 name = "behavior_tree"

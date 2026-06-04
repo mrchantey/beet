@@ -45,9 +45,7 @@ mod test {
 	#[beet_core::test]
 	async fn sets_no_cache_headers() {
 		let response = router_world()
-			.spawn((router(), NoCacheHeaders, children![exchange_route(
-				"", Hello
-			)]))
+			.spawn(((default_router(), children![exchange_route("", Hello)]), NoCacheHeaders))
 			.call::<Request, Response>(Request::get(""))
 			.await
 			.unwrap();

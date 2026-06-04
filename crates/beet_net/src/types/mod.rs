@@ -55,16 +55,17 @@ mod http_method;
 mod status_code;
 pub use http_method::*;
 pub use status_code::*;
-#[cfg(feature = "http")]
 pub mod http_ext;
 
-// higher-level exchange patterns built on the action system (std-only)
-#[cfg(feature = "std")]
+// higher-level exchange patterns built on the action system. `exchange` only
+// needs `beet_action`, so it rides the no_std-capable `action` feature;
+// `exchange_stats` stays std-only (it backs the std `HttpServer` requirement).
+#[cfg(feature = "action")]
 mod exchange;
 #[cfg(feature = "std")]
 mod exchange_stats;
 mod extractors;
-#[cfg(feature = "std")]
+#[cfg(feature = "action")]
 pub use exchange::*;
 #[cfg(feature = "std")]
 pub use exchange_stats::*;

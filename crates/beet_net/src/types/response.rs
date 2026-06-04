@@ -256,6 +256,21 @@ impl Response {
 		}
 	}
 
+	/// Create an OK (200) response with a plain-text body.
+	pub fn ok_text(text: impl Into<Body>) -> Self {
+		Self::ok_body(text, MediaType::Text)
+	}
+
+	/// Create a response with the given status and a plain-text body.
+	pub fn status_text(status: StatusCode, text: impl Into<Body>) -> Self {
+		let mut parts = ResponseParts::new(status);
+		parts.headers.set_content_type(MediaType::Text);
+		Self {
+			parts,
+			body: text.into(),
+		}
+	}
+
 	/// Create a response with the given body, inferring the content type
 	/// from the path's extension via [`SmolPath::media_type`].
 	/// Defaults to `application/octet-stream` for unrecognized extensions.

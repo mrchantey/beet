@@ -637,6 +637,29 @@ impl AsyncEntity {
 		})
 	}
 
+	/// Runs a function with mutable access to the whole [`World`] alongside this
+	/// entity's id, returning its output.
+	///
+	/// Errors if the entity has been despawned. Prefer [`Self::with`] when only
+	/// the [`EntityWorldMut`] is needed; reach for this when a handler must touch
+	/// the wider world (eg spawn or despawn sibling entities) and still know the
+	/// caller's id.
+	pub fn with_world<O>(
+		&self,
+		func: impl 'static + Send + FnOnce(&mut World, Entity) -> O,
+	) -> impl Future<Output = Result<O>> + Send
+	where
+		O: 'static + Send + Sync,
+	{
+		let entity = self.entity;
+		self.world.with(move |world: &mut World| -> Result<O> {
+			if world.get_entity(entity).is_err() {
+				bevybail!("Entity {entity:?} despawned");
+			}
+			func(world, entity).xok()
+		})
+	}
+
 	/// Runs a function with access to the entity id and a [`SystemParam`].
 	///
 	/// Errors if the entity has been despawned.
