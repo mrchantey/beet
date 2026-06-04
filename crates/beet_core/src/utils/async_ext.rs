@@ -58,13 +58,14 @@ pub type LifetimeSendBoxedFuture<'a, T> =
 	Pin<Box<dyn 'a + Send + Future<Output = T>>>;
 
 cfg_if! {
-	if #[cfg(target_arch = "wasm32")] {
-		/// A BoxedFuture which is `Send` on non-wasm32 targets with bevy_multithreaded enabled
-		pub type MaybeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
-	} else {
-		/// A BoxedFuture which is `Send` on non-wasm32 targets with bevy_multithreaded enabled
+	// `Send` only in multi-threaded native builds, matching [`MaybeSend`].
+	if #[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))] {
+		/// A boxed [`Future`], `Send` only in multi-threaded native builds (matching [`MaybeSend`]).
 		pub type MaybeSendBoxedFuture<'a, T> =
 			Pin<Box<dyn 'a + Send + Future<Output = T>>>;
+	} else {
+		/// A boxed [`Future`], `Send` only in multi-threaded native builds (matching [`MaybeSend`]).
+		pub type MaybeSendBoxedFuture<'a, T> = Pin<Box<dyn 'a + Future<Output = T>>>;
 	}
 }
 
@@ -108,7 +109,16 @@ where
 	F: Future + 'static + MaybeSend + MaybeSync,
 	F::Output: 'static + MaybeSend + MaybeSync,
 {
-	bevy::tasks::IoTaskPool::get().spawn(fut)
+	cfg_if! {
+		// `IoTaskPool::spawn` requires `Send` whenever bevy's `multi_threaded`
+		// feature is active; only here is the future guaranteed `Send` (matching
+		// [`MaybeSend`]). Otherwise spawn locally, which never requires it.
+		if #[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))] {
+			bevy::tasks::IoTaskPool::get().spawn(fut)
+		} else {
+			bevy::tasks::IoTaskPool::get().spawn_local(fut)
+		}
+	}
 }
 
 /// Error returned when an async operation times out.

@@ -162,35 +162,49 @@ struct AsyncSpawnerInner {
 
 impl Default for AsyncSpawner {
 	fn default() -> Self {
-		Self(Arc::new(AsyncSpawnerInner {
-			in_flight: AtomicUsize::new(0),
+		let spawn: Box<dyn Fn(SpawnFut) + Send + Sync>;
+		let spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>;
+		cfg_if! {
 			// wasm: bevy `spawn_local` uses the JS event loop, which the
 			// synchronous bridge driver cannot tick. Use our own tickable
 			// executor instead (see `tick_bridge_executor`).
-			#[cfg(target_arch = "wasm32")]
-			spawn: Box::new(|fut| {
-				BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
-			}),
-			#[cfg(target_arch = "wasm32")]
-			spawn_local: Box::new(|fut| {
-				BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
-			}),
-			#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-			spawn: Box::new(|fut| {
-				bevy::tasks::IoTaskPool::get().spawn(fut).detach();
-			}),
-			#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-			spawn_local: Box::new(|fut| {
-				bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
-			}),
-			#[cfg(not(feature = "std"))]
-			spawn: Box::new(|_| {
-				panic!("no default AsyncSpawner on no_std; insert one manually")
-			}),
-			#[cfg(not(feature = "std"))]
-			spawn_local: Box::new(|_| {
-				panic!("no default AsyncSpawner on no_std; insert one manually")
-			}),
+			if #[cfg(target_arch = "wasm32")] {
+				spawn = Box::new(|fut| {
+					BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+				});
+				spawn_local = Box::new(|fut| {
+					BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+				});
+			} else if #[cfg(all(feature = "std", feature = "bevy_multithreaded"))] {
+				spawn = Box::new(|fut| {
+					bevy::tasks::IoTaskPool::get().spawn(fut).detach();
+				});
+				spawn_local = Box::new(|fut| {
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
+				});
+			} else if #[cfg(feature = "std")] {
+				// `SpawnFut` is not `Send` here, so it cannot go through `spawn`
+				// (which requires `Send` whenever bevy's `multi_threaded` feature
+				// is active); spawn it locally instead.
+				spawn = Box::new(|fut| {
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
+				});
+				spawn_local = Box::new(|fut| {
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
+				});
+			} else {
+				spawn = Box::new(|_| {
+					panic!("no default AsyncSpawner on no_std; insert one manually")
+				});
+				spawn_local = Box::new(|_| {
+					panic!("no default AsyncSpawner on no_std; insert one manually")
+				});
+			}
+		}
+		Self(Arc::new(AsyncSpawnerInner {
+			in_flight: AtomicUsize::new(0),
+			spawn,
+			spawn_local,
 		}))
 	}
 }
