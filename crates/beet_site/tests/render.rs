@@ -8,7 +8,7 @@ use beet_site::prelude::*;
 fn site_world() -> World {
 	(
 		RouterPlugin,
-		material::MaterialStylePlugin::new(palettes::basic::BLUE),
+		material::MaterialStylePlugin::new(palettes::basic::GREEN),
 	)
 		.into_world()
 		.xtap(|world| world.insert_resource(pkg_config!()))

@@ -11,50 +11,67 @@ use beet_ui::prelude::*;
 use beet_ui::*;
 
 fn main() {
-	println!("=== Beet Layout Engine Demo ===\n");
+	let size = terminal_ext::size();
+	println!("=== Beet Layout Engine Demo ({}×{}) ===\n", size.x, size.y);
 
-	render("JustifyContent::Start", setup_justify_start);
-	render("JustifyContent::Center", setup_justify_center);
-	render("JustifyContent::End", setup_justify_end);
-	render("JustifyContent::SpaceBetween", setup_justify_space_between);
-	render("JustifyContent::SpaceAround", setup_justify_space_around);
-	render("JustifyContent::SpaceEvenly", setup_justify_space_evenly);
+	let mut overflow = 0;
+	overflow += render("JustifyContent::Start", setup_justify_start);
+	overflow += render("JustifyContent::Center", setup_justify_center);
+	overflow += render("JustifyContent::End", setup_justify_end);
+	overflow += render("JustifyContent::SpaceBetween", setup_justify_space_between);
+	overflow += render("JustifyContent::SpaceAround", setup_justify_space_around);
+	overflow += render("JustifyContent::SpaceEvenly", setup_justify_space_evenly);
 
-	render("AlignItems::Start", setup_align_start);
-	render("AlignItems::Center", setup_align_center);
-	render("AlignItems::End", setup_align_end);
-	render("AlignItems::Stretch", setup_align_stretch);
+	overflow += render("AlignItems::Start", setup_align_start);
+	overflow += render("AlignItems::Center", setup_align_center);
+	overflow += render("AlignItems::End", setup_align_end);
+	overflow += render("AlignItems::Stretch", setup_align_stretch);
 
-	render("Row and Column Gaps", setup_gaps);
-	render("Flex Grow", setup_flex_grow);
-	render("No Wrap", setup_no_wrap);
-	render("Wrap", setup_wrap);
-	render("Nested Rows and Columns", setup_nested);
+	overflow += render("Row and Column Gaps", setup_gaps);
+	overflow += render("Flex Grow", setup_flex_grow);
+	overflow += render("No Wrap", setup_no_wrap);
+	overflow += render("Wrap", setup_wrap);
+	overflow += render("Nested Rows and Columns", setup_nested);
 
-	render("Margin Only", setup_margin_only);
-	render("Border Only", setup_border_only);
-	render("Padding Only", setup_padding_only);
-	render("Margin + Border + Padding", setup_all_spacing);
+	overflow += render("Margin Only", setup_margin_only);
+	overflow += render("Border Only", setup_border_only);
+	overflow += render("Padding Only", setup_padding_only);
+	overflow += render("Margin + Border + Padding", setup_all_spacing);
 
 	// Style demos (ANSI color output)
-	render("Foreground Color", setup_foreground_color);
-	render("Background Color", setup_background_color);
-	render("Border Color (per-side)", setup_border_color);
-	render("Text Formatting", setup_text_formatting);
-	render("Text Italic", setup_text_italic);
-	render("Text Blink", setup_text_blink);
-	render("Text Hidden", setup_text_hidden);
-	render("Inline Layout", setup_inline_basic);
-	render("Inline Wrap", setup_inline_wrap);
-	render("Text Align", setup_text_align);
-	render("Wide Characters (CJK)", setup_wide_chars);
+	overflow += render("Foreground Color", setup_foreground_color);
+	overflow += render("Background Color", setup_background_color);
+	overflow += render("Border Color (per-side)", setup_border_color);
+	overflow += render("Text Formatting", setup_text_formatting);
+	overflow += render("Text Italic", setup_text_italic);
+	overflow += render("Text Blink", setup_text_blink);
+	overflow += render("Text Hidden", setup_text_hidden);
+	overflow += render("Inline Layout", setup_inline_basic);
+	overflow += render("Inline Wrap", setup_inline_wrap);
+	overflow += render("Text Align", setup_text_align);
+	overflow += render("Wide Characters (CJK)", setup_wide_chars);
+
+	// Render width must never exceed the measured terminal width, otherwise the
+	// terminal soft-wraps and every box appears one column too wide.
+	println!();
+	match overflow {
+		0 => println!("✓ all lines render within the {}-column terminal", size.x),
+		n => println!("✗ {n} line(s) exceeded the {}-column terminal", size.x),
+	}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn render<B: Bundle>(name: &str, setup: fn() -> B) {
+/// Render a demo and return the number of lines wider than the terminal.
+fn render<B: Bundle>(name: &str, setup: fn() -> B) -> usize {
+	let width = terminal_ext::size().x as usize;
 	let out = Buffer::render_oneshot(setup()).trim_lines();
+	let over = out.lines().filter(|line| display_width(line) > width).count();
 	println!("\n{name}: \n{out}");
+	if over > 0 {
+		println!("  ⚠ {over} line(s) exceed the {width}-column width");
+	}
+	over
 }
 
 fn bordered() -> BoxStyle {

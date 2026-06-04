@@ -36,9 +36,10 @@ pub use flex_buffer::*;
 pub use input::*;
 pub use layout::LayoutRect;
 pub use measure::IntrinsicSize;
-pub use paint::*;
+// paint/prepare expose the crate-internal `CharcellTree`, so they stay crate-visible
+pub(crate) use paint::*;
 pub use plugin::*;
-pub use prepare::*;
+pub(crate) use prepare::*;
 #[cfg(feature = "terminal")]
 pub use terminal::*;
 
@@ -47,4 +48,5 @@ pub(self) use flex::*;
 pub(self) use inline::*;
 pub(self) use layout::*;
 pub(self) use measure::*;
+pub use text::display_width;
 pub(self) use text::*;

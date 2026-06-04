@@ -51,6 +51,18 @@ pub trait AsBuffer {
 	/// Write a cell at `pos`. Out-of-bounds writes are dropped.
 	fn set(&mut self, pos: UVec2, cell: Cell);
 
+	/// Set a cell, composing it over the destination: a cell with no background
+	/// of its own keeps the background already present. Terminal cells are
+	/// opaque, so this is how a glyph or border shows the fill beneath it rather
+	/// than punching a transparent hole in it.
+	fn set_composite(&mut self, pos: UVec2, mut cell: Cell) {
+		if cell.style.background.is_none() {
+			cell.style.background =
+				self.get(pos).and_then(|existing| existing.style.background);
+		}
+		self.set(pos, cell);
+	}
+
 	/// Reset all cells to [`Cell::BLANK`].
 	fn clear(&mut self);
 
@@ -79,23 +91,24 @@ pub trait AsBuffer {
 		for ch in text.chars() {
 			let w = unicode_width(ch) as u32;
 			let cell_pos = UVec2::new(pos.x + col, pos.y);
-			if cell_pos.x >= self.size().x {
+			// a wide glyph displays 2 columns, so stop before one that can't fit
+			// both rather than overflowing the right edge by a column.
+			if cell_pos.x + w > self.size().x {
 				break;
 			}
-			self.set(
+			// glyphs compose over the cell beneath them (see `set_composite`),
+			// keeping the page/code surface fill rather than punching a hole.
+			self.set_composite(
 				cell_pos,
 				Cell::new(ch.to_string(), style.clone(), entity),
 			);
 			// placeholder for the trailing column of a wide character
 			if w == 2 {
-				let cont_pos = UVec2::new(pos.x + col + 1, pos.y);
-				if cont_pos.x < self.size().x {
-					self.set(cont_pos, Cell {
-						symbol: None,
-						style: style.clone(),
-						entity: Some(entity),
-					});
-				}
+				self.set_composite(UVec2::new(cell_pos.x + 1, pos.y), Cell {
+					symbol: None,
+					style: style.clone(),
+					entity: Some(entity),
+				});
 			}
 			col += w;
 		}
@@ -219,7 +232,20 @@ impl AsBuffer for Buffer {
 
 // ── Rendering ───────────────────────────────────────────────────────────────
 
+/// Exclusive end column for a row: one past its last [significant](Cell::is_significant)
+/// cell, so trailing blank padding is dropped while background fills are kept.
+fn row_render_end(cells: &[Cell], width: usize, y: usize) -> usize {
+	let row = &cells[y * width..y * width + width];
+	row.iter()
+		.rposition(Cell::is_significant)
+		.map(|idx| idx + 1)
+		.unwrap_or(0)
+}
+
 /// Render a row-major cell grid (`width × height`) to plain text.
+///
+/// Trailing blank padding is trimmed per row (see [`row_render_end`]) so rows
+/// render ragged rather than padded to the full width.
 pub(crate) fn render_cells_plain(
 	cells: &[Cell],
 	width: usize,
@@ -227,7 +253,7 @@ pub(crate) fn render_cells_plain(
 ) -> String {
 	let mut result = String::with_capacity(cells.len());
 	for y in 0..height {
-		for x in 0..width {
+		for x in 0..row_render_end(cells, width, y) {
 			let cell = &cells[y * width + x];
 			// skip trailing columns of wide characters
 			if cell.is_wide_continuation() {
@@ -259,7 +285,7 @@ pub(crate) fn render_cells_ansi(
 	let mut prev_link: Option<SmolStr> = None;
 
 	for y in 0..height {
-		for x in 0..width {
+		for x in 0..row_render_end(cells, width, y) {
 			let cell = &cells[y * width + x];
 			// trailing column of a wide char emits nothing and keeps the
 			// current link/style state intact.
@@ -292,32 +318,22 @@ pub(crate) fn render_cells_ansi(
 				out.push(b' ');
 			}
 		}
+		// reset at the end of each row so an active background (eg an app bar
+		// fill reaching the edge) can't bleed across the newline via the
+		// terminal's back-colour-erase.
+		if prev_style.is_some() {
+			out.extend_from_slice(escape::RESET.as_bytes());
+			prev_style = None;
+		}
+		if prev_link.is_some() {
+			write_osc8(&mut out, None);
+			prev_link = None;
+		}
 		if y + 1 < height {
 			out.push(b'\n');
 		}
 	}
-	if prev_style.is_some() {
-		out.extend_from_slice(escape::RESET.as_bytes());
-	}
-	if prev_link.is_some() {
-		write_osc8(&mut out, None);
-	}
 	String::from_utf8_lossy(&out).into_owned()
-}
-
-/// Trim trailing spaces from each line, leaving escape sequences intact.
-///
-/// Used by the stdout [`FlexBuffer`] so width-padded rows render ragged (and
-/// blank rows become truly empty), matching terminal text conventions.
-pub(crate) fn trim_line_trailing(rendered: &str) -> String {
-	let mut out = String::with_capacity(rendered.len());
-	for (idx, line) in rendered.split('\n').enumerate() {
-		if idx > 0 {
-			out.push('\n');
-		}
-		out.push_str(line.trim_end_matches(' '));
-	}
-	out
 }
 
 /// Write an OSC-8 hyperlink sequence: opening with `url`, or closing for `None`.
@@ -371,6 +387,17 @@ impl Cell {
 	/// occupies both columns).
 	pub fn is_wide_continuation(&self) -> bool {
 		self.symbol.is_none() && self.entity.is_some()
+	}
+
+	/// Whether the cell must be emitted rather than trimmed as trailing padding.
+	///
+	/// A glyph other than a blank space is always significant, as is any cell
+	/// carrying a background fill (so a full-width app bar or code surface keeps
+	/// its colour to the edge). Truly blank padding (`Cell::BLANK` or an
+	/// unstyled space) is trimmed from the end of each row.
+	pub fn is_significant(&self) -> bool {
+		self.symbol.as_deref().is_some_and(|symbol| symbol != " ")
+			|| self.style.background.is_some()
 	}
 
 	/// Display width in terminal columns. Wide chars (CJK, fullwidth) = 2.

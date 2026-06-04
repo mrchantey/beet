@@ -143,7 +143,6 @@ pub(super) fn draw_border(
 	node: &CharcellNodeData,
 ) {
 	let box_style = node.box_style();
-	let visual = node.visual_style();
 	let entity = node.entity;
 
 	let width = rect.width();
@@ -153,67 +152,67 @@ pub(super) fn draw_border(
 		return; // too small for a border
 	}
 
-	let top_style = side_style(box_style.and_then(|b| b.border_top), visual);
-	let bottom_style =
-		side_style(box_style.and_then(|b| b.border_bottom), visual);
-	let left_style = side_style(box_style.and_then(|b| b.border_left), visual);
-	let right_style =
-		side_style(box_style.and_then(|b| b.border_right), visual);
+	let top_style = side_style(box_style.and_then(|b| b.border_top));
+	let bottom_style = side_style(box_style.and_then(|b| b.border_bottom));
+	let left_style = side_style(box_style.and_then(|b| b.border_left));
+	let right_style = side_style(box_style.and_then(|b| b.border_right));
 
 	let (left, right) = (rect.min.x, rect.max.x - 1);
 	let (top, bottom) = (rect.min.y, rect.max.y - 1);
 
 	if sides.all() {
 		// full box: corners join the sides
-		buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set(UVec2::new(right, top), Cell::new("┐", top_style.clone(), entity));
-		buffer.set(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
-		buffer.set(UVec2::new(right, bottom), Cell::new("┘", bottom_style.clone(), entity));
+		buffer.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, top), Cell::new("┐", top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, bottom), Cell::new("┘", bottom_style.clone(), entity));
 	}
 
 	// horizontal edges span the full width (corners overwrite the ends above)
 	if sides.top {
 		for x in left..=right {
-			buffer.set(UVec2::new(x, top), Cell::new("─", top_style.clone(), entity));
+			buffer.set_composite(UVec2::new(x, top), Cell::new("─", top_style.clone(), entity));
 		}
 	}
 	if sides.bottom {
 		for x in left..=right {
-			buffer.set(UVec2::new(x, bottom), Cell::new("─", bottom_style.clone(), entity));
+			buffer.set_composite(UVec2::new(x, bottom), Cell::new("─", bottom_style.clone(), entity));
 		}
 	}
 	// vertical edges span the full height
 	if sides.left {
 		for y in top..=bottom {
-			buffer.set(UVec2::new(left, y), Cell::new("│", left_style.clone(), entity));
+			buffer.set_composite(UVec2::new(left, y), Cell::new("│", left_style.clone(), entity));
 		}
 	}
 	if sides.right {
 		for y in top..=bottom {
-			buffer.set(UVec2::new(right, y), Cell::new("│", right_style.clone(), entity));
+			buffer.set_composite(UVec2::new(right, y), Cell::new("│", right_style.clone(), entity));
 		}
 	}
 
 	if sides.all() {
 		// re-draw corners so they sit on top of the straight edges
-		buffer.set(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set(UVec2::new(right, top), Cell::new("┐", top_style, entity));
-		buffer.set(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
-		buffer.set(UVec2::new(right, bottom), Cell::new("┘", bottom_style, entity));
+		buffer.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, top), Cell::new("┐", top_style, entity));
+		buffer.set_composite(UVec2::new(left, bottom), Cell::new("└", bottom_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, bottom), Cell::new("┘", bottom_style, entity));
 	}
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// Build a [`VisualStyle`] for one border side, using the provided color as
-/// the foreground and inheriting the background from the visual style.
-pub(super) fn side_style(
-	border_color: Option<Color>,
-	visual: &VisualStyle,
-) -> VisualStyle {
+/// Build a [`VisualStyle`] for one border side, using the provided color as the
+/// foreground and no background of its own.
+///
+/// Border cells are written with [`set_composite`](AsBuffer::set_composite), so
+/// they pick up whatever fill already sits beneath them: the node's own
+/// background where its inner fill reached, the page otherwise. A lone divider
+/// (eg an app bar's bottom border) thus reads on the page rather than carrying
+/// the bar's surface one row past its content.
+pub(super) fn side_style(border_color: Option<Color>) -> VisualStyle {
 	VisualStyle {
 		foreground: border_color,
-		background: visual.background,
 		..default()
 	}
 }

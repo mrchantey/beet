@@ -145,6 +145,14 @@ fn collect_inline_runs(
 ) -> Vec<InlineRun> {
 	let mut runs = Vec::new();
 	collect_runs_inner(node, query, None, &mut runs);
+	// descendant runs with no background of their own (eg syntax-highlighted
+	// spans) inherit the IFC owner's fill, so a `<pre>` background paints behind
+	// every run rather than leaving holes where coloured spans overwrite it.
+	if let Some(background) = node.visual_style().background {
+		for run in &mut runs {
+			run.style.background.get_or_insert(background);
+		}
+	}
 	runs
 }
 
@@ -482,6 +490,27 @@ mod pipeline_tests {
 		// outside <pre>, an embedded newline collapses to a space in the flow
 		render(UVec2::new(40, 5), rsx_direct!{ <p>"alpha\nbeta"</p> })
 			.xpect_eq("alpha beta");
+	}
+
+	#[beet_core::test]
+	fn paragraph_tail_survives_narrow_column() {
+		use crate::prelude::style::*;
+		// a paragraph laid out in a grow column narrower than its natural width
+		// wraps into more rows than measured at the viewport width; its reserved
+		// height must follow the assigned width so the tail is not clipped.
+		let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa";
+		let out = FlexBuffer::render_oneshot_plain(40, (
+			LayoutStyle::flex_row(),
+			children![
+				(rsx_direct!{ "SIDEBARWIDTH" }, LayoutStyle::default()),
+				(
+					LayoutStyle::default().with_flex_grow(1),
+					children![ rsx_direct!{ <p>{text}</p> } ],
+				),
+			],
+		));
+		// every word, including the last, makes it into the flowed column
+		out.as_str().xpect_contains("alpha").xpect_contains("kappa");
 	}
 
 	#[beet_core::test]

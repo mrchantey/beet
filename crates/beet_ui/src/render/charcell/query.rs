@@ -104,7 +104,7 @@ fn resolve_render_ref(refs: &Query<&RenderRef>, mut entity: Entity) -> Entity {
 /// queries and re-deriving the resolution. Its orderings match
 /// [`CharcellNodeData::child_nodes`], so the per-entity rect map keys line up.
 #[derive(SystemParam)]
-pub(super) struct CharcellTree<'w, 's> {
+pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	refs: Query<'w, 's, &'static RenderRef>,
 }

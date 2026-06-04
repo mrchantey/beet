@@ -36,6 +36,12 @@ name = "showcase"
 path = "examples/showcase.rs"
 required-features = ["scene", "style"]
 
+# measures the real terminal via crossterm, so requires the `terminal` feature
+[[example]]
+name = "layout"
+path = "examples/layout.rs"
+required-features = ["terminal"]
+
 
 [features]
 default = ["std","rsx", "style"]

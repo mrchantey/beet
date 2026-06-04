@@ -1,5 +1,6 @@
 use super::*;
 use beet_core::prelude::*;
+use bevy::math::URect;
 use bevy::math::UVec2;
 
 /// Sentinel viewport height for a [`FlexBuffer`].
@@ -77,25 +78,25 @@ impl FlexBuffer {
 	}
 
 	/// Render to plain text (no ANSI styling), trimming trailing blank rows and
-	/// per-line trailing spaces.
+	/// per-row trailing blank padding.
 	pub fn render_plain(&self) -> String {
-		trim_line_trailing(&render_cells_plain(
+		render_cells_plain(
 			&self.cells,
 			self.width as usize,
 			self.render_height() as usize,
-		))
+		)
 	}
 
 	/// Render to a string with ANSI styling and OSC-8 hyperlinks, trimming
-	/// trailing blank rows and per-line trailing spaces.
+	/// trailing blank rows and per-row trailing blank padding.
 	pub fn render(&self) -> String {
 		let links = &self.links;
-		trim_line_trailing(&render_cells_ansi(
+		render_cells_ansi(
 			&self.cells,
 			self.width as usize,
 			self.render_height() as usize,
 			|pos| links.get(&pos).cloned(),
-		))
+		)
 	}
 }
 
@@ -121,6 +122,25 @@ impl AsBuffer for FlexBuffer {
 		self.ensure_rows(pos.y + 1);
 		if let Some(idx) = self.index(pos) {
 			self.cells[idx] = cell;
+		}
+	}
+
+	/// Fill `rect`, growing the backing rows to back a finite region.
+	///
+	/// A node paints its background before its content, so without growth a fill
+	/// that lands above the current high-water mark (eg the app bar, painted
+	/// pre-order before any text) would clamp to nothing. A sentinel-tall fill
+	/// (the root viewport) is left to lazy growth so it can't balloon the
+	/// allocation.
+	fn fill_rect(&mut self, rect: URect, cell: Cell) {
+		if rect.max.y < AUTO_GROW_VIEWPORT_HEIGHT {
+			self.ensure_rows(rect.max.y);
+		}
+		let max_y = rect.max.y.min(self.allocated_rows());
+		for y in rect.min.y..max_y {
+			for x in rect.min.x..rect.max.x {
+				self.set(UVec2::new(x, y), cell.clone());
+			}
 		}
 	}
 
@@ -160,12 +180,22 @@ mod tests {
 	}
 
 	#[beet_core::test]
-	fn fill_rect_does_not_grow() {
-		// a viewport-tall background must not balloon the allocation; fill is
-		// clamped to the rows already painted (none here).
+	fn sentinel_fill_does_not_grow() {
+		// a viewport-tall (sentinel) background must not balloon the allocation;
+		// such a fill is clamped to the rows already painted (none here).
 		let mut buf = FlexBuffer::new(4);
 		buf.fill_rect(URect::new(0, 0, 4, AUTO_GROW_VIEWPORT_HEIGHT), cell("x"));
 		buf.allocated_rows().xpect_eq(0);
+	}
+
+	#[beet_core::test]
+	fn finite_fill_grows_to_back_region() {
+		// a finite background (eg an elevated bar) painted before its content
+		// grows the allocation so the fill is retained behind later text.
+		let mut buf = FlexBuffer::new(4);
+		buf.fill_rect(URect::new(0, 0, 4, 2), cell("x"));
+		buf.allocated_rows().xpect_eq(2);
+		buf.get(UVec2::new(3, 1)).unwrap().symbol_str().xpect_eq("x");
 	}
 
 	#[beet_core::test]

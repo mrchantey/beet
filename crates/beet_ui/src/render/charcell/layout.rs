@@ -97,20 +97,23 @@ pub fn block_layout_rects(
 	// it (the marker itself paints into the gutter in the paint phase).
 	let gutter = marker_gutter(node, query);
 	let child_min_x = (content_rect.min.x + gutter).min(content_rect.max.x);
+	let child_width = content_rect.max.x.saturating_sub(child_min_x);
 	let mut child_y = content_rect.min.y;
 	for child in node.child_nodes(query) {
 		if child_y >= content_rect.max.y {
 			break;
 		}
-		let child_size = child.intrinsic_size();
+		// height resolved at the assigned width, not the wider measured width, so
+		// a narrowed column reserves every wrapped row instead of clipping the tail.
+		let child_height = resolve_height(&child, query, child_width, viewport);
 		let child_rect = URect::new(
 			child_min_x,
 			child_y,
 			content_rect.max.x,
-			(child_y + child_size.y).min(content_rect.max.y),
+			(child_y + child_height).min(content_rect.max.y),
 		);
 		layout_rects.insert(child.entity, child_rect);
-		child_y += child_size.y.max(1);
+		child_y += child_height.max(1);
 	}
 	Ok(())
 }
@@ -212,5 +215,29 @@ mod tests {
 		// Should wrap — not all on one line since 5+5+3 = 13 > 10
 		let lines: Vec<&str> = out.lines().collect();
 		(lines.len() >= 2).xpect_true();
+	}
+
+	/// No rendered line may exceed the buffer width, otherwise the terminal
+	/// soft-wraps and content appears a column too wide (see the `layout` example).
+	#[beet_core::test]
+	fn never_renders_wider_than_buffer() {
+		let bordered =
+			BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)));
+		let width = 12;
+		// a grow box filling the line, an unbreakable run, and wide chars that
+		// would straddle the right edge all stay within the buffer width.
+		let bundle = (LayoutStyle::flex_row().column_gap(1), children![
+			(rsx_direct!{ "中文日本語ＡＢＣ" }, bordered.clone()),
+			(
+				rsx_direct!{ "Supercalifragilistic" },
+				bordered.clone(),
+				LayoutStyle::default().with_flex_grow(1)
+			),
+		]);
+		Buffer::render_oneshot_sized(UVec2::new(width, 6), bundle)
+			.lines()
+			.map(display_width)
+			.all(|line_width| line_width <= width as usize)
+			.xpect_true();
 	}
 }

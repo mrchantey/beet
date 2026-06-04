@@ -11,7 +11,7 @@ pub fn server_plugin(app: &mut App) {
 		MinimalPlugins,
 		RouterPlugin,
 		ServerPlugin,
-		material::MaterialStylePlugin::new(palettes::basic::BLUE),
+		material::MaterialStylePlugin::new(palettes::basic::GREEN),
 	));
 }
 

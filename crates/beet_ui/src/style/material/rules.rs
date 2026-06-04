@@ -451,7 +451,10 @@ pub fn app_bar_nav() -> Rule {
 /// Page `<footer>` - mirrors the app bar's elevation with a top divider.
 ///
 /// A flex row so the centered copyright and the right-aligned build info sit on
-/// one line, flanked by the growing [`footer_side`] cells.
+/// one line, flanked by the growing [`footer_side`] cells. The row wraps, so on
+/// a terminal too narrow for one line the build info drops to its own full-width
+/// row and word-wraps rather than being squeezed into a sliver and broken
+/// mid-word.
 pub fn footer() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("footer"))
@@ -460,6 +463,7 @@ pub fn footer() -> Rule {
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
 		.with_token(common_props::BorderTopWidth,geometry::OutlineWidthThin).unwrap()
 		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
 		.with_value(common_props::ColumnGapProp, 2u32)
 		.with_value(common_props::Padding, Spacing {

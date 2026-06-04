@@ -3,6 +3,7 @@ use crate::style::AlignContent;
 use crate::style::AlignItems;
 use crate::style::AlignSelf;
 use crate::style::Direction;
+use crate::style::Display;
 use crate::style::FlexBox;
 use crate::style::FlexWrap;
 use crate::style::JustifyContent;
@@ -10,6 +11,11 @@ use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
+use super::establishes_inline_flow;
+use super::marker_gutter;
+use super::measure_inline_flow;
+use super::measure_str;
+use super::measure_text;
 use super::query::CharcellNodeData;
 use super::query::CharcellQuery;
 
@@ -150,6 +156,151 @@ pub fn measure_flex(
 	}
 }
 
+// ── Width-constrained height resolution ────────────────────────────────────────
+
+/// Total height (rows, including the node's own box overhead) the node needs
+/// when its border box is constrained to `width` columns.
+///
+/// The [measure pass](measure_node) sizes heights at the unconstrained viewport
+/// width, so a node later laid out into a narrower column (eg a paragraph beside
+/// a sidebar) wraps into more rows than were reserved, and paint clips the tail.
+/// The layout pass calls this with each node's *assigned* width so the reserved
+/// height matches what paint will flow.
+pub(super) fn resolve_height(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	width: u32,
+	viewport: UVec2,
+) -> u32 {
+	let box_model = BoxModel::from_node(node, viewport);
+	let overhead = box_model.overhead();
+	let content_width = width.saturating_sub(overhead.x);
+	let content_height = match node.layout_style().display {
+		Display::None => 0,
+		Display::Flex => {
+			resolve_flex_height(node, query, content_width, viewport)
+		}
+		// text leaf (eg a paragraph's text node)
+		_ if node.value().is_some() => measure_text(node, content_width).y,
+		// container of inline content: flow descendants as wrapped text
+		_ if establishes_inline_flow(node, query) => {
+			measure_inline_flow(node, query, content_width).y
+		}
+		// block leaf whose content is generated (eg `<hr>`, `<img>` alt)
+		_ if let Some(marker) =
+			node.marker().filter(|_| !node.has_child_nodes(query)) =>
+		{
+			measure_str(marker, content_width).y
+		}
+		// block container: stack children, each flowed at the constrained width
+		_ => resolve_block_height(node, query, content_width, viewport),
+	};
+	content_height + overhead.y
+}
+
+/// Block flow height: children stack, each laid out at the content width (less
+/// any marker gutter), mirroring [`block_layout_rects`].
+fn resolve_block_height(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	content_width: u32,
+	viewport: UVec2,
+) -> u32 {
+	let child_width = content_width.saturating_sub(marker_gutter(node, query));
+	node.child_nodes(query)
+		.map(|child| resolve_height(&child, query, child_width, viewport).max(1))
+		.sum()
+}
+
+/// Flex height: form lines at the constrained main width, then sum line heights
+/// (row) or take the tallest column (column), recursing through each item.
+fn resolve_flex_height(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	content_width: u32,
+	viewport: UVec2,
+) -> u32 {
+	let flexbox = node.flexbox();
+	let mut child_sizes = node
+		.child_nodes(query)
+		.map(|child| (child.entity, child.intrinsic_size()))
+		.collect::<Vec<_>>();
+	child_sizes.sort_by_key(|(entity, _)| flex_order(*entity, query));
+	let available = UVec2::new(content_width, viewport.y);
+	let lines = form_lines(&child_sizes, flexbox, available, viewport);
+
+	match resolve_direction(flexbox.direction, viewport) {
+		// rows stack: total height is the sum of each line's tallest item
+		Direction::Horizontal => lines
+			.iter()
+			.enumerate()
+			.map(|(idx, line)| {
+				let gap = if idx > 0 { flexbox.row_gap } else { 0 };
+				let sizes = resolve_line_sizes(
+					flexbox,
+					line,
+					query,
+					content_width,
+					viewport,
+				);
+				gap + sizes.iter().map(|size| size.y).max().unwrap_or(0)
+			})
+			.sum(),
+		// columns sit side by side: height is the tallest column
+		Direction::Vertical => lines
+			.iter()
+			.map(|line| {
+				let gaps =
+					flexbox.row_gap * (line.len().saturating_sub(1) as u32);
+				let items: u32 = line
+					.iter()
+					.filter_map(|(entity, size)| {
+						query.unresolved_node(*entity).ok().map(|child| {
+							let width = size.x.min(content_width);
+							resolve_height(&child, query, width, viewport)
+						})
+					})
+					.sum();
+				items + gaps
+			})
+			.max()
+			.unwrap_or(0),
+		_ => unreachable!(
+			"resolve_direction should eliminate viewport variants"
+		),
+	}
+}
+
+/// A line's flex-grown item sizes, with each item's height resolved at its
+/// assigned (grown) width rather than the width it was measured at.
+fn resolve_line_sizes(
+	flexbox: &FlexBox,
+	line: &[(Entity, UVec2)],
+	query: &CharcellQuery,
+	container_main: u32,
+	viewport: UVec2,
+) -> Vec<UVec2> {
+	apply_flex_grow(flexbox, line, query, container_main, viewport)
+		.into_iter()
+		.zip(line.iter())
+		.map(|(size, (entity, _))| {
+			let height = query
+				.unresolved_node(*entity)
+				.map(|child| resolve_height(&child, query, size.x, viewport))
+				.unwrap_or(size.y);
+			UVec2::new(size.x, height)
+		})
+		.collect()
+}
+
+/// Flex order of `entity`, defaulting to `0` for nodes without a layout style.
+fn flex_order(entity: Entity, query: &CharcellQuery) -> i32 {
+	query
+		.unresolved_node(entity)
+		.map(|node| node.layout_style().flex_order)
+		.unwrap_or(0)
+}
+
 // ── Layout pass ───────────────────────────────────────────────────────────────
 
 /// Layout pass: assign a [`LayoutRect`] to each flex child.
@@ -175,24 +326,32 @@ pub fn flex_layout_rects(
 		.map(|child| (child.entity, child.intrinsic_size()))
 		.collect();
 	// Sort by flex_order
-	child_sizes.sort_by_key(|(e, _)| {
-		query
-			.unresolved_node(*e)
-			.map(|n| n.layout_style().flex_order)
-			.unwrap_or(0)
-	});
+	child_sizes.sort_by_key(|(e, _)| flex_order(*e, query));
 	let lines = form_lines(&child_sizes, flexbox, available, viewport);
 
-	// Collect cross sizes per line
-	let line_cross_sizes: Vec<u32> = lines
+	let direction = resolve_direction(flexbox.direction, viewport);
+	let container_main = match direction {
+		Direction::Horizontal => content_rect.width(),
+		Direction::Vertical => content_rect.height(),
+		_ => {
+			unreachable!("resolve_direction should eliminate viewport variants")
+		}
+	};
+
+	// Final per-line item sizes: flex-grown along the main axis, with each
+	// item's cross size (a row's heights) resolved at its assigned width so a
+	// stretched line is tall enough for its wrapped content (see `resolve_height`).
+	let final_per_line: Vec<Vec<UVec2>> = lines
 		.iter()
 		.map(|line| {
-			let sizes: Vec<UVec2> = line.iter().map(|(_, s)| *s).collect();
-			line_cross_size_for(&sizes, flexbox.direction, viewport)
+			resolve_line_sizes(flexbox, line, query, container_main, viewport)
 		})
 		.collect();
+	let line_cross_sizes: Vec<u32> = final_per_line
+		.iter()
+		.map(|sizes| line_cross_size_for(sizes, flexbox.direction, viewport))
+		.collect();
 
-	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_cross = match direction {
 		Direction::Horizontal => content_rect.height(),
 		Direction::Vertical => content_rect.width(),
@@ -231,17 +390,11 @@ pub fn flex_layout_rects(
 					break;
 				}
 
-				let final_sizes = apply_flex_grow(
-					flexbox,
-					line,
-					query,
-					content_rect.width(),
-					viewport,
-				);
+				let final_sizes = &final_per_line[line_idx];
 				let main_positions = apply_justify(
 					flexbox,
 					line,
-					&final_sizes,
+					final_sizes,
 					content_rect.width(),
 					viewport,
 				);
@@ -292,17 +445,11 @@ pub fn flex_layout_rects(
 					break;
 				}
 
-				let final_sizes = apply_flex_grow(
-					flexbox,
-					line,
-					query,
-					content_rect.height(),
-					viewport,
-				);
+				let final_sizes = &final_per_line[line_idx];
 				let main_positions = apply_justify(
 					flexbox,
 					line,
-					&final_sizes,
+					final_sizes,
 					content_rect.height(),
 					viewport,
 				);
@@ -464,13 +611,6 @@ fn apply_flex_grow(
 		0
 	};
 
-	let natural_total: u32 = line
-		.iter()
-		.map(|(_, s)| main_size(*s, flexbox.direction, viewport))
-		.sum();
-
-	let free = container_main.saturating_sub(natural_total + gap_total);
-
 	// Collect flex_grow from each child's layout style
 	let grow_values: Vec<u32> = line
 		.iter()
@@ -484,18 +624,47 @@ fn apply_flex_grow(
 
 	let total_grow: u32 = grow_values.iter().sum();
 
+	let natural_total: u32 = line
+		.iter()
+		.map(|(_, s)| main_size(*s, flexbox.direction, viewport))
+		.sum();
+	let non_grow_total: u32 = line
+		.iter()
+		.zip(grow_values.iter())
+		.filter(|(_, grow)| **grow == 0)
+		.map(|((_, s), _)| main_size(*s, flexbox.direction, viewport))
+		.sum();
+
+	// When the line has free space, growers take their natural size *plus* a
+	// share of the surplus (standard flex-grow). When it overflows, growers
+	// instead split the space left after the non-growing items, shrinking below
+	// their natural size to fit (eg a text column beside a fixed sidebar) rather
+	// than overflowing the line and clipping their content.
+	let used = natural_total + gap_total;
+	let resolve_main = |nat: u32, grow: u32| -> u32 {
+		if total_grow == 0 || grow == 0 {
+			return nat;
+		}
+		if used <= container_main {
+			let surplus = container_main - used;
+			nat + (surplus as u64 * grow as u64 / total_grow as u64) as u32
+		} else {
+			let grow_space =
+				container_main.saturating_sub(non_grow_total + gap_total);
+			(grow_space as u64 * grow as u64 / total_grow as u64) as u32
+		}
+	};
+
 	line.iter()
 		.zip(grow_values.iter())
 		.map(|((_, nat), &grow)| {
-			let bonus = if total_grow > 0 {
-				(free as u64 * grow as u64 / total_grow as u64) as u32
-			} else {
-				0
-			};
-
+			let main = resolve_main(
+				main_size(*nat, flexbox.direction, viewport),
+				grow,
+			);
 			match direction {
-				Direction::Horizontal => UVec2::new(nat.x + bonus, nat.y),
-				Direction::Vertical => UVec2::new(nat.x, nat.y + bonus),
+				Direction::Horizontal => UVec2::new(main, nat.y),
+				Direction::Vertical => UVec2::new(nat.x, main),
 				_ => unreachable!(
 					"resolve_direction should eliminate viewport variants"
 				),
