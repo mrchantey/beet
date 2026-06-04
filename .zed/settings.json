@@ -1,14 +1,10 @@
-// Folder-specific settings
-//
-// For a full list of overridable settings, and general information on folder-specific settings,
-// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+// https://zed.dev/docs/configuring-zed#settings-files
 {
 	// "show_completions_on_input": false,
 	// "completions": {
 	// 	"words": "disabled"
 	// },
 	// "show_edit_predictions": false,
-	// "show_completions_on_input": false,
 	// "snippet_sort_order": "inline",
 	// "autosave": "off",
 	"lsp": {
@@ -91,32 +87,24 @@
 	},
 	"file_scan_inclusions": ["agent/plan*", "agent/beet_flow*", "agent/report*"],
 	"file_scan_exclusions": [
-		// "agent/*",
+		".cargo",
 		".beet",
 		".claude",
+		".gitignore",
+		".env.example",
+		".github",
 		".playwright-cli",
-		"scripts",
-		// "tests",
-		// "target",
+		".vscode",
+		"CLAUDE.md",
+		"target",
 		"rustfmt.toml",
 		"CHANGELOG.md",
 		"Cargo.lock",
-		// "crates/beet_build",
-		// "crates/beet_router_old",
-		// "crates/beet_site",
-		// ".beet",
 		"**/.git",
 		".gitattributes",
 		"LICENSE-APACHE.txt",
 		"LICENSE-MIT.txt",
 		"**/node_modules",
-		// "**/*.log",
-		// "**/Cargo.lock",
 		// "rustc-ice**",
-		// ".env.example",
-		// ".beet",
-		".github",
-		// ".cargo",
-		".vscode",
 	],
 }
