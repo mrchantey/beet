@@ -1,6 +1,7 @@
 assets
 agent/*
 .claude
+.playwright-cli
 .beet/infra
 !agent/skills
 out.txt
