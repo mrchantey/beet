@@ -157,8 +157,9 @@ impl RuleSet {
 		// (eg `.dark-scheme`) can override a `:root` default, mirroring CSS.
 		// `@media`-gated rules are skipped: there is no target media context for
 		// charcell/native, so print/reduced-motion rules only affect CSS output.
-		// The most specific matching rule wins (class beats tag); ties keep the
-		// earlier rule, matching the most-specific-first insertion convention.
+		// The most specific matching rule wins (class beats tag); ties go to the
+		// later rule, mirroring CSS source order (and the serialized stylesheet)
+		// so a theme override appended after a user-agent default wins on both.
 		self.rules
 			.iter()
 			.filter(|rule| rule.media().is_none() && rule.selector().matches(el))
@@ -167,7 +168,7 @@ impl RuleSet {
 					.ok()
 					.map(|value| (rule.selector().specificity(), value))
 			})
-			.reduce(|best, next| if next.0 > best.0 { next } else { best })
+			.reduce(|best, next| if next.0 >= best.0 { next } else { best })
 			.map(|(_, value)| value)
 			.ok_or_else(|| bevyhow!("no matching rule for token `{key}`"))
 	}

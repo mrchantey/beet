@@ -31,7 +31,7 @@ pub fn BeetDocumentShell(
 				<ColorSchemeScript/>
 				<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
 			</Head>
-			<body>
+			<body {Classes::new([classes::PAGE])}>
 				<Header>
 					<Link slot="nav" label="Docs" href=routes::docs::index() variant=ButtonVariant::Text/>
 					<Link slot="nav" label="Blog" href=routes::blog::index() variant=ButtonVariant::Text/>

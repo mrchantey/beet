@@ -75,6 +75,8 @@ pub const APP_BAR_SCROLLED: ClassName = ClassName::new_static("app-bar-scrolled"
 pub const APP_BAR_NAV: ClassName = ClassName::new_static("app-bar-nav");
 pub const CONTAINER: ClassName = ClassName::new_static("container");
 pub const PAGE: ClassName = ClassName::new_static("page");
+/// A footer side cell that grows to flank the centered copyright.
+pub const FOOTER_SIDE: ClassName = ClassName::new_static("footer-side");
 
 // ── Form controls ───────────────────────────────────────────────────────────────
 pub const INPUT: ClassName = ClassName::new_static("input");

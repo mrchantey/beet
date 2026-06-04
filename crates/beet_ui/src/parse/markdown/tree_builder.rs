@@ -490,6 +490,13 @@ impl<'a> MdTreeBuilder<'a> {
 				}
 				self.pop();
 			}
+			"code" => {
+				// a fenced code block pushes `pre > code`; one `End(CodeBlock)`
+				// closes both, else the trailing `pre` would swallow every
+				// following block as a child.
+				self.pop();
+				self.pop();
+			}
 			_ => {
 				self.pop();
 			}
@@ -770,6 +777,16 @@ mod test {
 		let pre_children = node_children(&nodes[0]);
 		pre_children.len().xpect_eq(1);
 		node_name(&pre_children[0]).xpect_eq("code");
+	}
+
+	#[beet_core::test]
+	fn code_block_closes_pre() {
+		// the paragraph after a fenced block is a sibling of the `pre`, not a
+		// child swallowed by an unclosed `pre`.
+		let nodes = build("```rust\nfn main() {}\n```\n\nafter");
+		nodes.len().xpect_eq(2);
+		node_name(&nodes[0]).xpect_eq("pre");
+		node_name(&nodes[1]).xpect_eq("p");
 	}
 
 	#[beet_core::test]

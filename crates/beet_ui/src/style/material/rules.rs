@@ -283,6 +283,37 @@ pub fn text_label_small() -> Rule {
 		.with_token(TypographyProps,typography::LabelSmall).unwrap()
 }
 
+// ── Prose element overrides ───────────────────────────────────────────────────
+
+// Theme overrides for prose tags also styled by the user-agent
+// [`default_element_rules`]. Appended after them in `all_rules`, so the later
+// (theme) rule wins the same-specificity tag cascade on both the terminal and
+// the serialized stylesheet: links pick up `Primary`, code spans/blocks a
+// `SurfaceContainerHighest` fill with `OnSurface` text.
+
+/// Anchor text in the theme's primary color.
+pub fn link_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("a"))
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+}
+
+/// Inline `<code>` - filled chip readable against the page surface.
+pub fn code_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("code"))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
+/// Block `<pre>` - filled code surface matching inline code.
+pub fn pre_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("pre"))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+}
+
 // ── Color Utility Classes ─────────────────────────────────────────────────────
 
 /// Primary color scheme - primary background with on-primary text.
@@ -418,6 +449,9 @@ pub fn app_bar_nav() -> Rule {
 }
 
 /// Page `<footer>` - mirrors the app bar's elevation with a top divider.
+///
+/// A flex row so the centered copyright and the right-aligned build info sit on
+/// one line, flanked by the growing [`footer_side`] cells.
 pub fn footer() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("footer"))
@@ -425,6 +459,22 @@ pub fn footer() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
 		.with_token(common_props::BorderTopWidth,geometry::OutlineWidthThin).unwrap()
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::ColumnGapProp, 2u32)
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(1.),
+			right: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
+}
+
+/// Footer side cell - grows to push the copyright to the centre and the build
+/// info to the right edge.
+pub fn footer_side() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(FOOTER_SIDE))
+		.with_value(common_props::FlexGrowProp, 1u32)
 }
 
 /// App bar in scrolled state - adds elevation shadow.
@@ -764,7 +814,13 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar_scrolled(),
 		app_bar_nav(),
 		footer(),
+		footer_side(),
 		container(),
+		// prose overrides — appended so they win the tag cascade over the
+		// user-agent element defaults (later rule wins ties)
+		link_prose(),
+		code_prose(),
+		pre_prose(),
 		main_content(),
 		page(),
 		// form controls — state/compound rules first so they win the cascade

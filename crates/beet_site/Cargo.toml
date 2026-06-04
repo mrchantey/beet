@@ -29,6 +29,11 @@ web = ["render", "beet/http_server"]
 # Terminal render target: the charcell pipeline (`CharcellPlugin` + stdio host).
 terminal = ["render", "beet/terminal"]
 
+# CLI mode: render a single route to stdout and exit, picking HTML or ANSI via
+# `--accept`. Overrides the default HTTP server without needing
+# `--no-default-features`. Pulls in both render targets so either output works.
+cli = ["web", "terminal"]
+
 # Build-time route codegen. Compiles without the generated `src/codegen` modules
 # so it can bootstrap them: `cargo run -p beet_site --no-default-features
 # --features codegen`. Run this before a `web`/`terminal` build.

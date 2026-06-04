@@ -148,7 +148,7 @@ fn header_places_children_and_nav() {
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("HeaderExtra")
-		.xpect_contains("<nav><span>NavLink</span></nav>");
+		.xpect_contains("<nav class=\"app-bar-nav\"><span>NavLink</span></nav>");
 }
 
 #[beet_core::test]

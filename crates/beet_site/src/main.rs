@@ -1,9 +1,10 @@
 //! The beet website binary.
 //!
-//! With the `codegen` feature it runs the route codegen pass and exits. With a
-//! render target it boots the site router behind a server: an [`HttpServer`]
-//! when the `web` feature is enabled, else a [`CliServer`] that renders a single
-//! route to the terminal (ANSI) and exits.
+//! With the `codegen` feature it runs the route codegen pass and exits.
+//! Otherwise it boots the site router behind a server: an [`HttpServer`] by
+//! default, or a [`CliServer`] (with the `cli` feature, or when no `web` target
+//! is enabled) that renders a single route to stdout (HTML or ANSI per
+//! `--accept`) and exits.
 
 #[cfg(feature = "codegen")]
 fn main() -> beet::prelude::Result { beet_site::run_codegen() }
@@ -25,17 +26,22 @@ fn main() {
 		.run();
 }
 
-/// The web target listens for HTTP requests.
-#[cfg(all(not(feature = "codegen"), feature = "web"))]
+/// Boots an HTTP server, the default web target.
+#[cfg(all(
+	not(feature = "codegen"),
+	feature = "web",
+	not(feature = "cli")
+))]
 fn site_server() -> impl beet::prelude::Bundle {
 	beet::prelude::HttpServer::default()
 }
 
-/// The terminal-only target renders a single route to stdout and exits.
+/// Renders a single route to stdout and exits. Selected by the `cli` feature, or
+/// whenever no `web` target is present (eg `--no-default-features --features
+/// terminal`).
 #[cfg(all(
 	not(feature = "codegen"),
-	not(feature = "web"),
-	feature = "terminal"
+	any(feature = "cli", not(feature = "web"))
 ))]
 fn site_server() -> impl beet::prelude::Bundle { beet::prelude::CliServer }
 
