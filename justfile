@@ -108,9 +108,6 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates/beet_design/**/*.rs 				\
-	crates/beet_design/**/**/*.rs 		\
-	crates/beet_design/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -179,7 +176,6 @@ snap:
 	cargo test -p beet_core_macros 	--lib --all-features -- --snap
 	cargo test -p beet_net					--lib --features=server,ureq,tungstenite,native-tls,flow -- --snap
 	cargo test -p beet_build 				--lib --all-features -- --snap
-	cargo test -p beet_design 			--lib --all-features -- --snap
 	cargo test -p beet_router 			--lib --all-features -- --snap
 
 # The libtest path (`custom_test_frameworks`) and the `nightly` feature are
@@ -252,7 +248,7 @@ test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 
 
-# The rsx crates (beet_build, beet_design, beet_site) are
+# The rsx crates (beet_build, beet_site) are
 # currently commented out of the workspace, and beet_router's old
 # `tokens`/`server` features no longer exist. beet_router is already
 # exercised by `test-core`. Re-add lines here as the rsx crates come back.
@@ -300,7 +296,6 @@ clear-ice:
 
 clear-artifacts:
 	just clear-ice
-	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 	rm -rf launch.ron
 	rm -rf target

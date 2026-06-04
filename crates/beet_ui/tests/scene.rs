@@ -247,10 +247,9 @@ fn bsn_inheritance_matches_rsx_tag_form() {
 	world.entity(bsn_root).get::<DemoButton>().unwrap();
 }
 
-/// `beet_design::BucketList` reduced to its essence: a synchronous `#[scene]`
-/// constructor whose **behavior** (observer firing → mutating a signal-driven
-/// resource) attaches via an event attribute on the scene-built tree. No part
-/// of the constructor is async.
+/// A synchronous `#[scene]` constructor whose **behavior** (observer firing →
+/// mutating a signal-driven resource) attaches via an event attribute on the
+/// scene-built tree. No part of the constructor is async.
 #[scene]
 fn Counter(#[prop(into)] label: String) -> impl Scene {
 	rsx! {

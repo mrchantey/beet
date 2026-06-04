@@ -36,8 +36,6 @@ pub use beet_router as router;
 pub use beet_thread as thread;
 #[cfg(feature = "ui")]
 pub use beet_ui as ui;
-// #[cfg(feature = "design")]
-// pub use beet_design as design;
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;
 // #[cfg(feature = "flow")]

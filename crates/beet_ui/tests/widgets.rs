@@ -1,4 +1,4 @@
-//! Unit tests for the ported `beet_design` widgets in `beet_ui::widgets`.
+//! Unit tests for the `beet_ui::widgets`.
 //!
 //! Each test spawns the widget into a minimal scene world and asserts the
 //! shape of the produced entity tree — root tag, marker component, semantic

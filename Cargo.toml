@@ -63,9 +63,6 @@ members = [
 	"crates/beet_ml",
 	"crates/beet_spatial",
 
-	## 💡 RSX
-	# "crates/beet_design",
-
 	## 💡 Beet
 	"crates/beet_site",
 	"crates/beet-cli",
@@ -94,9 +91,6 @@ beet_action = { path = "crates/beet_action", version = "0.0.9-dev.11", default-f
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.9-dev.11", default-features = false }
 beet_ml = { path = "crates/beet_ml", version = "0.0.9-dev.11" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.9-dev.11" }
-
-
-# beet_design = { path = "crates/beet_design", version = "0.0.9-dev.11" }
 
 #💡 local
 # bevy_ecs = {version = "0.19", default-features = false, features = ["backtrace"]}
@@ -377,7 +371,6 @@ examples = ["bevy_default", "spatial", "dep:beet_examples"]
 ml = ["spatial", "dep:beet_ml", "beet_examples?/ml"]
 cuda = ["ml", "beet_ml/cuda"]
 # flow = ["dep:beet_flow"]
-# design = ["dep:beet_design"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
@@ -402,9 +395,6 @@ beet_ui = { workspace = true, optional = true }
 # core; the std `router` feature re-adds `beet_router/std` (+ markdown + http).
 beet_router = { path = "crates/beet_router", version = "0.0.9-dev.11", optional = true, default-features = false }
 beet_action = { workspace = true, optional = true }
-
-#💡 web
-# beet_design = { workspace = true, optional = true }
 
 #💡 flow
 # beet_flow = { workspace = true, optional = true }

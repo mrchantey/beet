@@ -4,9 +4,6 @@
 //! active rule set (Material Design 3 today) maps those to design tokens. A
 //! [`Link`] is an `<a>` styled as a button — the rules match any element, so a
 //! hyperlink picks up the same look as a `<button>`.
-//!
-//! Promoted from the throwaway `tests/scene.rs` fixture per
-//! `agent/plans/beet_design.md` (Decision 3).
 use crate::prelude::*;
 use beet_core::prelude::*;
 

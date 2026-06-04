@@ -2,8 +2,7 @@
 //!
 //! Widgets emit *semantic* classes via [`Classes`](crate::token::Classes)
 //! (never `class="…"` strings); the active rule set (Material Design 3 via
-//! `MaterialStylePlugin` today) maps those classes to design tokens. See
-//! `agent/plans/beet_design.md` for the authoring model.
+//! `MaterialStylePlugin` today) maps those classes to design tokens.
 //!
 //! Gated behind the `scene` feature; rendering targets and styling come from
 //! the same DOM + rule machinery as parsed HTML.

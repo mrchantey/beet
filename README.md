@@ -95,7 +95,6 @@ fn Counter(initial: i32) -> impl Bundle {
 | -------------------------------------------------------------- | ------ | --------------------------------------------------- |
 | [`beet_router`](crates/beet_router/Cargo.toml)                 | 🐉      | Transport agnostic routing for bevy applications                     |
 | [`beet_build`](crates/beet_build/Cargo.toml)                   | 🐉      | Codegen and compilation tooling for beet            |
-| [`beet_design`](crates/beet_design/Cargo.toml)                 | 🐉      | Design system and components for beet rsx           |
 | [`beet-cli`](crates/beet-cli/Cargo.toml)                       | 🐉      | Tools for building and deploying beet apps          |
 | [`beet_site`](crates/beet_site/Cargo.toml)                     | 🐉      | The beet website, built with beet                   |
 
