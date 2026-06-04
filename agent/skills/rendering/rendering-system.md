@@ -131,7 +131,7 @@ cargo test -p beet_ui --lib render::charcell  # charcell unit and snapshot tests
 
 ## Legacy API you may encounter
 
-Older code (and the reference mockups in `agent/reference/mockups`) uses a previous, web-only API. When porting it, translate as follows:
+Older code (and the reference mockups in `.agents/reference/mockups`) uses a previous, web-only API. When porting it, translate as follows:
 
 | Legacy | Current |
 |---|---|

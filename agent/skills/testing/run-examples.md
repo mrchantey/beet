@@ -6,7 +6,7 @@ Use the workspace examples as smoke tests to catch regressions that unit and int
 
 Not every example is verifiable from the CLI — many are 3D/2D Bevy windowed apps, browser-driven, or TUIs that block on stdin. This skill only exercises the ones that exit on their own (or that we can probe with `curl` while they run in the background).
 
-Stream the entire output of each example into `agent/scratch.txt` (overwrite for the first command, append for subsequent ones), then grep that file. This avoids reruns when checking multiple things.
+Stream the entire output of each example into `.agents/scratch.txt` (overwrite for the first command, append for subsequent ones), then grep that file. This avoids reruns when checking multiple things.
 
 Treat compile failures the same as `run-tests.md`: retry once, and if a mold linker error persists (`RUST_MIN_STACK`, "section sizes" etc) bump the workspace `version = "0.0.9-dev.N"` in `Cargo.toml`.
 
@@ -129,11 +129,11 @@ cargo check --example chat               --features=thread
 
 1. Begin a fresh run by overwriting the scratch file:
    ```sh
-   : > agent/scratch.txt
+   : > .agents/scratch.txt
    ```
 2. Walk through sections 1–7 in order, appending each invocation's output:
    ```sh
-   timeout 60 cargo run --example hello_world --features=action 2>&1 | tee -a agent/scratch.txt
+   timeout 60 cargo run --example hello_world --features=action 2>&1 | tee -a .agents/scratch.txt
    ```
 3. On a failing example, isolate it with `--features=…` matching the workspace declaration, fix using a subagent if the fault is non-trivial, then rerun just that example before moving on.
 4. For server examples, launch with `run_in_background`, probe with `curl`, kill the background pid before continuing.
@@ -142,4 +142,4 @@ cargo check --example chat               --features=thread
 
 ## Success
 
-The smoke set passes when every command in sections 1–7 exits 0 (or, for the server probes, the `curl` returns the expected body) and `agent/scratch.txt` contains no unexpected `error`/`warning`/`panicked` lines.
+The smoke set passes when every command in sections 1–7 exits 0 (or, for the server probes, the `curl` returns the expected body) and `.agents/scratch.txt` contains no unexpected `error`/`warning`/`panicked` lines.
