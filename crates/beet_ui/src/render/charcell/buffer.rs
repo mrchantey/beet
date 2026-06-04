@@ -557,6 +557,54 @@ mod tests {
 	}
 
 	#[beet_core::test]
+	fn full_box_border_carries_fill_background() {
+		// a bordered box with a background clips the fill to the border edge, so
+		// its corner glyph sits on the box's own surface, not the page beneath.
+		let bg = Color::srgb(0.5, 0., 0.5);
+		let buffer = Buffer::new(UVec2::new(10, 4)).populate((
+			LayoutStyle::flex_row(),
+			children![(rsx_direct!{ "X" }, bordered(), VisualStyle {
+				background: Some(bg),
+				..default()
+			})],
+		));
+		let corner = buffer.get(UVec2::new(0, 0)).unwrap();
+		corner.symbol_str().xpect_eq("┌");
+		corner.style.background.xpect_eq(Some(bg));
+	}
+
+	#[beet_core::test]
+	fn lone_divider_does_not_carry_node_background() {
+		// a bottom-border-only node (eg an app bar) is a divider, not a box: its
+		// edge composes over the surface beneath rather than trailing the node's
+		// own background a row past its content.
+		let bg = Color::srgb(0.5, 0., 0.5);
+		let buffer = Buffer::new(UVec2::new(10, 4)).populate((
+			LayoutStyle::flex_row(),
+			children![(
+				rsx_direct!{ "Bar" },
+				BoxStyle::default().with_border(Spacing {
+					bottom: Length::Rem(1.),
+					..Spacing::DEFAULT
+				}),
+				VisualStyle {
+					background: Some(bg),
+					..default()
+				}
+			)],
+		));
+		// the divider row's dash inherits no fill of its own
+		buffer
+			.iter_cells()
+			.find(|(_, cell)| cell.symbol_str() == "─")
+			.unwrap()
+			.1
+			.style
+			.background
+			.xpect_eq(None);
+	}
+
+	#[beet_core::test]
 	fn blink_renders() {
 		let out = render((LayoutStyle::flex_row(), children![(
 			rsx_direct!{ "Blink" },

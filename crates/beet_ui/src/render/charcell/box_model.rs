@@ -152,10 +152,18 @@ pub(super) fn draw_border(
 		return; // too small for a border
 	}
 
-	let top_style = side_style(box_style.and_then(|b| b.border_top));
-	let bottom_style = side_style(box_style.and_then(|b| b.border_bottom));
-	let left_style = side_style(box_style.and_then(|b| b.border_left));
-	let right_style = side_style(box_style.and_then(|b| b.border_right));
+	// A full box clips its background to the border edge (CSS border-box), so its
+	// borders sit on the node's own fill. A lone edge (eg an app bar's bottom
+	// divider) carries no fill of its own and composes over what's beneath, so it
+	// reads on the page rather than trailing the bar's surface a row past its
+	// content.
+	let border_bg = sides.all().then(|| node.visual_style().background).flatten();
+	let top_style = side_style(box_style.and_then(|b| b.border_top), border_bg);
+	let bottom_style =
+		side_style(box_style.and_then(|b| b.border_bottom), border_bg);
+	let left_style = side_style(box_style.and_then(|b| b.border_left), border_bg);
+	let right_style =
+		side_style(box_style.and_then(|b| b.border_right), border_bg);
 
 	let (left, right) = (rect.min.x, rect.max.x - 1);
 	let (top, bottom) = (rect.min.y, rect.max.y - 1);
@@ -202,17 +210,20 @@ pub(super) fn draw_border(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// Build a [`VisualStyle`] for one border side, using the provided color as the
-/// foreground and no background of its own.
+/// Build a [`VisualStyle`] for one border side from its foreground color and an
+/// optional background.
 ///
-/// Border cells are written with [`set_composite`](AsBuffer::set_composite), so
-/// they pick up whatever fill already sits beneath them: the node's own
-/// background where its inner fill reached, the page otherwise. A lone divider
-/// (eg an app bar's bottom border) thus reads on the page rather than carrying
-/// the bar's surface one row past its content.
-pub(super) fn side_style(border_color: Option<Color>) -> VisualStyle {
+/// Border cells are written with [`set_composite`](AsBuffer::set_composite): a
+/// `None` background composes over whatever fill sits beneath (used by lone
+/// dividers), while `Some` paints the node's own surface under the border (used
+/// by full boxes, so a bordered box's edge matches its fill).
+pub(super) fn side_style(
+	border_color: Option<Color>,
+	background: Option<Color>,
+) -> VisualStyle {
 	VisualStyle {
 		foreground: border_color,
+		background,
 		..default()
 	}
 }
