@@ -14,6 +14,7 @@
 					// "target": "wasm32-unknown-unknown",
 					// "features": "all",
 					"features": [],
+					"noDefaultFeatures": true,
 					// run check on nightly so `nightly` feature's #![feature(..)] compiles (avoids E0554)
 					"extraEnv": { "RUSTUP_TOOLCHAIN": "nightly" },
 					// [
