@@ -8,13 +8,11 @@ Beet is a framework for building malleable applications, software that can be re
 
 > 🚧 Beet is pre-release and under active construction. If it sounds interesting, come and say hi in the [Beetmash Discord](https://discord.gg/DcURUQCXtx).
 
-## Why ECS, everywhere
+## One world, many interfaces
 
-Most stacks specialise their tools by interface: one library for the CLI, another for the HTTP server, another for the UI. Each is a mountain to climb, and moving between them means climbing back down and starting again.
+A CLI, a server and a GUI differ mostly in how bytes arrive and leave. Beet describes the application once, as entities and components, and treats the interface as a matter of input and output. The same router serves a terminal, an HTTP request and an AI tool call; the same scene tree renders to HTML or the terminal. Behaviors, requests and even cloud infrastructure all live as data in one open Bevy world.
 
-Beet takes the opposite bet. A CLI, a server and a GUI differ only in how bytes arrive and leave, so beet describes the application once, as entities and components, and treats the interface as a matter of input and output. The same router serves a terminal, an HTTP request and an AI tool call. The same scene tree renders to HTML or the terminal. Behaviors, requests and even cloud infrastructure are all just data in a Bevy world.
-
-Encoding behavior as data is also what makes an application malleable: structure that lives as components is structure a user can inspect and bend, rather than logic locked away in compiled control flow.
+That openness is what makes an application malleable. Structure that lives as components is structure a person can inspect and reshape while it runs, rather than logic sealed inside compiled control flow. It is the quality beet borrows from Smalltalk and HyperCard: a world you can reach into and bend, not just run.
 
 ## Where to go next
 

@@ -4,9 +4,9 @@ title = "beet_action"
 
 # beet_action
 
-`beet_action` is the idea most of beet is built from: a function is just an entity you can call.
+In `beet_action`, a function is just an entity you can call.
 
-Attach an [`Action`] component to an entity and it becomes callable. `call` runs the handler with an input and awaits its output. Because the action lives on an entity, it can have children, and control-flow nodes like `Sequence` are nothing more than actions that call their children in turn. Behavior trees, state machines and utility AI all fall out of that single primitive rather than each needing their own engine.
+Attach an [`Action`] component to an entity and it becomes callable. `call` runs the handler with an input and awaits its output. Because the action lives on an entity, it can have children, and control-flow nodes like `Sequence` are nothing more than actions that call their children in turn. Behavior trees, state machines and utility AI are all built from that single primitive.
 
 ```rust
 # use beet_core::prelude::*;
@@ -28,4 +28,4 @@ An action comes in one of three flavors, chosen with the `#[action]` macro to ma
 - `#[action]` on a regular function makes it a Bevy system, taking its input as `In<T>` and reaching for any system param.
 - `#[action]` on an `async fn` gets async world access, so the handler can `await` other actions, IO or timers.
 
-This range is the point: the same calling convention covers a pure adder and an agent that awaits a network reply, so higher-level crates like `beet_net`, `beet_router` and `beet_thread` can all speak in actions without caring which flavor sits underneath.
+The range matters: the same calling convention covers a pure adder and an agent that awaits a network reply, so higher-level crates like `beet_net`, `beet_router` and `beet_thread` can all speak in actions without caring which flavor sits underneath.

@@ -24,4 +24,4 @@ fn setup(mut commands: Commands) {
 }
 ```
 
-Routing is the place where beet's "interface is just IO" philosophy becomes concrete, and it does more than dispatch. It can generate routes from a file tree (`codegen` feature), render route output into [beet_ui](/docs/crates/beet_ui) scene trees, export a static site, and run on `no_std` targets through an embedded route core. The website you are reading is one such router rendered to HTML.
+Routing is where one set of routes serving many interfaces becomes concrete, and it does more than dispatch. It can generate routes from a file tree (`codegen` feature), render route output into [beet_ui](/docs/crates/beet_ui) scene trees, export a static site, and run on `no_std` targets through an embedded route core. The website you are reading is one such router rendered to HTML.

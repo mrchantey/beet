@@ -4,7 +4,7 @@ title = "Speak every interface"
 
 # Speak every interface
 
-In this tutorial we will write two routes and serve them, first from the command line and then over HTTP, without changing a single route. This is beet's central trick: an interface is just a way in and out, so the same application can answer all of them.
+In this tutorial we will write two routes and serve them, first from the command line and then over HTTP, without changing a single route. The idea is simple: an interface is just a way in and out, so the same routes can answer all of them.
 
 ## Set up the project
 
@@ -99,4 +99,4 @@ Notice what did *not* change. The routes are identical; only the server in front
 
 ## What you have built
 
-You have served one set of routes over two completely different interfaces. The routes never learned where their requests came from, which is exactly the point: in beet, the CLI, an HTTP server and a REPL are interchangeable front doors to the same application. Next, [Your first agent](/docs/tutorials/first-agent) puts an LLM behind one of these doors.
+You have served one set of routes over two completely different interfaces. The routes never learned where their requests came from. In beet the CLI, an HTTP server and a REPL are interchangeable front doors to the same application. Next, [Your first agent](/docs/tutorials/first-agent) puts an LLM behind one of these doors.
