@@ -2,7 +2,7 @@
 
 How the `beet_ui` rendering system works. Pages are authored once as target-agnostic scenes and rendered to multiple targets (the web as HTML + CSS, the terminal as charcell ANSI). Read this before writing or editing pages, widgets, or style rules.
 
-For the iteration workflow (build/verify loop, sub-agent orchestration, visual verification) see the adjacent `iterate-rendering.md`. For the terminal renderer internals see the adjacent `charcell.md`. For browser automation see the adjacent `playwright.md`.
+For the iteration workflow (build/verify loop, sub-agent orchestration, visual verification) see the adjacent `SKILL.md`. For the terminal renderer internals see the adjacent `charcell.md`. For browser automation see the adjacent `playwright.md`.
 
 ## The big picture
 
@@ -88,9 +88,11 @@ Common prop tokens (`beet_ui::prelude::common_props` / `style`): `BackgroundColo
 
 A raw `<style>` element with a CSS string is the last-resort escape hatch. It is web-only and ignored by the terminal, so reach for it only when a token or class genuinely cannot express what is needed (eg a pure color-palette showcase keyed off the emitted CSS variables). Use it sparingly; it is exactly the target-agnostic property we are trying to preserve.
 
+Registering a rule (above) is for a class reused across elements. For a **one-off, per-element** style, declare an **inline class** on the element itself (`inline_class!`, `crates/beet_ui/src/token/class.rs`) rather than scattering a single-use rule into another file. The inline-class system is the intended home for one-offs; if it does not yet resolve as a scene-mode `rsx!` block attribute, treat that as a gap to close, not a reason to register one-off rules elsewhere.
+
 Two pitfalls when styling layout:
 
-- `inline_class!` and the `OnSpawn` it returns do not work as a scene-mode `rsx!` block attribute. Scene block attributes only accept plain `Component` values (`Default + Clone + Component`), eg `Classes`/`FieldRef`. `inline_class!` is for `rsx_direct!`/bundle mode, not `impl Scene` pages. To style a one-off element in a scene, register a `Rule` and attach its class.
+- Charcell reads the layout enum directly; CSS reads `AsCssValue`. The two can disagree (a value valid for the terminal can serialize to invalid CSS), so verify the generated CSS, not just the charcell render.
 - Flex gaps differ by target. `ColumnGapProp`/`RowGapProp` are `u32` and drive the charcell flex layout, but they serialize to unitless CSS (`column-gap: 2`) which browsers ignore. For the web `gap` to render, also set `GapProp` (a `Length`, eg `Length::Rem(1.0)`, which emits a valid `gap: 1rem`). Set both on a layout rule so each target gets its gap. The library's own `.app-bar-nav`/`footer` rules predate this and only set the u32 props, so their web gap is currently 0, a known framework follow-up.
 
 ## Routing and codegen
@@ -109,29 +111,11 @@ After adding or removing route files you must regenerate the codegen modules:
 cargo run -p beet_site --no-default-features --features codegen
 ```
 
-This rewrites `src/codegen/{pages.rs,docs/mod.rs,blog/mod.rs,route_tree.rs}` (generated artifacts, gitignored). The generated typed paths in `route_tree.rs` are used as `<Link href=routes::docs::index()/>`, and the sidebar nav is auto-collected from the route tree.
-
-## Running both targets
-
-```bash
-# web server, serves on 127.0.0.1:8337
-cargo run -p beet_site --features web
-
-# terminal (charcell) render of a single route, path segments after --
-cargo run -p beet_site --features cli -- blog post-1
-cargo run -p beet_site --features cli -- docs design color schemes
-```
-
-CLI mode renders one route to stdout (HTML or ANSI per `--accept`) and exits.
-
-```bash
-cargo test -p beet_site                       # end-to-end render tests (custom harness)
-cargo test -p beet_ui --lib render::charcell  # charcell unit and snapshot tests
-```
+This rewrites `src/codegen/{pages.rs,docs/mod.rs,blog/mod.rs,route_tree.rs}` (generated artifacts, gitignored). The generated typed paths in `route_tree.rs` are used as `<Link href=routes::docs::index()/>`, and the sidebar nav is auto-collected from the route tree. Render commands and the build/verify loop live in `SKILL.md`.
 
 ## Legacy API you may encounter
 
-Older code (and the reference mockups in `.agents/reference/mockups`) uses a previous, web-only API. When porting it, translate as follows:
+Older code (and the previous site's source in `.agents/reference/beet_old`) uses a previous, web-only API. When porting it, translate as follows:
 
 | Legacy | Current |
 |---|---|

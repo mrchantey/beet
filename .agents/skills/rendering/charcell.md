@@ -9,6 +9,10 @@ Always check both, they exercise different buffers:
 - **Layout example** (fixed `Buffer`, ANSI): `cargo run -p beet_ui --example layout --features=terminal`. The `terminal` feature is required so it measures the real terminal via crossterm, otherwise it falls back to 80 cols. The example prints each demo plus a final pass/fail line asserting no rendered line exceeds the measured width.
 - **beet_site CLI** (auto-growing `FlexBuffer`, stdout): `cargo run -p beet_site --features cli -- blog post-1`. The real-world prose path (markdown, sidebar, header/footer, syntax highlighting).
 
+## Already handled — don't reinvent in CSS
+
+`render/charcell/decorate.rs` generates leading content: `<li>` bullets/numbers (lists already mark and nest), blockquote bars, the `<hr>` rule, `<img>` alt text. These are the charcell equivalent of `::before` markers, so list/quote markers exist on the terminal without any CSS list-style; the web is the side that needs markers restored.
+
 ## Measure against a real terminal width
 
 Piping either target into a tool makes crossterm fall back to 80 cols, and the visible width is hidden behind ANSI/OSC escapes. To pin a width and read true output, run the prebuilt binary under a PTY with a set winsize. Drop this in `/tmp/charcell.py`:
@@ -39,11 +43,14 @@ else:
     sys.stdout.buffer.write(out)
 ```
 
-- Build first, then run the binary path directly (not `cargo run`, which adds its own output): `cargo build -p beet_site --features cli` then `COLS=50 python3 /tmp/charcell.py /home/$USER/.cargo_target/debug/beet_site blog post-1`. The binary lives under the workspace target dir.
+- Build first, then run the binary path directly (not `cargo run`, which adds its own output): `cargo build -p beet_site --no-default-features --features cli` then `COLS=50 python3 /tmp/charcell.py /home/$USER/.cargo_target/debug/beet_site blog post-1`. The binary lives under the workspace target dir. (A default `cargo build`/`cargo test` overwrites it with the web target, which binds a server instead of rendering.)
 - Stripped mode prints `width repr(line)` per row, so visible widths are obvious and overflow is easy to spot with awk (`$1>50`).
 - Pass `--raw` as a trailing arg to dump bytes with escapes intact, then `grep`/`cat -v` for the SGR codes when debugging a specific cell's foreground (`38;2;r;g;b`) or background (`48;2;r;g;b`).
 
-Gotcha: never eyeball widths from a truncated `repr(line[:N])`, the slice hides real content and invents phantom truncation. Strip escapes and print the full line.
+Gotchas:
+
+- Never eyeball widths from a truncated `repr(line[:N])`; the slice hides real content and invents phantom truncation. Strip escapes and print the full line.
+- Adding `padding` or `display: block` to an inline prose element (eg a sidebar link) changes its charcell box and can over-indent the whole subtree. Re-render the terminal after any such layout change, not just the web.
 
 ## Tests
 
