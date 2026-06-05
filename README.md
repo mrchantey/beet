@@ -63,7 +63,7 @@ let outcome = AsyncPlugin::world()
 
 | Crate                                            | Status | Description                                          |
 | ------------------------------------------------ | ------ | ---------------------------------------------------- |
-| [`beet_thread`](crates/beet_thread)              | 🐉      | LLM conversations and agents as entity hierarchies   |
+| [`beet_thread`](crates/beet_thread)              | 🐉      | Multi-actor orchestration for chat, humans and agents |
 | [`beet_spatial`](crates/beet_spatial)            | 🐉      | Spatial actions: movement, steering and robotics     |
 | [`beet_ml`](crates/beet_ml)                      | 🐉      | Machine learning actions: embeddings and RL          |
 
