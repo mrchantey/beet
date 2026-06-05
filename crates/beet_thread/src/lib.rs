@@ -1,4 +1,4 @@
-//!
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 
 beet_core::test_main!();

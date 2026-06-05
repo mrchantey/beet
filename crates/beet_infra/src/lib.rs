@@ -1,10 +1,4 @@
-//! Infrastructure as code for beet, built on OpenTofu.
-//!
-//! This crate provides typed Rust bindings for Terraform/OpenTofu
-//! configuration, including:
-//! - [`terra`] for building and exporting JSON configurations
-//! - [`bindings_generator`] for generating typed Rust bindings from provider schemas
-//! - [`bindings`] for pre-generated bindings of commonly used providers
+#![doc = include_str!("../README.md")]
 
 beet_core::test_main!();
 

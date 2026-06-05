@@ -1,25 +1,13 @@
 # beet_core_shared
 
-Shared utilities for `beet_core` and `beet_core_macros`.
+Token-manipulation utilities shared by `beet_core` and the `beet_core_macros` proc-macro crate.
 
-This crate contains token manipulation utilities that need to be compiled for both the main `beet_core` crate and the `beet_core_macros` proc-macro crate.
+A proc-macro crate cannot share modules with a regular library crate, so the `syn`/`quote` helpers both need live here. You should not depend on this crate directly; it is re-exported through `beet_core` behind the `tokens` feature.
 
-## Purpose
+Contents:
 
-Proc-macro crates have special compilation requirements and cannot share code directly with regular library crates through module paths. This crate solves that problem by extracting shared token utilities into a standalone crate that both `beet_core` and `beet_core_macros` can depend on.
-
-## Contents
-
-- **`AttributeGroup`** - Parse and validate syn attributes
-- **`NamedField`** - Wrapper for struct fields and function parameters with attribute parsing
-- **`pkg_ext`** - Package configuration helpers for determining internal vs external crate usage
-
-## Usage
-
-Users typically don't need to depend on this crate directly. It is reexported through `beet_core::tokens_utils` when the `tokens` feature is enabled.
-
-```rust
-use beet_core::prelude::*; // With tokens feature enabled
-
-let attrs = AttributeGroup::parse(&field.attrs, "field")?;
-```
+- `AttributeGroup` / `AttributeMap` - parse and validate `syn` attributes
+- `NamedField` - struct fields and function parameters with attribute parsing
+- `TokenizeSelf` - tokenize a value back into its constructing source
+- `pkg_ext` - Cargo.toml helpers for resolving internal vs external crate paths
+- `synbail!` / `synhow!` - ergonomic `syn::Error` construction

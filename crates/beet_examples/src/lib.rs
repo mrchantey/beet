@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 beet_core::test_main!();
 
 #[cfg(feature = "bevy_default")]

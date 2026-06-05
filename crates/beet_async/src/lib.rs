@@ -1,21 +1,7 @@
-//! # Beet Async
+#![doc = include_str!("../README.md")]
 //!
-//! ⚠️ Temporary Crate ⚠️
-//!
-//! This crate will eventually be replaced with the upstream bevy_async, currently with two differentiating features:
-//! - exclusive world access
-//! - wasm support
-//!
-//! The objective here is to coordinate two participants that want to share World access:
-//!
-//! - The main Bevy schedule
-//! - Futures and async tasks running on other threads
-//!
-//! This is done through the bridge primitive introduced in this crate.
-//!
-//! This is a beet-owned vendored copy of the in-progress upstream `bevy_async`
-//! crate, rewired onto beet's single `bevy` dependency and carrying beet's
-//! exclusive-bridge patch ([`AsyncWorld::exclusive`]). See `agent/plans/bevy_async.md`.
+//! See `agent/plans/bevy_async.md` for the exclusive-bridge patch
+//! ([`AsyncWorld::exclusive`]).
 //!
 //! Invariants of this crate:
 //!

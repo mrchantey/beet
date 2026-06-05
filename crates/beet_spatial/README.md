@@ -1,16 +1,10 @@
-# `beet_spatial`
+# beet_spatial
 
-An extension of `beet_flow` with support for spatial actions:
+Spatial actions built on [`beet_action`], for moving things around a Bevy world.
 
-## Movement
-- Translate
-- Hover
+- **Movement**: translate, hover, rotate-to-velocity, force integration
+- **Steering**: seek, wander, arrive, align, separate, cohere
+- **Inverse kinematics** and **procedural animation**
+- **Robotics** helpers
 
-
-## Steering
-- Wander
-- Seek
-- Align
-- Separate
-- Cohere
-- EndOnArrive
+Pull in `BeetSpatialPlugins` to register the actions and their tick schedule.

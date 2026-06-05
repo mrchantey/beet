@@ -1,26 +1,4 @@
-//! Core utilities and types for the beet framework.
-//!
-//! This crate provides foundational building blocks used across all beet crates,
-//! including cross-platform abstractions, extension traits, and common patterns.
-//!
-//! # Modules
-//!
-//! - [`arena`] - Global arenas for storing objects with copyable handles (requires `std`)
-//! - [`extensions`] - Extension traits for standard library types
-//! - [`utils`] - General utilities including async helpers and method chaining
-//! - [`testing`] - Custom test runner and matchers (requires `testing` feature)
-//! - [`fs`] - File system utilities (native only, requires `fs` feature)
-//!
-//! # Feature Flags
-//!
-//! - `std` - Standard library support (enabled by default)
-//! - `serde` - Serialization support
-//! - `testing` - Test runner and matcher utilities
-//! - `fs` - File system watching and utilities (native only)
-//! - `tokens` - Proc-macro token utilities
-//! - `rand` - Random number generation
-//! - `nightly` - Nightly Rust features like `Fn` trait implementations
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
 // The lib itself always uses the stable `inventory` runner (`[lib]

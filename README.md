@@ -13,12 +13,10 @@
      <a href="https://beetstack.dev">Website</a>
      <span> | </span>
     <a href="https://docs.rs/beet">API Docs</a>
-    <!-- <span> | </span>
-    <a href="https://mrchantey.github.io/beet/other/contributing.html">Contributing</a> -->
   </h3>
 </div>
 
-Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a <a href="https://bevy.org">Bevy App</a>, and all structure and behavior is written in Entity Component System architecture.
+Beet is a framework for building user-modifiable applications, like smalltalk or hypercard. Everything from the CLI to client applications is a [Bevy App](https://bevy.org), and all structure and behavior is written in Entity Component System architecture.
 
 > 🚧 Mind your step! 🚧
 >
@@ -29,95 +27,64 @@ Beet is a framework for building user-modifiable applications, like smalltalk or
 - 🐣 near stable: incomplete docs
 - 🐉 highly experimental: here be dragons
 
-Beet crates fall into a few main categories.
+The `beet` crate re-exports the crates below behind feature flags. Each can also be used standalone.
 
-## Utils
+## Core
 
-General patterns and tools for application development.
+Cross-platform primitives shared by every other crate.
 
-| Crate                                        | Status | Description                                    |
-| -------------------------------------------- | ------ | ---------------------------------------------- |
-| [`beet_core`](crates/beet_core/Cargo.toml)   | 🦢      | Core utilities and types for other beet crates |
-| [`beet_net`](crates/beet_net/Cargo.toml)     | 🐣      | Transport agnostic networking for bevy applications.|
+| Crate                                          | Status | Description                                          |
+| ---------------------------------------------- | ------ | ---------------------------------------------------- |
+| [`beet_core`](crates/beet_core)                | 🦢      | Cross-platform types, extension traits and a test runner |
+| [`beet_net`](crates/beet_net)                  | 🐣      | Transport agnostic request/response networking      |
+| [`beet_action`](crates/beet_action)            | 🐣      | Entities as callable async functions                 |
+| [`beet_ui`](crates/beet_ui)                    | 🐉      | XML-like UI trees rendered to HTML or the terminal   |
+| [`beet_router`](crates/beet_router)            | 🐉      | Transport agnostic routing for bevy applications     |
+| [`beet_infra`](crates/beet_infra)              | 🐉      | Infrastructure as code, built on OpenTofu            |
+| [`beet_async`](crates/beet_async)              | 🐉      | Vendored bevy_async bridge for wasm and exclusive world access |
 
+## Agents & Behavior
 
-## Control Flow
-
-Control flow crates for use in behavior paradigms like behavior trees, utility AI or agentic systems.
-
-```rust
-world
-  .spawn((
-    Name::new("My Behavior"),
-    Sequence,
-    children![
-      (
-        Name::new("Hello"),
-        EndWith(Outcome::Pass),
-      ),
-      (
-        Name::new("World"),
-        EndWith(Outcome::Pass),
-      ),
-    ],
-  ))
-  .trigger_target(GetOutcome)
-  .flush();
-```
-
-
-| Crate                                            | Status | Description                                        |
-| ------------------------------------------------ | ------ | -------------------------------------------------- |
-| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | An ECS control flow library                        |
-| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Spatial actions built upon beet_flow               |
-| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Machine Learning actions built upon beet_flow      |
-
-
-## Web
-
-Crates for building and deploying web apps. These crates are very experimental and changing frequently.
+Behaviors built on `beet_action`, for paradigms like behavior trees, utility AI and agentic systems.
 
 ```rust
-#[template]
-fn Counter(initial: i32) -> impl Bundle {
-  let (get, set) = signal(initial);
+use beet::prelude::*;
 
-  rsx!{
-    <button onclick=move |_| set(get() + 1)>
-      Cookie Count: {get}
-    </button>
-  }
-}
+# async fn run() -> Result {
+let outcome = AsyncPlugin::world()
+  .spawn((Sequence::new(), children![
+    Log::new("hello"),
+    Log::new("world"),
+  ]))
+  .call::<(), Outcome>(())
+  .await?;
+# Ok(()) }
 ```
 
+| Crate                                            | Status | Description                                          |
+| ------------------------------------------------ | ------ | ---------------------------------------------------- |
+| [`beet_thread`](crates/beet_thread)              | 🐉      | LLM conversations and agents as entity hierarchies   |
+| [`beet_spatial`](crates/beet_spatial)            | 🐉      | Spatial actions: movement, steering and robotics     |
+| [`beet_ml`](crates/beet_ml)                      | 🐉      | Machine learning actions: embeddings and RL          |
 
-| Crate                                                          | Status | Description                                         |
-| -------------------------------------------------------------- | ------ | --------------------------------------------------- |
-| [`beet_router`](crates/beet_router/Cargo.toml)                 | 🐉      | Transport agnostic routing for bevy applications                     |
-| [`beet_build`](crates/beet_build/Cargo.toml)                   | 🐉      | Codegen and compilation tooling for beet            |
-| [`beet-cli`](crates/beet-cli/Cargo.toml)                       | 🐉      | Tools for building and deploying beet apps          |
-| [`beet_site`](crates/beet_site/Cargo.toml)                     | 🐉      | The beet website, built with beet                   |
+## Apps & Tooling
 
-
-## Experiments
-
-| Crate                                              | Status | Description                                      |
-| -------------------------------------------------- | ------ | ------------------------------------------------ |
-| [`beet_actor`](crates/beet_actor/Cargo.toml)       | 🐉      | Actor types and systems  |
-| [`beet_examples`](crates/beet_examples/Cargo.toml) | 🐉      | Bits and pieces for substantial beet examples    |
+| Crate                                            | Status | Description                                          |
+| ------------------------------------------------ | ------ | ---------------------------------------------------- |
+| [`beet-cli`](crates/beet-cli)                    | 🐉      | Build, serve and run-wasm helpers for beet apps      |
+| [`beet_site`](crates/beet_site)                  | 🐉      | The beet website, built with beet                    |
+| [`beet_examples`](crates/beet_examples)          | 🐉      | Shared scaffolding for the larger examples           |
 
 ## Bevy Versions
 
-This chart is for matching a bevy version against a particular beet version.
-
-| `bevy` | `beet` |
-| ------ | ------ |
-| 0.17   | 0.0.7  |
-| 0.16   | 0.0.6  |
-| 0.15   | 0.0.4  |
-| 0.14   | 0.0.2  |
-| 0.12   | 0.0.1  |
-
+| `bevy` | `beet`  |
+| ------ | ------- |
+| 0.19   | 0.0.9   |
+| 0.17   | 0.0.7   |
+| 0.16   | 0.0.6   |
+| 0.15   | 0.0.4   |
+| 0.14   | 0.0.2   |
+| 0.12   | 0.0.1   |
 
 ## Local Development
 
@@ -135,5 +102,5 @@ To prevent this either run with RUST_MIN_STACK='some_gigantic_number', or just k
 git clone https://github.com/mrchantey/beet
 cd beet
 just init-repo
-just test-all
+just test-core
 ```

@@ -41,9 +41,12 @@ App::new()
 | `server` | Lightweight mini HTTP server using `async-io` TCP |
 | `hyper` | Full-featured Hyper HTTP server (implies `server`) |
 | `lambda` | AWS Lambda server support |
-| `aws` | AWS S3 and DynamoDB providers |
+| `aws_sdk` | AWS S3 and DynamoDB providers |
 | `reqwest` | Use reqwest as the HTTP client backend |
 | `ureq` | Use ureq as the HTTP client backend |
 | `tungstenite` | Native WebSocket support |
+| `russh_client` / `russh_server` | SSH client and server |
+| `webdriver` | WebDriver browser automation client |
+| `mdns` / `udp` | mDNS service discovery and UDP sockets |
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |

@@ -1,11 +1,8 @@
-# `beet_ml`
+# beet_ml
 
-This crate contains various ML integrations with bevy/beet.
+Machine learning actions built on [`beet_action`].
 
-## Candle
+- **Language**: the [`Bert`] sentence-embedding asset (via Huggingface [Candle](https://github.com/huggingface/candle)) with a [`Sentence`] action for selecting the closest match to a user phrase.
+- **Reinforcement learning**: a `FrozenLake` environment and Q-learning agents ported from OpenAI Gym, runnable headless or in realtime.
 
-`SentenceSelector` is an implementation of the bert models from Huggingface Candle.
-
-## RL Enviroments
-
-FrozenLakePlugin is a port of the one found in OpenAI gym.
+Add `BeetMlPlugins` to register the assets, actions and tick schedule.
