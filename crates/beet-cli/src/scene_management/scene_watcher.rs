@@ -111,7 +111,7 @@ fn spawn_watcher(world: &mut World, path: AbsPathBuf) {
 }
 
 
-#[cfg(all(test, feature = "qrcode"))]
+#[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet::prelude::*;
@@ -123,17 +123,21 @@ mod test {
 	/// The default CLI commands round-trip through world serde: a serialized
 	/// router reloads with every command route discoverable, proving the
 	/// reflectable markers reconstruct their path/behaviour from require hooks.
-	#[beet_core::test]
+	#[beet::test]
 	fn scene_round_trips() {
+		// build the default command tree and serialize it, as the exporter does.
 		let mut world = cli_world();
-		let root = world
-			.spawn((default_router(), children![
-				RunWasm, BuildWasm, ExportPdf, QrCode
-			]))
-			.flush();
+		let root = world.spawn(default_router()).id();
+		world.entity_mut(root).with_children(|parent| {
+			parent.spawn(RunWasm);
+			parent.spawn(BuildWasm);
+			parent.spawn(ExportPdf);
+			#[cfg(feature = "qrcode")]
+			parent.spawn(QrCode);
+		});
+		world.flush();
 		let json = WorldSerdeSaver::new(&mut world)
 			.with_entity_tree(root)
-			.deny_component::<ParamsPartial>()
 			.save(MediaType::Json)
 			.unwrap();
 
@@ -150,7 +154,8 @@ mod test {
 		let tree = world.entity(root).get::<RouteTree>().unwrap();
 		tree.find(&["build-wasm"]).xpect_some();
 		tree.find(&["export-pdf"]).xpect_some();
-		tree.find(&["qrcode"]).xpect_some();
 		tree.find(&["run-wasm", "some-binary"]).xpect_some();
+		#[cfg(feature = "qrcode")]
+		tree.find(&["qrcode"]).xpect_some();
 	}
 }

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
-beet_core::test_main!();
+#[cfg(test)]
+beet::test_main!();
 
 mod commands;
 mod scene_management;

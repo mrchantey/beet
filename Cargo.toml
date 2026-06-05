@@ -298,7 +298,7 @@ native-tls = [
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + markdown
 # + http surface it relied on (previously supplied by default features + net).
-router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http"]
+router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
 # no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
 # dispatch and middleware core from beet_router, without the std scene/help
 # rendering pipeline. See `beet_router`'s `embedded` module.

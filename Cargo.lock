@@ -1321,7 +1321,6 @@ name = "beet-cli"
 version = "0.0.9-dev.11"
 dependencies = [
  "beet",
- "beet_core",
  "image",
  "qrcode",
 ]

@@ -34,7 +34,7 @@ image = { version = "0.25", optional = true }
 
 [dev-dependencies]
 beet = { workspace = true, features = ["testing"] }
-beet_core = { workspace = true, features = ["testing"] }
 
+# the `beet` test runner replaces libtest's harness
 [lib]
 harness = false

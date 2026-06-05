@@ -8,6 +8,7 @@ pub mod bindings;
 mod blocks;
 pub mod terra;
 mod types;
+#[cfg(feature = "beet_router")]
 mod wasm;
 
 #[cfg(feature = "bindings_generator")]
@@ -22,5 +23,6 @@ pub mod prelude {
 	pub use crate::terra;
 	pub use crate::terra::tofu;
 	pub use crate::types::*;
+	#[cfg(feature = "beet_router")]
 	pub use crate::wasm::*;
 }

@@ -39,9 +39,6 @@ fn export_default_cli(world: &mut World) -> Result {
 
 	let json = WorldSerdeSaver::new(world)
 		.with_entity_tree(entity)
-		// reconstructed on load from each command's require hook, so it need not
-		// be serialized.
-		.deny_component::<ParamsPartial>()
 		.save(MediaType::Json)?
 		.as_utf8()?
 		.to_string();
