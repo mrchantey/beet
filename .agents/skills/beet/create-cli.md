@@ -5,50 +5,56 @@ A beet CLI is just a router: a [`CliServer`] reads the process args as a
 response is written to stdout. There is no bespoke arg-parsing layer — a command
 is a route, its flags are request params, and `--help` is router middleware.
 
-The canonical example is the `beet` CLI itself (`crates/beet-cli`). Read it
-alongside this skill; everything below is drawn from it.
+The canonical example is the `beet` CLI itself: the `beet` binary
+(`crates/beet-cli/src/main.rs`) is a bare scene runner that loads its routes from
+a `beet.json`, and the `default_cli` example
+(`crates/beet-cli/examples/default_cli.rs`) builds that scene and serializes it.
+Read them alongside this skill; everything below is drawn from them.
 
 ## 1. The app
+
+A CLI is a [`CliServer`] router whose routes are the commands. The commands are
+reflectable route actions (`#[action(route = "...")]`), so the whole tree can be
+serialized to a `beet.json` scene and reloaded by the `beet` runner:
 
 ```rust
 use beet::prelude::*;
 use beet_cli::prelude::*;
 
-fn main() -> AppExit {
-	App::new()
-		.add_plugins((MinimalPlugins, LogPlugin::default(), ClientAppPlugin))
-		.add_systems(Startup, setup)
-		.run()
-}
-
-/// Spawns the CLI server with every command wired as a route.
-fn setup(mut commands: Commands) {
-	commands
-		.spawn((CliServer::default(), default_router()))
-		.with_children(|parent| {
-			parent.spawn(exchange_route("build-wasm", BuildWasm));
-			parent.spawn(exchange_route("export-pdf", ExportPdf));
-			parent.spawn(exchange_route("run-wasm/*args", RunWasm));
-		});
+/// The default `beet` CLI: a CliServer router wiring every built-in command.
+fn default_cli(world: &mut World) -> Entity {
+	let entity = world.spawn((CliServer::default(), default_router())).id();
+	world.entity_mut(entity).with_children(|parent| {
+		parent.spawn(BuildWasm);
+		parent.spawn(ExportPdf);
+		parent.spawn(RunWasm);
+	});
+	entity
 }
 ```
+
+Each command is spawned as a bare marker: its `#[action(route = "...")]`
+attribute requires the `PathPartial` + dispatch components, so the route is
+self-describing and round-trips through world serde with no extra wiring.
 
 - `CliServer` turns `beet <args>` into a request and streams the response to
   stdout, mapping a non-OK status to a non-zero exit code.
 - `default_router()` bundles the route lookup plus the `RequestLogger`,
   `HelpHandler` and `NavigateHandler` middleware and the default app routes;
   spawn your own routes as `children` of the same entity.
-- Each `exchange_route(path, Action)` is one command. The `path` is matched
-  against the args, ie `beet build-wasm` hits the `build-wasm` route.
+- Each command marker is one command. The `route` path is matched against the
+  args, ie `beet build-wasm` hits the `build-wasm` route.
 
 ## 2. A command
 
-A command is an `#[action]` async fn taking [`RequestParts`] and returning
-`Result<String>`. The string is the response body.
+A command is an `#[action(route = "...")]` async fn taking [`RequestParts`] and
+returning `Result<String>`. The string is the response body. Derive `Reflect`
++ `#[reflect(Component)]` so the route serializes into a `beet.json` scene.
 
 ```rust
-#[action]
-#[derive(Component)]
+#[action(route = "qrcode", handler_only)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
 pub async fn QrCode(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<QrCodeParams>()?;
@@ -126,6 +132,9 @@ request use [`RequestParts::unparse_cli_args`] — it returns every path segment
 as a positional followed by params as `--key`/`--key=value`:
 
 ```rust
+#[action(route = "run-wasm/*args", handler_only)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	// rebuilds `[run-wasm, <binary>, ..forwarded]`; skip the command segment
 	// consumed by the route, pop the binary, forward the rest to the module.
@@ -147,9 +156,22 @@ yields HTML and the default yields styled terminal output. Rendering requires
 `RouterPlugin` (pulled in by `ClientAppPlugin`), which registers the charcell
 render pipeline.
 
+## 7. Shipping the CLI as a scene
+
+The `beet` binary is a scene runner: on startup it loads `beet.json` from the
+cwd, and that scene supplies the `CliServer` and its routes. The `default_cli`
+example builds the route tree and serializes it via `WorldSerdeSaver`; the runner
+reloads it with `WorldSerdeLoader`, reconstructing each command's behaviour from
+its require hooks. The runner must `register_type` every command (see
+`CliCommandsPlugin`) so the markers deserialize. The scene management
+(loading, marking, watching, reloading) lives in
+`crates/beet-cli/src/scene_management`.
+
 ## Reference
 
-- `crates/beet-cli/src/main.rs` — app + route wiring
+- `crates/beet-cli/src/main.rs` — the scene runner
+- `crates/beet-cli/examples/default_cli.rs` — build + serialize the CLI scene
+- `crates/beet-cli/src/scene_management` — load/watch/reload `beet.json`
 - `crates/beet-cli/src/commands/qrcode.rs` — params + `parse_reflect`
 - `crates/beet-cli/src/commands/run_wasm.rs` — greedy route + `unparse_cli_args`
 - `examples/file_based_routes/main.rs` — a CLI/HTTP app sharing one router

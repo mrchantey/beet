@@ -19,8 +19,9 @@ const DENO_TS: &str = include_str!("deno.ts");
 /// `run-wasm` is the binary, and the remaining positional segments and query
 /// params are forwarded to the running module — the beet wasm test runner reads
 /// them back via `Deno.args`.
-#[action]
-#[derive(Component)]
+#[action(route = "run-wasm/*args", handler_only)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	// rebuilds `[run-wasm, <binary>, ..forwarded]`; skip the `run-wasm`
 	// command consumed by the route, pop the binary path, forward the rest.

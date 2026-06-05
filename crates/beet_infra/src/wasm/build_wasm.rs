@@ -24,8 +24,9 @@ struct BuildWasmParams {
 /// Runs `cargo build --target wasm32-unknown-unknown --no-default-features
 /// --features client`, then `wasm-bindgen` into `<out_dir>/wasm`, and in release
 /// mode `wasm-opt -Oz` over the result, returning the artifact size.
-#[action]
-#[derive(Component)]
+#[action(route = "build-wasm", handler_only)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<BuildWasmParams>())]
 pub async fn BuildWasm(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<BuildWasmParams>()?;

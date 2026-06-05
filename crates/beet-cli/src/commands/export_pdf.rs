@@ -22,8 +22,9 @@ struct ExportPdfParams {
 /// `--input` is the URL, `--output` the file (default `file.pdf`),
 /// `--no-margin` disables margins, and `--page-ranges` limits the pages, ie
 /// `--page-ranges=1-5,8`.
-#[action]
-#[derive(Component)]
+#[action(route = "export-pdf", handler_only)]
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<ExportPdfParams>())]
 pub async fn ExportPdf(parts: RequestParts) -> Result<String> {
 	let params = parts.params().parse_reflect::<ExportPdfParams>()?;

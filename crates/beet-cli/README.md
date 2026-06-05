@@ -1,8 +1,8 @@
 # beet-cli
 
-The `beet` command-line interface: build, serve and run-wasm helpers for beet apps.
+The `beet` command-line interface: a scene runner whose commands are loaded from a `beet.json`.
 
-The CLI is itself a beet app. Every command is an [`Action`] served as a route on a [`CliServer`]-backed router, so `beet --help` lists the commands and `beet <command>` dispatches one.
+The CLI is itself a beet app. Like a game engine pressing play with no scene loaded, the bare binary does nothing. On startup it looks for a `beet.json` in the cwd: absent, it prints a welcome message and exits; present, it loads that scene, which supplies the actual CLI as routes on a [`CliServer`]-backed router, then watches the file for live reloads. So `beet --help` lists the loaded commands and `beet <command>` dispatches one.
 
 | Command | Description |
 |---------|-------------|
