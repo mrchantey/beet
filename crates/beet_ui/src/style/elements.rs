@@ -68,14 +68,23 @@ pub fn default_element_rules() -> Vec<Rule> {
 	]
 }
 
-/// User-agent rule removing the [`NON_VISUAL_TAGS`] from layout via
-/// `display: none`, so visual renderers omit metadata/scripting/embedded tags.
+/// User-agent rule removing metadata and scripting tags from layout via
+/// `display: none`, so visual renderers omit them.
+///
+/// Note this is a strict subset of [`NON_VISUAL_TAGS`]: the embedded-media tags
+/// (`iframe`/`object`/`embed`) are visual on the web, so they are *not* hidden
+/// here. The charcell walker still skips them via [`is_non_visual`], so they
+/// render on the web but not the terminal.
 ///
 /// Kept separate from the prose [`default_element_rules`] so theme rule sets (eg
 /// Material) can include it without pulling in prose props that need their own
 /// CSS resolvers.
 pub fn non_visual_rule() -> Rule {
-	Rule::tags(NON_VISUAL_TAGS).with_canonical(Display::None)
+	Rule::tags(&[
+		"head", "script", "style", "template", "noscript", "meta", "link",
+		"title", "base",
+	])
+	.with_canonical(Display::None)
 }
 
 /// A rule forcing `display: block` on the given tags.
@@ -118,8 +127,8 @@ fn link() -> Rule {
 		.with_canonical(DecorationLine::underline())
 }
 
+// A `blockquote` is a block with the usual gap below; its callout look (lifted
+// surface, primary left rule) comes from the theme's `blockquote_prose` rule.
 fn blockquote() -> Rule {
 	block_spaced(&["blockquote"])
-		.with_value(ForegroundColor, faint())
-		.with_canonical(FontStyle::Italic)
 }

@@ -34,6 +34,8 @@ pub fn button_outlined() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(BTN_OUTLINED))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeFull).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
@@ -76,6 +78,18 @@ pub fn button_elevated() -> Rule {
 		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
 }
 
+/// Padding shared by every button, giving the label room inside its container.
+/// Horizontal `1.25rem` reads as the MD3 pill inset; the vertical `0.4rem`
+/// rounds to zero terminal rows so charcell buttons stay a single line.
+fn button_padding() -> Spacing {
+	Spacing {
+		top: Length::Rem(0.4),
+		bottom: Length::Rem(0.4),
+		left: Length::Rem(1.25),
+		right: Length::Rem(1.25),
+	}
+}
+
 /// Generic button base styles.
 ///
 /// Applied to all `<button>` elements for consistent baseline styling.
@@ -84,17 +98,22 @@ pub fn button_base() -> Rule {
 		.with_selector(Selector::Tag("button".into()))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+		.with_value(common_props::Padding, button_padding())
 }
 
 /// Class-based button baseline, mirroring [`button_base`].
 ///
 /// Lets a non-`<button>` element styled as a button (eg an `<a>` [`Link`]) pick
-/// up the same baseline typography and shape via the `.btn` class.
+/// up the same baseline typography, shape, and padding via the `.btn` class, and
+/// strips the underline a prose `<a>` would otherwise carry so a link button
+/// reads identically to a `<button>`.
 pub fn button_class() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(BTN))
 		.with_token(TypographyProps,typography::LabelLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
+		.with_value(common_props::Padding, button_padding())
+		.with_canonical(DecorationLine::DEFAULT)
 }
 
 /// Secondary filled button - medium emphasis using the secondary color.
@@ -150,6 +169,7 @@ pub fn card_filled() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
 /// Elevated card - container with shadow elevation.
@@ -162,6 +182,7 @@ pub fn card_elevated() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
 /// Outlined card - container with visible border.
@@ -174,6 +195,9 @@ pub fn card_outlined() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(ShapeProps,geometry::ShapeMedium).unwrap()
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
 // ── Typography Utility Classes ────────────────────────────────────────────────
@@ -298,20 +322,39 @@ pub fn link_prose() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
-/// Inline `<code>` - filled chip readable against the page surface.
+/// Inline `<code>` - filled chip readable against the page surface, with a
+/// faint rounded corner.
 pub fn code_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("code"))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 }
 
-/// Block `<pre>` - filled code surface matching inline code.
+/// Block `<pre>` - filled code surface matching inline code, padded with a
+/// rounded corner.
 pub fn pre_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("pre"))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHighest).unwrap()
+		.with_token(ShapeProps,geometry::ShapeSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
+}
+
+/// Block `<blockquote>` - a lifted surface card with a primary left rule, the
+/// callout look shared by web and terminal.
+pub fn blockquote_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("blockquote"))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHigh).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+		.with_token(common_props::BorderLeftWidth,geometry::OutlineWidthThick).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
 // ── Color Utility Classes ─────────────────────────────────────────────────────
@@ -445,7 +488,33 @@ pub fn app_bar_nav() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(APP_BAR_NAV))
 		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::GapProp, Length::Rem(0.5))
 		.with_value(common_props::ColumnGapProp, 2u32)
+}
+
+/// App bar title link - the brand wordmark. Larger than body type, undecorated,
+/// and using the surface foreground rather than the prose-link primary color so
+/// it reads as a title rather than a hyperlink.
+pub fn app_bar_title() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class("app-bar-title"))
+		.with_token(TypographyProps,typography::TitleLarge).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+		.with_canonical(DecorationLine::DEFAULT)
+}
+
+/// On the web, the app bar gains breathing room above and below its row.
+/// Charcell stays a single compact line since it ignores this media-gated rule.
+pub fn app_bar_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(APP_BAR))
+		.with_value(common_props::Padding, Spacing {
+			top: Length::Rem(0.75),
+			bottom: Length::Rem(0.75),
+			left: Length::Rem(1.5),
+			right: Length::Rem(1.5),
+		})
 }
 
 /// Page `<footer>` - mirrors the app bar's elevation with a top divider.
@@ -511,16 +580,43 @@ pub fn main_content() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
-/// Page - full page background using the base surface color.
+/// Page - full page background using the base surface color, with a comfortable
+/// large body type as the default reading size.
 pub fn page() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(PAGE))
 		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
-		.with_token(TypographyProps,typography::BodyMedium).unwrap()
+		.with_token(TypographyProps,typography::BodyLarge).unwrap()
 }
 
 // ── Form controls ───────────────────────────────────────────────────────────
+
+/// `<form>` layout - a vertical stack whose fields stretch to the form width, so
+/// a bare `<form>` of labels and inputs reads as key-over-value rows with a gap
+/// between each field. Works on both targets.
+pub fn form_layout() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("form"))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::AlignItemsProp, AlignItems::Stretch)
+		.with_value(common_props::GapProp, Length::Rem(1.))
+		.with_value(common_props::RowGapProp, 1u32)
+}
+
+/// Field `<label>` - a block sitting just above its input, medium weight so the
+/// key reads as a heading for its value.
+pub fn label_field() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("label"))
+		.with_value(common_props::DisplayProp, Display::Block)
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+		.with_value(common_props::MarginProp, Spacing {
+			bottom: Length::Rem(0.25),
+			..Spacing::DEFAULT
+		})
+}
 
 /// Shared baseline for `.input` text fields and text areas.
 pub fn input_base() -> Rule {
@@ -625,21 +721,24 @@ pub fn table() -> Rule {
 		.with_value(common_props::Width, Length::Percent(100.))
 }
 
-/// Header cells - medium weight, left aligned, padded, bottom border.
+/// Header cells - medium weight, left aligned, padded, with a solid bottom rule
+/// separating the header from the body.
 pub fn table_th() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("th"))
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
 		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
+		.with_token(common_props::BorderBottomWidth,geometry::OutlineWidthThin).unwrap()
 		.with_value(common_props::TextAlignProp, TextAlign::Left)
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 
-/// Body cells - padded, faint divider border.
+/// Body cells - padded, with a faint divider rule below each row.
 pub fn table_td() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("td"))
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
+		.with_token(common_props::BorderBottomWidth,geometry::OutlineWidthThin).unwrap()
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 
@@ -665,6 +764,7 @@ pub fn summary() -> Rule {
 pub fn sidebar() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR))
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerLow).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
@@ -675,11 +775,43 @@ pub fn sidebar() -> Rule {
 		})
 }
 
-/// Sidebar link - primary-colored, for navigable leaves and branches.
+/// Sidebar link - an undecorated link in the faint surface-variant foreground,
+/// lifting to the active highlight via [`sidebar_active`].
 pub fn sidebar_link() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_LINK))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_canonical(DecorationLine::DEFAULT)
+}
+
+/// On the web, sidebar links fill the rail width as padded blocks, so the active
+/// highlight reads as a full-width pill. Charcell keeps them inline (it ignores
+/// this media-gated rule), avoiding the per-item left inset a padded block would
+/// add to the terminal tree.
+pub fn sidebar_link_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(SIDEBAR_LINK))
+		.with_value(common_props::DisplayProp, Display::Block)
+		.with_value(common_props::Padding, Spacing {
+			top: Length::Rem(0.25),
+			bottom: Length::Rem(0.25),
+			left: Length::Rem(0.5),
+			right: Length::Rem(0.5),
+		})
+}
+
+/// The current page in the sidebar - primary text on a raised surface, matching
+/// the `aria-current="page"` leaf or branch link. An attribute selector, so it
+/// works the same on both targets.
+pub fn sidebar_active() -> Rule {
+	Rule::new()
+		.with_selector(Selector::attribute("aria-current", Some("page".into())))
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHigh).unwrap()
+		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
 }
 
 /// Nested sidebar item - indented under its parent group. Each nesting level's
@@ -768,6 +900,43 @@ pub fn disabled_state() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 }
 
+// ── Web-only overrides ────────────────────────────────────────────────────────
+// `@media screen` rules: the charcell cascade ignores media-gated rules, so
+// these refine the web look without touching the terminal, which keeps its
+// colored headings and grows to fit its content.
+
+/// On the web, prose headings drop the terminal's per-level hue and inherit the
+/// page foreground, so they read as plain bold text. Charcell keeps its colored
+/// headings since it ignores this media-gated rule.
+pub fn headings_web_color() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::AnyOf(
+			["h1","h2","h3","h4","h5","h6"].iter().map(|t| Selector::tag(*t)).collect(),
+		))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+}
+
+/// On the web, the `.page` body fills at least the viewport height as a flex
+/// column, so a short page still pins its footer to the bottom of the screen.
+pub fn page_fill_viewport() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(PAGE))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::MinHeight, Length::ViewportHeight(100.))
+}
+
+/// On the web, the sidebar + main row grows to fill the space above the footer
+/// inside the [`page_fill_viewport`] column.
+pub fn container_grow_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(CONTAINER))
+		.with_value(common_props::FlexGrowProp, 1u32)
+}
+
 /// Returns all Material Design component rules.
 pub fn all_rules() -> Vec<Rule> {
 	vec![
@@ -817,6 +986,8 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar(),
 		app_bar_scrolled(),
 		app_bar_nav(),
+		app_bar_title(),
+		app_bar_web(),
 		footer(),
 		footer_side(),
 		container(),
@@ -825,11 +996,14 @@ pub fn all_rules() -> Vec<Rule> {
 		link_prose(),
 		code_prose(),
 		pre_prose(),
+		blockquote_prose(),
 		main_content(),
 		page(),
 		// form controls — state/compound rules first so they win the cascade
 		input_focus(),
 		select_focus(),
+		form_layout(),
+		label_field(),
 		input_base(),
 		input_outlined(),
 		input_filled(),
@@ -848,6 +1022,8 @@ pub fn all_rules() -> Vec<Rule> {
 		summary(),
 		sidebar(),
 		sidebar_link(),
+		sidebar_link_web(),
+		sidebar_active(),
 		sidebar_item(),
 		sidebar_label(),
 		// utilities
@@ -869,6 +1045,10 @@ pub fn all_rules() -> Vec<Rule> {
 		// accessibility — global state rules
 		focus_ring(),
 		disabled_state(),
+		// web-only overrides — gated behind `@media screen`, ignored by charcell
+		headings_web_color(),
+		page_fill_viewport(),
+		container_grow_web(),
 	]
 }
 

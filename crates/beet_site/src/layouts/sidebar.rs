@@ -17,6 +17,7 @@ pub fn BeetSidebar(
 		.next()
 		.map(|tree| {
 			SidebarState::new(cx.current_path())
+				.with_home(false)
 				.with_exclude("app-info")
 				.with_exclude("analytics")
 				.with_info("docs", SidebarInfo {

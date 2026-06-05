@@ -75,6 +75,8 @@ pub enum Length {
 	ViewportMin(f32),
 	// percentage of viewport max
 	ViewportMax(f32),
+	// percentage of viewport height
+	ViewportHeight(f32),
 }
 
 impl Default for Length {
@@ -97,6 +99,9 @@ impl Length {
 			Self::ViewportMax(value) => {
 				value / 100.0 * viewport.max_element() / REM_PIXELS
 			}
+			Self::ViewportHeight(value) => {
+				value / 100.0 * viewport.y / REM_PIXELS
+			}
 		}
 	}
 }
@@ -109,6 +114,7 @@ impl std::fmt::Display for Length {
 			Self::Percent(value) => write!(f, "{}%", value),
 			Self::ViewportMin(value) => write!(f, "{}vmin", value),
 			Self::ViewportMax(value) => write!(f, "{}vmax", value),
+			Self::ViewportHeight(value) => write!(f, "{}vh", value),
 		}
 	}
 }

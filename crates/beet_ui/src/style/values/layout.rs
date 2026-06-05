@@ -345,11 +345,13 @@ pub enum Direction {
 
 impl AsCssValue for Direction {
 	fn as_css_value(&self) -> Result<CssValue> {
+		// `flex-direction` is the only CSS consumer, so map to its axis keywords.
+		// The charcell layout engine reads the [`Direction`] enum directly, not
+		// this string, so the viewport-relative variants (charcell-only) collapse
+		// to their dominant axis here.
 		match self {
-			Self::Horizontal => "horizontal",
-			Self::Vertical => "vertical",
-			Self::ViewportMin => "vmin",
-			Self::ViewportMax => "vmax",
+			Self::Horizontal | Self::ViewportMin => "row",
+			Self::Vertical | Self::ViewportMax => "column",
 		}
 		.xmap(CssValue::expression)
 		.xok()

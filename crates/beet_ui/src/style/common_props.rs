@@ -20,6 +20,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(ColorRoleProps)
 		.insert(Font)
 		.insert(Height)
+		.insert(MinHeight)
 		.insert(Width)
 		.insert(Padding)
 		.insert(GapProp)
@@ -69,6 +70,7 @@ canonical_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style
 css_property!(Font, Typography, "font-family");
 
 css_property!(Height, Length, "height");
+css_property!(MinHeight, Length, TokenInheritance::NotInherited, "min-height");
 css_property!(Width, Length, "width");
 css_property!(Padding, Spacing, "padding");
 css_property!(GapProp, Length, "gap");

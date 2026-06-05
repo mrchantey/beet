@@ -29,6 +29,12 @@ pub struct Rule {
 pub enum MediaQuery {
 	/// `@media print` — applies when printing.
 	Print,
+	/// `@media screen` — applies on screen, ie the web.
+	///
+	/// The charcell cascade ignores all media-gated rules, so a `Screen` rule is
+	/// the idiom for web-only styling: it lands in the serialized stylesheet but
+	/// never in the terminal cascade.
+	Screen,
 	/// `@media (prefers-reduced-motion: reduce)`.
 	ReducedMotion,
 }
@@ -38,6 +44,7 @@ impl MediaQuery {
 	pub fn as_css(&self) -> &'static str {
 		match self {
 			MediaQuery::Print => "print",
+			MediaQuery::Screen => "screen",
 			MediaQuery::ReducedMotion => "(prefers-reduced-motion: reduce)",
 		}
 	}

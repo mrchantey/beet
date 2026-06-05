@@ -13,10 +13,28 @@ pub fn server_plugin(app: &mut App) {
 		ServerPlugin,
 		material::MaterialStylePlugin::new(palettes::basic::GREEN),
 	));
-	// site-local layout rule, see `design_row_rule`.
-	app.world_mut()
-		.get_resource_or_init::<RuleSet>()
-		.insert_rule(design_row_rule());
+	// site-local layout rules, see `design_row_rule` and `hero_rule`.
+	let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
+	rules.insert_rule(design_row_rule());
+	rules.insert_rule(hero_rule());
+}
+
+/// The landing-page hero: a centered flex column so the title, tagline, and
+/// card stack centered down the middle of the main column on both targets.
+fn hero_rule() -> Rule {
+	use style::AlignItems;
+	use style::Direction;
+	use style::Display;
+	use style::Length;
+	use style::TextAlign;
+	use style::common_props;
+	Rule::class("hero")
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::TextAlignProp, TextAlign::Center)
+		.with_value(common_props::GapProp, Length::Rem(1.5))
+		.with_value(common_props::RowGapProp, 1u32)
 }
 
 /// A horizontal flex row with a gap, for the design showcase pages that lay out

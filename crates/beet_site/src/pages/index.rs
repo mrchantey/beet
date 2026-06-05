@@ -9,15 +9,17 @@ pub fn get() -> impl Scene {
 			<p {Classes::new([classes::TEXT_TITLE_LARGE])}>
 				<b>"A malleable application framework"</b>
 			</p>
-			<div {Classes::new([classes::CARD_FILLED])}>
-				<p>"🚧 Mind your step! 🚧"</p>
+			<div {Classes::new([classes::CARD_FILLED, ClassName::string("hero-card")])}>
+				<h3>"🚧 Mind your step! 🚧"</h3>
 				<p>
 					"Beet is under construction. If this project is of interest please come and say hi in the "
 					<a href="https://discord.gg/DcURUQCXtx">"Beetmash Discord Server"</a>
 					"."
 				</p>
-				<Link label="GitHub" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Outlined/>
-				<Link label="Blog" href=routes::blog::index() variant=ButtonVariant::Filled/>
+				<div {Classes::new(["design-row"])}>
+					<Link label="GitHub" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Outlined/>
+					<Link label="Blog" href=routes::blog::index() variant=ButtonVariant::Filled/>
+				</div>
 			</div>
 			<p {Classes::new([classes::TEXT_BODY_LARGE])}>
 				"Beet is a framework for building user-modifiable applications, like Smalltalk or HyperCard. Everything from the CLI to client applications is a "

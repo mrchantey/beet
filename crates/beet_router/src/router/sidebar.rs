@@ -57,6 +57,9 @@ pub struct SidebarState {
 	/// Glob filter for paths whose subtree is omitted from the nav (eg infra
 	/// routes like `app-info`/`analytics`). Allows every path by default.
 	pub filter: GlobFilter,
+	/// Whether to prepend the synthetic "Home" entry. `true` by default; set
+	/// `false` when the header already links home.
+	pub show_home: bool,
 }
 
 impl SidebarState {
@@ -66,7 +69,15 @@ impl SidebarState {
 			current_path: current_path.into(),
 			infos: HashMap::default(),
 			filter: GlobFilter::default(),
+			show_home: true,
 		}
+	}
+
+	/// Toggle the synthetic "Home" entry. Pass `false` to omit it, eg when the
+	/// page header already carries a home link.
+	pub fn with_home(mut self, show_home: bool) -> Self {
+		self.show_home = show_home;
+		self
 	}
 
 	/// Set the override for a specific path.
@@ -98,7 +109,8 @@ impl SidebarState {
 	/// Emits a synthetic "Home" entry followed by a recursively collected,
 	/// order-sorted node for each routable child of the tree.
 	pub fn collect(&self, tree: &RouteTree) -> Vec<SidebarNode> {
-		let mut nodes = vec![self.home_node()];
+		let mut nodes =
+			if self.show_home { vec![self.home_node()] } else { Vec::new() };
 		for child in self.sort_children(tree) {
 			if let Some(node) = self.collect_node(&child) {
 				nodes.push(node);

@@ -36,6 +36,7 @@
 }
 
 th {
+  border-bottom-width: var(--material-geometry-outline-width-thin);
   border-color: var(--material-colors-outline);
   font-weight: var(--material-typography-weight-medium);
   padding: 0.5rem 0.5rem 0.5rem 0.5rem;

@@ -171,9 +171,14 @@ async fn terminal_renders_charcell_shell_layout() {
 		// material rules reach the charcell paint, not raw text
 		.xpect_contains("\u{1b}[");
 
-	// sidebar and main share rows: a line holds both a nav entry and body text
+	// sidebar and main share rows: a line holds nav text left of the divider and
+	// body text right of it, proving the two-column layout rather than a stack.
 	strip_ansi(&body)
 		.lines()
-		.any(|line| line.contains("blog") && line.contains("Beet"))
+		.any(|line| {
+			line.split_once('│').is_some_and(|(nav, main)| {
+				!nav.trim().is_empty() && !main.trim().is_empty()
+			})
+		})
 		.xpect_true();
 }
