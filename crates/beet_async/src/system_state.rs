@@ -45,10 +45,19 @@ pub(crate) trait ErasedSystemStateCell:
 
 impl<P: SystemParam> ErasedSystemStateCell for SystemStateCell<P> {
 	fn apply(&self, world: &mut World) {
-		// We expect initialization to have already occurred before `apply` is
-		// ever called. So `unwrap()` here reflects an invariant of the bridge.
-		// Completed requests only exist for initialized system states.
-		self.0.get().unwrap().lock().unwrap().apply(world);
+		// A request is marked "completed" once its future drops the wake signal,
+		// which happens at the *top* of every poll, before world access is even
+		// attempted. So a completed request may carry an uninitialized cell: this
+		// occurs when the future is woken but fails to acquire the `world_scope`
+		// lock (another future holds it), returns `Poll::Pending`, and re-queues.
+		// In that case `try_lock` was never reached, so the `OnceLock` is empty.
+		//
+		// An uninitialized cell has no `SystemState`, and therefore no deferred
+		// ops to flush, so applying it is a no-op. The future's real work is
+		// applied later, when its re-queued request finally acquires the lock.
+		if let Some(system_state) = self.0.get() {
+			system_state.lock().unwrap().apply(world);
+		}
 	}
 }
 

@@ -8,7 +8,9 @@
 //! - Normal rust safety invariants for &mut World (aliasing)
 //! - At most one future has world access at a time
 //! - Futures only access the world while the scoped pointer (managed by the bridge driver) is live
-//! - `SystemState` is always initialized before use
+//! - `SystemState` is always initialized before use (but a completed request may
+//!   carry an *uninitialized* cell if its future re-queued without gaining access,
+//!   in which case applying it is a no-op)
 //! - Deferred ops are only applied after every future finishes polling and releases world access
 //! - The driver can't deadlock
 //! - All futures that want world access can eventually complete (assuming fair scheduling by the async runtime)
@@ -235,6 +237,86 @@ mod tests {
 		app.update();
 
 		assert!(SPAWNED.load(Ordering::Relaxed) >= 1);
+	}
+
+	/// Regression test for an async-bridge panic (see `agent/plans/async_bridge.md`).
+	///
+	/// When two futures with *different* `SystemParam` types (hence different
+	/// `SystemStateCell`s) are woken in the same sync point, one can grab the
+	/// global `world_scope` lock while the other, polled concurrently on a worker
+	/// thread, fails to and re-queues. The re-queuing future had already dropped
+	/// its wake signal at the top of `poll`, so the driver treated its request as
+	/// complete and called `apply` on a `SystemState` that was never initialized,
+	/// panicking on `OnceLock::get().unwrap()`.
+	///
+	/// We widen the contention window by holding the world scope in a busy spin,
+	/// and spawn many interleaved tasks of two param types so a concurrent poll
+	/// reliably loses the race. Pre-fix the driver panics inside `app.update()`.
+	#[test]
+	fn concurrent_bridge_does_not_panic_on_uninitialized_state() {
+		struct MySyncPoint;
+		#[derive(Resource)]
+		struct Marker;
+		static COMPLETED: AtomicI32 = AtomicI32::new(0);
+
+		const TASKS_PER_KIND: usize = 32;
+
+		let mut app = App::new();
+		app.add_plugins((
+			AsyncPlugin::default(),
+			ScheduleRunnerPlugin::default(),
+			TaskPoolPlugin::default(),
+		));
+		app.insert_resource(Marker);
+		app.add_systems(Update, async_world_sync_point::<MySyncPoint>);
+
+		app.add_systems(Startup, move |world: Res<AsyncWorld>| {
+			let pool = AsyncComputeTaskPool::get();
+			for _ in 0..TASKS_PER_KIND {
+				// Kind A holds the world scope in a busy spin, widening the
+				// contention window for concurrently-polled kind B futures.
+				let world_a = world.clone();
+				pool.spawn(async move {
+					world_a
+						.system_state::<Commands>()
+						.bridge(MySyncPoint, |mut commands: Commands| {
+							let start = std::time::Instant::now();
+							while start.elapsed().as_micros() < 200 {
+								std::hint::spin_loop();
+							}
+							commands.spawn_empty();
+						})
+						.await
+						.unwrap();
+					COMPLETED.fetch_add(1, Ordering::Relaxed);
+				})
+				.detach();
+
+				// Kind B uses a *different* `SystemParam` type, so it owns a
+				// separate `SystemStateCell`. This is the future whose cell
+				// stayed uninitialized in the original bug.
+				let world_b = world.clone();
+				pool.spawn(async move {
+					world_b
+						.system_state::<Res<Marker>>()
+						.bridge(MySyncPoint, |_marker: Res<Marker>| {})
+						.await
+						.unwrap();
+					COMPLETED.fetch_add(1, Ordering::Relaxed);
+				})
+				.detach();
+			}
+		});
+
+		// Drive until every task completes. Pre-fix, the driver panics here.
+		let total = (TASKS_PER_KIND * 2) as i32;
+		for _ in 0..1000 {
+			app.update();
+			if COMPLETED.load(Ordering::Relaxed) == total {
+				break;
+			}
+		}
+		assert_eq!(COMPLETED.load(Ordering::Relaxed), total);
 	}
 
 	#[test]
