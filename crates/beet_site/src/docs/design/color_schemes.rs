@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::prelude::*;
 
 /// Showcases every Material color role as a swatch, in both the light and dark
 /// schemes. Each swatch fills its background with the color-role token and its

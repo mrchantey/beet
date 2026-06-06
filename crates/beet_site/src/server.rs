@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use beet::prelude::*;
 
 /// The beet brand green, `rgb(0, 255, 127)` (spring green), seeding the Material
-/// palette.
+/// palette. Private: every accent derives from it through the style system, so
+/// the theme stays the single source of colour.
 const THEME_COLOR: Color = Color::srgb(0., 1., 0.75);
 
 
@@ -18,32 +18,10 @@ pub fn server_plugin(app: &mut App) {
 		ServerPlugin,
 		material::MaterialStylePlugin::new(THEME_COLOR),
 	));
-	// site-local layout rule, see `design_row_rule`. The landing-page hero uses
-	// `inline_class!` instead, since its layout is a single-use one-off.
+	// site-local layout rule, see `design_row_rule` (in `style`). The landing-page
+	// hero uses `inline_class!` instead, since its layout is a single-use one-off.
 	let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
 	rules.insert_rule(design_row_rule());
-}
-
-/// A horizontal flex row with a gap, for the design showcase pages that lay out
-/// widget variants side by side, styling [`crate::classes::DESIGN_ROW`].
-///
-/// Expressed as design tokens rather than a raw `<style>` so it spaces items in
-/// both the web and terminal targets, mirroring the library `app-bar-nav` rule.
-fn design_row_rule() -> Rule {
-	use style::AlignItems;
-	use style::Display;
-	use style::FlexWrap;
-	use style::Length;
-	use style::common_props;
-	// the `Length` row/column gap props serialize to valid CSS *and* drive the
-	// charcell flex layout, so one value spaces items on both targets.
-	Rule::new()
-		.with_selector(Selector::class(crate::classes::DESIGN_ROW))
-		.with_value(common_props::DisplayProp, Display::Flex)
-		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
-		.with_value(common_props::AlignItemsProp, AlignItems::Center)
-		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
-		.with_value(common_props::RowGapProp, Length::Rem(1.0))
 }
 
 /// Every site route: the page collection plus the docs and blog collections,

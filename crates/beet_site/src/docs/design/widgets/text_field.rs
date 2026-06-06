@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::prelude::*;
 
 /// Shows the [`TextField`] and [`TextArea`] widget variants.
 ///

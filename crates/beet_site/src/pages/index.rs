@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet::prelude::*;
 
 /// The site landing page, placed into the [`BeetDocumentShell`] `<main>`.
 ///

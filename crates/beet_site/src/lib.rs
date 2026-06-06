@@ -13,11 +13,11 @@ pub use launch::run_codegen;
 // generated includes below) lets `cargo run --features codegen` bootstrap the
 // `src/codegen` modules even when they do not yet exist.
 #[cfg(all(feature = "render", not(feature = "codegen")))]
-pub mod classes;
-#[cfg(all(feature = "render", not(feature = "codegen")))]
 pub mod layouts;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 mod server;
+#[cfg(all(feature = "render", not(feature = "codegen")))]
+mod style;
 
 // generated route modules (see `run_codegen`)
 #[cfg(all(feature = "render", not(feature = "codegen")))]
@@ -46,4 +46,9 @@ pub mod prelude {
 	pub use crate::route_tree::routes;
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
 	pub use crate::server::*;
+	#[cfg(all(feature = "render", not(feature = "codegen")))]
+	pub use crate::style::*;
+	// the library prelude, so a page needs only `use crate::prelude::*`.
+	#[cfg(all(feature = "render", not(feature = "codegen")))]
+	pub use beet::prelude::*;
 }

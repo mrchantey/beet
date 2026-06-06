@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet::prelude::*;
 
 /// The global document shell wrapping every route's body.
 ///

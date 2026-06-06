@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::prelude::*;
 
 /// Shows the [`ErrorText`] widget used for inline validation feedback.
 pub fn get() -> impl Scene {
