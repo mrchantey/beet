@@ -325,13 +325,11 @@ pub fn pre_prose() -> Rule {
 pub fn blockquote_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("blockquote"))
-		// .with_token(common_props::BackgroundColor,colors::SurfaceContainerLow).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainer).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
 		.with_token(common_props::BorderLeftWidth,geometry::OutlineWidthThick).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
-		.with_canonical(FontStyle::Italic)
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
