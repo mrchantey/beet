@@ -17,8 +17,12 @@ name = "beet"
 path = "src/main.rs"
 
 [features]
-default = ["qrcode"]
+default = ["qrcode", "net"]
 qrcode = ["dep:qrcode", "dep:image"]
+# HTTP transport for the remote scene-control commands. Native-only: the
+# ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
+# target table below rather than wired into this feature directly.
+net = ["beet/ureq","beet/rustls-tls"]
 
 [dependencies]
 beet = { workspace = true, features = [
@@ -28,9 +32,6 @@ beet = { workspace = true, features = [
 	"json",
 	"webdriver",
 	"world_serde",
-	# the remote scene-control commands fetch a device over HTTP.
-	"ureq",
-	"rustls-tls",
 ] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }

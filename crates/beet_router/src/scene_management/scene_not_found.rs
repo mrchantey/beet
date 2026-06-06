@@ -1,7 +1,7 @@
 //! The welcome page shown when the cwd has no `beet.json`.
 
+use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_ui::prelude::*;
 
 /// Rendered when no `beet.json` is found in the cwd: like a game engine pressing
 /// play with no scene loaded, the CLI has no behaviour of its own.
@@ -17,14 +17,10 @@ pub fn SceneNotFound() -> impl Scene {
 	}
 }
 
-/// Spawn, render and print [`SceneNotFound`] through the charcell pipeline,
-/// despawning the ephemeral render tree afterwards.
-pub fn render_scene_not_found(world: &mut World) -> Result {
-	let root = world.spawn_scene(SceneNotFound::scene(default()))?.id();
-	let output = AnsiTermRenderer::new()
-		.render(&mut RenderContext::new(root, world))?
-		.to_string();
-	world.entity_mut(root).despawn();
-	cross_log_noline!("{output}");
-	Ok(())
+/// The root route serving [`SceneNotFound`], spawned by the host when the cwd
+/// has no `beet.json` so `beet` answers with the welcome page through the normal
+/// request pipeline (content-negotiated, like any other route) instead of
+/// logging and exiting.
+pub fn scene_not_found_route() -> impl Bundle {
+	render_action::scene_func_route("", SceneNotFound::scene)
 }

@@ -2,6 +2,7 @@ use super::DynamicWorldBuilder;
 use super::WorldFilter;
 use super::serde::DynamicWorldSerializer;
 use crate::prelude::*;
+use bevy::ecs::query::QueryFilter;
 
 /// Serializes world state or a subtree to various formats.
 ///
@@ -73,6 +74,60 @@ impl<'a> WorldSerdeSaver<'a> {
 	pub fn deny_component<T: Component>(mut self) -> Self {
 		self.component_filter = self.component_filter.deny::<T>();
 		self
+	}
+
+	/// Serialize `roots` and their descendants as one scene.
+	///
+	/// A root may sit under a parent (eg a loaded scene reparented under a
+	/// server); that [`ChildOf`] is detached before serializing and restored
+	/// after, so the saved scene carries no dangling parent reference (which
+	/// would fail to spawn on load).
+	pub fn save_roots(
+		world: &mut World,
+		media_type: MediaType,
+		roots: impl IntoIterator<Item = Entity>,
+	) -> Result<MediaBytes> {
+		let roots = roots.into_iter().collect::<Vec<_>>();
+		// detach each root from its parent, remembering them to re-attach once
+		// serialized.
+		let roots_with_parents = roots
+			.iter()
+			.filter_map(|root| {
+				world
+					.entity(*root)
+					.get::<ChildOf>()
+					.map(|child_of| (*root, child_of.parent()))
+			})
+			.collect::<Vec<_>>();
+		roots_with_parents.iter().for_each(|(root, _)| {
+			world.entity_mut(*root).remove::<ChildOf>();
+		});
+
+		let result = {
+			let mut saver = WorldSerdeSaver::new(world);
+			for root in &roots {
+				saver = saver.with_entity_tree(*root);
+			}
+			saver.save(media_type)
+		};
+
+		roots_with_parents.into_iter().for_each(|(root, parent)| {
+			world.entity_mut(root).insert(ChildOf(parent));
+		});
+		result
+	}
+
+	/// Like [`save_roots`](Self::save_roots) but collects the roots from a query
+	/// filter, eg `save_roots_filtered::<With<BeetSceneRoot>>`.
+	pub fn save_roots_filtered<D: QueryFilter>(
+		world: &mut World,
+		media_type: MediaType,
+	) -> Result<MediaBytes> {
+		let roots = world
+			.query_filtered::<Entity, D>()
+			.iter(world)
+			.collect::<Vec<_>>();
+		Self::save_roots(world, media_type, roots)
 	}
 
 	/// Serializes to [`MediaBytes`] using the given format with default options.

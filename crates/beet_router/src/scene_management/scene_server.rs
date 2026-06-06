@@ -1,7 +1,9 @@
 //! The scene server: a bootstrap HTTP API whose *real* routes arrive over the
 //! wire as a beet scene. The meta-routes here ([`LoadScene`], [`ClearScene`],
-//! [`Reset`], [`DumpScene`], [`Home`]) load, swap and inspect that scene; the
-//! behaviours it wires ([`ActionRoute`] and any domain leaves) live elsewhere.
+//! [`Reset`], [`DumpScene`]) load, swap and inspect that scene; the behaviours
+//! it wires ([`SpawnAction`] and any domain leaves) live elsewhere. The route
+//! listing / help is handled by the router's default not-found middleware, so
+//! there is no bespoke home route.
 //!
 //! Hardware-agnostic and no_std-friendly, so the same server runs on a host or
 //! on bare-metal firmware. Add [`SceneServerPlugin`] to register the reflectable
@@ -16,16 +18,15 @@ use beet_net::prelude::*;
 extern crate alloc;
 use alloc::format;
 use alloc::string::String;
-use alloc::vec::Vec;
 
-/// Registers the reflectable types every scene server understands ([`ActionRoute`]
+/// Registers the reflectable types every scene server understands ([`SpawnAction`]
 /// and the [`BeetSceneRoot`] marker), so reflection can (de)serialize a loaded
 /// scene. Domain crates add their own route/action/scene types on top.
 pub struct SceneServerPlugin;
 
 impl Plugin for SceneServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<ActionRoute>()
+		app.register_type::<SpawnAction>()
 			.register_type::<BeetSceneRoot>();
 	}
 }
@@ -37,7 +38,7 @@ impl Plugin for SceneServerPlugin {
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[type_path = "scene"]
-pub async fn ActionRoute(cx: ActionContext<RequestParts>) -> Response {
+pub async fn SpawnAction(cx: ActionContext<RequestParts>) -> Response {
 	let caller = cx.caller.clone();
 	let child = caller
 		.get(|children: &Children| children.first().copied())
@@ -81,10 +82,9 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 		.with_world(move |world, caller| -> Response {
 			let server = world.root_ancestor(caller);
 			match set_scene(world, &media, Some(server)) {
-				Ok(roots) => Response::ok_text(format!(
-					"loaded scene: {} root(s)\n",
-					roots.len()
-				)),
+				Ok(roots) => {
+					Response::ok_text(format!("loaded scene: {} root(s)\n", roots.len()))
+				}
 				Err(err) => {
 					cross_log_error!("scene: failed to load: {err}");
 					Response::status_text(
@@ -104,20 +104,13 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 		})
 }
 
-/// `GET /clear` — despawn the loaded scene and reset the hardware.
+/// `GET /clear` — despawn the loaded scene and reset the hardware. The route tree
+/// is rebuilt by [`despawn_scene`], so the cleared routes drop out of dispatch.
 #[action(handler_only)]
 #[derive(Default, Clone, Component)]
 pub async fn ClearScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
-		.with_world(|world, caller| {
-			despawn_scene(world);
-			// rebuild the tree so the cleared routes drop out of dispatch.
-			let server = world.root_ancestor(caller);
-			world
-				.run_system_cached_with(RouteTree::rebuild, server)
-				.unwrap_or(Ok(()))
-				.ok();
-		})
+		.with_world(|world, _caller| despawn_scene(world))
 		.await
 		.ok();
 	Response::ok_text("scene cleared\n")
@@ -144,17 +137,11 @@ pub async fn Reset(cx: ActionContext<RequestParts>) -> Response {
 pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
 		.with_world(|world, _caller| -> Response {
-			let roots = world
-				.query_filtered::<Entity, With<BeetSceneRoot>>()
-				.iter(world)
-				.collect::<Vec<_>>();
-			let mut saver = WorldSerdeSaver::new(world);
-			for root in roots {
-				saver = saver.with_entity_tree(root);
-			}
-			match saver
-				.save(MediaType::Json)
-				.and_then(|bytes| bytes.as_utf8().map(String::from))
+			match WorldSerdeSaver::save_roots_filtered::<With<BeetSceneRoot>>(
+				world,
+				MediaType::Json,
+			)
+			.and_then(|bytes| bytes.as_utf8().map(String::from))
 			{
 				Ok(json) => Response::ok_body(json, MediaType::Json),
 				Err(err) => {
@@ -174,30 +161,4 @@ pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 				"dump failed\n",
 			)
 		})
-}
-
-/// `GET /` — list the meta-routes and the currently loaded scene routes.
-#[action(handler_only)]
-#[derive(Default, Clone, Component)]
-pub async fn Home(cx: ActionContext<RequestParts>) -> Response {
-	let routes = cx
-		.caller
-		.with_state::<AncestorQuery<&RouteTree>, String>(move |entity, query| {
-			query
-				.get(entity)
-				.map(|tree| {
-					tree.flatten()
-						.iter()
-						.map(|pattern| {
-							format!("  /{}\n", pattern.annotated_path())
-						})
-						.collect::<String>()
-				})
-				.unwrap_or_default()
-		})
-		.await
-		.unwrap_or_default();
-	Response::ok_text(format!(
-		"scene server\n\nmeta routes:\n  /load   POST a scene (json|postcard)\n  /clear  despawn scene + reset\n  /reset  stop hardware\n  /dump   current scene as json\n\nactive routes:\n{routes}"
-	))
 }

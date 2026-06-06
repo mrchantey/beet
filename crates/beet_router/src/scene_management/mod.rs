@@ -8,10 +8,11 @@
 //!   a POSTed scene; runs equally on a host or on bare-metal firmware.
 //! - [`scene_watcher`]: the host CLI side — load, watch and reload a `beet.json`.
 //! - [`scene_not_found`]: the welcome page shown when no `beet.json` exists.
-//! - [`remote`]: a router-as-CLI that fetches a scene-server device.
+//! - [`scene_commands`]: the host load/clear/reset/dump/run commands, each
+//!   targeting either a remote device or the local world, plus [`ExportScene`].
 //!
-//! The core and server need `world_serde`; the watcher, welcome page and remote
-//! control are std-only.
+//! The core and server need `world_serde`; the watcher, welcome page and host
+//! commands are std-only.
 
 // Shared core + HTTP scene server: no_std-friendly, gated on `world_serde` since
 // both load/save scenes through world serde.
@@ -35,8 +36,9 @@ mod scene_not_found;
 #[cfg(feature = "std")]
 pub use scene_not_found::*;
 
-// Remote control: a CLI that fetches a device (std http client).
-#[cfg(feature = "std")]
-mod remote;
-#[cfg(feature = "std")]
-pub use remote::*;
+// Host scene commands: load/clear/reset/dump/run + export, each local or remote
+// (std http client + world serde for the local path).
+#[cfg(all(feature = "std", feature = "world_serde"))]
+mod scene_commands;
+#[cfg(all(feature = "std", feature = "world_serde"))]
+pub use scene_commands::*;

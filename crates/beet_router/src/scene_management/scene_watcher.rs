@@ -1,18 +1,24 @@
 //! Loading, watching and reloading a `beet.json` scene from the cwd: the host
 //! side of scene management, where the scene *is* a file the process watches.
+//!
+//! The host is a single [`CliServer`] + [`default_router`]; the scene loads
+//! *under* it, so a `beet.json` need only carry the command routes, not its own
+//! server (symmetric with the device's [`HttpServer`] host). When no `beet.json`
+//! exists the host serves the [`SceneNotFound`] welcome page at `/`.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// File name of the scene a CLI loads from the cwd.
 pub const BEET_SCENE_FILE: &str = "beet.json";
 
 /// Loads, watches and reloads the [`BEET_SCENE_FILE`] scene from the cwd.
 ///
-/// On startup [`load_beet_scene`] looks for a `beet.json`: absent, it renders
-/// [`SceneNotFound`] and exits; present, it loads the scene (marking each root
-/// [`BeetSceneRoot`]) and installs an [`FsWatcher`] that swaps the scene whenever
-/// the file changes.
+/// On startup [`load_beet_scene`] spawns the host, then looks for a `beet.json`:
+/// absent, it serves [`SceneNotFound`]; present, it loads the scene under the
+/// host (marking each root [`BeetSceneRoot`]) and installs an [`FsWatcher`] that
+/// swaps the scene whenever the file changes.
 pub struct SceneManagementPlugin;
 
 impl Plugin for SceneManagementPlugin {
@@ -31,20 +37,21 @@ pub struct BeetSceneWatcher {
 	pub entity: Entity,
 }
 
-/// Startup system: load `beet.json` from the cwd, or render [`SceneNotFound`]
-/// and exit when it is absent.
-///
-/// Note that here we deliberately do not use a CliServer, as that would conflict
-/// with any CliServer spawned by a scene. this step is intentionally minimal.
+/// Startup system: spawn the host, then load `beet.json` from the cwd under it,
+/// or serve [`SceneNotFound`] when it is absent.
 pub fn load_beet_scene(world: &mut World) -> Result {
+	// the single host: a CliServer parses the args, dispatches through the
+	// router and exits. Scenes load under it as route children.
+	let host = world.spawn((CliServer, default_router())).id();
+
 	let path = AbsPathBuf::new(BEET_SCENE_FILE)?;
-	if !path.exists() {
-		render_scene_not_found(world)?;
-		world.write_message(AppExit::Success);
-		return Ok(());
+	if path.exists() {
+		set_scene(world, &fs_ext::read_media(&path)?, Some(host))?;
+		spawn_watcher(world, path, host);
+	} else {
+		// no beet.json: serve the welcome page at the root path.
+		world.entity_mut(host).with_child(scene_not_found_route());
 	}
-	set_scene(world, &fs_ext::read_media(&path)?, None)?;
-	spawn_watcher(world, path);
 	Ok(())
 }
 
@@ -52,8 +59,8 @@ pub fn load_beet_scene(world: &mut World) -> Result {
 ///
 /// The parent directory is watched (filtered to `beet.json`) rather than the
 /// file itself, so atomic editor saves that swap the file's inode are still
-/// picked up.
-fn spawn_watcher(world: &mut World, path: AbsPathBuf) {
+/// picked up. Reloads swap the scene under `host`.
+fn spawn_watcher(world: &mut World, path: AbsPathBuf, host: Entity) {
 	let dir = path.parent().unwrap_or_else(|| path.clone());
 	let watch_path = path.clone();
 	let entity = world
@@ -68,7 +75,7 @@ fn spawn_watcher(world: &mut World, path: AbsPathBuf) {
 			commands.queue(move |world: &mut World| {
 				match fs_ext::read_media(&path) {
 					Ok(media) => {
-						if let Err(err) = set_scene(world, &media, None) {
+						if let Err(err) = set_scene(world, &media, Some(host)) {
 							cross_log_error!(
 								"failed to reload {BEET_SCENE_FILE}: {err}"
 							);

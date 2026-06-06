@@ -66,7 +66,9 @@ pub fn set_scene(
 }
 
 /// Despawn the active scene: trigger [`ResetScene`] then despawn every
-/// [`BeetSceneRoot`] tree. A no-op when no scene is loaded.
+/// [`BeetSceneRoot`] tree, rebuilding the route tree of each server the roots
+/// hung under so the cleared routes drop out of dispatch. A no-op when no scene
+/// is loaded.
 pub fn despawn_scene(world: &mut World) {
 	let existing = world
 		.query_filtered::<Entity, With<BeetSceneRoot>>()
@@ -76,9 +78,23 @@ pub fn despawn_scene(world: &mut World) {
 		return;
 	}
 	world.trigger(ResetScene);
+	// the servers the scene was reparented under, captured before despawning so
+	// their route trees can be rebuilt without the now-gone routes.
+	let servers = existing
+		.iter()
+		.filter_map(|entity| {
+			world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
+		})
+		.collect::<HashSet<_>>();
 	existing
 		.into_iter()
 		.for_each(|entity| world.entity_mut(entity).despawn());
+	servers.into_iter().for_each(|server| {
+		world
+			.run_system_cached_with(RouteTree::rebuild, server)
+			.unwrap_or(Ok(()))
+			.ok();
+	});
 }
 
 
