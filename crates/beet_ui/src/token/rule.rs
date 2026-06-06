@@ -31,23 +31,39 @@ pub enum MediaQuery {
 	Print,
 	/// `@media screen` — applies on screen, ie the web.
 	///
-	/// The charcell cascade ignores all media-gated rules, so a `Screen` rule is
-	/// the idiom for web-only styling: it lands in the serialized stylesheet but
-	/// never in the terminal cascade.
+	/// Prefer [`Terminal`](Self::Terminal) for terminal-only styling: a `Screen`
+	/// rule is dropped in print contexts, so gating layout behind it breaks
+	/// printed output. `Screen` is for the rare rule that is genuinely
+	/// screen-only (eg sticky positioning).
 	Screen,
+	/// Terminal/char-cell only. This is the inverse of the other queries: it has
+	/// no CSS equivalent, so it is *excluded* from the serialized stylesheet and
+	/// *included* by the charcell cascade. The idiom for terminal-only styling
+	/// (eg the colored prose headings) that must not leak into web or print.
+	Terminal,
 	/// `@media (prefers-reduced-motion: reduce)`.
 	ReducedMotion,
 }
 
 impl MediaQuery {
-	/// The CSS condition placed after `@media`.
-	pub fn as_css(&self) -> &'static str {
+	/// The CSS condition placed after `@media`, or `None` for a query with no
+	/// web equivalent ([`Terminal`](Self::Terminal)), which is skipped during
+	/// CSS serialization.
+	pub fn as_css(&self) -> Option<&'static str> {
 		match self {
-			MediaQuery::Print => "print",
-			MediaQuery::Screen => "screen",
-			MediaQuery::ReducedMotion => "(prefers-reduced-motion: reduce)",
+			MediaQuery::Print => Some("print"),
+			MediaQuery::Screen => Some("screen"),
+			MediaQuery::Terminal => None,
+			MediaQuery::ReducedMotion => {
+				Some("(prefers-reduced-motion: reduce)")
+			}
 		}
 	}
+
+	/// `true` if the charcell/native cascade should apply rules gated by this
+	/// query. Only [`Terminal`](Self::Terminal) is a terminal context; the rest
+	/// are web/print and excluded.
+	pub fn is_terminal(self) -> bool { matches!(self, Self::Terminal) }
 }
 
 impl Rule {
@@ -75,14 +91,8 @@ impl Rule {
 	/// `Rule::tags(&["strong", "b"])`. A single tag yields a plain
 	/// [`Selector::Tag`]; multiple tags an [`Selector::AnyOf`].
 	pub fn tags(tags: &[&str]) -> Self {
-		let selector = match tags {
-			[tag] => Selector::tag(*tag),
-			_ => Selector::AnyOf(
-				tags.iter().map(|t| Selector::tag(*t)).collect(),
-			),
-		};
 		Self {
-			selector,
+			selector: Selector::any_tag(tags.iter().copied()),
 			declarations: default(),
 			media: None,
 		}
@@ -297,6 +307,17 @@ impl Selector {
 	}
 	pub fn tag(tag: impl Into<SmolStr>) -> Self { Self::Tag(tag.into()) }
 	pub fn state(state: ElementState) -> Self { Self::State(state) }
+
+	/// Match any of the given tags, eg `Selector::any_tag(["h1", "h2"])`. A
+	/// single tag collapses to a plain [`Tag`](Self::Tag); multiple to an
+	/// [`AnyOf`](Self::AnyOf).
+	pub fn any_tag(tags: impl IntoIterator<Item: Into<SmolStr>>) -> Self {
+		let mut tags = tags.into_iter().map(Self::tag).collect::<Vec<_>>();
+		match tags.len() {
+			1 => tags.remove(0),
+			_ => Self::AnyOf(tags),
+		}
+	}
 
 	pub fn attribute(key: impl Into<SmolStr>, value: Option<Value>) -> Self {
 		Self::Attribute {

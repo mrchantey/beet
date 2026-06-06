@@ -11,32 +11,17 @@ pub fn server_plugin(app: &mut App) {
 		MinimalPlugins,
 		RouterPlugin,
 		ServerPlugin,
-		material::MaterialStylePlugin::new(palettes::basic::GREEN),
+		material::MaterialStylePlugin::new(THEME_COLOR),
 	));
-	// site-local layout rules, see `design_row_rule` and `hero_rule`.
+	// site-local layout rule, see `design_row_rule`. The landing-page hero uses
+	// `inline_class!` instead, since its layout is a single-use one-off.
 	let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
 	rules.insert_rule(design_row_rule());
-	rules.insert_rule(hero_rule());
 }
 
-/// The landing-page hero: a centered flex column so the title, tagline, and
-/// card stack centered down the middle of the main column on both targets.
-fn hero_rule() -> Rule {
-	use style::AlignItems;
-	use style::Direction;
-	use style::Display;
-	use style::Length;
-	use style::TextAlign;
-	use style::common_props;
-	Rule::class("hero")
-		.with_value(common_props::DisplayProp, Display::Flex)
-		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
-		.with_value(common_props::AlignItemsProp, AlignItems::Center)
-		.with_value(common_props::TextAlignProp, TextAlign::Center)
-		.with_value(common_props::GapProp, Length::Rem(1.5))
-		.with_value(common_props::RowGapProp, 1u32)
-}
-
+/// Site-local class for the design showcase rows that lay widget variants out
+/// side by side. A const so the rule and the pages that emit it share one name.
+pub const DESIGN_ROW: ClassName = ClassName::new_static("design-row");
 /// A horizontal flex row with a gap, for the design showcase pages that lay out
 /// widget variants side by side.
 ///
@@ -48,16 +33,15 @@ fn design_row_rule() -> Rule {
 	use style::FlexWrap;
 	use style::Length;
 	use style::common_props;
-	// `GapProp` (a `Length`) drives the web `gap`, while the `u32`
-	// column/row gap props drive the charcell flex layout; the latter serialize
-	// unitless so they are ignored by browsers, hence both are set.
-	Rule::class("design-row")
+	// the `Length` row/column gap props serialize to valid CSS *and* drive the
+	// charcell flex layout, so one value spaces items on both targets.
+	Rule::new()
+		.with_selector(Selector::class(DESIGN_ROW))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
-		.with_value(common_props::GapProp, Length::Rem(1.0))
-		.with_value(common_props::ColumnGapProp, 2u32)
-		.with_value(common_props::RowGapProp, 1u32)
+		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
+		.with_value(common_props::RowGapProp, Length::Rem(1.0))
 }
 
 /// Every site route: the page collection plus the docs and blog collections,

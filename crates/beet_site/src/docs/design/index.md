@@ -10,22 +10,22 @@ tokens, never raw CSS.
 
 ## Color
 
-- [Color Schemes](/docs/design/color/schemes)
+- [Color Schemes](/docs/design/color_schemes)
 
 ## CSS
 
-- [Typography](/docs/design/css/typography)
-- [Code Elements](/docs/design/css/elements/code)
+- [Typography](/docs/design/typography)
+- [Code Elements](/docs/design/code)
 
 ## Layout
 
-- [PDF Layout](/docs/design/layout/pdf)
+- [PDF Layout](/docs/design/pdf)
 
-## Templates
+## Widgets
 
-- [Button](/docs/design/templates/button)
-- [Error Text](/docs/design/templates/error_text)
-- [Form](/docs/design/templates/form)
-- [Select](/docs/design/templates/select)
-- [Table](/docs/design/templates/table)
-- [Text Field](/docs/design/templates/text_field)
+- [Button](/docs/design/widgets/button)
+- [Error Text](/docs/design/widgets/error_text)
+- [Form](/docs/design/widgets/form)
+- [Select](/docs/design/widgets/select)
+- [Table](/docs/design/widgets/table)
+- [Text Field](/docs/design/widgets/text_field)

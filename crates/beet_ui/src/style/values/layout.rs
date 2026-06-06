@@ -29,6 +29,29 @@ impl AsCssValue for Display {
 	}
 }
 
+/// Mouse cursor shown over a node, mapping to CSS `cursor`. Web-only; the
+/// terminal has no pointer cursor so the charcell cascade ignores it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Cursor {
+	/// Browser default for the element.
+	#[default]
+	Auto,
+	/// The hand pointer, signalling an interactive control.
+	Pointer,
+}
+
+impl AsCssValue for Cursor {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Auto => "auto",
+			Self::Pointer => "pointer",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 /// Fragmentation break forced after a box, mapping to CSS `break-after`.
 ///
 /// Only meaningful for paginated media (print); the `@media print` rule that

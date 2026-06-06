@@ -23,19 +23,33 @@ pub fn BeetDocumentShell(
 	let description = meta
 		.and_then(|meta| meta.description.clone())
 		.unwrap_or_else(|| pkg.description.clone());
+	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
+	// a body class; absent it, the web follows the OS (`color_scheme.js`) and the
+	// terminal defaults to dark (`AnsiTermRenderer`).
+	let mut body_classes = Classes::new([classes::PAGE]);
+	match cx.parts().get_param("color-scheme") {
+		Some("light") => {
+			body_classes.insert_class(classes::LIGHT_SCHEME);
+		}
+		Some("dark") => {
+			body_classes.insert_class(classes::DARK_SCHEME);
+		}
+		_ => {}
+	}
 	rsx! {
 		<html lang="en">
 			<Head title=title description=description>
 				<Preflight/>
+				<Reset/>
 				<Stylesheet/>
 				<ColorSchemeScript/>
 				<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
 			</Head>
-			<body {Classes::new([classes::PAGE])}>
+			<body {body_classes}>
 				<Header>
-					<Link slot="nav" label="Docs" href=routes::docs::index() variant=ButtonVariant::Text/>
-					<Link slot="nav" label="Blog" href=routes::blog::index() variant=ButtonVariant::Text/>
-					<Link slot="nav" label="GitHub" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Text/>
+					<Link slot="nav" href=routes::docs::index() variant=ButtonVariant::Text>"Docs"</Link>
+					<Link slot="nav" href=routes::blog::index() variant=ButtonVariant::Text>"Blog"</Link>
+					<Link slot="nav" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Text>"GitHub"</Link>
 				</Header>
 				<div {Classes::new([classes::CONTAINER])}>
 					<BeetSidebar/>

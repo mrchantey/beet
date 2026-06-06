@@ -45,40 +45,30 @@ impl ButtonVariant {
 	}
 }
 
-/// A styled `<button>` carrying a text label.
+/// A styled `<button>`; its content is the default slot's children.
 #[scene]
-pub fn Button(
-	#[prop(into)] label: String,
-	variant: ButtonVariant,
-) -> impl Scene {
+pub fn Button(variant: ButtonVariant) -> impl Scene {
 	rsx! {
-		<button {Classes::new([classes::BTN, variant.class()])}>{label}</button>
+		<button {Classes::new([classes::BTN, variant.class()])}><slot/></button>
 	}
 }
 
-/// A `<button>` sized for a single glyph (`btn-icon`); the label is the icon.
+/// A `<button>` sized for a single glyph (`btn-icon`); the slot is the icon.
 #[scene]
-pub fn IconButton(
-	#[prop(into)] label: String,
-	variant: ButtonVariant,
-) -> impl Scene {
+pub fn IconButton(variant: ButtonVariant) -> impl Scene {
 	rsx! {
 		<button {Classes::new([classes::BTN, classes::BTN_ICON, variant.class()])}>
-			{label}
+			<slot/>
 		</button>
 	}
 }
 
-/// An `<a>` hyperlink styled as a button.
+/// An `<a>` hyperlink styled as a button; its content is the default slot.
 #[scene]
-pub fn Link(
-	#[prop(into)] label: String,
-	#[prop(into)] href: String,
-	variant: ButtonVariant,
-) -> impl Scene {
+pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Scene {
 	rsx! {
 		<a {Classes::new([classes::BTN, variant.class()])} href={href}>
-			{label}
+			<slot/>
 		</a>
 	}
 }

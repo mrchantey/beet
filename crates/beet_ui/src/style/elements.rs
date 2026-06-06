@@ -46,12 +46,22 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// ── Block structure ──
 		block_spaced(&["p", "ul", "ol"]),
 		block(&["li", "div"]),
-		heading("h1", Color::srgb(0.,    0.502, 0.   )),
-		heading("h2", Color::srgb(0.,    0.502, 0.502)),
-		heading("h3", Color::srgb(0.,    0.,    0.502)),
-		heading("h4", Color::srgb(0.502, 0.,    0.502)),
-		block_spaced(&["h5"]).with_canonical(FontWeight::Bold),
-		heading("h6", faint()),
+		// headings are bold blocks on every target; the per-level hue is added
+		// for the terminal only via `heading_color` (below), so web/print stay
+		// plain bold text inheriting the page foreground.
+		heading("h1"),
+		heading("h2"),
+		heading("h3"),
+		heading("h4"),
+		heading("h5"),
+		heading("h6"),
+		// terminal-only heading colors, inverted from a former web override so
+		// the terminal opts *in* to the hue rather than the web opting out.
+		terminal_heading_color("h1", Color::srgb(0.,    0.502, 0.   )),
+		terminal_heading_color("h2", Color::srgb(0.,    0.502, 0.502)),
+		terminal_heading_color("h3", Color::srgb(0.,    0.,    0.502)),
+		terminal_heading_color("h4", Color::srgb(0.502, 0.,    0.502)),
+		terminal_heading_color("h6", faint()),
 		blockquote(),
 		block_spaced(&["pre"])
 			.with_canonical(WhiteSpace::Pre)
@@ -103,10 +113,16 @@ fn inline(tags: &[&str]) -> Rule {
 	Rule::tags(tags).with_canonical(Display::Inline)
 }
 
-fn heading(tag: &str, color: Color) -> Rule {
-	block_spaced(&[tag])
+fn heading(tag: &str) -> Rule {
+	block_spaced(&[tag]).with_canonical(FontWeight::Bold)
+}
+
+/// A terminal-only per-level heading color, gated behind [`MediaQuery::Terminal`]
+/// so it applies in the charcell cascade but never reaches the web stylesheet.
+fn terminal_heading_color(tag: &str, color: Color) -> Rule {
+	Rule::tags(&[tag])
+		.with_media(MediaQuery::Terminal)
 		.with_value(ForegroundColor, color)
-		.with_canonical(FontWeight::Bold)
 }
 
 fn bold(tags: &[&str]) -> Rule {

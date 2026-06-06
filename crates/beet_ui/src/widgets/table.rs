@@ -2,16 +2,25 @@
 //!
 //! Slot content is supplied as `<tr>` rows; the head/foot slots wrap their
 //! content in `<thead>`/`<tfoot>` automatically.
+use crate::token::Classes;
+use crate::token::classes;
 use beet_core::prelude::*;
 
 /// A styled `<table>` with semantic head/body/foot sections.
 ///
 /// Slots: `head` (one or more `<tr>` for `<thead>`), default (rows for
 /// `<tbody>`), `foot` (rows for `<tfoot>`).
+///
+/// Set `vertical_lines` for a full cell grid (vertical dividers as well as the
+/// default horizontal row rules).
 #[scene]
-pub fn Table() -> impl Scene {
+pub fn Table(#[prop] vertical_lines: bool) -> impl Scene {
+	let mut class_set = Classes::new([classes::TABLE]);
+	if vertical_lines {
+		class_set.insert_class(classes::TABLE_BORDERED);
+	}
 	rsx! {
-		<table {Classes::new([classes::TABLE])}>
+		<table {class_set}>
 			<thead>
 				<slot name="head"/>
 			</thead>

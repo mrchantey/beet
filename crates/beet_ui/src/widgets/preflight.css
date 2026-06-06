@@ -1,4 +1,9 @@
 /*
+	A VERBATIM copy of Tailwind's Preflight. Do not edit: keep it byte-for-byte
+	with upstream so it can be diffed/updated against new Tailwind releases. Any
+	beet-specific web overrides belong in the adjacent `reset.css` (loaded after
+	this file), never here.
+
 	https://unpkg.com/tailwindcss@4.3.0/preflight.css
   1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
   2. Remove default margins and padding

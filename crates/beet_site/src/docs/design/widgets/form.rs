@@ -14,6 +14,7 @@ pub fn get() -> impl Scene {
 				"A form with no custom styling: each field is a label over its input, "
 				"stacked vertically with the submit button at the bottom."
 			</p>
+			<div {inline_class![(common_props::MaxWidth, Length::Rem(30.))]}>
 			<Form name="demo">
 				<label>"Name"</label>
 				<TextField name="name" placeholder="Ada Lovelace"/>
@@ -27,8 +28,9 @@ pub fn get() -> impl Scene {
 				</Select>
 				<label>"Message"</label>
 				<TextArea name="message" placeholder="Tell us more…"/>
-				<Button label="Submit" variant=ButtonVariant::Filled/>
+				<Button variant=ButtonVariant::Filled>"Submit"</Button>
 			</Form>
+			</div>
 			<h2>"Submitted value"</h2>
 			<pre><code id="form-output">"Submit the form to see its JSON value."</code></pre>
 			<script>{FORM_SCRIPT}</script>

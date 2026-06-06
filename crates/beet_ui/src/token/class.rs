@@ -44,8 +44,15 @@ impl ClassName {
 	pub fn as_selector(&self) -> SmolStr {
 		match self {
 			Self::String(s) => s.clone(),
+			// sanitize the callsite into a valid CSS identifier: the raw
+			// `file:line:col` carries `/`, `.`, `:` which a browser would parse as
+			// pseudo-class/combinator tokens, so the web rule would never match.
 			Self::Inline { file, line, col } => {
-				format!("inline:{file}:{line}:{col}").into()
+				let file: String = file
+					.chars()
+					.map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+					.collect();
+				format!("inline-{file}-{line}-{col}").into()
 			}
 		}
 	}

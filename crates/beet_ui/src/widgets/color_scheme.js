@@ -16,6 +16,13 @@
 		return globalThis.localStorage?.getItem(KEY);
 	}
 
+	// an explicit `?color-scheme=light|dark` query param wins and is persisted,
+	// mirroring the CLI `--color-scheme` flag on the terminal target.
+	function queryOverride() {
+		const value = new URLSearchParams(globalThis.location?.search).get(KEY);
+		return value === "light" || value === "dark" ? value : null;
+	}
+
 	globalThis.setColorScheme = function (scheme) {
 		globalThis.localStorage?.setItem(KEY, scheme);
 		apply(scheme);
@@ -26,5 +33,7 @@
 		if (!stored()) apply(media.matches ? "dark" : "light");
 	});
 
-	apply(stored() ?? (media.matches ? "dark" : "light"));
+	const override = queryOverride();
+	if (override) globalThis.setColorScheme(override);
+	else apply(stored() ?? (media.matches ? "dark" : "light"));
 })();

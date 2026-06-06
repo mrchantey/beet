@@ -32,6 +32,19 @@ pub fn get() -> impl Scene {
 			<p>"This is a paragraph with " <small>"small text"</small></p>
 			<p>"This is a paragraph with " <sub>"subscript text"</sub></p>
 			<p>"This is a paragraph with " <sup>"superscript text"</sup></p>
+			<h2>"Lists"</h2>
+			<p>"An unordered list:"</p>
+			<ul>
+				<li>"First item"</li>
+				<li>"Second item"</li>
+				<li>"Third item"</li>
+			</ul>
+			<p>"An ordered list:"</p>
+			<ol>
+				<li>"First step"</li>
+				<li>"Second step"</li>
+				<li>"Third step"</li>
+			</ol>
 			<blockquote>"This is blockquoted text"</blockquote>
 			<p>"This is a paragraph with " <q>"quoted text"</q></p>
 			<p>"This is a paragraph with " <cite>"citation text"</cite></p>

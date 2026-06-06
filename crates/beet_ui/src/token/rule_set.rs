@@ -155,15 +155,18 @@ impl RuleSet {
 		// The `:root` default rule is the lowest-priority fallback,
 		// applied by `RuleSetQuery` after the ancestor walk, so a matching rule
 		// (eg `.dark-scheme`) can override a `:root` default, mirroring CSS.
-		// `@media`-gated rules are skipped: there is no target media context for
-		// charcell/native, so print/reduced-motion rules only affect CSS output.
+		// `@media`-gated rules are skipped *unless* gated by `Terminal`, the one
+		// query whose context is this cascade: print/screen/reduced-motion are
+		// web concerns that only affect CSS output, while a `Terminal` rule (eg
+		// the colored prose headings) applies here and is excluded from CSS.
 		// The most specific matching rule wins (class beats tag); ties go to the
 		// later rule, mirroring CSS source order (and the serialized stylesheet)
 		// so a theme override appended after a user-agent default wins on both.
 		self.rules
 			.iter()
 			.filter(|rule| {
-				rule.media().is_none() && rule.selector().matches(el)
+				rule.media().is_none_or(MediaQuery::is_terminal)
+					&& rule.selector().matches(el)
 			})
 			.filter_map(|rule| {
 				rule.get(key)

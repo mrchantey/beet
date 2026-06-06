@@ -47,6 +47,9 @@ impl CssBuilder {
 	) -> Result<String> {
 		let css_rules = rule_set
 			.iter()
+			// `Terminal`-gated rules have no CSS equivalent, so they never reach
+			// the serialized stylesheet (the charcell cascade applies them instead).
+			.filter(|rule| !rule.media().is_some_and(MediaQuery::is_terminal))
 			.xtry_map(|rule| CssRule::from_rule(css_map, rule))?;
 
 		// iteration variables
@@ -113,10 +116,12 @@ impl CssBuilder {
 		};
 
 		// gate behind an `@media (…)` at-rule when the rule carries a media query
-		match css_rule.media() {
+		// with a CSS equivalent (`Terminal` has none and is filtered out before
+		// serialization, so `as_css` returning `None` falls through to the bare rule).
+		match css_rule.media().and_then(|media| media.as_css()) {
 			None => rule,
 			Some(media) if self.minify => {
-				format!("@media {}{{{}}}", media.as_css(), rule)
+				format!("@media {}{{{}}}", media, rule)
 			}
 			Some(media) => {
 				let indented = rule
@@ -124,7 +129,7 @@ impl CssBuilder {
 					.map(|line| format!("  {line}"))
 					.collect::<Vec<_>>()
 					.join("\n");
-				format!("@media {} {{\n{}\n}}", media.as_css(), indented)
+				format!("@media {} {{\n{}\n}}", media, indented)
 			}
 		}
 		.xok()
