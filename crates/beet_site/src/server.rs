@@ -24,11 +24,8 @@ pub fn server_plugin(app: &mut App) {
 	rules.insert_rule(design_row_rule());
 }
 
-/// Site-local class for the design showcase rows that lay widget variants out
-/// side by side. A const so the rule and the pages that emit it share one name.
-pub const DESIGN_ROW: ClassName = ClassName::new_static("design-row");
 /// A horizontal flex row with a gap, for the design showcase pages that lay out
-/// widget variants side by side.
+/// widget variants side by side, styling [`crate::classes::DESIGN_ROW`].
 ///
 /// Expressed as design tokens rather than a raw `<style>` so it spaces items in
 /// both the web and terminal targets, mirroring the library `app-bar-nav` rule.
@@ -41,7 +38,7 @@ fn design_row_rule() -> Rule {
 	// the `Length` row/column gap props serialize to valid CSS *and* drive the
 	// charcell flex layout, so one value spaces items on both targets.
 	Rule::new()
-		.with_selector(Selector::class(DESIGN_ROW))
+		.with_selector(Selector::class(crate::classes::DESIGN_ROW))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexWrapProp, FlexWrap::Wrap)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)

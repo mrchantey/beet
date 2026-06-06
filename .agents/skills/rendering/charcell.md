@@ -11,7 +11,12 @@ Always check both, they exercise different buffers:
 
 ## Already handled — don't reinvent in CSS
 
-`render/charcell/decorate.rs` generates leading content: `<li>` bullets/numbers (lists already mark and nest), blockquote bars, the `<hr>` rule, `<img>` alt text. These are the charcell equivalent of `::before` markers, so list/quote markers exist on the terminal without any CSS list-style; the web is the side that needs markers restored.
+`render/charcell/decorate.rs` generates leading content: `<li>` bullets/numbers (lists already mark and nest), blockquote bars, the `<hr>` rule, `<img>` alt text. These are the charcell equivalent of `::before` markers, so list/quote markers exist on the terminal without any CSS list-style; the web is the side that needs markers restored. `<li>` under a `<nav>` get **no** marker (navigation, not prose), mirroring the web `reset.css` `nav ul` rule.
+
+## Two facts that bite
+
+- Charcell defaults to the **dark** scheme, but the **document shell** sets it now (`shell.rs` adds `.dark-scheme` to `<body>` when the request doesn't accept html), not the renderer. Without a dark scheme a light-scheme `OnSurface` (dark) is invisible on the usual dark terminal — the old "grey body text" report. Transcluded content (`.md` routes, `RenderRef`) used to miss this because the cascade ancestor walk didn't cross the transclusion boundary; now `RuleSetQuery::parent` + `resolve_styles` follow `RenderRef` (see `rendering-system.md`).
+- `tui_inset` (`box_model.rs`) multiplies horizontal margin/padding by 2, so `1rem` left padding renders as **2** cells (and `0.5rem` also → 2, since `round(0.5)=1` then `*2`). A 1-cell indent is unreachable through padding; it needs an explicit per-depth indent or a charcell change. Known remaining charcell items: the sidebar tree over-indents + has stray vertical gaps under `<details>` groups (the web sidebar is clean — caret on the right via a `Screen`-gated flex `summary`, indented children, wider rail), and the homepage hero centers against the full viewport width so it overflows past the sidebar (a flex measure bug with sidebar + centered content).
 
 ## Measure against a real terminal width
 

@@ -133,8 +133,11 @@ where
 /// Register a rule inline at the callsite, returning an [`OnSpawn`] effect that
 /// adds a unique inline class to the entity and registers the rule (only once)
 /// in the global [`RuleSet`].
-/// This pattern is somewhat analagous to Component Scoped Styles as seen in frameworks
-/// like Astro.
+///
+/// [`OnSpawn`] is a [`BundleEffect`], so it works as a block attribute in both
+/// the bundle `rsx_direct!` and the scene `rsx!` lowerings (scenes lift it via
+/// [`IntoScene`](crate::prelude::IntoScene)). This pattern is somewhat analagous
+/// to Component Scoped Styles as seen in frameworks like Astro.
 #[track_caller]
 pub fn inline_class(
 	declarations: impl IntoIterator<Item = (TokenKey, TokenValue)>,

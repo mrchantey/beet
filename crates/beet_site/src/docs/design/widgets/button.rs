@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet::prelude::*;
 
 /// Showcases every [`Button`] and [`Link`] variant.

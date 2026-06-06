@@ -7,11 +7,18 @@
 use crate::prelude::Attribute;
 use crate::prelude::AttributeOf;
 use beet_core::prelude::*;
+use bevy::ecs::template::Template;
+use bevy::ecs::template::TemplateContext;
 use bevy::prelude::ChildOf;
 use bevy::scene::EntityScene;
 use bevy::scene::RelatedScenes;
+use bevy::scene::ResolveContext;
+use bevy::scene::ResolveSceneError;
+use bevy::scene::ResolvedScene;
 use bevy::scene::Scene;
 use bevy::scene::template_value;
+use std::sync::Arc;
+use std::sync::Mutex;
 use variadics_please::all_tuples;
 
 /// Lift `self` into an [`impl Scene`]. The marker `M` disambiguates the
@@ -92,6 +99,46 @@ where
 	C: 'static + Send + Sync + Unpin + Default + Clone + Component,
 {
 	fn into_scene(self) -> impl Scene { template_value(self) }
+}
+
+/// A [`BundleEffect`] like [`OnSpawn`] lifts into a scene that applies the
+/// effect to the spawning entity at build time. This lets effect-returning
+/// helpers (eg [`inline_class`](crate::prelude::inline_class)) be used as scene
+/// block attributes without wrapping them in a component.
+impl IntoScene<(NotSceneMarker, Self)> for OnSpawn {
+	fn into_scene(self) -> impl Scene {
+		OnSpawnScene(Arc::new(Mutex::new(Some(self))))
+	}
+}
+
+/// Applies a take-once [`OnSpawn`] effect to the spawning entity during the
+/// build phase, mirroring bevy's `OnTemplate`. The [`Arc`]/[`Mutex`] make it
+/// [`Clone`] (required by [`Template`]) while holding the non-`Clone` effect.
+struct OnSpawnScene(Arc<Mutex<Option<OnSpawn>>>);
+
+impl Template for OnSpawnScene {
+	type Output = ();
+	fn build_template(
+		&self,
+		ctx: &mut TemplateContext,
+	) -> bevy::ecs::error::Result<()> {
+		if let Some(on_spawn) = self.0.lock().unwrap().take() {
+			(on_spawn.0)(ctx.entity);
+		}
+		Ok(())
+	}
+	fn clone_template(&self) -> Self { Self(self.0.clone()) }
+}
+
+impl Scene for OnSpawnScene {
+	fn resolve(
+		self,
+		_ctx: &mut ResolveContext,
+		scene: &mut ResolvedScene,
+	) -> Result<(), ResolveSceneError> {
+		scene.push_bundle_template(self);
+		Ok(())
+	}
 }
 
 /// `Option<T>` — present items become a scene, absent ones become an empty

@@ -84,23 +84,34 @@ Slotted children are passed with `slot="name"`, eg `<tr slot="head">...</tr>`.
 
 The proper target-agnostic way to add a reusable style class is to register a `Rule` in the rule set, because it resolves on both web and terminal (it sets design tokens, not raw CSS). Add the rule once at app setup and reference it by class on elements. See `beet_site/src/server.rs` `design_row_rule` for a worked flex-row example, and `style/material/rules.rs` for the library patterns, including token-to-token references via `.with_token(BackgroundColor, colors::Primary)`.
 
-Common prop tokens (`beet_ui::prelude::common_props` / `style`): `BackgroundColor`, `ForegroundColor` (Color), `DisplayProp` (Display), `GapProp`/`ColumnGapProp`/`RowGapProp`, `Padding`/`MarginProp` (Spacing/Length), `Width`/`Height` (Length), `FlexDirectionProp` (Direction), `AlignItemsProp`, `JustifyContentProp`. Values: `Length::{Px,Rem,Percent}`, `Display::{Block,Inline,Flex,None}`, `Direction::{Horizontal,Vertical}`, `JustifyContent`, `AlignItems`.
+Common prop tokens (`beet_ui::prelude::common_props` / `style`): `BackgroundColor`, `ForegroundColor` (Color), `DisplayProp` (Display), `GapProp`/`ColumnGapProp`/`RowGapProp` (all `Length`), `Padding`/`MarginProp` (Spacing/Length), `Width`/`Height`/`MinWidth`/`MaxWidth`/`MinHeight`/`MaxHeight` (Length), `FlexDirectionProp` (Direction), `AlignItemsProp`, `JustifyContentProp`, `CursorProp` (Cursor, web-only). Values: `Length::{Px,Rem,Percent,ViewportWidth,ViewportHeight,ViewportMin,ViewportMax}`, `Display::{Block,Inline,Flex,None}`, `Direction::{Horizontal,Vertical}`, `JustifyContent`, `AlignItems`, `Cursor::{Auto,Pointer}`, `ListStyle::{Auto,None}` (`ListStyleProp`, inherited, maps to `list-style-type`; the charcell list decorator reads it to suppress markers — see the `nav` rule). Site-local: the private `THEME_COLOR` seed in `beet_site/src/server.rs` (all accents derive from it through the style system, never referenced directly) and the `classes` module (`beet_site/src/classes.rs`, re-exports the library `classes` plus `DESIGN_ROW`; reference site-local additions as `crate::classes::DESIGN_ROW` — a bare `classes::` resolves to the library module via the `beet::prelude` glob).
 
-A raw `<style>` element with a CSS string is the last-resort escape hatch. It is web-only and ignored by the terminal, so reach for it only when a token or class genuinely cannot express what is needed (eg a pure color-palette showcase keyed off the emitted CSS variables). Use it sparingly; it is exactly the target-agnostic property we are trying to preserve.
+A raw `<style>` element with a CSS string is the last-resort escape hatch. It is web-only and ignored by the terminal. The site's standing web-only overrides live in `beet_ui/src/widgets/reset.css` (emitted by the `Reset` widget, loaded after `Preflight` — itself a verbatim, do-not-edit Tailwind copy). `reset.css` is full raw CSS, so it *can* use descendant/pseudo selectors the rule system cannot (eg `nav ul { list-style: none }`); it currently restores prose list markers Tailwind strips. Reach for raw CSS only when a token/class/rule cannot express the intent.
 
-Registering a rule (above) is for a class reused across elements. For a **one-off, per-element** style, declare an **inline class** on the element itself (`inline_class!`, `crates/beet_ui/src/token/class.rs`) rather than scattering a single-use rule into another file. The inline-class system is the intended home for one-offs; if it does not yet resolve as a scene-mode `rsx!` block attribute, treat that as a gap to close, not a reason to register one-off rules elsewhere.
+Registering a rule (above) is for a class reused across elements. For a **one-off, per-element** style, declare an **inline class** on the element itself (`inline_class!`, `crates/beet_ui/src/token/class.rs`). `inline_class!` returns the `InlineClass` *component* (a component hook registers its rule + adds its sanitized class on insert), so it works as a block attribute in **both** `rsx_direct!` and scene `rsx!`. Two scene-rsx gotchas learned the hard way:
+- Only the **first** `{..}` after a tag is a block attribute; a second `{..}` is parsed as a child. To put both a semantic class and an inline class on one element, combine them in a single tuple attribute `{(Classes::new([..]), inline_class![..])}` — tuples lift via `IntoScene` only when *every* element does (components do), or just wrap with a `<div>`.
+- The inline class name is sanitized to a valid CSS identifier (`inline-<file>-<line>-<col>`); the raw `file:line:col` form silently fails on the web (browsers read `:` `/` `.` as selector tokens).
 
-Two pitfalls when styling layout:
+Three pitfalls when styling layout:
 
 - Charcell reads the layout enum directly; CSS reads `AsCssValue`. The two can disagree (a value valid for the terminal can serialize to invalid CSS), so verify the generated CSS, not just the charcell render.
-- Flex gaps differ by target. `ColumnGapProp`/`RowGapProp` are `u32` and drive the charcell flex layout, but they serialize to unitless CSS (`column-gap: 2`) which browsers ignore. For the web `gap` to render, also set `GapProp` (a `Length`, eg `Length::Rem(1.0)`, which emits a valid `gap: 1rem`). Set both on a layout rule so each target gets its gap. The library's own `.app-bar-nav`/`footer` rules predate this and only set the u32 props, so their web gap is currently 0, a known framework follow-up.
+- Gaps are unified: `ColumnGapProp`/`RowGapProp` are `Length`, serializing to valid CSS *and* driving charcell. They stay `Length` end to end — `FlexBox.row_gap`/`column_gap` are `Length`, not pre-rounded cells, so a pixel native renderer gets pixels and a viewport gap resolves against the real viewport. The charcell flex engine rounds to whole cells at layout via `FlexBox::row_gap_cells(viewport)`/`column_gap_cells(viewport)` (mirroring how `Spacing` insets convert). `GapProp` is the redundant shorthand. The `LayoutStyle`/`FlexBox` gap builders now take `Length` (`.column_gap(Length::Rem(1.))`), not `u32`.
+- Charcell doubles horizontal padding (`tui_inset` in `render/charcell/box_model.rs` does `min.x*=2`), so `1rem` left padding = 2 terminal cells, not 1, and `0.5rem` also rounds to 2 (`round(0.5)=1`, then `*2`). A **1-cell** indent is unreachable through padding alone — it needs an explicit per-depth indent in the widget or a charcell change. Budget for this when sizing terminal indents (sidebar tree, app-bar inset).
+
+## Media gating (web vs print vs terminal)
+
+A `Rule` may carry a `MediaQuery` gate. The cascade (charcell/native) applies rules with **no** gate *or* the `Terminal` gate; CSS serialization emits `Screen`/`Print`/`ReducedMotion` and **drops** `Terminal`. So:
+- Terminal-only styling (eg the colored prose headings): gate with `MediaQuery::Terminal`. Never use `Screen` for "not in terminal" — `Screen` also drops in print, breaking printed output. The pattern is "plain default everywhere + a `Terminal` rule opts the terminal in" (see `elements.rs` `heading_color`, `rules.rs` `app_bar_terminal`/`sidebar_link_terminal`).
+- Genuinely screen-only layout (viewport-fill, sticky) legitimately uses `Screen`.
+- `Selector::any_tag([..])` builds a multi-tag `AnyOf`; the selector model has **no descendant/child combinator**. For per-cell-in-a-container styling, an *inherited* token can fake it on charcell (the cascade walks ancestors), but **CSS `border-width` is not inherited**, so that trick frames the container element on the web instead. The `.table-vertical-borders` column dividers are therefore web-only via a raw `td + td`/`th + th` adjacent-sibling rule in `reset.css` (charcell tables stack vertically with no grid, so vertical dividers don't apply there). When a per-descendant style needs the `+`/`>` combinators, reach for `reset.css`.
+- **Transcluded content inherits the shell cascade.** Route content is rendered then transcluded into the document shell *by reference* (`RenderRef`, no `ChildOf` edge), so a naive `ChildOf` ancestor walk stops at the content root and a deep non-inherited token (eg a card's `background-color: SurfaceContainerHighest`) falls back to the light `:root` — the "white card on a dark page". Fixed in two places: `RuleSetQuery::parent` treats a `RenderRef` *target* as a child of its holder (so inheritance crosses the boundary), and `resolve_styles` follows `RenderRef` holders when traversing so already-rendered `.md` content re-resolves under the shell. Regression tests: `material_plugin.rs` `nested_card_inherits_dark_scheme` / `render_ref_content_inherits_dark_scheme`.
 
 ## Routing and codegen
 
 Routing is file-based (`crates/beet_site/src/launch.rs`):
 
 - `src/pages/*.rs` map to top-level routes (eg `src/pages/foo.rs` to `/foo`)
-- `src/docs/**` map to `/docs/**`, with nested dirs allowed (eg `src/docs/design/color/schemes.rs` to `/docs/design/color/schemes`)
+- `src/docs/**` map to `/docs/**`, with nested dirs allowed (eg `src/docs/design/widgets/button.rs` to `/docs/design/widgets/button`). Codegen is stale after a dir reorg — regenerate it or the build fails on a missing module path.
 - `src/blog/**` map to `/blog/**`
 
 Each `.rs` route file needs `pub fn get() -> impl Scene`. `.md` files are routes directly.
@@ -123,7 +134,7 @@ Older code (and the previous site's source in `.agents/reference/beet_old`) uses
 | `#[template]` + `client:load` + `signal` | plain scene; reactivity via the `document` module |
 | `class="card-filled"` (string) | `{Classes::new([classes::CARD_FILLED])}` |
 | raw `<style>` scoped blocks | semantic classes / registered rules (raw `<style>` only as a last resort) |
-| `<Button>Increment</Button>` (children) | `<Button label="Increment"/>` (prop) |
+| `<Button label="Increment"/>` (prop) | `<Button>"Increment"</Button>` (default slot) |
 | `<ErrorText value=.../>` | `<ErrorText message="..."/>` |
 | `var(--bt-color-primary)` | design tokens (`colors::Primary`) via rules |
 
@@ -132,7 +143,9 @@ Live-interactivity demos (counters, live form binding, select `onchange`) rely o
 ## Gotchas
 
 - Regenerate codegen after any route change, or the build will not see new pages.
-- `Button`/`Link`/`ErrorText` take text as a prop, not as children.
+- `Button`/`Link`/`IconButton` take content as their **default slot** (`<Button>"Save"</Button>`), not a `label` prop. `ErrorText` still takes `message`.
+- Color scheme: the **document shell** decides it (`shell.rs`), not the renderer. An explicit `?color-scheme=light|dark` (CLI `--color-scheme=`) pins a `.light-scheme`/`.dark-scheme` on `<body>`. Absent that, the web follows the OS via `color_scheme.js`; a non-html target (terminal) has no script, so the shell defaults `<body>` to `.dark-scheme` when `!cx.parts().accepts(MediaType::Html)` (dark prose on a dark terminal would be invisible). `RequestParts::accepts` is the helper. The CLI's default Accept (`AnsiTerm,Text,Markdown,Json`, no Html) drives this.
+- Syntax highlighting needs the `beet/syntax_highlighting` feature (in `beet_site`'s `render` feature). It emits `class="hl-<capture>"` spans; the theme rules + the syntax `CssTokenMap` are registered by `StylePlugin` (the token map is required or the web `Stylesheet` errors "no CSS resolver registered for … PunctuationSpecial"). Verify with `docs/design/code`.
 - The terminal target silently skips anything web-only (`<head>`, `<style>`, `<script>`, `@media`, CSS), which is why class and token styling is preferred.
 - `children!`/`related!` are set operations, clobbering existing relations.
 - Use `cross_log!()` or `.xprint()`, not `println!` (which is silent in wasm).

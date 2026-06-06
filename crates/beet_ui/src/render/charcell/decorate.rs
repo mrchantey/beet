@@ -4,6 +4,8 @@
 //! splicing nodes into the parsed document, so the same tree drives both the
 //! visitor and charcell renderers.
 use crate::prelude::*;
+use crate::style::ListStyle;
+use crate::style::common_props::ListStyleProp;
 use beet_core::prelude::*;
 
 /// An OSC-8 hyperlink target attached to an `<a>` or `<img>` element.
@@ -51,6 +53,7 @@ pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 /// `<hr>` (rule), and `<img>` (alt text).
 pub fn apply_markers(
 	mut commands: Commands,
+	ruleset: RuleSetQuery,
 	elements: ElementQuery,
 	parents: Query<&ChildOf>,
 	tags: Query<&Element>,
@@ -58,9 +61,9 @@ pub fn apply_markers(
 ) {
 	for view in elements.iter() {
 		let marker = match view.tag() {
-			"li" => {
-				list_marker(view.entity, &parents, &tags, &children, &elements)
-			}
+			"li" => list_marker(
+				view.entity, &ruleset, &parents, &tags, &children, &elements,
+			),
 			"p" => blockquote_bar(view.entity, &parents, &tags),
 			"hr" => Some(HR_RULE.into()),
 			"img" => Some(img_marker(&view)),
@@ -76,11 +79,21 @@ pub fn apply_markers(
 /// list's kind and the item's position among its `<li>` siblings.
 fn list_marker(
 	li: Entity,
+	ruleset: &RuleSetQuery,
 	parents: &Query<&ChildOf>,
 	tags: &Query<&Element>,
 	children: &Query<&Children>,
 	elements: &ElementQuery,
 ) -> Option<SmolStr> {
+	// `list-style-type: none` (inherited, eg set on an ancestor `<nav>`) strips
+	// the marker, so navigation lists read as links rather than bullets.
+	if ruleset
+		.resolve(li, ListStyleProp)
+		.is_ok_and(|style| style == ListStyle::None)
+	{
+		return None;
+	}
+
 	let parent = parents.get(li).ok()?.0;
 	match tags.get(parent).ok()?.tag() {
 		"ul" => Some("• ".into()),

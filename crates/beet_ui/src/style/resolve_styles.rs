@@ -16,6 +16,10 @@ pub fn resolve_styles(
 	query: Query<Entity, Or<(Changed<Element>, Changed<Classes>)>>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
+	// content transcluded by reference has no `ChildOf` edge to the shell, so the
+	// traversal follows holders to re-resolve referenced content under the shell's
+	// cascade (eg the color scheme), even when the content itself is unchanged.
+	render_refs: Query<&RenderRef>,
 	// the box model (margin/border/padding/background) is element-level; text and
 	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
 	elements: Query<(), With<Element>>,
@@ -69,6 +73,11 @@ pub fn resolve_styles(
 			if let Some(children_list) = children.get(entity).ok() {
 				queue.extend(children_list.into_iter().cloned());
 			}
+			// follow a `RenderRef` holder into the content it renders in place, so
+			// transcluded content re-resolves under this (shell) cascade.
+			if let Ok(render_ref) = render_refs.get(entity) {
+				queue.push(render_ref.0);
+			}
 		}
 	}
 	Ok(())
@@ -120,6 +129,9 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	let align_items = query.resolve(entity, AlignItemsProp).unwrap_or_default();
 	let align_content =
 		query.resolve(entity, AlignContentProp).unwrap_or_default();
+	// gaps stay as `Length` here (the resolution-independent value): each renderer
+	// converts at layout time, where the real viewport is known. The charcell
+	// engine rounds to whole cells via `FlexBox::{row,column}_gap_cells`.
 	let row_gap = query.resolve(entity, RowGapProp).unwrap_or_default();
 	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
 	LayoutStyle {

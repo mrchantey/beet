@@ -64,11 +64,12 @@ pub fn button_outlined() -> Rule {
 		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
 }
 
-/// Text button - lowest emphasis, no container, primary-colored text.
+/// Text button - lowest emphasis, no container, regular surface-foreground text
+/// (not the primary accent, so it reads as a plain control rather than a link).
 pub fn button_text() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(BTN_TEXT))
-		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 }
 
 /// Tonal button - medium emphasis with secondary container color.
@@ -291,8 +292,9 @@ pub fn link_prose() -> Rule {
 
 /// Inline `<code>` - filled chip readable against the page surface, with a
 /// faint rounded corner and a slim inset so the fill clears the glyphs. The
-/// vertical inset rounds to zero terminal rows, so it leaves the line height
-/// untouched on both targets.
+/// vertical inset never disturbs line height: on the web `<code>` is inline, so
+/// top/bottom padding extends the chip background without growing the line box;
+/// on the terminal the inset rounds to zero rows.
 pub fn code_prose() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("code"))
@@ -713,16 +715,6 @@ pub fn table_th() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 
-/// Bordered table - draws a full cell grid. It sets only the *inherited* uniform
-/// `border-width`; `th`/`td` carry the border *color*, while `thead`/`tbody`/`tr`
-/// do not, so the width inherits all the way down but only the cells (which have
-/// a color) actually paint, yielding vertical dividers without per-cell rules.
-pub fn table_bordered() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(TABLE_BORDERED))
-		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
-}
-
 /// Body cells - padded, with a faint divider rule below each row.
 pub fn table_td() -> Rule {
 	Rule::new()
@@ -749,6 +741,42 @@ pub fn summary() -> Rule {
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
 }
 
+/// Sidebar group summary - `list-style: none` drops the browser's default left
+/// disclosure triangle (replaced by the right-hand caret). The terminal keeps
+/// the summary inline so the caret follows the label on one tight row.
+pub fn sidebar_summary() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_SUMMARY))
+		.with_canonical(ListStyle::None)
+		.with_value(common_props::CursorProp, Cursor::Pointer)
+}
+
+/// Web sidebar summary - a flex row that pushes the caret to the right edge.
+/// Screen-gated: the charcell summary stays inline (flex there adds stray rows).
+pub fn sidebar_summary_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(SIDEBAR_SUMMARY))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::JustifyContentProp, JustifyContent::SpaceBetween)
+}
+
+/// Sidebar disclosure caret - faint, sitting at the right edge of its summary.
+pub fn sidebar_caret() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_CARET))
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+}
+
+/// Nested sidebar `<ul>` - drops the prose list's block spacing so the tree's
+/// rows sit flush (overriding the `ul` block-gap margin on both targets).
+pub fn sidebar_list() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_LIST))
+		.with_value(common_props::MarginProp, Spacing::DEFAULT)
+}
+
 /// Sidebar nav container - a left rail divided from the main column by a
 /// right border, with padding so its links clear the divider.
 pub fn sidebar() -> Rule {
@@ -756,12 +784,27 @@ pub fn sidebar() -> Rule {
 		.with_selector(Selector::class(SIDEBAR))
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerLow).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
-		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_token(TypographyProps,typography::TitleMedium).unwrap()
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
 		.with_token(common_props::BorderRightWidth,geometry::OutlineWidthThin).unwrap()
 		.with_value(common_props::Padding, Spacing {
 			right: Length::Rem(1.),
 			..Spacing::DEFAULT
+		})
+}
+
+/// Web sidebar - a comfortable fixed rail width so the nav tree isn't cramped.
+/// Screen-gated: the terminal sizes the rail to its content instead.
+pub fn sidebar_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(SIDEBAR))
+		.with_value(common_props::Width, Length::Rem(16.))
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(0.5),
+			right: Length::Rem(1.),
+			top: Length::Rem(0.5),
+			bottom: Length::Rem(0.5),
 		})
 }
 
@@ -811,7 +854,7 @@ pub fn sidebar_active() -> Rule {
 /// non-root `sidebar-item` carries it; `sidebar-item-root` stays flush left.
 pub fn sidebar_item() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class("sidebar-item"))
+		.with_selector(Selector::class(SIDEBAR_ITEM))
 		.with_value(common_props::Padding, Spacing {
 			left: Length::Rem(1.),
 			..Spacing::DEFAULT
@@ -992,15 +1035,20 @@ pub fn all_rules() -> Vec<Rule> {
 		select_filled(),
 		select_text(),
 		error_text(),
-		// table
+		// table (the `.table-vertical-borders` column dividers are a web concern,
+		// drawn by an adjacent-sibling rule in `reset.css`; charcell tables stack)
 		table(),
-		table_bordered(),
 		table_th(),
 		table_td(),
 		// disclosure + sidebar
 		details(),
 		summary(),
+		sidebar_summary(),
+		sidebar_summary_web(),
+		sidebar_caret(),
+		sidebar_list(),
 		sidebar(),
+		sidebar_web(),
 		sidebar_link(),
 		sidebar_link_terminal(),
 		sidebar_active(),

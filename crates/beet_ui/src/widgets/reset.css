@@ -12,6 +12,15 @@
 	this is the web side catching up.
 */
 
+/* Vertical-border table: internal column dividers only. An adjacent-sibling
+   rule borders every cell except the first in its row, so the lines fall
+   between columns without framing the table. (The charcell target instead
+   inherits a border-width down to the cells; see `table_vertical_borders`.) */
+.table-vertical-borders th + th,
+.table-vertical-borders td + td {
+	border-inline-start: var(--material-geometry-outline-width-thin) solid var(--material-colors-outline-variant);
+}
+
 ul {
 	list-style: disc;
 	padding-left: 1.5rem;
@@ -32,7 +41,11 @@ nav ol {
 	margin: 0;
 }
 
-/* A larger disclosure triangle for sidebar groups. */
-nav summary::marker {
-	font-size: 1.1em;
+/* The sidebar draws its own right-aligned disclosure caret, so hide the
+   browser's default left-edge triangle. */
+nav summary {
+	list-style: none;
+}
+nav summary::-webkit-details-marker {
+	display: none;
 }

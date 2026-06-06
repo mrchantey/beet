@@ -91,12 +91,27 @@ pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
 
 // ── Table ───────────────────────────────────────────────────────────────────────
 pub const TABLE: ClassName = ClassName::new_static("table");
+/// A table with internal vertical column dividers, in addition to the default
+/// horizontal row rules.
+pub const TABLE_VERTICAL_BORDERS: ClassName =
+	ClassName::new_static("table-vertical-borders");
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────────
 pub const SIDEBAR: ClassName = ClassName::new_static("sidebar");
 pub const SIDEBAR_LINK: ClassName = ClassName::new_static("sidebar-link");
 pub const SIDEBAR_LABEL: ClassName = ClassName::new_static("sidebar-label");
 pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
+/// A `<summary>` row in the sidebar: label on the left, disclosure caret right.
+pub const SIDEBAR_SUMMARY: ClassName = ClassName::new_static("sidebar-summary");
+/// The disclosure caret on a sidebar group's summary.
+pub const SIDEBAR_CARET: ClassName = ClassName::new_static("sidebar-caret");
+/// A nested `<ul>` of sidebar items, with no list block spacing.
+pub const SIDEBAR_LIST: ClassName = ClassName::new_static("sidebar-list");
+/// A non-root sidebar item, indented one level under its parent group.
+pub const SIDEBAR_ITEM: ClassName = ClassName::new_static("sidebar-item");
+/// A root (top-level) sidebar item, flush with the rail's left edge.
+pub const SIDEBAR_ITEM_ROOT: ClassName =
+	ClassName::new_static("sidebar-item-root");
 
 // ── Generic utilities ─────────────────────────────────────────────────────────────
 pub const HIDDEN: ClassName = ClassName::new_static("hidden");

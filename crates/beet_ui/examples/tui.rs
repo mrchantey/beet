@@ -20,7 +20,7 @@ fn setup(mut commands: Commands) {
 		StdioTerminal::default(),
 		DoubleBuffer::default(),
 		Document::new(val!({ "count": 0i64 })),
-		LayoutStyle::flex_row().column_gap(1),
+		LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 		children![((
 			LayoutStyle::flex_row(),
 			rsx_direct! { <div>"Value: "{(Value::default(), count_field())}</div> },

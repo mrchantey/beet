@@ -11,6 +11,7 @@
 use crate::prelude::*;
 use crate::style::Display;
 use crate::style::FontStyle;
+use crate::style::ListStyle;
 use crate::style::FontWeight;
 use crate::style::Length;
 use crate::style::Spacing;
@@ -46,22 +47,20 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// ── Block structure ──
 		block_spaced(&["p", "ul", "ol"]),
 		block(&["li", "div"]),
-		// headings are bold blocks on every target; the per-level hue is added
-		// for the terminal only via `heading_color` (below), so web/print stay
-		// plain bold text inheriting the page foreground.
+		// navigation lists carry no markers (the sidebar is nav, not prose). CSS
+		// `list-style-type` is inherited, so `none` on the `<nav>` strips bullets
+		// from every list item inside it on both targets — the charcell decorator
+		// reads the resolved value, the web honors it directly.
+		nav_list_style(),
+		// headings are plain bold on every target; the terminal-only per-level
+		// hue is theme-derived in `themes::terminal_heading_colors`, keeping
+		// these user-agent defaults free of any hardcoded palette.
 		heading("h1"),
 		heading("h2"),
 		heading("h3"),
 		heading("h4"),
 		heading("h5"),
 		heading("h6"),
-		// terminal-only heading colors, inverted from a former web override so
-		// the terminal opts *in* to the hue rather than the web opting out.
-		terminal_heading_color("h1", Color::srgb(0.,    0.502, 0.   )),
-		terminal_heading_color("h2", Color::srgb(0.,    0.502, 0.502)),
-		terminal_heading_color("h3", Color::srgb(0.,    0.,    0.502)),
-		terminal_heading_color("h4", Color::srgb(0.502, 0.,    0.502)),
-		terminal_heading_color("h6", faint()),
 		blockquote(),
 		block_spaced(&["pre"])
 			.with_canonical(WhiteSpace::Pre)
@@ -102,6 +101,12 @@ fn block(tags: &[&str]) -> Rule {
 	Rule::tags(tags).with_canonical(Display::Block)
 }
 
+/// `<nav>` strips list markers from its descendant lists (inherited
+/// `list-style-type: none`), so navigation reads as links, not a bulleted list.
+fn nav_list_style() -> Rule {
+	Rule::tags(&["nav"]).with_canonical(ListStyle::None)
+}
+
 /// A `display: block` rule that also reserves a [`block_gap`] below, separating
 /// the element from the following block.
 fn block_spaced(tags: &[&str]) -> Rule {
@@ -115,14 +120,6 @@ fn inline(tags: &[&str]) -> Rule {
 
 fn heading(tag: &str) -> Rule {
 	block_spaced(&[tag]).with_canonical(FontWeight::Bold)
-}
-
-/// A terminal-only per-level heading color, gated behind [`MediaQuery::Terminal`]
-/// so it applies in the charcell cascade but never reaches the web stylesheet.
-fn terminal_heading_color(tag: &str, color: Color) -> Rule {
-	Rule::tags(&[tag])
-		.with_media(MediaQuery::Terminal)
-		.with_value(ForegroundColor, color)
 }
 
 fn bold(tags: &[&str]) -> Rule {

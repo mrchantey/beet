@@ -72,9 +72,9 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 		active,
 	} = node;
 	let root_class = if root {
-		"sidebar-item-root"
+		classes::SIDEBAR_ITEM_ROOT
 	} else {
-		"sidebar-item"
+		classes::SIDEBAR_ITEM
 	};
 	let href = path.map(|path| path.with_leading_slash());
 
@@ -121,7 +121,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 
 /// A leaf `<li><a>` link, marked `aria-current="page"` when active.
 fn leaf_link(
-	root_class: &'static str,
+	root_class: ClassName,
 	display_name: String,
 	href: String,
 	active: bool,

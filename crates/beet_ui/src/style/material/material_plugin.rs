@@ -35,6 +35,8 @@ impl Plugin for MaterialStylePlugin {
 			.default_rule_mut()
 			.push_declarations(default_declarations(self.color.clone()));
 		rules.extend_rules(default_material_rules());
+		// terminal-only heading hues, interpolated from this theme's palette
+		rules.extend_rules(themes::terminal_heading_colors(self.color.clone()));
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
@@ -54,8 +56,10 @@ pub fn default_token_map() -> CssTokenMap {
 /// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
 /// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
 pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
+	let color = color.into();
 	RuleSet::new(default_declarations(color))
 		.with_rules(default_material_rules())
+		.with_rules(themes::terminal_heading_colors(color))
 }
 
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
@@ -114,6 +118,62 @@ mod tests {
 				"--io-crates-beet-ui-style-material-motion-short2: 100ms;",
 			)
 			.xpect_contains("--io-crates-beet-ui-style-material-typography-headline-large-weight: var(--io-crates-beet-ui-style-material-typography-weight-regular);");
+	}
+
+	/// A deep `.card-filled` under a `.dark-scheme` ancestor resolves its
+	/// `BackgroundColor` (which points at `SurfaceContainerHighest`) to the dark
+	/// tone, not the light `:root` fallback — the "white card on a dark page" bug.
+	#[beet_core::test]
+	fn nested_card_inherits_dark_scheme() {
+		use crate::style::common_props::BackgroundColor;
+		let mut world = MaterialStylePlugin::world();
+		let body = world
+			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.id();
+		let mid = world.spawn((rsx_direct! { <main/> }, ChildOf(body))).id();
+		let card = world
+			.spawn((
+				rsx_direct! { <div/> },
+				Classes::new([classes::CARD_FILLED]),
+				ChildOf(mid),
+			))
+			.id();
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let card_bg = query.resolve(card, BackgroundColor).unwrap();
+			let dark_highest =
+				query.resolve(body, colors::SurfaceContainerHighest).unwrap();
+			card_bg.xpect_eq(dark_highest);
+		});
+	}
+
+	/// Content transcluded into a `.dark-scheme` shell by [`RenderRef`] (no
+	/// `ChildOf` edge) still inherits the shell's scheme through the holder, so a
+	/// card in referenced content is dark, not the light `:root` fallback. This is
+	/// the document-shell transclusion path that produced the "white card".
+	#[beet_core::test]
+	fn render_ref_content_inherits_dark_scheme() {
+		use crate::style::common_props::BackgroundColor;
+		let mut world = MaterialStylePlugin::world();
+		// content is its own root (no ChildOf to the shell), holding a card
+		let content = world.spawn(rsx_direct! { <main/> }).id();
+		let card = world
+			.spawn((
+				rsx_direct! { <div/> },
+				Classes::new([classes::CARD_FILLED]),
+				ChildOf(content),
+			))
+			.id();
+		// shell body carries the scheme; a holder transcludes the content by ref
+		let body = world
+			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.id();
+		world.spawn((RenderRef::new(content), ChildOf(body)));
+		world.with_state::<RuleSetQuery, _>(|query| {
+			let card_bg = query.resolve(card, BackgroundColor).unwrap();
+			let dark_highest =
+				query.resolve(body, colors::SurfaceContainerHighest).unwrap();
+			card_bg.xpect_eq(dark_highest);
+		});
 	}
 
 	/// A descendant with no scheme class of its own inherits the nearest

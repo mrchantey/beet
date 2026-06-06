@@ -100,8 +100,8 @@ pub fn measure_flex(
 
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
-		Direction::Horizontal => flexbox.row_gap,
-		Direction::Vertical => flexbox.column_gap,
+		Direction::Horizontal => flexbox.row_gap_cells(viewport),
+		Direction::Vertical => flexbox.column_gap_cells(viewport),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -117,7 +117,7 @@ pub fn measure_flex(
 					total_h += line_gap;
 				}
 				let gap_total = if line.len() > 1 {
-					flexbox.column_gap * (line.len() as u32 - 1)
+					flexbox.column_gap_cells(viewport) * (line.len() as u32 - 1)
 				} else {
 					0
 				};
@@ -138,7 +138,7 @@ pub fn measure_flex(
 					total_w += line_gap;
 				}
 				let gap_total = if line.len() > 1 {
-					flexbox.row_gap * (line.len() as u32 - 1)
+					flexbox.row_gap_cells(viewport) * (line.len() as u32 - 1)
 				} else {
 					0
 				};
@@ -237,7 +237,7 @@ fn resolve_flex_height(
 			.iter()
 			.enumerate()
 			.map(|(idx, line)| {
-				let gap = if idx > 0 { flexbox.row_gap } else { 0 };
+				let gap = if idx > 0 { flexbox.row_gap_cells(viewport) } else { 0 };
 				let sizes = resolve_line_sizes(
 					flexbox,
 					line,
@@ -253,7 +253,7 @@ fn resolve_flex_height(
 			.iter()
 			.map(|line| {
 				let gaps =
-					flexbox.row_gap * (line.len().saturating_sub(1) as u32);
+					flexbox.row_gap_cells(viewport) * (line.len().saturating_sub(1) as u32);
 				let items: u32 = line
 					.iter()
 					.filter_map(|(entity, size)| {
@@ -378,7 +378,7 @@ pub fn flex_layout_rects(
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
 						- if line_cross_sizes.len() > 1 {
-							flexbox.row_gap
+							flexbox.row_gap_cells(viewport)
 								* (line_cross_sizes.len() as u32 - 1)
 						} else {
 							0
@@ -433,7 +433,7 @@ pub fn flex_layout_rects(
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
 						- if line_cross_sizes.len() > 1 {
-							flexbox.column_gap
+							flexbox.column_gap_cells(viewport)
 								* (line_cross_sizes.len() as u32 - 1)
 						} else {
 							0
@@ -505,8 +505,8 @@ fn form_lines(
 	};
 
 	let main_gap = match direction {
-		Direction::Horizontal => flexbox.column_gap,
-		Direction::Vertical => flexbox.row_gap,
+		Direction::Horizontal => flexbox.column_gap_cells(viewport),
+		Direction::Vertical => flexbox.row_gap_cells(viewport),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -600,8 +600,8 @@ fn apply_flex_grow(
 ) -> Vec<UVec2> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let main_gap = match direction {
-		Direction::Horizontal => flexbox.column_gap,
-		Direction::Vertical => flexbox.row_gap,
+		Direction::Horizontal => flexbox.column_gap_cells(viewport),
+		Direction::Vertical => flexbox.row_gap_cells(viewport),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -684,8 +684,8 @@ fn apply_justify(
 ) -> Vec<u32> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let main_gap = match direction {
-		Direction::Horizontal => flexbox.column_gap,
-		Direction::Vertical => flexbox.row_gap,
+		Direction::Horizontal => flexbox.column_gap_cells(viewport),
+		Direction::Vertical => flexbox.row_gap_cells(viewport),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -768,8 +768,8 @@ fn apply_align_content(
 ) -> Vec<u32> {
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let line_gap = match direction {
-		Direction::Horizontal => flexbox.row_gap,
-		Direction::Vertical => flexbox.column_gap,
+		Direction::Horizontal => flexbox.row_gap_cells(viewport),
+		Direction::Vertical => flexbox.column_gap_cells(viewport),
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -861,7 +861,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::Start)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(rsx_direct! {"A"}, bordered()),
 				(rsx_direct! {"B"}, bordered()),
@@ -876,7 +876,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::End)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(rsx_direct! {"A"}, bordered()),
 				(rsx_direct! {"B"}, bordered()),
@@ -891,7 +891,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.justify_content(JustifyContent::Center)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(rsx_direct! {"A"}, bordered()),
 				(rsx_direct! {"B"}, bordered()),
@@ -903,7 +903,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn column_gap() {
-		render((LayoutStyle::flex_row().column_gap(3), children![
+		render((LayoutStyle::flex_row().column_gap(Length::Rem(3.)), children![
 			(rsx_direct! {"A"}, bordered()),
 			(rsx_direct! {"B"}, bordered()),
 		]))
@@ -913,7 +913,7 @@ mod tests {
 	#[beet_core::test]
 	fn flex_grow_distributes_space() {
 		let output =
-			render((LayoutStyle::flex_row().column_gap(1), children![
+			render((LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
 				(rsx_direct! {"A"}, bordered()),
 				(
 					rsx_direct! {"B"},
@@ -939,7 +939,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.align_items(AlignItems::Center)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(
 					LayoutStyle::flex_col(),
@@ -960,7 +960,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.align_items(AlignItems::Start)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(
 					LayoutStyle::flex_col(),
@@ -981,7 +981,7 @@ mod tests {
 		render((
 			LayoutStyle::flex_row()
 				.align_items(AlignItems::End)
-				.column_gap(1),
+				.column_gap(Length::Rem(1.)),
 			children![
 				(
 					LayoutStyle::flex_col(),
@@ -999,9 +999,9 @@ mod tests {
 
 	#[beet_core::test]
 	fn nested_flex() {
-		render((LayoutStyle::flex_col().row_gap(1), children![
+		render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
 			(
-				LayoutStyle::flex_row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 				children![
 					(rsx_direct! {"A"}, bordered()),
 					(rsx_direct! {"B"}, bordered()),
@@ -1009,7 +1009,7 @@ mod tests {
 				bordered()
 			),
 			(
-				LayoutStyle::flex_row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 				children![
 					(rsx_direct! {"C"}, bordered()),
 					(rsx_direct! {"D"}, bordered()),
@@ -1033,7 +1033,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn column_with_multiple_items() {
-		render((LayoutStyle::flex_col().row_gap(1), children![
+		render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
 			(rsx_direct! {"First"}, bordered()),
 			(rsx_direct! {"Second"}, bordered()),
 			(rsx_direct! {"Third"}, bordered()),
@@ -1068,9 +1068,9 @@ mod tests {
 	/// Verifies background ordering and multi-level flex layout.
 	#[beet_core::test]
 	fn nested_with_backgrounds() {
-		let out = render((LayoutStyle::flex_col().row_gap(1), children![
+		let out = render((LayoutStyle::flex_col().row_gap(Length::Rem(1.)), children![
 			(
-				LayoutStyle::flex_row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 				children![
 					(rsx_direct! { "Left" }, bordered(), VisualStyle {
 						background: Some(Color::srgb(0.2, 0.2, 0.5)),
@@ -1084,7 +1084,7 @@ mod tests {
 				bordered()
 			),
 			(
-				LayoutStyle::flex_row().column_gap(1),
+				LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 				children![(rsx_direct! { "Below" }, bordered(), VisualStyle {
 					background: Some(Color::srgb(0.2, 0.5, 0.2)),
 					..default()
@@ -1105,7 +1105,7 @@ mod tests {
 	/// The border width must account for the display width, not the char count.
 	#[beet_core::test]
 	fn wide_chars_layout() {
-		let out = render((LayoutStyle::flex_row().column_gap(1), children![
+		let out = render((LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
 			(rsx_direct! { "中文" }, bordered()),
 			(rsx_direct! { "ＡＢＣ" }, bordered()),
 		]));

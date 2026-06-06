@@ -4,9 +4,11 @@ use beet_core::prelude::*;
 use material_colors::color::Argb;
 use material_colors::theme::Palettes;
 use material_colors::theme::ThemeBuilder;
+use crate::style::common_props::ForegroundColor;
 use crate::style::material::colors;
 use crate::style::material::tones;
 use crate::token::classes;
+use bevy::color::Mix;
 
 /// Color conversion helpers for material-colors integration.
 #[extend::ext(name=MaterialColorExt)]

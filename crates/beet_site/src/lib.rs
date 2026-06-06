@@ -13,6 +13,8 @@ pub use launch::run_codegen;
 // generated includes below) lets `cargo run --features codegen` bootstrap the
 // `src/codegen` modules even when they do not yet exist.
 #[cfg(all(feature = "render", not(feature = "codegen")))]
+pub mod classes;
+#[cfg(all(feature = "render", not(feature = "codegen")))]
 pub mod layouts;
 #[cfg(all(feature = "render", not(feature = "codegen")))]
 mod server;

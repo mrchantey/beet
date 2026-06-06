@@ -24,14 +24,17 @@ pub fn BeetDocumentShell(
 		.and_then(|meta| meta.description.clone())
 		.unwrap_or_else(|| pkg.description.clone());
 	// an explicit `?color-scheme=light|dark` pins the scheme on both targets via
-	// a body class; absent it, the web follows the OS (`color_scheme.js`) and the
-	// terminal defaults to dark (`AnsiTermRenderer`).
+	// a body class. Absent it, the web follows the OS (`color_scheme.js`); a
+	// non-html target (the terminal) defaults to dark.
 	let mut body_classes = Classes::new([classes::PAGE]);
 	match cx.parts().get_param("color-scheme") {
 		Some("light") => {
 			body_classes.insert_class(classes::LIGHT_SCHEME);
 		}
 		Some("dark") => {
+			body_classes.insert_class(classes::DARK_SCHEME);
+		}
+		_ if !cx.parts().accepts(MediaType::Html) => {
 			body_classes.insert_class(classes::DARK_SCHEME);
 		}
 		_ => {}

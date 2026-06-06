@@ -48,6 +48,12 @@ impl Plugin for StylePlugin {
 				Rule::new().with_extend(syntax::default_scheme()),
 			);
 			rules.extend_rules(syntax::class_rules());
+			// register the syntax tokens' CSS resolvers so the web `Stylesheet`
+			// can serialize the `.hl-<capture>` colour variables (otherwise it
+			// errors with "no CSS resolver registered" once a code block emits them).
+			app.world_mut()
+				.get_resource_or_init::<CssTokenMap>()
+				.extend(syntax::token_map());
 		}
 		#[cfg(any(
 			not(feature = "syntax_highlighting"),

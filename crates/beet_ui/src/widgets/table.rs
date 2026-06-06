@@ -17,7 +17,7 @@ use beet_core::prelude::*;
 pub fn Table(#[prop] vertical_lines: bool) -> impl Scene {
 	let mut class_set = Classes::new([classes::TABLE]);
 	if vertical_lines {
-		class_set.insert_class(classes::TABLE_BORDERED);
+		class_set.insert_class(classes::TABLE_VERTICAL_BORDERS);
 	}
 	rsx! {
 		<table {class_set}>

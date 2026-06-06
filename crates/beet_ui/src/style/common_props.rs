@@ -49,6 +49,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(ColumnGapProp)
 		.insert(RowGapProp)
 		.insert(DisplayProp)
+		.insert(ListStyleProp)
 		.insert(BorderColorProp)
 		.insert(BorderTopWidth)
 		.insert(BorderRightWidth)
@@ -103,6 +104,7 @@ canonical_property!(CursorProp, Cursor, TokenInheritance::NotInherited, "cursor"
 css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, "transition-duration");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
+canonical_property!(ListStyleProp, ListStyle, "list-style-type");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, "border-color");
 css_property!(BorderTopWidth, Length, TokenInheritance::NotInherited, "border-top-width");

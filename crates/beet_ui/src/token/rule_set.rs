@@ -185,6 +185,11 @@ pub struct RuleSetQuery<'w, 's> {
 	rule_set: ResMut<'w, RuleSet>,
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	_children: Query<'w, 's, &'static Children>,
+	// reverse [`RenderRef`] lookup, so the inherited cascade crosses transclusion
+	// boundaries: content transcluded into a shell by reference has no `ChildOf`
+	// edge to the shell, so inheritance (eg the color scheme) continues from the
+	// holder that renders it in place.
+	render_refs: Query<'w, 's, (Entity, &'static RenderRef)>,
 	element_query: ElementQuery<'w, 's>,
 }
 
@@ -215,10 +220,7 @@ impl RuleSetQuery<'_, '_> {
 			Err(err) => {
 				// inherited tokens search ancestors before the root fallback
 				if token.is_inherited()
-					&& let Ok(ancestor) = self
-						.ancestors
-						.get(entity)
-						.map(|ancestor| ancestor.get())
+					&& let Some(ancestor) = self.parent(entity)
 				{
 					self.resolve_untyped(ancestor, token)
 				} else {
@@ -227,6 +229,18 @@ impl RuleSetQuery<'_, '_> {
 				}
 			}
 		}
+	}
+
+	/// The cascade parent of `entity`. A transcluded entity (the target of a
+	/// [`RenderRef`]) inherits from the holder that renders it in place, not from
+	/// its original [`ChildOf`] spawn location — so the cascade (eg the color
+	/// scheme) crosses the transclusion boundary. Otherwise the `ChildOf` parent.
+	fn parent(&self, entity: Entity) -> Option<Entity> {
+		self.render_refs
+			.iter()
+			.find(|(_, render_ref)| render_ref.0 == entity)
+			.map(|(holder, _)| holder)
+			.or_else(|| self.ancestors.get(entity).map(|child_of| child_of.get()).ok())
 	}
 
 	/// Resolves `token` against the `:root` default rule — the lowest-priority

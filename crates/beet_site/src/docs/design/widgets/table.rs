@@ -21,17 +21,18 @@ pub fn get() -> impl Scene {
 }
 
 /// The shared header row cells.
-fn head_cells() -> Vec<Box<dyn Scene>> {
+fn head_cells() -> impl Scene {
 	vec![
 		rsx! { <th>"Name"</th> }.any_scene(),
 		rsx! { <th>"Age"</th> }.any_scene(),
 		rsx! { <th>"Occupation"</th> }.any_scene(),
 		rsx! { <th></th> }.any_scene(),
 	]
+	.into_scene()
 }
 
 /// The shared demo body rows.
-fn body_rows() -> Vec<Box<dyn Scene>> {
+fn body_rows() -> impl Scene {
 	let users = [
 		("Alice", 30, "Engineer"),
 		("Bob", 25, "Designer"),
@@ -52,5 +53,6 @@ fn body_rows() -> Vec<Box<dyn Scene>> {
 			}
 			.any_scene()
 		})
-		.collect()
+		.collect::<Vec<_>>()
+		.into_scene()
 }

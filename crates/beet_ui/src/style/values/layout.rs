@@ -99,6 +99,34 @@ impl AsCssValue for WhiteSpace {
 	}
 }
 
+/// Marker style for list items, mapping to CSS `list-style-type`.
+///
+/// Inherited (like CSS), so setting `None` on an ancestor (eg a `<nav>`) strips
+/// markers from every descendant list item. The charcell decorator reads the
+/// resolved value to decide whether a `<li>` gets a bullet/number.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ListStyle {
+	/// Marker chosen from the list kind (`<ul>` bullet, `<ol>` number).
+	#[default]
+	Auto,
+	/// No marker, mapping to CSS `list-style-type: none`.
+	None,
+}
+
+impl AsCssValue for ListStyle {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			// `Auto` keeps the browser's per-tag default (disc/decimal); only the
+			// `None` opt-out needs serializing.
+			Self::Auto => "revert",
+			Self::None => "none",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 pub static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
 /// Layout properties for a node.
@@ -160,17 +188,17 @@ impl LayoutStyle {
 		self
 	}
 
-	pub fn row_gap(mut self, gap: u32) -> Self {
+	pub fn row_gap(mut self, gap: Length) -> Self {
 		self.flex_box.row_gap = gap;
 		self
 	}
 
-	pub fn column_gap(mut self, gap: u32) -> Self {
+	pub fn column_gap(mut self, gap: Length) -> Self {
 		self.flex_box.column_gap = gap;
 		self
 	}
 
-	pub fn gap(mut self, gap: u32) -> Self {
+	pub fn gap(mut self, gap: Length) -> Self {
 		self.flex_box.row_gap = gap;
 		self.flex_box.column_gap = gap;
 		self
@@ -178,6 +206,11 @@ impl LayoutStyle {
 }
 
 /// Flexbox configuration for a node.
+///
+/// Gaps are stored as [`Length`] (resolution-independent), not pre-rounded
+/// cells: a pixel native renderer wants pixels and a viewport-relative gap needs
+/// the real viewport, so each target converts at layout time. The charcell
+/// engine uses [`FlexBox::row_gap_cells`]/[`FlexBox::column_gap_cells`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlexBox {
 	pub direction: Direction,
@@ -185,8 +218,8 @@ pub struct FlexBox {
 	pub align_items: AlignItems,
 	pub align_content: AlignContent,
 	pub justify_content: JustifyContent,
-	pub row_gap: u32,
-	pub column_gap: u32,
+	pub row_gap: Length,
+	pub column_gap: Length,
 }
 
 impl Default for FlexBox {
@@ -201,8 +234,8 @@ impl FlexBox {
 			align_items: AlignItems::Start,
 			align_content: AlignContent::Start,
 			justify_content: JustifyContent::Start,
-			row_gap: 0,
-			column_gap: 0,
+			row_gap: Length::DEFAULT,
+			column_gap: Length::DEFAULT,
 		}
 	}
 
@@ -213,8 +246,8 @@ impl FlexBox {
 			align_items: AlignItems::Start,
 			align_content: AlignContent::Start,
 			justify_content: JustifyContent::Start,
-			row_gap: 0,
-			column_gap: 0,
+			row_gap: Length::DEFAULT,
+			column_gap: Length::DEFAULT,
 		}
 	}
 
@@ -238,21 +271,39 @@ impl FlexBox {
 		self
 	}
 
-	pub fn row_gap(mut self, gap: u32) -> Self {
+	pub fn row_gap(mut self, gap: Length) -> Self {
 		self.row_gap = gap;
 		self
 	}
 
-	pub fn column_gap(mut self, gap: u32) -> Self {
+	pub fn column_gap(mut self, gap: Length) -> Self {
 		self.column_gap = gap;
 		self
 	}
 
-	pub fn gap(mut self, gap: u32) -> Self {
+	pub fn gap(mut self, gap: Length) -> Self {
 		self.row_gap = gap;
 		self.column_gap = gap;
 		self
 	}
+
+	/// The row gap rounded to whole terminal cells, resolving any
+	/// viewport-relative length against `viewport` (in cells).
+	pub fn row_gap_cells(&self, viewport: UVec2) -> u32 {
+		gap_cells(self.row_gap, viewport)
+	}
+
+	/// The column gap rounded to whole terminal cells, resolving any
+	/// viewport-relative length against `viewport` (in cells).
+	pub fn column_gap_cells(&self, viewport: UVec2) -> u32 {
+		gap_cells(self.column_gap, viewport)
+	}
+}
+
+/// Round a gap [`Length`] to whole terminal cells (1rem ≈ 1 cell), matching how
+/// [`Spacing`] insets convert in the charcell box model.
+fn gap_cells(gap: Length, viewport: UVec2) -> u32 {
+	gap.into_rem(viewport.as_vec2()).round().max(0.) as u32
 }
 
 

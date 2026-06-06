@@ -204,6 +204,16 @@ impl RequestParts {
 				.unwrap_or(false)
 	}
 
+	/// Whether the request's `Accept` header lists the given media type. A
+	/// request with no (or unparseable) `Accept` header is treated as accepting
+	/// anything, returning `true`.
+	pub fn accepts(&self, media: MediaType) -> bool {
+		match self.headers.get::<header::Accept>() {
+			Some(Ok(types)) => types.contains(&media),
+			_ => true,
+		}
+	}
+
 	/// Returns the path as a joined string with leading slash.
 	pub fn path_string(&self) -> String { self.url.path_string() }
 
