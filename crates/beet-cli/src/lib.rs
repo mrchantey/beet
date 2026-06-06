@@ -4,9 +4,9 @@
 beet::test_main!();
 
 mod commands;
-mod scene_management;
+mod scene_export;
 
 pub mod prelude {
 	pub use crate::commands::*;
-	pub use crate::scene_management::*;
+	pub use crate::scene_export::*;
 }

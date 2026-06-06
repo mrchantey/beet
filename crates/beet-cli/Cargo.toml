@@ -28,6 +28,9 @@ beet = { workspace = true, features = [
 	"json",
 	"webdriver",
 	"world_serde",
+	# the remote scene-control commands fetch a device over HTTP.
+	"ureq",
+	"rustls-tls",
 ] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }

@@ -12,6 +12,7 @@ mod route_codegen;
 mod media;
 mod navigate;
 mod router;
+mod scene_management;
 #[cfg(feature = "std")]
 mod scene_routes;
 #[cfg(feature = "std")]
@@ -26,6 +27,7 @@ pub mod prelude {
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;
 	pub use crate::router::*;
+	pub use crate::scene_management::*;
 	#[cfg(feature = "std")]
 	pub use crate::scene_routes::*;
 	#[cfg(feature = "std")]

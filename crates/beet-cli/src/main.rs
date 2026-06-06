@@ -15,8 +15,10 @@ fn main() -> AppExit {
 			LogPlugin::default(),
 			ClientAppPlugin,
 			// the runner must know every command type a `beet.json` can reference, so
-			// the loaded scene's markers reconstruct their behaviour.
+			// the loaded scene's markers reconstruct their behaviour: the built-in
+			// build/run/export commands and the remote scene-control commands.
 			CliCommandsPlugin,
+			RemoteCommandsPlugin,
 			SceneManagementPlugin,
 		))
 		.run()

@@ -1,6 +1,7 @@
 //! The welcome page shown when the cwd has no `beet.json`.
 
-use beet::prelude::*;
+use beet_core::prelude::*;
+use beet_ui::prelude::*;
 
 /// Rendered when no `beet.json` is found in the cwd: like a game engine pressing
 /// play with no scene loaded, the CLI has no behaviour of its own.

@@ -24,9 +24,10 @@ fn main() -> AppExit {
 		.run()
 }
 
-/// Spawn the default CLI bundle, serialize its entity tree to `./beet.json`,
-/// then despawn it and exit. The transient [`CliServer`] short-circuits its run
-/// hook once the entity is despawned, so spawning it just to serialize is safe.
+/// Spawn the default CLI bundle, serialize its entity tree to the
+/// [`scene_output_path`] and exit. The transient [`CliServer`] short-circuits
+/// its run hook once the entity is despawned, so spawning it just to serialize
+/// is safe.
 fn export_default_cli(world: &mut World) -> Result {
 	let entity = world.spawn((CliServer::default(), default_router())).id();
 	world.entity_mut(entity).with_children(|parent| {
@@ -36,16 +37,5 @@ fn export_default_cli(world: &mut World) -> Result {
 		#[cfg(feature = "qrcode")]
 		parent.spawn(QrCode);
 	});
-
-	let json = WorldSerdeSaver::new(world)
-		.with_entity_tree(entity)
-		.save(MediaType::Json)?
-		.as_utf8()?
-		.to_string();
-	world.entity_mut(entity).despawn();
-
-	fs_ext::write(BEET_SCENE_FILE, &json)?;
-	cross_log!("wrote default cli scene to {BEET_SCENE_FILE}");
-	world.write_message(AppExit::Success);
-	Ok(())
+	export_scene(world, entity)
 }
