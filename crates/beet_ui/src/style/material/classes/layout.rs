@@ -55,11 +55,13 @@ pub fn app_bar_terminal() -> Rule {
 }
 
 /// App bar navigation - a flex row so its links are spaced rather than running
-/// together as adjacent inline anchors.
+/// together as adjacent inline anchors. Centers on the cross axis so links of
+/// differing heights (a bordered button beside a text link) sit on one line.
 pub fn app_bar_nav() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(APP_BAR_NAV))
 		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
 		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
 }
 

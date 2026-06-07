@@ -168,79 +168,80 @@ pub(super) fn draw_border(
 	let (left, right) = (rect.min.x, rect.max.x - 1);
 	let (top, bottom) = (rect.min.y, rect.max.y - 1);
 
+	// per-side border weight: a thick rule (eg the blockquote callout's left
+	// border) draws with the heavy box-drawing glyphs so the weight reads in the
+	// terminal, where a border is otherwise a single light cell.
+	let heavy = |width: fn(&BoxStyle) -> crate::style::Length| {
+		box_style.map(|b| is_heavy(width(b))).unwrap_or(false)
+	};
+	let (heavy_top, heavy_bottom, heavy_left, heavy_right) = (
+		heavy(|b| b.border.top),
+		heavy(|b| b.border.bottom),
+		heavy(|b| b.border.left),
+		heavy(|b| b.border.right),
+	);
+
+	// a corner joins two sides; it reads heavy only when both meeting sides do.
+	let corner = |a, b, heavy_glyph, light_glyph| {
+		if a && b { heavy_glyph } else { light_glyph }
+	};
+
 	if sides.all() {
 		// full box: corners join the sides
-		buffer
-			.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set_composite(
-			UVec2::new(right, top),
-			Cell::new("┐", top_style.clone(), entity),
-		);
-		buffer.set_composite(
-			UVec2::new(left, bottom),
-			Cell::new("└", bottom_style.clone(), entity),
-		);
-		buffer.set_composite(
-			UVec2::new(right, bottom),
-			Cell::new("┘", bottom_style.clone(), entity),
-		);
+		buffer.set_composite(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style.clone(), entity));
 	}
 
 	// horizontal edges span the full width (corners overwrite the ends above)
 	if sides.top {
+		let glyph = if heavy_top { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite(
-				UVec2::new(x, top),
-				Cell::new("─", top_style.clone(), entity),
-			);
+			buffer.set_composite(UVec2::new(x, top), Cell::new(glyph, top_style.clone(), entity));
 		}
 	}
 	if sides.bottom {
+		let glyph = if heavy_bottom { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite(
-				UVec2::new(x, bottom),
-				Cell::new("─", bottom_style.clone(), entity),
-			);
+			buffer.set_composite(UVec2::new(x, bottom), Cell::new(glyph, bottom_style.clone(), entity));
 		}
 	}
 	// vertical edges span the full height
 	if sides.left {
+		let glyph = if heavy_left { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite(
-				UVec2::new(left, y),
-				Cell::new("│", left_style.clone(), entity),
-			);
+			buffer.set_composite(UVec2::new(left, y), Cell::new(glyph, left_style.clone(), entity));
 		}
 	}
 	if sides.right {
+		let glyph = if heavy_right { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite(
-				UVec2::new(right, y),
-				Cell::new("│", right_style.clone(), entity),
-			);
+			buffer.set_composite(UVec2::new(right, y), Cell::new(glyph, right_style.clone(), entity));
 		}
 	}
 
 	if sides.all() {
 		// re-draw corners so they sit on top of the straight edges
-		buffer
-			.set_composite(rect.min, Cell::new("┌", top_style.clone(), entity));
-		buffer.set_composite(
-			UVec2::new(right, top),
-			Cell::new("┐", top_style, entity),
-		);
-		buffer.set_composite(
-			UVec2::new(left, bottom),
-			Cell::new("└", bottom_style.clone(), entity),
-		);
-		buffer.set_composite(
-			UVec2::new(right, bottom),
-			Cell::new("┘", bottom_style, entity),
-		);
+		buffer.set_composite(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style, entity));
+		buffer.set_composite(UVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity));
+		buffer.set_composite(UVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style, entity));
 	}
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// A border at or above this width (in rem) draws with the heavy box-drawing
+/// glyphs rather than the light ones. Sits between the thin (1px) and thick
+/// (3px) outline tokens so only a deliberately thick rule reads as heavy.
+const HEAVY_BORDER_REM: f32 = 0.15;
+
+/// Whether a border of the given width draws heavy. Border widths are
+/// pixel-based, so the viewport is irrelevant to the rem conversion.
+fn is_heavy(width: crate::style::Length) -> bool {
+	width.into_rem(Vec2::ZERO) >= HEAVY_BORDER_REM
+}
 
 /// Build a [`VisualStyle`] for one border side from its foreground color and an
 /// optional background.

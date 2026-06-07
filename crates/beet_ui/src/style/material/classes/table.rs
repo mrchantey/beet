@@ -15,9 +15,13 @@ pub const TABLE_VERTICAL_BORDERS: ClassName =
 
 /// Table container - full-width, surface foreground, with a block gap below so
 /// the next block clears the table rather than butting against its last row.
+///
+/// Matches both the `<table>` tag and the `.table` class so a markdown table
+/// (which carries no class) gets the same look as the [`Table`](crate::prelude::Table)
+/// widget.
 pub fn table() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(TABLE))
+		.with_selector(Selector::tag("table").merge_any(Selector::class(TABLE)))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 		.with_value(common_props::Width, Length::Percent(100.))

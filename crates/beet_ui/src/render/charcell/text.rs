@@ -42,6 +42,10 @@ pub(super) fn paint_text(
 	};
 	let visual = node.visual_style();
 	let entity = node.entity;
+	// a marker-only leaf can still carry a link (eg an `<iframe>`/`<img>` collapsed
+	// to its title/alt text); wrap its painted cells in the OSC-8 link, matching
+	// the inline flow.
+	let link = node.hyperlink();
 	let lines = word_wrap(&text, content_rect.width());
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as u32;
@@ -55,6 +59,13 @@ pub(super) fn paint_text(
 			visual.clone(),
 			entity,
 		);
+		// `aligned` already spans the content width from its left edge, so the
+		// link covers the row's text columns.
+		if let Some(link) = link {
+			for col in content_rect.min.x..content_rect.min.x + content_rect.width() {
+				buffer.set_link(UVec2::new(col, y), link);
+			}
+		}
 	}
 	Ok(())
 }

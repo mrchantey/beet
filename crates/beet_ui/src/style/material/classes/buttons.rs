@@ -38,7 +38,8 @@ fn button_padding() -> Spacing {
 ///
 /// Corners are slightly rounded ([`ShapeSmall`](geometry::ShapeSmall)) rather
 /// than a full pill; the [`button_icon`] variant opts back into the circular full
-/// radius.
+/// radius. The animated [hover dim](crate::prelude::hover_dim) and its easing
+/// transition are shared with links via [`interactive_transition`].
 pub fn button_base() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("button").merge_any(Selector::class(BTN)))
@@ -52,15 +53,13 @@ pub fn button_base() -> Rule {
 /// A contained (filled-style) button: a solid `color` surface with `on_color`
 /// text and the given `elevation`.
 ///
-/// Reserves the same thin border every button carries, coloured to match its own
-/// fill so the box still reads as a solid surface. Reserving the border on every
-/// contained variant is what keeps a filled and an [outlined](button_outlined)
-/// button the same size on both targets — the outline only *recolours* the
-/// border rather than adding one. Without it the terminal draws a filled button
-/// as a single line of text while an outlined button is a three-row box.
+/// Carries no border: the fill alone reads as a solid surface, so a contained
+/// button stays a single line of text in the terminal rather than a three-row
+/// box. It lines up with the taller [outlined](button_outlined) button through
+/// cross-axis centering of its flex row, not by matching its box size.
 fn button_contained(
 	class: ClassName,
-	color: impl Into<Token> + Copy,
+	color: impl Into<Token>,
 	on_color: impl Into<Token>,
 	elevation: impl Into<Token>,
 ) -> Rule {
@@ -68,8 +67,6 @@ fn button_contained(
 		.with_selector(Selector::class(class))
 		.with_token(common_props::BackgroundColor, color).unwrap()
 		.with_token(common_props::ForegroundColor, on_color).unwrap()
-		.with_token(common_props::BorderColorProp, color).unwrap()
-		.with_token(common_props::OutlineWidth, geometry::OutlineWidthThin).unwrap()
 		.with_token(common_props::ElevationProp, elevation).unwrap()
 }
 

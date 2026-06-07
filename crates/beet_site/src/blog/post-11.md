@@ -7,10 +7,7 @@ created="2026-05-01"
 
 *Pete Hayman — 1st May, 2026*
 
-<iframe src="https://www.youtube.com/embed/iDhZLY5WvlM" title="The Harvest #11 - User Modifiable Users" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-<br/>
-<br/>
+<iframe src="https://www.youtube.com/embed/iDhZLY5WvlM" alt-src="https://youtu.be/iDhZLY5WvlM" title="The Harvest #11 - User Modifiable Users" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 > *Computers aren’t the thing. They’re the thing that gets us to the thing.*
 > 

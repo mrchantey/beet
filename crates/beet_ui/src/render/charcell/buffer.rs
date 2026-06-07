@@ -501,7 +501,7 @@ mod tests {
 	}
 
 	fn bordered() -> BoxStyle {
-		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+		BoxStyle::default().with_border(Spacing::all(Length::Px(1.)))
 	}
 
 	#[beet_core::test]
@@ -584,7 +584,7 @@ mod tests {
 			children![(
 				rsx_direct! { "Bar" },
 				BoxStyle::default().with_border(Spacing {
-					bottom: Length::Rem(1.),
+					bottom: Length::Px(1.),
 					..Spacing::DEFAULT
 				}),
 				VisualStyle {

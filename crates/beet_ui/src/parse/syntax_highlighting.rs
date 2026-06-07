@@ -16,6 +16,7 @@
 use crate::prelude::*;
 use crate::style::syntax::tokens as tokens_mod;
 use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::Language;
@@ -48,7 +49,11 @@ impl core::fmt::Debug for SyntaxHighlighting {
 #[derive(Clone)]
 struct LanguageEntry {
 	language: Language,
-	query_source: SmolStr,
+	/// Compiled once at registration and shared (`Arc`) across every
+	/// [`highlight`](SyntaxHighlighting::highlight) call. Recompiling the large
+	/// grammar queries (eg rust) per code block dominated markdown page render
+	/// time; caching the compiled query keeps it off the hot path.
+	query: Arc<TsQuery>,
 	aliases: Vec<SmolStr>,
 }
 
@@ -129,12 +134,13 @@ impl SyntaxHighlighting {
 	) -> &mut Self {
 		let name = name.into();
 		let query_source = query.into();
-		// validate up-front so a bad grammar fails registration, not highlight
-		TsQuery::new(&language, &query_source).expect("query compiles");
+		// compile up-front so a bad grammar fails registration, not highlight, and
+		// the cached query is reused by every `highlight` call.
+		let query = TsQuery::new(&language, &query_source).expect("query compiles");
 		let aliases = aliases.iter().map(|s| SmolStr::from(*s)).collect();
 		self.languages.insert(name, LanguageEntry {
 			language,
-			query_source,
+			query: Arc::new(query),
 			aliases,
 		});
 		self
@@ -179,15 +185,14 @@ impl SyntaxHighlighting {
 			}];
 		};
 
-		let query = TsQuery::new(&entry.language, &entry.query_source)
-			.expect("query compiles");
+		let query = entry.query.as_ref();
 		let capture_names: Vec<&str> = query.capture_names().to_vec();
 
 		// 1. collect captures sorted by start byte (BTreeMap keeps order)
 		let mut events: BTreeMap<usize, (usize, u32)> = BTreeMap::new();
 		let mut cursor = QueryCursor::new();
 		let mut matches =
-			cursor.captures(&query, tree.root_node(), source.as_bytes());
+			cursor.captures(query, tree.root_node(), source.as_bytes());
 		while let Some((m, _)) = matches.next() {
 			for cap in m.captures {
 				let node = cap.node;

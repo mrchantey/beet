@@ -60,14 +60,44 @@ pub fn reduced_motion() -> Rule {
 		.with_value(common_props::AnimationDurationProp, Duration::ZERO)
 }
 
-// ── Accessibility ─────────────────────────────────────────────────────────────
+// ── Interaction ─────────────────────────────────────────────────────────────
 
-/// Focus ring - primary-colored border on any focused element (`:focus`).
-pub fn focus_ring() -> Rule {
-	Rule::new()
-		.with_selector(Selector::state(ElementState::Focused))
-		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+/// The set of interactive elements that share the hover affordance: every
+/// `<button>` (and `.btn`-styled link) plus any `<a>`, so buttons, prose links,
+/// and sidebar anchors all respond to hover identically.
+fn interactive() -> Selector {
+	Selector::AnyOf(vec![Selector::tag("button"), Selector::tag("a")])
 }
+
+/// `:hover` over an interactive element: the same selectors, gated on the
+/// [`Hovered`](ElementState::Hovered) state.
+fn interactive_hover() -> Selector {
+	Selector::AnyOf(vec![
+		Selector::AllOf(vec![Selector::tag("button"), Selector::state(ElementState::Hovered)]),
+		Selector::AllOf(vec![Selector::tag("a"), Selector::state(ElementState::Hovered)]),
+	])
+}
+
+/// Eases the [hover dim](hover_dim) in and out on every interactive element.
+/// With no explicit `transition-property` the browser animates all changes, so
+/// the same short duration also smooths the active state and focus ring.
+pub fn interactive_transition() -> Rule {
+	Rule::new()
+		.with_selector(interactive())
+		.with_token(common_props::TransitionDurationProp,motion::Short4).unwrap()
+}
+
+/// Hover affordance - a slight whole-element dim on `button:hover`/`a:hover`,
+/// animated by [`interactive_transition`]. Opacity is uniform across element
+/// types and the one effect that reads the same on a filled button, a text link,
+/// and a sidebar row.
+pub fn hover_dim() -> Rule {
+	Rule::new()
+		.with_selector(interactive_hover())
+		.with_value(common_props::OpacityProp, 0.8_f32)
+}
+
+// ── Accessibility ─────────────────────────────────────────────────────────────
 
 /// Disabled elements - faint foreground (`:disabled`).
 pub fn disabled_state() -> Rule {

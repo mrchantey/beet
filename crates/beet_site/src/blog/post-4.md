@@ -7,10 +7,7 @@ created="2025-10-07"
 
 *Pete Hayman — 7th October, 2025*
 
-<iframe src="https://www.youtube.com/embed/yI9tuBsrW1M" title="Full Moon Harvest #4 | Action Time" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-<br/>
-<br/>
+<iframe src="https://www.youtube.com/embed/yI9tuBsrW1M" alt-src="https://youtu.be/yI9tuBsrW1M" title="Full Moon Harvest #4 | Action Time" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 This one's a bit of a groundwork harvest, I have some exciting ideas for where to take beet next but to do it properly we need a firm base to launch from.
 

@@ -7,10 +7,7 @@ created="2026-02-01"
 
 *Pete Hayman — 1st February, 2026*
 
-<iframe src="https://www.youtube.com/embed/8nokKDoz2_4" title="The Harvest #8 | It's all been done before" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-<br/>
-<br/>
+<iframe src="https://www.youtube.com/embed/8nokKDoz2_4" alt-src="https://youtu.be/8nokKDoz2_4" title="The Harvest #8 | It's all been done before" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually dont go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my faviorite songs as a ten-year-old.
 

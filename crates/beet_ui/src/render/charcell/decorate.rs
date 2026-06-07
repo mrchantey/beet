@@ -33,13 +33,19 @@ pub struct Marker(pub SmolStr);
 /// Width of the `<hr>` rule, matching the legacy visitor renderer.
 const HR_RULE: &str = "────────────────────";
 
-/// Attach a [`Hyperlink`] to every `<a>` (from `href`) and `<img>` (from `src`)
-/// element so the inline flow can emit OSC-8 links.
+/// Attach a [`Hyperlink`] to every `<a>` (from `href`), `<img>` (from `src`),
+/// and `<iframe>` element so the inline flow can emit OSC-8 links.
+///
+/// An embedded `<iframe>` can't render in the terminal, so it collapses to a
+/// link: its [`Marker`] (see [`iframe_marker`]) carries the title text and this
+/// hyperlink its destination, preferring the `alt-src` (a normal watch URL) over
+/// the embed-only `src`.
 pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 	for view in elements.iter() {
 		let url = match view.tag() {
 			"a" => view.attribute_string("href"),
 			"img" => view.attribute_string("src"),
+			"iframe" => iframe_url(&view),
 			_ => continue,
 		};
 		if !url.is_empty() {
@@ -49,8 +55,9 @@ pub fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 }
 
 /// Attach a [`Marker`] to elements that carry generated content:
-/// `<li>` (bullet/number), `<p>` inside a `<blockquote>` (quote bar),
-/// `<hr>` (rule), and `<img>` (alt text).
+/// `<li>` (bullet/number), `<hr>` (rule), and `<img>` (alt text). The
+/// `<blockquote>` callout draws its own thick left border via the box model, so
+/// no per-paragraph quote bar is added.
 pub fn apply_markers(
 	mut commands: Commands,
 	ruleset: RuleSetQuery,
@@ -64,9 +71,9 @@ pub fn apply_markers(
 			"li" => list_marker(
 				view.entity, &ruleset, &parents, &tags, &children, &elements,
 			),
-			"p" => blockquote_bar(view.entity, &parents, &tags),
 			"hr" => Some(HR_RULE.into()),
 			"img" => Some(img_marker(&view)),
+			"iframe" => Some(iframe_marker(&view)),
 			_ => None,
 		};
 		if let Some(marker) = marker {
@@ -122,28 +129,6 @@ fn list_marker(
 	}
 }
 
-/// The quote-bar prefix (`▌ ` per nesting level) for a paragraph inside one or
-/// more `<blockquote>`s, or `None` when not quoted.
-fn blockquote_bar(
-	paragraph: Entity,
-	parents: &Query<&ChildOf>,
-	tags: &Query<&Element>,
-) -> Option<SmolStr> {
-	let mut depth = 0;
-	let mut current = paragraph;
-	while let Ok(parent) = parents.get(current) {
-		current = parent.0;
-		if tags
-			.get(current)
-			.map(|el| el.tag() == "blockquote")
-			.unwrap_or(false)
-		{
-			depth += 1;
-		}
-	}
-	(depth > 0).then(|| "▌ ".repeat(depth).into())
-}
-
 /// The `[alt]` (or `[image: src]`) placeholder text for an image.
 fn img_marker(view: &ElementView) -> SmolStr {
 	let alt = view.attribute_string("alt");
@@ -151,6 +136,28 @@ fn img_marker(view: &ElementView) -> SmolStr {
 		format!("[image: {}]", view.attribute_string("src")).into()
 	} else {
 		format!("[{alt}]").into()
+	}
+}
+
+/// The link text for an `<iframe>` collapsed to an anchor: its `title`, falling
+/// back to the destination URL when untitled.
+fn iframe_marker(view: &ElementView) -> SmolStr {
+	let title = view.attribute_string("title");
+	if title.is_empty() {
+		iframe_url(view).into()
+	} else {
+		title.into()
+	}
+}
+
+/// The destination URL for an `<iframe>` link: the `alt-src` (a normal watch
+/// URL) if present, else the embed-only `src`.
+fn iframe_url(view: &ElementView) -> String {
+	let alt_src = view.attribute_string("alt-src");
+	if alt_src.is_empty() {
+		view.attribute_string("src").to_string()
+	} else {
+		alt_src.to_string()
 	}
 }
 
@@ -209,10 +216,14 @@ mod tests {
 			.xpect_contains("2. second");
 	}
 
+	/// The per-paragraph quote bar is gone: a quoted paragraph carries no `▌`
+	/// prefix (the callout's thick left border is drawn by the box model instead).
 	#[beet_core::test]
-	fn blockquote_bar() {
+	fn blockquote_has_no_paragraph_bar() {
 		render(rsx_direct! { <blockquote><p>"quoted text"</p></blockquote> })
-			.xpect_contains("▌ quoted text");
+			.xpect_contains("quoted text")
+			.xnot()
+			.xpect_contains("▌");
 	}
 
 	#[beet_core::test]
@@ -224,6 +235,33 @@ mod tests {
 	fn image_alt_text() {
 		render(rsx_direct! { <img src="image.png" alt="alt text"/> })
 			.xpect_contains("[alt text]");
+	}
+
+	/// An `<iframe>` collapses to its `title` as an OSC-8 link targeting the
+	/// `alt-src` (a normal watch URL) rather than the embed-only `src`.
+	#[beet_core::test]
+	fn iframe_renders_as_titled_link() {
+		let out = FlexBuffer::render_oneshot(40, rsx_direct! {
+			<iframe
+				src="https://www.youtube.com/embed/abc123"
+				alt-src="https://youtu.be/abc123"
+				title="My Talk"
+			/>
+		});
+		out.xpect_contains("My Talk")
+			// OSC-8 hyperlink to the watch URL, not the embed URL
+			.xpect_contains("\x1b]8;;https://youtu.be/abc123\x1b\\")
+			.xnot()
+			.xpect_contains("embed");
+	}
+
+	/// Without an `alt-src` the link falls back to the `src`.
+	#[beet_core::test]
+	fn iframe_link_falls_back_to_src() {
+		FlexBuffer::render_oneshot(40, rsx_direct! {
+			<iframe src="https://example.com/clip" title="Clip"/>
+		})
+		.xpect_contains("\x1b]8;;https://example.com/clip\x1b\\");
 	}
 
 	#[beet_core::test]

@@ -93,6 +93,7 @@ pub fn all_rules() -> Vec<Rule> {
 		// prose overrides — appended so they win the tag cascade over the
 		// user-agent element defaults (later rule wins ties)
 		link_prose(),
+		mark_prose(),
 		code_prose(),
 		pre_prose(),
 		blockquote_prose(),
@@ -148,8 +149,10 @@ pub fn all_rules() -> Vec<Rule> {
 		page_break(),
 		// reduced motion — gated behind `@media (prefers-reduced-motion)`
 		reduced_motion(),
+		// interaction — shared hover affordance for buttons and links
+		interactive_transition(),
+		hover_dim(),
 		// accessibility — global state rules
-		focus_ring(),
 		disabled_state(),
 		// web-only overrides — gated behind `@media screen`, ignored by charcell
 		page_fill_viewport(),

@@ -7,10 +7,7 @@ created="2025-11-05"
 
 *Pete Hayman — 5th November, 2025*
 
-<iframe src="https://www.youtube.com/embed/BhLvfvw1rgw" title="Full Moon Harvest #5 | Declarative State" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-<br/>
-<br/>
+<iframe src="https://www.youtube.com/embed/BhLvfvw1rgw" alt-src="https://youtu.be/BhLvfvw1rgw" title="Full Moon Harvest #5 | Declarative State" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 Writing a metaframework can be surprisingly straightforward: Start with an unmet need, and copy-pasta the best modern patterns and principles that align with this need. So far the web layer of beet has been entirely based on Astro which is taking the web dev world by storm with a single principle:
 

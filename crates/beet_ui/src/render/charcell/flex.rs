@@ -875,7 +875,26 @@ mod tests {
 	}
 
 	fn bordered() -> BoxStyle {
-		BoxStyle::default().with_border(Spacing::all(Length::Rem(1.)))
+		BoxStyle::default().with_border(Spacing::all(Length::Px(1.)))
+	}
+
+	/// A thick border (eg the blockquote callout's left rule) draws with the
+	/// heavy box-drawing glyph; a thin one stays light.
+	#[beet_core::test]
+	fn thick_border_draws_heavy() {
+		render((LayoutStyle::flex_row(), children![(
+			rsx_direct! {"Q"},
+			BoxStyle::default()
+				.with_border(Spacing {
+					left: Length::Px(3.),
+					..Spacing::DEFAULT
+				})
+				// padding gives the callout the height a border needs to draw
+				.with_padding(Spacing::all(Length::Rem(1.)))
+		)]))
+		.xpect_contains("┃")
+		.xnot()
+		.xpect_contains("│");
 	}
 
 	#[beet_core::test]
@@ -1047,7 +1066,7 @@ mod tests {
 		render((LayoutStyle::flex_row(), children![(
 			rsx_direct! {"X"},
 			BoxStyle::default()
-				.with_border(Spacing::all(Length::Rem(1.)))
+				.with_border(Spacing::all(Length::Px(1.)))
 				.with_padding(Spacing::all(Length::Rem(0.5)))
 		)]))
 		.xpect_snapshot();

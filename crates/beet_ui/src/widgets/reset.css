@@ -50,6 +50,23 @@ nav summary::-webkit-details-marker {
 	display: none;
 }
 
+/* The disclosure caret is a decorative glyph, not content: keep it out of text
+   selection so dragging across a sidebar row doesn't highlight the arrow. */
+.sidebar-caret {
+	user-select: none;
+}
+
+/* Text selection (drag-select and `<mark>` highlights) reads in the theme's
+   secondary container, so highlighted prose stays on-palette across schemes. */
+::selection {
+	background-color: var(--material-colors-secondary);
+	color: var(--material-colors-on-secondary);
+}
+::-moz-selection {
+	background-color: var(--material-colors-secondary);
+	color: var(--material-colors-on-secondary);
+}
+
 /* Embedded media (eg the blog's YouTube embeds): a centred, responsive 16:9
    block capped at a comfortable measure rather than the iframe's tiny default
    intrinsic size. */
@@ -58,6 +75,8 @@ iframe {
 	width: 100%;
 	max-width: 30rem;
 	margin-inline: auto;
+	/* clears the following block, replacing the per-post `<br/>` spacers */
+	margin-bottom: 2rem;
 	aspect-ratio: 16 / 9;
 	height: auto;
 	border: 0;

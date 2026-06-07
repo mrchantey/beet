@@ -155,6 +155,16 @@ pub fn link_prose() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
+/// Highlighted `<mark>` text - the secondary container fill matching the drag
+/// selection (see the web `::selection` rule), so a highlight reads on-palette
+/// on both targets rather than the browser's default yellow.
+pub fn mark_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::tag("mark"))
+		.with_token(common_props::BackgroundColor,colors::Secondary).unwrap()
+		.with_token(common_props::ForegroundColor,colors::OnSecondary).unwrap()
+}
+
 /// Inline `<code>` - filled chip readable against the page surface, with a
 /// faint rounded corner and a slim inset so the fill clears the glyphs. The
 /// vertical inset never disturbs line height: on the web `<code>` is inline, so
