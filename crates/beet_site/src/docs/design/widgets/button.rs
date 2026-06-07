@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// Showcases every [`Button`] and [`Link`] variant.
 pub fn get() -> impl Scene {
@@ -6,7 +6,7 @@ pub fn get() -> impl Scene {
 		<article>
 			<h1>"Button"</h1>
 			<h2>"Variants"</h2>
-			<div {Classes::new([classes::DESIGN_ROW])}>
+			<div {Classes::new([crate::style::classes::DESIGN_ROW])}>
 				<Button variant=ButtonVariant::Filled>"Filled"</Button>
 				<Button variant=ButtonVariant::Secondary>"Secondary"</Button>
 				<Button variant=ButtonVariant::Tertiary>"Tertiary"</Button>
@@ -17,7 +17,7 @@ pub fn get() -> impl Scene {
 				<Button variant=ButtonVariant::Text>"Text"</Button>
 			</div>
 			<h2>"Links"</h2>
-			<div {Classes::new([classes::DESIGN_ROW])}>
+			<div {Classes::new([crate::style::classes::DESIGN_ROW])}>
 				<Link href="#" variant=ButtonVariant::Filled>"Filled"</Link>
 				<Link href="#" variant=ButtonVariant::Secondary>"Secondary"</Link>
 				<Link href="#" variant=ButtonVariant::Tertiary>"Tertiary"</Link>

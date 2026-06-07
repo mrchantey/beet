@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// A complete [`Form`] showcase: a vertical stack of labelled fields styled
 /// entirely by the rule set, plus a small script that echoes the submitted

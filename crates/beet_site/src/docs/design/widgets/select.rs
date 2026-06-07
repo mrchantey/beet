@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// Shows the [`Select`] widget variants with `<option>` children.
 ///

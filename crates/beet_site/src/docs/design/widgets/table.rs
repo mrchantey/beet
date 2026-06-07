@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// Shows the [`Table`] widget: the default horizontal-rule layout and the
 /// `vertical_lines` grid variant, sharing one set of demo rows.

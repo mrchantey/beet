@@ -35,8 +35,6 @@ impl Plugin for MaterialStylePlugin {
 			.default_rule_mut()
 			.push_declarations(default_declarations(self.color.clone()));
 		rules.extend_rules(default_material_rules());
-		// terminal-only heading hues, interpolated from this theme's palette
-		rules.extend_rules(themes::terminal_heading_colors(self.color.clone()));
 		app.world_mut()
 			.get_resource_or_init::<CssTokenMap>()
 			.extend(default_token_map());
@@ -56,18 +54,16 @@ pub fn default_token_map() -> CssTokenMap {
 /// set (no prose [`default_element_rules`]). [`MaterialStylePlugin`] instead
 /// extends the shared rule set so it composes with `StylePlugin`'s prose rules.
 pub fn default_rule_set(color: impl Into<Color>) -> RuleSet {
-	let color = color.into();
 	RuleSet::new(default_declarations(color))
 		.with_rules(default_material_rules())
-		.with_rules(themes::terminal_heading_colors(color))
 }
 
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
 /// metadata/scripting tags resolve to `display: none`), the component
-/// [`rules::all_rules`], and the light/dark scheme rules.
+/// [`classes::all_rules`], and the light/dark scheme rules.
 pub fn default_material_rules() -> Vec<Rule> {
 	core::iter::once(non_visual_rule())
-		.chain(rules::all_rules())
+		.chain(classes::all_rules())
 		.chain([themes::light_scheme(), themes::dark_scheme()])
 		.collect()
 }

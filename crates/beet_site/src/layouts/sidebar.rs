@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// The site navigation sidebar, collected from the router's [`RouteTree`].
 ///

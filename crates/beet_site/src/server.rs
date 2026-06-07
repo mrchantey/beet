@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet::prelude::*;
 
 /// The beet brand green, `rgb(0, 255, 127)` (spring green), seeding the Material
 /// palette. Private: every accent derives from it through the style system, so

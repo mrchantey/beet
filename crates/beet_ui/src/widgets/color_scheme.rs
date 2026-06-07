@@ -6,7 +6,7 @@
 //! ancestor element. Drop it into the document `<head>` (eg the `head` slot) so
 //! the scheme is applied before the body paints, avoiding a flash of the wrong
 //! theme.
-use crate::token::classes;
+use crate::style::material::classes;
 use beet_core::prelude::*;
 
 /// Emits the bundled color-scheme seed/persist script as an inline `<script>`.

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet::prelude::*;
 
 /// Showcases heading levels, paragraphs, and inline text elements.
 pub fn get() -> impl Scene {

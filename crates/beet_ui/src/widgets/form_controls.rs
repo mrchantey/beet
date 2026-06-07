@@ -10,7 +10,7 @@
 //! styles these classes via [`RuleSet`]; widget files never hand-roll CSS.
 use crate::prelude::FieldRef;
 use crate::token::ClassName;
-use crate::token::classes;
+use crate::style::material::classes;
 use beet_core::prelude::*;
 
 /// Variant style for a [`TextField`] or [`TextArea`], mapped onto a class

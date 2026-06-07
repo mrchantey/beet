@@ -3,7 +3,7 @@
 //! Slot content is supplied as `<tr>` rows; the head/foot slots wrap their
 //! content in `<thead>`/`<tfoot>` automatically.
 use crate::token::Classes;
-use crate::token::classes;
+use crate::style::material::classes;
 use beet_core::prelude::*;
 
 /// A styled `<table>` with semantic head/body/foot sections.

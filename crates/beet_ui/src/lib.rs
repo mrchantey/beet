@@ -38,6 +38,9 @@ pub mod prelude {
 	pub use crate::scene::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
+	/// The shared class-name vocabulary, reached through the `classes::` prefix.
+	#[cfg(feature = "style")]
+	pub use crate::style::material::classes;
 	#[cfg(feature = "style")]
 	pub use crate::style::BlinkStyle;
 	#[cfg(feature = "style")]

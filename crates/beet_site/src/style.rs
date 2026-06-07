@@ -1,5 +1,4 @@
-//! Site-local style: the class vocabulary and the rules layered onto the
-//! library Material set.
+//! Site-local style: the rules layered onto the library Material set.
 use beet::prelude::*;
 
 /// The site's own class names, layered on the library

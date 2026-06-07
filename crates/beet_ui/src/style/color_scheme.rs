@@ -6,7 +6,6 @@
 //! the runtime handle: set it on an ancestor element and [`sync_color_scheme`]
 //! mirrors it onto [`Classes`], re-running the cascade via `resolve_styles`.
 use crate::prelude::*;
-use crate::token::classes;
 use beet_core::prelude::*;
 
 /// The active color scheme on an element — the typed counterpart to the
@@ -75,7 +74,7 @@ pub fn sync_color_scheme(
 mod test {
 	use super::*;
 	use crate::style::material::MaterialStylePlugin;
-	use crate::token::classes;
+	use crate::style::material::classes;
 
 	/// Toggling [`ColorScheme`] at runtime re-resolves the cached non-web style,
 	/// so the background flips between the light and dark schemes.

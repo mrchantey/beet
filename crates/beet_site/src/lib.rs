@@ -46,9 +46,9 @@ pub mod prelude {
 	pub use crate::route_tree::routes;
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
 	pub use crate::server::*;
+	// the site-local `classes` module is intentionally *not* re-exported: a bare
+	// `classes::` resolves to the library set, and a site-local class is reached
+	// by its full path (`crate::style::classes::DESIGN_ROW`).
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
-	pub use crate::style::*;
-	// the library prelude, so a page needs only `use crate::prelude::*`.
-	#[cfg(all(feature = "render", not(feature = "codegen")))]
-	pub use beet::prelude::*;
+	pub use crate::style::design_row_rule;
 }

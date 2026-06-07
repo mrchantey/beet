@@ -52,9 +52,9 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// from every list item inside it on both targets — the charcell decorator
 		// reads the resolved value, the web honors it directly.
 		nav_list_style(),
-		// headings are plain bold on every target; the terminal-only per-level
-		// hue is theme-derived in `themes::terminal_heading_colors`, keeping
-		// these user-agent defaults free of any hardcoded palette.
+		// headings are plain bold on every target; the terminal-only accent
+		// hue comes from `classes::terminal_headings`, keeping these user-agent
+		// defaults free of any hardcoded palette.
 		heading("h1"),
 		heading("h2"),
 		heading("h3"),
