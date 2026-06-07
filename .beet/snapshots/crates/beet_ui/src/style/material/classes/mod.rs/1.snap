@@ -43,13 +43,8 @@ th {
   text-align: left;
 }
 
-details {
-  display: block;
-}
-
-summary {
-  color: var(--material-colors-on-surface);
-  font-weight: var(--material-typography-weight-medium);
+.sidebar-summary {
+  list-style-type: none;
 }
 
 .hidden {

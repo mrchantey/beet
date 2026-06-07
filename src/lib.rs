@@ -26,6 +26,8 @@ pub use beet_core::test_main;
 pub use beet_core::test_runner;
 #[cfg(feature = "testing")]
 pub use beet_core::testing;
+#[cfg(feature = "examples")]
+pub use beet_examples as examples;
 #[cfg(feature = "infra")]
 pub use beet_infra as infra;
 #[cfg(feature = "net")]
@@ -36,8 +38,6 @@ pub use beet_router as router;
 pub use beet_thread as thread;
 #[cfg(feature = "ui")]
 pub use beet_ui as ui;
-#[cfg(feature = "examples")]
-pub use beet_examples as examples;
 // #[cfg(feature = "flow")]
 // pub use beet_flow as flow;
 #[cfg(feature = "ml")]
@@ -97,6 +97,7 @@ pub mod prelude {
 		// we're aligned on layout design patterns, and not dependent on
 		// the bevy_ui pixel rendering specificities
 		if #[cfg(feature = "ui")]{
+			pub use beet_core::prelude::Transform;
 			pub use crate::ui::prelude::style::*;
 			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;

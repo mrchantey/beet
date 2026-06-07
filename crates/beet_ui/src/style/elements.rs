@@ -9,6 +9,7 @@
 //! [`resolve_styles`] runs in the [`PostParseTree`] schedule.
 
 use crate::prelude::*;
+use crate::style::Cursor;
 use crate::style::Display;
 use crate::style::FontStyle;
 use crate::style::ListStyle;
@@ -47,6 +48,12 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// ── Block structure ──
 		block_spaced(&["p", "ul", "ol"]),
 		block(&["li", "div"]),
+		// disclosure: a `<details>` is a block, its `<summary>` a clickable block
+		// header (pointer cursor on the header only). Generic (not sidebar-
+		// specific) so any disclosure lays out the same on both targets; the
+		// sidebar layers classes on top.
+		block(&["details"]),
+		block(&["summary"]).with_value(CursorProp, Cursor::Pointer),
 		// navigation lists carry no markers (the sidebar is nav, not prose). CSS
 		// `list-style-type` is inherited, so `none` on the `<nav>` strips bullets
 		// from every list item inside it on both targets — the charcell decorator

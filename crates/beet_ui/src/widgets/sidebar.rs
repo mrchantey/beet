@@ -94,13 +94,24 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			.map(|child| sidebar_item(child, false))
 			.collect();
 		let summary = summary_content(display_name, href, active);
+		// One down-caret glyph, always. On the web it's pushed to the right edge
+		// (flex) and CSS rotates it to point right when the group is collapsed
+		// (`details:not([open])`), so it tracks the disclosure state reactively.
+		// The terminal can't rotate and always renders children, so a static
+		// down-caret reads correctly there.
+		let summary_row = rsx! {
+			<summary {Classes::new([classes::SIDEBAR_SUMMARY])}>
+				{summary}
+				<span {Classes::new([classes::SIDEBAR_CARET])}>" ▾"</span>
+			</summary>
+		};
 		// the `open` attribute can't be conditionally interpolated, so fork.
 		if expanded {
 			rsx! {
 				<li {Classes::new([root_class])}>
 					<details {Classes::new([classes::SIDEBAR_GROUP])} open>
-						<summary>{summary}</summary>
-						<ul>{child_items}</ul>
+						{summary_row}
+						<ul {Classes::new([classes::SIDEBAR_LIST])}>{child_items}</ul>
 					</details>
 				</li>
 			}
@@ -109,8 +120,8 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 			rsx! {
 				<li {Classes::new([root_class])}>
 					<details {Classes::new([classes::SIDEBAR_GROUP])}>
-						<summary>{summary}</summary>
-						<ul>{child_items}</ul>
+						{summary_row}
+						<ul {Classes::new([classes::SIDEBAR_LIST])}>{child_items}</ul>
 					</details>
 				</li>
 			}
@@ -168,5 +179,109 @@ fn summary_content(
 			<span {Classes::new([classes::SIDEBAR_LABEL, ClassName::string("branch")])}>{display_name}</span>
 		}
 		.any_scene(),
+	}
+}
+
+#[cfg(all(test, feature = "style"))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A representative nav tree: top-level branches plus mixed leaf/branch
+	/// children at several depths, all expanded so every indent level is visible.
+	fn nodes() -> Vec<SidebarNode> {
+		fn leaf(name: &str) -> SidebarNode {
+			SidebarNode {
+				display_name: name.into(),
+				path: Some(SmolPath::new(name)),
+				..default()
+			}
+		}
+		fn branch(name: &str, children: Vec<SidebarNode>) -> SidebarNode {
+			SidebarNode {
+				display_name: name.into(),
+				path: None,
+				children,
+				expanded: true,
+				..default()
+			}
+		}
+		vec![
+			leaf("home"),
+			branch("docs", vec![
+				leaf("intro"),
+				branch("crates", vec![
+					leaf("beet_core"),
+					branch("nested", vec![leaf("deep")]),
+				]),
+				leaf("guides"),
+			]),
+			branch("blog", vec![leaf("post-1"), leaf("post-2")]),
+		]
+	}
+
+	/// Render the sidebar to plain charcell with the Material rule set.
+	fn render_charcell(nodes: Vec<SidebarNode>) -> String {
+		let mut world = (
+			bevy::app::TaskPoolPlugin::default(),
+			bevy::asset::AssetPlugin::default(),
+			bevy::scene::ScenePlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root =
+			world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
+		world.entity_mut(root).insert(FlexBuffer::new(40));
+		world.run_schedule(crate::parse::PostParseTree);
+		world
+			.entity_mut(root)
+			.take::<FlexBuffer>()
+			.unwrap()
+			.render_plain()
+	}
+
+	/// The leading-space indent of the row whose text starts with `label`.
+	fn indent_of(out: &str, label: &str) -> usize {
+		let row = out
+			.lines()
+			.find(|line| line.trim_start().starts_with(label))
+			.unwrap_or_else(|| panic!("no row for `{label}`"));
+		row.len() - row.trim_start().len()
+	}
+
+	/// The terminal tree indents one fixed step per depth, applied identically to
+	/// leaf and branch rows (the bug this guards against was branch rows — built
+	/// from `<details>`/`<summary>` — drifting deeper than their leaf siblings).
+	#[beet_core::test]
+	fn charcell_indent_is_consistent() {
+		let out = render_charcell(nodes());
+		let indent = |label| indent_of(&out, label);
+		// root rows sit flush, leaf and branch alike
+		indent("home").xpect_eq(0);
+		indent("docs").xpect_eq(0);
+		indent("blog").xpect_eq(0);
+		// a leaf and a branch at the same depth share an indent
+		let step = indent("intro");
+		(step > 0).xpect_true();
+		indent("crates").xpect_eq(step);
+		indent("guides").xpect_eq(step);
+		indent("post-1").xpect_eq(step);
+		// each deeper level steps in by the same unit
+		indent("beet_core").xpect_eq(step * 2);
+		indent("nested").xpect_eq(step * 2);
+		indent("deep").xpect_eq(step * 3);
+	}
+
+	/// The branch caret follows its label on one row (`docs ▾`), not on a line of
+	/// its own and not floated to a far-right column.
+	#[beet_core::test]
+	fn charcell_caret_follows_label() {
+		let out = render_charcell(nodes());
+		out.lines()
+			.find(|line| line.trim_start().starts_with("docs"))
+			.unwrap()
+			.trim_start()
+			.xpect_starts_with("docs ▾");
 	}
 }

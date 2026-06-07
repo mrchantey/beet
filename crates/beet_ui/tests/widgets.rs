@@ -528,7 +528,7 @@ fn button_emits_base_and_variant_class() {
 	let mut world = scene_ext::test_world();
 	let root = world
 		.spawn_scene(
-			rsx! { <Button label="Save" variant=ButtonVariant::Error/> },
+			rsx! { <Button variant=ButtonVariant::Error>"Save"</Button> },
 		)
 		.unwrap()
 		.id();
@@ -550,7 +550,7 @@ fn button_emits_base_and_variant_class() {
 fn icon_button_adds_icon_class() {
 	let mut world = scene_ext::test_world();
 	let root = world
-		.spawn_scene(rsx! { <IconButton label="+"/> })
+		.spawn_scene(rsx! { <IconButton>"+"</IconButton> })
 		.unwrap()
 		.id();
 	world.with_state::<ElementQuery, _>(|query| {
@@ -565,7 +565,7 @@ fn link_is_anchor_styled_as_button() {
 	let mut world = scene_ext::test_world();
 	let root = world
 		.spawn_scene(rsx! {
-			<Link label="Home" href="/" variant=ButtonVariant::Outlined/>
+			<Link href="/" variant=ButtonVariant::Outlined>"Home"</Link>
 		})
 		.unwrap()
 		.id();

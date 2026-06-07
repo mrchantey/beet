@@ -119,12 +119,11 @@ pub fn all_rules() -> Vec<Rule> {
 		table(),
 		table_th(),
 		table_td(),
-		// disclosure + sidebar
-		details(),
-		summary(),
+		// sidebar (the generic disclosure rules live in `style::elements`)
 		sidebar_summary(),
 		sidebar_summary_web(),
 		sidebar_caret(),
+		sidebar_caret_collapsed(),
 		sidebar_list(),
 		sidebar(),
 		sidebar_web(),
@@ -179,8 +178,7 @@ mod tests {
 			input_outlined(),
 			input_focus(),
 			table_th(),
-			details(),
-			summary(),
+			sidebar_summary(),
 			hidden(),
 			text_align(TEXT_CENTER, TextAlign::Center),
 		]);
@@ -204,7 +202,7 @@ mod tests {
 			.xpect_contains(".btn")
 			.xpect_contains(".btn-error")
 			.xpect_contains(".error-text")
-			.xpect_contains("details")
+			.xpect_contains(".sidebar-summary")
 			.xpect_contains(".hidden")
 			.xpect_contains(".text-center")
 			.xpect_contains(":disabled")

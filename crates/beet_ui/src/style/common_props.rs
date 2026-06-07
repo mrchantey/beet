@@ -2,6 +2,7 @@
 use crate::prelude::*;
 use crate::style::FontStyle;
 use crate::style::FontWeight;
+use crate::style::Transform;
 use crate::style::AlignSelf;
 use crate::style::AlignItems;
 use crate::style::JustifyContent;
@@ -59,6 +60,7 @@ pub fn token_map()->CssTokenMap{
 		.insert(CursorProp)
 		.insert(TransitionDurationProp)
 		.insert(AnimationDurationProp)
+		.insert(TransformProp)
 }
 
 
@@ -74,13 +76,13 @@ canonical_property!(DecorationStyleProp, DecorationStyle, "text-decoration-style
 
 css_property!(Font, Typography, "font-family");
 
-css_property!(Height, Length, "height");
+css_property!(Height, Length, TokenInheritance::NotInherited, "height");
 css_property!(MinHeight, Length, TokenInheritance::NotInherited, "min-height");
 css_property!(MaxHeight, Length, TokenInheritance::NotInherited, "max-height");
-css_property!(Width, Length, "width");
+css_property!(Width, Length, TokenInheritance::NotInherited, "width");
 css_property!(MinWidth, Length, TokenInheritance::NotInherited, "min-width");
 css_property!(MaxWidth, Length, TokenInheritance::NotInherited, "max-width");
-css_property!(Padding, Spacing, "padding");
+css_property!(Padding, Spacing, TokenInheritance::NotInherited, "padding");
 css_property!(GapProp, Length, "gap");
 css_property!(
 	ShapeProp, Shape, "border-radius"
@@ -101,6 +103,7 @@ canonical_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "a
 canonical_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");
 canonical_property!(BreakAfterProp, BreakAfter, TokenInheritance::NotInherited, "break-after");
 canonical_property!(CursorProp, Cursor, TokenInheritance::NotInherited, "cursor");
+canonical_property!(TransformProp, Transform, TokenInheritance::NotInherited, "transform");
 css_property!(TransitionDurationProp, Duration, TokenInheritance::NotInherited, "transition-duration");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");

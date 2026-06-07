@@ -52,6 +52,29 @@ impl AsCssValue for Cursor {
 	}
 }
 
+/// A CSS `transform`. Only the rotation beet needs today is modelled; the
+/// terminal has no transform, so the charcell cascade ignores the property.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Transform {
+	/// No transform applied.
+	#[default]
+	None,
+	/// Clockwise rotation in degrees about the box centre.
+	Rotate(f32),
+}
+
+impl AsCssValue for Transform {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::None => "none".to_string(),
+			Self::Rotate(degrees) => format!("rotate({degrees}deg)"),
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 /// Fragmentation break forced after a box, mapping to CSS `break-after`.
 ///
 /// Only meaningful for paginated media (print); the `@media print` rule that

@@ -51,10 +51,15 @@ impl RuleSet {
 		true
 	}
 
-	/// Add a new rule, merging with the last added if selectors match
+	/// Add a new rule, merging with the last added when both its selector and
+	/// `@media` gate match. The media check keeps a screen/terminal-gated rule
+	/// from folding its declarations into an adjacent ungated rule with the same
+	/// selector (eg `.sidebar` + a screen-only `.sidebar` width), which would
+	/// strip the gate and leak the value to every target.
 	pub fn insert_rule(&mut self, rule: Rule) {
 		if let Some(last) = self.rules.back_mut()
 			&& last.selector() == rule.selector()
+			&& last.media() == rule.media()
 		{
 			last.push_declarations(rule);
 		} else {

@@ -159,6 +159,15 @@ impl CssRule {
 			Selector::Not(inner) => {
 				format!(":not({})", Self::selector_to_css_inner(inner))
 			}
+			// the descendant combinator, ie `ancestor descendant` (space-joined).
+			Selector::Descendant {
+				ancestor,
+				descendant,
+			} => format!(
+				"{} {}",
+				Self::selector_to_css_inner(ancestor),
+				Self::selector_to_css_inner(descendant)
+			),
 		}
 	}
 }

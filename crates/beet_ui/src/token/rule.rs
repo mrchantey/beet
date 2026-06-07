@@ -299,6 +299,15 @@ pub enum Selector {
 	},
 	/// Negate a rule, ie must not have tag
 	Not(Arc<Self>),
+	/// Match `descendant` when nested anywhere under an element matching
+	/// `ancestor`, ie in css `ancestor descendant` (note the space). A web-only
+	/// combinator: it serializes to CSS but the charcell cascade has no ancestor
+	/// context in [`matches`](Self::matches), so it never matches there (every
+	/// rule using it is `@media screen`-gated and thus skipped by that cascade).
+	Descendant {
+		ancestor: Arc<Self>,
+		descendant: Arc<Self>,
+	},
 }
 
 impl Selector {
@@ -326,6 +335,14 @@ impl Selector {
 		}
 	}
 	pub fn not(inner: Selector) -> Self { Self::Not(Arc::new(inner)) }
+
+	/// A descendant combinator, ie css `ancestor descendant`.
+	pub fn descendant(ancestor: Selector, descendant: Selector) -> Self {
+		Self::Descendant {
+			ancestor: Arc::new(ancestor),
+			descendant: Arc::new(descendant),
+		}
+	}
 
 	/// Merge two selectors as an AnyOf, collapsing global selectors
 	pub fn merge_any(self, other: Self) -> Self {
@@ -367,6 +384,11 @@ impl Selector {
 			Selector::AnyOf(parts) => {
 				parts.iter().map(Selector::specificity).max().unwrap_or(0)
 			}
+			// a combinator's weight is the sum of both sides, mirroring CSS.
+			Selector::Descendant {
+				ancestor,
+				descendant,
+			} => ancestor.specificity() + descendant.specificity(),
 		}
 	}
 
@@ -388,6 +410,10 @@ impl Selector {
 			Selector::State(state) => el.contains_state(state),
 			Selector::Class(class) => el.contains_class(class),
 			Selector::Not(inner) => !inner.matches(el),
+			// the charcell cascade resolves one element at a time without ancestor
+			// context, so a descendant combinator can't be evaluated here; it is a
+			// web-only construct serialized to CSS (see the variant docs).
+			Selector::Descendant { .. } => false,
 		}
 	}
 }

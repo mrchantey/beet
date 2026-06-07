@@ -3,6 +3,7 @@
 use crate::prelude::*;
 use crate::style::*;
 use crate::style::material::*;
+use beet_core::prelude::Duration;
 
 // ── Class names ─────────────────────────────────────────────────────────────────
 pub const SIDEBAR: ClassName = ClassName::new_static("sidebar");
@@ -23,33 +24,19 @@ pub const SIDEBAR_ITEM_ROOT: ClassName =
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
-/// Disclosure container - block layout for `<details>`.
-pub fn details() -> Rule {
-	Rule::new()
-		.with_selector(Selector::tag("details"))
-		.with_value(common_props::DisplayProp, Display::Block)
-}
-
-/// Disclosure header (`<summary>`) - medium weight, surface foreground.
-pub fn summary() -> Rule {
-	Rule::new()
-		.with_selector(Selector::tag("summary"))
-		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
-		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
-}
-
 /// Sidebar group summary - `list-style: none` drops the browser's default left
-/// disclosure triangle (replaced by the right-hand caret). The terminal keeps
-/// the summary inline so the caret follows the label on one tight row.
+/// disclosure triangle (replaced by the right-hand caret). The generic
+/// `<details>`/`<summary>` block + cursor rules live in `style::elements`.
 pub fn sidebar_summary() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_SUMMARY))
 		.with_canonical(ListStyle::None)
-		.with_value(common_props::CursorProp, Cursor::Pointer)
 }
 
 /// Web sidebar summary - a flex row that pushes the caret to the right edge.
-/// Screen-gated: the charcell summary stays inline (flex there adds stray rows).
+/// Screen-gated: on the terminal the summary stays a plain block, its inline
+/// label + caret flowing together on one tight row (`docs ▾`); flex there would
+/// strand the caret in a far-right column.
 pub fn sidebar_summary_web() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
@@ -60,10 +47,32 @@ pub fn sidebar_summary_web() -> Rule {
 }
 
 /// Sidebar disclosure caret - faint, sitting at the right edge of its summary.
+/// A single down-caret glyph; the web rotates it to point right when the group
+/// is collapsed (see [`sidebar_caret_collapsed`]), the transition smoothing the
+/// flip. The terminal can't rotate and always shows children, so the static
+/// down-caret reads correctly there.
 pub fn sidebar_caret() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_CARET))
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_value(common_props::TransitionDurationProp, Duration::from_millis(150))
+}
+
+/// Web caret rotation - a collapsed `<details>` (no `open` attribute) points its
+/// caret right via a 90° rotation. A descendant combinator (`details:not([open])
+/// .sidebar-caret`), so it's web-only: the charcell cascade has no ancestor
+/// context and the terminal always renders children expanded anyway.
+pub fn sidebar_caret_collapsed() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::descendant(
+			Selector::AllOf(vec![
+				Selector::tag("details"),
+				Selector::not(Selector::attribute("open", None)),
+			]),
+			Selector::class(SIDEBAR_CARET),
+		))
+		.with_value(common_props::TransformProp, Transform::Rotate(-90.))
 }
 
 /// Nested sidebar `<ul>` - drops the prose list's block spacing so the tree's
@@ -91,12 +100,15 @@ pub fn sidebar() -> Rule {
 }
 
 /// Web sidebar - a comfortable fixed rail width so the nav tree isn't cramped.
-/// Screen-gated: the terminal sizes the rail to its content instead.
+/// `min-width` pins the width: the rail is a flex item beside the main column,
+/// so without a floor the main content's preferred width shrinks it (a varying
+/// amount per page). Screen-gated: the terminal sizes the rail to its content.
 pub fn sidebar_web() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::class(SIDEBAR))
 		.with_value(common_props::Width, Length::Rem(16.))
+		.with_value(common_props::MinWidth, Length::Rem(16.))
 		.with_value(common_props::Padding, Spacing {
 			left: Length::Rem(0.5),
 			right: Length::Rem(1.),
