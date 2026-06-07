@@ -25,6 +25,12 @@ use beet_core::prelude::*;
 #[component(on_add=on_add)]
 pub struct CliServer;
 
+/// When inserted, a [`CliServer`] streams its response but does not emit
+/// [`AppExit`], keeping the process alive after the command completes (eg so a
+/// `--watch` file watcher keeps firing).
+#[derive(Default, Resource)]
+pub struct KeepAlive;
+
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).queue_async(run_and_exit);
 }
@@ -67,7 +73,15 @@ async fn run_and_exit(entity: AsyncEntity) -> Result {
 
 	stream_body_to_stdout(body).await?;
 
-	entity.world().write_message(exit).await;
+	// a `--watch` command inserts `KeepAlive` so the schedule keeps running and
+	// the file watcher can fire; otherwise the process exits after one command.
+	let keep_alive = entity
+		.world()
+		.with(|world| world.contains_resource::<KeepAlive>())
+		.await;
+	if !keep_alive {
+		entity.world().write_message(exit).await;
+	}
 	Ok(())
 }
 
