@@ -28,19 +28,23 @@ fn main() -> AppExit {
 		.run()
 }
 
-/// Spawn the export server: a [`CliServer`] whose [`ExportScene`] route carries
-/// the utility commands as its children and an [`ExportPath`] for the output.
-/// Running the example serializes that scene to `target/scenes/utils-cli.json`.
+/// Spawn the export server: a [`CliServer`] whose [`ExportScene`] route is the
+/// *export instruction* (carrying the [`ExportPath`]) and whose single child is
+/// the scene root — a bare [`Router`] carrying the utility commands. Only that
+/// child is serialized, so the export markers stay out of the output. A plain
+/// [`Router`] (not [`default_router`]) avoids re-adding the host's app routes,
+/// which would clash when the scene loads under another router. Running the
+/// example writes the scene to `target/scenes/utils-cli.json`.
 fn spawn_export_server(world: &mut World) {
 	world.spawn((CliServer, default_router(), children![(
 		ExportScene,
 		ExportPath("target/scenes/utils-cli.json".into()),
-		children![
+		children![(Router, children![
 			RunWasm,
 			BuildWasm,
 			ExportPdf,
 			#[cfg(feature = "qrcode")]
 			QrCode,
-		],
+		])],
 	)]));
 }

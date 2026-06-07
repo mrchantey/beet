@@ -6,8 +6,10 @@
 //!   [`ResetScene`] event and [`set_scene`], which swaps the active scene.
 //! - [`scene_server`]: an HTTP API (no_std-friendly) whose real routes arrive as
 //!   a POSTed scene; runs equally on a host or on bare-metal firmware.
-//! - [`scene_watcher`]: the host CLI side — `start_server`, the `.beet` retained
-//!   scene cache and the `--watch` file watcher.
+//! - [`scene_watcher`]: the host CLI side, wired through ECS — the
+//!   [`SceneManagementPlugin`] reactively persists the `.beet` retained scene
+//!   cache (observers on [`BeetSceneRoot`]) and a [`SceneWatch`] `on_add` hook
+//!   installs the `--watch` file watcher.
 //! - [`scene_not_found`]: the welcome page shown until a scene supplies its own
 //!   root route.
 //! - [`scene_commands`]: the host load/clear/reset/dump/run commands, each

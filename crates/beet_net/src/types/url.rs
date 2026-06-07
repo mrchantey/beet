@@ -308,6 +308,23 @@ impl Url {
 		self.path.push(segment.into());
 		self
 	}
+
+	/// Redirect this URL onto another's destination: a copy of `self` whose
+	/// scheme, authority and path are taken from `other`, keeping `self`'s query
+	/// params and fragment.
+	///
+	/// Used to forward a request to a new target without losing its existing
+	/// query/body semantics, ie pointing a `run` command at a remote device:
+	/// the caller's params survive, only the destination changes.
+	pub fn forward(&self, other: &Url) -> Url {
+		Url {
+			scheme: other.scheme.clone(),
+			authority: other.authority.clone(),
+			path: other.path.clone(),
+			params: self.params.clone(),
+			fragment: self.fragment.clone(),
+		}
+	}
 }
 
 impl core::fmt::Display for Url {
@@ -919,5 +936,16 @@ mod test {
 	fn from_str_impl() {
 		let url: Url = "https://example.com/path".into();
 		url.scheme().clone().xpect_eq(Scheme::Https);
+	}
+
+	#[beet_core::test]
+	fn forward_keeps_query_swaps_destination() {
+		// caller's params survive, destination scheme/authority/path are replaced.
+		let caller = Url::parse("/run/led?bright=on#top");
+		let target = Url::parse("https://device.local:8080/led");
+		caller
+			.forward(&target)
+			.to_string()
+			.xpect_eq("https://device.local:8080/led?bright=on#top");
 	}
 }

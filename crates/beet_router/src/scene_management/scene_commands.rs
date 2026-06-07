@@ -19,9 +19,8 @@
 //! beet reset                         # stop the hardware
 //! ```
 //!
-//! [`ExportScene`] / [`ExportChildren`] are the inverse: they serialize their
-//! descendant scenes to JSON files, used by the export examples to generate
-//! loadable scenes.
+//! [`ExportScene`] is the inverse: it serializes the scene rooted at its entity
+//! to a JSON file, used by the export examples to generate loadable scenes.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -30,7 +29,6 @@ use beet_net::prelude::*;
 extern crate alloc;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::vec::Vec;
 
 /// Registers the scene-command reflect types so a scene carrying them round-trips:
 /// the loader reconstructs each command's path/behaviour from its require hooks.
@@ -44,7 +42,6 @@ impl Plugin for SceneCommandsPlugin {
 			.register_type::<SceneDump>()
 			.register_type::<SceneRun>()
 			.register_type::<ExportScene>()
-			.register_type::<ExportChildren>()
 			.register_type::<ExportPath>();
 	}
 }
@@ -60,9 +57,13 @@ fn device_url(parts: &RequestParts) -> Option<String> {
 
 /// `load <path>` — load a scene file. With a device URL, POSTs it to the
 /// device's `/load`; otherwise loads it into the local world under the host
-/// router, persisting it to [`BEET_CACHE_PATH`]. `<path>` is greedy so a
-/// slash-bearing path is captured whole. `--watch` (local only) reloads the
-/// scene on every save and keeps the process alive.
+/// router (persisted reactively to [`BEET_CACHE_PATH`]). `<path>` is greedy so a
+/// slash-bearing path is captured whole.
+///
+/// `--watch` reloads on every save and keeps the process alive: locally it
+/// re-applies the scene, remotely it re-uploads (POST) the file to the device.
+/// The watch is set up by spawning a [`SceneWatch`] entity, whose `on_add` hook
+/// installs the watcher.
 #[action(route = "load/*scene", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -76,19 +77,31 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		bevybail!("usage: load <path-to-scene.json>");
 	}
 	let watch = cx.input.has_param("watch");
+	let path = AbsPathBuf::new(&path)?;
 	let media = fs_ext::read_media(&path)?;
 	match device_url(&cx.input) {
 		Some(url) => {
-			if watch {
-				bevybail!(
-					"--watch is only supported for local scenes (unset BEET_REMOTE_URL / --url)"
-				);
-			}
 			Request::post(format!("{url}/load"))
 				.with_content_type(media.media_type().clone())
 				.with_body(media.bytes())
 				.send()
-				.await
+				.await?;
+			if watch {
+				let url = Url::parse(url);
+				cx.caller
+					.with_world(move |world, caller| {
+						let host = world.root_ancestor(caller);
+						world.spawn((
+							SceneWatch { path },
+							RemoteWatch { url },
+							ChildOf(host),
+						));
+						// keep the schedule running so the watcher can fire.
+						world.insert_resource(KeepAlive);
+					})
+					.await?;
+			}
+			Response::ok_text("uploaded scene\n").xok()
 		}
 		None => {
 			cx.caller
@@ -96,11 +109,16 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 					let host = world.root_ancestor(caller);
 					let roots = set_scene(world, &media, Some(host))?;
 					if watch {
-						spawn_scene_watcher(world, path, host);
+						// a [`BeetSceneRoot`] so it is cleared with the scene and
+						// persisted to the cache (reattaching on the next startup).
+						world.spawn((
+							BeetSceneRoot,
+							SceneWatch { path },
+							ChildOf(host),
+						));
 						// keep the schedule running so the watcher can fire.
 						world.insert_resource(KeepAlive);
 					}
-					persist_scene(world)?;
 					Response::ok_text(format!(
 						"loaded scene: {} root(s)\n",
 						roots.len()
@@ -113,7 +131,8 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 }
 
 /// `clear` — despawn the loaded scene and reset. Remote hits `/clear`; local
-/// despawns the active scene and clears [`BEET_CACHE_PATH`].
+/// despawns the active scene, which reactively clears [`BEET_CACHE_PATH`] via the
+/// [`BeetSceneRoot`] remove observer.
 #[action(route = "clear", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -122,11 +141,8 @@ pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
 		Some(url) => Request::get(format!("{url}/clear")).send().await,
 		None => {
 			cx.caller
-				.with_world(|world, _caller| -> Result {
-					despawn_scene(world);
-					persist_scene(world)
-				})
-				.await??;
+				.with_world(|world, _caller| despawn_scene(world))
+				.await?;
 			Response::ok_text("scene cleared\n").xok()
 		}
 	}
@@ -186,13 +202,8 @@ pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
 		Some(url) => {
 			let target = Url::parse(format!("{url}/{route}"));
 			let (mut parts, body) = cx.input.into_parts();
-			let forwarded = parts
-				.url()
-				.clone()
-				.with_scheme(target.scheme().clone())
-				.with_authority(target.authority().unwrap_or_default().to_string())
-				.with_path(target.path().clone());
-			*parts.url_mut() = forwarded;
+			// redirect the request onto the device, keeping its query + fragment.
+			*parts.url_mut() = parts.url().forward(&target);
 			Request::from_parts(parts, body).send().await
 		}
 		None => {
@@ -213,19 +224,18 @@ pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
 }
 
 /// Output path baked onto an [`ExportScene`], so it needs no `--output` flag.
-/// Lets [`ExportChildren`] export many scenes to many files in a single run.
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct ExportPath(pub String);
 
-/// Serialize this action's descendant scene to a JSON file. Each child is a root
-/// of the exported scene, written via [`WorldSerdeSaver::save_roots`]. The output
-/// path is the caller's [`ExportPath`] component, else the `--output` request
-/// param.
+/// Serialize a scene to a JSON file. [`ExportScene`] is the *export instruction*,
+/// kept on a parent so it never pollutes the output; its single child is the
+/// actual scene root that gets serialized (entity + descendants) via
+/// [`WorldSerdeSaver::save_roots`]. The output path is the caller's
+/// [`ExportPath`] component, else the `--output` request param.
 ///
-/// Mounted at the root path so its descendants' serialized [`PathPattern`]s carry
-/// no prefix (an `export/…` ancestor would corrupt the loaded routes); run the
-/// host with just `--output <path>`.
+/// Mounted at the root path so the exported root's [`PathPattern`]s carry no
+/// prefix (an `export/…` ancestor would corrupt the loaded routes).
 #[action(route = "", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -239,33 +249,11 @@ pub async fn ExportScene(cx: ActionContext<RequestParts>) -> Result<Response> {
 		.await?
 }
 
-/// Export many scenes in one run: each child is an [`ExportScene`]-style root
-/// carrying its own [`ExportPath`] and scene children, serialized to its own
-/// file. The ergonomic way to dump a set of example scenes.
-#[action(route = "", handler_only)]
-#[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-pub async fn ExportChildren(
-	cx: ActionContext<RequestParts>,
-) -> Result<Response> {
-	cx.caller
-		.with_world(|world, caller| -> Result<Response> {
-			let children = world
-				.entity(caller)
-				.get::<Children>()
-				.map(|children| children.iter().collect::<Vec<_>>())
-				.unwrap_or_default();
-			let mut log = String::new();
-			for child in children {
-				log.push_str(&export_entity(world, child, None)?);
-			}
-			Response::ok_text(log).xok()
-		})
-		.await?
-}
-
-/// Serialize `entity`'s children (each a scene root) to a JSON file, resolving
-/// the path from its [`ExportPath`] component or the `default_output` fallback.
+/// Serialize the [`ExportScene`] entity's single child (the scene root) and its
+/// descendants to a JSON file, resolving the path from the entity's
+/// [`ExportPath`] component or the `default_output` fallback. The scene root is
+/// the child rather than the entity itself, so the [`ExportScene`]/[`ExportPath`]
+/// markers stay out of the exported scene.
 fn export_entity(
 	world: &mut World,
 	entity: Entity,
@@ -280,12 +268,14 @@ fn export_entity(
 			bevyhow!("no export path: set --output or an ExportPath component")
 		})?;
 	let output = AbsPathBuf::new(output)?;
-	let roots = world
+	let root = world
 		.entity(entity)
 		.get::<Children>()
-		.map(|children| children.iter().collect::<Vec<_>>())
-		.unwrap_or_default();
-	let json = WorldSerdeSaver::save_roots(world, MediaType::Json, roots)?
+		.and_then(|children| children.iter().next())
+		.ok_or_else(|| {
+			bevyhow!("ExportScene has no child scene root to export")
+		})?;
+	let json = WorldSerdeSaver::save_roots(world, MediaType::Json, [root])?
 		.as_utf8()?
 		.to_string();
 	fs_ext::write(&output, &json)?;
