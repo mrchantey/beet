@@ -1,26 +1,21 @@
-# Iterate on the Charcell Renderer
+# Charcell Renderer
 
-The iteration cycle for changes to `crates/beet_ui/src/render/charcell` (terminal layout + paint). The code reads cleanly enough to learn as you go; this is just how to verify changes quickly.
+The terminal layout + paint engine, `crates/beet_ui/src/render/charcell`. Read the code as you go; this is the part that bites and how to verify.
 
-## Two render targets
+## Already handled, don't reinvent in CSS
 
-Always check both, they exercise different buffers:
+`charcell/decorate.rs` generates leading content (the terminal's `::before`): `<li>` bullets/numbers, blockquote bars, the `<hr>` rule, `<img>` alt text. So list/quote markers exist on the terminal with no CSS `list-style`; the web is the side that restores markers. `<li>` under a `<nav>` get **no** marker (navigation, not prose).
 
-- **Layout example** (fixed `Buffer`, ANSI): `cargo run -p beet_ui --example layout --features=terminal`. The `terminal` feature is required so it measures the real terminal via crossterm, otherwise it falls back to 80 cols. The example prints each demo plus a final pass/fail line asserting no rendered line exceeds the measured width.
-- **beet_site CLI** (auto-growing `FlexBuffer`, stdout): `cargo run -p beet_site --features cli -- blog post-1`. The real-world prose path (markdown, sidebar, header/footer, syntax highlighting).
+## Facts that bite
 
-## Already handled — don't reinvent in CSS
-
-`render/charcell/decorate.rs` generates leading content: `<li>` bullets/numbers (lists already mark and nest), blockquote bars, the `<hr>` rule, `<img>` alt text. These are the charcell equivalent of `::before` markers, so list/quote markers exist on the terminal without any CSS list-style; the web is the side that needs markers restored. `<li>` under a `<nav>` get **no** marker (navigation, not prose), mirroring the web `reset.css` `nav ul` rule.
-
-## Two facts that bite
-
-- Charcell defaults to the **dark** scheme, but the **document shell** sets it now (`shell.rs` adds `.dark-scheme` to `<body>` when the request doesn't accept html), not the renderer. Without a dark scheme a light-scheme `OnSurface` (dark) is invisible on the usual dark terminal — the old "grey body text" report. Transcluded content (`.md` routes, `RenderRef`) used to miss this because the cascade ancestor walk didn't cross the transclusion boundary; now `RuleSetQuery::parent` + `resolve_styles` follow `RenderRef` (see `rendering-system.md`).
-- `tui_inset` (`box_model.rs`) multiplies horizontal margin/padding by 2, so `1rem` left padding renders as **2** cells (and `0.5rem` also → 2, since `round(0.5)=1` then `*2`). A 1-cell indent is unreachable through padding; it needs an explicit per-depth indent or a charcell change. Known remaining charcell items: the sidebar tree over-indents + has stray vertical gaps under `<details>` groups (the web sidebar is clean — caret on the right via a `Screen`-gated flex `summary`, indented children, wider rail), and the homepage hero centers against the full viewport width so it overflows past the sidebar (a flex measure bug with sidebar + centered content).
+- **`tui_inset` doubles horizontal spacing** (`box_model.rs` does `min.x *= 2`), so `1rem` left padding = **2** cells, and `0.5rem` also → 2 (`round(0.5)=1`, then `*2`). Horizontal padding is therefore always even; a **1-cell** indent is unreachable through padding, it needs an explicit per-depth indent or a charcell change.
+- **A block lays out its inline children inline.** A `<summary>` (block) with an inline label + caret flows them on one row; that's why the sidebar caret sits beside its label on the terminal without flex (flex is the web's screen-gated rule).
+- **Adding `padding`/`display:block` to an inline element** changes its charcell box and can shift a whole subtree. Re-render the terminal after any such change, not just the web.
+- **Default scheme is dark**, set by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: a non-html request gets `.dark-scheme` on `<body>` so a light `OnSurface` isn't invisible on a dark terminal. Transcluded `.md`/`RenderRef` content inherits this because `RuleSetQuery::parent` + `resolve_styles` follow `RenderRef` across the transclusion boundary.
 
 ## Measure against a real terminal width
 
-Piping either target into a tool makes crossterm fall back to 80 cols, and the visible width is hidden behind ANSI/OSC escapes. To pin a width and read true output, run the prebuilt binary under a PTY with a set winsize. Drop this in `/tmp/charcell.py`:
+Piping either target makes crossterm fall back to 80 cols and hides width behind escapes. Run the prebuilt binary under a PTY with a set winsize. Drop this in `/tmp/charcell.py`:
 
 ```python
 import os,sys,select,fcntl,termios,struct,re,unicodedata
@@ -48,23 +43,10 @@ else:
     sys.stdout.buffer.write(out)
 ```
 
-- Build first, then run the binary path directly (not `cargo run`, which adds its own output): `cargo build -p beet_site --no-default-features --features cli` then `COLS=50 python3 /tmp/charcell.py /home/$USER/.cargo_target/debug/beet_site blog post-1`. The binary lives under the workspace target dir. (A default `cargo build`/`cargo test` overwrites it with the web target, which binds a server instead of rendering.)
-- Stripped mode prints `width repr(line)` per row, so visible widths are obvious and overflow is easy to spot with awk (`$1>50`).
-- Pass `--raw` as a trailing arg to dump bytes with escapes intact, then `grep`/`cat -v` for the SGR codes when debugging a specific cell's foreground (`38;2;r;g;b`) or background (`48;2;r;g;b`).
-
-Gotchas:
-
-- Never eyeball widths from a truncated `repr(line[:N])`; the slice hides real content and invents phantom truncation. Strip escapes and print the full line.
-- Adding `padding` or `display: block` to an inline prose element (eg a sidebar link) changes its charcell box and can over-indent the whole subtree. Re-render the terminal after any such layout change, not just the web.
+`cargo build -p beet_site --features cli` then `COLS=50 python3 /tmp/charcell.py ~/.cargo_target/debug/beet_site blog post-1`. Run the binary directly (not `cargo run`). Stripped mode prints `width repr(line)` per row, so overflow is `awk '$1>50'`. Pass `--raw` to keep escapes, then grep SGR codes (`38;2;r;g;b` fg, `48;2;r;g;b` bg). Never eyeball widths from a truncated `repr(line[:N])`, strip escapes and print the full line.
 
 ## Tests
 
-- Unit + snapshot: `cargo test -p beet_ui --lib render::charcell`. Layout output is snapshot tested; regenerate intended changes with `cargo test -p beet_ui --lib render::charcell -- --snap`, then eyeball the diff under `.beet/snapshots/...`.
-- End to end prose: `cargo test -p beet_site`.
-- Match a fix with a regression test in the relevant module's `mod tests`, asserting on cell state (`buffer.iter_cells()`, `cell.style.background`) or stripped output, not exact bytes.
-
-## Cycle
-
-1. Reproduce the issue in both targets at a few widths (eg 30/50/80) via the PTY, confirming what's actually wrong (clipped text, wrong width, wrong colour) rather than trusting the first glance.
-2. Make the change, rebuild the affected crate.
-3. Re-run the PTY checks at the same widths, then the test suites above, refreshing snapshots only for intended changes.
+- `cargo test -p beet_ui --lib render::charcell` (snapshots; `--snap` to regenerate, then eyeball `.beet/snapshots/...`).
+- `cargo test -p beet_site` for end-to-end prose.
+- Match a fix with a regression test asserting on cell state (`buffer.iter_cells()`, `cell.style.background`) or stripped output, not exact bytes.

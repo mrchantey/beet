@@ -1,32 +1,21 @@
 # Verifying the web target
 
-The HTML rendered by `$BIN <path> --accept=text/html` inlines its stylesheet, so a `file://` URL renders fully styled with no server, no assets, no routing.
+Two ways to a styled page: run the server (`cargo run -p beet_site`, :8337) and hit the live URL, or render `--accept=text/html` to a file (the stylesheet inlines, so `file://` needs no server). The live server is best for interactive checks; a file is best for a frozen snapshot. `npx playwright install chromium` once.
+
+## Content first (cheap)
+
+Most questions are content/structure, not pixels: is the text right, are elements present and ordered. Grep the rendered HTML (including the inlined `<style>` block) or take an accessibility-tree snapshot, both far cheaper than a screenshot. Reach for a screenshot only when the question is genuinely visual (spacing, colour, alignment, footer-at-bottom).
+
+## Screenshot (one-shot)
 
 ```bash
-npx playwright install chromium   # once
-```
-
-## Check content first (cheap)
-
-Most checks are about content and structure, not pixels: is the text right, are the elements present and in order. For those, grep the rendered HTML or take an accessibility-tree snapshot — both are far cheaper than a screenshot and don't burn image context. Reach for a screenshot only once content is confirmed and the remaining question is genuinely visual (spacing, colour, alignment, footer-at-bottom).
-
-## Screenshot (only when visual judgment is needed)
-
-One-shot, opens-captures-exits:
-
-```bash
-npx playwright screenshot --full-page file:///tmp/page.html out.png
-npx playwright screenshot --viewport-size=1280,820 file:///tmp/page.html out.png  # footer-at-bottom check
+npx playwright screenshot --full-page http://localhost:8337/docs out.png
+npx playwright screenshot --viewport-size=1280,820 file:///tmp/page.html out.png   # footer-at-bottom
 npx playwright screenshot --color-scheme=dark file:///tmp/page.html out.png
 ```
 
-`--full-page` for content; a fixed `--viewport-size` for layout that depends on viewport height. View only the few pages that matter.
+Clip to the element under test to save context: a small node script that resolves `playwright` from `~/.local/lib/node_modules`, `goto`s, and `(await page.$('#sidebar')).screenshot(...)`.
 
-## Interactive (functional) checks
+## Probe + interact (functional)
 
-For verifying scripts (eg a form's submit handler), drive a page with the `playwright` node module: `goto` the file, `fill`/`selectOption`/`click`, read back `textContent`. Needs the module resolvable on `NODE_PATH`. Usually unnecessary: the rendered HTML hooks (`name`/`id`/inline `<script>` text) can be grepped to confirm wiring.
-
-## Notes
-
-- Capture the live reference page and the local page and compare side by side.
-- The stateful `playwright-cli` (sessions, snapshots, clicks) exists too, but needs the full chromium build, not the headless shell that `npx playwright screenshot` uses; prefer the one-shot form above.
+The same node script is how you find root causes and verify behavior without eyeballing: `page.evaluate` to dump `getComputedStyle`/`getBoundingClientRect` over the elements in question, or `click`/`fill`/`selectOption` then read back state (eg click a `<details>` summary, assert its caret's computed `transform` flipped). Capture the live reference and the local page and judge them side by side.

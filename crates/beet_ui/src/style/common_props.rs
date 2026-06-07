@@ -64,6 +64,13 @@ pub fn token_map()->CssTokenMap{
 }
 
 
+// Inheritance mirrors CSS: layout/box props (padding, margin, width/height,
+// border-*, border-radius, box-shadow, gap, outline, display, flex-*, transform)
+// are NOT inherited; text props (color, font-*, line-height, letter-spacing,
+// text-align, white-space, list-style, visibility) are. The exception is the
+// text-decoration trio: CSS doesn't inherit it but paints it through in-flow
+// descendants, which this renderer models as inheritance so an underline reaches
+// nested spans.
 css_property!(ForegroundColor, Color, "color");
 css_property!(BackgroundColor, Color, TokenInheritance::NotInherited, "background-color");
 css_property!(DecorationColor, Color, "text-decoration-color");
@@ -83,15 +90,11 @@ css_property!(Width, Length, TokenInheritance::NotInherited, "width");
 css_property!(MinWidth, Length, TokenInheritance::NotInherited, "min-width");
 css_property!(MaxWidth, Length, TokenInheritance::NotInherited, "max-width");
 css_property!(Padding, Spacing, TokenInheritance::NotInherited, "padding");
-css_property!(GapProp, Length, "gap");
-css_property!(
-	ShapeProp, Shape, "border-radius"
-);
-canonical_property!(
-	ElevationProp, Elevation, "box-shadow"
-);
-css_property!(OutlineWidth, Length, "border-width");
-css_property!(OutlineOffset, Length, "outline-offset");
+css_property!(GapProp, Length, TokenInheritance::NotInherited, "gap");
+css_property!(ShapeProp, Shape, TokenInheritance::NotInherited, "border-radius");
+canonical_property!(ElevationProp, Elevation, TokenInheritance::NotInherited, "box-shadow");
+css_property!(OutlineWidth, Length, TokenInheritance::NotInherited, "border-width");
+css_property!(OutlineOffset, Length, TokenInheritance::NotInherited, "outline-offset");
 css_property!(FontSize, Length, "font-size");
 canonical_property!(FontWeightProp, FontWeight, "font-weight");
 css_property!(LineHeight, Length, "line-height");
@@ -109,7 +112,7 @@ css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
-css_property!(BorderColorProp, Color, "border-color");
+css_property!(BorderColorProp, Color, TokenInheritance::NotInherited, "border-color");
 css_property!(BorderTopWidth, Length, TokenInheritance::NotInherited, "border-top-width");
 css_property!(BorderRightWidth, Length, TokenInheritance::NotInherited, "border-right-width");
 css_property!(BorderBottomWidth, Length, TokenInheritance::NotInherited, "border-bottom-width");
