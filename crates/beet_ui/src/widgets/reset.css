@@ -49,3 +49,23 @@ nav summary {
 nav summary::-webkit-details-marker {
 	display: none;
 }
+
+/* Embedded media (eg the blog's YouTube embeds): a centred, responsive 16:9
+   block capped at a comfortable measure rather than the iframe's tiny default
+   intrinsic size. */
+iframe {
+	display: block;
+	width: 100%;
+	max-width: 30rem;
+	margin-inline: auto;
+	aspect-ratio: 16 / 9;
+	height: auto;
+	border: 0;
+}
+
+/* A blockquote pads its own box, so the bottom margin of its last child would
+   stack on top of that padding into an oversized gutter. Drop the trailing
+   margin while keeping the inter-paragraph margins of a multi-line quote. */
+blockquote > :last-child {
+	margin-bottom: 0;
+}

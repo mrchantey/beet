@@ -209,6 +209,29 @@ pub fn terminal_headings() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
+/// Prose heading sizes - maps `<h1>`..`<h6>` onto the MD3 type scale (headline
+/// then title sizes) so headings step down in size as on the web reference,
+/// rather than all rendering at the body size. Only `font-size`/`line-height`
+/// are set, leaving the user-agent bold weight from [`default_element_rules`]
+/// intact; the terminal ignores both so its headings stay bold and `Primary`.
+pub fn heading_sizes() -> Vec<Rule> {
+	vec![
+		heading_size("h1", typography::FontSizeHeadlineLarge,  typography::LineHeightHeadlineLarge),
+		heading_size("h2", typography::FontSizeHeadlineMedium, typography::LineHeightHeadlineMedium),
+		heading_size("h3", typography::FontSizeHeadlineSmall,  typography::LineHeightHeadlineSmall),
+		heading_size("h4", typography::FontSizeTitleLarge,     typography::LineHeightTitleLarge),
+		heading_size("h5", typography::FontSizeTitleMedium,    typography::LineHeightTitleMedium),
+		heading_size("h6", typography::FontSizeTitleSmall,     typography::LineHeightTitleSmall),
+	]
+}
+
+/// One heading-level size rule, setting the font size and matching line height.
+fn heading_size(tag: &str, size: impl Into<Token>, line_height: impl Into<Token>) -> Rule {
+	Rule::tags(&[tag])
+		.with_token(common_props::FontSize, size).unwrap()
+		.with_token(common_props::LineHeight, line_height).unwrap()
+}
+
 // ── Generic text utility rules ──────────────────────────────────────────────────
 
 /// A text-alignment utility rule for `class`.

@@ -49,13 +49,33 @@ pub fn button_base() -> Rule {
 		.with_canonical(DecorationLine::DEFAULT)
 }
 
+/// A contained (filled-style) button: a solid `color` surface with `on_color`
+/// text and the given `elevation`.
+///
+/// Reserves the same thin border every button carries, coloured to match its own
+/// fill so the box still reads as a solid surface. Reserving the border on every
+/// contained variant is what keeps a filled and an [outlined](button_outlined)
+/// button the same size on both targets — the outline only *recolours* the
+/// border rather than adding one. Without it the terminal draws a filled button
+/// as a single line of text while an outlined button is a three-row box.
+fn button_contained(
+	class: ClassName,
+	color: impl Into<Token> + Copy,
+	on_color: impl Into<Token>,
+	elevation: impl Into<Token>,
+) -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(class))
+		.with_token(common_props::BackgroundColor, color).unwrap()
+		.with_token(common_props::ForegroundColor, on_color).unwrap()
+		.with_token(common_props::BorderColorProp, color).unwrap()
+		.with_token(common_props::OutlineWidth, geometry::OutlineWidthThin).unwrap()
+		.with_token(common_props::ElevationProp, elevation).unwrap()
+}
+
 /// Filled button - the primary action button with high emphasis.
 pub fn button_filled() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_FILLED))
-		.with_token(common_props::BackgroundColor,colors::Primary).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnPrimary).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+	button_contained(BTN_FILLED, colors::Primary, colors::OnPrimary, geometry::Elevation0)
 }
 
 /// Outlined button - medium emphasis with a visible border, regular foreground.
@@ -78,47 +98,27 @@ pub fn button_text() -> Rule {
 
 /// Tonal button - medium emphasis with secondary container color.
 pub fn button_tonal() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_TONAL))
-		.with_token(common_props::BackgroundColor,colors::SecondaryContainer).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnSecondaryContainer).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+	button_contained(BTN_TONAL, colors::SecondaryContainer, colors::OnSecondaryContainer, geometry::Elevation0)
 }
 
 /// Elevated button - medium emphasis with shadow elevation, regular foreground.
 pub fn button_elevated() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_ELEVATED))
-		.with_token(common_props::BackgroundColor,colors::Surface).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation1).unwrap()
+	button_contained(BTN_ELEVATED, colors::Surface, colors::OnSurface, geometry::Elevation1)
 }
 
 /// Secondary filled button - medium emphasis using the secondary color.
 pub fn button_secondary() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_SECONDARY))
-		.with_token(common_props::BackgroundColor,colors::Secondary).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnSecondary).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+	button_contained(BTN_SECONDARY, colors::Secondary, colors::OnSecondary, geometry::Elevation0)
 }
 
 /// Tertiary filled button - medium emphasis using the tertiary color.
 pub fn button_tertiary() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_TERTIARY))
-		.with_token(common_props::BackgroundColor,colors::Tertiary).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnTertiary).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+	button_contained(BTN_TERTIARY, colors::Tertiary, colors::OnTertiary, geometry::Elevation0)
 }
 
 /// Error button - destructive action using the error color.
 pub fn button_error() -> Rule {
-	Rule::new()
-		.with_selector(Selector::class(BTN_ERROR))
-		.with_token(common_props::BackgroundColor,colors::Error).unwrap()
-		.with_token(common_props::ForegroundColor,colors::OnError).unwrap()
-		.with_token(common_props::ElevationProp,geometry::Elevation0).unwrap()
+	button_contained(BTN_ERROR, colors::Error, colors::OnError, geometry::Elevation0)
 }
 
 /// Icon button - circular, container-less button sized for a single glyph.

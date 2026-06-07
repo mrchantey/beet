@@ -243,6 +243,8 @@ fn resolve_flex_height(
 					line,
 					query,
 					content_width,
+					// a row's cross axis is height, which is unbounded
+					u32::MAX,
 					viewport,
 				);
 				gap + sizes.iter().map(|size| size.y).max().unwrap_or(0)
@@ -275,22 +277,36 @@ fn resolve_flex_height(
 
 /// A line's flex-grown item sizes, with each item's height resolved at its
 /// assigned (grown) width rather than the width it was measured at.
+///
+/// `container_cross` clamps the cross axis: in a column the cross axis is width,
+/// which the fixed-width terminal bounds. An item measured at the unconstrained
+/// viewport width would otherwise overflow the narrower column and, under
+/// `align-items: center`, centre against a width larger than it actually has
+/// (the homepage hero drifting past the sidebar). The main axis is left to the
+/// flex-grow logic, so a row's heights stay unbounded (content scrolls).
 fn resolve_line_sizes(
 	flexbox: &FlexBox,
 	line: &[(Entity, UVec2)],
 	query: &CharcellQuery,
 	container_main: u32,
+	container_cross: u32,
 	viewport: UVec2,
 ) -> Vec<UVec2> {
+	let vertical =
+		resolve_direction(flexbox.direction, viewport) == Direction::Vertical;
 	apply_flex_grow(flexbox, line, query, container_main, viewport)
 		.into_iter()
 		.zip(line.iter())
 		.map(|(size, (entity, _))| {
+			// clamp the column cross size (width) to the container, then resolve
+			// height at that assigned width so wrapped rows are fully reserved.
+			let width =
+				if vertical { size.x.min(container_cross) } else { size.x };
 			let height = query
 				.unresolved_node(*entity)
-				.map(|child| resolve_height(&child, query, size.x, viewport))
+				.map(|child| resolve_height(&child, query, width, viewport))
 				.unwrap_or(size.y);
-			UVec2::new(size.x, height)
+			UVec2::new(width, height)
 		})
 		.collect()
 }
@@ -339,21 +355,6 @@ pub fn flex_layout_rects(
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
 	};
-
-	// Final per-line item sizes: flex-grown along the main axis, with each
-	// item's cross size (a row's heights) resolved at its assigned width so a
-	// stretched line is tall enough for its wrapped content (see `resolve_height`).
-	let final_per_line: Vec<Vec<UVec2>> = lines
-		.iter()
-		.map(|line| {
-			resolve_line_sizes(flexbox, line, query, container_main, viewport)
-		})
-		.collect();
-	let line_cross_sizes: Vec<u32> = final_per_line
-		.iter()
-		.map(|sizes| line_cross_size_for(sizes, flexbox.direction, viewport))
-		.collect();
-
 	let container_cross = match direction {
 		Direction::Horizontal => content_rect.height(),
 		Direction::Vertical => content_rect.width(),
@@ -361,6 +362,27 @@ pub fn flex_layout_rects(
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
 	};
+
+	// Final per-line item sizes: flex-grown along the main axis, with each
+	// item's cross size (a row's heights) resolved at its assigned width so a
+	// stretched line is tall enough for its wrapped content (see `resolve_height`).
+	let final_per_line: Vec<Vec<UVec2>> = lines
+		.iter()
+		.map(|line| {
+			resolve_line_sizes(
+				flexbox,
+				line,
+				query,
+				container_main,
+				container_cross,
+				viewport,
+			)
+		})
+		.collect();
+	let line_cross_sizes: Vec<u32> = final_per_line
+		.iter()
+		.map(|sizes| line_cross_size_for(sizes, flexbox.direction, viewport))
+		.collect();
 
 	let line_positions = apply_align_content(
 		flexbox,

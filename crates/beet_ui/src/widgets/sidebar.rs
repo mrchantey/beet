@@ -165,7 +165,7 @@ fn summary_content(
 	active: bool,
 ) -> Box<dyn Scene> {
 	let link_classes =
-		|| Classes::new([classes::SIDEBAR_LINK, ClassName::string("branch")]);
+		|| Classes::new([classes::SIDEBAR_LINK, classes::SIDEBAR_BRANCH]);
 	match href {
 		Some(href) if active => rsx! {
 			<a {link_classes()} href=href aria-current="page">{display_name}</a>
@@ -176,7 +176,7 @@ fn summary_content(
 		}
 		.any_scene(),
 		None => rsx! {
-			<span {Classes::new([classes::SIDEBAR_LABEL, ClassName::string("branch")])}>{display_name}</span>
+			<span {Classes::new([classes::SIDEBAR_LABEL, classes::SIDEBAR_BRANCH])}>{display_name}</span>
 		}
 		.any_scene(),
 	}
@@ -273,15 +273,19 @@ mod test {
 		indent("deep").xpect_eq(step * 3);
 	}
 
-	/// The branch caret follows its label on one row (`docs ▾`), not on a line of
-	/// its own and not floated to a far-right column.
+	/// The branch caret is right-aligned on its summary row: the label sits at the
+	/// left, the caret floated to the right edge, on one row (`docs        ▾`).
 	#[beet_core::test]
-	fn charcell_caret_follows_label() {
+	fn charcell_caret_right_aligned() {
 		let out = render_charcell(nodes());
-		out.lines()
+		let row = out
+			.lines()
 			.find(|line| line.trim_start().starts_with("docs"))
-			.unwrap()
-			.trim_start()
-			.xpect_starts_with("docs ▾");
+			.unwrap();
+		// label leads the row, caret trails it at the far right
+		row.trim_start().xpect_starts_with("docs");
+		row.trim_end().xpect_ends_with("▾");
+		// the caret is pushed right, not sitting immediately beside the label
+		(row.trim_end().len() - "docs".len() > 4).xpect_true();
 	}
 }

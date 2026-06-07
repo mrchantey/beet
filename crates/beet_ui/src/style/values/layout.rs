@@ -8,6 +8,12 @@ pub enum Display {
 	/// Standard block flow layout.
 	#[default]
 	Block,
+	/// A block-level box that also generates a list marker, mapping to CSS
+	/// `display: list-item`. The charcell engine lays it out exactly like
+	/// [`Block`](Self::Block) (its marker comes from the decorator, not the
+	/// display mode); the web needs `list-item` rather than `block` for a `<li>`
+	/// to keep its bullet/number.
+	ListItem,
 	/// Inline flow layout.
 	Inline,
 	/// Flexbox layout.
@@ -20,6 +26,7 @@ impl AsCssValue for Display {
 	fn as_css_value(&self) -> Result<CssValue> {
 		match self {
 			Self::Block => "block",
+			Self::ListItem => "list-item",
 			Self::Inline => "inline",
 			Self::Flex => "flex",
 			Self::None => "none",

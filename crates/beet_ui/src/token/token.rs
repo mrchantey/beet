@@ -101,7 +101,7 @@ macro_rules! token {
 		$schema_ty:ty,
 		$inherited:expr
 	) => {
-		#[derive(::bevy::reflect::TypePath, Default)]
+		#[derive(::bevy::reflect::TypePath, Default, Clone, Copy)]
 		$(#[$meta])*
 		pub struct $new_ty;
 		impl $crate::prelude::TypedToken for $new_ty{
@@ -128,7 +128,7 @@ mod tests {
 	#[cfg(feature = "style")]
 	token!(
 		/// Some cool type
-		#[derive(Debug, Clone)]
+		#[derive(Debug)]
 		Foo,
 		Color
 	);

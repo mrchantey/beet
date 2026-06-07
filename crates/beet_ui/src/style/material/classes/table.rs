@@ -13,13 +13,18 @@ pub const TABLE_VERTICAL_BORDERS: ClassName =
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
-/// Table container - full-width, surface foreground.
+/// Table container - full-width, surface foreground, with a block gap below so
+/// the next block clears the table rather than butting against its last row.
 pub fn table() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TABLE))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 		.with_value(common_props::Width, Length::Percent(100.))
+		.with_value(common_props::MarginProp, Spacing {
+			bottom: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
 }
 
 /// Header cells - medium weight, left aligned, padded, with a solid bottom rule

@@ -14,6 +14,9 @@ pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
 pub const SIDEBAR_SUMMARY: ClassName = ClassName::new_static("sidebar-summary");
 /// The disclosure caret on a sidebar group's summary.
 pub const SIDEBAR_CARET: ClassName = ClassName::new_static("sidebar-caret");
+/// The label/link of a `<summary>` branch row, grown to fill the row so its
+/// (active) highlight reaches the right-hand caret.
+pub const SIDEBAR_BRANCH: ClassName = ClassName::new_static("sidebar-branch");
 /// A nested `<ul>` of sidebar items, with no list block spacing.
 pub const SIDEBAR_LIST: ClassName = ClassName::new_static("sidebar-list");
 /// A non-root sidebar item, indented one level under its parent group.
@@ -24,37 +27,39 @@ pub const SIDEBAR_ITEM_ROOT: ClassName =
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
-/// Sidebar group summary - `list-style: none` drops the browser's default left
-/// disclosure triangle (replaced by the right-hand caret). The generic
-/// `<details>`/`<summary>` block + cursor rules live in `style::elements`.
+/// Sidebar group summary - a flex row on both targets: the label/link grows to
+/// fill the row (see [`sidebar_branch`]) and the disclosure caret sits at the
+/// right edge. `list-style: none` drops the browser's default left disclosure
+/// triangle (replaced by the right-hand caret). The generic `<details>`/
+/// `<summary>` block + cursor rules live in `style::elements`.
 pub fn sidebar_summary() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_SUMMARY))
 		.with_canonical(ListStyle::None)
-}
-
-/// Web sidebar summary - a flex row that pushes the caret to the right edge.
-/// Screen-gated: on the terminal the summary stays a plain block, its inline
-/// label + caret flowing together on one tight row (`docs ▾`); flex there would
-/// strand the caret in a far-right column.
-pub fn sidebar_summary_web() -> Rule {
-	Rule::new()
-		.with_media(MediaQuery::Screen)
-		.with_selector(Selector::class(SIDEBAR_SUMMARY))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
-		.with_value(common_props::JustifyContentProp, JustifyContent::SpaceBetween)
 }
 
-/// Sidebar disclosure caret - faint, sitting at the right edge of its summary.
-/// A single down-caret glyph; the web rotates it to point right when the group
-/// is collapsed (see [`sidebar_caret_collapsed`]), the transition smoothing the
+/// Sidebar branch label/link - grows to fill its `<summary>` row so its padded
+/// block (and active highlight) runs full-width up to the right-hand caret,
+/// matching how a leaf link fills its row.
+pub fn sidebar_branch() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SIDEBAR_BRANCH))
+		.with_value(common_props::FlexGrowProp, 1u32)
+}
+
+/// Sidebar disclosure caret - faint, sitting at the right edge of its summary,
+/// larger than the row text so it reads as a clear affordance. A single
+/// down-caret glyph; the web rotates it to point right when the group is
+/// collapsed (see [`sidebar_caret_collapsed`]), the transition smoothing the
 /// flip. The terminal can't rotate and always shows children, so the static
 /// down-caret reads correctly there.
 pub fn sidebar_caret() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_CARET))
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_value(common_props::FontSize, Length::Rem(1.5))
 		.with_value(common_props::TransitionDurationProp, Duration::from_millis(150))
 }
 
@@ -136,13 +141,14 @@ pub fn sidebar_link() -> Rule {
 		})
 }
 
-/// Terminal sidebar link - inline with no padding, so a link adds no per-item
-/// left inset to the terminal nav tree (the block padding is a web affordance).
+/// Terminal sidebar row - drops the web block padding from links and labels so a
+/// row adds no per-item left inset to the terminal nav tree (the padding is a web
+/// affordance). The row stays a full-width `display: block`, so the active
+/// highlight fills the rail rather than hugging the text.
 pub fn sidebar_link_terminal() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Terminal)
-		.with_selector(Selector::class(SIDEBAR_LINK))
-		.with_value(common_props::DisplayProp, Display::Inline)
+		.with_selector(Selector::class(SIDEBAR_LINK).merge_any(Selector::class(SIDEBAR_LABEL)))
 		.with_value(common_props::Padding, Spacing::DEFAULT)
 }
 
@@ -170,10 +176,20 @@ pub fn sidebar_item() -> Rule {
 		})
 }
 
-/// Sidebar group label - faint, for non-navigable headers.
+/// Sidebar group label - faint, for non-navigable headers. Carries the same
+/// padded block as [`sidebar_link`] so an anchorless row (a group with no route)
+/// lines its text up with the link rows beside it rather than sitting a padding
+/// step to the left. The terminal strips the padding via [`sidebar_link_terminal`].
 pub fn sidebar_label() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_LABEL))
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
+		.with_value(common_props::DisplayProp, Display::Block)
+		.with_value(common_props::Padding, Spacing {
+			top: Length::Rem(0.25),
+			bottom: Length::Rem(0.25),
+			left: Length::Rem(0.5),
+			right: Length::Rem(0.5),
+		})
 }

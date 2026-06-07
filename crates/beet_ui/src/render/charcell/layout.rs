@@ -52,7 +52,9 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 					)?,
-					Display::Block => block_layout_rects(
+					// a list item lays out as a block; its marker is drawn by the
+					// decorator, so charcell treats `list-item` identically to `block`.
+					Display::Block | Display::ListItem => block_layout_rects(
 						&node,
 						&charcell,
 						node_rect,

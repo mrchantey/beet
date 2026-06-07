@@ -47,7 +47,10 @@ pub fn default_element_rules() -> Vec<Rule> {
 		non_visual_rule(),
 		// ── Block structure ──
 		block_spaced(&["p", "ul", "ol"]),
-		block(&["li", "div"]),
+		block(&["div"]),
+		// a list item is block-level on both targets but keeps its web marker via
+		// `display: list-item` (the charcell decorator draws the marker itself).
+		list_item(&["li"]),
 		// disclosure: a `<details>` is a block, its `<summary>` a clickable block
 		// header (pointer cursor on the header only). Generic (not sidebar-
 		// specific) so any disclosure lays out the same on both targets; the
@@ -106,6 +109,12 @@ pub fn non_visual_rule() -> Rule {
 /// A rule forcing `display: block` on the given tags.
 fn block(tags: &[&str]) -> Rule {
 	Rule::tags(tags).with_canonical(Display::Block)
+}
+
+/// A rule forcing `display: list-item` on the given tags, so the web keeps the
+/// element's list marker. Charcell lays it out as a block.
+fn list_item(tags: &[&str]) -> Rule {
+	Rule::tags(tags).with_canonical(Display::ListItem)
 }
 
 /// `<nav>` strips list markers from its descendant lists (inherited

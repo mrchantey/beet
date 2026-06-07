@@ -39,7 +39,7 @@ pub use utilities::*;
 
 /// Returns all Material Design component rules.
 pub fn all_rules() -> Vec<Rule> {
-	vec![
+	let mut rules = vec![
 		button_base(),
 		button_filled(),
 		button_outlined(),
@@ -121,7 +121,7 @@ pub fn all_rules() -> Vec<Rule> {
 		table_td(),
 		// sidebar (the generic disclosure rules live in `style::elements`)
 		sidebar_summary(),
-		sidebar_summary_web(),
+		sidebar_branch(),
 		sidebar_caret(),
 		sidebar_caret_collapsed(),
 		sidebar_list(),
@@ -154,7 +154,11 @@ pub fn all_rules() -> Vec<Rule> {
 		// web-only overrides — gated behind `@media screen`, ignored by charcell
 		page_fill_viewport(),
 		container_grow_web(),
-	]
+	];
+	// prose heading sizes (the MD3 type scale per `<h1>`..`<h6>`); appended so
+	// these tag rules win the cascade over the user-agent heading defaults.
+	rules.extend(heading_sizes());
+	rules
 }
 
 

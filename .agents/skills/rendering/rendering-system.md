@@ -76,6 +76,8 @@ Live-interactivity demos (counters, live binding) rely on the old signal system;
 
 ## Gotchas
 
+- `<li>` is `Display::ListItem`, not `Block`: the web needs `list-item` to keep its bullet/number (Preflight strips markers, `reset.css` restores `list-style` on `ul`/`ol`), while charcell lays it out as a block and draws the marker via `decorate.rs`. A plain `display: block` on a `<li>` silently drops web markers.
+- A border changes an element's footprint on both targets (a terminal border eats a whole cell). To keep variants the same size, *reserve* the border on every variant and only recolour it — eg contained buttons (`button_contained`) carry a fill-matched border so they match the outlined variant.
 - Color scheme is decided by the layout (`beet_site/src/layouts/layout.rs`), not the renderer: `?color-scheme=light|dark` (CLI `--color-scheme=`) pins a body class; else the web follows the OS via `color_scheme.js` and a non-html target defaults to `.dark-scheme` (dark prose on a dark terminal would be invisible).
 - Syntax highlighting needs `beet/syntax_highlighting` (in `beet_site`'s `render` feature); verify with `docs/design/code`.
 - `children!`/`related!` are set operations, clobbering existing relations.

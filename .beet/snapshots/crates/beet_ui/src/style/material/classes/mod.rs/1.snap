@@ -44,6 +44,8 @@ th {
 }
 
 .sidebar-summary {
+  align-items: center;
+  display: flex;
   list-style-type: none;
 }
 
