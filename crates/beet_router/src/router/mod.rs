@@ -50,9 +50,9 @@ mod help;
 #[cfg(feature = "std")]
 pub use help::*;
 #[cfg(feature = "std")]
-mod layout;
+mod base_layout;
 #[cfg(feature = "std")]
-pub use layout::*;
+pub use base_layout::*;
 #[cfg(feature = "std")]
 mod sidebar;
 #[cfg(feature = "std")]

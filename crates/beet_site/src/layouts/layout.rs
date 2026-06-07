@@ -5,7 +5,7 @@ use beet::prelude::*;
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
 /// around the route content (the default `<slot/>`, transcluded in place by the
-/// [`Layout`] middleware). The library [`Head`] carries the web-only
+/// [`BaseLayout`] middleware). The library [`Head`] carries the web-only
 /// stylesheet/color-scheme/preflight/favicon, with its title/description sourced
 /// from the matched route's [`ArticleMeta`] (markdown frontmatter, queried off
 /// the [`RequestContext`] route entity, falling back to [`PackageConfig`]). The

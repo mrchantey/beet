@@ -2,7 +2,7 @@
 //! layout (the web `<html>`/`<head>` document, an article/sidebar layout, etc.)
 //! without reparenting or re-resolving it.
 //!
-//! [`Layout`] is a render-middleware component (registered like any other
+//! [`BaseLayout`] is a render-middleware component (registered like any other
 //! middleware, eg [`RequestLogger`]). For every descendant render route it runs
 //! the inner handler to obtain the content render root, then builds the layout,
 //! an ordinary `#[scene]` widget, with the content as its `children` prop (a
@@ -32,7 +32,7 @@ use beet_ui::prelude::*;
 /// # use beet_ui::prelude::*;
 /// #[scene]
 /// fn PageLayout() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
-/// let bundle = (Router, Layout::<PageLayout>::default());
+/// let bundle = (Router, BaseLayout::<PageLayout>::default());
 /// ```
 ///
 /// For each request it runs the inner route to obtain the content render root,
@@ -41,7 +41,7 @@ use beet_ui::prelude::*;
 #[action]
 #[derive(Component)]
 #[component(on_add = on_add_middleware::<Self, RequestParts, Entity>)]
-pub async fn Layout<C>(
+pub async fn BaseLayout<C>(
 	cx: ActionContext<(RequestParts, Next<RequestParts, Entity>)>,
 ) -> Result<Entity>
 where
@@ -153,7 +153,7 @@ mod test {
 	async fn wraps_fixed_route() {
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::<PageLayout>::default(), children![
+			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -174,7 +174,7 @@ mod test {
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::<PageLayout>::default(), children![
+			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -195,7 +195,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::<PageLayout>::default(), children![
+			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
 				render_action::async_route("", page)
 			]))
 			.flush();
@@ -223,7 +223,7 @@ mod test {
 			.spawn((
 				store,
 				Router,
-				Layout::<PageLayout>::default(),
+				BaseLayout::<PageLayout>::default(),
 				children![route("post", BlobScene::new("post.md"))],
 			))
 			.flush();
@@ -242,7 +242,7 @@ mod test {
 		// the layout decides placement; here the content lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::<NavLayout>::default(), children![
+			.spawn((Router, BaseLayout::<NavLayout>::default(), children![
 				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
 			]))
 			.flush();

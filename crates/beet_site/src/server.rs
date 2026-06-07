@@ -49,12 +49,12 @@ fn content_store(dir: &str) -> BlobStore {
 ///
 /// The batteries-included [`default_router`] (adding `/app-info` and
 /// `POST /analytics`) wrapped in the global [`BeetLayout`] via the
-/// [`Layout`] render middleware, so every route's body is placed into
+/// [`BaseLayout`] render middleware, so every route's body is placed into
 /// the layout's `<main>`.
 pub fn beet_site_router() -> impl Bundle {
 	(
 		default_router(),
 		beet_site_endpoints(),
-		Layout::<BeetLayout>::default(),
+		BaseLayout::<BeetLayout>::default(),
 	)
 }
