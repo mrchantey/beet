@@ -3,7 +3,7 @@ beet::test_main!();
 use beet::prelude::*;
 use beet_site::prelude::*;
 
-/// Spawn the site router and collect the sidebar nav the shell would render
+/// Spawn the site router and collect the sidebar nav the layout would render
 /// from its [`RouteTree`].
 fn sidebar_nodes() -> Vec<SidebarNode> {
 	let mut world = RouterPlugin.into_world();

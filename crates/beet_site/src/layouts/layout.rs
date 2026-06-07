@@ -1,17 +1,17 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The global document shell wrapping every route's body.
+/// The global document layout wrapping every route's body.
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
 /// around the route content (the default `<slot/>`, transcluded in place by the
-/// [`DocumentShell`] middleware). The library [`Head`] carries the web-only
+/// [`Layout`] middleware). The library [`Head`] carries the web-only
 /// stylesheet/color-scheme/preflight/favicon, with its title/description sourced
 /// from the matched route's [`ArticleMeta`] (markdown frontmatter, queried off
 /// the [`RequestContext`] route entity, falling back to [`PackageConfig`]). The
-/// `<head>` is non-visual, so the same shell renders in the terminal.
+/// `<head>` is non-visual, so the same layout renders in the terminal.
 #[scene(system)]
-pub fn BeetDocumentShell(
+pub fn BeetLayout(
 	cx: Res<RequestContext>,
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,

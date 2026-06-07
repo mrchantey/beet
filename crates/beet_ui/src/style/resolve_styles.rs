@@ -16,8 +16,8 @@ pub fn resolve_styles(
 	query: Query<Entity, Or<(Changed<Element>, Changed<Classes>)>>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
-	// content transcluded by reference has no `ChildOf` edge to the shell, so the
-	// traversal follows holders to re-resolve referenced content under the shell's
+	// content transcluded by reference has no `ChildOf` edge to the layout, so the
+	// traversal follows holders to re-resolve referenced content under the layout's
 	// cascade (eg the color scheme), even when the content itself is unchanged.
 	render_refs: Query<&RenderRef>,
 	// the box model (margin/border/padding/background) is element-level; text and
@@ -74,7 +74,7 @@ pub fn resolve_styles(
 				queue.extend(children_list.into_iter().cloned());
 			}
 			// follow a `RenderRef` holder into the content it renders in place, so
-			// transcluded content re-resolves under this (shell) cascade.
+			// transcluded content re-resolves under this (layout) cascade.
 			if let Ok(render_ref) = render_refs.get(entity) {
 				queue.push(render_ref.0);
 			}

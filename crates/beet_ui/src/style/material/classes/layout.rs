@@ -1,4 +1,4 @@
-//! Document-shell layout classes and their Material Design 3 rules.
+//! Document-layout classes and their Material Design 3 rules.
 #![cfg_attr(rustfmt, rustfmt_skip)]
 use crate::prelude::*;
 use crate::style::*;

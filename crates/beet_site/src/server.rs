@@ -48,13 +48,13 @@ fn content_store(dir: &str) -> BlobStore {
 /// The site router.
 ///
 /// The batteries-included [`default_router`] (adding `/app-info` and
-/// `POST /analytics`) wrapped in the global [`BeetDocumentShell`] via the
-/// [`DocumentShell`] render middleware, so every route's body is placed into
-/// the shell's `<main>`.
+/// `POST /analytics`) wrapped in the global [`BeetLayout`] via the
+/// [`Layout`] render middleware, so every route's body is placed into
+/// the layout's `<main>`.
 pub fn beet_site_router() -> impl Bundle {
 	(
 		default_router(),
 		beet_site_endpoints(),
-		DocumentShell::<BeetDocumentShell>::default(),
+		Layout::<BeetLayout>::default(),
 	)
 }

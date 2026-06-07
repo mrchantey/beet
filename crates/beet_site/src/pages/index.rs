@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// The site landing page, placed into the [`BeetDocumentShell`] `<main>`.
+/// The site landing page, placed into the [`BeetLayout`] `<main>`.
 ///
 /// One-off layout (the centered hero column, the card and body max-widths, the
 /// centered button row) is declared with `inline_class!` right on each element,

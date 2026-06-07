@@ -6,11 +6,11 @@ use beet_core::prelude::*;
 /// into the referenced entity instead of the holder's own components and
 /// [`Children`]. The referenced entity is neither owned nor moved, so it can be
 /// a persistent, separately-managed subtree (eg fixed-route content shared
-/// across requests) transcluded into an ephemeral shell.
+/// across requests) transcluded into an ephemeral layout.
 ///
 /// This is distinct from author-facing `<slot>` composition (which lowers to
 /// [`SceneProp`] props at macro time): the layout middleware needs to inject
-/// already-spawned route content into a freshly-spawned document shell without
+/// already-spawned route content into a freshly-spawned document layout without
 /// despawning it, by reference rather than by value.
 #[derive(
 	Debug,

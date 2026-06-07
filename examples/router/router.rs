@@ -107,8 +107,8 @@ fn server_from_cli() -> Result<OnSpawn> {
 fn routes() -> impl Bundle {
 	(
 		// render middleware wrapping every descendant route's content in the
-		// `Shell` document, transcluded in place at its `<slot/>`
-		DocumentShell::<Shell>::default(),
+		// `RouterLayout` document, transcluded in place at its `<slot/>`
+		Layout::<RouterLayout>::default(),
 		children![
 			route("", BlobScene::new("content/home.md")),
 			route("about", BlobScene::new("content/about.md")),
@@ -162,17 +162,17 @@ fn sequence() -> impl Bundle {
 }
 
 // ╔═══════════════════════════════════════════╗
-// ║   Document Shell                          ║
+// ║   Layout                                  ║
 // ╚═══════════════════════════════════════════╝
 
-/// The document shell wrapping every route's content.
+/// The document layout wrapping every route's content.
 ///
-/// An ordinary `#[scene]` widget with a `<slot/>`: the [`DocumentShell`] render
+/// An ordinary `#[scene]` widget with a `<slot/>`: the [`Layout`] render
 /// middleware runs each route, then transcludes the resulting content in place
-/// at the `<slot/>`. The `<head>` is non-visual, so the same shell renders in
+/// at the `<slot/>`. The `<head>` is non-visual, so the same layout renders in
 /// the terminal and over HTTP.
 #[scene]
-fn Shell() -> impl Scene {
+fn RouterLayout() -> impl Scene {
 	rsx! {
 		<html>
 			<head><title>"Router Example"</title></head>

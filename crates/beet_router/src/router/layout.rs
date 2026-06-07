@@ -1,19 +1,19 @@
 //! Layout render middleware: wrap a route's rendered content in a document
-//! shell (the web `<html>`/`<head>` document, an article/sidebar layout, etc.)
+//! layout (the web `<html>`/`<head>` document, an article/sidebar layout, etc.)
 //! without reparenting or re-resolving it.
 //!
-//! [`DocumentShell`] is a render-middleware component (registered like any other
+//! [`Layout`] is a render-middleware component (registered like any other
 //! middleware, eg [`RequestLogger`]). For every descendant render route it runs
-//! the inner handler to obtain the content render root, then builds the shell —
-//! an ordinary `#[scene]` widget — with the content as its `children` prop (a
+//! the inner handler to obtain the content render root, then builds the layout,
+//! an ordinary `#[scene]` widget, with the content as its `children` prop (a
 //! [`RenderRef`] transclusion). The content is rendered *in place, by reference*:
-//! it is never reparented under the shell nor re-resolved, so a persistent fixed
+//! it is never reparented under the layout nor re-resolved, so a persistent fixed
 //! route survives request after request.
 //!
-//! The shell wraps **every** request regardless of target. Non-visual document
+//! The layout wraps **every** request regardless of target. Non-visual document
 //! chrome (`<head>`/`<style>`/`<script>`) simply does not paint in the terminal
 //! (it resolves to `display: none`; see the user-agent style layer), so the same
-//! shell renders correctly on web and terminal.
+//! layout renders correctly on web and terminal.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -21,7 +21,7 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// Render middleware wrapping every descendant render route in the document
-/// shell widget `C` — an ordinary `#[scene]` widget with a default `<slot/>`.
+/// layout widget `C` — an ordinary `#[scene]` widget with a default `<slot/>`.
 ///
 /// Add it to an ancestor of the routes it should wrap (eg the router entity),
 /// exactly like any other middleware ([`RequestLogger`], [`HelpHandler`]):
@@ -31,17 +31,17 @@ use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_ui::prelude::*;
 /// #[scene]
-/// fn Shell() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
-/// let bundle = (Router, DocumentShell::<Shell>::default());
+/// fn PageLayout() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
+/// let bundle = (Router, Layout::<PageLayout>::default());
 /// ```
 ///
 /// For each request it runs the inner route to obtain the content render root,
 /// then builds `C` with that content as its `children` prop (a [`RenderRef`]
-/// transclusion placed by the shell's `<slot/>`).
+/// transclusion placed by the layout's `<slot/>`).
 #[action]
 #[derive(Component)]
 #[component(on_add = on_add_middleware::<Self, RequestParts, Entity>)]
-pub async fn DocumentShell<C>(
+pub async fn Layout<C>(
 	cx: ActionContext<(RequestParts, Next<RequestParts, Entity>)>,
 ) -> Result<Entity>
 where
@@ -58,12 +58,12 @@ where
 		.await
 }
 
-/// Spawn the shell `C` around the existing `content` render root, returning the
-/// shell as the new render root.
+/// Spawn the layout `C` around the existing `content` render root, returning the
+/// layout as the new render root.
 ///
-/// The content is handed to the shell as a [`SceneProp`] wrapping a
-/// [`RenderRef`]: the shell places it via its `<slot/>`, transcluding the
-/// existing content entity **by reference**. The shell subtree is ephemeral and
+/// The content is handed to the layout as a [`SceneProp`] wrapping a
+/// [`RenderRef`]: the layout places it via its `<slot/>`, transcluding the
+/// existing content entity **by reference**. The layout subtree is ephemeral and
 /// despawned after render (along with the content's own ephemerals), but the
 /// referenced content is never owned or despawned here, so a persistent fixed
 /// route survives request after request.
@@ -88,13 +88,13 @@ fn wrap_content<C: WithChildren>(
 		(rendered, despawn)
 	};
 
-	// the request-scoped render context, read by the shell's scene systems: the
+	// the request-scoped render context, read by the layout's scene systems: the
 	// request parts plus the rendered content entity, off which widgets query
 	// any per-route components (eg `ArticleMeta` parsed from frontmatter).
-	// Installed as a resource for the synchronous shell build, then removed.
+	// Installed as a resource for the synchronous layout build, then removed.
 	world.insert_resource(RequestContext::new(parts, rendered));
 
-	// the content is transcluded by reference: the shell places this prop, which
+	// the content is transcluded by reference: the layout places this prop, which
 	// resolves to a transparent entity pointing at the existing content.
 	let content_prop = SceneProp::new(template_value(RenderRef::new(rendered)));
 	let layout = world
@@ -102,7 +102,7 @@ fn wrap_content<C: WithChildren>(
 		.id();
 	world.remove_resource::<RequestContext>();
 
-	// despawn the shell subtree plus the content's ephemerals after render
+	// despawn the layout subtree plus the content's ephemerals after render
 	let mut to_despawn = vec![layout];
 	to_despawn.extend(content_despawn);
 	RenderRoot::insert(&mut world.entity_mut(layout), to_despawn);
@@ -118,9 +118,9 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// A document shell with a `<meta charset>` head; the content fills `<main>`.
+	/// A document layout with a `<meta charset>` head; the content fills `<main>`.
 	#[scene]
-	fn Shell() -> impl Scene {
+	fn PageLayout() -> impl Scene {
 		rsx! {
 			<html>
 				<head><meta charset="utf-8"/></head>
@@ -129,9 +129,9 @@ mod test {
 		}
 	}
 
-	/// A shell that places the content inside `<nav>`.
+	/// A layout that places the content inside `<nav>`.
 	#[scene]
-	fn NavShell() -> impl Scene {
+	fn NavLayout() -> impl Scene {
 		rsx! { <body><nav><slot/></nav></body> }
 	}
 
@@ -153,7 +153,7 @@ mod test {
 	async fn wraps_fixed_route() {
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, DocumentShell::<Shell>::default(), children![
+			.spawn((Router, Layout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -162,7 +162,7 @@ mod test {
 			.flush();
 
 		let html = get(&mut world, root, "").await;
-		// shell + page body present, transcluded in place
+		// layout + page body present, transcluded in place
 		html.as_str()
 			.xpect_contains("<meta charset=\"utf-8\"")
 			.xpect_contains("<p>page body</p>");
@@ -170,11 +170,11 @@ mod test {
 
 	#[beet_core::test]
 	async fn fixed_route_survives_repeat_requests() {
-		// the shared fixed content must not be despawned with the shell; each
+		// the shared fixed content must not be despawned with the layout; each
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, DocumentShell::<Shell>::default(), children![
+			.spawn((Router, Layout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
 					rsx_direct! { <p>"page body"</p> }
@@ -195,7 +195,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, DocumentShell::<Shell>::default(), children![
+			.spawn((Router, Layout::<PageLayout>::default(), children![
 				render_action::async_route("", page)
 			]))
 			.flush();
@@ -223,12 +223,12 @@ mod test {
 			.spawn((
 				store,
 				Router,
-				DocumentShell::<Shell>::default(),
+				Layout::<PageLayout>::default(),
 				children![route("post", BlobScene::new("post.md"))],
 			))
 			.flush();
 
-		// the markdown content (parsed per request) lands inside the shell's
+		// the markdown content (parsed per request) lands inside the layout's
 		// `main`, transcluded by reference
 		get(&mut world, root, "post")
 			.await
@@ -238,11 +238,11 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn shell_places_content_where_it_chooses() {
-		// the shell decides placement; here the content lands inside <nav>
+	async fn layout_places_content_where_it_chooses() {
+		// the layout decides placement; here the content lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, DocumentShell::<NavShell>::default(), children![
+			.spawn((Router, Layout::<NavLayout>::default(), children![
 				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
 			]))
 			.flush();

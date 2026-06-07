@@ -361,7 +361,7 @@ fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 }
 
 /// Emit a `WithChildren` impl when the widget has a `children: SceneProp` prop
-/// (declared or `<slot/>`-injected), letting it serve as a document shell. No
+/// (declared or `<slot/>`-injected), letting it serve as a document layout. No
 /// output when absent or when the `slot` feature is off.
 #[cfg(feature = "slot")]
 fn with_children_impl(
@@ -945,20 +945,20 @@ mod test {
 	#[cfg(feature = "slot")]
 	#[test]
 	fn children_prop_emits_with_children_impl() {
-		// a `<slot/>` (children prop) makes the widget usable as a document shell
+		// a `<slot/>` (children prop) makes the widget usable as a document layout
 		let result = parse_str(quote!(), syn::parse_quote! {
-			fn Shell() -> impl Scene {
+			fn Layout() -> impl Scene {
 				rsx! { <html><body><slot/></body></html> }
 			}
 		});
-		assert!(result.contains("WithChildren for Shell"));
+		assert!(result.contains("WithChildren for Layout"));
 		assert!(result.contains(". with_children (children)"));
 	}
 
 	#[cfg(feature = "slot")]
 	#[test]
 	fn no_children_skips_with_children_impl() {
-		// a widget with only named slots is not a shell
+		// a widget with only named slots is not a layout
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn Bar() -> impl Scene {
 				rsx! { <nav><slot name="links"/></nav> }

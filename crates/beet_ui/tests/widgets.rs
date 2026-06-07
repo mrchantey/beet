@@ -21,9 +21,9 @@ use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
 use beet_ui::*;
 
-/// A scene world with a [`PackageConfig`] resource. The document-shell widgets
+/// A scene world with a [`PackageConfig`] resource. The document-layout widgets
 /// read this synchronously at scene build via `#[scene(system)]`.
-fn shell_world() -> World {
+fn layout_world() -> World {
 	let mut world = scene_ext::test_world();
 	world.insert_resource(PackageConfig {
 		title: "Beet UI".into(),
@@ -40,7 +40,7 @@ fn shell_world() -> World {
 
 #[beet_core::test]
 fn head_emits_charset_meta() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <Head/> }).unwrap().id();
 	world.entity(root).get::<Head>().unwrap();
 
@@ -59,7 +59,7 @@ fn head_emits_charset_meta() {
 fn head_title_override_beats_package_config() {
 	// per-page `ArticleMeta` title/description override the `PackageConfig`
 	// defaults; here the title prop wins over the resource's "Beet UI".
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world
 		.spawn_scene(rsx! { <Head title="Override Title"/> })
 		.unwrap()
@@ -77,7 +77,7 @@ fn head_title_override_beats_package_config() {
 #[beet_core::test]
 fn head_includes_pwa_meta_beyond_twelve_children() {
 	// the PWA/Twitter block pushes Head past 12 children; chunking keeps them
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <Head/> }).unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let names: Vec<String> = query
@@ -95,7 +95,7 @@ fn head_includes_pwa_meta_beyond_twelve_children() {
 
 #[beet_core::test]
 fn header_renders_title_from_package_config() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <Header/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
@@ -109,7 +109,7 @@ fn header_renders_title_from_package_config() {
 
 #[beet_core::test]
 fn footer_includes_version() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <Footer/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
@@ -122,7 +122,7 @@ fn footer_includes_version() {
 	});
 }
 
-/// Render `root` to an HTML string (shell widgets emit `<head>` etc).
+/// Render `root` to an HTML string (layout widgets emit `<head>` etc).
 fn render_html(world: &mut World, root: Entity) -> String {
 	HtmlRenderer::new()
 		.render(&mut RenderContext::new(root, world))
@@ -135,7 +135,7 @@ fn header_places_children_and_nav() {
 	// a `#[scene(system)]` widget receiving children: default content sits after
 	// the title, `slot="nav"` content fills the <nav>. Proves the cloned-props
 	// path carries `SceneProp`s (the old slot system clobbered system widgets).
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world
 		.spawn_scene(rsx! {
 			<Header>
@@ -158,7 +158,7 @@ fn page_layout_forwards_through_nested_composition() {
 	// the headline fix: PageLayout forwards head/header_nav/body through
 	// HtmlDocument into Head/Header — multi-level forwarding the old `<slot>`
 	// system could not do.
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world
 		.spawn_scene(rsx! {
 			<PageLayout>
@@ -180,7 +180,7 @@ fn page_layout_forwards_through_nested_composition() {
 
 #[beet_core::test]
 fn html_document_root_is_html() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <HtmlDocument/> }).unwrap().id();
 	world
 		.entity(root)
@@ -193,7 +193,7 @@ fn html_document_root_is_html() {
 
 #[beet_core::test]
 fn page_layout_root_is_html() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <PageLayout/> }).unwrap().id();
 	// PageLayout wraps HtmlDocument, whose root is <html>
 	world
@@ -207,7 +207,7 @@ fn page_layout_root_is_html() {
 
 #[beet_core::test]
 fn content_layout_root_is_html() {
-	let mut world = shell_world();
+	let mut world = layout_world();
 	let root = world.spawn_scene(rsx! { <ContentLayout/> }).unwrap().id();
 	world
 		.entity(root)

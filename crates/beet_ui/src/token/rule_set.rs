@@ -186,8 +186,8 @@ pub struct RuleSetQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	_children: Query<'w, 's, &'static Children>,
 	// reverse [`RenderRef`] lookup, so the inherited cascade crosses transclusion
-	// boundaries: content transcluded into a shell by reference has no `ChildOf`
-	// edge to the shell, so inheritance (eg the color scheme) continues from the
+	// boundaries: content transcluded into a layout by reference has no `ChildOf`
+	// edge to the layout, so inheritance (eg the color scheme) continues from the
 	// holder that renders it in place.
 	render_refs: Query<'w, 's, (Entity, &'static RenderRef)>,
 	element_query: ElementQuery<'w, 's>,

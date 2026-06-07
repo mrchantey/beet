@@ -20,14 +20,14 @@ fn html_get(path: &str) -> Request {
 }
 
 #[beet::test]
-async fn home_in_document_shell() {
+async fn home_in_document_layout() {
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get(""))
 		.await
-		// document shell from the layout middleware
+		// document layout from the layout middleware
 		.xpect_contains(r#"<meta charset="UTF-8""#)
-		// page body transcluded into the shell's <main>
+		// page body transcluded into the layout's <main>
 		.xpect_contains("A malleable application framework")
 		// header + sidebar chrome
 		.xpect_contains(r#"id="sidebar"#);
@@ -47,20 +47,20 @@ async fn docs_renders_sidebar_and_content() {
 }
 
 #[beet::test]
-async fn blog_post_in_shell() {
+async fn blog_post_in_layout() {
 	site_world()
 		.spawn(beet_site_router())
 		.exchange_str(html_get("blog/post-1"))
 		.await
 		.xpect_contains(r#"<meta charset="UTF-8""#)
-		// markdown body rendered inside the shell
+		// markdown body rendered inside the layout
 		.xpect_contains("Full Stack Bevy");
 }
 
 #[beet::test]
 async fn blog_post_title_from_frontmatter() {
 	// the per-page `<title>` comes from the post's frontmatter via `ArticleMeta`
-	// (queried off the `RequestContext` route entity) -> the shell's `Head`, not
+	// (queried off the `RequestContext` route entity) -> the layout's `Head`, not
 	// the package default.
 	site_world()
 		.spawn(beet_site_router())
@@ -81,9 +81,9 @@ async fn sidebar_marks_active_route() {
 }
 
 #[beet::test]
-async fn terminal_renders_full_shell() {
+async fn terminal_renders_full_layout() {
 	// the terminal target negotiates text, not HTML, but now renders the *full*
-	// document shell (header, sidebar, footer) around the body — the non-visual
+	// document layout (header, sidebar, footer) around the body — the non-visual
 	// `<head>`/`<style>` simply does not paint, so no markup or CSS leaks.
 	site_world()
 		.spawn(beet_site_router())
@@ -94,7 +94,7 @@ async fn terminal_renders_full_shell() {
 		.await
 		// the page body is present ...
 		.xpect_contains("A malleable application framework")
-		// ... wrapped in the shell chrome (a header nav link, a sidebar entry) ...
+		// ... wrapped in the layout chrome (a header nav link, a sidebar entry) ...
 		.xpect_contains("Docs")
 		// ... while the non-visual document head never leaks as text
 		.xnot()
@@ -151,9 +151,9 @@ fn strip_ansi(body: &str) -> String {
 }
 
 #[beet::test]
-async fn terminal_renders_charcell_shell_layout() {
+async fn terminal_renders_charcell_layout() {
 	// the CLI target negotiates AnsiTerm first, driving the charcell layout
-	// engine (not the plain-text fallback): the shell becomes a real two-column
+	// engine (not the plain-text fallback): the layout becomes a real two-column
 	// layout with an elevated header/footer and a sidebar divider.
 	let body = site_world()
 		.spawn(beet_site_router())

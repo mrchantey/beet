@@ -51,7 +51,7 @@ impl SceneProp {
 ///
 /// Emitted by `#[scene]` for any widget with a `children: SceneProp` prop
 /// (declared explicitly or via a default `<slot/>`). It bridges a widget to the
-/// layout middleware: a document shell is just a `#[scene]` widget, built with
+/// layout middleware: a document layout is just a `#[scene]` widget, built with
 /// the route content as its `children`.
 pub trait WithChildren: SceneComponent {
 	/// The widget's props with `children` set, all other props defaulted.

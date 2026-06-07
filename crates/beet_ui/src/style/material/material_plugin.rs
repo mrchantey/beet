@@ -142,15 +142,15 @@ mod tests {
 		});
 	}
 
-	/// Content transcluded into a `.dark-scheme` shell by [`RenderRef`] (no
-	/// `ChildOf` edge) still inherits the shell's scheme through the holder, so a
+	/// Content transcluded into a `.dark-scheme` layout by [`RenderRef`] (no
+	/// `ChildOf` edge) still inherits the layout's scheme through the holder, so a
 	/// card in referenced content is dark, not the light `:root` fallback. This is
-	/// the document-shell transclusion path that produced the "white card".
+	/// the document-layout transclusion path that produced the "white card".
 	#[beet_core::test]
 	fn render_ref_content_inherits_dark_scheme() {
 		use crate::style::common_props::BackgroundColor;
 		let mut world = MaterialStylePlugin::world();
-		// content is its own root (no ChildOf to the shell), holding a card
+		// content is its own root (no ChildOf to the layout), holding a card
 		let content = world.spawn(rsx_direct! { <main/> }).id();
 		let card = world
 			.spawn((
@@ -159,7 +159,7 @@ mod tests {
 				ChildOf(content),
 			))
 			.id();
-		// shell body carries the scheme; a holder transcludes the content by ref
+		// layout body carries the scheme; a holder transcludes the content by ref
 		let body = world
 			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
 			.id();

@@ -1,5 +1,5 @@
 //! Showcase gallery — a runnable page exercising the Material Design 3 rule
-//! set and the ported `beet_ui` widgets. The whole page (document shell,
+//! set and the ported `beet_ui` widgets. The whole page (document layout,
 //! stylesheet, and gallery body) is a single scene: no hand-assembled HTML
 //! string. The built stylesheet is itself a widget ([`Stylesheet`]), the color
 //! scheme seeds via [`ColorSchemeScript`], and the body is rendered once and
@@ -81,7 +81,7 @@ fn serve_showcase(world: &mut World) -> Result {
 	Ok(())
 }
 
-/// The full page as one scene: an `<html>` shell whose `<head>` carries the
+/// The full page as one scene: an `<html>` layout whose `<head>` carries the
 /// preflight reset, the built [`Stylesheet`], and the [`ColorSchemeScript`],
 /// with the [`gallery`] in the `<body>`.
 fn showcase_page() -> impl Scene {
