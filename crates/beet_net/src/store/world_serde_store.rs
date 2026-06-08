@@ -84,13 +84,14 @@ impl WorldSerdeStore {
 						}
 
 						let world = entity.into_world_mut();
-						let mut saver = WorldSerdeSaver::new(world);
+						let mut saver = WorldSerdeSaver::new();
 
 						for entity in spawned_entities {
 							// add all and their descendents to save
-							saver = saver.with_entity_tree(entity);
+							saver = saver.with_entity_tree(world, entity);
 						}
 						let world_serde_media = saver.save(
+							world,
 							blob.media_type().unwrap_or(MediaType::Json),
 						)?;
 						(blob, world_serde_media).xok()
@@ -119,9 +120,9 @@ impl WorldSerdeStore {
 			.world()
 			.with(move |world| {
 				let entity = world.spawn(bundle).id();
-				let bytes = WorldSerdeSaver::new(world)
-					.with_entity_tree(entity)
-					.save(media_type);
+				let bytes = WorldSerdeSaver::new()
+					.with_entity_tree(world, entity)
+					.save(world, media_type);
 				world.entity_mut(entity).despawn();
 				bytes
 			})

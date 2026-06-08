@@ -128,9 +128,9 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![exchange_route("ping", Ping)]))
 			.flush();
-		let json = WorldSerdeSaver::new(&mut world)
-			.with_entity_tree(root)
-			.save(MediaType::Json)
+		let json = WorldSerdeSaver::new()
+			.with_entity_tree(&world, root)
+			.save(&world, MediaType::Json)
 			.unwrap();
 
 		// load it under a fresh server entity, as the scene server does.

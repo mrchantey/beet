@@ -205,8 +205,8 @@ mod test {
 	#[crate::test]
 	fn round_trip_ron() {
 		let mut app = serde_world();
-		let world_serde_bytes = WorldSerdeSaver::new_default(app.world_mut())
-			.save(MediaType::Ron)
+		let world_serde_bytes = WorldSerdeSaver::new_default(app.world())
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		world_serde_bytes
 			.as_utf8()
@@ -226,9 +226,9 @@ mod test {
 			.entity_mut(entity)
 			.with_child(Name::new("Child"));
 
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
-			.with_entity_tree(entity)
-			.save(MediaType::Ron)
+		let world_serde_bytes = WorldSerdeSaver::new()
+			.with_entity_tree(app.world(), entity)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		let text = world_serde_bytes.as_utf8().unwrap();
 		text.xref().xpect_contains("Root");
@@ -238,8 +238,8 @@ mod test {
 	#[crate::test]
 	fn custom_entity_map() {
 		let mut app = serde_world();
-		let world_serde_bytes = WorldSerdeSaver::new_default(app.world_mut())
-			.save(MediaType::Ron)
+		let world_serde_bytes = WorldSerdeSaver::new_default(app.world())
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		let mut entity_map = Default::default();
 		WorldSerdeLoader::new(app.world_mut())
@@ -252,9 +252,9 @@ mod test {
 	fn loads_into_entity_adds_world_serde_of() {
 		let mut app = serde_world();
 		let child = app.world_mut().spawn(Name::new("WorldSerdeChild")).id();
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new()
 			.with_entities([child])
-			.save(MediaType::Ron)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 
 		let target = app.world_mut().spawn(Name::new("Target")).id();
@@ -282,9 +282,9 @@ mod test {
 	fn loads_into_entity_preserves_existing_children() {
 		let mut app = serde_world();
 		let child = app.world_mut().spawn(Name::new("WorldSerdeChild")).id();
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new()
 			.with_entities([child])
-			.save(MediaType::Ron)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 
 		let target = app

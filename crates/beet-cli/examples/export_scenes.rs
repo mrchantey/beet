@@ -24,27 +24,29 @@ fn main() -> AppExit {
 			// register the utility command types so they serialize into the scene.
 			CliCommandsPlugin,
 		))
-		.add_systems(Startup, spawn_export_server)
-		.run()
+		// spawn the tagged scene root, then [`export_scenes`] writes it to disk.
+		.add_systems(Startup, (spawn_scene, export_scenes).chain())
+		.run_once()
+		.unwrap_or(AppExit::Success)
 }
 
-/// Spawn the export server: a [`CliServer`] whose [`ExportScene`] route is the
-/// *export instruction* (carrying the [`ExportPath`]) and whose single child is
-/// the scene root — a bare [`Router`] carrying the utility commands. Only that
-/// child is serialized, so the export markers stay out of the output. A plain
+/// Spawn the scene root — a bare [`Router`] carrying the utility commands —
+/// tagged with the [`ExportScene`] route and its [`ExportPath`]. The export
+/// markers are denied by the saver, so they stay out of the output. A plain
 /// [`Router`] (not [`default_router`]) avoids re-adding the host's app routes,
-/// which would clash when the scene loads under another router. Running the
-/// example writes the scene to `target/scenes/utils-cli.json`.
-fn spawn_export_server(world: &mut World) {
-	world.spawn((CliServer, default_router(), children![(
+/// which would clash when the scene loads under another router. [`export_scenes`]
+/// then writes it to `target/scenes/utils-cli.json`.
+fn spawn_scene(mut commands: Commands) {
+	commands.spawn((
 		ExportScene,
 		ExportPath("target/scenes/utils-cli.json".into()),
-		children![(Router, children![
+		Router,
+		children![
 			RunWasm,
 			BuildWasm,
 			ExportPdf,
 			#[cfg(feature = "qrcode")]
 			QrCode,
-		])],
-	)]));
+		],
+	));
 }

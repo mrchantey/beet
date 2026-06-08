@@ -485,9 +485,9 @@ mod test {
 		let entity = app.world_mut().spawn(increment(count_field())).id();
 
 		// Serialize
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
-			.with_entity_tree(entity)
-			.save(MediaType::Ron)
+		let world_serde_bytes = WorldSerdeSaver::new()
+			.with_entity_tree(app.world(), entity)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		world_serde_bytes
 			.as_utf8()

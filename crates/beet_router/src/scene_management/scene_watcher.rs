@@ -206,12 +206,10 @@ fn persist_scene_cache(world: &mut World) -> Result {
 		}
 		return Ok(());
 	}
-	let json = WorldSerdeSaver::save_roots_filtered::<With<BeetSceneRoot>>(
-		world,
-		MediaType::Json,
-	)?
-	.as_utf8()?
-	.to_string();
+	let json = WorldSerdeSaver::new()
+		.save_roots_filtered::<With<BeetSceneRoot>>(world, MediaType::Json)?
+		.as_utf8()?
+		.to_string();
 	fs_ext::write(&path, &json)?;
 	Ok(())
 }

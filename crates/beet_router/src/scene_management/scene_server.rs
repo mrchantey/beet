@@ -137,11 +137,12 @@ pub async fn Reset(cx: ActionContext<RequestParts>) -> Response {
 pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
 		.with_world(|world, _caller| -> Response {
-			match WorldSerdeSaver::save_roots_filtered::<With<BeetSceneRoot>>(
-				world,
-				MediaType::Json,
-			)
-			.and_then(|bytes| bytes.as_utf8().map(String::from))
+			match WorldSerdeSaver::new()
+				.save_roots_filtered::<With<BeetSceneRoot>>(
+					world,
+					MediaType::Json,
+				)
+				.and_then(|bytes| bytes.as_utf8().map(String::from))
 			{
 				Ok(json) => Response::ok_body(json, MediaType::Json),
 				Err(err) => {

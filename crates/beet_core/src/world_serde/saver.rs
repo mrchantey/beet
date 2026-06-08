@@ -4,48 +4,36 @@ use super::serde::DynamicWorldSerializer;
 use crate::prelude::*;
 use bevy::ecs::query::QueryFilter;
 
-/// Serializes world state or a subtree to various formats.
-///
-/// Use [`WorldSerdeSaver::new`] for the full world, or [`WorldSerdeSaver::with_entity_tree`]
-/// to serialize only an entity and its descendants.
-///
-/// Extraction is deferred until [`WorldSerdeSaver::save`], as the underlying
-/// [`DynamicWorldBuilder`] borrows the [`AppTypeRegistry`] for its lifetime.
-pub struct WorldSerdeSaver<'a> {
-	world: &'a World,
+/// Configures and runs a serialization of world state or a subtree to various
+/// formats. The config (filters, entities, resource flag) is held independently
+/// of the world, so a preconfigured saver — eg one that denies certain export
+/// markers — can be reused, and the world is borrowed only at the moment it is
+/// traversed ([`with_entity_tree`](Self::with_entity_tree)) or serialized
+/// ([`save`](Self::save)).
+#[derive(Default)]
+pub struct WorldSerdeSaver {
 	component_filter: WorldFilter,
 	resource_filter: WorldFilter,
 	entities: Vec<Entity>,
 	extract_resources: bool,
 }
 
-impl<'a> WorldSerdeSaver<'a> {
-	/// Creates a saver for the entire world.
-	pub fn new(world: &'a mut World) -> Self {
-		Self {
-			world,
-			component_filter: WorldFilter::default(),
-			resource_filter: WorldFilter::default(),
-			entities: Vec::new(),
-			extract_resources: false,
-		}
-	}
+impl WorldSerdeSaver {
+	/// Creates an empty saver. Add entities with [`with_entity_tree`](Self::with_entity_tree)
+	/// or [`with_entities`](Self::with_entities), then [`save`](Self::save).
+	pub fn new() -> Self { Self::default() }
 
 	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
-	pub fn new_default(world: &'a mut World) -> Self {
-		let all_entities: Vec<Entity> =
-			world.query::<Entity>().iter(world).collect();
-		Self::new(world)
-			.with_entities(all_entities)
+	pub fn new_default(world: &World) -> Self {
+		Self::new()
+			.with_entities(world.iter_entities().map(|entity| entity.id()))
 			.deny_resource::<Time<Real>>()
 			.extract_resources()
 	}
 
 	/// Scopes serialization to an entity and its descendants.
-	pub fn with_entity_tree(mut self, entity: Entity) -> Self {
-		let mut entities = Vec::new();
-		self.collect_descendants(entity, &mut entities);
-		self.entities.extend(entities);
+	pub fn with_entity_tree(mut self, world: &World, entity: Entity) -> Self {
+		self.collect_descendants(world, entity);
 		self
 	}
 
@@ -83,6 +71,7 @@ impl<'a> WorldSerdeSaver<'a> {
 	/// after, so the saved scene carries no dangling parent reference (which
 	/// would fail to spawn on load).
 	pub fn save_roots(
+		mut self,
 		world: &mut World,
 		media_type: MediaType,
 		roots: impl IntoIterator<Item = Entity>,
@@ -103,13 +92,10 @@ impl<'a> WorldSerdeSaver<'a> {
 			world.entity_mut(*root).remove::<ChildOf>();
 		});
 
-		let result = {
-			let mut saver = WorldSerdeSaver::new(world);
-			for root in &roots {
-				saver = saver.with_entity_tree(*root);
-			}
-			saver.save(media_type)
-		};
+		for root in &roots {
+			self = self.with_entity_tree(world, *root);
+		}
+		let result = self.save(world, media_type);
 
 		roots_with_parents.into_iter().for_each(|(root, parent)| {
 			world.entity_mut(root).insert(ChildOf(parent));
@@ -120,6 +106,7 @@ impl<'a> WorldSerdeSaver<'a> {
 	/// Like [`save_roots`](Self::save_roots) but collects the roots from a query
 	/// filter, eg `save_roots_filtered::<With<BeetSceneRoot>>`.
 	pub fn save_roots_filtered<D: QueryFilter>(
+		self,
 		world: &mut World,
 		media_type: MediaType,
 	) -> Result<MediaBytes> {
@@ -127,27 +114,27 @@ impl<'a> WorldSerdeSaver<'a> {
 			.query_filtered::<Entity, D>()
 			.iter(world)
 			.collect::<Vec<_>>();
-		Self::save_roots(world, media_type, roots)
+		self.save_roots(world, media_type, roots)
 	}
 
 	/// Serializes to [`MediaBytes`] using the given format with default options.
-	pub fn save(self, media_type: MediaType) -> Result<MediaBytes> {
-		self.save_with_options(media_type, default())
+	pub fn save(self, world: &World, media_type: MediaType) -> Result<MediaBytes> {
+		self.save_with_options(world, media_type, default())
 	}
 
 	/// Serializes to [`MediaBytes`] using the given format and [`SerializeOptions`].
 	pub fn save_with_options(
 		self,
+		world: &World,
 		media_type: MediaType,
 		options: SerializeOptions,
 	) -> Result<MediaBytes> {
-		let registry = self.world.resource::<AppTypeRegistry>();
+		let registry = world.resource::<AppTypeRegistry>();
 		let registry = registry.read();
-		let mut builder =
-			DynamicWorldBuilder::from_world(self.world, &registry)
-				.with_component_filter(self.component_filter)
-				.with_resource_filter(self.resource_filter)
-				.extract_entities(self.entities.into_iter());
+		let mut builder = DynamicWorldBuilder::from_world(world, &registry)
+			.with_component_filter(self.component_filter)
+			.with_resource_filter(self.resource_filter)
+			.extract_entities(self.entities.into_iter());
 		if self.extract_resources {
 			builder = builder.extract_resources();
 		}
@@ -156,12 +143,13 @@ impl<'a> WorldSerdeSaver<'a> {
 		MediaBytes::serialize_with_options(media_type, &serializer, options)
 	}
 
-	/// Collects an entity and all its descendants into a flat list.
-	fn collect_descendants(&self, entity: Entity, entities: &mut Vec<Entity>) {
-		entities.push(entity);
-		if let Some(children) = self.world.entity(entity).get::<Children>() {
-			for child in children.iter() {
-				self.collect_descendants(child, entities);
+	/// Collects an entity and all its descendants into the entity set.
+	fn collect_descendants(&mut self, world: &World, entity: Entity) {
+		self.entities.push(entity);
+		if let Some(children) = world.entity(entity).get::<Children>() {
+			let children = children.iter().collect::<Vec<_>>();
+			for child in children {
+				self.collect_descendants(world, child);
 			}
 		}
 	}

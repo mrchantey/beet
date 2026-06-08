@@ -428,9 +428,9 @@ mod test {
 		app.world().entity(entity).get::<ActionMeta>().xpect_some();
 
 		// Serialize
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new()
 			.with_entities([entity])
-			.save(MediaType::Ron)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		world_serde_bytes
 			.as_utf8()
@@ -471,9 +471,9 @@ mod test {
 		app.update();
 
 		// Serialize then despawn
-		let world_serde_bytes = WorldSerdeSaver::new(app.world_mut())
+		let world_serde_bytes = WorldSerdeSaver::new()
 			.with_entities([entity])
-			.save(MediaType::Ron)
+			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		app.world_mut().entity_mut(entity).despawn();
 		app.update();
