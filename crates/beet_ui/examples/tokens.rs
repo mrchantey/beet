@@ -11,7 +11,7 @@ use beet_ui::*;
 
 fn main() {
 	App::new()
-		.add_plugins(CharcellPlugin)
+		.add_plugins((CharcellPlugin, RealtimePostParsePlugin))
 		.insert_resource(
 			RuleSet::default().with_rule(
 				Rule::tag("h1")

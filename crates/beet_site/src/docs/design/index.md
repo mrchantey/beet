@@ -23,9 +23,9 @@ tokens, never raw CSS.
 
 ## Widgets
 
-- [Button](/docs/design/widgets/button)
-- [Error Text](/docs/design/widgets/error_text)
-- [Form](/docs/design/widgets/form)
-- [Select](/docs/design/widgets/select)
-- [Table](/docs/design/widgets/table)
-- [Text Field](/docs/design/widgets/text_field)
+- [Button](/docs/design/button)
+- [Error Text](/docs/design/error_text)
+- [Form](/docs/design/form)
+- [Select](/docs/design/select)
+- [Table](/docs/design/table)
+- [Text Field](/docs/design/text_field)

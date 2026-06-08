@@ -30,6 +30,8 @@ pub impl EntityWorldMut<'_> {
 	) -> impl Future<Output = Response> {
 		let start_time = Instant::now();
 		let request = request.into();
+		let method = *request.method();
+		let path = request.path_string();
 		async move {
 			self.run_async_then(async move |entity| {
 				let res = entity.call(request).await.unwrap_or_else(|err| {
@@ -49,6 +51,8 @@ pub impl EntityWorldMut<'_> {
 				entity
 					.trigger(move |entity| ExchangeEnd {
 						entity,
+						method,
+						path,
 						start_time,
 						status,
 					})
@@ -84,16 +88,35 @@ pub impl AsyncEntity {
 		&self,
 		request: impl Into<Request>,
 	) -> impl MaybeSend + Future<Output = Response> {
+		let start_time = Instant::now();
 		let request = request.into();
+		let method = *request.method();
+		let path = request.path_string();
+		let entity = self.clone();
 		let fut = self.call::<Request, Response>(request);
 		async move {
-			match fut.await {
+			let res = match fut.await {
 				Ok(res) => res,
 				Err(err) => {
 					error!("Exchange failed: {}", err);
 					Response::internal_error()
 				}
-			}
+			};
+			// fire `ExchangeEnd` so `exchange_stats` can log method/path/status/
+			// duration. This is the live-server path (mini/hyper backends call
+			// through here), mirroring the std `ExchangeExt::exchange` variant.
+			let status = res.status();
+			entity
+				.trigger(move |entity| ExchangeEnd {
+					entity,
+					method,
+					path,
+					start_time,
+					status,
+				})
+				.await
+				.ok();
+			res
 		}
 	}
 
@@ -111,11 +134,19 @@ pub impl AsyncEntity {
 
 /// Event triggered when an exchange completes.
 ///
-/// Contains timing and status information for metrics and logging.
+/// Carries the request method/path captured at dispatch plus the response
+/// status and start time, so observers (eg [`exchange_stats`]) can log
+/// per-request info without a [`RequestMeta`] component on the handler entity
+/// (the live-server path dispatches the request through `call`, not as a
+/// spawned component).
 #[derive(Clone, EntityEvent)]
 pub struct ExchangeEnd {
 	/// The entity that handled this exchange.
 	pub entity: Entity,
+	/// The request method, captured at dispatch.
+	pub method: HttpMethod,
+	/// The request path, captured at dispatch.
+	pub path: String,
 	/// When the exchange started.
 	pub start_time: Instant,
 	/// The HTTP status code of the response.

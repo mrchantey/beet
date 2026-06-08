@@ -14,6 +14,12 @@ impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<CliServer>();
+
+		// per-request logging: log each exchange's method/path/status/duration on
+		// completion. std-only, since [`ExchangeStats`] (the request counter the
+		// observer increments) backs the std [`HttpServer`] requirement.
+		#[cfg(feature = "std")]
+		app.add_observer(exchange_stats);
 	}
 }
 

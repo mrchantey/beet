@@ -70,3 +70,20 @@ fn main() {
     }
 }
 ```
+
+## Tab-indented code block
+
+Indentation uses real tab characters, which must expand to spaces rather than
+leaking a raw `\t` into the terminal and overflowing the box.
+
+```rust
+fn bucket_fallback() -> impl Bundle {
+	(
+		HandlerConditions::fallback(),
+		bucket_file_handler(),
+		related!{Endpoints[
+			bundle_endpoint(|| rsx!{<div>fallback</div>})
+		]}
+	)
+}
+```

@@ -176,6 +176,8 @@ fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
 		},
 		margin,
 		padding,
+		width: query.resolve(entity, Width).ok(),
+		height: query.resolve(entity, Height).ok(),
 	}
 	.xok()
 }

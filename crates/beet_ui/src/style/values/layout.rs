@@ -18,6 +18,13 @@ pub enum Display {
 	Inline,
 	/// Flexbox layout.
 	Flex,
+	/// Table wrapper (`<table>`): lays its rows out as a column-aligned grid. The
+	/// charcell engine drives table layout off this and [`TableCell`](Self::TableCell)
+	/// alone — rows and row groups (`<tr>`/`<thead>`/…) are found structurally, so
+	/// they need no display of their own.
+	Table,
+	/// A table cell (`<td>`/`<th>`), mapping to CSS `display: table-cell`.
+	TableCell,
 	/// Removed from layout entirely (hidden), mapping to CSS `display: none`.
 	None,
 }
@@ -29,6 +36,8 @@ impl AsCssValue for Display {
 			Self::ListItem => "list-item",
 			Self::Inline => "inline",
 			Self::Flex => "flex",
+			Self::Table => "table",
+			Self::TableCell => "table-cell",
 			Self::None => "none",
 		}
 		.xmap(CssValue::expression)

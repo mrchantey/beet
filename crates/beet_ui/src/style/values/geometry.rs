@@ -17,6 +17,13 @@ pub struct BoxStyle {
 	pub border: Spacing,
 	pub margin: Spacing,
 	pub padding: Spacing,
+	/// Explicit content width (CSS `width`); `None` sizes to content. The
+	/// charcell engine resolves it to whole cells so a fixed-width control (eg an
+	/// `<input>` or a colour swatch) keeps its size on the terminal, not just the
+	/// web.
+	pub width: Option<Length>,
+	/// Explicit content height (CSS `height`); `None` sizes to content.
+	pub height: Option<Length>,
 }
 
 pub static BOX_STYLE_DEFAULT: BoxStyle = BoxStyle::DEFAULT;
@@ -30,6 +37,8 @@ impl BoxStyle {
 		border: Spacing::DEFAULT,
 		margin: Spacing::DEFAULT,
 		padding: Spacing::DEFAULT,
+		width: None,
+		height: None,
 	};
 	/// Set all four border colors at once.
 	pub fn with_border_color(mut self, color: impl Into<Color>) -> Self {

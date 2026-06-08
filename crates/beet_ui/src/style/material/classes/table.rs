@@ -22,6 +22,7 @@ pub const TABLE_VERTICAL_BORDERS: ClassName =
 pub fn table() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("table").merge_any(Selector::class(TABLE)))
+		.with_value(common_props::DisplayProp, Display::Table)
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyMedium).unwrap()
 		.with_value(common_props::Width, Length::Percent(100.))
@@ -36,6 +37,7 @@ pub fn table() -> Rule {
 pub fn table_th() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("th"))
+		.with_value(common_props::DisplayProp, Display::TableCell)
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
 		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
 		.with_token(common_props::BorderBottomWidth,geometry::OutlineWidthThin).unwrap()
@@ -47,6 +49,7 @@ pub fn table_th() -> Rule {
 pub fn table_td() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("td"))
+		.with_value(common_props::DisplayProp, Display::TableCell)
 		.with_token(common_props::BorderColorProp,colors::OutlineVariant).unwrap()
 		.with_token(common_props::BorderBottomWidth,geometry::OutlineWidthThin).unwrap()
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))

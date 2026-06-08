@@ -4,6 +4,7 @@
 //! and three draw helpers that fill the corresponding terminal cells.
 use crate::prelude::*;
 use crate::style::BoxStyle;
+use crate::style::Length;
 use crate::style::Spacing;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
@@ -52,6 +53,10 @@ pub(super) struct BoxModel {
 	pub margin: URect,
 	pub border: BorderSides,
 	pub padding: URect,
+	/// Explicit content width/height in cells (CSS `width`/`height`), `None` to
+	/// size to content.
+	pub width: Option<u32>,
+	pub height: Option<u32>,
 }
 
 impl BoxModel {
@@ -74,6 +79,8 @@ impl BoxModel {
 				margin: URect::default(),
 				border: BorderSides::default(),
 				padding: URect::default(),
+				width: None,
+				height: None,
 			};
 		};
 
@@ -88,11 +95,24 @@ impl BoxModel {
 			top: box_style.border.top.into_rem(vp) > 0.,
 			bottom: box_style.border.bottom.into_rem(vp) > 0.,
 		};
+		// Only absolute lengths fix a charcell size (1rem ≈ 1 cell, matching the
+		// gap/marker conversions). A percentage/viewport length is relative to the
+		// containing block, which the per-node box model can't resolve, so those
+		// keep content sizing — eg a `width: 100%` table still fills its column
+		// through normal block flow rather than snapping to the viewport.
+		let absolute_cells = |length: Length| match length {
+			Length::Px(_) | Length::Rem(_) => {
+				Some(length.into_rem(vp).round().max(0.) as u32)
+			}
+			_ => None,
+		};
 
 		Self {
 			margin,
 			border,
 			padding,
+			width: box_style.width.and_then(absolute_cells),
+			height: box_style.height.and_then(absolute_cells),
 		}
 	}
 
@@ -113,6 +133,9 @@ impl BoxModel {
 		inset_rect(self.inner_rect(containing), self.padding)
 	}
 
+	/// The bottom margin, in cells.
+	pub fn margin_bottom(&self) -> u32 { self.margin.max.y }
+
 	/// Total cell overhead consumed by margin, border, and padding.
 	pub fn overhead(&self) -> UVec2 {
 		let margin_x = self.margin.min.x + self.margin.max.x;
@@ -126,6 +149,17 @@ impl BoxModel {
 			margin_y + padding_y + border_y,
 		)
 	}
+}
+
+/// The bottom margin a node reserves below itself, in cells. Block containers
+/// drop this from their *last* child so a trailing margin doesn't pad the
+/// container's bottom edge — the cross-target equivalent of the web
+/// `:last-child { margin-bottom: 0 }` reset (blockquotes, cards, nested lists).
+pub(super) fn node_bottom_margin(
+	node: &CharcellNodeData,
+	viewport: UVec2,
+) -> u32 {
+	BoxModel::from_node(node, viewport).margin_bottom()
 }
 
 // ── Drawing ─────────────────────────────────────────────────────────────────

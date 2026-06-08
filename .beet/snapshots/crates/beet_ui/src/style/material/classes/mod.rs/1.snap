@@ -24,6 +24,7 @@
   letter-spacing: var(--material-typography-body-large-ls);
   line-height: var(--material-typography-body-large-lh);
   padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+  width: 15rem;
 }
 
 .input-outlined {
@@ -38,6 +39,7 @@
 th {
   border-bottom-width: var(--material-geometry-outline-width-thin);
   border-color: var(--material-colors-outline);
+  display: table-cell;
   font-weight: var(--material-typography-weight-medium);
   padding: 0.5rem 0.5rem 0.5rem 0.5rem;
   text-align: left;

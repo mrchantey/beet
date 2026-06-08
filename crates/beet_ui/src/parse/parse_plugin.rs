@@ -1,32 +1,91 @@
 //! Scheduling for the post-parse pipeline.
 //!
 //! [`PostParseTree`] is the single schedule where a parsed entity tree is
-//! styled, decorated, laid out, and painted. Parsers run it as a one-off after
-//! building their tree; [`ParsePlugin`] additionally wires it into the main
-//! schedule order so realtime apps re-run it after every [`Update`].
+//! styled, decorated, laid out, and painted. Every render path runs it
+//! on demand: one-off parsers (eg
+//! [`MarkdownParser`](crate::prelude::MarkdownParser)) and the charcell
+//! renderers call [`World::run_schedule`]/[`World::try_run_schedule`] right
+//! after building their tree.
+//!
+//! [`ParsePlugin`] (pulled in by [`StylePlugin`](crate::prelude::StylePlugin))
+//! registers the schedule but deliberately does **not** wire it into the main
+//! schedule order. A request/response server or a one-shot render must not
+//! repaint every frame: doing so re-scans every parsed tree still resident in
+//! the world on every tick, so latency climbs as routes accumulate their cached
+//! trees. Only a realtime app driven by the main loop wants per-frame repaint,
+//! and it opts in with [`RealtimePostParsePlugin`].
 use beet_core::prelude::*;
 
-/// Registers [`PostParseTree`] to run after [`Update`] in the main schedule
-/// order, so realtime apps resolve styles and repaint each frame.
+/// Registers the [`PostParseTree`] schedule for on-demand runs.
 ///
-/// One-off parsers (eg [`MarkdownParser`](crate::prelude::MarkdownParser)) run
-/// the schedule directly via [`World::try_run_schedule`] after building their
-/// tree, so they do not require this plugin — it only matters for apps driven
-/// by the main loop.
+/// Does not add it to the main schedule order — see the module docs. Realtime
+/// apps add [`RealtimePostParsePlugin`] for per-frame repaint.
 #[derive(Default)]
 pub struct ParsePlugin;
 
 impl Plugin for ParsePlugin {
 	fn build(&self, app: &mut App) {
-		// for realtime apps, run the post-parse pipeline after every update
-		app.insert_schedule_after(Update, PostParseTree);
+		// ensure the schedule exists for on-demand `run_schedule` callers, without
+		// adding it to the per-frame main loop (which would repaint the whole world
+		// every tick).
+		app.init_schedule(PostParseTree);
 	}
 }
 
-/// Schedule run once an entity tree has been parsed (or, in realtime apps,
-/// after every [`Update`]).
+/// Opt-in plugin for realtime apps driven by the main loop: runs the
+/// [`PostParseTree`] pipeline after every [`Update`] so style changes and
+/// document mutations repaint each frame.
+///
+/// A server or one-shot render must not add this — they run [`PostParseTree`]
+/// on demand per request/render instead. See the module docs.
+#[derive(Default)]
+pub struct RealtimePostParsePlugin;
+
+impl Plugin for RealtimePostParsePlugin {
+	fn build(&self, app: &mut App) {
+		app.init_plugin::<ParsePlugin>()
+			.insert_schedule_after(Update, PostParseTree);
+	}
+}
+
+/// Schedule run once an entity tree has been parsed (or, with
+/// [`RealtimePostParsePlugin`], after every [`Update`]).
 ///
 /// Hosts style resolution, syntax highlighting, charcell decorations, and the
 /// layout/paint pipeline, ordered via their respective system sets.
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct PostParseTree;
+
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use bevy::app::MainScheduleOrder;
+	use bevy::ecs::schedule::ScheduleLabel;
+
+	fn in_main_order(app: &App) -> bool {
+		let label = PostParseTree.intern();
+		app.world()
+			.resource::<MainScheduleOrder>()
+			.labels
+			.contains(&label)
+	}
+
+	/// The server/one-shot path must not repaint every frame: a request handler
+	/// runs [`PostParseTree`] on demand, and leaving it in the main loop re-scans
+	/// every parsed route tree each tick, so latency climbs as routes accumulate.
+	#[beet_core::test]
+	fn parse_plugin_stays_out_of_main_loop() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ParsePlugin));
+		in_main_order(&app).xpect_false();
+	}
+
+	/// Realtime apps opt into per-frame repaint.
+	#[beet_core::test]
+	fn realtime_plugin_runs_after_update() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, RealtimePostParsePlugin));
+		in_main_order(&app).xpect_true();
+	}
+}

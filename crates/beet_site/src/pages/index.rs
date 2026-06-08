@@ -55,11 +55,14 @@ fn block_measure() -> OnSpawn {
 	inline_class![(common_props::MaxWidth, Length::Rem(34.))]
 }
 
-/// The centered call-to-action button row.
+/// The centered call-to-action button row. Cross-axis centering lines up the
+/// shorter filled button with the taller outlined one (see `button_contained`),
+/// keeping both labels on the same row.
 fn button_row() -> OnSpawn {
 	inline_class![
 		(common_props::DisplayProp, style::Display::Flex),
 		(common_props::JustifyContentProp, style::JustifyContent::Center),
+		(common_props::AlignItemsProp, style::AlignItems::Center),
 		(common_props::ColumnGapProp, Length::Rem(1.)),
 	]
 }

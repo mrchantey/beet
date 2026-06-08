@@ -3,7 +3,9 @@ use beet_core::prelude::*;
 use bevy::math::URect;
 use bevy::math::UVec2;
 
+use super::align_offset;
 use super::query::CharcellNodeData;
+use super::truncate_to_width;
 
 /// Compute the intrinsic size of a text node.
 ///
@@ -46,19 +48,36 @@ pub(super) fn paint_text(
 	// to its title/alt text); wrap its painted cells in the OSC-8 link, matching
 	// the inline flow.
 	let link = node.hyperlink();
+	// a text decoration (eg the iframe link's underline) must underline only the
+	// glyphs, not the row-filling padding, so the line is painted in two passes:
+	// the full aligned line with the decoration stripped, then the glyphs alone
+	// with the decoration. Skipped (single pass) when there's nothing to decorate.
+	let decorated = visual.decoration_line != DecorationLine::DEFAULT;
+	let undecorated =
+		visual.clone().with_decoration_line(DecorationLine::DEFAULT);
 	let lines = word_wrap(&text, content_rect.width());
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as u32;
 		if y >= content_rect.max.y {
 			break;
 		}
-		let aligned = align_line(line, content_rect.width(), visual.text_align);
-		buffer.write_text(
-			UVec2::new(content_rect.min.x, y),
-			&aligned,
-			visual.clone(),
-			entity,
-		);
+		let width = content_rect.width();
+		let aligned = align_line(line, width, visual.text_align);
+		let origin = UVec2::new(content_rect.min.x, y);
+		if decorated {
+			buffer.write_text(origin, &aligned, undecorated.clone(), entity);
+			let glyphs = truncate_to_width(line, width as usize);
+			let offset =
+				align_offset(display_width(glyphs) as u32, width, visual.text_align);
+			buffer.write_text(
+				UVec2::new(content_rect.min.x + offset, y),
+				glyphs,
+				visual.clone(),
+				entity,
+			);
+		} else {
+			buffer.write_text(origin, &aligned, visual.clone(), entity);
+		}
 		// `aligned` already spans the content width from its left edge, so the
 		// link covers the row's text columns.
 		if let Some(link) = link {

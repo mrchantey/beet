@@ -6,6 +6,15 @@ The terminal layout + paint engine, `crates/beet_ui/src/render/charcell`. Read t
 
 `charcell/decorate.rs` generates leading content (the terminal's `::before`): `<li>` bullets/numbers, blockquote bars, the `<hr>` rule, `<img>` alt text. So list/quote markers exist on the terminal with no CSS `list-style`; the web is the side that restores markers. `<li>` under a `<nav>` get **no** marker (navigation, not prose).
 
+## What the engine now honours (don't reach for CSS-only workarounds)
+
+- **Explicit `width`/`height`** size a box on the terminal too, but **only absolute lengths** (`Px`/`Rem`, 1rem≈1cell, resolved in `box_model.rs` `from_box_style`, applied in `measure_node`/`resolve_height`). `%`/viewport lengths are container-relative and stay content-sized (so a `width:100%` table still fills its column via block flow). Flex items pick this up through their intrinsic size; a block child still gets full container width, so an explicit-width block is only honoured inside a flex row.
+- **Tables** (`charcell/table.rs`) lay out as a column-aligned grid off `Display::Table` + `Display::TableCell` alone — a *row* is any node with `table-cell` children (covers `<tr>` and a markdown `<thead>` holding cells directly), so `<tr>`/`<thead>`/`<tbody>` need no display and are skipped via a `managed` set in `layout_nodes`. Columns take their widest cell, scaled down to fit.
+- **Last child drops its bottom margin** in block flow (`measure_block`/`resolve_block_height`/`block_layout_rects` via `node_bottom_margin`), the cross-target `:last-child { margin-bottom: 0 }` — fixes the blockquote/card double gutter and the nested-list gap. The last child keeps its full rect (no clamp) so its empty trailing-margin row spills into the container's padding rather than clipping content.
+- **Tabs in `<pre>` expand to 4-col stops** (`inline.rs` `split_pre_lines`, matching web `tab-size: 4`); a raw `\t` left in a cell makes the real terminal re-expand and overflow the code box. A single trailing empty line is dropped there too (fenced code ends with `\n`).
+- **Block-leaf text decoration** (eg the iframe link's underline) only covers the glyphs, not the row-filling pad: `paint_text` paints the padded line undecorated, then overlays the glyphs decorated.
+- **Anonymous block boxes**: a list item mixing leading inline content with a nested list gets its inline run wrapped in a `<div>` at parse time (`tree_builder.rs` `wrap_inline_runs`) so it flows on one line instead of each child breaking to its own.
+
 ## Facts that bite
 
 - **`tui_inset` doubles horizontal spacing** (`box_model.rs` does `min.x *= 2`), so `1rem` left padding = **2** cells, and `0.5rem` also → 2 (`round(0.5)=1`, then `*2`). Horizontal padding is therefore always even; a **1-cell** indent is unreachable through padding, it needs an explicit per-depth indent or a charcell change.

@@ -19,7 +19,7 @@ pub fn server_plugin(app: &mut App) {
 		ServerPlugin,
 		material::MaterialStylePlugin::new(THEME_COLOR),
 	));
-	// site-local layout rule, see `design_row_rule` (in `style`). The landing-page
+	// site-local layout rules, see `design_row_rule` (in `style`). The landing-page
 	// hero uses `inline_class!` instead, since its layout is a single-use one-off.
 	let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
 	rules.insert_rule(design_row_rule());

@@ -237,6 +237,42 @@ mod test {
 			.xpect_contains("markdown body");
 	}
 
+	/// Repeated requests to the same markdown route must not leak entities: the
+	/// per-request layout subtree and content ephemerals are despawned after
+	/// render, and the persistent route tree is diffed in place. A growing entity
+	/// count is the ramp-up bug (a page got slower with every visit because the
+	/// post-parse pipeline re-scanned ever more resident entities).
+	#[beet_core::test]
+	async fn repeated_requests_stay_bounded() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"post.md".into(),
+				"# Title\n\n```rust\nfn main() {}\n```\n\nbody".to_owned(),
+			)
+			.await
+			.unwrap();
+
+		let mut world = router_world();
+		let root = world
+			.spawn((
+				store,
+				Router,
+				BaseLayout::<PageLayout>::default(),
+				children![route("post", BlobScene::new("post.md"))],
+			))
+			.flush();
+
+		// warm up so the route's tree is parsed and any one-off resources settle,
+		// then sample the entity count and confirm it holds flat across requests.
+		get(&mut world, root, "post").await;
+		let baseline = world.iter_entities().count();
+		for _ in 0..8 {
+			get(&mut world, root, "post").await;
+		}
+		world.iter_entities().count().xpect_eq(baseline);
+	}
+
 	#[beet_core::test]
 	async fn layout_places_content_where_it_chooses() {
 		// the layout decides placement; here the content lands inside <nav>

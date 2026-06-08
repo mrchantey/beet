@@ -33,10 +33,16 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 		layout_rects
 			.insert(root, URect::new(0, 0, viewport_size.x, viewport_size.y));
 
-		// Read phase: use CharcellQuery to distribute rects to children
+		// Read phase: use CharcellQuery to distribute rects to children.
+		// `managed` holds the structural rows/wrappers a table laid out itself, so
+		// the loop doesn't re-flow them as plain blocks.
 		{
 			let charcell = params.p0();
+			let mut managed = HashSet::<Entity>::default();
 			for &entity in &ordered {
+				if managed.contains(&entity) {
+					continue;
+				}
 				let Some(&node_rect) = layout_rects.get(&entity) else {
 					continue;
 				};
@@ -52,15 +58,26 @@ pub fn layout_nodes<B: Component + AsBuffer>(
 						viewport_size,
 						&mut layout_rects,
 					)?,
-					// a list item lays out as a block; its marker is drawn by the
-					// decorator, so charcell treats `list-item` identically to `block`.
-					Display::Block | Display::ListItem => block_layout_rects(
+					Display::Table => table_layout_rects(
 						&node,
 						&charcell,
 						node_rect,
 						viewport_size,
 						&mut layout_rects,
+						&mut managed,
 					)?,
+					// a list item lays out as a block; its marker is drawn by the
+					// decorator, so charcell treats `list-item` identically to `block`.
+					// a table cell flows its own content as a block within its grid rect.
+					Display::Block | Display::ListItem | Display::TableCell => {
+						block_layout_rects(
+							&node,
+							&charcell,
+							node_rect,
+							viewport_size,
+							&mut layout_rects,
+						)?
+					}
 					Display::Inline => inline_layout_rects(
 						&node,
 						&charcell,
@@ -101,19 +118,25 @@ pub fn block_layout_rects(
 	let child_min_x = (content_rect.min.x + gutter).min(content_rect.max.x);
 	let child_width = content_rect.max.x.saturating_sub(child_min_x);
 	let mut child_y = content_rect.min.y;
-	for child in node.child_nodes(query) {
+	let children: Vec<_> = node.child_nodes(query).collect();
+	let last = children.len().saturating_sub(1);
+	for (i, child) in children.iter().enumerate() {
 		if child_y >= content_rect.max.y {
 			break;
 		}
 		// height resolved at the assigned width, not the wider measured width, so
 		// a narrowed column reserves every wrapped row instead of clipping the tail.
-		let child_height = resolve_height(&child, query, child_width, viewport);
-		let child_rect = URect::new(
-			child_min_x,
-			child_y,
-			content_rect.max.x,
-			(child_y + child_height).min(content_rect.max.y),
-		);
+		let child_height = resolve_height(child, query, child_width, viewport);
+		// the last child keeps its full box so its own bottom-margin inset never
+		// clips content; the container was already measured one margin shorter
+		// (see `node_bottom_margin`), so that empty trailing-margin row simply
+		// spills into the container's bottom padding rather than reserving a gap.
+		let bottom = match i == last {
+			true => child_y + child_height,
+			false => (child_y + child_height).min(content_rect.max.y),
+		};
+		let child_rect =
+			URect::new(child_min_x, child_y, content_rect.max.x, bottom);
 		layout_rects.insert(child.entity, child_rect);
 		child_y += child_height.max(1);
 	}

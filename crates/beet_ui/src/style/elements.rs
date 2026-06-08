@@ -82,6 +82,15 @@ pub fn default_element_rules() -> Vec<Rule> {
 		strikethrough(&["del", "s"]),
 		inline(&["code"]).with_value(ForegroundColor, code_fg()),
 		inline(&["span"]),
+		// the remaining inline text-level tags carry no special default look
+		// beyond flowing inline; without this they default to `display: block`
+		// and break onto their own full-width line mid-sentence.
+		inline(&[
+			"mark", "small", "sub", "sup", "q", "cite", "abbr", "time",
+			"samp", "kbd", "var", "dfn", "data", "bdi", "bdo", "wbr",
+		]),
+		// inserted text mirrors deleted text, underlined rather than struck
+		inline(&["ins", "u"]).with_canonical(DecorationLine::underline()),
 		link(),
 		inline(&["img"]).with_value(ForegroundColor, faint()),
 		// an embedded `<iframe>` can't render in the terminal; the charcell

@@ -221,18 +221,44 @@ fn flow_inline(
 		.collect()
 }
 
+/// Width of a tab stop, matching the web's `tab-size: 4` (Preflight).
+const TAB_WIDTH: usize = 4;
+
 /// Split the char stream into lines on `\n`, preserving everything else.
+///
+/// Tabs are expanded to spaces up to the next [`TAB_WIDTH`] stop, since a raw
+/// `\t` left in a cell makes the terminal jump to its own tab stop and overflow
+/// the code block's box (the web expands tabs via `tab-size`).
 fn split_pre_lines(chars: &[(char, usize)]) -> Vec<Vec<(char, usize)>> {
 	let mut lines = Vec::new();
 	let mut current = Vec::new();
+	let mut col = 0usize;
 	for &(ch, idx) in chars {
-		if ch == '\n' {
-			lines.push(core::mem::take(&mut current));
-		} else {
-			current.push((ch, idx));
+		match ch {
+			'\n' => {
+				lines.push(core::mem::take(&mut current));
+				col = 0;
+			}
+			'\t' => {
+				let stop = (col / TAB_WIDTH + 1) * TAB_WIDTH;
+				while col < stop {
+					current.push((' ', idx));
+					col += 1;
+				}
+			}
+			_ => {
+				current.push((ch, idx));
+				col += unicode_width(ch) as usize;
+			}
 		}
 	}
 	lines.push(current);
+	// drop a single trailing empty line: a fenced code block's text ends with a
+	// `\n`, which would otherwise render an empty row inside the `<pre>` box and
+	// gives it an uneven one-above / two-below gutter.
+	if lines.len() > 1 && lines.last().is_some_and(|line| line.is_empty()) {
+		lines.pop();
+	}
 	lines
 }
 
@@ -334,7 +360,7 @@ fn line_width(line: &Vec<InlineSpan>) -> u32 {
 }
 
 /// Leading-column offset for a line of `line_w` columns within `width`.
-fn align_offset(line_w: u32, width: u32, align: TextAlign) -> u32 {
+pub(super) fn align_offset(line_w: u32, width: u32, align: TextAlign) -> u32 {
 	let pad = width.saturating_sub(line_w);
 	match align {
 		TextAlign::Left => 0,
@@ -344,7 +370,7 @@ fn align_offset(line_w: u32, width: u32, align: TextAlign) -> u32 {
 }
 
 /// Truncate `text` to at most `max_cols` display columns.
-fn truncate_to_width(text: &str, max_cols: usize) -> &str {
+pub(super) fn truncate_to_width(text: &str, max_cols: usize) -> &str {
 	let mut width = 0;
 	for (i, ch) in text.char_indices() {
 		let w = unicode_width(ch) as usize;
@@ -429,6 +455,15 @@ mod tests {
 		let runs = [run("fn  main()\n    body")];
 		lines_text(&flow_inline(&runs, 4, true))
 			.xpect_eq(vec!["fn  main()".to_string(), "    body".to_string()]);
+	}
+
+	#[beet_core::test]
+	fn preformatted_expands_tabs_to_stops() {
+		// tabs advance to the next 4-column stop rather than leaking a raw `\t`
+		// that the terminal would re-expand and overflow the code block.
+		let runs = [run("\tfn\tx")];
+		lines_text(&flow_inline(&runs, 40, true))
+			.xpect_eq(vec!["    fn  x".to_string()]);
 	}
 
 	#[beet_core::test]

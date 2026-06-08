@@ -6,7 +6,7 @@ use beet::prelude::*;
 /// infra routes (`app-info`/`analytics`). The current path comes from the
 /// [`RequestContext`], so the active route is marked and its ancestor branches
 /// auto-expand. The `docs` and `blog` collections are forced open so their
-/// entries are always visible.
+/// entries are always visible, with `docs` pinned before `blog`.
 #[scene(system)]
 pub fn BeetSidebar(
 	cx: Res<RequestContext>,
@@ -21,10 +21,12 @@ pub fn BeetSidebar(
 				.with_exclude("app-info")
 				.with_exclude("analytics")
 				.with_info("docs", SidebarInfo {
+					order: Some(0),
 					expanded: Some(true),
 					..default()
 				})
 				.with_info("blog", SidebarInfo {
+					order: Some(1),
 					expanded: Some(true),
 					..default()
 				})

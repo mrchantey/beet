@@ -16,8 +16,10 @@ use super::marker_gutter;
 use super::measure_inline_flow;
 use super::measure_str;
 use super::measure_text;
+use super::node_bottom_margin;
 use super::query::CharcellNodeData;
 use super::query::CharcellQuery;
+use super::resolve_table_height;
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
@@ -180,6 +182,9 @@ pub(super) fn resolve_height(
 		Display::Flex => {
 			resolve_flex_height(node, query, content_width, viewport)
 		}
+		Display::Table => {
+			resolve_table_height(node, query, content_width, viewport)
+		}
 		// text leaf (eg a paragraph's text node)
 		_ if node.value().is_some() => measure_text(node, content_width).y,
 		// container of inline content: flow descendants as wrapped text
@@ -195,6 +200,8 @@ pub(super) fn resolve_height(
 		// block container: stack children, each flowed at the constrained width
 		_ => resolve_block_height(node, query, content_width, viewport),
 	};
+	// an explicit `height` overrides the resolved content height.
+	let content_height = box_model.height.unwrap_or(content_height);
 	content_height + overhead.y
 }
 
@@ -207,9 +214,20 @@ fn resolve_block_height(
 	viewport: UVec2,
 ) -> u32 {
 	let child_width = content_width.saturating_sub(marker_gutter(node, query));
-	node.child_nodes(query)
-		.map(|child| {
-			resolve_height(&child, query, child_width, viewport).max(1)
+	let children: Vec<_> = node.child_nodes(query).collect();
+	let last = children.len().saturating_sub(1);
+	children
+		.iter()
+		.enumerate()
+		.map(|(i, child)| {
+			let height =
+				resolve_height(child, query, child_width, viewport).max(1);
+			// the last child's trailing margin doesn't reserve a row (matches
+			// `measure_block` and `block_layout_rects`).
+			match i == last {
+				true => height.saturating_sub(node_bottom_margin(child, viewport)),
+				false => height,
+			}
 		})
 		.sum()
 }

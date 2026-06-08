@@ -42,13 +42,17 @@ pub fn label_field() -> Rule {
 		})
 }
 
-/// Shared baseline for `.input` text fields and text areas.
+/// Shared baseline for `.input` text fields and text areas. A fixed `15rem`
+/// width gives a consistent, comfortable measure on both targets rather than
+/// the browser's `size`-derived default (and the terminal's content-hugging
+/// box); a `<form>`'s stretch still grows wider fields when needed.
 pub fn input_base() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(INPUT))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Width, Length::Rem(15.))
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 
@@ -84,13 +88,15 @@ pub fn input_focus() -> Rule {
 		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
 }
 
-/// Shared baseline for `.select` elements.
+/// Shared baseline for `.select` elements, matching the `.input` width so a
+/// form's controls line up at a consistent measure.
 pub fn select_base() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SELECT))
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
 		.with_token(ShapeProps,geometry::ShapeExtraSmall).unwrap()
+		.with_value(common_props::Width, Length::Rem(15.))
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 

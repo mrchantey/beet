@@ -65,6 +65,9 @@ pub(super) fn measure_node(
 		Display::Flex => {
 			measure_flex(node, query, sizes, content_available, viewport)?
 		}
+		Display::Table => {
+			measure_table(node, query, content_available, viewport)
+		}
 		// text leaf (eg a paragraph's text node)
 		_ if node.value().is_some() => measure_text(node, content_available.x),
 		// container of inline content: flow descendants as wrapped text
@@ -78,8 +81,14 @@ pub(super) fn measure_node(
 			measure_str(marker, content_available.x)
 		}
 		// block container: stack children vertically
-		_ => measure_block(node, query, content_available, sizes),
+		_ => measure_block(node, query, content_available, viewport, sizes),
 	};
+	// an explicit `width`/`height` overrides the measured content size, so a
+	// fixed-size control keeps its footprint instead of hugging its content.
+	let content_size = UVec2::new(
+		box_model.width.unwrap_or(content_size.x),
+		box_model.height.unwrap_or(content_size.y),
+	);
 	(content_size + overhead).xok()
 }
 
@@ -93,19 +102,28 @@ fn measure_block(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	available: UVec2,
+	viewport: UVec2,
 	sizes: &HashMap<Entity, UVec2>,
 ) -> UVec2 {
 	// a list item holding a nested list reserves a left gutter for its marker
 	let gutter = marker_gutter(node, query);
 	let mut max_w = 0u32;
 	let mut total_h = 0u32;
-	for child in node.child_nodes(query) {
+	let children: Vec<_> = node.child_nodes(query).collect();
+	let last = children.len().saturating_sub(1);
+	for (i, child) in children.iter().enumerate() {
 		let size = sizes
 			.get(&child.entity)
 			.copied()
 			.unwrap_or_else(|| child.intrinsic_size());
 		max_w = max_w.max(size.x);
-		total_h += size.y.max(1);
+		let mut height = size.y.max(1);
+		// the last child's trailing margin doesn't reserve a row, so it can't
+		// pad the container's bottom edge (see `node_bottom_margin`).
+		if i == last {
+			height = height.saturating_sub(node_bottom_margin(child, viewport));
+		}
+		total_h += height;
 	}
 	UVec2::new((gutter + max_w).min(available.x), total_h)
 }

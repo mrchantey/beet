@@ -23,6 +23,8 @@ mod prepare;
 mod query;
 pub(self) use query::*;
 mod renderer;
+mod table;
+pub(self) use table::*;
 #[cfg(feature = "terminal")]
 mod terminal;
 mod text;

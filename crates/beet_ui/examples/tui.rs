@@ -6,7 +6,14 @@ use beet_ui::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, CharcellPlugin, DocumentPlugin))
+		.add_plugins((
+			MinimalPlugins,
+			CharcellPlugin,
+			DocumentPlugin,
+			// realtime repaint: this app mutates the document every Update, so it
+			// runs the post-parse pipeline after each frame.
+			RealtimePostParsePlugin,
+		))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)
 		.add_observer(on_input)

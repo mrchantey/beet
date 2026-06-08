@@ -7,44 +7,32 @@ use beet_core::prelude::*;
 
 
 
-/// Observer that logs exchange completion and updates statistics.
+/// Observer that logs each completed exchange and bumps the server's request
+/// counter, registered by [`ServerPlugin`](crate::prelude::ServerPlugin).
 ///
-/// This observer should be added to the world to enable request logging.
-/// It logs the request path, method, status, duration, and request index.
-///
-/// # Example
-///
-/// ```ignore
-/// world.add_observer(exchange_stats);
-/// ```
+/// Logs a single concise line per request — method, path, status, duration, and
+/// running request index — at `info`. The method/path/status/timing ride on the
+/// [`ExchangeEnd`] event, so this works for the live-server `call` path as well
+/// as spawn-type exchanges.
 pub fn exchange_stats(
 	ev: On<ExchangeEnd>,
 	mut servers: AncestorQuery<&mut ExchangeStats>,
-	exchange: Query<&RequestMeta>,
 ) -> Result {
 	let entity = ev.event_target();
 
-	let mut stats = Vec::new();
+	let index = servers
+		.get_mut(entity)
+		.map(|mut server| server.increment_requests().request_count())
+		.ok();
 
-	// only available for spawn type exchanges
-	if let Ok(meta) = exchange.get(entity) {
-		stats.push(format!("path:\t{}", meta.path_string()));
-		stats.push(format!("method:\t{}", meta.method()));
-	};
-
-	stats.push(format!("status:\t{}", ev.status));
-
-	stats.push(format!(
-		"duration:\t{}",
-		time_ext::pretty_print_duration(ev.start_time.elapsed())
-	));
-
-	if let Ok(mut server) = servers.get_mut(entity) {
-		server.increment_requests();
-		stats.push(format!("index:\t{}", server.request_count()));
-	}
-
-	info!("Request Complete:\n{}", stats.join("\n"));
+	info!(
+		"{} {} -> {} in {}{}",
+		ev.method,
+		ev.path,
+		ev.status,
+		time_ext::pretty_print_duration(ev.start_time.elapsed()),
+		index.map(|i| format!(" (#{i})")).unwrap_or_default(),
+	);
 	Ok(())
 }
 

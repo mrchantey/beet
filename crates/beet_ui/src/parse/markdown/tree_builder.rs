@@ -53,6 +53,75 @@ pub(crate) fn build_markdown_tree<'a>(
 	builder.finish()
 }
 
+/// Block-level tags that can appear inside a list item. Used to split an item's
+/// children into anonymous inline runs and block siblings.
+fn is_block_level(node: &HtmlNode) -> bool {
+	match node {
+		HtmlNode::Element { name, .. } => matches!(
+			*name,
+			"ul" | "ol"
+				| "p" | "div"
+				| "blockquote"
+				| "pre" | "table"
+				| "h1" | "h2"
+				| "h3" | "h4"
+				| "h5" | "h6"
+				| "hr" | "dl"
+				| "details"
+				| "figure"
+				| "section"
+		),
+		// text and non-visual nodes (comments, doctype, expressions) are not block
+		// boxes, so they join the surrounding inline run.
+		_ => false,
+	}
+}
+
+/// Whether a node is whitespace-only text, ie carries no visible content.
+fn is_blank_text(node: &HtmlNode) -> bool {
+	matches!(node, HtmlNode::Text(text) if text.trim().is_empty())
+}
+
+/// Wrap maximal runs of inline children in anonymous `<div>` blocks whenever the
+/// children mix inline and block content, mirroring how a browser generates
+/// anonymous block boxes. Without this a list item like `` - a: `b` `` followed
+/// by a nested list lays its `a: b` out as two stacked full-width blocks rather
+/// than one inline line. A purely-inline item is returned unchanged so it still
+/// flows as a single inline context.
+fn wrap_inline_runs<'a>(
+	children: Vec<HtmlNode<'a>>,
+	source: &'a str,
+) -> Vec<HtmlNode<'a>> {
+	if !children.iter().any(is_block_level) {
+		return children;
+	}
+	let mut out = Vec::new();
+	let mut run: Vec<HtmlNode<'a>> = Vec::new();
+	let flush = |run: &mut Vec<HtmlNode<'a>>, out: &mut Vec<HtmlNode<'a>>| {
+		// a run of only whitespace carries no content, so it's dropped rather than
+		// boxed into an empty block.
+		match run.iter().any(|node| !is_blank_text(node)) {
+			true => out.push(HtmlNode::Element {
+				name: "div",
+				attributes: vec![],
+				children: core::mem::take(run),
+				source,
+			}),
+			false => run.clear(),
+		}
+	};
+	for child in children {
+		if is_block_level(&child) {
+			flush(&mut run, &mut out);
+			out.push(child);
+		} else {
+			run.push(child);
+		}
+	}
+	flush(&mut run, &mut out);
+	out
+}
+
 
 /// Internal stack-based builder that converts pulldown events into a
 /// `TreeNode` tree. Each open tag pushes a frame; each close tag pops
@@ -140,7 +209,15 @@ impl<'a> MdTreeBuilder<'a> {
 		if self.stack.len() <= 1 {
 			return;
 		}
-		if let Some(frame) = self.stack.pop() {
+		if let Some(mut frame) = self.stack.pop() {
+			// a tight list item mixing leading inline content with a nested list (or
+			// other block) is the one prose case of a block box with mixed children;
+			// wrap its inline runs in anonymous blocks so they flow on one line
+			// rather than each breaking to its own (browsers do this implicitly).
+			if frame.name == "li" {
+				frame.children =
+					wrap_inline_runs(frame.children, frame.source);
+			}
 			let node = HtmlNode::Element {
 				name: frame.name,
 				attributes: frame.attributes,
