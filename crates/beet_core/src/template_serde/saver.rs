@@ -27,7 +27,7 @@ impl TemplateSaver {
 	pub fn new() -> Self { Self::default() }
 
 	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
-	pub fn new_default(world: &World) -> Self {
+	pub fn new_all(world: &World) -> Self {
 		Self::new()
 			.with_entities(world.iter_entities().map(|entity| entity.id()))
 			.deny_resource::<Time<Real>>()

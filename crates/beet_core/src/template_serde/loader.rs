@@ -222,7 +222,7 @@ mod test {
 	#[crate::test]
 	fn round_trip_ron() {
 		let mut app = serde_world();
-		let bytes = TemplateSaver::new_default(app.world())
+		let bytes = TemplateSaver::new_all(app.world())
 			.save(app.world(), MediaType::Ron)
 			.unwrap();
 		bytes.as_utf8().unwrap().xref().xpect_contains("Time");

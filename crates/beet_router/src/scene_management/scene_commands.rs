@@ -19,8 +19,8 @@
 //! beet reset                         # stop the hardware
 //! ```
 //!
-//! [`ExportScene`] is the inverse: it serializes the scene rooted at its entity
-//! to a JSON file, used by the export examples to generate loadable scenes.
+//! [`ExportScenes`] is the inverse: it serializes the scenes rooted under its
+//! route to JSON files, used by the export bins to generate loadable scenes.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -41,7 +41,7 @@ impl Plugin for SceneCommandsPlugin {
 			.register_type::<SceneReset>()
 			.register_type::<SceneDump>()
 			.register_type::<SceneCall>()
-			.register_type::<ExportScene>()
+			.register_type::<ExportScenes>()
 			.register_type::<ExportPath>();
 	}
 }
@@ -228,67 +228,56 @@ pub async fn SceneCall(cx: ActionContext<Request>) -> Result<Response> {
 	}
 }
 
-/// Output path baked onto an [`ExportScene`], so it needs no `--output` flag.
+/// Output path baked onto a scene root under an [`ExportScenes`] route, so the
+/// export needs no `--output` flag.
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct ExportPath(pub String);
 
-/// Serialize a scene to a JSON file. [`ExportScene`]/[`ExportPath`] are the
-/// *export instruction*; they sit on the scene root itself but are denied from
-/// the output by the [`TemplateSaver`], so the exported scene carries only the
-/// real components. The output path is the caller's [`ExportPath`] component,
-/// else the `--output` request param.
+/// A route whose children are each serialized to disk as a standalone scene.
 ///
-/// Mounted at the root path so the exported root's [`PathPattern`]s carry no
-/// prefix (an `export/…` ancestor would corrupt the loaded routes).
+/// The set of exported scenes is declared by the route's entity tree: every
+/// direct child is a scene root, written to its own [`ExportPath`]. This is the
+/// regular [`CliServer`] pattern — the export binaries spawn it as the root
+/// route, so running the CLI with no args (a request for `/`) writes them all.
+///
+/// Each child's subtree is serialized on its own, so a child's [`PathPattern`]s
+/// carry only its own prefix (an `export/…` ancestor would corrupt the loaded
+/// routes); the [`ExportPath`] marker is denied from the output so it stays out
+/// of the saved scene.
 #[action(route = "", handler_only)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn ExportScene(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let output = cx.input.get_param("output").map(String::from);
+pub async fn ExportScenes(cx: ActionContext<RequestParts>) -> Result<Response> {
 	cx.caller
-		.with_world(move |world, caller| -> Result<Response> {
-			Response::ok_text(export_entity(world, caller, output.as_deref())?)
-				.xok()
+		.with_world(|world, caller| -> Result<Response> {
+			let report = world
+				.entity(caller)
+				.get::<Children>()
+				.map(|children| children.iter().collect::<Vec<_>>())
+				.unwrap_or_default()
+				.into_iter()
+				.map(|child| export_entity(world, child))
+				.collect::<Result<Vec<_>>>()?
+				.join("");
+			Response::ok_text(report).xok()
 		})
 		.await?
 }
 
-/// Serialize every [`ExportScene`] entity in the world to its [`ExportPath`] in
-/// one pass. An exclusive system for export binaries (see beet-cli's
-/// `export_scenes` example): spawn each scene root tagged with [`ExportScene`] +
-/// [`ExportPath`], then run this to write them all to disk.
-pub fn export_scenes(world: &mut World) -> Result {
-	let entities = world
-		.query_filtered::<Entity, With<ExportScene>>()
-		.iter(world)
-		.collect::<Vec<_>>();
-	for entity in entities {
-		cross_log!("{}", export_entity(world, entity, None)?.trim_end());
-	}
-	Ok(())
-}
-
-/// Serialize the [`ExportScene`] entity (the scene root) and its descendants to
-/// a JSON file, resolving the path from the entity's [`ExportPath`] component or
-/// the `default_output` fallback. The [`ExportScene`]/[`ExportPath`] markers are
-/// denied from the output so they stay out of the exported scene.
-fn export_entity(
-	world: &mut World,
-	entity: Entity,
-	default_output: Option<&str>,
-) -> Result<String> {
+/// Serialize the scene rooted at `entity` and its descendants to its
+/// [`ExportPath`]. The [`ExportPath`] marker is denied from the output so it
+/// stays out of the exported scene.
+fn export_entity(world: &mut World, entity: Entity) -> Result<String> {
 	let output = world
 		.entity(entity)
 		.get::<ExportPath>()
 		.map(|path| path.0.clone())
-		.or_else(|| default_output.map(String::from))
 		.ok_or_else(|| {
-			bevyhow!("no export path: set --output or an ExportPath component")
+			bevyhow!("scene root under an ExportScenes route needs an ExportPath")
 		})?;
 	let output = AbsPathBuf::new(output)?;
 	let json = TemplateSaver::new()
-		.deny_component::<ExportScene>()
 		.deny_component::<ExportPath>()
 		.save_roots(world, MediaType::Json, [entity])?
 		.as_utf8()?

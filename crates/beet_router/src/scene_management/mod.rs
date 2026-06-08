@@ -11,7 +11,7 @@
 //!   cache (observers on [`BeetSceneRoot`]) and a [`SceneWatch`] `on_add` hook
 //!   installs the `--watch` file watcher.
 //! - [`scene_commands`]: the host load/clear/reset/dump/run commands, each
-//!   targeting either a remote device or the local world, plus [`ExportScene`].
+//!   targeting either a remote device or the local world, plus [`ExportScenes`].
 //!
 //! The core and server need `template_serde`; the watcher, welcome page and host
 //! commands are std-only.
