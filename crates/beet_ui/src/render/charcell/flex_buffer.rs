@@ -40,6 +40,11 @@ impl FlexBuffer {
 	/// Raw cell slice.
 	pub fn cells(&self) -> &[Cell] { &self.cells }
 
+	/// The OSC-8 hyperlink target attached to the cell at `pos`, if any.
+	pub fn link_at(&self, pos: UVec2) -> Option<&str> {
+		self.links.get(&pos).map(SmolStr::as_str)
+	}
+
 	/// Convert position to buffer index, bounds-checked against allocated rows.
 	fn index(&self, pos: UVec2) -> Option<usize> {
 		if pos.x >= self.width || pos.y >= self.allocated_rows() {

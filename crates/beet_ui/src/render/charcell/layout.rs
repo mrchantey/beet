@@ -112,11 +112,12 @@ pub fn block_layout_rects(
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
 	let content_rect = box_model.content_rect(container_rect);
+	let containing = UVec2::new(content_rect.width(), content_rect.height());
 	// a list item's marker occupies a left gutter; its children are inset past
 	// it (the marker itself paints into the gutter in the paint phase).
 	let gutter = marker_gutter(node, query);
 	let child_min_x = (content_rect.min.x + gutter).min(content_rect.max.x);
-	let child_width = content_rect.max.x.saturating_sub(child_min_x);
+	let full_width = content_rect.max.x.saturating_sub(child_min_x);
 	let mut child_y = content_rect.min.y;
 	let children: Vec<_> = node.child_nodes(query).collect();
 	let last = children.len().saturating_sub(1);
@@ -124,9 +125,15 @@ pub fn block_layout_rects(
 		if child_y >= content_rect.max.y {
 			break;
 		}
+		// an explicit (percent/absolute) width takes the child off full-bleed block
+		// flow, clamped to the available width; otherwise it fills the content box.
+		let (explicit_w, explicit_h) =
+			explicit_box_size(child, viewport, containing);
+		let child_width = explicit_w.unwrap_or(full_width).min(full_width);
 		// height resolved at the assigned width, not the wider measured width, so
 		// a narrowed column reserves every wrapped row instead of clipping the tail.
-		let child_height = resolve_height(child, query, child_width, viewport);
+		let child_height = explicit_h
+			.unwrap_or_else(|| resolve_height(child, query, child_width, viewport));
 		// the last child keeps its full box so its own bottom-margin inset never
 		// clips content; the container was already measured one margin shorter
 		// (see `node_bottom_margin`), so that empty trailing-margin row simply
@@ -135,8 +142,12 @@ pub fn block_layout_rects(
 			true => child_y + child_height,
 			false => (child_y + child_height).min(content_rect.max.y),
 		};
-		let child_rect =
-			URect::new(child_min_x, child_y, content_rect.max.x, bottom);
+		let child_rect = URect::new(
+			child_min_x,
+			child_y,
+			(child_min_x + child_width).min(content_rect.max.x),
+			bottom,
+		);
 		layout_rects.insert(child.entity, child_rect);
 		child_y += child_height.max(1);
 	}
@@ -244,6 +255,58 @@ mod tests {
 		// Should wrap — not all on one line since 5+5+3 = 13 > 10
 		let lines: Vec<&str> = out.lines().collect();
 		(lines.len() >= 2).xpect_true();
+	}
+
+	/// The width in cells of the background fill on row `y` of `buffer`.
+	fn fill_width(buffer: &Buffer, bg: Color, y: u32) -> usize {
+		buffer
+			.iter_cells()
+			.filter(|(pos, cell)| pos.y == y && cell.style.background == Some(bg))
+			.count()
+	}
+
+	/// A percentage `width` resolves against the containing block in the layout
+	/// pass (the measure pass leaves it content-sized), so a `width: 50%` block in
+	/// block flow occupies half its container's content width on the terminal.
+	/// A half-width block child whose `width` is the given [`Length`], filled with
+	/// `bg`. Wrapped in an explicit block container so the child is block-level
+	/// (an inline-level node would not get a box fill, matching CSS).
+	fn sized_block(width: Length, bg: Color) -> impl Bundle {
+		(LayoutStyle::default(), children![(
+			LayoutStyle::default(),
+			BoxStyle {
+				width: Some(width),
+				..default()
+			},
+			VisualStyle {
+				background: Some(bg),
+				..default()
+			},
+			children![rsx_direct! {"x"}],
+		)])
+	}
+
+	/// A percentage `width` resolves against the containing block in the layout
+	/// pass (the measure pass leaves it content-sized), so a `width: 50%` block in
+	/// block flow occupies half its container's content width on the terminal.
+	#[beet_core::test]
+	fn percent_width_resolves_against_container() {
+		let bg = Color::srgb(0.2, 0.4, 0.8);
+		let buffer = Buffer::new(UVec2::new(20, 4))
+			.populate(sized_block(Length::Percent(50.), bg));
+		// the half-width fill covers 10 of the 20 columns on the first row
+		fill_width(&buffer, bg, 0).xpect_eq(10);
+	}
+
+	/// A viewport-relative `width` resolves against the real viewport in both
+	/// passes (the viewport is always known), so a `width: 50vw` block on a
+	/// 20-column buffer is 10 columns wide.
+	#[beet_core::test]
+	fn viewport_width_resolves_against_viewport() {
+		let bg = Color::srgb(0.8, 0.3, 0.2);
+		let buffer = Buffer::new(UVec2::new(20, 4))
+			.populate(sized_block(Length::ViewportWidth(50.), bg));
+		fill_width(&buffer, bg, 0).xpect_eq(10);
 	}
 
 	/// No rendered line may exceed the buffer width, otherwise the terminal

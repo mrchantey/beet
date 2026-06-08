@@ -60,19 +60,40 @@ pub(super) struct BoxModel {
 }
 
 impl BoxModel {
-	/// Compute the box model for `node` relative to `viewport`.
-	///
-	/// Returns zeroed/false defaults when the node has no box style.
+	/// Compute the box model for `node` relative to `viewport`, with no containing
+	/// block (the measure context, where a node's containing block is not yet
+	/// known). Percentage `width`/`height` stay content-sized; absolute and
+	/// viewport-relative lengths resolve.
 	pub fn from_node(node: &CharcellNodeData, viewport: UVec2) -> Self {
-		Self::from_box_style(node.box_style(), viewport)
+		Self::from_box_style(node.box_style(), viewport, None)
 	}
 
-	/// Compute the box model from an optional [`BoxStyle`] and `viewport`.
+	/// Compute the box model for `node` with its `containing` block's content size
+	/// known (the layout context), so a percentage `width`/`height` resolves
+	/// against the containing block as CSS requires.
+	pub fn from_node_in(
+		node: &CharcellNodeData,
+		viewport: UVec2,
+		containing: UVec2,
+	) -> Self {
+		Self::from_box_style(node.box_style(), viewport, Some(containing))
+	}
+
+	/// Compute the box model from an optional [`BoxStyle`], the `viewport`, and an
+	/// optional `containing` block content size (in cells).
 	///
-	/// Returns zeroed/false defaults when `box_style` is `None`.
+	/// Returns zeroed/false defaults when `box_style` is `None`. Explicit
+	/// `width`/`height` resolve to cells: absolute lengths (1rem ≈ 1 cell, matching
+	/// the gap/marker conversions) and viewport-relative lengths always resolve;
+	/// a percentage resolves against `containing` when given (the layout pass) and
+	/// otherwise stays content-sized (the measure pass, where the containing block
+	/// is not yet known — matching how browsers treat percent against an auto
+	/// container). So a `width: 100%` table still fills its column either way:
+	/// through real percent resolution in layout, or block flow in measure.
 	pub fn from_box_style(
 		box_style: Option<&BoxStyle>,
 		viewport: UVec2,
+		containing: Option<UVec2>,
 	) -> Self {
 		let Some(box_style) = box_style else {
 			return Self {
@@ -95,24 +116,17 @@ impl BoxModel {
 			top: box_style.border.top.into_rem(vp) > 0.,
 			bottom: box_style.border.bottom.into_rem(vp) > 0.,
 		};
-		// Only absolute lengths fix a charcell size (1rem ≈ 1 cell, matching the
-		// gap/marker conversions). A percentage/viewport length is relative to the
-		// containing block, which the per-node box model can't resolve, so those
-		// keep content sizing — eg a `width: 100%` table still fills its column
-		// through normal block flow rather than snapping to the viewport.
-		let absolute_cells = |length: Length| match length {
-			Length::Px(_) | Length::Rem(_) => {
-				Some(length.into_rem(vp).round().max(0.) as u32)
-			}
-			_ => None,
-		};
 
 		Self {
 			margin,
 			border,
 			padding,
-			width: box_style.width.and_then(absolute_cells),
-			height: box_style.height.and_then(absolute_cells),
+			width: box_style
+				.width
+				.and_then(|length| explicit_cells(length, vp, containing.map(|c| c.x))),
+			height: box_style
+				.height
+				.and_then(|length| explicit_cells(length, vp, containing.map(|c| c.y))),
 		}
 	}
 
@@ -149,6 +163,29 @@ impl BoxModel {
 			margin_y + padding_y + border_y,
 		)
 	}
+}
+
+/// The explicit border-box width/height a child reserves, resolved against its
+/// `containing` block's content size (in cells), or `None` along an axis the
+/// child sizes to content. Used by the layout pass to honour a percent `width`
+/// (eg `width: 100%` filling a column, `width: 50%` taking half) that the measure
+/// pass left content-sized because the containing block was not yet known.
+///
+/// CSS `width`/`height` are content-box here, so the child's own margin, border,
+/// and padding overhead is added back to give the footprint that goes into its
+/// rect — consistent with how [`measure_node`](super::measure_node) builds the
+/// intrinsic size from an explicit content size.
+pub(super) fn explicit_box_size(
+	node: &CharcellNodeData,
+	viewport: UVec2,
+	containing: UVec2,
+) -> (Option<u32>, Option<u32>) {
+	let box_model = BoxModel::from_node_in(node, viewport, containing);
+	let overhead = box_model.overhead();
+	(
+		box_model.width.map(|width| width + overhead.x),
+		box_model.height.map(|height| height + overhead.y),
+	)
 }
 
 /// The bottom margin a node reserves below itself, in cells. Block containers
@@ -265,6 +302,45 @@ pub(super) fn draw_border(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Resolve an explicit `width`/`height` [`Length`] to whole cells.
+///
+/// Absolute lengths use the rem convention (1rem ≈ 1 cell). Viewport-relative
+/// lengths resolve as a fraction of the `viewport`, which here is measured in
+/// *cells*, so `50vw` of a 20-cell-wide terminal is 10 cells (not the
+/// pixel-denominated [`Length::into_rem`], which would shrink it ~16x). A
+/// `Percent` resolves against the containing block's content size along the same
+/// axis (`containing`, in cells) when known — the layout pass — returning `None`
+/// otherwise so the measure pass sizes the node to content.
+fn explicit_cells(
+	length: Length,
+	viewport: Vec2,
+	containing: Option<u32>,
+) -> Option<u32> {
+	let cells = |fraction: f32, extent: f32| (fraction * extent).round().max(0.);
+	match length {
+		Length::Px(_) | Length::Rem(_) => {
+			Some(length.into_rem(viewport).round().max(0.) as u32)
+		}
+		// percent is relative to the containing block, resolved in the layout pass
+		Length::Percent(percent) => containing
+			.map(|axis| cells(percent / 100., axis as f32) as u32),
+		// viewport units resolve against the cell viewport, one cell per percent of
+		// the relevant viewport extent
+		Length::ViewportWidth(percent) => {
+			Some(cells(percent / 100., viewport.x) as u32)
+		}
+		Length::ViewportHeight(percent) => {
+			Some(cells(percent / 100., viewport.y) as u32)
+		}
+		Length::ViewportMin(percent) => {
+			Some(cells(percent / 100., viewport.min_element()) as u32)
+		}
+		Length::ViewportMax(percent) => {
+			Some(cells(percent / 100., viewport.max_element()) as u32)
+		}
+	}
+}
 
 /// A border at or above this width (in rem) draws with the heavy box-drawing
 /// glyphs rather than the light ones. Sits between the thin (1px) and thick

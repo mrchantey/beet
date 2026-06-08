@@ -64,11 +64,13 @@ pub(super) fn paint_text(
 		let width = content_rect.width();
 		let aligned = align_line(line, width, visual.text_align);
 		let origin = UVec2::new(content_rect.min.x, y);
+		// the glyph columns this row actually paints, used by both the decorated
+		// overlay and the OSC-8 link so neither bleeds into the padding.
+		let glyphs = truncate_to_width(line, width as usize);
+		let glyph_width = display_width(glyphs) as u32;
+		let offset = align_offset(glyph_width, width, visual.text_align);
 		if decorated {
 			buffer.write_text(origin, &aligned, undecorated.clone(), entity);
-			let glyphs = truncate_to_width(line, width as usize);
-			let offset =
-				align_offset(display_width(glyphs) as u32, width, visual.text_align);
 			buffer.write_text(
 				UVec2::new(content_rect.min.x + offset, y),
 				glyphs,
@@ -78,10 +80,11 @@ pub(super) fn paint_text(
 		} else {
 			buffer.write_text(origin, &aligned, visual.clone(), entity);
 		}
-		// `aligned` already spans the content width from its left edge, so the
-		// link covers the row's text columns.
+		// the link covers only the painted glyph columns, not the row-filling
+		// padding, so the terminal's hyperlink underline ends at the text.
 		if let Some(link) = link {
-			for col in content_rect.min.x..content_rect.min.x + content_rect.width() {
+			let start = content_rect.min.x + offset;
+			for col in start..start + glyph_width {
 				buffer.set_link(UVec2::new(col, y), link);
 			}
 		}

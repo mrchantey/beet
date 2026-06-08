@@ -239,4 +239,46 @@ mod test {
 		// the second column sits past the widest first-column cell ("Alice" = 5)
 		(body.find("30").unwrap() >= 5).xpect_true();
 	}
+
+	/// The `<table>` rule carries `width: 100%`. With explicit-width resolution in
+	/// the layout pass, that percent must still make the table span its container
+	/// (a row-spanning background fills the full content width), guarding against a
+	/// regression where percent resolution shrank the table off the old block-flow
+	/// full-bleed path.
+	#[beet_core::test]
+	fn full_width_table_fills_container() {
+		let bg = Color::srgb(0.2, 0.4, 0.8);
+		let table = (
+			LayoutStyle::default(),
+			children![(
+				LayoutStyle {
+					display: Display::Table,
+					..default()
+				},
+				BoxStyle {
+					width: Some(Length::Percent(100.)),
+					..default()
+				},
+				// a row carries the background so its rect (spanning the table's
+				// content width) is what we measure
+				children![(
+					LayoutStyle::default(),
+					VisualStyle {
+						background: Some(bg),
+						..default()
+					},
+					children![cell("A"), cell("B")],
+				)],
+			)],
+		);
+		let buffer = Buffer::new(UVec2::new(20, 4)).populate(table);
+		// the row background spans all 20 columns of the container's content width
+		buffer
+			.iter_cells()
+			.filter(|(pos, cell)| {
+				pos.y == 0 && cell.style.background == Some(bg)
+			})
+			.count()
+			.xpect_eq(20);
+	}
 }

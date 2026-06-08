@@ -255,6 +255,28 @@ mod tests {
 			.xpect_contains("embed");
 	}
 
+	/// The OSC-8 link region covers only the title glyphs, not the row-filling
+	/// padding, so the terminal's hyperlink underline ends at the text rather than
+	/// running to the page edge. Inspecting the link map directly catches the
+	/// defect even when trailing padding would otherwise trim away on render.
+	#[beet_core::test]
+	fn iframe_link_ends_at_title() {
+		let mut world = CharcellPlugin::world();
+		let root = world
+			.spawn((FlexBuffer::new(40), rsx_direct! {
+				<iframe src="https://example.com/clip" title="My Talk"/>
+			}))
+			.id();
+		world.run_schedule(PostParseTree);
+		let buffer = world.entity_mut(root).take::<FlexBuffer>().unwrap();
+		// "My Talk" is 7 cols, left-aligned: the link covers cols 0..7 only.
+		buffer
+			.link_at(UVec2::new(6, 0))
+			.xpect_eq(Some("https://example.com/clip"));
+		buffer.link_at(UVec2::new(7, 0)).xpect_eq(None);
+		buffer.link_at(UVec2::new(39, 0)).xpect_eq(None);
+	}
+
 	/// Without an `alt-src` the link falls back to the `src`.
 	#[beet_core::test]
 	fn iframe_link_falls_back_to_src() {

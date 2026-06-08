@@ -12,6 +12,7 @@ use bevy::math::URect;
 use bevy::math::UVec2;
 
 use super::establishes_inline_flow;
+use super::explicit_box_size;
 use super::marker_gutter;
 use super::measure_inline_flow;
 use super::measure_str;
@@ -356,10 +357,23 @@ pub fn flex_layout_rects(
 	let content_rect = box_model.content_rect(container_rect);
 	let available = UVec2::new(content_rect.width(), content_rect.height());
 
-	// Get child sizes directly from child_nodes (already computed by measure phase)
+	// Get child sizes directly from child_nodes (already computed by measure phase),
+	// overriding either axis a child sizes explicitly (eg a percent `width`, which
+	// the measure pass left content-sized) with that resolved size as its base.
 	let mut child_sizes: Vec<(Entity, UVec2)> = node
 		.child_nodes(query)
-		.map(|child| (child.entity, child.intrinsic_size()))
+		.map(|child| {
+			let intrinsic = child.intrinsic_size();
+			let (explicit_w, explicit_h) =
+				explicit_box_size(&child, viewport, available);
+			(
+				child.entity,
+				UVec2::new(
+					explicit_w.unwrap_or(intrinsic.x),
+					explicit_h.unwrap_or(intrinsic.y),
+				),
+			)
+		})
 		.collect();
 	// Sort by flex_order
 	child_sizes.sort_by_key(|(e, _)| flex_order(*e, query));
