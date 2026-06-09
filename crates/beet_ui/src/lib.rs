@@ -41,6 +41,10 @@ pub mod prelude {
 	/// The shared class-name vocabulary, reached through the `classes::` prefix.
 	#[cfg(feature = "style")]
 	pub use crate::style::material::classes;
+	/// The Material design-token roles (`colors::Primary`, `colors::OnSurface`,
+	/// …), reached through the `colors::` prefix for site-local token rules.
+	#[cfg(feature = "style")]
+	pub use crate::style::material::colors;
 	#[cfg(feature = "style")]
 	pub use crate::style::BlinkStyle;
 	#[cfg(feature = "style")]
