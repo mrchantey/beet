@@ -209,7 +209,15 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<RenderRequest> {
 			{
 				entity.insert(meta);
 			}
-			RenderRoot::insert(&mut entity, default());
+			// The parsed tree is per-request: despawn it (recursively) after render
+			// so the persistent route entity does not accumulate every visited
+			// page's content. Otherwise the global `PostParseTree` systems reprocess
+			// an ever-growing world, ramping up render time with each distinct page.
+			let to_despawn = entity
+				.get::<Children>()
+				.map(|children| children.iter().collect())
+				.unwrap_or_default();
+			RenderRoot::insert(&mut entity, to_despawn);
 			Ok(())
 		})
 		.await??;
