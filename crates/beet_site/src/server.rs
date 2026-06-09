@@ -16,6 +16,7 @@ pub fn server_plugin(app: &mut App) {
 	app.add_plugins((
 		MinimalPlugins,
 		RouterPlugin,
+		LogPlugin::new(Level::INFO),
 		ServerPlugin,
 		material::MaterialStylePlugin::new(THEME_COLOR),
 	));

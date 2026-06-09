@@ -17,6 +17,11 @@ pub struct LogPlugin {
 	pub filter: String,
 }
 
+impl LogPlugin {
+	/// Creates a new `LogPlugin` with the provided default level
+	pub fn new(level: tracing::Level) -> Self { Self { level, ..default() } }
+}
+
 impl Default for LogPlugin {
 	fn default() -> Self {
 		let PrettyTracing {
