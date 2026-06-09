@@ -4,6 +4,9 @@
 //! splicing nodes into the parsed document, so the same tree drives both the
 //! visitor and charcell renderers.
 use crate::prelude::*;
+use crate::style::BoxStyle;
+use crate::style::Display;
+use crate::style::LayoutStyle;
 use crate::style::ListStyle;
 use crate::style::common_props::ListStyleProp;
 use beet_core::prelude::*;
@@ -82,6 +85,107 @@ pub fn apply_markers(
 	}
 }
 
+/// Draw internal column dividers for a `.table-vertical-borders` table on the
+/// terminal. The web does this with an adjacent-sibling rule in `reset.css`,
+/// which the charcell cascade can't express (it has no ancestor context), so
+/// here every cell but the first in its row gets a left border mirroring its own
+/// bottom rule — the dividers fall between columns, matching the web.
+pub fn apply_table_vertical_borders(
+	elements: ElementQuery,
+	children: Query<&Children>,
+	mut box_styles: Query<&mut BoxStyle>,
+) {
+	for view in elements.iter() {
+		if view.tag() != "table"
+			|| !view.contains_class_name(&classes::TABLE_VERTICAL_BORDERS)
+		{
+			continue;
+		}
+		let mut rows = Vec::new();
+		collect_cell_rows(view.entity, &elements, &children, &mut rows);
+		for row in rows {
+			for &cell in row.iter().skip(1) {
+				if let Ok(mut box_style) = box_styles.get_mut(cell) {
+					box_style.border.left = box_style.border.bottom;
+					box_style.border_left = box_style.border_bottom;
+				}
+			}
+		}
+	}
+}
+
+/// Collect a table's rows as lists of cell entities (`<td>`/`<th>`), in column
+/// order, descending through the `<thead>`/`<tbody>`/`<tr>` wrappers. A *row* is
+/// any node whose direct children are cells, mirroring the table layout pass.
+fn collect_cell_rows(
+	entity: Entity,
+	elements: &ElementQuery,
+	children: &Query<&Children>,
+	rows: &mut Vec<Vec<Entity>>,
+) {
+	let Ok(kids) = children.get(entity) else {
+		return;
+	};
+	let is_cell = |entity: Entity| {
+		elements
+			.get(entity)
+			.is_ok_and(|view| matches!(view.tag(), "td" | "th"))
+	};
+	let cells: Vec<Entity> =
+		kids.iter().filter(|&kid| is_cell(kid)).collect();
+	if cells.is_empty() {
+		for kid in kids.iter() {
+			collect_cell_rows(kid, elements, children, rows);
+		}
+	} else {
+		rows.push(cells);
+	}
+}
+
+/// Generic `<details>` disclosure on the terminal, mirroring the web's native
+/// collapse. A closed details (no `open` attribute) hides everything but its
+/// `<summary>` and prefixes the summary with a `▸` caret; an open one keeps its
+/// body and shows a `▾` caret. The sidebar's own disclosure (its right-aligned
+/// branch carets and always-expanded tree) carries `SIDEBAR_GROUP`, so it is
+/// left untouched.
+pub fn apply_disclosure(
+	mut commands: Commands,
+	elements: ElementQuery,
+	children: Query<&Children>,
+	mut layouts: Query<&mut LayoutStyle>,
+) {
+	for view in elements.iter() {
+		if view.tag() != "details"
+			|| view.contains_class_name(&classes::SIDEBAR_GROUP)
+		{
+			continue;
+		}
+		let open = view.attribute("open").is_some();
+		let Ok(kids) = children.get(view.entity) else {
+			continue;
+		};
+		for child in kids.iter() {
+			let is_summary = elements
+				.get(child)
+				.is_ok_and(|child| child.tag() == "summary");
+			match is_summary {
+				// the caret affordance, leading the summary like a tree disclosure
+				true => {
+					let caret = if open { "▾ " } else { "▸ " };
+					commands.entity(child).insert(Marker(caret.into()));
+				}
+				// a closed disclosure collapses its body out of layout
+				false if !open => {
+					if let Ok(mut layout) = layouts.get_mut(child) {
+						layout.display = Display::None;
+					}
+				}
+				false => {}
+			}
+		}
+	}
+}
+
 /// The bullet (`• `) or number (`N. `) prefix for a list item, from its parent
 /// list's kind and the item's position among its `<li>` siblings.
 fn list_marker(
@@ -129,24 +233,27 @@ fn list_marker(
 	}
 }
 
-/// The `[alt]` (or `[image: src]`) placeholder text for an image.
+/// The `[image]:`-prefixed placeholder text for an image, using the alt text and
+/// falling back to the `src`. The prefix tells the reader what the link is and is
+/// part of the clickable link region.
 fn img_marker(view: &ElementView) -> SmolStr {
 	let alt = view.attribute_string("alt");
 	if alt.is_empty() {
-		format!("[image: {}]", view.attribute_string("src")).into()
+		format!("[image]: {}", view.attribute_string("src")).into()
 	} else {
-		format!("[{alt}]").into()
+		format!("[image]: {alt}").into()
 	}
 }
 
-/// The link text for an `<iframe>` collapsed to an anchor: its `title`, falling
-/// back to the destination URL when untitled.
+/// The `[iframe]:`-prefixed link text for an `<iframe>` collapsed to an anchor:
+/// its `title`, falling back to the destination URL when untitled. The prefix
+/// tells the reader what the link is and is part of the clickable link region.
 fn iframe_marker(view: &ElementView) -> SmolStr {
 	let title = view.attribute_string("title");
 	if title.is_empty() {
-		iframe_url(view).into()
+		format!("[iframe]: {}", iframe_url(view)).into()
 	} else {
-		title.into()
+		format!("[iframe]: {title}").into()
 	}
 }
 
@@ -231,14 +338,37 @@ mod tests {
 		render(rsx_direct! { <hr/> }).xpect_contains("────");
 	}
 
+	/// A closed `<details>` collapses its body and shows a right-pointing caret,
+	/// the terminal equivalent of the web's native collapsed disclosure.
+	#[beet_core::test]
+	fn closed_details_collapses_with_caret() {
+		render(rsx_direct! {
+			<details><summary>"Summary"</summary><p>"Body"</p></details>
+		})
+		.xpect_contains("▸ Summary")
+		.xnot()
+		.xpect_contains("Body");
+	}
+
+	/// An open `<details>` keeps its body and shows a down-pointing caret.
+	#[beet_core::test]
+	fn open_details_expands_with_caret() {
+		render(rsx_direct! {
+			<details open><summary>"Summary"</summary><p>"Body"</p></details>
+		})
+		.xpect_contains("▾ Summary")
+		.xpect_contains("Body");
+	}
+
 	#[beet_core::test]
 	fn image_alt_text() {
 		render(rsx_direct! { <img src="image.png" alt="alt text"/> })
-			.xpect_contains("[alt text]");
+			.xpect_contains("[image]: alt text");
 	}
 
-	/// An `<iframe>` collapses to its `title` as an OSC-8 link targeting the
-	/// `alt-src` (a normal watch URL) rather than the embed-only `src`.
+	/// An `<iframe>` collapses to its `[iframe]:`-prefixed `title` as an OSC-8
+	/// link targeting the `alt-src` (a normal watch URL) rather than the
+	/// embed-only `src`.
 	#[beet_core::test]
 	fn iframe_renders_as_titled_link() {
 		let out = FlexBuffer::render_oneshot(40, rsx_direct! {
@@ -248,7 +378,7 @@ mod tests {
 				title="My Talk"
 			/>
 		});
-		out.xpect_contains("My Talk")
+		out.xpect_contains("[iframe]: My Talk")
 			// OSC-8 hyperlink to the watch URL, not the embed URL
 			.xpect_contains("\x1b]8;;https://youtu.be/abc123\x1b\\")
 			.xnot()
@@ -269,11 +399,11 @@ mod tests {
 			.id();
 		world.run_schedule(PostParseTree);
 		let buffer = world.entity_mut(root).take::<FlexBuffer>().unwrap();
-		// "My Talk" is 7 cols, left-aligned: the link covers cols 0..7 only.
+		// "[iframe]: My Talk" is 17 cols, left-aligned: the link covers cols 0..17.
 		buffer
-			.link_at(UVec2::new(6, 0))
+			.link_at(UVec2::new(16, 0))
 			.xpect_eq(Some("https://example.com/clip"));
-		buffer.link_at(UVec2::new(7, 0)).xpect_eq(None);
+		buffer.link_at(UVec2::new(17, 0)).xpect_eq(None);
 		buffer.link_at(UVec2::new(39, 0)).xpect_eq(None);
 	}
 

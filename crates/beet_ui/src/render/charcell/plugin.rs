@@ -30,7 +30,13 @@ impl Plugin for CharcellPlugin {
 			// post-resolve decorations consumed by the charcell paint pipeline
 			.add_systems(
 				PostParseTree,
-				(apply_hyperlinks, apply_markers).in_set(DecorateSet),
+				(
+					apply_hyperlinks,
+					apply_markers,
+					apply_table_vertical_borders,
+					apply_disclosure,
+				)
+					.in_set(DecorateSet),
 			);
 
 
