@@ -129,10 +129,12 @@ pub fn all_rules() -> Vec<Rule> {
 		sidebar(),
 		sidebar_web(),
 		sidebar_link(),
-		sidebar_link_terminal(),
 		sidebar_active(),
 		sidebar_item(),
 		sidebar_label(),
+		// terminal padding-strip last so it wins the tie over both the web
+		// `.sidebar-link` and `.sidebar-label` padding (later rule wins ties)
+		sidebar_link_terminal(),
 		// utilities
 		hidden(),
 		text_align(TEXT_LEFT, TextAlign::Left),

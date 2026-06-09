@@ -10,8 +10,6 @@
 //!   [`SceneManagementPlugin`] reactively persists the `.beet` retained scene
 //!   cache (observers on [`BeetSceneRoot`]) and a [`SceneWatch`] `on_add` hook
 //!   installs the `--watch` file watcher.
-//! - [`scene_not_found`]: the welcome page shown until a scene supplies its own
-//!   root route.
 //! - [`scene_commands`]: the host load/clear/reset/dump/run commands, each
 //!   targeting either a remote device or the local world, plus [`ExportScene`].
 //!
@@ -29,20 +27,17 @@ mod scene_server;
 #[cfg(feature = "world_serde")]
 pub use scene_server::*;
 
-// Host CLI side: file watcher (needs std fs + the shared `set_scene`) and the
-// welcome page (needs the std beet_ui render pipeline).
-#[cfg(all(feature = "std", feature = "world_serde"))]
+// Host CLI side: the file watcher needs native fs (`FsWatcher`/`DirEvent`, absent
+// on wasm), so it and the scene commands that spawn it are gated off wasm.
+#[cfg(all(feature = "std", feature = "world_serde", not(target_arch = "wasm32")))]
 mod scene_watcher;
-#[cfg(all(feature = "std", feature = "world_serde"))]
+#[cfg(all(feature = "std", feature = "world_serde", not(target_arch = "wasm32")))]
 pub use scene_watcher::*;
-#[cfg(feature = "std")]
-mod scene_not_found;
-#[cfg(feature = "std")]
-pub use scene_not_found::*;
 
 // Host scene commands: load/clear/reset/dump/run + export, each local or remote
-// (std http client + world serde for the local path).
-#[cfg(all(feature = "std", feature = "world_serde"))]
+// (std http client + world serde for the local path). Spawns the file watcher,
+// so they share its native-only gate.
+#[cfg(all(feature = "std", feature = "world_serde", not(target_arch = "wasm32")))]
 mod scene_commands;
-#[cfg(all(feature = "std", feature = "world_serde"))]
+#[cfg(all(feature = "std", feature = "world_serde", not(target_arch = "wasm32")))]
 pub use scene_commands::*;

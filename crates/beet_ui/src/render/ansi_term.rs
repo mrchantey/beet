@@ -235,19 +235,21 @@ mod test {
 
 	#[beet_core::test]
 	fn render_blockquote() {
+		// no per-paragraph `▌` bar: the callout's left rule is a box-model
+		// border supplied by the theme, absent under the bare `CharcellPlugin`
 		render("> quoted text")
 			.xmap(strip_ansi)
 			.trim()
-			.xpect_eq("▌ quoted text");
+			.xpect_eq("quoted text");
 	}
 
 	#[beet_core::test]
 	fn render_blockquote_with_emphasis() {
-		// inline elements inside a blockquote must appear after the prefix
+		// inline emphasis inside a blockquote flows as plain quoted text
 		render("> *notable remark*")
 			.xmap(strip_ansi)
 			.trim()
-			.xpect_eq("▌ notable remark");
+			.xpect_eq("notable remark");
 	}
 
 	#[beet_core::test]

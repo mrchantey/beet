@@ -12,6 +12,8 @@ mod route_codegen;
 mod media;
 mod navigate;
 mod router;
+// every scene-management module needs `world_serde` (load/save a scene through it).
+#[cfg(feature = "world_serde")]
 mod scene_management;
 #[cfg(feature = "std")]
 mod scene_routes;
@@ -27,6 +29,7 @@ pub mod prelude {
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;
 	pub use crate::router::*;
+	#[cfg(feature = "world_serde")]
 	pub use crate::scene_management::*;
 	#[cfg(feature = "std")]
 	pub use crate::scene_routes::*;

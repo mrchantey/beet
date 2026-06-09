@@ -75,7 +75,7 @@ fn swatch(
 /// Every Material colour role grouped by family, the single source of truth for
 /// both the showcase DOM (`docs/design/color_schemes`) and its rules.
 pub fn color_swatch_groups() -> Vec<SwatchGroup> {
-	use colors::*;
+	use beet::ui::style::material::colors::*;
 	vec![
 		SwatchGroup {
 			title: "Primary",

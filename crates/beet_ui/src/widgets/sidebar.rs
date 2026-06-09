@@ -274,7 +274,9 @@ mod test {
 	}
 
 	/// The branch caret is right-aligned on its summary row: the label sits at the
-	/// left, the caret floated to the right edge, on one row (`docs        ▾`).
+	/// left, the caret floated to the right edge, on one row (`docs        ▾ │`).
+	/// The rail's right-border divider (and its right padding) trail every row, so
+	/// the caret is the rightmost *content* rather than the last glyph.
 	#[beet_core::test]
 	fn charcell_caret_right_aligned() {
 		let out = render_charcell(nodes());
@@ -282,10 +284,12 @@ mod test {
 			.lines()
 			.find(|line| line.trim_start().starts_with("docs"))
 			.unwrap();
-		// label leads the row, caret trails it at the far right
-		row.trim_start().xpect_starts_with("docs");
-		row.trim_end().xpect_ends_with("▾");
+		// strip the trailing rail divider/padding to expose the row's content
+		let content = row.trim_end_matches(['│', ' ']);
+		// label leads the row, caret trails it at the far right of the content
+		content.trim_start().xpect_starts_with("docs");
+		content.xpect_ends_with("▾");
 		// the caret is pushed right, not sitting immediately beside the label
-		(row.trim_end().len() - "docs".len() > 4).xpect_true();
+		(content.len() - "docs".len() > 4).xpect_true();
 	}
 }

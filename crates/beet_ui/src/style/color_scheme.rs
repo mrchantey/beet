@@ -80,8 +80,11 @@ mod test {
 	/// so the background flips between the light and dark schemes.
 	#[beet_core::test]
 	fn scheme_toggle_reresolves() {
+		// `RealtimePostParsePlugin` wires `PostParseTree` into the main loop so
+		// `update_local` re-resolves styles, matching a realtime app's repaint
 		let mut world =
-			(MaterialStylePlugin::default(), StylePlugin).into_world();
+			(MaterialStylePlugin::default(), StylePlugin, RealtimePostParsePlugin)
+				.into_world();
 		let entity = world
 			.spawn((
 				rsx_direct! { <div/> },

@@ -143,4 +143,42 @@ mod test {
 		let tree = world.entity(server).get::<RouteTree>().unwrap();
 		tree.find(&["ping"]).xpect_some();
 	}
+
+	/// The retained-cache persist path: load a scene under a host, mark it
+	/// [`BeetSceneRoot`], then re-serialize via `save_roots_filtered` (what the
+	/// CLI writes to `.beet/scene.json`) and rehydrate it. The child routes must
+	/// survive the round-trip, not just the bare root.
+	#[beet_core::test(timeout_ms = 10000)]
+	async fn persist_round_trip_keeps_children() {
+		// build + serialize a one-route scene, as an exporter would.
+		let mut world = test_world();
+		let root = world
+			.spawn((default_router(), children![exchange_route("ping", Ping)]))
+			.flush();
+		let json = WorldSerdeSaver::new()
+			.with_entity_tree(&world, root)
+			.save(&world, MediaType::Json)
+			.unwrap();
+
+		// the CLI re-persists on every startup (rehydrate marks `BeetSceneRoot`,
+		// the observer re-saves), so the cache survives repeated load→save cycles,
+		// not just one. Each iteration loads the prior bytes under a fresh host and
+		// re-saves via the persist path; the child route must never be dropped.
+		let mut bytes = json;
+		for _ in 0..3 {
+			let mut world = test_world();
+			let host = world.spawn(default_router()).flush();
+			set_scene(&mut world, &bytes, Some(host)).unwrap();
+			world.flush();
+			world
+				.entity(host)
+				.get::<RouteTree>()
+				.unwrap()
+				.find(&["ping"])
+				.xpect_some();
+			bytes = WorldSerdeSaver::new()
+				.save_roots_filtered::<With<BeetSceneRoot>>(&mut world, MediaType::Json)
+				.unwrap();
+		}
+	}
 }

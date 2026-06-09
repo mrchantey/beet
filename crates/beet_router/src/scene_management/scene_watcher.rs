@@ -24,8 +24,13 @@ use beet_net::prelude::*;
 extern crate alloc;
 use alloc::string::ToString;
 
-/// Relative path of the CLI's retained-scene cache, loaded on startup and
-/// rewritten whenever the local [`BeetSceneRoot`] set changes.
+/// Workspace-relative path of the CLI's retained-scene cache, loaded on startup
+/// and rewritten whenever the local [`BeetSceneRoot`] set changes.
+///
+/// Resolved against the workspace root (not the cwd) so the retained scene is a
+/// project-level artifact: a `beet load` from the repo root and a later `beet`
+/// invocation from a crate subdir (eg the `run-wasm` cargo test runner, which
+/// runs from each package's directory) share one cache.
 pub const BEET_CACHE_PATH: &str = ".beet/scene.json";
 
 /// Wires the host scene-management machinery: reflect types, the cache-rehydrate
@@ -143,7 +148,7 @@ async fn reload_watched(world: AsyncWorld, watcher: Entity) -> Result {
 /// under the single host. Any [`SceneWatch`] markers in the cache re-fire their
 /// `on_add` hook, reattaching watchers automatically.
 pub fn rehydrate_scene_cache(world: &mut World) -> Result {
-	let path = AbsPathBuf::new(BEET_CACHE_PATH)?;
+	let path = AbsPathBuf::new_workspace_rel(BEET_CACHE_PATH)?;
 	if !path.exists() {
 		return Ok(());
 	}
@@ -194,7 +199,7 @@ fn persist_on_root_removed(
 /// trees are saved (not the host server/commands); when no scene is loaded the
 /// cache file is removed. Idempotent, so repeated calls during a swap are safe.
 fn persist_scene_cache(world: &mut World) -> Result {
-	let path = AbsPathBuf::new(BEET_CACHE_PATH)?;
+	let path = AbsPathBuf::new_workspace_rel(BEET_CACHE_PATH)?;
 	let has_roots = world
 		.query_filtered::<Entity, With<BeetSceneRoot>>()
 		.iter(world)

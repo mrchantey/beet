@@ -111,16 +111,16 @@ fn gallery() -> impl Scene {
 			// ── Buttons (widgets) ─────────────────────────────────────────────
 			<section>
 				<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Buttons"</h2>
-				<Button label="Filled" variant=ButtonVariant::Filled/>
-				<Button label="Outlined" variant=ButtonVariant::Outlined/>
-				<Button label="Text" variant=ButtonVariant::Text/>
-				<Button label="Tonal" variant=ButtonVariant::Tonal/>
-				<Button label="Elevated" variant=ButtonVariant::Elevated/>
-				<Button label="Secondary" variant=ButtonVariant::Secondary/>
-				<Button label="Tertiary" variant=ButtonVariant::Tertiary/>
-				<Button label="Error" variant=ButtonVariant::Error/>
-				<IconButton label="+"/>
-				<Link label="A link button" href="#" variant=ButtonVariant::Text/>
+				<Button variant=ButtonVariant::Filled>"Filled"</Button>
+				<Button variant=ButtonVariant::Outlined>"Outlined"</Button>
+				<Button variant=ButtonVariant::Text>"Text"</Button>
+				<Button variant=ButtonVariant::Tonal>"Tonal"</Button>
+				<Button variant=ButtonVariant::Elevated>"Elevated"</Button>
+				<Button variant=ButtonVariant::Secondary>"Secondary"</Button>
+				<Button variant=ButtonVariant::Tertiary>"Tertiary"</Button>
+				<Button variant=ButtonVariant::Error>"Error"</Button>
+				<IconButton>"+"</IconButton>
+				<Link href="#" variant=ButtonVariant::Text>"A link button"</Link>
 			</section>
 
 			// ── Cards ─────────────────────────────────────────────────────────
