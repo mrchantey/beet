@@ -98,6 +98,7 @@ pub mod prelude {
 		// the bevy_ui pixel rendering specificities
 		if #[cfg(feature = "ui")]{
 			pub use beet_core::prelude::Transform;
+			pub use crate::ui::prelude::Reset;
 			pub use crate::ui::prelude::style::*;
 			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;
