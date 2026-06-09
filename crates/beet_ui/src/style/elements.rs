@@ -96,8 +96,11 @@ pub fn default_element_rules() -> Vec<Rule> {
 		// an embedded `<iframe>` can't render in the terminal; the charcell
 		// decorator collapses it to a titled OSC-8 link (its `Marker` text +
 		// `Hyperlink`, painted as a link by `paint_text`), underlined as a block
-		// on its own line. Web serializes the real iframe and ignores this.
-		block_spaced(&["iframe"]).with_canonical(DecorationLine::underline()),
+		// on its own line and faded like the `<img>` alt placeholder. Web
+		// serializes the real iframe and ignores this.
+		block_spaced(&["iframe"])
+			.with_canonical(DecorationLine::underline())
+			.with_value(ForegroundColor, faint()),
 	]
 }
 
