@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::reflect::Typed;
 use core::marker::PhantomData;
 use core::sync::atomic::AtomicUsize;
@@ -254,21 +253,6 @@ where
 				fields.update_typed(subject, self, func)
 			}
 		})
-	}
-}
-
-/// Marker disambiguating the [`TypedFieldRef`] markup-read [`IntoScene`] impl.
-#[cfg(feature = "scene")]
-pub struct SceneTypedFieldRefMarker;
-
-/// Read a [`TypedFieldRef`] in markup, ie `rsx!{ <span>{count}</span> }`,
-/// lowering to the inner [`FieldRef`] that syncs on `Changed<Document>`.
-#[cfg(feature = "scene")]
-impl<T> crate::prelude::IntoScene<(NotSceneMarker, SceneTypedFieldRefMarker)>
-	for TypedFieldRef<T>
-{
-	fn into_scene(self) -> impl bevy::scene::Scene {
-		(self.field, self.schema).into_scene()
 	}
 }
 

@@ -5,3 +5,7 @@ mod value;
 pub use value::*;
 mod media;
 pub use media::*;
+#[cfg(feature = "serde")]
+mod document;
+#[cfg(feature = "serde")]
+pub use document::*;

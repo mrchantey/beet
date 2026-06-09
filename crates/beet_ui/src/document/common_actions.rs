@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::reflect::GetTypeRegistration;
@@ -235,6 +234,8 @@ where
 #[cfg(test)]
 mod test {
 	use super::*;
+	#[cfg(feature = "world_serde")]
+	use crate::prelude::DocumentUiPlugin;
 	use beet_action::prelude::*;
 
 	fn count_field() -> FieldRef { FieldRef::new("count") }
@@ -478,7 +479,7 @@ mod test {
 		use bevy::ecs::entity::EntityHashMap;
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
-		app.init_plugin::<DocumentPlugin>();
+		app.init_plugin::<DocumentUiPlugin>();
 		app.init();
 		app.update();
 

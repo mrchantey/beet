@@ -30,7 +30,6 @@
 //! # Example
 //!
 //! ```ignore
-//! use beet_ui::prelude::*;
 //! use beet_core::prelude::*;
 //!
 //! let mut world = DocumentPlugin::world();
@@ -46,7 +45,6 @@
 //! ```
 
 use crate::prelude::*;
-use beet_core::prelude::*;
 
 
 
@@ -120,7 +118,10 @@ pub(super) fn unlink_field_from_document(
 /// The symmetric counterpart of [`sync_local_to_document`].
 ///
 /// Runs in `PreUpdate` to ensure values are synchronized before user systems run.
-pub(super) fn sync_document_to_local(
+///
+/// Public so external systems (eg beet_ui's `refresh_blob_store_list`) can order
+/// against the document read path.
+pub fn sync_document_to_local(
 	query: Populated<(&Document, &Fields), Changed<Document>>,
 	mut text_fields: Query<(&ResolvedFieldPath, &mut Value)>,
 ) -> Result {

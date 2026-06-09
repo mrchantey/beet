@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -67,6 +66,7 @@ pub(super) fn refresh_blob_store_list(
 #[cfg(all(test, feature = "json"))]
 mod test {
 	use super::*;
+	use crate::prelude::DocumentUiPlugin;
 
 	/// Count the `ReactiveChild` rows of `entity`.
 	fn row_count(world: &mut World, entity: Entity) -> usize {
@@ -91,7 +91,7 @@ mod test {
 			MinimalPlugins,
 			AsyncPlugin,
 			StorePlugin,
-			DocumentPlugin,
+			DocumentUiPlugin,
 		));
 		// the InMemoryStore is co-located with the Document + list; `store`
 		// shares its backing Arc so test writes reach the same objects

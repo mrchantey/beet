@@ -1,7 +1,5 @@
-#[cfg(feature = "action")]
-use super::common_actions;
-use crate::document::*;
-use beet_core::prelude::*;
+use super::*;
+use crate::prelude::*;
 
 
 /// Plugin that enables document synchronization for field values.
@@ -14,7 +12,6 @@ use beet_core::prelude::*;
 /// # Example
 ///
 /// ```
-/// use beet_ui::prelude::*;
 /// use beet_core::prelude::*;
 ///
 /// let mut world = DocumentPlugin::world();
@@ -50,15 +47,6 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Value>()
 			.register_type::<ValueSchema>();
 
-		// Register action types when the action feature is enabled
-		#[cfg(feature = "action")]
-		app.register_type::<common_actions::Increment>()
-			.register_type::<common_actions::Decrement>()
-			.register_type::<common_actions::AddField>()
-			.register_type::<common_actions::SetField>()
-			.register_type::<common_actions::RemoveAtField>()
-			.register_type::<common_actions::ReadField>();
-
 		app
 			// Add observers and systems
 			.add_observer(link_field_to_document)
@@ -80,16 +68,6 @@ impl Plugin for DocumentPlugin {
 					.chain()
 					.after(async_world_sync_point::<BeetAsyncSyncPoint>),
 			);
-
-		// re-list a changed BlobStore into its backing field, before the sync
-		// chain renders it, also after the async sync point
-		#[cfg(feature = "net")]
-		app.add_systems(
-			PreUpdate,
-			refresh_blob_store_list
-				.after(async_world_sync_point::<BeetAsyncSyncPoint>)
-				.before(sync_document_to_local),
-		);
 	}
 }
 

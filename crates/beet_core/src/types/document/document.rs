@@ -1,6 +1,4 @@
-use beet_core::prelude::*;
-
-use bevy::reflect::Typed;
+use crate::prelude::*;
 
 /// In-memory document that can be attached to entities.
 ///
@@ -102,7 +100,7 @@ impl Document {
 		path: &[FieldSegment],
 	) -> Result<T, DocumentError>
 	where
-		T: 'static + Send + Sync + DeserializeOwned + Typed,
+		T: 'static + Send + Sync + DeserializeOwned + bevy::reflect::Typed,
 	{
 		let value = self.get_field_ref(path)?;
 		value.clone().into_serde().map_err(|err| {
@@ -214,7 +212,12 @@ impl Document {
 pub enum DocumentError {
 	/// Value type mismatch from a [`Value`] accessor.
 	#[error("failed to parse value at path {path}, {error}")]
-	ValueError { path: FieldPath, error: ValueError },
+	ValueError {
+		/// The path where the error occurred.
+		path: FieldPath,
+		/// The underlying [`Value`] accessor error.
+		error: ValueError,
+	},
 	/// Array index was out of bounds.
 	#[error("array index {index} out of bounds\nAt path {path:?}")]
 	ArrayIndexOutOfBounds {

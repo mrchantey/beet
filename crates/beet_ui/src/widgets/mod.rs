@@ -8,8 +8,8 @@
 //! the same DOM + rule machinery as parsed HTML.
 //!
 //! **Reactive substrate.** State lives in documents:
-//! [`TypedFieldRef`](crate::prelude::TypedFieldRef) for a single typed atom and
-//! [`ReactiveChildren`](crate::prelude::ReactiveChildren) for a list field that
+//! [`TypedFieldRef`](beet_core::prelude::TypedFieldRef) for a single typed atom and
+//! [`ReactiveChildren`](beet_core::prelude::ReactiveChildren) for a list field that
 //! materializes one child per item. The full loop — native event then document
 //! mutation then change-detected rebuild — is proven by `native_event_drives_list`
 //! in `document/reactive_children.rs`, with zero render-target coupling.

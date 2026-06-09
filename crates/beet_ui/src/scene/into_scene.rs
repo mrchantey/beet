@@ -90,7 +90,7 @@ impl<T: Into<Value>> IntoScene<(NotSceneMarker, SceneIntoValueMarker)> for T {
 pub struct SceneComponentMarker;
 
 /// Any [`Component`] (eg [`Classes`](crate::prelude::Classes),
-/// [`FieldRef`](crate::document::FieldRef))
+/// [`FieldRef`](beet_core::prelude::FieldRef))
 /// used as a block attribute lifts into a [`template_value`] patch that
 /// attaches it to the current entity. `Option<C>` composes for free via the
 /// `Option` impl, so widgets can take an optional `field: Option<FieldRef>`.

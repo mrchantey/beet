@@ -1,7 +1,6 @@
 //! Reactive keyed state: a typed [`TypedFieldRef<T>`] field stays in sync and
 //! reads / writes without touching [`Value`] or `FieldSegment` directly.
 use beet_core::prelude::*;
-use beet_ui::prelude::*;
 
 fn main() -> Result {
 	let mut world = DocumentPlugin::world();

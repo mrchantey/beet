@@ -15,7 +15,6 @@
 //! `FieldRef("name")` authored inside child N resolves to `items[N].name`.
 
 use crate::prelude::*;
-use beet_core::prelude::*;
 
 /// A field-path prefix contributed to every [`FieldRef`] *beneath* this entity.
 ///

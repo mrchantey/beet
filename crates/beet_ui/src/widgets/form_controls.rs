@@ -8,7 +8,6 @@
 //! Variants are mapped one-to-one onto a class name (e.g. `Filled →
 //! [`classes::INPUT_FILLED`]). The active rule set (Material Design 3 today)
 //! styles these classes via [`RuleSet`]; widget files never hand-roll CSS.
-use crate::prelude::FieldRef;
 use crate::token::ClassName;
 use crate::style::material::classes;
 use beet_core::prelude::*;
@@ -38,7 +37,7 @@ impl TextFieldVariant {
 
 /// A styled `<input>` text field. Optionally binds to a document field via
 /// `field`; when set, the [`FieldRef`] component attaches to the input and it
-/// syncs with the resolved [`Document`](crate::document::Document).
+/// syncs with the resolved [`Document`](beet_core::prelude::Document).
 ///
 /// `name` and `placeholder` are optional — when unset their attributes are
 /// omitted rather than rendered empty.
@@ -118,7 +117,7 @@ pub fn Select(
 }
 
 /// A `<form>` element. Inputs inside the form bind to the form's parent
-/// [`Document`](crate::document::Document) via [`FieldRef`]; the optional
+/// [`Document`](beet_core::prelude::Document) via [`FieldRef`]; the optional
 /// `field` prop attaches a [`FieldRef`] to the form itself (eg the document
 /// root the nested inputs resolve against). The legacy WASM
 /// `FormData → DynamicStruct` path is gone.

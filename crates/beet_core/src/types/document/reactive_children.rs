@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 
 /// Reactive structure: spawns one child per item of a list-typed document field,

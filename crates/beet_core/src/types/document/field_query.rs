@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::reflect::Typed;
 
 /// System parameter for reading and writing document fields, the schema-checked

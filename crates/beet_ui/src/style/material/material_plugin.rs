@@ -204,10 +204,10 @@ mod tests {
 	/// and the light and dark schemes resolve to different colors.
 	#[beet_core::test]
 	fn scheme_class_themes_page() {
-		// `RealtimePostParsePlugin` wires `PostParseTree` into the main loop so
+		// `RealtimeParsePlugin` wires `PostParseTree` into the main loop so
 		// `update_local` resolves styles (the on-demand render paths run it directly)
 		let mut world =
-			(MaterialStylePlugin::default(), StylePlugin, RealtimePostParsePlugin)
+			(MaterialStylePlugin::default(), StylePlugin, RealtimeParsePlugin)
 				.into_world();
 		let light = world
 			.spawn((

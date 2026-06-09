@@ -1,7 +1,7 @@
 //! Keyboard input routed to the single focused entity's [`Value`].
 //!
-//! This layer knows nothing about [`Document`](crate::prelude::Document) or
-//! [`FieldRef`](crate::prelude::FieldRef): it only writes `Changed<Value>` on
+//! This layer knows nothing about [`Document`](beet_core::prelude::Document) or
+//! [`FieldRef`](beet_core::prelude::FieldRef): it only writes `Changed<Value>` on
 //! the focused entity. The bidi sync chain carries that change into the
 //! document. Consumers read it with
 //! `Query<&Value, (Changed<Value>, With<Focus>)>`.

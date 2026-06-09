@@ -1,4 +1,4 @@
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::reflect::Typed;
 
 /// An optional schema describing the shape of a [`Document`](super::Document).
