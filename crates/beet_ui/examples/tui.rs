@@ -12,7 +12,7 @@ fn main() {
 			DocumentPlugin,
 			// realtime repaint: this app mutates the document every Update, so it
 			// runs the post-parse pipeline after each frame.
-			RealtimePostParsePlugin,
+			RealtimeParsePlugin,
 		))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)

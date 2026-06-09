@@ -199,6 +199,20 @@ pub(crate) enum HtmlNode<'a> {
 	Expression(&'a str),
 }
 
+impl<'a> HtmlNode<'a> {
+	/// Whether this node is whitespace-only text, ie carries no visible content.
+	pub(crate) fn is_blank_text(&self) -> bool {
+		matches!(self, HtmlNode::Text(text) if text.trim().is_empty())
+	}
+
+	/// Whether this node is a block-level element (see [`is_block_element`]).
+	/// Text and non-visual nodes (comments, doctype, expressions) are not block
+	/// boxes, so they join the surrounding inline run.
+	pub(crate) fn is_block_level(&self) -> bool {
+		matches!(self, HtmlNode::Element { name, .. } if is_block_element(name))
+	}
+}
+
 /// Build a tree of [`TreeNode`] from a flat list of [`HtmlToken`].
 ///
 /// This handles nesting by tracking open/close tags, void elements,

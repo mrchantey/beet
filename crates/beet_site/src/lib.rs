@@ -50,7 +50,7 @@ pub mod prelude {
 	// `classes::` resolves to the library set, and a site-local class is reached
 	// by its full path (`crate::style::classes::DESIGN_ROW`).
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
-	pub use crate::style::color_scheme_rules;
+	pub use crate::docs_codegen::design_color_schemes::color_scheme_rules;
 	#[cfg(all(feature = "render", not(feature = "codegen")))]
 	pub use crate::style::design_row_rule;
 }

@@ -4,7 +4,7 @@ use beet_ui::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, CharcellPlugin, RealtimePostParsePlugin))
+		.add_plugins((MinimalPlugins, CharcellPlugin, RealtimeParsePlugin))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)
 		.add_observer(on_input)

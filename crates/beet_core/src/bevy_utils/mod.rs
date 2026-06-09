@@ -24,6 +24,7 @@
 //! # Debugging
 //!
 //! - [`BevyhowError`] - Error type for use with Bevy's error handling
+//! - [`LogPlugin`] - Drop-in replacement for bevy's `LogPlugin` using [`PrettyTracing`]
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
 //! - [`IdCounter`] - Unique ID generation
 //!

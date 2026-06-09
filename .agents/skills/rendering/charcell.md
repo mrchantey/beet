@@ -4,7 +4,9 @@ The terminal layout + paint engine, `crates/beet_ui/src/render/charcell`. Read t
 
 ## Already handled, don't reinvent in CSS
 
-`charcell/decorate.rs` generates leading content (the terminal's `::before`): `<li>` bullets/numbers, blockquote bars, the `<hr>` rule, `<img>` alt text. So list/quote markers exist on the terminal with no CSS `list-style`; the web is the side that restores markers. `<li>` under a `<nav>` get **no** marker (navigation, not prose).
+`charcell/decorate.rs` generates leading content (the terminal's `::before`): `<li>` bullets/numbers, blockquote bars, the `<hr>` rule, `<img>` alt text (`[image]: …`), the `<iframe>` link (`[iframe]: …`, the whole prefix is part of the OSC-8 link), and the generic `<details>`/`<summary>` disclosure caret (`▸` closed / `▾` open). So list/quote markers exist on the terminal with no CSS `list-style`; the web is the side that restores markers. `<li>` under a `<nav>` get **no** marker (navigation, not prose).
+
+`decorate.rs` also runs target-only structural fixups the cascade can't express, since `DecorateSet` runs after `ResolveStylesSet` and may mutate the resolved `LayoutStyle`/`BoxStyle`: `apply_disclosure` collapses a closed generic `<details>` (sets non-`<summary>` children to `Display::None`; the sidebar's `SIDEBAR_GROUP` is exempt and always expands), and `apply_table_vertical_borders` gives each non-first cell of a `.table-vertical-borders` table a left border mirroring its bottom rule (the web does this with a `td + td` sibling rule in `reset.css`). Register a new such system in `DecorateSet` (`charcell/plugin.rs`).
 
 ## What the engine now honours (don't reach for CSS-only workarounds)
 

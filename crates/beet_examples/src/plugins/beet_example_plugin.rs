@@ -16,18 +16,19 @@ pub fn minimal_beet_example_plugin(app: &mut App) {
 /// A running app with flow and spatial
 pub fn running_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
+		// beet's `LogPlugin` replaces bevy's, so disable bevy's here and add ours.
 		DefaultPlugins
-			.set(LogPlugin {
-				level: bevy::log::Level::WARN,
-				..default()
-			})
-			// .set(bevyhub_window_plugin())
 			.set(AssetPlugin {
 				// file_path: "../../assets".into(),
 				meta_check: AssetMetaCheck::Never,
 				..default()
 			})
-			.build(),
+			.build()
+			.disable::<bevy::log::LogPlugin>(),
+		LogPlugin {
+			level: Level::WARN,
+			..default()
+		},
 		beet_example_plugin,
 	))
 	.add_systems(Update, (close_on_esc, toggle_fullscreen));

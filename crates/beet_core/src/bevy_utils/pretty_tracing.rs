@@ -4,9 +4,49 @@ use bevy::log::tracing_subscriber;
 use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 
+/// Drop-in replacement for bevy's [`bevy::log::LogPlugin`] that installs beet's
+/// [`PrettyTracing`] subscriber. Prefer this over bevy's `LogPlugin` so every
+/// beet app shares the same compact, cross-platform log format.
+#[derive(Clone)]
+pub struct LogPlugin {
+	/// Default level used when neither `RUST_LOG` nor the AWS lambda log level
+	/// is present in the environment.
+	pub level: tracing::Level,
+	/// Extra comma-separated `EnvFilter` directives appended to the defaults,
+	/// eg `"ureq=off,ureq_proto=off"`.
+	pub filter: String,
+}
+
+impl Default for LogPlugin {
+	fn default() -> Self {
+		let PrettyTracing {
+			default_level,
+			filter,
+		} = PrettyTracing::default();
+		Self {
+			level: default_level,
+			filter,
+		}
+	}
+}
+
+impl Plugin for LogPlugin {
+	fn build(&self, _app: &mut App) {
+		PrettyTracing {
+			default_level: self.level,
+			filter: self.filter.clone(),
+		}
+		.init();
+	}
+}
+
 /// Opinionated high level tracing initialization
+#[derive(Clone)]
 pub struct PrettyTracing {
-	default_level: tracing::Level,
+	/// Level used when no level is found in the environment.
+	pub default_level: tracing::Level,
+	/// Extra comma-separated `EnvFilter` directives appended to the defaults.
+	pub filter: String,
 }
 
 impl Default for PrettyTracing {
@@ -15,7 +55,10 @@ impl Default for PrettyTracing {
 		let default_level = tracing::Level::WARN;
 		#[cfg(not(test))]
 		let default_level = tracing::Level::DEBUG;
-		Self { default_level }
+		Self {
+			default_level,
+			filter: String::new(),
+		}
 	}
 }
 
@@ -36,6 +79,26 @@ impl PrettyTracing {
 			.flatten()
 			.unwrap_or(self.default_level.into());
 
+		// caller-supplied directives win over the defaults below, so append them last.
+		let env_filter = self
+			.filter
+			.split(',')
+			.map(str::trim)
+			.filter(|directive| !directive.is_empty())
+			.fold(
+				tracing_subscriber::EnvFilter::from_default_env()
+					.add_directive("wgpu=error".parse().unwrap())
+					.add_directive("naga=warn".parse().unwrap())
+					.add_directive("bevy_app=warn".parse().unwrap())
+					.add_directive("walrus=warn".parse().unwrap())
+					.add_directive("aws=warn".parse().unwrap())
+					.add_directive("hyper-util=warn".parse().unwrap())
+					.add_directive(log_level.into()),
+				|filter, directive| {
+					filter.add_directive(directive.parse().unwrap())
+				},
+			);
+
 		let sub = tracing_subscriber::fmt()
 			.compact()
 			.with_level(true)
@@ -45,16 +108,7 @@ impl PrettyTracing {
 			.with_file(true)
 			.without_time()
 			.with_line_number(true)
-			.with_env_filter(
-				tracing_subscriber::EnvFilter::from_default_env()
-					.add_directive("wgpu=error".parse().unwrap())
-					.add_directive("naga=warn".parse().unwrap())
-					.add_directive("bevy_app=warn".parse().unwrap())
-					.add_directive("walrus=warn".parse().unwrap())
-					.add_directive("aws=warn".parse().unwrap())
-					.add_directive("hyper-util=warn".parse().unwrap())
-					.add_directive(log_level.into()),
-			)
+			.with_env_filter(env_filter)
 			.with_writer(std::io::stdout);
 		// #[cfg(debug_assertions)]
 		// // remove timestamps from the output in debug mode

@@ -8,47 +8,56 @@ use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 
-/// The default set of HTML block-level element names.
-///
-/// Shared by renderers that need to distinguish block vs inline elements
-/// for whitespace and layout decisions.
+/// The HTML block-level element names, the single list shared by everything that
+/// distinguishes block from inline elements for whitespace and layout decisions
+/// (renderers, the markdown tree builder, …).
+pub const BLOCK_ELEMENTS: &[&str] = &[
+	"address",
+	"article",
+	"aside",
+	"blockquote",
+	"details",
+	"dialog",
+	"dd",
+	"div",
+	"dl",
+	"dt",
+	"fieldset",
+	"figcaption",
+	"figure",
+	"footer",
+	"form",
+	"h1",
+	"h2",
+	"h3",
+	"h4",
+	"h5",
+	"h6",
+	"header",
+	"hgroup",
+	"hr",
+	"li",
+	"main",
+	"nav",
+	"ol",
+	"p",
+	"pre",
+	"search",
+	"section",
+	"table",
+	"ul",
+];
+
+/// Whether `name` is an HTML block-level element (case-insensitive), per
+/// [`BLOCK_ELEMENTS`].
+pub fn is_block_element(name: &str) -> bool {
+	BLOCK_ELEMENTS.iter().any(|el| el.eq_ignore_ascii_case(name))
+}
+
+/// The default set of block-level element names as owned `Cow`s, for renderers
+/// that store an overridable list.
 pub fn default_block_elements() -> Vec<Cow<'static, str>> {
-	vec![
-		"address".into(),
-		"article".into(),
-		"aside".into(),
-		"blockquote".into(),
-		"details".into(),
-		"dialog".into(),
-		"dd".into(),
-		"div".into(),
-		"dl".into(),
-		"dt".into(),
-		"fieldset".into(),
-		"figcaption".into(),
-		"figure".into(),
-		"footer".into(),
-		"form".into(),
-		"h1".into(),
-		"h2".into(),
-		"h3".into(),
-		"h4".into(),
-		"h5".into(),
-		"h6".into(),
-		"header".into(),
-		"hgroup".into(),
-		"hr".into(),
-		"li".into(),
-		"main".into(),
-		"nav".into(),
-		"ol".into(),
-		"p".into(),
-		"pre".into(),
-		"search".into(),
-		"section".into(),
-		"table".into(),
-		"ul".into(),
-	]
+	BLOCK_ELEMENTS.iter().map(|el| Cow::Borrowed(*el)).collect()
 }
 
 

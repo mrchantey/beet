@@ -188,9 +188,6 @@ pub mod prelude {
 	pub use bevy::ecs::system::SystemParam;
 	pub use bevy::ecs::traversal::Traversal;
 	pub use bevy::ecs::world::DeferredWorld;
-	// bevy_log is std-only and only enabled via the `std` feature.
-	#[cfg(feature = "std")]
-	pub use bevy::log::LogPlugin;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;

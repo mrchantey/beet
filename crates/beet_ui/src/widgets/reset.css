@@ -14,8 +14,9 @@
 
 /* Vertical-border table: internal column dividers only. An adjacent-sibling
    rule borders every cell except the first in its row, so the lines fall
-   between columns without framing the table. (The charcell target instead
-   inherits a border-width down to the cells; see `table_vertical_borders`.) */
+   between columns without framing the table. (The charcell target draws the
+   same dividers via the `apply_table_vertical_borders` decorate system, since
+   its cascade can't express this ancestor-scoped sibling rule.) */
 .table-vertical-borders th + th,
 .table-vertical-borders td + td {
 	border-inline-start: var(--material-geometry-outline-width-thin) solid var(--material-colors-outline-variant);

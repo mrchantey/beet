@@ -13,13 +13,13 @@
 //! repaint every frame: doing so re-scans every parsed tree still resident in
 //! the world on every tick, so latency climbs as routes accumulate their cached
 //! trees. Only a realtime app driven by the main loop wants per-frame repaint,
-//! and it opts in with [`RealtimePostParsePlugin`].
+//! and it opts in with [`RealtimeParsePlugin`].
 use beet_core::prelude::*;
 
 /// Registers the [`PostParseTree`] schedule for on-demand runs.
 ///
 /// Does not add it to the main schedule order — see the module docs. Realtime
-/// apps add [`RealtimePostParsePlugin`] for per-frame repaint.
+/// apps add [`RealtimeParsePlugin`] for per-frame repaint.
 #[derive(Default)]
 pub struct ParsePlugin;
 
@@ -39,9 +39,9 @@ impl Plugin for ParsePlugin {
 /// A server or one-shot render must not add this — they run [`PostParseTree`]
 /// on demand per request/render instead. See the module docs.
 #[derive(Default)]
-pub struct RealtimePostParsePlugin;
+pub struct RealtimeParsePlugin;
 
-impl Plugin for RealtimePostParsePlugin {
+impl Plugin for RealtimeParsePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<ParsePlugin>()
 			.insert_schedule_after(Update, PostParseTree);
@@ -49,7 +49,7 @@ impl Plugin for RealtimePostParsePlugin {
 }
 
 /// Schedule run once an entity tree has been parsed (or, with
-/// [`RealtimePostParsePlugin`], after every [`Update`]).
+/// [`RealtimeParsePlugin`], after every [`Update`]).
 ///
 /// Hosts style resolution, syntax highlighting, charcell decorations, and the
 /// layout/paint pipeline, ordered via their respective system sets.
@@ -85,7 +85,7 @@ mod test {
 	#[beet_core::test]
 	fn realtime_plugin_runs_after_update() {
 		let mut app = App::new();
-		app.add_plugins((MinimalPlugins, RealtimePostParsePlugin));
+		app.add_plugins((MinimalPlugins, RealtimeParsePlugin));
 		in_main_order(&app).xpect_true();
 	}
 }

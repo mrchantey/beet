@@ -115,8 +115,9 @@ pub fn all_rules() -> Vec<Rule> {
 		select_filled(),
 		select_text(),
 		error_text(),
-		// table (the `.table-vertical-borders` column dividers are a web concern,
-		// drawn by an adjacent-sibling rule in `reset.css`; charcell tables stack)
+		// table (the `.table-vertical-borders` column dividers are drawn per target:
+		// an adjacent-sibling rule in `reset.css` on the web, the
+		// `apply_table_vertical_borders` decorate system on the terminal)
 		table(),
 		table_th(),
 		table_td(),

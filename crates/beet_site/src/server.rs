@@ -25,9 +25,7 @@ pub fn server_plugin(app: &mut App) {
 	rules.insert_rule(design_row_rule());
 	// the color-schemes showcase binds each swatch to its role tokens through the
 	// rule set, so the palette resolves on both targets rather than a web `<style>`.
-	for rule in color_scheme_rules() {
-		rules.insert_rule(rule);
-	}
+	rules.extend_rules(color_scheme_rules());
 }
 
 /// Every site route: the page collection plus the docs and blog collections,

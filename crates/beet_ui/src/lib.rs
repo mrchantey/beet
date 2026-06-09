@@ -41,10 +41,13 @@ pub mod prelude {
 	/// The shared class-name vocabulary, reached through the `classes::` prefix.
 	#[cfg(feature = "style")]
 	pub use crate::style::material::classes;
-	/// The Material design-token roles (`colors::Primary`, `colors::OnSurface`,
-	/// …), reached through the `colors::` prefix for site-local token rules.
+	/// The Material styling system. Its design-token roles are deliberately
+	/// reached through the `material::` prefix (eg `material::colors::Primary`),
+	/// since Material is one of potentially many styling systems. (Internally
+	/// beet_ui's own rule definitions reach the bare `colors::` prefix via
+	/// `use crate::style::material::*`.)
 	#[cfg(feature = "style")]
-	pub use crate::style::material::colors;
+	pub use crate::style::material;
 	#[cfg(feature = "style")]
 	pub use crate::style::BlinkStyle;
 	#[cfg(feature = "style")]
