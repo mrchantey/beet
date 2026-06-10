@@ -15,8 +15,8 @@
 //! There is no `NameProps` struct and no marker component: the data struct *is*
 //! the props, and props are runtime-verified input values, not a compile-time
 //! call-site contract. Capitalized tags in `rsx!` lower to
-//! `Name { p1: x.into(), ..Default::default() }.into_node_bundle()`, dispatched
-//! to build at runtime.
+//! `Name { p1: x.into(), ..Default::default() }.into_snippet_bundle()`,
+//! dispatched to build at runtime.
 //!
 //! # Prop grammar
 //!
@@ -94,12 +94,12 @@ impl Prop {
 	/// The field's stored type. A required prop or a declared `Option<T>` prop
 	/// stores `PropOpt<inner>` (so the call-site conversion stays unambiguous);
 	/// everything else stores its declared type.
-	fn stored_ty(&self, beet_ui: &syn::Path) -> TokenStream {
+	fn stored_ty(&self, beet_core: &syn::Path) -> TokenStream {
 		if self.required {
 			let ty = &self.ty;
-			quote! { #beet_ui::prelude::PropOpt<#ty> }
+			quote! { #beet_core::prelude::PropOpt<#ty> }
 		} else if let Some(inner) = &self.option_inner {
-			quote! { #beet_ui::prelude::PropOpt<#inner> }
+			quote! { #beet_core::prelude::PropOpt<#inner> }
 		} else {
 			let ty = &self.ty;
 			quote! { #ty }
@@ -110,9 +110,9 @@ impl Prop {
 	///
 	/// Fields are `pub` so a `<Name field=x/>` struct-literal patch resolves
 	/// across module boundaries (the same crate, a different module).
-	fn field_def(&self, beet_ui: &syn::Path) -> TokenStream {
+	fn field_def(&self, beet_core: &syn::Path) -> TokenStream {
 		let ident = &self.ident;
-		let stored_ty = self.stored_ty(beet_ui);
+		let stored_ty = self.stored_ty(beet_core);
 		let other_attrs = &self.other_attrs;
 		quote! {
 			#(#other_attrs)*
@@ -326,7 +326,6 @@ fn emit(
 	let body = &item.block;
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
-	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
 	let bevy = pkg_ext::bevy();
 
 	let field_idents: Vec<&syn::Ident> =
@@ -339,7 +338,7 @@ fn emit(
 			syn::LitStr::new(&prop.ident.to_string(), prop.ident.span())
 		})
 		.collect();
-	let data_struct = data_struct(vis, name, props, &beet_ui);
+	let data_struct = data_struct(vis, name, props, &beet_core);
 
 	let pre_stmts = pre_body_stmts(body);
 	let lowered = lower_body(body)?;
@@ -354,15 +353,15 @@ fn emit(
 	// bundle, insert it into the build target.
 	let build_body = match system {
 		Some(System { sys_types, sys_pats }) => quote! {
-			let inner = #beet_ui::prelude::system_template::<
+			let inner = #beet_core::prelude::system_template::<
 				(#(#sys_types,)*), _, _
 			>(move |_entity, (#(#sys_pats,)*)| {
 				let Self { #(#field_idents),* } = props.clone();
 				#(#required_unwraps)*
 				#(#body_bindings)*
 				#(#pre_stmts)*
-				let bundle = { use #beet_ui::prelude::*; #lowered };
-				#beet_ui::prelude::node(bundle)
+				let bundle = { use #beet_core::prelude::*; #lowered };
+				#beet_core::prelude::snippet(bundle)
 			});
 			cx.entity.build_template(&inner)
 		},
@@ -371,7 +370,7 @@ fn emit(
 			#(#required_unwraps)*
 			#(#body_bindings)*
 			#(#pre_stmts)*
-			let bundle = { use #beet_ui::prelude::*; #lowered };
+			let bundle = { use #beet_core::prelude::*; #lowered };
 			cx.entity.insert(bundle);
 			::core::result::Result::Ok(())
 		},
@@ -415,7 +414,7 @@ fn emit(
 				#(#required_checks)*
 				if !missing.is_empty() {
 					return ::core::result::Result::Err(
-						#beet_ui::prelude::MissingProps {
+						#beet_core::prelude::MissingProps {
 							props: missing,
 							location,
 						}.into(),
@@ -430,7 +429,7 @@ fn emit(
 		// marks this as a build-subtree template, so `<#name .../>` dispatches to
 		// build rather than insert (distinguishing it from a reflect-patch
 		// component, which Bevy's blanket `Template` impl would otherwise shadow).
-		impl #beet_ui::prelude::BuildTemplate for #name {}
+		impl #beet_core::prelude::BuildTemplate for #name {}
 
 		// the prop schema, authored by the typed signature: starts from the
 		// reflect-derived struct schema (a `PropOpt<T>` prop is an optional inner
@@ -468,10 +467,10 @@ fn data_struct(
 	vis: &syn::Visibility,
 	name: &syn::Ident,
 	props: &[Prop],
-	beet_ui: &syn::Path,
+	beet_core: &syn::Path,
 ) -> TokenStream {
 	let field_defs: Vec<TokenStream> =
-		props.iter().map(|prop| prop.field_def(beet_ui)).collect();
+		props.iter().map(|prop| prop.field_def(beet_core)).collect();
 	let needs_manual_default =
 		props.iter().any(|prop| prop.default_expr.is_some());
 

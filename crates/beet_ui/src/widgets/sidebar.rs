@@ -60,10 +60,10 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 /// helper used by [`Sidebar`]; not its own `#[template]` widget because the
 /// recursion reads the parent's `root` context.
 ///
-/// Returns a [`Node`] (via `.any_node()`) because each branch of the
+/// Returns a [`Snippet`] (via `.any_snippet()`) because each branch of the
 /// match builds a differently-shaped tree and `impl Trait` cannot unify across
 /// arms.
-fn sidebar_item(node: SidebarNode, root: bool) -> Node {
+fn sidebar_item(node: SidebarNode, root: bool) -> Snippet {
 	let SidebarNode {
 		display_name,
 		path,
@@ -86,7 +86,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Node {
 					<span {Classes::new([classes::SIDEBAR_LABEL])}>{display_name}</span>
 				</li>
 			}
-			.any_node(),
+			.any_snippet(),
 		}
 	} else {
 		let child_items: Vec<_> = children
@@ -115,7 +115,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Node {
 					</details>
 				</li>
 			}
-			.any_node()
+			.any_snippet()
 		} else {
 			rsx! {
 				<li {Classes::new([root_class])}>
@@ -125,7 +125,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Node {
 					</details>
 				</li>
 			}
-			.any_node()
+			.any_snippet()
 		}
 	}
 }
@@ -136,7 +136,7 @@ fn leaf_link(
 	display_name: String,
 	href: String,
 	active: bool,
-) -> Node {
+) -> Snippet {
 	let link_classes =
 		|| Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")]);
 	// `aria-current` can't be conditionally interpolated, so fork on `active`.
@@ -146,14 +146,14 @@ fn leaf_link(
 				<a {link_classes()} href=href aria-current="page">{display_name}</a>
 			</li>
 		}
-		.any_node()
+		.any_snippet()
 	} else {
 		rsx! {
 			<li {Classes::new([root_class])}>
 				<a {link_classes()} href=href>{display_name}</a>
 			</li>
 		}
-		.any_node()
+		.any_snippet()
 	}
 }
 
@@ -163,22 +163,22 @@ fn summary_content(
 	display_name: String,
 	href: Option<String>,
 	active: bool,
-) -> Node {
+) -> Snippet {
 	let link_classes =
 		|| Classes::new([classes::SIDEBAR_LINK, classes::SIDEBAR_BRANCH]);
 	match href {
 		Some(href) if active => rsx! {
 			<a {link_classes()} href=href aria-current="page">{display_name}</a>
 		}
-		.any_node(),
+		.any_snippet(),
 		Some(href) => rsx! {
 			<a {link_classes()} href=href>{display_name}</a>
 		}
-		.any_node(),
+		.any_snippet(),
 		None => rsx! {
 			<span {Classes::new([classes::SIDEBAR_LABEL, classes::SIDEBAR_BRANCH])}>{display_name}</span>
 		}
-		.any_node(),
+		.any_snippet(),
 	}
 }
 

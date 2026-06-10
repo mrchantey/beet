@@ -9,7 +9,7 @@
 
 use super::ast::*;
 use super::cursor::Cursor;
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// Parse an attribute-value or text-position value: a literal or a reference.
 pub fn parse_value_expr(cursor: &mut Cursor) -> Result<ValueExpr> {

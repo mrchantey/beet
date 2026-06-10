@@ -1,29 +1,38 @@
-//! Markdown parser that produces the same ECS entity tree as [`super::html`].
+//! Markdown parser producing an ECS entity tree of [`Element`]/[`Value`] nodes.
 //!
-//! Uses `pulldown-cmark` to tokenize markdown, converts events into the shared
-//! [`TreeNode`](super::html::diff::TreeNode) intermediate representation, then
-//! diffs against entities using the same infrastructure as the HTML parser.
+//! Uses `pulldown-cmark` to tokenize markdown, converts events into a
+//! [`TreeNode`](diff::TreeNode) intermediate representation, then diffs against
+//! entities using its own tokenizer + diff engine (the `combinators`/`diff`/
+//! `tokens` submodules, formerly the standalone HTML parser's, now owned here).
 //!
-//! Embedded HTML blocks and inline HTML are delegated to the HTML tokenizer.
+//! Embedded markup inside markdown is tokenized by [`combinators`]; an embedded
+//! uppercase `<Template>` is then resolved through the core BSX resolver
+//! ([`resolve_mdx_templates`]), so MDX templates resolve without a second
+//! resolver.
 //!
 //! Enable with the `markdown_parser` feature flag.
 
+mod combinators;
+mod diff;
 mod frontmatter;
+mod tokens;
 mod tree_builder;
+pub use combinators::HtmlParseConfig;
+pub use diff::*;
 pub use frontmatter::*;
-pub(crate) use tree_builder::*;
+pub use tokens::*;
 
-// Re-export diff internals used by tree_builder within crate
-use crate::parse::html::diff::diff_children;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use diff::diff_children;
 use pulldown_cmark::Options;
 
 /// A configurable markdown parser that implements [`NodeParser`].
 ///
-/// Parses markdown into a tree of ECS entities using the same [`TreeNode`]
-/// and diff infrastructure as [`HtmlParser`]. Embedded HTML is delegated
-/// to the HTML tokenizer via an internal [`HtmlParser`] configuration.
+/// Parses markdown into a tree of ECS entities via a [`TreeNode`]
+/// representation and the markdown-owned diff engine. Embedded markup is
+/// tokenized by the [`combinators`] HTML tokenizer; an embedded uppercase
+/// `<Template>` is resolved through the core BSX resolver.
 ///
 /// ## Example
 /// ```rust

@@ -12,7 +12,8 @@
 //! a `.bsx` declares the template's prop schema (see [`super::schema`]).
 
 use super::ast::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 use std::path::Path;
 
 /// An in-memory registry mapping a BSX template's module path (eg
@@ -79,6 +80,7 @@ impl BsxTemplateRegistry {
 	/// `path::to::X`, so `<path::to::X>` resolves to it. This is the registration
 	/// pass: all templates are registered before any are loaded, so a tag resolves
 	/// to a known template and its schema. Uses `fs_ext` (cross-platform).
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub fn register_dir(&mut self, dir: impl AsRef<Path>) -> Result {
 		let dir = dir.as_ref();
 		for path in ReadDir::files_recursive(dir)? {
@@ -118,6 +120,7 @@ impl BsxTemplateRegistry {
 }
 
 /// World/App registration of a BSX template directory.
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 #[extend::ext(name=WorldRegisterBsxExt)]
 pub impl World {
 	/// Register every `.bsx` under `dir` by its module path, populating the
@@ -170,6 +173,7 @@ pub impl World {
 
 /// The Rust-style module path of a `.bsx` file relative to its template `dir`:
 /// `<dir>/path/to/X.bsx` -> `path::to::X`.
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 fn module_path_of(dir: &Path, path: &Path) -> Result<String> {
 	let relative = path.strip_prefix(dir).map_err(|_| {
 		bevyhow!("template file `{}` is not under `{}`", path.display(), dir.display())
@@ -186,7 +190,7 @@ fn module_path_of(dir: &Path, path: &Path) -> Result<String> {
 	Ok(module)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
 mod test {
 	use super::*;
 

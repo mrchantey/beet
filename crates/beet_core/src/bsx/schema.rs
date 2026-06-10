@@ -17,7 +17,7 @@
 
 use super::ast::*;
 use super::resolve::is_directive;
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::template::TemplateContext;
 
 /// Verify the props supplied to `tag` against its registered prop schema.
@@ -67,6 +67,8 @@ pub fn verify_props_against(
 		struct_schema.allow_additional = true;
 	}
 	let mut props = props_value(el);
+	// `validate` is async-shaped but resolves in one poll without an executor, so
+	// `async_ext::block_on` drives it on both std and no_std.
 	let errors = async_ext::block_on(resolved.validate(&mut props));
 	if errors.is_empty() {
 		Ok(())

@@ -1,8 +1,9 @@
 //! Media-type-driven parser that dispatches to format-specific [`NodeParser`]
 //! implementations based on the media type of [`ParseContext::bytes`].
 //!
-//! Enable additional parsers via feature flags:
-//! - `html_parser` — adds [`HtmlParser`] support for [`MediaType::Html`]
+//! One markup parser: with the `bsx` feature, both [`MediaType::Bsx`] and
+//! [`MediaType::Html`] dispatch to the core BSX parser (HTML is the
+//! features-off subset). Enable additional parsers via feature flags:
 //! - `markdown_parser` — adds [`MarkdownParser`] support for [`MediaType::Markdown`]
 
 use crate::prelude::*;
@@ -22,8 +23,6 @@ pub struct MediaParser {
 	plain_text_parser: PlainTextParser,
 	#[cfg(feature = "bsx")]
 	bsx_parser: BsxParser,
-	#[cfg(feature = "html_parser")]
-	html_parser: HtmlParser,
 	#[cfg(feature = "markdown_parser")]
 	markdown_parser: MarkdownParser,
 }
@@ -43,8 +42,6 @@ impl MediaParser {
 			plain_text_parser: PlainTextParser::default(),
 			#[cfg(feature = "bsx")]
 			bsx_parser: BsxParser::bsx(),
-			#[cfg(feature = "html_parser")]
-			html_parser: HtmlParser::new(),
 			#[cfg(feature = "markdown_parser")]
 			markdown_parser: MarkdownParser::new(),
 		}
@@ -59,13 +56,6 @@ impl MediaParser {
 	/// Override the [`PlainTextParser`] instance.
 	pub fn with_plain_text_parser(mut self, parser: PlainTextParser) -> Self {
 		self.plain_text_parser = parser;
-		self
-	}
-
-	/// Override the [`HtmlParser`] instance.
-	#[cfg(feature = "html_parser")]
-	pub fn with_html_parser(mut self, parser: HtmlParser) -> Self {
-		self.html_parser = parser;
 		self
 	}
 
@@ -87,10 +77,10 @@ impl NodeParser for MediaParser {
 			// both dispatch here when the `bsx` feature is on.
 			#[cfg(feature = "bsx")]
 			MediaType::Bsx => self.bsx_parser.parse(cx),
+			// HTML is the BSX grammar with its features disabled (the XML-inspired
+			// markup it accepts), so it dispatches to the same parser.
 			#[cfg(feature = "bsx")]
 			MediaType::Html => BsxParser::html().parse(cx),
-			#[cfg(all(feature = "html_parser", not(feature = "bsx")))]
-			MediaType::Html => self.html_parser.parse(cx),
 			#[cfg(feature = "markdown_parser")]
 			MediaType::Markdown => self.markdown_parser.parse(cx),
 			ref other if self.plaintext_fallback && other.is_text() => {
@@ -100,9 +90,10 @@ impl NodeParser for MediaParser {
 				#[allow(unused_mut)]
 				let mut supported = vec![MediaType::Text];
 				#[cfg(feature = "bsx")]
-				supported.push(MediaType::Bsx);
-				#[cfg(feature = "html_parser")]
-				supported.push(MediaType::Html);
+				{
+					supported.push(MediaType::Bsx);
+					supported.push(MediaType::Html);
+				}
 				#[cfg(feature = "markdown_parser")]
 				supported.push(MediaType::Markdown);
 				Err(ParseError::UnsupportedType {
@@ -138,11 +129,14 @@ mod test {
 			.xpect_eq(Value::Str("hello".into()));
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn parse_html() {
+		// `MediaType::Html` dispatches to the BSX parser (HTML is the features-off
+		// subset). The substrate plugins are needed since BSX builds through it.
 		let bytes = MediaBytes::new_html("<div>hello</div>");
-		World::new()
+		(TemplatePlugin, DocumentPlugin)
+			.into_world()
 			.spawn_empty()
 			.xtap(|entity| {
 				MediaParser::new()

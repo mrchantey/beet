@@ -331,13 +331,13 @@ fn default_raw_text_elements() -> Vec<Cow<'static, str>> {
 mod test {
 	use super::*;
 
-	#[cfg(feature = "html_parser")]
-	/// Parse HTML then render it back via [`HtmlRenderer`].
+	#[cfg(feature = "bsx")]
+	/// Parse HTML (via the BSX parser's HTML mode) then render it back.
 	fn roundtrip(html: &str) -> String {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		HtmlRenderer::new()
@@ -346,13 +346,13 @@ mod test {
 			.to_string()
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	/// Parse then render with expression support.
 	fn roundtrip_expressions(html: &str) -> String {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		HtmlParser::with_expressions()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		HtmlRenderer::new()
@@ -362,46 +362,46 @@ mod test {
 			.to_string()
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_simple_element() {
 		roundtrip("<div>hello</div>").xpect_eq("<div>hello</div>".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_nested_elements() {
 		roundtrip("<div><span>inner</span></div>")
 			.xpect_eq("<div><span>inner</span></div>".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_void_element() {
 		roundtrip("<div><br>text</div>")
 			.xpect_eq("<div><br />text</div>".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->").xpect_eq("<!-- hello -->".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_text_only() {
 		roundtrip("hello world").xpect_eq("hello world".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_expression() {
 		roundtrip_expressions("<p>{name}</p>")
 			.xpect_eq("<p>{name}</p>".to_string());
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_attributes() {
 		roundtrip("<div class=\"foo\" id=\"bar\"></div>")
@@ -409,7 +409,7 @@ mod test {
 			.xpect_contains("id=\"bar\"");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_self_closing() {
 		roundtrip("<img src=\"foo.png\" />")
@@ -417,14 +417,14 @@ mod test {
 			.xpect_contains("/>");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	/// Helper: parse HTML then render with escape_html enabled.
 	#[allow(dead_code)]
 	fn roundtrip_escaped(html: &str) -> String {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		HtmlRenderer::new()
@@ -505,7 +505,7 @@ mod test {
 			.xpect_contains("&amp;");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn roundtrip_script_raw_text() {
 		// Parsing and re-rendering script content should preserve raw text.

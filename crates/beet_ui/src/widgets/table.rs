@@ -55,7 +55,7 @@ mod test {
 		world.entity_mut(root).take::<FlexBuffer>().unwrap().render_plain()
 	}
 
-	fn demo(vertical_lines: bool) -> Node {
+	fn demo(vertical_lines: bool) -> Snippet {
 		rsx! {
 			<Table vertical_lines=vertical_lines>
 				<tr slot="head"><th>"Name"</th><th>"Age"</th></tr>

@@ -2,10 +2,6 @@
 mod bsx;
 #[cfg(feature = "bsx")]
 pub use bsx::*;
-#[cfg(feature = "html_parser")]
-mod html;
-#[cfg(feature = "html_parser")]
-pub use html::*;
 #[cfg(feature = "markdown_parser")]
 mod markdown;
 #[cfg(feature = "markdown_parser")]

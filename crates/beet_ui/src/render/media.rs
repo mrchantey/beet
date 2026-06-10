@@ -33,7 +33,7 @@ pub struct MediaRenderer {
 fn get_default_media_type() -> MediaType {
 	#[cfg(feature = "markdown_parser")]
 	return MediaType::Markdown;
-	#[cfg(all(not(feature = "markdown_parser"), feature = "html_parser"))]
+	#[cfg(all(not(feature = "markdown_parser"), feature = "bsx"))]
 	return MediaType::Html;
 	MediaType::Text
 }
@@ -203,7 +203,7 @@ mod test {
 	#[allow(unused)]
 	use beet_core::prelude::*;
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	fn render(
 		world: &mut World,
 		entity: Entity,
@@ -218,13 +218,13 @@ mod test {
 	}
 
 	/// Parse HTML then render back via [`MediaRenderer`] targeting HTML.
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_html() {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hello</div>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		render(&mut world, entity, MediaType::Html, vec![])
@@ -232,13 +232,13 @@ mod test {
 	}
 
 	/// Parse HTML then render as plain text via [`MediaRenderer`].
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_plain_text() {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>hello</p>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		render(&mut world, entity, MediaType::Text, vec![])
@@ -262,13 +262,13 @@ mod test {
 
 	/// A text-based media type with no dedicated renderer falls back
 	/// to plain text when `plaintext_fallback` is enabled (default).
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn fallback_text_type() {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>hello</p>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		render(&mut world, entity, MediaType::Css, vec![])
@@ -276,13 +276,13 @@ mod test {
 	}
 
 	/// `accepts` list is consulted in priority order.
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn accepts_priority() {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hi</div>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		// Html is first in accepts, so we should get HTML output.
@@ -295,13 +295,13 @@ mod test {
 
 	/// When no type in `accepts` matches and fallback is disabled, errors
 	/// with [`RenderError::AcceptMismatch`].
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn no_match_errors() {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hi</div>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		// Render with only Png accepted and fallback disabled — should error.

@@ -8,7 +8,7 @@
 //! ([`super::resolve`]) walks this tree; type inference happens there, against
 //! the target's `TypeInfo`, not here.
 
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// A single node in the BSX tree.
 #[derive(Debug, Clone, PartialEq)]

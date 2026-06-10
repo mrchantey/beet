@@ -87,7 +87,7 @@ impl<'a> Cursor<'a> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
+	use crate::prelude::*;
 
 	#[beet_core::test]
 	fn peek_and_bump() {

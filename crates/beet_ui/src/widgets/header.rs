@@ -1,4 +1,5 @@
 //! Page `<header>` widget — app bar with a title link and a `<nav>` slot.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A page `<header>` with a title link to `home_route` (defaults to `/`) and

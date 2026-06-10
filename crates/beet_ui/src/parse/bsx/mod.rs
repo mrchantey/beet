@@ -1,48 +1,24 @@
-//! The BSX parser: one hand-written recursive-descent cursor parser whose
-//! features-off configuration is exactly HTML.
+//! The `beet_ui` BSX front-end: a thin [`NodeParser`] that delegates parsing to
+//! the core BSX parser ([`beet_core::bsx`]).
 //!
-//! BSX is the full grammar (uppercase resolution, the value grammar, `bx:`
-//! directives); HTML is BSX with those features disabled, gated behind the `bsx`
-//! cargo feature so the HTML-only mode is a real, tested configuration. The
-//! parser builds a [`BsxNode`](ast::BsxNode) syntax tree, resolved into a
-//! document-wired entity tree through the frozen template substrate by
-//! [`BsxTemplate`], so a `.bsx` file produces trees identical to what `rsx!`
-//! lowers to.
-//!
-//! Internal split (`bsx_parser.md`): the syntax tree ([`ast`]), the cursor
-//! ([`cursor`]), the markup parser ([`parse`]), the value grammar ([`value`]),
-//! literal-to-reflect resolution ([`reflect`]), AST-to-world resolution
-//! ([`resolve`]), the event vocabulary ([`events`]), and the BSX-template
-//! registry ([`registry`]).
-
-mod ast;
-mod cursor;
-mod events;
-mod parse;
-mod reflect;
-mod registry;
-mod remote;
-mod resolve;
-mod schema;
-mod value;
-
-pub use ast::*;
-pub use events::*;
-pub use parse::*;
-pub use registry::*;
-pub use remote::*;
-pub use resolve::*;
-pub use schema::*;
+//! The grammar, the value model, the `bx:` directives, the event/verb seam, and
+//! the AST-to-world resolution all live in `beet_core`; this file only adapts
+//! that to the ui-side [`MediaParser`] dispatch. One parser, one grammar:
+//! [`MediaType::Bsx`] parses with BSX features on, [`MediaType::Html`] with them
+//! off (the HTML-only subset). The default event/verb registration lives in
+//! [`BsxDefaultsPlugin`].
+mod defaults;
+pub use defaults::*;
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A [`NodeParser`] for the BSX and HTML media types.
+/// A [`NodeParser`] for the BSX and HTML media types, delegating to the core
+/// parser.
 ///
-/// One parser, one grammar: [`MediaType::Bsx`] dispatches with BSX features on,
-/// [`MediaType::Html`] with them off (the HTML-only subset). The parsed tree is
-/// resolved into the calling entity through `insert_template`, so slots,
-/// references, and the lifecycle resolve in the one instantiation path.
+/// The parsed tree is resolved into the calling entity through
+/// `insert_template`, so slots, references, and the lifecycle resolve in the one
+/// instantiation path.
 #[derive(Debug, Clone, Default)]
 pub struct BsxParser {
 	/// Tokenization configuration (which grammar features are enabled).

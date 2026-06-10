@@ -30,14 +30,18 @@ std = [
 	"beet_net/http",
 	"dep:beet_ui",
 	"dep:webbrowser",
+	# markup parsing for media negotiation routes `MediaType::Html` through BSX.
+	"bsx",
 ]
 interface = ["serde"]
+# The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
+# parser). Routes `MediaType::Html` parsing through BSX for media negotiation.
+bsx = ["std", "beet_ui/bsx"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_action/serde", "beet_net/serde"]
 markdown = ["std", "dep:pulldown-cmark"]
-html_parser = ["std", "beet_ui/html_parser"]
-markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
+markdown_parser = ["std", "beet_ui/markdown_parser"]
 http = ["std", "beet_net/server"]
 # beet_router's only template_serde use is rebuilding route trees on a
 # `TemplateLoaded` event, which comes from `beet_core/template_serde` (beet's

@@ -8,7 +8,7 @@
 //! concrete type downstream.
 
 use super::ast::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::TypeRegistry;

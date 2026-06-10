@@ -268,14 +268,14 @@ mod test {
 			.xpect_contains("\n\n");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn unescape_html_entities() {
 		let mut app = App::new();
-		app.add_plugins(CharcellPlugin);
+		app.add_plugins((TemplatePlugin, DocumentPlugin, CharcellPlugin));
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>a &amp; b</p>");
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(
 				&mut app.world_mut().entity_mut(entity),
 				&bytes,

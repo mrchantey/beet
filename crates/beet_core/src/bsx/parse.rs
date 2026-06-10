@@ -9,7 +9,7 @@
 use super::ast::*;
 use super::cursor::Cursor;
 use super::value::*;
-use beet_core::prelude::*;
+use crate::prelude::*;
 
 /// Configuration toggling the BSX-only grammar features.
 #[derive(Debug, Clone)]
@@ -135,7 +135,66 @@ fn parse_text(
 		}
 		return Ok(None);
 	}
-	Ok(Some(BsxNode::Text(text.to_string())))
+	// decode character references in prose text (`&amp;` -> `&`); valid in both
+	// XML-inspired BSX and HTML, and required for the renderer round-trip.
+	Ok(Some(BsxNode::Text(decode_entities(&text))))
+}
+
+/// Decode the standard XML/HTML named character references plus numeric
+/// (`&#NN;` / `&#xHH;`) references in prose text. An unrecognized `&name;` is
+/// left verbatim, matching lenient HTML behavior.
+fn decode_entities(input: &str) -> String {
+	// fast path: no references present.
+	if !input.contains('&') {
+		return input.to_string();
+	}
+	let mut out = String::with_capacity(input.len());
+	let mut rest = input;
+	while let Some(amp) = rest.find('&') {
+		out.push_str(&rest[..amp]);
+		rest = &rest[amp..];
+		match rest.find(';') {
+			Some(semi) => {
+				let entity = &rest[..=semi];
+				match decode_one_entity(&entity[1..entity.len() - 1]) {
+					Some(decoded) => out.push_str(&decoded),
+					// unknown reference: keep it verbatim.
+					None => out.push_str(entity),
+				}
+				rest = &rest[semi + 1..];
+			}
+			// no closing `;`: copy the remainder literally.
+			None => {
+				out.push_str(rest);
+				return out;
+			}
+		}
+	}
+	out.push_str(rest);
+	out
+}
+
+/// Decode one entity body (the text between `&` and `;`), or `None` if unknown.
+fn decode_one_entity(body: &str) -> Option<String> {
+	// numeric references: `&#NN;` (decimal) and `&#xHH;` (hex).
+	if let Some(num) = body.strip_prefix('#') {
+		let code = match num.strip_prefix(['x', 'X']) {
+			Some(hex) => u32::from_str_radix(hex, 16).ok()?,
+			None => num.parse::<u32>().ok()?,
+		};
+		return char::from_u32(code).map(String::from);
+	}
+	// the structural XML5 named references, the ones the round-trip relies on.
+	let ch = match body {
+		"amp" => '&',
+		"lt" => '<',
+		"gt" => '>',
+		"quot" => '"',
+		"apos" => '\'',
+		"nbsp" => '\u{00A0}',
+		_ => return None,
+	};
+	Some(String::from(ch))
 }
 
 /// Parse a text-position `{..}` block into a value expression.

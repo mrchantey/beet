@@ -81,6 +81,30 @@ pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }
 
+/// Drives an *immediately-ready* future to completion on no_std by polling once
+/// with a no-op waker.
+///
+/// no_std has no executor, so this only works for futures that never pend (eg
+/// the synchronous-shaped schema validation, which is `async` only for the
+/// remote-fetch seam but resolves in one poll for an in-memory schema). A future
+/// that pends panics, which never happens on this path.
+#[cfg(not(feature = "std"))]
+pub fn block_on<F: Future>(fut: F) -> F::Output {
+	use core::task::Context;
+	use core::task::Poll;
+	let waker = core::task::Waker::noop();
+	let mut cx = Context::from_waker(waker);
+	let mut fut = fut;
+	// SAFETY: `fut` is owned and never moved after pinning.
+	let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+	match fut.as_mut().poll(&mut cx) {
+		Poll::Ready(output) => output,
+		Poll::Pending => {
+			panic!("block_on (no_std) requires an immediately-ready future")
+		}
+	}
+}
+
 /// Blocks the current thread on a future, running it on a [`LocalExecutor`].
 ///
 /// This is the underlying driver for [`#[beet::main]`](beet_core_macros::beet_main).

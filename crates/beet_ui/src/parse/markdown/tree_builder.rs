@@ -4,13 +4,13 @@
 //! The entry point is [`build_markdown_tree`], which returns a
 //! [`MarkdownTreeResult`] containing the node tree and optional frontmatter.
 
+use super::combinators::HtmlParseConfig;
+use super::diff::HtmlDiffConfig;
+use super::diff::HtmlNode;
 use super::frontmatter::Frontmatter;
 use super::frontmatter::FrontmatterKind;
-use crate::parse::html::combinators::HtmlParseConfig;
-use crate::parse::html::diff::HtmlDiffConfig;
-use crate::parse::html::diff::HtmlNode;
-use crate::parse::html::tokens::HtmlAttribute;
-use crate::parse::html::tokens::HtmlToken;
+use super::tokens::HtmlAttribute;
+use super::tokens::HtmlToken;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;
@@ -562,7 +562,7 @@ impl<'a> MdTreeBuilder<'a> {
 	/// and lets a paired inline tag (`<strong>…</strong>`) wrap the markdown
 	/// text events that arrive between its open and close.
 	fn apply_html_fragment(&mut self, source: &'a str) {
-		let tokens = match crate::parse::html::combinators::parse_document(
+		let tokens = match super::combinators::parse_document(
 			source,
 			&self.html_parse_config,
 		) {

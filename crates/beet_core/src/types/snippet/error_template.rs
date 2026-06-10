@@ -6,8 +6,8 @@
 //! [`ErrorTemplate`] carrying [`MissingProps`], which rides `TemplateError` and
 //! surfaces through `LoadTemplate { is_error: true }`. The type stays generic
 //! over the error so other build-time failures use the same path.
+use crate::prelude::*;
 use alloc::sync::Arc;
-use beet_core::prelude::*;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
 use core::panic::Location;

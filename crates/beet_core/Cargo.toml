@@ -33,6 +33,12 @@ path = "tests/bundle_effect.rs"
 harness = false
 
 [[test]]
+name = "rsx"
+path = "tests/rsx.rs"
+required-features = ["rsx", "testing", "serde"]
+harness = false
+
+[[test]]
 name = "component_lifecycle"
 path = "tests/component_lifecycle.rs"
 harness = false
@@ -69,7 +75,7 @@ harness = false
 
 
 [features]
-default = ["std"]
+default = ["std", "bsx"]
 std = [
 	"bevy_color",
 	"bevy/std",
@@ -179,9 +185,14 @@ tokens = [
 	"dep:proc-macro2",
 	"dep:prettyplease",
 	"dep:proc-macro2-diagnostics",
-	"dep:variadics_please",
 ]
 rsx = ["beet_core_macros/rsx"]
+# The hand-written BSX (`.bsx`) cursor parser and its resolution into the
+# document-wired template tree (`src/bsx`). Default-on, gated only because it is
+# a lot of code: an ultra-minimal build can drop it and keep the serde
+# front-ends. The parser is no_std-capable; `register_dir` is additionally
+# `fs`-gated, remote fetch `bevy_async`-gated, and JSON schemas `json`-gated.
+bsx = ["serde"]
 
 
 [dependencies]
@@ -230,7 +241,7 @@ syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 proc-macro2-diagnostics = { workspace = true, optional = true }
-variadics_please = { workspace = true, optional = true }
+variadics_please = { workspace = true }
 prettyplease = { workspace = true, optional = true }
 
 # rand — workspace sets default-features = false so the `rand` feature is
@@ -330,5 +341,5 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
-beet_core = {path = ".", features=["testing"] }
+beet_core = {path = ".", features=["testing", "rsx", "bsx", "json"] }
 # beet_core = {path = ".", features=["testing", "rand", "json", "postcard"]}

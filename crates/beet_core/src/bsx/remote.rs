@@ -13,7 +13,7 @@
 //!
 //! Gated behind `bevy_async`: the no_std core never references this.
 
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::template::TemplateContext;
 
 /// Register a pending remote-schema fetch on the build root, so `LoadTemplate`
@@ -148,5 +148,3 @@ async fn resolve_remote_template(
 		.await;
 }
 
-/// Whether `tag` is the remote-template element `<Template>`.
-pub fn is_remote_template_tag(tag: &str) -> bool { tag == "Template" }

@@ -49,6 +49,8 @@ pub use utils::cross_log::_cross_log_native_noline;
 #[cfg(feature = "std")]
 pub mod arena;
 mod bevy_extensions;
+#[cfg(feature = "bsx")]
+pub mod bsx;
 pub mod bevy_utils;
 pub mod extensions;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -137,6 +139,8 @@ pub mod prelude {
 	pub use crate::arena::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
+	#[cfg(feature = "bsx")]
+	pub use crate::bsx::*;
 	pub use crate::bevybail;
 	pub use crate::bevyhow;
 	pub use crate::cfg_if;

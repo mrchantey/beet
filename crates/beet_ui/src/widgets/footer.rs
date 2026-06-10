@@ -1,4 +1,5 @@
 //! Page `<footer>` widget — copyright, build info, and a default slot.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A page `<footer>` displaying the copyright + version + build stage from

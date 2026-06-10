@@ -8,8 +8,7 @@
 //! Variants are mapped one-to-one onto a class name (e.g. `Filled →
 //! [`classes::INPUT_FILLED`]). The active rule set (Material Design 3 today)
 //! styles these classes via [`RuleSet`]; widget files never hand-roll CSS.
-use crate::token::ClassName;
-use crate::style::material::classes;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Variant style for a [`TextField`] or [`TextArea`], mapped onto a class

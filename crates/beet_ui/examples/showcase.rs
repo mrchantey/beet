@@ -52,7 +52,7 @@ fn main() {
 
 /// Render the showcase page once, write it to disk, and serve it on every route.
 fn serve_showcase(world: &mut World) -> Result {
-	let root = world.spawn_template(node(showcase_page())).id();
+	let root = world.spawn_template(snippet(showcase_page())).id();
 	let html = HtmlRenderer::new()
 		.render(&mut RenderContext::new(root, world))?
 		.to_string();

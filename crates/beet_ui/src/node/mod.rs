@@ -1,24 +1,16 @@
-//! The `rsx!` / `#[template]` lowering-target runtime.
+//! Re-exports of the `rsx!` / `#[template]` snippet runtime (now in
+//! [`beet_core`](beet_core::types::snippet)) plus the small ui-side authoring
+//! helpers ([`attr`]/[`optional_attr`]/[`test_world`]) that reference rendering
+//! types.
 //!
-//! `rsx!` lowers markup to a [`Bundle`](beet_core::prelude::Bundle) tree built
-//! on [`Element`](crate::prelude::Element)/[`Attribute`](crate::prelude::Attribute)/`children!`/[`Value`](beet_core::prelude::Value),
-//! wrapped at the root by [`node`] into the
-//! [`impl Template<Output = ()>`](bevy::ecs::template::Template) the substrate's
-//! `spawn_template` accepts. This is the no-`bevy_scene` authoring layer: it
-//! targets the beet template substrate directly.
-//!
-//! - [`IntoNode`] lifts markup values (text, `{expr}`, `Vec`, `Option`, tuple).
-//! - [`IntoNodeBundle`] dispatches an uppercase tag or bare spread: a
-//!   [`Component`](beet_core::prelude::Component) inserts, a build-subtree
-//!   template builds.
-//! - [`SystemTemplate`] backs `#[template(system)]`.
-//! - [`ErrorTemplate`]/[`MissingProps`] carry a graceful build failure.
-mod into_node;
-mod node_error;
+//! The snippet runtime ([`Snippet`](beet_core::prelude::Snippet),
+//! [`IntoSnippet`](beet_core::prelude::IntoSnippet), … ) moved to
+//! `beet_core::types::snippet`; this module re-exports it so the `rsx!`
+//! lowering and `use beet_ui::prelude::*` call sites resolve unchanged.
 mod node_ext;
-mod system_node;
-
-pub use into_node::*;
-pub use node_error::*;
 pub use node_ext::*;
-pub use system_node::*;
+
+// re-export the moved snippet runtime so `beet_ui::prelude::*` keeps resolving
+// `snippet`/`IntoSnippet`/`IntoSnippetBundle`/`PropOpt`/`BuildTemplate`/… for
+// the macro output and existing call sites.
+pub use beet_core::types::snippet::*;

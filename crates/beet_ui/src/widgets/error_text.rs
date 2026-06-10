@@ -1,6 +1,7 @@
 //! Error-text widget: a single-element widget styled by the `.error-text`
 //! rule (`Error`/`OnError` tokens). The error message is supplied as a prop;
 //! callers conditionally include the widget when an error is present.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Renders a colored error message in a `<span>`.

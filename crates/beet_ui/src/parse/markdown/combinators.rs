@@ -591,6 +591,9 @@ fn starts_with_close_tag_or_empty(input: &str, tag_name: &str) -> bool {
 #[cfg(test)]
 mod test {
 	use super::*;
+	// disambiguate from the core BSX `parse_document` that `beet_core::prelude`
+	// also globs in: these tests exercise the markdown-owned HTML tokenizer.
+	use super::parse_document;
 	use beet_core::prelude::*;
 
 	// -- tag name --

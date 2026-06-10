@@ -3,6 +3,7 @@
 //!
 //! `<head>` is intentionally separate from the body chrome — these layouts
 //! glue them together at the call site, and each layer only adds what it owns.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Wraps an entire page, including `<head>` and `<body>`.

@@ -21,7 +21,6 @@ use super::events::*;
 use super::reflect::*;
 use super::registry::*;
 use crate::prelude::*;
-use beet_core::prelude::*;
 use bevy::ecs::template::SceneEntityReference;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
@@ -449,7 +448,7 @@ fn resolve_entity_refs(
 /// Collect every `$name` in a spread's literals.
 fn collect_entity_ref_names(spread: &SpreadExpr, out: &mut Vec<SmolStr>) {
 	let items = match spread {
-		SpreadExpr::Named(named) => std::slice::from_ref(named),
+		SpreadExpr::Named(named) => core::slice::from_ref(named),
 		SpreadExpr::Tuple(items) => items.as_slice(),
 	};
 	for named in items {
@@ -498,10 +497,12 @@ fn build_uppercase(
 	cx: &mut TemplateContext,
 ) -> Result<()> {
 	// `<Template src="..">` is the remote-template front-end: register a pending
-	// fetch into the root's pending set, awaited by `LoadTemplate`.
-	if is_remote_template_tag(&el.tag) {
-		if let Some(src) = string_attr(el, "src") {
-			register_remote_template(SmolStr::from(src.as_str()), cx)?;
+	// fetch into the root's pending set, awaited by `LoadTemplate`. Remote
+	// resolution needs the async runtime, so it is `bevy_async`-gated.
+	if el.tag == "Template" {
+		if let Some(_src) = string_attr(el, "src") {
+			#[cfg(feature = "bevy_async")]
+			register_remote_template(SmolStr::from(_src.as_str()), cx)?;
 		}
 		apply_common_directives(el, refs, cx)?;
 		return Ok(());
@@ -510,8 +511,9 @@ fn build_uppercase(
 	// a `<path::to::X>` BSX template resolves from the registry first.
 	if let Some(def) = registry.get(&el.tag) {
 		// a remote schema resolves asynchronously, deferring `LoadTemplate`.
-		if let Some(url) = def.remote_schema.clone() {
-			register_remote_schema(SmolStr::from(el.tag.as_str()), url, cx)?;
+		if let Some(_url) = def.remote_schema.clone() {
+			#[cfg(feature = "bevy_async")]
+			register_remote_schema(SmolStr::from(el.tag.as_str()), _url, cx)?;
 		}
 		// verify props against the template's inline `bx:schema`, if it declared one.
 		if let Some(schema) = def.schema.clone() {
@@ -595,11 +597,15 @@ fn apply_reflect_field_bindings(
 		let AttrValue::Expr(ValueExpr::FieldRef { path, init }) = &attr.value else {
 			continue;
 		};
-		let component = el.tag.rsplit("::").next().unwrap_or(&el.tag);
-		entity.insert((
-			field_ref(path, init.as_ref())?,
-			ReflectFieldRef::new(component, attr.key.as_str()),
-		));
+		entity.insert(field_ref(path, init.as_ref())?);
+		// the `Value`<->reflect bridge needs `serde_json` (the `json` feature); an
+		// embedded build without it keeps the `FieldRef` binding but loses the
+		// bidirectional reflect-field write (Risk: documented, acceptable).
+		#[cfg(feature = "json")]
+		{
+			let component = el.tag.rsplit("::").next().unwrap_or(&el.tag);
+			entity.insert(ReflectFieldRef::new(component, attr.key.as_str()));
+		}
 		// one FieldRef per entity: the first field reference owns the binding.
 		break;
 	}
@@ -662,10 +668,13 @@ fn apply_common_directives(
 	if let Some(slot) = slot_routing(el) {
 		cx.entity.insert(slot);
 	}
-	// `bx:click=verb#field` events.
+	// `bx:<event>=verb#field` events. The event name is the directive suffix
+	// after `bx:`; the verb + field resolve through the core registries.
 	for attr in &el.attributes {
-		if attr.key == "bx:click" {
-			let binding = parse_event_binding(&attr.value)?;
+		if let Some(event) = attr.key.strip_prefix("bx:")
+			&& BSX_EVENTS.contains(&event)
+		{
+			let binding = parse_event_binding(event, &attr.value)?;
 			install_event(cx.entity, &binding);
 		}
 	}
@@ -812,7 +821,7 @@ fn apply_spread(
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> Result<()> {
 	let items = match spread {
-		SpreadExpr::Named(named) => std::slice::from_ref(named),
+		SpreadExpr::Named(named) => core::slice::from_ref(named),
 		SpreadExpr::Tuple(items) => items.as_slice(),
 	};
 	for named in items {
@@ -1048,8 +1057,14 @@ fn attr_to_literal(value: &AttrValue) -> Result<DataLiteral> {
 	}
 }
 
-/// Parse a `bx:click=verb#field` event binding from its attribute value.
-fn parse_event_binding(value: &AttrValue) -> Result<EventBinding> {
+/// The `bx:<event>` directive names treated as event bindings (as opposed to the
+/// structural directives `scope`/`for`/`key`/`slot`/`ref`/`schema`). Core stays
+/// event-agnostic; this list only names which directives carry a `verb#field`,
+/// not what the events mean (that lives in the [`EventRegistry`] installers).
+const BSX_EVENTS: &[&str] = &["click"];
+
+/// Parse a `bx:<event>=verb#field` event binding from its attribute value.
+fn parse_event_binding(event: &str, value: &AttrValue) -> Result<EventBinding> {
 	let raw = match value {
 		AttrValue::Str(string) => string.clone(),
 		// an unbraced `bx:click=increment#count` parses as a value expr fallback.
@@ -1058,17 +1073,18 @@ fn parse_event_binding(value: &AttrValue) -> Result<EventBinding> {
 		{
 			named.name.clone()
 		}
-		_ => bevybail!("`bx:click` expects a `verb#field` binding"),
+		_ => bevybail!("`bx:{event}` expects a `verb#field` binding"),
 	};
-	let (verb, rest) = raw
-		.split_once('#')
-		.ok_or_else(|| bevyhow!("`bx:click` must name a field, ie `verb#field`"))?;
+	let (verb, rest) = raw.split_once('#').ok_or_else(|| {
+		bevyhow!("`bx:{event}` must name a field, ie `verb#field`")
+	})?;
 	let (field_str, init) = match rest.split_once('=') {
 		Some((field, init)) => (field, Some(parse_init(init)?)),
 		None => (rest, None),
 	};
 	Ok(EventBinding {
-		verb: EventVerb::parse(verb),
+		event: event.into(),
+		verb: verb.into(),
 		field: FieldPath::new(field_str.split('.').collect::<Vec<_>>()),
 		init,
 	})

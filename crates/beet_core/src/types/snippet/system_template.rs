@@ -1,7 +1,7 @@
 //! Runtime support for `#[template(system)]`: a build-subtree [`Template`] that
 //! reads the world synchronously at build time and applies a produced subtree to
 //! the entity.
-use beet_core::prelude::*;
+use crate::prelude::*;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::system::SystemParam;
 use bevy::ecs::template::Template;
@@ -12,7 +12,7 @@ use core::marker::PhantomData;
 ///
 /// World access happens at the build phase: it fetches the system params `P`
 /// against the building entity (the established
-/// [`with_state`](beet_core::prelude::EntityWorldMutExt::with_state) pattern),
+/// [`with_state`](crate::prelude::EntityWorldMutExt::with_state) pattern),
 /// runs `build` to produce a child template, and builds that subtree into the
 /// entity. Entirely synchronous, no async constructor.
 pub struct SystemTemplate<P, F, T> {

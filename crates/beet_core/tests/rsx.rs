@@ -1,15 +1,19 @@
 //! Lowering tests for the single `rsx!` macro: asserts the lowered tree for
-//! elements, components, templates, spreads, slots, values, and events. This is
-//! the Task 2 gate (the merged macro lowering correctly to the substrate).
+//! elements, components, templates, spreads, values, and events. The `rsx!`
+//! macro and its snippet runtime live in `beet_core`, so this tests core
+//! machinery (the built tree), independent of any renderer.
 beet_core::test_main!();
 
+// alias the crate's modules at the test root so the `crate::…` paths the `rsx!`
+// / `#[template]` / `#[beet_core::test]` macros emit resolve in this integration
+// test (whose `CARGO_PKG_NAME` is `beet_core`).
+use beet_core::exports;
+use beet_core::prelude;
 use beet_core::prelude::*;
-// resolve `crate::` aliasing emitted by the macros.
-use beet_ui::*;
-use beet_ui::prelude::*;
+use beet_core::testing;
 
-/// A spawn-capable template world.
-fn world() -> World { test_world() }
+/// A spawn-capable template world (the minimal substrate + document plugins).
+fn world() -> World { (TemplatePlugin, DocumentPlugin).into_world() }
 
 /// Names of an entity's children, in order.
 fn child_values(world: &World, entity: Entity) -> Vec<Value> {

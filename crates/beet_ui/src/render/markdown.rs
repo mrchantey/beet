@@ -500,13 +500,13 @@ mod test {
 			.xpect_eq("<!-- hello -->");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
-		let mut world = World::new();
+		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
-		HtmlParser::new()
+		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
 		MarkdownRenderer::new()
@@ -515,7 +515,7 @@ mod test {
 			.to_string()
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn unescape_html_entities_in_text() {
 		render_unescaped("<p>a &amp; b</p>")
@@ -523,7 +523,7 @@ mod test {
 			.xpect_eq("a & b");
 	}
 
-	#[cfg(feature = "html_parser")]
+	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn unescape_angle_brackets_in_text() {
 		render_unescaped("<p>&lt;div&gt;</p>")

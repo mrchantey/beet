@@ -1,8 +1,8 @@
 //! The single `rsx!` markup lowering.
 //!
-//! Lowers JSX-like markup to a [`Bundle`] tree on beet_ui's
+//! Lowers JSX-like markup to a [`Bundle`] tree on the
 //! `Element`/`Attribute`/`children!`/`Value` base, wrapped at the root by
-//! `node(..)` into the `impl Template<Output = ()>` the substrate's
+//! `snippet(..)` into the `impl Template<Output = ()>` the substrate's
 //! `spawn_template` accepts. This merges the former `rsx!`/`rsx_direct!` pair
 //! into one macro targeting the template substrate (no `bevy_scene`).
 //!
@@ -12,12 +12,12 @@
 //! - An uppercase tag is a **component** (reflect-patched, inserted) or a
 //!   **template** (built with input props). The macro cannot know which, so it
 //!   emits a static struct update `Foo { a: a.into(), ..Default::default() }`
-//!   dispatched at runtime through `IntoNodeBundle` (a `Component` inserts, a
+//!   dispatched at runtime through `IntoSnippetBundle` (a `Component` inserts, a
 //!   build-subtree `Template` builds).
 //! - A bare `{..}` in attribute position is a **spread**: components/templates
-//!   inserted onto the entity, also through `IntoNodeBundle`.
+//!   inserted onto the entity, also through `IntoSnippetBundle`.
 //! - An attribute or text `{..}` is a **value**: a Rust expression, lifted via
-//!   `IntoNode`.
+//!   `IntoSnippet`.
 //! - `<Slot/>` lowers to a `SlotTarget` marker; `bx:slot="x"`/`slot="x"` on a
 //!   node lowers to a `SlotChild` marker. The walker resolves them.
 //! - `on*` / `bx:click` events lower to observers.
@@ -47,13 +47,13 @@ use syn::spanned::Spanned;
 type CustomNode = rstml::Infallible;
 
 /// The `rsx!` proc-macro entry: lowers markup to an `impl Template<Output = ()>`
-/// by wrapping the lowered bundle in `node(..)`.
+/// by wrapping the lowered bundle in `snippet(..)`.
 pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	let beet_ui = pkg_ext::internal_or_beet("beet_ui");
+	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let bundle = lower_rsx(input.into());
 	quote! {{
-		use #beet_ui::prelude::*;
-		node(#bundle)
+		use #beet_core::prelude::*;
+		snippet(#bundle)
 	}}
 	.into()
 }
@@ -61,10 +61,10 @@ pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Lower markup token stream to a [`Bundle`] expression.
 ///
 /// This is the in-process entry point both the `rsx!` macro (which wraps the
-/// result in `node(..)`) and `#[template]` (which uses it as the function body's
-/// `impl Bundle`) call. It performs no `use` injection; the caller scopes the
-/// emitted identifiers (`Element`, `Value`, `IntoNode`, …) via
-/// `use beet_ui::prelude::*`.
+/// result in `snippet(..)`) and `#[template]` (which uses it as the function
+/// body's `impl Bundle`) call. It performs no `use` injection; the caller scopes
+/// the emitted identifiers (`Element`, `Value`, `IntoSnippet`, …) via
+/// `use beet_core::prelude::*`.
 pub fn lower_rsx(input: TokenStream) -> TokenStream {
 	// No `macro_call_pattern`: this function is the single lowering pass, called
 	// in process by both `rsx!` and `#[template]`. The pattern triggers rstml's
@@ -109,8 +109,8 @@ fn tokenize_node(node: &Node<CustomNode>) -> TokenStream {
 			quote! { Value::new(#value) }
 		}
 		Node::Block(NodeBlock::ValidBlock(block)) => {
-			// text-position `{expr}`: a value lifted via `IntoNode`.
-			quote! { (#block).into_node() }
+			// text-position `{expr}`: a value lifted via `IntoSnippet`.
+			quote! { (#block).into_snippet() }
 		}
 		Node::Block(NodeBlock::Invalid(invalid)) => {
 			syn::Error::new(invalid.span(), "invalid block expression")
@@ -243,7 +243,7 @@ fn tokenize_html_element(
 		match attr {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				// bare `{..}` spread: components/templates onto this entity.
-				extra.push(quote! { (#block).into_node_bundle() });
+				extra.push(quote! { (#block).into_snippet_bundle() });
 			}
 			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
 				extra.push(
@@ -269,7 +269,7 @@ fn tokenize_html_element(
 				match (key.starts_with("on"), value) {
 					(true, Some(val)) => {
 						// `on*` event handler -> observer.
-						extra.push(quote! { (#val).into_node() });
+						extra.push(quote! { (#val).into_snippet() });
 					}
 					(true, None) => extra.push(
 						syn::Error::new(
@@ -316,7 +316,7 @@ fn slot_child_marker(attr: &rstml::node::KeyedAttribute) -> TokenStream {
 }
 
 /// Tokenize a capitalized tag `<Foo a=x b/>` to a component patch / template
-/// build, dispatched at runtime by `IntoNodeBundle`.
+/// build, dispatched at runtime by `IntoSnippetBundle`.
 ///
 /// Values lower to a static struct update `Foo { a: x.into(), b: true.into(),
 /// ..Default::default() }`. Caller content becomes
@@ -361,7 +361,7 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 				}
 			}
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				spreads.push(quote! { (#block).into_node_bundle() });
+				spreads.push(quote! { (#block).into_snippet_bundle() });
 			}
 			NodeAttribute::Block(NodeBlock::Invalid(invalid)) => {
 				spreads.push(
@@ -377,7 +377,7 @@ fn tokenize_component(el: &NodeElement<CustomNode>, tag: &str) -> TokenStream {
 
 	// the patch-over-default struct update, dispatched insert-vs-build.
 	let patch = quote! {
-		(#tag_path { #(#fields,)* ..Default::default() }).into_node_bundle()
+		(#tag_path { #(#fields,)* ..Default::default() }).into_snippet_bundle()
 	};
 
 	let mut parts: Vec<TokenStream> = Vec::new();

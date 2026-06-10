@@ -205,6 +205,17 @@ impl<T> TypedFieldRef<T> {
 	}
 }
 
+/// Marker disambiguating the [`TypedFieldRef`] markup-read [`IntoSnippet`] impl.
+pub struct SnippetTypedFieldRefMarker;
+
+/// Read a [`TypedFieldRef`] in markup, ie `rsx!{ <span>{count}</span> }`,
+/// lowering to the inner [`FieldRef`] that syncs on `Changed<Document>`.
+impl<T> IntoSnippet<(NotSnippetBundleMarker, SnippetTypedFieldRefMarker)>
+	for TypedFieldRef<T>
+{
+	fn into_snippet(self) -> impl Bundle { self.field() }
+}
+
 impl<T> TypedFieldRef<T>
 where
 	T: Default + Serialize + DeserializeOwned + Typed,

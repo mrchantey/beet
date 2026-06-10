@@ -1,9 +1,10 @@
-mod element;
 mod element_query;
 mod element_view;
 mod expression;
 mod state;
-pub use element::*;
+// the basic markup-node types moved to `beet_core::types::element`; re-export so
+// `beet_ui::prelude::*` (renderers, widgets, the macro lowering) resolves them.
+pub use beet_core::types::element::*;
 pub use element_query::*;
 pub use element_view::*;
 pub use expression::*;
