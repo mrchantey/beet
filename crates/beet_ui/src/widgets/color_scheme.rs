@@ -14,8 +14,8 @@ use beet_core::prelude::*;
 /// The script reads the persisted choice (else the OS `prefers-color-scheme`),
 /// toggling the matching class on `<html>`. `setColorScheme("light" | "dark")`
 /// becomes available globally for a theme switcher.
-#[scene]
-pub fn ColorSchemeScript() -> impl Scene {
+#[template]
+pub fn ColorSchemeScript() -> impl Bundle {
 	// inject the shared class-name constants so the script and the style rules
 	// stay in lockstep.
 	let body = format!(

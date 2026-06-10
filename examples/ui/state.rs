@@ -17,7 +17,7 @@ fn setup(mut commands: Commands) {
 	let value_token = token();
 	let increment_token = increment(value_token);
 
-	commands.spawn(rsx_direct! {
+	commands.spawn(rsx! {
 		<div>
 			<span> Count: {value_token}</span>
 			<button onclick={increment_token}>Increment</button>

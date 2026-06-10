@@ -199,7 +199,6 @@ mod test {
 
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	use bevy::ecs::entity::EntityHashMap;
 
 	#[action(pure)]
 	fn add((a, b): (i32, i32)) -> i32 { a + b }
@@ -411,7 +410,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn wrapper_world_serde_roundtrip() {
+	fn wrapper_template_roundtrip() {
 		let mut app = serde_app();
 
 		let entity = app
@@ -428,11 +427,11 @@ mod test {
 		app.world().entity(entity).get::<ActionMeta>().xpect_some();
 
 		// Serialize
-		let world_serde_bytes = WorldSerdeSaver::new()
+		let template_bytes = TemplateSaver::new()
 			.with_entities([entity])
 			.save(app.world(), MediaType::Ron)
 			.unwrap();
-		world_serde_bytes
+		template_bytes
 			.as_utf8()
 			.unwrap()
 			.xref()
@@ -443,16 +442,14 @@ mod test {
 		app.update();
 
 		// Deserialize
-		let mut entity_map = EntityHashMap::default();
-		WorldSerdeLoader::new(app.world_mut())
-			.with_entity_map(&mut entity_map)
-			.load(&world_serde_bytes)
+		let loaded = TemplateLoader::new(app.world_mut())
+			.load(&template_bytes)
 			.unwrap();
 		app.update();
 
 		// The loaded entity should have the wrapper and a ActionMeta
 		// (Action itself isn't serializable, but #[require] re-creates it)
-		let loaded = *entity_map.values().next().unwrap();
+		let loaded = *loaded.first().unwrap();
 		app.world()
 			.entity(loaded)
 			.get::<AddOneWrapper<Doubler>>()
@@ -471,7 +468,7 @@ mod test {
 		app.update();
 
 		// Serialize then despawn
-		let world_serde_bytes = WorldSerdeSaver::new()
+		let template_bytes = TemplateSaver::new()
 			.with_entities([entity])
 			.save(app.world(), MediaType::Ron)
 			.unwrap();
@@ -479,15 +476,13 @@ mod test {
 		app.update();
 
 		// Deserialize
-		let mut entity_map = EntityHashMap::default();
-		WorldSerdeLoader::new(app.world_mut())
-			.with_entity_map(&mut entity_map)
-			.load(&world_serde_bytes)
+		let loaded = TemplateLoader::new(app.world_mut())
+			.load(&template_bytes)
 			.unwrap();
 		app.update();
 
 		// Call the wrapped action on the loaded entity: double(5) + 1 = 11
-		let loaded = *entity_map.values().next().unwrap();
+		let loaded = *loaded.first().unwrap();
 		app.world_mut()
 			.entity_mut(loaded)
 			.call::<i32, i32>(5)

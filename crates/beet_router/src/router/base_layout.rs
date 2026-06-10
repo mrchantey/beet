@@ -5,10 +5,10 @@
 //! [`BaseLayout`] is a render-middleware component (registered like any other
 //! middleware, eg [`RequestLogger`]). For every descendant render route it runs
 //! the inner handler to obtain the content render root, then builds the layout,
-//! an ordinary `#[scene]` widget, with the content as its `children` prop (a
-//! [`RenderRef`] transclusion). The content is rendered *in place, by reference*:
-//! it is never reparented under the layout nor re-resolved, so a persistent fixed
-//! route survives request after request.
+//! an ordinary `#[template]` widget, with the content routed into its default
+//! `<Slot>` as a [`RenderRef`] transclusion. The content is rendered *in place,
+//! by reference*: it is never reparented under the layout nor re-resolved, so a
+//! persistent fixed route survives request after request.
 //!
 //! The layout wraps **every** request regardless of target. Non-visual document
 //! chrome (`<head>`/`<style>`/`<script>`) simply does not paint in the terminal
@@ -21,7 +21,7 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// Render middleware wrapping every descendant render route in the document
-/// layout widget `C` — an ordinary `#[scene]` widget with a default `<slot/>`.
+/// layout widget `C` — an ordinary `#[template]` widget with a default `<Slot>`.
 ///
 /// Add it to an ancestor of the routes it should wrap (eg the router entity),
 /// exactly like any other middleware ([`RequestLogger`], [`HelpHandler`]):
@@ -30,14 +30,14 @@ use beet_ui::prelude::*;
 /// # use beet_router::prelude::*;
 /// # use beet_core::prelude::*;
 /// # use beet_ui::prelude::*;
-/// #[scene]
-/// fn PageLayout() -> impl Scene { rsx! { <html><body><slot/></body></html> } }
+/// #[template]
+/// fn PageLayout() -> impl Bundle { rsx! { <html><body><Slot/></body></html> } }
 /// let bundle = (Router, BaseLayout::<PageLayout>::default());
 /// ```
 ///
 /// For each request it runs the inner route to obtain the content render root,
-/// then builds `C` with that content as its `children` prop (a [`RenderRef`]
-/// transclusion placed by the layout's `<slot/>`).
+/// then builds `C` with that content routed into its default `<Slot>` (a
+/// [`RenderRef`] transclusion).
 #[action]
 #[derive(Component)]
 #[component(on_add = on_add_middleware::<Self, RequestParts, Entity>)]
@@ -45,7 +45,7 @@ pub async fn BaseLayout<C>(
 	cx: ActionContext<(RequestParts, Next<RequestParts, Entity>)>,
 ) -> Result<Entity>
 where
-	C: 'static + Send + Sync + Clone + WithChildren,
+	C: 'static + Send + Sync + Clone + Default + BuildTemplate,
 {
 	let (parts, next) = &cx.input;
 	// resolve the inner content render root, then wrap it
@@ -61,13 +61,13 @@ where
 /// Spawn the layout `C` around the existing `content` render root, returning the
 /// layout as the new render root.
 ///
-/// The content is handed to the layout as a [`SceneProp`] wrapping a
-/// [`RenderRef`]: the layout places it via its `<slot/>`, transcluding the
-/// existing content entity **by reference**. The layout subtree is ephemeral and
-/// despawned after render (along with the content's own ephemerals), but the
-/// referenced content is never owned or despawned here, so a persistent fixed
-/// route survives request after request.
-fn wrap_content<C: WithChildren>(
+/// The content is routed into the layout's default `<Slot>` as a [`SlotChild`]
+/// carrying a [`RenderRef`]: the walker splices it at the layout's slot,
+/// transcluding the existing content entity **by reference**. The layout subtree
+/// is ephemeral and despawned after render (along with the content's own
+/// ephemerals), but the referenced content is never owned or despawned here, so
+/// a persistent fixed route survives request after request.
+fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 	world: &mut World,
 	parts: RequestParts,
 	content: Entity,
@@ -94,11 +94,13 @@ fn wrap_content<C: WithChildren>(
 	// Installed as a resource for the synchronous layout build, then removed.
 	world.insert_resource(RequestContext::new(parts, rendered));
 
-	// the content is transcluded by reference: the layout places this prop, which
-	// resolves to a transparent entity pointing at the existing content.
-	let content_prop = SceneProp::new(template_value(RenderRef::new(rendered)));
+	// the content is transcluded by reference: route it into the layout's default
+	// slot as a `SlotChild` carrying a `RenderRef` to the existing content.
 	let layout = world
-		.spawn_scene(C::scene(C::with_children(content_prop)))?
+		.spawn_template(node((
+			C::default().into_node_bundle(),
+			children![(RenderRef::new(rendered), SlotChild::new())],
+		)))
 		.id();
 	world.remove_resource::<RequestContext>();
 
@@ -119,20 +121,20 @@ mod test {
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
 	/// A document layout with a `<meta charset>` head; the content fills `<main>`.
-	#[scene]
-	fn PageLayout() -> impl Scene {
+	#[template]
+	fn PageLayout() -> impl Bundle {
 		rsx! {
 			<html>
 				<head><meta charset="utf-8"/></head>
-				<body><main><slot/></main></body>
+				<body><main><Slot/></main></body>
 			</html>
 		}
 	}
 
 	/// A layout that places the content inside `<nav>`.
-	#[scene]
-	fn NavLayout() -> impl Scene {
-		rsx! { <body><nav><slot/></nav></body> }
+	#[template]
+	fn NavLayout() -> impl Bundle {
+		rsx! { <body><nav><Slot/></nav></body> }
 	}
 
 	/// Request `path`, negotiating HTML, and return the rendered body.
@@ -156,7 +158,7 @@ mod test {
 			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct! { <p>"page body"</p> }
+					rsx! { <p>"page body"</p> }
 				)
 			]))
 			.flush();
@@ -177,7 +179,7 @@ mod test {
 			.spawn((Router, BaseLayout::<PageLayout>::default(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct! { <p>"page body"</p> }
+					rsx! { <p>"page body"</p> }
 				)
 			]))
 			.flush();
@@ -191,7 +193,7 @@ mod test {
 	#[beet_core::test]
 	async fn wraps_async_route() {
 		async fn page(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx_direct! { <p>"async body"</p> }
+			rsx! { <p>"async body"</p> }
 		}
 		let mut world = router_world();
 		let root = world
@@ -279,7 +281,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router, BaseLayout::<NavLayout>::default(), children![
-				render_action::fixed_route("", rsx_direct! { <a>"home"</a> })
+				render_action::fixed_route("", rsx! { <a>"home"</a> })
 			]))
 			.flush();
 

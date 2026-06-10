@@ -6,7 +6,7 @@ use beet::prelude::*;
 /// One-off layout (the centered hero column, the card and body max-widths, the
 /// centered button row) is declared with `inline_class!` right on each element,
 /// extracted into the small helpers below so the markup stays readable.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<div {hero_column()}>
 			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet"</h1>

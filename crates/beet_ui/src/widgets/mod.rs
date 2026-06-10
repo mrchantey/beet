@@ -1,6 +1,6 @@
-//! Reusable `#[scene]` function-component widgets.
+//! Reusable `#[template]` function components.
 //!
-//! Widgets emit *semantic* classes via [`Classes`](crate::token::Classes)
+//! These emit *semantic* classes via [`Classes`](crate::token::Classes)
 //! (never `class="…"` strings); the active rule set (Material Design 3 via
 //! `MaterialStylePlugin` today) maps those classes to design tokens.
 //!

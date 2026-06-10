@@ -20,7 +20,7 @@
 //!         ..default()
 //!     });
 //! // let nodes = state.collect(&tree);
-//! // let sidebar = world.spawn_scene(rsx!{ <Sidebar nodes=nodes/> });
+//! // let sidebar = world.spawn_template(rsx!{ <Sidebar nodes=nodes/> });
 //! ```
 
 use crate::prelude::*;
@@ -279,8 +279,7 @@ mod test {
 	/// Spawn the `Sidebar` widget from collected nodes and render it to HTML.
 	fn render_sidebar(world: &mut World, nodes: Vec<SidebarNode>) -> String {
 		let entity = world
-			.spawn_scene(rsx! { <Sidebar nodes=nodes/> })
-			.unwrap()
+			.spawn_template(rsx! { <Sidebar nodes=nodes/> })
 			.id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(entity, world))
@@ -307,11 +306,11 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 				render_action::fixed_route(
 					"docs",
-					rsx_direct! { <p>"docs"</p> }
+					rsx! { <p>"docs"</p> }
 				),
 			])
 			.flush();
@@ -332,11 +331,11 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 				render_action::fixed_route(
 					"docs",
-					rsx_direct! { <p>"docs"</p> }
+					rsx! { <p>"docs"</p> }
 				),
 			])
 			.flush();
@@ -355,7 +354,7 @@ mod test {
 		let root = world
 			.spawn(children![render_action::fixed_route(
 				"about",
-				rsx_direct! { <p>"about"</p> }
+				rsx! { <p>"about"</p> }
 			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -371,16 +370,16 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 				(PathPartial::new("docs"), children![
 					render_action::fixed_route(
 						"intro",
-						rsx_direct! { <p>"intro"</p> }
+						rsx! { <p>"intro"</p> }
 					),
 					render_action::fixed_route(
 						"api",
-						rsx_direct! { <p>"api"</p> }
+						rsx! { <p>"api"</p> }
 					),
 				]),
 			])
@@ -409,13 +408,13 @@ mod test {
 				(PathPartial::new("docs"), children![
 					render_action::fixed_route(
 						"intro",
-						rsx_direct! { <p>"intro"</p> }
+						rsx! { <p>"intro"</p> }
 					),
 				]),
 				(PathPartial::new("blog"), children![
 					render_action::fixed_route(
 						"post1",
-						rsx_direct! { <p>"post1"</p> }
+						rsx! { <p>"post1"</p> }
 					),
 				]),
 			])
@@ -443,7 +442,7 @@ mod test {
 		let root = world
 			.spawn(children![render_action::fixed_route(
 				"about",
-				rsx_direct! { <p>"about"</p> }
+				rsx! { <p>"about"</p> }
 			)])
 			.flush();
 		let tree = tree_of(&mut world, root);
@@ -471,11 +470,11 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"zulu",
-					rsx_direct! { <p>"zulu"</p> }
+					rsx! { <p>"zulu"</p> }
 				),
 				render_action::fixed_route(
 					"alpha",
-					rsx_direct! { <p>"alpha"</p> }
+					rsx! { <p>"alpha"</p> }
 				),
 			])
 			.flush();
@@ -518,7 +517,7 @@ mod test {
 			.spawn(children![(PathPartial::new("docs"), children![
 				render_action::fixed_route(
 					"intro",
-					rsx_direct! { <p>"intro"</p> }
+					rsx! { <p>"intro"</p> }
 				),
 			])])
 			.flush();
@@ -550,7 +549,7 @@ mod test {
 				),
 				children![render_action::fixed_route(
 					"intro",
-					rsx_direct! { <p>"intro"</p> }
+					rsx! { <p>"intro"</p> }
 				)],
 			)])
 			.flush();
@@ -572,12 +571,12 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 				(PathPartial::new("docs"), children![
 					render_action::fixed_route(
 						"intro",
-						rsx_direct! { <p>"intro"</p> }
+						rsx! { <p>"intro"</p> }
 					),
 				]),
 			])

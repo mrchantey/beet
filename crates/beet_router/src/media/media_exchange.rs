@@ -67,9 +67,9 @@ fn parse_body_to_render_target(
 		MediaType::Markdown => MarkdownParser::default()
 			.parse(cx)
 			.map_err(|err| bevyhow!("{err}")),
-		MediaType::Json => todo!("beet_ui json parser, WorldSerdeLoader?"),
+		MediaType::Json => todo!("beet_ui json parser, TemplateLoader?"),
 		MediaType::Bytes | MediaType::Postcard => {
-			todo!("beet_ui postcard parser, WorldSerdeLoader?")
+			todo!("beet_ui postcard parser, TemplateLoader?")
 		}
 		unsupported => {
 			bevybail!("Unsupported Content-Type: {unsupported}")

@@ -42,6 +42,20 @@ pub enum ValueSchema {
 	Map(MapSchema),
 	/// A tagged union.
 	Enum(EnumSchema),
+	/// An optional value: [`Value::Null`] is accepted, anything else is
+	/// validated against the inner schema. This is how an `Option`-typed field
+	/// is represented so a missing or null value validates rather than failing.
+	Optional(Box<ValueSchema>),
+	/// A reference to another template's (or registered type's) schema, resolved
+	/// by name against the [`SchemaRegistry`].
+	///
+	/// This is what makes schemas composable: an `items` array of `TodoItem`
+	/// references `TodoItem`'s schema, so schemas form a graph mirroring the
+	/// template graph and validate recursively. The name is a registered
+	/// template's module path (`path::to::TodoItem`) or a Rust short type path.
+	/// Until resolved, validation against it is a wildcard (deferred), since the
+	/// referenced schema may resolve asynchronously.
+	Reference(SmolStr),
 }
 
 impl Default for ValueSchema {
@@ -76,10 +90,16 @@ impl ValueSchema {
 		path: &[FieldSegment],
 	) -> Result<&ValueSchema> {
 		let mut current = self;
-		for segment in path {
+		for (i, segment) in path.iter().enumerate() {
 			current = match (current, segment) {
 				// Any matches the rest of the path
 				(ValueSchema::Any, _) => return Ok(current),
+				// an unresolved reference swallows the rest of the path, like Any
+				(ValueSchema::Reference(_), _) => return Ok(current),
+				// an optional descends into its inner schema for the same segment
+				(ValueSchema::Optional(inner), _) => {
+					return inner.get_field_schema(&path[i..]);
+				}
 				(ValueSchema::Struct(schema), FieldSegment::ObjectKey(key)) => {
 					&schema
 						.fields
@@ -114,9 +134,16 @@ impl ValueSchema {
 	/// Whether this schema is compatible with `other`, treating
 	/// [`ValueSchema::Any`] on either side as a wildcard.
 	pub fn matches(&self, other: &ValueSchema) -> bool {
-		matches!(self, ValueSchema::Any)
-			|| matches!(other, ValueSchema::Any)
-			|| self == other
+		match (self, other) {
+			// an unresolved reference or `Any` is a wildcard on either side
+			(ValueSchema::Any | ValueSchema::Reference(_), _) => true,
+			(_, ValueSchema::Any | ValueSchema::Reference(_)) => true,
+			// an optional matches its bare inner and another optional's inner, so a
+			// typed write of `T` validates against an `Option<T>` field
+			(ValueSchema::Optional(inner), other)
+			| (other, ValueSchema::Optional(inner)) => inner.matches(other),
+			(a, b) => a == b,
+		}
 	}
 
 	/// Assert this schema [`matches`](Self::matches) `other`, reporting the
@@ -182,6 +209,18 @@ impl ApplyConstraints for ValueSchema {
 				ValueSchema::Enum(schema) => {
 					validate_enum(schema, path, value).await
 				}
+				ValueSchema::Optional(inner) => {
+					// a null satisfies an optional; anything else validates as the
+					// inner schema.
+					if matches!(value, Value::Null) {
+						Vec::new()
+					} else {
+						inner.apply(path, value).await
+					}
+				}
+				// an unresolved reference is a wildcard: the referenced schema may
+				// still be resolving asynchronously, so validation is deferred.
+				ValueSchema::Reference(_) => Vec::new(),
 			}
 		})
 	}
@@ -638,6 +677,42 @@ mod test {
 		let mut value = val!("Nope");
 		let errors = schema.validate(&mut value).await;
 		errors.len().xpect_eq(1);
+	}
+
+	#[crate::test]
+	async fn optional_field_accepts_null_or_value() {
+		// an `Option<String>` field validates a present string, a null, and an
+		// absent field, but rejects a wrong-typed present value.
+		let schema = ValueSchema::of::<UserProfile>();
+		// present and well typed
+		schema
+			.validate(&mut val!({ "name": "A", "age": 1u64, "email": "a@b.c" }))
+			.await
+			.is_empty()
+			.xpect_true();
+		// explicit null is accepted by the optional
+		schema
+			.validate(&mut val!({ "name": "A", "age": 1u64, "email": null }))
+			.await
+			.is_empty()
+			.xpect_true();
+		// a present but wrong-typed value still fails
+		schema
+			.validate(&mut val!({ "name": "A", "age": 1u64, "email": 42 }))
+			.await
+			.is_empty()
+			.xpect_false();
+	}
+
+	#[crate::test]
+	fn optional_schema_built_for_option_field() {
+		let schema = ValueSchema::of::<UserProfile>();
+		let ValueSchema::Struct(struct_schema) = schema else {
+			panic!("expected struct schema");
+		};
+		// `email: Option<String>` is an Optional wrapper over String.
+		let email = &struct_schema.fields[2];
+		matches!(email.schema, ValueSchema::Optional(_)).xpect_true();
 	}
 
 	#[crate::test]

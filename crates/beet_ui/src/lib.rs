@@ -10,15 +10,15 @@ extern crate std;
 
 mod document;
 mod input;
+#[cfg(feature = "template")]
+pub mod node;
 mod parse;
 mod render;
-#[cfg(feature = "scene")]
-pub mod scene;
 #[cfg(feature = "style")]
 pub mod style;
 mod token;
 mod types;
-#[cfg(feature = "scene")]
+#[cfg(feature = "template")]
 mod widgets;
 
 /// Exports the most commonly used items.
@@ -32,10 +32,10 @@ pub mod prelude {
 	pub use crate::document::*;
 	pub use crate::inline_class;
 	pub use crate::input::*;
+	#[cfg(feature = "template")]
+	pub use crate::node::*;
 	pub use crate::parse::*;
 	pub use crate::render::*;
-	#[cfg(feature = "scene")]
-	pub use crate::scene::*;
 	#[cfg(feature = "style")]
 	pub use crate::style;
 	/// The shared class-name vocabulary, reached through the `classes::` prefix.
@@ -72,7 +72,7 @@ pub mod prelude {
 	pub use crate::token::*;
 
 	pub use crate::types::*;
-	#[cfg(feature = "scene")]
+	#[cfg(feature = "template")]
 	pub use crate::widgets::*;
 
 	// re-exported so the `token!` macro can resolve `$crate::prelude::FieldSchema`

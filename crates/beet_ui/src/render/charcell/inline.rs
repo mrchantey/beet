@@ -507,7 +507,7 @@ mod pipeline_tests {
 		// text, emphasis and trailing text flow onto one continuous line
 		render(
 			UVec2::new(40, 5),
-			rsx_direct! { <p>"Hello "<em>"world"</em>"!"</p> },
+			rsx! { <p>"Hello "<em>"world"</em>"!"</p> },
 		)
 		.xpect_eq("Hello world!");
 	}
@@ -516,7 +516,7 @@ mod pipeline_tests {
 	fn paragraph_wraps_at_content_width() {
 		render(
 			UVec2::new(9, 5),
-			rsx_direct! { <p>"one two three four"</p> },
+			rsx! { <p>"one two three four"</p> },
 		)
 		.xpect_eq("one two\nthree\nfour");
 	}
@@ -525,7 +525,7 @@ mod pipeline_tests {
 	fn preformatted_preserves_newlines_and_spaces() {
 		render(
 			UVec2::new(20, 5),
-			rsx_direct! { <pre>"fn  main()\n    body"</pre> },
+			rsx! { <pre>"fn  main()\n    body"</pre> },
 		)
 		.xpect_eq("fn  main()\n    body");
 	}
@@ -533,7 +533,7 @@ mod pipeline_tests {
 	#[beet_core::test]
 	fn normal_paragraph_collapses_newlines() {
 		// outside <pre>, an embedded newline collapses to a space in the flow
-		render(UVec2::new(40, 5), rsx_direct! { <p>"alpha\nbeta"</p> })
+		render(UVec2::new(40, 5), rsx! { <p>"alpha\nbeta"</p> })
 			.xpect_eq("alpha beta");
 	}
 
@@ -547,9 +547,9 @@ mod pipeline_tests {
 		let out = FlexBuffer::render_oneshot_plain(
 			40,
 			(LayoutStyle::flex_row(), children![
-				(rsx_direct! { "SIDEBARWIDTH" }, LayoutStyle::default()),
+				(rsx! { "SIDEBARWIDTH" }, LayoutStyle::default()),
 				(LayoutStyle::default().with_flex_grow(1), children![
-					rsx_direct! { <p>{text}</p> }
+					rsx! { <p>{text}</p> }
 				],),
 			]),
 		);
@@ -563,7 +563,7 @@ mod pipeline_tests {
 		// independently-inheriting font-style and font-weight cascades.
 		Buffer::render_oneshot_sized(
 			UVec2::new(40, 3),
-			rsx_direct! { <p><em><strong>"x"</strong></em></p> },
+			rsx! { <p><em><strong>"x"</strong></em></p> },
 		)
 		.xpect_contains("\x1b[1m")
 		.xpect_contains("\x1b[3m");

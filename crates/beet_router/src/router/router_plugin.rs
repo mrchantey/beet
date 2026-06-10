@@ -4,8 +4,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 #[cfg(feature = "std")]
 use beet_ui::prelude::*;
-#[cfg(feature = "std")]
-use bevy::asset::AssetPlugin;
 
 
 /// Plugin that registers route-building observers for actions.
@@ -14,7 +12,7 @@ use bevy::asset::AssetPlugin;
 /// actions are spawned in an entity hierarchy. The route-building observers are
 /// shared across std and no_std; the std build additionally wires the scene /
 /// asset / charcell rendering pipeline and the reflect registrations the
-/// help/scene routes and `world_serde`/scripting need (all std-only). Scene
+/// help/scene routes and `template_serde`/scripting need (all std-only). Scene
 /// routes register as actions (via [`RenderRoot`] + [`ActionMeta`]), so there is
 /// no separate scene observer.
 #[derive(Default)]
@@ -54,17 +52,17 @@ impl Plugin for RouterPlugin {
 		#[cfg(feature = "std")]
 		{
 			app
-				// scene routes render through the charcell layout/paint pipeline;
-				// without it the `PostParseTree` schedule has no systems and ANSI
-				// output is blank.
+				// template routes render through the charcell layout/paint
+				// pipeline; without it the `PostParseTree` schedule has no systems
+				// and ANSI output is blank.
 				.init_plugin::<CharcellPlugin>()
-				// `scene_route` spawns Bevy scenes per request; needs the
-				// AssetServer and ScenePatch asset machinery.
-				.init_plugin::<AssetPlugin>()
-				.init_plugin::<ScenePlugin>()
+				// per-request route content is built through the template
+				// substrate (`spawn_template`), which needs the template plugins.
+				.init_plugin::<TemplatePlugin>()
+				.init_plugin::<DocumentPlugin>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>();
-			#[cfg(feature = "world_serde")]
+			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			#[cfg(feature = "scripting")]
 			app.register_type::<Script<RequestParts, String>>()
@@ -170,15 +168,15 @@ pub fn insert_route_tree(
 	Ok(())
 }
 
-/// Observer that rebuilds [`RouteTree`] roots after a [`WorldSerdeLoaded`],
+/// Observer that rebuilds [`RouteTree`] roots after a [`TemplateLoaded`],
 /// where reflect-driven [`ChildOf`] inserts settle later than [`PathPattern`]
 /// and leave per-leaf trees on the wrong ancestors.
 ///
 /// The load trigger fires synchronously once the hierarchy is whole, so each
 /// affected root is recomputed exactly once before any async serving begins.
-#[cfg(feature = "world_serde")]
+#[cfg(feature = "template_serde")]
 pub fn rebuild_route_trees_on_load(
-	ev: On<WorldSerdeLoaded>,
+	ev: On<TemplateLoaded>,
 	mut commands: Commands,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,

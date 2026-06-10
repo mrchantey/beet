@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// The static home page, linking to the other routes via the generated,
 /// compile-time-checked [`routes`] module.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<main>
 			<h1>"File-based routes"</h1>

@@ -42,7 +42,7 @@ pub fn set_scene(
 
 	// roots are the spawned entities with no parent; mark them so the whole
 	// scene can be despawned together on the next swap.
-	let roots = WorldSerdeLoader::new(world)
+	let roots = TemplateLoader::new(world)
 		.load(media)?
 		.into_iter()
 		.filter(|entity| !world.entity(*entity).contains::<ChildOf>())
@@ -98,7 +98,7 @@ pub fn despawn_scene(world: &mut World) {
 }
 
 
-#[cfg(all(test, feature = "world_serde", feature = "json"))]
+#[cfg(all(test, feature = "template_serde", feature = "json"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -128,7 +128,7 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![exchange_route("ping", Ping)]))
 			.flush();
-		let json = WorldSerdeSaver::new()
+		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
 			.save(&world, MediaType::Json)
 			.unwrap();
@@ -155,7 +155,7 @@ mod test {
 		let root = world
 			.spawn((default_router(), children![exchange_route("ping", Ping)]))
 			.flush();
-		let json = WorldSerdeSaver::new()
+		let json = TemplateSaver::new()
 			.with_entity_tree(&world, root)
 			.save(&world, MediaType::Json)
 			.unwrap();
@@ -176,7 +176,7 @@ mod test {
 				.unwrap()
 				.find(&["ping"])
 				.xpect_some();
-			bytes = WorldSerdeSaver::new()
+			bytes = TemplateSaver::new()
 				.save_roots_filtered::<With<BeetSceneRoot>>(&mut world, MediaType::Json)
 				.unwrap();
 		}

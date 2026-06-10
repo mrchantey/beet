@@ -34,6 +34,8 @@ pub enum MediaType {
 	Ron,
 	/// `text/markdown`
 	Markdown,
+	/// `text/x-bsx` — Beet Script XML, the `.bsx` template format.
+	Bsx,
 	/// `text/event-stream` — Server-Sent Events.
 	EventStream,
 	/// `text/css`
@@ -148,6 +150,7 @@ impl MediaType {
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
 	const MARKDOWN: &'static str = "text/markdown";
+	const BSX: &'static str = "text/x-bsx";
 	const BYTES: &'static str = "application/octet-stream";
 	const EVENT_STREAM: &'static str = "text/event-stream";
 	const CSS: &'static str = "text/css";
@@ -222,6 +225,7 @@ impl MediaType {
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
 			val if val.contains(Self::RON) => MediaType::Ron,
 			val if val.contains(Self::HTML) => MediaType::Html,
+			val if val.contains(Self::BSX) => MediaType::Bsx,
 			val if val.contains(Self::MARKDOWN) => MediaType::Markdown,
 			val if val.contains(Self::EVENT_STREAM) => MediaType::EventStream,
 			val if val.contains("text/xml") || val.contains(Self::XML) => {
@@ -306,6 +310,7 @@ impl MediaType {
 			// text
 			"txt" | "text" | "log" => MediaType::Text,
 			"md" | "markdown" => MediaType::Markdown,
+			"bsx" => MediaType::Bsx,
 			"html" | "htm" => MediaType::Html,
 			"css" => MediaType::Css,
 			"js" | "mjs" | "cjs" => MediaType::Javascript,
@@ -377,6 +382,7 @@ impl MediaType {
 			MediaType::Json => Some("json"),
 			MediaType::Xml => Some("xml"),
 			MediaType::Markdown => Some("md"),
+			MediaType::Bsx => Some("bsx"),
 			MediaType::Csv => Some("csv"),
 			MediaType::Url => Some("url"),
 			MediaType::Yaml => Some("yaml"),
@@ -455,6 +461,7 @@ impl MediaType {
 			MediaType::Postcard => Self::POSTCARD,
 			MediaType::Ron => Self::RON,
 			MediaType::Markdown => Self::MARKDOWN,
+			MediaType::Bsx => Self::BSX,
 			MediaType::EventStream => Self::EVENT_STREAM,
 			MediaType::Css => Self::CSS,
 			MediaType::Javascript => Self::JAVASCRIPT,
@@ -535,6 +542,7 @@ impl MediaType {
 				| MediaType::Xml
 				| MediaType::Json
 				| MediaType::Markdown
+				| MediaType::Bsx
 				| MediaType::EventStream
 				| MediaType::Css
 				| MediaType::Javascript

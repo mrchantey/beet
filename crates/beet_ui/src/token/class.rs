@@ -135,7 +135,7 @@ where
 /// in the global [`RuleSet`].
 ///
 /// [`OnSpawn`] is a [`BundleEffect`], so it works as a block attribute in both
-/// the bundle `rsx_direct!` and the scene `rsx!` lowerings (scenes lift it via
+/// the bundle `rsx!` and the scene `rsx!` lowerings (scenes lift it via
 /// [`IntoScene`](crate::prelude::IntoScene)). This pattern is somewhat analagous
 /// to Component Scoped Styles as seen in frameworks like Astro.
 #[track_caller]
@@ -167,7 +167,7 @@ pub fn inline_class(
 /// Declare a [`RuleSet`] rule inline on an element.
 ///
 /// ```ignore
-/// rsx_direct!{<div {inline_class![
+/// rsx!{<div {inline_class![
 /// 	(ForegroundColor, Color::BLUE),
 /// 	(BackgroundColor, Color::RED),
 /// ]} />}

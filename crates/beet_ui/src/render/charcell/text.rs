@@ -199,7 +199,7 @@ mod tests {
 	#[beet_core::test]
 	fn text_align_left() {
 		render_pluses((
-			rsx_direct! { "Hi" },
+			rsx! { "Hi" },
 			VisualStyle::default().with_text_align(TextAlign::Left),
 		))
 		.xpect_snapshot();
@@ -208,7 +208,7 @@ mod tests {
 	#[beet_core::test]
 	fn text_align_right() {
 		render_pluses((
-			rsx_direct! { "Hi" },
+			rsx! { "Hi" },
 			VisualStyle::default().with_text_align(TextAlign::Right),
 		))
 		.xpect_snapshot();
@@ -217,7 +217,7 @@ mod tests {
 	#[beet_core::test]
 	fn text_align_center() {
 		render_pluses((
-			rsx_direct! { "Hi" },
+			rsx! { "Hi" },
 			VisualStyle::default().with_text_align(TextAlign::Center),
 		))
 		.xpect_snapshot();
@@ -231,7 +231,7 @@ mod tests {
 			foreground: Some(Color::srgb(1., 0., 0.)),
 			..VisualStyle::default()
 		};
-		render((rsx_direct! { "Hi" }, visual)).xpect_snapshot();
+		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 
 	#[beet_core::test]
@@ -240,7 +240,7 @@ mod tests {
 			decoration_line: DecorationLine::underline(),
 			..VisualStyle::default()
 		};
-		render((rsx_direct! { "Hi" }, visual)).xpect_snapshot();
+		render((rsx! { "Hi" }, visual)).xpect_snapshot();
 	}
 
 	// ── Wide character support ────────────────────────────────────────────────

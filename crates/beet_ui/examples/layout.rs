@@ -99,9 +99,9 @@ fn setup_justify_start() -> impl Bundle {
 			.justify_content(JustifyContent::Start)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -112,9 +112,9 @@ fn setup_justify_center() -> impl Bundle {
 			.justify_content(JustifyContent::Center)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -125,9 +125,9 @@ fn setup_justify_end() -> impl Bundle {
 			.justify_content(JustifyContent::End)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -138,9 +138,9 @@ fn setup_justify_space_between() -> impl Bundle {
 			.justify_content(JustifyContent::SpaceBetween)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -151,9 +151,9 @@ fn setup_justify_space_around() -> impl Bundle {
 			.justify_content(JustifyContent::SpaceAround)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -164,9 +164,9 @@ fn setup_justify_space_evenly() -> impl Bundle {
 			.justify_content(JustifyContent::SpaceEvenly)
 			.column_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"A"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
-			(rsx_direct! {"C"}, bordered()),
+			(rsx! {"A"}, bordered()),
+			(rsx! {"B"}, bordered()),
+			(rsx! {"C"}, bordered()),
 		],
 	)
 }
@@ -182,14 +182,14 @@ fn setup_align_start() -> impl Bundle {
 			(
 				LayoutStyle::flex_col(),
 				children![
-					(rsx_direct! {"Very"}, bordered()),
-					(rsx_direct! {"Tall"}, bordered()),
-					(rsx_direct! {"Item"}, bordered()),
+					(rsx! {"Very"}, bordered()),
+					(rsx! {"Tall"}, bordered()),
+					(rsx! {"Item"}, bordered()),
 				],
 				bordered()
 			),
-			(rsx_direct! {"Short"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
+			(rsx! {"Short"}, bordered()),
+			(rsx! {"B"}, bordered()),
 		],
 	)
 }
@@ -203,14 +203,14 @@ fn setup_align_center() -> impl Bundle {
 			(
 				LayoutStyle::flex_col(),
 				children![
-					(rsx_direct! {"Very"}, bordered()),
-					(rsx_direct! {"Tall"}, bordered()),
-					(rsx_direct! {"Item"}, bordered()),
+					(rsx! {"Very"}, bordered()),
+					(rsx! {"Tall"}, bordered()),
+					(rsx! {"Item"}, bordered()),
 				],
 				bordered()
 			),
-			(rsx_direct! {"Short"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
+			(rsx! {"Short"}, bordered()),
+			(rsx! {"B"}, bordered()),
 		],
 	)
 }
@@ -224,14 +224,14 @@ fn setup_align_end() -> impl Bundle {
 			(
 				LayoutStyle::flex_col(),
 				children![
-					(rsx_direct! {"Very"}, bordered()),
-					(rsx_direct! {"Tall"}, bordered()),
-					(rsx_direct! {"Item"}, bordered()),
+					(rsx! {"Very"}, bordered()),
+					(rsx! {"Tall"}, bordered()),
+					(rsx! {"Item"}, bordered()),
 				],
 				bordered()
 			),
-			(rsx_direct! {"Short"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
+			(rsx! {"Short"}, bordered()),
+			(rsx! {"B"}, bordered()),
 		],
 	)
 }
@@ -245,14 +245,14 @@ fn setup_align_stretch() -> impl Bundle {
 			(
 				LayoutStyle::flex_col(),
 				children![
-					(rsx_direct! {"Very"}, bordered()),
-					(rsx_direct! {"Tall"}, bordered()),
-					(rsx_direct! {"Item"}, bordered()),
+					(rsx! {"Very"}, bordered()),
+					(rsx! {"Tall"}, bordered()),
+					(rsx! {"Item"}, bordered()),
 				],
 				bordered()
 			),
-			(rsx_direct! {"Short"}, bordered()),
-			(rsx_direct! {"B"}, bordered()),
+			(rsx! {"Short"}, bordered()),
+			(rsx! {"B"}, bordered()),
 		],
 	)
 }
@@ -266,12 +266,12 @@ fn setup_gaps() -> impl Bundle {
 			.row_gap(Length::Rem(1.))
 			.column_gap(Length::Rem(2.)),
 		children![
-			(rsx_direct! {"1"}, bordered()),
-			(rsx_direct! {"2"}, bordered()),
-			(rsx_direct! {"3"}, bordered()),
-			(rsx_direct! {"4"}, bordered()),
-			(rsx_direct! {"5"}, bordered()),
-			(rsx_direct! {"6"}, bordered()),
+			(rsx! {"1"}, bordered()),
+			(rsx! {"2"}, bordered()),
+			(rsx! {"3"}, bordered()),
+			(rsx! {"4"}, bordered()),
+			(rsx! {"5"}, bordered()),
+			(rsx! {"6"}, bordered()),
 		],
 	)
 }
@@ -280,18 +280,18 @@ fn setup_gaps() -> impl Bundle {
 
 fn setup_flex_grow() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! {"Fixed"}, bordered()),
+		(rsx! {"Fixed"}, bordered()),
 		(
-			rsx_direct! {"Grow 1"},
+			rsx! {"Grow 1"},
 			bordered(),
 			LayoutStyle::default().with_flex_grow(1)
 		),
 		(
-			rsx_direct! {"Grow 2"},
+			rsx! {"Grow 2"},
 			bordered(),
 			LayoutStyle::default().with_flex_grow(2)
 		),
-		(rsx_direct! {"Fixed"}, bordered()),
+		(rsx! {"Fixed"}, bordered()),
 	])
 }
 
@@ -299,11 +299,11 @@ fn setup_flex_grow() -> impl Bundle {
 
 fn setup_no_wrap() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! {"Item 1"}, bordered()),
-		(rsx_direct! {"Item 2"}, bordered()),
-		(rsx_direct! {"Item 3"}, bordered()),
-		(rsx_direct! {"Item 4"}, bordered()),
-		(rsx_direct! {"Item 5"}, bordered()),
+		(rsx! {"Item 1"}, bordered()),
+		(rsx! {"Item 2"}, bordered()),
+		(rsx! {"Item 3"}, bordered()),
+		(rsx! {"Item 4"}, bordered()),
+		(rsx! {"Item 5"}, bordered()),
 	])
 }
 
@@ -314,11 +314,11 @@ fn setup_wrap() -> impl Bundle {
 			.column_gap(Length::Rem(1.))
 			.row_gap(Length::Rem(1.)),
 		children![
-			(rsx_direct! {"Item 1"}, bordered()),
-			(rsx_direct! {"Item 2"}, bordered()),
-			(rsx_direct! {"Item 3"}, bordered()),
-			(rsx_direct! {"Item 4"}, bordered()),
-			(rsx_direct! {"Item 5"}, bordered()),
+			(rsx! {"Item 1"}, bordered()),
+			(rsx! {"Item 2"}, bordered()),
+			(rsx! {"Item 3"}, bordered()),
+			(rsx! {"Item 4"}, bordered()),
+			(rsx! {"Item 5"}, bordered()),
 		],
 	)
 }
@@ -351,8 +351,8 @@ fn setup_nested() -> impl Bundle {
 		(
 			LayoutStyle::flex_row().column_gap(Length::Rem(1.)),
 			children![
-				(rsx_direct! {"Header L"}, bordered(), header_style.clone()),
-				(rsx_direct! {"Header R"}, bordered(), header_style.clone()),
+				(rsx! {"Header L"}, bordered(), header_style.clone()),
+				(rsx! {"Header R"}, bordered(), header_style.clone()),
 			],
 			bordered()
 		),
@@ -361,12 +361,12 @@ fn setup_nested() -> impl Bundle {
 			VisualStyle::default()
 				.with_background(palettes::tailwind::EMERALD_900),
 			children![
-				(rsx_direct! {"Sidebar"}, bordered(), sidebar_style),
+				(rsx! {"Sidebar"}, bordered(), sidebar_style),
 				(
 					LayoutStyle::flex_col().row_gap(Length::Rem(1.)),
 					children![
-						(rsx_direct! {"Main"}, bordered(), main_style),
-						(rsx_direct! {"Footer"}, bordered(), footer_style),
+						(rsx! {"Main"}, bordered(), main_style),
+						(rsx! {"Footer"}, bordered(), footer_style),
 					],
 					bordered()
 				),
@@ -380,26 +380,26 @@ fn setup_nested() -> impl Bundle {
 
 fn setup_margin_only() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx_direct! {"A"}, margin()),
-		(rsx_direct! {"B"}, margin()),
-		(rsx_direct! {"C"}, margin()),
+		(rsx! {"A"}, margin()),
+		(rsx! {"B"}, margin()),
+		(rsx! {"C"}, margin()),
 	])
 }
 
 fn setup_border_only() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx_direct! {"A"}, bordered()),
-		(rsx_direct! {"B"}, bordered()),
-		(rsx_direct! {"C"}, bordered()),
+		(rsx! {"A"}, bordered()),
+		(rsx! {"B"}, bordered()),
+		(rsx! {"C"}, bordered()),
 	])
 }
 
 fn setup_padding_only() -> impl Bundle {
 	let style = bordered().with_padding(Spacing::all(Length::Rem(1.)));
 	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx_direct! {"A"}, style.clone()),
-		(rsx_direct! {"B"}, style.clone()),
-		(rsx_direct! {"C"}, style.clone()),
+		(rsx! {"A"}, style.clone()),
+		(rsx! {"B"}, style.clone()),
+		(rsx! {"C"}, style.clone()),
 	])
 }
 
@@ -410,9 +410,9 @@ fn setup_all_spacing() -> impl Bundle {
 		.with_padding(Spacing::all(Length::Rem(1.)));
 
 	(LayoutStyle::flex_row().column_gap(Length::Rem(0.)), children![
-		(rsx_direct! {"A"}, style.clone()),
-		(rsx_direct! {"B"}, style.clone()),
-		(rsx_direct! {"C"}, style.clone()),
+		(rsx! {"A"}, style.clone()),
+		(rsx! {"B"}, style.clone()),
+		(rsx! {"C"}, style.clone()),
 	])
 }
 
@@ -420,15 +420,15 @@ fn setup_all_spacing() -> impl Bundle {
 
 fn setup_foreground_color() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Red" }, bordered(), VisualStyle {
+		(rsx! { "Red" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(1., 0., 0.)),
 			..default()
 		},),
-		(rsx_direct! { "Green" }, bordered(), VisualStyle {
+		(rsx! { "Green" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0., 0.8, 0.)),
 			..default()
 		},),
-		(rsx_direct! { "Blue" }, bordered(), VisualStyle {
+		(rsx! { "Blue" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0.2, 0.4, 1.)),
 			..default()
 		},),
@@ -438,7 +438,7 @@ fn setup_foreground_color() -> impl Bundle {
 fn setup_background_color() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
 		(
-			rsx_direct! { "A" },
+			rsx! { "A" },
 			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
 			VisualStyle {
 				background: Some(Color::srgb(0.5, 0., 0.5)),
@@ -447,7 +447,7 @@ fn setup_background_color() -> impl Bundle {
 			},
 		),
 		(
-			rsx_direct! { "B" },
+			rsx! { "B" },
 			bordered().with_padding(Spacing::all(Length::Rem(0.5))),
 			VisualStyle {
 				background: Some(Color::srgb(0., 0.4, 0.6)),
@@ -461,7 +461,7 @@ fn setup_background_color() -> impl Bundle {
 fn setup_border_color() -> impl Bundle {
 	// Each node gets per-side border colors: top=red, bottom=blue, left=green, right=yellow
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![(
-		rsx_direct! { "Box" },
+		rsx! { "Box" },
 		BoxStyle {
 			border: Spacing::all(Length::Rem(1.)),
 			border_top: Some(Color::srgb(1., 0., 0.)),
@@ -475,15 +475,15 @@ fn setup_border_color() -> impl Bundle {
 
 fn setup_text_formatting() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Underline" }, bordered(), VisualStyle {
+		(rsx! { "Underline" }, bordered(), VisualStyle {
 			decoration_line: DecorationLine::underline(),
 			..default()
 		},),
-		(rsx_direct! { "Strike" }, bordered(), VisualStyle {
+		(rsx! { "Strike" }, bordered(), VisualStyle {
 			decoration_line: DecorationLine::line_through(),
 			..default()
 		},),
-		(rsx_direct! { "Bold" }, bordered(), VisualStyle {
+		(rsx! { "Bold" }, bordered(), VisualStyle {
 			font_weight: FontWeight::Bold,
 			..default()
 		},),
@@ -492,11 +492,11 @@ fn setup_text_formatting() -> impl Bundle {
 
 fn setup_text_italic() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Italic" }, bordered(), VisualStyle {
+		(rsx! { "Italic" }, bordered(), VisualStyle {
 			font_style: FontStyle::Italic,
 			..default()
 		}),
-		(rsx_direct! { "Bold+Italic" }, bordered(), VisualStyle {
+		(rsx! { "Bold+Italic" }, bordered(), VisualStyle {
 			font_weight: FontWeight::Bold,
 			font_style: FontStyle::Italic,
 			..default()
@@ -506,11 +506,11 @@ fn setup_text_italic() -> impl Bundle {
 
 fn setup_text_blink() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Blink" }, bordered(), VisualStyle {
+		(rsx! { "Blink" }, bordered(), VisualStyle {
 			blink: BlinkStyle::Blink,
 			..default()
 		}),
-		(rsx_direct! { "RapidBlink" }, bordered(), VisualStyle {
+		(rsx! { "RapidBlink" }, bordered(), VisualStyle {
 			blink: BlinkStyle::RapidBlink,
 			..default()
 		}),
@@ -519,11 +519,11 @@ fn setup_text_blink() -> impl Bundle {
 
 fn setup_text_hidden() -> impl Bundle {
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Visible" }, bordered(), VisualStyle {
+		(rsx! { "Visible" }, bordered(), VisualStyle {
 			visibility: Visibility::Visible,
 			..default()
 		}),
-		(rsx_direct! { "Hidden" }, bordered(), VisualStyle {
+		(rsx! { "Hidden" }, bordered(), VisualStyle {
 			visibility: Visibility::Hidden,
 			..default()
 		}),
@@ -537,11 +537,11 @@ fn setup_inline_basic() -> impl Bundle {
 			..default()
 		},
 		children![
-			rsx_direct! { "Hello" },
-			rsx_direct! { " " },
-			rsx_direct! { "World" },
-			rsx_direct! { " " },
-			rsx_direct! { "Inline!" },
+			rsx! { "Hello" },
+			rsx! { " " },
+			rsx! { "World" },
+			rsx! { " " },
+			rsx! { "Inline!" },
 		],
 	)
 }
@@ -554,12 +554,12 @@ fn setup_inline_wrap() -> impl Bundle {
 			..default()
 		},
 		children![
-			rsx_direct! { "A Very Long Sentence " },
-			rsx_direct! { "A Very Long Sentence " },
-			rsx_direct! { "A Very Long Sentence " },
-			rsx_direct! { "A Very Long Sentence " },
-			rsx_direct! { "A Very Long Sentence " },
-			rsx_direct! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
+			rsx! { "A Very Long Sentence " },
 		],
 	)
 }
@@ -567,15 +567,15 @@ fn setup_inline_wrap() -> impl Bundle {
 fn setup_wide_chars() -> impl Bundle {
 	// CJK and fullwidth characters occupy 2 terminal columns each
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "中文" }, bordered(), VisualStyle {
+		(rsx! { "中文" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0.9, 0.5, 0.1)),
 			..default()
 		}),
-		(rsx_direct! { "日本語" }, bordered(), VisualStyle {
+		(rsx! { "日本語" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0.1, 0.7, 0.9)),
 			..default()
 		}),
-		(rsx_direct! { "ＡＢＣ" }, bordered(), VisualStyle {
+		(rsx! { "ＡＢＣ" }, bordered(), VisualStyle {
 			foreground: Some(Color::srgb(0.5, 0.9, 0.4)),
 			..default()
 		}),
@@ -591,15 +591,15 @@ fn setup_text_align() -> impl Bundle {
 	);
 
 	(LayoutStyle::flex_row().column_gap(Length::Rem(1.)), children![
-		(rsx_direct! { "Left" }, item_styles.clone(), VisualStyle {
+		(rsx! { "Left" }, item_styles.clone(), VisualStyle {
 			text_align: TextAlign::Left,
 			..default()
 		},),
-		(rsx_direct! { "Center" }, item_styles.clone(), VisualStyle {
+		(rsx! { "Center" }, item_styles.clone(), VisualStyle {
 			text_align: TextAlign::Center,
 			..default()
 		},),
-		(rsx_direct! { "Right" }, item_styles, VisualStyle {
+		(rsx! { "Right" }, item_styles, VisualStyle {
 			text_align: TextAlign::Right,
 			..default()
 		},),

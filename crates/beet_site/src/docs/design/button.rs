@@ -1,7 +1,7 @@
 use beet::prelude::*;
 
 /// Showcases every [`Button`] and [`Link`] variant.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Button"</h1>

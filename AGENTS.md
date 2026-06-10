@@ -55,6 +55,15 @@ Never use `.claude/projects/../memory`, all content related to this project must
 	- Bad: `foo(bar(bazz))`
 	- Good: `bar(bazz).xmap(foo)`
 - Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
+- Utility modules: utility module must have the `_ext` prefix and be reexported as a `pub mod` and implementers must use that prefix:
+```rust
+// mod.rs
+pub mod async_ext;
+// async_ext.rs
+pub async fn do_async_thing(){}
+// foo.rs
+async_ext::do_async_thing().await;
+```
 - when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
 - never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature
 

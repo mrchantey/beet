@@ -1,7 +1,7 @@
 //! # Router Serde Example
 //!
 //! Mirrors [`cli`](./cli.rs), but persists the entire route world to
-//! disk via [`WorldSerdeStore`]. On first run the world is written to
+//! disk via [`TemplateStore`]. On first run the world is written to
 //! `examples/router/router_serde.json`, and is loaded from that file
 //! on subsequent runs. Pass `--new` to overwrite the file with a
 //! fresh copy.
@@ -63,7 +63,7 @@ fn setup(async_commands: AsyncCommands) {
 		if new_world {
 			blob.remove().await.ok();
 		}
-		WorldSerdeStore::load_or_create(world.clone(), blob, async |_| {
+		TemplateStore::load_or_create(world.clone(), blob, async |_| {
 			route_bundle().xok()
 		})
 		.await?;

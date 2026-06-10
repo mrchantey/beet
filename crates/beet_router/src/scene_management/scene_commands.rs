@@ -179,7 +179,7 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 		None => {
 			cx.caller
 				.with_world(|world, _caller| -> Result<Response> {
-					let json = WorldSerdeSaver::new()
+					let json = TemplateSaver::new()
 						.save_roots_filtered::<With<BeetSceneRoot>>(
 							world,
 							MediaType::Json,
@@ -235,7 +235,7 @@ pub struct ExportPath(pub String);
 
 /// Serialize a scene to a JSON file. [`ExportScene`]/[`ExportPath`] are the
 /// *export instruction*; they sit on the scene root itself but are denied from
-/// the output by the [`WorldSerdeSaver`], so the exported scene carries only the
+/// the output by the [`TemplateSaver`], so the exported scene carries only the
 /// real components. The output path is the caller's [`ExportPath`] component,
 /// else the `--output` request param.
 ///
@@ -287,7 +287,7 @@ fn export_entity(
 			bevyhow!("no export path: set --output or an ExportPath component")
 		})?;
 	let output = AbsPathBuf::new(output)?;
-	let json = WorldSerdeSaver::new()
+	let json = TemplateSaver::new()
 		.deny_component::<ExportScene>()
 		.deny_component::<ExportPath>()
 		.save_roots(world, MediaType::Json, [entity])?

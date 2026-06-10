@@ -211,7 +211,7 @@ fn persist_scene_cache(world: &mut World) -> Result {
 		}
 		return Ok(());
 	}
-	let json = WorldSerdeSaver::new()
+	let json = TemplateSaver::new()
 		.save_roots_filtered::<With<BeetSceneRoot>>(world, MediaType::Json)?
 		.as_utf8()?
 		.to_string();
@@ -220,7 +220,7 @@ fn persist_scene_cache(world: &mut World) -> Result {
 }
 
 
-#[cfg(all(test, feature = "world_serde", feature = "json"))]
+#[cfg(all(test, feature = "template_serde", feature = "json"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

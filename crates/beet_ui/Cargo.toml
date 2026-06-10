@@ -34,7 +34,7 @@ required-features = ["style"]
 [[example]]
 name = "showcase"
 path = "examples/showcase.rs"
-required-features = ["scene", "style"]
+required-features = ["template", "style"]
 
 # measures the real terminal via crossterm, so requires the `terminal` feature
 [[example]]
@@ -44,7 +44,7 @@ required-features = ["terminal"]
 
 
 [features]
-default = ["std","rsx", "style"]
+default = ["std","rsx", "style", "template", "bsx"]
 std = []
 # Backend-agnostic keyboard input: the `FocusPlugin` reads bevy `KeyboardInput`
 # messages and routes them to the focused entity's `Value`. Opt-in so a plain
@@ -54,9 +54,10 @@ action = ["dep:beet_action", "net"]
 net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/fs", "beet_net/http"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
-# Bevy's first-party scene system (`Scene`/`Template`/`bsn!`). Heavy + std-only,
-# so it is opt-in; `rsx_direct!` and beet_core stay free of it.
-scene = ["std", "rsx", "bevy/scene"]
+# The function-component widget layer: `#[template]` widgets and the `rsx!`
+# lowering-target node runtime. std-only, so it is opt-in; beet_core's no_std
+# core stays free of it.
+template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
@@ -67,6 +68,11 @@ json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 html_parser = ["dep:winnow"]
 markdown_parser = ["html_parser", "dep:pulldown-cmark"]
+# The hand-written BSX (`.bsx`) cursor parser and its resolution into the
+# document-wired template tree. HTML is this parser with its features disabled,
+# so the parser is dispatched to for both `MediaType::Bsx` and `MediaType::Html`
+# when enabled. std-only, since it builds through the `template` substrate.
+bsx = ["template"]
 syntax_highlighting = [
 	"style",
 	"dep:tree-sitter",
@@ -77,7 +83,7 @@ syntax_highlighting = [
 	"dep:streaming-iterator"
 ]
 
-world_serde = ["beet_core/world_serde", "serde"]
+template_serde = ["beet_core/template_serde", "serde"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["std"] }
@@ -127,13 +133,26 @@ path = "tests/rsx.rs"
 harness = false
 
 [[test]]
-name = "scene"
-path = "tests/scene.rs"
+name = "template"
+path = "tests/template.rs"
 harness = false
-required-features = ["scene"]
+required-features = ["template"]
 
 [[test]]
 name = "widgets"
 path = "tests/widgets.rs"
 harness = false
-required-features = ["scene"]
+required-features = ["template"]
+
+[[test]]
+name = "bsx"
+path = "tests/bsx.rs"
+harness = false
+required-features = ["bsx"]
+
+[[test]]
+name = "schema"
+path = "tests/schema.rs"
+harness = false
+required-features = ["bsx", "json"]
+

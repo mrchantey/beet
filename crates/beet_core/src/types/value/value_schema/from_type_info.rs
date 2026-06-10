@@ -144,13 +144,16 @@ fn map_schema(info: &MapInfo) -> MapSchema {
 }
 
 fn enum_schema(info: &EnumInfo) -> ValueSchema {
-	// Treat `Option<T>` specially: schema becomes the inner type, since
-	// values are flattened by serde-style external tagging.
+	// Treat `Option<T>` specially: an optional wrapper over the inner schema, so a
+	// null or missing value validates while a present value is typed as `T`.
 	if is_option_type(info.type_path())
 		&& let Some(VariantInfo::Tuple(some_info)) = info.variant("Some")
 		&& let Some(field) = some_info.field_at(0)
 	{
-		return resolve_field(field.type_info(), field.type_path());
+		return ValueSchema::Optional(Box::new(resolve_field(
+			field.type_info(),
+			field.type_path(),
+		)));
 	}
 
 	let variants = info
@@ -202,10 +205,10 @@ fn enum_schema(info: &EnumInfo) -> ValueSchema {
 
 fn primitive_schema(type_path: &str) -> ValueSchema {
 	if is_option_type(type_path) {
-		// Outer Option<T> path with no resolvable inner type info: treat as
-		// the inner primitive (best effort).
+		// Outer Option<T> path with no resolvable inner type info: an optional
+		// wrapper over the inner primitive (best effort).
 		if let Some(inner) = extract_option_inner(type_path) {
-			return primitive_schema(inner);
+			return ValueSchema::Optional(Box::new(primitive_schema(inner)));
 		}
 	}
 	let short = type_path.rsplit("::").next().unwrap_or(type_path);

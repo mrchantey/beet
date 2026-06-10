@@ -137,7 +137,7 @@ pub async fn Reset(cx: ActionContext<RequestParts>) -> Response {
 pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
 		.with_world(|world, _caller| -> Response {
-			match WorldSerdeSaver::new()
+			match TemplateSaver::new()
 				.save_roots_filtered::<With<BeetSceneRoot>>(
 					world,
 					MediaType::Json,

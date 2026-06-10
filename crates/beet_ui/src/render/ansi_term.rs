@@ -223,9 +223,11 @@ mod test {
 
 	#[beet_core::test]
 	fn render_image() {
+		// `<img>` renders as the `[image]: <alt>` placeholder (see
+		// `charcell/decorate.rs::img_marker`).
 		render("![alt text](image.png)")
 			.xmap(strip_ansi)
-			.xpect_contains("[alt text]");
+			.xpect_contains("[image]: alt text");
 	}
 
 	#[beet_core::test]

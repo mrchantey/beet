@@ -51,23 +51,42 @@ impl Plugin for DocumentPlugin {
 			// Add observers and systems
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
-			.add_observer(resolve_field_path)
-			// the document sync chain runs after the async sync point so an
-			// async field write (eg refresh_blob_store_list) lands the same pass
-			.add_systems(
-				PreUpdate,
-				(
-					update_resolved_field_paths
-						.run_if(resolved_paths_need_update),
-					sync_schema.run_if(schema_needs_sync),
-					sync_document_to_local,
-					sync_resolved_path_changes,
-					sync_local_to_document,
-					update_reactive_children,
-				)
-					.chain()
-					.after(async_world_sync_point::<BeetAsyncSyncPoint>),
-			);
+			.add_observer(resolve_field_path);
+
+		// the document sync chain. With `bevy_async` it runs after the async sync
+		// point so an async field write (eg refresh_blob_store_list) lands the
+		// same pass; without it (no_std core) there is no sync point to order on.
+		#[cfg(feature = "json")]
+		app.register_type::<ReflectFieldRef>();
+
+		// the reflect-field-binding sync mirrors a `Value` to/from a reflected
+		// component field, the generalization of the `Value`-component bind. It
+		// runs after the document drives `Value` so the read direction lands first.
+		#[cfg(feature = "json")]
+		let reflect_sync = sync_reflect_field_bindings;
+		#[cfg(not(feature = "json"))]
+		let reflect_sync = || {};
+
+		let sync_chain = (
+			update_resolved_field_paths.run_if(resolved_paths_need_update),
+			sync_schema.run_if(schema_needs_sync),
+			sync_document_to_local,
+			sync_resolved_path_changes,
+			// reflect-field binding runs between the read path and the write-back,
+			// so a document change reaches the component and a component edit reaches
+			// the document, both within one pass.
+			reflect_sync,
+			sync_local_to_document,
+			update_reactive_children,
+		)
+			.chain();
+		#[cfg(feature = "bevy_async")]
+		app.add_systems(
+			PreUpdate,
+			sync_chain.after(async_world_sync_point::<BeetAsyncSyncPoint>),
+		);
+		#[cfg(not(feature = "bevy_async"))]
+		app.add_systems(PreUpdate, sync_chain);
 	}
 }
 

@@ -2,7 +2,7 @@ use beet::prelude::*;
 
 /// Shows the [`Table`] widget: the default horizontal-rule layout and the
 /// `vertical_lines` grid variant, sharing one set of demo rows.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Table"</h1>
@@ -35,7 +35,7 @@ pub fn get() -> impl Scene {
 }
 
 /// A demo body row: the user's details and a profile action.
-fn user_row(name: &str, age: u32, occupation: &str) -> impl Scene {
+fn user_row(name: &str, age: u32, occupation: &str) -> impl Bundle {
 	rsx! {
 		<tr>
 			<td>{name}</td>

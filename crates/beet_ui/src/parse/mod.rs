@@ -1,3 +1,7 @@
+#[cfg(feature = "bsx")]
+mod bsx;
+#[cfg(feature = "bsx")]
+pub use bsx::*;
 #[cfg(feature = "html_parser")]
 mod html;
 #[cfg(feature = "html_parser")]

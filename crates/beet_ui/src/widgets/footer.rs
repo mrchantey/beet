@@ -3,8 +3,8 @@ use beet_core::prelude::*;
 
 /// A page `<footer>` displaying the copyright + version + build stage from
 /// [`PackageConfig`].
-#[scene(system)]
-pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Scene {
+#[template(system)]
+pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 	let PackageConfig {
 		title,
 		version,
@@ -24,7 +24,7 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Scene {
 
 	rsx! {
 		<footer id="page-footer" {Classes::new([classes::PRINT_HIDDEN])}>
-			<span {Classes::new([classes::FOOTER_SIDE])}><slot/></span>
+			<span {Classes::new([classes::FOOTER_SIDE])}><Slot/></span>
 			<span>{footer_text}</span>
 			<span {Classes::new([classes::FOOTER_SIDE, classes::TEXT_RIGHT])}>{build_text}</span>
 		</footer>

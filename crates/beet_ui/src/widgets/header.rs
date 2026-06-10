@@ -3,11 +3,11 @@ use beet_core::prelude::*;
 
 /// A page `<header>` with a title link to `home_route` (defaults to `/`) and
 /// a `<nav>` slot for navigation links.
-#[scene(system)]
+#[template(system)]
 pub fn Header(
 	#[prop(into)] home_route: String,
 	pkg_config: Res<PackageConfig>,
-) -> impl Scene {
+) -> impl Bundle {
 	let title = pkg_config.title.clone();
 	let home_route = if home_route.is_empty() {
 		"/".to_string()
@@ -19,9 +19,9 @@ pub fn Header(
 			<a {Classes::new(["app-bar-title"])} href={home_route}>
 				{title}
 			</a>
-			<slot/>
+			<Slot/>
 			<nav {Classes::new([classes::APP_BAR_NAV])}>
-				<slot name="nav"/>
+				<Slot name="nav"/>
 			</nav>
 		</header>
 	}

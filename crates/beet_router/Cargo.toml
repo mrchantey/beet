@@ -39,11 +39,11 @@ markdown = ["std", "dep:pulldown-cmark"]
 html_parser = ["std", "beet_ui/html_parser"]
 markdown_parser = ["html_parser", "beet_ui/markdown_parser"]
 http = ["std", "beet_net/server"]
-# beet_router's only world_serde use is rebuilding route trees on a
-# `WorldSerdeLoaded` event, which comes from `beet_core/world_serde` (beet's
+# beet_router's only template_serde use is rebuilding route trees on a
+# `TemplateLoaded` event, which comes from `beet_core/template_serde` (beet's
 # own fork). It does NOT need bevy's `bevy_world_serialization` feature, which
 # drags in `bevy_asset` (std) and so breaks no_std consumers.
-world_serde = ["beet_core/world_serde", "serde"]
+template_serde = ["beet_core/template_serde", "serde"]
 # Generic scripting registration (the `Script`/`ExchangeScript` reflect types).
 # Backend-agnostic; pair with a backend (eg `rhai`) for a working runtime.
 scripting = ["std", "beet_action/scripting", "serde"]
@@ -66,8 +66,8 @@ codegen = [
 beet_core = { workspace = true, default-features = false, features = ["bevy_async"] }
 beet_action = { workspace = true, default-features = false }
 beet_net = { workspace = true, default-features = false }
-# std-only: the scene/render pipeline backing scene routes, media, help, sidebar.
-beet_ui = { workspace = true, optional = true, features = ["action", "scene"] }
+# std-only: the template/render pipeline backing template routes, media, help, sidebar.
+beet_ui = { workspace = true, optional = true, features = ["action", "template"] }
 bevy.workspace = true
 extend.workspace = true
 thiserror.workspace = true

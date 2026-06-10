@@ -1,8 +1,8 @@
 //! Demostrates persisting chat to the filesystem
 //!
 //! ```sh
-//! cargo run --example persistent_chat --features=thread,world_serde
-//! cargo run --example persistent_chat --features=thread,world_serde -- --new
+//! cargo run --example persistent_chat --features=thread,template_serde
+//! cargo run --example persistent_chat --features=thread,template_serde -- --new
 //! ```
 use beet::prelude::*;
 
@@ -44,7 +44,7 @@ fn setup(async_commands: AsyncCommands) {
 		if new_thread {
 			blob.remove().await.ok();
 		}
-		WorldSerdeStore::load_or_create(world, blob, async |_| {
+		TemplateStore::load_or_create(world, blob, async |_| {
 			chat_bundle().xok()
 		})
 		.await?;

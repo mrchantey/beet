@@ -46,29 +46,29 @@ impl ButtonVariant {
 }
 
 /// A styled `<button>`; its content is the default slot's children.
-#[scene]
-pub fn Button(variant: ButtonVariant) -> impl Scene {
+#[template]
+pub fn Button(variant: ButtonVariant) -> impl Bundle {
 	rsx! {
-		<button {Classes::new([classes::BTN, variant.class()])}><slot/></button>
+		<button {Classes::new([classes::BTN, variant.class()])}><Slot/></button>
 	}
 }
 
 /// A `<button>` sized for a single glyph (`btn-icon`); the slot is the icon.
-#[scene]
-pub fn IconButton(variant: ButtonVariant) -> impl Scene {
+#[template]
+pub fn IconButton(variant: ButtonVariant) -> impl Bundle {
 	rsx! {
 		<button {Classes::new([classes::BTN, classes::BTN_ICON, variant.class()])}>
-			<slot/>
+			<Slot/>
 		</button>
 	}
 }
 
 /// An `<a>` hyperlink styled as a button; its content is the default slot.
-#[scene]
-pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Scene {
+#[template]
+pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Bundle {
 	rsx! {
 		<a {Classes::new([classes::BTN, variant.class()])} href={href}>
-			<slot/>
+			<Slot/>
 		</a>
 	}
 }

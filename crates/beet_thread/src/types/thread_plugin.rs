@@ -55,7 +55,7 @@ impl Plugin for ThreadPlugin {
 			// _
 			;
 
-		#[cfg(feature = "world_serde")]
+		#[cfg(feature = "template_serde")]
 		app.add_systems(PostUpdate, thread_store::store_thread_on_post);
 	}
 }

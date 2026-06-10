@@ -50,11 +50,8 @@ use bevy::platform::sync::Mutex;
 use core::future::Future;
 use core::panic::Location;
 use core::pin::Pin;
-use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
-use core::task::Poll;
-use core::task::Waker;
 
 /// In wasm or single-threaded environments, wraps this type in a [`SendWrapper`],
 /// otherwise is just the type itself.
@@ -573,21 +570,34 @@ pub impl AsyncWorld {
 		})
 	}
 
-	/// Awaits a single event of type `E`, then despawns the observer.
-	fn await_event<E: Event, B: Bundle>(
+	/// Installs a temporary observer for `E`, resolves on its first fire with the
+	/// observer's return value `O`, then removes the observer.
+	///
+	/// The `observer` closure receives the [`On<E>`] trigger and returns the
+	/// value the future resolves to, eg `|ev| ev.is_error` to await a
+	/// [`LoadTemplate`](crate::prelude::LoadTemplate) and surface its error flag.
+	fn await_event<E, O>(
 		&self,
-	) -> impl Future<Output = ()> + Send {
+		observer: impl 'static + Send + Sync + Fn(On<E>) -> O,
+	) -> impl Future<Output = O> + Send
+	where
+		E: Event<Trigger<'static>: Default>,
+		O: 'static + Send + Sync,
+	{
 		let world = self.clone();
 		async move {
-			let signal = OnceSignal::new();
-			let observer_signal = signal.clone();
+			let (send, recv) = oneshot();
+			let sender = Arc::new(Mutex::new(Some(send)));
 			world
-				.observe(move |ev: On<E, B>, mut commands: Commands| {
-					observer_signal.signal();
-					commands.entity(ev.observer()).despawn();
+				.observe(move |ev: On<E>, mut commands: Commands| {
+					let observer_entity = ev.observer();
+					if let Some(send) = sender.lock().unwrap().take() {
+						send.signal(observer(ev));
+					}
+					commands.entity(observer_entity).despawn();
 				})
 				.await;
-			signal.wait().await;
+			recv.wait().await
 		}
 	}
 
@@ -868,21 +878,34 @@ impl AsyncEntity {
 		})
 	}
 
-	/// Awaits a single event of type `E` for this entity, then despawns the observer.
-	pub fn await_event<E: Event, B: Bundle>(
+	/// Installs a temporary observer for `E` on this entity, resolves on its
+	/// first fire with the observer's return value `O`, then removes the
+	/// observer.
+	///
+	/// The route-handler case: `spawn_template` a root, then
+	/// `entity.await_event::<LoadTemplate, _>(|ev| ev.is_error)` to await
+	/// readiness and branch on the error flag.
+	pub fn await_event<E, O>(
 		&self,
-	) -> impl Future<Output = Result<()>> + Send {
+		observer: impl 'static + Send + Sync + Fn(On<E>) -> O,
+	) -> impl Future<Output = Result<O>> + Send
+	where
+		E: EntityEvent<Trigger<'static>: Default>,
+		O: 'static + Send + Sync,
+	{
 		let this = self.clone();
 		async move {
-			let signal = OnceSignal::new();
-			let observer_signal = signal.clone();
-			this.observe(move |ev: On<E, B>, mut commands: Commands| {
-				observer_signal.signal();
-				commands.entity(ev.observer()).despawn();
+			let (send, recv) = oneshot();
+			let sender = Arc::new(Mutex::new(Some(send)));
+			this.observe(move |ev: On<E>, mut commands: Commands| {
+				let observer_entity = ev.observer();
+				if let Some(send) = sender.lock().unwrap().take() {
+					send.signal(observer(ev));
+				}
+				commands.entity(observer_entity).despawn();
 			})
 			.await?;
-			signal.wait().await;
-			Ok(())
+			recv.wait().await.xok()
 		}
 	}
 
@@ -1172,42 +1195,6 @@ where
 	run_async_task(world, move |_| func(entity)).await;
 }
 
-/// A clonable one-shot completion flag used by `await_event`.
-#[derive(Clone)]
-struct OnceSignal(Arc<OnceSignalInner>);
-
-struct OnceSignalInner {
-	fired: AtomicBool,
-	waker: Mutex<Option<Waker>>,
-}
-
-impl OnceSignal {
-	fn new() -> Self {
-		Self(Arc::new(OnceSignalInner {
-			fired: AtomicBool::new(false),
-			waker: Mutex::new(None),
-		}))
-	}
-
-	fn signal(&self) {
-		self.0.fired.store(true, Ordering::SeqCst);
-		if let Some(waker) = self.0.waker.lock().unwrap().take() {
-			waker.wake();
-		}
-	}
-
-	fn wait(&self) -> impl Future<Output = ()> + '_ {
-		core::future::poll_fn(move |cx| {
-			if self.0.fired.load(Ordering::SeqCst) {
-				Poll::Ready(())
-			} else {
-				*self.0.waker.lock().unwrap() = Some(cx.waker().clone());
-				Poll::Pending
-			}
-		})
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -1297,5 +1284,32 @@ mod test {
 		let mut app = test_app();
 		let result = app.world_mut().run_async_then(|_| async { 42 }).await;
 		result.xpect_eq(42);
+	}
+
+	#[derive(EntityEvent)]
+	struct Ping {
+		entity: Entity,
+		value: u32,
+	}
+
+	#[beet_core::test]
+	async fn await_event_resolves_with_observer_value() {
+		let mut app = test_app();
+		let entity = app.world_mut().spawn_empty().id();
+		// re-fire each update so the awaiting observer catches it whenever it is
+		// installed; the observer despawns itself on first fire.
+		app.add_systems(Update, move |mut commands: Commands| {
+			commands
+				.entity(entity)
+				.try_trigger(move |entity| Ping { entity, value: 7 });
+		});
+		let value = app
+			.world_mut()
+			.run_async_then(move |world| async move {
+				world.entity(entity).await_event::<Ping, _>(|ev| ev.value).await
+			})
+			.await
+			.unwrap();
+		value.xpect_eq(7);
 	}
 }

@@ -1,7 +1,7 @@
 use beet::prelude::*;
 
 /// Showcases heading levels, paragraphs, and inline text elements.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"This is a H1 Heading"</h1>

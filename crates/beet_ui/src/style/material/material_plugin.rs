@@ -124,12 +124,12 @@ mod tests {
 		use crate::style::common_props::BackgroundColor;
 		let mut world = MaterialStylePlugin::world();
 		let body = world
-			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
 			.id();
-		let mid = world.spawn((rsx_direct! { <main/> }, ChildOf(body))).id();
+		let mid = world.spawn((rsx! { <main/> }, ChildOf(body))).id();
 		let card = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::CARD_FILLED]),
 				ChildOf(mid),
 			))
@@ -151,17 +151,17 @@ mod tests {
 		use crate::style::common_props::BackgroundColor;
 		let mut world = MaterialStylePlugin::world();
 		// content is its own root (no ChildOf to the layout), holding a card
-		let content = world.spawn(rsx_direct! { <main/> }).id();
+		let content = world.spawn(rsx! { <main/> }).id();
 		let card = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::CARD_FILLED]),
 				ChildOf(content),
 			))
 			.id();
 		// layout body carries the scheme; a holder transcludes the content by ref
 		let body = world
-			.spawn((rsx_direct! { <div/> }, Classes::new([classes::DARK_SCHEME])))
+			.spawn((rsx! { <div/> }, Classes::new([classes::DARK_SCHEME])))
 			.id();
 		world.spawn((RenderRef::new(content), ChildOf(body)));
 		world.with_state::<RuleSetQuery, _>(|query| {
@@ -180,14 +180,14 @@ mod tests {
 		let mut world = MaterialStylePlugin::world();
 		let parent = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::DARK_SCHEME]),
 			))
 			.id();
 		let child =
-			world.spawn((rsx_direct! { <span/> }, ChildOf(parent))).id();
+			world.spawn((rsx! { <span/> }, ChildOf(parent))).id();
 		// a sibling with no scheme falls back to the light `:root` default
-		let bare = world.spawn(rsx_direct! { <span/> }).id();
+		let bare = world.spawn(rsx! { <span/> }).id();
 
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let child_surface = query.resolve(child, colors::Surface).unwrap();
@@ -211,13 +211,13 @@ mod tests {
 				.into_world();
 		let light = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::PAGE, classes::LIGHT_SCHEME]),
 			))
 			.id();
 		let dark = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::PAGE, classes::DARK_SCHEME]),
 			))
 			.id();

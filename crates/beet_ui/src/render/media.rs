@@ -22,8 +22,8 @@ pub struct MediaRenderer {
 	default_media_type: MediaType,
 	plain_text_renderer: PlainTextRenderer,
 	html_renderer: HtmlRenderer,
-	#[cfg(feature = "world_serde")]
-	world_serde_renderer: WorldSerdeRenderer,
+	#[cfg(feature = "template_serde")]
+	template_renderer: TemplateRenderer,
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "style")]
 	ansi_term_renderer: AnsiTermRenderer,
@@ -52,8 +52,8 @@ impl MediaRenderer {
 			markdown_renderer: default(),
 			#[cfg(feature = "style")]
 			ansi_term_renderer: default(),
-			#[cfg(feature = "world_serde")]
-			world_serde_renderer: default(),
+			#[cfg(feature = "template_serde")]
+			template_renderer: default(),
 		}
 	}
 
@@ -91,12 +91,12 @@ impl MediaRenderer {
 		self
 	}
 
-	#[cfg(feature = "world_serde")]
-	pub fn with_world_serde_renderer(
+	#[cfg(feature = "template_serde")]
+	pub fn with_template_renderer(
 		mut self,
-		renderer: WorldSerdeRenderer,
+		renderer: TemplateRenderer,
 	) -> Self {
-		self.world_serde_renderer = renderer;
+		self.template_renderer = renderer;
 		self
 	}
 
@@ -136,12 +136,12 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(all(feature = "world_serde", feature = "postcard"))]
+			#[cfg(all(feature = "template_serde", feature = "postcard"))]
 			MediaType::Postcard => {
-				self.world_serde_renderer.render(&mut inner_cx).map(Some)
+				self.template_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(all(feature = "world_serde", feature = "json"))]
-			MediaType::Json => self.world_serde_renderer.render(&mut inner_cx).map(Some),
+			#[cfg(all(feature = "template_serde", feature = "json"))]
+			MediaType::Json => self.template_renderer.render(&mut inner_cx).map(Some),
 			_ => Ok(None),
 		}
 	}
@@ -152,9 +152,9 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "style")]
 		available.push(MediaType::AnsiTerm);
-		#[cfg(all(feature = "world_serde", feature = "json"))]
+		#[cfg(all(feature = "template_serde", feature = "json"))]
 		available.push(MediaType::Json);
-		#[cfg(all(feature = "world_serde", feature = "postcard"))]
+		#[cfg(all(feature = "template_serde", feature = "postcard"))]
 		available.push(MediaType::Postcard);
 		available
 	}

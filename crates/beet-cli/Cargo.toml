@@ -31,7 +31,7 @@ beet = { workspace = true, features = [
 	"infra",
 	"json",
 	"webdriver",
-	"world_serde",
+	"template_serde",
 ] }
 qrcode = { version = "0.14", optional = true }
 image = { version = "0.25", optional = true }

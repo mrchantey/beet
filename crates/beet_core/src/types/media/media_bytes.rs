@@ -51,6 +51,11 @@ impl MediaBytes {
 		Self::new_str(MediaType::Markdown, text.as_ref())
 	}
 
+	/// Create [`MediaBytes`] with [`MediaType::Bsx`].
+	pub fn new_bsx(text: impl AsRef<str>) -> Self {
+		Self::new_str(MediaType::Bsx, text.as_ref())
+	}
+
 	/// Create [`MediaBytes`] with [`MediaType::Json`].
 	pub fn new_json(text: impl AsRef<str>) -> Self {
 		Self::new_str(MediaType::Json, text.as_ref())

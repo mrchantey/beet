@@ -99,6 +99,11 @@ pub mod prelude {
 		if #[cfg(feature = "ui")]{
 			pub use beet_core::prelude::Transform;
 			pub use crate::ui::prelude::Reset;
+			// ui's `Header`/`Table` types overlap with `beet_net`'s `Header` trait
+			// and `beet_thread`'s `Table` trait (same namespace, glob-imported); an
+			// explicit re-export resolves the overlap in favour of the ui types.
+			pub use crate::ui::prelude::Header;
+			pub use crate::ui::prelude::Table;
 			pub use crate::ui::prelude::style::*;
 			pub use crate::ui::prelude::style::Display;
 			pub use crate::ui::prelude::style::JustifyContent;
@@ -113,20 +118,12 @@ pub mod prelude {
 		}
 	}
 	cfg_if! {
-		// widgets live behind beet_ui's `scene` feature
-		if #[cfg(feature = "scene")]{
+		// widgets live behind beet_ui's `template` feature
+		if #[cfg(feature = "template")]{
 			pub use crate::ui::prelude::Button;
 			pub use crate::ui::prelude::SidebarNode;
 		}
 	}
-	// ui's widget `Header`/`Table` types overlap with `beet_net`'s `Header`
-	// trait and `beet_thread`'s `Table` trait. `thread` transitively compiles
-	// beet_ui with `scene` (via `beet_router`), so cover it alongside `scene`;
-	// prefer the ui widgets.
-	#[cfg(all(feature = "ui", any(feature = "scene", feature = "thread")))]
-	pub use crate::ui::prelude::Header;
-	#[cfg(all(feature = "ui", any(feature = "scene", feature = "thread")))]
-	pub use crate::ui::prelude::Table;
 }
 
 pub mod exports {

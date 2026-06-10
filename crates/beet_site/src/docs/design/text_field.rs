@@ -4,7 +4,7 @@ use beet::prelude::*;
 ///
 /// The legacy live `oninput` signal demo and disabled variants are dropped; the
 /// static variants render across web and terminal.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Text Field"</h1>

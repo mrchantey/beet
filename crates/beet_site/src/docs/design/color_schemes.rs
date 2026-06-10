@@ -13,7 +13,7 @@ const COLOR_GROUP: ClassName = ClassName::new_static("color-group");
 /// not a web-only `<style>`, so the palette resolves on the terminal too and
 /// each `.light-scheme`/`.dark-scheme` wrapper renders its own scheme on both
 /// targets.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Color Schemes"</h1>
@@ -26,14 +26,14 @@ pub fn get() -> impl Scene {
 }
 
 /// One full set of color-role swatches, grouped by Material role family.
-fn scheme() -> impl Scene {
+fn scheme() -> impl Bundle {
 	let groups: Vec<_> =
 		color_swatch_groups().into_iter().map(swatch_group).collect();
 	rsx! { <div>{groups}</div> }
 }
 
 /// A titled, wrapping row of swatches for one colour-role family.
-fn swatch_group(group: SwatchGroup) -> impl Scene {
+fn swatch_group(group: SwatchGroup) -> impl Bundle {
 	let title = group.title.to_string();
 	let boxes: Vec<_> = group
 		.swatches

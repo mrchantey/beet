@@ -271,7 +271,7 @@ mod tests {
 	#[beet_core::test]
 	fn terminal_headings_resolve_to_primary() {
 		let mut world = (MaterialStylePlugin::default(), StylePlugin).into_world();
-		let heading = world.spawn(rsx_direct! { <h1/> }).id();
+		let heading = world.spawn(rsx! { <h1/> }).id();
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let foreground =
 				query.resolve(heading, common_props::ForegroundColor).unwrap();
@@ -286,7 +286,7 @@ mod tests {
 	fn error_text_resolves_to_error_color() {
 		let mut world = MaterialStylePlugin::world();
 		let entity = world
-			.spawn(rsx_direct! { <span {Classes::new([ERROR_TEXT])}/> })
+			.spawn(rsx! { <span {Classes::new([ERROR_TEXT])}/> })
 			.id();
 		world.with_state::<RuleSetQuery, _>(|query| {
 			let foreground =

@@ -43,8 +43,8 @@ impl SidebarNode {
 /// `nodes` is the tree to render. Each branch becomes a `<details>` (open when
 /// its node is `expanded`); leaves become `<a>` links, marked `aria-current`
 /// when `active`.
-#[scene]
-pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
+#[template]
+pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	let items: Vec<_> = nodes
 		.into_iter()
 		.map(|node| sidebar_item(node, true))
@@ -57,13 +57,13 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Scene {
 }
 
 /// One row in the sidebar — a link, a header, or a `<details>` group. Recursive
-/// helper used by [`Sidebar`]; not its own `#[scene]` widget because the
+/// helper used by [`Sidebar`]; not its own `#[template]` widget because the
 /// recursion reads the parent's `root` context.
 ///
-/// Returns a [`Box<dyn Scene>`] (via `.any_scene()`) because each branch of the
+/// Returns a [`Node`] (via `.any_node()`) because each branch of the
 /// match builds a differently-shaped tree and `impl Trait` cannot unify across
 /// arms.
-fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
+fn sidebar_item(node: SidebarNode, root: bool) -> Node {
 	let SidebarNode {
 		display_name,
 		path,
@@ -86,7 +86,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 					<span {Classes::new([classes::SIDEBAR_LABEL])}>{display_name}</span>
 				</li>
 			}
-			.any_scene(),
+			.any_node(),
 		}
 	} else {
 		let child_items: Vec<_> = children
@@ -115,7 +115,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 					</details>
 				</li>
 			}
-			.any_scene()
+			.any_node()
 		} else {
 			rsx! {
 				<li {Classes::new([root_class])}>
@@ -125,7 +125,7 @@ fn sidebar_item(node: SidebarNode, root: bool) -> Box<dyn Scene> {
 					</details>
 				</li>
 			}
-			.any_scene()
+			.any_node()
 		}
 	}
 }
@@ -136,7 +136,7 @@ fn leaf_link(
 	display_name: String,
 	href: String,
 	active: bool,
-) -> Box<dyn Scene> {
+) -> Node {
 	let link_classes =
 		|| Classes::new([classes::SIDEBAR_LINK, ClassName::string("leaf")]);
 	// `aria-current` can't be conditionally interpolated, so fork on `active`.
@@ -146,14 +146,14 @@ fn leaf_link(
 				<a {link_classes()} href=href aria-current="page">{display_name}</a>
 			</li>
 		}
-		.any_scene()
+		.any_node()
 	} else {
 		rsx! {
 			<li {Classes::new([root_class])}>
 				<a {link_classes()} href=href>{display_name}</a>
 			</li>
 		}
-		.any_scene()
+		.any_node()
 	}
 }
 
@@ -163,22 +163,22 @@ fn summary_content(
 	display_name: String,
 	href: Option<String>,
 	active: bool,
-) -> Box<dyn Scene> {
+) -> Node {
 	let link_classes =
 		|| Classes::new([classes::SIDEBAR_LINK, classes::SIDEBAR_BRANCH]);
 	match href {
 		Some(href) if active => rsx! {
 			<a {link_classes()} href=href aria-current="page">{display_name}</a>
 		}
-		.any_scene(),
+		.any_node(),
 		Some(href) => rsx! {
 			<a {link_classes()} href=href>{display_name}</a>
 		}
-		.any_scene(),
+		.any_node(),
 		None => rsx! {
 			<span {Classes::new([classes::SIDEBAR_LABEL, classes::SIDEBAR_BRANCH])}>{display_name}</span>
 		}
-		.any_scene(),
+		.any_node(),
 	}
 }
 
@@ -223,15 +223,14 @@ mod test {
 	/// Render the sidebar to plain charcell with the Material rule set.
 	fn render_charcell(nodes: Vec<SidebarNode>) -> String {
 		let mut world = (
-			bevy::app::TaskPoolPlugin::default(),
-			bevy::asset::AssetPlugin::default(),
-			bevy::scene::ScenePlugin,
+			TemplatePlugin,
+			DocumentPlugin,
 			CharcellPlugin,
 			crate::style::material::MaterialStylePlugin::default(),
 		)
 			.into_world();
 		let root =
-			world.spawn_scene(rsx! { <Sidebar nodes=nodes/> }).unwrap().id();
+			world.spawn_template(rsx! { <Sidebar nodes=nodes/> }).id();
 		world.entity_mut(root).insert(FlexBuffer::new(40));
 		world.run_schedule(crate::parse::PostParseTree);
 		world

@@ -66,7 +66,7 @@ mod tests {
 		let root = world
 			.spawn((
 				Buffer::new(UVec2::new(20, 5)).into_double_buffer(),
-				rsx_direct! { <div><h1>"Title"</h1><p>"Body"</p></div> },
+				rsx! { <div><h1>"Title"</h1><p>"Body"</p></div> },
 			))
 			.id();
 		// the schedule resolves styles, decorates, lays out, and paints
@@ -99,7 +99,7 @@ mod tests {
 		let entity = world
 			.spawn((
 				Buffer::new(UVec2::new(40, 6)).into_double_buffer(),
-				rsx_direct! {
+				rsx! {
 					<div>
 						<head><style>"body { color: red; }"</style></head>
 						<p>"Visible"</p>
@@ -127,7 +127,7 @@ mod tests {
 			.collect::<Vec<_>>()
 			.join("\n");
 		let out =
-			FlexBuffer::render_oneshot(20, rsx_direct! { <pre>{text}</pre> });
+			FlexBuffer::render_oneshot(20, rsx! { <pre>{text}</pre> });
 		out.lines().count().xpect_eq(30);
 	}
 
@@ -137,7 +137,7 @@ mod tests {
 		// lays out, and paints the referenced entity in the holder's place,
 		// without it being parented under the buffer tree.
 		let mut world = CharcellPlugin::world();
-		let content = world.spawn(rsx_direct! { <p>"transcluded"</p> }).id();
+		let content = world.spawn(rsx! { <p>"transcluded"</p> }).id();
 		let root = world
 			.spawn((FlexBuffer::new(40), children![(RenderRef::new(content),)]))
 			.id();
@@ -156,7 +156,7 @@ mod tests {
 		// inline flow wraps around the link's painted columns as OSC-8.
 		let out = FlexBuffer::render_oneshot(
 			40,
-			rsx_direct! { <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
+			rsx! { <p>"See "<a href="https://beet.org">"the docs"</a>"."</p> },
 		);
 		out.as_str()
 			.xpect_contains("\x1b]8;;https://beet.org\x1b\\")

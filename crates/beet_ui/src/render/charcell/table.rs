@@ -202,7 +202,7 @@ mod test {
 				display: Display::TableCell,
 				..default()
 			},
-			rsx_direct! { {text} },
+			rsx! { {text} },
 		)
 	}
 

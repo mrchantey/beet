@@ -15,8 +15,8 @@ pub enum TokenKey {
 	Url(SmolStr),
 	/// An inline key at a specific source location (file:line:col).
 	Inline(SmolStr),
-	// /// uuid reflect impl feature gated behind world_serde?
-	// #[cfg(feature="world_serde")]
+	// /// uuid reflect impl feature gated behind template_serde?
+	// #[cfg(feature="template_serde")]
 	// Uuid(uuid::Uuid),
 }
 

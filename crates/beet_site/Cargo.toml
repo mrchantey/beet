@@ -17,11 +17,11 @@ keywords.workspace = true
 [features]
 default = ["web", "terminal"]
 
-# Shared render substrate: the router, scene system, markdown content and the
+# Shared render substrate: the router, template system, markdown content and the
 # style rule set, used by both render targets. Page bodies and layouts live here.
 # `json` brings the batteries-included `default_router` (`/app-info`,
 # `POST /analytics`).
-render = ["beet/router", "beet/scene", "beet/markdown", "beet/style", "beet/json", "beet/syntax_highlighting"]
+render = ["beet/router", "beet/template", "beet/markdown", "beet/style", "beet/json", "beet/syntax_highlighting"]
 
 # Web render target: the document shell + HTTP server + `HtmlRenderer`.
 web = ["render", "beet/http_server"]

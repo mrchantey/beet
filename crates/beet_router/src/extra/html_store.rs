@@ -95,7 +95,7 @@ mod test {
 			.spawn((
 				(default_router(), children![render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"live about"</p> }
+					rsx! { <p>"live about"</p> }
 				)]),
 				HtmlStore::ssg(html_store().await),
 			))
@@ -116,7 +116,7 @@ mod test {
 			.spawn((
 				(default_router(), children![render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"live about"</p> }
+					rsx! { <p>"live about"</p> }
 				)]),
 				HtmlStore::ssr(html_store().await),
 			))
@@ -135,7 +135,7 @@ mod test {
 			.spawn((
 				(default_router(), children![render_action::fixed_route(
 					"contact",
-					rsx_direct! { <p>"live contact"</p> }
+					rsx! { <p>"live contact"</p> }
 				)]),
 				HtmlStore::ssg(html_store().await),
 			))

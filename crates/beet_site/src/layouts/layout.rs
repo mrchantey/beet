@@ -4,18 +4,18 @@ use beet::prelude::*;
 /// The global document layout wrapping every route's body.
 ///
 /// Composes the library [`Header`]/[`Footer`] and the site [`BeetSidebar`]
-/// around the route content (the default `<slot/>`, transcluded in place by the
+/// around the route content (the default `<Slot/>`, transcluded in place by the
 /// [`BaseLayout`] middleware). The library [`Head`] carries the web-only
 /// stylesheet/color-scheme/preflight/favicon, with its title/description sourced
 /// from the matched route's [`ArticleMeta`] (markdown frontmatter, queried off
 /// the [`RequestContext`] route entity, falling back to [`PackageConfig`]). The
 /// `<head>` is non-visual, so the same layout renders in the terminal.
-#[scene(system)]
+#[template(system)]
 pub fn BeetLayout(
 	cx: Res<RequestContext>,
 	metas: Query<&ArticleMeta>,
 	pkg: Res<PackageConfig>,
-) -> impl Scene {
+) -> impl Bundle {
 	let meta = metas.get(cx.route()).ok();
 	let title = meta
 		.and_then(|meta| meta.title.clone())
@@ -57,7 +57,7 @@ pub fn BeetLayout(
 				<div {Classes::new([classes::CONTAINER])}>
 					<BeetSidebar/>
 					<main>
-						<slot/>
+						<Slot/>
 					</main>
 				</div>
 				<Footer/>

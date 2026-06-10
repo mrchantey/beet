@@ -1,0 +1,4 @@
+<section bx:scope="user">
+	<h1>Hello, {#name}!</h1>
+	<p>You have {#unread=0} unread messages.</p>
+</section>

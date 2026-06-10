@@ -1,7 +1,7 @@
 use beet::prelude::*;
 
 /// Shows the [`ErrorText`] widget used for inline validation feedback.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Error Text"</h1>

@@ -107,7 +107,7 @@ fn server_from_cli() -> Result<OnSpawn> {
 fn routes() -> impl Bundle {
 	(
 		// render middleware wrapping every descendant route's content in the
-		// `RouterLayout` document, transcluded in place at its `<slot/>`
+		// `RouterLayout` document, transcluded in place at its `<Slot/>`
 		BaseLayout::<RouterLayout>::default(),
 		children![
 			route("", BlobScene::new("content/home.md")),
@@ -130,7 +130,7 @@ fn counter() -> impl Bundle {
 	let field_ref = FieldRef::new("count").with_init(0);
 	(
 		ParamsPartial::new::<CounterParams>(),
-		render_action::fixed_route("counter", rsx_direct! {
+		render_action::fixed_route("counter", rsx! {
 			<div>
 				<h1>"Cookie Counter"</h1>
 				<p>"Value: "{field_ref.clone()}</p>
@@ -167,12 +167,12 @@ fn sequence() -> impl Bundle {
 
 /// The document layout wrapping every route's content.
 ///
-/// An ordinary `#[scene]` widget with a `<slot/>`: the [`BaseLayout`] render
+/// An ordinary `#[template]` widget with a `<Slot/>`: the [`BaseLayout`] render
 /// middleware runs each route, then transcludes the resulting content in place
-/// at the `<slot/>`. The `<head>` is non-visual, so the same layout renders in
+/// at the `<Slot/>`. The `<head>` is non-visual, so the same layout renders in
 /// the terminal and over HTTP.
-#[scene]
-fn RouterLayout() -> impl Scene {
+#[template]
+fn RouterLayout() -> impl Bundle {
 	rsx! {
 		<html>
 			<head><title>"Router Example"</title></head>
@@ -184,7 +184,7 @@ fn RouterLayout() -> impl Scene {
 						<li><a href="/counter">"Counter"</a></li>
 					</ul>
 				</nav>
-				<main><slot/></main>
+				<main><Slot/></main>
 			</body>
 		</html>
 	}

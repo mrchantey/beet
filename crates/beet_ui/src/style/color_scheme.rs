@@ -87,7 +87,7 @@ mod test {
 				.into_world();
 		let entity = world
 			.spawn((
-				rsx_direct! { <div/> },
+				rsx! { <div/> },
 				Classes::new([classes::PAGE]),
 				ColorScheme::Light,
 			))

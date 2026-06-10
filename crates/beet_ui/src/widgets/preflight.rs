@@ -10,8 +10,8 @@ use beet_core::prelude::*;
 
 /// Emits the bundled Tailwind Preflight reset (`preflight.css`) as a `<style>`
 /// element.
-#[scene]
-pub fn Preflight() -> impl Scene {
+#[template]
+pub fn Preflight() -> impl Bundle {
 	let preflight = include_str!("./preflight.css");
 	rsx! {
 		<style>{preflight}</style>
@@ -24,8 +24,8 @@ pub fn Preflight() -> impl Scene {
 /// so its rules layer over the verbatim Tailwind reset (eg restoring prose list
 /// markers). It is an escape hatch for browser-only presentation; prefer a token
 /// rule or class where one can express the intent.
-#[scene]
-pub fn Reset() -> impl Scene {
+#[template]
+pub fn Reset() -> impl Bundle {
 	let reset = include_str!("./reset.css");
 	rsx! {
 		<style>{reset}</style>

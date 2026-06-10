@@ -311,14 +311,14 @@ mod tests {
 
 	#[beet_core::test]
 	fn unordered_list_bullets() {
-		render(rsx_direct! { <ul><li>"alpha"</li><li>"beta"</li></ul> })
+		render(rsx! { <ul><li>"alpha"</li><li>"beta"</li></ul> })
 			.xpect_contains("• alpha")
 			.xpect_contains("• beta");
 	}
 
 	#[beet_core::test]
 	fn ordered_list_numbers() {
-		render(rsx_direct! { <ol><li>"first"</li><li>"second"</li></ol> })
+		render(rsx! { <ol><li>"first"</li><li>"second"</li></ol> })
 			.xpect_contains("1. first")
 			.xpect_contains("2. second");
 	}
@@ -327,7 +327,7 @@ mod tests {
 	/// prefix (the callout's thick left border is drawn by the box model instead).
 	#[beet_core::test]
 	fn blockquote_has_no_paragraph_bar() {
-		render(rsx_direct! { <blockquote><p>"quoted text"</p></blockquote> })
+		render(rsx! { <blockquote><p>"quoted text"</p></blockquote> })
 			.xpect_contains("quoted text")
 			.xnot()
 			.xpect_contains("▌");
@@ -335,14 +335,14 @@ mod tests {
 
 	#[beet_core::test]
 	fn thematic_break_rule() {
-		render(rsx_direct! { <hr/> }).xpect_contains("────");
+		render(rsx! { <hr/> }).xpect_contains("────");
 	}
 
 	/// A closed `<details>` collapses its body and shows a right-pointing caret,
 	/// the terminal equivalent of the web's native collapsed disclosure.
 	#[beet_core::test]
 	fn closed_details_collapses_with_caret() {
-		render(rsx_direct! {
+		render(rsx! {
 			<details><summary>"Summary"</summary><p>"Body"</p></details>
 		})
 		.xpect_contains("▸ Summary")
@@ -353,7 +353,7 @@ mod tests {
 	/// An open `<details>` keeps its body and shows a down-pointing caret.
 	#[beet_core::test]
 	fn open_details_expands_with_caret() {
-		render(rsx_direct! {
+		render(rsx! {
 			<details open><summary>"Summary"</summary><p>"Body"</p></details>
 		})
 		.xpect_contains("▾ Summary")
@@ -362,7 +362,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn image_alt_text() {
-		render(rsx_direct! { <img src="image.png" alt="alt text"/> })
+		render(rsx! { <img src="image.png" alt="alt text"/> })
 			.xpect_contains("[image]: alt text");
 	}
 
@@ -371,7 +371,7 @@ mod tests {
 	/// embed-only `src`.
 	#[beet_core::test]
 	fn iframe_renders_as_titled_link() {
-		let out = FlexBuffer::render_oneshot(40, rsx_direct! {
+		let out = FlexBuffer::render_oneshot(40, rsx! {
 			<iframe
 				src="https://www.youtube.com/embed/abc123"
 				alt-src="https://youtu.be/abc123"
@@ -393,7 +393,7 @@ mod tests {
 	fn iframe_link_ends_at_title() {
 		let mut world = CharcellPlugin::world();
 		let root = world
-			.spawn((FlexBuffer::new(40), rsx_direct! {
+			.spawn((FlexBuffer::new(40), rsx! {
 				<iframe src="https://example.com/clip" title="My Talk"/>
 			}))
 			.id();
@@ -410,7 +410,7 @@ mod tests {
 	/// Without an `alt-src` the link falls back to the `src`.
 	#[beet_core::test]
 	fn iframe_link_falls_back_to_src() {
-		FlexBuffer::render_oneshot(40, rsx_direct! {
+		FlexBuffer::render_oneshot(40, rsx! {
 			<iframe src="https://example.com/clip" title="Clip"/>
 		})
 		.xpect_contains("\x1b]8;;https://example.com/clip\x1b\\");
@@ -420,7 +420,7 @@ mod tests {
 	fn nested_list_indented() {
 		// the outer item's marker sits in a left gutter, so its nested list is
 		// inset one marker-width, indenting the nested bullet under the label.
-		let out = FlexBuffer::render_oneshot_plain(40, rsx_direct! {
+		let out = FlexBuffer::render_oneshot_plain(40, rsx! {
 			<ul><li>"top"<ul><li>"nested"</li></ul></li></ul>
 		});
 		out.lines()

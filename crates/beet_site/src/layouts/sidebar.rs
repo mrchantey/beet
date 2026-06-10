@@ -7,11 +7,11 @@ use beet::prelude::*;
 /// [`RequestContext`], so the active route is marked and its ancestor branches
 /// auto-expand. The `docs` and `blog` collections are forced open so their
 /// entries are always visible, with `docs` pinned before `blog`.
-#[scene(system)]
+#[template(system)]
 pub fn BeetSidebar(
 	cx: Res<RequestContext>,
 	trees: Query<&RouteTree, With<Router>>,
-) -> impl Scene {
+) -> impl Bundle {
 	let nodes = trees
 		.iter()
 		.next()

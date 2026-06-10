@@ -126,14 +126,19 @@ custom_test_frameworks = [
 ]
 http = ["dep:http"]
 crossterm = ["dep:crossterm"]
-bevy_default = ["world_serde", "bevy_multithreaded"]
-# forked from bevy_world_serialization, see src/world_serde. needs reflect + Entity serde
-world_serde = ["serde", "bevy/serialize"]
+bevy_default = ["template_serde", "bevy_multithreaded"]
+# template serialization, see src/template_serde. needs reflect + Entity serde
+template_serde = ["serde", "bevy/serialize"]
 bevy_keyboard = ["bevy/keyboard"]
 bevy_mouse = ["bevy/mouse"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]
+# Additive asset support for the template substrate: an asset path resolves to a
+# `Handle` at build time and defers `LoadTemplate` until the asset finishes
+# loading. The no_std core stays asset-free; removing this leaves a fully
+# functional asset-free substrate where `LoadTemplate` fires immediately.
+bevy_asset = ["bevy/bevy_asset"]
 # no_std base serialization support. Heavier format crates (`ron`,
 # `serde_plain`, json, postcard) are opt-in via their own features.
 serde = [
@@ -141,7 +146,7 @@ serde = [
 	"dep:serde",
 	"smol_str/serde"
 ]
-# RON text format, used by `MediaType::Ron` and `world_serde` loading.
+# RON text format, used by `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "dep:ron"]
 # Plaintext (de)serialization for `MediaType::Text` via serde_plain.
 serde_plain = ["serde", "dep:serde_plain"]

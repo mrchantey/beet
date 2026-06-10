@@ -131,20 +131,20 @@ fn emit_rust_route(
 
 	match collection.category {
 		RouteCollectionCategory::Pages => {
-			// Page handlers return `impl Scene` (the authoring default); the
-			// scene-route family resolves + spawns them per request.
+			// Page handlers return `impl Bundle` (an `rsx!` tree); the route
+			// family builds them through the template substrate per request.
 			let route = match kind {
 				HandlerKind::Static => {
-					quote! { render_action::fixed_scene_route(#path, #mod_ident::#func) }
+					quote! { render_action::fixed_func_route(#path, #mod_ident::#func) }
 				}
 				HandlerKind::Pure => {
-					quote! { render_action::scene_route(#path, #mod_ident::#func) }
+					quote! { render_action::pure_route(#path, #mod_ident::#func) }
 				}
 				HandlerKind::Async => {
-					quote! { render_action::async_scene_route(#path, #mod_ident::#func) }
+					quote! { render_action::async_route(#path, #mod_ident::#func) }
 				}
 				HandlerKind::System => {
-					quote! { render_action::system_scene_route(#path, #mod_ident::#func) }
+					quote! { render_action::system_route(#path, #mod_ident::#func) }
 				}
 			};
 			let cache = match kind {

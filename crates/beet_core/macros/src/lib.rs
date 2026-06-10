@@ -9,11 +9,9 @@ mod getset;
 mod main_attr;
 mod mdx;
 #[cfg(feature = "rsx")]
-mod rsx_direct;
+mod rsx;
 #[cfg(feature = "rsx")]
-mod rsx_scene;
-#[cfg(feature = "rsx")]
-mod scene;
+mod template;
 mod sendit;
 mod test_attr;
 mod to_tokens;
@@ -191,18 +189,19 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	mdx::impl_mdx(input)
 }
 
-/// JSX-like macro that lowers HTML-like markup to an `impl Scene`, flowing
-/// through Bevy's `bevy_scene` resolve→build→spawn pipeline.
+/// JSX-like macro lowering HTML-like markup to an `impl Template<Output = ()>`
+/// built through beet's template substrate (`spawn_template`).
 ///
-/// Requires the consuming crate to enable the `scene` feature (which provides
-/// `template_value`, `RelatedScenes`, `EntityScene`, etc. via its prelude). For
-/// the no_std-friendly, dependency-light variant that produces an `impl Bundle`
-/// directly, use [`rsx_direct`].
+/// Lowercase tags become elements, uppercase tags resolve to a component
+/// (reflect-patched) or a `#[template]` (built with input props), bare `{..}`
+/// attributes spread components/templates onto the entity, attribute/text
+/// `{..}` are Rust expressions, `<Slot>`/`bx:slot` lower to slot markers, and
+/// `on*` handlers lower to observers. See `.agents/plans/bsx/macros.md`.
 ///
 /// ## Example
 ///
 /// ```rust ignore
-/// fn my_ui() -> impl Scene {
+/// fn my_ui() -> impl Template<Output = ()> {
 ///     rsx! {
 ///         <div class="container">
 ///             <span>"hello"</span>
@@ -213,48 +212,36 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[cfg(feature = "rsx")]
 #[proc_macro]
 pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	rsx_scene::impl_rsx_scene(input)
+	rsx::impl_rsx(input)
 }
 
-/// Direct, immediate variant of [`rsx`]: lowers HTML-like markup straight to an
-/// `impl Bundle`, spawning entities eagerly.
+/// Authors a function component that registers a template on the substrate.
 ///
-/// This is the no_std-friendly, dependency-light lowering with no `bevy_scene`
-/// dependency. Use it when the scene-producing [`rsx`] machinery is overkill or
-/// unavailable.
-#[cfg(feature = "rsx")]
-#[proc_macro]
-pub fn rsx_direct(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	rsx_direct::impl_rsx_direct(input)
-}
-
-/// Authors a Leptos/Solid-style function component that lowers to an
-/// `impl Scene`.
+/// From `fn Name(p1: T1, p2: T2, ..) -> impl Bundle` (body written as
+/// `rsx! { .. }`) it derives the prop schema from the signature and emits a
+/// registered template type `Name` building the body's subtree. There is no
+/// `NameProps` struct and no compile-time call-site prop checking; props are
+/// runtime-verified input values. `#[template(system)]` reads world/ancestor
+/// state at build time (non-`#[prop]` params are Bevy `SystemParam`s).
 ///
-/// From `fn Name(p1: T1, p2: T2, ..) -> impl Scene` it generates a props
-/// struct `NameProps` (`Default` + `SetWith`, with per-param `#[prop(into)]`
-/// becoming `#[set_with(into)]`) and rewrites the function to take that props
-/// struct. Capitalized tags in [`rsx`] map attributes to the props setters by
-/// name, so omitted attributes fall back to `Default`.
-///
-/// With the `slot` feature (default), `<slot>` placeholders in the body are
-/// hoisted into `SceneProp` props: `<slot/>` becomes a `children` prop,
-/// `<slot name="x"/>` an `x` prop (`-` lowered to `_`). The caller fills them
-/// with `slot="x"` content (default = unmarked children).
+/// Prop grammar: a bare field or `#[prop(default)]` is optional (type default);
+/// `#[prop(default = expr)]` defaults to `expr`; `#[prop(required)]` is required
+/// (a missing required prop is a graceful error); `#[prop(into)]` accepts
+/// `impl Into`.
 ///
 /// ```rust ignore
-/// #[scene]
-/// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Scene {
-///     rsx! { <button>{label} <slot/></button> }
+/// #[template]
+/// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Bundle {
+///     rsx! { <button>{label} <Slot/></button> }
 /// }
 /// ```
 #[cfg(feature = "rsx")]
 #[proc_macro_attribute]
-pub fn scene(
+pub fn template(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	scene::impl_scene(attr, item)
+	template::impl_template(attr, item)
 }
 
 

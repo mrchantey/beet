@@ -8,5 +8,5 @@ These are re-exported through `beet_core` (and in turn `beet`), so depend on tho
 - `#[derive(Get, Set, SetWith)]` - per-field getters and setters
 - `#[derive(ToTokens)]` - tokenize a value back into its constructing source
 - `#[main]` / `#[test]` - async entry point and the beet test attribute
-- `rsx!` / `rsx_direct!` / `mdx!` / `#[scene]` - HTML-like UI authoring (`rsx` feature)
+- `rsx!` / `mdx!` / `#[template]` - HTML-like UI authoring (`rsx` feature)
 - `#[derive(AsAny)]`, `#[derive(BundleEffect)]` and other small helpers

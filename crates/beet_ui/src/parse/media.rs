@@ -20,6 +20,8 @@ pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
 	plaintext_fallback: bool,
 	plain_text_parser: PlainTextParser,
+	#[cfg(feature = "bsx")]
+	bsx_parser: BsxParser,
 	#[cfg(feature = "html_parser")]
 	html_parser: HtmlParser,
 	#[cfg(feature = "markdown_parser")]
@@ -39,6 +41,8 @@ impl MediaParser {
 		Self {
 			plaintext_fallback: true,
 			plain_text_parser: PlainTextParser::default(),
+			#[cfg(feature = "bsx")]
+			bsx_parser: BsxParser::bsx(),
 			#[cfg(feature = "html_parser")]
 			html_parser: HtmlParser::new(),
 			#[cfg(feature = "markdown_parser")]
@@ -79,7 +83,13 @@ impl NodeParser for MediaParser {
 		let media_type = cx.bytes.media_type().clone();
 		match media_type {
 			MediaType::Text => self.plain_text_parser.parse(cx),
-			#[cfg(feature = "html_parser")]
+			// the one parser: BSX (full grammar) and HTML (features-off subset)
+			// both dispatch here when the `bsx` feature is on.
+			#[cfg(feature = "bsx")]
+			MediaType::Bsx => self.bsx_parser.parse(cx),
+			#[cfg(feature = "bsx")]
+			MediaType::Html => BsxParser::html().parse(cx),
+			#[cfg(all(feature = "html_parser", not(feature = "bsx")))]
 			MediaType::Html => self.html_parser.parse(cx),
 			#[cfg(feature = "markdown_parser")]
 			MediaType::Markdown => self.markdown_parser.parse(cx),
@@ -89,6 +99,8 @@ impl NodeParser for MediaParser {
 			other => {
 				#[allow(unused_mut)]
 				let mut supported = vec![MediaType::Text];
+				#[cfg(feature = "bsx")]
+				supported.push(MediaType::Bsx);
 				#[cfg(feature = "html_parser")]
 				supported.push(MediaType::Html);
 				#[cfg(feature = "markdown_parser")]
@@ -140,6 +152,29 @@ mod test {
 			.children()
 			.len()
 			.xpect_eq(1);
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn parse_bsx() {
+		// `MediaType::Bsx` dispatches to the BSX parser by default. Parsed content
+		// becomes children of the container parse target.
+		let bytes = MediaBytes::new_bsx("<div>hello</div>");
+		(TemplatePlugin, DocumentPlugin)
+			.into_world()
+			.spawn_empty()
+			.xtap(|entity| {
+				MediaParser::new()
+					.parse(ParseContext::new(entity, &bytes))
+					.unwrap();
+			})
+			.child(0)
+			.unwrap()
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.to_string()
+			.xpect_eq("div".to_string());
 	}
 
 	#[cfg(feature = "markdown_parser")]

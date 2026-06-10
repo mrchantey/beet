@@ -2,7 +2,7 @@
 //!
 //! The layout middleware installs a [`RequestContext`] resource before the
 //! document-layout scene is built and removes it after, so the layout's
-//! `#[scene(system)]` widgets can read the current request and the matched
+//! `#[template(system)]` widgets can read the current request and the matched
 //! route entity through an ordinary `cx: Res<RequestContext>` parameter.
 //!
 //! It is a resource rather than an ancestor component because scene systems run

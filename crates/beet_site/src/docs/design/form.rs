@@ -6,7 +6,7 @@ use beet::prelude::*;
 ///
 /// The script is web-only (the terminal skips `<script>`); on the web it serves
 /// as the live demo replacing the legacy `DynamicStruct` submit path.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Form"</h1>

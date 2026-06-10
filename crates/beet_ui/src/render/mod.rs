@@ -6,10 +6,10 @@ pub use tui::*;
 mod charcell;
 #[cfg(feature = "style")]
 pub use charcell::*;
-#[cfg(feature = "world_serde")]
-mod world_serde;
-#[cfg(feature = "world_serde")]
-pub use world_serde::*;
+#[cfg(feature = "template_serde")]
+mod template;
+#[cfg(feature = "template_serde")]
+pub use template::*;
 mod html;
 pub use html::*;
 mod html_utils;

@@ -515,7 +515,7 @@ mod test {
 			.spawn(children![
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 				action_at("action"),
 			])

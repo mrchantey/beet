@@ -74,7 +74,7 @@ where
 
 /// Entities are convert into children of the entity they are inserted into.
 ///
-/// `rsx_direct!{<div>{entity}</div>}` spawns an entity with this OnSpawn effect,
+/// `rsx!{<div>{entity}</div>}` spawns an entity with this OnSpawn effect,
 /// which becomes the parent of the entity passed in.
 impl IntoBundle<(NotBundleMarker, Self)> for Entity {
 	fn into_bundle(self) -> impl Bundle {

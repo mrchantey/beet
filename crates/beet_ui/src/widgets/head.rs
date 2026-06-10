@@ -2,7 +2,7 @@
 //!
 //! Web `<head>` only — non-web targets ignore the produced meta tags during
 //! rendering. The meta values are sourced from [`PackageConfig`] at scene build
-//! time via `#[scene(system)]`, so the same widget composition fills correctly
+//! time via `#[template(system)]`, so the same widget composition fills correctly
 //! in any binary that initializes the resource (via `pkg_config!()`).
 //!
 //! `<head>` is split from `<header>`/`<footer>` because it targets the document
@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// description, version, theme-color, application-name, the core Open Graph and
 /// Twitter-card tags, and the Apple/Android/Microsoft PWA meta block. Extra
 /// app-specific tags can be added through the default slot.
-#[scene(system)]
+#[template(system)]
 pub fn Head(
 	#[prop] fixed_scale: bool,
 	/// Per-page title override; falls back to [`PackageConfig::title`].
@@ -35,7 +35,7 @@ pub fn Head(
 	#[prop]
 	description: Option<String>,
 	pkg_config: Res<PackageConfig>,
-) -> impl Scene {
+) -> impl Bundle {
 	// per-page `ArticleMeta` values override the package defaults.
 	let title = SmolStr::new(title.as_deref().unwrap_or(&pkg_config.title));
 	let description =
@@ -53,7 +53,7 @@ pub fn Head(
 		<head>
 			<meta charset="UTF-8"/>
 			// child-text position needs an owned value (the block flows through
-			// `into_scene`, whose `impl Scene` would otherwise borrow `title`);
+			// `into_node`, which would otherwise borrow `title`);
 			// attribute positions take `{&title}` directly via `Value::new`.
 			<title>{title.clone()}</title>
 			<link rel="canonical" href={&homepage}/>
@@ -79,7 +79,7 @@ pub fn Head(
 			<meta name="mobile-web-app-capable" content="yes"/>
 			// Microsoft tile
 			<meta name="msapplication-TileColor" content="#000000"/>
-			<slot/>
+			<Slot/>
 		</head>
 	}
 }

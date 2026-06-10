@@ -7,8 +7,8 @@ use beet_core::prelude::*;
 use beet_net::prelude::ANALYTICS_JS;
 
 /// Injects the static analytics JS as a `<script>` element.
-#[scene]
-pub fn Analytics() -> impl Scene {
+#[template]
+pub fn Analytics() -> impl Bundle {
 	let body = ANALYTICS_JS.to_string();
 	rsx! {
 		<script>{body}</script>

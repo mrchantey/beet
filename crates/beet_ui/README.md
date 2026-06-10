@@ -43,4 +43,4 @@ Renderers walk a tree of nodes and perform some action like appending a html buf
 
 ## Authoring
 
-Trees are usually written with the `rsx!` / `rsx_direct!` macros, and reusable widgets with `#[scene]` function components used as capitalized tags. Styling uses semantic `Classes` resolved by a rule set rather than stringly-typed class names.
+Trees are written with the `rsx!` macro, and reusable widgets with `#[template]` function components used as capitalized tags. Styling uses semantic `Classes` resolved by a rule set rather than stringly-typed class names.

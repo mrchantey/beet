@@ -109,14 +109,14 @@ mod test {
 				(
 					render_action::fixed_route(
 						"about",
-						rsx_direct! { <p>"About"</p> }
+						rsx! { <p>"About"</p> }
 					),
 					HttpMethod::Get
 				),
 				(
 					render_action::fixed_route(
 						"",
-						rsx_direct! { <h1>"Home"</h1> }
+						rsx! { <h1>"Home"</h1> }
 					),
 					HttpMethod::Get
 				),

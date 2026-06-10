@@ -289,10 +289,10 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((nav_router(), children![
-				render_action::fixed_route("", rsx_direct! { <h1>"Root"</h1> }),
+				render_action::fixed_route("", rsx! { <h1>"Root"</h1> }),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"About page"</p> }
+					rsx! { <p>"About page"</p> }
 				),
 			]))
 			.flush();
@@ -316,11 +316,11 @@ mod test {
 			.spawn((nav_router(), children![
 				render_action::fixed_route(
 					"alpha",
-					rsx_direct! { <p>"Alpha page"</p> }
+					rsx! { <p>"Alpha page"</p> }
 				),
 				render_action::fixed_route(
 					"beta",
-					rsx_direct! { <p>"Beta page"</p> }
+					rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -344,11 +344,11 @@ mod test {
 			.spawn((nav_router(), children![
 				render_action::fixed_route(
 					"alpha",
-					rsx_direct! { <p>"Alpha page"</p> }
+					rsx! { <p>"Alpha page"</p> }
 				),
 				render_action::fixed_route(
 					"beta",
-					rsx_direct! { <p>"Beta page"</p> }
+					rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -385,11 +385,11 @@ mod test {
 			.spawn((nav_router(), children![
 				render_action::fixed_route(
 					"alpha",
-					rsx_direct! { <p>"Alpha page"</p> }
+					rsx! { <p>"Alpha page"</p> }
 				),
 				render_action::fixed_route(
 					"beta",
-					rsx_direct! { <p>"Beta page"</p> }
+					rsx! { <p>"Beta page"</p> }
 				),
 			]))
 			.flush();
@@ -413,7 +413,7 @@ mod test {
 		let root = world
 			.spawn((nav_router(), children![render_action::fixed_route(
 				"about",
-				rsx_direct! { <p>"About page"</p> }
+				rsx! { <p>"About page"</p> }
 			),]))
 			.flush();
 

@@ -148,7 +148,7 @@ mod tests {
 		// a heading and a paragraph are both block: each on its own line(s),
 		// stacked top-to-bottom and separated by the block gap (the heading's
 		// bottom margin), with trailing blank rows trimmed away.
-		render(rsx_direct! {
+		render(rsx! {
 			<div>
 				<h1>"Title"</h1>
 				<p>"Body"</p>
@@ -162,7 +162,7 @@ mod tests {
 		// a paragraph wider than the viewport wraps to two rows; the block
 		// container must reserve both (plus the block gap) so the following
 		// block is not clipped: two wrapped rows, a blank gap, then the heading.
-		render(rsx_direct! {
+		render(rsx! {
 			<div>
 				<p>"one two three four five six"</p>
 				<h2>"End"</h2>

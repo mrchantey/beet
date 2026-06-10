@@ -7,8 +7,8 @@ use beet_core::prelude::*;
 ///
 /// Reactive show/hide is the caller's responsibility — wrap the widget in an
 /// effect or conditional render.
-#[scene]
-pub fn ErrorText(#[prop(into)] message: String) -> impl Scene {
+#[template]
+pub fn ErrorText(#[prop(into)] message: String) -> impl Bundle {
 	rsx! {
 		<span {Classes::new([classes::ERROR_TEXT])}>{message}</span>
 	}

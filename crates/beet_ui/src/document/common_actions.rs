@@ -234,7 +234,7 @@ where
 #[cfg(test)]
 mod test {
 	use super::*;
-	#[cfg(feature = "world_serde")]
+	#[cfg(feature = "template_serde")]
 	use crate::prelude::DocumentUiPlugin;
 	use beet_action::prelude::*;
 
@@ -474,9 +474,8 @@ mod test {
 	}
 
 	#[beet_core::test]
-	#[cfg(feature = "world_serde")]
-	fn roundtrip_increment_world_serde() {
-		use bevy::ecs::entity::EntityHashMap;
+	#[cfg(feature = "template_serde")]
+	fn roundtrip_increment_template() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.init_plugin::<DocumentUiPlugin>();
@@ -486,11 +485,11 @@ mod test {
 		let entity = app.world_mut().spawn(increment(count_field())).id();
 
 		// Serialize
-		let world_serde_bytes = WorldSerdeSaver::new()
+		let template_bytes = TemplateSaver::new()
 			.with_entity_tree(app.world(), entity)
 			.save(app.world(), MediaType::Ron)
 			.unwrap();
-		world_serde_bytes
+		template_bytes
 			.as_utf8()
 			.unwrap()
 			.xref()
@@ -500,16 +499,14 @@ mod test {
 		app.world_mut().entity_mut(entity).despawn();
 
 		// Load
-		let mut entity_map = EntityHashMap::default();
-		WorldSerdeLoader::new(app.world_mut())
-			.with_entity_map(&mut entity_map)
-			.load(&world_serde_bytes)
+		let loaded = TemplateLoader::new(app.world_mut())
+			.load(&template_bytes)
 			.unwrap();
 		app.update();
 
 		// The loaded entity should have Increment and ActionMeta
 		// (Action itself isn't serializable, but #[require] re-creates it)
-		let loaded = *entity_map.values().next().unwrap();
+		let loaded = *loaded.first().unwrap();
 		app.world().entity(loaded).get::<Increment>().xpect_some();
 		app.world().entity(loaded).get::<ActionMeta>().xpect_some();
 	}

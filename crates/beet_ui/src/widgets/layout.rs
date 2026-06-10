@@ -8,15 +8,15 @@ use beet_core::prelude::*;
 /// Wraps an entire page, including `<head>` and `<body>`.
 ///
 /// Slots: `head` (extra `<head>` content), default (page `<body>`).
-#[scene]
-pub fn HtmlDocument() -> impl Scene {
+#[template]
+pub fn HtmlDocument() -> impl Bundle {
 	rsx! {
 		<html lang="en">
 			<Head>
-				<slot name="head"/>
+				<Slot name="head"/>
 			</Head>
 			<body>
-				<slot/>
+				<Slot/>
 			</body>
 		</html>
 	}
@@ -26,19 +26,19 @@ pub fn HtmlDocument() -> impl Scene {
 /// around a body slot.
 ///
 /// Slots: `head`, `header`, `header-nav`, `footer`, default (page body).
-#[scene]
-pub fn PageLayout() -> impl Scene {
+#[template]
+pub fn PageLayout() -> impl Bundle {
 	rsx! {
 		<HtmlDocument>
-			<slot name="head" slot="head"/>
+			<Slot name="head" slot="head"/>
 			<div {Classes::new([classes::PAGE])}>
 				<Header>
-					<slot name="header"/>
-					<slot name="header-nav" slot="nav"/>
+					<Slot name="header"/>
+					<Slot name="header-nav" slot="nav"/>
 				</Header>
-				<slot/>
+				<Slot/>
 				<Footer>
-					<slot name="footer"/>
+					<Slot name="footer"/>
 				</Footer>
 			</div>
 		</HtmlDocument>
@@ -48,24 +48,24 @@ pub fn PageLayout() -> impl Scene {
 /// Forces a page break when printing. Renders an empty element carrying the
 /// [`classes::PAGE_BREAK`] class, styled by the `@media print` `page_break`
 /// rule (`break-after: page`); a no-op on screen and non-web targets.
-#[scene]
-pub fn PageBreak() -> impl Scene {
+#[template]
+pub fn PageBreak() -> impl Bundle {
 	rsx! { <div {Classes::new([classes::PAGE_BREAK])}/> }
 }
 
 /// A [`PageLayout`] with a `<main>` content area for article-style pages.
 ///
 /// Slots: `head`, `header`, `header-nav`, `footer`, default (main content).
-#[scene]
-pub fn ContentLayout() -> impl Scene {
+#[template]
+pub fn ContentLayout() -> impl Bundle {
 	rsx! {
 		<PageLayout>
-			<slot name="head" slot="head"/>
-			<slot name="header" slot="header"/>
-			<slot name="header-nav" slot="header-nav"/>
-			<slot name="footer" slot="footer"/>
+			<Slot name="head" slot="head"/>
+			<Slot name="header" slot="header"/>
+			<Slot name="header-nav" slot="header-nav"/>
+			<Slot name="footer" slot="footer"/>
 			<main {Classes::new(["content-main"])}>
-				<slot/>
+				<Slot/>
 			</main>
 		</PageLayout>
 	}

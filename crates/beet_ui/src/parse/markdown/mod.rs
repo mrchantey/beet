@@ -114,6 +114,12 @@ impl MarkdownParser {
 			span_lookup.as_ref(),
 		)?;
 
+		// MDX: resolve any embedded uppercase `<Template>` markup the markdown
+		// tokenizer emitted as a plain element, delegating to the BSX resolver so
+		// MDX templates resolve for free without a second resolver.
+		#[cfg(feature = "bsx")]
+		resolve_mdx_templates(world, entity)?;
+
 		// run post-parse systems (syntax highlighting, style resolution, ..)
 		// when registered, ie via `StylePlugin`.
 		let _ = world.try_run_schedule(PostParseTree);

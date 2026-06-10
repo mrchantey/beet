@@ -41,13 +41,13 @@ impl TextFieldVariant {
 ///
 /// `name` and `placeholder` are optional — when unset their attributes are
 /// omitted rather than rendered empty.
-#[scene]
+#[template]
 pub fn TextField(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	placeholder: Option<String>,
 	field: Option<FieldRef>,
-) -> impl Scene {
+) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
 		<input
@@ -62,13 +62,13 @@ pub fn TextField(
 
 /// A styled `<textarea>`. Same variant set and optional `field` binding as
 /// [`TextField`]; `name` and `placeholder` are likewise optional.
-#[scene]
+#[template]
 pub fn TextArea(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	placeholder: Option<String>,
 	field: Option<FieldRef>,
-) -> impl Scene {
+) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
 		<textarea
@@ -102,16 +102,16 @@ impl SelectVariant {
 /// A styled `<select>` element. The options are supplied via the default
 /// slot (typically `<option>` children). Optionally binds to a document field
 /// via `field`; `name` is omitted when unset.
-#[scene]
+#[template]
 pub fn Select(
 	variant: SelectVariant,
 	name: Option<String>,
 	field: Option<FieldRef>,
-) -> impl Scene {
+) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
 		<select {Classes::new([classes::SELECT, class])} {field} {optional_attr("name", name)}>
-			<slot/>
+			<Slot/>
 		</select>
 	}
 }
@@ -121,11 +121,48 @@ pub fn Select(
 /// `field` prop attaches a [`FieldRef`] to the form itself (eg the document
 /// root the nested inputs resolve against). The legacy WASM
 /// `FormData → DynamicStruct` path is gone.
-#[scene]
-pub fn Form(name: Option<String>, field: Option<FieldRef>) -> impl Scene {
+#[template]
+pub fn Form(name: Option<String>, field: Option<FieldRef>) -> impl Bundle {
 	rsx! {
 		<form {field} {optional_attr("name", name)}>
-			<slot/>
+			<Slot/>
 		</form>
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// Render a template to an HTML string through the substrate.
+	fn render_html(template: impl bevy::ecs::template::Template<Output = ()>) -> String {
+		let mut world = test_world();
+		let root = world.spawn_template(template).id();
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+	}
+
+	// A literal attribute (`type`) and multiple block attributes
+	// (`optional_attr` for `name`/`placeholder`) must all survive: each `attr`
+	// adds a related attribute entity rather than clobbering the set.
+	#[beet_core::test]
+	fn text_field_keeps_all_attributes() {
+		render_html(rsx! {
+			<TextField name="email" placeholder="ada@example.com"/>
+		})
+		.xpect_contains("type=\"text\"")
+		.xpect_contains("name=\"email\"")
+		.xpect_contains("placeholder=\"ada@example.com\"");
+	}
+
+	#[beet_core::test]
+	fn text_area_keeps_all_attributes() {
+		render_html(rsx! { <TextArea name="message" placeholder="hi"/> })
+			.xpect_contains("name=\"message\"")
+			.xpect_contains("placeholder=\"hi\"");
 	}
 }

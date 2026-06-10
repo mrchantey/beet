@@ -1,20 +1,19 @@
 //! Showcase gallery — a runnable page exercising the Material Design 3 rule
 //! set and the ported `beet_ui` widgets. The whole page (document layout,
-//! stylesheet, and gallery body) is a single scene: no hand-assembled HTML
+//! stylesheet, and gallery body) is a single template: no hand-assembled HTML
 //! string. The built stylesheet is itself a widget ([`Stylesheet`]), the color
 //! scheme seeds via [`ColorSchemeScript`], and the body is rendered once and
 //! served over HTTP for live inspection (and also written to disk).
 //!
 //! Run with:
 //! ```not_rust
-//! cargo run -p beet_ui --example showcase --features scene,style
+//! cargo run -p beet_ui --example showcase --features template,style
 //! ```
 //! then open <http://localhost:8337>.
 //!
-//! `<Select>`/`<Table>` options and rows are passed as **scene props**: caller
-//! content written between the tags becomes the widget's `children` prop, and
-//! `slot="head"` rows route to the named `head` prop, which the widget places
-//! explicitly (see [`SceneProp`]).
+//! `<Select>`/`<Table>` options and rows are passed as slotted children: caller
+//! content written between the tags lands in the widget's default `<Slot>`, and
+//! `slot="head"` rows route to the named `head` slot (see `<Slot>`).
 use beet_core::prelude::*;
 use beet_net::prelude::DEFAULT_SERVER_PORT;
 use beet_net::prelude::HttpServer;
@@ -27,14 +26,13 @@ use beet_ui::prelude::*;
 use beet_ui::*;
 use bevy::MinimalPlugins;
 use bevy::app::App;
-use bevy::asset::AssetPlugin;
 
 fn main() {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
-			AssetPlugin::default(),
-			ScenePlugin,
+			TemplatePlugin,
+			DocumentPlugin,
 			material::MaterialStylePlugin::new(palettes::basic::BLUE),
 			ServerPlugin,
 		))
@@ -54,7 +52,7 @@ fn main() {
 
 /// Render the showcase page once, write it to disk, and serve it on every route.
 fn serve_showcase(world: &mut World) -> Result {
-	let root = world.spawn_scene(showcase_page())?.id();
+	let root = world.spawn_template(node(showcase_page())).id();
 	let html = HtmlRenderer::new()
 		.render(&mut RenderContext::new(root, world))?
 		.to_string();
@@ -84,7 +82,7 @@ fn serve_showcase(world: &mut World) -> Result {
 /// The full page as one scene: an `<html>` layout whose `<head>` carries the
 /// preflight reset, the built [`Stylesheet`], and the [`ColorSchemeScript`],
 /// with the [`gallery`] in the `<body>`.
-fn showcase_page() -> impl Scene {
+fn showcase_page() -> impl Bundle {
 	rsx! {
 		<html lang="en">
 			<head>
@@ -103,7 +101,7 @@ fn showcase_page() -> impl Scene {
 }
 
 /// The gallery body: a `<main>` with a section per rule/widget group.
-fn gallery() -> impl Scene {
+fn gallery() -> impl Bundle {
 	rsx! {
 		<main {Classes::new([classes::PAGE])}>
 			<h1 {Classes::new([classes::TEXT_DISPLAY_MEDIUM])}>"Beet UI Showcase"</h1>

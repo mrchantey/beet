@@ -14,11 +14,11 @@ pub impl Commands<'_, '_> {
 	}
 
 	/// Loads world serde data from [`MediaBytes`].
-	#[cfg(feature = "world_serde")]
-	fn load_world_serde(&mut self, bytes: impl Into<MediaBytes>) {
+	#[cfg(feature = "template_serde")]
+	fn load_template(&mut self, bytes: impl Into<MediaBytes>) {
 		let bytes = bytes.into();
 		self.queue(move |world: &mut World| -> Result {
-			WorldSerdeLoader::new(world).load(&bytes)?;
+			TemplateLoader::new(world).load(&bytes)?;
 			Ok(())
 		});
 	}

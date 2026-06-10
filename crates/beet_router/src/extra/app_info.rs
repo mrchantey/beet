@@ -1,21 +1,17 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_ui::prelude::SceneComponent;
 
-/// A scene route at `/app-info` rendering the [`PackageConfig`] as an article.
+/// A template route at `/app-info` rendering the [`PackageConfig`] as an article.
 ///
 /// Requires a [`PackageConfig`] resource (eg via `pkg_config!()`).
 pub fn app_info() -> impl Bundle {
-	render_action::scene_func_route(
-		"app-info",
-		<AppInfoScene as SceneComponent>::scene,
-	)
+	render_action::func_route("app-info", |_: ()| rsx! { <AppInfoContent/> })
 }
 
-/// Reads [`PackageConfig`] synchronously at scene build, returning an
+/// Reads [`PackageConfig`] synchronously at template build, returning an
 /// `<article>` describing the package.
-#[scene(system)]
-fn AppInfoScene(config: Res<PackageConfig>) -> impl Scene {
+#[template(system)]
+fn AppInfoContent(config: Res<PackageConfig>) -> impl Bundle {
 	let PackageConfig {
 		title,
 		description,

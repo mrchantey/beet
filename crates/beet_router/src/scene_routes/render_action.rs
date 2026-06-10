@@ -1,23 +1,23 @@
 //! Route constructors — turn a path + handler into a complete route.
 //!
-//! **Page handlers return `impl Scene`** (the authoring default), served by the
-//! scene-route family the codegen emits:
+//! **Page handlers return `impl Bundle`** (the authoring default; an `rsx!`
+//! tree is one), served by the route family the codegen emits:
 //!
-//! - [`fixed_scene_route`] — `fn() -> impl Scene`, a static page.
-//! - [`scene_route`] — `fn(cx: ActionContext<In>) -> impl Scene`.
-//! - [`async_scene_route`] — `async fn(cx: ActionContext<In>) -> impl Scene`.
-//! - [`system_scene_route`] — `fn(cx: In<ActionContext<In>>, ..) -> impl Scene`.
+//! - [`fixed_route`] — a static page from a [`Bundle`].
+//! - [`pure_route`] — `fn(cx: ActionContext<In>) -> impl Bundle`.
+//! - [`async_route`] — `async fn(cx: ActionContext<In>) -> impl Bundle`.
+//! - [`system_route`] — `fn(cx: In<ActionContext<In>>, ..) -> impl Bundle`.
 //!
-//! The `impl Bundle` family ([`fixed_route`]/[`pure_route`]/[`async_route`]/
-//! [`system_route`]) is the lower-level primitive for content built without the
-//! scene layer (eg `rsx_direct!`); it is no longer the page-authoring default.
+//! The router dispatches actions whose output must be [`ExchangeRouteOut`]. The
+//! per-request constructors bridge this: a handler becomes an
+//! `Action<In, RenderRequest>` called on every request that runs the handler,
+//! builds the result through the template substrate (`spawn_template`) as an
+//! ephemeral render root, and hands back its [`RenderRequest`]. The renderer
+//! serializes it and despawns it via [`DespawnAfterRender`].
 //!
-//! Either way the router dispatches actions whose output must be
-//! [`ExchangeRouteOut`]. The per-request constructors bridge this: a handler
-//! becomes an `Action<In, RenderRequest>` called on every request that runs the
-//! handler, spawns the result as an ephemeral render root, and hands back its
-//! [`RenderRequest`]. The renderer then serializes it and despawns it via
-//! [`DespawnAfterRender`].
+//! Building through `spawn_template` (not a bare `world.spawn`) is what resolves
+//! the content's slots and fires its `On<SpawnTemplate>`/`On<LoadTemplate>`
+//! lifecycle, so a page composed of `#[template]` widgets renders correctly.
 //!
 //! For pages whose content depends on the request, `In` is typically [`Request`]
 //! (the full request, the same shape route actions like `CallerScene` use).
@@ -27,7 +27,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_ui::prelude::Scene;
+use beet_ui::prelude::node;
 use bevy::ecs::system::In;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
@@ -103,8 +103,12 @@ where
 }
 
 /// The shared second half of every per-request route constructor: takes the
-/// bundle produced by a handler, spawns it as an ephemeral render root, and
-/// returns its [`RenderRequest`]. The entity is despawned after render.
+/// bundle produced by a handler, builds it through the template substrate as an
+/// ephemeral render root, and returns its [`RenderRequest`]. The entity is
+/// despawned after render.
+///
+/// Building via `spawn_template` (rather than a bare `world.spawn`) runs the
+/// slot resolution and lifecycle for content composed of `#[template]` widgets.
 fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 -> Action<B, RenderRequest> {
 	Action::new_async(|cx: ActionContext<B>| async move {
@@ -112,7 +116,7 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 		caller
 			.world()
 			.with(move |world: &mut World| {
-				let mut entity = world.spawn(bundle);
+				let mut entity = world.spawn_template(node(bundle));
 				let id = entity.id();
 				RenderRoot::insert(&mut entity, vec![id]);
 				RenderRequest(id)
@@ -122,123 +126,39 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 	})
 }
 
-/// A per-request scene route from a sync handler returning an [`impl Scene`].
-///
-/// Like [`pure_route`] but uses Bevy's scene system instead of bundle spawning:
-/// the handler returns an `impl Scene` (typically from a `#[scene]` /
-/// `#[scene(system)]` function or `rsx!`), which is resolved and spawned
-/// per request as an ephemeral render root.
-pub fn scene_route<Func, Input, S, M1>(path: &str, handler: Func) -> impl Bundle
-where
-	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> S,
-	Input: 'static + Send + Sync + FromRequest<M1>,
-	S: 'static + Send + Sync + Scene,
-{
-	exchange_route(
-		path,
-		Action::new_pure(handler).chain(spawn_scene_step::<S>()),
-	)
-}
-
-/// Shorthand for [`scene_route`] when the handler is a plain constructor that
-/// ignores the request — `<Foo as SceneComponent>::scene`-style. Builds the
-/// props via `Default` and calls the constructor each request.
+/// Shorthand for a route whose handler is a plain constructor that ignores the
+/// request — a `#[template]`-built content function. Builds the content `Props`
+/// via `Default` and calls the constructor each request.
 ///
 /// ```no_run
 /// # use beet_router::prelude::*;
 /// # use beet_action::prelude::*;
 /// # use beet_net::prelude::*;
-/// # use beet_ui::prelude::SceneComponent;
-/// # #[derive(Default)] struct AppInfo;
-/// # impl AppInfo {
-/// #     fn scene(_: ()) -> impl beet_ui::prelude::Scene { () }
-/// # }
-/// // closure form (annotate the input so `scene_route` can pick a `FromRequest`)
-/// render_action::scene_route(
-///     "app-info",
-///     |_: ActionContext<Request>| AppInfo::scene(()),
-/// );
-/// // shorthand
-/// render_action::scene_func_route("app-info", AppInfo::scene);
+/// # use beet_core::prelude::*;
+/// # use beet_ui::prelude::*;
+/// fn home() -> impl Bundle { Element::new("p").with_inner_text("Home") }
+/// render_action::func_route("home", |_: ()| home());
 /// ```
-pub fn scene_func_route<Func, Props, S>(path: &str, ctor: Func) -> impl Bundle
+pub fn func_route<Func, Props, B>(path: &str, ctor: Func) -> impl Bundle
 where
-	Func: 'static + Send + Sync + Clone + Fn(Props) -> S,
+	Func: 'static + Send + Sync + Clone + Fn(Props) -> B,
 	Props: 'static + Send + Sync + Default,
-	S: 'static + Send + Sync + Scene,
+	B: 'static + Send + Sync + Bundle,
 {
-	scene_route(path, move |_cx: ActionContext<Request>| {
+	pure_route(path, move |_cx: ActionContext<Request>| {
 		ctor(Props::default())
 	})
 }
 
-/// A static scene page from a no-argument handler `fn() -> impl Scene`, the
-/// scene equivalent of [`fixed_route`]. The handler is called per request (the
-/// route is typically marked `CacheStrategy::Static`, so the result is cached).
-pub fn fixed_scene_route<Func, S>(path: &str, handler: Func) -> impl Bundle
+/// A static page from a no-argument handler `fn() -> impl Bundle`. The handler
+/// is called per request (the route is typically `CacheStrategy::Static`, so the
+/// result is cached). This is the page-codegen default for a static page.
+pub fn fixed_func_route<Func, B>(path: &str, handler: Func) -> impl Bundle
 where
-	Func: 'static + Send + Sync + Clone + Fn() -> S,
-	S: 'static + Send + Sync + Scene,
+	Func: 'static + Send + Sync + Clone + Fn() -> B,
+	B: 'static + Send + Sync + Bundle,
 {
-	scene_route(path, move |_cx: ActionContext<Request>| handler())
-}
-
-/// A per-request scene route from an async handler
-/// `async fn(cx: ActionContext<In>) -> impl Scene`, the scene equivalent of
-/// [`async_route`].
-pub fn async_scene_route<Func, Input, Fut, S, M1>(
-	path: &str,
-	handler: Func,
-) -> impl Bundle
-where
-	Func: 'static + Send + Sync + Clone + Fn(ActionContext<Input>) -> Fut,
-	Fut: 'static + MaybeSend + Future<Output = S>,
-	Input: 'static + Send + Sync + FromRequest<M1>,
-	S: 'static + Send + Sync + Scene,
-{
-	exchange_route(
-		path,
-		Action::new_async(handler).chain(spawn_scene_step::<S>()),
-	)
-}
-
-/// A per-request scene route from a system handler
-/// `fn(cx: In<ActionContext<In>>, ..system params) -> impl Scene`, the scene
-/// equivalent of [`system_route`].
-pub fn system_scene_route<Func, Input, S, FnMarker, M1>(
-	path: &str,
-	handler: Func,
-) -> impl Bundle
-where
-	Func: 'static + Send + Sync + Clone,
-	FnMarker: 'static,
-	Func: SystemParamFunction<FnMarker, Out = S>,
-	Func: IntoSystem<In<ActionContext<Input>>, S, (IsFunctionSystem, FnMarker)>,
-	Input: 'static + Send + Sync + FromRequest<M1>,
-	S: 'static + Send + Sync + Scene,
-{
-	exchange_route(
-		path,
-		Action::new_system(handler).chain(spawn_scene_step::<S>()),
-	)
-}
-
-/// The scene equivalent of [`spawn_render_step`]: resolves and spawns the
-/// scene as an ephemeral render root.
-fn spawn_scene_step<S: 'static + Send + Sync + Scene>()
--> Action<S, RenderRequest> {
-	Action::new_async(|cx: ActionContext<S>| async move {
-		let (caller, scene) = (cx.caller, cx.input);
-		caller
-			.world()
-			.with(move |world: &mut World| -> Result<RenderRequest> {
-				let mut entity = world.spawn_scene(scene)?;
-				let id = entity.id();
-				RenderRoot::insert(&mut entity, vec![id]);
-				RenderRequest(id).xok()
-			})
-			.await
-	})
+	pure_route(path, move |_cx: ActionContext<Request>| handler())
 }
 
 
@@ -255,7 +175,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_async_handler() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx_direct! { <p>"async home"</p> }
+			rsx! { <p>"async home"</p> }
 		}
 		router_world()
 			.spawn((default_router(), children![render_action::async_route(
@@ -272,7 +192,7 @@ mod test {
 	#[beet_core::test]
 	async fn renders_system_handler() {
 		fn home(_cx: In<ActionContext<Request>>) -> impl Bundle {
-			rsx_direct! { <p>"system home"</p> }
+			rsx! { <p>"system home"</p> }
 		}
 		router_world()
 			.spawn((default_router(), children![render_action::system_route(
@@ -289,7 +209,7 @@ mod test {
 	#[beet_core::test]
 	async fn rebuilds_per_request() {
 		async fn home(_cx: ActionContext<Request>) -> impl Bundle {
-			rsx_direct! { <p>"home"</p> }
+			rsx! { <p>"home"</p> }
 		}
 		let mut world = router_world();
 		let root = world

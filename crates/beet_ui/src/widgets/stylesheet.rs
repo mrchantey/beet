@@ -13,8 +13,8 @@ use beet_core::prelude::*;
 ///
 /// `minify` toggles whitespace stripping (off by default, for readable dev
 /// output). Variable names use [`FormatVariables::short`].
-#[scene(system)]
-pub fn Stylesheet(#[prop] minify: bool, style: StyleQuery) -> impl Scene {
+#[template(system)]
+pub fn Stylesheet(#[prop] minify: bool, style: StyleQuery) -> impl Bundle {
 	let css = style
 		.build_css(
 			&CssBuilder::default()

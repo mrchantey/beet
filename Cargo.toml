@@ -257,7 +257,7 @@ nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
-# RON text format for `MediaType::Ron` and `world_serde` loading.
+# RON text format for `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
@@ -272,7 +272,7 @@ bevy_default = [
 	"beet_examples?/bevy_default",
 	"beet_spatial?/bevy_default",
 ]
-world_serde = ["beet_core/world_serde", "beet_net?/world_serde", "beet_router?/world_serde", "beet_thread?/world_serde"]
+template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]
@@ -298,7 +298,7 @@ native-tls = [
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
 # `default-features = false`, so the std router must re-enable the std + markdown
 # + http surface it relied on (previously supplied by default features + net).
-router = ["scene", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
+router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
 # no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
 # dispatch and middleware core from beet_router, without the std scene/help
 # rendering pipeline. See `beet_router`'s `embedded` module.
@@ -345,9 +345,9 @@ quickjs = ["action","beet_action/quickjs"]
 # beet_router scripting registrations. Pulls `quickjs` + `serde` + `std`.
 quickjs_serde = ["quickjs","serde","std","beet_action/quickjs_serde","beet_router?/scripting"]
 ui = ["dep:beet_ui"]
-# Bevy's first-party scene system + the `beet_ui` widget set (Header, Button,
-# Sidebar, Table). Heavy + std-only, so it stays opt-in.
-scene = ["ui", "beet_ui?/scene"]
+# The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
+# and the `rsx!`/`#[template]` lowering runtime. std-only, so it stays opt-in.
+template = ["ui", "beet_ui?/template"]
 style = ["ui", "beet_ui?/style"]
 # Backend-agnostic keyboard input routed to the focused entity (`FocusPlugin`).
 keyboard = ["ui", "beet_ui?/keyboard"]
@@ -374,7 +374,7 @@ cuda = ["ml", "beet_ml/cuda"]
 # 💡 Server
 
 spatial = ["action", "dep:beet_spatial"]
-# world_serde = ["beet_core/world_serde"]
+# template_serde = ["beet_core/template_serde"]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -498,6 +498,16 @@ path = "examples/ui/state.rs"
 required-features = ["ratatui"]
 
 [[example]]
+name = "bsx_rsx_match"
+path = "examples/ui/bsx_rsx_match.rs"
+required-features = ["template"]
+
+[[example]]
+name = "bsx_bindings"
+path = "examples/ui/bsx_bindings.rs"
+required-features = ["template"]
+
+[[example]]
 name = "crud"
 path = "examples/ui/crud.rs"
 required-features = ["ui", "action"]
@@ -532,7 +542,7 @@ required-features = ["router", "rhai_serde"]
 [[example]]
 name = "router_serde"
 path = "examples/router/router_serde.rs"
-required-features = ["router", "rhai_serde", "world_serde"]
+required-features = ["router", "rhai_serde", "template_serde"]
 
 [[example]]
 name = "file_based_routes"
@@ -574,7 +584,7 @@ required-features = ["thread", "fs", "router"]
 [[example]]
 name = "persistent_chat"
 path = "examples/thread/persistent_chat.rs"
-required-features = ["thread","world_serde"]
+required-features = ["thread","template_serde"]
 
 
 

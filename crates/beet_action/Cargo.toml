@@ -20,7 +20,7 @@ default = ["std", "reflect"]
 std = ["beet_core/std", "rhai?/std", "rquickjs?/std"]
 serde = ["dep:serde", "beet_core/serde", "bitflags/serde"]
 json = ["serde", "dep:serde_json", "beet_core/json"]
-world_serde = ["beet_core/world_serde"]
+template_serde = ["beet_core/template_serde"]
 reflect = ["beet_core/bevy_reflect_documentation"]
 # Engine-agnostic scripting framework (`ScriptLanguage` + dispatch). Pulls
 # nothing — no serde, no engine, no std. The serde-marshalled `Script` /
@@ -61,7 +61,7 @@ rhai = { workspace = true, optional = true }
 rquickjs = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_action = { path = ".", features= ["world_serde", "rhai_serde", "quickjs_serde"] }
+beet_action = { path = ".", features= ["template_serde", "rhai_serde", "quickjs_serde"] }
 beet_core = { workspace = true, features = ["testing", "ron"] }
 
 [lib]

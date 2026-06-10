@@ -13,8 +13,8 @@ use beet_core::prelude::*;
 ///
 /// Set `vertical_lines` for a full cell grid (vertical dividers as well as the
 /// default horizontal row rules).
-#[scene]
-pub fn Table(#[prop] vertical_lines: bool) -> impl Scene {
+#[template]
+pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 	let mut class_set = Classes::new([classes::TABLE]);
 	if vertical_lines {
 		class_set.insert_class(classes::TABLE_VERTICAL_BORDERS);
@@ -22,13 +22,13 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Scene {
 	rsx! {
 		<table {class_set}>
 			<thead>
-				<slot name="head"/>
+				<Slot name="head"/>
 			</thead>
 			<tbody>
-				<slot/>
+				<Slot/>
 			</tbody>
 			<tfoot>
-				<slot name="foot"/>
+				<Slot name="foot"/>
 			</tfoot>
 		</table>
 	}
@@ -40,23 +40,22 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Render a scene to plain charcell with the Material rule set.
-	fn render_charcell(scene: impl Scene) -> String {
+	/// Render a template to plain charcell with the Material rule set.
+	fn render_charcell(template: impl bevy::ecs::template::Template<Output = ()>) -> String {
 		let mut world = (
-			bevy::app::TaskPoolPlugin::default(),
-			bevy::asset::AssetPlugin::default(),
-			bevy::scene::ScenePlugin,
+			TemplatePlugin,
+			DocumentPlugin,
 			CharcellPlugin,
 			crate::style::material::MaterialStylePlugin::default(),
 		)
 			.into_world();
-		let root = world.spawn_scene(scene).unwrap().id();
+		let root = world.spawn_template(template).id();
 		world.entity_mut(root).insert(FlexBuffer::new(40));
 		world.run_schedule(crate::parse::PostParseTree);
 		world.entity_mut(root).take::<FlexBuffer>().unwrap().render_plain()
 	}
 
-	fn demo(vertical_lines: bool) -> impl Scene {
+	fn demo(vertical_lines: bool) -> Node {
 		rsx! {
 			<Table vertical_lines=vertical_lines>
 				<tr slot="head"><th>"Name"</th><th>"Age"</th></tr>

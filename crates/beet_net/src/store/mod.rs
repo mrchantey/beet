@@ -44,16 +44,16 @@ mod analytics;
 mod aws_cli;
 #[cfg(all(feature = "json", feature = "std"))]
 mod table;
-#[cfg(feature = "world_serde")]
-mod world_serde_store;
+#[cfg(feature = "template_serde")]
+mod template_store;
 #[cfg(all(feature = "json", feature = "std"))]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
 #[cfg(all(feature = "json", feature = "std"))]
 pub use table::*;
-#[cfg(feature = "world_serde")]
-pub use world_serde_store::*;
+#[cfg(feature = "template_serde")]
+pub use template_store::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_blob_watchers;
 #[cfg(feature = "std")]
@@ -114,8 +114,8 @@ impl Plugin for StorePlugin {
 			.add_observer(add_fs_store_watcher)
 			.add_observer(remove_fs_store_watcher);
 
-		#[cfg(feature = "world_serde")]
-		app.add_systems(PostUpdate, load_world_serde_on_insert);
+		#[cfg(feature = "template_serde")]
+		app.add_systems(PostUpdate, load_template_on_insert);
 
 		// wasm localStorage watcher lifecycle (NonSend, owns the JS closure)
 		#[cfg(target_arch = "wasm32")]

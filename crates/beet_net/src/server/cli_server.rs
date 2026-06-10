@@ -37,7 +37,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 async fn run_and_exit(entity: AsyncEntity) -> Result {
 	// short-circuit when the entity has already been despawned, ie
-	// [`WorldSerdeStore::save_bundle`] briefly spawns a [`CliServer`]
+	// [`TemplateStore::save_bundle`] briefly spawns a [`CliServer`]
 	// just to serialize it.
 	if !entity.is_alive().await {
 		return Ok(());

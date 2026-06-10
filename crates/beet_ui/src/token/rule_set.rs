@@ -293,7 +293,7 @@ mod tests {
 					.unwrap(),
 			),
 		);
-		let mut entity = world.spawn(rsx_direct! { <div/> });
+		let mut entity = world.spawn(rsx! { <div/> });
 
 		// a matching (non-default) rule is found directly by `cascade`
 		entity

@@ -4,7 +4,7 @@ use beet::prelude::*;
 ///
 /// The legacy `onchange` signal demo is dropped; the static variants render
 /// across web and terminal.
-pub fn get() -> impl Scene {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<article>
 			<h1>"Select"</h1>

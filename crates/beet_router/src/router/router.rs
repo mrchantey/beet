@@ -203,7 +203,7 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![render_action::fixed_route(
 				"about",
-				rsx_direct! { <p>"About page"</p> }
+				rsx! { <p>"About page"</p> }
 			),]))
 			.call::<Request, Response>(Request::get("about"))
 			.await
@@ -219,7 +219,7 @@ mod test {
 		router_world()
 			.spawn((default_router(), children![render_action::fixed_route(
 				"",
-				rsx_direct! { <p>"Root content"</p> }
+				rsx! { <p>"Root content"</p> }
 			),]))
 			.call::<Request, Response>(Request::get(""))
 			.await
@@ -235,11 +235,11 @@ mod test {
 			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::get(""))
@@ -258,7 +258,7 @@ mod test {
 				increment(FieldRef::new("count")),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
@@ -276,7 +276,7 @@ mod test {
 				increment(FieldRef::new("count")),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str("--help"))
@@ -305,11 +305,11 @@ mod test {
 			.spawn((default_router(), children![
 				render_action::fixed_route(
 					"",
-					rsx_direct! { <h1>"My Server"</h1> <p>"welcome!"</p> }
+					rsx! { <h1>"My Server"</h1> <p>"welcome!"</p> }
 				),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str(""))
@@ -336,7 +336,7 @@ mod test {
 				),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.flush();
@@ -381,7 +381,7 @@ mod test {
 				),
 				render_action::fixed_route(
 					"about",
-					rsx_direct! { <p>"about"</p> }
+					rsx! { <p>"about"</p> }
 				),
 			]))
 			.call::<Request, Response>(Request::from_cli_str(
