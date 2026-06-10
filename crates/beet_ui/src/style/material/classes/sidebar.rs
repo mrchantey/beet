@@ -5,8 +5,15 @@ use crate::style::*;
 use crate::style::material::*;
 use beet_core::prelude::Duration;
 
+/// Viewport width (px) at or below which the sidebar collapses behind the
+/// [`MENU_BUTTON`] toggle. Shared by the responsive rules here and the
+/// `sidebar.js` runtime so the CSS breakpoint and the resize handler agree.
+pub const SIDEBAR_BREAKPOINT_PX: u32 = 1024;
+
 // ── Class names ─────────────────────────────────────────────────────────────────
 pub const SIDEBAR: ClassName = ClassName::new_static("sidebar");
+/// The header toggle that shows/hides the sidebar on narrow screens.
+pub const MENU_BUTTON: ClassName = ClassName::new_static("menu-button");
 pub const SIDEBAR_LINK: ClassName = ClassName::new_static("sidebar-link");
 pub const SIDEBAR_LABEL: ClassName = ClassName::new_static("sidebar-label");
 pub const SIDEBAR_GROUP: ClassName = ClassName::new_static("sidebar-group");
@@ -120,6 +127,40 @@ pub fn sidebar_web() -> Rule {
 			top: Length::Rem(0.5),
 			bottom: Length::Rem(0.5),
 		})
+}
+
+/// Web sidebar collapse - on screens at or below [`SIDEBAR_BREAKPOINT_PX`] the
+/// rail is taken out of flow when `sidebar.js` marks it `aria-hidden="true"`
+/// (its default on load below the breakpoint, toggled by the [`MENU_BUTTON`]).
+/// Screen-gated and attribute-driven, so the terminal - which never sets the
+/// attribute - keeps the rail.
+pub fn sidebar_hidden() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(SIDEBAR),
+			Selector::attribute("aria-hidden", Some("true".into())),
+		]))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// Menu button - hidden by default on every target; the wide-screen sidebar is
+/// always visible (and the terminal rail too) so the toggle is unnecessary.
+/// Ungated so the terminal cascade also hides it; the web reveals it below the
+/// breakpoint via [`menu_button_visible`].
+pub fn menu_button() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(MENU_BUTTON))
+		.with_value(common_props::DisplayProp, Display::None)
+}
+
+/// Menu button on narrow screens - shown at or below [`SIDEBAR_BREAKPOINT_PX`],
+/// where the sidebar collapses and needs a toggle.
+pub fn menu_button_visible() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::MaxWidth(SIDEBAR_BREAKPOINT_PX))
+		.with_selector(Selector::class(MENU_BUTTON))
+		.with_value(common_props::DisplayProp, Display::Flex)
 }
 
 /// Sidebar link - an undecorated link in the faint surface-variant foreground,

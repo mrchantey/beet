@@ -4,6 +4,10 @@ use beet_core::prelude::*;
 
 /// A page `<header>` with a title link to `home_route` (defaults to `/`) and
 /// a `<nav>` slot for navigation links.
+///
+/// The `leading` slot holds an optional control left of the title (eg a
+/// [`MenuButton`](crate::prelude::MenuButton)); the default slot sits between
+/// the leading cluster and the `nav`.
 #[template(system)]
 pub fn Header(
 	#[prop(into)] home_route: String,
@@ -17,9 +21,12 @@ pub fn Header(
 	};
 	rsx! {
 		<header {Classes::new([classes::APP_BAR, classes::PRINT_HIDDEN])}>
-			<a {Classes::new(["app-bar-title"])} href={home_route}>
-				{title}
-			</a>
+			<div {Classes::new([classes::APP_BAR_LEADING])}>
+				<Slot name="leading"/>
+				<a {Classes::new(["app-bar-title"])} href={home_route}>
+					{title}
+				</a>
+			</div>
 			<Slot/>
 			<nav {Classes::new([classes::APP_BAR_NAV])}>
 				<Slot name="nav"/>

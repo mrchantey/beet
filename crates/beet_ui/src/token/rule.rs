@@ -43,20 +43,24 @@ pub enum MediaQuery {
 	Terminal,
 	/// `@media (prefers-reduced-motion: reduce)`.
 	ReducedMotion,
+	/// `@media (max-width: {0}px)` — applies at or below the given viewport width
+	/// in pixels, the idiom for narrow-screen (mobile) overrides.
+	MaxWidth(u32),
 }
 
 impl MediaQuery {
 	/// The CSS condition placed after `@media`, or `None` for a query with no
 	/// web equivalent ([`Terminal`](Self::Terminal)), which is skipped during
 	/// CSS serialization.
-	pub fn as_css(&self) -> Option<&'static str> {
+	pub fn as_css(&self) -> Option<String> {
 		match self {
-			MediaQuery::Print => Some("print"),
-			MediaQuery::Screen => Some("screen"),
+			MediaQuery::Print => Some("print".into()),
+			MediaQuery::Screen => Some("screen".into()),
 			MediaQuery::Terminal => None,
 			MediaQuery::ReducedMotion => {
-				Some("(prefers-reduced-motion: reduce)")
+				Some("(prefers-reduced-motion: reduce)".into())
 			}
+			MediaQuery::MaxWidth(px) => Some(format!("(max-width: {px}px)")),
 		}
 	}
 

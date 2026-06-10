@@ -8,6 +8,9 @@ use crate::style::material::*;
 pub const APP_BAR: ClassName = ClassName::new_static("app-bar");
 pub const APP_BAR_SCROLLED: ClassName = ClassName::new_static("app-bar-scrolled");
 pub const APP_BAR_NAV: ClassName = ClassName::new_static("app-bar-nav");
+/// The app bar's leading cluster: an optional control (eg the sidebar menu
+/// button) sitting immediately left of the title.
+pub const APP_BAR_LEADING: ClassName = ClassName::new_static("app-bar-leading");
 pub const CONTAINER: ClassName = ClassName::new_static("container");
 pub const PAGE: ClassName = ClassName::new_static("page");
 /// A footer side cell that grows to flank the centered copyright.
@@ -60,6 +63,17 @@ pub fn app_bar_terminal() -> Rule {
 pub fn app_bar_nav() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(APP_BAR_NAV))
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::AlignItemsProp, AlignItems::Center)
+		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
+}
+
+/// App bar leading cluster - a flex row so a leading control (the menu button)
+/// sits beside the title with a comfortable gap, the pair held to the left while
+/// the nav stays right via the bar's `space-between`.
+pub fn app_bar_leading() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(APP_BAR_LEADING))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
 		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))

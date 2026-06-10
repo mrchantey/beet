@@ -85,6 +85,7 @@ pub fn all_rules() -> Vec<Rule> {
 		app_bar(),
 		app_bar_scrolled(),
 		app_bar_nav(),
+		app_bar_leading(),
 		app_bar_title(),
 		app_bar_terminal(),
 		footer(),
@@ -129,6 +130,10 @@ pub fn all_rules() -> Vec<Rule> {
 		sidebar_list(),
 		sidebar(),
 		sidebar_web(),
+		// responsive: narrow-screen collapse + the header toggle that drives it
+		sidebar_hidden(),
+		menu_button(),
+		menu_button_visible(),
 		sidebar_link(),
 		sidebar_active(),
 		sidebar_item(),

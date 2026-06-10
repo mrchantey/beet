@@ -43,6 +43,11 @@ impl SidebarNode {
 /// `nodes` is the tree to render. Each branch becomes a `<details>` (open when
 /// its node is `expanded`); leaves become `<a>` links, marked `aria-current`
 /// when `active`.
+///
+/// Ships its own [`SidebarScript`]: on the web the rail collapses below
+/// [`classes::SIDEBAR_BREAKPOINT_PX`] and is toggled by a [`MenuButton`] in the
+/// header. The `aria-hidden="false"` default keeps it visible without script
+/// (and on the terminal, where the script is inert).
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	let items: Vec<_> = nodes
@@ -50,9 +55,44 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 		.map(|node| sidebar_item(node, true))
 		.collect();
 	rsx! {
-		<nav id="sidebar" {Classes::new([classes::SIDEBAR, classes::PRINT_HIDDEN])}>
+		<nav id="sidebar" aria-hidden="false" {Classes::new([classes::SIDEBAR, classes::PRINT_HIDDEN])}>
 			{items}
+			<SidebarScript/>
 		</nav>
+	}
+}
+
+/// Emits the bundled responsive-sidebar script as an inline `<script>`, with the
+/// breakpoint injected so the resize handler matches the CSS. Bundled with
+/// [`Sidebar`]; standalone only so its world-free body stays out of the tree
+/// match in [`sidebar_item`].
+#[template]
+pub fn SidebarScript() -> impl Bundle {
+	let body = format!(
+		"const BREAKPOINT={};\n{}",
+		classes::SIDEBAR_BREAKPOINT_PX,
+		include_str!("./sidebar.js"),
+	);
+	rsx! {
+		<script>{body}</script>
+	}
+}
+
+/// The sidebar toggle for the app bar — a hamburger icon button wired to
+/// `#sidebar` via `aria-controls`. Hidden by default and revealed below
+/// [`classes::SIDEBAR_BREAKPOINT_PX`] by the `menu-button` rules; [`Sidebar`]'s
+/// [`SidebarScript`] binds its click to collapse/expand the rail. Place it in
+/// the header's leading slot, left of the title.
+#[template]
+pub fn MenuButton() -> impl Bundle {
+	rsx! {
+		<button
+			id="menu-button"
+			aria-controls="sidebar"
+			aria-label="Toggle navigation"
+			{Classes::new([classes::BTN, classes::BTN_ICON, classes::MENU_BUTTON])}>
+			"☰"
+		</button>
 	}
 }
 
@@ -220,8 +260,10 @@ mod test {
 		]
 	}
 
-	/// Render the sidebar to plain charcell with the Material rule set.
-	fn render_charcell(nodes: Vec<SidebarNode>) -> String {
+	/// Render `template` to plain charcell with the Material rule set.
+	fn render_plain(
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> String {
 		let mut world = (
 			TemplatePlugin,
 			DocumentPlugin,
@@ -229,8 +271,7 @@ mod test {
 			crate::style::material::MaterialStylePlugin::default(),
 		)
 			.into_world();
-		let root =
-			world.spawn_template(rsx! { <Sidebar nodes=nodes/> }).id();
+		let root = world.spawn_template(template).id();
 		world.entity_mut(root).insert(FlexBuffer::new(40));
 		world.run_schedule(crate::parse::PostParseTree);
 		world
@@ -238,6 +279,28 @@ mod test {
 			.take::<FlexBuffer>()
 			.unwrap()
 			.render_plain()
+	}
+
+	/// Render the sidebar to plain charcell with the Material rule set.
+	fn render_charcell(nodes: Vec<SidebarNode>) -> String {
+		render_plain(rsx! { <Sidebar nodes=nodes/> })
+	}
+
+	/// The menu button is `display: none` on the styled (charcell) target - it is
+	/// a web-only affordance for the narrow-screen sidebar - so its glyph never
+	/// paints. Rendered beside a sibling so the test distinguishes "hidden" from
+	/// "empty buffer": only the sibling survives.
+	#[beet_core::test]
+	fn menu_button_hidden_on_terminal() {
+		render_plain(rsx! {
+			<div>
+				<MenuButton/>
+				<span>"Beet"</span>
+			</div>
+		})
+		.xpect_contains("Beet")
+		.xnot()
+		.xpect_contains("☰");
 	}
 
 	/// The leading-space indent of the row whose text starts with `label`.

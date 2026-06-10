@@ -50,6 +50,7 @@ pub fn BeetLayout(
 			</Head>
 			<body {body_classes}>
 				<Header>
+					<MenuButton slot="leading"/>
 					<Link slot="nav" href=routes::docs::index() variant=ButtonVariant::Text>"Docs"</Link>
 					<Link slot="nav" href=routes::blog::index() variant=ButtonVariant::Text>"Blog"</Link>
 					<Link slot="nav" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Text>"GitHub"</Link>
