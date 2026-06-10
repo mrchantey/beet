@@ -61,8 +61,7 @@ template = ["std", "rsx", "style"]
 style = ["json", "dep:material-colors", "beet_core/bevy_color", "dep:heck", "dep:bitflags"]
 serde = ["dep:serde"]
 
-ratatui = ["dep:bevy_ratatui", "dep:ratatui", "keyboard"]
-terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse"]
+terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet_core/crossterm", "beet_core/bevy_mouse", "beet_core/bevy_window"]
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
@@ -113,8 +112,6 @@ material-colors = {version = "0.4.2", optional = true }
 # tree-sitter grammars are C parsers that don't cross-compile to wasm
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 libc = {workspace = true, optional = true}
-ratatui = {workspace = true, optional = true, features=["crossterm","unstable-rendered-line-info"]}
-bevy_ratatui = {workspace = true, optional = true, features = ["crossterm","keyboard", "mouse"] }
 tree-sitter = { version = "0.26", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }
 tree-sitter-javascript = { version = "0.25", optional = true }

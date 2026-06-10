@@ -48,10 +48,9 @@ fn setup(mut commands: Commands) {
 	commands.spawn(live_scene_host(terminal_ext::size()));
 	commands.spawn(Navigator::new(Url::parse(&url)));
 	// an editable URL bar bound to the document field `url`.
-	commands.spawn((
-		Document::new(val!({ "url": url })),
-		children![rsx! { <TextField field={FieldRef::new("url")}/> }],
-	));
+	commands.spawn((Document::new(val!({ "url": url })), children![
+		rsx! { <TextField field={FieldRef::new("url")}/> }
+	]));
 }
 
 /// Navigate to the URL bar's value on Enter.
@@ -61,9 +60,9 @@ fn url_bar_enter(
 	bars: Query<&Value, With<Focus>>,
 	navigators: Query<Entity, With<Navigator>>,
 ) -> Result {
-	let entered = keys
-		.read()
-		.any(|key| key.state == ButtonState::Pressed && key.logical_key == Key::Enter);
+	let entered = keys.read().any(|key| {
+		key.state == ButtonState::Pressed && key.logical_key == Key::Enter
+	});
 	if !entered {
 		return Ok(());
 	}
@@ -102,7 +101,7 @@ fn history_keys(
 //*
 //
 // # 🌐 Classic Web-1.0 Sites That Work Great in TUI Browsers
-//
+// # 		These serve as a good starting place for exploring the tui web
 // ---
 //
 // # 📚 Text-heavy knowledge sites
