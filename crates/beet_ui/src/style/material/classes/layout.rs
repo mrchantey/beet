@@ -68,6 +68,17 @@ pub fn app_bar_nav() -> Rule {
 		.with_value(common_props::ColumnGapProp, Length::Rem(1.0))
 }
 
+/// Web app bar navigation - drops the column gap, since the nav buttons carry
+/// their own horizontal padding on the web. Screen-gated: the terminal keeps the
+/// [`app_bar_nav`] gap, where the links render as bare inline runs that would
+/// otherwise collide.
+pub fn app_bar_nav_web() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::class(APP_BAR_NAV))
+		.with_value(common_props::ColumnGapProp, Length::Rem(0.))
+}
+
 /// App bar leading cluster - a flex row so a leading control (the menu button)
 /// sits beside the title with a comfortable gap, the pair held to the left while
 /// the nav stays right via the bar's `space-between`.

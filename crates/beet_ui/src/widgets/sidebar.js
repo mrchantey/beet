@@ -19,17 +19,16 @@
 		globalThis.addEventListener("resize", () => (narrow() ? hide() : show()));
 
 		// the menu button toggles the rail on narrow screens
-		menuButton?.addEventListener("click", () =>
-			isHidden() ? show() : hide(),
-		);
+		menuButton?.addEventListener("click", () => isHidden() ? show() : hide());
 
+		// Disabled, causes flash of rerender just to navigate..
 		// following a link on a narrow screen collapses the rail back
-		sidebar.querySelectorAll("a").forEach((link) =>
-			link.addEventListener("click", () => narrow() && hide()),
-		);
+		// sidebar.querySelectorAll("a").forEach((link) =>
+		// 	link.addEventListener("click", () => narrow() && hide()),
+		// );
 	}
 
-	if (document.readyState === "loading")
+	if (document.readyState === "loading") {
 		document.addEventListener("DOMContentLoaded", init);
-	else init();
+	} else init();
 })();

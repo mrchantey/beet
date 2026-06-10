@@ -147,11 +147,20 @@ pub fn sidebar_hidden() -> Rule {
 /// Menu button - hidden by default on every target; the wide-screen sidebar is
 /// always visible (and the terminal rail too) so the toggle is unnecessary.
 /// Ungated so the terminal cascade also hides it; the web reveals it below the
-/// breakpoint via [`menu_button_visible`].
+/// breakpoint via [`menu_button_visible`]. A larger glyph than the nav buttons
+/// with no horizontal padding, so it reads as a compact icon affordance flush
+/// against the title.
 pub fn menu_button() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(MENU_BUTTON))
 		.with_value(common_props::DisplayProp, Display::None)
+		.with_value(common_props::FontSize, Length::Rem(2.))
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(0.),
+			right: Length::Rem(0.),
+			top: Length::Rem(0.4),
+			bottom: Length::Rem(0.4),
+		})
 }
 
 /// Menu button on narrow screens - shown at or below [`SIDEBAR_BREAKPOINT_PX`],

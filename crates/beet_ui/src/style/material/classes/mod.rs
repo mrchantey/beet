@@ -163,6 +163,7 @@ pub fn all_rules() -> Vec<Rule> {
 		// accessibility — global state rules
 		disabled_state(),
 		// web-only overrides — gated behind `@media screen`, ignored by charcell
+		app_bar_nav_web(),
 		page_fill_viewport(),
 		container_grow_web(),
 	];
