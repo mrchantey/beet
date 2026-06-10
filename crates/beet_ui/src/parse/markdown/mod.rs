@@ -1,38 +1,54 @@
 //! Markdown parser producing an ECS entity tree of [`Element`]/[`Value`] nodes.
 //!
-//! Uses `pulldown-cmark` to tokenize markdown, converts events into a
-//! [`TreeNode`](diff::TreeNode) intermediate representation, then diffs against
-//! entities using its own tokenizer + diff engine (the `combinators`/`diff`/
-//! `tokens` submodules, formerly the standalone HTML parser's, now owned here).
-//!
-//! Embedded markup inside markdown is tokenized by [`combinators`]; an embedded
-//! uppercase `<Template>` is then resolved through the core BSX resolver
-//! ([`resolve_mdx_templates`]), so MDX templates resolve without a second
-//! resolver.
+//! Uses `pulldown-cmark` for markdown prose (headings, lists, emphasis, code),
+//! building an [`HtmlNode`](diff::HtmlNode) intermediate representation that the
+//! [`diff`] engine reconciles against existing entities on reparse. Markdown
+//! owns the prose structure and the interleaving stack ([`tree_builder`]); the
+//! markup itself (tags, attributes, `bx:` directives, spreads, components) is
+//! parsed by the core BSX fragment primitive ([`parse_fragment`]), so BSX is the
+//! single markup authority. An embedded uppercase component/template or `bx:`
+//! directive resolves per-tag through the BSX resolver during the diff.
 //!
 //! Enable with the `markdown_parser` feature flag.
 
-mod combinators;
 mod diff;
 mod frontmatter;
-mod tokens;
 mod tree_builder;
-pub use combinators::HtmlParseConfig;
 pub use diff::*;
 pub use frontmatter::*;
-pub use tokens::*;
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use diff::diff_children;
 use pulldown_cmark::Options;
 
+/// Configuration for parsing embedded markup inside markdown, a thin wrapper over
+/// the core [`BsxFragmentConfig`] threaded through to [`parse_fragment`].
+pub type HtmlParseConfig = BsxFragmentConfig;
+
+/// Helpers mirroring the markdown parser's expectations on [`HtmlParseConfig`].
+pub trait HtmlParseConfigExt {
+	/// A config with `{expr}` and `{{expr}}` expression parsing enabled.
+	fn with_expressions() -> Self;
+}
+
+impl HtmlParseConfigExt for HtmlParseConfig {
+	fn with_expressions() -> Self {
+		Self {
+			expressions: true,
+			raw_text_expressions: true,
+			..Default::default()
+		}
+	}
+}
+
 /// A configurable markdown parser that implements [`NodeParser`].
 ///
-/// Parses markdown into a tree of ECS entities via a [`TreeNode`]
-/// representation and the markdown-owned diff engine. Embedded markup is
-/// tokenized by the [`combinators`] HTML tokenizer; an embedded uppercase
-/// `<Template>` is resolved through the core BSX resolver.
+/// Parses markdown into a tree of ECS entities via an [`HtmlNode`]
+/// representation and the markdown-owned diff engine. Embedded markup is parsed
+/// by the core BSX fragment primitive ([`parse_fragment`]); an embedded
+/// component/template tag or `bx:` directive resolves per-tag through the core
+/// BSX resolver during the diff.
 ///
 /// ## Example
 /// ```rust
@@ -114,7 +130,9 @@ impl MarkdownParser {
 			span_lookup.as_ref(),
 		)?;
 
-		// diff tree against entity
+		// diff tree against entity. an embedded uppercase component/template or
+		// `bx:` directive resolves through the BSX resolver per-tag inside the
+		// diff (no separate MDX resolution pass).
 		diff_children(
 			world,
 			entity,
@@ -122,12 +140,6 @@ impl MarkdownParser {
 			&self.html_diff_config,
 			span_lookup.as_ref(),
 		)?;
-
-		// MDX: resolve any embedded uppercase `<Template>` markup the markdown
-		// tokenizer emitted as a plain element, delegating to the BSX resolver so
-		// MDX templates resolve for free without a second resolver.
-		#[cfg(feature = "bsx")]
-		resolve_mdx_templates(world, entity)?;
 
 		// run post-parse systems (syntax highlighting, style resolution, ..)
 		// when registered, ie via `StylePlugin`.

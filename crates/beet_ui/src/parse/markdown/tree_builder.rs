@@ -1,21 +1,42 @@
-//! Converts `pulldown-cmark` events into the shared [`TreeNode`] intermediate
-//! representation used by the HTML parser's diff infrastructure.
+//! Converts `pulldown-cmark` events into the [`HtmlNode`] intermediate
+//! representation the [`diff`](super::diff) engine reconciles into entities.
 //!
-//! The entry point is [`build_markdown_tree`], which returns a
-//! [`MarkdownTreeResult`] containing the node tree and optional frontmatter.
+//! This is the markdown structure logic: a stack-based builder that interleaves
+//! prose with embedded markup. Each embedded HTML fragment is parsed by the core
+//! BSX fragment primitive ([`parse_fragment`]) and applied to the shared stack,
+//! so a single element can span several `pulldown-cmark` events (the open tag on
+//! one line, the close on another) and a paired inline tag can wrap the markdown
+//! text between its open and close.
+//!
+//! The entry point is [`build_markdown_tree`], which returns a [`MarkdownTree`]
+//! containing the node tree and optional frontmatter.
 
-use super::combinators::HtmlParseConfig;
+use super::HtmlParseConfig;
 use super::diff::HtmlDiffConfig;
 use super::diff::HtmlNode;
 use super::frontmatter::Frontmatter;
 use super::frontmatter::FrontmatterKind;
-use super::tokens::HtmlAttribute;
-use super::tokens::HtmlToken;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;
 use pulldown_cmark::Options;
 use pulldown_cmark::Tag;
+
+/// Build a plain string attribute `key="value"`.
+fn str_attr(key: &str, value: &str) -> BsxAttribute {
+	BsxAttribute {
+		key: key.to_string(),
+		value: AttrValue::Str(value.to_string()),
+	}
+}
+
+/// Build a bare flag attribute, ie `disabled`.
+fn flag_attr(key: &str) -> BsxAttribute {
+	BsxAttribute {
+		key: key.to_string(),
+		value: AttrValue::Flag,
+	}
+}
 
 /// Result of building a markdown tree, containing the node list and
 /// optional parsed frontmatter.
@@ -26,11 +47,11 @@ pub(crate) struct MarkdownTree<'a> {
 	pub frontmatter: Option<Frontmatter>,
 }
 
-/// Parse markdown text into a [`MarkdownTreeResult`].
+/// Parse markdown text into a [`MarkdownTree`].
 ///
-/// Uses `pulldown-cmark` with the given options, converts each event
-/// into [`TreeNode`] using HTML-equivalent tag names, and delegates
-/// embedded HTML to the HTML tokenizer.
+/// Uses `pulldown-cmark` with the given options, converts each event into an
+/// [`HtmlNode`] using HTML-equivalent tag names, and delegates embedded markup
+/// to the core BSX fragment primitive ([`parse_fragment`]).
 pub(crate) fn build_markdown_tree<'a>(
 	text: &'a str,
 	options: Options,
@@ -115,10 +136,10 @@ struct MdTreeBuilder<'a> {
 
 struct StackFrame<'a> {
 	/// HTML tag name for this element. Markdown tags are `'static` literals;
-	/// embedded HTML tags borrow from the source, hence the `'a` lifetime.
+	/// embedded markup tags borrow from the source, hence the `'a` lifetime.
 	name: &'a str,
-	/// Attributes on this element.
-	attributes: Vec<HtmlAttribute<'a>>,
+	/// Attributes on this element, sharing the BSX value grammar.
+	attributes: Vec<BsxAttribute>,
 	/// Source text slice for span tracking.
 	source: &'a str,
 	/// Accumulated child nodes.
@@ -138,7 +159,7 @@ impl<'a> StackFrame<'a> {
 	fn with_attributes(
 		name: &'a str,
 		source: &'a str,
-		attributes: Vec<HtmlAttribute<'a>>,
+		attributes: Vec<BsxAttribute>,
 	) -> Self {
 		Self {
 			name,
@@ -213,7 +234,7 @@ impl<'a> MdTreeBuilder<'a> {
 		&mut self,
 		name: &'a str,
 		source: &'a str,
-		attributes: Vec<HtmlAttribute<'a>>,
+		attributes: Vec<BsxAttribute>,
 	) {
 		self.push_leaf(HtmlNode::Element {
 			name,
@@ -240,7 +261,7 @@ impl<'a> MdTreeBuilder<'a> {
 					{
 						content.push_str(&text);
 					}
-				} else if self.html_parse_config.parse_expressions {
+				} else if self.html_parse_config.expressions {
 					self.push_text_with_expressions(self.slice(&range));
 				} else {
 					self.push_leaf(HtmlNode::Text(self.slice(&range)));
@@ -287,7 +308,7 @@ impl<'a> MdTreeBuilder<'a> {
 					attributes: vec![],
 					children: vec![HtmlNode::Element {
 						name: "a",
-						attributes: vec![HtmlAttribute::new("href", href_text)],
+						attributes: vec![str_attr("href", href_text)],
 						children: vec![HtmlNode::Text(href_text)],
 						source,
 					}],
@@ -296,11 +317,11 @@ impl<'a> MdTreeBuilder<'a> {
 			}
 			Event::TaskListMarker(checked) => {
 				let mut attrs = vec![
-					HtmlAttribute::boolean("disabled"),
-					HtmlAttribute::new("type", "checkbox"),
+					flag_attr("disabled"),
+					str_attr("type", "checkbox"),
 				];
 				if checked {
-					attrs.push(HtmlAttribute::boolean("checked"));
+					attrs.push(flag_attr("checked"));
 				}
 				self.push_void("input", source, attrs);
 			}
@@ -308,7 +329,7 @@ impl<'a> MdTreeBuilder<'a> {
 				let text_slice = self.slice(&range);
 				self.push_leaf(HtmlNode::Element {
 					name: "span",
-					attributes: vec![HtmlAttribute::new(
+					attributes: vec![str_attr(
 						"class",
 						"math-inline",
 					)],
@@ -320,7 +341,7 @@ impl<'a> MdTreeBuilder<'a> {
 				let text_slice = self.slice(&range);
 				self.push_leaf(HtmlNode::Element {
 					name: "div",
-					attributes: vec![HtmlAttribute::new(
+					attributes: vec![str_attr(
 						"class",
 						"math-display",
 					)],
@@ -365,7 +386,7 @@ impl<'a> MdTreeBuilder<'a> {
 							let class_val = self
 								.find_substring(source, lang)
 								.unwrap_or(source);
-							vec![HtmlAttribute::new("class", class_val)]
+							vec![str_attr("class", class_val)]
 						} else {
 							vec![]
 						}
@@ -384,7 +405,7 @@ impl<'a> MdTreeBuilder<'a> {
 					// Find start number text in source for attribute borrowing
 					let start_text =
 						self.find_digit_substring(source).unwrap_or(source);
-					let attrs = vec![HtmlAttribute::new("start", start_text)];
+					let attrs = vec![str_attr("start", start_text)];
 					self.push(StackFrame::with_attributes("ol", source, attrs));
 				}
 				None => {
@@ -399,8 +420,8 @@ impl<'a> MdTreeBuilder<'a> {
 					.find_substring(source, label.as_ref())
 					.unwrap_or(source);
 				let attrs = vec![
-					HtmlAttribute::new("class", "footnote-definition"),
-					HtmlAttribute::new("id", label_text),
+					str_attr("class", "footnote-definition"),
+					str_attr("id", label_text),
 				];
 				self.push(StackFrame::with_attributes("div", source, attrs));
 			}
@@ -448,12 +469,12 @@ impl<'a> MdTreeBuilder<'a> {
 				let href = self
 					.find_substring(source, dest_url.as_ref())
 					.unwrap_or(source);
-				let mut attrs = vec![HtmlAttribute::new("href", href)];
+				let mut attrs = vec![str_attr("href", href)];
 				if !title.is_empty() {
 					let title_text = self
 						.find_substring(source, title.as_ref())
 						.unwrap_or(source);
-					attrs.push(HtmlAttribute::new("title", title_text));
+					attrs.push(str_attr("title", title_text));
 				}
 				self.push(StackFrame::with_attributes("a", source, attrs));
 			}
@@ -463,12 +484,12 @@ impl<'a> MdTreeBuilder<'a> {
 				let src = self
 					.find_substring(source, dest_url.as_ref())
 					.unwrap_or(source);
-				let mut attrs = vec![HtmlAttribute::new("src", src)];
+				let mut attrs = vec![str_attr("src", src)];
 				if !title.is_empty() {
 					let title_text = self
 						.find_substring(source, title.as_ref())
 						.unwrap_or(source);
-					attrs.push(HtmlAttribute::new("title", title_text));
+					attrs.push(str_attr("title", title_text));
 				}
 				self.push(StackFrame::with_attributes("img", source, attrs));
 			}
@@ -532,7 +553,7 @@ impl<'a> MdTreeBuilder<'a> {
 						// For simple alt text this is a single contiguous
 						// slice from the source.
 						let alt = alt_slices[0];
-						frame.attributes.push(HtmlAttribute::new("alt", alt));
+						frame.attributes.push(str_attr("alt", alt));
 					}
 					frame.children.clear();
 				}
@@ -562,10 +583,7 @@ impl<'a> MdTreeBuilder<'a> {
 	/// and lets a paired inline tag (`<strong>…</strong>`) wrap the markdown
 	/// text events that arrive between its open and close.
 	fn apply_html_fragment(&mut self, source: &'a str) {
-		let tokens = match super::combinators::parse_document(
-			source,
-			&self.html_parse_config,
-		) {
+		let tokens = match parse_fragment(source, &self.html_parse_config) {
 			Ok(tokens) => tokens,
 			// an unparseable fragment falls back to verbatim text
 			Err(_) => {
@@ -575,37 +593,34 @@ impl<'a> MdTreeBuilder<'a> {
 		};
 		for token in tokens {
 			match token {
-				HtmlToken::OpenTag {
-					name,
+				BsxFragmentToken::Open {
+					tag,
 					attributes,
 					self_closing,
-					source,
 				} => {
+					// the fragment carries no per-tag source slice, so element span
+					// tracking uses the whole fragment (only used when a path is set).
 					if self_closing
-						|| self.html_diff_config.is_void_element(name)
+						|| self.html_diff_config.is_void_element(tag)
 					{
-						self.push_void(name, source, attributes);
+						self.push_void(tag, source, attributes);
 					} else {
 						self.push(StackFrame::with_attributes(
-							name, source, attributes,
+							tag, source, attributes,
 						));
 					}
 				}
-				HtmlToken::CloseTag(name) => self.pop_named(name),
-				HtmlToken::Text(text) => {
-					if self.html_parse_config.parse_expressions {
-						self.push_text_with_expressions(text);
-					} else {
-						self.push_leaf(HtmlNode::Text(text));
-					}
+				BsxFragmentToken::Close { tag } => self.pop_named(tag),
+				BsxFragmentToken::Text(text) => {
+					self.push_leaf(HtmlNode::Text(text))
 				}
-				HtmlToken::Comment(text) => {
+				BsxFragmentToken::Comment(text) => {
 					self.push_leaf(HtmlNode::Comment(text))
 				}
-				HtmlToken::Doctype(text) => {
+				BsxFragmentToken::Doctype(text) => {
 					self.push_leaf(HtmlNode::Doctype(text))
 				}
-				HtmlToken::Expression(expr) => {
+				BsxFragmentToken::Expr(expr) => {
 					self.push_leaf(HtmlNode::Expression(expr))
 				}
 			}

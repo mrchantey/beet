@@ -36,6 +36,7 @@ pub use ast::*;
 pub use events::*;
 pub use parse::*;
 pub use registry::*;
+pub use value::parse_value_expr_str;
 #[cfg(feature = "bevy_async")]
 pub use remote::*;
 pub use resolve::*;

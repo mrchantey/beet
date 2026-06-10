@@ -66,11 +66,11 @@ terminal = ["style", "keyboard", "dep:vte", "dep:libc", "beet_core/ctrlc", "beet
 
 json = ["dep:serde_json", "serde", "beet_core/json"]
 postcard = ["dep:postcard", "serde", "beet_core/postcard"]
-# The markdown / MDX parser. Owns its tokenizer + diff engine (the
-# `combinators`/`diff`/`tokens` submodules, formerly the standalone HTML
-# parser's) and resolves embedded `<Template>` markup through the core BSX
-# resolver. Markup media types parse via BSX (the standalone HTML parser is gone).
-markdown_parser = ["bsx", "dep:winnow", "dep:pulldown-cmark"]
+# The markdown / MDX parser. Owns the prose structure and the diff engine (the
+# `diff` submodule), and parses embedded markup through the core BSX fragment
+# primitive (`parse_fragment`), so BSX is the single markup authority and an
+# embedded component/template/`bx:` resolves per-tag through the BSX resolver.
+markdown_parser = ["bsx", "dep:pulldown-cmark"]
 # The `beet_ui` BSX front-end: a thin `NodeParser` delegating to the core BSX
 # parser (`beet_core/bsx`), plus the default `bx:click` event/verb registration.
 # HTML dispatches to the same parser with its features disabled, for both
@@ -99,7 +99,6 @@ bytes.workspace = true
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-winnow = { version = "0.7", optional = true }
 pulldown-cmark = { version = "0.13", optional = true, features = ["html"] }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }

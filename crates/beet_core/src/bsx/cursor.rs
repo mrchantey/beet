@@ -21,6 +21,14 @@ impl<'a> Cursor<'a> {
 	/// The unconsumed remainder of the source.
 	pub fn rest(&self) -> &'a str { &self.source[self.offset..] }
 
+	/// The current byte offset into the source.
+	pub fn offset(&self) -> usize { self.offset }
+
+	/// Slice the source between two byte offsets recorded from [`Self::offset`].
+	pub fn slice(&self, start: usize, end: usize) -> &'a str {
+		&self.source[start..end]
+	}
+
 	/// Whether the cursor has reached the end of the source.
 	pub fn is_eof(&self) -> bool { self.offset >= self.source.len() }
 

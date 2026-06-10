@@ -401,6 +401,47 @@ fn mdx_resolves_embedded_template() {
 	render_html(&mut world, root).xpect_contains("<strong>Hi</strong>");
 }
 
+/// Parse markdown into a freshly spawned entity and render it to HTML.
+#[cfg(feature = "markdown_parser")]
+fn render_markdown(world: &mut World, md: &str) -> String {
+	let bytes = MediaBytes::new_markdown(md);
+	let mut entity = world.spawn_empty();
+	MarkdownParser::new()
+		.parse(ParseContext::new(&mut entity, &bytes))
+		.unwrap();
+	let root = entity.id();
+	render_html(world, root)
+}
+
+#[cfg(feature = "markdown_parser")]
+#[beet_core::test]
+fn mdx_plain_html_unchanged() {
+	// a lowercase embedded element diffs as plain HTML, attributes intact.
+	let mut world = world();
+	render_markdown(&mut world, "<div class=\"card\">hi</div>")
+		.xpect_contains("<div class=\"card\">")
+		.xpect_contains("hi");
+}
+
+/// A component embedded in MDX as a wrapping tag (open + children + close
+/// arriving as separate `pulldown-cmark` events) still resolves through BSX.
+#[template]
+fn Wrap() -> impl Bundle {
+	rsx! { <section><slot/></section> }
+}
+
+#[cfg(feature = "markdown_parser")]
+#[beet_core::test]
+fn mdx_resolves_component_with_children() {
+	let mut world = world();
+	world.register_template::<Wrap>();
+	// the open tag, the markdown body, and the close arrive as separate events;
+	// the BSX build path resolves the whole subtree.
+	render_markdown(&mut world, "<Wrap>**bold**</Wrap>")
+		.xpect_contains("<section>")
+		.xpect_contains("<strong>bold</strong>");
+}
+
 // ---- html-mode subset -------------------------------------------------------
 
 #[beet_core::test]

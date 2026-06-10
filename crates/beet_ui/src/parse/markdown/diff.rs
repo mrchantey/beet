@@ -1,18 +1,21 @@
-//! Entity tree diffing logic for the HTML parser.
+//! Entity tree diffing logic for the markdown parser.
 //!
-//! Converts a flat stream of [`HtmlToken`] into a tree of ECS entities,
-//! diffing against any existing entity hierarchy to minimize mutations.
+//! Diffs an [`HtmlNode`] tree (built by [`tree_builder`](super::tree_builder)
+//! from `pulldown-cmark` events and BSX fragment tokens) against any existing
+//! entity hierarchy to minimize mutations on reparse. Embedded markup that needs
+//! the full BSX grammar (an uppercase component/template tag, a `bx:` directive,
+//! or a `{..}` spread) is built through [`BsxTemplate`] so BSX is the single
+//! markup authority; plain HTML elements diff in place here.
 //!
 //! When a [`SpanLookup`] is provided, every spawned or diffed entity
 //! receives a [`FileSpan`] component covering its source text:
 //! - Element entities: span of the opening tag (`<tag ...>`)
-//! - Attribute entities: span of the `key="value"` or `{expr}` text
+//! - Attribute entities: span of the `key="value"` text, when locatable
 //! - Text nodes: span of the text content
 //! - Comment nodes: span of the comment text
 //! - Doctype nodes: span of the doctype text
 //! - Expression nodes: span of the `{expr}` text
 
-use super::tokens::*;
 use crate::prelude::*;
 
 use beet_core::prelude::*;
@@ -131,9 +134,12 @@ impl HtmlDiffConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum HtmlNode<'a> {
 	/// An element with name, attributes, and children.
+	///
+	/// Attributes share the BSX [`AttrValue`] grammar, so a `bx:` directive or a
+	/// spread resolves natively rather than as a stringly-typed pair.
 	Element {
 		name: &'a str,
-		attributes: Vec<HtmlAttribute<'a>>,
+		attributes: Vec<BsxAttribute>,
 		children: Vec<HtmlNode<'a>>,
 		/// The full opening tag source text, ie `<div class="foo">`.
 		source: &'a str,
@@ -160,6 +166,92 @@ impl<'a> HtmlNode<'a> {
 	pub(crate) fn is_block_level(&self) -> bool {
 		matches!(self, HtmlNode::Element { name, .. } if is_block_element(name))
 	}
+
+	/// Whether this element must be built through the BSX resolver rather than
+	/// diffed as a plain HTML element: an uppercase component/template tag, or any
+	/// attribute carrying a `bx:` directive, a value-grammar expression, or a
+	/// spread. Plain HTML (the markdown-heavy common case) returns `false`.
+	fn needs_bsx(&self) -> bool {
+		let HtmlNode::Element {
+			name, attributes, ..
+		} = self
+		else {
+			return false;
+		};
+		is_bsx_tag(name)
+			|| attributes.iter().any(|attr| {
+				attr.key.starts_with("bx:")
+					|| matches!(
+						attr.value,
+						AttrValue::Expr(_) | AttrValue::Spread(_)
+					)
+			})
+	}
+}
+
+/// Whether a tag resolves by name (component/template) rather than as an HTML
+/// element: a capitalized tag, or a `path::to::X` whose last segment is
+/// capitalized. Mirrors the core BSX `is_uppercase_tag`.
+fn is_bsx_tag(tag: &str) -> bool {
+	tag.rsplit("::")
+		.next()
+		.unwrap_or(tag)
+		.starts_with(|ch: char| ch.is_uppercase())
+}
+
+/// Build an [`HtmlNode::Element`] subtree through [`BsxTemplate`], so an embedded
+/// uppercase component/template, `bx:` directive, or spread resolves through the
+/// one BSX resolver. Replaces the former post-parse `resolve_mdx_templates` pass:
+/// resolution now happens per-tag, inline, while the tree is diffed.
+fn build_via_bsx(world: &mut World, entity: Entity, node: &HtmlNode<'_>) {
+	let Some(element) = html_node_to_bsx(node) else {
+		return;
+	};
+	// despawn any existing children and strip stale markers before rebuilding.
+	let children: Vec<Entity> = world
+		.entity(entity)
+		.get::<Children>()
+		.map(|kids| kids.iter().collect())
+		.unwrap_or_default();
+	for child in children {
+		world.entity_mut(child).despawn();
+	}
+	world.entity_mut(entity).remove::<Element>();
+	let registry = world
+		.get_resource::<BsxTemplateRegistry>()
+		.cloned()
+		.unwrap_or_default();
+	let template = BsxTemplate::new(vec![element], registry);
+	world.entity_mut(entity).insert_template(template);
+}
+
+/// Convert an [`HtmlNode`] tree into a [`BsxNode`], for the BSX build path.
+fn html_node_to_bsx(node: &HtmlNode<'_>) -> Option<BsxNode> {
+	match node {
+		HtmlNode::Element {
+			name,
+			attributes,
+			children,
+			..
+		} => Some(BsxNode::Element(BsxElement {
+			tag: name.to_string(),
+			attributes: attributes.clone(),
+			children: children.iter().filter_map(html_node_to_bsx).collect(),
+			self_closing: children.is_empty(),
+		})),
+		HtmlNode::Text(text) => {
+			Some(BsxNode::Text(unescape_html_text(text)))
+		}
+		HtmlNode::Comment(text) => Some(BsxNode::Comment(text.to_string())),
+		HtmlNode::Doctype(text) => Some(BsxNode::Doctype(text.to_string())),
+		// a markdown `{expr}` inside a BSX subtree: parse it as a value expression.
+		HtmlNode::Expression(expr) => parse_text_block_expr(expr),
+	}
+}
+
+/// Parse a markdown expression string into a BSX text-position value expression.
+fn parse_text_block_expr(expr: &str) -> Option<BsxNode> {
+	parse_value_expr_str(expr).ok().map(BsxNode::Expr)
 }
 
 /// Collect the entity ids of the direct children of `entity`.
@@ -229,6 +321,16 @@ fn diff_node(
 			children,
 			source,
 		} => {
+			// an embedded BSX element (uppercase tag, `bx:`, or spread) resolves
+			// through the one BSX resolver rather than diffing as plain HTML.
+			if tree_node.needs_bsx() {
+				let span = span_lookup.map(|lookup| lookup.span_of(source));
+				build_via_bsx(world, entity, tree_node);
+				if let Some(span) = span {
+					world.entity_mut(entity).insert(span);
+				}
+				return Ok(());
+			}
 			let span = span_lookup.map(|lookup| lookup.span_of(source));
 			let has_matching_element =
 				world.entity(entity).get::<Element>().is_some();
@@ -244,13 +346,7 @@ fn diff_node(
 				drop(entity_mut);
 
 				// diff attributes
-				diff_attributes(
-					world,
-					entity,
-					attributes,
-					config,
-					span_lookup,
-				)?;
+				diff_attributes(world, entity, attributes, config)?;
 
 				// diff children recursively
 				diff_children(world, entity, children, config, span_lookup)?;
@@ -333,7 +429,7 @@ fn replace_with_element(
 	world: &mut World,
 	entity: Entity,
 	name: &str,
-	attributes: &[HtmlAttribute<'_>],
+	attributes: &[BsxAttribute],
 	children: &[HtmlNode<'_>],
 	config: &HtmlDiffConfig,
 	span_lookup: Option<&SpanLookup>,
@@ -353,7 +449,7 @@ fn replace_with_element(
 	drop(entity_mut);
 
 	// diff attributes
-	diff_attributes(world, entity, attributes, config, span_lookup)?;
+	diff_attributes(world, entity, attributes, config)?;
 
 	// despawn all existing children
 	let child_ids = collect_children(world, entity);
@@ -371,72 +467,41 @@ fn replace_with_element(
 	Ok(())
 }
 
-/// Diff attributes on an entity against a list of parsed attributes.
+/// Diff the attributes of a plain HTML element against its entity.
 ///
-/// When `span_lookup` is provided, each attribute entity receives a
-/// [`FileSpan`] covering its source text (key, `=`, and value).
+/// Only [`AttrValue::Str`] and [`AttrValue::Flag`] reach here: a `bx:` directive,
+/// a value-grammar expression, or a spread routes the whole element through the
+/// BSX resolver instead ([`build_via_bsx`]), so this stays the simple HTML case.
 fn diff_attributes(
 	world: &mut World,
 	entity: Entity,
-	attributes: &[HtmlAttribute<'_>],
+	attributes: &[BsxAttribute],
 	config: &HtmlDiffConfig,
-	span_lookup: Option<&SpanLookup>,
 ) -> Result {
-	// pre-convert to owned data including optional spans
-	let attrs_owned: Vec<(String, Option<String>, bool, Option<FileSpan>)> =
-		attributes
-			.iter()
-			.map(|attr| {
-				let span = span_lookup.and_then(|lookup| {
-					if !attr.key.is_empty() {
-						if let Some(val) = attr.value {
-							// span from key to end of value
-							let key_offset = lookup.slice_offset(attr.key);
-							let val_offset = lookup.slice_offset(val);
-							let end_offset = val_offset + val.len();
-							Some(FileSpan::new(
-								lookup.path().as_ref(),
-								lookup.line_col(key_offset),
-								lookup.line_col(end_offset),
-							))
-						} else {
-							Some(lookup.span_of(attr.key))
-						}
-					} else if let Some(val) = attr.value {
-						// keyless expression: span covers the expression content
-						Some(lookup.span_of(val))
-					} else {
-						None
-					}
-				});
-				(
-					attr.effective_key().to_string(),
-					attr.value.map(|val| val.to_string()),
-					attr.expression,
-					span,
-				)
-			})
-			.collect();
-
+	// pre-convert to owned `(key, value)` pairs; a `Flag` has no value.
 	let parse_values = config.parse_attribute_values;
+	let attrs_owned: Vec<(String, Value)> = attributes
+		.iter()
+		.map(|attr| {
+			let value = match &attr.value {
+				AttrValue::Str(string) if parse_values => {
+					Value::parse_string(string)
+				}
+				AttrValue::Str(string) => Value::str(string),
+				_ => Value::Null,
+			};
+			(attr.key.clone(), value)
+		})
+		.collect();
 
-	// collect existing attribute entities
-	let existing_attr_entities: Vec<Entity> = world
+	// collect existing attribute entities as (entity, key, value).
+	let existing: Vec<(Entity, String, Value)> = world
 		.entity(entity)
 		.get::<Attributes>()
-		.map(|attrs| {
-			let mut ids = Vec::new();
-			for attr_entity in attrs.iter() {
-				ids.push(attr_entity);
-			}
-			ids
-		})
-		.unwrap_or_default();
-
-	// build a list of existing attributes: (entity, key, value)
-	let existing: Vec<(Entity, String, Value)> = existing_attr_entities
-		.iter()
-		.filter_map(|&attr_entity| {
+		.map(|attrs| attrs.iter().collect::<Vec<_>>())
+		.unwrap_or_default()
+		.into_iter()
+		.filter_map(|attr_entity| {
 			let entity_ref = world.get_entity(attr_entity).ok()?;
 			let key = entity_ref.get::<Attribute>()?.to_string();
 			let value = entity_ref.get::<Value>().cloned().unwrap_or_default();
@@ -444,96 +509,30 @@ fn diff_attributes(
 		})
 		.collect();
 
-	// process new attributes
 	let mut matched = vec![false; existing.len()];
-
-	for (key, value, is_expression, span) in &attrs_owned {
-		if *is_expression {
-			// expression attributes
-			let expr_value: Value = value
-				.as_ref()
-				.map(|val| Value::str(val))
-				.unwrap_or(Value::Null);
-
-			// try to find matching existing attribute
-			let found = existing
-				.iter()
-				.position(|(_, existing_key, _)| existing_key == key);
-
-			if let Some(idx) = found {
+	for (key, new_value) in &attrs_owned {
+		match existing.iter().position(|(_, ex_key, _)| ex_key == key) {
+			Some(idx) => {
 				matched[idx] = true;
-				let (attr_entity, _, ref existing_val) = existing[idx];
-				if *existing_val != expr_value {
-					world.entity_mut(attr_entity).insert(expr_value);
-				}
-				// ensure it has the Expression component
-				// Expression is immutable, remove then insert
-				let mut attr_mut = world.entity_mut(attr_entity);
-				attr_mut.remove::<Expression>();
-				attr_mut.insert(Expression(value.clone().unwrap_or_default()));
-				if let Some(span) = span {
-					attr_mut.insert(span.clone());
-				}
-			} else {
-				// spawn new attribute entity
-				let bundle = (
-					Attribute::new(key),
-					expr_value,
-					Expression(value.clone().unwrap_or_default()),
-					AttributeOf::new(entity),
-				);
-				let attr_id = world.spawn(bundle).id();
-				if let Some(span) = span {
-					world.entity_mut(attr_id).insert(span.clone());
+				let (attr_entity, _, existing_val) = &existing[idx];
+				if existing_val != new_value {
+					world.entity_mut(*attr_entity).insert(new_value.clone());
 				}
 			}
-		} else {
-			let new_value: Value = value
-				.as_ref()
-				.map(|val| {
-					if parse_values {
-						Value::parse_string(val)
-					} else {
-						Value::str(val)
-					}
-				})
-				.unwrap_or(Value::Null);
-
-			// find matching existing attribute
-			let found = existing
-				.iter()
-				.position(|(_, existing_key, _)| *existing_key == *key);
-
-			if let Some(idx) = found {
-				matched[idx] = true;
-				let (attr_entity, _, ref existing_val) = existing[idx];
-				if *existing_val != new_value {
-					world.entity_mut(attr_entity).insert(new_value);
-				}
-				if let Some(span) = span {
-					world.entity_mut(attr_entity).insert(span.clone());
-				}
-			} else {
-				// spawn new attribute entity
-				let attr_id = world
-					.spawn((
-						Attribute::new(key),
-						new_value,
-						AttributeOf::new(entity),
-					))
-					.id();
-				if let Some(span) = span {
-					world.entity_mut(attr_id).insert(span.clone());
-				}
+			None => {
+				world.spawn((
+					Attribute::new(key),
+					new_value.clone(),
+					AttributeOf::new(entity),
+				));
 			}
 		}
 	}
 
-	// despawn unmatched existing attributes
+	// despawn unmatched existing attributes.
 	for (idx, was_matched) in matched.iter().enumerate() {
 		if !was_matched {
-			let (attr_entity, _, _) = &existing[idx];
-			world.entity_mut(*attr_entity).despawn();
+			world.entity_mut(existing[idx].0).despawn();
 		}
 	}
 
@@ -558,14 +557,19 @@ pub(crate) fn spawn_node(
 			source,
 		} => {
 			let span = span_lookup.map(|lookup| lookup.span_of(source));
-			let child_id =
-				world.spawn((Element::new(*name), ChildOf(parent))).id();
+			let child_id = world.spawn(ChildOf(parent)).id();
 			if let Some(span) = span {
 				world.entity_mut(child_id).insert(span);
 			}
-			diff_attributes(world, child_id, attributes, config, span_lookup)?;
-			for child_node in children {
-				spawn_node(world, child_id, child_node, config, span_lookup)?;
+			// an embedded BSX element resolves through the BSX resolver.
+			if tree_node.needs_bsx() {
+				build_via_bsx(world, child_id, tree_node);
+			} else {
+				world.entity_mut(child_id).insert(Element::new(*name));
+				diff_attributes(world, child_id, attributes, config)?;
+				for child_node in children {
+					spawn_node(world, child_id, child_node, config, span_lookup)?;
+				}
 			}
 		}
 		HtmlNode::Text(text) => {
