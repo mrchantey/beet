@@ -524,19 +524,3 @@ mod raw_mode {
 		Ok(())
 	}
 }
-
-/// Exit on ctrl+c when [`StdioTerminal::ctrl_c_exit`] is set.
-pub fn exit_ctrl_c(
-	ev: On<TerminalEvent>,
-	mut commands: Commands,
-	query: Query<&StdioTerminal>,
-) {
-	if let Ok(term) = query.get(ev.target()) {
-		if term.ctrl_c_exit {
-			if matches!(ev.event(), TerminalEvent::Key(k) if k == &KeyPress::CTRL_C)
-			{
-				commands.write_message(AppExit::Success);
-			}
-		}
-	}
-}

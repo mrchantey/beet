@@ -1,4 +1,3 @@
-use crate::render::Terminal;
 use beet_core::prelude::*;
 use bevy::input::keyboard::NativeKeyCode;
 use bevy::prelude::KeyCode;
@@ -36,27 +35,14 @@ impl InputParser {
 	}
 }
 
-// ── Bevy systems ──────────────────────────────────────────────────────────────
-
-/// Read input events from each [`Terminal`] and forward them as ECS events.
-pub fn terminal_events(
-	mut commands: Commands,
-	mut query: Populated<(Entity, &mut Terminal)>,
-) -> Result {
-	for (entity, mut terminal) in query.iter_mut() {
-		for event in terminal.read_events()? {
-			commands.entity(entity).trigger_target(event);
-		}
-	}
-	Ok(())
-}
-
-
 // ── Public types ──────────────────────────────────────────────────────────────
 
-/// Input event from the terminal, targeted at the terminal entity.
-#[derive(Debug, Clone, EntityTargetEvent)]
-#[event(auto_propagate)]
+/// Parsed terminal input, the [`InputParser`]'s intermediate representation.
+///
+/// Consumed internally by [`terminal_input_bridge`](super::terminal_input_bridge),
+/// which translates it into bevy's own input messages. Not an ECS event: the
+/// whole app reads bevy input, not this.
+#[derive(Debug, Clone)]
 pub enum TerminalEvent {
 	Key(KeyPress),
 	Mouse(MouseEvent),
@@ -476,7 +462,7 @@ fn char_to_key(c: char) -> (KeyCode, KeyModifier) {
 	(key, modifier)
 }
 
-fn char_to_keycode(c: char) -> KeyCode {
+pub(super) fn char_to_keycode(c: char) -> KeyCode {
 	match c {
 		'a' => KeyCode::KeyA,
 		'b' => KeyCode::KeyB,

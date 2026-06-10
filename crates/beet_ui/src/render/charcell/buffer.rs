@@ -1,13 +1,8 @@
 use crate::render::DoubleBuffer;
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-use crate::style::BlinkStyle;
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-use crate::style::FontStyle;
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-use crate::style::Visibility;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
+use bevy::math::IVec2;
 use bevy::math::UVec2;
 
 /// Returns the display width (in terminal columns) for a character.
@@ -63,6 +58,26 @@ pub trait AsBuffer {
 		self.set(pos, cell);
 	}
 
+	/// Write a cell at a signed position through a [`Clip`], the paint boundary
+	/// between signed layout space and the unsigned cell grid. A position outside
+	/// the clip (or with a negative component) is dropped; the rest delegates to
+	/// [`set`](Self::set), which drops anything `>= size`. This is the single
+	/// place the signed-to-unsigned clamp and the overflow clip are applied.
+	fn set_clipped(&mut self, pos: IVec2, cell: Cell, clip: Clip) {
+		if let Some(pos) = clip.cell(pos) {
+			self.set(pos, cell);
+		}
+	}
+
+	/// Composite variant of [`set_clipped`](Self::set_clipped): drops a clipped
+	/// position, otherwise composes over the destination like
+	/// [`set_composite`](Self::set_composite).
+	fn set_composite_clipped(&mut self, pos: IVec2, cell: Cell, clip: Clip) {
+		if let Some(pos) = clip.cell(pos) {
+			self.set_composite(pos, cell);
+		}
+	}
+
 	/// Reset all cells to [`Cell::BLANK`].
 	fn clear(&mut self);
 
@@ -76,56 +91,98 @@ pub trait AsBuffer {
 	/// Only the stdout [`FlexBuffer`] records and emits links.
 	fn set_link(&mut self, _pos: UVec2, _url: &str) {}
 
-	/// Write text starting at `pos`, advancing by each character's display width.
+	/// Write text starting at signed `pos`, advancing by each character's display
+	/// width, dropping any cell outside `clip`.
 	///
 	/// Wide (CJK/fullwidth) characters occupy 2 columns; the trailing column is
 	/// written as a `None`-symbol placeholder so the diff sees it as changed.
 	fn write_text(
 		&mut self,
-		pos: UVec2,
+		pos: IVec2,
 		text: &str,
 		style: VisualStyle,
 		entity: Entity,
+		clip: Clip,
 	) {
-		let mut col = 0u32;
+		let mut col = 0i32;
 		for ch in text.chars() {
-			let w = unicode_width(ch) as u32;
-			let cell_pos = UVec2::new(pos.x + col, pos.y);
+			let w = unicode_width(ch) as i32;
+			let cell_pos = IVec2::new(pos.x + col, pos.y);
 			// a wide glyph displays 2 columns, so stop before one that can't fit
 			// both rather than overflowing the right edge by a column.
-			if cell_pos.x + w > self.size().x {
+			if cell_pos.x + w > self.size().x as i32 {
 				break;
 			}
 			// glyphs compose over the cell beneath them (see `set_composite`),
 			// keeping the page/code surface fill rather than punching a hole.
-			self.set_composite(
+			self.set_composite_clipped(
 				cell_pos,
 				Cell::new(ch.to_string(), style.clone(), entity),
+				clip,
 			);
 			// placeholder for the trailing column of a wide character
 			if w == 2 {
-				self.set_composite(UVec2::new(cell_pos.x + 1, pos.y), Cell {
-					symbol: None,
-					style: style.clone(),
-					entity: Some(entity),
-				});
+				self.set_composite_clipped(
+					IVec2::new(cell_pos.x + 1, pos.y),
+					Cell {
+						symbol: None,
+						style: style.clone(),
+						entity: Some(entity),
+					},
+					clip,
+				);
 			}
 			col += w;
 		}
 	}
 
-	/// Fill all cells in `rect` with `cell`.
+	/// Fill all cells in the signed `rect` that fall within `clip`.
 	///
-	/// Clamped to the [allocated rows](Self::allocated_rows) so a sentinel-tall
-	/// background can't explode a [`FlexBuffer`] allocation; only painted rows
-	/// are filled.
-	fn fill_rect(&mut self, rect: URect, cell: Cell) {
-		let max_y = rect.max.y.min(self.allocated_rows());
-		for y in rect.min.y..max_y {
-			for x in rect.min.x..rect.max.x {
-				self.set(UVec2::new(x, y), cell.clone());
+	/// Cells outside the clip (including negative coordinates) are dropped, and
+	/// the fill is clamped to the [allocated rows](Self::allocated_rows) so a
+	/// sentinel-tall background can't explode a [`FlexBuffer`] allocation; only
+	/// painted rows are filled.
+	fn fill_rect(&mut self, rect: IRect, cell: Cell, clip: Clip) {
+		let rect = clip.intersect(rect);
+		let max_y = rect.max.y.min(self.allocated_rows() as i32);
+		for y in rect.min.y.max(0)..max_y {
+			for x in rect.min.x.max(0)..rect.max.x.max(0) {
+				self.set(UVec2::new(x as u32, y as u32), cell.clone());
 			}
 		}
+	}
+}
+
+/// A paint clip: the rectangular region (in signed cell space) cells may be
+/// written to. `overflow: visible` uses [`Clip::NONE`] (the full viewport), an
+/// overflow container narrows it to its padding box. Composes with the buffer's
+/// own `[0, size)` bound, so this only carries the overflow clip.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Clip(pub IRect);
+
+impl Clip {
+	/// An effectively unbounded clip (`overflow: visible`): the buffer's own
+	/// `[0, size)` bound still applies at write time.
+	pub const NONE: Self = Self(IRect {
+		min: IVec2::new(i32::MIN / 2, i32::MIN / 2),
+		max: IVec2::new(i32::MAX / 2, i32::MAX / 2),
+	});
+
+	/// Intersect this clip with `other`, the operation that nests clips as the
+	/// paint walk descends into overflow containers.
+	pub fn intersect(self, other: IRect) -> IRect { self.0.intersect(other) }
+
+	/// Map a signed cell position to the unsigned grid, returning `None` when it
+	/// falls outside the clip or has a negative component. The `>= size` upper
+	/// bound is enforced by [`AsBuffer::set`].
+	pub fn cell(self, pos: IVec2) -> Option<UVec2> {
+		(pos.x >= self.0.min.x
+			&& pos.y >= self.0.min.y
+			&& pos.x < self.0.max.x
+			&& pos.y < self.0.max.y
+			&& pos.x >= 0
+			&& pos.y >= 0)
+			.then(|| UVec2::new(pos.x as u32, pos.y as u32))
 	}
 }
 
@@ -156,6 +213,13 @@ impl Buffer {
 	pub fn new_half_terminal() -> Self {
 		let size = terminal_ext::size();
 		Self::new(UVec2::new(size.x, size.y / 2))
+	}
+
+	/// Reallocate to `size`, clearing all cells. Used on a terminal resize, where
+	/// the previous contents are invalidated and a full repaint follows.
+	pub fn resize(&mut self, size: UVec2) {
+		self.size = size;
+		self.cells = alloc::vec::from_elem(Cell::BLANK, (size.x * size.y) as usize);
 	}
 
 	pub fn into_double_buffer(self) -> DoubleBuffer {
@@ -272,8 +336,8 @@ pub(crate) fn render_cells_plain(
 ///
 /// `link_at` supplies an optional [OSC-8 hyperlink](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda)
 /// target per position — always `None` for the fixed [`Buffer`], the links map
-/// for a [`FlexBuffer`]. Links are emitted only by this stdout backend, not the
-/// ratatui/TUI path which routes clicks through its own handlers.
+/// for a [`FlexBuffer`]. Links are emitted only by this stdout backend; the live
+/// TUI routes clicks through its hit-test instead.
 pub(crate) fn render_cells_ansi(
 	cells: &[Cell],
 	width: usize,
@@ -421,73 +485,6 @@ impl Cell {
 	}
 }
 
-
-// ── Ratatui conversions ───────────────────────────────────────────────────────
-
-/// Convert a bevy [`Color`] to a ratatui terminal color via RGB.
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-fn color_to_ratatui(color: Color) -> ratatui::style::Color {
-	let s = color.to_srgba_u8();
-	ratatui::style::Color::Rgb(s.red, s.green, s.blue)
-}
-
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-#[extend::ext]
-impl VisualStyle {
-	/// Converts to a ratatui [`Style`](ratatui::style::Style).
-	fn to_ratatui_style(&self) -> ratatui::style::Style {
-		let mut modifier = ratatui::style::Modifier::empty();
-		if self.font_weight.is_bold() {
-			modifier |= ratatui::style::Modifier::BOLD;
-		}
-		if self.font_style == FontStyle::Italic {
-			modifier |= ratatui::style::Modifier::ITALIC;
-		}
-		// dim derived from foreground alpha
-		if let Some(fg) = self.foreground {
-			if fg.to_srgba_u8().alpha < 128 {
-				modifier |= ratatui::style::Modifier::DIM;
-			}
-		}
-		match self.blink {
-			BlinkStyle::None => {}
-			BlinkStyle::Blink => {
-				modifier |= ratatui::style::Modifier::SLOW_BLINK
-			}
-			BlinkStyle::RapidBlink => {
-				modifier |= ratatui::style::Modifier::RAPID_BLINK
-			}
-		}
-		if self.visibility == Visibility::Hidden {
-			modifier |= ratatui::style::Modifier::HIDDEN;
-		}
-		if self.decoration_line.underline {
-			modifier |= ratatui::style::Modifier::UNDERLINED;
-		}
-		if self.decoration_line.line_through {
-			modifier |= ratatui::style::Modifier::CROSSED_OUT;
-		}
-		// OVERLINE has no ratatui Modifier equivalent
-		ratatui::style::Style {
-			fg: self.foreground.map(color_to_ratatui),
-			bg: self.background.map(color_to_ratatui),
-			underline_color: self.decoration_color.map(color_to_ratatui),
-			add_modifier: modifier,
-			sub_modifier: ratatui::style::Modifier::empty(),
-		}
-	}
-}
-
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-impl Cell {
-	/// Converts to a ratatui [`Cell`](ratatui::buffer::Cell).
-	pub fn to_ratatui_cell(&self) -> ratatui::buffer::Cell {
-		let mut cell = ratatui::buffer::Cell::default();
-		cell.set_symbol(self.symbol_str());
-		cell.set_style(self.style.to_ratatui_style());
-		cell
-	}
-}
 
 #[cfg(test)]
 mod tests {

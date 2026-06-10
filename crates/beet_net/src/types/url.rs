@@ -189,6 +189,15 @@ impl Url {
 	/// The authority (host and optional port), if present.
 	pub fn authority(&self) -> Option<&str> { self.authority.as_deref() }
 
+	/// Whether this URL points to another origin (an absolute URL with a host),
+	/// rather than a relative/same-origin path.
+	///
+	/// A bare path (`/about`, `./next`) or a scheme-less URL is internal; an
+	/// absolute URL carrying an `authority` (`https://other.example/x`) is
+	/// external. This is the internal-vs-external classification a browser uses to
+	/// decide whether a link navigates in-app or leaves it.
+	pub fn is_external(&self) -> bool { self.authority.is_some() }
+
 	/// Set the authority.
 	pub fn with_authority(mut self, authority: impl Into<String>) -> Self {
 		self.authority = Some(authority.into());

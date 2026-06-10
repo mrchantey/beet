@@ -1,13 +1,8 @@
-//! Charcell backends for interacting with the terminal,
-//! This is directly influenced by, and intended to be compatible with ratatui backends.
+//! Charcell backends for interacting with the terminal.
 use super::Cell;
 use beet_core::prelude::*;
 mod test_backend;
 pub use test_backend::*;
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-mod ratatui_backend;
-#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-pub use ratatui_backend::*;
 
 
 /// The window size in characters (columns / rows) as well as pixels.

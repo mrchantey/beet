@@ -7,6 +7,7 @@ use crate::prelude::*;
 use crate::style::Display;
 use crate::style::*;
 use beet_core::prelude::*;
+use bevy::math::IRect;
 use bevy::math::UVec2;
 
 /// Per-node flat style view, without children.
@@ -24,13 +25,35 @@ pub(super) struct CharcellNodeData<'a> {
 	box_style: Option<&'a BoxStyle>,
 	hyperlink: Option<&'a Hyperlink>,
 	marker: Option<&'a Marker>,
+	scroll: Option<&'a ScrollPosition>,
+	position: Option<&'a PositionStyle>,
+	scrollbar: Option<&'a ScrollbarStyle>,
 }
 
 impl CharcellNodeData<'_> {
 	pub fn value(&self) -> Option<&Value> { self.value }
 
 	pub fn intrinsic_size(&self) -> UVec2 { self.intrinsic_size.0 }
-	pub fn layout_rect(&self) -> URect { self.layout_rect.0 }
+	pub fn layout_rect(&self) -> IRect { self.layout_rect.0 }
+
+	/// This node's own scroll offset (zero when not a scroll container), the
+	/// distance the paint pass translates its descendants by.
+	pub fn scroll_offset(&self) -> bevy::math::IVec2 {
+		self.scroll.map(|scroll| scroll.offset).unwrap_or_default()
+	}
+
+	/// Whether this node is a scroll container (has a [`ScrollPosition`]).
+	pub fn is_scroll_container(&self) -> bool { self.scroll.is_some() }
+
+	/// Resolved positioning, defaulting to static with no insets.
+	pub fn position_style(&self) -> PositionStyle {
+		self.position.copied().unwrap_or_default()
+	}
+
+	/// Resolved scrollbar styling, defaulting to the renderer defaults.
+	pub fn scrollbar_style(&self) -> ScrollbarStyle {
+		self.scrollbar.copied().unwrap_or_default()
+	}
 
 	/// return option here, allows for computation skips
 	pub fn box_style(&self) -> Option<&BoxStyle> { self.box_style }
@@ -78,6 +101,18 @@ impl CharcellNodeData<'_> {
 			.filter(|node| node.layout_style().display != Display::None)
 	}
 
+	/// In-flow child nodes: [`child_nodes`](Self::child_nodes) minus out-of-flow
+	/// (absolute/fixed) children, which the flow layout must ignore so siblings
+	/// lay out as if they are absent. The out-of-flow children are placed against
+	/// their containing block in the positioning pass.
+	pub(super) fn flow_child_nodes<'a>(
+		&'a self,
+		query: &'a CharcellQuery,
+	) -> impl 'a + Iterator<Item = CharcellNodeData<'a>> {
+		self.child_nodes(query)
+			.filter(|node| !node.position_style().position.is_out_of_flow())
+	}
+
 	/// Whether this node has any renderable child nodes.
 	pub(super) fn has_child_nodes(&self, query: &CharcellQuery) -> bool {
 		self.child_nodes(query).next().is_some()
@@ -122,6 +157,14 @@ impl CharcellTree<'_, '_> {
 			.into_iter()
 			.flat_map(|children| children.iter())
 			.map(|child| self.resolve(child))
+	}
+
+	/// Resolved direct children of `entity`, holders replaced by their referents.
+	///
+	/// Same ordering as [`CharcellNodeData::child_nodes`], so the per-entity rect
+	/// and clip maps key consistently with paint.
+	pub fn children_of(&self, entity: Entity) -> Vec<Entity> {
+		self.children(entity).collect()
 	}
 
 	/// Pre-order traversal from `root`, inclusive.
@@ -180,6 +223,9 @@ pub struct CharcellQuery<'w, 's> {
 			Option<&'static Children>,
 			Option<&'static Hyperlink>,
 			Option<&'static Marker>,
+			Option<&'static ScrollPosition>,
+			Option<&'static PositionStyle>,
+			Option<&'static ScrollbarStyle>,
 		),
 	>,
 	refs: Query<'w, 's, &'static RenderRef>,
@@ -214,6 +260,9 @@ impl CharcellQuery<'_, '_> {
 			children,
 			hyperlink,
 			marker,
+			scroll,
+			position,
+			scrollbar,
 		) = self.nodes.get(entity)?;
 		Ok(CharcellNodeData {
 			intrinsic_size,
@@ -226,6 +275,9 @@ impl CharcellQuery<'_, '_> {
 			box_style,
 			hyperlink,
 			marker,
+			scroll,
+			position,
+			scrollbar,
 		})
 	}
 }

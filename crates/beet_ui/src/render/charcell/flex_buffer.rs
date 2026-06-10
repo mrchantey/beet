@@ -1,6 +1,6 @@
 use super::*;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
 use bevy::math::UVec2;
 
 /// Sentinel viewport height for a [`FlexBuffer`].
@@ -132,20 +132,24 @@ impl AsBuffer for FlexBuffer {
 		}
 	}
 
-	/// Fill `rect`, growing the backing rows to back a finite region.
+	/// Fill the signed `rect` within `clip`, growing the backing rows to back a
+	/// finite region.
 	///
 	/// A node paints its background before its content, so without growth a fill
 	/// that lands above the current high-water mark (eg the app bar, painted
 	/// pre-order before any text) would clamp to nothing. A sentinel-tall fill
 	/// (the root viewport) is left to lazy growth so it can't balloon the
-	/// allocation.
-	fn fill_rect(&mut self, rect: URect, cell: Cell) {
-		if rect.max.y < AUTO_GROW_VIEWPORT_HEIGHT {
-			self.ensure_rows(rect.max.y);
+	/// allocation. Cells outside the clip (or above/left of the origin) are
+	/// dropped.
+	fn fill_rect(&mut self, rect: IRect, cell: Cell, clip: Clip) {
+		let rect = clip.intersect(rect);
+		let max_y = rect.max.y.max(0) as u32;
+		if max_y < AUTO_GROW_VIEWPORT_HEIGHT {
+			self.ensure_rows(max_y);
 		}
-		let max_y = rect.max.y.min(self.allocated_rows());
-		for y in rect.min.y..max_y {
-			for x in rect.min.x..rect.max.x {
+		let max_y = max_y.min(self.allocated_rows());
+		for y in rect.min.y.max(0) as u32..max_y {
+			for x in rect.min.x.max(0) as u32..rect.max.x.max(0) as u32 {
 				self.set(UVec2::new(x, y), cell.clone());
 			}
 		}
@@ -165,7 +169,8 @@ impl AsBuffer for FlexBuffer {
 mod tests {
 	use super::*;
 	use crate::style::VisualStyle;
-	use bevy::math::URect;
+	use bevy::math::IRect;
+	use bevy::math::IVec2;
 
 	fn cell(symbol: &str) -> Cell {
 		Cell::new(symbol, VisualStyle::default(), Entity::PLACEHOLDER)
@@ -177,10 +182,11 @@ mod tests {
 		// instead of clipping the cell away.
 		let mut buf = FlexBuffer::new(4);
 		buf.write_text(
-			UVec2::new(0, 500),
+			IVec2::new(0, 500),
 			"hi",
 			VisualStyle::default(),
 			Entity::PLACEHOLDER,
+			Clip::NONE,
 		);
 		buf.allocated_rows().xpect_eq(501);
 		buf.get(UVec2::new(0, 500))
@@ -195,8 +201,9 @@ mod tests {
 		// such a fill is clamped to the rows already painted (none here).
 		let mut buf = FlexBuffer::new(4);
 		buf.fill_rect(
-			URect::new(0, 0, 4, AUTO_GROW_VIEWPORT_HEIGHT),
+			IRect::new(0, 0, 4, AUTO_GROW_VIEWPORT_HEIGHT as i32),
 			cell("x"),
+			Clip::NONE,
 		);
 		buf.allocated_rows().xpect_eq(0);
 	}
@@ -206,7 +213,7 @@ mod tests {
 		// a finite background (eg an elevated bar) painted before its content
 		// grows the allocation so the fill is retained behind later text.
 		let mut buf = FlexBuffer::new(4);
-		buf.fill_rect(URect::new(0, 0, 4, 2), cell("x"));
+		buf.fill_rect(IRect::new(0, 0, 4, 2), cell("x"), Clip::NONE);
 		buf.allocated_rows().xpect_eq(2);
 		buf.get(UVec2::new(3, 1))
 			.unwrap()
@@ -233,16 +240,18 @@ mod tests {
 		// trailing row → render trims back to the single content row.
 		let mut buf = FlexBuffer::new(4);
 		buf.write_text(
-			UVec2::new(0, 0),
+			IVec2::new(0, 0),
 			"hi",
 			VisualStyle::default(),
 			Entity::PLACEHOLDER,
+			Clip::NONE,
 		);
 		buf.write_text(
-			UVec2::new(0, 3),
+			IVec2::new(0, 3),
 			"yo",
 			VisualStyle::default(),
 			Entity::PLACEHOLDER,
+			Clip::NONE,
 		);
 		buf.allocated_rows().xpect_eq(4);
 		// blank out the trailing content row

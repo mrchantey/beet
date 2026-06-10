@@ -4,18 +4,13 @@ use beet_ui::prelude::*;
 
 
 fn main() {
+	// CharcellTuiPlugin composes the charcell pipeline, the reactive document
+	// chain, and per-frame repaint, so a live TUI app is just MinimalPlugins +
+	// this plugin.
 	App::new()
-		.add_plugins((
-			MinimalPlugins,
-			CharcellPlugin,
-			DocumentPlugin,
-			// realtime repaint: this app mutates the document every Update, so it
-			// runs the post-parse pipeline after each frame.
-			RealtimeParsePlugin,
-		))
+		.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 		.add_systems(Startup, setup)
 		.add_systems(Update, update)
-		.add_observer(on_input)
 		.run();
 }
 
@@ -53,10 +48,3 @@ fn update(
 	})
 }
 
-fn on_input(ev: On<TerminalEvent>, mut _commands: Commands) {
-	match ev.event() {
-		TerminalEvent::Key(_key_press) => {}
-		TerminalEvent::Mouse(_mouse) => {}
-		_ => {}
-	}
-}

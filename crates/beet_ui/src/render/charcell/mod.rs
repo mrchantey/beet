@@ -14,7 +14,11 @@ mod flex;
 mod flex_buffer;
 mod inline;
 #[cfg(feature = "terminal")]
+mod hit_test;
+#[cfg(feature = "terminal")]
 mod input;
+#[cfg(feature = "terminal")]
+mod input_bridge;
 mod layout;
 mod measure;
 mod paint;
@@ -23,10 +27,17 @@ mod prepare;
 mod query;
 pub(self) use query::*;
 mod renderer;
+mod scrollbar;
+pub(self) use scrollbar::*;
+mod stacking;
+pub(self) use stacking::*;
 mod table;
 pub(self) use table::*;
 #[cfg(feature = "terminal")]
 mod terminal;
+/// In-process test harness for the live TUI, reused by the interaction tasks.
+#[cfg(all(test, feature = "terminal"))]
+pub(crate) mod test_host;
 mod text;
 
 pub use backend::*;
@@ -35,7 +46,11 @@ pub use decorate::*;
 pub use double_buffer::*;
 pub use flex_buffer::*;
 #[cfg(feature = "terminal")]
+pub use hit_test::*;
+#[cfg(feature = "terminal")]
 pub use input::*;
+#[cfg(feature = "terminal")]
+pub use input_bridge::*;
 pub use layout::LayoutRect;
 pub use measure::IntrinsicSize;
 // paint/prepare expose the crate-internal `CharcellTree`, so they stay crate-visible

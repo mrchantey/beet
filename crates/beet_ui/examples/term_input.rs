@@ -1,13 +1,13 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
+use bevy::input::keyboard::KeyboardInput;
 
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, CharcellPlugin, RealtimeParsePlugin))
+		.add_plugins((MinimalPlugins, CharcellTuiPlugin))
 		.add_systems(Startup, setup)
-		.add_systems(Update, update)
-		.add_observer(on_input)
+		.add_systems(Update, (update, log_input))
 		.run();
 }
 
@@ -26,6 +26,10 @@ fn update(nodes: Query<&mut Value>) {
 		}
 	}
 }
-fn on_input(ev: On<TerminalEvent>) {
-	println!("Event: {ev:?}");
+
+/// Terminal input now flows through bevy's unified `KeyboardInput` messages.
+fn log_input(mut keys: MessageReader<KeyboardInput>) {
+	for key in keys.read() {
+		cross_log!("Key: {key:?}");
+	}
 }

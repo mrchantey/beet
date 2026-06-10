@@ -45,6 +45,195 @@ impl AsCssValue for Display {
 	}
 }
 
+/// How content overflowing a node's box is handled along one axis, mapping to
+/// CSS `overflow-x`/`overflow-y`.
+///
+/// `Visible` (default) lets content paint outside the box, the current behavior.
+/// The other three clip descendants to the padding box; `Scroll` always reserves
+/// a scrollbar gutter, `Auto` only when content overflows (Task 04).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Overflow {
+	/// Content is not clipped and may paint outside the box.
+	#[default]
+	Visible,
+	/// Content is clipped to the padding box, no scrolling affordance.
+	Hidden,
+	/// Content is clipped and always shows a scrollbar.
+	Scroll,
+	/// Content is clipped and shows a scrollbar only when it overflows.
+	Auto,
+}
+
+impl Overflow {
+	/// Whether this axis clips its overflow (anything but `Visible`).
+	pub fn is_clipped(&self) -> bool { !matches!(self, Self::Visible) }
+
+	/// Whether this axis is scrollable (`Scroll` or `Auto`).
+	pub fn is_scroll(&self) -> bool {
+		matches!(self, Self::Scroll | Self::Auto)
+	}
+}
+
+impl AsCssValue for Overflow {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Visible => "visible",
+			Self::Hidden => "hidden",
+			Self::Scroll => "scroll",
+			Self::Auto => "auto",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// CSS `position`: how a box is placed relative to normal flow.
+///
+/// `Static` (default) is normal flow. `Relative` lays out in flow then offsets
+/// by the insets. `Absolute`/`Fixed` are removed from flow and placed against a
+/// containing block (the nearest positioned ancestor / the viewport). `Sticky`
+/// lays out in flow then clamps within its scroll container.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Position {
+	/// Normal flow, insets ignored.
+	#[default]
+	Static,
+	/// Normal flow, then offset by the insets; the flow slot is preserved.
+	Relative,
+	/// Out of flow, placed against the nearest positioned ancestor's padding box.
+	Absolute,
+	/// Out of flow, placed against the viewport.
+	Fixed,
+	/// Normal flow, then clamped within the nearest scroll container's scrollport.
+	Sticky,
+}
+
+impl Position {
+	/// Whether the box is removed from its parent's normal flow.
+	pub fn is_out_of_flow(&self) -> bool {
+		matches!(self, Self::Absolute | Self::Fixed)
+	}
+
+	/// Whether the box establishes a containing block for absolute descendants.
+	pub fn is_positioned(&self) -> bool { !matches!(self, Self::Static) }
+}
+
+impl AsCssValue for Position {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Static => "static",
+			Self::Relative => "relative",
+			Self::Absolute => "absolute",
+			Self::Fixed => "fixed",
+			Self::Sticky => "sticky",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// Resolved positioning for a node: its [`Position`] and the four inset
+/// (`top`/`right`/`bottom`/`left`) lengths, each `None` for CSS `auto`.
+///
+/// A dedicated component (rather than fields on [`LayoutStyle`]) keeps the common
+/// layout style small; only positioned elements carry one. The charcell layout
+/// pass reads it to place the box.
+#[derive(Debug, Default, Clone, Copy, PartialEq, SetWith, Component)]
+pub struct PositionStyle {
+	pub position: Position,
+	/// `[top, right, bottom, left]`, `None` for `auto`.
+	pub inset: [Option<Length>; 4],
+	/// CSS `z-index`: stacking order within the parent stacking context. `None`
+	/// is `auto` (does not form a stacking context on its own).
+	pub z_index: Option<i32>,
+}
+
+impl PositionStyle {
+	pub const TOP: usize = 0;
+	pub const RIGHT: usize = 1;
+	pub const BOTTOM: usize = 2;
+	pub const LEFT: usize = 3;
+
+	pub fn top(&self) -> Option<Length> { self.inset[Self::TOP] }
+	pub fn right(&self) -> Option<Length> { self.inset[Self::RIGHT] }
+	pub fn bottom(&self) -> Option<Length> { self.inset[Self::BOTTOM] }
+	pub fn left(&self) -> Option<Length> { self.inset[Self::LEFT] }
+
+	/// Whether this style places the box anywhere but normal static flow.
+	pub fn is_positioned(&self) -> bool { self.position.is_positioned() }
+}
+
+/// CSS `scrollbar-width`: the thickness of a scroll container's scrollbar.
+///
+/// `Auto` is the normal bar, `Thin` a lighter one (same 1-cell gutter, lighter
+/// glyph in the terminal), `None` removes the bar and its reserved gutter.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ScrollbarWidth {
+	/// The default scrollbar.
+	#[default]
+	Auto,
+	/// A thinner scrollbar (lighter glyph), same reserved gutter.
+	Thin,
+	/// No scrollbar and no reserved gutter; content uses the full width.
+	None,
+}
+
+impl ScrollbarWidth {
+	/// Whether a gutter/bar is reserved at all (`None` reserves nothing).
+	pub fn reserves_gutter(&self) -> bool { !matches!(self, Self::None) }
+}
+
+impl AsCssValue for ScrollbarWidth {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Auto => "auto",
+			Self::Thin => "thin",
+			Self::None => "none",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// CSS `scrollbar-color`: the thumb and track colours of a scrollbar.
+#[derive(Debug, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ScrollbarColor {
+	/// The draggable thumb colour.
+	pub thumb: Color,
+	/// The track (groove) colour.
+	pub track: Color,
+}
+
+impl AsCssValue for ScrollbarColor {
+	fn as_css_value(&self) -> Result<CssValue> {
+		// CSS `scrollbar-color: <thumb> <track>`
+		format!(
+			"{} {}",
+			self.thumb.as_css_value()?.to_string(),
+			self.track.as_css_value()?.to_string()
+		)
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
+/// Resolved scrollbar styling for a scroll container: thumb/track colours and
+/// the width keyword. A renderer-agnostic value (the charcell scrollbar paint
+/// reads it, the native renderer would too); only the glyph choice is
+/// charcell-specific.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Component)]
+pub struct ScrollbarStyle {
+	/// `None` keeps the renderer's default thumb colour.
+	pub thumb: Option<Color>,
+	/// `None` keeps the renderer's default track colour.
+	pub track: Option<Color>,
+	pub width: ScrollbarWidth,
+}
+
 /// Mouse cursor shown over a node, mapping to CSS `cursor`. Web-only; the
 /// terminal has no pointer cursor so the charcell cascade ignores it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
@@ -177,6 +366,10 @@ pub struct LayoutStyle {
 	pub flex_order: i32,
 	pub flex_grow: u32,
 	pub align_self: AlignSelf,
+	/// Horizontal overflow handling, mapping to CSS `overflow-x`.
+	pub overflow_x: Overflow,
+	/// Vertical overflow handling, mapping to CSS `overflow-y`.
+	pub overflow_y: Overflow,
 }
 
 impl LayoutStyle {
@@ -187,7 +380,21 @@ impl LayoutStyle {
 		flex_order: 0,
 		flex_grow: 0,
 		align_self: AlignSelf::Auto,
+		overflow_x: Overflow::Visible,
+		overflow_y: Overflow::Visible,
 	};
+
+	/// Whether either axis clips its overflow.
+	pub fn clips(&self) -> bool {
+		self.overflow_x.is_clipped() || self.overflow_y.is_clipped()
+	}
+
+	/// Set both overflow axes at once (CSS `overflow` shorthand).
+	pub fn overflow(mut self, overflow: Overflow) -> Self {
+		self.overflow_x = overflow;
+		self.overflow_y = overflow;
+		self
+	}
 
 	/// Create a flex-row layout style.
 	pub fn flex_row() -> Self {

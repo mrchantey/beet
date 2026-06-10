@@ -12,8 +12,12 @@ pub fn resolve_styles(
 	mut commands: Commands,
 	ruleset_query: RuleSetQuery,
 	// classes drive the cascade (eg `.dark-scheme`), so a runtime class change
-	// must re-resolve even when the [`Element`] itself is untouched.
-	query: Query<Entity, Or<(Changed<Element>, Changed<Classes>)>>,
+	// must re-resolve even when the [`Element`] itself is untouched. Interactive
+	// state (eg `:focus`) does too, so a focus change re-resolves the cascade.
+	query: Query<
+		Entity,
+		Or<(Changed<Element>, Changed<Classes>, Changed<ElementStateMap>)>,
+	>,
 	ancestors: Query<&ChildOf>,
 	children: Query<&Children>,
 	// content transcluded by reference has no `ChildOf` edge to the layout, so the
@@ -27,6 +31,8 @@ pub fn resolve_styles(
 		Option<&mut VisualStyle>,
 		Option<&mut LayoutStyle>,
 		Option<&mut BoxStyle>,
+		Option<&mut PositionStyle>,
+		Option<&mut ScrollbarStyle>,
 	)>,
 ) -> Result {
 	// TODO fine-grained listeners
@@ -68,6 +74,32 @@ pub fn resolve_styles(
 				style.set_if_neq(box_s);
 			} else {
 				commands.entity(entity).insert(box_s);
+			}
+
+			// resolve positioning — element-level like the box model, so a text
+			// node never carries its ancestor's position.
+			let position = if elements.contains(entity) {
+				resolve_position(&ruleset_query, entity)?
+			} else {
+				PositionStyle::default()
+			};
+			if let Some(mut style) = styles.get_mut(entity)?.3 {
+				style.set_if_neq(position);
+			} else {
+				commands.entity(entity).insert(position);
+			}
+
+			// resolve scrollbar styling (element-level), read by the charcell
+			// scrollbar paint on scroll containers.
+			let scrollbar = if elements.contains(entity) {
+				resolve_scrollbar(&ruleset_query, entity)?
+			} else {
+				ScrollbarStyle::default()
+			};
+			if let Some(mut style) = styles.get_mut(entity)?.4 {
+				style.set_if_neq(scrollbar);
+			} else {
+				commands.entity(entity).insert(scrollbar);
 			}
 
 			if let Some(children_list) = children.get(entity).ok() {
@@ -134,6 +166,8 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 	// engine rounds to whole cells via `FlexBox::{row,column}_gap_cells`.
 	let row_gap = query.resolve(entity, RowGapProp).unwrap_or_default();
 	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
+	let overflow_x = query.resolve(entity, OverflowXProp).unwrap_or_default();
+	let overflow_y = query.resolve(entity, OverflowYProp).unwrap_or_default();
 	LayoutStyle {
 		display,
 		white_space,
@@ -149,6 +183,42 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 		flex_grow,
 		flex_order,
 		align_self,
+		overflow_x,
+		overflow_y,
+	}
+	.xok()
+}
+
+fn resolve_position(
+	query: &RuleSetQuery,
+	entity: Entity,
+) -> Result<PositionStyle> {
+	let position = query.resolve(entity, PositionProp).unwrap_or_default();
+	// each inset is `auto` (None) unless a rule sets it.
+	PositionStyle {
+		position,
+		inset: [
+			query.resolve(entity, InsetTop).ok(),
+			query.resolve(entity, InsetRight).ok(),
+			query.resolve(entity, InsetBottom).ok(),
+			query.resolve(entity, InsetLeft).ok(),
+		],
+		z_index: query.resolve(entity, ZIndexProp).ok(),
+	}
+	.xok()
+}
+
+fn resolve_scrollbar(
+	query: &RuleSetQuery,
+	entity: Entity,
+) -> Result<ScrollbarStyle> {
+	let width = query.resolve(entity, ScrollbarWidthProp).unwrap_or_default();
+	// scrollbar-color sets both thumb and track; absent leaves renderer defaults.
+	let color = query.resolve(entity, ScrollbarColorProp).ok();
+	ScrollbarStyle {
+		thumb: color.map(|c| c.thumb),
+		track: color.map(|c| c.track),
+		width,
 	}
 	.xok()
 }

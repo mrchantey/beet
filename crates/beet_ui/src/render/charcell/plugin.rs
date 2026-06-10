@@ -1,5 +1,7 @@
 use super::*;
 use crate::parse::PostParseTree;
+#[cfg(feature = "terminal")]
+use crate::parse::RealtimeParsePlugin;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
@@ -7,12 +9,71 @@ use bevy::ecs::component::Mutable;
 #[allow(unused)]
 use bevy::ecs::schedule::common_conditions;
 
+/// The single plugin a live, interactive terminal app adds.
+///
+/// Composes the charcell render pipeline ([`CharcellPlugin`]) with per-frame
+/// repaint ([`RealtimeParsePlugin`]), the reactive document chain
+/// ([`DocumentUiPlugin`]), and spawns the one [`PrimaryPointer`]. The terminal
+/// lifecycle (input read, render, flush, restore) ships with [`CharcellPlugin`]
+/// under the `terminal` feature, so this is purely the live-app composition.
+///
+/// Later tasks layer the input bridge (terminal bytes to bevy input) and the
+/// hit-test (cursor to [`Pointer`] events) onto this plugin.
+#[cfg(feature = "terminal")]
+#[derive(Default)]
+pub struct CharcellTuiPlugin;
+
+#[cfg(feature = "terminal")]
+impl Plugin for CharcellTuiPlugin {
+	fn build(&self, app: &mut App) {
+		// InputPlugin maintains ButtonInput<KeyCode>/<MouseButton> and registers the
+		// input message types from the bridge's emissions; it works headless (no
+		// winit), which is exactly what the terminal needs.
+		if !app.is_plugin_added::<bevy::input::InputPlugin>() {
+			app.add_plugins(bevy::input::InputPlugin);
+		}
+		// CursorMoved is a window message; with no WindowPlugin (no winit) the
+		// terminal host registers it itself so the bridge can emit it.
+		app.add_message::<bevy::window::CursorMoved>();
+		app.init_plugin::<CharcellPlugin>()
+			.init_plugin::<RealtimeParsePlugin>()
+			.init_plugin::<crate::prelude::DocumentUiPlugin>()
+			.init_plugin::<crate::prelude::FocusPlugin>()
+			// terminal bytes to bevy input, before InputPlugin consumes the messages
+			// this frame so `ButtonInput` reflects them immediately.
+			.add_systems(
+				PreUpdate,
+				terminal_input_bridge
+					.before(bevy::input::InputSystems),
+			)
+			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
+			.add_systems(PreUpdate, resize_stdio_buffers)
+			// hit-test + scroll input ride the bridged bevy mouse/key messages.
+			.add_systems(Update, (pointer_input, scroll_input, exit_on_ctrl_c))
+			// exactly one primary pointer for the hit-test (Task 09) to read.
+			.add_systems(Startup, spawn_primary_pointer);
+	}
+}
+
+/// Spawn the single [`PrimaryPointer`] the live TUI routes cursor events through.
+#[cfg(feature = "terminal")]
+fn spawn_primary_pointer(
+	mut commands: Commands,
+	existing: Query<(), With<crate::prelude::PrimaryPointer>>,
+) {
+	// idempotent: a host may have spawned one already
+	if existing.is_empty() {
+		commands.spawn(crate::prelude::PrimaryPointer);
+	}
+}
+
 #[derive(Default)]
 pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<StylePlugin>()
+			.register_type::<crate::prelude::ScrollPosition>()
 			.add_plugins((
 				// layout + paint pipeline per buffer type; each only acts on entities
 				// carrying its own buffer component, so registering both is harmless.
@@ -40,22 +101,21 @@ impl Plugin for CharcellPlugin {
 			);
 
 
-		// Terminal-specific systems: input, render, flush.
+		// Terminal output: render the diffed buffer, flush, restore on exit. Input
+		// is bridged to bevy by `CharcellTuiPlugin` (the live app), not here.
 		#[cfg(feature = "terminal")]
-		app.add_observer(exit_ctrl_c)
-			.add_systems(PreUpdate, terminal_events)
-			.add_systems(
-				PostParseTree,
-				(
-					render_terminal,
-					flush_terminals,
-					restore_terminals
-						.run_if(common_conditions::on_message::<AppExit>),
-				)
-					.chain()
-					.after(paint_nodes::<DoubleBuffer>)
-					.in_set(CharcellRenderSet),
-			);
+		app.add_systems(
+			PostParseTree,
+			(
+				render_terminal,
+				flush_terminals,
+				restore_terminals
+					.run_if(common_conditions::on_message::<AppExit>),
+			)
+				.chain()
+				.after(paint_nodes::<DoubleBuffer>)
+				.in_set(CharcellRenderSet),
+		);
 	}
 }
 
@@ -68,6 +128,9 @@ fn buffer_plugin<B: Component<Mutability = Mutable> + AsBuffer>(app: &mut App) {
 			prepare_charcell_tree::<B>,
 			measure_nodes::<B>,
 			layout_nodes::<B>,
+			// re-clamp scroll offsets against the freshly laid-out geometry before
+			// paint reads them to translate descendants.
+			clamp_scroll_positions::<B>,
 			paint_nodes::<B>,
 		)
 			.chain()

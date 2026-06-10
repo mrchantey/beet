@@ -106,8 +106,4 @@ pub mod prelude {
 pub mod exports {
 	// used by the val! macro
 	pub use beet_core::prelude::HashMap;
-	#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-	pub use bevy_ratatui;
-	#[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]
-	pub use ratatui;
 }

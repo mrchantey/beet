@@ -87,11 +87,6 @@ pub mod prelude {
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 	cfg_if! {
-		if #[cfg(all(feature = "ratatui", not(target_arch = "wasm32")))]{
-			pub use crate::ui::prelude::Justify;
-		}
-	}
-	cfg_if! {
 		// re-exports to disambiguate bevy ui
 		// overlaps here are a feature not a bug,
 		// we're aligned on layout design patterns, and not dependent on

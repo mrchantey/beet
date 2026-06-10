@@ -11,7 +11,7 @@
 use super::*;
 use crate::style::Display;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
 use bevy::math::UVec2;
 
 /// One table row: the entity that owns the row plus its cell entities in column
@@ -148,16 +148,16 @@ pub(super) fn resolve_table_height(
 pub(super) fn table_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
-	container_rect: URect,
+	container_rect: IRect,
 	viewport: UVec2,
-	layout_rects: &mut HashMap<Entity, URect>,
+	layout_rects: &mut HashMap<Entity, IRect>,
 	managed: &mut HashSet<Entity>,
 ) -> Result {
 	let box_model = BoxModel::from_node(node, viewport);
-	let content = box_model.content_rect(container_rect);
+	let content = scrollport_of(node, box_model.content_rect(container_rect));
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, managed);
-	let widths = column_widths(&rows, query, content.width());
+	let widths = column_widths(&rows, query, content.width().max(0) as u32);
 
 	let mut row_y = content.min.y;
 	for row in &rows {
@@ -165,26 +165,26 @@ pub(super) fn table_layout_rects(
 			break;
 		}
 		let height = row_height(row, query, &widths, viewport);
-		let row_bottom = (row_y + height).min(content.max.y);
+		let row_bottom = (row_y + height as i32).min(content.max.y);
 		let mut col_x = content.min.x;
 		for (col, &cell) in row.cells.iter().enumerate() {
 			let width = widths.get(col).copied().unwrap_or(0);
-			let cell_rect = URect::new(
+			let cell_rect = IRect::new(
 				col_x,
 				row_y,
-				(col_x + width).min(content.max.x),
+				(col_x + width as i32).min(content.max.x),
 				row_bottom,
 			);
 			layout_rects.insert(cell, cell_rect);
-			col_x += width;
+			col_x += width as i32;
 		}
 		// the row node spans its cells, so a row-level background or border paints
 		// behind the whole row.
 		layout_rects.insert(
 			row.node,
-			URect::new(content.min.x, row_y, content.max.x, row_bottom),
+			IRect::new(content.min.x, row_y, content.max.x, row_bottom),
 		);
-		row_y += height;
+		row_y += height as i32;
 	}
 	Ok(())
 }

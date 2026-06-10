@@ -164,4 +164,69 @@ mod test {
 			.xpect_contains("name=\"message\"")
 			.xpect_contains("placeholder=\"hi\"");
 	}
+
+	/// A focused `TextField` widget bound to a document field is editable: typing
+	/// updates its `Value`, and the document sync chain carries the edit back into
+	/// the field. This is the widget-as-template form of the old `TuiTextBox`,
+	/// now actually editable.
+	#[cfg(feature = "terminal")]
+	#[beet_core::test]
+	fn input_widget_edits_bound_document_field() {
+		use bevy::input::ButtonState;
+		use bevy::input::keyboard::Key;
+		use bevy::input::keyboard::KeyCode;
+		use bevy::input::keyboard::KeyboardInput;
+
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			bevy::input::InputPlugin,
+			CharcellPlugin,
+			RealtimeParsePlugin,
+			DocumentPlugin,
+			FocusPlugin,
+		));
+		// a document with a `name` field, and a TextField bound to it.
+		let root = app
+			.world_mut()
+			.spawn_template(rsx! {
+				<div>
+					<TextField field={FieldRef::new("name")}/>
+				</div>
+			})
+			.id();
+		app.world_mut()
+			.entity_mut(root)
+			.insert(Document::new(val!({ "name": "" })));
+		app.update();
+
+		// focus the input (the <input> element) and type "hi".
+		let input = app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(app.world())
+			.find(|(_, element)| element.tag() == "input")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		app.world_mut().entity_mut(input).insert(Focus);
+		for ch in ["h", "i"] {
+			app.world_mut().write_message(KeyboardInput {
+				key_code: KeyCode::KeyH,
+				logical_key: Key::Character(ch.into()),
+				state: ButtonState::Pressed,
+				text: Some(ch.into()),
+				repeat: false,
+				window: Entity::PLACEHOLDER,
+			});
+		}
+		// a few frames for the edit to flow through the document sync chain.
+		for _ in 0..3 {
+			app.update();
+		}
+		// the document's `name` field now holds the typed text.
+		let doc = app.world().get::<Document>(root).unwrap();
+		doc.get_field::<String>(&[FieldSegment::key("name")])
+			.unwrap()
+			.xpect_eq("hi".to_string());
+	}
 }

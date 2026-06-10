@@ -49,8 +49,24 @@ impl DoubleBuffer {
 		self.buffers.into_iter().nth(self.current).unwrap()
 	}
 
+	/// Reallocate both inner buffers to `size`, clearing them. On a terminal
+	/// resize the old contents are invalid; both buffers start blank so the next
+	/// paint diffs the full new frame against a cleared previous buffer and
+	/// redraws everything.
+	pub fn resize(&mut self, size: UVec2) {
+		for buffer in &mut self.buffers {
+			buffer.resize(size);
+		}
+	}
+
 	/// The buffer currently being drawn into.
 	pub fn current_buffer(&self) -> &Buffer { &self.buffers[self.current] }
+
+	/// The most recently completed (on-screen) frame: the buffer not currently
+	/// being drawn into. After [`swap_buffers`](Self::swap_buffers) this holds the
+	/// frame just rendered to the terminal, so a test harness snapshots it to see
+	/// what is on screen. Before the first swap it is the blank back buffer.
+	pub fn front_buffer(&self) -> &Buffer { &self.buffers[1 - self.current] }
 
 	/// Mutable access to the buffer currently being drawn into.
 	pub fn current_buffer_mut(&mut self) -> &mut Buffer {

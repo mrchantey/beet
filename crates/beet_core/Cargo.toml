@@ -137,6 +137,9 @@ bevy_default = ["template_serde", "bevy_multithreaded"]
 template_serde = ["serde", "bevy/serialize"]
 bevy_keyboard = ["bevy/keyboard"]
 bevy_mouse = ["bevy/mouse"]
+# the window-types layer (CursorMoved etc); does not pull winit, so a terminal
+# host can synthesize the same cursor events winit would.
+bevy_window = ["bevy/bevy_window"]
 bevy_reflect_documentation = ["bevy/reflect_documentation"]
 bevy_multithreaded = ["bevy/multi_threaded"]
 bevy_color = ["bevy/bevy_color"]

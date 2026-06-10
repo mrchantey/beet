@@ -8,7 +8,7 @@ use crate::style::FlexBox;
 use crate::style::FlexWrap;
 use crate::style::JustifyContent;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
 use bevy::math::UVec2;
 
 use super::establishes_inline_flow;
@@ -21,6 +21,7 @@ use super::node_bottom_margin;
 use super::query::CharcellNodeData;
 use super::query::CharcellQuery;
 use super::resolve_table_height;
+use super::scrollport_of;
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
@@ -347,21 +348,26 @@ fn flex_order(entity: Entity, query: &CharcellQuery) -> i32 {
 pub fn flex_layout_rects(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
-	container_rect: URect,
+	container_rect: IRect,
 	viewport: UVec2,
-	layout_rects: &mut HashMap<Entity, URect>,
+	layout_rects: &mut HashMap<Entity, IRect>,
 ) -> Result {
 	let flexbox = node.flexbox();
 
 	let box_model = BoxModel::from_node(node, viewport);
-	let content_rect = box_model.content_rect(container_rect);
-	let available = UVec2::new(content_rect.width(), content_rect.height());
+	let content_rect = scrollport_of(node, box_model.content_rect(container_rect));
+	// flex math works in unsigned cell sizes; the signed content rect origin is
+	// re-added when each child rect is placed.
+	let available = UVec2::new(
+		content_rect.width().max(0) as u32,
+		content_rect.height().max(0) as u32,
+	);
 
 	// Get child sizes directly from child_nodes (already computed by measure phase),
 	// overriding either axis a child sizes explicitly (eg a percent `width`, which
 	// the measure pass left content-sized) with that resolved size as its base.
 	let mut child_sizes: Vec<(Entity, UVec2)> = node
-		.child_nodes(query)
+		.flow_child_nodes(query)
 		.map(|child| {
 			let intrinsic = child.intrinsic_size();
 			let (explicit_w, explicit_h) =
@@ -381,15 +387,15 @@ pub fn flex_layout_rects(
 
 	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_main = match direction {
-		Direction::Horizontal => content_rect.width(),
-		Direction::Vertical => content_rect.height(),
+		Direction::Horizontal => available.x,
+		Direction::Vertical => available.y,
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
 	};
 	let container_cross = match direction {
-		Direction::Horizontal => content_rect.height(),
-		Direction::Vertical => content_rect.width(),
+		Direction::Horizontal => available.y,
+		Direction::Vertical => available.x,
 		_ => {
 			unreachable!("resolve_direction should eliminate viewport variants")
 		}
@@ -427,7 +433,8 @@ pub fn flex_layout_rects(
 		// ── Row layout ──────────────────────────────────────────────────────
 		Direction::Horizontal => {
 			for (line_idx, line) in lines.iter().enumerate() {
-				let line_y = content_rect.min.y + line_positions[line_idx];
+				let line_y =
+					content_rect.min.y + line_positions[line_idx] as i32;
 				let line_h = if flexbox.align_content == AlignContent::Stretch {
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
@@ -451,7 +458,7 @@ pub fn flex_layout_rects(
 					flexbox,
 					line,
 					final_sizes,
-					content_rect.width(),
+					available.x,
 					viewport,
 				);
 
@@ -466,13 +473,15 @@ pub fn flex_layout_rects(
 						_ => fsize.y.min(line_h),
 					};
 					let child_y = line_y
-						+ cross_offset(entity, query, flexbox, child_h, line_h);
-					let child_x = content_rect.min.x + main_positions[item_idx];
-					let child_rect = URect::new(
+						+ cross_offset(entity, query, flexbox, child_h, line_h)
+							as i32;
+					let child_x =
+						content_rect.min.x + main_positions[item_idx] as i32;
+					let child_rect = IRect::new(
 						child_x,
 						child_y,
-						child_x + fsize.x,
-						child_y + child_h,
+						child_x + fsize.x as i32,
+						child_y + child_h as i32,
 					);
 					layout_rects.insert(entity, child_rect);
 				}
@@ -482,7 +491,8 @@ pub fn flex_layout_rects(
 		// ── Col layout ──────────────────────────────────────────────────────
 		Direction::Vertical => {
 			for (line_idx, line) in lines.iter().enumerate() {
-				let line_x = content_rect.min.x + line_positions[line_idx];
+				let line_x =
+					content_rect.min.x + line_positions[line_idx] as i32;
 				let line_w = if flexbox.align_content == AlignContent::Stretch {
 					let bonus = (container_cross
 						- line_cross_sizes.iter().sum::<u32>()
@@ -506,7 +516,7 @@ pub fn flex_layout_rects(
 					flexbox,
 					line,
 					final_sizes,
-					content_rect.height(),
+					available.y,
 					viewport,
 				);
 
@@ -521,13 +531,15 @@ pub fn flex_layout_rects(
 						_ => fsize.x.min(line_w),
 					};
 					let child_x = line_x
-						+ cross_offset(entity, query, flexbox, child_w, line_w);
-					let child_y = content_rect.min.y + main_positions[item_idx];
-					let child_rect = URect::new(
+						+ cross_offset(entity, query, flexbox, child_w, line_w)
+							as i32;
+					let child_y =
+						content_rect.min.y + main_positions[item_idx] as i32;
+					let child_rect = IRect::new(
 						child_x,
 						child_y,
-						child_x + child_w,
-						child_y + fsize.y,
+						child_x + child_w as i32,
+						child_y + fsize.y as i32,
 					);
 					layout_rects.insert(entity, child_rect);
 				}

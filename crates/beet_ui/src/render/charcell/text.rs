@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
+use bevy::math::IVec2;
 use bevy::math::UVec2;
 
 use super::align_offset;
@@ -32,8 +33,9 @@ pub(super) fn measure_str(text: &str, max_width: u32) -> UVec2 {
 /// `<hr>` rule); a no-op when it has neither.
 pub(super) fn paint_text(
 	node: &CharcellNodeData,
-	content_rect: URect,
+	content_rect: IRect,
 	buffer: &mut impl AsBuffer,
+	clip: Clip,
 ) -> Result {
 	let text = match node.value() {
 		Some(value) => value.to_string(),
@@ -55,37 +57,38 @@ pub(super) fn paint_text(
 	let decorated = visual.decoration_line != DecorationLine::DEFAULT;
 	let undecorated =
 		visual.clone().with_decoration_line(DecorationLine::DEFAULT);
-	let lines = word_wrap(&text, content_rect.width());
+	let width = content_rect.width().max(0) as u32;
+	let lines = word_wrap(&text, width);
 	for (i, line) in lines.iter().enumerate() {
-		let y = content_rect.min.y + i as u32;
+		let y = content_rect.min.y + i as i32;
 		if y >= content_rect.max.y {
 			break;
 		}
-		let width = content_rect.width();
 		let aligned = align_line(line, width, visual.text_align);
-		let origin = UVec2::new(content_rect.min.x, y);
+		let origin = IVec2::new(content_rect.min.x, y);
 		// the glyph columns this row actually paints, used by both the decorated
 		// overlay and the OSC-8 link so neither bleeds into the padding.
 		let glyphs = truncate_to_width(line, width as usize);
 		let glyph_width = display_width(glyphs) as u32;
 		let offset = align_offset(glyph_width, width, visual.text_align);
 		if decorated {
-			buffer.write_text(origin, &aligned, undecorated.clone(), entity);
+			buffer.write_text(origin, &aligned, undecorated.clone(), entity, clip);
 			buffer.write_text(
-				UVec2::new(content_rect.min.x + offset, y),
+				IVec2::new(content_rect.min.x + offset as i32, y),
 				glyphs,
 				visual.clone(),
 				entity,
+				clip,
 			);
 		} else {
-			buffer.write_text(origin, &aligned, visual.clone(), entity);
+			buffer.write_text(origin, &aligned, visual.clone(), entity, clip);
 		}
 		// the link covers only the painted glyph columns, not the row-filling
 		// padding, so the terminal's hyperlink underline ends at the text.
 		if let Some(link) = link {
-			let start = content_rect.min.x + offset;
+			let start = (content_rect.min.x + offset as i32).max(0) as u32;
 			for col in start..start + glyph_width {
-				buffer.set_link(UVec2::new(col, y), link);
+				buffer.set_link(UVec2::new(col, y.max(0) as u32), link);
 			}
 		}
 	}

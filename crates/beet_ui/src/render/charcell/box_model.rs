@@ -8,6 +8,8 @@ use crate::style::Length;
 use crate::style::Spacing;
 use crate::style::VisualStyle;
 use beet_core::prelude::*;
+use bevy::math::IRect;
+use bevy::math::IVec2;
 use bevy::math::URect;
 use bevy::math::UVec2;
 use bevy::math::Vec2;
@@ -131,19 +133,19 @@ impl BoxModel {
 	}
 
 	/// The rect after subtracting margin from `containing`.
-	pub fn border_rect(&self, containing: URect) -> URect {
+	pub fn border_rect(&self, containing: IRect) -> IRect {
 		inset_rect(containing, self.margin)
 	}
 
 	/// The rect after subtracting margin and border from `containing`.
 	///
 	/// Shrinks by one cell per present border side.
-	pub fn inner_rect(&self, containing: URect) -> URect {
+	pub fn inner_rect(&self, containing: IRect) -> IRect {
 		inset_rect(self.border_rect(containing), self.border.inset())
 	}
 
 	/// The rect after subtracting margin, border, and padding from `containing`.
-	pub fn content_rect(&self, containing: URect) -> URect {
+	pub fn content_rect(&self, containing: IRect) -> IRect {
 		inset_rect(self.inner_rect(containing), self.padding)
 	}
 
@@ -209,9 +211,10 @@ pub(super) fn node_bottom_margin(
 /// [`BoxStyle`]. No-ops when the rect is too small (width or height < 2).
 pub(super) fn draw_border(
 	buffer: &mut impl AsBuffer,
-	rect: URect,
+	rect: IRect,
 	sides: BorderSides,
 	node: &CharcellNodeData,
+	clip: Clip,
 ) {
 	let box_style = node.box_style();
 	let entity = node.entity;
@@ -259,45 +262,45 @@ pub(super) fn draw_border(
 
 	if sides.all() {
 		// full box: corners join the sides
-		buffer.set_composite(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style.clone(), entity));
+		buffer.set_composite_clipped(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity), clip);
+		buffer.set_composite_clipped(IVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style.clone(), entity), clip);
+		buffer.set_composite_clipped(IVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity), clip);
+		buffer.set_composite_clipped(IVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style.clone(), entity), clip);
 	}
 
 	// horizontal edges span the full width (corners overwrite the ends above)
 	if sides.top {
 		let glyph = if heavy_top { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite(UVec2::new(x, top), Cell::new(glyph, top_style.clone(), entity));
+			buffer.set_composite_clipped(IVec2::new(x, top), Cell::new(glyph, top_style.clone(), entity), clip);
 		}
 	}
 	if sides.bottom {
 		let glyph = if heavy_bottom { "━" } else { "─" };
 		for x in left..=right {
-			buffer.set_composite(UVec2::new(x, bottom), Cell::new(glyph, bottom_style.clone(), entity));
+			buffer.set_composite_clipped(IVec2::new(x, bottom), Cell::new(glyph, bottom_style.clone(), entity), clip);
 		}
 	}
 	// vertical edges span the full height
 	if sides.left {
 		let glyph = if heavy_left { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite(UVec2::new(left, y), Cell::new(glyph, left_style.clone(), entity));
+			buffer.set_composite_clipped(IVec2::new(left, y), Cell::new(glyph, left_style.clone(), entity), clip);
 		}
 	}
 	if sides.right {
 		let glyph = if heavy_right { "┃" } else { "│" };
 		for y in top..=bottom {
-			buffer.set_composite(UVec2::new(right, y), Cell::new(glyph, right_style.clone(), entity));
+			buffer.set_composite_clipped(IVec2::new(right, y), Cell::new(glyph, right_style.clone(), entity), clip);
 		}
 	}
 
 	if sides.all() {
 		// re-draw corners so they sit on top of the straight edges
-		buffer.set_composite(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style, entity));
-		buffer.set_composite(UVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity));
-		buffer.set_composite(UVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style, entity));
+		buffer.set_composite_clipped(rect.min, Cell::new(corner(heavy_top, heavy_left, "┏", "┌"), top_style.clone(), entity), clip);
+		buffer.set_composite_clipped(IVec2::new(right, top), Cell::new(corner(heavy_top, heavy_right, "┓", "┐"), top_style, entity), clip);
+		buffer.set_composite_clipped(IVec2::new(left, bottom), Cell::new(corner(heavy_bottom, heavy_left, "┗", "└"), bottom_style.clone(), entity), clip);
+		buffer.set_composite_clipped(IVec2::new(right, bottom), Cell::new(corner(heavy_bottom, heavy_right, "┛", "┘"), bottom_style, entity), clip);
 	}
 }
 
@@ -371,23 +374,61 @@ pub(super) fn side_style(
 	}
 }
 
-/// Inset `outer` by the amounts in `insets`, returning the shrunken rect.
+/// Resolve a CSS inset (`top`/`right`/`bottom`/`left`) [`Length`] to signed
+/// cells against the `containing` block size on the inset's axis.
+///
+/// Unlike width/height, an inset may be negative (shifting the box up/left), so
+/// this keeps the sign rather than clamping to zero. Uses the same rem/viewport
+/// conversion as margins/padding, including the x-axis doubling so a horizontal
+/// inset reads consistently in the terminal's roughly 2:1 cell aspect. `x_axis`
+/// is true for `left`/`right`.
+pub(super) fn inset_cells(
+	length: Length,
+	viewport: UVec2,
+	containing: u32,
+	x_axis: bool,
+) -> i32 {
+	let vp = Vec2::new(viewport.x as f32, viewport.y as f32);
+	let raw = match length {
+		Length::Px(_) | Length::Rem(_) => length.into_rem(vp),
+		Length::Percent(percent) => percent / 100. * containing as f32,
+		Length::ViewportWidth(percent) => percent / 100. * vp.x,
+		Length::ViewportHeight(percent) => percent / 100. * vp.y,
+		Length::ViewportMin(percent) => percent / 100. * vp.min_element(),
+		Length::ViewportMax(percent) => percent / 100. * vp.max_element(),
+	};
+	let cells = raw.round() as i32;
+	if x_axis { cells * 2 } else { cells }
+}
+
+/// Translate a signed rect by `offset` (both corners), the scroll/paint shift.
+pub(super) fn translate_rect(rect: IRect, offset: IVec2) -> IRect {
+	IRect {
+		min: rect.min + offset,
+		max: rect.max + offset,
+	}
+}
+
+/// Inset signed `outer` by the (non-negative) amounts in `insets`, returning the
+/// shrunken rect. The `min` edges move inward by the leading insets and the
+/// `max` edges by the trailing ones, in signed space so an off-screen or scrolled
+/// box stays representable.
 ///
 /// Returns `outer` unchanged when the result would be invalid (zero or
 /// inverted dimensions).
-pub(super) fn inset_rect(outer: URect, insets: URect) -> URect {
-	let left = outer.min.x + insets.min.x;
-	let top = outer.min.y + insets.min.y;
-	let right = outer.max.x.saturating_sub(insets.max.x);
-	let bottom = outer.max.y.saturating_sub(insets.max.y);
+pub(super) fn inset_rect(outer: IRect, insets: URect) -> IRect {
+	let left = outer.min.x + insets.min.x as i32;
+	let top = outer.min.y + insets.min.y as i32;
+	let right = outer.max.x - insets.max.x as i32;
+	let bottom = outer.max.y - insets.max.y as i32;
 
 	if left >= right || top >= bottom {
 		return outer;
 	}
 
-	URect {
-		min: UVec2::new(left, top),
-		max: UVec2::new(right, bottom),
+	IRect {
+		min: IVec2::new(left, top),
+		max: IVec2::new(right, bottom),
 	}
 }
 

@@ -1,0 +1,411 @@
+//! Terminal input to bevy input bridge.
+//!
+//! Translates the [`InputParser`]'s [`TerminalEvent`]s into bevy's own input
+//! messages ([`KeyboardInput`], [`MouseButtonInput`], [`CursorMoved`],
+//! [`MouseWheel`]) so the whole app and the future native renderer consume one
+//! unified input path with zero terminal awareness. The terminal host entity
+//! doubles as the `window` surface on every emitted event.
+//!
+//! Terminal input is a stream of discrete keystrokes/clicks with no separate
+//! key-up, so each key emits a paired Pressed+Released within the frame: the
+//! Pressed message feeds the [`FocusPlugin`](crate::prelude::FocusPlugin) stream
+//! and `just_pressed`, the Released keeps `ButtonInput` from latching keys down.
+
+use super::*;
+use beet_core::prelude::*;
+use bevy::input::ButtonState;
+use bevy::input::keyboard::Key;
+use bevy::input::keyboard::KeyCode;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::input::mouse::MouseButtonInput;
+use bevy::input::mouse::MouseScrollUnit;
+use bevy::input::mouse::MouseWheel;
+use bevy::input::touch::TouchPhase;
+use bevy::math::Vec2;
+use bevy::window::CursorMoved;
+
+/// How many lines one mouse-wheel notch scrolls (mirrors the old TUI constant).
+const WHEEL_LINES: f32 = 3.;
+
+/// ECS system: read each terminal's parsed input and emit bevy input messages.
+///
+/// Replaces the old `TerminalEvent`-trigger path: keys become [`KeyboardInput`],
+/// mouse buttons [`MouseButtonInput`], motion [`CursorMoved`], wheel
+/// [`MouseWheel`], and a resize reallocates the host [`DoubleBuffer`]. The host
+/// entity is the `window` surface for every event.
+pub fn terminal_input_bridge(
+	mut keyboard: MessageWriter<KeyboardInput>,
+	mut mouse_button: MessageWriter<MouseButtonInput>,
+	mut cursor: MessageWriter<CursorMoved>,
+	mut wheel: MessageWriter<MouseWheel>,
+	mut query: Populated<(Entity, &mut Terminal, Option<&mut DoubleBuffer>)>,
+) -> Result {
+	for (surface, mut terminal, mut buffer) in query.iter_mut() {
+		for event in terminal.read_events()? {
+			match event {
+				TerminalEvent::Key(key) => {
+					for input in keyboard_inputs(key, surface) {
+						keyboard.write(input);
+					}
+				}
+				TerminalEvent::Mouse(mouse) => {
+					emit_mouse(
+						mouse,
+						surface,
+						&mut mouse_button,
+						&mut cursor,
+						&mut wheel,
+					);
+				}
+				TerminalEvent::Paste(text) => {
+					// paste has no first-class bevy event; replay it as a character
+					// stream so a focused input receives it (documented choice).
+					for ch in text.chars() {
+						for input in keyboard_inputs(
+							KeyPress::with_char(
+								char_to_keycode(ch),
+								KeyModifier::empty(),
+								Some(ch),
+							),
+							surface,
+						) {
+							keyboard.write(input);
+						}
+					}
+				}
+				TerminalEvent::Resize(size) => {
+					if let Some(buffer) = buffer.as_mut() {
+						buffer.resize(size);
+					}
+				}
+				TerminalEvent::Unsupported(_) => {}
+			}
+		}
+	}
+	Ok(())
+}
+
+/// The bevy [`KeyboardInput`] messages for one terminal [`KeyPress`]: any active
+/// modifier keys pressed, the main key pressed then released, then the modifiers
+/// released, all within the frame (terminal keystrokes are discrete).
+fn keyboard_inputs(key: KeyPress, window: Entity) -> Vec<KeyboardInput> {
+	let mut inputs = Vec::new();
+	let modifiers = modifier_keycodes(*key.modifier());
+	for &code in &modifiers {
+		inputs.push(named_input(code, modifier_key(code), ButtonState::Pressed, window));
+	}
+	let logical = logical_key(&key);
+	let text = key.char.map(|c| c.to_string().into());
+	inputs.push(KeyboardInput {
+		key_code: *key.key(),
+		logical_key: logical.clone(),
+		state: ButtonState::Pressed,
+		text: text.clone(),
+		repeat: false,
+		window,
+	});
+	inputs.push(KeyboardInput {
+		key_code: *key.key(),
+		logical_key: logical,
+		state: ButtonState::Released,
+		text,
+		repeat: false,
+		window,
+	});
+	for &code in modifiers.iter().rev() {
+		inputs.push(named_input(code, modifier_key(code), ButtonState::Released, window));
+	}
+	inputs
+}
+
+/// A [`KeyboardInput`] for a named (non-text) key.
+fn named_input(
+	key_code: KeyCode,
+	logical_key: Key,
+	state: ButtonState,
+	window: Entity,
+) -> KeyboardInput {
+	KeyboardInput {
+		key_code,
+		logical_key,
+		state,
+		text: None,
+		repeat: false,
+		window,
+	}
+}
+
+/// The logical [`Key`] for a key press: a named key (Enter/Tab/arrows/...) when
+/// the physical code is one, else the typed character, else unidentified.
+///
+/// A named key takes precedence even though the parser gives Enter/Tab a `\n`/`\t`
+/// char, because their logical key is `Key::Enter`/`Key::Tab`, not a character.
+fn logical_key(key: &KeyPress) -> Key {
+	let named = named_logical_key(*key.key());
+	if !matches!(named, Key::Unidentified(_)) {
+		return named;
+	}
+	if let Some(c) = key.char {
+		// a control combo (eg ctrl+c) carries a char but should not type it; only
+		// plain/shifted printable chars become text.
+		if !key.modifier().intersects(KeyModifier::CTRL | KeyModifier::ALT) {
+			return Key::Character(c.to_string().into());
+		}
+	}
+	named
+}
+
+/// Map a physical [`KeyCode`] to its named logical [`Key`], for keys that carry
+/// no typed text (navigation, editing, function keys). Falls back to
+/// [`Key::Unidentified`] for an unmapped code.
+fn named_logical_key(code: KeyCode) -> Key {
+	match code {
+		KeyCode::Enter => Key::Enter,
+		KeyCode::Backspace => Key::Backspace,
+		KeyCode::Tab => Key::Tab,
+		KeyCode::Space => Key::Space,
+		KeyCode::Delete => Key::Delete,
+		KeyCode::Escape => Key::Escape,
+		KeyCode::Home => Key::Home,
+		KeyCode::End => Key::End,
+		KeyCode::PageUp => Key::PageUp,
+		KeyCode::PageDown => Key::PageDown,
+		KeyCode::ArrowUp => Key::ArrowUp,
+		KeyCode::ArrowDown => Key::ArrowDown,
+		KeyCode::ArrowLeft => Key::ArrowLeft,
+		KeyCode::ArrowRight => Key::ArrowRight,
+		_ => Key::Unidentified(bevy::input::keyboard::NativeKey::Unidentified),
+	}
+}
+
+/// The physical modifier [`KeyCode`]s active in a [`KeyModifier`] set.
+fn modifier_keycodes(modifier: KeyModifier) -> Vec<KeyCode> {
+	let mut codes = Vec::new();
+	if modifier.contains(KeyModifier::CTRL) {
+		codes.push(KeyCode::ControlLeft);
+	}
+	if modifier.contains(KeyModifier::ALT) {
+		codes.push(KeyCode::AltLeft);
+	}
+	if modifier.contains(KeyModifier::SHIFT) {
+		codes.push(KeyCode::ShiftLeft);
+	}
+	codes
+}
+
+/// The logical [`Key`] for a modifier [`KeyCode`].
+fn modifier_key(code: KeyCode) -> Key {
+	match code {
+		KeyCode::ControlLeft => Key::Control,
+		KeyCode::AltLeft => Key::Alt,
+		KeyCode::ShiftLeft => Key::Shift,
+		_ => Key::Unidentified(bevy::input::keyboard::NativeKey::Unidentified),
+	}
+}
+
+/// Emit the bevy messages for one terminal mouse event: a [`CursorMoved`] for the
+/// new position plus, per kind, a [`MouseButtonInput`] (press/release) or a
+/// [`MouseWheel`] (scroll). Motion-only events emit just the cursor move.
+fn emit_mouse(
+	mouse: MouseEvent,
+	window: Entity,
+	button: &mut MessageWriter<MouseButtonInput>,
+	cursor: &mut MessageWriter<CursorMoved>,
+	wheel: &mut MessageWriter<MouseWheel>,
+) {
+	// the surface is a 1:1 cell grid, so cell coordinates cast straight to pixels.
+	let position = Vec2::new(mouse.position.x as f32, mouse.position.y as f32);
+	cursor.write(CursorMoved {
+		window,
+		position,
+		delta: None,
+	});
+	match mouse.kind {
+		MouseEventKind::Press(b) => {
+			button.write(MouseButtonInput {
+				button: b,
+				state: ButtonState::Pressed,
+				window,
+			});
+		}
+		MouseEventKind::Release(b) => {
+			button.write(MouseButtonInput {
+				button: b,
+				state: ButtonState::Released,
+				window,
+			});
+		}
+		MouseEventKind::Scroll(dir) => {
+			let (x, y) = match dir {
+				ScrollDirection::Up => (0., WHEEL_LINES),
+				ScrollDirection::Down => (0., -WHEEL_LINES),
+				ScrollDirection::Left => (-WHEEL_LINES, 0.),
+				ScrollDirection::Right => (WHEEL_LINES, 0.),
+			};
+			wheel.write(MouseWheel {
+				unit: MouseScrollUnit::Line,
+				x,
+				y,
+				window,
+				phase: TouchPhase::Moved,
+			});
+		}
+		// motion/drag: the cursor move above is the whole signal
+		MouseEventKind::Move | MouseEventKind::Drag(_) => {}
+	}
+}
+
+/// ECS system: resize a [`StdioTerminal`]'s [`DoubleBuffer`] to the real tty size
+/// when it changes, the cross-platform stand-in for a `SIGWINCH` handler.
+///
+/// Polls `terminal_ext::size()` each frame and reallocates on a change, forcing a
+/// full repaint. Only [`StdioTerminal`]s are polled; a [`ChannelTerminal`] has a
+/// fixed, caller-controlled size (and is resized via `DoubleBuffer::resize`
+/// directly in tests), so it is left alone.
+pub fn resize_stdio_buffers(
+	mut query: Query<&mut DoubleBuffer, With<StdioTerminal>>,
+) {
+	let size = terminal_ext::size();
+	for mut buffer in query.iter_mut() {
+		if buffer.current_buffer().size() != size {
+			buffer.resize(size);
+		}
+	}
+}
+
+/// ECS observer: exit on ctrl+c, read from the unified bevy keyboard input.
+///
+/// Driven by `ButtonInput<KeyCode>` (maintained by `InputPlugin` from the bridge
+/// messages): ctrl held (or just pressed this frame) plus C just pressed.
+pub fn exit_on_ctrl_c(
+	keys: Res<ButtonInput<KeyCode>>,
+	mut exit: MessageWriter<AppExit>,
+) {
+	let ctrl = keys.pressed(KeyCode::ControlLeft)
+		|| keys.just_pressed(KeyCode::ControlLeft);
+	if ctrl && keys.just_pressed(KeyCode::KeyC) {
+		exit.write(AppExit::Success);
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::prelude::*;
+	use crate::render::charcell::test_host::TestHost;
+	use bevy::app::AppExit;
+
+	/// The single pressed [`KeyboardInput`] for a logical key (the bridge emits a
+	/// matching Released too).
+	fn pressed_key(host: &TestHost) -> Option<KeyboardInput> {
+		host.messages::<KeyboardInput>()
+			.into_iter()
+			.find(|input| input.state == ButtonState::Pressed)
+	}
+
+	/// A character keypress maps to a `Key::Character` logical key and the right
+	/// physical `KeyCode`, Pressed.
+	#[beet_core::test]
+	fn char_key_maps_to_keyboard_input() {
+		let mut host = TestHost::new();
+		host.send_input(b"a");
+		host.step();
+		let key = pressed_key(&host).expect("a pressed KeyboardInput");
+		key.key_code.xpect_eq(KeyCode::KeyA);
+		(key.logical_key == Key::Character("a".into())).xpect_true();
+		key.text.xpect_eq(Some("a".into()));
+	}
+
+	/// Named keys (enter, backspace, arrows) map to their named logical keys.
+	#[beet_core::test]
+	fn named_keys_map_to_named_logical_keys() {
+		let cases: [(&[u8], KeyCode, Key); 4] = [
+			(b"\r", KeyCode::Enter, Key::Enter),
+			(b"\x7f", KeyCode::Backspace, Key::Backspace),
+			(b"\x1b[A", KeyCode::ArrowUp, Key::ArrowUp),
+			(b"\x1b[D", KeyCode::ArrowLeft, Key::ArrowLeft),
+		];
+		for (bytes, code, key) in cases {
+			let mut host = TestHost::new();
+			host.send_input(bytes);
+			host.step();
+			let input = pressed_key(&host).expect("a pressed KeyboardInput");
+			input.key_code.xpect_eq(code);
+			(input.logical_key == key).xpect_true();
+		}
+	}
+
+	/// An SGR mouse press emits a Left `MouseButtonInput` (Pressed) and a
+	/// `CursorMoved` at the 0-indexed cell.
+	#[beet_core::test]
+	fn sgr_mouse_press_emits_button_and_cursor() {
+		let mut host = TestHost::new();
+		// SGR press button 0 (left) at 1-indexed (5,3) -> 0-indexed cell (4,2)
+		host.send_input(b"\x1b[<0;5;3M");
+		host.step();
+		let button = host
+			.messages::<MouseButtonInput>()
+			.into_iter()
+			.next()
+			.expect("a MouseButtonInput");
+		(button.button == MouseButton::Left).xpect_true();
+		(button.state == ButtonState::Pressed).xpect_true();
+		let cursor = host
+			.messages::<CursorMoved>()
+			.into_iter()
+			.next()
+			.expect("a CursorMoved");
+		cursor.position.xpect_eq(Vec2::new(4., 2.));
+	}
+
+	/// An SGR wheel-up emits a line `MouseWheel` with positive `y`; wheel-down
+	/// negative.
+	#[beet_core::test]
+	fn wheel_emits_mouse_wheel() {
+		let mut host = TestHost::new();
+		host.send_input(b"\x1b[<64;1;1M"); // scroll up
+		host.step();
+		let wheel = host
+			.messages::<MouseWheel>()
+			.into_iter()
+			.next()
+			.expect("a MouseWheel");
+		(wheel.y > 0.).xpect_true();
+
+		let mut host = TestHost::new();
+		host.send_input(b"\x1b[<65;1;1M"); // scroll down
+		host.step();
+		let wheel = host.messages::<MouseWheel>().into_iter().next().unwrap();
+		(wheel.y < 0.).xpect_true();
+	}
+
+	/// A focused `<input>`-like entity receives typed text through the unified
+	/// keyboard path: the bridge feeds `FocusPlugin`, which edits the `Value`.
+	#[beet_core::test]
+	fn focus_plugin_receives_typed_text() {
+		let mut host = TestHost::new();
+		let field = host
+			.app
+			.world_mut()
+			.spawn((Focus, Value::str("")))
+			.id();
+		host.send_input(b"hi");
+		host.step();
+		host.app
+			.world()
+			.get::<Value>(field)
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::str("hi"));
+	}
+
+	/// ctrl+c writes `AppExit`, driven from the unified `ButtonInput<KeyCode>`.
+	#[beet_core::test]
+	fn ctrl_c_exits() {
+		let mut host = TestHost::new();
+		host.send_input(&[0x03]); // ctrl+c
+		host.step();
+		let exits = host.messages::<AppExit>();
+		(!exits.is_empty()).xpect_true();
+	}
+}

@@ -14,7 +14,8 @@ use crate::style::TextAlign;
 use crate::style::VisualStyle;
 use crate::style::WhiteSpace;
 use beet_core::prelude::*;
-use bevy::math::URect;
+use bevy::math::IRect;
+use bevy::math::IVec2;
 use bevy::math::UVec2;
 
 /// A contiguous run of text sharing one resolved [`VisualStyle`], sourced from
@@ -99,38 +100,40 @@ pub(super) fn measure_inline_flow(
 pub(super) fn paint_inline_flow(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
-	content_rect: URect,
+	content_rect: IRect,
 	buffer: &mut impl AsBuffer,
+	clip: Clip,
 ) {
 	let runs = collect_inline_runs(node, query);
-	let width = content_rect.width();
+	let width = content_rect.width().max(0) as u32;
 	let lines = flow_inline(&runs, width, is_preformatted(node));
 	let align = node.visual_style().text_align;
 
 	for (row, line) in lines.iter().enumerate() {
-		let y = content_rect.min.y + row as u32;
+		let y = content_rect.min.y + row as i32;
 		if y >= content_rect.max.y {
 			break;
 		}
-		let mut x =
-			content_rect.min.x + align_offset(line_width(line), width, align);
+		let mut x = content_rect.min.x
+			+ align_offset(line_width(line), width, align) as i32;
 		for span in line {
 			if x >= content_rect.max.x {
 				break;
 			}
-			let avail = (content_rect.max.x - x) as usize;
+			let avail = (content_rect.max.x - x).max(0) as usize;
 			let text = truncate_to_width(&span.text, avail);
 			buffer.write_text(
-				UVec2::new(x, y),
+				IVec2::new(x, y),
 				text,
 				span.style.clone(),
 				span.entity,
+				clip,
 			);
-			let span_width = display_width(text) as u32;
+			let span_width = display_width(text) as i32;
 			// wrap the painted columns in this run's OSC-8 link (stdout only)
 			if let Some(link) = &span.link {
-				for col in x..x + span_width {
-					buffer.set_link(UVec2::new(col, y), link);
+				for col in x.max(0)..(x + span_width).max(0) {
+					buffer.set_link(UVec2::new(col as u32, y.max(0) as u32), link);
 				}
 			}
 			x += span_width;

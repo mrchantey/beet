@@ -1,23 +1,37 @@
-//! An ittie bittie web browser demonstrating the parsing and rendering capabilities of beet.
+//! A tiny in-terminal web browser shell on the charcell renderer.
 //!
-//! This demo parses html and markdown only, SPAs and css/js heavy sites need not apply
+//! Parses HTML and markdown only (no SPAs, no heavy css/js). It hosts a
+//! [`Navigator`] and a live-render host ([`LiveScenePlugin`]) that paints the
+//! active route
+//! ([`CurrentScene`]) into a persistent [`DoubleBuffer`], with an editable URL
+//! bar and back/forward keys.
 //!
 //! ```sh
 //! cargo run --example mini_browser --features _mini_browser -- https://wikipedia.org
 //! ```
+//!
+//! Note: wiring the [`Navigator`]'s async HTTP fetch to render its response into
+//! the live host is a follow-up (see `.agents/plans/tui/decisions.md`, Task 10);
+//! this shell sets up the host, navigator, and input seam for it.
 use beet::prelude::*;
+use bevy::input::ButtonState;
+use bevy::input::keyboard::Key;
+use bevy::input::keyboard::KeyCode;
+use bevy::input::keyboard::KeyboardInput;
 
 fn main() {
 	App::new()
 		.add_plugins((
-			TuiPlugin::default(),
-			NavigatorPlugin::default(),
+			MinimalPlugins,
+			// the live terminal host: charcell render + input bridge + repaint.
+			CharcellTuiPlugin,
+			// link-click navigation + the single-active-scene invariant.
+			NavigatorPlugin,
+			// paint the active CurrentScene route into the host DoubleBuffer.
+			LiveScenePlugin,
 			AsyncPlugin::default(),
 		))
-		.add_systems(
-			PreUpdate,
-			(url_bar_input, history_input, update_url_bar_on_navigate),
-		)
+		.add_systems(PreUpdate, (url_bar_enter, history_keys))
 		.add_systems(Startup, setup)
 		.run();
 }
@@ -28,163 +42,58 @@ fn setup(mut commands: Commands) {
 		.path
 		.first()
 		.cloned()
-		.unwrap_or_else(|| "http://example.com".to_string());
+		.unwrap_or_else(|| "https://example.com".to_string());
 
-	commands.spawn((Layout::vertical(), children![
-		TuiTextBox::new("url", &url),
-		(
-			Navigator::new(url.clone()),
-			Middleware::new(RenderTui),
-			ParseRequest,
-			TuiNodeRenderer::default(),
-		)
-	]));
+	// the live host paints the active route; the Navigator drives navigation.
+	commands.spawn(live_scene_host(terminal_ext::size()));
+	commands.spawn(Navigator::new(Url::parse(&url)));
+	// an editable URL bar bound to the document field `url`.
+	commands.spawn((
+		Document::new(val!({ "url": url })),
+		children![rsx! { <TextField field={FieldRef::new("url")}/> }],
+	));
 }
 
-// parse the request body into a tree of Elements with the MediaParser.
-#[action]
-#[derive(Component)]
-async fn ParseRequest(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input().parts().clone();
-	let caller_id = cx.id();
-	let media = cx.input.into_media_bytes().await?;
-	cx.caller
-		.with(move |mut entity| -> Result {
-			// ideally we wouldnt need to despawn children,
-			// parser should be diffing
-			entity.despawn_children();
-			MediaParser::new().parse(ParseContext::new(&mut entity, &media))?;
-			// the caller is a fixed (non-ephemeral) render root
-			RenderRoot::insert(&mut entity, default());
-			Ok(())
-		})
-		.await??;
-
-	RenderRoot::render(caller_id, &cx.caller, parts).await
-}
-
-// apply the element tree to the tui
-#[action]
-#[derive(Component)]
-async fn RenderTui(
-	cx: ActionContext<(RequestParts, Next<RequestParts, Response>)>,
-) -> Result<Response> {
-	let mut renderer = cx.caller.get_cloned::<TuiNodeRenderer>().await?;
-	cx.caller
-		.with(move |mut entity| {
-			renderer.run(&mut entity, vec![MediaType::Ratatui])
-		})
-		.await??;
-	Response::ok().xok()
-}
-
-use beet::exports::bevy_ratatui::event::KeyMessage;
-use beet::exports::bevy_ratatui::event::MouseMessage;
-use beet::exports::ratatui::crossterm::event::KeyCode;
-use beet::exports::ratatui::crossterm::event::KeyModifiers;
-use beet::exports::ratatui::crossterm::event::MouseButton;
-use beet::exports::ratatui::crossterm::event::MouseEventKind;
-
-/// Handle character input, backspace and enter key in the URL bar.
-fn url_bar_input(
-	async_commands: AsyncCommands,
-	mut key_messages: MessageReader<KeyMessage>,
-	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
+/// Navigate to the URL bar's value on Enter.
+fn url_bar_enter(
+	mut commands: Commands,
+	mut keys: MessageReader<KeyboardInput>,
+	bars: Query<&Value, With<Focus>>,
 	navigators: Query<Entity, With<Navigator>>,
 ) -> Result {
-	let (mut widget, mut textbox) = textbox.single_mut()?;
-
-	for message in key_messages.read().filter(|msg| msg.is_press()) {
-		match message.code {
-			KeyCode::Enter => {
-				let url = Url::parse(&textbox.value);
-				async_commands
-					.entity(navigators.single()?)
-					.run(|entity| Navigator::navigate_to(entity, url));
-			}
-			KeyCode::Backspace => {
-				textbox.value.pop();
-				widget.set_changed();
-			}
-			KeyCode::Char(char) => {
-				textbox.value.push(char);
-				widget.set_changed();
-			}
-			_ => {}
-		}
-	}
-	Ok(())
-}
-
-/// Handle browser back/forward navigation via:
-///
-/// - `Alt+Left` / `Alt+Right` — standard terminal binding, also fired by
-///   most mice that report side-buttons (button 4 / button 5) through the
-///   terminal's mouse protocol.
-/// - `[` / `]` — keyboard shortcuts.
-/// - Middle-click fires back as a convenience (uncommon but handy in testing).
-fn history_input(
-	async_commands: AsyncCommands,
-	mut key_messages: MessageReader<KeyMessage>,
-	mut mouse_messages: MessageReader<MouseMessage>,
-	navigators: Query<Entity, With<Navigator>>,
-) -> Result {
-	let Ok(navigator) = navigators.single() else {
+	let entered = keys
+		.read()
+		.any(|key| key.state == ButtonState::Pressed && key.logical_key == Key::Enter);
+	if !entered {
 		return Ok(());
-	};
-
-	let mut go_back = false;
-	let mut go_forward = false;
-
-	for message in key_messages.read().filter(|msg| msg.is_press()) {
-		match message.code {
-			// Alt+Left — back (also triggered by mouse button 4 in most terminals)
-			KeyCode::Left if message.modifiers.contains(KeyModifiers::ALT) => {
-				go_back = true;
-			}
-			// Alt+Right — forward (also triggered by mouse button 5 in most terminals)
-			KeyCode::Right if message.modifiers.contains(KeyModifiers::ALT) => {
-				go_forward = true;
-			}
-			// Keyboard shortcuts
-			KeyCode::Char('[') => go_back = true,
-			KeyCode::Char(']') => go_forward = true,
-			_ => {}
-		}
 	}
-
-	// Some terminals / mouse drivers report side-buttons as middle-button
-	// variants; handle ScrollLeft/ScrollRight which kitty and some others emit.
-	for message in mouse_messages.read() {
-		match message.0.kind {
-			MouseEventKind::Down(MouseButton::Middle) => go_back = true,
-			MouseEventKind::ScrollLeft => go_back = true,
-			MouseEventKind::ScrollRight => go_forward = true,
-			_ => {}
-		}
+	if let (Ok(value), Ok(navigator)) = (bars.single(), navigators.single()) {
+		let url = Url::parse(value.to_string());
+		commands
+			.entity(navigator)
+			.queue_async(move |entity| Navigator::navigate_to(entity, url));
 	}
-
-	if go_back {
-		async_commands.entity(navigator).run(Navigator::back);
-	} else if go_forward {
-		async_commands.entity(navigator).run(Navigator::forward);
-	}
-
 	Ok(())
 }
 
-/// Propagate URL changes (eg link clicks) back to the URL bar.
-fn update_url_bar_on_navigate(
-	mut textbox: Query<(&mut TuiWidget, &mut TuiTextBox)>,
-	navigators: Populated<&Navigator, Changed<Navigator>>,
+/// Back/forward via `[` / `]`.
+fn history_keys(
+	mut commands: Commands,
+	mut keys: MessageReader<KeyboardInput>,
+	navigators: Query<Entity, With<Navigator>>,
 ) {
-	for navigator in navigators.iter() {
-		for (mut widget, mut textbox) in textbox.iter_mut() {
-			textbox.value = navigator.current_url().to_string();
-			if navigator.is_loading() {
-				textbox.value.push_str(" (loading...)");
+	let Ok(navigator) = navigators.single() else {
+		return;
+	};
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		match key.key_code {
+			KeyCode::BracketLeft => {
+				commands.entity(navigator).queue_async(Navigator::back);
 			}
-			widget.set_changed();
+			KeyCode::BracketRight => {
+				commands.entity(navigator).queue_async(Navigator::forward);
+			}
+			_ => {}
 		}
 	}
 }

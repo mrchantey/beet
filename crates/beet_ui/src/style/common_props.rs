@@ -51,6 +51,16 @@ pub fn token_map()->CssTokenMap{
 		.insert(RowGapProp)
 		.insert(DisplayProp)
 		.insert(ListStyleProp)
+		.insert(OverflowXProp)
+		.insert(OverflowYProp)
+		.insert(PositionProp)
+		.insert(InsetTop)
+		.insert(InsetRight)
+		.insert(InsetBottom)
+		.insert(InsetLeft)
+		.insert(ZIndexProp)
+		.insert(ScrollbarWidthProp)
+		.insert(ScrollbarColorProp)
 		.insert(BorderColorProp)
 		.insert(BorderTopWidth)
 		.insert(BorderRightWidth)
@@ -115,6 +125,19 @@ css_property!(OpacityProp, f32, TokenInheritance::NotInherited, "opacity");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");
+// overflow-x/-y share the `Overflow` value type, so neither can be the single
+// canonical token for it; author rules with `with_value(OverflowXProp, ..)`.
+css_property!(OverflowXProp, Overflow, TokenInheritance::NotInherited, "overflow-x");
+css_property!(OverflowYProp, Overflow, TokenInheritance::NotInherited, "overflow-y");
+canonical_property!(PositionProp, Position, TokenInheritance::NotInherited, "position");
+// inset properties; all four feed the same `Length` value type, so plain props.
+css_property!(InsetTop, Length, TokenInheritance::NotInherited, "top");
+css_property!(InsetRight, Length, TokenInheritance::NotInherited, "right");
+css_property!(InsetBottom, Length, TokenInheritance::NotInherited, "bottom");
+css_property!(InsetLeft, Length, TokenInheritance::NotInherited, "left");
+css_property!(ZIndexProp, i32, TokenInheritance::NotInherited, "z-index");
+canonical_property!(ScrollbarWidthProp, ScrollbarWidth, TokenInheritance::NotInherited, "scrollbar-width");
+canonical_property!(ScrollbarColorProp, ScrollbarColor, TokenInheritance::NotInherited, "scrollbar-color");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");
 css_property!(BorderColorProp, Color, TokenInheritance::NotInherited, "border-color");
 css_property!(BorderTopWidth, Length, TokenInheritance::NotInherited, "border-top-width");

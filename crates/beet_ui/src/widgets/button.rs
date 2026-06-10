@@ -72,3 +72,90 @@ pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Bundle {
 		</a>
 	}
 }
+
+#[cfg(all(test, feature = "terminal"))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use bevy::input::ButtonState;
+	use bevy::input::keyboard::Key;
+	use bevy::input::keyboard::KeyboardInput;
+
+	/// Counts how many times the button's action fired (its `PointerUp` observer).
+	#[derive(Resource, Default)]
+	struct Activations(u32);
+
+	/// The live stack a button needs: charcell render, focus, the document chain.
+	fn button_app() -> App {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			bevy::input::InputPlugin,
+			CharcellPlugin,
+			RealtimeParsePlugin,
+			DocumentPlugin,
+			FocusPlugin,
+		));
+		app.init_resource::<Activations>();
+		app
+	}
+
+	/// Spawn a `<Button>` whose action (a `PointerUp` observer) counts firings,
+	/// returning the `<button>` entity. Activation (click or Enter) fires
+	/// `PointerUp`, the same path `bx:click` rides.
+	fn spawn_button(app: &mut App) -> Entity {
+		app.world_mut()
+			.spawn_template(rsx! { <div><Button>"Save"</Button></div> });
+		app.update();
+		let button = app
+			.world_mut()
+			.query::<(Entity, &Element)>()
+			.iter(app.world())
+			.find(|(_, element)| element.tag() == "button")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		app.world_mut().entity_mut(button).observe(
+			|_: On<PointerUp>, mut count: ResMut<Activations>| count.0 += 1,
+		);
+		button
+	}
+
+	fn activations(app: &App) -> u32 { app.world().resource::<Activations>().0 }
+
+	/// A `Button` widget is a real `<button>`, focusable, that fires its action on
+	/// a pointer click.
+	#[beet_core::test]
+	fn button_is_focusable_and_fires_on_click() {
+		let mut app = button_app();
+		let button = spawn_button(&mut app);
+		// the button is focusable (inferred from the tag)
+		app.world().entity(button).contains::<Focusable>().xpect_true();
+		// click: PointerUp fires the action
+		let pointer = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(button)
+			.trigger(PointerUp::new(pointer));
+		app.update();
+		activations(&app).xpect_eq(1);
+	}
+
+	/// Pressing Enter on a focused `Button` fires the same action (keyboard
+	/// activation reuses the click path).
+	#[beet_core::test]
+	fn button_fires_on_enter() {
+		let mut app = button_app();
+		let button = spawn_button(&mut app);
+		app.world_mut().entity_mut(button).insert(Focus);
+		app.world_mut().write_message(KeyboardInput {
+			key_code: bevy::input::keyboard::KeyCode::Enter,
+			logical_key: Key::Enter,
+			state: ButtonState::Pressed,
+			text: None,
+			repeat: false,
+			window: Entity::PLACEHOLDER,
+		});
+		app.update();
+		// the activate-on-enter system fired PointerUp on the focused button
+		(activations(&app) >= 1).xpect_true();
+	}
+}
