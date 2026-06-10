@@ -6,7 +6,6 @@
 //! already a resolved value. The deferred-template slot is produced by the
 //! authoring front-ends (the parser and macros), not by extraction.
 
-use super::reflect_utils::clone_reflect_value;
 use crate::prelude::*;
 use alloc::collections::BTreeMap;
 use bevy::ecs::component::ComponentId;
@@ -262,7 +261,7 @@ impl<'w> TemplateBuilder<'w> {
 						.reflect(original_entity)?;
 
 					node.components.push(ComponentSlot::Value(
-						clone_reflect_value(
+						reflect_ext::clone_reflect_value(
 							component.as_partial_reflect(),
 							type_registration,
 						),
@@ -314,7 +313,7 @@ impl<'w> TemplateBuilder<'w> {
 
 				self.extracted_resources.insert(
 					component_id,
-					clone_reflect_value(
+					reflect_ext::clone_reflect_value(
 						component.as_partial_reflect(),
 						type_registration,
 					),

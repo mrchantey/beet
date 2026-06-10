@@ -49,7 +49,9 @@ impl BsxParser {
 				world.get_resource::<BsxTemplateRegistry>().cloned()
 			})
 			.unwrap_or_default();
-		entity.insert_template(BsxTemplate::container(nodes, registry));
+		// a build failure (eg a schema violation) rides `TemplateError` on the
+		// entity rather than aborting the parse, so the returned error is dropped.
+		let _ = entity.insert_template(BsxTemplate::container(nodes, registry));
 		Ok(())
 	}
 }

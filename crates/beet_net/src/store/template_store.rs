@@ -49,7 +49,7 @@ impl TemplateStore {
 	}
 
 
-	/// Loads the associated [`Blob`], adding to this entities [`TemplateEntities`].
+	/// Loads the associated [`Blob`], adding to this entities [`TemplateNodes`].
 	/// ## Errors
 	/// - Errors if this entity has no [`Blob`] or [`TemplateStore`]
 	pub async fn load(entity: AsyncEntity) -> Result<Vec<Entity>> {
@@ -63,7 +63,7 @@ impl TemplateStore {
 			.await
 			.flatten()
 	}
-	/// Writes all [`TemplateEntities`] and their created descendents to the associated [`Blob`]
+	/// Writes all [`TemplateNodes`] and their created descendents to the associated [`Blob`]
 	///
 	/// ## Errors
 	/// - Errors if this entity has no [`Blob`] or [`TemplateStore`]
@@ -77,7 +77,7 @@ impl TemplateStore {
 						let blob = entity.get_or_else_mut::<Blob>()?.clone();
 
 						let spawned_entities =
-							entity.try_get::<TemplateEntities>()?.to_vec();
+							entity.try_get::<TemplateNodes>()?.to_vec();
 
 						if error_on_empty && spawned_entities.is_empty() {
 							bevybail!("cannot save empty world serde data");

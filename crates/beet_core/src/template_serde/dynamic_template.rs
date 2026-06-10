@@ -6,8 +6,7 @@
 //! fully resolved save-game and a hand-authored page are the same kind of thing
 //! at different points on one axis: how much is already a value versus deferred.
 //!
-//! `DynamicTemplate` is itself a [`Template`], so the single blessed
-//! instantiation path
+//! `DynamicTemplate` is itself a [`Template`], so the single instantiation path
 //! ([`spawn_template`](crate::prelude::WorldTemplateExt::spawn_template) /
 //! [`insert_template`](crate::prelude::EntityWorldMutTemplateExt::insert_template))
 //! builds it. Building walks the nodes in order, mapping each in-template
@@ -68,7 +67,7 @@ subtree_template!(DynamicTemplate);
 /// spawned entity without a second remapping model. Absent for a plain
 /// `spawn_template`, where the caller only needs the root.
 #[derive(Default, Resource)]
-pub struct TemplateBuildSink(pub Vec<Entity>);
+pub(crate) struct TemplateBuildSink(pub Vec<Entity>);
 
 /// One node of a [`DynamicTemplate`]: an entity and its ordered component slots.
 pub struct DynamicTemplateNode {
@@ -224,10 +223,10 @@ fn build_node(
 }
 
 /// The deterministic [`SceneEntityReference`] for an in-template entity, keyed on
-/// its index at a fixed synthetic location.
+/// its index at this source location, so a reference is traceable when debugging.
 fn scene_reference(in_template: Entity) -> SceneEntityReference {
 	SceneEntityReference::new(
-		("template_serde", 0, 0),
+		(file!(), 0, 0),
 		in_template.index_u32() as usize,
 	)
 }
@@ -458,7 +457,7 @@ mod test {
 				components: vec![value(Score(7))],
 			}],
 		};
-		let root = world.spawn_template(template).id();
+		let root = world.spawn_template(template).unwrap().id();
 		world
 			.entity(root)
 			.get::<Score>()
@@ -489,6 +488,7 @@ mod test {
 				resources: vec![],
 				nodes,
 			})
+			.unwrap()
 			.id();
 
 		let children: Vec<String> = world
@@ -524,7 +524,7 @@ mod test {
 				},
 			],
 		};
-		let root = world.spawn_template(template).id();
+		let root = world.spawn_template(template).unwrap().id();
 		let referenced = world.entity(root).get::<Target>().unwrap().0;
 		world
 			.entity(referenced)
@@ -551,7 +551,7 @@ mod test {
 				})],
 			}],
 		};
-		let root = world.spawn_template(template).id();
+		let root = world.spawn_template(template).unwrap().id();
 		let child = world.entity(root).get::<Children>().unwrap()[0];
 		world
 			.entity(child)

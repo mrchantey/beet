@@ -334,7 +334,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	/// Parse HTML (via the BSX parser's HTML mode) then render it back.
 	fn roundtrip(html: &str) -> String {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()
@@ -349,7 +349,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	/// Parse then render with expression support.
 	fn roundtrip_expressions(html: &str) -> String {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()
@@ -421,7 +421,7 @@ mod test {
 	/// Helper: parse HTML then render with escape_html enabled.
 	#[allow(dead_code)]
 	fn roundtrip_escaped(html: &str) -> String {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()

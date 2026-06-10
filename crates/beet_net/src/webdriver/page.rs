@@ -3,6 +3,7 @@
 //! This module provides the [`Page`] type which wraps a browser session
 //! and provides high-level methods for navigation and interaction.
 
+use super::Element;
 use super::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;

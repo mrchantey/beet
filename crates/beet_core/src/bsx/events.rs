@@ -11,7 +11,8 @@
 //!   available (`beet_ui`/app) and is registered into this seam.
 //! - [`VerbRegistry`]: verb name -> a verb handler. A verb mutates the bound
 //!   document field and may need EXCLUSIVE world access, so the handler runs
-//!   with `&mut World` (an exclusive command, not inline in the observer).
+//!   with an [`EntityWorldMut`] (an exclusive command, not inline in the
+//!   observer).
 //!
 //! The field is bound by a [`FieldRef`] on the same entity, so a verb mutates
 //! the entity's own [`Value`], which the document sync mirrors back to the
@@ -39,14 +40,15 @@ pub struct EventBinding {
 	pub init: Option<Value>,
 }
 
-/// A verb handler: mutates the bound field's [`Value`] on `entity` with
-/// exclusive world access.
+/// A verb handler: mutates the bound entity's [`Value`] with exclusive world
+/// access.
 ///
-/// Exclusive access (`&mut World`) is deliberate: a verb may need to read or
-/// write beyond the entity's own [`Value`] (eg pull a target's input value into
-/// the field), which an inline observer closure cannot express. The event
-/// installer queues this to run as an exclusive command, never inline.
-pub type VerbFn = Arc<dyn Fn(&mut World, Entity) + Send + Sync>;
+/// Exclusive access (an [`EntityWorldMut`]) is deliberate: a verb may need to
+/// read or write beyond the entity's own [`Value`] (eg pull a target's input
+/// value into the field) via [`EntityWorldMut::world_scope`], which an inline
+/// observer closure cannot express. The event installer queues this to run as an
+/// exclusive command, never inline.
+pub type VerbFn = Arc<dyn Fn(&mut EntityWorldMut) + Send + Sync>;
 
 /// An event installer: wires the trigger (typically an observer) onto `entity`,
 /// running the named verb when the trigger fires.
@@ -96,7 +98,7 @@ impl VerbRegistry {
 	pub fn insert(
 		&mut self,
 		name: impl Into<SmolStr>,
-		verb: impl Fn(&mut World, Entity) + Send + Sync + 'static,
+		verb: impl Fn(&mut EntityWorldMut) + Send + Sync + 'static,
 	) {
 		self.verbs.insert(name.into(), Arc::new(verb));
 	}
@@ -203,19 +205,18 @@ mod test {
 		world.resource_mut::<EventRegistry>().insert(
 			"click",
 			|entity: &mut EntityWorldMut, verb: SmolStr, _field: FieldPath| {
-				let id = entity.id();
-				entity.world_scope(|world| {
-					if let Some(verb) = world.resource::<VerbRegistry>().get(&verb)
-					{
-						verb(world, id);
-					}
+				let verb_fn = entity.world_scope(|world| {
+					world.resource::<VerbRegistry>().get(&verb)
 				});
+				if let Some(verb_fn) = verb_fn {
+					verb_fn(entity);
+				}
 			},
 		);
 		world.resource_mut::<VerbRegistry>().insert(
 			"increment",
-			|world: &mut World, entity: Entity| {
-				if let Some(mut value) = world.get_mut::<Value>(entity) {
+			|entity: &mut EntityWorldMut| {
+				if let Some(mut value) = entity.get_mut::<Value>() {
 					*value = Value::Int(value.as_i64().unwrap_or(0) + 1);
 				}
 			},

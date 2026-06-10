@@ -14,7 +14,7 @@ const CARD_BSX: &str = include_str!("../assets/bsx/card.bsx");
 fn main() {
 	// 1. Build the UI from the `.bsx` file: parse the source into a fresh
 	// container entity, whose first child is the parsed `<article>` root.
-	let mut bsx_world = test_world();
+	let mut bsx_world = ui_world();
 	let container = {
 		let bytes = MediaBytes::new_bsx(CARD_BSX);
 		let mut entity = bsx_world.spawn_empty();
@@ -28,7 +28,7 @@ fn main() {
 
 	// 2. Build the identical UI from `rsx!`, lowered through the same
 	// `spawn_template` substrate.
-	let mut rsx_world = test_world();
+	let mut rsx_world = ui_world();
 	let rsx_root = rsx_world
 		.spawn_template(rsx! {
 			<article class="card">
@@ -37,6 +37,7 @@ fn main() {
 				<input type="text" name="email" placeholder="you@example.com"/>
 			</article>
 		})
+		.unwrap()
 		.id();
 	let rsx_html = render_html(&mut rsx_world, rsx_root);
 

@@ -23,7 +23,6 @@ use beet_net::prelude::ServerPlugin;
 use beet_net::prelude::exchange_handler;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
-use beet_ui::*;
 use bevy::MinimalPlugins;
 use bevy::app::App;
 
@@ -52,7 +51,7 @@ fn main() {
 
 /// Render the showcase page once, write it to disk, and serve it on every route.
 fn serve_showcase(world: &mut World) -> Result {
-	let root = world.spawn_template(snippet(showcase_page())).id();
+	let root = world.spawn_template(Snippet::from_bundle(showcase_page()))?.id();
 	let html = HtmlRenderer::new()
 		.render(&mut RenderContext::new(root, world))?
 		.to_string();

@@ -12,8 +12,7 @@
 //! [`Element`](crate::prelude::Element)/[`Attribute`](crate::prelude::Attribute)/`children!`/[`Value`](crate::prelude::Value),
 //! wrapped at the root by [`snippet`] into the
 //! [`impl Template<Output = ()>`](bevy::ecs::template::Template) the substrate's
-//! `spawn_template` accepts. This is the no-`bevy_scene` authoring layer: it
-//! targets the beet template substrate directly.
+//! `spawn_template` accepts, targeting the beet template substrate directly.
 //!
 //! - [`IntoSnippet`] lifts markup values (text, `{expr}`, `Vec`, `Option`,
 //!   tuple).
@@ -22,12 +21,12 @@
 //!   builds.
 //! - [`SystemTemplate`] backs `#[template(system)]`.
 //! - [`ErrorTemplate`]/[`MissingProps`] carry a graceful build failure.
-mod attr;
+mod attribute;
 mod error_template;
-mod into_snippet;
+mod snippet;
 mod system_template;
 
-pub use attr::*;
+pub use attribute::*;
 pub use error_template::*;
-pub use into_snippet::*;
+pub use snippet::*;
 pub use system_template::*;

@@ -1,7 +1,7 @@
 //! Template serialization and deserialization.
 //!
 //! Every serde format deserializes into one [`DynamicTemplate`], which builds
-//! itself into the world through the blessed
+//! itself into the world through the
 //! [`spawn_template`](crate::prelude::WorldTemplateExt::spawn_template) path. A
 //! fully resolved save-game and a hand-authored page are the same kind of thing
 //! at different points on one axis: how much of the template is a resolved value
@@ -32,7 +32,6 @@
 mod asset;
 mod dynamic_template;
 mod loader;
-mod reflect_utils;
 mod saver;
 mod template_builder;
 mod template_filter;

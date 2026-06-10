@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
-use beet_ui::*;
 use bevy::math::UVec2;
 
 fn main() {

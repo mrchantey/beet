@@ -6,8 +6,8 @@
 //! template from a reflected data value. [`register_template`] installs it, and
 //! [`build_template_by_name`] looks it up from the [`AppTypeRegistry`].
 //!
-//! Forward-compat: Task 5 attaches a schema to this registration. The type-data
-//! stays a thin build bridge; schemas register alongside it, not inside it.
+//! A schema attaches alongside this registration: the type-data stays a thin
+//! build bridge, and schemas register beside it rather than inside it.
 
 use crate::prelude::*;
 use bevy::ecs::template::Template;
@@ -22,6 +22,9 @@ use bevy::reflect::Typed;
 /// tag resolves to a build function without the concrete type in hand. The
 /// `#[derive(Clone)]` gives it the blanket [`TypeData`](bevy::reflect::TypeData)
 /// impl, so it lives in the registry.
+///
+/// The schema-side companion [`ReflectTemplateSchema`] registers beside this,
+/// keeping prop validation separate from the build bridge.
 #[derive(Clone)]
 pub struct ReflectTemplate {
 	/// Builds the template: `from_reflect` the data into `T`, then
@@ -46,8 +49,8 @@ impl ReflectTemplate {
 /// Reflect type-data carrying a template type's prop [`ValueSchema`], attached
 /// alongside [`ReflectTemplate`] by [`register_template`](WorldRegisterTemplateExt::register_template).
 ///
-/// The frozen substrate keeps the schema *beside* the build bridge, not inside
-/// it: a tag resolves to its build function (`ReflectTemplate`) and, separately,
+/// The schema sits *beside* the build bridge, not inside it: a tag resolves to
+/// its build function (`ReflectTemplate`) and, separately,
 /// to its prop schema (this), so the loader can verify props against the schema
 /// without building. A `<Foo a=.. b=../>` prop set is validated against the
 /// struct schema, surfacing a missing required field as a graceful error.
@@ -57,7 +60,7 @@ impl ReflectTemplate {
 /// schema. The `#[template]` macro overrides it with a precise schema that marks
 /// `#[prop(required)]` props as required (which the type alone cannot express).
 #[derive(Clone)]
-pub struct ReflectTemplateSchema {
+pub(crate) struct ReflectTemplateSchema {
 	/// The template's prop schema.
 	pub schema: ValueSchema,
 }
@@ -167,7 +170,7 @@ pub fn template_schema_by_name(
 ///
 /// Resolves `tag` to a [`ReflectTemplate`] from `registry`, then builds it from
 /// `value`. Errors if no template is registered under that tag.
-pub fn build_template_by_name(
+pub(crate) fn build_template_by_name(
 	registry: &AppTypeRegistry,
 	tag: &str,
 	value: &dyn PartialReflect,

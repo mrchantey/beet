@@ -213,6 +213,7 @@ mod test {
 					OK
 				},
 			))
+			.unwrap()
 			.id();
 
 		// LoadTemplate has not fired: the asset is still pending.
@@ -226,7 +227,7 @@ mod test {
 			if load_state.get().is_some() {
 				break;
 			}
-			async_io::Timer::after(core::time::Duration::from_millis(5)).await;
+			time_ext::sleep_millis(5).await;
 		}
 		// LoadTemplate fired, no error, once the asset finished loading.
 		load_state.get().xpect_eq(Some(false));

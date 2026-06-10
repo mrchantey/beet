@@ -221,7 +221,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_html() {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hello</div>");
 		BsxParser::html()
@@ -235,7 +235,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn render_plain_text() {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>hello</p>");
 		BsxParser::html()
@@ -265,7 +265,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn fallback_text_type() {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<p>hello</p>");
 		BsxParser::html()
@@ -279,7 +279,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn accepts_priority() {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hi</div>");
 		BsxParser::html()
@@ -298,7 +298,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn no_match_errors() {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html("<div>hi</div>");
 		BsxParser::html()

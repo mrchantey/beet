@@ -1,7 +1,7 @@
 //! The hand-written recursive-descent markup parser.
 //!
-//! One grammar: BSX with its extra features enabled, HTML with them disabled.
-//! [`BsxParseConfig::bsx_features`] gates the value grammar, `{..}` blocks, and
+//! One grammar: BSX with its extra surface enabled, HTML with it disabled.
+//! [`BsxParseConfig::bsx`] gates the value grammar, `{..}` blocks, and
 //! `bx:` directives, so the HTML-only mode is a real, tested configuration. The
 //! parser produces a [`BsxNode`] tree; resolution into the world is
 //! [`super::resolve`].
@@ -11,24 +11,24 @@ use super::cursor::Cursor;
 use super::value::*;
 use crate::prelude::*;
 
-/// Configuration toggling the BSX-only grammar features.
+/// Configuration toggling the BSX-only grammar surface.
 #[derive(Debug, Clone)]
 pub struct BsxParseConfig {
 	/// When `true`, the value grammar (`{..}` literals/references, bare spreads)
 	/// and `bx:` directives are parsed. When `false`, the parser accepts exactly
 	/// HTML: lowercase tags, string attributes, text, comments.
-	pub bsx_features: bool,
+	pub bsx: bool,
 }
 
 impl Default for BsxParseConfig {
-	fn default() -> Self { Self { bsx_features: true } }
+	fn default() -> Self { Self { bsx: true } }
 }
 
 impl BsxParseConfig {
 	/// The full BSX grammar.
-	pub fn bsx() -> Self { Self { bsx_features: true } }
-	/// HTML-only: BSX features disabled.
-	pub fn html() -> Self { Self { bsx_features: false } }
+	pub fn bsx() -> Self { Self { bsx: true } }
+	/// HTML-only: the BSX surface disabled.
+	pub fn html() -> Self { Self { bsx: false } }
 }
 
 /// HTML void elements that never have a closing tag.
@@ -450,7 +450,7 @@ fn parse_node(
 		return parse_element(cursor, config).map(Some);
 	}
 	// a text-position `{..}` block, only in BSX mode.
-	if config.bsx_features && cursor.peek() == Some('{') {
+	if config.bsx && cursor.peek() == Some('{') {
 		return parse_text_block(cursor).map(Some);
 	}
 	parse_text(cursor, config)
@@ -463,7 +463,7 @@ fn parse_text(
 	config: &BsxParseConfig,
 ) -> Result<Option<BsxNode>> {
 	let text = cursor.take_while(|ch| {
-		ch != '<' && !(config.bsx_features && ch == '{')
+		ch != '<' && !(config.bsx && ch == '{')
 	});
 	if text.is_empty() {
 		// avoid an infinite loop on a stray char we did not consume.
@@ -612,7 +612,7 @@ fn parse_attributes(
 			Some('>') => break,
 			Some('/') if cursor.starts_with("/>") => break,
 			// a bare-position spread `<el {..}>`, BSX only.
-			Some('{') if config.bsx_features => {
+			Some('{') if config.bsx => {
 				let inner = take_braced(cursor)?;
 				let spread = parse_spread(&mut Cursor::new(&inner))?;
 				attributes.push(BsxAttribute {
@@ -620,7 +620,7 @@ fn parse_attributes(
 					value: AttrValue::Spread(spread),
 				});
 			}
-			Some('{') => bevybail!("`{{..}}` spreads require the bsx feature"),
+			Some('{') => bevybail!("`{{..}}` spreads require bsx to be enabled"),
 			_ => attributes.push(parse_attribute(cursor, config)?),
 		}
 	}
@@ -636,8 +636,8 @@ fn parse_attribute(
 	if key.is_empty() {
 		bevybail!("expected an attribute name");
 	}
-	if !config.bsx_features && key.starts_with("bx:") {
-		bevybail!("`bx:` directives require the bsx feature");
+	if !config.bsx && key.starts_with("bx:") {
+		bevybail!("`bx:` directives require bsx to be enabled");
 	}
 	cursor.skip_ws();
 	if !cursor.eat("=") {
@@ -650,12 +650,12 @@ fn parse_attribute(
 	let value = match cursor.peek() {
 		Some('"') => AttrValue::Str(parse_attr_string(cursor)?),
 		Some('\'') => AttrValue::Str(parse_attr_string(cursor)?),
-		Some('{') if config.bsx_features => {
+		Some('{') if config.bsx => {
 			let inner = take_braced(cursor)?;
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(&inner))?)
 		}
 		// unbraced value grammar, BSX only: `value=#foo=42`, `align=Center`.
-		_ if config.bsx_features => {
+		_ if config.bsx => {
 			let raw = cursor.take_while(is_unbraced_value_char);
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(raw))?)
 		}

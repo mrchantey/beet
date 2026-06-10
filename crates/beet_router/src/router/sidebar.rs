@@ -280,6 +280,7 @@ mod test {
 	fn render_sidebar(world: &mut World, nodes: Vec<SidebarNode>) -> String {
 		let entity = world
 			.spawn_template(rsx! { <Sidebar nodes=nodes/> })
+			.unwrap()
 			.id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(entity, world))

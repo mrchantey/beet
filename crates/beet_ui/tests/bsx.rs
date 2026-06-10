@@ -6,12 +6,10 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
-// `use beet_ui::*` resolves the `crate::` aliasing the `rsx!` macro emits.
-use beet_ui::*;
 use bevy::reflect::GetTypeRegistration;
 
 /// A spawn-capable template world.
-fn world() -> World { test_world() }
+fn world() -> World { ui_world() }
 
 /// Register a reflect type into the world's [`AppTypeRegistry`].
 fn register<T: GetTypeRegistration>(world: &mut World) {
@@ -120,6 +118,7 @@ fn bsx_and_rsx_match() {
 	let mut world_b = world();
 	let rsx_root = world_b
 		.spawn_template(rsx! { <div class="card"><span>hi</span></div> })
+		.unwrap()
 		.id();
 	let rsx_html = render_html(&mut world_b, rsx_root);
 
@@ -223,7 +222,12 @@ fn entity_ref_resolves_forward() {
 		&mut world,
 		"<div><a {Linked{to:$target}}/><b bx:ref=\"target\"/></div>",
 	);
-	let children = world.entity(root).get::<Children>().unwrap().clone();
+	let children = world
+		.entity(root)
+		.get::<Children>()
+		.unwrap()
+		.iter()
+		.collect::<Vec<_>>();
 	let linked_holder = children[0];
 	let target = children[1];
 	world

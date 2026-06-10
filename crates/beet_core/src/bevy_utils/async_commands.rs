@@ -42,6 +42,7 @@ use bevy::ecs::component::Mutable;
 use bevy::ecs::system::Command;
 use bevy::ecs::system::EntityCommand;
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::ecs::template::Template;
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::SystemParam;
@@ -570,35 +571,63 @@ pub impl AsyncWorld {
 		})
 	}
 
-	/// Installs a temporary observer for `E`, resolves on its first fire with the
-	/// observer's return value `O`, then removes the observer.
+	/// Installs a temporary global observer for `E`, resolves on its first fire
+	/// with the observer system's return value `O`, then removes the observer.
 	///
-	/// The `observer` closure receives the [`On<E>`] trigger and returns the
-	/// value the future resolves to, eg `|ev| ev.is_error` to await a
+	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
+	/// may take arbitrary [`SystemParam`]s and returns the value the future
+	/// resolves to, eg `|ev: On<LoadTemplate>| ev.is_error` to await a
 	/// [`LoadTemplate`](crate::prelude::LoadTemplate) and surface its error flag.
-	fn await_event<E, O>(
+	fn await_event<E, B, M, O>(
 		&self,
-		observer: impl 'static + Send + Sync + Fn(On<E>) -> O,
+		observer: impl IntoObserverSystem<E, B, M, O>,
 	) -> impl Future<Output = O> + Send
 	where
 		E: Event<Trigger<'static>: Default>,
+		B: Bundle,
 		O: 'static + Send + Sync,
 	{
 		let world = self.clone();
 		async move {
 			let (send, recv) = oneshot();
 			let sender = Arc::new(Mutex::new(Some(send)));
-			world
-				.observe(move |ev: On<E>, mut commands: Commands| {
-					let observer_entity = ev.observer();
+			let slot: Arc<Mutex<Option<Entity>>> = Arc::new(Mutex::new(None));
+			let capture_slot = slot.clone();
+			// capture the piped observer system's output, signal it once, then
+			// despawn the temporary observer.
+			let capture =
+				move |bevy::ecs::system::In(value): bevy::ecs::system::In<O>,
+				      mut commands: Commands| {
 					if let Some(send) = sender.lock().unwrap().take() {
-						send.signal(observer(ev));
+						send.signal(value);
 					}
-					commands.entity(observer_entity).despawn();
+					if let Some(observer) = capture_slot.lock().unwrap().take() {
+						commands.entity(observer).despawn();
+					}
+				};
+			let system = IntoObserverSystem::into_system(observer);
+			let observer_entity = world
+				.with(move |world: &mut World| {
+					world.add_observer(system.pipe(capture)).id()
 				})
 				.await;
+			*slot.lock().unwrap() = Some(observer_entity);
 			recv.wait().await
 		}
+	}
+
+	/// Spawns a root and builds `template` into it, awaiting [`LoadTemplate`].
+	///
+	/// Unlike the synchronous [`World::spawn_template`](crate::prelude::WorldTemplateExt),
+	/// this awaits the full lifecycle: a template with deferred dependencies
+	/// (assets, remote schemas) resolves across later sync points, and the future
+	/// completes only once [`LoadTemplate`] fires. Fallible: a failed build
+	/// returns the root's [`TemplateError`] (its [`CloneError`]).
+	fn spawn_template(
+		&self,
+		template: impl Template<Output = ()> + Send + 'static,
+	) -> impl Future<Output = Result<Entity>> + Send {
+		build_template_async(self.clone(), None, template)
 	}
 
 	/// Handles an error using the world's default error handler.
@@ -610,6 +639,56 @@ pub impl AsyncWorld {
 		self.with(move |world| {
 			world.handle_command_error::<F>(err, location);
 		})
+	}
+}
+
+/// Builds `template` into a root (fresh when `entity` is `None`, else the given
+/// entity), awaiting its [`LoadTemplate`].
+///
+/// Installs the [`LoadTemplate`] observer *before* building so a synchronous load
+/// is never missed, surfacing the root's [`TemplateError`] on failure.
+fn build_template_async(
+	world: AsyncWorld,
+	entity: Option<Entity>,
+	template: impl Template<Output = ()> + Send + 'static,
+) -> impl Future<Output = Result<Entity>> + Send {
+	async move {
+		let (send, recv) = oneshot();
+		let sender = Arc::new(Mutex::new(Some(send)));
+		let root = world
+			.with(move |world: &mut World| {
+				let root =
+					entity.unwrap_or_else(|| world.spawn_empty().id());
+				// observe LoadTemplate on the root, signalling its error flag, then
+				// build (which fires it), so a synchronous load is caught.
+				world.entity_mut(root).observe(
+					move |ev: On<LoadTemplate>, mut commands: Commands| {
+						let observer = ev.observer();
+						if let Some(send) = sender.lock().unwrap().take() {
+							send.signal(ev.is_error);
+						}
+						commands.entity(observer).despawn();
+					},
+				);
+				let _ = world.entity_mut(root).insert_template(template);
+				root
+			})
+			.await;
+		if recv.wait().await {
+			// the root carries the shared `CloneError`; surface it.
+			let error = world
+				.with(move |world: &mut World| {
+					world
+						.get::<TemplateError>(root)
+						.map(|template_error| template_error.error.clone())
+				})
+				.await;
+			Err(error
+				.map(Into::into)
+				.unwrap_or_else(|| bevyhow!("template build failed")))
+		} else {
+			Ok(root)
+		}
 	}
 }
 
@@ -879,34 +958,74 @@ impl AsyncEntity {
 	}
 
 	/// Installs a temporary observer for `E` on this entity, resolves on its
-	/// first fire with the observer's return value `O`, then removes the
+	/// first fire with the observer system's return value `O`, then removes the
 	/// observer.
 	///
-	/// The route-handler case: `spawn_template` a root, then
-	/// `entity.await_event::<LoadTemplate, _>(|ev| ev.is_error)` to await
-	/// readiness and branch on the error flag.
-	pub fn await_event<E, O>(
+	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
+	/// may take arbitrary [`SystemParam`]s and returns the value the future
+	/// resolves to. The route-handler case: `spawn_template` a root, then
+	/// `entity.await_event::<LoadTemplate, _, _, _>(|ev: On<LoadTemplate>| ev.is_error)`
+	/// to await readiness and branch on the error flag.
+	pub fn await_event<E, B, M, O>(
 		&self,
-		observer: impl 'static + Send + Sync + Fn(On<E>) -> O,
+		observer: impl IntoObserverSystem<E, B, M, O>,
 	) -> impl Future<Output = Result<O>> + Send
 	where
 		E: EntityEvent<Trigger<'static>: Default>,
+		B: Bundle,
 		O: 'static + Send + Sync,
 	{
-		let this = self.clone();
+		let world = self.world.clone();
+		let target = self.entity;
 		async move {
 			let (send, recv) = oneshot();
 			let sender = Arc::new(Mutex::new(Some(send)));
-			this.observe(move |ev: On<E>, mut commands: Commands| {
-				let observer_entity = ev.observer();
-				if let Some(send) = sender.lock().unwrap().take() {
-					send.signal(observer(ev));
-				}
-				commands.entity(observer_entity).despawn();
-			})
-			.await?;
+			// the temporary observer despawns itself on its first fire; its entity
+			// is parked here once spawned.
+			let slot: Arc<Mutex<Option<Entity>>> = Arc::new(Mutex::new(None));
+			let capture_slot = slot.clone();
+			// capture the piped observer system's output, signal it once, then
+			// despawn the temporary observer.
+			let capture =
+				move |bevy::ecs::system::In(value): bevy::ecs::system::In<O>,
+				      mut commands: Commands| {
+					if let Some(send) = sender.lock().unwrap().take() {
+						send.signal(value);
+					}
+					if let Some(observer) = capture_slot.lock().unwrap().take() {
+						commands.entity(observer).despawn();
+					}
+				};
+			let system = IntoObserverSystem::into_system(observer);
+			// watch this entity for `E`, piping the user system into the capture.
+			let observer_entity = world
+				.with(move |world: &mut World| {
+					world
+						.spawn(
+							bevy::ecs::observer::Observer::new(
+								system.pipe(capture),
+							)
+							.with_entity(target),
+						)
+						.id()
+				})
+				.await;
+			*slot.lock().unwrap() = Some(observer_entity);
 			recv.wait().await.xok()
 		}
+	}
+
+	/// Builds `template` into this entity, awaiting [`LoadTemplate`].
+	///
+	/// The entity-scoped counterpart of
+	/// [`AsyncWorld::spawn_template`](AsyncWorldExt::spawn_template):
+	/// fallible, awaiting the full lifecycle and surfacing a failed build's
+	/// [`TemplateError`].
+	pub fn insert_template(
+		&self,
+		template: impl Template<Output = ()> + Send + 'static,
+	) -> impl Future<Output = Result<Entity>> + Send {
+		build_template_async(self.world.clone(), Some(self.entity), template)
 	}
 
 	/// Despawns the entity.
@@ -1306,7 +1425,10 @@ mod test {
 		let value = app
 			.world_mut()
 			.run_async_then(move |world| async move {
-				world.entity(entity).await_event::<Ping, _>(|ev| ev.value).await
+				world
+					.entity(entity)
+					.await_event(|ev: On<Ping>| ev.value)
+					.await
 			})
 			.await
 			.unwrap();

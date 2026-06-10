@@ -1,3 +1,4 @@
+//! Reflection helpers built on `bevy_reflect`.
 use alloc::boxed::Box;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::ReflectFromReflect;
@@ -11,7 +12,7 @@ use bevy_reflect::TypeRegistration;
 ///
 /// This helps ensure the original type and type data is retained,
 /// only returning a dynamic type if all other methods fail.
-pub(super) fn clone_reflect_value(
+pub fn clone_reflect_value(
 	value: &dyn PartialReflect,
 	type_registration: &TypeRegistration,
 ) -> Box<dyn PartialReflect> {

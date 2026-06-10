@@ -49,7 +49,7 @@ mod test {
 			crate::style::material::MaterialStylePlugin::default(),
 		)
 			.into_world();
-		let root = world.spawn_template(template).id();
+		let root = world.spawn_template(template).unwrap().id();
 		world.entity_mut(root).insert(FlexBuffer::new(40));
 		world.run_schedule(crate::parse::PostParseTree);
 		world.entity_mut(root).take::<FlexBuffer>().unwrap().render_plain()

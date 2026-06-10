@@ -1,5 +1,5 @@
-//! The template spawn substrate: the single blessed path for instantiating
-//! entity hierarchies from a Bevy [`Template`](bevy::ecs::template::Template).
+//! The template spawn substrate: the single path for instantiating entity
+//! hierarchies from a Bevy [`Template`](bevy::ecs::template::Template).
 //!
 //! [`spawn_template`](WorldTemplateExt::spawn_template) and
 //! [`insert_template`](EntityWorldMutTemplateExt::insert_template) are the only
@@ -12,8 +12,8 @@
 //! [`register_template`](WorldRegisterTemplateExt::register_template) installs
 //! the [`ReflectTemplate`] bridge so a template resolves by name.
 //!
-//! This is the no_std core every later task builds against; async helpers sit
-//! behind the `bevy_async` feature, never on the core path.
+//! This is the no_std core; async helpers sit behind the `bevy_async` feature,
+//! never on the core path.
 
 mod lifecycle;
 mod registry;

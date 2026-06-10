@@ -55,12 +55,6 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let attrs = AttributeMap::parse(attr)?;
 	attrs.assert_types(&[], &["system"])?;
 
-	if !item.sig.generics.params.is_empty() {
-		synbail!(
-			&item.sig.generics,
-			"`#[template]` does not support generics"
-		);
-	}
 	if attrs.contains_key("system") {
 		parse_system(item)
 	} else {
@@ -239,36 +233,43 @@ fn typed_arg(arg: &FnArg) -> syn::Result<&syn::PatType> {
 	}
 }
 
-/// Lower the `rsx! { .. }` body in process. The body is the function's single
-/// `rsx!` invocation; we strip the macro wrapper and lower the inner markup so
-/// rstml never sees a macro call (which would crash its recovery, see
-/// `macros.md`).
-fn lower_body(body: &syn::Block) -> syn::Result<TokenStream> {
-	let inner = rsx_body_tokens(body)?;
-	Ok(lower_rsx(inner))
-}
-
-/// Extract the token stream inside a `#[template]` body's `rsx! { .. }`.
+/// Lower the `#[template]` body to a [`Bundle`] expression.
 ///
-/// A `#[template]` body is exactly one `rsx!` macro invocation (optionally with
-/// leading `let` bindings). We find the trailing `rsx! { .. }` and return its
-/// brace contents.
-fn rsx_body_tokens(body: &syn::Block) -> syn::Result<TokenStream> {
+/// The body ends with an expression evaluating to `impl Bundle` (optionally with
+/// leading `let` bindings). A trailing `rsx! { .. }` is the common case and is
+/// lowered in process, stripping the macro wrapper so rstml never sees a macro
+/// call (which would crash its recovery). Any other trailing expression is used
+/// as-is, so a template can return a plain bundle, a helper call, or a `match`.
+fn lower_body(body: &syn::Block) -> syn::Result<TokenStream> {
 	let Some(last) = body.stmts.last() else {
-		synbail!(body, "`#[template]` body must end with an `rsx! {{ .. }}`");
+		synbail!(
+			body,
+			"`#[template]` body must end with an expression returning `impl Bundle`"
+		);
 	};
-	let mac = match last {
-		syn::Stmt::Expr(syn::Expr::Macro(em), _) => &em.mac,
-		syn::Stmt::Macro(sm) => &sm.mac,
+	// fast path: lower a trailing `rsx! { .. }` in process.
+	if let Some(inner) = rsx_macro_tokens(last) {
+		return Ok(lower_rsx(inner));
+	}
+	// otherwise the trailing expression is any `impl Bundle`.
+	match last {
+		syn::Stmt::Expr(expr, _) => Ok(quote! { #expr }),
 		_ => synbail!(
 			last,
-			"`#[template]` body must end with an `rsx! {{ .. }}`"
+			"`#[template]` body must end with an expression returning `impl Bundle`"
 		),
-	};
-	if !mac.path.is_ident("rsx") {
-		synbail!(mac, "`#[template]` body must end with an `rsx! {{ .. }}`");
 	}
-	Ok(mac.tokens.clone())
+}
+
+/// The brace contents of a trailing `rsx! { .. }` statement, if the body ends in
+/// one, so the markup can be lowered in process.
+fn rsx_macro_tokens(stmt: &syn::Stmt) -> Option<TokenStream> {
+	let mac = match stmt {
+		syn::Stmt::Expr(syn::Expr::Macro(em), _) => &em.mac,
+		syn::Stmt::Macro(sm) => &sm.mac,
+		_ => return None,
+	};
+	mac.path.is_ident("rsx").then(|| mac.tokens.clone())
 }
 
 /// Statements before the trailing `rsx!`, eg `let label = label.unwrap();`.
@@ -328,6 +329,44 @@ fn emit(
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let bevy = pkg_ext::bevy();
 
+	// thread any generics through every impl; empty generics emit nothing, so the
+	// non-generic path is unchanged. Trait bounds the generated impls need are
+	// deferred onto `Self`, so the author only declares their own param bounds.
+	let generics = &item.sig.generics;
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	// `Self`-deferred bounds the generated impls require, no-ops when non-generic.
+	let unpin_where = merge_where(
+		generics,
+		quote! {
+			for<'a> [()]:
+				#beet_core::exports::bevy::ecs::template::SpecializeFromTemplate
+		},
+	);
+	let template_where =
+		merge_where(generics, quote! { Self: ::core::clone::Clone });
+	let build_template_where = merge_where(
+		generics,
+		quote! {
+			Self: 'static
+				+ ::core::marker::Send
+				+ ::core::marker::Sync
+				+ ::core::clone::Clone
+				+ #bevy::ecs::template::Template<Output = ()>
+		},
+	);
+	let schema_where =
+		merge_where(generics, quote! { Self: #bevy::reflect::Typed });
+	let register_where = merge_where(
+		generics,
+		quote! {
+			Self: #bevy::reflect::FromReflect
+				+ #bevy::reflect::Typed
+				+ #bevy::reflect::GetTypeRegistration
+				+ #beet_core::prelude::GetTemplateSchema
+				+ #bevy::ecs::template::Template<Output = ()>
+		},
+	);
+
 	let field_idents: Vec<&syn::Ident> =
 		props.iter().map(|prop| &prop.ident).collect();
 	// the names of required props, so the schema can mark them required.
@@ -338,7 +377,7 @@ fn emit(
 			syn::LitStr::new(&prop.ident.to_string(), prop.ident.span())
 		})
 		.collect();
-	let data_struct = data_struct(vis, name, props, &beet_core);
+	let data_struct = data_struct(vis, name, generics, props, &beet_core);
 
 	let pre_stmts = pre_body_stmts(body);
 	let lowered = lower_body(body)?;
@@ -361,7 +400,7 @@ fn emit(
 				#(#body_bindings)*
 				#(#pre_stmts)*
 				let bundle = { use #beet_core::prelude::*; #lowered };
-				#beet_core::prelude::snippet(bundle)
+				#beet_core::prelude::Snippet::from_bundle(bundle)
 			});
 			cx.entity.build_template(&inner)
 		},
@@ -399,9 +438,13 @@ fn emit(
 		#[allow(non_snake_case)]
 		#data_struct
 
-		#beet_core::prelude::subtree_template!(#name);
+		// opt out of Bevy's blanket `Template for T: Default + Clone + Unpin`,
+		// generics-aware (the `subtree_template!` macro cannot express generics).
+		impl #impl_generics ::core::marker::Unpin for #name #ty_generics #unpin_where
+		{
+		}
 
-		impl #bevy::ecs::template::Template for #name {
+		impl #impl_generics #bevy::ecs::template::Template for #name #ty_generics #template_where {
 			type Output = ();
 			#[track_caller]
 			#[allow(non_snake_case, unused_variables, unused_braces)]
@@ -429,13 +472,13 @@ fn emit(
 		// marks this as a build-subtree template, so `<#name .../>` dispatches to
 		// build rather than insert (distinguishing it from a reflect-patch
 		// component, which Bevy's blanket `Template` impl would otherwise shadow).
-		impl #beet_core::prelude::BuildTemplate for #name {}
+		impl #impl_generics #beet_core::prelude::BuildTemplate for #name #ty_generics #build_template_where {}
 
 		// the prop schema, authored by the typed signature: starts from the
 		// reflect-derived struct schema (a `PropOpt<T>` prop is an optional inner
 		// schema), then marks `#[prop(required)]` props as required, which the type
 		// alone cannot express. The loader verifies a prop set against this.
-		impl #beet_core::prelude::GetTemplateSchema for #name {
+		impl #impl_generics #beet_core::prelude::GetTemplateSchema for #name #ty_generics #schema_where {
 			fn template_schema() -> #beet_core::prelude::ValueSchema {
 				let mut schema = #beet_core::prelude::ValueSchema::of::<Self>();
 				let required: &[&str] = &[#(#required_names),*];
@@ -448,17 +491,30 @@ fn emit(
 			}
 		}
 
-		impl #name {
+		impl #impl_generics #name #ty_generics #where_clause {
 			/// Registers this template by name on the world's type registry,
 			/// attaching its prop schema alongside the build bridge.
 			#[allow(dead_code, non_snake_case)]
 			#vis fn #register_fn(
 				world: &mut #bevy::ecs::world::World,
-			) {
+			) #register_where {
 				#beet_core::prelude::WorldRegisterTemplateExt::register_template::<Self>(world);
 			}
 		}
 	})
+}
+
+/// Build a `where` clause merging the author's predicates (if any) with `extra`
+/// bounds the generated impl needs, deferred onto `Self` so a generic template
+/// only declares its own param bounds.
+fn merge_where(generics: &syn::Generics, extra: TokenStream) -> TokenStream {
+	match &generics.where_clause {
+		Some(clause) => {
+			let predicates = &clause.predicates;
+			quote! { where #predicates, #extra }
+		}
+		None => quote! { where #extra },
+	}
 }
 
 /// The data struct definition. Derives `Default` directly unless a
@@ -466,6 +522,7 @@ fn emit(
 fn data_struct(
 	vis: &syn::Visibility,
 	name: &syn::Ident,
+	generics: &syn::Generics,
 	props: &[Prop],
 	beet_core: &syn::Path,
 ) -> TokenStream {
@@ -474,10 +531,11 @@ fn data_struct(
 	let needs_manual_default =
 		props.iter().any(|prop| prop.default_expr.is_some());
 
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 	let struct_def = if field_defs.is_empty() {
-		quote! { #vis struct #name; }
+		quote! { #vis struct #name #generics #where_clause; }
 	} else {
-		quote! { #vis struct #name { #(#field_defs),* } }
+		quote! { #vis struct #name #generics #where_clause { #(#field_defs),* } }
 	};
 
 	if needs_manual_default {
@@ -486,7 +544,7 @@ fn data_struct(
 		quote! {
 			#struct_def
 
-			impl ::core::default::Default for #name {
+			impl #impl_generics ::core::default::Default for #name #ty_generics #where_clause {
 				fn default() -> Self {
 					Self {
 						#(#field_idents: #defaults),*
@@ -564,8 +622,8 @@ mod test {
 		// reflect + default for the loader
 		assert!(result.contains("Reflect"));
 		assert!(result.contains("reflect (Default)"));
-		// the subtree-template opt-out + Template impl
-		assert!(result.contains("subtree_template !"));
+		// the subtree-template opt-out (inlined `Unpin`) + Template impl
+		assert!(result.contains("Unpin for Button"));
 		assert!(result.contains("Template for Button"));
 		assert!(result.contains("let Self { label , variant } = self . clone ()"));
 		// registration fn
@@ -643,10 +701,15 @@ mod test {
 	}
 
 	#[test]
-	fn rejects_generics() {
-		let err = parse_err(quote!(), syn::parse_quote! {
-			fn Bad<T>(x: T) -> impl Bundle { rsx! { <span/> } }
+	fn supports_generics() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			fn Wrapper<T: Bundle>(inner: T) -> impl Bundle {
+				rsx! { <div>{inner}</div> }
+			}
 		});
-		assert!(err.contains("generics"));
+		// generics thread through the struct and every impl.
+		assert!(result.contains("struct Wrapper < T : Bundle >"));
+		assert!(result.contains("Template for Wrapper < T >"));
+		assert!(result.contains("inner : T"));
 	}
 }

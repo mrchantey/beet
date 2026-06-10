@@ -964,7 +964,7 @@ fn parse_event_binding(event: &str, value: &AttrValue) -> Result<EventBinding> {
 		AttrValue::Expr(ValueExpr::Literal(DataLiteral::Enum(named)))
 			if matches!(named.fields, NamedFields::Unit) =>
 		{
-			named.name.clone()
+			named.name.to_string()
 		}
 		_ => bevybail!("`bx:{event}` expects a `verb#field` binding"),
 	};

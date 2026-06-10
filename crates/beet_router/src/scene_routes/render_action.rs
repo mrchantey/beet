@@ -27,7 +27,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_ui::prelude::snippet;
+use beet_ui::prelude::Snippet;
 use bevy::ecs::system::In;
 use bevy::ecs::system::IsFunctionSystem;
 use bevy::ecs::system::SystemParamFunction;
@@ -115,14 +115,14 @@ fn spawn_render_step<B: 'static + Send + Sync + Bundle>()
 		let (caller, bundle) = (cx.caller, cx.input);
 		caller
 			.world()
-			.with(move |world: &mut World| {
-				let mut entity = world.spawn_template(snippet(bundle));
+			.with(move |world: &mut World| -> Result<RenderRequest> {
+				let mut entity =
+					world.spawn_template(Snippet::from_bundle(bundle))?;
 				let id = entity.id();
 				RenderRoot::insert(&mut entity, vec![id]);
-				RenderRequest(id)
+				Ok(RenderRequest(id))
 			})
 			.await
-			.xok()
 	})
 }
 

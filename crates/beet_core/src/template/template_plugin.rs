@@ -46,6 +46,6 @@ mod test {
 
 		let mut world = TemplatePlugin::world();
 		// the minimal world spawns a template without panicking.
-		world.spawn_template(Noop);
+		world.spawn_template(Noop).unwrap();
 	}
 }

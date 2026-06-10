@@ -46,15 +46,16 @@ pub struct LoadTemplate {
 /// Build failures ride this path rather than panicking or returning an `Err`:
 /// the walker inserts this component and fires [`LoadTemplate`] with
 /// `is_error: true`.
-#[derive(Debug, Component)]
+#[derive(Debug, Clone, Component)]
 pub struct TemplateError {
-	/// The underlying error.
-	pub error: BevyError,
+	/// The underlying error, shared (via [`CloneError`]) with the
+	/// [`LoadTemplate`] event and the `spawn_template` return.
+	pub error: CloneError,
 }
 
 impl TemplateError {
 	/// Wraps an error for insertion on a failed root.
-	pub fn new(error: impl Into<BevyError>) -> Self {
+	pub fn new(error: impl Into<CloneError>) -> Self {
 		Self {
 			error: error.into(),
 		}
@@ -67,8 +68,8 @@ impl TemplateError {
 /// Each dependency is an opaque [`PendingId`]. The set fires [`LoadTemplate`]
 /// when it drains to empty (via [`drain_pending_dependencies`]).
 ///
-/// For Task 0 there are no dependencies, so a root that registers none drains
-/// immediately and [`LoadTemplate`] fires synchronously within `spawn_template`.
+/// A root that registers no dependencies drains immediately, so
+/// [`LoadTemplate`] fires synchronously within `spawn_template`.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct TemplatePending {
@@ -91,13 +92,24 @@ pub struct PendingId(u64);
 /// Absent outside a build, in which case a dependency registers on the entity it
 /// builds into.
 #[derive(Debug, Clone, Copy, Resource)]
-pub struct TemplateBuildRoot(pub Entity);
+pub(crate) struct TemplateBuildRoot(
+	// only the deferred-dependency paths read the root back via `resolve`: assets
+	// (`bevy_asset`) and remote bsx schemas/templates (`bsx`). Without either the
+	// resource is still set/cleared by the build walker as a scope marker, but its
+	// field goes unread.
+	#[cfg_attr(
+		not(any(feature = "bevy_asset", feature = "bsx")),
+		allow(dead_code)
+	)]
+	pub Entity,
+);
 
+#[cfg(any(feature = "bevy_asset", feature = "bsx"))]
 impl TemplateBuildRoot {
 	/// The build root recorded in `world`, falling back to `entity` when none is
 	/// set (a build outside the walker), so a deferred dependency always has a
 	/// root to park on.
-	pub fn resolve(world: &World, entity: Entity) -> Entity {
+	pub(crate) fn resolve(world: &World, entity: Entity) -> Entity {
 		world
 			.get_resource::<TemplateBuildRoot>()
 			.map(|root| root.0)
@@ -140,7 +152,7 @@ impl TemplatePending {
 /// resolver makes once it observes the set has drained. Calling it while
 /// dependencies remain is a no-op, so a resolver may call it unconditionally
 /// after [`TemplatePending::resolve`] returns `true`.
-pub fn drain_pending_dependencies(root: &mut EntityWorldMut) {
+pub(crate) fn drain_pending_dependencies(root: &mut EntityWorldMut) {
 	let pending_empty = root
 		.get::<TemplatePending>()
 		.map(TemplatePending::is_empty)

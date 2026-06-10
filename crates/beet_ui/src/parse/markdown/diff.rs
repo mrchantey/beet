@@ -222,7 +222,8 @@ fn build_via_bsx(world: &mut World, entity: Entity, node: &HtmlNode<'_>) {
 		.cloned()
 		.unwrap_or_default();
 	let template = BsxTemplate::new(vec![element], registry);
-	world.entity_mut(entity).insert_template(template);
+	// a build failure rides `TemplateError`/`LoadTemplate` on the entity.
+	let _ = world.entity_mut(entity).insert_template(template);
 }
 
 /// Convert an [`HtmlNode`] tree into a [`BsxNode`], for the BSX build path.

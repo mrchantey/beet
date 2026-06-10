@@ -8,7 +8,6 @@ use beet_ui::prelude::style::JustifyContent;
 use beet_ui::prelude::style::Visibility;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
-use beet_ui::*;
 
 fn main() {
 	let size = terminal_ext::size();

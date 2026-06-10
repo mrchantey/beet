@@ -185,7 +185,7 @@ fn parse_list(cursor: &mut Cursor) -> Result<DataLiteral> {
 }
 
 /// Parse a `{ key: value, .. }` struct literal body (braces inclusive).
-fn parse_struct(cursor: &mut Cursor) -> Result<Vec<(String, DataLiteral)>> {
+fn parse_struct(cursor: &mut Cursor) -> Result<Vec<(SmolStr, DataLiteral)>> {
 	cursor.eat("{");
 	let mut fields = Vec::new();
 	loop {
@@ -202,7 +202,7 @@ fn parse_struct(cursor: &mut Cursor) -> Result<Vec<(String, DataLiteral)>> {
 			bevybail!("expected `:` after struct field `{key}`");
 		}
 		let value = parse_literal(cursor)?;
-		fields.push((key.to_string(), value));
+		fields.push((key.into(), value));
 		cursor.skip_ws();
 		if !cursor.eat(",") && cursor.peek() != Some('}') {
 			bevybail!("expected `,` or `}}` in struct");
@@ -224,7 +224,7 @@ fn parse_ident_value(cursor: &mut Cursor) -> Result<DataLiteral> {
 	}
 	let fields = parse_named_fields(cursor)?;
 	Ok(DataLiteral::Enum(NamedLiteral {
-		name: ident.to_string(),
+		name: ident.into(),
 		fields,
 	}))
 }
@@ -240,7 +240,7 @@ fn parse_named_literal(cursor: &mut Cursor) -> Result<NamedLiteral> {
 	}
 	let fields = parse_named_fields(cursor)?;
 	Ok(NamedLiteral {
-		name: name.to_string(),
+		name: name.into(),
 		fields,
 	})
 }
@@ -305,7 +305,7 @@ mod test {
 			panic!("expected struct");
 		};
 		fields.len().xpect_eq(2);
-		fields[0].0.clone().xpect_eq("x".to_string());
+		fields[0].0.as_str().xpect_eq("x");
 	}
 
 	#[beet_core::test]
@@ -323,7 +323,7 @@ mod test {
 		else {
 			panic!("expected enum");
 		};
-		named.name.xpect_eq("Center".to_string());
+		named.name.as_str().xpect_eq("Center");
 		named.fields.xpect_eq(NamedFields::Unit);
 	}
 
@@ -350,7 +350,7 @@ mod test {
 		else {
 			panic!("expected named spread");
 		};
-		named.name.xpect_eq("MyComponent".to_string());
+		named.name.as_str().xpect_eq("MyComponent");
 
 		let SpreadExpr::Tuple(items) =
 			parse_spread(&mut Cursor::new("(A, B)")).unwrap()

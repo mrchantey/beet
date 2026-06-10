@@ -144,6 +144,13 @@ async fn reload_watched(world: AsyncWorld, watcher: Entity) -> Result {
 	}
 }
 
+/// Set while rehydrating so the [`BeetSceneRoot`] add observer does not persist
+/// the cache it is itself loading from. Without it the observer's deferred
+/// persist can flush mid-load, capturing a partial scene (root without its
+/// children) and clobbering the on-disk cache.
+#[derive(Resource)]
+struct Rehydrating;
+
 /// [`Startup`] system: rehydrate the retained scene from [`BEET_CACHE_PATH`]
 /// under the single host. Any [`SceneWatch`] markers in the cache re-fire their
 /// `on_add` hook, reattaching watchers automatically.
@@ -153,7 +160,11 @@ pub fn rehydrate_scene_cache(world: &mut World) -> Result {
 		return Ok(());
 	}
 	let host = scene_host(world)?;
-	set_scene(world, &fs_ext::read_media(&path)?, Some(host))?;
+	// loading *from* the cache must not persist *to* it (see [`Rehydrating`]).
+	world.insert_resource(Rehydrating);
+	let result = set_scene(world, &fs_ext::read_media(&path)?, Some(host));
+	world.remove_resource::<Rehydrating>();
+	result?;
 	Ok(())
 }
 
@@ -173,8 +184,16 @@ fn scene_host(world: &mut World) -> Result<Entity> {
 }
 
 /// Observer: rewrite [`BEET_CACHE_PATH`] when a [`BeetSceneRoot`] is added, so a
-/// freshly loaded scene survives the next invocation.
-fn persist_on_root_added(_ev: On<Add, BeetSceneRoot>, mut commands: Commands) {
+/// freshly loaded scene survives the next invocation. Skipped while rehydrating,
+/// which loads *from* the cache and must not write a partial scene back.
+fn persist_on_root_added(
+	_ev: On<Add, BeetSceneRoot>,
+	rehydrating: Option<Res<Rehydrating>>,
+	mut commands: Commands,
+) {
+	if rehydrating.is_some() {
+		return;
+	}
 	commands.queue(|world: &mut World| {
 		if let Err(err) = persist_scene_cache(world) {
 			cross_log_error!("scene persist failed: {err}");
@@ -183,11 +202,16 @@ fn persist_on_root_added(_ev: On<Add, BeetSceneRoot>, mut commands: Commands) {
 }
 
 /// Observer: rewrite (or remove) [`BEET_CACHE_PATH`] when a [`BeetSceneRoot`] is
-/// removed, so clearing a scene clears the cache.
+/// removed, so clearing a scene clears the cache. Skipped while rehydrating (the
+/// despawn that precedes a reload would otherwise wipe the cache being loaded).
 fn persist_on_root_removed(
 	_ev: On<Remove, BeetSceneRoot>,
+	rehydrating: Option<Res<Rehydrating>>,
 	mut commands: Commands,
 ) {
+	if rehydrating.is_some() {
+		return;
+	}
 	commands.queue(|world: &mut World| {
 		if let Err(err) = persist_scene_cache(world) {
 			cross_log_error!("scene persist failed: {err}");

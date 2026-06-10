@@ -1,4 +1,4 @@
-//! The blessed instantiation entrypoints and the build walker.
+//! The instantiation entrypoints and the build walker.
 //!
 //! [`WorldTemplateExt::spawn_template`] and
 //! [`EntityWorldMutTemplateExt::insert_template`]
@@ -21,8 +21,8 @@ use bevy::ecs::template::Template;
 ///
 /// Uses Bevy's `SpecializeFromTemplate` specialization trick: the `Unpin` impl
 /// is gated on a bound nothing satisfies, so the type is `!Unpin` for coherence
-/// yet the compiler still accepts the impl. Task 3's `#[template]` derive emits
-/// this for every function component.
+/// yet the compiler still accepts the impl. The `#[template]` derive emits this
+/// for every function component.
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -53,16 +53,17 @@ pub impl World {
 	/// Spawns a root entity and builds `template` into it.
 	///
 	/// Runs the build walker: build into the root, resolve slots, fire
-	/// [`SpawnTemplate`] then [`LoadTemplate`]. Returns the root, like
-	/// [`World::spawn`]. Errors do not escape here; they ride [`TemplateError`]
-	/// and [`LoadTemplate`] (`is_error: true`).
+	/// [`SpawnTemplate`] then [`LoadTemplate`]. On success returns the root, like
+	/// [`World::spawn`]. On failure the error rides [`TemplateError`] and
+	/// [`LoadTemplate`] (`is_error: true`) *and* is returned here, its inner a
+	/// [`CloneError`] shared across all three.
 	fn spawn_template(
 		&mut self,
 		template: impl Template<Output = ()>,
-	) -> EntityWorldMut<'_> {
+	) -> Result<EntityWorldMut<'_>> {
 		let root = self.spawn_empty().id();
-		build_root(self, root, template);
-		self.entity_mut(root)
+		build_root(self, root, template)?;
+		Ok(self.entity_mut(root))
 	}
 }
 
@@ -72,13 +73,59 @@ pub impl World {
 pub impl EntityWorldMut<'_> {
 	/// Builds `template` into this entity, which becomes the template root.
 	///
-	/// Same lifecycle as [`WorldTemplateExt::spawn_template`].
+	/// Same lifecycle as [`WorldTemplateExt::spawn_template`], including the
+	/// returned [`CloneError`] on failure.
 	fn insert_template(
 		&mut self,
 		template: impl Template<Output = ()>,
-	) -> &mut Self {
+	) -> Result<&mut Self> {
 		let root = self.id();
-		self.world_scope(|world| build_root(world, root, template));
+		self.world_scope(|world| build_root(world, root, template))?;
+		Ok(self)
+	}
+}
+
+/// Deferred instantiation entrypoint on [`Commands`].
+#[extend::ext(name=CommandsTemplateExt)]
+pub impl Commands<'_, '_> {
+	/// Queues a command that spawns a root and builds `template` into it,
+	/// returning the [`EntityCommands`] for the root.
+	///
+	/// Naturally infallible: the build runs later, when the command flushes, so a
+	/// failure rides [`TemplateError`] and [`LoadTemplate`] only (there is no
+	/// return value to carry it). Reach for the async `spawn_template` when the
+	/// failure must be awaited.
+	fn spawn_template(
+		&mut self,
+		template: impl Template<Output = ()> + Send + 'static,
+	) -> EntityCommands<'_> {
+		let mut entity = self.spawn_empty();
+		entity.queue(move |mut entity: EntityWorldMut| {
+			let root = entity.id();
+			entity.world_scope(move |world| {
+				let _ = build_root(world, root, template);
+			});
+		});
+		entity
+	}
+}
+
+/// Deferred instantiation entrypoint on [`EntityCommands`].
+#[extend::ext(name=EntityCommandsTemplateExt)]
+pub impl EntityCommands<'_> {
+	/// Queues a command building `template` into this entity, which becomes the
+	/// template root. Naturally infallible, like
+	/// [`CommandsTemplateExt::spawn_template`].
+	fn insert_template(
+		&mut self,
+		template: impl Template<Output = ()> + Send + 'static,
+	) -> &mut Self {
+		self.queue(move |mut entity: EntityWorldMut| {
+			let root = entity.id();
+			entity.world_scope(move |world| {
+				let _ = build_root(world, root, template);
+			});
+		});
 		self
 	}
 }
@@ -90,14 +137,14 @@ pub impl EntityWorldMut<'_> {
 /// 3. Fire [`SpawnTemplate`] on the root (the post-build boundary).
 /// 4. Drain the pending-dependency set, firing [`LoadTemplate`] when empty.
 ///
-/// Structured so nested template nodes (Task 1's `DynamicTemplate` IR) and
-/// future post-build passes attach at the slot/`SpawnTemplate` boundary without
+/// Structured so nested template nodes (the `DynamicTemplate` IR) and future
+/// post-build passes attach at the slot/`SpawnTemplate` boundary without
 /// rewriting this function.
 fn build_root(
 	world: &mut World,
 	root: Entity,
 	template: impl Template<Output = ()>,
-) {
+) -> Result<(), CloneError> {
 	// expose the root so a deferred dependency (asset, remote schema, remote
 	// template) parks its pending id on it; restore any outer root afterwards so a
 	// nested `insert_template` build does not leak its root to the parent.
@@ -110,9 +157,16 @@ fn build_root(
 		.build_template(&template)
 		// step 2: slots, only when the build itself succeeded.
 		.and_then(|()| resolve_slots(world, root));
-	if let Err(error) = build_result {
-		world.entity_mut(root).insert(TemplateError::new(error));
-	}
+	// a failure rides `TemplateError` + `LoadTemplate` *and* is returned, all
+	// sharing one `CloneError`.
+	let outcome = match build_result {
+		Ok(()) => Ok(()),
+		Err(error) => {
+			let error = CloneError::new(error);
+			world.entity_mut(root).insert(TemplateError::new(error.clone()));
+			Err(error)
+		}
+	};
 
 	match previous_root {
 		Some(previous) => world.insert_resource(previous),
@@ -124,8 +178,10 @@ fn build_root(
 	let mut entity = world.entity_mut(root);
 	// step 3: the built signal / post-build phase boundary.
 	entity.trigger(|entity| SpawnTemplate { entity });
-	// step 4: fire LoadTemplate when nothing is pending (always so for Task 0).
+	// step 4: fire LoadTemplate when nothing is pending.
 	drain_pending_dependencies(&mut entity);
+
+	outcome
 }
 
 #[cfg(test)]
@@ -154,7 +210,7 @@ mod test {
 	#[beet_core::test]
 	fn builds_into_root() {
 		let mut world = TemplatePlugin::world();
-		let root = world.spawn_template(Child("kid")).id();
+		let root = world.spawn_template(Child("kid")).unwrap().id();
 		let kid = world.entity(root).get::<Children>().unwrap()[0];
 		world.entity(kid).get::<Name>().unwrap().as_str().xpect_eq("kid");
 	}
@@ -203,7 +259,7 @@ mod test {
 		world
 			.add_observer(move |ev: On<LoadTemplate>| ls.set(Some(ev.is_error)));
 
-		let root = world.spawn_template(Card).id();
+		let root = world.spawn_template(Card).unwrap().id();
 
 		// helper: names of an entity's children in order.
 		let child_names = |world: &World, entity: Entity| -> Vec<String> {
@@ -255,7 +311,7 @@ mod test {
 			ls.set(Some(ev.is_error));
 		});
 
-		world.spawn_template(Child("kid"));
+		world.spawn_template(Child("kid")).unwrap();
 
 		// SpawnTemplate fires exactly once on the root.
 		spawn_count.get().xpect_eq(1);
@@ -282,11 +338,14 @@ mod test {
 			le.set(Some(ev.is_error));
 		});
 
-		let root = world.spawn_template(Boom).id();
+		let result = world.spawn_template(Boom);
 
-		// never panicked, never returned Err; the error rides the lifecycle.
+		// the error rides the lifecycle and is also returned, never a panic.
 		load_error.get().xpect_eq(Some(true));
-		world.entity(root).contains::<TemplateError>().xpect_true();
+		// (`EntityWorldMut` is not `Debug`, so take the error without `unwrap_err`)
+		result.err().unwrap().to_string().xpect_contains("boom");
+		// the root carries the same error via `TemplateError`.
+		world.query::<&TemplateError>().iter(&world).count().xpect_eq(1);
 	}
 
 	#[beet_core::test]
@@ -317,7 +376,7 @@ mod test {
 		}
 
 		let id_slot = Store::new(None);
-		let root = world.spawn_template(Pending(id_slot)).id();
+		let root = world.spawn_template(Pending(id_slot)).unwrap().id();
 
 		// LoadTemplate is deferred while the dependency is outstanding.
 		load_fired.get().xpect_false();

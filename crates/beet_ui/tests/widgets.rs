@@ -6,23 +6,17 @@
 //!
 //! Gated behind `feature = "template"` (matching `Cargo.toml`'s
 //! `required-features`).
-//!
-//! `use beet_ui::*;` is needed so the `rsx!` macro's expansion of
-//! `use crate::prelude::*;` resolves — integration tests are their own crate,
-//! so `crate::prelude` only exists if `prelude` is brought into scope at the
-//! test crate's root.
 #![cfg(feature = "template")]
 beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
-use beet_ui::*;
 
 /// A scene world with a [`PackageConfig`] resource. The document-layout widgets
 /// read this synchronously at template build via `#[template(system)]`.
 fn layout_world() -> World {
-	let mut world = test_world();
+	let mut world = ui_world();
 	world.insert_resource(PackageConfig {
 		title: "Beet UI".into(),
 		binary_name: "beet_ui".into(),
@@ -39,7 +33,7 @@ fn layout_world() -> World {
 #[beet_core::test]
 fn head_emits_charset_meta() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <Head/> }).id();
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		query.get(root).unwrap().tag().xpect_eq("head");
@@ -58,7 +52,7 @@ fn head_title_override_beats_package_config() {
 	// defaults; here the title prop wins over the resource's "Beet UI".
 	let mut world = layout_world();
 	let root = world.spawn_template(rsx! { <Head title="Override Title"/> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let values: Vec<String> = query
 			.iter_descendant_values(root)
@@ -73,7 +67,7 @@ fn head_title_override_beats_package_config() {
 fn head_includes_pwa_meta_beyond_twelve_children() {
 	// the PWA/Twitter block pushes Head past 12 children; chunking keeps them
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <Head/> }).id();
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let names: Vec<String> = query
 			.iter_descendants_inclusive(root)
@@ -91,7 +85,7 @@ fn head_includes_pwa_meta_beyond_twelve_children() {
 #[beet_core::test]
 fn header_renders_title_from_package_config() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <Header/> }).id();
+	let root = world.spawn_template(rsx! { <Header/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		query.get(root).unwrap().tag().xpect_eq("header");
@@ -105,7 +99,7 @@ fn header_renders_title_from_package_config() {
 #[beet_core::test]
 fn footer_includes_version() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <Footer/> }).id();
+	let root = world.spawn_template(rsx! { <Footer/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		query.get(root).unwrap().tag().xpect_eq("footer");
@@ -137,7 +131,7 @@ fn header_places_children_and_nav() {
 				"HeaderExtra"
 			</Header>
 		})
-		.id();
+		.unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("HeaderExtra")
@@ -155,11 +149,11 @@ fn page_layout_forwards_through_nested_composition() {
 	let root = world.spawn_template(rsx! {
 			<PageLayout>
 				<meta slot="head" name="custom" content="x"/>
-				<a slot="header_nav" href="/docs">"Docs"</a>
+				<a slot="header-nav" href="/docs">"Docs"</a>
 				"PageBody"
 			</PageLayout>
 		})
-		.id();
+		.unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		// the custom meta forwarded into <head> (Head's children), the nav link
@@ -172,7 +166,7 @@ fn page_layout_forwards_through_nested_composition() {
 #[beet_core::test]
 fn html_document_root_is_html() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <HtmlDocument/> }).id();
+	let root = world.spawn_template(rsx! { <HtmlDocument/> }).unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -184,7 +178,7 @@ fn html_document_root_is_html() {
 #[beet_core::test]
 fn page_layout_root_is_html() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <PageLayout/> }).id();
+	let root = world.spawn_template(rsx! { <PageLayout/> }).unwrap().id();
 	// PageLayout wraps HtmlDocument, whose root is <html>
 	world
 		.entity(root)
@@ -197,7 +191,7 @@ fn page_layout_root_is_html() {
 #[beet_core::test]
 fn content_layout_root_is_html() {
 	let mut world = layout_world();
-	let root = world.spawn_template(rsx! { <ContentLayout/> }).id();
+	let root = world.spawn_template(rsx! { <ContentLayout/> }).unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -208,9 +202,9 @@ fn content_layout_root_is_html() {
 
 #[beet_core::test]
 fn text_field_uses_input_classes() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <TextField name="username"/> })
-		.id();
+		.unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
@@ -223,11 +217,11 @@ fn text_field_uses_input_classes() {
 
 #[beet_core::test]
 fn text_field_variant_changes_class() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! {
 			<TextField name="x" variant=TextFieldVariant::Filled/>
 		})
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.contains_class_name(&classes::INPUT_FILLED)
@@ -239,28 +233,28 @@ fn text_field_variant_changes_class() {
 
 #[beet_core::test]
 fn text_field_field_attaches_field_ref() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	// supplied: the FieldRef component attaches to the input entity
 	let root = world.spawn_template(rsx! {
 			<TextField name="email" field=FieldRef::new("email")/>
 		})
-		.id();
+		.unwrap().id();
 	world.entity(root).get::<FieldRef>().unwrap();
 
 	// omitted: no FieldRef
 	let bare = world.spawn_template(rsx! { <TextField name="email"/> })
-		.id();
+		.unwrap().id();
 	world.entity(bare).get::<FieldRef>().is_none().xpect_true();
 }
 
 #[beet_core::test]
 fn text_field_omits_unset_optional_attrs() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	// omitted: no `name`/`placeholder` attributes (not an empty `name=""`)
-	let bare = world.spawn_template(rsx! { <TextField/> }).id();
+	let bare = world.spawn_template(rsx! { <TextField/> }).unwrap().id();
 	// supplied: the attribute is present with its value
 	let named = world.spawn_template(rsx! { <TextField name="email"/> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let bare = query.get(bare).unwrap();
 		bare.attribute("name").is_none().xpect_true();
@@ -275,9 +269,9 @@ fn text_field_omits_unset_optional_attrs() {
 
 #[beet_core::test]
 fn text_area_root_is_textarea() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <TextArea name="bio"/> })
-		.id();
+		.unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -288,9 +282,9 @@ fn text_area_root_is_textarea() {
 
 #[beet_core::test]
 fn select_root_is_select() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <Select name="country"/> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("select");
@@ -302,9 +296,9 @@ fn select_root_is_select() {
 
 #[beet_core::test]
 fn form_root_is_form() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <Form name="signup"/> })
-		.id();
+		.unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -315,9 +309,9 @@ fn form_root_is_form() {
 
 #[beet_core::test]
 fn error_text_carries_class() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <ErrorText message="oops"/> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("span");
@@ -331,8 +325,8 @@ fn error_text_carries_class() {
 
 #[beet_core::test]
 fn table_has_head_body_foot_sections() {
-	let mut world = test_world();
-	let root = world.spawn_template(rsx! { <Table/> }).id();
+	let mut world = ui_world();
+	let root = world.spawn_template(rsx! { <Table/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		query.get(root).unwrap().tag().xpect_eq("table");
@@ -348,14 +342,14 @@ fn table_has_head_body_foot_sections() {
 
 #[beet_core::test]
 fn sidebar_renders_nav() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Home".into(),
 		path: Some(SmolPath::new("/")),
 		..default()
 	}];
 	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("nav");
@@ -365,7 +359,7 @@ fn sidebar_renders_nav() {
 
 #[beet_core::test]
 fn sidebar_branch_renders_details() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "Docs".into(),
 		path: None,
@@ -378,7 +372,7 @@ fn sidebar_branch_renders_details() {
 		..default()
 	}];
 	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.id();
+		.unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
 		let tags: Vec<_> = query
@@ -392,7 +386,7 @@ fn sidebar_branch_renders_details() {
 
 #[beet_core::test]
 fn sidebar_active_leaf_marks_aria_current() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let nodes = vec![SidebarNode {
 		display_name: "About".into(),
 		path: Some(SmolPath::new("about")),
@@ -400,7 +394,7 @@ fn sidebar_active_leaf_marks_aria_current() {
 		..default()
 	}];
 	let root = world.spawn_template(rsx! { <Sidebar nodes=nodes/> })
-		.id();
+		.unwrap().id();
 	// the active leaf carries an `aria-current` attribute
 	world.with_state::<ElementQuery, _>(|query| {
 		query
@@ -415,8 +409,8 @@ fn sidebar_active_leaf_marks_aria_current() {
 
 #[beet_core::test]
 fn preflight_emits_style() {
-	let mut world = test_world();
-	let root = world.spawn_template(rsx! { <Preflight/> }).id();
+	let mut world = ui_world();
+	let root = world.spawn_template(rsx! { <Preflight/> }).unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -434,9 +428,9 @@ fn preflight_emits_style() {
 
 #[beet_core::test]
 fn color_scheme_script_emits_scheme_classes() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <ColorSchemeScript/> })
-		.id();
+		.unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -460,8 +454,8 @@ fn color_scheme_script_emits_scheme_classes() {
 #[cfg(feature = "net")]
 #[beet_core::test]
 fn analytics_emits_script() {
-	let mut world = test_world();
-	let root = world.spawn_template(rsx! { <Analytics/> }).id();
+	let mut world = ui_world();
+	let root = world.spawn_template(rsx! { <Analytics/> }).unwrap().id();
 	world
 		.entity(root)
 		.get::<Element>()
@@ -472,8 +466,8 @@ fn analytics_emits_script() {
 
 #[beet_core::test]
 fn page_break_emits_page_break_class() {
-	let mut world = test_world();
-	let root = world.spawn_template(rsx! { <PageBreak/> }).id();
+	let mut world = ui_world();
+	let root = world.spawn_template(rsx! { <PageBreak/> }).unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		query
 			.get(root)
@@ -485,11 +479,11 @@ fn page_break_emits_page_break_class() {
 
 #[beet_core::test]
 fn button_emits_base_and_variant_class() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(
 			rsx! { <Button variant=ButtonVariant::Error>"Save"</Button> },
 		)
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("button");
@@ -505,9 +499,9 @@ fn button_emits_base_and_variant_class() {
 
 #[beet_core::test]
 fn icon_button_adds_icon_class() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! { <IconButton>"+"</IconButton> })
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("button");
@@ -517,11 +511,11 @@ fn icon_button_adds_icon_class() {
 
 #[beet_core::test]
 fn link_is_anchor_styled_as_button() {
-	let mut world = test_world();
+	let mut world = ui_world();
 	let root = world.spawn_template(rsx! {
 			<Link href="/" variant=ButtonVariant::Outlined>"Home"</Link>
 		})
-		.id();
+		.unwrap().id();
 	world.with_state::<ElementQuery, _>(|query| {
 		let view = query.get(root).unwrap();
 		view.tag().xpect_eq("a");

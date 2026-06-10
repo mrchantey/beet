@@ -1,20 +1,20 @@
 //! The BSX parser: one hand-written recursive-descent cursor parser whose
-//! features-off configuration is exactly HTML.
+//! disabled-surface configuration is exactly HTML.
 //!
 //! BSX is the full grammar (uppercase resolution, the value grammar, `bx:`
-//! directives); HTML is BSX with those features disabled. The parser is
+//! directives); HTML is BSX with that surface disabled. The parser is
 //! XML-inspired markup, not "an HTML subset": one grammar, with HTML the markup
-//! it accepts when the extra features are switched off. It builds a
+//! it accepts when the extra surface is switched off. It builds a
 //! [`BsxNode`](ast::BsxNode) syntax tree, resolved into a document-wired entity
-//! tree through the frozen template substrate by [`BsxTemplate`], so a `.bsx`
-//! file produces trees identical to what `rsx!` lowers to.
+//! tree through the template substrate by [`BsxTemplate`], so a `.bsx` file
+//! produces trees identical to what `rsx!` lowers to.
 //!
 //! Author + parse + build live here in `beet_core`; rendering the built tree to
 //! HTML or charcell lives in `beet_ui`. The `MediaParser`/`MediaRenderer`
 //! dispatch also stays in `beet_ui`, delegating BSX parsing to
 //! [`parse_document`] + [`BsxTemplate`].
 //!
-//! Internal split (`bsx_parser.md`): the syntax tree ([`ast`]), the cursor
+//! Internal split: the syntax tree ([`ast`]), the cursor
 //! ([`cursor`]), the markup parser ([`parse`]), the value grammar ([`value`]),
 //! literal-to-reflect resolution ([`reflect`]), AST-to-world resolution
 //! ([`resolve`]), the event/verb seam ([`events`]), and the BSX-template

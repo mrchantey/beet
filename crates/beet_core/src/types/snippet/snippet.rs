@@ -5,8 +5,7 @@
 //! base, wrapped at the root by [`snippet`] into an
 //! [`impl Template<Output = ()>`](Template) the substrate's `spawn_template`
 //! accepts. This mirrors the marker-based blanket-impl pattern of
-//! [`IntoBundle`](crate::prelude::IntoBundle), but targets the template
-//! substrate rather than `bevy_scene`.
+//! [`IntoBundle`](crate::prelude::IntoBundle), targeting the template substrate.
 //!
 //! Two traits carry the lowering:
 //!
@@ -27,23 +26,6 @@ use bevy::ecs::template::TemplateContext;
 use bevy::platform::sync::Mutex;
 use variadics_please::all_tuples;
 
-/// Wraps an `rsx!` markup bundle into a [`Snippet`]: the
-/// [`impl Template<Output = ()>`](Template) the substrate can spawn, and an
-/// [`IntoSnippet`] value usable in a child position.
-///
-/// `world.spawn_template(rsx!{ .. })` builds the whole tree into the spawned
-/// root; a `<div>{rsx!{..}}</div>` (or a helper returning `rsx!{..}`) builds the
-/// snippet into a fresh child entity. This is the single root adapter every
-/// `rsx!` invocation emits.
-///
-/// The bundle is owned, not cloned: `spawn_template` builds a template exactly
-/// once, so the inner effect is take-once. [`Template::clone_template`] is still
-/// satisfiable (it hands back the same shared slot), but a built snippet cannot
-/// be rebuilt, which matches the eager-build contract.
-pub fn snippet(bundle: impl Bundle) -> Snippet {
-	Snippet(Arc::new(Mutex::new(Some(OnSpawn::insert(bundle)))))
-}
-
 /// A lowered `rsx!` tree (a *snippet*: a tree of XML nodes, the authored unit),
 /// usable three ways:
 ///
@@ -61,6 +43,23 @@ pub fn snippet(bundle: impl Bundle) -> Snippet {
 pub struct Snippet(Arc<Mutex<Option<OnSpawn>>>);
 
 impl Snippet {
+	/// Wraps an `rsx!` markup bundle into a [`Snippet`]: the
+	/// [`impl Template<Output = ()>`](Template) the substrate can spawn, and an
+	/// [`IntoSnippet`] value usable in a child position.
+	///
+	/// `world.spawn_template(rsx!{ .. })` builds the whole tree into the spawned
+	/// root; a `<div>{rsx!{..}}</div>` (or a helper returning `rsx!{..}`) builds
+	/// the snippet into a fresh child entity. This is the single root adapter
+	/// every `rsx!` invocation emits.
+	///
+	/// The bundle is owned, not cloned: `spawn_template` builds a template exactly
+	/// once, so the inner effect is take-once. [`Template::clone_template`] is
+	/// still satisfiable (it hands back the same shared slot), but a built snippet
+	/// cannot be rebuilt, which matches the eager-build contract.
+	pub fn from_bundle(bundle: impl Bundle) -> Self {
+		Snippet(Arc::new(Mutex::new(Some(OnSpawn::insert(bundle)))))
+	}
+
 	/// Type-erase this snippet, for match arms whose branches build
 	/// differently-shaped trees that `impl Trait` cannot unify.
 	pub fn any_snippet(self) -> Snippet { self }

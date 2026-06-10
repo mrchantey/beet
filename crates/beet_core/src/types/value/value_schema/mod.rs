@@ -8,6 +8,8 @@
 
 mod constraint;
 mod field_schema;
+#[cfg(feature = "json")]
+mod from_json;
 mod from_type_info;
 mod kinds;
 mod schema_registry;

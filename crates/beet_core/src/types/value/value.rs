@@ -620,13 +620,18 @@ macro_rules! val {
 		$crate::prelude::Value::List(vec![ $( $crate::val!($elem) ),* ])
 	};
 
+	// Empty object
+	({}) => {
+		$crate::prelude::Value::Map($crate::prelude::Map::default())
+	};
+
 	// Object
-	({ $($key:tt : $value:tt),* $(,)? }) => {
+	({ $($key:tt : $value:tt),+ $(,)? }) => {
 		{
 			let mut map = $crate::prelude::Map::default();
 			$(
 				map.insert($key, $crate::val!($value));
-			)*
+			)+
 			$crate::prelude::Value::Map(map)
 		}
 	};

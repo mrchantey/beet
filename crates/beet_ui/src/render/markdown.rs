@@ -503,7 +503,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
-		let mut world = test_world();
+		let mut world = ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()

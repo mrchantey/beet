@@ -168,7 +168,7 @@ pub fn insert_route_tree(
 	Ok(())
 }
 
-/// Observer that rebuilds [`RouteTree`] roots after a [`TemplateLoaded`],
+/// Observer that rebuilds [`RouteTree`] roots after a [`LoadTemplateSerde`],
 /// where reflect-driven [`ChildOf`] inserts settle later than [`PathPattern`]
 /// and leave per-leaf trees on the wrong ancestors.
 ///
@@ -176,7 +176,7 @@ pub fn insert_route_tree(
 /// affected root is recomputed exactly once before any async serving begins.
 #[cfg(feature = "template_serde")]
 pub fn rebuild_route_trees_on_load(
-	ev: On<TemplateLoaded>,
+	ev: On<LoadTemplateSerde>,
 	mut commands: Commands,
 	ancestors: Query<&ChildOf>,
 	children_query: Query<&Children>,

@@ -53,8 +53,8 @@ pub fn TextField(
 			{Classes::new([classes::INPUT, class])}
 			{field}
 			type="text"
-			{optional_attr("name", name)}
-			{optional_attr("placeholder", placeholder)}
+			{Attribute::bundle_option("name", name)}
+			{Attribute::bundle_option("placeholder", placeholder)}
 		/>
 	}
 }
@@ -73,8 +73,8 @@ pub fn TextArea(
 		<textarea
 			{Classes::new([classes::INPUT, class])}
 			{field}
-			{optional_attr("name", name)}
-			{optional_attr("placeholder", placeholder)}
+			{Attribute::bundle_option("name", name)}
+			{Attribute::bundle_option("placeholder", placeholder)}
 		/>
 	}
 }
@@ -109,7 +109,7 @@ pub fn Select(
 ) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
-		<select {Classes::new([classes::SELECT, class])} {field} {optional_attr("name", name)}>
+		<select {Classes::new([classes::SELECT, class])} {field} {Attribute::bundle_option("name", name)}>
 			<Slot/>
 		</select>
 	}
@@ -123,7 +123,7 @@ pub fn Select(
 #[template]
 pub fn Form(name: Option<String>, field: Option<FieldRef>) -> impl Bundle {
 	rsx! {
-		<form {field} {optional_attr("name", name)}>
+		<form {field} {Attribute::bundle_option("name", name)}>
 			<Slot/>
 		</form>
 	}
@@ -137,8 +137,8 @@ mod test {
 
 	/// Render a template to an HTML string through the substrate.
 	fn render_html(template: impl bevy::ecs::template::Template<Output = ()>) -> String {
-		let mut world = test_world();
-		let root = world.spawn_template(template).id();
+		let mut world = ui_world();
+		let root = world.spawn_template(template).unwrap().id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(root, &mut world))
 			.unwrap()

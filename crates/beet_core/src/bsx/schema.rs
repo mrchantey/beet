@@ -68,8 +68,8 @@ pub fn verify_props_against(
 	}
 	let mut props = props_value(el);
 	// `validate` is async-shaped but resolves in one poll without an executor, so
-	// `async_ext::block_on` drives it on both std and no_std.
-	let errors = async_ext::block_on(resolved.validate(&mut props));
+	// `try_block_on` drives it on both std and no_std.
+	let errors = async_ext::try_block_on(resolved.validate(&mut props))?;
 	if errors.is_empty() {
 		Ok(())
 	} else {
@@ -192,7 +192,9 @@ pub fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
 				return Some(SchemaDirective::Remote(SmolStr::from(src.as_str())));
 			}
 			let json = schema_block_body(el)?;
-			parse_json_schema(&json).ok().map(SchemaDirective::Inline)
+			ValueSchema::from_json_schema(&json)
+				.ok()
+				.map(SchemaDirective::Inline)
 		})
 		.unwrap_or(SchemaDirective::None)
 }
@@ -244,106 +246,6 @@ fn schema_block_body(el: &BsxElement) -> Option<String> {
 	})
 }
 
-/// Parse a `bx:schema` JSON block into a [`ValueSchema::Struct`].
-///
-/// The authoring surface is a JSON object mapping each prop name to a type
-/// descriptor, which is either:
-/// - a string naming a primitive (`"string"`, `"i64"`, `"u64"`, `"f64"`,
-///   `"bool"`) or another template/type, lowering to a composable
-///   [`ValueSchema::Reference`];
-/// - an object `{ "type": <descriptor>, "required": bool, "optional": bool,
-///   "items": <descriptor> }`, for required/optional fields and lists.
-///
-/// A field is optional unless `"required": true`. An `"optional": true` or an
-/// `Option`-style descriptor wraps the field in [`ValueSchema::Optional`].
-#[cfg(feature = "json")]
-pub fn parse_json_schema(json: &str) -> Result<ValueSchema> {
-	let root: serde_json::Value = serde_json::from_str(json)?;
-	let serde_json::Value::Object(map) = root else {
-		bevybail!("a `bx:schema` block must be a JSON object of props");
-	};
-	let mut fields = Vec::new();
-	for (key, descriptor) in map {
-		let (schema, required) = parse_descriptor(&descriptor)?;
-		fields.push(NamedFieldSchema {
-			key: SmolStr::from(key.as_str()),
-			required,
-			label: None,
-			description: None,
-			schema,
-		});
-	}
-	Ok(ValueSchema::Struct(StructSchema {
-		name: None,
-		allow_additional: false,
-		fields,
-	}))
-}
-
-/// Fallback for builds without the `json` feature: a `bx:schema` block cannot be
-/// parsed, so it is treated as absent.
-#[cfg(not(feature = "json"))]
-pub fn parse_json_schema(_json: &str) -> Result<ValueSchema> {
-	bevybail!("parsing a `bx:schema` block requires the `json` feature")
-}
-
-/// Parse one field descriptor, returning its schema and whether it is required.
-#[cfg(feature = "json")]
-fn parse_descriptor(descriptor: &serde_json::Value) -> Result<(ValueSchema, bool)> {
-	match descriptor {
-		// a bare string names a primitive or references another template/type
-		serde_json::Value::String(name) => Ok((descriptor_type(name), false)),
-		serde_json::Value::Object(map) => {
-			let required = map
-				.get("required")
-				.and_then(serde_json::Value::as_bool)
-				.unwrap_or(false);
-			let optional = map
-				.get("optional")
-				.and_then(serde_json::Value::as_bool)
-				.unwrap_or(false);
-			let mut schema = match (map.get("items"), map.get("type")) {
-				// a list of the item descriptor
-				(Some(items), _) => {
-					let (item, _) = parse_descriptor(items)?;
-					ValueSchema::List(ListSchema {
-						item: Box::new(item),
-						min_items: None,
-						max_items: None,
-						unique: false,
-					})
-				}
-				(None, Some(serde_json::Value::String(name))) => {
-					descriptor_type(name)
-				}
-				(None, Some(nested)) => parse_descriptor(nested)?.0,
-				(None, None) => ValueSchema::Any,
-			};
-			if optional {
-				schema = ValueSchema::Optional(Box::new(schema));
-			}
-			Ok((schema, required))
-		}
-		other => bevybail!("unsupported `bx:schema` descriptor: {other}"),
-	}
-}
-
-/// Map a descriptor name to a primitive schema, or a composable reference to
-/// another template/type's schema.
-#[cfg(feature = "json")]
-fn descriptor_type(name: &str) -> ValueSchema {
-	match name {
-		"string" | "str" => ValueSchema::String(StringSchema::default()),
-		"i64" | "int" | "i32" => ValueSchema::I64(I64Schema::default()),
-		"u64" | "uint" | "u32" => ValueSchema::U64(U64Schema::default()),
-		"f64" | "float" | "f32" => ValueSchema::F64(F64Schema::default()),
-		"bool" => ValueSchema::Bool(BoolSchema::default()),
-		"any" => ValueSchema::Any,
-		"null" => ValueSchema::Null,
-		// anything else references another template/type schema by name
-		other => ValueSchema::Reference(SmolStr::from(other)),
-	}
-}
 
 #[cfg(all(test, feature = "json"))]
 mod test {

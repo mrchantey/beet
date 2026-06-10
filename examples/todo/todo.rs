@@ -42,9 +42,10 @@ struct Todo {
 
 #[beet::main]
 async fn main() -> Result {
-	// DocumentPlugin drives the bidi sync the self-bound actions rely on: each
-	// route's local `Value` mirrors the shared `todos` field
-	let mut world = (AsyncPlugin, RouterPlugin, DocumentPlugin).into_world();
+	// `RouterPlugin` pulls in `DocumentPlugin`, which drives the bidi sync the
+	// self-bound actions rely on: each route's local `Value` mirrors the shared
+	// `todos` field.
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 
 	// load the persisted list, falling back to an empty document
 	let document = load_document().await?;

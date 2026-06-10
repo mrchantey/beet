@@ -701,7 +701,7 @@ mod test {
 		deserialized.nodes.len().xpect_eq(1);
 
 		let mut world = create_world();
-		world.spawn_template(deserialized);
+		world.spawn_template(deserialized).unwrap();
 		world
 			.query::<&Qux>()
 			.single(&world)

@@ -9,11 +9,9 @@ beet_core::test_main!();
 
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
-// `use beet_ui::*` resolves the `crate::` aliasing the `rsx!` macro emits.
-use beet_ui::*;
 
 /// A spawn-capable template world.
-fn world() -> World { test_world() }
+fn world() -> World { ui_world() }
 
 /// Parse a `.bsx` source into a freshly spawned container, returning the root.
 fn parse_bsx(world: &mut World, source: &str) -> Entity {

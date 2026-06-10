@@ -5,7 +5,43 @@
 
 use crate::prelude::*;
 use alloc::string::String;
+use alloc::sync::Arc;
 use bevy::prelude::BevyError;
+
+/// A [`Clone`] [`BevyError`], shared behind an [`Arc`].
+///
+/// `BevyError` is not `Clone`, yet the template build path must carry one error
+/// to three places at once: the [`TemplateError`](crate::prelude::TemplateError)
+/// component, the [`LoadTemplate`](crate::prelude::LoadTemplate) lifecycle event,
+/// and the `spawn_template` return. Wrapping it here lets the same error be
+/// shared across all three. A returned `BevyError` whose inner error is a
+/// `CloneError` came from this path.
+#[derive(Debug, Clone)]
+pub struct CloneError(pub Arc<BevyError>);
+
+impl CloneError {
+	/// Wrap an error so it can be cloned across the build error path.
+	pub fn new(error: impl Into<BevyError>) -> Self {
+		Self(Arc::new(error.into()))
+	}
+}
+
+impl core::ops::Deref for CloneError {
+	type Target = BevyError;
+	fn deref(&self) -> &BevyError { &self.0 }
+}
+
+impl core::fmt::Display for CloneError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+impl core::error::Error for CloneError {}
+
+impl From<BevyError> for CloneError {
+	fn from(error: BevyError) -> Self { Self::new(error) }
+}
 
 /// Trait for converting a value or Result into a `Result`.
 pub trait IntoResult<T = (), E = BevyError> {

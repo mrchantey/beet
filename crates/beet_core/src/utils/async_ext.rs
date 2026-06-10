@@ -76,20 +76,23 @@ pub fn yield_now() -> futures_lite::future::YieldNow {
 }
 
 /// Blocks the current thread on a future until it completes.
+///
+/// std-only and infallible: it owns a real executor, so it drives a future that
+/// pends to completion. no_std has no executor; reach for [`try_block_on`] there.
 #[cfg(feature = "std")]
 pub fn block_on<F: Future>(fut: F) -> F::Output {
 	futures::executor::block_on(fut)
 }
 
-/// Drives an *immediately-ready* future to completion on no_std by polling once
-/// with a no-op waker.
+/// Drives an *immediately-ready* future to completion by polling once with a
+/// no-op waker, returning [`Err`] if it pends.
 ///
-/// no_std has no executor, so this only works for futures that never pend (eg
-/// the synchronous-shaped schema validation, which is `async` only for the
-/// remote-fetch seam but resolves in one poll for an in-memory schema). A future
-/// that pends panics, which never happens on this path.
-#[cfg(not(feature = "std"))]
-pub fn block_on<F: Future>(fut: F) -> F::Output {
+/// The no_std-capable counterpart to [`block_on`]: with no executor it cannot
+/// park a pending future, so a future that pends is an error rather than a hang.
+/// Suits a future that is `async` only for a seam yet resolves in one poll (eg
+/// in-memory schema validation, whose async is reserved for the remote-fetch
+/// path).
+pub fn try_block_on<F: Future>(fut: F) -> Result<F::Output> {
 	use core::task::Context;
 	use core::task::Poll;
 	let waker = core::task::Waker::noop();
@@ -98,9 +101,9 @@ pub fn block_on<F: Future>(fut: F) -> F::Output {
 	// SAFETY: `fut` is owned and never moved after pinning.
 	let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
 	match fut.as_mut().poll(&mut cx) {
-		Poll::Ready(output) => output,
+		Poll::Ready(output) => Ok(output),
 		Poll::Pending => {
-			panic!("block_on (no_std) requires an immediately-ready future")
+			bevybail!("try_block_on requires an immediately-ready future")
 		}
 	}
 }

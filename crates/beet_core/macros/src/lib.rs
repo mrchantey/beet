@@ -196,12 +196,15 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// (reflect-patched) or a `#[template]` (built with input props), bare `{..}`
 /// attributes spread components/templates onto the entity, attribute/text
 /// `{..}` are Rust expressions, `<Slot>`/`bx:slot` lower to slot markers, and
-/// `on*` handlers lower to observers. See `.agents/plans/bsx/macros.md`.
+/// `on*` handlers lower to observers.
+///
+/// The lowered [`Snippet`] is both a [`Template`] and a [`Bundle`], so a helper
+/// can return the simpler `impl Bundle`.
 ///
 /// ## Example
 ///
 /// ```rust ignore
-/// fn my_ui() -> impl Template<Output = ()> {
+/// fn my_ui() -> impl Bundle {
 ///     rsx! {
 ///         <div class="container">
 ///             <span>"hello"</span>

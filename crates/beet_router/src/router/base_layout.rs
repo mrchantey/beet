@@ -97,10 +97,10 @@ fn wrap_content<C: 'static + Send + Sync + Clone + Default + BuildTemplate>(
 	// the content is transcluded by reference: route it into the layout's default
 	// slot as a `SlotChild` carrying a `RenderRef` to the existing content.
 	let layout = world
-		.spawn_template(snippet((
+		.spawn_template(Snippet::from_bundle((
 			C::default().into_snippet_bundle(),
 			children![(RenderRef::new(rendered), SlotChild::new())],
-		)))
+		)))?
 		.id();
 	world.remove_resource::<RequestContext>();
 

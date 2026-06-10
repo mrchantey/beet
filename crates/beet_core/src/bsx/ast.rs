@@ -98,7 +98,7 @@ pub enum DataLiteral {
 	/// `[a, b, c]`.
 	List(Vec<DataLiteral>),
 	/// `{ key: value, .. }`.
-	Struct(Vec<(String, DataLiteral)>),
+	Struct(Vec<(SmolStr, DataLiteral)>),
 	/// An enum variant, eg `Center`, `Rgb(1,2,3)`, `Point { x: 1 }`.
 	Enum(NamedLiteral),
 	/// A `$name` entity reference nested inside a literal, eg an `Entity`-typed
@@ -114,7 +114,7 @@ pub enum DataLiteral {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedLiteral {
 	/// The variant or type name, eg `Center`, `Rgb`, `MyComponent`.
-	pub name: String,
+	pub name: SmolStr,
 	/// The variant/struct fields.
 	pub fields: NamedFields,
 }
@@ -127,5 +127,5 @@ pub enum NamedFields {
 	/// Positional fields, ie a tuple variant `Rgb(1, 2, 3)`.
 	Tuple(Vec<DataLiteral>),
 	/// Named fields, ie a struct variant `Point { x: 1, y: 2 }`.
-	Struct(Vec<(String, DataLiteral)>),
+	Struct(Vec<(SmolStr, DataLiteral)>),
 }

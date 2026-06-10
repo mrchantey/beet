@@ -7,11 +7,9 @@ beet_core::test_main!();
 use beet_core::prelude::*;
 use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
-// `use beet_ui::*` resolves the `crate::` aliasing the macros emit.
-use beet_ui::*;
 
 /// A spawn-capable template world.
-fn world() -> World { test_world() }
+fn world() -> World { ui_world() }
 
 /// Render `root` to an HTML string.
 fn render_html(world: &mut World, root: Entity) -> String {
@@ -48,7 +46,7 @@ fn Card(#[prop(into)] title: String) -> impl Bundle {
 #[beet_core::test]
 fn into_prop_flows_to_body() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Card title="Hi"/> }).id();
+	let root = world.spawn_template(rsx! { <Card title="Hi"/> }).unwrap().id();
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
 	descendant_values(&world, root).xpect_eq(vec!["Hi".to_string()]);
 }
@@ -66,7 +64,7 @@ fn Tag(
 fn default_and_option_props() {
 	let mut world = world();
 	// omitted props fall back: `kind` -> "tag", `label` -> None (empty child).
-	let root = world.spawn_template(rsx! { <Tag/> }).id();
+	let root = world.spawn_template(rsx! { <Tag/> }).unwrap().id();
 	world.with_state::<AttributeQuery, _>(|query| {
 		query
 			.find(root, "class")
@@ -78,7 +76,7 @@ fn default_and_option_props() {
 	});
 
 	// supplied props flow through.
-	let root = world.spawn_template(rsx! { <Tag kind="x" label="hi"/> }).id();
+	let root = world.spawn_template(rsx! { <Tag kind="x" label="hi"/> }).unwrap().id();
 	world.with_state::<AttributeQuery, _>(|query| {
 		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("x");
 	});
@@ -104,7 +102,7 @@ fn Badge(#[prop(required)] variant: Variant) -> impl Bundle {
 #[beet_core::test]
 fn required_prop_supplied_resolves() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <Badge variant=Variant::Error/> }).id();
+	let root = world.spawn_template(rsx! { <Badge variant=Variant::Error/> }).unwrap().id();
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("span");
 	world.with_state::<AttributeQuery, _>(|query| {
 		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("error");
@@ -119,7 +117,7 @@ fn missing_required_prop_surfaces_error() {
 	world.add_observer(move |ev: On<LoadTemplate>| err.set(Some(ev.is_error)));
 
 	// `<Badge/>` leaves `variant` unset: a graceful TemplateError, never a panic.
-	let root = world.spawn_template(rsx! { <Badge/> }).id();
+	let root = world.spawn_template(rsx! { <Badge/> }).unwrap().id();
 	error.get().xpect_eq(Some(true));
 	let template_error = world.entity(root).get::<TemplateError>().unwrap();
 	template_error
@@ -144,7 +142,7 @@ fn AppInfo(config: Res<AppTitle>) -> impl Bundle {
 fn system_template_reads_resource() {
 	let mut world = world();
 	world.insert_resource(AppTitle("beet".into()));
-	let root = world.spawn_template(rsx! { <AppInfo/> }).id();
+	let root = world.spawn_template(rsx! { <AppInfo/> }).unwrap().id();
 	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("article");
 	descendant_values(&world, root).xpect_eq(vec!["beet".to_string()]);
 }
@@ -159,7 +157,7 @@ fn Panel(#[prop] role: String, config: Res<AppTitle>) -> impl Bundle {
 fn system_template_mixes_props_and_params() {
 	let mut world = world();
 	world.insert_resource(AppTitle("beet".into()));
-	let root = world.spawn_template(rsx! { <Panel role="main"/> }).id();
+	let root = world.spawn_template(rsx! { <Panel role="main"/> }).unwrap().id();
 	world.with_state::<AttributeQuery, _>(|query| {
 		query.find(root, "class").unwrap().1.as_str().unwrap().xpect_eq("main");
 	});
@@ -189,7 +187,7 @@ fn Counter(#[prop(into)] label: String) -> impl Bundle {
 fn template_event_attaches_observer() {
 	let mut world = world();
 	world.init_resource::<Count>();
-	let root = world.spawn_template(rsx! { <Counter label="Bump"/> }).id();
+	let root = world.spawn_template(rsx! { <Counter label="Bump"/> }).unwrap().id();
 
 	world.resource::<Count>().0.xpect_eq(0);
 	world.trigger(Bump(root));
@@ -221,7 +219,7 @@ fn named_and_default_slots() {
 				<p>"Body"</p>
 			</LayoutPanel>
 		})
-		.id();
+		.unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><h1>Title</h1></header>")
@@ -243,7 +241,7 @@ fn FallbackPanel() -> impl Bundle {
 #[beet_core::test]
 fn slot_fallback_renders_when_unset() {
 	let mut world = world();
-	let root = world.spawn_template(rsx! { <FallbackPanel/> }).id();
+	let root = world.spawn_template(rsx! { <FallbackPanel/> }).unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("Default Title")
@@ -260,7 +258,7 @@ fn slot_fallback_overridden_by_caller() {
 				<p>"Real Body"</p>
 			</FallbackPanel>
 		})
-		.id();
+		.unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><h1>Real Title</h1></header>")
@@ -276,7 +274,7 @@ fn slot_children_preserve_order() {
 		.spawn_template(rsx! {
 			<LayoutPanel><p>"one"</p><p>"two"</p><p>"three"</p></LayoutPanel>
 		})
-		.id();
+		.unwrap().id();
 	let html = render_html(&mut world, root);
 	html.find("one").unwrap().xpect_less_than(html.find("two").unwrap());
 	html.find("two").unwrap().xpect_less_than(html.find("three").unwrap());
@@ -299,7 +297,7 @@ fn nested_template_in_named_slot() {
 				<p>"Body"</p>
 			</LayoutPanel>
 		})
-		.id();
+		.unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains("<header><span>Title</span></header>")

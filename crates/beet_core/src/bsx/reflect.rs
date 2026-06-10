@@ -142,7 +142,7 @@ fn list_to_reflect(
 
 /// Build a [`DynamicStruct`] from named fields, recursing per field info.
 fn struct_to_reflect(
-	fields: &[(String, DataLiteral)],
+	fields: &[(SmolStr, DataLiteral)],
 	field_info: Option<&'static TypeInfo>,
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
@@ -157,7 +157,7 @@ fn struct_to_reflect(
 			.and_then(|info| info.field(name))
 			.and_then(|field| field.type_info());
 		dynamic.insert_boxed(
-			name,
+			name.as_str(),
 			literal_to_reflect(literal, nested, registry, resolver)?,
 		);
 	}
@@ -219,7 +219,7 @@ fn enum_to_reflect(
 					_ => None,
 				};
 				dynamic.insert_boxed(
-					name,
+					name.as_str(),
 					literal_to_reflect(literal, nested, registry, resolver)?,
 				);
 			}
@@ -227,7 +227,8 @@ fn enum_to_reflect(
 		}
 	};
 
-	let mut dynamic_enum = DynamicEnum::new(named.name.clone(), dynamic_variant);
+	let mut dynamic_enum =
+		DynamicEnum::new(named.name.to_string(), dynamic_variant);
 	dynamic_enum.set_represented_type(field_info);
 	Ok(Box::new(dynamic_enum))
 }
@@ -252,7 +253,7 @@ fn named_struct_to_reflect(
 				.and_then(|info| info.field(name))
 				.and_then(|field| field.type_info());
 			dynamic.insert_boxed(
-				name,
+				name.as_str(),
 				literal_to_reflect(literal, nested, registry, resolver)?,
 			);
 		}

@@ -88,10 +88,43 @@ impl SlotChild {
 /// unfilled target keeps its fallback. An unmatched [`SlotChild`] returns an
 /// error naming the missing slot and listing the available targets.
 ///
+/// Resolution iterates to a fixpoint: a pass splices each scope's matched
+/// content, which exposes deeper targets (a relay buried under another scope's
+/// content becomes reachable once that content is spliced in), so multi-level
+/// forwarding resolves one hop per pass until no wiring remains. Only then is
+/// leftover content an error.
+///
 /// Returns `Err` so the walker can ride a failure onto [`TemplateError`].
 pub fn resolve_slots(world: &mut World, root: Entity) -> Result {
-	let plan = world.run_system_cached_with(plan_slots, root)?;
-	apply_plan(world, plan)
+	loop {
+		let plan = world.run_system_cached_with(plan_slots, root)?;
+		// nothing matched this pass: the resolution is stable, so leftover content
+		// is genuinely unconsumed.
+		if plan.wirings.is_empty() {
+			return report_unmatched(plan);
+		}
+		apply_wirings(world, plan.wirings);
+	}
+}
+
+/// Splices each wiring's content into its target.
+fn apply_wirings(world: &mut World, wirings: Vec<SlotWiring>) {
+	for SlotWiring { target, content } in wirings {
+		splice_into_target(world, target, content);
+	}
+}
+
+/// Surfaces the first unconsumed slot as an error, naming it and the available
+/// targets in its scope.
+fn report_unmatched(plan: SlotPlan) -> Result {
+	if let Some(unmatched) = plan.unmatched.first() {
+		bevybail!(
+			"unconsumed slot content for slot {:?}; available targets: {:?}",
+			unmatched.name,
+			unmatched.available
+		);
+	}
+	OK
 }
 
 /// One slot wiring: a target and the ordered content routed into it.
@@ -180,7 +213,9 @@ fn plan_scope(
 
 		let mut matched = Vec::new();
 		sources.retain(|(name, content)| {
-			if *name == target_name {
+			// a relay must not consume itself: its `SlotChild` side and its
+			// re-opened `SlotTarget` side share one entity and slot name.
+			if *name == target_name && *content != target {
 				matched.push(*content);
 				false
 			} else {
@@ -203,8 +238,13 @@ fn plan_scope(
 		});
 	}
 
-	// any content left over is an error: name the slot, list available targets.
-	for (name, _) in sources {
+	// any content left over is an error, except a forwarding relay (a `SlotChild`
+	// that is itself a `SlotTarget`): its target resolves in a deeper scope, so an
+	// unmatched relay is a pass-through, not unconsumed content.
+	for (name, content) in sources {
+		if slot_targets.contains(content) {
+			continue;
+		}
 		plan.unmatched.push(UnmatchedSlot {
 			name,
 			available: targets.iter().map(|(name, _)| name.clone()).collect(),
@@ -225,15 +265,17 @@ fn collect_targets(
 	let mut targets = Vec::new();
 	let mut stack = vec![scope];
 	while let Some(entity) = stack.pop() {
-		// do not descend into routed content or a nested scope's own subtree.
+		if entity != scope && let Ok(target) = slot_targets.get(entity) {
+			// a target (including a forwarding relay that is also a `SlotChild`) is
+			// visible to this scope so the parent can fill it; its children are
+			// fallback or deeper content, not further targets for this scope.
+			targets.push((target.slot_name().into(), entity));
+			continue;
+		}
+		// do not descend into plain routed content or a nested scope's own subtree.
 		if entity != scope
 			&& (slot_children.contains(entity) || scopes.contains(&entity))
 		{
-			continue;
-		}
-		if entity != scope && let Ok(target) = slot_targets.get(entity) {
-			targets.push((target.slot_name().into(), entity));
-			// a target's children are fallback, not further targets.
 			continue;
 		}
 		if let Ok(child_list) = children.get(entity) {
@@ -243,21 +285,6 @@ fn collect_targets(
 	targets
 }
 
-/// Applies a plan: splice content into each target, drop the now-consumed
-/// fallback and markers, then error on any unmatched content.
-fn apply_plan(world: &mut World, plan: SlotPlan) -> Result {
-	for SlotWiring { target, content } in plan.wirings {
-		splice_into_target(world, target, content);
-	}
-	if let Some(unmatched) = plan.unmatched.first() {
-		bevybail!(
-			"unconsumed slot content for slot {:?}; available targets: {:?}",
-			unmatched.name,
-			unmatched.available
-		);
-	}
-	OK
-}
 
 /// Replaces a [`SlotTarget`]'s children with `content`, in order.
 ///
@@ -452,5 +479,52 @@ mod test {
 					.unwrap_or(false)
 			});
 		title_under_header.xpect_true();
+	}
+
+	#[beet_core::test]
+	fn relay_does_not_consume_itself() {
+		// a relay whose `SlotChild` and `SlotTarget` sides share a slot name must
+		// forward sibling content rather than swallowing it into its own target.
+		let mut world = World::new();
+		let scope = node(&mut world, "scope");
+		// the deeper structural target the relay forwards into.
+		let inner = world.spawn((SlotTarget::named("head"), ChildOf(scope))).id();
+		// the relay: routed as "head" content, and itself a re-opening "head" target.
+		world.spawn((
+			SlotChild::named("head"),
+			SlotTarget::named("head"),
+			ChildOf(scope),
+		));
+		// caller content for "head", which must flow through the relay, not be
+		// eaten by the relay matching its own name.
+		world.spawn((Name::new("meta"), SlotChild::named("head"), ChildOf(scope)));
+
+		resolve_slots(&mut world, scope).unwrap();
+
+		// the meta reached the inner target's subtree (via the relay).
+		let reached = world
+			.entity(inner)
+			.get::<Children>()
+			.into_iter()
+			.flat_map(|children| children.iter())
+			.flat_map(|child| {
+				core::iter::once(child).chain(
+					world
+						.entity(child)
+						.get::<Children>()
+						.into_iter()
+						.flat_map(|grandchildren| {
+							grandchildren.iter().collect::<Vec<_>>()
+						}),
+				)
+			})
+			.any(|entity| {
+				world
+					.entity(entity)
+					.get::<Name>()
+					.map(|name| name.as_str() == "meta")
+					.unwrap_or(false)
+			});
+		reached.xpect_true();
 	}
 }

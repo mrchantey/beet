@@ -2,11 +2,10 @@
 //!
 //! Lowers JSX-like markup to a [`Bundle`] tree on the
 //! `Element`/`Attribute`/`children!`/`Value` base, wrapped at the root by
-//! `snippet(..)` into the `impl Template<Output = ()>` the substrate's
-//! `spawn_template` accepts. This merges the former `rsx!`/`rsx_direct!` pair
-//! into one macro targeting the template substrate (no `bevy_scene`).
+//! `Snippet::from_bundle(..)` into the `impl Template<Output = ()>` the
+//! substrate's `spawn_template` accepts, targeting the template substrate.
 //!
-//! Lowering rules (see `.agents/plans/bsx/macros.md`):
+//! Lowering rules:
 //!
 //! - A lowercase tag becomes an [`Element`] with attribute children.
 //! - An uppercase tag is a **component** (reflect-patched, inserted) or a
@@ -47,13 +46,13 @@ use syn::spanned::Spanned;
 type CustomNode = rstml::Infallible;
 
 /// The `rsx!` proc-macro entry: lowers markup to an `impl Template<Output = ()>`
-/// by wrapping the lowered bundle in `snippet(..)`.
+/// by wrapping the lowered bundle in `Snippet::from_bundle(..)`.
 pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let bundle = lower_rsx(input.into());
 	quote! {{
 		use #beet_core::prelude::*;
-		snippet(#bundle)
+		Snippet::from_bundle(#bundle)
 	}}
 	.into()
 }
@@ -61,7 +60,7 @@ pub fn impl_rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Lower markup token stream to a [`Bundle`] expression.
 ///
 /// This is the in-process entry point both the `rsx!` macro (which wraps the
-/// result in `snippet(..)`) and `#[template]` (which uses it as the function
+/// result in `Snippet::from_bundle(..)`) and `#[template]` (which uses it as the function
 /// body's `impl Bundle`) call. It performs no `use` injection; the caller scopes
 /// the emitted identifiers (`Element`, `Value`, `IntoSnippet`, …) via
 /// `use beet_core::prelude::*`.

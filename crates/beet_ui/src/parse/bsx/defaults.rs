@@ -42,7 +42,7 @@ fn register_default_events(world: &mut World) {
 						if let Some(verb) =
 							world.resource::<VerbRegistry>().get(&verb)
 						{
-							verb(world, target);
+							verb(&mut world.entity_mut(target));
 						}
 					});
 				},
@@ -54,18 +54,18 @@ fn register_default_events(world: &mut World) {
 /// Register the example verb set, each mutating the target's bound [`Value`].
 fn register_default_verbs(world: &mut World) {
 	let mut verbs = world.resource_mut::<VerbRegistry>();
-	verbs.insert("increment", |world: &mut World, entity: Entity| {
-		if let Some(mut value) = world.get_mut::<Value>(entity) {
+	verbs.insert("increment", |entity: &mut EntityWorldMut| {
+		if let Some(mut value) = entity.get_mut::<Value>() {
 			*value = Value::Int(value.as_i64().unwrap_or(0) + 1);
 		}
 	});
-	verbs.insert("decrement", |world: &mut World, entity: Entity| {
-		if let Some(mut value) = world.get_mut::<Value>(entity) {
+	verbs.insert("decrement", |entity: &mut EntityWorldMut| {
+		if let Some(mut value) = entity.get_mut::<Value>() {
 			*value = Value::Int(value.as_i64().unwrap_or(0) - 1);
 		}
 	});
-	verbs.insert("toggle", |world: &mut World, entity: Entity| {
-		if let Some(mut value) = world.get_mut::<Value>(entity) {
+	verbs.insert("toggle", |entity: &mut EntityWorldMut| {
+		if let Some(mut value) = entity.get_mut::<Value>() {
 			*value = Value::Bool(!matches!(*value, Value::Bool(true)));
 		}
 	});

@@ -1,10 +1,10 @@
 //! Deserializing bytes into a [`DynamicTemplate`] and building it through the
-//! blessed [`spawn_template`](WorldTemplateExt::spawn_template) path.
+//! [`spawn_template`](WorldTemplateExt::spawn_template) path.
 //!
 //! [`TemplateLoader`] dispatches by [`MediaType`] to the right serde format,
 //! producing a [`DynamicTemplate`], then builds it. Every spawned entity is
 //! collected through the build sink, never a second remapping model. When a
-//! target entity is given, the spawned roots are tracked as [`TemplateOf`] of it
+//! target entity is given, the spawned roots are tracked as [`TemplateNodeOf`] of it
 //! rather than reparented, so its existing children survive.
 
 use crate::prelude::*;
@@ -13,10 +13,10 @@ use crate::prelude::*;
 ///
 /// With a target entity (via [`TemplateLoader::with_entity`] or
 /// [`TemplateLoader::new_entity`]) the spawned roots are tracked as
-/// [`TemplateEntities`] of that entity.
+/// [`TemplateNodes`] of that entity.
 pub struct TemplateLoader<'a> {
 	world: &'a mut World,
-	/// If set, spawned roots are tracked as [`TemplateOf`] of this entity.
+	/// If set, spawned roots are tracked as [`TemplateNodeOf`] of this entity.
 	entity: Option<Entity>,
 }
 
@@ -30,7 +30,7 @@ impl<'a> TemplateLoader<'a> {
 	}
 
 	/// Creates a loader for the world containing the given entity, tracking
-	/// spawned roots as [`TemplateOf`] of it.
+	/// spawned roots as [`TemplateNodeOf`] of it.
 	pub fn new_entity(entity: EntityWorldMut<'a>) -> Self {
 		let id = entity.id();
 		Self {
@@ -39,7 +39,7 @@ impl<'a> TemplateLoader<'a> {
 		}
 	}
 
-	/// Tracks spawned roots as [`TemplateOf`] of the given entity.
+	/// Tracks spawned roots as [`TemplateNodeOf`] of the given entity.
 	pub fn with_entity(mut self, entity: Entity) -> Self {
 		self.entity = Some(entity);
 		self
@@ -119,7 +119,7 @@ impl<'a> TemplateLoader<'a> {
 		let entity = self.entity;
 		// install the sink so the build records every real entity it maps to.
 		self.world.insert_resource(TemplateBuildSink::default());
-		self.world.spawn_template(template);
+		self.world.spawn_template(template)?;
 		let spawned = self
 			.world
 			.remove_resource::<TemplateBuildSink>()
@@ -127,14 +127,14 @@ impl<'a> TemplateLoader<'a> {
 			.unwrap_or_default();
 
 		// in entity mode the spawned roots (no `ChildOf`) are tracked as
-		// `TemplateOf` of the target rather than reparented, preserving its
+		// `TemplateNodeOf` of the target rather than reparented, preserving its
 		// existing children.
 		if let Some(parent) = entity {
 			for spawned_entity in spawned.iter() {
 				if !self.world.entity(*spawned_entity).contains::<ChildOf>() {
 					self.world
 						.entity_mut(*spawned_entity)
-						.insert(TemplateOf(parent));
+						.insert(TemplateNodeOf(parent));
 				}
 			}
 		}
@@ -143,7 +143,7 @@ impl<'a> TemplateLoader<'a> {
 		// observers run before relationships like `ChildOf` are whole. Signal
 		// completion now the hierarchy is settled, so listeners can react (eg
 		// rebuilding a `RouteTree`) before any async work runs.
-		self.world.trigger(TemplateLoaded {
+		self.world.trigger(LoadTemplateSerde {
 			entities: spawned.clone(),
 		});
 
@@ -151,14 +151,17 @@ impl<'a> TemplateLoader<'a> {
 	}
 }
 
-/// Triggered after a [`TemplateLoader`] builds deserialized entities into the
-/// world.
+/// Triggered after a [`TemplateLoader`] builds a whole batch of deserialized
+/// entities into the world.
 ///
-/// Reflect-driven loads insert components one entity at a time, so per-insert
-/// observers run before relationships settle. Listeners use this to react to a
-/// completed load synchronously, against the fully-formed hierarchy.
+/// Distinct from the per-root
+/// [`LoadTemplate`](crate::prelude::LoadTemplate) lifecycle event: this is the
+/// batch-completion signal carrying every entity the loader spawned. Reflect
+/// loads insert components one entity at a time, so per-insert observers run
+/// before relationships settle; listeners use this to react to a completed load
+/// synchronously, against the fully-formed hierarchy.
 #[derive(Debug, Clone, Event)]
-pub struct TemplateLoaded {
+pub struct LoadTemplateSerde {
 	/// The entities spawned by this load.
 	pub entities: Vec<Entity>,
 }
@@ -177,8 +180,8 @@ pub struct TemplateLoaded {
 	Component,
 )]
 #[reflect(Component)]
-#[relationship(relationship_target = TemplateEntities)]
-pub struct TemplateOf(pub Entity);
+#[relationship(relationship_target = TemplateNodes)]
+pub struct TemplateNodeOf(pub Entity);
 
 /// Tracks the entities spawned into a target via [`TemplateLoader::with_entity`].
 #[derive(
@@ -194,8 +197,8 @@ pub struct TemplateOf(pub Entity);
 	Component,
 )]
 #[reflect(Component)]
-#[relationship_target(relationship = TemplateOf, linked_spawn)]
-pub struct TemplateEntities(Vec<Entity>);
+#[relationship_target(relationship = TemplateNodeOf, linked_spawn)]
+pub struct TemplateNodes(Vec<Entity>);
 
 #[cfg(all(test, feature = "ron"))]
 mod test {
@@ -261,7 +264,7 @@ mod test {
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<TemplateOf>()
+			.get::<TemplateNodeOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);
@@ -314,11 +317,11 @@ mod test {
 			.as_str()
 			.xpect_eq("OldChild");
 
-		// spawned entities carry `TemplateOf`, not `ChildOf`.
+		// spawned entities carry `TemplateNodeOf`, not `ChildOf`.
 		spawned.len().xpect_eq(1);
 		app.world()
 			.entity(spawned[0])
-			.get::<TemplateOf>()
+			.get::<TemplateNodeOf>()
 			.unwrap()
 			.0
 			.xpect_eq(target);

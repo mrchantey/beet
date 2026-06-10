@@ -6,7 +6,6 @@ use beet_ui::style::common_props::BackgroundColor;
 use beet_ui::style::common_props::FontWeightProp;
 use beet_ui::style::common_props::ForegroundColor;
 use beet_ui::style::common_props::TextAlignProp;
-use beet_ui::*;
 
 
 fn main() {

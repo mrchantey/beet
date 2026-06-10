@@ -3,7 +3,6 @@
 //! wrapped, styled lines, while `<pre>` preserves whitespace and newlines.
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
-use beet_ui::*;
 use bevy::math::UVec2;
 
 fn main() {

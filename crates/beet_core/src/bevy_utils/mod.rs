@@ -56,6 +56,7 @@ pub use bevyhow::*;
 mod observer_adder;
 #[cfg(feature = "std")]
 pub mod observer_ext;
+pub mod reflect_ext;
 mod on_spawn;
 #[cfg(feature = "std")]
 mod pretty_tracing;
