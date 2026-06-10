@@ -96,7 +96,7 @@
 		".cargo",
 		".beet",
 		".claude",
-		".gitignore",
+		// ".gitignore",
 		".env.example",
 		".github",
 		".playwright-cli",
