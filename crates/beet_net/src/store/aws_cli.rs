@@ -358,7 +358,8 @@ impl S3Sync {
 	}
 }
 
-fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
+/// Whether a string is an S3 URI, ie starts with `s3://`.
+pub fn is_s3_uri(s: &str) -> bool { s.starts_with("s3://") }
 
 #[cfg(test)]
 mod test {

@@ -1,6 +1,6 @@
 //! Generates the `utils-cli` scene: the `beet` CLI's optional utility commands
-//! (run-wasm, build-wasm, export-pdf, and under `qrcode` qrcode) bundled as a
-//! loadable scene.
+//! (run-wasm, build-wasm, export-pdf, s3-sync, and under `qrcode` qrcode)
+//! bundled as a loadable scene.
 //!
 //! The `beet` binary itself only carries scene management; running this example
 //! writes `target/scenes/utils-cli.json`, which `beet load`s to add the utility
@@ -45,6 +45,7 @@ fn spawn_scene(mut commands: Commands) {
 			RunWasm,
 			BuildWasm,
 			ExportPdf,
+			SyncS3,
 			#[cfg(feature = "qrcode")]
 			QrCode,
 		],

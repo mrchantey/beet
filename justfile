@@ -21,25 +21,34 @@ export RUST_MIN_STACK := '1073741824'
 
 test-threads := '--test-threads=8'
 
+# The upstream bucket holding shared assets (models, fonts, fixtures).
+assets-bucket := 's3://beet-site--prod--assets'
+
 default:
 	just --list --unsorted
 
 #💡 Init
 
-# Pull assets into their respective crates.
+# Install the cli and load its utility commands (s3-sync, run-wasm, ...).
+init-cli:
+	just install-cli
+	cargo run -p beet-cli --example export_scenes
+	beet load target/scenes/utils-cli.json
+
+# Set up a fresh checkout: cli, assets, and the ml default model.
 init-repo:
+	just init-cli
 	just pull-assets
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
-	cargo launch codegen
 
+# Pull shared assets from the upstream bucket into ./assets.
 pull-assets:
-	cargo launch --only=pull-assets
+	beet s3-sync --src={{ assets-bucket }} --dst=./assets --delete
 
+# Push local ./assets up to the upstream bucket.
 push-assets:
-	cargo launch --only=push-assets
+	beet s3-sync --src=./assets --dst={{ assets-bucket }} --delete
 
-# just test-site
-# just export-scenes
 #💡 CLI
 
 # Run a cli command as if it was installed
@@ -47,8 +56,10 @@ cli *args:
   beet {{ args }}
   # cargo run -p beet-cli -- {{ args }}
 
+# `--locked` pins the workspace bevy rc, since a bare install re-resolves
+# pre-release deps to a newer, incompatible candidate.
 install-cli *args:
-  cargo install --path crates/beet-cli {{ args }}
+  cargo install --locked --path crates/beet-cli {{ args }}
 
 lambda-build:
 	cargo lambda build -p beet_site --features beet/lambda --release --lambda-dir target/lambda/crates
@@ -74,54 +85,11 @@ run-b crate *args:
 
 #💡 Aliases
 
-chat *args:
-	cargo run --example chat --features=agent -- {{ args }}
-
-run-csr:
-	cargo run --example csr --features=client
-	just watch just build-csr
-
-build-csr:
-	cargo build --example csr --features=client --target wasm32-unknown-unknown
-	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/examples/csr.wasm
-	just cli serve target/examples/csr
-
-
-run-hydration:
-	just watch just build-hydration
-
-run-ssr:
-	just watch cargo run --example ssr --features=server_app
-
-build-hydration:
-	cargo run --example hydration --features=css
-	cargo build --example hydration --target-dir=target --features=rsx --target wasm32-unknown-unknown
-	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
-	just cli serve target/examples/hydration
-
 doc crate *args:
 	just watch cargo doc -p {{ crate }} --open {{ args }}
 
 fmt *args:
-	cargo fmt {{ args }} && just leptosfmt {{ args }}
-
-# soo bad
-leptosfmt *args:
-	leptosfmt -q											\
-	crates/beet_site/**/*.rs 					\
-	crates/beet_site/**/**/*.rs 			\
-	crates/beet_site/**/**/**/*.rs 		\
-	{{ args }}
-
-#💡 e2e examples
-
-# Run bevy reactive example on an endless loop, it exits on recompile required
-run-bevy-rsx:
-	while true; do cargo run --example bevy_rsx --features=bevy_default; done
-
-# run-bevy-rsx but stop if there's an error
-run-bevy-rsx-if-ok:
-	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
+	cargo fmt {{ args }}
 
 # just cli watch -p beet_site {{args}}
 build-site *args:
@@ -160,7 +128,6 @@ test-all-doc *args:
 
 test-fmt:
 	cargo fmt 				--check
-	just leptosfmt 		--check
 
 test-ci *args:
 	just test-fmt
@@ -283,10 +250,7 @@ test-clanker:
 	--out-dir=assets/tests/agents/out
 
 example-chat *args:
-	just watch cargo run --example chat 	--features=native-tls,agent -- {{ args }}
-
-example-image *args:
-	just watch cargo run --example image 	--features=native-tls,agent -- {{ args }}
+	just watch cargo run --example chat 	--features=native-tls,thread -- {{ args }}
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer
