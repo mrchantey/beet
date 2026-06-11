@@ -135,9 +135,11 @@ mod tests {
 			))
 			.id();
 		world.with_state::<RuleSetQuery, _>(|query| {
-			let card_bg = query.resolve(card, BackgroundColor).unwrap();
-			let dark_highest =
-				query.resolve(body, colors::SurfaceContainerHighest).unwrap();
+			let memo = &mut default();
+			let card_bg = query.resolve(card, BackgroundColor, memo).unwrap();
+			let dark_highest = query
+				.resolve(body, colors::SurfaceContainerHighest, memo)
+				.unwrap();
 			card_bg.xpect_eq(dark_highest);
 		});
 	}
@@ -165,9 +167,11 @@ mod tests {
 			.id();
 		world.spawn((RenderRef::new(content), ChildOf(body)));
 		world.with_state::<RuleSetQuery, _>(|query| {
-			let card_bg = query.resolve(card, BackgroundColor).unwrap();
-			let dark_highest =
-				query.resolve(body, colors::SurfaceContainerHighest).unwrap();
+			let memo = &mut default();
+			let card_bg = query.resolve(card, BackgroundColor, memo).unwrap();
+			let dark_highest = query
+				.resolve(body, colors::SurfaceContainerHighest, memo)
+				.unwrap();
 			card_bg.xpect_eq(dark_highest);
 		});
 	}
@@ -190,13 +194,16 @@ mod tests {
 		let bare = world.spawn(rsx! { <span/> }).id();
 
 		world.with_state::<RuleSetQuery, _>(|query| {
-			let child_surface = query.resolve(child, colors::Surface).unwrap();
+			let memo = &mut default();
+			let child_surface =
+				query.resolve(child, colors::Surface, memo).unwrap();
 			// inherits the parent's dark scheme ...
 			child_surface
-				.xpect_eq(query.resolve(parent, colors::Surface).unwrap());
+				.xpect_eq(query.resolve(parent, colors::Surface, memo).unwrap());
 			// ... which differs from the do-nothing light fallback
-			(child_surface != query.resolve(bare, colors::Surface).unwrap())
-				.xpect_true();
+			(child_surface
+				!= query.resolve(bare, colors::Surface, memo).unwrap())
+			.xpect_true();
 		});
 	}
 

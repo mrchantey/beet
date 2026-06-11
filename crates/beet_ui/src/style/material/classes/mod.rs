@@ -279,9 +279,11 @@ mod tests {
 		let mut world = (MaterialStylePlugin::default(), StylePlugin).into_world();
 		let heading = world.spawn(rsx! { <h1/> }).id();
 		world.with_state::<RuleSetQuery, _>(|query| {
-			let foreground =
-				query.resolve(heading, common_props::ForegroundColor).unwrap();
-			let primary = query.resolve(heading, colors::Primary).unwrap();
+			let foreground = query
+				.resolve(heading, common_props::ForegroundColor, &mut default())
+				.unwrap();
+			let primary =
+				query.resolve(heading, colors::Primary, &mut default()).unwrap();
 			foreground.xpect_eq(primary);
 		});
 	}
@@ -295,9 +297,11 @@ mod tests {
 			.spawn(rsx! { <span {Classes::new([ERROR_TEXT])}/> })
 			.id();
 		world.with_state::<RuleSetQuery, _>(|query| {
-			let foreground =
-				query.resolve(entity, common_props::ForegroundColor).unwrap();
-			let error = query.resolve(entity, colors::Error).unwrap();
+			let foreground = query
+				.resolve(entity, common_props::ForegroundColor, &mut default())
+				.unwrap();
+			let error =
+				query.resolve(entity, colors::Error, &mut default()).unwrap();
 			foreground.xpect_eq(error);
 		});
 	}

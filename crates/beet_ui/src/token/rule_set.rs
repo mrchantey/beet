@@ -156,24 +156,43 @@ impl RuleSet {
 		self
 	}
 
-	fn cascade(&self, el: &ElementView, key: &Token) -> Result<&TokenValue> {
-		// The `:root` default rule is the lowest-priority fallback,
-		// applied by `RuleSetQuery` after the ancestor walk, so a matching rule
-		// (eg `.dark-scheme`) can override a `:root` default, mirroring CSS.
-		// `@media`-gated rules are skipped *unless* gated by `Terminal`, the one
-		// query whose context is this cascade: print/screen/reduced-motion are
-		// web concerns that only affect CSS output, while a `Terminal` rule (eg
-		// the colored prose headings) applies here and is excluded from CSS.
-		// The most specific matching rule wins (class beats tag); ties go to the
-		// later rule, mirroring CSS source order (and the serialized stylesheet)
-		// so a theme override appended after a user-agent default wins on both.
+	/// Indices (into [`Self::rules`]) of the rules whose selector matches `el`,
+	/// in source order. Computed once per element by [`RuleSetQuery`] and reused
+	/// across that element's ~30 property lookups, so the 228-rule selector scan
+	/// runs once per element instead of once per property.
+	///
+	/// `@media`-gated rules are skipped *unless* gated by `Terminal`, the one
+	/// query whose context is this cascade: print/screen/reduced-motion are web
+	/// concerns that only affect CSS output, while a `Terminal` rule (eg the
+	/// colored prose headings) applies here and is excluded from CSS.
+	fn matching_rule_indices(&self, el: &ElementView) -> Vec<usize> {
 		self.rules
 			.iter()
-			.filter(|rule| {
+			.enumerate()
+			.filter(|(_, rule)| {
 				rule.media().is_none_or(MediaQuery::is_terminal)
 					&& rule.selector().matches(el)
 			})
-			.filter_map(|rule| {
+			.map(|(index, _)| index)
+			.collect()
+	}
+
+	/// Pick the winning declaration for `key` among the pre-matched rules. The
+	/// `:root` default rule is the lowest-priority fallback, applied by
+	/// [`RuleSetQuery`] after the ancestor walk, so a matching rule (eg
+	/// `.dark-scheme`) can override a `:root` default, mirroring CSS. The most
+	/// specific matching rule wins (class beats tag); ties go to the later rule,
+	/// mirroring CSS source order (and the serialized stylesheet) so a theme
+	/// override appended after a user-agent default wins on both.
+	fn cascade_in(
+		&self,
+		matched: &[usize],
+		key: &Token,
+	) -> Result<&TokenValue> {
+		matched
+			.iter()
+			.filter_map(|&index| {
+				let rule = &self.rules[index];
 				rule.get(key)
 					.ok()
 					.map(|value| (rule.selector().specificity(), value))
@@ -184,6 +203,26 @@ impl RuleSet {
 	}
 }
 
+
+/// Within-pass cascade memo, owned by [`resolve_styles`] and fresh each pass so
+/// no stale value leaks across frames. Two caches collapse the cost:
+///
+/// - `values`: `(Entity, Token)` -> resolved [`Value`] (`None` = no match). An
+///   inherited token re-walked for every descendant becomes a single map hit
+///   instead of another ancestor walk, the fix for the O(n²) inheritance blowup.
+/// - `matched_rules`: nearest-element [`Entity`] -> indices of the rules whose
+///   selector matches it. Resolving an element touches ~30 properties; without
+///   this each would re-scan all rules, so this runs the selector scan once per
+///   element instead of once per property.
+#[derive(Default)]
+pub struct CascadeMemo {
+	values: HashMap<(Entity, Token), Option<Value>>,
+	matched_rules: HashMap<Entity, Vec<usize>>,
+	/// query [`Entity`] -> its nearest-ancestor element entity, so the
+	/// `get_in_ancestors` walk + [`ElementView`] build runs once per entity
+	/// rather than once per resolved property.
+	nearest_element: HashMap<Entity, Entity>,
+}
 
 #[derive(SystemParam)]
 pub struct RuleSetQuery<'w, 's> {
@@ -199,38 +238,67 @@ pub struct RuleSetQuery<'w, 's> {
 }
 
 impl RuleSetQuery<'_, '_> {
-	pub fn resolve<T>(&self, entity: Entity, token: T) -> Result<T::Value>
+	/// Resolve `token` for `entity`, memoizing the result in `memo`. The cache
+	/// collapses the inheritance ancestor walk (and `:root` fallback) so each
+	/// `(entity, token)` is cascaded once per pass.
+	pub fn resolve<T>(
+		&self,
+		entity: Entity,
+		token: T,
+		memo: &mut CascadeMemo,
+	) -> Result<T::Value>
 	where
 		T: TypedToken + Into<Token>,
 		T::Value: DeserializeOwned,
 	{
-		self.resolve_untyped(entity, &token.into())
-			.and_then(|value| value.clone().into_serde::<T::Value>())
+		self.resolve_untyped(entity, &token.into(), memo)
+			.and_then(|value| value.into_serde::<T::Value>())
 	}
 	pub fn resolve_untyped(
 		&self,
 		entity: Entity,
 		token: &Token,
-	) -> Result<&Value> {
-		match self.cascade(entity, &token) {
+		memo: &mut CascadeMemo,
+	) -> Result<Value> {
+		// inheritance re-walks the same `(ancestor, token)` for every descendant,
+		// so a cache hit here is what turns the cascade from O(n²) back to O(n).
+		let key = (entity, token.clone());
+		if let Some(cached) = memo.values.get(&key) {
+			return cached
+				.clone()
+				.ok_or_else(|| bevyhow!("no matching rule for token `{token}`"));
+		}
+		let resolved = self.resolve_untyped_uncached(entity, token, memo);
+		memo.values.insert(key, resolved.as_ref().ok().cloned());
+		resolved
+	}
+
+	fn resolve_untyped_uncached(
+		&self,
+		entity: Entity,
+		token: &Token,
+		memo: &mut CascadeMemo,
+	) -> Result<Value> {
+		match self.cascade(entity, token, memo) {
 			Ok(TokenValue::Value(value)) =>
 			// mapped directly to value, ie background-color: green
 			{
-				value.value().xok()
+				value.value().clone().xok()
 			}
-			Ok(TokenValue::Token(token)) => {
+			Ok(TokenValue::Token(next)) => {
 				// points to another token ie background-color: primary
-				self.resolve_untyped(entity, &token)
+				let next = next.clone();
+				self.resolve_untyped(entity, &next, memo)
 			}
 			Err(err) => {
 				// inherited tokens search ancestors before the root fallback
 				if token.is_inherited()
 					&& let Some(ancestor) = self.parent(entity)
 				{
-					self.resolve_untyped(ancestor, token)
+					self.resolve_untyped(ancestor, token, memo)
 				} else {
 					// fall back to the `:root` default declarations
-					self.resolve_default(entity, token).map_err(|_| err)
+					self.resolve_default(entity, token, memo).map_err(|_| err)
 				}
 			}
 		}
@@ -250,22 +318,43 @@ impl RuleSetQuery<'_, '_> {
 
 	/// Resolves `token` against the `:root` default rule — the lowest-priority
 	/// fallback consulted once the cascade and ancestor walk find nothing.
-	fn resolve_default(&self, entity: Entity, token: &Token) -> Result<&Value> {
-		match self.rule_set.default_rule().get(token)? {
-			TokenValue::Value(value) => value.value().xok(),
-			TokenValue::Token(token) => self.resolve_untyped(entity, token),
-		}
-	}
-	pub fn cascade(
+	fn resolve_default(
 		&self,
 		entity: Entity,
 		token: &Token,
-	) -> Result<&TokenValue> {
-		// get the nearest ancestor element, handling
-		// text and fragment nodes
+		memo: &mut CascadeMemo,
+	) -> Result<Value> {
+		match self.rule_set.default_rule().get(token)? {
+			TokenValue::Value(value) => value.value().clone().xok(),
+			TokenValue::Token(next) => {
+				let next = next.clone();
+				self.resolve_untyped(entity, &next, memo)
+			}
+		}
+	}
+	pub fn cascade<'a>(
+		&'a self,
+		entity: Entity,
+		token: &Token,
+		memo: &mut CascadeMemo,
+	) -> Result<&'a TokenValue> {
+		// fast path: once an entity's nearest element and that element's matched
+		// rules are cached, skip the `get_in_ancestors` walk and `ElementView`
+		// build entirely (the common case across an entity's ~30 properties).
+		if let Some(element) = memo.nearest_element.get(&entity)
+			&& let Some(matched) = memo.matched_rules.get(element)
+		{
+			return self.rule_set.cascade_in(matched, token);
+		}
+		// cold path: resolve the nearest ancestor element (handling text and
+		// fragment nodes) and the rules matching it, caching both.
 		let el = self.element_query.get_in_ancestors(entity)?;
-		let value = self.rule_set.cascade(&el, token)?;
-		Ok(value)
+		memo.nearest_element.insert(entity, el.entity);
+		let matched = memo
+			.matched_rules
+			.entry(el.entity)
+			.or_insert_with(|| self.rule_set.matching_rule_indices(&el));
+		self.rule_set.cascade_in(matched, token)
 	}
 }
 
@@ -298,7 +387,7 @@ mod tests {
 		// a matching (non-default) rule is found directly by `cascade`
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.cascade(entity, &Foo.into()).cloned()
+				query.cascade(entity, &Foo.into(), &mut default()).cloned()
 			})
 			.unwrap()
 			.xpect_eq(TokenValue::token(Bar));
@@ -306,14 +395,14 @@ mod tests {
 		// `Bar` lives only in the `:root` default rule, which `cascade` excludes ...
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.cascade(entity, &Bar.into()).is_err()
+				query.cascade(entity, &Bar.into(), &mut default()).is_err()
 			})
 			.xpect_true();
 
 		// ... but resolution falls back to it, following the token chain
 		entity
 			.with_state::<RuleSetQuery, _>(|entity, query| {
-				query.resolve_untyped(entity, &Foo.into()).cloned()
+				query.resolve_untyped(entity, &Foo.into(), &mut default())
 			})
 			.unwrap()
 			.xpect_eq(3u32.into());

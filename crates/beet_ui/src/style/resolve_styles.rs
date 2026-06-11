@@ -42,13 +42,19 @@ pub fn resolve_styles(
 		.map(|entity| ancestors.root_ancestor(entity))
 		.collect::<HashSet<_>>();
 
+	// within-pass cascade memo, keyed by `(entity, token)`. Resolving the page
+	// touches ~30 properties per entity and inherited tokens re-walk ancestors;
+	// without this the ancestor re-walk is O(n²). Fresh each run so no stale
+	// value leaks across frames.
+	let mut memo = CascadeMemo::default();
+
 	// inheritance cache friendly parallelism, top down queue,
 	// as described in stylo https://youtu.be/Y6SSTRr2mFU?t=310
 	let mut queue = roots.into_iter().collect::<Vec<_>>();
 	while !queue.is_empty() {
 		for entity in queue.drain(..).collect::<Vec<_>>() {
 			// resolve visual style
-			let visual = resolve_visual(&ruleset_query, entity)?;
+			let visual = resolve_visual(&ruleset_query, entity, &mut memo)?;
 			if let Some(mut style) = styles.get_mut(entity)?.0 {
 				style.set_if_neq(visual);
 			} else {
@@ -56,7 +62,7 @@ pub fn resolve_styles(
 			}
 
 			// resolve layout style
-			let layout = resolve_layout(&ruleset_query, entity)?;
+			let layout = resolve_layout(&ruleset_query, entity, &mut memo)?;
 			if let Some(mut style) = styles.get_mut(entity)?.1 {
 				style.set_if_neq(layout);
 			} else {
@@ -66,7 +72,7 @@ pub fn resolve_styles(
 			// resolve box style — only for elements, so a text/fragment child does
 			// not inherit and re-paint its ancestor element's border/background.
 			let box_s = if elements.contains(entity) {
-				resolve_box(&ruleset_query, entity)?
+				resolve_box(&ruleset_query, entity, &mut memo)?
 			} else {
 				BoxStyle::default()
 			};
@@ -79,7 +85,7 @@ pub fn resolve_styles(
 			// resolve positioning — element-level like the box model, so a text
 			// node never carries its ancestor's position.
 			let position = if elements.contains(entity) {
-				resolve_position(&ruleset_query, entity)?
+				resolve_position(&ruleset_query, entity, &mut memo)?
 			} else {
 				PositionStyle::default()
 			};
@@ -92,7 +98,7 @@ pub fn resolve_styles(
 			// resolve scrollbar styling (element-level), read by the charcell
 			// scrollbar paint on scroll containers.
 			let scrollbar = if elements.contains(entity) {
-				resolve_scrollbar(&ruleset_query, entity)?
+				resolve_scrollbar(&ruleset_query, entity, &mut memo)?
 			} else {
 				ScrollbarStyle::default()
 			};
@@ -118,21 +124,29 @@ pub fn resolve_styles(
 	Ok(())
 }
 
-fn resolve_visual(query: &RuleSetQuery, entity: Entity) -> Result<VisualStyle> {
-	let foreground = query.resolve(entity, ForegroundColor).ok();
-	let background = query.resolve(entity, BackgroundColor).ok();
-	let decoration_color = query.resolve(entity, DecorationColor).ok();
+fn resolve_visual(
+	query: &RuleSetQuery,
+	entity: Entity,
+	memo: &mut CascadeMemo,
+) -> Result<VisualStyle> {
+	let foreground = query.resolve(entity, ForegroundColor, memo).ok();
+	let background = query.resolve(entity, BackgroundColor, memo).ok();
+	let decoration_color = query.resolve(entity, DecorationColor, memo).ok();
 	let decoration_line = query
-		.resolve(entity, DecorationLineProp)
+		.resolve(entity, DecorationLineProp, memo)
 		.unwrap_or_default();
 	let decoration_style = query
-		.resolve(entity, DecorationStyleProp)
+		.resolve(entity, DecorationStyleProp, memo)
 		.unwrap_or_default();
-	let text_align = query.resolve(entity, TextAlignProp).unwrap_or_default();
-	let font_weight = query.resolve(entity, FontWeightProp).unwrap_or_default();
-	let font_style = query.resolve(entity, FontStyleProp).unwrap_or_default();
-	let blink = query.resolve(entity, BlinkStyleProp).unwrap_or_default();
-	let visibility = query.resolve(entity, VisibilityProp).unwrap_or_default();
+	let text_align =
+		query.resolve(entity, TextAlignProp, memo).unwrap_or_default();
+	let font_weight =
+		query.resolve(entity, FontWeightProp, memo).unwrap_or_default();
+	let font_style =
+		query.resolve(entity, FontStyleProp, memo).unwrap_or_default();
+	let blink = query.resolve(entity, BlinkStyleProp, memo).unwrap_or_default();
+	let visibility =
+		query.resolve(entity, VisibilityProp, memo).unwrap_or_default();
 
 	VisualStyle {
 		foreground,
@@ -149,28 +163,40 @@ fn resolve_visual(query: &RuleSetQuery, entity: Entity) -> Result<VisualStyle> {
 	.xok()
 }
 
-fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
-	let flex_grow = query.resolve(entity, FlexGrowProp).unwrap_or_default();
-	let flex_order = query.resolve(entity, FlexOrderProp).unwrap_or_default();
-	let align_self = query.resolve(entity, AlignSelfProp).unwrap_or_default();
-	let display = query.resolve(entity, DisplayProp).unwrap_or_default();
-	let white_space = query.resolve(entity, WhiteSpaceProp).unwrap_or_default();
+fn resolve_layout(
+	query: &RuleSetQuery,
+	entity: Entity,
+	memo: &mut CascadeMemo,
+) -> Result<LayoutStyle> {
+	let flex_grow =
+		query.resolve(entity, FlexGrowProp, memo).unwrap_or_default();
+	let flex_order =
+		query.resolve(entity, FlexOrderProp, memo).unwrap_or_default();
+	let align_self =
+		query.resolve(entity, AlignSelfProp, memo).unwrap_or_default();
+	let display = query.resolve(entity, DisplayProp, memo).unwrap_or_default();
+	let white_space =
+		query.resolve(entity, WhiteSpaceProp, memo).unwrap_or_default();
 	let direction =
-		query.resolve(entity, FlexDirectionProp).unwrap_or_default();
-	let wrap = query.resolve(entity, FlexWrapProp).unwrap_or_default();
+		query.resolve(entity, FlexDirectionProp, memo).unwrap_or_default();
+	let wrap = query.resolve(entity, FlexWrapProp, memo).unwrap_or_default();
 	let justify_content = query
-		.resolve(entity, JustifyContentProp)
+		.resolve(entity, JustifyContentProp, memo)
 		.unwrap_or_default();
-	let align_items = query.resolve(entity, AlignItemsProp).unwrap_or_default();
+	let align_items =
+		query.resolve(entity, AlignItemsProp, memo).unwrap_or_default();
 	let align_content =
-		query.resolve(entity, AlignContentProp).unwrap_or_default();
+		query.resolve(entity, AlignContentProp, memo).unwrap_or_default();
 	// gaps stay as `Length` here (the resolution-independent value): each renderer
 	// converts at layout time, where the real viewport is known. The charcell
 	// engine rounds to whole cells via `FlexBox::{row,column}_gap_cells`.
-	let row_gap = query.resolve(entity, RowGapProp).unwrap_or_default();
-	let column_gap = query.resolve(entity, ColumnGapProp).unwrap_or_default();
-	let overflow_x = query.resolve(entity, OverflowXProp).unwrap_or_default();
-	let overflow_y = query.resolve(entity, OverflowYProp).unwrap_or_default();
+	let row_gap = query.resolve(entity, RowGapProp, memo).unwrap_or_default();
+	let column_gap =
+		query.resolve(entity, ColumnGapProp, memo).unwrap_or_default();
+	let overflow_x =
+		query.resolve(entity, OverflowXProp, memo).unwrap_or_default();
+	let overflow_y =
+		query.resolve(entity, OverflowYProp, memo).unwrap_or_default();
 	LayoutStyle {
 		display,
 		white_space,
@@ -195,18 +221,19 @@ fn resolve_layout(query: &RuleSetQuery, entity: Entity) -> Result<LayoutStyle> {
 fn resolve_position(
 	query: &RuleSetQuery,
 	entity: Entity,
+	memo: &mut CascadeMemo,
 ) -> Result<PositionStyle> {
-	let position = query.resolve(entity, PositionProp).unwrap_or_default();
+	let position = query.resolve(entity, PositionProp, memo).unwrap_or_default();
 	// each inset is `auto` (None) unless a rule sets it.
 	PositionStyle {
 		position,
 		inset: [
-			query.resolve(entity, InsetTop).ok(),
-			query.resolve(entity, InsetRight).ok(),
-			query.resolve(entity, InsetBottom).ok(),
-			query.resolve(entity, InsetLeft).ok(),
+			query.resolve(entity, InsetTop, memo).ok(),
+			query.resolve(entity, InsetRight, memo).ok(),
+			query.resolve(entity, InsetBottom, memo).ok(),
+			query.resolve(entity, InsetLeft, memo).ok(),
 		],
-		z_index: query.resolve(entity, ZIndexProp).ok(),
+		z_index: query.resolve(entity, ZIndexProp, memo).ok(),
 	}
 	.xok()
 }
@@ -214,10 +241,12 @@ fn resolve_position(
 fn resolve_scrollbar(
 	query: &RuleSetQuery,
 	entity: Entity,
+	memo: &mut CascadeMemo,
 ) -> Result<ScrollbarStyle> {
-	let width = query.resolve(entity, ScrollbarWidthProp).unwrap_or_default();
+	let width =
+		query.resolve(entity, ScrollbarWidthProp, memo).unwrap_or_default();
 	// scrollbar-color sets both thumb and track; absent leaves renderer defaults.
-	let color = query.resolve(entity, ScrollbarColorProp).ok();
+	let color = query.resolve(entity, ScrollbarColorProp, memo).ok();
 	ScrollbarStyle {
 		thumb: color.map(|c| c.thumb),
 		track: color.map(|c| c.track),
@@ -226,13 +255,17 @@ fn resolve_scrollbar(
 	.xok()
 }
 
-fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
-	let padding = query.resolve(entity, Padding).unwrap_or_default();
-	let margin = query.resolve(entity, MarginProp).unwrap_or_default();
-	let border_color = query.resolve(entity, BorderColorProp).ok();
+fn resolve_box(
+	query: &RuleSetQuery,
+	entity: Entity,
+	memo: &mut CascadeMemo,
+) -> Result<BoxStyle> {
+	let padding = query.resolve(entity, Padding, memo).unwrap_or_default();
+	let margin = query.resolve(entity, MarginProp, memo).unwrap_or_default();
+	let border_color = query.resolve(entity, BorderColorProp, memo).ok();
 	// per-side border widths fall back to the uniform `border-width`, so a rule
 	// can reserve a single edge (eg `border-right`) or a full box.
-	let uniform = query.resolve(entity, OutlineWidth).ok();
+	let uniform = query.resolve(entity, OutlineWidth, memo).ok();
 	let resolve_side = |width: Result<Length>| {
 		width.ok().or(uniform).unwrap_or(Length::DEFAULT)
 	};
@@ -242,15 +275,15 @@ fn resolve_box(query: &RuleSetQuery, entity: Entity) -> Result<BoxStyle> {
 		border_top: border_color,
 		border_bottom: border_color,
 		border: Spacing {
-			top: resolve_side(query.resolve(entity, BorderTopWidth)),
-			right: resolve_side(query.resolve(entity, BorderRightWidth)),
-			bottom: resolve_side(query.resolve(entity, BorderBottomWidth)),
-			left: resolve_side(query.resolve(entity, BorderLeftWidth)),
+			top: resolve_side(query.resolve(entity, BorderTopWidth, memo)),
+			right: resolve_side(query.resolve(entity, BorderRightWidth, memo)),
+			bottom: resolve_side(query.resolve(entity, BorderBottomWidth, memo)),
+			left: resolve_side(query.resolve(entity, BorderLeftWidth, memo)),
 		},
 		margin,
 		padding,
-		width: query.resolve(entity, Width).ok(),
-		height: query.resolve(entity, Height).ok(),
+		width: query.resolve(entity, Width, memo).ok(),
+		height: query.resolve(entity, Height, memo).ok(),
 	}
 	.xok()
 }

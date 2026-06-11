@@ -199,7 +199,7 @@ fn list_marker(
 	// `list-style-type: none` (inherited, eg set on an ancestor `<nav>`) strips
 	// the marker, so navigation lists read as links rather than bullets.
 	if ruleset
-		.resolve(li, ListStyleProp)
+		.resolve(li, ListStyleProp, &mut default())
 		.is_ok_and(|style| style == ListStyle::None)
 	{
 		return None;
