@@ -242,6 +242,21 @@ async fn homepage_boots_with_chrome_and_scheme() {
 	host.has_scrollbar().xpect_false();
 }
 
+/// Alt+Left / Alt+Right drive the navigator back / forward through history.
+#[beet::test]
+async fn alt_arrow_navigates_history() {
+	let mut host = SiteHost::new(UVec2::new(120, 64), "/");
+	host.step_until("malleable application framework");
+	host.navigate("/blog");
+	host.step_until("Full Moon Harvest");
+	// alt+left -> back to the homepage
+	host.send(b"\x1b[1;3D");
+	host.step_until("malleable application framework");
+	// alt+right -> forward to the blog index
+	host.send(b"\x1b[1;3C");
+	host.step_until("Full Moon Harvest");
+}
+
 /// In-world navigation reaches the blog index (a markdown `BlobScene` route).
 #[beet::test]
 async fn navigates_to_blog_index() {
