@@ -62,6 +62,17 @@ impl Default for ValueSchema {
 	fn default() -> Self { Self::Null }
 }
 
+/// Fallback when the `json` feature is off (the real parser lives in
+/// `from_json.rs`): JSON schema parsing is unavailable, so a `bx:schema` block is
+/// treated as absent by its `.ok()` callers.
+#[cfg(not(feature = "json"))]
+impl ValueSchema {
+	/// Parsing a JSON schema requires the `json` feature.
+	pub fn from_json_schema(_json: &str) -> Result<ValueSchema> {
+		bevybail!("parsing a JSON schema requires the `json` feature")
+	}
+}
+
 impl ValueSchema {
 	/// Build a schema for `T` via its bevy reflect type info.
 	pub fn of<T: Typed>() -> Self { Self::from_type_info(T::type_info()) }

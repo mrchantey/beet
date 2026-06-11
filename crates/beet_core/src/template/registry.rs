@@ -170,7 +170,7 @@ pub fn template_schema_by_name(
 ///
 /// Resolves `tag` to a [`ReflectTemplate`] from `registry`, then builds it from
 /// `value`. Errors if no template is registered under that tag.
-pub(crate) fn build_template_by_name(
+pub fn build_template_by_name(
 	registry: &AppTypeRegistry,
 	tag: &str,
 	value: &dyn PartialReflect,

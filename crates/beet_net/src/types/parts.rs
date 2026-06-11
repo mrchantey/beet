@@ -235,25 +235,17 @@ impl RequestParts {
 		self.url.path_from(index)
 	}
 
-	/// Reconstructs a CLI argument vector from these parts: every path segment
-	/// as a positional, followed by each param as a `--key` flag (no value) or
-	/// `--key=value` pair.
+	/// Reconstructs the structured [`CliArgs`] these parts were derived from: path
+	/// segments as positionals, params as named args.
 	///
-	/// The inverse of the [`CliArgs`] → [`RequestParts`] conversion, useful for
-	/// forwarding a request to a subprocess. Ordering between positionals and
-	/// flags is not preserved.
-	pub fn unparse_cli_args(&self) -> Vec<String> {
-		let mut args = self.path().clone();
-		for (key, values) in self.params().iter_all() {
-			if values.is_empty() {
-				args.push(format!("--{key}"));
-			} else {
-				for value in values {
-					args.push(format!("--{key}={value}"));
-				}
-			}
+	/// The inverse of the [`CliArgs`] → [`RequestParts`] conversion. Mutate the
+	/// returned value for finer control, then [`CliArgs::into_args`] for the argv
+	/// (eg forwarding a request to a subprocess).
+	pub fn to_cli_args(&self) -> CliArgs {
+		CliArgs {
+			path: self.path().clone(),
+			params: self.params().clone(),
 		}
-		args
 	}
 
 	/// Returns a reference to the inner [`Url`].
@@ -696,9 +688,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn unparse_cli_args_roundtrip() {
+	fn to_cli_args_roundtrip() {
 		let cli = CliArgs::parse("run-wasm bin extra --flag --key=value");
-		let args = RequestParts::from(cli).unparse_cli_args();
+		let args = RequestParts::from(cli).to_cli_args().into_args();
 		// positionals lead, in order
 		args[..3].to_vec().xpect_eq(vec![
 			"run-wasm".to_string(),

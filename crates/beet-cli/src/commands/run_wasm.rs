@@ -24,21 +24,22 @@ const DENO_TS: &str = include_str!("deno.ts");
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
-	// segments after the `run-wasm` command rejoin into the absolute binary path.
-	let segments = parts.path_from(1);
+	let mut cli = parts.to_cli_args();
+	// route `run-wasm/*args`: the first segment is the command, the rest rejoin
+	// into the (absolute) binary path. cargo passes an absolute path whose `/`
+	// separators split into several segments, hence the rejoin.
+	let mut segments = core::mem::take(&mut cli.path);
+	if segments.is_empty() {
+		bevybail!("usage: beet run-wasm <binary-path> [args..]");
+	}
+	segments.remove(0);
 	if segments.is_empty() {
 		bevybail!("usage: beet run-wasm <binary-path> [args..]");
 	}
 	let exe_path = format!("/{}", segments.join("/"));
-	// forwarded flags arrive as query params, re-emitted as `--key[=value]`.
-	let forwarded = parts
-		.params()
-		.iter_all()
-		.flat_map(|(key, values)| match values.is_empty() {
-			true => vec![format!("--{key}")],
-			false => values.iter().map(|value| format!("--{key}={value}")).collect(),
-		})
-		.collect();
+	// `cli` now holds only the forwarded params; flatten them to `--key[=value]`
+	// flags the running module reads back via `Deno.args`.
+	let forwarded = cli.into_args();
 	run_wasm(Path::new(&exe_path), forwarded).await?;
 	// the module's output already streamed via inherited stdio
 	Ok(String::new())

@@ -154,6 +154,25 @@ impl CliArgs {
 		result
 	}
 
+	/// Flattens into a CLI argument vector: each path segment as a positional,
+	/// then each param as a `--key` flag (no value) or `--key=value` pair.
+	///
+	/// Ordering between positionals and flags is not preserved. The inverse of
+	/// [`parse_tokens`](Self::parse_tokens), useful for forwarding to a subprocess.
+	pub fn into_args(self) -> Vec<String> {
+		let mut args = self.path;
+		for (key, values) in self.params.iter_all() {
+			if values.is_empty() {
+				args.push(format!("--{key}"));
+			} else {
+				for value in values {
+					args.push(format!("--{key}={value}"));
+				}
+			}
+		}
+		args
+	}
+
 	/// Converts the parsed arguments back into a path string with query params.
 	pub fn into_path_string(&self) -> String {
 		let mut path_str = format!("/{}", self.path.join("/"));

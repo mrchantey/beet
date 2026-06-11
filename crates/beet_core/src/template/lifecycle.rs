@@ -91,18 +91,8 @@ pub struct PendingId(u64);
 /// [`PendingId`] must park on, so [`LoadTemplate`] defers until it resolves.
 /// Absent outside a build, in which case a dependency registers on the entity it
 /// builds into.
-#[derive(Debug, Clone, Copy, Resource)]
-pub(crate) struct TemplateBuildRoot(
-	// only the deferred-dependency paths read the root back via `resolve`: assets
-	// (`bevy_asset`) and remote bsx schemas/templates (`bsx`). Without either the
-	// resource is still set/cleared by the build walker as a scope marker, but its
-	// field goes unread.
-	#[cfg_attr(
-		not(any(feature = "bevy_asset", feature = "bsx")),
-		allow(dead_code)
-	)]
-	pub Entity,
-);
+#[derive(Debug, Clone, Copy, Deref, DerefMut, Resource)]
+pub(crate) struct TemplateBuildRoot(pub Entity);
 
 #[cfg(any(feature = "bevy_asset", feature = "bsx"))]
 impl TemplateBuildRoot {
@@ -112,7 +102,7 @@ impl TemplateBuildRoot {
 	pub(crate) fn resolve(world: &World, entity: Entity) -> Entity {
 		world
 			.get_resource::<TemplateBuildRoot>()
-			.map(|root| root.0)
+			.map(|root| **root)
 			.unwrap_or(entity)
 	}
 }

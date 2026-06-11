@@ -10,12 +10,14 @@ use bevy::prelude::BevyError;
 
 /// A [`Clone`] [`BevyError`], shared behind an [`Arc`].
 ///
-/// `BevyError` is not `Clone`, yet the template build path must carry one error
-/// to three places at once: the [`TemplateError`](crate::prelude::TemplateError)
-/// component, the [`LoadTemplate`](crate::prelude::LoadTemplate) lifecycle event,
-/// and the `spawn_template` return. Wrapping it here lets the same error be
-/// shared across all three. A returned `BevyError` whose inner error is a
-/// `CloneError` came from this path.
+/// `BevyError` is not `Clone`, so it cannot live in a type that must itself be
+/// `Clone`, nor be handed to more than one owner. `CloneError` wraps it in an
+/// `Arc` so the same error can be cloned freely and shared across consumers.
+///
+/// For example the template build path carries one failure to three places at
+/// once: the [`TemplateError`](crate::prelude::TemplateError) component, the
+/// [`LoadTemplate`](crate::prelude::LoadTemplate) event, and the `spawn_template`
+/// return. That is only possible because the error is cloneable here.
 #[derive(Debug, Clone)]
 pub struct CloneError(pub Arc<BevyError>);
 
