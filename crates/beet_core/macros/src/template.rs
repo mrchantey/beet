@@ -6,8 +6,9 @@
 //! - a data struct `Name { p1, p2, .. }` deriving `Default` + `Clone` +
 //!   `Reflect` (`#[reflect(Default)]`), whose fields are the props;
 //! - a build-subtree `impl Template<Output = ()>` for `Name` that checks
-//!   required props, binds the props by name, lowers the body in process, and
-//!   inserts the resulting bundle into the build target;
+//!   required props, binds the props by name, runs the body verbatim (any
+//!   `rsx!` inside expands normally), and inserts the resulting bundle into the
+//!   build target;
 //! - a `subtree_template!(Name)` opt-out of Bevy's blanket `Template` impl;
 //! - a `register_Name` registration fn (called by `register_template::<Name>()`)
 //!   exposing the template by name to the loader.
@@ -31,7 +32,6 @@
 //!
 //! `#[prop(all)]` is removed entirely.
 extern crate alloc;
-use crate::rsx::lower_rsx;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
@@ -233,51 +233,6 @@ fn typed_arg(arg: &FnArg) -> syn::Result<&syn::PatType> {
 	}
 }
 
-/// Lower the `#[template]` body to a [`Bundle`] expression.
-///
-/// The body ends with an expression evaluating to `impl Bundle` (optionally with
-/// leading `let` bindings). A trailing `rsx! { .. }` is the common case and is
-/// lowered in process, stripping the macro wrapper so rstml never sees a macro
-/// call (which would crash its recovery). Any other trailing expression is used
-/// as-is, so a template can return a plain bundle, a helper call, or a `match`.
-fn lower_body(body: &syn::Block) -> syn::Result<TokenStream> {
-	let Some(last) = body.stmts.last() else {
-		synbail!(
-			body,
-			"`#[template]` body must end with an expression returning `impl Bundle`"
-		);
-	};
-	// fast path: lower a trailing `rsx! { .. }` in process.
-	if let Some(inner) = rsx_macro_tokens(last) {
-		return Ok(lower_rsx(inner));
-	}
-	// otherwise the trailing expression is any `impl Bundle`.
-	match last {
-		syn::Stmt::Expr(expr, _) => Ok(quote! { #expr }),
-		_ => synbail!(
-			last,
-			"`#[template]` body must end with an expression returning `impl Bundle`"
-		),
-	}
-}
-
-/// The brace contents of a trailing `rsx! { .. }` statement, if the body ends in
-/// one, so the markup can be lowered in process.
-fn rsx_macro_tokens(stmt: &syn::Stmt) -> Option<TokenStream> {
-	let mac = match stmt {
-		syn::Stmt::Expr(syn::Expr::Macro(em), _) => &em.mac,
-		syn::Stmt::Macro(sm) => &sm.mac,
-		_ => return None,
-	};
-	mac.path.is_ident("rsx").then(|| mac.tokens.clone())
-}
-
-/// Statements before the trailing `rsx!`, eg `let label = label.unwrap();`.
-fn pre_body_stmts(body: &syn::Block) -> Vec<&syn::Stmt> {
-	let count = body.stmts.len().saturating_sub(1);
-	body.stmts.iter().take(count).collect()
-}
-
 /// Build the data struct + `Template` impl + registration for a pure template.
 fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
@@ -379,8 +334,6 @@ fn emit(
 		.collect();
 	let data_struct = data_struct(vis, name, generics, props, &beet_core);
 
-	let pre_stmts = pre_body_stmts(body);
-	let lowered = lower_body(body)?;
 	let required_checks = required_checks(props, &beet_core);
 	let required_unwraps = required_unwraps(props);
 	// rebind `PropOpt`-stored optional props to `Option<T>` for the body.
@@ -388,8 +341,9 @@ fn emit(
 		props.iter().filter_map(Prop::body_binding).collect();
 
 	let is_system = system.is_some();
-	// the inner build: bind props, run pre-statements, lower the body to a
-	// bundle, insert it into the build target.
+	// the inner build: bind props, run the body verbatim (it ends in an
+	// `impl Bundle`, commonly an `rsx!` that expands through the normal macro
+	// path), insert the resulting bundle into the build target.
 	let build_body = match system {
 		Some(System { sys_types, sys_pats }) => quote! {
 			let inner = #beet_core::prelude::system_template::<
@@ -398,8 +352,7 @@ fn emit(
 				let Self { #(#field_idents),* } = props.clone();
 				#(#required_unwraps)*
 				#(#body_bindings)*
-				#(#pre_stmts)*
-				let bundle = { use #beet_core::prelude::*; #lowered };
+				let bundle = { use #beet_core::prelude::*; #body };
 				#beet_core::prelude::Snippet::from_bundle(bundle)
 			});
 			cx.entity.build_template(&inner)
@@ -408,8 +361,7 @@ fn emit(
 			let Self { #(#field_idents),* } = self.clone();
 			#(#required_unwraps)*
 			#(#body_bindings)*
-			#(#pre_stmts)*
-			let bundle = { use #beet_core::prelude::*; #lowered };
+			let bundle = { use #beet_core::prelude::*; #body };
 			cx.entity.insert(bundle);
 			::core::result::Result::Ok(())
 		},
@@ -447,7 +399,7 @@ fn emit(
 		impl #impl_generics #bevy::ecs::template::Template for #name #ty_generics #template_where {
 			type Output = ();
 			#[track_caller]
-			#[allow(non_snake_case, unused_variables, unused_braces)]
+			#[allow(non_snake_case, unused_variables, unused_braces, unused_imports)]
 			fn build_template(
 				&self,
 				cx: &mut #bevy::ecs::template::TemplateContext,

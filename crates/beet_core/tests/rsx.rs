@@ -168,3 +168,26 @@ fn doctype_node() {
 	let root = world.spawn_template(rsx! { <!DOCTYPE html> }).unwrap().id();
 	world.entity(root).get::<Doctype>().unwrap();
 }
+
+// `#[template]` emits its body verbatim, so an `rsx!` need not be the trailing
+// statement: it can sit in a `let` binding or a `match` arm and still expand.
+#[template]
+fn Branch(#[prop(into)] heading: bool) -> impl Bundle {
+	let header = rsx! { <h1>"title"</h1> };
+	let body = match heading {
+		true => rsx! { <section>"with heading"</section> },
+		false => rsx! { <section>"no heading"</section> },
+	};
+	rsx! { <div>{header}{body}</div> }
+}
+
+#[beet_core::test]
+fn rsx_in_non_final_position() {
+	let mut world = world();
+	let root = world.spawn_template(rsx! { <Branch heading=true/> }).unwrap().id();
+	world.entity(root).get::<Element>().unwrap().tag().xpect_eq("div");
+	let children = world.entity(root).get::<Children>().unwrap();
+	children.len().xpect_eq(2);
+	world.entity(children[0]).get::<Element>().unwrap().tag().xpect_eq("h1");
+	world.entity(children[1]).get::<Element>().unwrap().tag().xpect_eq("section");
+}

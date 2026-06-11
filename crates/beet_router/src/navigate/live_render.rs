@@ -95,11 +95,15 @@ mod test {
 
 	/// Build a page tree marked as the active scene, returning its root entity.
 	///
-	/// Built through the template substrate (`spawn_template` + `snippet`) so a
+	/// Built through the template substrate (`spawn_template` + `Snippet`) so a
 	/// page of `#[template]` widgets resolves its slots/lifecycle, exactly as the
 	/// route constructors build per-request content.
 	fn spawn_scene(app: &mut App, bundle: impl Bundle) -> Entity {
-		let scene = app.world_mut().spawn_template(snippet(bundle)).id();
+		let scene = app
+			.world_mut()
+			.spawn_template(Snippet::from_bundle(bundle))
+			.unwrap()
+			.id();
 		app.world_mut().entity_mut(scene).insert(CurrentScene);
 		scene
 	}

@@ -1,5 +1,5 @@
 //! Tests for the `#[template]` and `#[template(system)]` macros: prop grammar
-//! (required/default/option/into), in-process body lowering, slots
+//! (required/default/option/into), verbatim body emission, slots
 //! (named/default/fallback/transfer), system world-reads, and events. This is
 //! part of the Task 3 gate.
 beet_core::test_main!();

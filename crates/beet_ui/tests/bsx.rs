@@ -117,7 +117,7 @@ fn bsx_and_rsx_match() {
 
 	let mut world_b = world();
 	let rsx_root = world_b
-		.spawn_template(rsx! { <div class="card"><span>hi</span></div> })
+		.spawn_template(rsx! { <div class="card"><span>"hi"</span></div> })
 		.unwrap()
 		.id();
 	let rsx_html = render_html(&mut world_b, rsx_root);
@@ -387,7 +387,7 @@ fn click_increments_field() {
 /// delegating to the BSX resolver.
 #[template]
 fn Greeting() -> impl Bundle {
-	rsx! { <strong>Hi</strong> }
+	rsx! { <strong>"Hi"</strong> }
 }
 
 #[cfg(feature = "markdown_parser")]
