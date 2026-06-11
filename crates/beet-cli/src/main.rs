@@ -20,7 +20,7 @@ fn main() -> AppExit {
 	App::new()
 		.add_plugins((
 			MinimalPlugins,
-			LogPlugin::default(),
+			LogPlugin::new(Level::DEBUG),
 			ClientAppPlugin,
 			// register the loadable command types so a scene's markers can
 			// reconstruct their behaviour: the `utils-cli` commands and the
@@ -42,10 +42,6 @@ fn main() -> AppExit {
 /// supply its own `/` root without colliding with a host-owned home route.
 fn spawn_host(world: &mut World) {
 	world.spawn((CliServer, default_router(), children![
-		SceneLoad,
-		SceneClear,
-		SceneReset,
-		SceneDump,
-		SceneRun,
+		SceneLoad, SceneClear, SceneReset, SceneDump, SceneRun,
 	]));
 }
